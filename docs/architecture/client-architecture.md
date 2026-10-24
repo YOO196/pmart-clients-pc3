@@ -16,7 +16,7 @@
 | 인증 | auth-service: 서비스 토큰(JWKS)만 구현. 고객 소셜 로그인·refresh 회전은 **계약만**(501). 쿠키/CSRF 방식 `[팀 확인 필요]` | 1차는 Bearer 토큰. 게이트웨이가 `Cookie` 헤더를 제거하므로 쿠키 세션은 현재 불가 |
 | CORS | 게이트웨이에 설정 없음 | 웹은 개발 시 Vite 프록시. 운영은 같은 출처 배포 또는 CORS 추가 요청(`backend-requests.md` BR-04) |
 
-## 2. 앱 구성 `[제안]`
+## 2. 앱 구성 `[확정 2026-10-24, ADR-0001]`
 
 비즈니스 문서의 단말 목록(architecture-design.md §2: 고객앱 / 라이더앱 / 점원앱(PDA) / 간선기사앱 / 관리자 웹)을 그대로 따른다.
 
@@ -28,7 +28,7 @@
 | driver_app | Flutter | 2단계(TMS 활성 시). 라이더와 ID·가용성을 공유하지 않으므로 별도 앱 |
 | backoffice | React SPA | 넓은 화면의 표·비교·승인함. 관리자 화면(MFC 관리자 현황 포함) |
 
-`[결정 필요]` 고객용 웹(React)도 필요한지. 현재는 범위 밖.
+고객용 웹·MFC 관리자 전용 웹·TMS 관제 웹은 만들지 않는다(2026-10-24 확정). MFC 관리자 화면은 backoffice 안에 권한·센터 범위로 둔다. 고객 웹은 사업 요구가 생기면 SPA를 추가한다.
 
 ## 3. 저장소 구조 `[제안]`
 
@@ -63,7 +63,7 @@ lib/
 └── shared/
 ```
 
-## 4. 기술 스택 `[제안]` (버전은 스캐폴딩 시점에 pub.dev / npm 최신 안정판을 확인해 고정)
+## 4. 기술 스택 `[확정 2026-10-24, ADR-0001]` (버전은 스캐폴딩 시점에 pub.dev / npm 최신 안정판을 확인해 고정)
 
 ### Flutter
 | 영역 | 선택 | 비고 |
@@ -75,7 +75,7 @@ lib/
 | HTTP | dio | 인터셉터: 인증·헤더·Problem·429·재시도 |
 | API 생성 | openapi-generator `dart-dio` (Java 21 있음) | 생성 결과가 3.1 스펙에서 부족하면 수기 DTO로 대체 검토 |
 | 보안 저장 | flutter_secure_storage | refresh token·기기 ID |
-| 스캔 | mobile_scanner(카메라) / PDA 하드웨어 스캐너는 키보드 웨지·브로드캐스트 인텐트 어댑터 | 단말 기종 `[결정 필요]` |
+| 스캔 | mobile_scanner(카메라) / PDA 하드웨어 스캐너는 키보드 웨지·브로드캐스트 인텐트 어댑터 | 단말 기종 `[결정 필요]` — 나중에 결정. 기종 확정 전에는 카메라·키보드 웨지 어댑터로 개발 |
 | 위치 | 백그라운드 위치 플러그인 | 전송 주기 `[결정 필요]` |
 | 결제 | 토스페이먼츠 결제 SDK(주문서형) | 진입 정보 API 부재 → BR-01 |
 | 소셜 로그인 | 카카오·네이버·애플·구글 SDK | 앱 키 발급 `[결정 필요]` |
@@ -84,13 +84,14 @@ lib/
 ### React (backoffice)
 | 영역 | 선택 |
 |---|---|
-| 빌드 | Vite 8 (`vite@^8.3.5`, `@vitejs/plugin-react@^6.1.2`, Node ^20.19 \|\| >=22.12) + TypeScript(strict) |
+| 빌드 | Vite 8 (`vite@^8.3.5`, `@vitejs/plugin-react@^6.1.2`, Node ^20.19 \|\| >=22.12) + TypeScript 7 (`typescript@^7.0.2`, strict). 호환 주의(2026-10-24 npm 기준): `openapi-typescript@7.13.0` 은 peer `typescript ^5.x`, `typescript-eslint@8.72.0` 은 peer `<6.1.0` 이라 TS 7을 아직 지원하지 않음 — C0에서 실제 설치·동작으로 확인하고 대응을 정한다 |
 | 라우팅 | React Router |
 | 서버 상태 | TanStack Query |
 | API 타입 | openapi-typescript + openapi-fetch (계약 → 타입, 런타임 경량) |
 | 목 | MSW (계약 예시·픽스처 기반) |
 | 스타일 | Tailwind CSS 4 (`tailwindcss@^4.3.3` + `@tailwindcss/vite@^4.3.3`, CSS 우선 설정: `@import "tailwindcss";`, `tailwind.config.js`·PostCSS 없음) |
 | UI 컴포넌트 | daisyUI 5 (`daisyui@^5.7.50`, CSS 플러그인: `@plugin "daisyui";`). 데이터 그리드는 없어 표는 daisyUI `table` 클래스로 시작하고, 정렬·가상 스크롤이 필요해지면 헤드리스 표 라이브러리 추가를 따로 결정 |
+| 지도 | 카카오 지도 JavaScript API(`dapi.kakao.com` SDK 스크립트 로드, 실시간 배송 관제 #6). 근거: 백엔드 `Delivery-business-logic.md` L103 "React 화면 + 카카오 지도 API". React 래퍼 라이브러리는 쓰지 않고 `src/shared/map` 어댑터로 감싼다(래퍼 추가는 별도 결정). JavaScript 키는 `VITE_KAKAO_MAP_KEY` 환경변수로 주입하고 저장소에 넣지 않는다. 앱 키 발급·허용 도메인 등록 `[결정 필요]` |
 | 테스트 | Vitest + Testing Library, E2E Playwright |
 
 ## 5. 공통 연동 계층 (`pmart_core` / `web/backoffice/src/api`)

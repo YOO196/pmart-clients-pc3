@@ -7,7 +7,7 @@ paths:
 # React(관리자 웹) 규칙
 
 ## 스택
-- Vite 8 + TypeScript(strict), React Router, TanStack Query, openapi-typescript + openapi-fetch, MSW, Vitest + Testing Library, Playwright.
+- Vite 8 + TypeScript 7(strict), React Router, TanStack Query, openapi-typescript + openapi-fetch, MSW, Vitest + Testing Library, Playwright.
 - 스타일: Tailwind CSS 4(`@tailwindcss/vite` 플러그인, CSS 우선 설정 — `tailwind.config.js` 를 만들지 않는다) + daisyUI 5(`@plugin "daisyui";`). 테마는 daisyUI 테마 변수로 정의하고 색을 하드코딩하지 않는다.
 - 요청 없이 상태관리·HTTP·UI 라이브러리를 추가하지 않는다. UI 컴포넌트는 daisyUI 하나만(다른 컴포넌트 라이브러리 병행 금지).
 - 루트 `package.json` 이 npm workspaces. 패키지 매니저는 npm(lockfile 커밋).

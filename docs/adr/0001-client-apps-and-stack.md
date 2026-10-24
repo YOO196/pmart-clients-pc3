@@ -1,6 +1,6 @@
 # ADR-0001 클라이언트 앱 구성과 기술 스택
 
-- 상태: 제안 (2026-10-24, 사용자 확인 대기)
+- 상태: 승인 (2026-10-24, 사용자 승인)
 - 관련: `docs/architecture/client-architecture.md` §2·§4, 백엔드 `docs/architecture/architecture-design.md` §2
 
 ## 배경
@@ -12,8 +12,10 @@
 2. React SPA: `web/backoffice`(관리자 웹, MFC 관리자 화면 포함).
 3. 단일 저장소: Dart pub workspace + npm workspaces. 공유 Dart 패키지 `pmart_api`(생성), `pmart_core`, `pmart_ui`.
 4. Flutter 스택: Riverpod, go_router, dio, flutter_secure_storage, openapi-generator `dart-dio`.
-5. 웹 스택: Vite + TypeScript, React Router, TanStack Query, openapi-typescript + openapi-fetch, MSW, Vitest, Playwright. 빌드·스타일·UI는 Vite 8 + Tailwind CSS 4 + daisyUI 5 (사용자 확정 2026-10-24, 확정 시점 최신: vite 8.3.5, tailwindcss 4.3.3, daisyui 5.7.50).
-6. 계약 코드 생성물은 커밋하지 않고, 생성 기준 백엔드 커밋을 `contracts.lock` 에 기록.
+5. 웹 스택: Vite + TypeScript, React Router, TanStack Query, openapi-typescript + openapi-fetch, MSW, Vitest, Playwright. 빌드·스타일·UI는 Vite 8 + TypeScript 7 + Tailwind CSS 4 + daisyUI 5 (사용자 확정 2026-10-24, 확정 시점 최신: vite 8.3.5, typescript 7.0.2, tailwindcss 4.3.3, daisyui 5.7.50).
+6. 지도(backoffice 실시간 배송 관제): 카카오 지도 JavaScript API. 키는 환경변수로 주입하고 커밋하지 않는다.
+7. 범위 밖: 고객 웹, MFC 관리자 전용 웹, TMS 관제 웹(MFC 관리자 화면은 backoffice에 포함). PDA 기종은 나중에 결정하고, 스캐너는 어댑터로 감싼다.
+8. 계약 코드 생성물은 커밋하지 않고, 생성 기준 백엔드 커밋을 `contracts.lock` 에 기록.
 
 ## 대안
 - MFC 앱 분리(PDA앱/패킹앱 별도): 단말·사용자가 같아 배포·로그인이 중복된다. 역할 메뉴로 충분.

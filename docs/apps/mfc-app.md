@@ -1,6 +1,6 @@
 # MFC 현장앱 (mfc_app, Flutter · Android PDA 우선)
 
-점원앱·PDA앱·패킹앱을 **역할별 메뉴로 한 앱에** 둔다 `[제안]`. 설정·배정·예외 해결은 관리자 웹(backoffice), PDA는 **실행만** (M 784, 1183).
+점원앱·PDA앱·패킹앱을 **역할별 메뉴로 한 앱에** 둔다 `[확정 2026-10-24, ADR-0001]`. 설정·배정·예외 해결은 관리자 웹(backoffice), PDA는 **실행만** (M 784, 1183).
 근거: `../pmart-backend/docs/business/MFC-business-logic.md`(M, v2.0), `Delivery-business-logic.md`(D), 계약 `mfc-fulfillment`, `mfc-capacity`, `mfc-inbound`, `mfc-location`, `mfc-quality`, `mfc-inventory`, `delivery-dispatch`, `product-service`(바코드).
 
 ## 1. 메뉴와 API

@@ -13,7 +13,7 @@
 | **C6 확장 (백엔드 3단계)** | 쿠폰·프로모션, 리뷰 사진, AI 등 | — | — |
 
 ## 선행 결정 (사용자)
-1. 앱 구성(Flutter 3 + React 1, MFC 앱 통합) 승인 — ADR-0001
-2. 스택 승인(Riverpod·go_router·dio / Vite·React Router·TanStack Query·openapi-fetch·MSW) — ADR-0001
-3. `pmart-clients` git 저장소 초기화·원격 저장소
+1. ~~앱 구성(Flutter 3 + React 1, MFC 앱 통합) 승인 — ADR-0001~~ 승인 2026-10-24
+2. ~~스택 승인(Riverpod·go_router·dio / Vite 8·Tailwind 4·daisyUI 5·React Router·TanStack Query·openapi-fetch·MSW·카카오 지도) — ADR-0001~~ 승인 2026-10-24
+3. ~~`pmart-clients` git 저장소 초기화~~ 완료(사용자). 원격 저장소는 미정
 4. `backend-requests.md` 의 높음 항목(BR-01, 02, 03, 05, 06, 07)을 백엔드 담당에 전달

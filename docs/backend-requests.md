@@ -12,7 +12,7 @@
 | BR-02 | 높음 | 라이더·MFC·관리자·기사 | 고객 외 주체(라이더·점원·운영자·간선기사) 로그인·전화 본인확인 API 없음 | OPEN |
 | BR-03 | 높음 | 전체(특히 웹) | 사용자 토큰 보관 방식(쿠키/CSRF vs Bearer) 미정, 게이트웨이가 `Cookie` 제거 | OPEN |
 | BR-04 | 중간 | 관리자 웹 | 게이트웨이 CORS 설정 없음 — 웹 배포 출처 결정 필요 | OPEN |
-| BR-05 | 높음 | MFC | PDA 작업 목록·작업 상세(피킹 지시 행) 조회 API 없음 | OPEN |
+| BR-05 | 높음 | MFC | PDA 작업 목록·작업 상세(피킹 지시 행) 조회 API 없음 | AGREED (`e817184`, 빌드 미검증) |
 | BR-06 | 높음 | 라이더 | 배차 제안 수신 채널·대기 목록(일반배차모드) API 없음 | OPEN |
 | BR-07 | 높음 | 라이더·고객·관리자 | 파일 업로드 API 없음(`photoRefs` 는 존재하지 않는 "file-service" 참조) | OPEN |
 | BR-08 | 낮음 | 전체 | `X-Source-System` 클라이언트 값 목록 확정 | OPEN |
@@ -43,6 +43,12 @@
 ## BR-05 MFC 작업 목록
 - 현황: `mfc-fulfillment` 외부 경로는 `POST /tasks/{taskId}/executions`, shipments/packages 뿐. 작업 생성은 `/internal/work-orders`. 점원이 "내 작업"을 받을 경로는 `mfc-capacity GET /assignments`(배정)뿐이고, 피킹 지시 행(로케이션·SKU·LOT·지시수량·기피킹량)을 담은 작업 상세가 없다.
 - 요청: `GET /tasks?assignee=me&type=&status=`, `GET /tasks/{taskId}`(지시 행·잔량·버전), 작업 시작(claim) 명령(WK-03 "한 요청만 성공").
+- 회신(2026-10-24, `../pmart-backend/docs/handoff/2026-10-24-clients-reply-high.md`): 수용. `d3ce55c` + 검토 수정 `e817184`.
+  - `GET /tasks?mfcId=&assignee=me&type=&state=`: 파라미터는 `status` 가 아니라 `state`. 기본값은 ASSIGNED, IN_PROGRESS이고 BLOCKED는 빠짐.
+  - `GET /tasks/{taskId}`: `lines[].pendingQty`, `pendingExecutions`, `activeStart`.
+  - `POST /tasks/{taskId}/starts` 와 짝 조회 `GET …/starts/{requestId}`.
+  - 서비스 빌드는 미검증이고 서버 구현 전까지 501이므로 목으로만 쓴다. `assignee=me` 는 BR-02, 실제 배정은 mfc-capacity 수동 배정 계약에 의존한다.
+- 추가 질문: 시작 503의 의미, 짝 조회 여부, 같은 키 재전송 → `docs/handoff/2026-10-24-backend-br05-start-503.md`
 
 ## BR-06 라이더 배차 제안
 - 현황: `GET /offers/{offerId}`, `POST /offers/{offerId}/responses` 만 있음. 제안이 라이더에게 도착하는 채널(푸시·SSE·폴링)과 일반배차모드의 대기 목록 조회가 없다.
