@@ -140,5 +140,56 @@
   "qAwaiting": "확정 대기",
   "qApplied": "반영",
   "qRejected": "거절",
-  "qChecking": "확인 중"
+  "qChecking": "확인 중",
+  "continuePacking": "이어서 패킹",
+  "packingTitle": "패킹",
+  "noShipment": "출하 정보가 없어요",
+  "shipmentReady": "모든 상품을 담았어요(출하 준비)",
+  "shipmentPreparing": "담을 상품이 남았어요",
+  "packCounts": "담을 {planned} · 밀봉 {sealed} · 지금 봉투 {bag}",
+  "@packCounts": {
+    "placeholders": {
+      "planned": {
+        "type": "int"
+      },
+      "sealed": {
+        "type": "int"
+      },
+      "bag": {
+        "type": "int"
+      }
+    }
+  },
+  "zoneChilled": "냉장",
+  "zoneFrozen": "냉동",
+  "zoneAmbient": "상온",
+  "packWrongItem": "이 출하에 없는 상품이에요",
+  "packOver": "담을 수량을 넘었어요",
+  "seal": "밀봉하고 라벨 만들기",
+  "sealUnknown": "밀봉됐는지 확인하는 중이에요. 포장을 새로 만들지 말고 다시 확인을 눌러 주세요",
+  "sealMismatch": "담은 수량이 피킹 수량과 맞지 않아요. 내용물을 다시 확인해 주세요",
+  "sealRejected": "밀봉하지 못했어요",
+  "packagesTitle": "포장",
+  "pkgOpen": "포장 중",
+  "pkgSealed": "밀봉",
+  "pkgHandedOver": "인계 완료",
+  "pkgInvalidated": "무효(재포장됨)",
+  "pkgVoided": "폐기",
+  "repack": "재포장",
+  "repackTitle": "재포장 사유",
+  "repackDamaged": "포장 파손",
+  "repackContent": "내용물 변경",
+  "repackLabel": "라벨을 읽을 수 없음",
+  "repackShortage": "결품 조정",
+  "repackRejected": "재포장할 수 없어요(인계 중이거나 이미 인계됨)",
+  "finishPacking": "패킹 완료",
+  "packingFinished": "패킹 완료 실적을 보냈어요",
+  "requestDispatch": "배차 요청",
+  "noDeliveryYet": "배송번호가 아직 없어요. 잠시 뒤 다시 시도해 주세요",
+  "dspSearching": "라이더를 찾고 있어요",
+  "dspOffering": "라이더에게 제안했어요(수락 대기)",
+  "dspAssigned": "라이더가 배정됐어요",
+  "dspFailed": "배차하지 못했어요. 관리자에게 알려 주세요",
+  "dspCancelled": "배차가 취소됐어요",
+  "dispatchOrderCancelled": "주문이 취소돼 배차할 수 없어요"
 }

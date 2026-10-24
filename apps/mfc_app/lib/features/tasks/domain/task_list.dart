@@ -187,4 +187,5 @@ abstract final class TaskProblemCode {
 /// 큐에 넣는 실행 명령 종류.
 abstract final class FieldCommandKind {
   static const pickExecution = 'pick-execution';
+  static const packExecution = 'pack-execution';
 }

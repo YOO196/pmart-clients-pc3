@@ -23,6 +23,8 @@ dependencies:
     path: ../../packages/pmart_ui
   pmart_api_mfc_fulfillment:
     path: ../../packages/pmart_api/gen/mfc-fulfillment
+  pmart_api_delivery_dispatch:
+    path: ../../packages/pmart_api/gen/delivery-dispatch
 
 dev_dependencies:
   flutter_test:

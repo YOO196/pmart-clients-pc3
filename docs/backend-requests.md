@@ -29,6 +29,7 @@
 | BR-19 | 낮음 | 고객 | 상품 카드·상세의 100g/100mL당 가격 표시 값 없음 | OPEN |
 | BR-20 | 중간 | 고객 | 필수 동의 대기(AUTH_CONSENT)에서 토큰 없이 동의 변경을 호출할 경로·`requiredConsents` 형식 불명 | OPEN |
 | BR-21 | 낮음 | 고객 | `OrderDraft` 응답에 품목·배송 방식·도착 구간·주소 반영 내용이 없음, 품절 처리 "다음에도 적용" 저장 경로 없음 | OPEN |
+| BR-22 | 낮음 | MFC | 밀봉 요청에 포장재 종류(보냉백 XS~XL·봉투 소~대·보냉재) 필드 없음, 라벨 출력 정보 없음 | OPEN |
 
 ---
 
@@ -153,3 +154,9 @@
   - "품절 시 처리 — 다음에도 적용"을 저장할 경로(고객 설정)가 없다.
 - 요청: `OrderDraft` 에 `lines`(sku·수량·스냅샷 이름)와 `delivery`(mode·window·addressId 요약·note·outOfStockPreference)를 넣어 줄지 확인. "다음에도 적용" 저장 위치(customer-service 설정?) 확인.
 - 클라이언트 처리(회신 전): 주문서 품목·배송 정보는 보낸 요청 사본을 보인다. 금액·자격·만료는 서버 값만 쓴다. "다음에도 적용"은 화면에 두지 않았다.
+
+## BR-22 포장재 종류·라벨 출력
+- 근거: MFC-business-logic WK-07 패킹 13단계 "포장재 스캔(보냉팩·아이스팩·드라이아이스)", "보냉백 XS/S/M/L/XL, 상온 봉투 소/중/대", "영수증·라벨 출력·부착". `docs/apps/mfc-app.md` §5.
+- 현황: `SealPackageRequest` 에는 `contents`·`bagCount`·`containsAlcohol`·`temperatureZone`·`weightG`·`volumeCm3`·`packedBy` 만 있다. 포장재 종류·크기, 보냉재 사용 기록이 없다. `Package` 에는 `qrCode` 만 있고 라벨에 찍을 정보(주소 요약·주의 문구 등)를 받는 경로가 없다.
+- 질문: 포장재 종류·보냉재를 기록할 필드를 둘지(배달 용량·보냉 판정에 쓰는지), 라벨 출력 내용은 어디서 받는지.
+- 클라이언트 처리(회신 전): 온도대만 고르고 봉투 수는 포장 1개당 1로 보낸다. 라벨은 QR 값만 화면에 보인다(프린터 `[결정 필요]`).

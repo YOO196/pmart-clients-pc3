@@ -138,7 +138,10 @@ class TaskDetailScreen extends ConsumerWidget {
     final me = ref.watch(currentWorkerIdProvider);
     ref.listen(startFlowProvider(taskId), (_, next) {
       if (next.phase == StartPhase.applied) {
-        context.pushReplacement('/tasks/$taskId/pick');
+        final kind = ref.read(provider).value?.kind;
+        context.pushReplacement(
+          '/tasks/$taskId/${kind == TaskKind.pack ? 'pack' : 'pick'}',
+        );
       }
     });
     return Scaffold(
@@ -201,10 +204,17 @@ class TaskDetailScreen extends ConsumerWidget {
                 // 키를 잃었어도 활성 시작이 본인이면 이어서 한다(새 키로 다시 시작하지 않는다).
                 FilledButton(
                   key: const ValueKey('continue-picking'),
-                  onPressed: () => context.push('/tasks/$taskId/pick'),
-                  child: Text(l10n.continuePicking),
+                  onPressed: () => context.push(
+                    '/tasks/$taskId/${t.kind == TaskKind.pack ? 'pack' : 'pick'}',
+                  ),
+                  child: Text(
+                    t.kind == TaskKind.pack
+                        ? l10n.continuePacking
+                        : l10n.continuePicking,
+                  ),
                 )
-              else if (t.state == TaskState.assigned && t.kind == TaskKind.pick)
+              else if (t.state == TaskState.assigned &&
+                  t.kind != TaskKind.dispatch)
                 CommandButton(
                   key: const ValueKey('start'),
                   busy: flow.phase == StartPhase.starting,
