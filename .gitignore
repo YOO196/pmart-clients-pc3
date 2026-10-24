@@ -1,2 +1,38 @@
 # 고객앱 레퍼런스 캡처: 타사 화면·개인정보 포함, 용량 큼. 로컬에만 둔다(2026-10-24 결정)
 docs/customer-app-design/
+
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+pubspec_overrides.yaml
+*.g.dart
+*.freezed.dart
+.flutter-plugins
+.flutter-plugins-dependencies
+coverage/
+
+# 계약 생성물 (contracts.lock 기준으로 재생성)
+packages/pmart_api/gen/
+tools/.cache/
+web/backoffice/src/api/generated/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# 비밀값
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+key.properties

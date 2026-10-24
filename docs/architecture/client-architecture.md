@@ -41,7 +41,7 @@ pmart-clients/
 ├── apps/
 │   ├── customer_app/  rider_app/  mfc_app/      (driver_app/ 2단계)
 ├── packages/
-│   ├── pmart_api/               # OpenAPI 생성 Dart 클라이언트 (lib/src/generated 는 .gitignore)
+│   ├── pmart_api/gen/<service>/ # OpenAPI 생성 Dart 클라이언트, 서비스마다 패키지 하나 (pmart_api_<service>, .gitignore). C0 확정
 │   ├── pmart_core/              # 아래 §5 공통 연동 계층
 │   └── pmart_ui/                # 테마·공통 위젯·UiState 표시·금액/시각 포맷
 ├── web/

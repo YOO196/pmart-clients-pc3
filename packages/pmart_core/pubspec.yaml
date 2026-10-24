@@ -1,0 +1,22 @@
+name: pmart_core
+description: PMart 클라이언트 공통 연동 계층 (헤더·멱등키·Problem·CommandResponse·결과 불명 해소·토큰 갱신·429).
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.13.4
+  flutter: ">=3.47.5"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  dio: ^5.11.1
+  flutter_secure_storage: ^11.2.0
+  meta: any
+  uuid: ^4.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

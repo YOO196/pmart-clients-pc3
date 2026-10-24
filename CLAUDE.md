@@ -51,8 +51,9 @@ docs/                 # 설계 정본 (아래 문서 지도)
 ## Commands
 ```bash
 # Flutter (Flutter 3.47.5 / Dart 3.13.4 확인됨)
+dart tools/gen_api.dart                           # 계약 → packages/pmart_api/gen/<service> 생성 (clone 직후 pub get 보다 먼저, ~6분)
+dart tools/gen_api.dart --only=cart,order         # 일부 서비스만
 flutter pub get                                   # 루트 workspace
-dart run tools/gen_api.dart                       # 계약 → packages/pmart_api 생성 [스캐폴딩 후 확정]
 cd apps/customer_app && flutter run --dart-define=PMART_ENV=mock
 flutter analyze && flutter test                   # 앱/패키지 디렉터리에서
 

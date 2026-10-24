@@ -1,0 +1,10 @@
+name: pmart_clients_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.13.4
+
+# Dart pub workspace. 각 패키지는 `resolution: workspace` 를 쓴다.
+workspace:
+  - packages/pmart_core
+  - packages/pmart_api/gen/*

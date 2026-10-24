@@ -1,0 +1,70 @@
+{
+  "backendCommit": "85269ee9ee3b478c3730f069d67c0959dd4e2101",
+  "backendContractsDirty": false,
+  "generatedAt": "2026-10-24T07:20:43.342247Z",
+  "generator": "openapi-generator-cli 7.26.0 (dart-dio, json_serializable)",
+  "services": {
+    "auth-service": [
+      "customer",
+      "rider",
+      "mfc"
+    ],
+    "customer-service": [
+      "customer"
+    ],
+    "cart-service": [
+      "customer"
+    ],
+    "product-service": [
+      "customer",
+      "mfc"
+    ],
+    "product-content-service": [
+      "customer"
+    ],
+    "pricing-service": [
+      "customer"
+    ],
+    "search-service": [
+      "customer"
+    ],
+    "storefront-service": [
+      "customer"
+    ],
+    "delivery-serviceability-service": [
+      "customer"
+    ],
+    "delivery-capacity-service": [
+      "customer"
+    ],
+    "order-service": [
+      "customer"
+    ],
+    "claim-service": [
+      "customer"
+    ],
+    "review-service": [
+      "customer"
+    ],
+    "notification-service": [
+      "customer",
+      "rider"
+    ],
+    "delivery-tracking-service": [
+      "customer",
+      "rider"
+    ],
+    "delivery-dispatch-service": [
+      "rider"
+    ],
+    "delivery-execution-service": [
+      "rider"
+    ],
+    "rider-service": [
+      "rider"
+    ],
+    "mfc-fulfillment-service": [
+      "mfc"
+    ]
+  }
+}
