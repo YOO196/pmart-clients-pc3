@@ -275,7 +275,15 @@ class _Sheet extends ConsumerWidget {
                   final int t => l10n.payButton(formatKrw(t)),
                   null => l10n.payButtonNoAmount,
                 },
-                onPressed: state.canPay ? () async => ctl.pay() : null,
+                onPressed: state.canPay
+                    ? () async {
+                        final start = await ctl.pay();
+                        // 사가가 시작됐을 뿐이다. 결제 화면이 결과를 서버에서 확인한다.
+                        if (start is CheckoutAccepted && context.mounted) {
+                          await context.push('/payments/${draft.draftId}');
+                        }
+                      }
+                    : null,
               ),
             ),
           ),

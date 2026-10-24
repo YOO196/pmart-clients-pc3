@@ -413,5 +413,29 @@
   "blockedNotMember": "주문하려면 로그인이 필요해요",
   "blockedNoAddress": "배달 주소를 먼저 골라 주세요",
   "blockedNoItems": "주문할 상품을 골라 주세요",
-  "blockedSetup": "배송 방식을 먼저 골라 주세요"
+  "blockedSetup": "배송 방식을 먼저 골라 주세요",
+  "payTitle": "결제",
+  "payPreparing": "결제 준비 중",
+  "payAuthenticating": "결제 인증 중",
+  "payConfirming": "결제 결과 확인 중",
+  "payDone": "주문이 완료됐어요",
+  "payFailed": "결제가 완료되지 않았어요",
+  "payCancelled": "결제를 취소했어요",
+  "payRecovering": "결제 승인과 주문을 맞추는 중이에요",
+  "payRefunding": "주문이 취소되어 결제 취소·환불을 확인하는 중이에요",
+  "payStillChecking": "확인이 오래 걸리고 있어요. 잠시 뒤 다시 확인해 주세요",
+  "payDoNotRetry": "결과가 나올 때까지 다시 결제하지 마세요. 두 번 결제되지 않도록 확인하고 있어요",
+  "payOrderNumber": "주문번호 {orderId}",
+  "@payOrderNumber": {
+    "placeholders": {
+      "orderId": {
+        "type": "String"
+      }
+    }
+  },
+  "payGoOrder": "주문 상세 보기",
+  "payGoHome": "홈으로",
+  "payRetry": "다시 결제하기",
+  "pendingPaymentBanner": "결과를 확인할 결제가 있어요",
+  "pendingPaymentOpen": "확인하기"
 }

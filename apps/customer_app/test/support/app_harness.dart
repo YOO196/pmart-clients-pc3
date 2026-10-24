@@ -18,6 +18,7 @@ import 'package:customer_app/features/checkout/presentation/checkout_controller.
 import 'package:customer_app/features/catalog/data/catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/presentation/catalog_providers.dart';
+import 'package:customer_app/features/payment/presentation/payment_controller.dart';
 import 'package:customer_app/shared/providers.dart';
 
 /// 목 모드 앱. 둘러보기는 [catalog](기본: 지연 없는 목)를 쓰고 [overrides] 를 더한다.
@@ -46,6 +47,11 @@ Widget testApp(
       checkout ?? MockCheckoutRepository(latency: Duration.zero),
     ),
     // 보안 저장소 대신 메모리 저장소(플랫폼 채널 없음).
+    secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+    paymentPollPolicyProvider.overrideWithValue((
+      interval: Duration.zero,
+      attempts: 3,
+    )),
     tokenStoreProvider.overrideWithValue(TokenStore(MemoryKeyValueStore())),
     ...overrides,
   ],

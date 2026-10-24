@@ -9,6 +9,7 @@ import 'features/cart/presentation/cart_screen.dart';
 import 'features/checkout/presentation/delivery_select_screen.dart';
 import 'features/checkout/presentation/order_sheet_screen.dart';
 import 'features/catalog/presentation/category_screen.dart';
+import 'features/payment/presentation/payment_screen.dart';
 import 'features/catalog/presentation/home_screen.dart';
 import 'features/catalog/presentation/product_detail_screen.dart';
 import 'features/catalog/presentation/product_list_screen.dart';
@@ -59,6 +60,12 @@ final routerProvider = Provider<GoRouter>(
         parentNavigatorKey: rootNavigatorKey,
         path: '/checkout',
         builder: (_, _) => const OrderSheetScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/payments/:draftId',
+        builder: (_, state) =>
+            PaymentScreen(draftId: state.pathParameters['draftId']!),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,

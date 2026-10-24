@@ -10,6 +10,7 @@ import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_controller.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../payment/presentation/payment_controller.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
 import 'widgets/product_tile_card.dart';
@@ -45,6 +46,7 @@ class HomeScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.symmetric(vertical: 12),
             children: [
+              const _PendingPaymentBanner(),
               for (final b in home.banners) _BannerCard(b),
               for (final s in home.sections)
                 _SectionView(
@@ -197,6 +199,32 @@ class _AddressChip extends ConsumerWidget {
           Flexible(child: Text(text, overflow: TextOverflow.ellipsis)),
           const Icon(Icons.expand_more),
         ],
+      ),
+    );
+  }
+}
+
+/// 앱을 다시 켰을 때 결과를 모르는 결제가 있으면 알린다. 결론은 결제 화면이 서버에서 확인한다.
+class _PendingPaymentBanner extends ConsumerWidget {
+  const _PendingPaymentBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final pending = ref.watch(pendingCheckoutsProvider).value ?? const [];
+    if (pending.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Card(
+        key: const ValueKey('pending-payment'),
+        child: ListTile(
+          leading: const Icon(Icons.payment),
+          title: Text(l10n.pendingPaymentBanner),
+          trailing: TextButton(
+            onPressed: () => context.push('/payments/${pending.first}'),
+            child: Text(l10n.pendingPaymentOpen),
+          ),
+        ),
       ),
     );
   }
