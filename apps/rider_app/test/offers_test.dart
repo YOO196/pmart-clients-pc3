@@ -10,7 +10,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import 'package:rider_app/app.dart';
 import 'package:rider_app/features/offers/data/mock_offer_repository.dart';
 import 'package:rider_app/features/offers/data/offer_repository.dart';
-import 'package:rider_app/features/offers/presentation/offers_screen.dart';
+import 'package:rider_app/features/offers/presentation/offer_controllers.dart';
 import 'package:rider_app/shared/providers.dart';
 
 Widget _app(List<Override> overrides) => ProviderScope(
@@ -23,11 +23,11 @@ void main() {
   setUpAll(initPmartFormatting);
 
   testWidgets('목 모드로 기동하면 서버가 준 남은 시간으로 제안이 보인다', (t) async {
+    final mock = MockOfferRepository(latency: Duration.zero);
     await t.pumpWidget(
       _app([
-        offerRepositoryProvider.overrideWithValue(
-          MockOfferRepository(latency: Duration.zero),
-        ),
+        offerRepositoryProvider.overrideWithValue(mock),
+        dutyRepositoryProvider.overrideWithValue(mock),
       ]),
     );
     await t.pumpAndSettle();

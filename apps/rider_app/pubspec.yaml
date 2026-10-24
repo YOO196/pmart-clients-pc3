@@ -23,6 +23,8 @@ dependencies:
     path: ../../packages/pmart_ui
   pmart_api_delivery_dispatch:
     path: ../../packages/pmart_api/gen/delivery-dispatch
+  pmart_api_rider:
+    path: ../../packages/pmart_api/gen/rider
 
 dev_dependencies:
   flutter_test:
