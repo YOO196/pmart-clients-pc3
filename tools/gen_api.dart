@@ -98,6 +98,9 @@ Future<void> main(List<String> args) async {
       out.path,
       '--additional-properties=pubName=$pkgName,serializationLibrary=json_serializable,pubDescription=Generated from pmart-backend $service ($sha)',
       '--global-property=apiTests=false,modelTests=false,apiDocs=false,modelDocs=false',
+      // format: date(Asia/Seoul 날짜)는 문자열 YYYY-MM-DD 로 둔다. DateTime 으로 두면 본문은
+      // 2026-10-24T00:00:00.000, 쿼리는 2026-10-24 00:00:00.000 으로 나가서 계약과 다르다.
+      '--type-mappings=date=String',
     ]);
     _patchGeneratedPackage(out, pkgName);
     _fixEnumDefaults(out);

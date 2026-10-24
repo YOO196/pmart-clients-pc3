@@ -287,5 +287,131 @@
   "addressConflict": "다른 곳에서 주소가 바뀌어 최신 목록을 불러왔어요. 다시 골라 주세요",
   "addressCommandFailed": "처리하지 못했어요. 다시 시도해 주세요",
   "homeAddressGuest": "주소를 설정해 주세요",
-  "homeAddressNone": "배달 주소를 골라 주세요"
+  "homeAddressNone": "배달 주소를 골라 주세요",
+  "cartOrder": "주문하기",
+  "deliveryTitle": "배송 방식 선택",
+  "modeSingle": "한집배달",
+  "modeBundled": "알뜰배달",
+  "modeScheduled": "예약배달",
+  "modeSingleNote": "우리 집만 바로 배달해요",
+  "modeBundledNote": "가까운 주문과 함께 배달해요",
+  "modeScheduledNote": "원하는 1시간 구간에 받아요",
+  "slotToday": "오늘",
+  "slotTomorrow": "내일",
+  "slotFull": "마감",
+  "slotClosed": "마감",
+  "slotConfigRequired": "준비 중",
+  "slotUnavailable": "확인 불가",
+  "slotRemaining": "{count}자리 남음",
+  "@slotRemaining": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "slotNote": "남은 자리는 안내일 뿐 확보된 것이 아니에요",
+  "slotRetry": "다시 조회",
+  "slotEmpty": "선택할 수 있는 시간이 없어요",
+  "orderOptionsTitle": "주문 옵션",
+  "oosOnly": "품절 상품만 빼고 받기",
+  "oosAll": "품절이 생기면 전체 취소",
+  "deliveryNote": "라이더 요청사항 (선택)",
+  "bagOptOut": "봉투 없이 받기",
+  "bagOptOutNote": "봉투를 받지 않아도 봉투값 100원은 그대로 청구돼요",
+  "deliveryNext": "주문서로",
+  "needShoppingAddress": "배달 주소를 먼저 골라 주세요",
+  "goAddresses": "주소 고르기",
+  "addressNotServiceable": "지금 주소는 배달 가능 지역이 아니거나 확인 중이에요",
+  "deliveryOptionsFailed": "배송 방식을 불러오지 못했어요",
+  "checkoutTitle": "주문서",
+  "checkoutPreparing": "재고와 배송을 확인하고 있어요",
+  "checkoutStillWaiting": "확인이 오래 걸리고 있어요",
+  "checkoutCheckAgain": "다시 확인",
+  "checkoutItems": "주문 상품",
+  "checkoutDelivery": "배송",
+  "checkoutAddress": "받는 곳",
+  "checkoutChange": "변경",
+  "checkoutOptions": "옵션",
+  "checkoutAmounts": "결제 금액",
+  "amountItems": "상품 금액",
+  "amountTip": "배달팁",
+  "amountBag": "봉투값",
+  "amountTotal": "총 결제 금액",
+  "tipStandard": "기본 배달팁",
+  "tipOver30000": "3만 원 이상 주문 무료",
+  "tipFirstPurchase": "첫 구매 무료",
+  "tipNone": "배달팁 없음",
+  "tipUnknown": "배달팁 확인 중",
+  "amountUnavailable": "확인 중",
+  "minOrderUnsatisfied": "최소 주문금액을 채우지 못했어요. 상품을 더 담아 주세요",
+  "splitShipment": "무게가 많아 {count}번에 나눠 배달해요",
+  "@splitShipment": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "priceHoldLeft": "가격 유지 {time} 남음",
+  "@priceHoldLeft": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "stockHoldLeft": "상품 확보 {time} 남음",
+  "@stockHoldLeft": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "payWithin": "{time} 안에 결제해 주세요",
+  "@payWithin": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "holdExpired": "유지 시간이 지났어요",
+  "draftExpired": "주문서 유효시간이 지났어요",
+  "draftRecreate": "주문서 다시 만들기",
+  "reQuoteTitle": "결제 금액이 바뀌었어요",
+  "reQuoteBefore": "이전 {amount}",
+  "@reQuoteBefore": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "reQuoteAfter": "변경 {amount}",
+  "@reQuoteAfter": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "reQuoteAgree": "바뀐 금액으로 진행",
+  "payButton": "{amount} 결제하기",
+  "@payButton": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "payButtonNoAmount": "결제하기",
+  "checkoutAccepted": "결제를 준비하고 있어요",
+  "checkoutUnknown": "결제 진입을 확인하는 중이에요. 결제를 다시 누르지 않아도 돼요",
+  "checkoutRejected": "지금은 결제할 수 없어요. 주문서를 다시 확인해 주세요",
+  "blockedNotMember": "주문하려면 로그인이 필요해요",
+  "blockedNoAddress": "배달 주소를 먼저 골라 주세요",
+  "blockedNoItems": "주문할 상품을 골라 주세요",
+  "blockedSetup": "배송 방식을 먼저 골라 주세요"
 }

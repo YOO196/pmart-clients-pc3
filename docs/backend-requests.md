@@ -28,6 +28,7 @@
 | BR-18 | 낮음 | 고객 | 주문서 이탈 시 초안 처리(명시적 취소 경로 여부) 확인 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
 | BR-19 | 낮음 | 고객 | 상품 카드·상세의 100g/100mL당 가격 표시 값 없음 | OPEN |
 | BR-20 | 중간 | 고객 | 필수 동의 대기(AUTH_CONSENT)에서 토큰 없이 동의 변경을 호출할 경로·`requiredConsents` 형식 불명 | OPEN |
+| BR-21 | 낮음 | 고객 | `OrderDraft` 응답에 품목·배송 방식·도착 구간·주소 반영 내용이 없음, 품절 처리 "다음에도 적용" 저장 경로 없음 | OPEN |
 
 ---
 
@@ -143,3 +144,12 @@
   2. `requiredConsents: string[]` 의 항목 형식("필요한 동의 항목·버전")이 정해져 있지 않다. `ConsentType` 값만인지, 버전을 붙이는지(예 `TERMS_OF_SERVICE:2026-10`) 알 수 없다. `/me/consent-changes` 는 항목마다 `consentType`·`version` 이 필요하다.
 - 질문: (1) AUTH_CONSENT 에서 동의를 반영하는 방법 — 임시 토큰을 줄지, 동의 항목을 `completions` 본문으로 받을지, 공개 동의 경로를 둘지. (2) `requiredConsents` 항목 형식.
 - 클라이언트 처리(회신 전): 목에서는 `TYPE:version` 으로 가정해 끝까지 동작한다. 실서버 구현은 계약대로 `/me/consent-changes` → `completions` 순으로 호출하며(`// BR-20`), 401 이 나면 로그인 실패로 보인다.
+
+## BR-21 주문 초안 응답의 반영 내용
+- 근거: Commerce 주문서(C 1599~) "품목, 방식·시간, 주소, 라이더 요청, 연락처, 품절 시 처리(+다음에도 적용), 금액, 견적 만료·재고 예약 만료"를 보인다. order-service `OrderDraft`.
+- 현황
+  - `OrderDraft` 는 `quote`·`resources`·`nextAction` 만 준다. 서버가 실제로 받아들인 품목·수량, `deliveryMode`·`arrivalWindow`, 배송지·`deliveryNote`·`outOfStockPreference` 는 돌려주지 않는다.
+  - 그래서 주문서는 클라이언트가 보낸 요청 사본을 보여 줄 수밖에 없다. 서버가 품목을 일부 빼거나 슬롯을 바꿔도 화면이 알 수 없다.
+  - "품절 시 처리 — 다음에도 적용"을 저장할 경로(고객 설정)가 없다.
+- 요청: `OrderDraft` 에 `lines`(sku·수량·스냅샷 이름)와 `delivery`(mode·window·addressId 요약·note·outOfStockPreference)를 넣어 줄지 확인. "다음에도 적용" 저장 위치(customer-service 설정?) 확인.
+- 클라이언트 처리(회신 전): 주문서 품목·배송 정보는 보낸 요청 사본을 보인다. 금액·자격·만료는 서버 값만 쓴다. "다음에도 적용"은 화면에 두지 않았다.

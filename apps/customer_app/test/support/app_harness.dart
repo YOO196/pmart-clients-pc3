@@ -12,6 +12,9 @@ import 'package:customer_app/features/auth/presentation/auth_controller.dart';
 import 'package:customer_app/features/cart/data/cart_repository.dart';
 import 'package:customer_app/features/cart/data/mock_cart_repository.dart';
 import 'package:customer_app/features/cart/presentation/cart_controller.dart';
+import 'package:customer_app/features/checkout/data/checkout_repository.dart';
+import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
+import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
 import 'package:customer_app/features/catalog/data/catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/presentation/catalog_providers.dart';
@@ -22,6 +25,7 @@ Widget testApp(
   List<Override> overrides, {
   CatalogRepository? catalog,
   CartRepository? cart,
+  CheckoutRepository? checkout,
 }) => ProviderScope(
   retry: (_, _) => null,
   overrides: [
@@ -37,6 +41,9 @@ Widget testApp(
     ),
     addressRepositoryProvider.overrideWithValue(
       MockAddressRepository(latency: Duration.zero),
+    ),
+    checkoutRepositoryProvider.overrideWithValue(
+      checkout ?? MockCheckoutRepository(latency: Duration.zero),
     ),
     // 보안 저장소 대신 메모리 저장소(플랫폼 채널 없음).
     tokenStoreProvider.overrideWithValue(TokenStore(MemoryKeyValueStore())),

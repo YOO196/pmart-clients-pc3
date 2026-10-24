@@ -35,6 +35,12 @@ dependencies:
     path: ../../packages/pmart_api/gen/storefront
   pmart_api_customer:
     path: ../../packages/pmart_api/gen/customer
+  pmart_api_order:
+    path: ../../packages/pmart_api/gen/order
+  pmart_api_delivery_capacity:
+    path: ../../packages/pmart_api/gen/delivery-capacity
+  pmart_api_delivery_serviceability:
+    path: ../../packages/pmart_api/gen/delivery-serviceability
 
 dev_dependencies:
   flutter_test:

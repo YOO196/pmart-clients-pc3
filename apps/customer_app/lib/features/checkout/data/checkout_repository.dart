@@ -1,0 +1,278 @@
+import 'package:dio/dio.dart';
+import 'package:pmart_api_delivery_capacity/pmart_api_delivery_capacity.dart'
+    as cap;
+import 'package:pmart_api_delivery_serviceability/pmart_api_delivery_serviceability.dart'
+    as svc;
+import 'package:pmart_api_order/pmart_api_order.dart' as api;
+import 'package:pmart_core/pmart_core.dart';
+
+import '../../../shared/order_status.dart';
+import '../../../shared/providers.dart' show sourceSystem;
+import '../domain/checkout.dart';
+
+/// 배송 방식·슬롯·주문 초안·결제 진입. 조회 실패는 [PmartFailure] 로 던진다.
+abstract interface class CheckoutRepository {
+  /// 센터가 제공하는 배송 방식(`GET /delivery-conditions`).
+  Future<List<DeliveryOption>> options(String mfcId);
+
+  /// 날짜(Asia/Seoul `YYYY-MM-DD`)의 예약 슬롯.
+  Future<List<Slot>> slots(String mfcId, String date);
+
+  /// `POST /order-drafts`. 같은 키·같은 본문 재전송은 기존 초안을 돌려준다.
+  /// 결과 불명은 [UnknownResultFailure] 로 던진다(같은 키 재전송으로 해소).
+  Future<OrderDraft> createDraft(
+    DraftRequest request, {
+    required IdempotencyKey key,
+  });
+
+  Future<OrderDraft> getDraft(String draftId);
+
+  /// `POST /order-drafts/{id}/checkouts`.
+  Future<CheckoutStart> startCheckout(
+    String draftId, {
+    required int expectedVersion,
+    required int acceptedQuoteVersion,
+    required IdempotencyKey key,
+  });
+}
+
+final class ApiCheckoutRepository implements CheckoutRepository {
+  ApiCheckoutRepository(Dio dio)
+    : _conditions = svc.PmartApiDeliveryServiceability(dio: dio)
+          .getConditionsApi(),
+      _slots = cap.PmartApiDeliveryCapacity(dio: dio).getSlotsApi(),
+      _drafts = api.PmartApiOrder(dio: dio).getDraftsApi();
+
+  final svc.ConditionsApi _conditions;
+  final cap.SlotsApi _slots;
+  final api.DraftsApi _drafts;
+
+  @override
+  Future<List<DeliveryOption>> options(String mfcId) async {
+    final res = await pmartGuard(
+      () => _conditions.getDeliveryConditions(mfcId: mfcId),
+    );
+    return optionsFromContract(
+      res.data ?? (throw const ContractViolationFailure('배송 조건 본문 없음')),
+    );
+  }
+
+  @override
+  Future<List<Slot>> slots(String mfcId, String date) async {
+    final res = await pmartGuard(
+      () => _slots.listSlots(mfcId: mfcId, date: date),
+    );
+    return slotsFromContract(
+      res.data ?? (throw const ContractViolationFailure('슬롯 본문 없음')),
+    );
+  }
+
+  @override
+  Future<OrderDraft> createDraft(
+    DraftRequest r, {
+    required IdempotencyKey key,
+  }) async {
+    final res = await pmartGuard(
+      () => _drafts.createOrderDraft(
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        createDraftRequest: draftRequestToContract(r),
+        extra: commandOptions(key).extra,
+      ),
+    );
+    return draftFromContract(
+      // 2xx 인데 본문이 없으면 만들어졌는지 모른다.
+      res.data ?? (throw UnknownResultFailure(requestId: key.value)),
+    );
+  }
+
+  @override
+  Future<OrderDraft> getDraft(String draftId) async {
+    final res = await pmartGuard(() => _drafts.getOrderDraft(draftId: draftId));
+    return draftFromContract(
+      res.data ?? (throw const ContractViolationFailure('초안 본문 없음')),
+    );
+  }
+
+  @override
+  Future<CheckoutStart> startCheckout(
+    String draftId, {
+    required int expectedVersion,
+    required int acceptedQuoteVersion,
+    required IdempotencyKey key,
+  }) async {
+    try {
+      final res = await pmartGuard(
+        () => _drafts.startCheckout(
+          draftId: draftId,
+          idempotencyKey: key.value,
+          xSourceSystem: sourceSystem,
+          xExpectedVersion: expectedVersion,
+          startCheckoutRequest: api.StartCheckoutRequest(
+            acceptedQuoteVersion: acceptedQuoteVersion,
+            paymentMethod:
+                api.StartCheckoutRequestPaymentMethodEnum.TOSS_PAYMENTS,
+          ),
+          extra: commandOptions(key, expectedVersion: expectedVersion).extra,
+        ),
+      );
+      return switch (res.data?.status) {
+        api.StartCheckout202ResponseStatusEnum.ACCEPTED ||
+        api.StartCheckout202ResponseStatusEnum.APPLIED => CheckoutAccepted(
+          res.data!.requestId,
+        ),
+        api.StartCheckout202ResponseStatusEnum.REJECTED => CheckoutRejected(
+          res.data!.nextAction ?? ProblemCode.domainRejected,
+        ),
+        _ => const CheckoutUnknown(),
+      };
+    } on PmartFailure catch (f) {
+      return checkoutFailureToStart(f);
+    }
+  }
+}
+
+CheckoutStart checkoutFailureToStart(PmartFailure f) => switch (f) {
+  UnknownResultFailure() => const CheckoutUnknown(),
+  ProblemFailure(:final problem)
+      when problem.code == CheckoutProblemCode.reQuoteRequired =>
+    const CheckoutReQuote(),
+  ProblemFailure(:final problem)
+      when problem.code == CheckoutProblemCode.draftExpired =>
+    const CheckoutDraftExpired(),
+  ProblemFailure(:final problem) => CheckoutRejected(problem.code),
+  _ => throw f,
+};
+
+List<DeliveryOption> optionsFromContract(svc.DeliveryConditions c) => [
+  for (final m
+      in c.deliveryModes ?? const <svc.DeliveryConditionsDeliveryModesEnum>[])
+    DeliveryOption(switch (m) {
+      svc.DeliveryConditionsDeliveryModesEnum.SINGLE => DeliveryMode.single,
+      svc.DeliveryConditionsDeliveryModesEnum.BUNDLED => DeliveryMode.bundled,
+      svc.DeliveryConditionsDeliveryModesEnum.SCHEDULED =>
+        DeliveryMode.scheduled,
+    }),
+];
+
+List<Slot> slotsFromContract(cap.ListSlots200Response r) => [
+  for (final s in r.slots ?? const <cap.Slot>[])
+    if (s.window case final w?)
+      Slot(
+        slotId: s.slotId,
+        window: ArrivalWindow(date: w.date, start: w.start, end: w.end),
+        availability: switch (s.availability) {
+          cap.SlotAvailabilityEnum.AVAILABLE => SlotAvailability.available,
+          cap.SlotAvailabilityEnum.FULL => SlotAvailability.full,
+          cap.SlotAvailabilityEnum.CLOSED => SlotAvailability.closed,
+          cap.SlotAvailabilityEnum.CONFIG_REQUIRED =>
+            SlotAvailability.configRequired,
+          _ => SlotAvailability.unavailable,
+        },
+        // 정원 미설정이면 남은 수를 0 으로 보이지 않는다.
+        remaining: s.capacity?.state == cap.SlotCapacityStateEnum.VALUE
+            ? s.remaining
+            : null,
+        cutoffAt: s.cutoffAt,
+      ),
+];
+
+api.CreateDraftRequest draftRequestToContract(DraftRequest r) =>
+    api.CreateDraftRequest(
+      purchaseIntentId: r.purchaseIntentId,
+      items: [
+        for (final l in r.lines)
+          api.CreateDraftRequestItemsInner(
+            cartItemId: l.cartItemId,
+            sku: l.sku,
+            quantity: l.quantity,
+          ),
+      ],
+      shoppingAddressId: r.shoppingAddressId,
+      expectedMfcId: r.expectedMfcId,
+      deliveryMode: switch (r.mode) {
+        DeliveryMode.single => api.CreateDraftRequestDeliveryModeEnum.SINGLE,
+        DeliveryMode.bundled => api.CreateDraftRequestDeliveryModeEnum.BUNDLED,
+        DeliveryMode.scheduled =>
+          api.CreateDraftRequestDeliveryModeEnum.SCHEDULED,
+      },
+      arrivalWindow: switch (r.window) {
+        final w? => api.ArrivalWindow(date: w.date, start: w.start, end: w.end),
+        null => null,
+      },
+      outOfStockPreference: switch (r.outOfStock) {
+        OutOfStockPreference.cancelOutOfStockOnly =>
+          api.CreateDraftRequestOutOfStockPreferenceEnum.CANCEL_OOS_ONLY,
+        OutOfStockPreference.cancelAll =>
+          api.CreateDraftRequestOutOfStockPreferenceEnum.CANCEL_ALL,
+      },
+      deliveryNote: r.deliveryNote,
+      bagOptOut: r.bagOptOut,
+    );
+
+HoldState _hold(String? wire) => switch (wire) {
+  null => HoldState.unknown,
+  'NOT_REQUESTED' || 'NOT_REQUIRED' => HoldState.notNeeded,
+  'HELD' => HoldState.held,
+  'FAILED' => HoldState.failed,
+  'RELEASED' => HoldState.released,
+  'UNKNOWN' => HoldState.unknown,
+  _ => HoldState.other,
+};
+
+OrderDraft draftFromContract(api.OrderDraft d) {
+  final q = d.quote;
+  final r = d.resources;
+  return OrderDraft(
+    draftId: d.draftId ?? (throw const ContractViolationFailure('draftId 없음')),
+    version:
+        d.version ?? (throw const ContractViolationFailure('초안 version 없음')),
+    status: OrderStatus.fromWire(d.status?.value),
+    orderId: d.orderId,
+    next: switch (d.nextAction) {
+      api.OrderDraftNextActionEnum.REVIEW => DraftNext.review,
+      api.OrderDraftNextActionEnum.RE_QUOTE => DraftNext.reQuote,
+      api.OrderDraftNextActionEnum.PAY => DraftNext.pay,
+      api.OrderDraftNextActionEnum.WAIT => DraftNext.wait,
+      api.OrderDraftNextActionEnum.DONE => DraftNext.done,
+      api.OrderDraftNextActionEnum.EXPIRED => DraftNext.expired,
+      null => DraftNext.unknown,
+    },
+    quote: q?.quoteVersion == null
+        ? null
+        : Quote(
+            version: q!.quoteVersion!,
+            expiresAt: q.quoteExpiresAt,
+            itemAmount: q.itemAmount,
+            deliveryTip: q.deliveryTip,
+            tipReason: switch (q.deliveryTipReason) {
+              api.QuoteDeliveryTipReasonEnum.STANDARD => TipReason.standard,
+              api.QuoteDeliveryTipReasonEnum.OVER_30000 => TipReason.over30000,
+              api.QuoteDeliveryTipReasonEnum.FIRST_PURCHASE =>
+                TipReason.firstPurchase,
+              api.QuoteDeliveryTipReasonEnum.NONE => TipReason.none,
+              null => TipReason.unknown,
+            },
+            bagFee: q.bagFee,
+            totalAmount: q.totalAmount,
+            minOrderSatisfied: q.minOrderSatisfied,
+            plannedShipments: q.plannedShipments,
+          ),
+    resources: r == null
+        ? null
+        : DraftResources(
+            inventory: _hold(r.inventoryReservation?.value),
+            capacity: _hold(r.capacityHold?.value),
+            slot: _hold(r.slotHold?.value),
+            payment: switch (r.payment?.value) {
+              'NOT_STARTED' => PaymentProgress.notStarted,
+              'STARTED' => PaymentProgress.started,
+              'APPROVED' => PaymentProgress.approved,
+              'FAILED' => PaymentProgress.failed,
+              'MISMATCH' => PaymentProgress.mismatch,
+              _ => PaymentProgress.unknown,
+            },
+            reservationExpiresAt: r.reservationExpiresAt,
+          ),
+  );
+}

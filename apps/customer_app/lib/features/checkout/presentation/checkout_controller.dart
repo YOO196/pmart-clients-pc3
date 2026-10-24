@@ -1,0 +1,402 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pmart_core/pmart_core.dart';
+
+import '../../../shared/order_status.dart';
+import '../../../shared/providers.dart';
+import '../../../shared/shopping_context.dart';
+import '../../address/presentation/address_controller.dart';
+import '../../cart/domain/cart.dart';
+import '../../cart/presentation/cart_controller.dart';
+import '../data/checkout_repository.dart';
+import '../data/mock_checkout_repository.dart';
+import '../domain/checkout.dart';
+
+final checkoutRepositoryProvider = Provider<CheckoutRepository>(
+  (ref) => switch (ref.watch(envProvider)) {
+    PmartEnv.mock => MockCheckoutRepository(),
+    PmartEnv.local => ApiCheckoutRepository(ref.watch(dioProvider)),
+  },
+);
+
+/// 지금 시각. 테스트에서 바꾼다. 서울 날짜·남은 시간 표시에만 쓴다(확정 판단은 서버).
+final clockProvider = Provider<DateTime Function()>((_) => DateTime.now);
+
+/// 초안 자원 확보 대기 조회 간격·횟수(계약에 서버 지정 간격이 없다).
+final draftPollPolicyProvider = Provider<({Duration interval, int attempts})>(
+  (_) => (interval: const Duration(seconds: 2), attempts: 10),
+);
+
+/// "주문하기" 한 번에 고객이 고른 배송 조건. 바뀌면 [revision] 이 오르고 초안을 새로 만든다.
+@immutable
+class CheckoutSetup {
+  const CheckoutSetup({
+    this.purchaseIntentId,
+    this.mode,
+    this.window,
+    this.outOfStock = OutOfStockPreference.cancelOutOfStockOnly,
+    this.deliveryNote = '',
+    this.bagOptOut = false,
+    this.revision = 0,
+  });
+
+  final String? purchaseIntentId;
+  final DeliveryMode? mode;
+  final ArrivalWindow? window;
+  final OutOfStockPreference outOfStock;
+  final String deliveryNote;
+  final bool bagOptOut;
+  final int revision;
+
+  /// 예약은 슬롯을 골라야 끝난다.
+  bool get complete =>
+      mode != null && (mode != DeliveryMode.scheduled || window != null);
+
+  CheckoutSetup copyWith({
+    String? purchaseIntentId,
+    DeliveryMode? mode,
+    ArrivalWindow? Function()? window,
+    OutOfStockPreference? outOfStock,
+    String? deliveryNote,
+    bool? bagOptOut,
+  }) => CheckoutSetup(
+    purchaseIntentId: purchaseIntentId ?? this.purchaseIntentId,
+    mode: mode ?? this.mode,
+    window: window != null ? window() : this.window,
+    outOfStock: outOfStock ?? this.outOfStock,
+    deliveryNote: deliveryNote ?? this.deliveryNote,
+    bagOptOut: bagOptOut ?? this.bagOptOut,
+    revision: revision + 1,
+  );
+}
+
+final checkoutSetupProvider =
+    NotifierProvider<CheckoutSetupController, CheckoutSetup>(
+      CheckoutSetupController.new,
+    );
+
+class CheckoutSetupController extends Notifier<CheckoutSetup> {
+  @override
+  CheckoutSetup build() => const CheckoutSetup();
+
+  /// 장바구니 "주문하기". 새 주문 의도를 연다(이전 선택은 유지한다).
+  void begin() {
+    if (state.purchaseIntentId != null) return;
+    state = state.copyWith(purchaseIntentId: IdempotencyKey.generate().value);
+  }
+
+  void setMode(DeliveryMode mode) => state = state.copyWith(
+    mode: mode,
+    window: mode == DeliveryMode.scheduled ? null : () => null,
+  );
+
+  void setWindow(ArrivalWindow window) =>
+      state = state.copyWith(window: () => window);
+
+  void setOutOfStock(OutOfStockPreference p) =>
+      state = state.copyWith(outOfStock: p);
+
+  void setNote(String note) => state = state.copyWith(deliveryNote: note);
+
+  void setBagOptOut(bool v) => state = state.copyWith(bagOptOut: v);
+
+  /// 주문이 확정되면 다음 주문을 위해 비운다.
+  void finish() => state = const CheckoutSetup();
+}
+
+final deliveryOptionsProvider =
+    FutureProvider.autoDispose<List<DeliveryOption>>((ref) async {
+      final mfcId = ref.watch(currentMfcIdProvider);
+      if (mfcId == null) {
+        // 담당 센터가 없으면(권역 밖·주소 없음) 조회할 수 없다. 빈 목록이 아니라 오류다.
+        throw const ProblemFailure(
+          Problem(status: 422, code: 'OUT_OF_SERVICE_AREA'),
+        );
+      }
+      return ref.watch(checkoutRepositoryProvider).options(mfcId);
+    });
+
+/// 날짜(서울 `YYYY-MM-DD`)별 슬롯. 실패하면 자동 재시도하지 않는다("다시 조회").
+final slotsProvider = FutureProvider.autoDispose.family<List<Slot>, String>((
+  ref,
+  date,
+) async {
+  final mfcId = ref.watch(currentMfcIdProvider);
+  if (mfcId == null) {
+    throw const ProblemFailure(
+      Problem(status: 422, code: 'OUT_OF_SERVICE_AREA'),
+    );
+  }
+  return ref.watch(checkoutRepositoryProvider).slots(mfcId, date);
+});
+
+/// 주문서 상태.
+@immutable
+class DraftState {
+  const DraftState({
+    required this.draft,
+    required this.request,
+    required this.setupRevision,
+    required this.cartVersion,
+    this.agreedQuote,
+    this.previousQuote,
+    this.paying = false,
+    this.checkoutUnknown = false,
+    this.lastStart,
+  });
+
+  final OrderDraft draft;
+  final DraftRequest request;
+  final int setupRevision;
+  final int cartVersion;
+
+  /// 고객이 보고 동의한 견적. 결제 진입의 acceptedQuoteVersion.
+  final Quote? agreedQuote;
+
+  /// 견적이 바뀌었을 때 이전 견적(전후 비교용). null 이 아니면 재동의 전이다.
+  final Quote? previousQuote;
+  final bool paying;
+
+  /// 결제 진입 결과를 모른다. 초안 조회로만 확인한다(결제 버튼을 다시 열지 않는다).
+  final bool checkoutUnknown;
+  final CheckoutStart? lastStart;
+
+  bool get needsReconsent => previousQuote != null;
+
+  /// 결제 버튼을 열어도 되는지. 서버가 PAY 를 줬고, 최소주문을 채웠고, 재동의가 끝났을 때만.
+  bool get canPay =>
+      draft.next == DraftNext.pay &&
+      draft.quote?.minOrderSatisfied == true &&
+      agreedQuote != null &&
+      !needsReconsent &&
+      !paying &&
+      !checkoutUnknown &&
+      lastStart is! CheckoutAccepted;
+
+  DraftState copyWith({
+    OrderDraft? draft,
+    Quote? Function()? agreedQuote,
+    Quote? Function()? previousQuote,
+    bool? paying,
+    bool? checkoutUnknown,
+    CheckoutStart? Function()? lastStart,
+  }) => DraftState(
+    draft: draft ?? this.draft,
+    request: request,
+    setupRevision: setupRevision,
+    cartVersion: cartVersion,
+    agreedQuote: agreedQuote != null ? agreedQuote() : this.agreedQuote,
+    previousQuote: previousQuote != null ? previousQuote() : this.previousQuote,
+    paying: paying ?? this.paying,
+    checkoutUnknown: checkoutUnknown ?? this.checkoutUnknown,
+    lastStart: lastStart != null ? lastStart() : this.lastStart,
+  );
+}
+
+/// 주문서를 만들 수 없는 이유.
+final class CheckoutBlocked implements Exception {
+  const CheckoutBlocked(this.reason);
+
+  final CheckoutBlockReason reason;
+}
+
+enum CheckoutBlockReason {
+  notMember,
+  noShoppingAddress,
+  noSelectedItems,
+  setupIncomplete,
+}
+
+final draftControllerProvider =
+    AsyncNotifierProvider<DraftController, DraftState?>(DraftController.new);
+
+class DraftController extends AsyncNotifier<DraftState?> {
+  CheckoutRepository get _repo => ref.read(checkoutRepositoryProvider);
+
+  @override
+  Future<DraftState?> build() async => null;
+
+  DraftState? get _current => state.value;
+
+  void _set(DraftState next) {
+    if (ref.mounted) state = AsyncData(next);
+  }
+
+  DraftRequest _request(CheckoutSetup setup) {
+    final book = ref.read(addressBookProvider).value;
+    if (book == null) {
+      throw const CheckoutBlocked(CheckoutBlockReason.notMember);
+    }
+    final addressId = book.context.shoppingAddressId;
+    if (addressId == null) {
+      throw const CheckoutBlocked(CheckoutBlockReason.noShoppingAddress);
+    }
+    final cart = ref.read(cartControllerProvider).value?.cart;
+    final lines = [
+      for (final l in cart?.lines ?? const <CartLine>[])
+        if (l.selected && l.purchasable)
+          DraftLine(cartItemId: l.cartItemId, sku: l.sku, quantity: l.quantity),
+    ];
+    if (lines.isEmpty) {
+      throw const CheckoutBlocked(CheckoutBlockReason.noSelectedItems);
+    }
+    if (!setup.complete || setup.purchaseIntentId == null) {
+      throw const CheckoutBlocked(CheckoutBlockReason.setupIncomplete);
+    }
+    return DraftRequest(
+      purchaseIntentId: setup.purchaseIntentId!,
+      lines: lines,
+      shoppingAddressId: addressId,
+      expectedMfcId: book.context.mfcId,
+      mode: setup.mode!,
+      window: setup.window,
+      outOfStock: setup.outOfStock,
+      deliveryNote: setup.deliveryNote.trim().isEmpty
+          ? null
+          : setup.deliveryNote.trim(),
+      bagOptOut: setup.bagOptOut,
+    );
+  }
+
+  /// 주문서 진입. 조건·장바구니가 그대로면 기존 초안을 다시 조회하고(타이머를 새로 시작하지 않는다),
+  /// 바뀌었으면 새 초안을 만든다.
+  Future<void> enter() async {
+    final setup = ref.read(checkoutSetupProvider);
+    final cartVersion =
+        ref.read(cartControllerProvider).value?.cart.version ?? -1;
+    final current = _current;
+    if (current != null &&
+        current.setupRevision == setup.revision &&
+        current.cartVersion == cartVersion &&
+        current.draft.next != DraftNext.expired) {
+      await refresh();
+      return;
+    }
+    state = const AsyncLoading();
+    try {
+      final request = _request(setup);
+      final draft = await _createWithResend(request);
+      _set(
+        DraftState(
+          draft: draft,
+          request: request,
+          setupRevision: setup.revision,
+          cartVersion: cartVersion,
+          agreedQuote: draft.quote,
+        ),
+      );
+      await _pollWhileWaiting();
+    } on CheckoutBlocked catch (e, st) {
+      if (ref.mounted) state = AsyncError(e, st);
+    } on PmartFailure catch (e, st) {
+      if (ref.mounted) state = AsyncError(e, st);
+    }
+  }
+
+  Future<OrderDraft> _createWithResend(DraftRequest request) async {
+    final key = IdempotencyKey.generate();
+    UnknownResultFailure? last;
+    for (var i = 0; i < 3; i++) {
+      try {
+        return await _repo.createDraft(request, key: key);
+      } on UnknownResultFailure catch (f) {
+        // 같은 키·같은 본문 재전송은 기존 초안을 돌려준다(새 초안을 만들지 않는다).
+        last = f;
+      }
+    }
+    throw last!;
+  }
+
+  Future<void> _pollWhileWaiting() async {
+    final policy = ref.read(draftPollPolicyProvider);
+    for (var i = 0; i < policy.attempts; i++) {
+      final current = _current;
+      if (current == null || current.draft.next != DraftNext.wait) return;
+      await Future<void>.delayed(policy.interval);
+      if (!ref.mounted) return;
+      await refresh();
+    }
+  }
+
+  /// 초안을 다시 조회한다. 견적이 바뀌었으면 재동의 전까지 결제를 막는다.
+  Future<void> refresh() async {
+    final current = _current;
+    if (current == null) return;
+    try {
+      final draft = await _repo.getDraft(current.draft.draftId);
+      if (!ref.mounted) return;
+      final latest = _current ?? current;
+      final agreed = latest.agreedQuote;
+      final changed =
+          agreed != null &&
+          draft.quote != null &&
+          draft.quote!.version != agreed.version &&
+          !latest.needsReconsent;
+      // 결제 진입 결과 불명의 짝 조회: 초안의 결제가 시작됐으면 진입이 받아들여진 것이다.
+      // 아직 시작 전이면 계속 "확인 중"이다(실패로 단정하지 않는다).
+      final started =
+          draft.status == OrderStatus.paymentPending ||
+          switch (draft.resources?.payment) {
+            PaymentProgress.started ||
+            PaymentProgress.approved ||
+            PaymentProgress.failed ||
+            PaymentProgress.mismatch => true,
+            _ => false,
+          };
+      final resolved = latest.checkoutUnknown && started;
+      _set(
+        latest.copyWith(
+          draft: draft,
+          previousQuote: changed ? () => agreed : null,
+          checkoutUnknown: latest.checkoutUnknown && !started,
+          lastStart: resolved ? () => CheckoutAccepted(draft.draftId) : null,
+        ),
+      );
+    } on PmartFailure catch (e, st) {
+      if (ref.mounted) state = AsyncError(e, st);
+    }
+  }
+
+  /// 바뀐 견적에 동의한다.
+  void agreeToNewQuote() {
+    final current = _current;
+    if (current == null || current.draft.quote == null) return;
+    _set(
+      current.copyWith(
+        agreedQuote: () => current.draft.quote,
+        previousQuote: () => null,
+        lastStart: () => null,
+      ),
+    );
+  }
+
+  /// "결제하기". 고객이 동의한 견적 버전으로 결제 진입을 요청한다.
+  Future<CheckoutStart?> pay() async {
+    final current = _current;
+    if (current == null || !current.canPay) return null;
+    _set(current.copyWith(paying: true, lastStart: () => null));
+    final start = await _repo.startCheckout(
+      current.draft.draftId,
+      expectedVersion: current.draft.version,
+      acceptedQuoteVersion: current.agreedQuote!.version,
+      key: IdempotencyKey.generate(),
+    );
+    if (!ref.mounted) return start;
+    _set(
+      (_current ?? current).copyWith(
+        paying: false,
+        checkoutUnknown: start is CheckoutUnknown,
+        lastStart: () => start,
+      ),
+    );
+    if (start is CheckoutReQuote) await refresh();
+    if (start is CheckoutUnknown) await refresh();
+    return start;
+  }
+
+  /// 주문서를 새로 만든다(유효시간 만료 뒤 등). 주문 의도는 유지한다.
+  Future<void> recreate() async {
+    state = const AsyncData(null);
+    await enter();
+  }
+}

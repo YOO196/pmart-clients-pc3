@@ -9,6 +9,9 @@ import '../../catalog/domain/catalog.dart' show SaleState;
 import '../../catalog/presentation/widgets/product_tile_card.dart'
     show ProductImage;
 import '../domain/cart.dart';
+import '../../auth/domain/auth.dart';
+import '../../auth/presentation/auth_controller.dart';
+import '../../checkout/presentation/checkout_controller.dart';
 import 'cart_controller.dart';
 import 'cart_messages.dart';
 
@@ -259,14 +262,14 @@ class _CartLineTile extends ConsumerWidget {
   }
 }
 
-class _CartSummaryBar extends StatelessWidget {
+class _CartSummaryBar extends ConsumerWidget {
   const _CartSummaryBar({required this.cart, required this.state});
 
   final Cart cart;
   final CartState state;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Material(
@@ -300,6 +303,15 @@ class _CartSummaryBar extends StatelessWidget {
               ),
               if (state.sync == CartSync.pending)
                 Text(l10n.cartChangePending, style: theme.textTheme.bodySmall),
+              const SizedBox(height: 8),
+              FilledButton(
+                key: const ValueKey('cart-order'),
+                // "주문하기"는 PG 진입이 아니다. 배송 방식 선택 → 주문서로 간다.
+                onPressed: (state.canChange && cart.hasSelectedPurchasable)
+                    ? () => _order(context, ref)
+                    : null,
+                child: Text(l10n.cartOrder),
+              ),
             ],
           ),
         ),
@@ -434,4 +446,14 @@ class _AddToCartBarState extends ConsumerState<AddToCartBar> {
         ),
       );
   }
+}
+
+/// 비회원은 주문 목적으로 로그인한 뒤 이어간다(자동 병합 없음).
+Future<void> _order(BuildContext context, WidgetRef ref) async {
+  if (ref.read(sessionProvider) is! MemberSession) {
+    final ok = await context.push<bool>('/login?purpose=checkout');
+    if (ok != true || !context.mounted) return;
+  }
+  ref.read(checkoutSetupProvider.notifier).begin();
+  await context.push('/checkout/delivery');
 }

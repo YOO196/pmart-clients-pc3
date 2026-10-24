@@ -6,6 +6,8 @@ import 'features/address/presentation/address_screens.dart';
 import 'features/auth/domain/auth.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cart/presentation/cart_screen.dart';
+import 'features/checkout/presentation/delivery_select_screen.dart';
+import 'features/checkout/presentation/order_sheet_screen.dart';
 import 'features/catalog/presentation/category_screen.dart';
 import 'features/catalog/presentation/home_screen.dart';
 import 'features/catalog/presentation/product_detail_screen.dart';
@@ -47,6 +49,16 @@ final routerProvider = Provider<GoRouter>(
             ],
           ),
         ],
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/checkout/delivery',
+        builder: (_, _) => const DeliverySelectScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/checkout',
+        builder: (_, _) => const OrderSheetScreen(),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
