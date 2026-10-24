@@ -27,6 +27,7 @@
 | BR-17 | 낮음 | 고객 | 현금영수증 신청·발급 가능 여부·발급 결과 조회 없음 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
 | BR-18 | 낮음 | 고객 | 주문서 이탈 시 초안 처리(명시적 취소 경로 여부) 확인 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
 | BR-19 | 낮음 | 고객 | 상품 카드·상세의 100g/100mL당 가격 표시 값 없음 | OPEN |
+| BR-20 | 중간 | 고객 | 필수 동의 대기(AUTH_CONSENT)에서 토큰 없이 동의 변경을 호출할 경로·`requiredConsents` 형식 불명 | OPEN |
 
 ---
 
@@ -134,3 +135,11 @@
 - 현황: `DisplayItem`·`SearchHit`·`SaleOption` 에 단위 가격 필드가 없다. `SaleOption.capacityLabel`(예 "500ml")은 표시용 문자열이고, `SkuDetail.weightG` 는 내부 경로(`/internal/skus`)라 고객앱이 쓸 수 없다.
 - 요청: 표시용 단위 가격(예 `unitPrice: { basis: G100|ML100, amount }`)을 pricing 사본과 함께 내려줄지, 아니면 1차에서 표시하지 않을지 결정.
 - 클라이언트 처리(회신 전): 표시하지 않는다. 라벨 문자열을 파싱해 계산하지 않는다(금액은 서버 값만 표시).
+
+## BR-20 필수 동의 대기 중 동의 반영 경로
+- 근거: auth `socialLogin` 설명 "응답 state가 AUTH_CONSENT면 customer-service 필수 동의 완료 후 POST /auth/social-logins/{authRequestId}/completions", `completeSocialLogin` 요청 `consentChangeRequestId`.
+- 현황
+  1. `AuthResult` 는 AUTH_MEMBER 일 때만 `tokens` 를 준다. 그런데 동의 반영 `POST /me/consent-changes` 는 `bearerAuth` 경로다. AUTH_CONSENT 상태의 클라이언트는 호출할 토큰이 없다.
+  2. `requiredConsents: string[]` 의 항목 형식("필요한 동의 항목·버전")이 정해져 있지 않다. `ConsentType` 값만인지, 버전을 붙이는지(예 `TERMS_OF_SERVICE:2026-10`) 알 수 없다. `/me/consent-changes` 는 항목마다 `consentType`·`version` 이 필요하다.
+- 질문: (1) AUTH_CONSENT 에서 동의를 반영하는 방법 — 임시 토큰을 줄지, 동의 항목을 `completions` 본문으로 받을지, 공개 동의 경로를 둘지. (2) `requiredConsents` 항목 형식.
+- 클라이언트 처리(회신 전): 목에서는 `TYPE:version` 으로 가정해 끝까지 동작한다. 실서버 구현은 계약대로 `/me/consent-changes` → `completions` 순으로 호출하며(`// BR-20`), 401 이 나면 로그인 실패로 보인다.

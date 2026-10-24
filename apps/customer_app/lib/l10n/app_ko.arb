@@ -226,5 +226,66 @@
     }
   },
   "cartUnavailableForAdd": "장바구니를 불러오지 못해서 지금은 담을 수 없어요",
-  "cartGoToCart": "장바구니 보기"
+  "cartGoToCart": "장바구니 보기",
+  "loginTitle": "로그인",
+  "loginBody": "간편 로그인으로 주문하고 주문 내역을 확인하세요",
+  "loginForCheckout": "주문하려면 로그인이 필요해요",
+  "loginKakao": "카카오로 시작하기",
+  "loginNaver": "네이버로 시작하기",
+  "loginApple": "Apple로 계속하기",
+  "loginGoogle": "Google로 계속하기",
+  "loginRestricted": "로그인이 잠시 제한됐어요. 잠시 후 다시 시도해 주세요",
+  "loginRestrictedFor": "로그인이 잠시 제한됐어요. {minutes}분 뒤 다시 시도해 주세요",
+  "@loginRestrictedFor": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "loginProviderDown": "로그인 서비스가 원활하지 않아요. 잠시 후 다시 시도해 주세요",
+  "loginRejected": "로그인하지 못했어요. 다시 시도해 주세요",
+  "loginUnknown": "로그인 결과를 확인하는 중이에요",
+  "loginCheckAgain": "다시 확인",
+  "consentTitle": "약관 동의",
+  "consentBody": "서비스 이용을 위해 필수 약관에 동의해 주세요",
+  "consentRequired": "[필수] {name}",
+  "@consentRequired": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "consentTerms": "이용약관",
+  "consentPrivacy": "개인정보 수집·이용",
+  "consentAge14": "만 14세 이상",
+  "consentSubmit": "동의하고 시작하기",
+  "addressTitle": "주소 관리",
+  "addressAdd": "새 주소 추가",
+  "addressEmpty": "등록한 주소가 없어요",
+  "addressLoginNeeded": "주소를 저장하려면 로그인이 필요해요",
+  "addressLabel": "주소 이름 (예: 집, 회사)",
+  "addressRoad": "도로명 주소",
+  "addressDetail": "상세 주소",
+  "addressReceiver": "받는 분",
+  "addressPhone": "연락처",
+  "addressEntrance": "공동현관 출입 방법",
+  "addressEntranceNote": "출입 안내 (선택)",
+  "addressSave": "저장",
+  "entranceFree": "자유 출입",
+  "entrancePassword": "비밀번호 필요",
+  "entranceCall": "호출 필요",
+  "entranceOther": "기타",
+  "fieldRequired": "입력해 주세요",
+  "serviceable": "배달 가능 지역이에요",
+  "serviceOutOfArea": "아직 배달하지 않는 지역이에요",
+  "serviceUnknown": "배달 가능 여부를 확인하는 중이에요",
+  "addressSaved": "주소를 저장했어요",
+  "shoppingAddressChanged": "이 주소 기준으로 상품을 보여드릴게요",
+  "addressCommandUnknown": "반영됐는지 확인하는 중이에요. 주소 목록에서 다시 확인해 주세요",
+  "addressConflict": "다른 곳에서 주소가 바뀌어 최신 목록을 불러왔어요. 다시 골라 주세요",
+  "addressCommandFailed": "처리하지 못했어요. 다시 시도해 주세요",
+  "homeAddressGuest": "주소를 설정해 주세요",
+  "homeAddressNone": "배달 주소를 골라 주세요"
 }

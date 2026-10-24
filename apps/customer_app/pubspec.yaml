@@ -33,6 +33,8 @@ dependencies:
     path: ../../packages/pmart_api/gen/search
   pmart_api_storefront:
     path: ../../packages/pmart_api/gen/storefront
+  pmart_api_customer:
+    path: ../../packages/pmart_api/gen/customer
 
 dev_dependencies:
   flutter_test:

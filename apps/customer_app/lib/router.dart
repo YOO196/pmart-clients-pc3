@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/address/presentation/address_screens.dart';
+import 'features/auth/domain/auth.dart';
+import 'features/auth/presentation/login_screen.dart';
 import 'features/cart/presentation/cart_screen.dart';
 import 'features/catalog/presentation/category_screen.dart';
 import 'features/catalog/presentation/home_screen.dart';
@@ -42,6 +45,27 @@ final routerProvider = Provider<GoRouter>(
             routes: [
               GoRoute(path: '/cart', builder: (_, _) => const CartScreen()),
             ],
+          ),
+        ],
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/login',
+        builder: (_, state) => LoginScreen(
+          purpose: state.uri.queryParameters['purpose'] == 'checkout'
+              ? LoginPurpose.checkout
+              : LoginPurpose.general,
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/addresses',
+        builder: (_, _) => const AddressListScreen(),
+        routes: [
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'new',
+            builder: (_, _) => const AddressFormScreen(),
           ),
         ],
       ),

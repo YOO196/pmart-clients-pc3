@@ -4,6 +4,7 @@ import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart';
 import '../../../shared/shopping_context.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../data/cart_repository.dart';
 import '../data/mock_cart_repository.dart';
 import '../domain/cart.dart';
@@ -83,6 +84,8 @@ class CartController extends AsyncNotifier<CartState> {
   @override
   Future<CartState> build() async {
     _unknownKey = null;
+    // 로그인·로그아웃하면 그 주체의 장바구니를 연다(일반 로그인은 자동 병합 없음).
+    ref.watch(sessionProvider);
     final cart = await ref
         .watch(cartRepositoryProvider)
         .open(mfcId: ref.watch(currentMfcIdProvider));

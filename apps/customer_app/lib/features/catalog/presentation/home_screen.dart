@@ -7,6 +7,9 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/providers.dart';
 import '../../../shared/ui_state_of.dart';
+import '../../address/presentation/address_controller.dart';
+import '../../auth/domain/auth.dart';
+import '../../auth/presentation/auth_controller.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
 import 'widgets/product_tile_card.dart';
@@ -25,7 +28,7 @@ class HomeScreen extends ConsumerWidget {
     );
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.homeTitle),
+        title: const _AddressChip(),
         actions: [
           if (mock)
             Padding(
@@ -162,6 +165,37 @@ class _SectionView extends ConsumerWidget {
             ),
           ),
           body,
+        ],
+      ),
+    );
+  }
+}
+
+/// 현재 쇼핑 주소. 누르면 주소 관리로 간다.
+class _AddressChip extends ConsumerWidget {
+  const _AddressChip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final member = ref.watch(sessionProvider) is MemberSession;
+    final book = ref.watch(addressBookProvider).value;
+    final text = !member
+        ? l10n.homeAddressGuest
+        : switch (book?.shoppingAddress) {
+            final a? => a.label ?? a.roadAddress,
+            null => l10n.homeAddressNone,
+          };
+    return InkWell(
+      key: const ValueKey('home-address'),
+      onTap: () => context.push('/addresses'),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.place_outlined, size: 20),
+          const SizedBox(width: 4),
+          Flexible(child: Text(text, overflow: TextOverflow.ellipsis)),
+          const Icon(Icons.expand_more),
         ],
       ),
     );
