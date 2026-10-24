@@ -1,0 +1,6 @@
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  /** vite.config.ts 의 define 이 빌드 때 바꿔 넣는다: mock(MSW) | local(실제 API). */
+  readonly VITE_PMART_ENV: 'mock' | 'local';
+}

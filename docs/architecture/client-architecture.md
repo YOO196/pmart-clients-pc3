@@ -47,6 +47,7 @@ pmart-clients/
 ├── web/
 │   └── backoffice/              # Vite + React + TS
 ├── tools/
+│   ├── web-tools/               # TS 5 웹 도구(openapi-typescript·ESLint). npm workspace 밖. C0 확정
 │   ├── gen_api.dart             # 계약 → Dart 생성
 │   └── (web) openapi-typescript 스크립트는 web/backoffice/package.json
 └── docs/
@@ -84,7 +85,7 @@ lib/
 ### React (backoffice)
 | 영역 | 선택 |
 |---|---|
-| 빌드 | Vite 8 (`vite@^8.3.5`, `@vitejs/plugin-react@^6.1.2`, Node ^20.19 \|\| >=22.12) + TypeScript 7 (`typescript@^7.0.2`, strict). 호환 주의(2026-10-24 npm 기준): `openapi-typescript@7.13.0` 은 peer `typescript ^5.x`, `typescript-eslint@8.72.0` 은 peer `<6.1.0` 이라 TS 7을 아직 지원하지 않음 — C0에서 실제 설치·동작으로 확인하고 대응을 정한다 |
+| 빌드 | Vite 8 (`vite@^8.3.5`, `@vitejs/plugin-react@^6.1.2`, Node ^20.19 \|\| >=22.12) + TypeScript 7 (`typescript@^7.0.2`, strict). **C0 확인 결과(2026-10-24)**: TS 7 패키지는 컴파일러 JS API를 내보내지 않는다(`exports` 가 `lib/version.cjs` 와 `unstable/*` 뿐). 그래서 `openapi-typescript`·`typescript-eslint` 는 TS 7 위에서 실행되지 않는다(peer 경고가 아니라 동작 불가). 대응: 타입 검사(`tsc --noEmit`)는 TS 7, 타입 생성·ESLint 는 `tools/web-tools`(npm workspace 밖, `typescript ~5.9.3`)에서 실행한다. 두 도구가 TS 7 을 지원하면 합친다 |
 | 라우팅 | React Router |
 | 서버 상태 | TanStack Query |
 | API 타입 | openapi-typescript + openapi-fetch (계약 → 타입, 런타임 경량) |

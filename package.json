@@ -1,0 +1,10 @@
+{
+  "name": "pmart-clients",
+  "private": true,
+  "workspaces": [
+    "web/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  }
+}

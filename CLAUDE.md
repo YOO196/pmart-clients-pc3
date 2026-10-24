@@ -54,15 +54,19 @@ docs/                 # 설계 정본 (아래 문서 지도)
 dart tools/gen_api.dart                           # 계약 → packages/pmart_api/gen/<service> 생성 (clone 직후 pub get 보다 먼저, ~6분)
 dart tools/gen_api.dart --only=cart,order         # 일부 서비스만
 flutter pub get                                   # 루트 workspace
-cd apps/customer_app && flutter run --dart-define=PMART_ENV=mock
-flutter analyze && flutter test                   # 앱/패키지 디렉터리에서
+cd apps/customer_app && flutter run --dart-define=PMART_ENV=mock   # 에뮬레이터면 --dart-define=PMART_ANDROID_EMULATOR=true
+flutter analyze && flutter test                   # 앱/패키지 디렉터리에서 (packages/pmart_core·pmart_ui, apps/*)
 
 # React (Node 24 / npm 11 확인됨)
-npm install                                       # 루트 workspace
-npm run dev -w web/backoffice                     # Vite dev 서버(게이트웨이 프록시)
-npm run test -w web/backoffice
+npm install                                       # 루트 workspace (web/*)
+npm install --prefix tools/web-tools              # TS 5 도구(타입 생성·ESLint). TS 7 과 같은 설치에 둘 수 없다
+npm run gen:api -w web/backoffice                 # 계약 → src/api/generated (커밋 안 함)
+npm run dev -w web/backoffice                     # 목 모드(MSW). 실서버는 dev:local (게이트웨이 프록시)
+npm run typecheck -w web/backoffice               # TS 7
+npm run lint -w web/backoffice                    # ESLint (tools/web-tools 의 TS 5)
+npm run test -w web/backoffice                    # Vitest + MSW
 ```
-명령은 스캐폴딩 후 실제 스크립트에 맞춰 갱신한다. 실행 전 경로와 스크립트 존재를 확인한다.
+실행 전 경로와 스크립트 존재를 확인한다. 검증은 목 모드만 쓴다(백엔드 도커 사용 안 함).
 
 ## 절대 규칙
 - `../pmart-backend` 의 파일을 수정하지 않는다. 계약 변경이 필요하면 `docs/backend-requests.md` 에 적고 사용자에게 보고한다.
