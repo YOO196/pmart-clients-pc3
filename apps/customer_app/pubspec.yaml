@@ -1,0 +1,36 @@
+name: customer_app
+description: PMart 고객 앱
+publish_to: none
+version: 0.1.0+1
+resolution: workspace
+
+environment:
+  sdk: ^3.13.4
+  flutter: ">=3.47.5"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  dio: ^5.11.1
+  flutter_riverpod: ^3.4.3
+  go_router: ^18.1.1
+  intl: ^0.20.3
+  pmart_core:
+    path: ../../packages/pmart_core
+  pmart_ui:
+    path: ../../packages/pmart_ui
+  pmart_api_cart:
+    path: ../../packages/pmart_api/gen/cart
+  pmart_api_auth:
+    path: ../../packages/pmart_api/gen/auth
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true

@@ -28,6 +28,18 @@ sealed class PmartFailure implements Exception {
       return CancelledFailure(requestId: requestId);
     }
 
+    // 2xx 를 받았는데 생성 모델로 읽지 못했다(필수 필드 누락·형식 불일치).
+    // 변경 요청이면 서버는 반영했을 수 있으므로 결과 불명으로 다룬다.
+    final httpStatus = response?.statusCode;
+    if (e.type == DioExceptionType.unknown &&
+        httpStatus != null &&
+        httpStatus >= 200 &&
+        httpStatus < 300) {
+      return mutation
+          ? UnknownResultFailure(requestId: requestId, httpStatus: httpStatus)
+          : ContractViolationFailure(e.error, requestId: requestId);
+    }
+
     if (response != null) {
       final problem = _parseProblem(response);
       if (problem != null) {
@@ -126,6 +138,19 @@ final class UnexpectedResponseFailure extends PmartFailure {
 
   @override
   String toString() => 'UnexpectedResponseFailure($httpStatus)';
+}
+
+/// 응답이 계약과 다르다(필수 값 누락·형식 불일치). 빈 값·0으로 메우지 않고 오류로 그린다.
+///
+/// Repository 가 생성 DTO 를 domain 모델로 바꿀 때 핵심 필드가 없으면 직접 던진다.
+final class ContractViolationFailure extends PmartFailure {
+  const ContractViolationFailure(this.cause, {super.requestId});
+
+  /// 원인(역직렬화 예외 또는 설명 문자열). 개인정보를 넣지 않는다.
+  final Object? cause;
+
+  @override
+  String toString() => 'ContractViolationFailure($cause)';
 }
 
 /// 호출 측이 취소함.

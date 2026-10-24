@@ -103,18 +103,25 @@ Future<void> main(List<String> args) async {
     _fixEnumDefaults(out);
   }
 
-  File('contracts.lock').writeAsStringSync(
-    const JsonEncoder.withIndent('  ').convert({
-          'backendCommit': sha,
-          'backendContractsDirty': dirty,
-          'generatedAt': DateTime.now().toUtc().toIso8601String(),
-          'generator':
-              'openapi-generator-cli $generatorVersion (dart-dio, json_serializable)',
-          'services': {for (final s in services.keys) s: services[s]},
-        }) +
-        '\n',
+  // contracts.lock 은 Dart("dart")·웹("web", tools/web-tools/gen-api.mjs) 생성이 함께 쓴다.
+  final lockFile = File('contracts.lock');
+  final lock = lockFile.existsSync()
+      ? (jsonDecode(lockFile.readAsStringSync()) as Map<String, dynamic>)
+      : <String, dynamic>{};
+  lock['dart'] = {
+    'backendCommit': sha,
+    'backendContractsDirty': dirty,
+    'generatedAt': DateTime.now().toUtc().toIso8601String(),
+    'generator':
+        'openapi-generator-cli $generatorVersion (dart-dio, json_serializable)',
+    // --only 로 일부만 다시 만들었으면 나머지는 이전 커밋 기준일 수 있다.
+    'regenerated': targets,
+    'services': {for (final s in services.keys) s: services[s]},
+  };
+  lockFile.writeAsStringSync(
+    '${const JsonEncoder.withIndent('  ').convert(lock)}\n',
   );
-  stdout.writeln('contracts.lock 갱신: $sha');
+  stdout.writeln('contracts.lock(dart) 갱신: $sha');
 
   if (!build) return;
   _run(_flutter, ['pub', 'get']);

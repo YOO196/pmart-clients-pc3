@@ -1,0 +1,21 @@
+{
+  "@@locale": "ko",
+  "appTitle": "PMart 라이더",
+  "offersTitle": "배차 제안",
+  "offersEmpty": "지금 받은 제안이 없어요",
+  "offerRemaining": "응답 {seconds}초 남음",
+  "@offerRemaining": {
+    "placeholders": { "seconds": { "type": "int" } }
+  },
+  "offerRemainingUnknown": "남은 시간 확인 중",
+  "offerFee": "예상 배달료 {fee}",
+  "@offerFee": {
+    "placeholders": { "fee": { "type": "String" } }
+  },
+  "offerDropArea": "도착 지역 {label}",
+  "@offerDropArea": {
+    "placeholders": { "label": { "type": "String" } }
+  },
+  "pollingStopped": "지금은 새 제안을 받을 수 없는 상태예요",
+  "mockModeBadge": "목 데이터"
+}

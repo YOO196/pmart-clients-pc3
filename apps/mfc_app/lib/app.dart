@@ -1,0 +1,28 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pmart_ui/pmart_ui.dart';
+
+import 'l10n/gen/app_localizations.dart';
+import 'router.dart';
+
+class MfcApp extends ConsumerWidget {
+  const MfcApp({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => MaterialApp.router(
+    onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+    theme: PmartTheme.light(),
+    darkTheme: PmartTheme.dark(),
+    locale: const Locale('ko'),
+    supportedLocales: AppLocalizations.supportedLocales,
+    localizationsDelegates: const [
+      AppLocalizations.delegate,
+      PmartUiLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    routerConfig: ref.watch(routerProvider),
+  );
+}

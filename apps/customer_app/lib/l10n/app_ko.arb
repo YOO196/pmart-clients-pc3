@@ -1,0 +1,18 @@
+{
+  "@@locale": "ko",
+  "appTitle": "PMart",
+  "homeTitle": "홈",
+  "cartSummaryTitle": "장바구니",
+  "cartLineCount": "담은 상품 {count}종",
+  "@cartLineCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "cartSelectedAmount": "선택 상품 합계 {amount}",
+  "@cartSelectedAmount": {
+    "placeholders": { "amount": { "type": "String" } }
+  },
+  "cartSelectedAmountNote": "결제 금액은 주문서에서 확인해요",
+  "cartAmountUnavailable": "합계를 확인할 수 없어요",
+  "cartEmpty": "담은 상품이 없어요",
+  "mockModeBadge": "목 데이터"
+}

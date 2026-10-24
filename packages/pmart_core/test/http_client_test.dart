@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart';
 
-import 'support/fake_adapter.dart';
+import 'package:pmart_core/testing.dart';
 
 void main() {
   late TokenStore tokens;
@@ -344,6 +344,27 @@ void main() {
           FakeReply.problem(503, problemBody('UNKNOWN_RESULT', status: 503)),
           mutation: true,
         ),
+        isA<UnknownResultFailure>(),
+      );
+    });
+
+    test('2xx 인데 모델로 읽지 못하면: 조회는 계약 위반, 변경은 결과 불명', () {
+      DioException deserializeError(String method) {
+        final options = RequestOptions(path: '/x', method: method);
+        return DioException(
+          requestOptions: options,
+          response: Response<dynamic>(requestOptions: options, statusCode: 200),
+          type: DioExceptionType.unknown,
+          error: const FormatException('missing cartId'),
+        );
+      }
+
+      expect(
+        PmartFailure.fromDioException(deserializeError('GET')),
+        isA<ContractViolationFailure>(),
+      );
+      expect(
+        PmartFailure.fromDioException(deserializeError('POST')),
         isA<UnknownResultFailure>(),
       );
     });

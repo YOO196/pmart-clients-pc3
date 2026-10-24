@@ -1,0 +1,20 @@
+{
+  "@@locale": "ko",
+  "appTitle": "PMart MFC",
+  "tasksTitle": "내 작업",
+  "tasksEmpty": "배정된 작업이 없어요",
+  "taskTypePick": "피킹",
+  "taskTypePack": "패킹",
+  "taskTypeDispatch": "출고",
+  "taskRemaining": "남은 수량 {qty}",
+  "@taskRemaining": {
+    "placeholders": { "qty": { "type": "int" } }
+  },
+  "taskRemainingUnknown": "남은 수량 확인 중",
+  "taskStateLabel": "상태 {state}",
+  "@taskStateLabel": {
+    "placeholders": { "state": { "type": "String" } }
+  },
+  "assignmentStale": "배정 정보가 최신이 아닐 수 있어요. 시작 가능 여부는 시작할 때 확인해요.",
+  "mockModeBadge": "목 데이터"
+}
