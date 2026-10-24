@@ -1,4 +1,4 @@
-# 백엔드 요청 목록 (계약 공백·확인 필요)
+SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |# 백엔드 요청 목록 (계약 공백·확인 필요)
 
 클라이언트 구현에 필요한데 `../pmart-backend/contracts` 에 없거나 모호한 것. **이 저장소에서 백엔드를 고치지 않는다.** 항목은 사용자를 통해 백엔드 담당(다른 계정)에 전달한다.
 상태: `OPEN`(미전달) / `SENT`(전달) / `AGREED`(합의, 계약 반영 대기) / `DONE`(계약 반영됨, 커밋 SHA) / `WONTFIX`.
