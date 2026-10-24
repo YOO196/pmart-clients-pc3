@@ -140,6 +140,8 @@ void main() {
 
     await t.tap(find.byKey(const ValueKey('on-duty')));
     await settle(t);
+    // 이전 안내를 내리고 새 안내를 띄우는 애니메이션을 기다린다.
+    await t.pump(const Duration(seconds: 1));
 
     expect(find.text('진행 중인 배송이 있어서 운행을 끝낼 수 없어요'), findsOneWidget);
     expect(

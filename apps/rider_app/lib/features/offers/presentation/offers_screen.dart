@@ -248,15 +248,17 @@ class _DutyCard extends ConsumerWidget {
     Future<void> change(bool onDuty, bool newDispatch) async {
       final code = await ctl.change(onDuty: onDuty, newDispatch: newDispatch);
       if (code == null || !context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            code == ProblemCode.invalidState
-                ? l10n.cannotEndWithActive
-                : l10n.dutyChangeFailed,
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              code == ProblemCode.invalidState
+                  ? l10n.cannotEndWithActive
+                  : l10n.dutyChangeFailed,
+            ),
           ),
-        ),
-      );
+        );
     }
 
     return Card(
