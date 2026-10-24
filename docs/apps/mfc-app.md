@@ -8,8 +8,9 @@
 | 메뉴 | API | 비고 |
 |---|---|---|
 | 로그인(직원 ID) | 없음 | BR-02 |
-| 내 작업 | `GET /assignments`(mfc-capacity) | 작업 목록·상세 없음(BR-05) |
-| 피킹 | `POST /tasks/{taskId}/executions`, `GET …/executions/{executionId}`, `GET /barcodes/{barcode}` | 지시 행 조회 BR-05 |
+| 내 작업 | `GET /tasks?mfcId=&assignee=me&type=&state=`, `GET /tasks/{taskId}` | BR-05 AGREED(`e817184`). 기본 state에 BLOCKED 없음 → 막힌 작업은 `state=BLOCKED` 로 따로 조회 |
+| 작업 시작 | `POST /tasks/{taskId}/starts`, `GET …/starts/{requestId}` | BR-05. 처리는 §3-1 |
+| 피킹 | `POST /tasks/{taskId}/executions`, `GET …/executions/{executionId}`, `GET /barcodes/{barcode}` | 지시 행은 `GET /tasks/{taskId}` 의 `lines[]` |
 | 패킹 | `GET /shipments/{id}`, `POST /shipments/{id}/packages`(밀봉 → 포장 QR), `GET /packages/{id}`, `POST /packages/{id}/repackings` | |
 | 배차 요청 | `POST /dispatch-requests`, `GET /dispatch-requests/{requestId}`, `GET /deliveries/{id}/dispatch` | 패킹 소요시간 입력 |
 | 인계 확인 | `GET /packages/{id}/handover-resolution`, `GET /deliveries/{id}/eta` | 라이더 스캔 결과 반영 |
@@ -29,6 +30,23 @@
 - **스캔 오류·통신 실패는 작업 FAILED가 아니다** — 요청 오류로 처리.
 - 출하 SHP: `PREPARING → READY → PARTIALLY_HANDED_OVER → HANDED_OVER`, `CANCELLED`, `CLOSED_PARTIAL`. 포장 PKG: `OPEN → SEALED → HANDED_OVER`, `INVALIDATED`(재포장), `VOIDED`.
 - 재고 반영 상태: `CAPTURED → SUBMITTED → PROCESSING → APPLIED | REJECTED | UNKNOWN_RESULT`. 확정 전엔 "확정 대기". `UNKNOWN_RESULT` 일 때 **물리 작업을 다시 하지 말라**고 안내.
+
+### 3-1. 작업 시작 처리 (`POST /tasks/{taskId}/starts`, 계약 `c609a4d`)
+근거: `../pmart-backend/docs/handoff/2026-10-24-clients-reply-br05-start-503.md`. 판정 순서는 담당 조회 → 판정 기록 → 응답이다.
+
+| 상황 | 의미 | 앱 동작 |
+|---|---|---|
+| 201 | 시작 성공 | IN_PROGRESS로 바꾸고 피킹 화면으로 이동 |
+| 409 `ALREADY_STARTED` / `NOT_ASSIGNEE` / `PREDECESSOR_NOT_COMPLETED` / `INVALID_STATE` / `VERSION_CONFLICT` | 거절 확정 | 원인 안내 후 작업 상세를 다시 조회 |
+| 503 `DEPENDENCY_UNAVAILABLE` | **시작 안 됨 확정**(판정 기록 없음) | "다시 시도" 버튼. 재시도는 **같은 키**로 하고, 같은 키로 보내면 서버가 다시 판정 |
+| 응답 없음(타임아웃·연결 끊김) | 결과 불명 | "확인 중" 표시. **같은 키 재전송**으로 확정한다. 짝 조회와 `activeStart` 는 보조 수단 |
+| 409 `IDEMPOTENCY_CONFLICT` `retryable=true` | 같은 키의 앞선 요청이 처리 중 | "확인 중" 유지, 잠시 뒤 같은 키로 재전송 |
+| 409 `IDEMPOTENCY_CONFLICT` `retryable=false` | 같은 키에 다른 본문(클라이언트 버그) | 오류 안내, 자동 재시도 금지 |
+| 짝 조회 404 | 미도달·처리 중·503 중 하나 | **시작 안 됨으로 확정하지 않는다.** 같은 키로 재전송 |
+| 키 분실(앱 재설치 등) | — | `GET /tasks/{taskId}` 의 `activeStart.workerId` 로 본인 시작 여부 확인. 새 키로 재시작하면 `ALREADY_STARTED` |
+
+- 확정 전에는 피킹 화면으로 넘어가지 않는다.
+- `UNKNOWN_RESULT` 는 이 명령에서 오지 않지만, 오면 "확인 중"으로 처리한다(방어).
 
 ## 4. 피킹 (M 639-676, IV-07)
 - 화면: 영수증번호, 진행(3/5), 층, 현재·다음 로케이션, 보관방법, SKU·바코드, 제조일·유통기한, 지시·기피킹·피킹 수량.

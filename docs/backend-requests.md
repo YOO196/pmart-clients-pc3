@@ -13,7 +13,7 @@
 | BR-03 | 높음 | 전체(특히 웹) | 사용자 토큰 보관 방식(쿠키/CSRF vs Bearer) 미정, 게이트웨이가 `Cookie` 제거 | OPEN |
 | BR-04 | 중간 | 관리자 웹 | 게이트웨이 CORS 설정 없음 — 웹 배포 출처 결정 필요 | OPEN |
 | BR-05 | 높음 | MFC | PDA 작업 목록·작업 상세(피킹 지시 행) 조회 API 없음 | AGREED (`e817184`, 빌드 미검증) |
-| BR-06 | 높음 | 라이더 | 배차 제안 수신 채널·대기 목록(일반배차모드) API 없음 | OPEN |
+| BR-06 | 높음 | 라이더 | 배차 제안 수신 채널·대기 목록(일반배차모드) API 없음 | AGREED(부분, `e817184`, 빌드 미검증) — 푸시·SSE·대기 목록 보류 |
 | BR-07 | 높음 | 라이더·고객·관리자 | 파일 업로드 API 없음(`photoRefs` 는 존재하지 않는 "file-service" 참조) | OPEN |
 | BR-08 | 낮음 | 전체 | `X-Source-System` 클라이언트 값 목록 확정 | OPEN |
 | BR-09 | 중간 | 고객·라이더 | 푸시 토큰(FCM/APNs) 등록·해제 API 없음 | OPEN |
@@ -49,10 +49,21 @@
   - `POST /tasks/{taskId}/starts` 와 짝 조회 `GET …/starts/{requestId}`.
   - 서비스 빌드는 미검증이고 서버 구현 전까지 501이므로 목으로만 쓴다. `assignee=me` 는 BR-02, 실제 배정은 mfc-capacity 수동 배정 계약에 의존한다.
 - 추가 질문: 시작 503의 의미, 짝 조회 여부, 같은 키 재전송 → `docs/handoff/2026-10-24-backend-br05-start-503.md`
+- 추가 회신(`../pmart-backend/docs/handoff/2026-10-24-clients-reply-br05-start-503.md`, 계약 `c609a4d`):
+  - 503은 항상 `DEPENDENCY_UNAVAILABLE` 이고, 시작 안 됨이 확정이다. 판정이 기록되지 않으므로 같은 키로 보내면 다시 판정한다.
+  - 짝 조회 404는 확정이 아니다.
+  - 응답이 없으면 같은 키로 재전송하는 것이 기본 확정 방법이다.
+  - 처리표는 `docs/apps/mfc-app.md` §3-1. 상태는 AGREED 유지(빌드 미검증).
 
 ## BR-06 라이더 배차 제안
 - 현황: `GET /offers/{offerId}`, `POST /offers/{offerId}/responses` 만 있음. 제안이 라이더에게 도착하는 채널(푸시·SSE·폴링)과 일반배차모드의 대기 목록 조회가 없다.
 - 요청: `GET /riders/me/offers`(활성 제안, 남은 시간) 또는 SSE 스트림, 일반배차모드 대기 목록.
+- 회신(`../pmart-backend/docs/handoff/2026-10-24-clients-reply-high.md`, `d3ce55c` + `e817184`): 부분 수용.
+  - 수용: `GET /offers?state=` 는 본인 제안만 준다. state를 생략하면 SENT이면서 만료 전인 것만 나온다. 응답에 `serverTime` 이 있고, 각 제안에 `remainingSec` 이 있다. 경로는 게이트웨이 라우팅 때문에 `/riders/me/offers` 가 아니라 `/offers` 로 정해졌다.
+  - 보류: 푸시·SSE 전달 채널(notification 결정 대기)과 일반배차모드 대기 목록(업무 문서 공백). 푸시 토큰은 BR-09에서 따로 회신한다.
+  - 클라이언트 반영: `docs/apps/rider-app.md` "제안 수신과 남은 시간".
+- 추가 질문: 폴링 간격 → `docs/handoff/2026-10-24-backend-br06-offer-polling.md`
+  - 회신(`../pmart-backend/docs/handoff/2026-10-24-clients-reply-br06-offer-polling.md`, `f4dd171`, lint만 통과, 빌드 미검증): 수용. 응답에 `pollAfterSec` 이 추가됐다(잠정 5초). 받을 수 없는 상태면 null이다. 처리율 제한은 JWT subject 단위 단일 버킷이다. 백그라운드에서 놓쳐도 되는지는 업무 결정 대기다(푸시·BR-09와 함께). 클라이언트 반영: `rider-app.md`.
 
 ## BR-07 파일 업로드
 - 현황: `delivery-execution` 전달 완료가 `photoRefs`(설명: "file-service 업로드 완료 참조")를 요구하지만 file-service 는 서비스 목록·계약에 없다. 리뷰 사진·CS 첨부·회수/파손 증빙·간선 인계 증빙도 같은 문제.

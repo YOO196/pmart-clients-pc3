@@ -11,7 +11,7 @@
 | 로그인 | 없음 | BR-02. 1차는 목 로그인 |
 | 홈·운행 상태 | `GET/PUT /riders/me/state`, `GET /riders/me` | 3상태 |
 | 배차 설정 | `GET/PUT /riders/me/settings` | 하나씩 배달하기, 모드 일반/AI추천 |
-| 배차 제안 | `GET /offers/{offerId}`, `POST /offers/{offerId}/responses` | 수신 채널·대기 목록 없음(BR-06) |
+| 배차 제안 | `GET /offers?state=`, `GET /offers/{offerId}`, `POST /offers/{offerId}/responses` | BR-06 부분 AGREED(`e817184`). 푸시·SSE와 일반배차 대기 목록은 보류 |
 | 배송 수행 | `GET /deliveries/{id}`, `POST …/store-arrivals`, `…/pickups`, `…/customer-arrivals`, `…/completions`, `…/failures` | |
 | QR 인계 | `POST /packages/{packageId}/handover-authorizations`, `…/handover-commits`, `GET …/handover-resolution` | mfc-fulfillment |
 | 배차 취소 | `POST /deliveries/{id}/assignment-cancellations` (+짝 조회) | 픽업 전/후 다름 |
@@ -36,6 +36,17 @@
 - 늦은 수락 안내 4종: 시간 만료 / 이미 배정 / 주문 취소 / 자격·용량 불충족.
 - 거절은 사유 입력, AI모드에만 거절 버튼. 5회 연속 거절 시 신규배차 OFF 권유 팝업. 연속 배차 최대 3건.
 - 수락 후 "배차취소"와 수락 전 "거절"은 다른 행위.
+
+**제안 수신과 남은 시간** (계약 `listMyOffers`, 회신 `../pmart-backend/docs/handoff/2026-10-24-clients-reply-high.md` BR-06)
+- 수신: 푸시·SSE가 정해질 때까지 `GET /offers`(state 생략 = SENT이면서 만료 전)를 폴링한다. 푸시를 도입한 뒤에도 offerId의 기준 경로는 이 조회다. 앱 실행·포그라운드 복귀·알림 탭 때마다 즉시 조회해서 유실을 복구한다.
+- 폴링 간격 (회신 `../pmart-backend/docs/handoff/2026-10-24-clients-reply-br06-offer-polling.md`, 계약 `f4dd171`):
+  - 응답의 `pollAfterSec` 을 따른다. 서버 잠정 기본값은 5초다. 클라이언트는 숫자를 하드코딩하지 않는다. 필드가 없거나 조회에 실패했을 때 쓸 대체값만 원격 설정으로 둔다.
+  - `pollAfterSec: null` 이면 폴링을 멈춘다. 운행 종료, 신규배차 OFF, 하나씩 배달 진행 중, 계정 제한일 때 서버가 null을 준다. 배차 건수로 간격을 계산하지 않는다.
+  - 다음 시점에는 간격과 관계없이 즉시 조회한다: 앱 실행, 포그라운드 복귀, 알림 탭, 운행 시작, 신규배차 ON 전환.
+  - 실패하면 지수 백오프로 재시도하고 "연결 확인 중"으로 표시한다("제안 없음"으로 표시하지 않음). 429(`RATE_LIMITED`)를 받으면 `Retry-After` 를 따른다. 처리율 제한은 JWT subject 단위 단일 버킷이고 위치 전송과 같이 쓴다.
+  - 백그라운드에서 제안을 놓쳐도 되는지: `[결정 필요]` 업무 결정 대기. 푸시(BR-06 보류분, BR-09)와 함께 팀에서 결정한다. 응답하지 못한 제안은 "미응답 만료"로 기록되며 연속 거절 5회에는 세지 않는다.
+- 남은 시간: 단말 시계를 쓰지 않는다. 응답의 `remainingSec`(또는 `expiresAt - serverTime`)에서 출발해 단말의 경과 시간(monotonic)으로 줄여 표시하고, 다시 조회할 때마다 서버 값으로 맞춘다. 0이 돼도 만료 확정이 아니다. 판정은 서버 수신 시각 기준이며, 늦은 수락은 `outcome=LATE` 로 안내한다.
+- 일반배차모드 대기 목록은 계약이 없다(BR-06 보류). 화면은 목으로만 둔다.
 
 **수행 흐름** (D 312-412)
 - `가게 도착 → QR 인계 → 픽업 완료 → 고객 도착 → 전달 완료`. GPS만으로 픽업·전달 완료 처리 안 함.
