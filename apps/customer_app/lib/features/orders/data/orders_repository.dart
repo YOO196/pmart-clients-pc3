@@ -7,6 +7,9 @@ import 'package:pmart_core/pmart_core.dart';
 import '../../../shared/order_status.dart';
 import '../../checkout/data/checkout_repository.dart' show quoteFromContract;
 import '../../checkout/domain/checkout.dart' show ArrivalWindow;
+import '../../../shared/providers.dart' show sourceSystem;
+import '../../claims/data/claims_repository.dart' show requestStateOf;
+import '../../claims/domain/claims.dart' show RequestState;
 import '../domain/orders.dart';
 
 /// 주문 조회·배송 도착 예상. 실패는 [PmartFailure] 로 던진다(빈 목록·배송 실패로 바꾸지 않는다).
@@ -17,6 +20,17 @@ abstract interface class OrdersRepository {
 
   /// `GET /deliveries/{id}/eta`. 실시간 구독(SSE)은 아직 붙이지 않았다(조회로 갱신).
   Future<DeliveryEtaView> eta(String deliveryId);
+
+  /// `POST /orders/{id}/reservation-time-changes`(202). 상품 준비 전만 받는다(INVALID_STATE).
+  Future<void> requestTimeChange(
+    String orderId,
+    ArrivalWindow window, {
+    required int expectedVersion,
+    required IdempotencyKey key,
+  });
+
+  /// 시간 변경 결과 조회. 불명이면 [RequestState.unknown].
+  Future<RequestState> timeChange(String orderId, IdempotencyKey key);
 }
 
 final class ApiOrdersRepository implements OrdersRepository {
@@ -53,6 +67,48 @@ final class ApiOrdersRepository implements OrdersRepository {
       res.data ?? (throw const ContractViolationFailure('ETA 본문 없음')),
     );
   }
+
+  @override
+  Future<void> requestTimeChange(
+    String orderId,
+    ArrivalWindow window, {
+    required int expectedVersion,
+    required IdempotencyKey key,
+  }) async {
+    await pmartGuard(
+      () => _orders.requestReservationTimeChange(
+        orderId: orderId,
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        xExpectedVersion: expectedVersion,
+        requestReservationTimeChangeRequest:
+            api.RequestReservationTimeChangeRequest(
+              newArrivalWindow: api.ArrivalWindow(
+                date: window.date,
+                start: window.start,
+                end: window.end,
+              ),
+            ),
+        extra: commandOptions(key, expectedVersion: expectedVersion).extra,
+      ),
+    );
+  }
+
+  @override
+  Future<RequestState> timeChange(String orderId, IdempotencyKey key) async {
+    try {
+      final res = await pmartGuard(
+        () => _orders.getReservationTimeChange(
+          orderId: orderId,
+          requestId: key.value,
+        ),
+      );
+      return requestStateOf(res.data?.state?.value);
+    } on ProblemFailure catch (f) {
+      if (f.problem.code == ProblemCode.notFound) return RequestState.unknown;
+      rethrow;
+    }
+  }
 }
 
 T _need<T>(T? v, String field) =>
@@ -84,6 +140,7 @@ OrderDetail orderFromContract(api.Order o) => OrderDetail(
   version: o.version ?? 0,
   status: OrderStatus.fromWire(o.status?.value),
   deliveryMode: o.deliveryMode,
+  mfcId: o.mfcId,
   window: switch (o.arrivalWindow) {
     final w? => ArrivalWindow(date: w.date, start: w.start, end: w.end),
     null => null,

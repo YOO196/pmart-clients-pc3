@@ -109,6 +109,7 @@ class OrderDetail {
     required this.shipments,
     required this.sources,
     this.deliveryMode,
+    this.mfcId,
     this.window,
     this.quote,
     this.paymentState,
@@ -119,6 +120,7 @@ class OrderDetail {
   final String orderId;
   final int version;
   final OrderStatus status;
+  final String? mfcId;
   final String? deliveryMode;
   final ArrivalWindow? window;
   final Quote? quote;

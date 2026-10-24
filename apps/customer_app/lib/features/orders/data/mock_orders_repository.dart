@@ -6,6 +6,8 @@ import 'package:pmart_core/pmart_core.dart';
 
 import '../../catalog/data/mock_catalog_repository.dart' show mockProducts;
 import '../../checkout/data/mock_checkout_repository.dart';
+import '../../checkout/domain/checkout.dart' show ArrivalWindow;
+import '../../claims/domain/claims.dart' show RequestState;
 import '../domain/orders.dart';
 import 'orders_repository.dart';
 
@@ -49,6 +51,52 @@ base class MockOrdersRepository implements OrdersRepository {
   };
 
   Map<String, Map<String, Object?>> _seeded() => {
+    'order-seed-4': {
+      'orderId': 'order-seed-4',
+      'version': 2,
+      'status': 'CONFIRMED',
+      'mfcId': 'MFC-MOCK-01',
+      'deliveryMode': 'SCHEDULED',
+      'arrivalWindow': {'date': '2026-10-24', 'start': '18:00', 'end': '19:00'},
+      'quote': {
+        ..._quoteSeed,
+        'itemAmount': 17940,
+        'deliveryTip': 3000,
+        'deliveryTipReason': 'STANDARD',
+        'totalAmount': 21040,
+        'plannedShipments': 1,
+      },
+      'lines': [
+        {
+          'orderLineId': 'ol-5',
+          'sku': 'E-00000002',
+          'productName': '그릭요거트 플레인 400g',
+          'unitPrice': 5980,
+          'originalQty': 3,
+          'handedOverQty': 0,
+          'cancelledBeforeShipQty': 0,
+          'deliveredQty': 0,
+        },
+      ],
+      'shipments': [
+        {
+          'shipmentId': 'sh-5',
+          'deliveryId': 'dlv-s5',
+          'lines': [
+            {'orderLineId': 'ol-5', 'qty': 3},
+          ],
+          'state': 'PLANNED',
+        },
+      ],
+      'payment': {'state': 'APPROVED', 'refundedAmount': 0},
+      'claims': <Object?>[],
+      'sources': [
+        {
+          'system': 'order-service',
+          'asOf': {'asOf': '2026-10-24T02:58:00Z', 'freshness': 'CURRENT'},
+        },
+      ],
+    },
     'order-seed-1': {
       'orderId': 'order-seed-1',
       'version': 7,
@@ -203,6 +251,7 @@ base class MockOrdersRepository implements OrdersRepository {
   };
 
   static const _orderedAt = {
+    'order-seed-4': '2026-10-24T01:00:00Z',
     'order-seed-1': '2026-10-24T02:30:00Z',
     'order-seed-2': '2026-10-22T08:10:00Z',
     'order-seed-3': '2026-10-20T06:00:00Z',
@@ -344,4 +393,74 @@ base class MockOrdersRepository implements OrdersRepository {
     };
     return etaFromContract(deliveryId, trk.DeliveryEta.fromJson(json));
   }
+
+  final _timeChanges =
+      <String, ({String orderId, Map<String, String> window, int polls})>{};
+
+  /// 다음 시간 변경을 서버가 거절하게 한다(정원 소진 등).
+  bool rejectNextTimeChange = false;
+
+  @override
+  Future<void> requestTimeChange(
+    String orderId,
+    ArrivalWindow window, {
+    required int expectedVersion,
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    if (_timeChanges.containsKey(key.value)) return;
+    final order = orderJson(orderId);
+    if (order == null) {
+      throw const ProblemFailure(
+        Problem(status: 404, code: ProblemCode.notFound),
+      );
+    }
+    if (order['status'] != 'CONFIRMED') {
+      // 상품 준비에 들어가면 바꿀 수 없다.
+      throw const ProblemFailure(
+        Problem(status: 409, code: ProblemCode.invalidState),
+      );
+    }
+    if (order['version'] != expectedVersion) {
+      throw const ProblemFailure(
+        Problem(status: 409, code: ProblemCode.versionConflict),
+      );
+    }
+    _timeChanges[key.value] = (
+      orderId: orderId,
+      window: {'date': window.date, 'start': window.start, 'end': window.end},
+      polls: 0,
+    );
+  }
+
+  @override
+  Future<RequestState> timeChange(String orderId, IdempotencyKey key) async {
+    await _wait();
+    final r = _timeChanges[key.value];
+    if (r == null) return RequestState.unknown;
+    if (r.polls == 0) {
+      _timeChanges[key.value] = (
+        orderId: r.orderId,
+        window: r.window,
+        polls: 1,
+      );
+      return RequestState.pending;
+    }
+    if (rejectNextTimeChange) {
+      rejectNextTimeChange = false;
+      _timeChanges.remove(key.value);
+      return RequestState.rejected;
+    }
+    final order = orderJson(orderId)!;
+    overrides[orderId] = {
+      ...order,
+      'arrivalWindow': r.window,
+      'version': (order['version']! as int) + 1,
+    };
+    _timeChanges.remove(key.value);
+    _confirmed.add(key.value);
+    return RequestState.confirmed;
+  }
+
+  final _confirmed = <String>{};
 }

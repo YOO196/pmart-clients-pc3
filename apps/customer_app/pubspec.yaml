@@ -43,6 +43,8 @@ dependencies:
     path: ../../packages/pmart_api/gen/delivery-serviceability
   pmart_api_delivery_tracking:
     path: ../../packages/pmart_api/gen/delivery-tracking
+  pmart_api_claim:
+    path: ../../packages/pmart_api/gen/claim
 
 dev_dependencies:
   flutter_test:

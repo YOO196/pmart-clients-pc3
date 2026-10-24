@@ -8,6 +8,7 @@ import 'features/auth/presentation/login_screen.dart';
 import 'features/cart/presentation/cart_screen.dart';
 import 'features/checkout/presentation/delivery_select_screen.dart';
 import 'features/checkout/presentation/order_sheet_screen.dart';
+import 'features/claims/presentation/claims_screens.dart';
 import 'features/catalog/presentation/category_screen.dart';
 import 'features/payment/presentation/payment_screen.dart';
 import 'features/orders/presentation/my_screen.dart';
@@ -82,6 +83,20 @@ final routerProvider = Provider<GoRouter>(
             path: ':orderId',
             builder: (_, state) =>
                 OrderDetailScreen(orderId: state.pathParameters['orderId']!),
+            routes: [
+              GoRoute(
+                parentNavigatorKey: rootNavigatorKey,
+                path: 'cancel',
+                builder: (_, state) =>
+                    CancelScreen(orderId: state.pathParameters['orderId']!),
+              ),
+              GoRoute(
+                parentNavigatorKey: rootNavigatorKey,
+                path: 'reschedule',
+                builder: (_, state) =>
+                    RescheduleScreen(orderId: state.pathParameters['orderId']!),
+              ),
+            ],
           ),
         ],
       ),
@@ -90,6 +105,12 @@ final routerProvider = Provider<GoRouter>(
         path: '/deliveries/:deliveryId',
         builder: (_, state) =>
             TrackingScreen(deliveryId: state.pathParameters['deliveryId']!),
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/claims/:claimId',
+        builder: (_, state) =>
+            ClaimScreen(claimId: state.pathParameters['claimId']!),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,

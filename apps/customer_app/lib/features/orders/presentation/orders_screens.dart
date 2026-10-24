@@ -11,6 +11,7 @@ import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../checkout/presentation/delivery_select_screen.dart'
     show windowText;
 import '../../checkout/presentation/order_sheet_screen.dart' show tipReasonText;
+import '../../../shared/order_status.dart';
 import '../domain/orders.dart';
 import 'orders_providers.dart';
 
@@ -185,6 +186,34 @@ class _OrderBody extends StatelessWidget {
             l10n.refundedAmount,
             formatKrw(o.refundedAmount!),
             key: const ValueKey('refunded'),
+          ),
+        for (final c in o.claims)
+          ListTile(
+            key: ValueKey('order-claim-${c.claimId}'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.assignment_return_outlined),
+            title: Text(l10n.claimTitle),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/claims/${c.claimId}'),
+          ),
+        const SizedBox(height: 16),
+        // 버튼은 요청 진입일 뿐이다. 가능 여부는 서버가 판정한다.
+        if (o.deliveryMode == 'SCHEDULED' && o.status == OrderStatus.confirmed)
+          OutlinedButton(
+            key: const ValueKey('reschedule'),
+            onPressed: () => context.push('/orders/${o.orderId}/reschedule'),
+            child: Text(l10n.rescheduleTitle),
+          ),
+        if (switch (o.status) {
+          OrderStatus.confirmed ||
+          OrderStatus.preparing ||
+          OrderStatus.partiallyHandedOver => true,
+          _ => false,
+        })
+          OutlinedButton(
+            key: const ValueKey('cancel-order'),
+            onPressed: () => context.push('/orders/${o.orderId}/cancel'),
+            child: Text(l10n.cancelTitle),
           ),
       ],
     );
