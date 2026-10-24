@@ -1,46 +1,359 @@
-import 'package:pmart_api_mfc_fulfillment/pmart_api_mfc_fulfillment.dart';
+import 'package:dio/dio.dart';
+import 'package:pmart_api_mfc_fulfillment/pmart_api_mfc_fulfillment.dart'
+    as api;
+import 'package:pmart_core/pmart_core.dart';
 
 import '../domain/task_list.dart';
 import 'task_repository.dart';
 
-/// 목 구현. 계약(`mfc-fulfillment-service.yaml` listTasks) 모양 JSON 을 생성 모델로 읽는다.
-final class MockTaskRepository implements TaskRepository {
-  MockTaskRepository({this.latency = const Duration(milliseconds: 300)});
-
-  final Duration latency;
-
-  static const fixture = <String, Object?>{
-    'items': [
-      {
-        'taskId': 'task-mock-1',
-        'taskType': 'PICK',
-        'state': 'ASSIGNED',
-        'version': 1,
-        'mfcId': 'MFC-MOCK-01',
-        'fulfillmentId': 'ful-1',
-        'shipmentId': 'shp-1',
-        'assignment': {'workerId': 'worker-mock-1', 'assignmentVersion': 2},
-        'lineCount': 4,
-        'plannedQty': 7,
-        'completedQty': 2,
-        'remainingQty': 5,
-        'promisedReadyAt': '2026-10-24T06:20:00Z',
-        'createdAt': '2026-10-24T06:00:00Z',
-      },
-      {
+/// 목 구현. 계약(`mfc-fulfillment-service.yaml`) 모양 JSON 을 생성 모델로 읽는다.
+///
+/// - task-mock-1: 배정된 피킹(3행). 시작·피킹 시연.
+/// - task-mock-2: 진행 중 패킹.
+/// - task-mock-3: 막힌 피킹(결품 보고).
+/// - task-mock-4: 다른 작업자가 이미 시작한 피킹(ALREADY_STARTED 시연).
+base class MockTaskRepository implements TaskRepository {
+  MockTaskRepository({this.latency = const Duration(milliseconds: 300)}) {
+    _tasks
+      ..['task-mock-1'] = _pickTask()
+      ..['task-mock-2'] = {
         'taskId': 'task-mock-2',
         'taskType': 'PACK',
         'state': 'IN_PROGRESS',
+        'version': 3,
+        'mfcId': 'MFC-MOCK-01',
+        'shipmentId': 'shp-2',
+        'assignment': {'workerId': workerId, 'assignmentVersion': 1},
+        'lineCount': 1,
         'remainingQty': 1,
+        'lines': <Object?>[],
+      }
+      ..['task-mock-3'] = {
+        ..._pickTask(id: 'task-mock-3'),
+        'state': 'BLOCKED',
+        'blockReason': '결품 보고(고객 확인 대기)',
+      }
+      ..['task-mock-4'] = {
+        ..._pickTask(id: 'task-mock-4'),
+        'assignment': {'workerId': workerId, 'assignmentVersion': 1},
+      };
+  }
+
+  final Duration latency;
+  static const workerId = 'worker-mock-1';
+  static const milkBarcode = '8801115114154';
+  static const yogurtBarcode = '8801115220015';
+  static const chipsBarcode = '8801019606557';
+
+  final _tasks = <String, Map<String, Object?>>{};
+  final _startsByKey = <String, Map<String, Object?>>{};
+  final _executions =
+      <
+        String,
+        ({String taskId, Map<String, Object?> payload, int polls, String state})
+      >{};
+  final _executionByKey = <String, String>{};
+  int _exeSeq = 0;
+
+  /// 다음 시작 n회를 503 DEPENDENCY_UNAVAILABLE(시작 안 됨)로 만든다.
+  int startUnavailable = 0;
+
+  /// 다음 시작을 "점유는 됐지만 응답 잃음"으로 만든다.
+  bool loseNextStartResponse = false;
+
+  /// 연결이 끊긴 상태(실행 전송이 서버에 닿지 않는다).
+  bool offline = false;
+
+  /// 다음 실행 응답을 1회 잃는다(서버는 접수함).
+  bool loseNextExecutionResponse = false;
+
+  /// 실행이 재고 반영까지 몇 번 조회해야 하는지.
+  int confirmPolls = 1;
+
+  final sentExecutionKeys = <String>[];
+
+  Future<void> _wait() => Future<void>.delayed(latency);
+
+  static Map<String, Object?> _pickTask({String id = 'task-mock-1'}) => {
+    'taskId': id,
+    'taskType': 'PICK',
+    'state': 'ASSIGNED',
+    'version': 1,
+    'mfcId': 'MFC-MOCK-01',
+    'fulfillmentId': 'ful-1',
+    'shipmentId': 'shp-1',
+    'assignment': {'workerId': workerId, 'assignmentVersion': 2},
+    'lineCount': 3,
+    'plannedQty': 4,
+    'completedQty': 0,
+    'remainingQty': 4,
+    'promisedReadyAt': '2026-10-24T06:20:00Z',
+    'createdAt': '2026-10-24T06:00:00Z',
+    'lines': [
+      {
+        'taskLineId': '$id-l1',
+        'orderLineId': 'ol-1',
+        'sku': 'E-00000002',
+        'productName': '그릭요거트 플레인 400g',
+        'barcode': yogurtBarcode,
+        'locationId': 'C01-01-101',
+        'lotId': 'LOT-Y-1024',
+        'expiresOn': '2026-11-05',
+        'plannedQty': 1,
+        'completedQty': 0,
+        'cancelledQty': 0,
+        'remainingQty': 1,
+        'pendingQty': 0,
+      },
+      {
+        'taskLineId': '$id-l2',
+        'orderLineId': 'ol-2',
+        'sku': 'E-00000001',
+        'productName': '서울우유 1L',
+        'barcode': milkBarcode,
+        'locationId': 'C01-02-205',
+        'lotId': 'LOT-M-1022',
+        'expiresOn': '2026-10-30',
+        'plannedQty': 2,
+        'completedQty': 0,
+        'cancelledQty': 0,
+        'remainingQty': 2,
+        'pendingQty': 0,
+      },
+      {
+        'taskLineId': '$id-l3',
+        'orderLineId': 'ol-3',
+        'sku': 'E-00000005',
+        'productName': '감자칩 오리지널 110g',
+        'barcode': chipsBarcode,
+        'locationId': 'A03-01-110',
+        'plannedQty': 1,
+        'completedQty': 0,
+        'cancelledQty': 0,
+        'remainingQty': 1,
+        'pendingQty': 0,
       },
     ],
-    'page': {'nextCursor': null, 'size': 50},
-    'asOf': {'asOf': '2026-10-24T06:05:00Z', 'freshness': 'CURRENT'},
   };
 
   @override
-  Future<TaskList> myTasks(String mfcId) async {
-    await Future<void>.delayed(latency);
-    return taskListFromContract(ListTasks200Response.fromJson(fixture));
+  Future<TaskList> myTasks(String mfcId, {bool blocked = false}) async {
+    await _wait();
+    final items = [
+      for (final t in _tasks.values)
+        if ((t['state'] == 'BLOCKED') == blocked &&
+            (blocked ||
+                t['state'] == 'ASSIGNED' ||
+                t['state'] == 'IN_PROGRESS'))
+          {
+            for (final e in t.entries)
+              if (e.key != 'lines') e.key: e.value,
+          },
+    ];
+    return taskListFromContract(
+      api.ListTasks200Response.fromJson({
+        'items': items,
+        'page': {'nextCursor': null, 'size': 50},
+        'asOf': {'asOf': '2026-10-24T06:05:00Z', 'freshness': 'CURRENT'},
+      }),
+    );
+  }
+
+  /// 목 작업 JSON(테스트에서 상태를 바꿀 때 쓴다).
+  Map<String, Object?> taskJson(String taskId) => _tasks[taskId]!;
+
+  @override
+  Future<TaskDetailView> task(String taskId) async {
+    await _wait();
+    final t = _tasks[taskId];
+    if (t == null) {
+      throw const ProblemFailure(
+        Problem(status: 404, code: ProblemCode.notFound),
+      );
+    }
+    return taskDetailFromContract(api.TaskDetail.fromJson(t));
+  }
+
+  @override
+  Future<StartOutcome> start(
+    String taskId, {
+    required String workerId,
+    required int assignmentVersion,
+    String? deviceId,
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    final recorded = _startsByKey[key.value];
+    if (recorded != null) return _startOutcome(recorded);
+    if (startUnavailable > 0) {
+      startUnavailable--;
+      // 판정 기록 없음 → 같은 키로 다시 보내면 처음부터 판정한다.
+      return startFailureToOutcome(
+        const UnknownResultFailure(
+          httpStatus: 503,
+          problem: Problem(
+            status: 503,
+            code: TaskProblemCode.dependencyUnavailable,
+          ),
+        ),
+      );
+    }
+    final t = _tasks[taskId]!;
+    final assignment = t['assignment']! as Map<String, Object?>;
+    final String? reject;
+    if (taskId == 'task-mock-4') {
+      reject = TaskProblemCode.alreadyStarted;
+    } else if (t['state'] != 'ASSIGNED') {
+      reject = TaskProblemCode.invalidState;
+    } else if (assignment['workerId'] != workerId) {
+      reject = TaskProblemCode.notAssignee;
+    } else if (assignment['assignmentVersion'] != assignmentVersion) {
+      reject = TaskProblemCode.versionConflict;
+    } else {
+      reject = null;
+    }
+    final decision = {
+      'outcome': reject == null ? 'STARTED' : 'REJECTED',
+      'rejectCode': reject,
+    };
+    _startsByKey[key.value] = decision;
+    if (reject == null) {
+      t
+        ..['state'] = 'IN_PROGRESS'
+        ..['version'] = (t['version']! as int) + 1
+        ..['activeStart'] = {
+          'requestId': key.value,
+          'workerId': workerId,
+          'deviceId': deviceId,
+          'startedAt': '2026-10-24T06:06:00Z',
+        };
+    }
+    if (loseNextStartResponse) {
+      loseNextStartResponse = false;
+      return startFailureToOutcome(
+        UnknownResultFailure(
+          requestId: key.value,
+          transport: DioExceptionType.receiveTimeout,
+        ),
+      );
+    }
+    return _startOutcome(decision);
+  }
+
+  StartOutcome _startOutcome(Map<String, Object?> d) =>
+      d['outcome'] == 'STARTED'
+      ? const StartApplied()
+      : StartRejected(d['rejectCode']! as String);
+
+  @override
+  Future<SendResult> sendExecution(QueueItem item) async {
+    await _wait();
+    sentExecutionKeys.add(item.id);
+    if (offline) {
+      return executionFailureToSend(
+        const UnknownResultFailure(transport: DioExceptionType.connectionError),
+      );
+    }
+    final existing = _executionByKey[item.id];
+    if (existing != null) return SendAccepted(resultId: existing);
+    final t = _tasks[item.targetId]!;
+    final assignment = t['assignment']! as Map<String, Object?>;
+    if (t['state'] != 'IN_PROGRESS') {
+      return executionFailureToSend(
+        const ProblemFailure(
+          Problem(status: 409, code: TaskProblemCode.invalidState),
+        ),
+      );
+    }
+    // 재배정 뒤 전임의 늦은 실적은 버전 충돌로 거절된다.
+    if (item.payload['assignmentVersion'] != assignment['assignmentVersion']) {
+      return executionFailureToSend(
+        const ProblemFailure(
+          Problem(status: 409, code: TaskProblemCode.versionConflict),
+        ),
+      );
+    }
+    final id = 'exe-${++_exeSeq}';
+    _executionByKey[item.id] = id;
+    _executions[id] = (
+      taskId: item.targetId,
+      payload: item.payload,
+      polls: 0,
+      state: 'INVENTORY_PENDING',
+    );
+    _applyPending(t, item.payload, pending: true);
+    if (loseNextExecutionResponse) {
+      loseNextExecutionResponse = false;
+      return executionFailureToSend(
+        UnknownResultFailure(
+          requestId: item.id,
+          transport: DioExceptionType.receiveTimeout,
+        ),
+      );
+    }
+    return SendAccepted(resultId: id);
+  }
+
+  /// 접수분은 pendingQty, 반영분은 completedQty·remainingQty 로 옮긴다.
+  void _applyPending(
+    Map<String, Object?> t,
+    Map<String, Object?> payload, {
+    required bool pending,
+  }) {
+    final lines = (t['lines']! as List).cast<Map<String, Object?>>();
+    for (final l in (payload['lines']! as List).cast<Map<String, Object?>>()) {
+      final line = lines.firstWhere(
+        (x) => x['orderLineId'] == l['orderLineId'],
+      );
+      final qty = l['pickedQty']! as int;
+      final shortage = (l['shortage'] as Map?)?['qty'] as int? ?? 0;
+      if (pending) {
+        line['pendingQty'] = (line['pendingQty'] as int? ?? 0) + qty;
+      } else {
+        line
+          ..['pendingQty'] = (line['pendingQty'] as int? ?? 0) - qty
+          ..['completedQty'] = (line['completedQty']! as int) + qty
+          ..['remainingQty'] = (line['remainingQty']! as int) - qty - shortage;
+        if (shortage > 0) t['state'] = 'BLOCKED';
+      }
+    }
+    final allDone = lines.every(
+      (l) => l['remainingQty'] == 0 && (l['pendingQty'] as int? ?? 0) == 0,
+    );
+    if (!pending && allDone && t['state'] == 'IN_PROGRESS') {
+      t['state'] = 'COMPLETED';
+    }
+    t['version'] = (t['version']! as int) + 1;
+  }
+
+  @override
+  Future<ConfirmResult> execution(String taskId, String executionId) async {
+    await _wait();
+    final e = _executions[executionId];
+    if (e == null) return ConfirmResult.unknown;
+    if (e.state == 'APPLIED') return ConfirmResult.applied;
+    final polls = e.polls + 1;
+    if (polls < confirmPolls) {
+      _executions[executionId] = (
+        taskId: e.taskId,
+        payload: e.payload,
+        polls: polls,
+        state: e.state,
+      );
+      return ConfirmResult.pending;
+    }
+    _executions[executionId] = (
+      taskId: e.taskId,
+      payload: e.payload,
+      polls: polls,
+      state: 'APPLIED',
+    );
+    _applyPending(_tasks[e.taskId]!, e.payload, pending: false);
+    return executionStateToConfirm(
+      api.TaskExecution.fromJson({
+        'executionId': executionId,
+        'state': 'APPLIED',
+      }).state?.value,
+    );
   }
 }

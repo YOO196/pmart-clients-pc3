@@ -6,6 +6,7 @@ export 'src/command_response.dart';
 export 'src/device_id.dart';
 export 'src/env.dart';
 export 'src/failure.dart';
+export 'src/field_queue.dart';
 export 'src/http_client.dart';
 export 'src/idempotency.dart';
 export 'src/interceptors.dart';

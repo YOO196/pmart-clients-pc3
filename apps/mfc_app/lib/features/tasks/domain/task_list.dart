@@ -2,6 +2,33 @@ import 'package:flutter/foundation.dart';
 
 enum TaskKind { pick, pack, dispatch }
 
+/// 계약 TaskState. 종료 상태(완료·부분 종결·실패·취소)에서는 다시 시작할 수 없다.
+enum TaskState {
+  waiting,
+  ready,
+  assigned,
+  inProgress,
+  completed,
+  blocked,
+  failed,
+  cancelled,
+  closedPartial,
+  unknown;
+
+  static TaskState fromWire(String? w) => switch (w) {
+    'WAITING' => waiting,
+    'READY' => ready,
+    'ASSIGNED' => assigned,
+    'IN_PROGRESS' => inProgress,
+    'COMPLETED' => completed,
+    'BLOCKED' => blocked,
+    'FAILED' => failed,
+    'CANCELLED' => cancelled,
+    'CLOSED_PARTIAL' => closedPartial,
+    _ => unknown,
+  };
+}
+
 /// `GET /tasks` 결과(화면용).
 @immutable
 class TaskList {
@@ -21,12 +48,143 @@ class TaskItem {
     required this.kind,
     required this.state,
     required this.remainingQty,
+    this.lineCount,
+    this.promisedReadyAt,
   });
 
   final String taskId;
   final TaskKind kind;
-
-  /// 계약 TaskState 코드 그대로(표시 문구 매핑은 C2).
-  final String state;
+  final TaskState state;
   final int? remainingQty;
+  final int? lineCount;
+  final DateTime? promisedReadyAt;
+}
+
+/// 작업 지시 행. 수량은 서버 확정값(계획 = 확정 + 승인취소 + 잔량)이다.
+@immutable
+class TaskLineView {
+  const TaskLineView({
+    required this.taskLineId,
+    required this.orderLineId,
+    required this.sku,
+    required this.plannedQty,
+    required this.completedQty,
+    required this.cancelledQty,
+    required this.remainingQty,
+    this.pendingQty = 0,
+    this.productName,
+    this.barcode,
+    this.locationId,
+    this.lotId,
+    this.expiresOn,
+  });
+
+  final String taskLineId;
+  final String orderLineId;
+  final String sku;
+  final String? productName;
+
+  /// 필수 스캔 대조값. 다른 바코드는 실적 0 + 원인 안내.
+  final String? barcode;
+  final String? locationId;
+  final String? lotId;
+  final String? expiresOn;
+  final int plannedQty;
+  final int completedQty;
+  final int cancelledQty;
+  final int remainingQty;
+
+  /// 접수됐지만 재고 확정 대기인 수량("확정 대기"로 따로 보인다).
+  final int pendingQty;
+
+  bool get done => remainingQty == 0 && pendingQty == 0;
+}
+
+@immutable
+class TaskDetailView {
+  const TaskDetailView({
+    required this.taskId,
+    required this.kind,
+    required this.state,
+    required this.version,
+    required this.lines,
+    this.assignedWorkerId,
+    this.assignmentVersion,
+    this.activeStartWorkerId,
+    this.activeStartRequestId,
+    this.pendingExecutionIds = const [],
+    this.blockReason,
+    this.shipmentId,
+  });
+
+  final String taskId;
+  final TaskKind kind;
+  final TaskState state;
+  final int version;
+  final String? assignedWorkerId;
+  final int? assignmentVersion;
+
+  /// 성공한 시작 점유(IN_PROGRESS 일 때). 키를 잃었을 때 본인 시작인지 확인한다.
+  final String? activeStartWorkerId;
+  final String? activeStartRequestId;
+  final List<String> pendingExecutionIds;
+  final String? blockReason;
+  final String? shipmentId;
+  final List<TaskLineView> lines;
+
+  int get totalPlanned => lines.fold(0, (s, l) => s + l.plannedQty);
+  int get totalCompleted => lines.fold(0, (s, l) => s + l.completedQty);
+}
+
+/// 작업 시작 판정(BR-05, `docs/apps/mfc-app.md` §3-1).
+@immutable
+sealed class StartOutcome {
+  const StartOutcome();
+}
+
+/// 시작 점유 성공. 이때만 피킹 화면으로 간다.
+final class StartApplied extends StartOutcome {
+  const StartApplied({this.taskVersion});
+
+  final int? taskVersion;
+}
+
+/// 거절 확정(ALREADY_STARTED·NOT_ASSIGNEE·PREDECESSOR_NOT_COMPLETED·INVALID_STATE·VERSION_CONFLICT).
+final class StartRejected extends StartOutcome {
+  const StartRejected(this.code);
+
+  final String code;
+}
+
+/// 503 DEPENDENCY_UNAVAILABLE: 시작 안 됨 확정(판정 기록 없음). 같은 키로 다시 시도할 수 있다.
+final class StartNotStarted extends StartOutcome {
+  const StartNotStarted();
+}
+
+/// 응답을 받지 못했거나 같은 키의 앞선 요청이 처리 중. 같은 키 재전송으로 확정한다.
+final class StartUnknown extends StartOutcome {
+  const StartUnknown();
+}
+
+/// 같은 키에 다른 본문(IDEMPOTENCY_CONFLICT, retryable=false). 클라이언트 오류라 자동 재시도하지 않는다.
+final class StartClientError extends StartOutcome {
+  const StartClientError();
+}
+
+/// 결품·파손·차단 보고 사유.
+enum ShortageReason { short, damaged, blocked }
+
+abstract final class TaskProblemCode {
+  static const alreadyStarted = 'ALREADY_STARTED';
+  static const notAssignee = 'NOT_ASSIGNEE';
+  static const predecessorNotCompleted = 'PREDECESSOR_NOT_COMPLETED';
+  static const invalidState = 'INVALID_STATE';
+  static const versionConflict = 'VERSION_CONFLICT';
+  static const idempotencyConflict = 'IDEMPOTENCY_CONFLICT';
+  static const dependencyUnavailable = 'DEPENDENCY_UNAVAILABLE';
+}
+
+/// 큐에 넣는 실행 명령 종류.
+abstract final class FieldCommandKind {
+  static const pickExecution = 'pick-execution';
 }

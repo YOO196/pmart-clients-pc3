@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
+import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/domain/checkout.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
 import 'package:customer_app/features/claims/data/mock_claims_repository.dart';
@@ -143,14 +144,21 @@ void main() {
         ..devicePixelRatio = 1;
       addTearDown(t.view.reset);
       await t.pumpWidget(
-        testApp(orders: orders, [
-          claimsRepositoryProvider.overrideWithValue(claims),
-          clockProvider.overrideWithValue(() => now),
-          requestPollPolicyProvider.overrideWithValue((
-            interval: Duration.zero,
-            attempts: 3,
-          )),
-        ]),
+        testApp(
+          orders: orders,
+          checkout: MockCheckoutRepository(
+            latency: Duration.zero,
+            now: () => now,
+          ),
+          [
+            claimsRepositoryProvider.overrideWithValue(claims),
+            clockProvider.overrideWithValue(() => now),
+            requestPollPolicyProvider.overrideWithValue((
+              interval: Duration.zero,
+              attempts: 3,
+            )),
+          ],
+        ),
       );
       await t.pumpAndSettle();
       await t.tap(find.text('마이').last);

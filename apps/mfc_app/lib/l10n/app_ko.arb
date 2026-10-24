@@ -8,13 +8,137 @@
   "taskTypeDispatch": "출고",
   "taskRemaining": "남은 수량 {qty}",
   "@taskRemaining": {
-    "placeholders": { "qty": { "type": "int" } }
+    "placeholders": {
+      "qty": {
+        "type": "int"
+      }
+    }
   },
   "taskRemainingUnknown": "남은 수량 확인 중",
-  "taskStateLabel": "상태 {state}",
-  "@taskStateLabel": {
-    "placeholders": { "state": { "type": "String" } }
-  },
   "assignmentStale": "배정 정보가 최신이 아닐 수 있어요. 시작 가능 여부는 시작할 때 확인해요.",
-  "mockModeBadge": "목 데이터"
+  "mockModeBadge": "목 데이터",
+  "tabMyTasks": "내 작업",
+  "tabBlockedTasks": "막힌 작업",
+  "tsWaiting": "대기",
+  "tsReady": "준비",
+  "tsAssigned": "배정됨",
+  "tsInProgress": "진행 중",
+  "tsCompleted": "완료",
+  "tsBlocked": "막힘",
+  "tsFailed": "실패",
+  "tsCancelled": "취소",
+  "tsClosedPartial": "부분 종결",
+  "tsUnknown": "상태 확인 중",
+  "taskDetailTitle": "작업 상세",
+  "taskProgress": "확정 {done} / 지시 {total}",
+  "@taskProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "taskBlocked": "막힌 이유: {reason}",
+  "@taskBlocked": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "assignmentVersion": "배정 버전 {v}",
+  "@assignmentVersion": {
+    "placeholders": {
+      "v": {
+        "type": "int"
+      }
+    }
+  },
+  "lineQty": "지시 {planned} · 확정 {done} · 잔량 {remaining}",
+  "@lineQty": {
+    "placeholders": {
+      "planned": {
+        "type": "int"
+      },
+      "done": {
+        "type": "int"
+      },
+      "remaining": {
+        "type": "int"
+      }
+    }
+  },
+  "startTask": "작업 시작",
+  "continuePicking": "이어서 피킹",
+  "checkAgain": "다시 확인",
+  "retry": "다시 시도",
+  "startAlreadyStarted": "다른 작업자가 이미 시작했어요",
+  "startNotAssignee": "내 담당 작업이 아니에요. 관리자에게 확인해 주세요",
+  "startPredecessor": "앞선 작업이 끝나지 않았어요",
+  "startVersionConflict": "배정이 바뀌었어요. 작업을 다시 확인해 주세요",
+  "startInvalidState": "지금은 시작할 수 없는 상태예요",
+  "startNotStarted": "배정 확인을 하지 못해 시작되지 않았어요. 다시 시도해 주세요",
+  "startUnknown": "시작됐는지 확인하는 중이에요. 다시 확인을 눌러 주세요",
+  "startClientError": "요청에 문제가 있어요. 관리자에게 알려 주세요",
+  "pickingTitle": "피킹",
+  "sync": "전송·확인",
+  "doNotRedo": "보낸 실적의 결과를 확인하는 중이에요. 상품을 다시 집거나 다시 스캔하지 마세요",
+  "expiresOn": "유통기한 {date}",
+  "@expiresOn": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "lot": "로트 {lot}",
+  "@lot": {
+    "placeholders": {
+      "lot": {
+        "type": "String"
+      }
+    }
+  },
+  "pickCounts": "잔량 {remaining} · 확정 대기 {pending} · 이번 스캔 {scanned}",
+  "@pickCounts": {
+    "placeholders": {
+      "remaining": {
+        "type": "int"
+      },
+      "pending": {
+        "type": "int"
+      },
+      "scanned": {
+        "type": "int"
+      }
+    }
+  },
+  "scanHint": "상품 바코드를 스캔하세요",
+  "scanWrongItem": "다른 상품이에요. 지시된 상품을 스캔해 주세요 (실적에 넣지 않았어요)",
+  "scanOver": "지시 수량을 넘었어요 (실적에 넣지 않았어요)",
+  "scanNoTarget": "피킹할 상품이 없어요",
+  "lineSubmit": "이 상품 실적 보내기",
+  "reportShortage": "결품·파손 보고",
+  "shortageTitle": "부족 {qty}개의 이유",
+  "@shortageTitle": {
+    "placeholders": {
+      "qty": {
+        "type": "int"
+      }
+    }
+  },
+  "shortageShort": "결품",
+  "shortageDamaged": "파손",
+  "shortageBlocked": "꺼낼 수 없음",
+  "pickAllConfirmed": "모든 실적이 확정됐어요",
+  "pickWaitingConfirm": "보낸 실적의 확정을 기다리고 있어요",
+  "queueTitle": "전송 상태",
+  "qQueued": "전송 대기",
+  "qAwaiting": "확정 대기",
+  "qApplied": "반영",
+  "qRejected": "거절",
+  "qChecking": "확인 중"
 }

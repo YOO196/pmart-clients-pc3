@@ -48,7 +48,12 @@ Widget testApp(
       MockAddressRepository(latency: Duration.zero),
     ),
     checkoutRepositoryProvider.overrideWithValue(
-      checkout ?? MockCheckoutRepository(latency: Duration.zero),
+      // 슬롯·만료가 실제 시계에 따라 바뀌지 않게 서울 12:00 으로 고정한다.
+      checkout ??
+          MockCheckoutRepository(
+            latency: Duration.zero,
+            now: () => DateTime.utc(2026, 10, 24, 3),
+          ),
     ),
     ordersRepositoryProvider.overrideWithValue(
       orders ?? MockOrdersRepository(latency: Duration.zero),

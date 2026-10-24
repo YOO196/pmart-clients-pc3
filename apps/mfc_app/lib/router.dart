@@ -3,10 +3,24 @@ import 'package:go_router/go_router.dart';
 
 import 'features/tasks/presentation/tasks_screen.dart';
 
-/// 라우트. 로그인 리다이렉트·딥링크(알림 → 화면)는 C1 에서 붙인다.
+/// 라우트. 점원 로그인(BR-02) 리다이렉트는 계약 반영 뒤 붙인다.
 final routerProvider = Provider<GoRouter>(
   (ref) => GoRouter(
     initialLocation: '/',
-    routes: [GoRoute(path: '/', builder: (_, _) => const TasksScreen())],
+    routes: [
+      GoRoute(path: '/', builder: (_, _) => const TasksScreen()),
+      GoRoute(
+        path: '/tasks/:taskId',
+        builder: (_, s) =>
+            TaskDetailScreen(taskId: s.pathParameters['taskId']!),
+        routes: [
+          GoRoute(
+            path: 'pick',
+            builder: (_, s) =>
+                PickingScreen(taskId: s.pathParameters['taskId']!),
+          ),
+        ],
+      ),
+    ],
   ),
 );
