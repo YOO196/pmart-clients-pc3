@@ -379,3 +379,57 @@ class DeliveryFlowController extends Notifier<DeliveryFlowState> {
         },
       });
 }
+
+@immutable
+class HelpFlowState {
+  const HelpFlowState({this.state, this.sending = false, this.key});
+
+  /// 접수 뒤 처리 상태. null 이면 아직 보내지 않았다.
+  final HelpState? state;
+  final bool sending;
+  final IdempotencyKey? key;
+}
+
+final helpFlowProvider = NotifierProvider.autoDispose
+    .family<HelpFlowController, HelpFlowState, String>(HelpFlowController.new);
+
+/// 도움요청. 접수 결과를 모르면 같은 키로 다시 보낸다(사건이 두 번 생기지 않게).
+class HelpFlowController extends Notifier<HelpFlowState> {
+  HelpFlowController(this.deliveryId);
+
+  final String deliveryId;
+
+  @override
+  HelpFlowState build() => const HelpFlowState();
+
+  Future<void> send(HelpCategory category, {String? detail}) async {
+    if (state.sending) return;
+    final key = state.key ?? IdempotencyKey.generate();
+    state = HelpFlowState(sending: true, key: key);
+    final repo = ref.read(deliveryRepositoryProvider);
+    var sent = false;
+    for (var i = 0; i < 3 && !sent; i++) {
+      try {
+        await repo.requestHelp(deliveryId, category, detail: detail, key: key);
+        sent = true;
+      } on UnknownResultFailure {
+        continue;
+      } on PmartFailure {
+        break;
+      }
+    }
+    if (!ref.mounted) return;
+    // 접수 응답을 끝내 못 받았어도 상태 조회로 확인한다(새 요청을 만들지 않는다).
+    final s = await repo.helpStatus(deliveryId, key);
+    if (ref.mounted) state = HelpFlowState(state: s, key: key);
+  }
+
+  Future<void> refresh() async {
+    final key = state.key;
+    if (key == null) return;
+    final s = await ref
+        .read(deliveryRepositoryProvider)
+        .helpStatus(deliveryId, key);
+    if (ref.mounted) state = HelpFlowState(state: s, key: key);
+  }
+}

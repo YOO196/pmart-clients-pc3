@@ -272,6 +272,14 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                 ],
                 _ => [Text(l10n.contactSupport)],
               },
+              const Divider(height: 32),
+              _HelpSection(
+                deliveryId: d.deliveryId,
+                // 사진을 못 올렸으면 지원센터 대체 증빙으로 이어지게 유형을 미리 고른다.
+                suggested: flow.uploadFailed
+                    ? HelpCategory.photoUploadFailed
+                    : null,
+              ),
             ],
           );
         },
@@ -343,6 +351,83 @@ class _FailureButton extends StatelessWidget {
         if (reason != null) await onReport(reason);
       },
       child: Text(l10n.reportFailure),
+    );
+  }
+}
+
+String helpCategoryText(AppLocalizations l10n, HelpCategory c) => switch (c) {
+  HelpCategory.customerUnreachable => l10n.hcUnreachable,
+  HelpCategory.addressIssue => l10n.hcAddress,
+  HelpCategory.goodsIssue => l10n.hcGoods,
+  HelpCategory.photoUploadFailed => l10n.hcPhoto,
+  HelpCategory.accident => l10n.hcAccident,
+  HelpCategory.appError => l10n.hcApp,
+  HelpCategory.other => l10n.hcOther,
+};
+
+/// 도움요청(지원센터). 접수 ≠ 해결이라 처리 상태를 따로 보인다.
+class _HelpSection extends ConsumerWidget {
+  const _HelpSection({required this.deliveryId, this.suggested});
+
+  final String deliveryId;
+  final HelpCategory? suggested;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final help = ref.watch(helpFlowProvider(deliveryId));
+    final ctl = ref.read(helpFlowProvider(deliveryId).notifier);
+    final status = help.state;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (status == null)
+          OutlinedButton.icon(
+            key: const ValueKey('help'),
+            icon: const Icon(Icons.support_agent),
+            onPressed: help.sending
+                ? null
+                : () async {
+                    final c = await showDialog<HelpCategory>(
+                      context: context,
+                      builder: (context) => SimpleDialog(
+                        title: Text(l10n.helpTitle),
+                        children: [
+                          for (final c in [
+                            ?suggested,
+                            ...HelpCategory.values.where((v) => v != suggested),
+                          ])
+                            SimpleDialogOption(
+                              key: ValueKey('help-${c.name}'),
+                              onPressed: () => Navigator.of(context).pop(c),
+                              child: Text(helpCategoryText(l10n, c)),
+                            ),
+                        ],
+                      ),
+                    );
+                    if (c != null) await ctl.send(c);
+                  },
+            label: Text(l10n.helpRequest),
+          )
+        else
+          ListTile(
+            key: const ValueKey('help-status'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.support_agent),
+            title: Text(switch (status) {
+              HelpState.open => l10n.helpOpen,
+              HelpState.inProgress => l10n.helpInProgress,
+              HelpState.resolved => l10n.helpResolved,
+              HelpState.unknown => l10n.helpUnknown,
+            }),
+            trailing: status == HelpState.resolved
+                ? null
+                : TextButton(
+                    onPressed: ctl.refresh,
+                    child: Text(l10n.checkAgain),
+                  ),
+          ),
+      ],
     );
   }
 }

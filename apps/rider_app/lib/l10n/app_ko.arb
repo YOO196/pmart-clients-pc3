@@ -154,5 +154,18 @@
   "qAwaiting": "확정 대기",
   "qApplied": "반영",
   "qRejected": "거절",
-  "qChecking": "확인 중"
+  "qChecking": "확인 중",
+  "helpRequest": "지원센터 도움요청",
+  "helpTitle": "어떤 도움이 필요한가요?",
+  "hcUnreachable": "고객과 연락이 안 돼요",
+  "hcAddress": "주소 문제",
+  "hcGoods": "상품 이상",
+  "hcPhoto": "사진을 올릴 수 없어요",
+  "hcAccident": "사고·고장",
+  "hcApp": "앱 오류",
+  "hcOther": "기타",
+  "helpOpen": "지원센터에 접수했어요",
+  "helpInProgress": "지원센터가 처리하고 있어요",
+  "helpResolved": "지원센터가 처리를 마쳤어요",
+  "helpUnknown": "접수됐는지 확인하는 중이에요"
 }

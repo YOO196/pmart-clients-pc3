@@ -268,6 +268,42 @@ base class MockDeliveryRepository
     return const SendAccepted();
   }
 
+  // ---------------------------------------------------------------- 도움요청
+
+  final _help = <String, int>{};
+
+  /// 다음 도움요청 응답을 1회 잃는다(서버는 접수함).
+  bool loseNextHelpResponse = false;
+
+  @override
+  Future<void> requestHelp(
+    String deliveryId,
+    HelpCategory category, {
+    String? detail,
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    _help.putIfAbsent(key.value, () => 0);
+    if (loseNextHelpResponse) {
+      loseNextHelpResponse = false;
+      throw UnknownResultFailure(requestId: key.value, httpStatus: 504);
+    }
+  }
+
+  /// 조회할 때마다 접수 → 처리 중 → 해결로 나아간다.
+  @override
+  Future<HelpState> helpStatus(String deliveryId, IdempotencyKey key) async {
+    await _wait();
+    final n = _help[key.value];
+    if (n == null) return HelpState.unknown;
+    _help[key.value] = n + 1;
+    return helpStateFromWire(switch (n) {
+      0 => 'OPEN',
+      1 => 'IN_PROGRESS',
+      _ => 'RESOLVED',
+    });
+  }
+
   // ---------------------------------------------------------------- 사진(BR-07)
 
   @override

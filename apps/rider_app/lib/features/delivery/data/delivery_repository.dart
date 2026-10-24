@@ -18,6 +18,17 @@ abstract interface class DeliveryRepository {
 
   /// BR-24: 전달지 정보 경로가 없다. 목만 값을 준다.
   Future<DropInfo?> dropInfo(String deliveryId);
+
+  /// `POST /deliveries/{id}/help-requests`(202). 같은 키 재전송은 같은 접수다. 결과 불명이면 [UnknownResultFailure].
+  Future<void> requestHelp(
+    String deliveryId,
+    HelpCategory category, {
+    String? detail,
+    required IdempotencyKey key,
+  });
+
+  /// 도움요청 상태(requestId = 멱등 키). 아직 모르면 [HelpState.unknown].
+  Future<HelpState> helpStatus(String deliveryId, IdempotencyKey key);
 }
 
 /// 포장 QR 인계(mfc-fulfillment).
@@ -161,6 +172,40 @@ final class ApiDeliveryRepository implements DeliveryRepository {
   Future<DropInfo?> dropInfo(String deliveryId) async =>
       // BR-24: 계약에 라이더용 전달지 조회가 없다.
       null;
+
+  @override
+  Future<void> requestHelp(
+    String deliveryId,
+    HelpCategory category, {
+    String? detail,
+    required IdempotencyKey key,
+  }) async {
+    await pmartGuard(
+      () => _exec.createHelpRequest(
+        deliveryId: deliveryId,
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        createHelpRequestRequest: ex.CreateHelpRequestRequest(
+          category: helpCategoryToContract(category),
+          detail: detail,
+        ),
+        extra: commandOptions(key).extra,
+      ),
+    );
+  }
+
+  @override
+  Future<HelpState> helpStatus(String deliveryId, IdempotencyKey key) async {
+    try {
+      final res = await pmartGuard(
+        () =>
+            _exec.getHelpRequest(deliveryId: deliveryId, requestId: key.value),
+      );
+      return helpStateFromWire(res.data?.state?.value);
+    } on PmartFailure {
+      return HelpState.unknown;
+    }
+  }
 }
 
 final class ApiHandoverRepository implements HandoverRepository {
@@ -322,3 +367,26 @@ DeliveryView deliveryFromContract(ex.DeliveryExecution d) => DeliveryView(
   packageIds: d.packageIds ?? const [],
   handoverIds: d.handoverIds ?? const [],
 );
+
+ex.CreateHelpRequestRequestCategoryEnum helpCategoryToContract(
+  HelpCategory c,
+) => switch (c) {
+  HelpCategory.customerUnreachable =>
+    ex.CreateHelpRequestRequestCategoryEnum.CUSTOMER_UNREACHABLE,
+  HelpCategory.addressIssue =>
+    ex.CreateHelpRequestRequestCategoryEnum.ADDRESS_ISSUE,
+  HelpCategory.goodsIssue =>
+    ex.CreateHelpRequestRequestCategoryEnum.GOODS_ISSUE,
+  HelpCategory.photoUploadFailed =>
+    ex.CreateHelpRequestRequestCategoryEnum.PHOTO_UPLOAD_FAILED,
+  HelpCategory.accident => ex.CreateHelpRequestRequestCategoryEnum.ACCIDENT,
+  HelpCategory.appError => ex.CreateHelpRequestRequestCategoryEnum.APP_ERROR,
+  HelpCategory.other => ex.CreateHelpRequestRequestCategoryEnum.OTHER,
+};
+
+HelpState helpStateFromWire(String? w) => switch (w) {
+  'OPEN' => HelpState.open,
+  'IN_PROGRESS' => HelpState.inProgress,
+  'RESOLVED' => HelpState.resolved,
+  _ => HelpState.unknown,
+};

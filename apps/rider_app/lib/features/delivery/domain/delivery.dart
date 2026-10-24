@@ -177,3 +177,17 @@ abstract final class HandoverProblemCode {
   static const handoverNotConfirmed = 'HANDOVER_NOT_CONFIRMED';
   static const evidenceRequired = 'EVIDENCE_REQUIRED';
 }
+
+/// 도움요청 유형(지원센터 사건으로 이어진다).
+enum HelpCategory {
+  customerUnreachable,
+  addressIssue,
+  goodsIssue,
+  photoUploadFailed,
+  accident,
+  appError,
+  other,
+}
+
+/// 도움요청 처리 상태. 접수 ≠ 해결.
+enum HelpState { open, inProgress, resolved, unknown }
