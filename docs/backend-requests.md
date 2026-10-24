@@ -20,12 +20,12 @@ SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`do
 | BR-10 | 중간 | 관리자 웹 | 상세 화면용 조회 경로(bff 미제공 화면)·내보내기/다운로드 API | OPEN |
 | BR-11 | 중간 | MFC | 점원 화면의 피킹·패킹·출고대기 현황, 입고 예정 화면의 조회 경로 | OPEN |
 | BR-12 | 낮음 | 고객 | 고객 노출 문구용 상태 코드(FUL_*, CXL_* 등) 와 계약 enum 대응 확정 | OPEN |
-| BR-13 | 중간 | 고객 | 배송 방식별 현재 가능 여부·불가 사유·예상시간·배달팁 조회 없음 | OPEN |
-| BR-14 | 중간 | 고객 | 견적에 최소주문 부족액·첫 구매 무료 4가지 상태 없음 | OPEN |
-| BR-15 | 중간 | 고객 | 반품·교환 자격(품목별 가능 여부·기한·사유) 조회와 사유별 증빙 요건 없음 | OPEN |
-| BR-16 | 중간 | 고객 | 고객 배송 문의 접수(지연·오배송·파손·누락·미수령) 경로 없음 | OPEN |
-| BR-17 | 낮음 | 고객 | 현금영수증 신청·발급 가능 여부·발급 결과 조회 없음 | OPEN |
-| BR-18 | 낮음 | 고객 | 주문서 이탈 시 초안 처리(명시적 취소 경로 여부) 확인 | OPEN |
+| BR-13 | 중간 | 고객 | 배송 방식별 현재 가능 여부·불가 사유·예상시간·배달팁 조회 없음 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
+| BR-14 | 중간 | 고객 | 견적에 최소주문 부족액·첫 구매 무료 4가지 상태 없음 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
+| BR-15 | 중간 | 고객 | 반품·교환 자격(품목별 가능 여부·기한·사유) 조회와 사유별 증빙 요건 없음 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
+| BR-16 | 중간 | 고객 | 고객 배송 문의 접수(지연·오배송·파손·누락·미수령) 경로 없음 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
+| BR-17 | 낮음 | 고객 | 현금영수증 신청·발급 가능 여부·발급 결과 조회 없음 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
+| BR-18 | 낮음 | 고객 | 주문서 이탈 시 초안 처리(명시적 취소 경로 여부) 확인 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
 
 ---
 
