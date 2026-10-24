@@ -1,0 +1,27 @@
+name: pmart_ui
+description: PMart 디자인 시스템 — 테마·UiState 7종 표시·금액/시각 포맷·명령 버튼·공통 문구.
+publish_to: none
+version: 0.1.0
+resolution: workspace
+
+environment:
+  sdk: ^3.13.4
+  flutter: ">=3.47.5"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.3
+  pmart_core:
+    path: ../pmart_core
+
+dev_dependencies:
+  dio: ^5.11.1
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  generate: true

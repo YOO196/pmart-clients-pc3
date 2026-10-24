@@ -36,3 +36,7 @@ Thumbs.db
 *.keystore
 *.jks
 key.properties
+
+# gen-l10n 생성물 (flutter pub get 시 재생성)
+packages/*/lib/l10n/gen/
+apps/*/lib/l10n/gen/

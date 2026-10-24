@@ -7,4 +7,5 @@ environment:
 # Dart pub workspace. 각 패키지는 `resolution: workspace` 를 쓴다.
 workspace:
   - packages/pmart_core
+  - packages/pmart_ui
   - packages/pmart_api/gen/*
