@@ -1,43 +1,292 @@
-import 'package:pmart_api_cart/pmart_api_cart.dart';
+import 'package:pmart_api_cart/pmart_api_cart.dart' as api;
+import 'package:pmart_core/pmart_core.dart';
 
-import '../domain/cart_summary.dart';
+import '../../catalog/data/mock_catalog_repository.dart' show mockProducts;
+import '../domain/cart.dart';
 import 'cart_repository.dart';
 
-/// 목 구현. 계약 스키마(`cart-service.yaml` Cart)를 따르는 JSON 을 생성 모델로 읽어서
-/// 실서버 구현과 같은 변환을 거친다. 계약에 없는 필드는 넣지 않는다.
-final class MockCartRepository implements CartRepository {
-  MockCartRepository({this.latency = const Duration(milliseconds: 300)});
+/// 목 장바구니 품목.
+final class _MockLine {
+  _MockLine(this.cartItemId, this.sku, this.quantity);
+
+  final String cartItemId;
+  final String sku;
+  int quantity;
+  bool selected = true;
+}
+
+/// 목 구현. 메모리에 장바구니 하나를 두고 계약 규칙(절대 수량, cartVersion, 상한, 가용)을 흉내 낸다.
+/// 응답은 계약 JSON → 생성 모델 → 실서버와 같은 변환을 거친다.
+base class MockCartRepository implements CartRepository {
+  MockCartRepository({
+    this.latency = const Duration(milliseconds: 300),
+    bool seeded = true,
+  }) {
+    if (seeded) {
+      _lines
+        ..add(_MockLine('ci-1', 'E-00000001', 2))
+        ..add(_MockLine('ci-2', 'E-00000005', 1));
+      _nextId = 3;
+    }
+  }
 
   final Duration latency;
+  static const cartId = 'cart-mock-1';
 
-  static const fixture = <String, Object?>{
-    'cartId': 'cart-mock-1',
-    'cartVersion': 3,
-    'ownerType': 'GUEST',
-    'accountId': null,
-    'mfcId': 'MFC-MOCK-01',
-    'items': [
-      {
-        'cartItemId': 'ci-1',
-        'sku': 'E-00000001',
-        'quantity': 2,
-        'selected': true,
-      },
-      {
-        'cartItemId': 'ci-2',
-        'sku': 'B-00000002',
-        'quantity': 1,
-        'selected': true,
-      },
-    ],
-    'selectedItemAmount': 23960,
-    'lastChangedAt': '2026-10-24T06:00:00Z',
-    'expiresAt': '2026-11-23T06:00:00Z',
-  };
+  /// 기초상품 낱개 환산 합계 상한(C 1068). 실제 값은 서버(product) 판정이다.
+  static const limitUnits = 10;
+
+  /// 낮은 가용 상품의 공개 가용 수량.
+  static const lowStockQty = 3;
+
+  final _lines = <_MockLine>[];
+  final _results = <String, Map<String, Object?>>{};
+  int version = 3;
+  int _nextId = 1;
+
+  /// 다음 변경 1회를 "반영은 됐지만 응답을 잃음"으로 만든다(결과 불명 시연).
+  bool loseNextResponse = false;
+
+  /// 다음 변경 1회를 "서버에 닿지 않음"으로 만든다(미적용인데 응답 불명).
+  bool dropNextRequest = false;
+
+  /// 원결과 조회가 몇 번 더 실패할지(조회 불가 시연).
+  int lookupFailures = 0;
+
+  /// 다른 기기에서 장바구니를 바꾼 것처럼 버전을 올린다(버전 충돌 시연).
+  void bumpVersionElsewhere() => version++;
+
+  Future<void> _wait() => Future<void>.delayed(latency);
+
+  ({
+    String productId,
+    String name,
+    String label,
+    int price,
+    String saleState,
+    String availability,
+    int units,
+  })?
+  _sku(String sku) {
+    for (final p in mockProducts) {
+      if (p.sku == sku) {
+        return (
+          productId: p.productId,
+          name: p.name,
+          label: '1개',
+          price: p.price,
+          saleState: p.saleState,
+          availability: p.availability,
+          units: 1,
+        );
+      }
+      if (p.bundleSku == sku) {
+        return (
+          productId: p.productId,
+          name: p.name,
+          label: '2개 묶음',
+          price: p.bundlePrice!,
+          saleState: p.saleState,
+          availability: 'AVAILABLE',
+          units: 2,
+        );
+      }
+    }
+    return null;
+  }
+
+  Map<String, Object?> cartJson() {
+    var amount = 0;
+    final items = <Map<String, Object?>>[];
+    for (final l in _lines) {
+      final s = _sku(l.sku)!;
+      final purchasable =
+          s.saleState == 'ON_SALE' && s.availability != 'SOLD_OUT';
+      if (l.selected && purchasable) amount += s.price * l.quantity;
+      items.add({
+        'cartItemId': l.cartItemId,
+        'sku': l.sku,
+        'productId': s.productId,
+        'quantity': l.quantity,
+        'selected': l.selected,
+        'display': {
+          'name': s.name,
+          'optionLabel': s.label,
+          'unitPrice': s.price,
+          'priceVersion': 1,
+          'saleState': s.saleState,
+          'availability': s.availability,
+          'availableQty': s.availability == 'LOW' ? lowStockQty : null,
+        },
+      });
+    }
+    return {
+      'cartId': cartId,
+      'cartVersion': version,
+      'ownerType': 'GUEST',
+      'accountId': null,
+      'mfcId': 'MFC-MOCK-01',
+      'items': items,
+      'selectedItemAmount': amount,
+      'lastChangedAt': '2026-10-24T06:00:00Z',
+      'expiresAt': '2026-11-23T06:00:00Z',
+    };
+  }
+
+  Cart _cart() => cartFromContract(api.Cart.fromJson(cartJson()));
 
   @override
-  Future<CartSummary> summary(String cartId) async {
-    await Future<void>.delayed(latency);
-    return cartSummaryFromContract(Cart.fromJson(fixture));
+  Future<Cart> open({String? mfcId}) async {
+    await _wait();
+    return _cart();
+  }
+
+  @override
+  Future<Cart> get(String cartId) async {
+    await _wait();
+    return _cart();
+  }
+
+  ProblemFailure _reject(String code, {Map<String, Object?> raw = const {}}) =>
+      ProblemFailure(
+        Problem(status: 422, code: code, raw: {'code': code, ...raw}),
+      );
+
+  int _unitsFor(String productId, {String? exceptItemId}) {
+    var total = 0;
+    for (final l in _lines) {
+      if (l.cartItemId == exceptItemId) continue;
+      final s = _sku(l.sku)!;
+      if (s.productId == productId) total += s.units * l.quantity;
+    }
+    return total;
+  }
+
+  /// 판매 상태 → 구매 상한 → 가용 순서로 검증한다(계약 addCartItem 설명).
+  void _validate(String sku, int quantity, {String? itemId}) {
+    final s = _sku(sku);
+    if (s == null || s.saleState != 'ON_SALE') {
+      throw _reject(CartProblemCode.skuNotSaleable);
+    }
+    final others = _unitsFor(s.productId, exceptItemId: itemId);
+    final total = others + s.units * quantity;
+    if (total > limitUnits) {
+      throw _reject(
+        CartProblemCode.quantityLimitExceeded,
+        raw: {
+          'limit': {
+            'baseProductId': s.productId,
+            'totalUnits': total,
+            'limitUnits': limitUnits,
+            'suggestedQuantity': (limitUnits - others) ~/ s.units,
+          },
+        },
+      );
+    }
+    if (s.availability == 'SOLD_OUT' ||
+        (s.availability == 'LOW' && quantity > lowStockQty)) {
+      throw _reject(
+        CartProblemCode.insufficientAvailableQuantity,
+        raw: {'availableQty': s.availability == 'LOW' ? lowStockQty : 0},
+      );
+    }
+  }
+
+  @override
+  Future<CartChangeOutcome> change(
+    String cartId,
+    CartChange change, {
+    required IdempotencyKey key,
+    required int expectedVersion,
+  }) async {
+    await _wait();
+    // 같은 키 재전송은 기존 결과를 돌려준다(중복 적용 없음).
+    if (dropNextRequest) {
+      dropNextRequest = false;
+      return const CartChangeUnknown();
+    }
+    final previous = _results[key.value];
+    if (previous != null) {
+      return changeResultFromContract(api.CartChangeResult.fromJson(previous));
+    }
+    try {
+      if (expectedVersion != version) {
+        throw ProblemFailure(
+          Problem(
+            status: 409,
+            code: CartProblemCode.versionConflict,
+            raw: {'cartVersion': version},
+          ),
+        );
+      }
+      final (itemId, sku, quantity, selected) = _apply(change);
+      version++;
+      final result = <String, Object?>{
+        'status': 'APPLIED',
+        'requestId': key.value,
+        'resultId': itemId,
+        'version': version,
+        'cartId': cartId,
+        'cartItemId': itemId,
+        'sku': sku,
+        'quantity': quantity,
+        'selected': selected,
+        'cartVersion': version,
+        'appliedRequestId': key.value,
+      };
+      _results[key.value] = result;
+      if (loseNextResponse) {
+        loseNextResponse = false;
+        throw UnknownResultFailure(requestId: key.value, httpStatus: 503);
+      }
+      return changeResultFromContract(api.CartChangeResult.fromJson(result));
+    } on PmartFailure catch (f) {
+      return changeFailureToOutcome(f);
+    }
+  }
+
+  (String, String, int, bool) _apply(CartChange change) {
+    switch (change) {
+      case AddItem(:final sku, :final quantity):
+        final existing = _lines.where((l) => l.sku == sku).firstOrNull;
+        _validate(sku, quantity, itemId: existing?.cartItemId);
+        // 같은 SKU 는 합산이 아니라 절대 수량 설정.
+        final line = existing ?? _MockLine('ci-${_nextId++}', sku, quantity);
+        if (existing == null) _lines.add(line);
+        line
+          ..quantity = quantity
+          ..selected = true;
+        return (line.cartItemId, sku, quantity, true);
+      case SetQuantity(:final cartItemId, :final quantity):
+        final line = _line(cartItemId);
+        _validate(line.sku, quantity, itemId: cartItemId);
+        line.quantity = quantity;
+        return (cartItemId, line.sku, quantity, line.selected);
+      case SetSelected(:final cartItemId, :final selected):
+        final line = _line(cartItemId)..selected = selected;
+        return (cartItemId, line.sku, line.quantity, selected);
+      case RemoveItem(:final cartItemId):
+        final line = _lines
+            .where((l) => l.cartItemId == cartItemId)
+            .firstOrNull;
+        _lines.remove(line);
+        return (cartItemId, line?.sku ?? 'E-00000000', 0, false);
+    }
+  }
+
+  _MockLine _line(String id) =>
+      _lines.where((l) => l.cartItemId == id).firstOrNull ??
+      (throw const ProblemFailure(Problem(status: 404, code: 'NOT_FOUND')));
+
+  @override
+  Future<CartChangeOutcome> lookup(String cartId, IdempotencyKey key) async {
+    await _wait();
+    if (lookupFailures > 0) {
+      lookupFailures--;
+      return const CartChangeUnknown();
+    }
+    final result = _results[key.value];
+    if (result == null) return const CartChangeNotApplied();
+    return changeResultFromContract(api.CartChangeResult.fromJson(result));
   }
 }

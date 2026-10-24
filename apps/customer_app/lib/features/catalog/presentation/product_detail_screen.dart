@@ -7,6 +7,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
+import '../../cart/presentation/cart_screen.dart' show AddToCartBar;
 import 'widgets/product_tile_card.dart';
 
 /// SCR-PRODUCT-001·OPTION-001. 가격·가용은 사본이다. 구매 가능 확정은 장바구니·주문서 서버 판정.
@@ -43,14 +44,28 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               onRetry: () => ref.invalidate(provider),
               ready: (context, p) => _body(context, l10n, p),
             ),
+      bottomNavigationBar: switch (value) {
+        AsyncData(value: final p) => Builder(
+          builder: (context) {
+            final selected = _selected(p);
+            return AddToCartBar(
+              sku: selected?.sku,
+              enabled: selected?.canOfferAdd ?? false,
+            );
+          },
+        ),
+        _ => null,
+      },
     );
   }
 
+  SaleOption? _selected(ProductDetail p) =>
+      p.options.where((o) => o.sku == _selectedSku).firstOrNull ??
+      p.options.where((o) => o.canOfferAdd).firstOrNull;
+
   Widget _body(BuildContext context, AppLocalizations l10n, ProductDetail p) {
     final theme = Theme.of(context);
-    final selected =
-        p.options.where((o) => o.sku == _selectedSku).firstOrNull ??
-        p.options.where((o) => o.canOfferAdd).firstOrNull;
+    final selected = _selected(p);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [

@@ -60,6 +60,7 @@ final class Problem {
   /// 결과가 불명인 오류인지. 실패로 확정하지 말고 짝 조회로 해소한다.
   bool get isUnknownResult =>
       code == ProblemCode.unknownResult ||
+      code == ProblemCode.requestResultUnknown ||
       code == ProblemCode.dependencyUnavailable;
 }
 
@@ -86,6 +87,9 @@ abstract final class ProblemCode {
   static const capacityExceeded = 'CAPACITY_EXCEEDED';
   static const dependencyUnavailable = 'DEPENDENCY_UNAVAILABLE';
   static const unknownResult = 'UNKNOWN_RESULT';
+
+  /// 서비스별 결과 불명(cart 등). [unknownResult] 와 같이 다룬다.
+  static const requestResultUnknown = 'REQUEST_RESULT_UNKNOWN';
   static const unsupportedAction = 'UNSUPPORTED_ACTION';
   static const approvalRequired = 'APPROVAL_REQUIRED';
   static const evidenceRequired = 'EVIDENCE_REQUIRED';

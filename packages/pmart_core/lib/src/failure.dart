@@ -43,7 +43,10 @@ sealed class PmartFailure implements Exception {
     if (response != null) {
       final problem = _parseProblem(response);
       if (problem != null) {
-        if (mutation && problem.isUnknownResult) {
+        // 변경 요청의 5xx 는 Problem 이 붙어 있어도 반영 여부를 모른다(짝 조회로 해소).
+        if (mutation &&
+            (problem.isUnknownResult ||
+                (response.statusCode ?? problem.status) >= 500)) {
           return UnknownResultFailure(
             problem: problem,
             requestId: requestId ?? problem.requestId,

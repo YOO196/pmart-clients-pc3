@@ -348,6 +348,35 @@ void main() {
       );
     });
 
+    test('변경 요청의 5xx 는 서비스별 code 가 붙어도 결과 불명이다', () async {
+      for (final code in ['REQUEST_RESULT_UNKNOWN', 'INTERNAL_ERROR']) {
+        expect(
+          await failureOf(
+            FakeReply.problem(503, problemBody(code, status: 503)),
+            mutation: true,
+          ),
+          isA<UnknownResultFailure>().having(
+            (f) => f.problem?.code,
+            'code',
+            code,
+          ),
+          reason: code,
+        );
+      }
+    });
+
+    test('조회의 5xx Problem 은 결과 불명이 아니라 Problem 이다', () async {
+      expect(
+        await failureOf(
+          FakeReply.problem(
+            503,
+            problemBody('REQUEST_RESULT_UNKNOWN', status: 503),
+          ),
+        ),
+        isA<ProblemFailure>(),
+      );
+    });
+
     test('2xx 인데 모델로 읽지 못하면: 조회는 계약 위반, 변경은 결과 불명', () {
       DioException deserializeError(String method) {
         final options = RequestOptions(path: '/x', method: method);

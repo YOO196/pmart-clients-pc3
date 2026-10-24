@@ -5,35 +5,47 @@
   "cartSummaryTitle": "장바구니",
   "cartLineCount": "담은 상품 {count}종",
   "@cartLineCount": {
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "cartSelectedAmount": "선택 상품 합계 {amount}",
   "@cartSelectedAmount": {
-    "placeholders": { "amount": { "type": "String" } }
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
   },
   "cartSelectedAmountNote": "결제 금액은 주문서에서 확인해요",
   "cartAmountUnavailable": "합계를 확인할 수 없어요",
   "cartEmpty": "담은 상품이 없어요",
   "mockModeBadge": "목 데이터",
-
   "navHome": "홈",
   "navCategory": "카테고리",
   "navSearch": "검색",
   "navCart": "장바구니",
   "navMy": "마이",
-
   "tabHome": "홈",
   "tabRanking": "랭킹",
   "tabNew": "신상품",
   "sectionUnavailable": "이 영역을 불러오지 못했어요",
   "sectionRetry": "이 영역 다시 불러오기",
   "sectionEmpty": "보여줄 상품이 없어요",
-
   "priceUnavailable": "가격 확인 중",
   "ratingUnavailable": "평점 정보 없음",
   "ratingValue": "{rating} ({count})",
   "@ratingValue": {
-    "placeholders": { "rating": { "type": "String" }, "count": { "type": "String" } }
+    "placeholders": {
+      "rating": {
+        "type": "String"
+      },
+      "count": {
+        "type": "String"
+      }
+    }
   },
   "soldOutTemporarily": "일시품절",
   "notCarried": "이 지역에서 팔지 않아요",
@@ -43,26 +55,35 @@
   "badgeNew": "NEW",
   "badgeRank": "{rank}위",
   "@badgeRank": {
-    "placeholders": { "rank": { "type": "int" } }
+    "placeholders": {
+      "rank": {
+        "type": "int"
+      }
+    }
   },
-
   "categoryTitle": "카테고리",
   "categoryAll": "{name} 전체",
   "@categoryAll": {
-    "placeholders": { "name": { "type": "String" } }
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
   },
-
   "searchHint": "상품을 검색해 보세요",
   "searchTitle": "검색",
   "searchSubmit": "검색",
   "searchNoResult": "검색 결과가 없어요",
   "searchResultCount": "상품 {count}개",
   "@searchResultCount": {
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "loadMore": "더 보기",
   "loadMoreFailed": "다음 상품을 불러오지 못했어요",
-
   "sortLabel": "정렬",
   "sortRelevance": "추천순",
   "sortPopular": "인기순",
@@ -70,21 +91,30 @@
   "sortPriceAsc": "낮은 가격순",
   "sortPriceDesc": "높은 가격순",
   "sortRating": "별점순",
-
   "filterTitle": "필터",
   "filterApply": "적용",
   "filterReset": "초기화",
   "filterClose": "닫기",
   "filterSelectedCount": "필터 {count}",
   "@filterSelectedCount": {
-    "placeholders": { "count": { "type": "int" } }
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "filterValueCount": "{label} ({count})",
   "@filterValueCount": {
-    "placeholders": { "label": { "type": "String" }, "count": { "type": "int" } }
+    "placeholders": {
+      "label": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
   },
   "filterUnavailable": "필터를 불러오지 못했어요",
-
   "productTitle": "상품 정보",
   "productOptions": "옵션 선택",
   "productDescription": "상품 설명",
@@ -94,7 +124,107 @@
   "productNotFound": "판매하지 않는 상품이에요",
   "unitBundle": "묶음 {units}개",
   "@unitBundle": {
-    "placeholders": { "units": { "type": "int" } }
+    "placeholders": {
+      "units": {
+        "type": "int"
+      }
+    }
   },
-  "priceNote": "결제 금액은 주문서에서 확정돼요"
+  "priceNote": "결제 금액은 주문서에서 확정돼요",
+  "cartTitle": "장바구니",
+  "cartSelectAll": "전체 선택",
+  "cartLineQuantity": "{quantity}개",
+  "@cartLineQuantity": {
+    "placeholders": {
+      "quantity": {
+        "type": "int"
+      }
+    }
+  },
+  "cartUnitPrice": "개당 {price}",
+  "@cartUnitPrice": {
+    "placeholders": {
+      "price": {
+        "type": "String"
+      }
+    }
+  },
+  "cartRemove": "삭제",
+  "cartRemoveConfirmTitle": "상품을 뺄까요?",
+  "cartRemoveConfirmBody": "{name}을(를) 장바구니에서 뺍니다.",
+  "@cartRemoveConfirmBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "cartRemoveConfirmCancel": "취소",
+  "cartRemoveConfirmOk": "빼기",
+  "cartIncrease": "수량 늘리기",
+  "cartDecrease": "수량 줄이기",
+  "cartLineSoldOut": "품절이라 지금 살 수 없어요",
+  "cartLineNotCarried": "지금 주소로는 배달하지 않는 상품이에요",
+  "cartLineSaleStopped": "판매가 끝난 상품이에요",
+  "cartLineUnknown": "판매 상태를 확인하는 중이에요",
+  "cartLineLowStock": "남은 수량이 적어요",
+  "cartLineAvailableQty": "지금 {count}개까지 있어요",
+  "@cartLineAvailableQty": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cartSelectedTotal": "선택 상품 합계",
+  "cartChangePending": "변경을 반영하는 중이에요",
+  "cartChangeUnknown": "변경이 반영됐는지 확인하는 중이에요",
+  "cartChangeUnknownNote": "확인될 때까지 다른 변경은 잠시 막아 둘게요",
+  "cartCheckAgain": "다시 확인",
+  "cartNoticeConflict": "다른 곳에서 장바구니가 바뀌어 최신 내용으로 다시 불러왔어요. 다시 확인해 주세요.",
+  "cartNoticeNotApplied": "변경이 반영되지 않았어요. 다시 시도해 주세요.",
+  "cartNoticeReloadFailed": "최신 장바구니를 불러오지 못했어요. 보이는 내용은 직전 확인한 내용이에요.",
+  "cartRejectLimit": "같은 상품은 낱개 기준 {limit}개까지 담을 수 있어요",
+  "@cartRejectLimit": {
+    "placeholders": {
+      "limit": {
+        "type": "int"
+      }
+    }
+  },
+  "cartRejectLimitUnknown": "담을 수 있는 수량을 넘었어요",
+  "cartRejectLimitSuggest": "{quantity}개까지 담을 수 있어요",
+  "@cartRejectLimitSuggest": {
+    "placeholders": {
+      "quantity": {
+        "type": "int"
+      }
+    }
+  },
+  "cartRejectAvailable": "지금 {count}개까지 담을 수 있어요",
+  "@cartRejectAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "cartRejectAvailableUnknown": "남은 수량이 부족해요",
+  "cartRejectNotSaleable": "지금 살 수 없는 상품이에요",
+  "cartRejectConfig": "판매 설정을 확인하는 중이라 지금은 담을 수 없어요",
+  "cartRejectOther": "요청을 처리하지 못했어요",
+  "cartDismiss": "확인",
+  "cartAdd": "장바구니 담기",
+  "cartUpdateQuantity": "장바구니 수량 바꾸기",
+  "cartAdded": "장바구니에 담았어요",
+  "cartInCart": "장바구니에 {quantity}개 있어요",
+  "@cartInCart": {
+    "placeholders": {
+      "quantity": {
+        "type": "int"
+      }
+    }
+  },
+  "cartUnavailableForAdd": "장바구니를 불러오지 못해서 지금은 담을 수 없어요",
+  "cartGoToCart": "장바구니 보기"
 }
