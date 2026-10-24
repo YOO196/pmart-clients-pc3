@@ -1,4 +1,4 @@
-SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |# 백엔드 요청 목록 (계약 공백·확인 필요)
+# 백엔드 요청 목록 (계약 공백·확인 필요)
 
 클라이언트 구현에 필요한데 `../pmart-backend/contracts` 에 없거나 모호한 것. **이 저장소에서 백엔드를 고치지 않는다.** 항목은 사용자를 통해 백엔드 담당(다른 계정)에 전달한다.
 상태: `OPEN`(미전달) / `SENT`(전달) / `AGREED`(합의, 계약 반영 대기) / `DONE`(계약 반영됨, 커밋 SHA) / `WONTFIX`.
@@ -26,6 +26,7 @@ SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`do
 | BR-16 | 중간 | 고객 | 고객 배송 문의 접수(지연·오배송·파손·누락·미수령) 경로 없음 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
 | BR-17 | 낮음 | 고객 | 현금영수증 신청·발급 가능 여부·발급 결과 조회 없음 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
 | BR-18 | 낮음 | 고객 | 주문서 이탈 시 초안 처리(명시적 취소 경로 여부) 확인 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
+| BR-19 | 낮음 | 고객 | 상품 카드·상세의 100g/100mL당 가격 표시 값 없음 | OPEN |
 
 ---
 
@@ -127,3 +128,9 @@ SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |SENT 준비(`do
 - 근거: Commerce :109 "화면 이탈이나 제한시간 경과만으로 … 확보를 해제하지 않는다", :1563 "앱에서 타이머만으로 점유 해제하지 않는다". 견적은 초안 생성 후 10분에 만료된다(`Quote.quoteExpiresAt`).
 - 현황: `order-drafts` 에는 POST, GET, `/checkouts` 만 있고 취소 경로는 없다.
 - 질문: 고객이 주문서에서 뒤로 나갈 때 클라이언트는 아무 호출도 하지 않고 초안 만료를 기다리면 되는가? 아니면 명시적인 초안 취소(확보 해제) 경로를 둘 계획인가? 회신 전 클라이언트 처리안은 "호출 없이 이탈, 재진입 시 GET으로 재검증"이다.
+
+## BR-19 100g/100mL당 가격
+- 근거: Commerce 상품 카드 규칙(C 1068~) "이미지·이름·규격·기본가·100g/100mL당 가격·별점·리뷰 수…". `docs/apps/customer-app.md` §2 상품.
+- 현황: `DisplayItem`·`SearchHit`·`SaleOption` 에 단위 가격 필드가 없다. `SaleOption.capacityLabel`(예 "500ml")은 표시용 문자열이고, `SkuDetail.weightG` 는 내부 경로(`/internal/skus`)라 고객앱이 쓸 수 없다.
+- 요청: 표시용 단위 가격(예 `unitPrice: { basis: G100|ML100, amount }`)을 pricing 사본과 함께 내려줄지, 아니면 1차에서 표시하지 않을지 결정.
+- 클라이언트 처리(회신 전): 표시하지 않는다. 라벨 문자열을 파싱해 계산하지 않는다(금액은 서버 값만 표시).

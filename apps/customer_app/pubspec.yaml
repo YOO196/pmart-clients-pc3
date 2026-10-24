@@ -25,6 +25,14 @@ dependencies:
     path: ../../packages/pmart_api/gen/cart
   pmart_api_auth:
     path: ../../packages/pmart_api/gen/auth
+  pmart_api_product:
+    path: ../../packages/pmart_api/gen/product
+  pmart_api_product_content:
+    path: ../../packages/pmart_api/gen/product-content
+  pmart_api_search:
+    path: ../../packages/pmart_api/gen/search
+  pmart_api_storefront:
+    path: ../../packages/pmart_api/gen/storefront
 
 dev_dependencies:
   flutter_test:

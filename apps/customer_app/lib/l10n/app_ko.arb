@@ -14,5 +14,87 @@
   "cartSelectedAmountNote": "결제 금액은 주문서에서 확인해요",
   "cartAmountUnavailable": "합계를 확인할 수 없어요",
   "cartEmpty": "담은 상품이 없어요",
-  "mockModeBadge": "목 데이터"
+  "mockModeBadge": "목 데이터",
+
+  "navHome": "홈",
+  "navCategory": "카테고리",
+  "navSearch": "검색",
+  "navCart": "장바구니",
+  "navMy": "마이",
+
+  "tabHome": "홈",
+  "tabRanking": "랭킹",
+  "tabNew": "신상품",
+  "sectionUnavailable": "이 영역을 불러오지 못했어요",
+  "sectionRetry": "이 영역 다시 불러오기",
+  "sectionEmpty": "보여줄 상품이 없어요",
+
+  "priceUnavailable": "가격 확인 중",
+  "ratingUnavailable": "평점 정보 없음",
+  "ratingValue": "{rating} ({count})",
+  "@ratingValue": {
+    "placeholders": { "rating": { "type": "String" }, "count": { "type": "String" } }
+  },
+  "soldOutTemporarily": "일시품절",
+  "notCarried": "이 지역에서 팔지 않아요",
+  "saleStateUnknown": "판매 상태 확인 중",
+  "availabilityLow": "남은 수량이 적어요",
+  "availabilityLowNote": "남은 수량은 안내일 뿐 확보된 것이 아니에요",
+  "badgeNew": "NEW",
+  "badgeRank": "{rank}위",
+  "@badgeRank": {
+    "placeholders": { "rank": { "type": "int" } }
+  },
+
+  "categoryTitle": "카테고리",
+  "categoryAll": "{name} 전체",
+  "@categoryAll": {
+    "placeholders": { "name": { "type": "String" } }
+  },
+
+  "searchHint": "상품을 검색해 보세요",
+  "searchTitle": "검색",
+  "searchSubmit": "검색",
+  "searchNoResult": "검색 결과가 없어요",
+  "searchResultCount": "상품 {count}개",
+  "@searchResultCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "loadMore": "더 보기",
+  "loadMoreFailed": "다음 상품을 불러오지 못했어요",
+
+  "sortLabel": "정렬",
+  "sortRelevance": "추천순",
+  "sortPopular": "인기순",
+  "sortNewest": "신상품순",
+  "sortPriceAsc": "낮은 가격순",
+  "sortPriceDesc": "높은 가격순",
+  "sortRating": "별점순",
+
+  "filterTitle": "필터",
+  "filterApply": "적용",
+  "filterReset": "초기화",
+  "filterClose": "닫기",
+  "filterSelectedCount": "필터 {count}",
+  "@filterSelectedCount": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "filterValueCount": "{label} ({count})",
+  "@filterValueCount": {
+    "placeholders": { "label": { "type": "String" }, "count": { "type": "int" } }
+  },
+  "filterUnavailable": "필터를 불러오지 못했어요",
+
+  "productTitle": "상품 정보",
+  "productOptions": "옵션 선택",
+  "productDescription": "상품 설명",
+  "productStorageGuide": "보관 방법",
+  "productReturnGuide": "반품 안내",
+  "productNotices": "알려드려요",
+  "productNotFound": "판매하지 않는 상품이에요",
+  "unitBundle": "묶음 {units}개",
+  "@unitBundle": {
+    "placeholders": { "units": { "type": "int" } }
+  },
+  "priceNote": "결제 금액은 주문서에서 확정돼요"
 }

@@ -17,7 +17,7 @@ final cartRepositoryProvider = Provider<CartRepository>(
   },
 );
 
-/// 현재 장바구니 ID. C1 에서 `POST /carts`(createOrGetCart) 결과로 바꾼다.
+/// 현재 장바구니 ID. 장바구니 단계에서 `POST /carts`(createOrGetCart) 결과로 바꾼다.
 final currentCartIdProvider = Provider<String>((_) => 'cart-mock-1');
 
 final cartSummaryProvider = FutureProvider<CartSummary>(
@@ -26,28 +26,18 @@ final cartSummaryProvider = FutureProvider<CartSummary>(
       .summary(ref.watch(currentCartIdProvider)),
 );
 
-class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+class CartScreen extends ConsumerWidget {
+  const CartScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final mock = ref.watch(envProvider) == PmartEnv.mock;
     final state = uiStateOf(
       ref.watch(cartSummaryProvider),
       isEmpty: (s) => s.lineCount == 0,
     );
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.homeTitle),
-        actions: [
-          if (mock)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Chip(label: Text(l10n.mockModeBadge)),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: Text(l10n.cartSummaryTitle)),
       body: UiStateView<CartSummary>(
         state: state,
         onRetry: () => ref.invalidate(cartSummaryProvider),
