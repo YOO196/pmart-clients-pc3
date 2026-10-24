@@ -437,5 +437,136 @@
   "payGoHome": "홈으로",
   "payRetry": "다시 결제하기",
   "pendingPaymentBanner": "결과를 확인할 결제가 있어요",
-  "pendingPaymentOpen": "확인하기"
+  "pendingPaymentOpen": "확인하기",
+  "ordersTitle": "주문 내역",
+  "ordersEmpty": "주문 내역이 없어요",
+  "ordersLoginNeeded": "주문 내역을 보려면 로그인이 필요해요",
+  "ordersItemCount": "상품 {count}종",
+  "@ordersItemCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "orderDetailTitle": "주문 상세",
+  "osChecking": "주문 확인 중",
+  "osPaymentPending": "결제 진행 중",
+  "osPaymentUnknown": "결제 결과 확인 중",
+  "osConfirmed": "주문 확인",
+  "osPreparing": "상품 준비 중",
+  "osPartiallyHandedOver": "배송 준비",
+  "osInDelivery": "배송 중",
+  "osPartiallyDelivered": "일부 전달",
+  "osCompleted": "배송 완료",
+  "osCancelled": "주문 취소",
+  "osExpired": "주문 시간 만료",
+  "osUnknown": "상태 확인 중",
+  "shPlanned": "배송 준비 전",
+  "shPreparing": "상품 준비 중",
+  "shReady": "출발 준비",
+  "shHandedOver": "라이더에게 전달",
+  "shInDelivery": "배송 중",
+  "shDelivered": "배송 완료",
+  "shFailed": "배송하지 못함",
+  "shCancelled": "배송 취소",
+  "shUnknown": "상태 확인 중",
+  "shipmentN": "배송 {n} · {state}",
+  "@shipmentN": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      },
+      "state": {
+        "type": "String"
+      }
+    }
+  },
+  "trackDelivery": "배송 조회",
+  "sourceStale": "{time} 기준 정보예요. 실제와 다를 수 있어요",
+  "@sourceStale": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "sourceStaleNoTime": "일부 정보가 늦게 반영되고 있어요",
+  "refundedAmount": "환불 완료 금액",
+  "qtyCancelled": "취소 {n}개",
+  "@qtyCancelled": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "qtyDelivered": "전달 {n}개",
+  "@qtyDelivered": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "qtyReturned": "반품 {n}개",
+  "@qtyReturned": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "qtyUnfulfilled": "미출고 {n}개",
+  "@qtyUnfulfilled": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "trackTitle": "배송 조회",
+  "stUnassigned": "라이더를 찾고 있어요",
+  "stToStore": "라이더가 상품을 받으러 가고 있어요",
+  "stAtStore": "라이더가 상품을 받고 있어요",
+  "stToCustomer": "배송 중이에요",
+  "stAtCustomer": "곧 도착해요",
+  "stDone": "배송이 끝났어요",
+  "stUnknown": "배송 상태를 확인하고 있어요",
+  "etaAt": "{time} 도착 예정",
+  "@etaAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "etaRemaining": "약 {minutes}분 남았어요",
+  "@etaRemaining": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "etaLocating": "라이더 위치를 확인하고 있어요",
+  "etaPending": "도착 시간을 계산하고 있어요",
+  "etaDelayed": "약속 시간보다 {minutes}분 정도 늦어지고 있어요",
+  "@etaDelayed": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "etaLoadFailed": "배송 위치를 불러오지 못했어요. 배송은 계속 진행되고 있을 수 있어요",
+  "asOfTime": "{time} 기준",
+  "@asOfTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "logout": "로그아웃"
 }

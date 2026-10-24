@@ -4,6 +4,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
+import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
 
 import 'support/app_harness.dart';
 
@@ -13,14 +14,15 @@ void main() {
 
   Future<void> toPayment(
     WidgetTester t,
-    MockCheckoutRepository checkout,
-  ) async {
+    MockCheckoutRepository checkout, {
+    MockOrdersRepository? orders,
+  }) async {
     t.view
       ..physicalSize = const Size(800, 2000)
       ..devicePixelRatio = 1;
     addTearDown(t.view.reset);
     await t.pumpWidget(
-      testApp(checkout: checkout, [
+      testApp(checkout: checkout, orders: orders, [
         clockProvider.overrideWithValue(() => now),
         draftPollPolicyProvider.overrideWithValue((
           interval: Duration.zero,
@@ -101,5 +103,25 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('pending-payment')), findsOneWidget);
+  });
+
+  testWidgets('주문 완료에서 주문 상세로 가면 서버 주문이 보인다', (t) async {
+    final checkout = MockCheckoutRepository(
+      latency: Duration.zero,
+      now: () => now,
+    );
+    await toPayment(
+      t,
+      checkout,
+      orders: MockOrdersRepository(checkout: checkout, latency: Duration.zero),
+    );
+    await t.pumpAndSettle();
+
+    await t.tap(find.byKey(const ValueKey('go-order')));
+    await t.pumpAndSettle();
+
+    expect(find.text('주문 상세'), findsOneWidget);
+    expect(find.text('주문 확인'), findsOneWidget);
+    expect(find.textContaining('서울우유 1L'), findsWidgets);
   });
 }

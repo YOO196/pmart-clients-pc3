@@ -18,6 +18,9 @@ import 'package:customer_app/features/checkout/presentation/checkout_controller.
 import 'package:customer_app/features/catalog/data/catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/presentation/catalog_providers.dart';
+import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
+import 'package:customer_app/features/orders/data/orders_repository.dart';
+import 'package:customer_app/features/orders/presentation/orders_providers.dart';
 import 'package:customer_app/features/payment/presentation/payment_controller.dart';
 import 'package:customer_app/shared/providers.dart';
 
@@ -27,6 +30,7 @@ Widget testApp(
   CatalogRepository? catalog,
   CartRepository? cart,
   CheckoutRepository? checkout,
+  OrdersRepository? orders,
 }) => ProviderScope(
   retry: (_, _) => null,
   overrides: [
@@ -45,6 +49,9 @@ Widget testApp(
     ),
     checkoutRepositoryProvider.overrideWithValue(
       checkout ?? MockCheckoutRepository(latency: Duration.zero),
+    ),
+    ordersRepositoryProvider.overrideWithValue(
+      orders ?? MockOrdersRepository(latency: Duration.zero),
     ),
     // 보안 저장소 대신 메모리 저장소(플랫폼 채널 없음).
     secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),

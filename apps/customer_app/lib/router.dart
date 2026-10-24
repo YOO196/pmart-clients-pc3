@@ -10,6 +10,8 @@ import 'features/checkout/presentation/delivery_select_screen.dart';
 import 'features/checkout/presentation/order_sheet_screen.dart';
 import 'features/catalog/presentation/category_screen.dart';
 import 'features/payment/presentation/payment_screen.dart';
+import 'features/orders/presentation/my_screen.dart';
+import 'features/orders/presentation/orders_screens.dart';
 import 'features/catalog/presentation/home_screen.dart';
 import 'features/catalog/presentation/product_detail_screen.dart';
 import 'features/catalog/presentation/product_list_screen.dart';
@@ -49,6 +51,9 @@ final routerProvider = Provider<GoRouter>(
               GoRoute(path: '/cart', builder: (_, _) => const CartScreen()),
             ],
           ),
+          StatefulShellBranch(
+            routes: [GoRoute(path: '/my', builder: (_, _) => const MyScreen())],
+          ),
         ],
       ),
       GoRoute(
@@ -66,6 +71,25 @@ final routerProvider = Provider<GoRouter>(
         path: '/payments/:draftId',
         builder: (_, state) =>
             PaymentScreen(draftId: state.pathParameters['draftId']!),
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/orders',
+        builder: (_, _) => const OrderListScreen(),
+        routes: [
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: ':orderId',
+            builder: (_, state) =>
+                OrderDetailScreen(orderId: state.pathParameters['orderId']!),
+          ),
+        ],
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/deliveries/:deliveryId',
+        builder: (_, state) =>
+            TrackingScreen(deliveryId: state.pathParameters['deliveryId']!),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
@@ -136,6 +160,10 @@ class _TabShell extends StatelessWidget {
           NavigationDestination(
             icon: const Icon(Icons.shopping_cart_outlined),
             label: l10n.navCart,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.person_outline),
+            label: l10n.navMy,
           ),
         ],
       ),

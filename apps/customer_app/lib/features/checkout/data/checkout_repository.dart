@@ -238,26 +238,7 @@ OrderDraft draftFromContract(api.OrderDraft d) {
       api.OrderDraftNextActionEnum.EXPIRED => DraftNext.expired,
       null => DraftNext.unknown,
     },
-    quote: q?.quoteVersion == null
-        ? null
-        : Quote(
-            version: q!.quoteVersion!,
-            expiresAt: q.quoteExpiresAt,
-            itemAmount: q.itemAmount,
-            deliveryTip: q.deliveryTip,
-            tipReason: switch (q.deliveryTipReason) {
-              api.QuoteDeliveryTipReasonEnum.STANDARD => TipReason.standard,
-              api.QuoteDeliveryTipReasonEnum.OVER_30000 => TipReason.over30000,
-              api.QuoteDeliveryTipReasonEnum.FIRST_PURCHASE =>
-                TipReason.firstPurchase,
-              api.QuoteDeliveryTipReasonEnum.NONE => TipReason.none,
-              null => TipReason.unknown,
-            },
-            bagFee: q.bagFee,
-            totalAmount: q.totalAmount,
-            minOrderSatisfied: q.minOrderSatisfied,
-            plannedShipments: q.plannedShipments,
-          ),
+    quote: q?.quoteVersion == null ? null : quoteFromContract(q!),
     resources: r == null
         ? null
         : DraftResources(
@@ -276,3 +257,22 @@ OrderDraft draftFromContract(api.OrderDraft d) {
           ),
   );
 }
+
+/// 견적(주문 초안·주문 공통). 값은 그대로 옮기고 계산하지 않는다.
+Quote quoteFromContract(api.Quote q) => Quote(
+  version: q.quoteVersion ?? 0,
+  expiresAt: q.quoteExpiresAt,
+  itemAmount: q.itemAmount,
+  deliveryTip: q.deliveryTip,
+  tipReason: switch (q.deliveryTipReason) {
+    api.QuoteDeliveryTipReasonEnum.STANDARD => TipReason.standard,
+    api.QuoteDeliveryTipReasonEnum.OVER_30000 => TipReason.over30000,
+    api.QuoteDeliveryTipReasonEnum.FIRST_PURCHASE => TipReason.firstPurchase,
+    api.QuoteDeliveryTipReasonEnum.NONE => TipReason.none,
+    null => TipReason.unknown,
+  },
+  bagFee: q.bagFee,
+  totalAmount: q.totalAmount,
+  minOrderSatisfied: q.minOrderSatisfied,
+  plannedShipments: q.plannedShipments,
+);
