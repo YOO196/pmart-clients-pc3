@@ -76,5 +76,83 @@
         "type": "String"
       }
     }
-  }
+  },
+  "sync": "전송·확인",
+  "checkAgain": "다시 확인",
+  "exAssigned": "배정됨 · 가게로 이동",
+  "exAtStore": "가게 도착 · 포장 인계",
+  "exPickedUp": "픽업 완료 · 고객에게 이동",
+  "exAtCustomer": "고객 도착 · 전달",
+  "exCompleted": "전달 완료",
+  "exFailed": "전달 실패 접수",
+  "exCancelled": "배송 취소",
+  "exOther": "상태 확인 중",
+  "doNotRepeat": "보낸 요청의 결과를 확인하는 중이에요. 같은 동작을 다시 하지 마세요",
+  "arriveStore": "가게 도착",
+  "handoverProgress": "포장 인계 {done} / {total}",
+  "@handoverProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "scanQr": "포장 QR 을 스캔하세요",
+  "scanOtherDelivery": "이 배송의 포장이 아니에요",
+  "scanDuplicate": "이미 스캔한 포장이에요",
+  "scanUnreadable": "QR 을 읽지 못했어요. 다시 스캔해 주세요",
+  "packageLabel": "포장 {id}",
+  "@packageLabel": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "hoWaiting": "스캔 전",
+  "hoWorking": "인계 확인 중",
+  "hoDone": "인계 완료",
+  "hoChecking": "인계 결과 확인 중 · 다시 스캔하지 마세요",
+  "hoStopped": "출고가 중지된 포장이에요. 점원에게 돌려주세요",
+  "hoAlready": "이미 인계된 포장이에요",
+  "hoInvalidated": "재포장돼서 무효가 된 라벨이에요. 새 라벨을 스캔해 주세요",
+  "hoMismatch": "다른 배송의 포장이에요",
+  "hoFenceActive": "다른 인계가 진행 중인 포장이에요",
+  "hoForbidden": "이 배송의 배정 라이더가 아니에요",
+  "hoRejected": "인계할 수 없는 포장이에요",
+  "partialHandover": "일부 포장만 인계됐어요. 남은 포장을 스캔해야 픽업할 수 있어요",
+  "pickupDone": "픽업 완료",
+  "arriveCustomer": "고객 도착",
+  "dropInfoUnavailable": "전달지 정보를 불러오지 못했어요",
+  "methodFace": "대면",
+  "methodContactless": "비대면",
+  "plHanded": "고객에게 직접",
+  "plDoor": "문 앞",
+  "plSecurity": "경비실",
+  "plBox": "택배함",
+  "plOther": "기타",
+  "photoGuide": "다른 고객·신분증·출입 비밀번호가 찍히지 않게 찍어 주세요",
+  "takePhoto": "전달 사진 찍고 올리기",
+  "photoUploaded": "사진 업로드 완료(다시 찍기)",
+  "uploadFailed": "사진을 올리지 못했어요. 다시 시도하거나 지원센터에 알려 주세요",
+  "completeDelivery": "전달 완료",
+  "deliveryDone": "전달을 마쳤어요",
+  "contactSupport": "지원센터에 문의해 주세요",
+  "reportFailure": "전달할 수 없어요",
+  "failureTitle": "전달할 수 없는 이유",
+  "frAbsent": "고객 부재",
+  "frAddress": "주소 오류",
+  "frUnreachable": "연락 안 됨",
+  "frRefused": "수령 거부",
+  "frDamaged": "상품 파손",
+  "frIncident": "사고·고장",
+  "frOther": "기타",
+  "qQueued": "전송 대기",
+  "qAwaiting": "확정 대기",
+  "qApplied": "반영",
+  "qRejected": "거절",
+  "qChecking": "확인 중"
 }

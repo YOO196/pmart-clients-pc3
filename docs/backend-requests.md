@@ -30,6 +30,8 @@
 | BR-20 | 중간 | 고객 | 필수 동의 대기(AUTH_CONSENT)에서 토큰 없이 동의 변경을 호출할 경로·`requiredConsents` 형식 불명 | OPEN |
 | BR-21 | 낮음 | 고객 | `OrderDraft` 응답에 품목·배송 방식·도착 구간·주소 반영 내용이 없음, 품절 처리 "다음에도 적용" 저장 경로 없음 | OPEN |
 | BR-22 | 낮음 | MFC | 밀봉 요청에 포장재 종류(보냉백 XS~XL·봉투 소~대·보냉재) 필드 없음, 라벨 출력 정보 없음 | OPEN |
+| BR-23 | 높음 | 라이더 | 포장 QR 원문 형식이 계약에 없어 스캔한 QR 에서 경로의 packageId 를 얻을 수 없음 | OPEN |
+| BR-24 | 높음 | 라이더 | 라이더가 볼 전달지(주소·상세·출입 안내·요청사항·연락)를 주는 계약 경로가 없음 | OPEN |
 
 ---
 
@@ -160,3 +162,15 @@
 - 현황: `SealPackageRequest` 에는 `contents`·`bagCount`·`containsAlcohol`·`temperatureZone`·`weightG`·`volumeCm3`·`packedBy` 만 있다. 포장재 종류·크기, 보냉재 사용 기록이 없다. `Package` 에는 `qrCode` 만 있고 라벨에 찍을 정보(주소 요약·주의 문구 등)를 받는 경로가 없다.
 - 질문: 포장재 종류·보냉재를 기록할 필드를 둘지(배달 용량·보냉 판정에 쓰는지), 라벨 출력 내용은 어디서 받는지.
 - 클라이언트 처리(회신 전): 온도대만 고르고 봉투 수는 포장 1개당 1로 보낸다. 라벨은 QR 값만 화면에 보인다(프린터 `[결정 필요]`).
+
+## BR-23 포장 QR 형식
+- 근거: mfc-fulfillment `authorizePackageHandover` 경로 `POST /packages/{packageId}/handover-authorizations`, 본문 `scannedCode`("QR 원문 (packageId + packageVersion)"), `Package.qrCode`.
+- 현황: 라이더는 포장 라벨의 QR 만 스캔하는데, 경로에 넣을 `packageId` 를 QR 에서 꺼내는 형식이 정해져 있지 않다. 배송의 `packageIds` 로 후보를 좁힐 수는 있지만, 어느 포장의 QR 인지는 QR 원문을 해석해야 안다.
+- 요청: (a) QR 원문 형식을 계약에 명시하거나(예: `PMART-PKG:{packageId}:v{packageVersion}`), (b) 경로 없이 `scannedCode` 만으로 승인하는 `POST /handover-authorizations` 를 둔다.
+- 클라이언트 처리(회신 전): 목 형식 `PMART-PKG:{id}:v{n}` 으로 해석한다(`packageIdFromQr`). 해석이 안 되면 "읽지 못했어요"로 안내하고 서버에 보내지 않는다.
+
+## BR-24 라이더용 전달지 정보
+- 근거: Delivery-business-logic 수행 흐름 "픽업 후: 주소·상세주소·연락(안심번호)", "고객 부재: 연락 2회 이상", `docs/apps/rider-app.md` §2 수행 흐름.
+- 현황: `DeliveryExecution`·dispatch `Offer.summary` 에는 도착 지역 요약만 있다. 픽업 뒤 라이더가 볼 상세 주소·출입 안내·요청사항·연락 수단(안심번호)을 주는 경로가 없다. 주소는 customer-service 회원 정보라 라이더가 직접 읽을 수 없다.
+- 요청: 픽업(PICKED_UP) 뒤에만 열리는 라이더용 전달지 조회(예: `GET /deliveries/{id}/drop-info`)와 노출 범위·안심번호 방식.
+- 클라이언트 처리(회신 전): 목에서만 전달지를 보인다. 실서버 구현은 null 을 돌려주고 화면은 "전달지 정보를 불러오지 못했어요"로 보인다.

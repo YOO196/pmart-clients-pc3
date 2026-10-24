@@ -5,6 +5,8 @@ import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:rider_app/app.dart';
+import 'package:rider_app/features/delivery/data/mock_delivery_repository.dart';
+import 'package:rider_app/features/delivery/presentation/delivery_controller.dart';
 import 'package:rider_app/features/offers/data/mock_offer_repository.dart';
 import 'package:rider_app/features/offers/domain/offer_list.dart';
 import 'package:rider_app/features/offers/presentation/offer_controllers.dart';
@@ -27,6 +29,9 @@ void main() {
       envProvider.overrideWithValue(PmartEnv.mock),
       offerRepositoryProvider.overrideWithValue(repo),
       dutyRepositoryProvider.overrideWithValue(repo),
+      deliveryRepositoryProvider.overrideWithValue(
+        MockDeliveryRepository(latency: Duration.zero, seeded: false),
+      ),
       monotonicProvider.overrideWithValue(() => mono),
     ],
     child: const RiderApp(),

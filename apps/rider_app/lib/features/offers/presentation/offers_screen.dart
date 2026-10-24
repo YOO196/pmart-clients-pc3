@@ -9,6 +9,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/providers.dart';
 import '../domain/offer_list.dart';
+import '../../delivery/presentation/delivery_controller.dart';
 import 'offer_controllers.dart';
 
 String lateText(AppLocalizations l10n, LateReason r) => switch (r) {
@@ -103,7 +104,11 @@ class _OffersScreenState extends ConsumerState<OffersScreen> {
     final duty = ref.watch(dutyProvider);
     final aiMode =
         ref.watch(dispatchModeProvider).value == DispatchMode.aiRecommended;
-    final assigned = ref.watch(assignedDeliveriesProvider);
+    // 진행 중 배송은 서버 목록(재접속 복구)과 이번에 수락한 배송을 합쳐 보인다.
+    final assigned = {
+      ...?ref.watch(myActiveDeliveriesProvider).value?.map((d) => d.deliveryId),
+      ...ref.watch(assignedDeliveriesProvider),
+    }.toList();
     final list = poll.list;
     return Scaffold(
       appBar: AppBar(
