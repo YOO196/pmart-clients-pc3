@@ -22,8 +22,8 @@
 
 | 앱 | 플랫폼 | 이유 |
 |---|---|---|
-| customer_app | Flutter iOS/Android | 고객 모바일. 토스 결제·소셜 로그인·푸시 |
-| rider_app | Flutter iOS/Android | 카메라(QR·전달 사진)·GPS 백그라운드 위치·외부 지도앱 |
+| customer_app | Flutter Android (iOS 중단, ADR-0002) | 고객 모바일. 토스 결제·소셜 로그인·푸시 |
+| rider_app | Flutter Android (iOS 중단, ADR-0002) | 카메라(QR·전달 사진)·GPS 백그라운드 위치·외부 지도앱 |
 | mfc_app | Flutter Android(PDA) | 바코드 스캐너·라벨 프린터. 점원앱·PDA·패킹앱을 **역할별 메뉴로 한 앱에** 둔다 |
 | driver_app | Flutter | 2단계(TMS 활성 시). 라이더와 ID·가용성을 공유하지 않으므로 별도 앱 |
 | backoffice | React SPA | 넓은 화면의 표·비교·승인함. 관리자 화면(MFC 관리자 현황 포함) |

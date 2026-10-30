@@ -4,10 +4,12 @@ PMart(퀵 커머스: 도심 MFC 기반 즉시·예약 배달)의 **클라이언�
 백엔드(`../pmart-backend`, Spring Boot MSA)는 **다른 계정의 Claude Code가 담당**한다. 이 저장소에서는 백엔드를 읽기만 한다.
 
 ## 앱 구성 `[확정 2026-10-24, ADR-0001]`
+Flutter 앱은 **Android 만** 개발한다. iOS 는 중단(`ios/` 는 두되 손대지 않음) — ADR-0002 (2026-10-30).
+
 | 앱 | 기술 | 사용자 | 1차 범위 | 문서 |
 |---|---|---|---|---|
-| `apps/customer_app` | Flutter (iOS/Android) | 고객 | 1단계 | `docs/apps/customer-app.md` |
-| `apps/rider_app` | Flutter (iOS/Android) | 라이더 | 1단계 | `docs/apps/rider-app.md` |
+| `apps/customer_app` | Flutter (Android) | 고객 | 1단계 | `docs/apps/customer-app.md` |
+| `apps/rider_app` | Flutter (Android) | 라이더 | 1단계 | `docs/apps/rider-app.md` |
 | `apps/mfc_app` | Flutter (Android PDA 우선) | MFC 점원(피킹·패킹·인계·입고·실사) | 1단계 | `docs/apps/mfc-app.md` |
 | `web/backoffice` | React SPA (Vite + TS) | 본사·센터 운영자 | 1단계 | `docs/apps/backoffice-web.md` |
 | (예약) `apps/driver_app` | Flutter | 간선기사(TMS) | 2단계 | `docs/apps/driver-app.md` |
