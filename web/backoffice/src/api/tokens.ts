@@ -2,6 +2,8 @@
 // refresh token 은 한 번만 쓴다(ADR-0018 회전): 갱신 응답의 새 값으로 바로 바꾼다.
 // X-Device-Id 도 이 탭의 메모리에 둔다. 갱신 때 로그인 때와 같은 값을 보내야 하고, refresh 가 메모리에만 있으니 탭 단위로 충분하다.
 
+import { randomUuid } from './uuid';
+
 export interface TokenPairLike {
   readonly accessToken: string;
   readonly refreshToken: string;
@@ -15,7 +17,7 @@ export class TokenStore {
   private refresh: string | null = null;
   private listeners = new Set<Listener>();
   /** 이 탭의 기기 ID(로그인·갱신에 같은 값) */
-  readonly deviceId: string = crypto.randomUUID();
+  readonly deviceId: string = randomUuid();
 
   get accessToken(): string | null {
     return this.access;

@@ -1,5 +1,6 @@
 // 변경 명령 헬퍼와 결과 불명 해소. pmart_core(Dart) 의 IdempotencyKey·ResultResolver 와 같은 규칙.
 import { PmartFailure } from './failure';
+import { randomUuid } from './uuid';
 
 /** `_common.yaml` CommandStatus. ACCEPTED 는 접수일 뿐 성공이 아니다. */
 export type CommandStatus = 'ACCEPTED' | 'APPLIED' | 'REJECTED' | 'UNKNOWN_RESULT';
@@ -27,7 +28,7 @@ export class IdempotencyKey {
   }
 
   static generate(): IdempotencyKey {
-    return new IdempotencyKey(crypto.randomUUID());
+    return new IdempotencyKey(randomUuid());
   }
 }
 

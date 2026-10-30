@@ -9,6 +9,7 @@ import { ProblemFailure } from '../../api/failure';
 import type { ChangeRequestBody } from '../../api/models';
 import { request } from '../../api/pmartFetch';
 import { settleCommand } from '../../api/settle';
+import { randomUuid } from '../../api/uuid';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback } from '../../shared/Feedback';
 import { formatKrw, formatSeoul } from '../../shared/format';
@@ -194,7 +195,7 @@ function PriceChange({ initialSku }: { readonly initialSku: string }) {
           <button type="button" className="btn btn-sm" onClick={() => setLines([...lines, emptyLine()])}>
             {m.prices.addLine}
           </button>
-          <button type="button" className="btn btn-primary btn-sm" disabled={!ok} onClick={() => setBody(priceChangeBody(lines, common, crypto.randomUUID()))}>
+          <button type="button" className="btn btn-primary btn-sm" disabled={!ok} onClick={() => setBody(priceChangeBody(lines, common, randomUuid()))}>
             {m.approvals.requestApproval}
           </button>
         </div>
