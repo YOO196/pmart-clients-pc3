@@ -4,6 +4,7 @@ import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart';
 import '../../../shared/shopping_context.dart';
+import '../../auth/domain/auth.dart' show MemberSession;
 import '../../auth/presentation/auth_controller.dart';
 import '../data/cart_repository.dart';
 import '../data/mock_cart_repository.dart';
@@ -12,7 +13,12 @@ import '../domain/cart.dart';
 final cartRepositoryProvider = Provider<CartRepository>(
   (ref) => switch (ref.watch(envProvider)) {
     PmartEnv.mock => MockCartRepository(),
-    PmartEnv.local => ApiCartRepository(ref.watch(dioProvider)),
+    // 회원은 회원 토큰, 비회원은 비회원 토큰(POST /auth/guest-sessions, ADR-0022)으로 같은 API 를 부른다.
+    PmartEnv.local => ApiCartRepository(
+      ref.watch(sessionProvider) is MemberSession
+          ? ref.watch(dioProvider)
+          : ref.watch(guestDioProvider),
+    ),
   },
 );
 

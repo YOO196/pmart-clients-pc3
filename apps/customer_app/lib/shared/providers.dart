@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_api_auth/pmart_api_auth.dart' as auth;
 import 'package:pmart_core/pmart_core.dart';
 
+import '../features/cart/data/guest_session.dart';
+
 /// `X-Source-System` (값 확정은 BR-08).
 const sourceSystem = 'customer-app';
 
@@ -21,16 +23,55 @@ final deviceIdProvider = Provider<DeviceIdProvider>(
   (ref) => DeviceIdProvider(ref.watch(secureStoreProvider)),
 );
 
-/// 실서버(local) 연동용 Dio. 목 모드에서는 만들지 않는다.
-final dioProvider = Provider<Dio>((ref) {
+/// 비회원 장바구니 토큰(typ=GUEST). 회원 토큰과 저장 키가 다르다.
+final guestTokenStoreProvider = Provider<TokenStore>(
+  (ref) =>
+      TokenStore(ref.watch(secureStoreProvider), refreshKey: guestRefreshKey),
+);
+
+/// 실서버(local) 게이트웨이 주소. 목 모드에서는 만들지 않는다.
+final apiBaseUrlProvider = Provider<String>((ref) {
   final env = ref.watch(envProvider);
   if (env == PmartEnv.mock) {
     throw StateError('목 모드는 네트워크를 쓰지 않는다. Repository 목 구현을 써야 한다.');
   }
-  final baseUrl = apiBaseUrl(
+  return apiBaseUrl(
     env,
     androidEmulator: const bool.fromEnvironment('PMART_ANDROID_EMULATOR'),
   );
+});
+
+/// 비회원 장바구니용 Dio. 비회원 토큰은 장바구니(/carts/**)에서만 통하므로(그 밖은 403) 다른 API 에 쓰지 않는다.
+/// 첫 요청 때 비회원 세션이 없으면 만든다([GuestSessionInterceptor]).
+final guestDioProvider = Provider<Dio>((ref) {
+  final baseUrl = ref.watch(apiBaseUrlProvider);
+  final deviceId = ref.watch(deviceIdProvider);
+  final tokens = ref.watch(guestTokenStoreProvider);
+  final dio = createPmartDio(
+    baseUrl: baseUrl,
+    sourceSystem: sourceSystem,
+    tokens: tokens,
+    deviceId: deviceId,
+    refresher: authRefresher(baseUrl: baseUrl, deviceId: deviceId),
+    log: kDebugMode ? debugPrint : null,
+  );
+  dio.interceptors.insert(
+    0,
+    GuestSessionInterceptor(
+      tokens: tokens,
+      start: guestSessionStarter(
+        baseUrl: baseUrl,
+        sourceSystem: sourceSystem,
+        deviceId: deviceId,
+      ),
+    ),
+  );
+  return dio;
+});
+
+/// 실서버(local) 연동용 Dio(회원 토큰). 목 모드에서는 만들지 않는다.
+final dioProvider = Provider<Dio>((ref) {
+  final baseUrl = ref.watch(apiBaseUrlProvider);
   final deviceId = ref.watch(deviceIdProvider);
   return createPmartDio(
     baseUrl: baseUrl,

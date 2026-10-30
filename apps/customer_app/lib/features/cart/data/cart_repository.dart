@@ -7,7 +7,7 @@ import '../../catalog/domain/catalog.dart' show SaleState;
 import '../domain/cart.dart';
 
 abstract interface class CartRepository {
-  /// 현재 장바구니를 만들거나 돌려준다(`POST /carts`). 회원은 계정, 비회원은 기기 기준.
+  /// 현재 장바구니를 만들거나 돌려준다(`POST /carts`). 회원은 계정, 비회원은 비회원 토큰 주체 기준.
   Future<Cart> open({String? mfcId});
 
   /// 실패는 [PmartFailure] 로 던진다.

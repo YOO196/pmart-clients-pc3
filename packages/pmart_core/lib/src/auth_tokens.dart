@@ -15,26 +15,31 @@ final class AuthTokens {
 }
 
 /// 토큰 보관. access token 은 메모리에만, refresh token 은 보안 저장소에 둔다.
+///
+/// 주체마다 따로 둔다(고객 앱: 회원 토큰과 비회원 장바구니 토큰은 [refreshKey] 가 다르다).
 final class TokenStore {
-  TokenStore(this._store);
+  TokenStore(this._store, {this.refreshKey = defaultRefreshKey});
 
-  static const _refreshKey = 'pmart.refreshToken';
+  static const defaultRefreshKey = 'pmart.refreshToken';
+
+  /// refresh token 을 두는 보안 저장소 키.
+  final String refreshKey;
 
   final SecureKeyValueStore _store;
   String? _accessToken;
 
   String? get accessToken => _accessToken;
 
-  Future<String?> readRefreshToken() => _store.read(_refreshKey);
+  Future<String?> readRefreshToken() => _store.read(refreshKey);
 
   Future<void> save(AuthTokens tokens) async {
     _accessToken = tokens.accessToken;
-    await _store.write(_refreshKey, tokens.refreshToken);
+    await _store.write(refreshKey, tokens.refreshToken);
   }
 
   Future<void> clear() async {
     _accessToken = null;
-    await _store.delete(_refreshKey);
+    await _store.delete(refreshKey);
   }
 }
 
