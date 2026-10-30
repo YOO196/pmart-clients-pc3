@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
@@ -37,9 +40,7 @@ void main() {
     await t.pumpAndSettle();
   }
 
-  testWidgets('비회원 주문하기 → 로그인 → 배송 방식 → 주문서(서버 금액, 최소주문 미달이면 결제 닫힘)', (
-    t,
-  ) async {
+  testWidgets('최소주문 미달이면(서버 판정) 주문서로 넘어가지 않고 장바구니로 안내한다', (t) async {
     final checkout = MockCheckoutRepository(
       latency: Duration.zero,
       now: () => now,
@@ -54,6 +55,31 @@ void main() {
     await t.tap(find.byKey(const ValueKey('mode-single')));
     await t.pump();
     await t.tap(next);
+    await t.pumpAndSettle();
+
+    // 목 서버: 상품액 7,940원 → minOrderSatisfied=false. 앱은 금액을 비교하지 않는다.
+    expect(find.text('주문서'), findsNothing);
+    expect(find.text('배송 방식 선택'), findsOneWidget);
+    expect(find.byKey(const ValueKey('delivery-min-order')), findsOneWidget);
+    expect(find.text('최소 주문금액을 채우지 못했어요. 상품을 더 담아 주세요'), findsOneWidget);
+
+    await t.tap(find.text('장바구니 보기'));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cart-order')), findsOneWidget);
+  });
+
+  testWidgets('주문서 화면은 그래도 서버의 최소주문 판정으로 결제를 막는다(방어)', (t) async {
+    final checkout = MockCheckoutRepository(
+      latency: Duration.zero,
+      now: () => now,
+    );
+    await t.pumpWidget(app(checkout));
+    await toDelivery(t);
+    await t.tap(find.byKey(const ValueKey('mode-single')));
+    await t.pump();
+    // 배송 선택 단계를 건너뛰고 주문서로 바로 들어온 경우(뒤로 가기·딥링크 등)
+    final router = GoRouter.of(t.element(find.text('배송 방식 선택')));
+    unawaited(router.push('/checkout'));
     await t.pumpAndSettle();
 
     expect(find.text('주문서'), findsOneWidget);

@@ -51,9 +51,17 @@ class SessionController extends Notifier<Session> {
   @override
   Session build() => const GuestSession();
 
-  Future<void> signIn(LoginMember member) async {
+  Future<void> signIn(
+    LoginMember member, {
+    SocialProvider? provider,
+    String? accountLabel,
+  }) async {
     await ref.read(tokenStoreProvider).save(member.tokens);
-    state = MemberSession(member.accountId);
+    state = MemberSession(
+      member.accountId,
+      provider: provider,
+      accountLabel: accountLabel,
+    );
   }
 
   /// 저장된 refresh token 이 있을 때만 서버에 세션을 묻는다(`GET /auth/sessions/current`).
@@ -113,8 +121,12 @@ class LoginFlowController extends Notifier<LoginFlow> {
 
   final LoginPurpose purpose;
 
-  /// 결과 불명인 로그인의 키·제공자·제공자 토큰. 다시 확인은 같은 키로 재전송한다.
-  ({IdempotencyKey key, SocialProvider provider, String token})? _unknown;
+  /// 결과 불명인 로그인의 키·제공자·제공자 자격. 다시 확인은 같은 키로 재전송한다.
+  ({IdempotencyKey key, SocialProvider provider, SocialCredential credential})?
+  _unknown;
+
+  /// 이번 로그인 시도의 제공자·계정 표시(회원이 되면 세션에 붙인다).
+  ({SocialProvider provider, String? label})? _who;
 
   @override
   LoginFlow build() => const LoginIdle();
@@ -126,9 +138,9 @@ class LoginFlowController extends Notifier<LoginFlow> {
   Future<void> start(SocialProvider provider) async {
     if (busy) return;
     state = LoginWorking(provider);
-    final String? token;
+    final SocialCredential? credential;
     try {
-      token = await ref.read(socialTokenSourceProvider).obtain(provider);
+      credential = await ref.read(socialTokenSourceProvider).obtain(provider);
     } on SocialProviderDown {
       return _settle(const LoginProviderUnavailable());
     } on SocialProviderMisconfigured {
@@ -137,17 +149,18 @@ class LoginFlowController extends Notifier<LoginFlow> {
       );
     }
     if (!ref.mounted) return;
-    if (token == null) return _settle(const LoginCancelled());
+    if (credential == null) return _settle(const LoginCancelled());
+    _who = (provider: provider, label: credential.accountLabel);
     final key = IdempotencyKey.generate();
     final outcome = await _repo.login(
       provider,
-      token,
+      credential.token,
       purpose: purpose,
       key: key,
     );
     if (!ref.mounted) return;
     if (outcome is LoginUnknown) {
-      _unknown = (key: key, provider: provider, token: token);
+      _unknown = (key: key, provider: provider, credential: credential);
       return _resolve(
         outcome,
         attempts: ref.read(loginResolveAttemptsProvider),
@@ -173,7 +186,7 @@ class LoginFlowController extends Notifier<LoginFlow> {
           ? await _repo.lookup(id)
           : await _repo.login(
               unknown.provider,
-              unknown.token,
+              unknown.credential.token,
               purpose: purpose,
               key: unknown.key,
             );
@@ -208,7 +221,9 @@ class LoginFlowController extends Notifier<LoginFlow> {
 
   Future<void> _settle(LoginOutcome outcome) async {
     if (outcome is LoginMember) {
-      await ref.read(sessionProvider.notifier).signIn(outcome);
+      await ref
+          .read(sessionProvider.notifier)
+          .signIn(outcome, provider: _who?.provider, accountLabel: _who?.label);
     }
     if (ref.mounted) state = LoginSettled(outcome);
   }

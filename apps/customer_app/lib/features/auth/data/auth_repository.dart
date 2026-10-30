@@ -6,12 +6,12 @@ import 'package:pmart_core/pmart_core.dart';
 import '../../../shared/providers.dart' show sourceSystem;
 import '../domain/auth.dart';
 
-/// 제공자 SDK 에서 인가 코드·ID 토큰을 받는다. 고객이 취소하면 null.
+/// 제공자 SDK 에서 인가 코드·ID 토큰(과 표시용 계정 이름)을 받는다. 고객이 취소하면 null.
 ///
 /// 실제 SDK(카카오 등)는 앱 키 결정 뒤 붙인다(`[결정 필요]` 카카오 키). 토큰은 로그에 남기지 않는다.
 abstract interface class SocialTokenSource {
   /// 제공자 장애면 [SocialProviderDown] 을 던진다.
-  Future<String?> obtain(SocialProvider provider);
+  Future<SocialCredential?> obtain(SocialProvider provider);
 }
 
 final class SocialProviderDown implements Exception {

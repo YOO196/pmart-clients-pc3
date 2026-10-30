@@ -111,7 +111,26 @@ final class GuestSession extends Session {
 }
 
 final class MemberSession extends Session {
-  const MemberSession(this.accountId);
+  const MemberSession(this.accountId, {this.provider, this.accountLabel});
 
   final String accountId;
+
+  /// 로그인한 제공자. 앱을 다시 켜서 복원한 세션은 모른다(null).
+  final SocialProvider? provider;
+
+  /// 제공자 SDK 가 알려 준 계정 표시(이메일 등). 이 기기 화면에만 보이고 저장·로그·서버 전송하지 않는다.
+  final String? accountLabel;
+}
+
+/// 제공자 SDK 결과: 서버에 보낼 토큰과 화면 표시용 계정 이름.
+@immutable
+final class SocialCredential {
+  const SocialCredential(this.token, {this.accountLabel});
+
+  final String token;
+  final String? accountLabel;
+
+  /// 토큰·계정 값을 로그에 남기지 않는다.
+  @override
+  String toString() => 'SocialCredential(***)';
 }

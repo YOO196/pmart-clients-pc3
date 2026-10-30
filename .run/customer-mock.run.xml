@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="고객앱 목" type="FlutterRunConfigurationType" factoryName="Flutter">
+    <option name="additionalArgs" value="--dart-define=PMART_ENV=mock" />
+    <option name="filePath" value="$PROJECT_DIR$/apps/customer_app/lib/main.dart" />
+    <method v="2" />
+  </configuration>
+</component>

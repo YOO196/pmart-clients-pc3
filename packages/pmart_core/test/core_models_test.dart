@@ -143,6 +143,18 @@ void main() {
       );
     });
 
+    test('PMART_API_BASE_URL 은 local 의 게이트웨이 주소를 바꾸고, mock 에는 영향이 없다', () {
+      const lan = 'http://192.168.0.40:8080/api/v1';
+      expect(
+        apiBaseUrl(PmartEnv.local, androidEmulator: true, override: lan),
+        lan,
+      );
+      expect(
+        apiBaseUrl(PmartEnv.mock, override: lan),
+        'http://mock.invalid/api/v1',
+      );
+    });
+
     test('멱등 키는 128자를 넘을 수 없다', () {
       expect(() => IdempotencyKey('x' * 129), throwsArgumentError);
       expect(IdempotencyKey.generate(), isNot(IdempotencyKey.generate()));

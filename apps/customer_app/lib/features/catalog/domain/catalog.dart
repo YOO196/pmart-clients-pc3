@@ -138,6 +138,7 @@ class CategoryNode {
 
   final String categoryId;
   final String? parentId;
+
   /// 1=상위, 2=하위, 3=칩1, 4=칩2 (계약 CategoryLevel)
   final int depth;
   final String name;

@@ -102,6 +102,50 @@ void main() {
     });
   });
 
+  testWidgets('목 모드 로그인 화면은 실제 Google 로그인이 아니라고 알린다', (t) async {
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('home-address')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('go-login')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('login-mock-notice')), findsOneWidget);
+    // 디버그 띠(DEBUG)도 Banner 라 문구로 고른다.
+    expect(
+      find.byWidgetPredicate((w) => w is Banner && w.message == '목 데이터'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('로그인하면 마이에 제공자와 계정(목은 가짜 계정)이 보인다', (t) async {
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('home-address')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('go-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이').last);
+    await t.pumpAndSettle();
+
+    final account = find.byKey(const ValueKey('my-account'));
+    expect(account, findsOneWidget);
+    expect(
+      find.descendant(of: account, matching: find.text('카카오로 로그인했어요')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: account,
+        matching: find.text('mock-kakao@pmart.invalid'),
+      ),
+      findsOneWidget,
+    );
+  });
+
   group('거절 사유별 문구', () {
     for (final (code, text) in [
       ('PROVIDER_REJECTED', 'Google 계정을 확인하지 못했어요. 다시 로그인해 주세요'),

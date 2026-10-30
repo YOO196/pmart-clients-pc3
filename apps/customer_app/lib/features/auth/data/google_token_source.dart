@@ -16,14 +16,15 @@ final class SocialProviderMisconfigured implements Exception {
 }
 
 /// Google Sign-In 결과 코드 → 앱 처리. 취소는 null(서버를 부르지 않고 실패 횟수에도 넣지 않는다).
-String? googleSignInFailure(GoogleSignInExceptionCode code) => switch (code) {
-  GoogleSignInExceptionCode.canceled ||
-  GoogleSignInExceptionCode.interrupted => null,
-  GoogleSignInExceptionCode.clientConfigurationError ||
-  GoogleSignInExceptionCode.providerConfigurationError =>
-    throw const SocialProviderMisconfigured(),
-  _ => throw const SocialProviderDown(),
-};
+SocialCredential? googleSignInFailure(GoogleSignInExceptionCode code) =>
+    switch (code) {
+      GoogleSignInExceptionCode.canceled ||
+      GoogleSignInExceptionCode.interrupted => null,
+      GoogleSignInExceptionCode.clientConfigurationError ||
+      GoogleSignInExceptionCode.providerConfigurationError =>
+        throw const SocialProviderMisconfigured(),
+      _ => throw const SocialProviderDown(),
+    };
 
 /// 실제 Google 계정 선택 창 → ID 토큰. 토큰 값은 로그·오류 문구에 남기지 않는다.
 /// (GoogleSignInAuthentication.toString 은 토큰을 찍으므로 그 객체를 문자열로 바꾸지 않는다.)
@@ -38,7 +39,7 @@ final class GoogleSocialTokenSource implements SocialTokenSource {
   Future<void>? _initialized;
 
   @override
-  Future<String?> obtain(SocialProvider provider) async {
+  Future<SocialCredential?> obtain(SocialProvider provider) async {
     // 서버는 Google 만 지원한다(ADR-0019). 화면도 Google 버튼만 보인다.
     if (provider != SocialProvider.google) throw const SocialProviderDown();
     try {
@@ -51,7 +52,7 @@ final class GoogleSocialTokenSource implements SocialTokenSource {
       if (idToken == null || idToken.isEmpty) {
         throw const SocialProviderMisconfigured();
       }
-      return idToken;
+      return SocialCredential(idToken, accountLabel: account.email);
     } on GoogleSignInException catch (e) {
       return googleSignInFailure(e.code);
     }

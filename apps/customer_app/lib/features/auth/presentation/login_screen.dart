@@ -5,6 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../data/auth_repository.dart' show consentTypeOf;
 import '../domain/auth.dart';
+
+import 'package:pmart_core/pmart_core.dart' show PmartEnv;
+
+import '../../../shared/providers.dart' show envProvider;
 import 'auth_controller.dart';
 
 /// SCR-AUTH-001·CONSENT-001. 로그인되면 `true` 로 돌아간다. 취소·실패는 원래 화면을 그대로 둔다.
@@ -125,6 +129,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ? l10n.loginForCheckout
                 : l10n.loginBody,
           ),
+          if (ref.watch(envProvider) == PmartEnv.mock) ...[
+            const SizedBox(height: 8),
+            Text(
+              l10n.loginMockNotice,
+              key: const ValueKey('login-mock-notice'),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
           const SizedBox(height: 24),
           if (message != null) ...[
             Text(

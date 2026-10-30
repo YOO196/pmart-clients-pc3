@@ -207,6 +207,15 @@ enum CheckoutBlockReason {
   setupIncomplete,
 }
 
+/// 배송 선택 "다음"에서 주문서로 넘어가도 되는지(서버 판정만 쓴다).
+enum CheckoutGate {
+  /// 주문서로 간다(그 밖의 오류·대기는 주문서 화면이 보여 준다).
+  proceed,
+
+  /// 서버가 최소 주문금액 미달이라고 했다(초안 거절 MIN_ORDER_AMOUNT 또는 견적 minOrderSatisfied=false).
+  minOrderUnmet,
+}
+
 final draftControllerProvider =
     AsyncNotifierProvider<DraftController, DraftState?>(DraftController.new);
 
@@ -291,6 +300,21 @@ class DraftController extends AsyncNotifier<DraftState?> {
     } on PmartFailure catch (e, st) {
       if (ref.mounted) state = AsyncError(e, st);
     }
+  }
+
+  /// 주문서 진입 전에 초안을 먼저 만들어 서버의 최소 주문 판정을 본다. 앱은 금액을 계산하지 않는다.
+  /// 판정 전(견적 없음)이면 막지 않는다 — 주문서가 서버 값으로 다시 막는다(결제 버튼).
+  Future<CheckoutGate> prepare() async {
+    await enter();
+    return switch (state) {
+      AsyncError(error: ProblemFailure(:final problem))
+          when problem.code == CheckoutProblemCode.minOrderAmount =>
+        CheckoutGate.minOrderUnmet,
+      AsyncData(value: final DraftState s)
+          when s.draft.quote?.minOrderSatisfied == false =>
+        CheckoutGate.minOrderUnmet,
+      _ => CheckoutGate.proceed,
+    };
   }
 
   Future<OrderDraft> _createWithResend(DraftRequest request) async {

@@ -12,10 +12,14 @@ final class MockSocialTokenSource implements SocialTokenSource {
   final Set<SocialProvider> down;
 
   @override
-  Future<String?> obtain(SocialProvider provider) async {
+  Future<SocialCredential?> obtain(SocialProvider provider) async {
     if (down.contains(provider)) throw const SocialProviderDown();
     if (cancelled.contains(provider)) return null;
-    return 'mock-provider-token-${provider.name}';
+    // 목은 제공자 창 없이 바로 성공한다. 실제 계정이 아님을 이름으로 드러낸다.
+    return SocialCredential(
+      'mock-provider-token-${provider.name}',
+      accountLabel: 'mock-${provider.name}@pmart.invalid',
+    );
   }
 }
 

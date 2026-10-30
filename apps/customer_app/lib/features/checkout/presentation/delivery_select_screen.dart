@@ -89,6 +89,35 @@ class _DeliveryBody extends ConsumerStatefulWidget {
 }
 
 class _DeliveryBodyState extends ConsumerState<_DeliveryBody> {
+  bool _preparing = false;
+
+  /// 서버가 최소 주문 미달이라고 하면 주문서로 넘어가지 않고 장바구니로 안내한다.
+  Future<void> _next() async {
+    setState(() => _preparing = true);
+    final gate = await ref.read(draftControllerProvider.notifier).prepare();
+    if (!mounted) return;
+    setState(() => _preparing = false);
+    switch (gate) {
+      case CheckoutGate.proceed:
+        await context.push('/checkout');
+      case CheckoutGate.minOrderUnmet:
+        final l10n = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              key: const ValueKey('delivery-min-order'),
+              // BR-14: 부족액은 계약에 없어 금액 없이 안내한다(앱에서 계산하지 않는다).
+              content: Text(l10n.minOrderUnsatisfied),
+              action: SnackBarAction(
+                label: l10n.cartGoToCart,
+                onPressed: () => context.go('/cart'),
+              ),
+            ),
+          );
+    }
+  }
+
   bool _tomorrow = false;
   late final _note = TextEditingController(
     text: ref.read(checkoutSetupProvider).deliveryNote,
@@ -203,10 +232,13 @@ class _DeliveryBodyState extends ConsumerState<_DeliveryBody> {
               width: double.infinity,
               child: FilledButton(
                 key: const ValueKey('delivery-next'),
-                onPressed: setup.complete
-                    ? () => context.push('/checkout')
-                    : null,
-                child: Text(l10n.deliveryNext),
+                onPressed: setup.complete && !_preparing ? _next : null,
+                child: _preparing
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(l10n.deliveryNext),
               ),
             ),
           ),
