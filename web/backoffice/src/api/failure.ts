@@ -86,6 +86,16 @@ export class UnexpectedResponseFailure extends PmartFailure {
 
 export class SessionExpiredFailure extends PmartFailure {}
 
+/** 2xx 이지만 CommandResponse.status = REJECTED. 거절이 확정된 결과다. */
+export class CommandRejectedFailure extends PmartFailure {
+  constructor(
+    readonly nextAction?: string,
+    requestId?: string,
+  ) {
+    super('COMMAND_REJECTED', requestId);
+  }
+}
+
 export function isMutation(method: string): boolean {
   return !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase());
 }

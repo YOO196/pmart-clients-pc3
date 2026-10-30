@@ -17,6 +17,8 @@ import {
 import type { TokenStore } from './tokens';
 
 export const PUBLIC_HEADER = 'X-Pmart-Public';
+/** 계약이 Idempotency-Key 를 받지 않는 변경 요청(운영자 로그인). 보내기 전에 지운다. */
+export const NO_IDEMPOTENCY_HEADER = 'X-Pmart-No-Idempotency';
 
 export interface PmartFetchOptions {
   /** `X-Source-System` (값 확정은 BR-08) */
@@ -58,9 +60,11 @@ export function createPmartFetch(options: PmartFetchOptions): PmartFetch {
     const headers = new Headers(req.headers);
     const isPublic = headers.has(PUBLIC_HEADER);
     headers.delete(PUBLIC_HEADER);
+    const noIdempotency = headers.has(NO_IDEMPOTENCY_HEADER);
+    headers.delete(NO_IDEMPOTENCY_HEADER);
     headers.set('X-Source-System', sourceSystem);
     headers.set('Accept', 'application/json, application/problem+json');
-    if (isMutation(req.method) && !headers.get('Idempotency-Key')) {
+    if (isMutation(req.method) && !noIdempotency && !headers.get('Idempotency-Key')) {
       throw new Error(`변경 요청에 Idempotency-Key 가 없다: ${req.method} ${new URL(req.url).pathname}`);
     }
     const access = tokens.accessToken;
@@ -76,7 +80,8 @@ export function createPmartFetch(options: PmartFetchOptions): PmartFetch {
       onSessionExpired?.();
       return false;
     }
-    tokens.accessToken = next;
+    // refresh() 가 회전된 토큰 쌍을 이미 넣었으면 다시 쓰지 않는다.
+    if (tokens.accessToken !== next) tokens.accessToken = next;
     return true;
   }
 
@@ -170,4 +175,21 @@ export async function request<T>(
       : new ContractViolationFailure('본문 없음', requestId);
   }
   return data;
+}
+
+/**
+ * 계약이 204(본문 없음)로 성공을 알리는 변경 요청용. 2xx 면 반영됐다고 본다(본문이 없어도 결과 불명이 아니다).
+ *   await requestNoContent('POST', api.auth.POST('/auth/password-changes', {...}))
+ */
+export async function requestNoContent(
+  method: string,
+  call: Promise<{ error?: unknown; response: Response }>,
+): Promise<void> {
+  let result: { error?: unknown; response: Response };
+  try {
+    result = await call;
+  } catch (e) {
+    throw failureFromTransport(e, method);
+  }
+  if (!result.response.ok) throw failureFromResponse(result.response, result.error, method);
 }

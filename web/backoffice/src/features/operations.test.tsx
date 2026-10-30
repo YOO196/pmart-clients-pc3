@@ -1,0 +1,68 @@
+import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it } from 'vitest';
+
+import { db } from '../mocks/db';
+import { as, renderAt } from '../test/render';
+
+describe('판매 상태', () => {
+  it('판매중지를 승인 없이 보내면 APPROVAL_REQUIRED 를 보여 주고 상태는 그대로다', async () => {
+    const user = userEvent.setup();
+    renderAt('/products/P-00000001');
+    await screen.findByTestId('sale-state');
+    await user.selectOptions(screen.getByLabelText('판매 상태'), 'SALE_STOPPED');
+    await user.type(screen.getByLabelText('사유'), '품질 이슈');
+    await user.click(screen.getByRole('button', { name: '변경 요청' }));
+
+    expect(await screen.findByRole('alert')).toHaveAttribute('data-code', 'APPROVAL_REQUIRED');
+    expect(screen.getByTestId('sale-state')).toHaveTextContent('판매중');
+    expect(db.products.get('P-00000001')?.saleState).toBe('ON_SALE');
+  });
+
+  it('일시품절은 바로 반영되고 X-Expected-Version 을 보낸다', async () => {
+    const user = userEvent.setup();
+    const view = renderAt('/products/P-00000001');
+    await screen.findByTestId('sale-state');
+    await user.type(screen.getByLabelText('사유'), '입고 지연');
+    await user.click(screen.getByRole('button', { name: '변경 요청' }));
+
+    expect(await screen.findByText('판매 상태가 바뀌었어요.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('sale-state')).toHaveTextContent('일시품절'));
+    expect(view.mutations('/sale-state-changes')[0]?.headers.get('X-Expected-Version')).toBe('1');
+    view.stop();
+  });
+});
+
+describe('가격', () => {
+  it('가격 미설정은 0원이 아니라 미설정(판매 불가)으로 보인다', async () => {
+    renderAt('/prices?sku=E-00000002');
+    expect(await screen.findByText('가격 미설정(판매 불가). 0원이 아니에요.')).toBeInTheDocument();
+    expect(screen.queryByText('0원')).not.toBeInTheDocument();
+  });
+
+  it('현재 기본가는 서버 값을 그대로 표시한다', async () => {
+    renderAt('/prices?sku=E-00000001');
+    expect(await screen.findByTestId('base-price')).toHaveTextContent('4,500원');
+  });
+});
+
+describe('센터 취급', () => {
+  it('레코드가 없으면 OFF 이고, 켜기는 version 0 을 기대 버전으로 보낸다', async () => {
+    const user = userEvent.setup();
+    const view = renderAt('/handlings?type=MFC&center=MFC-BSN-01', as.center);
+    expect(await screen.findByTestId('handling-E-00000001')).toHaveTextContent('OFF');
+
+    await user.click(screen.getAllByRole('button', { name: '켜기' })[0]!);
+    await waitFor(() => expect(screen.getByTestId('handling-E-00000001')).toHaveTextContent('ON'));
+    expect(view.mutations('/sku-handlings')[0]?.headers.get('X-Expected-Version')).toBe('0');
+    view.stop();
+  });
+
+  it('자기 센터가 아니면 FORBIDDEN 화면이다(빈 목록이 아님)', async () => {
+    renderAt('/handlings?type=MFC&center=MFC-OTHER-01', as.center);
+    expect(await screen.findByText('이용할 수 없는 화면이에요')).toBeInTheDocument();
+    expect(screen.queryByText('표시할 내용이 없어요')).not.toBeInTheDocument();
+  });
+});
+
+

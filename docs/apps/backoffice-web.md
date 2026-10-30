@@ -38,6 +38,29 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 역할 표: BO §3.1(L126-141). 담당 그룹: CS / MFC_OPS / DELIVERY_OPS / SCM / FINANCE / QUALITY / SECURITY.
 권한 거절 사유(auth): NO_ROLE, OUT_OF_CENTER_SCOPE, DELEGATION_EXPIRED, DELEGATION_SCOPE_EXCEEDED, NOT_OWNER, SELF_APPROVAL, PRINCIPAL_RESTRICTED, SESSION_INVALID — 사용자 문구로 매핑.
 
+## 2-1. 임시 백오피스: 상품·콘텐츠·가격·승인·센터 취급 (2026-10-30)
+근거: `../pmart-backend/docs/handoff/2026-10-30-clients-notice-temp-backoffice-api.md`(기준 `86e156e`). 위 표의 #3·#4 를 bff 없이 원서비스 경로로 먼저 만든다.
+
+| 메뉴 | 경로 | API |
+|---|---|---|
+| 로그인 | `/login` | auth `POST /auth/operator-logins`(Idempotency-Key 없음, `X-Device-Id`). 실패 `LOGIN_FAILED`·`ACCOUNT_LOCKED` |
+| 내 세션 | `/session` | `GET /auth/sessions/current`, `POST /auth/password-changes`(204), `POST /auth/logouts` |
+| 운영자 계정 | `/operators` | `GET`·`POST /operator-accounts`, `PUT …/{id}`(X-Expected-Version), `POST …/{id}/password-resets` — OPERATOR_ADMIN |
+| 승인함·상세 | `/approvals`, `/approvals/:id` | approval `GET /approvals`, `GET /approvals/{id}`, `POST …/decisions`(APPROVE·REJECT 만) |
+| 카테고리 트리 | `/categories` | product `GET /categories/tree`, `…/filters`, `POST /category-tree-versions` |
+| 상품 등록 | `/products/drafts/new`, `/products/drafts/:id` | `/product-drafts*` → 제출 준비 → 승인 요청 |
+| 상품 일괄 | `/products/import`, `/products/import/:id` | `/product-import-batches*`, id-map 내려받기 |
+| 상품 조회·판매 상태 | `/products`, `/products/:id` | `GET /products`, `/skus`, `/barcodes`, `POST …/sale-state-changes` + 짝 조회 |
+| 콘텐츠 등록·일괄 | `/contents/drafts/*`, `/contents/import/*` | `/content-drafts*`, 이미지 업로드, `/content-import-batches*` |
+| 가격 | `/prices?sku=` | `GET /prices/{sku}`(PRICE_NOT_SET = 미설정), `/price-versions/{sku}`, PRICE 변경 요청, `POST /price-version-applications` + 짝 조회 |
+| 센터 취급 | `/handlings?type=&center=` | `/mfcs/{id}/sku-handlings`·`/cdcs/{id}/sku-handlings`, `…/sku-handling-batches` |
+
+공통 흐름: 정본 "제출 준비" 응답의 `approvalRequest` → approval `POST /change-requests` → `…/submissions`(approvalId). 두 요청 키는 사용자 행위 키 하나에서 만든다(`{key}:cr`, `{key}:submit`). 판매중지·가격은 화면이 변경 요청 본문을 직접 만든다(handoff §4.3·§4.5).
+승인 뒤 정본 반영은 비동기라 승인 상세에서 1초 간격·최대 30회 폴링하고, 끝나지 않으면 "아직 확인되지 않음 + 다시 확인"으로 둔다.
+토큰(ADR-0018): access·refresh 모두 탭 메모리(새로고침 = 재로그인, localStorage 금지). 401 → pmartFetch single-flight 로 `POST /auth/tokens` 한 번(회전된 refresh 로 즉시 교체) → 원 요청 재전송. `TOKEN_INVALID`·`TOKEN_REUSED`·`SESSION_EXPIRED` 면 토큰을 지우고 로그인 화면(`/login?from=`). 갱신 결과 불명이면 같은 refresh 를 다시 보내지 않는다(재사용으로 세션이 끊김). `X-Device-Id` 는 탭마다 UUID(refresh 도 탭 메모리라 충분).
+실행 모드: `dev`(목) / `dev:local`(Vite 프록시 → localhost:8080, 첫 관리자 admin / pmart-local) / `dev:lan`·`build:lan`(게이트웨이 `http://D603-16:8080/api/v1` 직접, 브라우저는 `http://D603-16` 으로 열어야 CORS 통과).
+막힌 것: 이미지 인증(BR-25), 초안 목록(BR-26), 센터 목록(center-master 다음 작업 → 센터 ID 입력).
+
 ## 3. 기술 메모
 - 개발: Vite 프록시 `/api → http://localhost:8080` (CORS 없음, BR-04). 목은 MSW.
 - 모든 목록은 커서 페이지(`size`, `cursor`). 표·필터 상태는 URL 쿼리에 둔다(공유·새로고침 복원).

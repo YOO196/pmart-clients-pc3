@@ -5,13 +5,14 @@ import { describe, expect, it } from 'vitest';
 import { API_BASE } from '../../api/client';
 import { App } from '../../app/App';
 import { approvalInbox } from '../../mocks/fixtures';
+import { as } from '../../test/render';
 import { server } from '../../test/server';
 
 const inbox = `${API_BASE}/views/approval-inbox`;
 
 describe('승인함 (목 모드, MSW)', () => {
   it('원천·신선도와 함께 목록을 보여 준다', async () => {
-    render(<App memory />);
+    render(<App memory initialPath="/views/approval-inbox" initialToken={as.md} />);
 
     expect(await screen.findByText('dos-mock-1')).toBeInTheDocument();
     expect(screen.getByText(/approval-service · 정본 · 최신/)).toBeInTheDocument();
@@ -28,7 +29,7 @@ describe('승인함 (목 모드, MSW)', () => {
         ),
       ),
     );
-    render(<App memory />);
+    render(<App memory initialPath="/views/approval-inbox" initialToken={as.md} />);
 
     expect(await screen.findByText('정보를 불러오지 못했어요')).toBeInTheDocument();
     expect(screen.getByText('문의 번호 rid-1')).toBeInTheDocument();
@@ -44,13 +45,13 @@ describe('승인함 (목 모드, MSW)', () => {
         ),
       ),
     );
-    render(<App memory />);
+    render(<App memory initialPath="/views/approval-inbox" initialToken={as.md} />);
     expect(await screen.findByText('이용할 수 없는 화면이에요')).toBeInTheDocument();
   });
 
   it('정상 0건만 빈 화면이다', async () => {
     server.use(http.get(inbox, () => HttpResponse.json({ ...approvalInbox, items: [] })));
-    render(<App memory />);
+    render(<App memory initialPath="/views/approval-inbox" initialToken={as.md} />);
     expect(await screen.findByText('심사할 건이 없어요')).toBeInTheDocument();
   });
 
@@ -58,7 +59,7 @@ describe('승인함 (목 모드, MSW)', () => {
     server.use(
       http.get(inbox, () => HttpResponse.json({ ...approvalInbox, unavailableSources: ['order-service'] })),
     );
-    render(<App memory />);
+    render(<App memory initialPath="/views/approval-inbox" initialToken={as.md} />);
     expect(await screen.findByText('dos-mock-1')).toBeInTheDocument();
     expect(screen.getAllByText(/조회하지 못한 원천: order-service/).length).toBeGreaterThan(0);
   });

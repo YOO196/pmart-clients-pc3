@@ -41,6 +41,43 @@ export function command(key: IdempotencyKey, expectedVersion?: number): { header
   };
 }
 
+/** `_common.yaml` IdempotencyKey·SourceSystem·ExpectedVersion 헤더 파라미터. 값 확정은 BR-08. */
+export const SOURCE_SYSTEM = 'backoffice-web';
+
+interface CommandHeader {
+  readonly 'Idempotency-Key': string;
+  readonly 'X-Source-System': string;
+  readonly 'X-Expected-Version'?: number;
+}
+
+/**
+ * openapi-fetch 호출용. 계약이 헤더를 필수 파라미터로 두므로 params.header 로 넣는다.
+ *   client.POST(path, { ...commandParams(key, { path: { id }, version }), body })
+ */
+export function commandParams<P extends object>(
+  key: IdempotencyKey,
+  options: { readonly path: P; readonly version?: number | undefined },
+): { params: { header: CommandHeader; path: P } };
+export function commandParams(
+  key: IdempotencyKey,
+  options?: { readonly version?: number | undefined },
+): { params: { header: CommandHeader } };
+export function commandParams(
+  key: IdempotencyKey,
+  { path, version }: { readonly path?: object; readonly version?: number | undefined } = {},
+): { params: { header: CommandHeader; path?: object } } {
+  return {
+    params: {
+      header: {
+        'Idempotency-Key': key.value,
+        'X-Source-System': SOURCE_SYSTEM,
+        ...(version === undefined ? {} : { 'X-Expected-Version': version }),
+      },
+      ...(path ? { path } : {}),
+    },
+  };
+}
+
 export type Resolution =
   | { readonly kind: 'resolved'; readonly response: CommandResponse }
   | { readonly kind: 'unknown'; readonly last?: CommandResponse; readonly lastFailure?: PmartFailure };

@@ -9,9 +9,9 @@
 | ID | 우선 | 앱 | 요약 | 상태 |
 |---|---|---|---|---|
 | BR-01 | 높음 | 고객 | 토스 결제창 진입 정보·결제 인증 결과 전달 경로가 고객용 API에 없음 | OPEN |
-| BR-02 | 높음 | 라이더·MFC·관리자·기사 | 고객 외 주체(라이더·점원·운영자·간선기사) 로그인·전화 본인확인 API 없음 | OPEN |
+| BR-02 | 높음 | 라이더·MFC·관리자·기사 | 고객 외 주체(라이더·점원·운영자·간선기사) 로그인·전화 본인확인 API 없음 | 일부 DONE — 운영자 로그인 `f6ed21b`(ADR-0018). 라이더·점원·간선기사·본인확인 OPEN |
 | BR-03 | 높음 | 전체(특히 웹) | 사용자 토큰 보관 방식(쿠키/CSRF vs Bearer) 미정, 게이트웨이가 `Cookie` 제거 | OPEN |
-| BR-04 | 중간 | 관리자 웹 | 게이트웨이 CORS 설정 없음 — 웹 배포 출처 결정 필요 | OPEN |
+| BR-04 | 중간 | 관리자 웹 | 게이트웨이 CORS 설정 없음 — 웹 배포 출처 결정 필요 | DONE (`f6ed21b`·`1b0f84b`, 허용 출처 localhost:5173·3000, LAN `http://d603-16`) |
 | BR-05 | 높음 | MFC | PDA 작업 목록·작업 상세(피킹 지시 행) 조회 API 없음 | AGREED (`e817184`, check 통과 `3916354`) |
 | BR-06 | 높음 | 라이더 | 배차 제안 수신 채널·대기 목록(일반배차모드) API 없음 | AGREED(부분, `e817184`+`f4dd171`, check 통과 `3916354`) — 푸시·SSE·대기 목록 보류 |
 | BR-07 | 높음 | 라이더·고객·관리자 | 파일 업로드 API 없음(`photoRefs` 는 존재하지 않는 "file-service" 참조) | OPEN |
@@ -32,6 +32,8 @@
 | BR-22 | 낮음 | MFC | 밀봉 요청에 포장재 종류(보냉백 XS~XL·봉투 소~대·보냉재) 필드 없음, 라벨 출력 정보 없음 | OPEN |
 | BR-23 | 높음 | 라이더 | 포장 QR 원문 형식이 계약에 없어 스캔한 QR 에서 경로의 packageId 를 얻을 수 없음 | OPEN |
 | BR-24 | 높음 | 라이더 | 라이더가 볼 전달지(주소·상세·출입 안내·요청사항·연락)를 주는 계약 경로가 없음 | OPEN |
+| BR-25 | 중간 | 관리자 웹 | 인증이 필요한 상품 이미지(`GET /content-images/{imageId}`)를 `<img>` 로 표시할 방식 미정 | OPEN(백엔드 인지, handoff 2026-10-30 §0-3) |
+| BR-26 | 낮음 | 관리자 웹 | 상품·콘텐츠 초안 목록 조회 API 없음(ID 를 알아야만 다시 열 수 있음) | OPEN |
 
 ---
 
@@ -44,6 +46,7 @@
 ## BR-02 고객 외 주체 인증
 - 현황: auth-service 외부 경로는 고객 소셜 로그인 3개 + 토큰 갱신·로그아웃·세션 조회뿐. `Session.principalType` 에는 RIDER/OPERATOR 가 있다. `POST /riders/signups` 는 `phoneVerificationRef`(auth 본인확인 결과) 를 요구하지만 본인확인 API가 없다.
 - 요청: 라이더 로그인(아이디·비밀번호 또는 전화 OTP), 전화 본인확인, MFC 점원 로그인(직원 ID 바코드 기반 여부), 운영자 로그인(BO-Q01: IAM·추가 인증), 간선기사 로그인(2단계).
+- 2026-10-30: 운영자 로그인 반영(auth `POST /auth/operator-logins`, `/auth/tokens` 회전, `/operator-accounts`, ADR-0018). 백오피스 구현 완료. 추가 인증(BO-Q01)은 없음.
 
 ## BR-03 토큰 보관 방식
 - auth-service.yaml `info.description`: "쿠키/CSRF 방식은 [팀 확인 필요]". 게이트웨이 `default-filters: RemoveRequestHeader=Cookie`.
@@ -51,6 +54,7 @@
 
 ## BR-04 CORS
 - 게이트웨이에 CORS 설정 없음. 개발은 Vite 프록시로 우회 가능. 운영에서 관리자 웹을 게이트웨이와 같은 출처로 배포할지, 허용 출처를 둘지 결정 필요.
+- 2026-10-30 DONE: 허용 출처 방식(자격 증명 미허용, 쿠키 없음). 백오피스 `npm run build:lan` 은 `http://D603-16:8080/api/v1` 로 직접 호출한다.
 
 ## BR-05 MFC 작업 목록
 - 현황: `mfc-fulfillment` 외부 경로는 `POST /tasks/{taskId}/executions`, shipments/packages 뿐. 작업 생성은 `/internal/work-orders`. 점원이 "내 작업"을 받을 경로는 `mfc-capacity GET /assignments`(배정)뿐이고, 피킹 지시 행(로케이션·SKU·LOT·지시수량·기피킹량)을 담은 작업 상세가 없다.
@@ -174,3 +178,15 @@
 - 현황: `DeliveryExecution`·dispatch `Offer.summary` 에는 도착 지역 요약만 있다. 픽업 뒤 라이더가 볼 상세 주소·출입 안내·요청사항·연락 수단(안심번호)을 주는 경로가 없다. 주소는 customer-service 회원 정보라 라이더가 직접 읽을 수 없다.
 - 요청: 픽업(PICKED_UP) 뒤에만 열리는 라이더용 전달지 조회(예: `GET /deliveries/{id}/drop-info`)와 노출 범위·안심번호 방식.
 - 클라이언트 처리(회신 전): 목에서만 전달지를 보인다. 실서버 구현은 null 을 돌려주고 화면은 "전달지 정보를 불러오지 못했어요"로 보인다.
+
+## BR-25 상품 이미지 표시 방식 (관리자 웹)
+- 근거: 백엔드 handoff `2026-10-30-clients-notice-temp-backoffice-api.md` §0-3, product-content `GET /content-images/{imageId}`(bearerAuth).
+- 현황: 이미지 본문도 JWT 가 필요해 `<img src>` 로는 못 받는다.
+- 요청: 서명 URL·쿠키·공개 버킷 등 표시 방식 결정. 고객앱(카드 이미지)도 같은 문제다.
+- 클라이언트 처리(회신 전): `fetch` + Bearer 로 받아 `URL.createObjectURL` 로 표시한다(`web/backoffice/src/features/contents/AuthedImage.tsx`).
+
+## BR-26 상품·콘텐츠 초안 목록
+- 근거: product `/product-drafts`, product-content `/content-drafts` 는 생성·단건 조회·수정·제출만 있다. 배치는 `/…-import-batches/{batchId}` 로 묶어 볼 수 있다.
+- 현황: 개별 입력 초안은 만든 직후 화면을 벗어나면 ID 를 알아야만 다시 열 수 있다. 승인 상세의 행(`lineKey` = draftId)으로 거슬러 찾을 수는 있다.
+- 요청: `GET /product-drafts?state=&validationState=&cursor=`·`GET /content-drafts?state=&cursor=` 같은 목록(작성자·상태 필터).
+- 클라이언트 처리(회신 전): 초안 ID 입력으로 연다.
