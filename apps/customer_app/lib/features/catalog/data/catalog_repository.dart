@@ -250,11 +250,14 @@ List<CategoryNode> categoriesFromContract(pd.GetCategoryTree200Response r) {
       CategoryNode(
         categoryId: _required(n.categoryId, 'CategoryNode.categoryId'),
         parentId: n.parentId,
-        depth: switch (n.depth) {
-          pd.CategoryNodeDepthEnum.number2 => 2,
-          _ => 1,
+        // 계약 CategoryLevel(상위>하위>칩1>칩2, ADR-0015) → 깊이 1~4
+        depth: switch (n.level) {
+          pd.CategoryLevel.TOP => 1,
+          pd.CategoryLevel.SUB => 2,
+          pd.CategoryLevel.CHIP1 => 3,
+          pd.CategoryLevel.CHIP2 => 4,
         },
-        name: n.name ?? '',
+        name: n.name,
       ),
   ];
 }

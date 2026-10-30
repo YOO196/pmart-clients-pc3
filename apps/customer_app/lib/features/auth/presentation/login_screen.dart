@@ -133,7 +133,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Text(l10n.loginCheckAgain),
             )
           else
-            for (final p in SocialProvider.values)
+            for (final p in loginProviders)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: FilledButton.tonal(

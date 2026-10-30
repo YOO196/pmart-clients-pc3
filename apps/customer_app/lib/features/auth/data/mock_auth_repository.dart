@@ -22,12 +22,16 @@ final class MockSocialTokenSource implements SocialTokenSource {
 /// 목 구현. 제공자별로 다른 결과를 낸다(계약 AuthResult JSON → 생성 모델 → 같은 변환).
 /// - 카카오: 기존 회원
 /// - 네이버: 새 계정, 필수 동의 대기 → 동의 후 회원
-/// - 애플: 로그인 제한(423)
+/// - [restricted] 제공자(기본 애플, 화면에는 없음): 로그인 제한(423)
 /// - 구글: 첫 시도는 결과 불명, 같은 키 재전송 시 회원
 base class MockAuthRepository implements AuthRepository {
-  MockAuthRepository({this.latency = const Duration(milliseconds: 300)});
+  MockAuthRepository({
+    this.latency = const Duration(milliseconds: 300),
+    this.restricted = const {SocialProvider.apple},
+  });
 
   final Duration latency;
+  final Set<SocialProvider> restricted;
   static const accountId = 'acct-mock-1';
   static const requiredConsents = [
     'TERMS_OF_SERVICE:2026-10',
@@ -77,6 +81,17 @@ base class MockAuthRepository implements AuthRepository {
     if (previous != null) return _out(previous);
     final id = 'auth-${++_seq}';
     final merge = purpose == LoginPurpose.checkout;
+    if (restricted.contains(provider)) {
+      return authFailureToOutcome(
+        const ProblemFailure(
+          Problem(
+            status: 423,
+            code: AuthProblemCode.restricted,
+            raw: {'retryAfterSeconds': 600},
+          ),
+        ),
+      );
+    }
     switch (provider) {
       case SocialProvider.kakao:
         return _out(_byKey[key.value] = _member(id, merge: merge));
@@ -92,15 +107,6 @@ base class MockAuthRepository implements AuthRepository {
         _byRequest[id] = json;
         return _out(_byKey[key.value] = json);
       case SocialProvider.apple:
-        return authFailureToOutcome(
-          const ProblemFailure(
-            Problem(
-              status: 423,
-              code: AuthProblemCode.restricted,
-              raw: {'retryAfterSeconds': 600},
-            ),
-          ),
-        );
       case SocialProvider.google:
         // 서버는 처리했지만 응답을 잃은 경우. 같은 키 재전송이면 원결과가 온다.
         _byKey[key.value] = _member(id, merge: merge);

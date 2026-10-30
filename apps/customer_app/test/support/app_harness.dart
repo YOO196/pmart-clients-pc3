@@ -31,6 +31,7 @@ Widget testApp(
   CartRepository? cart,
   CheckoutRepository? checkout,
   OrdersRepository? orders,
+  MockAuthRepository? auth,
 }) => ProviderScope(
   retry: (_, _) => null,
   overrides: [
@@ -42,7 +43,7 @@ Widget testApp(
       cart ?? MockCartRepository(latency: Duration.zero),
     ),
     authRepositoryProvider.overrideWithValue(
-      MockAuthRepository(latency: Duration.zero),
+      auth ?? MockAuthRepository(latency: Duration.zero),
     ),
     addressRepositoryProvider.overrideWithValue(
       MockAddressRepository(latency: Duration.zero),

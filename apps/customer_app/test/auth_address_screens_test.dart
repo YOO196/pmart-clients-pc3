@@ -33,7 +33,7 @@ void main() {
     expect(find.text('집'), findsOneWidget);
   });
 
-  testWidgets('로그인 제한 중에는 버튼이 막히고 서버의 남은 시간을 보인다', (t) async {
+  testWidgets('Android 로그인 화면에는 애플 로그인 버튼이 없다(ADR-0002)', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('home-address')));
@@ -41,7 +41,30 @@ void main() {
     await t.tap(find.byKey(const ValueKey('go-login')));
     await t.pumpAndSettle();
 
-    await t.tap(find.byKey(const ValueKey('login-apple')));
+    expect(find.byKey(const ValueKey('login-apple')), findsNothing);
+    expect(find.text('Apple로 계속하기'), findsNothing);
+    for (final p in ['kakao', 'naver', 'google']) {
+      expect(find.byKey(ValueKey('login-$p')), findsOneWidget);
+    }
+  });
+
+  testWidgets('로그인 제한 중에는 버튼이 막히고 서버의 남은 시간을 보인다', (t) async {
+    await t.pumpWidget(
+      testApp(
+        const [],
+        auth: MockAuthRepository(
+          latency: Duration.zero,
+          restricted: {SocialProvider.google},
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('home-address')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('go-login')));
+    await t.pumpAndSettle();
+
+    await t.tap(find.byKey(const ValueKey('login-google')));
     await t.pumpAndSettle();
 
     expect(find.textContaining('10분 뒤'), findsOneWidget);

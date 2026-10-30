@@ -255,7 +255,7 @@ base class MockCatalogRepository implements CatalogRepository {
     'nodes': [
       {
         'categoryId': 'C-FV',
-        'depth': 1,
+        'level': 'TOP',
         'name': '과일·채소',
         'sortOrder': 1,
         'exposed': true,
@@ -263,7 +263,7 @@ base class MockCatalogRepository implements CatalogRepository {
       {
         'categoryId': 'C-FRUIT',
         'parentId': 'C-FV',
-        'depth': 2,
+        'level': 'SUB',
         'name': '과일',
         'sortOrder': 1,
         'exposed': true,
@@ -271,14 +271,14 @@ base class MockCatalogRepository implements CatalogRepository {
       {
         'categoryId': 'C-VEG',
         'parentId': 'C-FV',
-        'depth': 2,
+        'level': 'SUB',
         'name': '채소',
         'sortOrder': 2,
         'exposed': true,
       },
       {
         'categoryId': 'C-DAIRY',
-        'depth': 1,
+        'level': 'TOP',
         'name': '우유·유제품',
         'sortOrder': 2,
         'exposed': true,
@@ -286,7 +286,7 @@ base class MockCatalogRepository implements CatalogRepository {
       {
         'categoryId': 'C-MILK',
         'parentId': 'C-DAIRY',
-        'depth': 2,
+        'level': 'SUB',
         'name': '우유',
         'sortOrder': 1,
         'exposed': true,
@@ -294,14 +294,14 @@ base class MockCatalogRepository implements CatalogRepository {
       {
         'categoryId': 'C-YOGURT',
         'parentId': 'C-DAIRY',
-        'depth': 2,
+        'level': 'SUB',
         'name': '요거트',
         'sortOrder': 2,
         'exposed': true,
       },
       {
         'categoryId': 'C-SNACK',
-        'depth': 1,
+        'level': 'TOP',
         'name': '과자·간식',
         'sortOrder': 3,
         'exposed': true,
@@ -309,14 +309,14 @@ base class MockCatalogRepository implements CatalogRepository {
       {
         'categoryId': 'C-CHIPS',
         'parentId': 'C-SNACK',
-        'depth': 2,
+        'level': 'SUB',
         'name': '스낵',
         'sortOrder': 1,
         'exposed': true,
       },
       {
         'categoryId': 'C-HIDDEN',
-        'depth': 1,
+        'level': 'TOP',
         'name': '숨김',
         'sortOrder': 9,
         'exposed': false,

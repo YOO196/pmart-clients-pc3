@@ -3,6 +3,14 @@ import 'package:pmart_core/pmart_core.dart' show AuthTokens;
 
 enum SocialProvider { kakao, naver, apple, google }
 
+/// 로그인 화면에 보이는 제공자. Flutter 는 Android 만 개발해 애플 로그인 버튼은 두지 않는다(ADR-0002).
+/// [SocialProvider.apple] 은 계약 enum 이라 남긴다.
+const loginProviders = [
+  SocialProvider.kakao,
+  SocialProvider.naver,
+  SocialProvider.google,
+];
+
 /// CHECKOUT 이면 로그인 뒤 장바구니 병합 확인으로 돌아간다(일반 로그인은 자동 병합 없음).
 enum LoginPurpose { general, checkout }
 
