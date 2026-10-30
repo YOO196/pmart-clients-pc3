@@ -4,6 +4,7 @@ import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart';
 import '../data/auth_repository.dart';
+import '../data/google_token_source.dart';
 import '../data/mock_auth_repository.dart';
 import '../domain/auth.dart';
 
@@ -20,15 +21,28 @@ final authRepositoryProvider = Provider<AuthRepository>(
 final socialTokenSourceProvider = Provider<SocialTokenSource>(
   (ref) => switch (ref.watch(envProvider)) {
     PmartEnv.mock => MockSocialTokenSource(),
-    // 실제 제공자 SDK 는 앱 키 결정 뒤 붙인다. 그 전까지 local 도 목 제공자를 쓴다.
-    PmartEnv.local => MockSocialTokenSource(),
+    // 실서버는 Google 만 지원한다(ADR-0019). 카카오·네이버 SDK 는 서버 지원 뒤 붙인다.
+    PmartEnv.local => GoogleSocialTokenSource(),
+  },
+);
+
+/// 로그인 화면에 보일 제공자. 실서버는 지원하는 제공자만(나머지는 501 이라 버튼을 숨긴다).
+final loginProvidersProvider = Provider<List<SocialProvider>>(
+  (ref) => switch (ref.watch(envProvider)) {
+    PmartEnv.mock => loginProviders,
+    PmartEnv.local => serverLoginProviders,
   },
 );
 
 /// 결과 불명 로그인의 같은 키 재전송 횟수.
 final loginResolveAttemptsProvider = Provider<int>((_) => 2);
 
-/// 앱의 로그인 상태. 시작은 비회원이다(저장된 세션 복원은 `GET /auth/sessions/current` 로 붙인다).
+/// 앱 시작 때 한 번: 저장된 refresh token 이 있으면 세션을 되살린다. 실패하면 비회원으로 둔다.
+final sessionRestoreProvider = FutureProvider<void>(
+  (ref) => ref.read(sessionProvider.notifier).restore(),
+);
+
+/// 앱의 로그인 상태. 시작은 비회원이고, [sessionRestoreProvider] 가 저장된 세션을 확인한다.
 final sessionProvider = NotifierProvider<SessionController, Session>(
   SessionController.new,
 );
@@ -42,8 +56,26 @@ class SessionController extends Notifier<Session> {
     state = MemberSession(member.accountId);
   }
 
+  /// 저장된 refresh token 이 있을 때만 서버에 세션을 묻는다(`GET /auth/sessions/current`).
+  /// 서버가 확인한 계정만 회원으로 보인다. 그 사이 직접 로그인했으면 덮지 않는다.
+  Future<void> restore() async {
+    final tokens = ref.read(tokenStoreProvider);
+    if (await tokens.readRefreshToken() == null) return;
+    final accountId = await ref.read(authRepositoryProvider).currentAccountId();
+    if (!ref.mounted || accountId == null || state is MemberSession) return;
+    state = MemberSession(accountId);
+  }
+
   Future<void> signOut() async {
     await ref.read(tokenStoreProvider).clear();
+    final source = ref.read(socialTokenSourceProvider);
+    if (source is GoogleSocialTokenSource) {
+      try {
+        await source.signOut();
+      } on Object {
+        // Google 쪽 선택 해제 실패는 앱 로그아웃을 막지 않는다.
+      }
+    }
     state = const GuestSession();
   }
 }
@@ -99,6 +131,10 @@ class LoginFlowController extends Notifier<LoginFlow> {
       token = await ref.read(socialTokenSourceProvider).obtain(provider);
     } on SocialProviderDown {
       return _settle(const LoginProviderUnavailable());
+    } on SocialProviderMisconfigured {
+      return _settle(
+        const LoginRejected(AuthProblemCode.providerConfiguration),
+      );
     }
     if (!ref.mounted) return;
     if (token == null) return _settle(const LoginCancelled());

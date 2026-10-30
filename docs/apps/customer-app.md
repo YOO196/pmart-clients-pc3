@@ -34,6 +34,8 @@ Commerce 문서의 PPC = MFC. 1차 제외: 쿠폰·프로모션·할인 배너·
 - 423 `AUTH_RESTRICTED`(15분 5회 → 10분): `retryAfterSeconds` 표시. 사용자 취소·제공자 장애는 횟수 제외(서버 판정).
 - 같은 이메일로 계정 병합 안 함. 필수/선택 동의 분리, 선택 거부해도 구매 가능. 동의·앱 알림 설정·OS 권한은 서로 다른 값.
 - 일반 로그인 후 회원 장바구니로 전환(자동 병합 없음). 주문서에서 로그인(`purpose=CHECKOUT`)하면 병합 확인 화면.
+- 실서버 제공자는 Google 만(백엔드 ADR-0019, 2026-10-30). `google_sign_in` 으로 ID 토큰 → `providerToken`. serverClientId = 백엔드 안내의 웹 클라이언트 ID(`--dart-define=PMART_GOOGLE_SERVER_CLIENT_ID` 로 바꿀 수 있음). Android OAuth 클라이언트(패키지 `com.pmart.customer_app` + 서명 SHA-1) 등록 필요. 카카오·네이버 버튼은 실서버 모드에서 숨김(501). 애플은 Android 만 개발이라 없음(ADR-0002).
+- 앱 시작 때 저장된 refresh token 이 있으면 `GET /auth/sessions/current` 로 세션 복원(서버가 확인한 CUSTOMER 만 회원). 로그아웃은 토큰 삭제 + Google 계정 선택 해제(서버 `POST /auth/logouts` 는 아직 부르지 않음).
 
 **주소** (C 847-957)
 - 검색 → 지도 확인 → 상세주소·출입 안내·라이더 요청 → 구분 → 기본 지정 → 저장. 위치 권한 거부 시 직접 검색 유지.

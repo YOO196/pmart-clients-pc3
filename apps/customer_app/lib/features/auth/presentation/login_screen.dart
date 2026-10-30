@@ -103,7 +103,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         null => l10n.loginRestricted,
       },
       LoginProviderUnavailable() => l10n.loginProviderDown,
-      LoginRejected() => l10n.loginRejected,
+      LoginRejected(:final code) => switch (code) {
+        AuthProblemCode.providerRejected => l10n.loginProviderRejected,
+        AuthProblemCode.accountNotAvailable ||
+        AuthProblemCode.accountNotPurchasable => l10n.loginAccountUnavailable,
+        AuthProblemCode.configRequired ||
+        AuthProblemCode.providerConfiguration => l10n.loginConfigRequired,
+        AuthProblemCode.unsupported => l10n.loginUnsupported,
+        _ => l10n.loginRejected,
+      },
       LoginUnknown() => l10n.loginUnknown,
       _ => null,
     };
@@ -133,7 +141,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Text(l10n.loginCheckAgain),
             )
           else
-            for (final p in loginProviders)
+            for (final p in ref.watch(loginProvidersProvider))
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: FilledButton.tonal(

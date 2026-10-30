@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 디버그 빌드만: 로컬 백엔드(http://10.0.2.2:8080, PMART_ENV=local)를 평문 HTTP 로 부른다.
+         release 매니페스트에는 없다(출시 빌드는 HTTPS 만). -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>

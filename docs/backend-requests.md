@@ -34,6 +34,7 @@
 | BR-24 | 높음 | 라이더 | 라이더가 볼 전달지(주소·상세·출입 안내·요청사항·연락)를 주는 계약 경로가 없음 | OPEN |
 | BR-25 | 중간 | 관리자 웹 | 인증이 필요한 상품 이미지(`GET /content-images/{imageId}`)를 `<img>` 로 표시할 방식 미정 | OPEN(백엔드 인지, handoff 2026-10-30 §0-3) |
 | BR-26 | 낮음 | 관리자 웹 | 상품·콘텐츠 초안 목록 조회 API 없음(ID 를 알아야만 다시 열 수 있음) | OPEN |
+| BR-27 | 낮음 | 고객 | 이용 불가 계정 오류: 계약 422 `ACCOUNT_NOT_PURCHASABLE` vs 안내 403 `ACCOUNT_NOT_AVAILABLE` | SENT 준비(`docs/handoff/2026-10-30-backend-customer-google-login.md`) |
 
 ---
 
@@ -190,3 +191,8 @@
 - 현황: 개별 입력 초안은 만든 직후 화면을 벗어나면 ID 를 알아야만 다시 열 수 있다. 승인 상세의 행(`lineKey` = draftId)으로 거슬러 찾을 수는 있다.
 - 요청: `GET /product-drafts?state=&validationState=&cursor=`·`GET /content-drafts?state=&cursor=` 같은 목록(작성자·상태 필터).
 - 클라이언트 처리(회신 전): 초안 ID 입력으로 연다.
+
+## BR-27 고객 로그인 이용 불가 계정 오류 코드
+- 근거: 계약 auth-service `POST /auth/social-logins` 422 `REQUIRED_CONSENT_MISSING / ACCOUNT_NOT_PURCHASABLE`, 백엔드 안내 `2026-10-30-clients-notice-customer-google-login.md` §4 의 403 `ACCOUNT_NOT_AVAILABLE`.
+- 질문: 실제 코드·상태, 두 코드의 차이, 계약 반영 여부.
+- 클라이언트 처리(회신 전): 두 코드 모두 같은 문구("지금은 이 계정으로 이용할 수 없어요").

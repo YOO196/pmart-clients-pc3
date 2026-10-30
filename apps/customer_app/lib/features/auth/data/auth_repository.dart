@@ -30,6 +30,10 @@ abstract interface class AuthRepository {
   /// `GET /auth/social-logins/{authRequestId}`.
   Future<LoginOutcome> lookup(String authRequestId);
 
+  /// 저장된 세션의 계정(`GET /auth/sessions/current`. 401 이면 인터셉터가 refresh 회전 후 다시 보낸다).
+  /// 세션이 끝났으면 null(토큰은 인터셉터가 지운다). 네트워크 오류도 null — 토큰은 두고 비회원으로 시작한다.
+  Future<String?> currentAccountId();
+
   /// 필수 동의 반영 후 인증 완료.
   Future<LoginOutcome> completeWithConsents(
     String authRequestId,
@@ -42,9 +46,11 @@ abstract interface class AuthRepository {
 final class ApiAuthRepository implements AuthRepository {
   ApiAuthRepository(Dio dio, this._deviceId)
     : _logins = auth.PmartApiAuth(dio: dio).getLoginsApi(),
+      _tokens = auth.PmartApiAuth(dio: dio).getTokensApi(),
       _consents = customer.PmartApiCustomer(dio: dio).getConsentsApi();
 
   final auth.LoginsApi _logins;
+  final auth.TokensApi _tokens;
   final customer.ConsentsApi _consents;
   final DeviceIdProvider _deviceId;
 
@@ -89,6 +95,20 @@ final class ApiAuthRepository implements AuthRepository {
       extra: {PmartExtra.public: true},
     )).data,
   );
+
+  @override
+  Future<String?> currentAccountId() async {
+    try {
+      final session = await pmartGuard(
+        () async => (await _tokens.getCurrentSession()).data,
+      );
+      return session?.principalType == auth.SessionPrincipalTypeEnum.CUSTOMER
+          ? session?.principalId
+          : null;
+    } on PmartFailure {
+      return null;
+    }
+  }
 
   @override
   Future<LoginOutcome> completeWithConsents(
@@ -186,6 +206,10 @@ LoginOutcome authFailureToOutcome(PmartFailure f) => switch (f) {
   UnknownResultFailure(:final problem)
       when problem?.code == AuthProblemCode.providerUnavailable =>
     const LoginProviderUnavailable(),
+  // 501 은 "지원하지 않음"이 확정된 응답이다. 변경 요청의 5xx 라도 결과 불명으로 두지 않는다.
+  UnknownResultFailure(:final problem)
+      when problem?.code == AuthProblemCode.unsupported =>
+    const LoginRejected(AuthProblemCode.unsupported),
   UnknownResultFailure() => const LoginUnknown(),
   _ => throw f,
 };

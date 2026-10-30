@@ -3,13 +3,16 @@ import 'package:pmart_core/pmart_core.dart' show AuthTokens;
 
 enum SocialProvider { kakao, naver, apple, google }
 
-/// 로그인 화면에 보이는 제공자. Flutter 는 Android 만 개발해 애플 로그인 버튼은 두지 않는다(ADR-0002).
+/// 목 모드 로그인 화면의 제공자. Flutter 는 Android 만 개발해 애플 로그인 버튼은 두지 않는다(ADR-0002).
 /// [SocialProvider.apple] 은 계약 enum 이라 남긴다.
 const loginProviders = [
   SocialProvider.kakao,
   SocialProvider.naver,
   SocialProvider.google,
 ];
+
+/// 실서버가 지금 지원하는 제공자(ADR-0019: Google 먼저. 카카오·네이버는 501 UNSUPPORTED_ACTION).
+const serverLoginProviders = [SocialProvider.google];
 
 /// CHECKOUT 이면 로그인 뒤 장바구니 병합 확인으로 돌아간다(일반 로그인은 자동 병합 없음).
 enum LoginPurpose { general, checkout }
@@ -87,6 +90,14 @@ abstract final class AuthProblemCode {
   static const providerUnavailable = 'PROVIDER_UNAVAILABLE';
   static const requiredConsentMissing = 'REQUIRED_CONSENT_MISSING';
   static const accountNotPurchasable = 'ACCOUNT_NOT_PURCHASABLE';
+
+  /// 백엔드 안내(403)의 코드. 계약(422 ACCOUNT_NOT_PURCHASABLE)과 달라 확인 중(BR-27).
+  static const accountNotAvailable = 'ACCOUNT_NOT_AVAILABLE';
+  static const unsupported = 'UNSUPPORTED_ACTION';
+  static const configRequired = 'CONFIG_REQUIRED';
+
+  /// 앱 쪽 Google 설정 오류(서버 코드가 아니다).
+  static const providerConfiguration = 'CLIENT_PROVIDER_CONFIGURATION';
 }
 
 /// 앱의 현재 로그인 상태.

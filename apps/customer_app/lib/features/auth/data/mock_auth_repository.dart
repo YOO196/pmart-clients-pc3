@@ -28,10 +28,21 @@ base class MockAuthRepository implements AuthRepository {
   MockAuthRepository({
     this.latency = const Duration(milliseconds: 300),
     this.restricted = const {SocialProvider.apple},
+    this.restoredAccountId,
   });
 
   final Duration latency;
   final Set<SocialProvider> restricted;
+
+  /// 앱 시작 때 복원될 계정(null 이면 저장된 세션 없음).
+  final String? restoredAccountId;
+
+  @override
+  Future<String?> currentAccountId() async {
+    await _wait();
+    return restoredAccountId;
+  }
+
   static const accountId = 'acct-mock-1';
   static const requiredConsents = [
     'TERMS_OF_SERVICE:2026-10',
