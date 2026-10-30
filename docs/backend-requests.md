@@ -35,6 +35,8 @@
 | BR-25 | 중간 | 관리자 웹 | 인증이 필요한 상품 이미지(`GET /content-images/{imageId}`)를 `<img>` 로 표시할 방식 미정 | OPEN(백엔드 인지, handoff 2026-10-30 §0-3) |
 | BR-26 | 낮음 | 관리자 웹 | 상품·콘텐츠 초안 목록 조회 API 없음(ID 를 알아야만 다시 열 수 있음) | OPEN |
 | BR-27 | 낮음 | 고객 | 이용 불가 계정 오류: 계약 422 `ACCOUNT_NOT_PURCHASABLE` vs 안내 403 `ACCOUNT_NOT_AVAILABLE` | SENT 준비(`docs/handoff/2026-10-30-backend-customer-google-login.md`) |
+| BR-28 | 높음 | 고객 | 비회원 둘러보기: `/categories/tree`·`/product-contents/**`·`/prices/**` 가 공개 경로가 아니고 비회원 장바구니 식별 방법 없음 | **RESOLVED**(2026-10-30): 둘러보기 공개(백엔드 `clients-notice-public-browse-and-test-data`), 비회원 장바구니 = 게스트 토큰(ADR-0022, `clients-notice-cart-and-guest-token`). 고객앱 비회원 토큰 반영됨 |
+| BR-29 | 높음 | 고객 | 주소 좌표(`AddressInput.geo`)의 출처: 앱에 주소 검색(좌표 제공)이 없어 회원 주소 판정이 늘 UNKNOWN | OPEN(사용자 결정: 주소 검색 수단) |
 
 ---
 
@@ -116,6 +118,7 @@
   1. `Quote` 에 최소주문 기준액과 부족액(`minOrderShortfall`)을 넣는다.
   2. 첫 구매 상태 enum을 넣는다.
   3. 장바구니 화면에서 최소주문 미달 여부와 배달팁 예상을 서버 값으로 받을 경로가 있는지(아니면 주문서 진입 후에만 표시하는지) 정해 준다.
+- 클라이언트 처리(2026-10-30): 배송 선택 "다음"에서 주문서 초안을 먼저 만들고, 서버가 `MIN_ORDER_AMOUNT`(422) 또는 `minOrderSatisfied=false` 면 주문서로 넘어가지 않고 장바구니로 안내한다. 장바구니 단계 판정은 3번 회신 대기(앱이 15,000원과 비교하지 않는다).
 - 참고: 30,000원 판정 상품액은 문서 안에서 :1621("기본단가×수량")과 :2857·:2760("오퍼·프로모션 후, 쿠폰 전")이 다르게 적혀 있다. 계약 `itemAmount` 설명은 후자다. 확인을 부탁한다.
 
 ## BR-15 반품·교환 자격과 증빙 요건
@@ -196,3 +199,14 @@
 - 근거: 계약 auth-service `POST /auth/social-logins` 422 `REQUIRED_CONSENT_MISSING / ACCOUNT_NOT_PURCHASABLE`, 백엔드 안내 `2026-10-30-clients-notice-customer-google-login.md` §4 의 403 `ACCOUNT_NOT_AVAILABLE`.
 - 질문: 실제 코드·상태, 두 코드의 차이, 계약 반영 여부.
 - 클라이언트 처리(회신 전): 두 코드 모두 같은 문구("지금은 이 계정으로 이용할 수 없어요").
+
+## BR-28 비회원 둘러보기·비회원 장바구니
+- 근거: 게이트웨이 public-paths 에 storefront·search·guest-delivery-addresses 는 있으나 카테고리·상품 상세·가격은 없다(토큰 없이 401, LAN 확인 2026-10-30). `docs/apps/customer-app.md` "비회원: 둘러보기·장바구니까지".
+- 요청: 고객 읽기 경로를 공개로 열지 결정, 비회원 장바구니 식별 방식(게스트 토큰 / X-Device-Id / 없음).
+- 클라이언트 처리(회신 전): 실서버 모드에서 비회원 상세 조회는 오류 화면으로 보인다.
+
+## BR-29 주소 좌표의 출처
+- 배경: 백엔드는 배송 가능 판정을 좌표로만 한다(`clients-notice-customer-addresses` §1). `POST /me/addresses` 에 `geo{lat,lng}` 가 없으면 `serviceability.state=UNKNOWN` 이고, 쇼핑 주소로 골라도 담당 MFC 가 정해지지 않는다.
+- 고객앱 상태: 주소를 손으로 입력한다. 주소 검색(도로명 → 좌표)이 없어 `geo` 를 보내지 않는다. 좌표를 앱에서 추측해 넣지 않는다.
+- 결정 필요(사용자/백엔드): 주소 검색 수단. 예) 카카오 우편번호 + 좌표 변환(카카오 로컬 API 키 필요), 행안부 도로명주소 API + 좌표 API, 또는 서버가 도로명으로 좌표 변환. 앱 키(비밀이 아닌 키라도) 발급·보관 방식도 함께.
+- 그때까지: 회원 주소는 저장되지만 "확인 중"으로 표시된다(배송 가능으로 그리지 않음).

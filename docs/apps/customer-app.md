@@ -13,7 +13,7 @@ Commerce 문서의 PPC = MFC. 1차 제외: 쿠폰·프로모션·할인 배너·
 | 홈 | SCR-HOME-001 | `GET /storefront/home`, `/storefront/tabs/{tabKey}`, `/storefront/sections/{id}/items`, `/storefront/banners` | 공개 |
 | 카테고리·검색 | SCR-CATEGORY/SEARCH/LIST/FILTER-001 | `GET /categories/tree`, `GET /search/products`, `/search/suggestions`, `/search/filters`, `GET/DELETE /me/recent-searches` | 검색 공개 |
 | 상품 | SCR-PRODUCT-001, OPTION-001 | `GET /product-contents/{productId}`, `GET /product-contents?…`(카드 일괄), `GET /prices`, `GET /products/{id}/reviews` | 리뷰 공개 |
-| 장바구니 | SCR-CART-001, CART-MERGE-001 | `POST /carts`, `GET /carts/{id}`, `POST /carts/{id}/items`, `PATCH/DELETE /carts/{id}/items/{itemId}`, `GET /carts/{id}/change-requests/{requestId}`, `POST/GET /carts/{id}/merges` | (비회원은 `X-Device-Id`) |
+| 장바구니 | SCR-CART-001, CART-MERGE-001 | `POST /carts`, `GET /carts/{id}`, `POST /carts/{id}/items`, `PATCH/DELETE /carts/{id}/items/{itemId}`, `GET /carts/{id}/change-requests/{requestId}`, `POST/GET /carts/{id}/merges` | 비회원은 비회원 토큰(`POST /auth/guest-sessions`, typ=GUEST, ADR-0022). 병합은 회원 토큰 + `X-Guest-Token` |
 | 배송 방식·슬롯 | SCR-DELIVERY-SELECT-001 | `GET /slots`, `GET /delivery-conditions` | |
 | 주문서·결제 | SCR-CHECKOUT-001, PAYMENT-001 | `POST /order-drafts`, `GET /order-drafts/{id}`, `POST /order-drafts/{id}/checkouts` + **토스 결제(BR-01)** | |
 | 주문내역·상세 | SCR-ORDER-LIST/DETAIL-001 | `GET /orders`, `GET /orders/{id}` | |
@@ -35,6 +35,8 @@ Commerce 문서의 PPC = MFC. 1차 제외: 쿠폰·프로모션·할인 배너·
 - 같은 이메일로 계정 병합 안 함. 필수/선택 동의 분리, 선택 거부해도 구매 가능. 동의·앱 알림 설정·OS 권한은 서로 다른 값.
 - 일반 로그인 후 회원 장바구니로 전환(자동 병합 없음). 주문서에서 로그인(`purpose=CHECKOUT`)하면 병합 확인 화면.
 - 실서버 제공자는 Google 만(백엔드 ADR-0019, 2026-10-30). `google_sign_in` 으로 ID 토큰 → `providerToken`. serverClientId = 백엔드 안내의 웹 클라이언트 ID(`--dart-define=PMART_GOOGLE_SERVER_CLIENT_ID` 로 바꿀 수 있음). Android OAuth 클라이언트(패키지 `com.pmart.customer_app` + 서명 SHA-1) 등록 필요. 카카오·네이버 버튼은 실서버 모드에서 숨김(501). 애플은 Android 만 개발이라 없음(ADR-0002).
+- 마이 탭에 로그인 제공자·계정(제공자 SDK 의 이메일, 기기 화면에만, 저장 안 함)을 보인다. 목 계정은 `mock-…@pmart.invalid`. 앱 재시작으로 복원한 세션은 계정 표시가 없다.
+- 목 모드는 앱 모서리 "목 데이터" 띠와 로그인 화면 안내로 표시한다(목 로그인은 제공자 창 없이 항상 성공).
 - 앱 시작 때 저장된 refresh token 이 있으면 `GET /auth/sessions/current` 로 세션 복원(서버가 확인한 CUSTOMER 만 회원). 로그아웃은 토큰 삭제 + Google 계정 선택 해제(서버 `POST /auth/logouts` 는 아직 부르지 않음).
 
 **주소** (C 847-957)
