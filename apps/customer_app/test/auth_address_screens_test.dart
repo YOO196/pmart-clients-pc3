@@ -142,32 +142,43 @@ void main() {
     await t.tap(find.byKey(const ValueKey('consent-submit')));
     await t.pumpAndSettle();
 
-    // 새로 가입한 계정은 휴대폰 번호부터 받는다. 저장 전에는 닫히지 않는다.
-    expect(find.text('휴대폰 번호 등록'), findsOneWidget);
-    expect(find.byKey(const ValueKey('phone-later')), findsNothing);
-    await t.enterText(find.byKey(const ValueKey('phone-input')), '0101234');
-    await t.tap(find.byKey(const ValueKey('phone-save')));
+    // 새로 가입한 계정은 내 정보(이름·휴대폰 번호)부터 받는다. 저장 전에는 닫히지 않는다.
+    expect(find.text('내 정보 등록'), findsOneWidget);
+    expect(find.byKey(const ValueKey('info-later')), findsNothing);
+    await t.enterText(find.byKey(const ValueKey('info-phone')), '0101234');
+    await t.tap(find.byKey(const ValueKey('info-save')));
     await t.pumpAndSettle();
+    expect(find.text('이름을 입력해 주세요(30자 이내)'), findsOneWidget);
     expect(find.textContaining('휴대폰 번호를 확인해 주세요'), findsOneWidget);
 
+    await t.enterText(find.byKey(const ValueKey('info-name')), ' 김피마 ');
     await t.enterText(
-      find.byKey(const ValueKey('phone-input')),
+      find.byKey(const ValueKey('info-phone')),
       '010-1234-5678',
     );
-    await t.tap(find.byKey(const ValueKey('phone-save')));
+    await t.tap(find.byKey(const ValueKey('info-save')));
     await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('my-account')), findsOneWidget);
     expect(
       find.descendant(
-        of: find.byKey(const ValueKey('my-phone')),
-        matching: find.text('010-****-5678'),
+        of: find.byKey(const ValueKey('my-info')),
+        matching: find.text('김피마 · 010-****-5678'),
       ),
       findsOneWidget,
     );
+
+    // 마이 → 내 정보: 이름만 바꾸면 번호는 비워 둔 채 저장된다.
+    await t.tap(find.byKey(const ValueKey('my-info')));
+    await t.pumpAndSettle();
+    expect(find.text('지금 번호 010-****-5678. 바꿀 때만 입력해 주세요'), findsOneWidget);
+    await t.enterText(find.byKey(const ValueKey('info-name')), '박피마');
+    await t.tap(find.byKey(const ValueKey('info-save')));
+    await t.pumpAndSettle();
+    expect(find.text('박피마 · 010-****-5678'), findsOneWidget);
   });
 
-  testWidgets('가입 직후 휴대폰 저장을 서버가 아직 제공하지 않으면(501) 나중에 하기로 가입을 마친다', (t) async {
+  testWidgets('가입 직후 내 정보 저장을 서버가 아직 제공하지 않으면(501) 나중에 하기로 가입을 마친다', (t) async {
     await t.pumpWidget(
       testApp(
         const [],
@@ -189,18 +200,19 @@ void main() {
     await t.tap(find.byKey(const ValueKey('consent-submit')));
     await t.pumpAndSettle();
 
-    await t.enterText(find.byKey(const ValueKey('phone-input')), '01012345678');
-    await t.tap(find.byKey(const ValueKey('phone-save')));
+    await t.enterText(find.byKey(const ValueKey('info-name')), '김피마');
+    await t.enterText(find.byKey(const ValueKey('info-phone')), '01012345678');
+    await t.tap(find.byKey(const ValueKey('info-save')));
     await t.pumpAndSettle();
-    expect(find.text('휴대폰 번호 저장은 아직 준비 중이에요'), findsOneWidget);
+    expect(find.text('내 정보 저장은 아직 준비 중이에요'), findsOneWidget);
 
-    await t.tap(find.byKey(const ValueKey('phone-later')));
+    await t.tap(find.byKey(const ValueKey('info-later')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('my-account')), findsOneWidget);
     expect(
       find.descendant(
-        of: find.byKey(const ValueKey('my-phone')),
-        matching: find.text('등록되지 않았어요'),
+        of: find.byKey(const ValueKey('my-info')),
+        matching: find.text('이름·휴대폰 번호를 등록해 주세요'),
       ),
       findsOneWidget,
     );

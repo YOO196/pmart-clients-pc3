@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../profile/presentation/my_info_screen.dart' show myInfoSummary;
 import '../../profile/presentation/profile_controller.dart';
 
 /// SCR-ACCOUNT-001(일부). 주문 내역·주소 관리·로그인/로그아웃 진입.
@@ -41,16 +42,16 @@ class MyScreen extends ConsumerWidget {
             ),
           if (member)
             ListTile(
-              key: const ValueKey('my-phone'),
-              leading: const Icon(Icons.phone_iphone_outlined),
-              title: Text(l10n.phoneTitle),
+              key: const ValueKey('my-info'),
+              leading: const Icon(Icons.badge_outlined),
+              title: Text(l10n.infoTitle),
               subtitle: Text(switch (ref.watch(profileProvider)) {
-                AsyncData(value: final p?) when p.hasPhone => p.phoneMasked!,
-                AsyncData(value: _?) => l10n.phoneNotSet,
-                AsyncError() => l10n.phoneLoadFailed,
-                _ => l10n.phoneLoading,
+                AsyncData(value: final p?) => myInfoSummary(l10n, p),
+                AsyncError() => l10n.infoLoadFailed,
+                _ => l10n.infoLoading,
               }),
-              onTap: () => context.push('/me/phone'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/me/info'),
             ),
           ListTile(
             key: const ValueKey('my-orders'),

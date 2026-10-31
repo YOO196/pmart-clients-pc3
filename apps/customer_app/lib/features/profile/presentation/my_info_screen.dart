@@ -1,0 +1,169 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pmart_ui/pmart_ui.dart';
+
+import '../../../l10n/gen/app_localizations.dart';
+import '../domain/profile.dart';
+import 'profile_controller.dart';
+
+/// 마이 목록에 보일 한 줄 요약(이름 · 가린 번호).
+String myInfoSummary(AppLocalizations l10n, Profile p) {
+  final name = p.nickname?.trim() ?? '';
+  if (name.isEmpty && !p.hasPhone) return l10n.infoNotSet;
+  return [
+    name.isEmpty ? l10n.infoNameNotSet : name,
+    p.hasPhone ? p.phoneMasked! : l10n.infoPhoneNotSet,
+  ].join(' · ');
+}
+
+/// SCR-ACCOUNT 내 정보: 이름·휴대폰 번호. 회원가입 직후([signup])와 마이에서 같은 화면을 쓴다.
+/// 저장은 서버 결과(APPLIED)로만 확정한다.
+///
+/// 가입 직후에는 저장할 때까지 닫지 않는다. 서버가 저장을 제공하지 않거나(501)
+/// 결과를 확인하지 못했을 때만 "나중에 하기"를 연다(가입을 막지 않는다).
+class MyInfoScreen extends ConsumerStatefulWidget {
+  const MyInfoScreen({super.key, this.signup = false});
+
+  final bool signup;
+
+  @override
+  ConsumerState<MyInfoScreen> createState() => _MyInfoScreenState();
+}
+
+class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
+  final _form = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  bool _filled = false;
+  ProfileChangeOutcome? _last;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
+  bool get _canSkip =>
+      _last is ProfileChangeUnsupported || _last is ProfileChangeUnknown;
+
+  Future<void> _save(Profile? current) async {
+    if (!(_form.currentState?.validate() ?? false)) return;
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final name = _name.text.trim();
+    final phone = _phone.text.trim();
+    // 바뀐 항목만 보낸다. 번호는 새로 입력했을 때만.
+    final nameChanged = name != (current?.nickname?.trim() ?? '');
+    if (!nameChanged && phone.isEmpty) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.infoNothingChanged)));
+      return;
+    }
+    final outcome = await ref
+        .read(profileProvider.notifier)
+        .changeProfile(
+          name: nameChanged ? name : null,
+          phone: phone.isEmpty ? null : phone,
+        );
+    if (!mounted) return;
+    setState(() => _last = outcome);
+    if (outcome is ProfileChangeApplied) {
+      messenger.showSnackBar(SnackBar(content: Text(l10n.infoSaved)));
+      context.pop(true);
+    }
+  }
+
+  String? _message(AppLocalizations l10n) => switch (_last) {
+    null || ProfileChangeApplied() => null,
+    ProfileChangePending() => l10n.infoPending,
+    ProfileChangeUnsupported() => l10n.infoUnsupported,
+    ProfileChangeRejected() => l10n.infoRejected,
+    ProfileChangeUnknown() => l10n.infoUnknown,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final value = ref.watch(profileProvider);
+    final profile = value.value;
+    // 서버 값으로 한 번만 채운다(입력 중에 덮어쓰지 않는다).
+    if (!_filled && profile != null) {
+      _filled = true;
+      _name.text = profile.nickname ?? '';
+    }
+    final hasPhone = profile?.hasPhone ?? false;
+    final message = _message(l10n);
+    return PopScope(
+      canPop: !widget.signup || _canSkip,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.signup ? l10n.infoSignupTitle : l10n.infoTitle),
+          automaticallyImplyLeading: !widget.signup,
+        ),
+        body: switch (value) {
+          AsyncError() when profile == null => Center(
+            child: Text(l10n.infoLoadFailed),
+          ),
+          _ when profile == null => const Center(
+            child: CircularProgressIndicator(),
+          ),
+          _ => Form(
+            key: _form,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Text(widget.signup ? l10n.infoSignupGuide : l10n.infoGuide),
+                const SizedBox(height: 16),
+                TextFormField(
+                  key: const ValueKey('info-name'),
+                  controller: _name,
+                  maxLength: NameInput.maxLength,
+                  decoration: InputDecoration(labelText: l10n.infoName),
+                  validator: (v) =>
+                      NameInput.valid(v ?? '') ? null : l10n.infoNameInvalid,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  key: const ValueKey('info-phone'),
+                  controller: _phone,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 13,
+                  decoration: InputDecoration(
+                    labelText: l10n.infoPhone,
+                    hintText: '010-1234-5678',
+                    helperText: hasPhone
+                        ? l10n.infoPhoneCurrent(profile.phoneMasked!)
+                        : null,
+                  ),
+                  // 등록된 번호가 있으면 비워 둘 수 있다(그대로 둠). 없으면 필수.
+                  validator: (v) {
+                    final raw = v?.trim() ?? '';
+                    if (raw.isEmpty && hasPhone) return null;
+                    return PhoneInput.valid(raw) ? null : l10n.infoPhoneInvalid;
+                  },
+                ),
+                if (message != null) ...[
+                  const SizedBox(height: 8),
+                  Text(message, key: const ValueKey('info-message')),
+                ],
+                const SizedBox(height: 16),
+                CommandButton(
+                  key: const ValueKey('info-save'),
+                  label: l10n.infoSave,
+                  onPressed: () => _save(profile),
+                ),
+                if (widget.signup && _canSkip)
+                  TextButton(
+                    key: const ValueKey('info-later'),
+                    onPressed: () => context.pop(false),
+                    child: Text(l10n.infoLater),
+                  ),
+              ],
+            ),
+          ),
+        },
+      ),
+    );
+  }
+}

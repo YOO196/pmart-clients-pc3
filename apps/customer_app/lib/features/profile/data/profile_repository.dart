@@ -10,9 +10,11 @@ abstract interface class ProfileRepository {
   /// `GET /me`. 실패는 [PmartFailure] 로 던진다.
   Future<Profile> get();
 
-  /// `POST /me/profile-changes {phone}`. 결과 불명은 같은 [key] 재전송·[change] 짝 조회로 해소한다.
-  Future<ProfileChangeOutcome> changePhone(
-    String phone, {
+  /// `POST /me/profile-changes {nickname?, phone?}`. 바뀐 항목만 보낸다.
+  /// 결과 불명은 같은 [key] 재전송·[change] 짝 조회로 해소한다.
+  Future<ProfileChangeOutcome> changeProfile({
+    String? nickname,
+    String? phone,
     required int expectedVersion,
     required IdempotencyKey key,
   });
@@ -42,8 +44,9 @@ final class ApiProfileRepository implements ProfileRepository {
   }
 
   @override
-  Future<ProfileChangeOutcome> changePhone(
-    String phone, {
+  Future<ProfileChangeOutcome> changeProfile({
+    String? nickname,
+    String? phone,
     required int expectedVersion,
     required IdempotencyKey key,
   }) async {
@@ -53,7 +56,10 @@ final class ApiProfileRepository implements ProfileRepository {
           idempotencyKey: key.value,
           xSourceSystem: sourceSystem,
           xExpectedVersion: expectedVersion,
-          changeMyProfileRequest: api.ChangeMyProfileRequest(phone: phone),
+          changeMyProfileRequest: api.ChangeMyProfileRequest(
+            nickname: nickname,
+            phone: phone,
+          ),
           extra: commandOptions(key, expectedVersion: expectedVersion).extra,
         ),
       );

@@ -135,6 +135,11 @@ void main() {
 
     expect(find.text('장바구니에 담았어요'), findsOneWidget);
     expect(find.text('장바구니에 2개 있어요'), findsOneWidget);
+
+    // "장바구니 보기" 버튼이 있어도 알림은 잠시 뒤 스스로 닫힌다.
+    await t.pump(const Duration(seconds: 5));
+    await t.pumpAndSettle();
+    expect(find.text('장바구니에 담았어요'), findsNothing);
   });
 
   testWidgets('상세에서 상한 초과는 서버 상한으로 안내한다', (t) async {

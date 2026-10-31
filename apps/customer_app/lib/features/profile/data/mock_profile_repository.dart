@@ -9,6 +9,9 @@ final class MockProfileRepository implements ProfileRepository {
 
   final Duration latency;
   String? _phone;
+
+  /// 새로 가입한 계정처럼 이름이 비어 있다.
+  String? nickname;
   int _version = 1;
 
   /// 다음 변경을 501(미구현)로 만든다.
@@ -28,14 +31,15 @@ final class MockProfileRepository implements ProfileRepository {
     return Profile(
       accountId: 'acct-mock-1',
       version: _version,
-      nickname: '피마',
+      nickname: nickname,
       phoneMasked: _phone == null ? null : mask(_phone!),
     );
   }
 
   @override
-  Future<ProfileChangeOutcome> changePhone(
-    String phone, {
+  Future<ProfileChangeOutcome> changeProfile({
+    String? nickname,
+    String? phone,
     required int expectedVersion,
     required IdempotencyKey key,
   }) async {
@@ -47,7 +51,8 @@ final class MockProfileRepository implements ProfileRepository {
     if (expectedVersion != _version) {
       return const ProfileChangeRejected(ProblemCode.versionConflict);
     }
-    _phone = phone;
+    if (nickname != null) this.nickname = nickname;
+    if (phone != null) _phone = phone;
     _version++;
     return const ProfileChangeApplied();
   }

@@ -39,9 +39,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _ => item,
       };
 
-  /// 새로 가입한 계정은 휴대폰 번호부터 받는다(소셜 로그인이 번호를 주지 않음). 끝나면 원래 화면으로.
+  /// 새로 가입한 계정은 내 정보(이름·휴대폰 번호)부터 받는다(소셜 로그인이 번호를 주지 않음). 끝나면 원래 화면으로.
   Future<void> _afterLogin({required bool newAccount}) async {
-    if (newAccount) await context.push<bool>('/me/phone?from=signup');
+    if (newAccount) await context.push<bool>('/me/info?from=signup');
     if (!mounted) return;
     if (context.canPop()) context.pop(true);
   }

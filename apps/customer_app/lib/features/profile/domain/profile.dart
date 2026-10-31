@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// 본인 프로필(계약 `Profile`). 연락처는 서버가 가린 값만 받는다.
+/// 본인 프로필(계약 `Profile`). 이름은 nickname, 연락처는 서버가 가린 값만 받는다.
 @immutable
 class Profile {
   const Profile({
@@ -32,7 +32,17 @@ abstract final class PhoneInput {
   static bool valid(String raw) => _mobile.hasMatch(normalize(raw));
 }
 
-/// 휴대폰 번호 저장 결과. [ProfileChangeApplied] 만 "저장됨"이다.
+/// 이름(계약 `Profile.nickname`, 최대 30자). 계약에 실명 필드가 없어 nickname 에 둔다(BR-32).
+abstract final class NameInput {
+  static const maxLength = 30;
+
+  static bool valid(String raw) {
+    final v = raw.trim();
+    return v.isNotEmpty && v.length <= maxLength;
+  }
+}
+
+/// 내 정보(이름·휴대폰 번호) 저장 결과. [ProfileChangeApplied] 만 "저장됨"이다.
 @immutable
 sealed class ProfileChangeOutcome {
   const ProfileChangeOutcome();

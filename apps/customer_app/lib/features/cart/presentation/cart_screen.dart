@@ -436,6 +436,8 @@ class _AddToCartBarState extends ConsumerState<AddToCartBar> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
+          // 버튼이 달린 SnackBar 는 Flutter 기본값으로 자동으로 닫히지 않는다(persist). 알림은 잠시 뒤 닫는다.
+          persist: false,
           content: Text(text),
           action: outcome is CartChangeApplied
               ? SnackBarAction(

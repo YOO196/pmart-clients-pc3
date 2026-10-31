@@ -43,24 +43,25 @@ class ProfileController extends AsyncNotifier<Profile?> {
     }
   }
 
-  /// 휴대폰 번호 저장. 버튼 한 번 = 키 하나, 결과 불명 재전송은 같은 키.
-  Future<ProfileChangeOutcome> changePhone(String raw) async {
+  /// 내 정보 저장. 바뀐 항목만 보낸다(이름은 앞뒤 공백 제거, 번호는 숫자만).
+  /// 버튼 한 번 = 키 하나, 결과 불명 재전송은 같은 키·같은 본문.
+  Future<ProfileChangeOutcome> changeProfile({
+    String? name,
+    String? phone,
+  }) async {
     final current = state.value ?? await future;
     if (current == null) return const ProfileChangeRejected('NOT_MEMBER');
-    final phone = PhoneInput.normalize(raw);
+    final nickname = name?.trim();
+    final digits = phone == null ? null : PhoneInput.normalize(phone);
     final key = IdempotencyKey.generate();
-    var outcome = await _repo.changePhone(
-      phone,
+    Future<ProfileChangeOutcome> send() => _repo.changeProfile(
+      nickname: nickname,
+      phone: digits,
       expectedVersion: current.version,
       key: key,
     );
-    if (outcome is ProfileChangeUnknown) {
-      outcome = await _repo.changePhone(
-        phone,
-        expectedVersion: current.version,
-        key: key,
-      );
-    }
+    var outcome = await send();
+    if (outcome is ProfileChangeUnknown) outcome = await send();
     if (outcome case ProfileChangePending(:final requestId)) {
       final policy = ref.read(profilePollPolicyProvider);
       for (var i = 0; i < policy.attempts; i++) {
