@@ -182,12 +182,11 @@ class _AddressChip extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final member = ref.watch(sessionProvider) is MemberSession;
     final book = ref.watch(addressBookProvider).value;
-    final text = !member
-        ? l10n.homeAddressGuest
-        : switch (book?.shoppingAddress) {
-            final a? => a.label ?? a.roadAddress,
-            null => l10n.homeAddressNone,
-          };
+    // 비회원도 비회원 배송지를 고르면 그 주소를 보인다.
+    final text = switch (book?.shoppingAddress) {
+      final a? => a.label ?? a.roadAddress,
+      null => member ? l10n.homeAddressNone : l10n.homeAddressGuest,
+    };
     return InkWell(
       key: const ValueKey('home-address'),
       onTap: () => context.push('/addresses'),

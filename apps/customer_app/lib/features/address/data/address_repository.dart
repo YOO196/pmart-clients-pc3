@@ -5,7 +5,7 @@ import 'package:pmart_core/pmart_core.dart';
 import '../../../shared/providers.dart' show sourceSystem;
 import '../domain/address.dart';
 
-/// 회원 주소록·쇼핑 주소. 실패는 [PmartFailure] 로 던진다.
+/// 회원 주소록·쇼핑 주소, 비회원 배송지. 실패는 [PmartFailure] 로 던진다.
 abstract interface class AddressRepository {
   Future<AddressBook> book();
 
@@ -21,13 +21,54 @@ abstract interface class AddressRepository {
   });
 
   Future<ShoppingContext> context();
+
+  /// `POST /guest-delivery-addresses`(토큰 없음, X-Device-Id). 결과 불명은 같은 [key] 재전송으로 해소한다.
+  Future<Address> addGuest(AddressDraft draft, {required IdempotencyKey key});
+
+  /// `GET /guest-delivery-addresses/{id}`(같은 기기만).
+  Future<Address> guest(String guestAddressId);
 }
 
 final class ApiAddressRepository implements AddressRepository {
-  ApiAddressRepository(Dio dio)
+  ApiAddressRepository(Dio dio, this._deviceId)
     : _addresses = api.PmartApiCustomer(dio: dio).getAddressesApi();
 
   final api.AddressesApi _addresses;
+  final DeviceIdProvider _deviceId;
+
+  @override
+  Future<Address> addGuest(
+    AddressDraft draft, {
+    required IdempotencyKey key,
+  }) async {
+    final deviceId = await _deviceId.get();
+    final res = await pmartGuard(
+      () => _addresses.createGuestDeliveryAddress(
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        xDeviceId: deviceId,
+        addressInput: addressInputToContract(draft),
+        extra: commandOptions(key).extra,
+      ),
+    );
+    return addressFromContract(
+      res.data ?? (throw UnknownResultFailure(requestId: key.value)),
+    );
+  }
+
+  @override
+  Future<Address> guest(String guestAddressId) async {
+    final deviceId = await _deviceId.get();
+    final res = await pmartGuard(
+      () => _addresses.getGuestDeliveryAddress(
+        guestAddressId: guestAddressId,
+        xDeviceId: deviceId,
+      ),
+    );
+    return addressFromContract(
+      res.data ?? (throw const ContractViolationFailure('배송지 본문 없음')),
+    );
+  }
 
   @override
   Future<AddressBook> book() async {
@@ -52,26 +93,7 @@ final class ApiAddressRepository implements AddressRepository {
       () => _addresses.addMyAddress(
         idempotencyKey: key.value,
         xSourceSystem: sourceSystem,
-        addressInput: api.AddressInput(
-          label: draft.label,
-          roadAddress: draft.roadAddress,
-          detailAddress: draft.detailAddress,
-          receiverName: draft.receiverName,
-          receiverPhone: draft.receiverPhone,
-          entranceMethod: switch (draft.entranceMethod) {
-            EntranceMethod.free => api.AddressInputEntranceMethodEnum.FREE,
-            EntranceMethod.password =>
-              api.AddressInputEntranceMethodEnum.PASSWORD,
-            EntranceMethod.call => api.AddressInputEntranceMethodEnum.CALL,
-            EntranceMethod.other => api.AddressInputEntranceMethodEnum.OTHER,
-            null => null,
-          },
-          entranceNote: draft.entranceNote,
-          geo: switch (draft.geo) {
-            final g? => api.AddressInputGeo(lat: g.lat, lng: g.lng),
-            null => null,
-          },
-        ),
+        addressInput: addressInputToContract(draft),
         extra: commandOptions(key).extra,
       ),
     );
@@ -111,6 +133,26 @@ final class ApiAddressRepository implements AddressRepository {
     );
   }
 }
+
+api.AddressInput addressInputToContract(AddressDraft draft) => api.AddressInput(
+  label: draft.label,
+  roadAddress: draft.roadAddress,
+  detailAddress: draft.detailAddress,
+  receiverName: draft.receiverName,
+  receiverPhone: draft.receiverPhone,
+  entranceMethod: switch (draft.entranceMethod) {
+    EntranceMethod.free => api.AddressInputEntranceMethodEnum.FREE,
+    EntranceMethod.password => api.AddressInputEntranceMethodEnum.PASSWORD,
+    EntranceMethod.call => api.AddressInputEntranceMethodEnum.CALL,
+    EntranceMethod.other => api.AddressInputEntranceMethodEnum.OTHER,
+    null => null,
+  },
+  entranceNote: draft.entranceNote,
+  geo: switch (draft.geo) {
+    final g? => api.AddressInputGeo(lat: g.lat, lng: g.lng),
+    null => null,
+  },
+);
 
 Address addressFromContract(api.Address a) => Address(
   addressId:

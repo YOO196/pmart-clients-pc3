@@ -35,6 +35,7 @@ void main() {
         adapter: adapter,
         delay: (_) async {},
       ),
+      DeviceIdProvider(MemoryKeyValueStore()),
     );
   }
 

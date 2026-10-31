@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../profile/presentation/profile_controller.dart';
 
 /// SCR-ACCOUNT-001(일부). 주문 내역·주소 관리·로그인/로그아웃 진입.
 String providerName(AppLocalizations l10n, SocialProvider p) => switch (p) {
@@ -37,6 +38,19 @@ class MyScreen extends ConsumerWidget {
                 null => l10n.myLoggedIn,
               }),
               subtitle: Text(session.accountLabel ?? l10n.myAccountUnknown),
+            ),
+          if (member)
+            ListTile(
+              key: const ValueKey('my-phone'),
+              leading: const Icon(Icons.phone_iphone_outlined),
+              title: Text(l10n.phoneTitle),
+              subtitle: Text(switch (ref.watch(profileProvider)) {
+                AsyncData(value: final p?) when p.hasPhone => p.phoneMasked!,
+                AsyncData(value: _?) => l10n.phoneNotSet,
+                AsyncError() => l10n.phoneLoadFailed,
+                _ => l10n.phoneLoading,
+              }),
+              onTap: () => context.push('/me/phone'),
             ),
           ListTile(
             key: const ValueKey('my-orders'),

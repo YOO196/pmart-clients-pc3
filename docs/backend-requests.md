@@ -39,6 +39,8 @@
 | BR-29 | 높음 | 고객 | 주소 좌표(`AddressInput.geo`)의 출처: 앱에 주소 검색(좌표 제공)이 없어 회원 주소 판정이 늘 UNKNOWN | 결정됨(2026-10-31): 우편번호 검색 + 서버 좌표 변환(BR-30) + 카카오 지도 핀 조정. BR-30 회신 대기 |
 | BR-30 | 높음 | 고객 | 주소 → 좌표 변환 API(카카오 로컬, REST 키는 서버). 지도 핀 조정 전 시작 좌표 | OPEN(요청 `docs/handoff/2026-10-31-backend-address-geocoding.md`) |
 | BR-31 | 중간 | 백오피스 | 상품 목록 `GET /products` 에 검색어(상품명·ID) 파라미터가 없음. 콘텐츠 등록의 상품 고르기가 불러온 쪽 안에서만 찾는다 | OPEN |
+| BR-32 | 높음 | 고객 | 휴대폰 번호 저장(`POST /me/profile-changes`)이 501. 배송지 받는 분·연락처 자동 채움에 쓸 본인 연락처(가리지 않은 값)·기본 수령정보가 없음 | OPEN(요청 `docs/handoff/2026-10-31-backend-customer-profile-and-refunds.md`) |
+| BR-33 | 중간 | 고객 | 내 취소·반품·환불 목록 경로가 없음(클레임 단건 환불 조회만) | OPEN(같은 요청서 §3) |
 
 ---
 

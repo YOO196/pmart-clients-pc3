@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart' show DioExceptionType;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart';
 
+import 'package:customer_app/features/address/data/address_repository.dart';
 import 'package:customer_app/features/address/data/mock_address_repository.dart';
 import 'package:customer_app/features/address/domain/address.dart';
 import 'package:customer_app/features/address/presentation/address_controller.dart';
@@ -16,15 +18,20 @@ void main() {
   late MockAuthRepository authRepo;
   late MockAddressRepository addressRepo;
   late TokenStore tokens;
+  late MemoryKeyValueStore secure;
 
-  ProviderContainer make({List<Override> extra = const []}) {
+  ProviderContainer make({
+    List<Override> extra = const [],
+    AddressRepository? repo,
+  }) {
     final c = ProviderContainer(
       retry: (_, _) => null,
       overrides: [
         envProvider.overrideWithValue(PmartEnv.mock),
         authRepositoryProvider.overrideWithValue(authRepo),
-        addressRepositoryProvider.overrideWithValue(addressRepo),
+        addressRepositoryProvider.overrideWithValue(repo ?? addressRepo),
         tokenStoreProvider.overrideWithValue(tokens),
+        secureStoreProvider.overrideWithValue(secure),
         ...extra,
       ],
     );
@@ -36,6 +43,7 @@ void main() {
     authRepo = MockAuthRepository(latency: Duration.zero);
     addressRepo = MockAddressRepository(latency: Duration.zero);
     tokens = TokenStore(MemoryKeyValueStore());
+    secure = MemoryKeyValueStore();
   });
 
   LoginOutcome? settled(ProviderContainer c) =>
@@ -131,9 +139,53 @@ void main() {
       return c;
     }
 
-    test('비회원은 주소록이 없다(빈 주소록과 구분)', () async {
+    test('비회원 주소록은 이 기기의 비회원 배송지이고, 등록하면 쇼핑 주소가 된다', () async {
       final c = make();
-      expect(await c.read(addressBookProvider.future), isNull);
+      c.listen(addressBookProvider, (_, _) {});
+      final empty = await c.read(addressBookProvider.future);
+      expect(empty!.addresses, isEmpty);
+
+      final outcome = await c
+          .read(addressBookProvider.notifier)
+          .add(
+            const AddressDraft(
+              roadAddress: '서울 송파구 올림픽로 300',
+              detailAddress: '1층',
+              receiverName: '김피마',
+              receiverPhone: '010-0000-0000',
+            ),
+          );
+
+      expect(outcome, isA<AddressSaved>());
+      final book = c.read(addressBookProvider).requireValue!;
+      expect(book.addresses, hasLength(1));
+      expect(book.context.shoppingAddressId, book.addresses.single.addressId);
+      expect(c.read(currentMfcIdProvider), book.addresses.single.mfcId);
+      // 비회원 배송지는 회원 주소록에 섞이지 않는다.
+      expect((await addressRepo.book()).addresses.map((a) => a.addressId), [
+        'addr-1',
+      ]);
+      // 기기에는 ID 만 둔다.
+      expect(
+        await secure.read('pmart.guest.addressIds'),
+        book.addresses.single.addressId,
+      );
+    });
+
+    test('비회원 배송지 조회 실패는 빈 주소록이 아니라 오류다', () async {
+      await secure.write('pmart.guest.addressIds', 'guest-x');
+      final failing = _FailingGuestRepo(addressRepo);
+      final c = make(repo: failing);
+      c.listen(addressBookProvider, (_, _) {});
+      await expectLater(
+        c.read(addressBookProvider.future),
+        throwsA(isA<NetworkFailure>()),
+      );
+      expect(
+        await secure.read('pmart.guest.addressIds'),
+        'guest-x',
+        reason: '조회 실패로 ID 를 지우지 않는다',
+      );
     });
 
     test('회원의 담당 센터는 쇼핑 컨텍스트에서 온다', () async {
@@ -219,4 +271,14 @@ void main() {
       );
     });
   });
+}
+
+final class _FailingGuestRepo extends MockAddressRepository {
+  _FailingGuestRepo(this.inner) : super(latency: Duration.zero);
+
+  final MockAddressRepository inner;
+
+  @override
+  Future<Address> guest(String guestAddressId) async =>
+      throw const NetworkFailure(DioExceptionType.connectionError);
 }

@@ -11,6 +11,7 @@ import 'features/checkout/presentation/order_sheet_screen.dart';
 import 'features/claims/presentation/claims_screens.dart';
 import 'features/catalog/presentation/category_screen.dart';
 import 'features/payment/presentation/payment_screen.dart';
+import 'features/profile/presentation/phone_screen.dart';
 import 'features/orders/presentation/my_screen.dart';
 import 'features/orders/presentation/orders_screens.dart';
 import 'features/catalog/presentation/home_screen.dart';
@@ -120,6 +121,12 @@ final routerProvider = Provider<GoRouter>(
               ? LoginPurpose.checkout
               : LoginPurpose.general,
         ),
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/me/phone',
+        builder: (_, state) =>
+            PhoneScreen(signup: state.uri.queryParameters['from'] == 'signup'),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,

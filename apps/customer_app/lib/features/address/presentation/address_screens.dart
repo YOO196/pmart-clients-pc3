@@ -72,16 +72,12 @@ class AddressListScreen extends ConsumerWidget {
               icon: const Icon(Icons.add),
               label: Text(l10n.addressAdd),
             ),
-      body: switch (value) {
-        AsyncData(value: null) => LoginRequired(
-          message: l10n.addressLoginNeeded,
-        ),
-        _ => UiStateView<AddressBook?>(
-          state: uiStateOf(value),
-          onRetry: () => ref.invalidate(addressBookProvider),
-          ready: (context, book) => _AddressList(book: book!),
-        ),
-      },
+      // 비회원도 배송지를 등록한다(업무 문서: 비회원 배송지). 비회원 배송지는 이 기기에서만 보인다.
+      body: UiStateView<AddressBook?>(
+        state: uiStateOf(value),
+        onRetry: () => ref.invalidate(addressBookProvider),
+        ready: (context, book) => _AddressList(book: book!),
+      ),
     );
   }
 }

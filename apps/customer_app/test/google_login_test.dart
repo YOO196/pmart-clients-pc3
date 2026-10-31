@@ -105,9 +105,9 @@ void main() {
   testWidgets('목 모드 로그인 화면은 실제 Google 로그인이 아니라고 알린다', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('home-address')));
+    await t.tap(find.text('마이').last);
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('go-login')));
+    await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('login-mock-notice')), findsOneWidget);
     // 디버그 띠(DEBUG)도 Banner 라 문구로 고른다.
@@ -120,15 +120,11 @@ void main() {
   testWidgets('로그인하면 마이에 제공자와 계정(목은 가짜 계정)이 보인다', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('home-address')));
+    await t.tap(find.text('마이').last);
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('go-login')));
+    await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('login-kakao')));
-    await t.pumpAndSettle();
-    await t.tap(find.byType(BackButton));
-    await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
     await t.pumpAndSettle();
 
     final account = find.byKey(const ValueKey('my-account'));
@@ -156,9 +152,9 @@ void main() {
       testWidgets(code, (t) async {
         await t.pumpWidget(testApp(const [], auth: _RejectingAuth(code)));
         await t.pumpAndSettle();
-        await t.tap(find.byKey(const ValueKey('home-address')));
+        await t.tap(find.text('마이').last);
         await t.pumpAndSettle();
-        await t.tap(find.byKey(const ValueKey('go-login')));
+        await t.tap(find.byKey(const ValueKey('my-login')));
         await t.pumpAndSettle();
         await t.tap(find.byKey(const ValueKey('login-google')));
         await t.pumpAndSettle();

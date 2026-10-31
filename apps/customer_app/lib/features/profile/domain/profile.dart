@@ -1,0 +1,66 @@
+import 'package:flutter/foundation.dart';
+
+/// 본인 프로필(계약 `Profile`). 연락처는 서버가 가린 값만 받는다.
+@immutable
+class Profile {
+  const Profile({
+    required this.accountId,
+    required this.version,
+    this.nickname,
+    this.phoneMasked,
+  });
+
+  final String accountId;
+  final int version;
+  final String? nickname;
+
+  /// 서버가 가린 휴대폰 번호(예: 010-****-1234). 없으면 아직 등록하지 않았다.
+  final String? phoneMasked;
+
+  bool get hasPhone => phoneMasked?.isNotEmpty ?? false;
+
+  @override
+  String toString() => 'Profile($accountId, v$version)';
+}
+
+/// 휴대폰 번호 입력 규칙(화면 검증용, 서버가 최종 검증). 숫자만 남겨 010·011·016~019 로 시작하는 10~11자리.
+abstract final class PhoneInput {
+  static final _mobile = RegExp(r'^01[016789]\d{7,8}$');
+
+  static String normalize(String raw) => raw.replaceAll(RegExp(r'\D'), '');
+
+  static bool valid(String raw) => _mobile.hasMatch(normalize(raw));
+}
+
+/// 휴대폰 번호 저장 결과. [ProfileChangeApplied] 만 "저장됨"이다.
+@immutable
+sealed class ProfileChangeOutcome {
+  const ProfileChangeOutcome();
+}
+
+final class ProfileChangeApplied extends ProfileChangeOutcome {
+  const ProfileChangeApplied();
+}
+
+/// 접수됐지만 반영을 아직 확인하지 못했다. 같은 요청 ID 로 다시 확인한다.
+final class ProfileChangePending extends ProfileChangeOutcome {
+  const ProfileChangePending(this.requestId);
+
+  final String requestId;
+}
+
+/// 서버가 아직 이 기능을 제공하지 않는다(501 UNSUPPORTED_ACTION).
+final class ProfileChangeUnsupported extends ProfileChangeOutcome {
+  const ProfileChangeUnsupported();
+}
+
+final class ProfileChangeRejected extends ProfileChangeOutcome {
+  const ProfileChangeRejected(this.code);
+
+  final String code;
+}
+
+/// 결과를 모른다(응답 유실·5xx). 프로필을 다시 조회해 확인한다.
+final class ProfileChangeUnknown extends ProfileChangeOutcome {
+  const ProfileChangeUnknown();
+}

@@ -22,6 +22,9 @@ import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
 import 'package:customer_app/features/orders/data/orders_repository.dart';
 import 'package:customer_app/features/orders/presentation/orders_providers.dart';
 import 'package:customer_app/features/payment/presentation/payment_controller.dart';
+import 'package:customer_app/features/profile/data/mock_profile_repository.dart';
+import 'package:customer_app/features/profile/data/profile_repository.dart';
+import 'package:customer_app/features/profile/presentation/profile_controller.dart';
 import 'package:customer_app/shared/providers.dart';
 
 /// 목 모드 앱. 둘러보기는 [catalog](기본: 지연 없는 목)를 쓰고 [overrides] 를 더한다.
@@ -32,6 +35,7 @@ Widget testApp(
   CheckoutRepository? checkout,
   OrdersRepository? orders,
   MockAuthRepository? auth,
+  ProfileRepository? profile,
 }) => ProviderScope(
   retry: (_, _) => null,
   overrides: [
@@ -58,6 +62,9 @@ Widget testApp(
     ),
     ordersRepositoryProvider.overrideWithValue(
       orders ?? MockOrdersRepository(latency: Duration.zero),
+    ),
+    profileRepositoryProvider.overrideWithValue(
+      profile ?? MockProfileRepository(latency: Duration.zero),
     ),
     // 보안 저장소 대신 메모리 저장소(플랫폼 채널 없음).
     secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),

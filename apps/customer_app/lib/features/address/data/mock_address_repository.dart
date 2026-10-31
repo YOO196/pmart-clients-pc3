@@ -119,6 +119,41 @@ base class MockAddressRepository implements AddressRepository {
     return contextFromContract(api.ShoppingContext.fromJson(_contextJson()));
   }
 
+  final _guestAddresses = <String, Map<String, Object?>>{};
+  final _guestByKey = <String, Map<String, Object?>>{};
+
+  @override
+  Future<Address> addGuest(
+    AddressDraft draft, {
+    required IdempotencyKey key,
+  }) async {
+    final existing = _guestByKey[key.value];
+    if (existing != null) {
+      await _wait();
+      return addressFromContract(api.Address.fromJson(existing));
+    }
+    final saved = await add(draft, key: key);
+    // 회원 주소록에 섞지 않는다.
+    final json = _addresses.removeLast()
+      ..['addressId'] = 'guest-${saved.addressId}';
+    _addedByKey.remove(key.value);
+    _guestAddresses[json['addressId']! as String] = json;
+    _guestByKey[key.value] = json;
+    return addressFromContract(api.Address.fromJson(json));
+  }
+
+  @override
+  Future<Address> guest(String guestAddressId) async {
+    await _wait();
+    final json = _guestAddresses[guestAddressId];
+    if (json == null) {
+      throw const ProblemFailure(
+        Problem(status: 404, code: ProblemCode.notFound),
+      );
+    }
+    return addressFromContract(api.Address.fromJson(json));
+  }
+
   @override
   Future<ShoppingContext> context() async {
     await _wait();

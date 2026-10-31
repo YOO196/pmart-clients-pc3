@@ -6,14 +6,22 @@ import '../../../shared/providers.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/address_repository.dart';
+import '../data/guest_address_store.dart';
 import '../data/mock_address_repository.dart';
 import '../domain/address.dart';
 
 final addressRepositoryProvider = Provider<AddressRepository>(
   (ref) => switch (ref.watch(envProvider)) {
     PmartEnv.mock => MockAddressRepository(),
-    PmartEnv.local => ApiAddressRepository(ref.watch(dioProvider)),
+    PmartEnv.local => ApiAddressRepository(
+      ref.watch(dioProvider),
+      ref.watch(deviceIdProvider),
+    ),
   },
+);
+
+final guestAddressStoreProvider = Provider<GuestAddressStore>(
+  (ref) => GuestAddressStore(ref.watch(secureStoreProvider)),
 );
 
 /// 결과 불명 주소 저장의 같은 키 재전송 횟수.
@@ -50,7 +58,7 @@ final class AddressCommandFailed extends AddressCommandOutcome {
   final PmartFailure failure;
 }
 
-/// 회원 주소록. 비회원이면 null.
+/// 주소록. 회원은 서버 주소록·쇼핑 컨텍스트, 비회원은 이 기기의 비회원 배송지(고른 배송지가 쇼핑 주소).
 final addressBookProvider =
     AsyncNotifierProvider<AddressBookController, AddressBook?>(
       AddressBookController.new,
@@ -59,16 +67,46 @@ final addressBookProvider =
 class AddressBookController extends AsyncNotifier<AddressBook?> {
   AddressRepository get _repo => ref.read(addressRepositoryProvider);
 
+  bool get _guest => ref.read(sessionProvider) is! MemberSession;
+  GuestAddressStore get _guestStore => ref.read(guestAddressStoreProvider);
+
   @override
   Future<AddressBook?> build() async {
     final session = ref.watch(sessionProvider);
-    if (session is! MemberSession) return null;
-    return ref.watch(addressRepositoryProvider).book();
+    final repo = ref.watch(addressRepositoryProvider);
+    if (session is! MemberSession) return _guestBook(repo);
+    return repo.book();
+  }
+
+  /// 비회원 배송지는 기기에 둔 ID 로 하나씩 조회한다. 서버에 없는(404) 것만 지우고, 조회 실패는 실패로 둔다.
+  Future<AddressBook> _guestBook(AddressRepository repo) async {
+    final store = ref.read(guestAddressStoreProvider);
+    final addresses = <Address>[];
+    for (final id in await store.ids()) {
+      try {
+        addresses.add(await repo.guest(id));
+      } on ProblemFailure catch (f) {
+        if (f.problem.code != ProblemCode.notFound) rethrow;
+      }
+    }
+    await store.retain(addresses.map((a) => a.addressId));
+    final selectedId = await store.selected();
+    final selected =
+        addresses.where((a) => a.addressId == selectedId).firstOrNull ??
+        addresses.lastOrNull;
+    return AddressBook(
+      addresses: addresses,
+      context: ShoppingContext(
+        version: 0,
+        shoppingAddressId: selected?.addressId,
+        mfcId: selected?.mfcId,
+      ),
+    );
   }
 
   Future<void> _reload() async {
     try {
-      final book = await _repo.book();
+      final book = _guest ? await _guestBook(_repo) : await _repo.book();
       if (ref.mounted) state = AsyncData(book);
     } on PmartFailure catch (e, st) {
       if (ref.mounted) state = AsyncError(e, st);
@@ -81,7 +119,14 @@ class AddressBookController extends AsyncNotifier<AddressBook?> {
     PmartFailure? last;
     for (var i = 0; i < attempts; i++) {
       try {
-        final saved = await _repo.add(draft, key: key);
+        final saved = _guest
+            ? await _repo.addGuest(draft, key: key)
+            : await _repo.add(draft, key: key);
+        if (_guest) {
+          // 비회원은 방금 등록한 배송지를 쇼핑 주소로 쓴다.
+          await _guestStore.add(saved.addressId);
+          await _guestStore.select(saved.addressId);
+        }
         await _reload();
         return AddressSaved(saved);
       } on UnknownResultFailure catch (f) {
@@ -101,6 +146,12 @@ class AddressBookController extends AsyncNotifier<AddressBook?> {
     final book = state.value;
     if (book == null) {
       return const AddressCommandFailed(SessionExpiredFailure());
+    }
+    if (_guest) {
+      // 비회원 쇼핑 주소는 이 기기에서만 고른다(서버 쇼핑 컨텍스트 없음).
+      await _guestStore.select(addressId);
+      await _reload();
+      return const ShoppingAddressChanged();
     }
     final key = IdempotencyKey.generate();
     try {
