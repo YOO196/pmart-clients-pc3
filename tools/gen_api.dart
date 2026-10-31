@@ -33,6 +33,7 @@ const services = <String, List<String>>{
   'delivery-serviceability-service': ['customer'],
   'delivery-capacity-service': ['customer'],
   'order-service': ['customer'],
+  'payment-service': ['customer'],
   'claim-service': ['customer'],
   'review-service': ['customer'],
   'notification-service': ['customer', 'rider'],

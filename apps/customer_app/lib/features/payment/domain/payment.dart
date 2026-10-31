@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// 토스 결제창 진입 정보(BR-01 설계안: `nextAction=PAY` 인 초안의 `checkout`). 필드 이름은 계약 반영 후 확정.
+/// 토스 결제창 진입 정보(계약 `OrderDraft.payment`, `nextAction=PAY` 일 때만).
 ///
 /// `clientKey` 는 공개 키라 서버 응답으로 받는다. 로그에 남기지 않는다.
 @immutable
@@ -10,13 +10,19 @@ class PaymentEntry {
     required this.pgOrderId,
     required this.amount,
     required this.orderName,
+    this.paymentAttemptId,
     this.expiresAt,
   });
 
   final String clientKey;
+
+  /// 결제창의 orderId 이자 승인 요청의 orderId. 가공하지 않는다.
   final String pgOrderId;
+  final String? paymentAttemptId;
   final int amount;
   final String orderName;
+
+  /// 이 시각이 지나면 결제창을 열지 않는다(재고·슬롯 점유 만료 — 그 뒤 승인은 거절된다).
   final DateTime? expiresAt;
 
   @override
@@ -76,7 +82,7 @@ enum PaymentPhase {
   /// 주문 완료(서버가 orderId 와 확정 상태를 줬다)
   done,
 
-  /// 결제 실패 확인(다시 결제 가능)
+  /// 결제 실패 확인. 이번 결제 시도는 끝났고, 주문서에서 새로 결제 진입해야 한다.
   failed,
 
   /// 결제 승인·주문 복구 중(MISMATCH 등). "다시 결제" 없음.
@@ -104,9 +110,13 @@ class PaymentFlowState {
   /// 확인을 여러 번 했지만 아직 결론이 없다. "다시 확인"만 보인다.
   final bool stillChecking;
 
-  /// 다시 결제를 허용하는지. 결과 불명·복구·환불 중에는 절대 허용하지 않는다.
+  /// 다시 결제(주문서로 돌아가 새 키로 결제 진입)를 허용하는지. 결과 불명·복구·환불 중에는 절대 허용하지 않는다.
   bool get canRetryPayment => phase == PaymentPhase.failed;
+
+  /// 주문서로 돌아가야 하는 실패(재고·여력 확보 실패, 결제 가능 시간 지남 등).
+  bool get fromCheckout =>
+      failureCode != null && failureCode != 'USER_CANCELLED';
 }
 
-/// 결제 인증 결과 전달(BR-01 설계안: payment-service 고객용 명령) 결과.
+/// 승인 요청(`POST /payment-confirmations`) 결과. accepted 도 결제 완료가 아니다(주문 확정은 초안 조회로).
 enum AuthSubmitResult { accepted, rejected, unknown }

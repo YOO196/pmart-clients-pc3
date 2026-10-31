@@ -173,9 +173,10 @@ class DraftState {
 
   bool get needsReconsent => previousQuote != null;
 
-  /// 결제 버튼을 열어도 되는지. 서버가 PAY 를 줬고, 막는 사유가 없고, 최소주문을 채웠고, 재동의가 끝났을 때만.
+  /// 결제 버튼을 열어도 되는지. 결제 진입 전 초안(DRAFT·REVIEW)이고, 막는 사유가 없고,
+  /// 최소주문을 채웠고, 재동의가 끝났을 때만. PAY 는 이미 결제 진입한 뒤라 새로 진입하지 않는다.
   bool get canPay =>
-      draft.next == DraftNext.pay &&
+      draft.awaitingCheckout &&
       draft.blockers.isEmpty &&
       draft.quote?.minOrderSatisfied == true &&
       agreedQuote != null &&
@@ -393,7 +394,12 @@ class DraftController extends AsyncNotifier<DraftState?> {
           draft: draft,
           previousQuote: changed ? () => agreed : null,
           checkoutUnknown: latest.checkoutUnknown && !started,
-          lastStart: resolved ? () => CheckoutAccepted(draft.draftId) : null,
+          lastStart: resolved
+              ? () => CheckoutAccepted(draft.draftId)
+              // 결제 시도가 끝나 초안으로 돌아왔다(실패·취소). 새 키로 다시 결제 진입할 수 있다.
+              : draft.awaitingCheckout && latest.lastStart is CheckoutAccepted
+              ? () => null
+              : null,
         ),
       );
     } on PmartFailure catch (e, st) {

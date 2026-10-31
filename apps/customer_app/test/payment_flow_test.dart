@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart';
 
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
+import 'package:customer_app/features/checkout/domain/checkout.dart';
+import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
 import 'package:customer_app/features/payment/data/payment_repository.dart';
 import 'package:customer_app/features/payment/domain/payment.dart';
 import 'package:customer_app/features/payment/presentation/payment_controller.dart';
@@ -73,21 +75,30 @@ void main() {
     expect(pg.launches, 1, reason: '다시 확인은 결제창을 다시 열지 않는다');
   });
 
-  test('승인 실패는 실패로 확인되고 고객이 다시 결제할 수 있다', () async {
+  test('승인 실패는 실패로 확인되고 주문서에서 새 키로 다시 결제 진입한다', () async {
     checkout.approval = MockApproval.decline;
 
     final s = await run();
 
     expect(s.phase, PaymentPhase.failed);
     expect(s.canRetryPayment, isTrue);
+    expect(await c.read(pendingCheckoutsProvider.future), isEmpty);
 
-    await flow().retry();
+    // 주문서로 돌아오면 초안은 결제 진입 전(DRAFT·REVIEW)이라 다시 결제할 수 있다.
+    final draft = c.read(draftControllerProvider.notifier);
+    await draft.refresh();
+    expect(c.read(draftControllerProvider).requireValue!.canPay, isTrue);
+    expect(await draft.pay(), isA<CheckoutAccepted>());
+    expect(checkout.checkoutKeys.toSet(), hasLength(2), reason: '새 결제 진입은 새 키');
 
-    expect(state().phase, PaymentPhase.done);
+    c.invalidate(paymentFlowProvider(draftId));
+    final again = await run();
+
+    expect(again.phase, PaymentPhase.done);
     expect(pg.launches, 2);
   });
 
-  test('결제창을 닫으면 서버에 인증 결과를 보내지 않는다', () async {
+  test('결제창을 닫으면 승인 요청 없이 취소를 알리고 실패로 둔다', () async {
     pg.next = const PgCancelled();
 
     final s = await run();
@@ -95,6 +106,40 @@ void main() {
     expect(s.phase, PaymentPhase.failed);
     expect(s.failureCode, 'USER_CANCELLED');
     expect(checkout.authKeys, isEmpty);
+    expect(checkout.authFailures.single.$2, tossUserCancelCode);
+  });
+
+  test('재고 확보에 실패하면 결제창을 열지 않고 사유를 보인다', () async {
+    c.invalidate(paymentFlowProvider(draftId));
+    // 새 결제 진입이 재고 부족으로 끝난 초안을 만든다.
+    checkout.drafts[draftId]!.json
+      ..['status'] = 'DRAFT'
+      ..['nextAction'] = 'REVIEW'
+      ..remove('payment')
+      ..['checkoutFailure'] = {
+        'step': 'RESERVE_INVENTORY',
+        'code': CheckoutProblemCode.insufficientStock,
+      };
+
+    final s = await run();
+
+    expect(s.phase, PaymentPhase.failed);
+    expect(s.failureCode, CheckoutProblemCode.insufficientStock);
+    expect(pg.launches, 0);
+  });
+
+  test('결제 가능 시간이 지난 결제창 정보로는 결제창을 열지 않는다', () async {
+    final payment =
+        checkout.drafts[draftId]!.json['payment']! as Map<String, Object?>;
+    payment['expiresAt'] = now
+        .subtract(const Duration(seconds: 1))
+        .toIso8601String();
+
+    final s = await run();
+
+    expect(s.phase, PaymentPhase.failed);
+    expect(s.failureCode, CheckoutProblemCode.resourceExpired);
+    expect(pg.launches, 0);
   });
 
   test('승인·주문 불일치는 복구 중이고 다시 결제는 없다', () async {
@@ -125,14 +170,13 @@ void main() {
     expect(checkout.authKeys, isEmpty);
   });
 
-  test('인증 결과 전달 응답을 잃으면 같은 키로 다시 보낸다', () async {
+  test('승인 요청 응답을 잃어도 다시 보내지 않고 조회로 완료를 확인한다', () async {
     checkout.loseNextAuthResponse = true;
 
     final s = await run();
 
     expect(s.phase, PaymentPhase.done);
-    expect(checkout.authKeys, hasLength(2));
-    expect(checkout.authKeys.toSet(), hasLength(1));
+    expect(checkout.authKeys, hasLength(1));
   });
 
   test('인증 결과를 넘긴 뒤 다시 들어오면 결제창을 열지 않고 결과만 조회한다', () async {
@@ -160,10 +204,15 @@ void main() {
     expect(pg.launches, 1);
   });
 
-  test('실서버 결제 경로는 BR-01 회신 전이라 계약 위반으로 막힌다', () async {
-    await expectLater(
-      const ApiPaymentRepository().entry('d'),
-      throwsA(isA<ContractViolationFailure>()),
+  test('결제창 SDK 를 붙이기 전 실서버 결제창은 열리지 않는다고 돌려준다', () async {
+    final ret = await const UnconnectedPgLauncher().launch(
+      const PaymentEntry(
+        clientKey: 'k',
+        pgOrderId: 'pay-1',
+        amount: 1000,
+        orderName: 'x',
+      ),
     );
+    expect(ret, isA<PgFailed>());
   });
 }

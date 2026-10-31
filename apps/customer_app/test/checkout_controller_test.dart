@@ -84,13 +84,14 @@ void main() {
     expect(state().canPay, isFalse);
   });
 
-  test('자원 확보를 기다렸다가 서버가 PAY 를 주면 결제를 연다(금액은 서버 값)', () async {
+  test('확인을 기다렸다가 결제 진입 전 초안(DRAFT·REVIEW)이면 결제를 연다(금액은 서버 값)', () async {
     await fillCartTo(5); // 2,980×5 + 1,980 = 16,880
 
     await draft().enter();
 
     final s = state();
-    expect(s.draft.next, DraftNext.pay);
+    expect(s.draft.next, DraftNext.review);
+    expect(s.draft.awaitingCheckout, isTrue);
     expect(s.canPay, isTrue);
     expect(s.draft.quote!.itemAmount, 16880);
     expect(s.draft.quote!.deliveryTip, 4000);
@@ -171,7 +172,7 @@ void main() {
     await draft().enter();
 
     expect(checkout.drafts, hasLength(1));
-    expect(state().draft.next, DraftNext.pay);
+    expect(state().draft.awaitingCheckout, isTrue);
   });
 
   test('주문서에 다시 들어오면 같은 초안을 다시 조회한다(타이머 재시작 없음)', () async {

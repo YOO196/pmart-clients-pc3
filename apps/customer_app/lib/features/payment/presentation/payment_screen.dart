@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../checkout/presentation/checkout_controller.dart';
+import '../../checkout/presentation/order_sheet_screen.dart'
+    show checkoutFailureText;
+import '../data/payment_repository.dart' show UnconnectedPgLauncher;
 import '../domain/payment.dart';
 import 'payment_controller.dart';
 
@@ -12,8 +16,12 @@ String paymentPhaseText(AppLocalizations l10n, PaymentFlowState s) =>
       PaymentPhase.authenticating => l10n.payAuthenticating,
       PaymentPhase.confirming => l10n.payConfirming,
       PaymentPhase.done => l10n.payDone,
-      PaymentPhase.failed =>
-        s.failureCode == 'USER_CANCELLED' ? l10n.payCancelled : l10n.payFailed,
+      PaymentPhase.failed => switch (s.failureCode) {
+        'USER_CANCELLED' => l10n.payCancelled,
+        UnconnectedPgLauncher.code => l10n.payNotConnected,
+        final String code => checkoutFailureText(l10n, code),
+        null => l10n.payFailed,
+      },
       PaymentPhase.recovering => l10n.payRecovering,
       PaymentPhase.refunding => l10n.payRefunding,
     };
@@ -98,11 +106,19 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   child: Text(l10n.payGoHome),
                 ),
               ],
+              // 이번 결제 시도는 끝났다. 주문서로 돌아가 새로 결제 진입한다(같은 결제창을 다시 열지 않는다).
               if (s.canRetryPayment)
                 FilledButton(
                   key: const ValueKey('pay-retry'),
-                  onPressed: ctl.retry,
-                  child: Text(l10n.payRetry),
+                  onPressed: () {
+                    ref.read(draftControllerProvider.notifier).refresh();
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/checkout');
+                    }
+                  },
+                  child: Text(l10n.payBackToOrderSheet),
                 ),
               if (!working &&
                   !s.canRetryPayment &&

@@ -447,6 +447,23 @@
   "checkoutUnknown": "결제 진입을 확인하는 중이에요. 결제를 다시 누르지 않아도 돼요",
   "checkoutRejected": "지금은 결제할 수 없어요. 주문서를 다시 확인해 주세요",
   "checkoutNotYetSupported": "결제는 아직 준비 중이에요. 주문서까지만 확인할 수 있어요",
+  "checkoutBlocked": "주문서에 확인할 내용이 남아 있어요. 위 안내를 확인해 주세요",
+  "cfInsufficientStock": "재고가 부족한 상품이 있어 결제를 시작하지 못했어요. 장바구니를 확인해 주세요",
+  "cfSkuNotHandled": "지금 센터에서 다루지 않는 상품이 있어요. 장바구니를 확인해 주세요",
+  "cfCapacityExceeded": "주문이 몰려 지금은 받을 수 없어요. 배송 방식이나 시간을 바꿔 주세요",
+  "cfSlotNotSelectable": "고른 배송 시간이 마감됐어요. 다른 시간을 골라 주세요",
+  "cfResourceExpired": "결제 가능 시간이 지났어요. 주문서를 확인하고 다시 결제해 주세요",
+  "payBackToOrderSheet": "주문서에서 다시 결제하기",
+  "payNotConnected": "결제창이 아직 연결되지 않았어요(개발 빌드)",
+  "devTestGeoButton": "[개발] 시험 좌표 넣기(서면역)",
+  "devTestGeoRoad": "[시험] 부산 부산진구 서면역 부근",
+  "devTestGeoSet": "[개발] 시험 좌표 {lat}, {lng} 로 저장해요",
+  "@devTestGeoSet": {
+    "placeholders": {
+      "lat": {"type": "String"},
+      "lng": {"type": "String"}
+    }
+  },
   "draftAccountNotPurchasable": "지금은 이 계정으로 주문할 수 없어요. 고객센터로 문의해 주세요",
   "draftServiceabilityUnknown": "배송 가능 여부를 아직 확인하지 못했어요. 주소를 다시 확인해 주세요",
   "draftMfcChanged": "주소의 담당 센터가 바뀌었어요. 장바구니와 배송 방식을 다시 확인해 주세요",

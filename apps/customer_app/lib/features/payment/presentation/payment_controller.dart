@@ -12,21 +12,27 @@ import '../domain/payment.dart';
 
 final paymentRepositoryProvider = Provider<PaymentRepository>(
   (ref) => switch (ref.watch(envProvider)) {
-    // 목은 초안과 같은 저장소가 결제도 흉내 낸다(BR-01).
+    // 목은 초안과 같은 저장소가 결제도 흉내 낸다.
     PmartEnv.mock => ref.watch(checkoutRepositoryProvider) as PaymentRepository,
-    PmartEnv.local => const ApiPaymentRepository(),
+    PmartEnv.local => ApiPaymentRepository(ref.watch(dioProvider)),
   },
 );
 
-final pgLauncherProvider = Provider<PgLauncher>((_) => MockPgLauncher());
+/// 토스 결제위젯 SDK 는 아직 붙이지 않았다. 실서버에서는 결제창을 열 수 없다고 돌려준다.
+final pgLauncherProvider = Provider<PgLauncher>(
+  (ref) => switch (ref.watch(envProvider)) {
+    PmartEnv.mock => MockPgLauncher(),
+    PmartEnv.local => const UnconnectedPgLauncher(),
+  },
+);
 
 final pendingCommandStoreProvider = Provider<PendingCommandStore>(
   (ref) => PendingCommandStore(ref.watch(secureStoreProvider)),
 );
 
-/// 결제 결과 확인 조회 간격·횟수. 화면이 열려 있는 동안만 짧게 본다.
+/// 결제 진입·결과 확인 조회 간격·횟수(⑥ 안내: 1초 간격, 최대 30초). 화면이 열려 있는 동안만 본다.
 final paymentPollPolicyProvider = Provider<({Duration interval, int attempts})>(
-  (_) => (interval: const Duration(seconds: 2), attempts: 10),
+  (_) => (interval: const Duration(seconds: 1), attempts: 30),
 );
 
 /// 진행 중 결제의 저장 종류. 인증 결과를 넘긴 뒤에는 결제창을 다시 열지 않는다.
@@ -51,8 +57,10 @@ final paymentFlowProvider = NotifierProvider.autoDispose
 
 /// 결제 진행. 화면 문구 단계: 준비 → 인증 → 결과 확인 → 완료/실패/복구/환불.
 ///
-/// 결제창 복귀·인증 성공·인증 결과 접수 어느 것도 완료가 아니다. 초안 조회가 orderId 와
+/// 결제창 복귀·인증 성공·승인 요청 접수 어느 것도 완료가 아니다. 초안 조회가 orderId 와
 /// 확정 상태를 줄 때만 [PaymentPhase.done].
+///
+/// 실패하면 이번 결제 시도는 끝난다(서버가 재고·슬롯을 푼다). 다시 결제는 주문서에서 새 키로 결제 진입한다.
 class PaymentFlowController extends Notifier<PaymentFlowState> {
   PaymentFlowController(this.draftId);
 
@@ -86,6 +94,8 @@ class PaymentFlowController extends Notifier<PaymentFlowState> {
   /// 결과를 서버 상태에서 읽는다. 아직 진행 중이면 null.
   PaymentFlowState? _evaluate(OrderDraft d) {
     final payment = d.resources?.payment;
+    PaymentFlowState failed(String code) =>
+        PaymentFlowState(phase: PaymentPhase.failed, failureCode: code);
     if (d.orderId != null && d.status.isConfirmedOrLater) {
       return PaymentFlowState(phase: PaymentPhase.done, orderId: d.orderId);
     }
@@ -101,18 +111,19 @@ class PaymentFlowController extends Notifier<PaymentFlowState> {
         payment == PaymentProgress.unknown) {
       return const PaymentFlowState(phase: PaymentPhase.confirming);
     }
-    if (payment == PaymentProgress.failed) {
-      return PaymentFlowState(
-        phase: PaymentPhase.failed,
-        failureCode: 'PAYMENT_FAILED',
-        entry: state.entry,
-      );
+    // 자원 확보·결제가 실패해 초안으로 돌아왔다(DRAFT·REVIEW 또는 견적 만료 EXPIRED·RE_QUOTE).
+    if (d.checkoutFailure case final f?
+        when d.next == DraftNext.review || d.next == DraftNext.reQuote) {
+      return failed(f.code);
     }
+    if (d.expired) return failed(CheckoutProblemCode.resourceExpired);
+    if (payment == PaymentProgress.failed) return failed('PAYMENT_FAILED');
     return null;
   }
 
   bool _terminal(PaymentFlowState s) => switch (s.phase) {
     PaymentPhase.done ||
+    PaymentPhase.failed ||
     PaymentPhase.refunding ||
     PaymentPhase.recovering => true,
     _ => false,
@@ -155,24 +166,6 @@ class PaymentFlowController extends Notifier<PaymentFlowState> {
     }
   }
 
-  /// 실패 확인 뒤에만 "다시 결제". 결과 불명·복구·환불 중에는 아무것도 하지 않는다.
-  Future<void> retry() async {
-    if (!state.canRetryPayment || _running) return;
-    _running = true;
-    try {
-      await _pay();
-    } on PmartFailure {
-      _set(
-        const PaymentFlowState(
-          phase: PaymentPhase.confirming,
-          stillChecking: true,
-        ),
-      );
-    } finally {
-      _running = false;
-    }
-  }
-
   /// "다시 확인". 서버 상태만 다시 조회한다.
   Future<void> checkAgain() async {
     if (_running) return;
@@ -185,16 +178,19 @@ class PaymentFlowController extends Notifier<PaymentFlowState> {
   }
 
   Future<void> _pay() async {
-    _set(PaymentFlowState(phase: PaymentPhase.preparing, entry: state.entry));
-    final entry = state.entry ?? await _waitEntry();
-    if (entry == null) {
-      _set(
-        const PaymentFlowState(
-          phase: PaymentPhase.preparing,
-          stillChecking: true,
-        ),
+    _set(const PaymentFlowState(phase: PaymentPhase.preparing));
+    final entry = await _waitEntry();
+    if (entry == null || !ref.mounted) return;
+    // 결제 가능 시간이 지났으면 결제창을 열지 않는다(그 뒤 승인은 거절된다).
+    final expiresAt = entry.expiresAt;
+    if (expiresAt != null && !ref.read(clockProvider)().isBefore(expiresAt)) {
+      final s = PaymentFlowState(
+        phase: PaymentPhase.failed,
+        failureCode: CheckoutProblemCode.resourceExpired,
+        entry: entry,
       );
-      return;
+      _set(s);
+      return _finish(s);
     }
     _set(PaymentFlowState(phase: PaymentPhase.authenticating, entry: entry));
     final ret = await ref.read(pgLauncherProvider).launch(entry);
@@ -205,21 +201,23 @@ class PaymentFlowController extends Notifier<PaymentFlowState> {
         await _submit(ret);
         await _confirm();
       case PgCancelled():
-        _set(
-          PaymentFlowState(
-            phase: PaymentPhase.failed,
-            failureCode: 'USER_CANCELLED',
-            entry: entry,
-          ),
+        await _reportFailure(entry, tossUserCancelCode);
+        final s = PaymentFlowState(
+          phase: PaymentPhase.failed,
+          failureCode: 'USER_CANCELLED',
+          entry: entry,
         );
+        _set(s);
+        await _finish(s);
       case PgFailed(:final code):
-        _set(
-          PaymentFlowState(
-            phase: PaymentPhase.failed,
-            failureCode: code,
-            entry: entry,
-          ),
+        await _reportFailure(entry, code);
+        final s = PaymentFlowState(
+          phase: PaymentPhase.failed,
+          failureCode: code,
+          entry: entry,
         );
+        _set(s);
+        await _finish(s);
       case PgNoReturn():
         // 결과를 못 받았다. 서버(웹훅 등)가 처리했을 수 있으니 조회로만 판단한다.
         _set(PaymentFlowState(phase: PaymentPhase.confirming, entry: entry));
@@ -227,14 +225,33 @@ class PaymentFlowController extends Notifier<PaymentFlowState> {
     }
   }
 
+  /// 초안을 조회해 결제창 정보(nextAction=PAY)를 기다린다. 재고 확인 중(RESOURCE_PENDING·WAIT)이면 계속 보고,
+  /// 실패·만료·확정이 오면 그 상태를 보인다(그때는 null).
   Future<PaymentEntry?> _waitEntry() async {
     final policy = ref.read(paymentPollPolicyProvider);
     for (var i = 0; i < policy.attempts; i++) {
       if (i > 0) await Future<void>.delayed(policy.interval);
       if (!ref.mounted) return null;
-      final entry = await _payments.entry(draftId);
-      if (entry != null) return entry;
+      final d = await _drafts.getDraft(draftId);
+      if (!ref.mounted) return null;
+      if (d.next == DraftNext.pay && d.payment != null) return d.payment;
+      final evaluated = _evaluate(d);
+      if (evaluated != null) {
+        _set(evaluated);
+        if (evaluated.phase == PaymentPhase.confirming) {
+          await _confirm();
+        } else if (_terminal(evaluated)) {
+          await _finish(evaluated);
+        }
+        return null;
+      }
     }
+    _set(
+      const PaymentFlowState(
+        phase: PaymentPhase.preparing,
+        stillChecking: true,
+      ),
+    );
     return null;
   }
 
@@ -242,13 +259,23 @@ class PaymentFlowController extends Notifier<PaymentFlowState> {
     final key = IdempotencyKey.generate();
     // 넘긴 뒤에는 결제창을 다시 열지 않는다(앱이 꺼져도 결과 조회로 복구).
     await _remember(CheckoutCommandKind.authSubmitted);
-    for (var i = 0; i < 3; i++) {
-      try {
-        final r = await _payments.submitAuth(auth, key: key);
-        if (r != AuthSubmitResult.unknown) return;
-      } on UnknownResultFailure {
-        // 같은 키로 다시 보낸다.
-      }
+    try {
+      // 응답을 놓쳐도 다시 보내지 않는다(결제 안내 §1⑤). 결과는 초안 조회로 확인한다.
+      await _payments.submitAuth(auth, key: key);
+    } on PmartFailure {
+      // 위와 같다.
+    }
+  }
+
+  Future<void> _reportFailure(PaymentEntry entry, String code) async {
+    try {
+      await _payments.reportAuthFailure(
+        entry,
+        code,
+        key: IdempotencyKey.generate(),
+      );
+    } on PmartFailure {
+      // 알리지 못해도 서버 점유 만료로 풀린다. 결과는 초안 조회로 본다.
     }
   }
 
@@ -282,6 +309,7 @@ class PaymentFlowController extends Notifier<PaymentFlowState> {
 
   Future<void> _finish(PaymentFlowState s) async {
     await _store.remove('checkout-$draftId');
+    if (!ref.mounted) return;
     ref.invalidate(pendingCheckoutsProvider);
     if (s.phase == PaymentPhase.done) {
       ref.read(checkoutSetupProvider.notifier).finish();

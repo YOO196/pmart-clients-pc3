@@ -214,6 +214,56 @@ void main() {
     expect(draft.quote?.firstPurchase, FirstPurchaseBenefit.expected);
   });
 
+  test('결제 진입 뒤 초안: PAY 면 결제창 정보, 실패면 checkoutFailure 를 옮긴다(⑥ 안내)', () async {
+    final pay = await repo(
+      (_) => const FakeReply(
+        200,
+        body: {
+          'draftId': 'd-1',
+          'version': 3,
+          'status': 'PAYMENT_PENDING',
+          'nextAction': 'PAY',
+          'orderId': 'ORD-1',
+          'payment': {
+            'paymentAttemptId': 'pay-abc123',
+            'amount': 16880,
+            'orderName': 'PMart 장보기 2개 상품',
+            'provider': 'TOSS_PAYMENTS',
+            'pgOrderId': 'pay-abc123',
+            'clientKey': 'test_ck_x',
+            'expiresAt': '2026-10-31T03:10:00Z',
+          },
+        },
+      ),
+    ).getDraft('d-1');
+
+    expect(pay.next, DraftNext.pay);
+    expect(pay.awaitingCheckout, isFalse);
+    expect(pay.payment?.pgOrderId, 'pay-abc123');
+    expect(pay.payment?.amount, 16880);
+    expect(pay.payment?.expiresAt, DateTime.utc(2026, 10, 31, 3, 10));
+
+    final failed = await repo(
+      (_) => const FakeReply(
+        200,
+        body: {
+          'draftId': 'd-1',
+          'version': 4,
+          'status': 'DRAFT',
+          'nextAction': 'REVIEW',
+          'checkoutFailure': {
+            'step': 'RESERVE_INVENTORY',
+            'code': 'INSUFFICIENT_STOCK',
+          },
+        },
+      ),
+    ).getDraft('d-1');
+
+    expect(failed.payment, isNull);
+    expect(failed.awaitingCheckout, isTrue);
+    expect(failed.checkoutFailure?.code, CheckoutProblemCode.insufficientStock);
+  });
+
   test('LAN 실제 응답: 예약 슬롯 끝이 24:00 이어도 읽고 표시한다', () async {
     final options = await repo(
       (_) => const FakeReply(

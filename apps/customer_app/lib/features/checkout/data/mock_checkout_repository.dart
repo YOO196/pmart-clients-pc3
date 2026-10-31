@@ -35,8 +35,17 @@ base class MockCheckoutRepository
   final Duration latency;
   final DateTime Function() now;
 
-  /// 초안 생성 뒤 몇 번 조회해야 자원 확보(nextAction=PAY)가 끝나는지.
+  /// 초안 생성 뒤 몇 번 조회해야 확인(nextAction=REVIEW)이 끝나는지.
   final int waitPolls;
+
+  /// 다음 결제 진입의 자원 확보를 이 코드로 실패시킨다(초안 checkoutFailure, 예: INSUFFICIENT_STOCK).
+  String? failNextCheckout;
+
+  /// 결제창 정보의 만료 시각(기본: 지금부터 10분).
+  Duration paymentWindow = const Duration(minutes: 10);
+
+  /// 결제창 실패·취소 보고(orderId, errorCode).
+  final authFailures = <(String, String)>[];
 
   /// BR-13 시연: 지금 안 되는 방식과 사유 코드(계약 `unavailableReason`, 예: NIGHT_TIME).
   Map<DeliveryMode, String> unavailable = {};
@@ -262,7 +271,7 @@ base class MockCheckoutRepository
     d.json
       ..['status'] = 'DRAFT'
       ..['version'] = (d.json['version']! as int) + 1
-      ..['nextAction'] = ok ? 'PAY' : 'REVIEW'
+      ..['nextAction'] = 'REVIEW'
       ..['resources'] = {
         'inventoryReservation': ok ? 'HELD' : 'NOT_REQUESTED',
         'capacityHold': ok ? 'HELD' : 'NOT_REQUESTED',
@@ -294,7 +303,9 @@ base class MockCheckoutRepository
     final quote = d.json['quote']! as Map<String, Object?>;
     final expires = DateTime.parse(quote['quoteExpiresAt']! as String);
     // 견적 10분이 지나면 서버는 status=EXPIRED·nextAction=RE_QUOTE 로 알린다(⑤ 안내 §3).
-    if (!now().isBefore(expires) && d.json['nextAction'] == 'PAY') {
+    if (!now().isBefore(expires) &&
+        d.json['status'] == 'DRAFT' &&
+        d.json['nextAction'] == 'REVIEW') {
       d.json
         ..['status'] = 'EXPIRED'
         ..['nextAction'] = 'RE_QUOTE';
@@ -326,7 +337,7 @@ base class MockCheckoutRepository
       d.json
         ..['quote'] = _quote(d.request, current + 1, now(), priceDelta: 500)
         ..['version'] = (d.json['version']! as int) + 1
-        ..['nextAction'] = 'PAY';
+        ..['nextAction'] = 'REVIEW';
       return checkoutFailureToStart(
         const ProblemFailure(
           Problem(status: 422, code: CheckoutProblemCode.reQuoteRequired),
@@ -340,15 +351,44 @@ base class MockCheckoutRepository
         ),
       );
     }
+    final orderId = 'order-${draftId.substring('draft-'.length)}';
+    d.json
+      ..remove('checkoutFailure')
+      ..['orderId'] = orderId
+      ..['version'] = (d.json['version']! as int) + 1;
+    if (failNextCheckout case final code?) {
+      // 확보 실패: 서버가 이번 시도분을 풀고 초안으로 돌려보낸다.
+      failNextCheckout = null;
+      d.json
+        ..['status'] = 'DRAFT'
+        ..['nextAction'] = 'REVIEW'
+        ..['checkoutFailure'] = {'step': 'RESERVE_INVENTORY', 'code': code};
+      return CheckoutAccepted(orderId);
+    }
+    final attempt = 'pay${++_attemptSeq}x$draftId';
+    final names = [for (final l in d.request.lines) l.sku];
     d.json
       ..['status'] = 'PAYMENT_PENDING'
-      ..['nextAction'] = 'WAIT'
-      ..['version'] = (d.json['version']! as int) + 1;
-    (d.json['resources']! as Map<String, Object?>)['payment'] = 'STARTED';
-    return CheckoutAccepted(key.value);
+      ..['nextAction'] = 'PAY'
+      ..['payment'] = {
+        'paymentAttemptId': attempt,
+        'pgOrderId': attempt,
+        'amount': quote['totalAmount'],
+        'orderName': names.length == 1
+            ? names.first
+            : '${names.first} 외 ${names.length - 1}건',
+        'provider': 'TOSS_PAYMENTS',
+        'clientKey': 'test_ck_mock',
+        'expiresAt': now().add(paymentWindow).toUtc().toIso8601String(),
+      };
+    (d.json['resources']! as Map<String, Object?>)
+      ..['inventoryReservation'] = 'HELD'
+      ..['capacityHold'] = 'HELD'
+      ..['payment'] = 'STARTED';
+    return CheckoutAccepted(orderId);
   }
 
-  // ---------- BR-01 목: 결제 진입 정보·인증 결과 전달·서버 승인(계약 반영 전 가정) ----------
+  // ---------- 결제 목: 승인 요청·실패 보고·서버 승인(payment-service checkout 흉내) ----------
 
   /// 다음 인증 결과 전달에 대한 서버 승인 결과.
   MockApproval approval = MockApproval.approve;
@@ -362,39 +402,54 @@ base class MockCheckoutRepository
   final authKeys = <String>[];
   final _authResults = <String, AuthSubmitResult>{};
   final confirmedOrders = <String, MockDraft>{};
-  int _orderSeq = 0;
+  int _attemptSeq = 0;
 
   MockDraft? _byPgOrder(String pgOrderId) => drafts.values
-      .where((d) => 'pg-${d.json['draftId']}' == pgOrderId)
+      .where(
+        (d) =>
+            (d.json['payment'] as Map<String, Object?>?)?['pgOrderId'] ==
+            pgOrderId,
+      )
       .firstOrNull;
 
+  /// 결제 시도가 끝나 초안으로 돌아간다(서버가 재고·여력을 푼다).
+  void _backToDraft(MockDraft d, String code) {
+    d.json
+      ..['status'] = 'DRAFT'
+      ..['nextAction'] = 'REVIEW'
+      ..remove('payment')
+      ..['checkoutFailure'] = {'step': 'AWAIT_PAYMENT_RESULT', 'code': code};
+    (d.json['resources']! as Map<String, Object?>)
+      ..['inventoryReservation'] = 'RELEASED'
+      ..['capacityHold'] = 'RELEASED';
+  }
+
   @override
-  Future<PaymentEntry?> entry(String draftId) async {
+  Future<void> reportAuthFailure(
+    PaymentEntry entry,
+    String errorCode, {
+    required IdempotencyKey key,
+  }) async {
     await _wait();
-    final d = drafts[draftId];
-    if (d == null || d.json['status'] != 'PAYMENT_PENDING') return null;
-    final quote = d.json['quote']! as Map<String, Object?>;
-    final names = [for (final l in d.request.lines) l.sku];
-    return PaymentEntry(
-      clientKey: 'test_ck_mock',
-      pgOrderId: 'pg-$draftId',
-      amount: quote['totalAmount']! as int,
-      orderName: names.length == 1
-          ? names.first
-          : '${names.first} 외 ${names.length - 1}건',
-      expiresAt: now().add(const Duration(minutes: 10)),
-    );
+    authFailures.add((entry.pgOrderId, errorCode));
+    final d = _byPgOrder(entry.pgOrderId);
+    if (d != null && d.json['nextAction'] == 'PAY') {
+      _backToDraft(
+        d,
+        errorCode == tossUserCancelCode ? 'PAYMENT_CANCELED' : 'PAYMENT_FAILED',
+      );
+    }
   }
 
   void _setPayment(MockDraft d, String payment) =>
       (d.json['resources']! as Map<String, Object?>)['payment'] = payment;
 
   void _approve(MockDraft d) {
-    final orderId = 'order-${++_orderSeq}';
+    final orderId = d.json['orderId']! as String;
     d.json
       ..['status'] = 'CONFIRMED'
-      ..['orderId'] = orderId
-      ..['nextAction'] = 'DONE';
+      ..['nextAction'] = 'DONE'
+      ..remove('payment');
     _setPayment(d, 'APPROVED');
     confirmedOrders[orderId] = d;
   }
@@ -418,14 +473,21 @@ base class MockCheckoutRepository
       case MockApproval.approve:
         _approve(d);
       case MockApproval.decline:
-        d.json['status'] = 'PAYMENT_PENDING';
-        _setPayment(d, 'FAILED');
+        // 승인 실패: 서버가 즉시 풀고 초안으로 돌려보낸다.
+        _backToDraft(d, 'PAYMENT_FAILED');
         approval = MockApproval.approve;
+        return _authResults[key.value] = AuthSubmitResult.rejected;
       case MockApproval.unknown:
-        d.json['status'] = 'PAYMENT_UNKNOWN';
+        d.json
+          ..['status'] = 'PAYMENT_UNKNOWN'
+          ..['nextAction'] = 'WAIT'
+          ..remove('payment');
         _setPayment(d, 'UNKNOWN');
       case MockApproval.mismatch:
-        d.json['status'] = 'PAYMENT_UNKNOWN';
+        d.json
+          ..['status'] = 'PAYMENT_UNKNOWN'
+          ..['nextAction'] = 'WAIT'
+          ..remove('payment');
         _setPayment(d, 'MISMATCH');
       case MockApproval.approveThenCancel:
         d.json

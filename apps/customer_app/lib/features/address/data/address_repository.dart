@@ -67,6 +67,10 @@ final class ApiAddressRepository implements AddressRepository {
             null => null,
           },
           entranceNote: draft.entranceNote,
+          geo: switch (draft.geo) {
+            final g? => api.AddressInputGeo(lat: g.lat, lng: g.lng),
+            null => null,
+          },
         ),
         extra: commandOptions(key).extra,
       ),

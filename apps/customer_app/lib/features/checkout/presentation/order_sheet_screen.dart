@@ -42,6 +42,18 @@ String minOrderText(AppLocalizations l10n, Quote? q) =>
       _ => l10n.minOrderUnsatisfied,
     };
 
+/// 결제 진입 실패 사유(초안 checkoutFailure.code·결제 흐름 실패 코드).
+String checkoutFailureText(AppLocalizations l10n, String code) =>
+    switch (code) {
+      CheckoutProblemCode.insufficientStock => l10n.cfInsufficientStock,
+      CheckoutProblemCode.skuNotHandled => l10n.cfSkuNotHandled,
+      CheckoutProblemCode.capacityExceeded => l10n.cfCapacityExceeded,
+      CheckoutProblemCode.slotNotSelectable => l10n.cfSlotNotSelectable,
+      CheckoutProblemCode.configRequired => l10n.draftConfigRequired,
+      CheckoutProblemCode.resourceExpired => l10n.cfResourceExpired,
+      _ => l10n.payFailed,
+    };
+
 /// 초안 생성 거절(422·409) 사유와 고객이 갈 곳. 모르는 코드는 null(일반 오류 화면).
 ({String text, String? route, String? action})? draftRejection(
   AppLocalizations l10n,
@@ -270,13 +282,23 @@ class _Sheet extends ConsumerWidget {
           icon: Icons.payment,
           text: l10n.checkoutAccepted,
         ),
+      // 지난 결제 진입이 자원 확보·결제에서 실패했다. 서버가 확보분을 풀었고, 견적이 유효하면 다시 결제할 수 있다.
+      if (draft.checkoutFailure case final f?
+          when state.lastStart is! CheckoutAccepted)
+        _Banner(
+          key: const ValueKey('checkout-failure'),
+          icon: Icons.error_outline,
+          text: checkoutFailureText(l10n, f.code),
+        ),
       if (state.lastStart case CheckoutRejected(:final code))
         _Banner(
           key: const ValueKey('checkout-rejected'),
           icon: Icons.error_outline,
-          text: code == CheckoutProblemCode.unsupported
-              ? l10n.checkoutNotYetSupported
-              : l10n.checkoutRejected,
+          text: switch (code) {
+            CheckoutProblemCode.unsupported => l10n.checkoutNotYetSupported,
+            CheckoutProblemCode.checkoutBlocked => l10n.checkoutBlocked,
+            _ => l10n.checkoutRejected,
+          },
         ),
       if (state.needsReconsent) _ReQuoteCard(state: state),
     ];
@@ -289,7 +311,7 @@ class _Sheet extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             children: [
               ...banners,
-              if (expiry != null && draft.next == DraftNext.pay)
+              if (expiry != null && draft.awaitingCheckout)
                 Text(
                   expiry.isAfter(now)
                       ? l10n.payWithin(_left(expiry.difference(now)))

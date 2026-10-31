@@ -37,6 +37,8 @@ dependencies:
     path: ../../packages/pmart_api/gen/customer
   pmart_api_order:
     path: ../../packages/pmart_api/gen/order
+  pmart_api_payment:
+    path: ../../packages/pmart_api/gen/payment
   pmart_api_delivery_capacity:
     path: ../../packages/pmart_api/gen/delivery-capacity
   pmart_api_delivery_serviceability:

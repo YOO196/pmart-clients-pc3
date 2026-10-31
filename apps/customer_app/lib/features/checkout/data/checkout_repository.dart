@@ -6,6 +6,7 @@ import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/order_status.dart';
 import '../../../shared/providers.dart' show sourceSystem;
+import '../../payment/domain/payment.dart' show PaymentEntry;
 import '../domain/checkout.dart';
 
 /// 배송 방식·슬롯·주문 초안·결제 진입. 조회 실패는 [PmartFailure] 로 던진다.
@@ -298,6 +299,30 @@ OrderDraft draftFromContract(api.OrderDraft d) {
       null => DraftNext.unknown,
     },
     quote: q?.quoteVersion == null ? null : quoteFromContract(q!),
+    payment: switch (d.payment) {
+      api.OrderDraftPayment(
+        clientKey: final String clientKey,
+        pgOrderId: final String pgOrderId,
+        amount: final int amount,
+      ) =>
+        PaymentEntry(
+          clientKey: clientKey,
+          pgOrderId: pgOrderId,
+          amount: amount,
+          orderName: d.payment!.orderName ?? '',
+          paymentAttemptId: d.payment!.paymentAttemptId,
+          expiresAt: d.payment!.expiresAt,
+        ),
+      // 결제창에 필요한 값이 빠졌으면 결제창을 열지 않는다(대기로 둔다).
+      _ => null,
+    },
+    checkoutFailure: switch (d.checkoutFailure) {
+      api.OrderDraftCheckoutFailure(code: final String code) => CheckoutFailure(
+        code: code,
+        step: d.checkoutFailure!.step,
+      ),
+      _ => null,
+    },
     blockers: [
       for (final b in d.blockers ?? const <api.DraftBlocker>[])
         switch (b.code) {

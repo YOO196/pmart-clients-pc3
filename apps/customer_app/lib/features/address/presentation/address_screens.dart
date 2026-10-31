@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -148,6 +149,9 @@ class _AddressListState extends ConsumerState<_AddressList> {
 }
 
 /// SCR-ADDRESS-EDIT-001. 주소 검색·지도 확인은 지도 키 결정 뒤 붙인다(지금은 직접 입력).
+/// 시험 좌표 버튼을 보일지. 릴리스 빌드에서는 보이지 않는다.
+const showDevTestGeo = !kReleaseMode;
+
 class AddressFormScreen extends ConsumerStatefulWidget {
   const AddressFormScreen({super.key});
 
@@ -164,6 +168,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   final _phone = TextEditingController();
   final _note = TextEditingController();
   EntranceMethod _entrance = EntranceMethod.free;
+  ({double lat, double lng})? _geo;
 
   @override
   void dispose() {
@@ -192,6 +197,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
             receiverPhone: _phone.text.trim(),
             entranceMethod: _entrance,
             entranceNote: _note.text.trim().isEmpty ? null : _note.text.trim(),
+            geo: _geo,
           ),
         );
     if (!mounted) return;
@@ -289,6 +295,29 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               AddressLimits.entranceNote,
               required: false,
             ),
+            // 개발 빌드 전용: 주소 검색(BR-29)이 없어 좌표를 보낼 수 없으므로 LAN 시험 권역 좌표를 넣는다.
+            if (showDevTestGeo) ...[
+              OutlinedButton.icon(
+                key: const ValueKey('dev-test-geo'),
+                icon: const Icon(Icons.science_outlined),
+                label: Text(l10n.devTestGeoButton),
+                onPressed: () => setState(() {
+                  _geo = DevTestGeo.seomyeon;
+                  if (_road.text.trim().isEmpty) {
+                    _road.text = l10n.devTestGeoRoad;
+                  }
+                }),
+              ),
+              if (_geo case final g?)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    l10n.devTestGeoSet(g.lat.toString(), g.lng.toString()),
+                    key: const ValueKey('dev-test-geo-set'),
+                  ),
+                ),
+              const SizedBox(height: 12),
+            ],
             CommandButton(
               key: const ValueKey('address-save'),
               label: l10n.addressSave,

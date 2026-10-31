@@ -43,6 +43,7 @@ class AddressDraft {
     this.label,
     this.entranceMethod,
     this.entranceNote,
+    this.geo,
   });
 
   final String? label;
@@ -53,8 +54,18 @@ class AddressDraft {
   final EntranceMethod? entranceMethod;
   final String? entranceNote;
 
+  /// 좌표(계약 `AddressInput.geo`). 서버가 이것으로 배송 가능·담당 센터를 판정한다.
+  /// 주소 검색이 붙기 전에는 개발 빌드의 시험 좌표로만 채운다(BR-29).
+  final ({double lat, double lng})? geo;
+
   @override
   String toString() => 'AddressDraft(…)';
+}
+
+/// 개발 빌드 전용 시험 좌표(백엔드 LAN 시험 권역, 2026-10-31 안내: 부산진구 서면역 부근 → SERVICEABLE).
+/// 실제 주소 검색(BR-29)이 붙으면 지운다.
+abstract final class DevTestGeo {
+  static const seomyeon = (lat: 35.1578, lng: 129.0597);
 }
 
 /// 계약 `AddressInput` maxLength. 화면 입력 상한으로만 쓴다(서버가 최종 검증).

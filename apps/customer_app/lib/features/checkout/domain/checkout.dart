@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../shared/order_status.dart';
+import '../../payment/domain/payment.dart' show PaymentEntry;
 
 /// 한집(SINGLE) / 알뜰(BUNDLED) / 예약(SCHEDULED). 이름은 잠정("한집/알뜰/예약" 유지).
 enum DeliveryMode { single, bundled, scheduled }
@@ -208,8 +209,20 @@ class DraftResources {
   final DateTime? reservationExpiresAt;
 }
 
-/// 서버가 알려 준 다음 행동. 결제 버튼은 [pay] 일 때만 연다.
+/// 서버가 알려 준 다음 행동. 주문서의 결제 버튼은 결제 진입 전(DRAFT·[review])에만,
+/// 결제창은 [pay] 일 때만 연다.
 enum DraftNext { review, reQuote, pay, wait, done, expired, unknown }
+
+/// 마지막 결제 진입의 자원 확보·결제 시작 실패(계약 `OrderDraft.checkoutFailure`).
+/// 확보했던 것은 서버가 푼다. 견적이 유효하면 새 키로 다시 결제 진입할 수 있다.
+@immutable
+class CheckoutFailure {
+  const CheckoutFailure({required this.code, this.step});
+
+  /// INSUFFICIENT_STOCK·SKU_NOT_HANDLED·CAPACITY_EXCEEDED·SLOT_NOT_SELECTABLE·CONFIG_REQUIRED·RESOURCE_EXPIRED 등.
+  final String code;
+  final String? step;
+}
 
 @immutable
 class OrderDraft {
@@ -222,6 +235,8 @@ class OrderDraft {
     this.resources,
     this.orderId,
     this.blockers = const [],
+    this.payment,
+    this.checkoutFailure,
   });
 
   final String draftId;
@@ -231,8 +246,16 @@ class OrderDraft {
   final DraftResources? resources;
   final DraftNext next;
 
-  /// 확정 시에만 있다. 이것과 확정 상태가 있어야 "주문 완료"다.
+  /// 결제 진입 때 발급된다. 확정 상태와 함께 있어야 "주문 완료"다.
   final String? orderId;
+
+  /// 결제창 진입 정보. [next] 가 [DraftNext.pay] 일 때만 있다.
+  final PaymentEntry? payment;
+  final CheckoutFailure? checkoutFailure;
+
+  /// 결제 진입 전(또는 실패로 돌아온) 초안. 주문서의 결제 버튼은 이때만 연다.
+  bool get awaitingCheckout =>
+      status == OrderStatus.draft && next == DraftNext.review;
 
   /// 결제 진입을 막는 사유(서버 순서). 최소주문 미달·방식 불가·슬롯 문제는 422 가 아니라 여기로 온다.
   final List<DraftBlocker> blockers;
@@ -337,6 +360,12 @@ abstract final class CheckoutProblemCode {
   static const priceNotSet = 'PRICE_NOT_SET';
   static const configRequired = 'CONFIG_REQUIRED';
   static const mfcChanged = 'MFC_CHANGED';
+  static const checkoutBlocked = 'CHECKOUT_BLOCKED';
+  static const insufficientStock = 'INSUFFICIENT_STOCK';
+  static const skuNotHandled = 'SKU_NOT_HANDLED';
+  static const capacityExceeded = 'CAPACITY_EXCEEDED';
+  static const slotNotSelectable = 'SLOT_NOT_SELECTABLE';
+  static const resourceExpired = 'RESOURCE_EXPIRED';
 
   /// 초안 생성 거절(422·409 MFC_CHANGED). 같은 조건으로 다시 보내도 안 되므로 주문서로 넘어가지 않는다.
   static const draftRejections = {
