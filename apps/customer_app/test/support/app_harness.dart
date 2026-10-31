@@ -6,7 +6,11 @@ import 'package:pmart_core/pmart_core.dart';
 
 import 'package:customer_app/app.dart';
 import 'package:customer_app/features/address/data/mock_address_repository.dart';
+import 'package:customer_app/features/address/data/geocoding_repository.dart';
 import 'package:customer_app/features/address/presentation/address_controller.dart';
+import 'package:customer_app/features/address/presentation/address_screens.dart';
+import 'package:customer_app/features/address/presentation/map_pick_screen.dart';
+import 'package:customer_app/features/address/presentation/postcode_screen.dart';
 import 'package:customer_app/features/auth/data/mock_auth_repository.dart';
 import 'package:customer_app/features/auth/presentation/auth_controller.dart';
 import 'package:customer_app/features/cart/data/cart_repository.dart';
@@ -36,6 +40,8 @@ Widget testApp(
   OrdersRepository? orders,
   MockAuthRepository? auth,
   ProfileRepository? profile,
+  FakeAddressPicker? addressPicker,
+  MockAddressRepository? address,
 }) => ProviderScope(
   retry: (_, _) => null,
   overrides: [
@@ -50,7 +56,7 @@ Widget testApp(
       auth ?? MockAuthRepository(latency: Duration.zero),
     ),
     addressRepositoryProvider.overrideWithValue(
-      MockAddressRepository(latency: Duration.zero),
+      address ?? MockAddressRepository(latency: Duration.zero),
     ),
     checkoutRepositoryProvider.overrideWithValue(
       // 슬롯·만료가 실제 시계에 따라 바뀌지 않게 서울 12:00 으로 고정한다.
@@ -66,6 +72,8 @@ Widget testApp(
     profileRepositoryProvider.overrideWithValue(
       profile ?? MockProfileRepository(latency: Duration.zero),
     ),
+    // 주소 검색(웹뷰)·카카오 지도는 시험에서 띄울 수 없어 가짜로 바꾼다.
+    ...(addressPicker ?? FakeAddressPicker()).overrides,
     // 보안 저장소 대신 메모리 저장소(플랫폼 채널 없음).
     secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),
     paymentPollPolicyProvider.overrideWithValue((
@@ -77,6 +85,33 @@ Widget testApp(
   ],
   child: const CustomerApp(),
 );
+
+/// 주소 검색 결과·지도 핀을 정해 두는 가짜. [road] 를 고르고, 지도는 [pin](없으면 시작 위치)으로 확인한다.
+final class FakeAddressPicker {
+  FakeAddressPicker({
+    this.road = '서울 송파구 올림픽로 300',
+    this.pin,
+    MockGeocodingRepository? geocoding,
+  }) : geocoding = geocoding ?? MockGeocodingRepository(latency: Duration.zero);
+
+  String? road;
+  GeoPoint? pin;
+  final MockGeocodingRepository geocoding;
+  final mapStarts = <GeoPoint>[];
+
+  List<Override> get overrides => [
+    geocodingRepositoryProvider.overrideWithValue(geocoding),
+    addressSearchProvider.overrideWithValue(
+      (_) async => road == null
+          ? null
+          : PostcodeResult(roadAddress: road!, zoneNo: '05551'),
+    ),
+    mapPickProvider.overrideWithValue((_, initial, _) async {
+      mapStarts.add(initial);
+      return pin ?? initial;
+    }),
+  ];
+}
 
 /// 가로 진열 안의 상품을 화면에 보이게 한 뒤 누른다.
 Future<void> tapTile(WidgetTester t, String productId) async {

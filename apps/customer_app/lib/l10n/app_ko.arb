@@ -482,15 +482,28 @@
   "payResultMismatch": "결제창 결과가 주문과 맞지 않아 결제를 진행하지 않았어요. 주문서에서 다시 결제해 주세요",
   "tossTitle": "결제수단 선택",
   "tossAgreementRequired": "필수 약관에 동의해 주세요",
-  "devTestGeoButton": "[개발] 시험 좌표 넣기(서면역)",
-  "devTestGeoRoad": "[시험] 부산 부산진구 서면역 부근",
-  "devTestGeoSet": "[개발] 시험 좌표 {lat}, {lng} 로 저장해요",
-  "@devTestGeoSet": {
+  "devTestGeoButton": "[개발] 시험 주소 넣기(부산진구 중앙대로 672)",
+  "addressSearchTitle": "주소 검색",
+  "addressSearchHint": "눌러서 도로명·지번·건물명으로 찾기",
+  "addressSearchFailed": "주소 검색을 불러오지 못했어요. 인터넷 연결을 확인해 주세요",
+  "addressPinNone": "주소를 고르면 지도에서 배달 위치를 맞출 수 있어요",
+  "addressPinPicking": "지도 위치를 찾고 있어요",
+  "addressPinPicked": "배달 위치를 지도에서 맞췄어요",
+  "addressPinNotFound": "지도 위치를 찾지 못했어요. 주소만으로 저장할 수 있어요",
+  "addressPinFailed": "지도 위치를 확인하지 못했어요. 주소만으로 저장하거나 다시 시도해 주세요",
+  "addressPinAdjust": "지도에서 맞추기",
+  "mapPickTitle": "배달 위치 확인",
+  "mapPinGuide": "지도를 움직여 핀을 정확한 배달 위치(건물·출입구)에 맞춰 주세요",
+  "mapPinChecking": "핀 위치를 확인하고 있어요",
+  "mapPinHere": "핀 위치: {address}",
+  "@mapPinHere": {
     "placeholders": {
-      "lat": {"type": "String"},
-      "lng": {"type": "String"}
+      "address": {"type": "String"}
     }
   },
+  "mapPinLookupFailed": "핀 위치의 주소를 확인하지 못했어요",
+  "mapConfirm": "이 위치로 할게요",
+  "mapUnavailable": "이 기기에서는 지도를 보여 줄 수 없어요. 주소 검색 위치로 저장해요",
   "draftAccountNotPurchasable": "지금은 이 계정으로 주문할 수 없어요. 고객센터로 문의해 주세요",
   "draftServiceabilityUnknown": "배송 가능 여부를 아직 확인하지 못했어요. 주소를 다시 확인해 주세요",
   "draftMfcChanged": "주소의 담당 센터가 바뀌었어요. 장바구니와 배송 방식을 다시 확인해 주세요",

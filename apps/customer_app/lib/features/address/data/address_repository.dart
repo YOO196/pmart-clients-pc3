@@ -138,6 +138,7 @@ api.AddressInput addressInputToContract(AddressDraft draft) => api.AddressInput(
   label: draft.label,
   roadAddress: draft.roadAddress,
   detailAddress: draft.detailAddress,
+  postalCode: draft.postalCode,
   receiverName: draft.receiverName,
   receiverPhone: draft.receiverPhone,
   entranceMethod: switch (draft.entranceMethod) {

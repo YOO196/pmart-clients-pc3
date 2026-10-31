@@ -29,7 +29,8 @@ void main() {
     await t.tap(find.byKey(const ValueKey('address-add')));
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('f-label')), '우리집');
-    await t.enterText(find.byKey(const ValueKey('f-road')), '서울 송파구 올림픽로 300');
+    await t.tap(find.byKey(const ValueKey('address-search')));
+    await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('f-detail')), '101동');
     await t.enterText(find.byKey(const ValueKey('f-name')), '김피마');
     await t.enterText(find.byKey(const ValueKey('f-phone')), '01000000000');
@@ -219,12 +220,13 @@ void main() {
   });
 
   testWidgets('새 주소 저장은 저장 결과와 배송 가능 판정을 따로 알린다', (t) async {
+    final picker = FakeAddressPicker(road: '제주 제주시 첨단로 1');
     // 입력 칸이 많아 화면을 키운다(목록 지연 생성으로 버튼이 안 만들어지지 않게).
     t.view
       ..physicalSize = const Size(800, 1800)
       ..devicePixelRatio = 1;
     addTearDown(t.view.reset);
-    await t.pumpWidget(testApp(const []));
+    await t.pumpWidget(testApp(const [], addressPicker: picker));
     await t.pumpAndSettle();
     await t.tap(find.text('마이').last);
     await t.pumpAndSettle();
@@ -243,7 +245,8 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('입력해 주세요'), findsWidgets);
 
-    await t.enterText(find.byKey(const ValueKey('f-road')), '제주 제주시 첨단로 1');
+    await t.tap(find.byKey(const ValueKey('address-search')));
+    await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('f-detail')), '1층');
     await t.enterText(find.byKey(const ValueKey('f-name')), '김피마');
     await t.enterText(find.byKey(const ValueKey('f-phone')), '010-0000-0000');

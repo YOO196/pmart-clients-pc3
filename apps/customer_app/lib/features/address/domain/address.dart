@@ -44,6 +44,7 @@ class AddressDraft {
     this.entranceMethod,
     this.entranceNote,
     this.geo,
+    this.postalCode,
   });
 
   final String? label;
@@ -58,14 +59,20 @@ class AddressDraft {
   /// 주소 검색이 붙기 전에는 개발 빌드의 시험 좌표로만 채운다(BR-29).
   final ({double lat, double lng})? geo;
 
+  /// 우편번호(주소 검색 결과).
+  final String? postalCode;
+
   @override
   String toString() => 'AddressDraft(…)';
 }
 
-/// 개발 빌드 전용 시험 좌표(백엔드 LAN 시험 권역, 2026-10-31 안내: 부산진구 서면역 부근 → SERVICEABLE).
-/// 실제 주소 검색(BR-29)이 붙으면 지운다.
-abstract final class DevTestGeo {
-  static const seomyeon = (lat: 35.1578, lng: 129.0597);
+/// 개발 빌드 전용 시험 주소. 카카오 지도가 안 되는 x86 에뮬레이터에서 시험할 때 쓴다.
+/// 판정은 도로명으로 하므로(ADR-0023) LAN 시험 권역(부산진구) 안의 실제 도로명주소다.
+/// 좌표는 서버 주소 변환 결과(2026-10-31 LAN 확인).
+abstract final class DevTestAddress {
+  static const roadAddress = '부산 부산진구 중앙대로 672';
+  static const postalCode = '47296';
+  static const geo = (lat: 35.1529, lng: 129.0596);
 }
 
 /// 계약 `AddressInput` maxLength. 화면 입력 상한으로만 쓴다(서버가 최종 검증).

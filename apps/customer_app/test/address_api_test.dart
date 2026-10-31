@@ -46,14 +46,14 @@ void main() {
     receiverPhone: '01000000000',
   );
 
-  test('시험 좌표를 넣으면 주소 추가 본문에 geo 가 실린다(BR-29 전 개발용)', () async {
+  test('지도 핀 좌표는 주소 추가 본문의 geo 로 실린다(배달 위치 참고, ADR-0023)', () async {
     final saved = await repo().add(
       const AddressDraft(
         roadAddress: '[시험] 부산 부산진구 서면역 부근',
         detailAddress: '1층',
         receiverName: '홍길동',
         receiverPhone: '01000000000',
-        geo: DevTestGeo.seomyeon,
+        geo: DevTestAddress.geo,
       ),
       key: IdempotencyKey('k-1'),
     );
@@ -61,7 +61,7 @@ void main() {
     final body = jsonDecode(
       adapter.requests.single.data as String,
     ) as Map<String, dynamic>;
-    expect(body['geo'], {'lat': 35.1578, 'lng': 129.0597});
+    expect(body['geo'], {'lat': 35.1529, 'lng': 129.0596});
     expect(saved.serviceability, Serviceability.serviceable);
     expect(saved.mfcId, 'MFC-SEED-01');
   });
