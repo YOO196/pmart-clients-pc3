@@ -1,8 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:pmart_api_delivery_capacity/pmart_api_delivery_capacity.dart'
     as cap;
-import 'package:pmart_api_delivery_serviceability/pmart_api_delivery_serviceability.dart'
-    as svc;
 import 'package:pmart_api_order/pmart_api_order.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
 
@@ -12,8 +10,9 @@ import '../domain/checkout.dart';
 
 /// 배송 방식·슬롯·주문 초안·결제 진입. 조회 실패는 [PmartFailure] 로 던진다.
 abstract interface class CheckoutRepository {
-  /// 센터가 제공하는 배송 방식(`GET /delivery-conditions`).
-  Future<List<DeliveryOption>> options(String mfcId);
+  /// 배송 방식별 가능 여부·사유·예상시간·배달팁·가장 빠른 슬롯(`GET /delivery-options`, BR-13).
+  /// [itemAmount] 는 서버 값(장바구니 selectedItemAmount)만 넘긴다. 주면 무료 사유를 적용한 배달팁도 온다.
+  Future<List<DeliveryOption>> options(String mfcId, {int? itemAmount});
 
   /// 날짜(Asia/Seoul `YYYY-MM-DD`)의 예약 슬롯.
   Future<List<Slot>> slots(String mfcId, String date);
@@ -38,22 +37,19 @@ abstract interface class CheckoutRepository {
 
 final class ApiCheckoutRepository implements CheckoutRepository {
   ApiCheckoutRepository(Dio dio)
-    : _conditions = svc.PmartApiDeliveryServiceability(dio: dio)
-          .getConditionsApi(),
-      _slots = cap.PmartApiDeliveryCapacity(dio: dio).getSlotsApi(),
+    : _slots = cap.PmartApiDeliveryCapacity(dio: dio).getSlotsApi(),
       _drafts = api.PmartApiOrder(dio: dio).getDraftsApi();
 
-  final svc.ConditionsApi _conditions;
   final cap.SlotsApi _slots;
   final api.DraftsApi _drafts;
 
   @override
-  Future<List<DeliveryOption>> options(String mfcId) async {
+  Future<List<DeliveryOption>> options(String mfcId, {int? itemAmount}) async {
     final res = await pmartGuard(
-      () => _conditions.getDeliveryConditions(mfcId: mfcId),
+      () => _drafts.getDeliveryOptions(mfcId: mfcId, itemAmount: itemAmount),
     );
     return optionsFromContract(
-      res.data ?? (throw const ContractViolationFailure('배송 조건 본문 없음')),
+      res.data ?? (throw const ContractViolationFailure('배송 방식 본문 없음')),
     );
   }
 
@@ -133,6 +129,11 @@ final class ApiCheckoutRepository implements CheckoutRepository {
 }
 
 CheckoutStart checkoutFailureToStart(PmartFailure f) => switch (f) {
+  // 501 UNSUPPORTED_ACTION 은 "아직 지원하지 않음"이 확정된 응답이다(결제 진입은 ⑥ 전까지 501).
+  // 변경 요청의 5xx 라도 결과 불명으로 두지 않는다.
+  UnknownResultFailure(:final problem)
+      when problem?.code == CheckoutProblemCode.unsupported =>
+    const CheckoutRejected(CheckoutProblemCode.unsupported),
   UnknownResultFailure() => const CheckoutUnknown(),
   ProblemFailure(:final problem)
       when problem.code == CheckoutProblemCode.reQuoteRequired =>
@@ -144,15 +145,73 @@ CheckoutStart checkoutFailureToStart(PmartFailure f) => switch (f) {
   _ => throw f,
 };
 
-List<DeliveryOption> optionsFromContract(svc.DeliveryConditions c) => [
-  for (final m
-      in c.deliveryModes ?? const <svc.DeliveryConditionsDeliveryModesEnum>[])
-    DeliveryOption(switch (m) {
-      svc.DeliveryConditionsDeliveryModesEnum.SINGLE => DeliveryMode.single,
-      svc.DeliveryConditionsDeliveryModesEnum.BUNDLED => DeliveryMode.bundled,
-      svc.DeliveryConditionsDeliveryModesEnum.SCHEDULED =>
-        DeliveryMode.scheduled,
-    }),
+List<DeliveryOption> optionsFromContract(api.DeliveryOptions c) => [
+  for (final o in c.options ?? const <api.DeliveryOption>[])
+    DeliveryOption(
+      switch (o.mode) {
+        api.DeliveryOptionModeEnum.SINGLE => DeliveryMode.single,
+        api.DeliveryOptionModeEnum.BUNDLED => DeliveryMode.bundled,
+        api.DeliveryOptionModeEnum.SCHEDULED => DeliveryMode.scheduled,
+      },
+      availability: switch (o.availability) {
+        api.DeliveryOptionAvailabilityEnum.AVAILABLE =>
+          OptionAvailability.available,
+        api.DeliveryOptionAvailabilityEnum.UNAVAILABLE =>
+          OptionAvailability.unavailable,
+        api.DeliveryOptionAvailabilityEnum.CONFIG_REQUIRED =>
+          OptionAvailability.configRequired,
+        api.DeliveryOptionAvailabilityEnum.UNKNOWN =>
+          OptionAvailability.unknown,
+      },
+      reason: switch (o.unavailableReason) {
+        null => null,
+        api.DeliveryOptionUnavailableReasonEnum.NIGHT_TIME =>
+          UnavailableReason.nightTime,
+        api.DeliveryOptionUnavailableReasonEnum.CENTER_CLOSED =>
+          UnavailableReason.centerClosed,
+        api.DeliveryOptionUnavailableReasonEnum.NO_SLOT =>
+          UnavailableReason.noSlot,
+        api.DeliveryOptionUnavailableReasonEnum.CONFIG_REQUIRED =>
+          UnavailableReason.configRequired,
+        api.DeliveryOptionUnavailableReasonEnum.LOOKUP_FAILED =>
+          UnavailableReason.lookupFailed,
+      },
+      eta: switch (o.eta) {
+        null => null,
+        final e when e.state == api.DeliveryOptionEtaStateEnum.VALUE =>
+          switch (e.value) {
+            final Map<String, dynamic> v => Eta(
+              minMinutes: (v['minMinutes'] as num?)?.toInt(),
+              maxMinutes: (v['maxMinutes'] as num?)?.toInt(),
+            ),
+            // 값 모양이 다르면 모르는 것으로(0분으로 만들지 않는다).
+            _ => null,
+          },
+        final e when e.state == api.DeliveryOptionEtaStateEnum.NOT_SET =>
+          const Eta.notSet(),
+        _ => null,
+      },
+      tip: switch (o.deliveryTip) {
+        null => null,
+        final t => OptionTip(
+          base: t.base_,
+          applied: t.applied,
+          reason: switch (t.reason) {
+            api.DeliveryOptionDeliveryTipReasonEnum.STANDARD =>
+              TipReason.standard,
+            api.DeliveryOptionDeliveryTipReasonEnum.OVER_30000 =>
+              TipReason.over30000,
+            api.DeliveryOptionDeliveryTipReasonEnum.FIRST_PURCHASE =>
+              TipReason.firstPurchase,
+            _ => TipReason.unknown,
+          },
+        ),
+      },
+      earliestSlot: switch (o.earliestSlot) {
+        final w? => ArrivalWindow(date: w.date, start: w.start, end: w.end),
+        null => null,
+      },
+    ),
 ];
 
 List<Slot> slotsFromContract(cap.ListSlots200Response r) => [
@@ -239,6 +298,18 @@ OrderDraft draftFromContract(api.OrderDraft d) {
       null => DraftNext.unknown,
     },
     quote: q?.quoteVersion == null ? null : quoteFromContract(q!),
+    blockers: [
+      for (final b in d.blockers ?? const <api.DraftBlocker>[])
+        switch (b.code) {
+          api.DraftBlockerCodeEnum.MIN_ORDER_AMOUNT =>
+            DraftBlocker.minOrderAmount,
+          api.DraftBlockerCodeEnum.DELIVERY_MODE_UNAVAILABLE =>
+            DraftBlocker.deliveryModeUnavailable,
+          api.DraftBlockerCodeEnum.SLOT_REQUIRED => DraftBlocker.slotRequired,
+          api.DraftBlockerCodeEnum.SLOT_UNAVAILABLE =>
+            DraftBlocker.slotUnavailable,
+        },
+    ],
     resources: r == null
         ? null
         : DraftResources(
@@ -275,4 +346,17 @@ Quote quoteFromContract(api.Quote q) => Quote(
   totalAmount: q.totalAmount,
   minOrderSatisfied: q.minOrderSatisfied,
   plannedShipments: q.plannedShipments,
+  minOrderAmount: q.minOrderAmount,
+  minOrderShortfall: q.minOrderShortfall,
+  deliveryTipBase: q.deliveryTipBase,
+  firstPurchase: switch (q.firstPurchaseBenefit) {
+    api.QuoteFirstPurchaseBenefitEnum.EXPECTED => FirstPurchaseBenefit.expected,
+    api.QuoteFirstPurchaseBenefitEnum.CHECKING_OTHER_ORDER =>
+      FirstPurchaseBenefit.checkingOtherOrder,
+    api.QuoteFirstPurchaseBenefitEnum.CONFIRMED =>
+      FirstPurchaseBenefit.confirmed,
+    api.QuoteFirstPurchaseBenefitEnum.NOT_ELIGIBLE =>
+      FirstPurchaseBenefit.notEligible,
+    _ => FirstPurchaseBenefit.unknown,
+  },
 );

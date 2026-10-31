@@ -1,7 +1,5 @@
 import 'package:pmart_api_delivery_capacity/pmart_api_delivery_capacity.dart'
     as cap;
-import 'package:pmart_api_delivery_serviceability/pmart_api_delivery_serviceability.dart'
-    as svc;
 import 'package:pmart_api_order/pmart_api_order.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
 
@@ -40,7 +38,7 @@ base class MockCheckoutRepository
   /// 초안 생성 뒤 몇 번 조회해야 자원 확보(nextAction=PAY)가 끝나는지.
   final int waitPolls;
 
-  /// BR-13 시연: 지금 안 되는 방식과 사유.
+  /// BR-13 시연: 지금 안 되는 방식과 사유 코드(계약 `unavailableReason`, 예: NIGHT_TIME).
   Map<DeliveryMode, String> unavailable = {};
 
   /// 첫 구매 무료 대상인지(서버 판정 흉내).
@@ -48,6 +46,9 @@ base class MockCheckoutRepository
 
   /// 다음 결제 진입을 가격 변경(RE_QUOTE_REQUIRED)으로 만든다.
   bool priceChangesOnCheckout = false;
+
+  /// 다음 초안 생성을 이 코드로 거절한다(422, MFC_CHANGED 는 409).
+  String? rejectNextDraft;
 
   /// 다음 초안 생성을 "만들어졌지만 응답 잃음"으로 만든다.
   bool loseNextDraftResponse = false;
@@ -60,25 +61,50 @@ base class MockCheckoutRepository
   Future<void> _wait() => Future<void>.delayed(latency);
 
   @override
-  Future<List<DeliveryOption>> options(String mfcId) async {
+  Future<List<DeliveryOption>> options(String mfcId, {int? itemAmount}) async {
     await _wait();
-    final base = optionsFromContract(
-      svc.DeliveryConditions.fromJson({
+    // 서버 규칙 흉내: 한집 4,000·알뜰/예약 3,000, 3만 원 이상·첫 구매 무료(상품액을 줬을 때만 적용액).
+    Map<String, Object?> option(DeliveryMode mode, String wire) {
+      final reason = unavailable[mode];
+      final base = mode == DeliveryMode.single ? 4000 : 3000;
+      final (applied, tipReason) = switch (itemAmount) {
+        null => (null, null),
+        final a when a >= 30000 => (0, 'OVER_30000'),
+        _ when firstPurchase => (0, 'FIRST_PURCHASE'),
+        _ => (base, 'STANDARD'),
+      };
+      final tomorrow = now().toUtc().add(const Duration(hours: 9 + 24));
+      final date =
+          '${tomorrow.year}-${tomorrow.month.toString().padLeft(2, '0')}-${tomorrow.day.toString().padLeft(2, '0')}';
+      return {
+        'mode': wire,
+        'availability': reason == null ? 'AVAILABLE' : 'UNAVAILABLE',
+        'unavailableReason': reason,
+        'eta': mode == DeliveryMode.scheduled
+            ? {'state': 'NOT_SET'}
+            : {
+                'state': 'VALUE',
+                'value': mode == DeliveryMode.single
+                    ? {'minMinutes': 30, 'maxMinutes': 60}
+                    : {'minMinutes': 60, 'maxMinutes': 120},
+              },
+        'deliveryTip': {'base': base, 'applied': applied, 'reason': tipReason},
+        if (mode == DeliveryMode.scheduled)
+          'earliestSlot': {'date': date, 'start': '09:00', 'end': '10:00'},
+      };
+    }
+
+    return optionsFromContract(
+      api.DeliveryOptions.fromJson({
         'mfcId': mfcId,
-        'policyVersion': 1,
-        'deliveryModes': ['SINGLE', 'BUNDLED', 'SCHEDULED'],
-        'timeRestriction': {
-          'state': 'WINDOW',
-          'start': '00:00',
-          'end': '08:00',
-        },
+        'evaluatedAt': now().toUtc().toIso8601String(),
+        'options': [
+          option(DeliveryMode.single, 'SINGLE'),
+          option(DeliveryMode.bundled, 'BUNDLED'),
+          option(DeliveryMode.scheduled, 'SCHEDULED'),
+        ],
       }),
     );
-    // BR-13: 계약에는 방식별 가능 여부가 없다. 목에서만 사유를 붙인다.
-    return [
-      for (final o in base)
-        DeliveryOption(o.mode, unavailableReason: unavailable[o.mode]),
-    ];
   }
 
   @override
@@ -147,6 +173,7 @@ base class MockCheckoutRepository
         : firstPurchase
         ? (0, 'FIRST_PURCHASE')
         : (r.mode == DeliveryMode.single ? 4000 : 3000, 'STANDARD');
+    const minOrder = 15000;
     return {
       'quoteVersion': version,
       'quoteExpiresAt': created
@@ -159,7 +186,11 @@ base class MockCheckoutRepository
       'deliveryTipReason': reason,
       'bagFee': 100,
       'totalAmount': items + tip + 100,
-      'minOrderSatisfied': items >= 15000,
+      'minOrderSatisfied': items >= minOrder,
+      'minOrderAmount': minOrder,
+      'minOrderShortfall': items >= minOrder ? 0 : minOrder - items,
+      'deliveryTipBase': r.mode == DeliveryMode.single ? 4000 : 3000,
+      'firstPurchaseBenefit': firstPurchase ? 'EXPECTED' : 'NOT_ELIGIBLE',
       'weightG': 3000,
       'plannedShipments': 1,
     };
@@ -176,6 +207,15 @@ base class MockCheckoutRepository
     await _wait();
     final existing = _byKey[key.value];
     if (existing != null) return _out(drafts[existing]!);
+    if (rejectNextDraft case final code?) {
+      rejectNextDraft = null;
+      throw ProblemFailure(
+        Problem(
+          status: code == CheckoutProblemCode.mfcChanged ? 409 : 422,
+          code: code,
+        ),
+      );
+    }
     final id = 'draft-${++_seq}';
     final created = now();
     final d = MockDraft(
@@ -186,6 +226,12 @@ base class MockCheckoutRepository
         'status': 'RESOURCE_PENDING',
         'mfcId': request.expectedMfcId,
         'quote': _quote(request, 1, created),
+        'createdAt': created.toUtc().toIso8601String(),
+        // 최소주문 미달은 거절이 아니라 막는 사유로 준다(계약 DraftBlocker).
+        'blockers': [
+          if (_quote(request, 1, created)['minOrderSatisfied'] != true)
+            {'code': 'MIN_ORDER_AMOUNT'},
+        ],
         'resources': {
           'inventoryReservation': 'NOT_REQUESTED',
           'capacityHold': 'NOT_REQUESTED',
@@ -247,8 +293,11 @@ base class MockCheckoutRepository
     }
     final quote = d.json['quote']! as Map<String, Object?>;
     final expires = DateTime.parse(quote['quoteExpiresAt']! as String);
+    // 견적 10분이 지나면 서버는 status=EXPIRED·nextAction=RE_QUOTE 로 알린다(⑤ 안내 §3).
     if (!now().isBefore(expires) && d.json['nextAction'] == 'PAY') {
-      d.json['nextAction'] = 'RE_QUOTE';
+      d.json
+        ..['status'] = 'EXPIRED'
+        ..['nextAction'] = 'RE_QUOTE';
     }
     if (approvesWithoutReturn && d.json['status'] == 'PAYMENT_PENDING') {
       approvesWithoutReturn = false;

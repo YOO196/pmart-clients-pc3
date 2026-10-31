@@ -85,6 +85,10 @@ class CheckoutSetupController extends Notifier<CheckoutSetup> {
     state = state.copyWith(purchaseIntentId: IdempotencyKey.generate().value);
   }
 
+  /// 만료된 초안을 다시 만들 때 새 주문 의도를 연다(같은 의도로 보내면 만료 초안이 돌아온다).
+  void renewIntent() =>
+      state = state.copyWith(purchaseIntentId: IdempotencyKey.generate().value);
+
   void setMode(DeliveryMode mode) => state = state.copyWith(
     mode: mode,
     window: mode == DeliveryMode.scheduled ? null : () => null,
@@ -113,7 +117,13 @@ final deliveryOptionsProvider =
           Problem(status: 422, code: 'OUT_OF_SERVICE_AREA'),
         );
       }
-      return ref.watch(checkoutRepositoryProvider).options(mfcId);
+      // 배달팁 적용액은 서버 상품액(장바구니 selectedItemAmount)으로만 묻는다. 모르면 기본 팁만 받는다.
+      final itemAmount = ref.watch(
+        cartControllerProvider.select((c) => c.value?.cart.selectedItemAmount),
+      );
+      return ref
+          .watch(checkoutRepositoryProvider)
+          .options(mfcId, itemAmount: itemAmount);
     });
 
 /// 날짜(서울 `YYYY-MM-DD`)별 슬롯. 실패하면 자동 재시도하지 않는다("다시 조회").
@@ -163,9 +173,10 @@ class DraftState {
 
   bool get needsReconsent => previousQuote != null;
 
-  /// 결제 버튼을 열어도 되는지. 서버가 PAY 를 줬고, 최소주문을 채웠고, 재동의가 끝났을 때만.
+  /// 결제 버튼을 열어도 되는지. 서버가 PAY 를 줬고, 막는 사유가 없고, 최소주문을 채웠고, 재동의가 끝났을 때만.
   bool get canPay =>
       draft.next == DraftNext.pay &&
+      draft.blockers.isEmpty &&
       draft.quote?.minOrderSatisfied == true &&
       agreedQuote != null &&
       !needsReconsent &&
@@ -212,8 +223,12 @@ enum CheckoutGate {
   /// 주문서로 간다(그 밖의 오류·대기는 주문서 화면이 보여 준다).
   proceed,
 
-  /// 서버가 최소 주문금액 미달이라고 했다(초안 거절 MIN_ORDER_AMOUNT 또는 견적 minOrderSatisfied=false).
+  /// 서버가 최소 주문금액 미달이라고 했다(초안 blockers 의 MIN_ORDER_AMOUNT 또는 견적 minOrderSatisfied=false).
+  /// 부족액은 초안 견적의 minOrderShortfall 로 안내한다.
   minOrderUnmet,
+
+  /// 서버가 초안을 거절했다(계정·권역·상품·가격·센터 변경 등). 사유는 [DraftController] 의 오류로 본다.
+  rejected,
 }
 
 final draftControllerProvider =
@@ -277,7 +292,7 @@ class DraftController extends AsyncNotifier<DraftState?> {
     if (current != null &&
         current.setupRevision == setup.revision &&
         current.cartVersion == cartVersion &&
-        current.draft.next != DraftNext.expired) {
+        !current.draft.expired) {
       await refresh();
       return;
     }
@@ -307,12 +322,17 @@ class DraftController extends AsyncNotifier<DraftState?> {
   Future<CheckoutGate> prepare() async {
     await enter();
     return switch (state) {
+      // 예전 계약(422 거절)도 같은 뜻으로 받는다.
       AsyncError(error: ProblemFailure(:final problem))
           when problem.code == CheckoutProblemCode.minOrderAmount =>
         CheckoutGate.minOrderUnmet,
       AsyncData(value: final DraftState s)
-          when s.draft.quote?.minOrderSatisfied == false =>
+          when s.draft.blockers.contains(DraftBlocker.minOrderAmount) ||
+              s.draft.quote?.minOrderSatisfied == false =>
         CheckoutGate.minOrderUnmet,
+      AsyncError(error: ProblemFailure(:final problem))
+          when CheckoutProblemCode.draftRejections.contains(problem.code) =>
+        CheckoutGate.rejected,
       _ => CheckoutGate.proceed,
     };
   }
@@ -418,8 +438,11 @@ class DraftController extends AsyncNotifier<DraftState?> {
     return start;
   }
 
-  /// 주문서를 새로 만든다(유효시간 만료 뒤 등). 주문 의도는 유지한다.
+  /// 주문서를 새로 만든다. 만료된 초안이면 새 주문 의도로(⑤ 안내 §3), 그 밖(조회 오류 재시도)은 같은 의도로.
   Future<void> recreate() async {
+    if (_current?.draft.expired ?? false) {
+      ref.read(checkoutSetupProvider.notifier).renewIntent();
+    }
     state = const AsyncData(null);
     await enter();
   }

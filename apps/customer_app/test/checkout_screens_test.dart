@@ -61,7 +61,8 @@ void main() {
     expect(find.text('주문서'), findsNothing);
     expect(find.text('배송 방식 선택'), findsOneWidget);
     expect(find.byKey(const ValueKey('delivery-min-order')), findsOneWidget);
-    expect(find.text('최소 주문금액을 채우지 못했어요. 상품을 더 담아 주세요'), findsOneWidget);
+    // 부족액은 서버 값(minOrderShortfall). 목 서버: 15,000 − 7,940.
+    expect(find.text('7,060원 더 담으면 주문할 수 있어요'), findsOneWidget);
 
     await t.tap(find.text('장바구니 보기'));
     await t.pumpAndSettle();
@@ -92,6 +93,15 @@ void main() {
       ),
     );
     expect(pay.onPressed, isNull);
+    // 결제 버튼에는 서버가 준 첫 막는 사유가 보인다. 부족액은 서버 값.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('pay')),
+        matching: find.text('최소 주문금액 미달'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('7,060원 더 담으면 주문할 수 있어요'), findsOneWidget);
   });
 
   testWidgets('예약은 고를 수 있는 슬롯만 열리고 마감·미설정은 막힌다', (t) async {
@@ -120,11 +130,11 @@ void main() {
     expect(t.widget<FilledButton>(next).onPressed, isNotNull);
   });
 
-  testWidgets('BR-13 목: 지금 안 되는 방식은 사유와 함께 막힌다', (t) async {
+  testWidgets('BR-13: 지금 안 되는 방식은 서버 사유와 함께 막힌다', (t) async {
     final checkout = MockCheckoutRepository(
       latency: Duration.zero,
       now: () => now,
-    )..unavailable = {DeliveryMode.single: '지금은 한집배달을 할 수 없어요'};
+    )..unavailable = {DeliveryMode.single: 'NIGHT_TIME'};
     await t.pumpWidget(app(checkout));
     await toDelivery(t);
 
@@ -132,6 +142,31 @@ void main() {
       find.byKey(const ValueKey('mode-single')),
     );
     expect(tile.enabled, isFalse);
-    expect(find.text('지금은 한집배달을 할 수 없어요'), findsOneWidget);
+    expect(find.text('심야(00~08시)에는 바로 배달이 없어요. 예약으로 받아 주세요'), findsOneWidget);
+  });
+
+  testWidgets('초안이 409 MFC_CHANGED 로 거절되면 주문서로 가지 않고 사유와 장바구니로 가는 길을 보인다', (
+    t,
+  ) async {
+    final checkout = MockCheckoutRepository(
+      latency: Duration.zero,
+      now: () => now,
+    )..rejectNextDraft = CheckoutProblemCode.mfcChanged;
+    await t.pumpWidget(app(checkout));
+    await toDelivery(t);
+    await t.tap(find.byKey(const ValueKey('mode-single')));
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('delivery-next')));
+    await t.pumpAndSettle();
+
+    expect(find.text('주문서'), findsNothing);
+    expect(find.byKey(const ValueKey('delivery-rejected')), findsOneWidget);
+    expect(
+      find.text('주소의 담당 센터가 바뀌었어요. 장바구니와 배송 방식을 다시 확인해 주세요'),
+      findsOneWidget,
+    );
+    await t.tap(find.text('장바구니 보기'));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cart-order')), findsOneWidget);
   });
 }

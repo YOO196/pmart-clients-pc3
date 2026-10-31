@@ -11,6 +11,7 @@ import '../../address/presentation/address_controller.dart';
 import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../domain/checkout.dart';
 import 'checkout_controller.dart';
+import 'order_sheet_screen.dart' show draftRejection;
 
 String modeLabel(AppLocalizations l10n, DeliveryMode m) => switch (m) {
   DeliveryMode.single => l10n.modeSingle,
@@ -23,6 +24,42 @@ String windowText(ArrivalWindow w) => formatSeoulWindow(
   DateTime.parse('${w.date}T${w.start}:00+09:00'),
   DateTime.parse('${w.date}T${w.end}:00+09:00'),
 );
+
+/// 방식 한 줄 설명: 불가면 사유, 가능하면 방식 설명 + 예상시간·배달팁·가장 빠른 시간(서버 값만).
+String optionSubtitle(AppLocalizations l10n, DeliveryOption o) {
+  if (!o.available) {
+    return switch (o.availability) {
+      OptionAvailability.unknown => l10n.optionUnknown,
+      OptionAvailability.configRequired => l10n.optionConfigRequired,
+      _ => switch (o.reason) {
+        UnavailableReason.nightTime => l10n.optionNightTime,
+        UnavailableReason.centerClosed => l10n.optionCenterClosed,
+        UnavailableReason.noSlot => l10n.optionNoSlot,
+        UnavailableReason.configRequired => l10n.optionConfigRequired,
+        // 조회 실패를 "배달 불가"로 보이지 않는다.
+        UnavailableReason.lookupFailed => l10n.optionLookupFailed,
+        UnavailableReason.unknown || null => l10n.optionUnavailable,
+      },
+    };
+  }
+  final eta = o.eta;
+  final tip = o.tip?.applied ?? o.tip?.base;
+  return [
+    switch (o.mode) {
+      DeliveryMode.single => l10n.modeSingleNote,
+      DeliveryMode.bundled => l10n.modeBundledNote,
+      DeliveryMode.scheduled => l10n.modeScheduledNote,
+    },
+    // ETA 미설정(NOT_SET)은 표시하지 않는다(0분·"곧"으로 그리지 않음, ⑤ 안내 §1).
+    if (eta != null && !eta.notSet)
+      switch ((eta.minMinutes, eta.maxMinutes)) {
+        (final int a, final int b) => l10n.optionEta(a, b),
+        _ => null,
+      },
+    if (tip != null) l10n.optionTip(formatKrw(tip)),
+    if (o.earliestSlot case final w?) l10n.optionEarliestSlot(windowText(w)),
+  ].nonNulls.join(' · ');
+}
 
 String seoulDate(DateTime instant) =>
     DateFormat('yyyy-MM-dd').format(toSeoulWallClock(instant));
@@ -100,15 +137,50 @@ class _DeliveryBodyState extends ConsumerState<_DeliveryBody> {
     switch (gate) {
       case CheckoutGate.proceed:
         await context.push('/checkout');
+      case CheckoutGate.rejected:
+        final l10n = AppLocalizations.of(context);
+        final rejection = draftRejection(
+          l10n,
+          ref.read(draftControllerProvider).error,
+        );
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              key: const ValueKey('delivery-rejected'),
+              content: Text(rejection?.text ?? l10n.checkoutRejected),
+              action: switch (rejection) {
+                (
+                  route: final String route,
+                  action: final String label,
+                  text: _,
+                ) =>
+                  SnackBarAction(
+                    label: label,
+                    onPressed: () => context.go(route),
+                  ),
+                _ => null,
+              },
+            ),
+          );
       case CheckoutGate.minOrderUnmet:
         final l10n = AppLocalizations.of(context);
+        final shortfall = ref
+            .read(draftControllerProvider)
+            .value
+            ?.draft
+            .quote
+            ?.minOrderShortfall;
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
             SnackBar(
               key: const ValueKey('delivery-min-order'),
-              // BR-14: 부족액은 계약에 없어 금액 없이 안내한다(앱에서 계산하지 않는다).
-              content: Text(l10n.minOrderUnsatisfied),
+              // BR-14: 부족액은 서버 값(minOrderShortfall)만 쓴다. 없으면 금액 없이 안내한다.
+              content: Text(switch (shortfall) {
+                final int n when n > 0 => l10n.minOrderShortfall(formatKrw(n)),
+                _ => l10n.minOrderUnsatisfied,
+              }),
               action: SnackBarAction(
                 label: l10n.cartGoToCart,
                 onPressed: () => context.go('/cart'),
@@ -157,15 +229,7 @@ class _DeliveryBodyState extends ConsumerState<_DeliveryBody> {
                           value: o.mode,
                           enabled: o.available,
                           title: Text(modeLabel(l10n, o.mode)),
-                          subtitle: Text(
-                            o.unavailableReason ??
-                                switch (o.mode) {
-                                  DeliveryMode.single => l10n.modeSingleNote,
-                                  DeliveryMode.bundled => l10n.modeBundledNote,
-                                  DeliveryMode.scheduled =>
-                                    l10n.modeScheduledNote,
-                                },
-                          ),
+                          subtitle: Text(optionSubtitle(l10n, o)),
                         ),
                     ],
                   ),

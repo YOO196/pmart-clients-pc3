@@ -5,17 +5,61 @@ import '../../../shared/order_status.dart';
 /// 한집(SINGLE) / 알뜰(BUNDLED) / 예약(SCHEDULED). 이름은 잠정("한집/알뜰/예약" 유지).
 enum DeliveryMode { single, bundled, scheduled }
 
-/// 배송 방식 선택지. [unavailableReason] 은 계약에 없어서 목에서만 채운다(BR-13).
+/// 배송 방식 가능 여부(`GET /delivery-options`, BR-13). 조회 실패(unknown)를 불가로 보이지 않는다.
+enum OptionAvailability { available, unavailable, configRequired, unknown }
+
+/// 불가 사유. NIGHT_TIME = 00:00~08:00 실제 배송 없음(예약만).
+enum UnavailableReason {
+  nightTime,
+  centerClosed,
+  noSlot,
+  configRequired,
+  lookupFailed,
+  unknown,
+}
+
+/// 예상 소요시간(정책값). [notSet] 이면 "미설정"으로 보이고 0분으로 바꾸지 않는다.
+@immutable
+class Eta {
+  const Eta({this.minMinutes, this.maxMinutes, this.notSet = false});
+
+  const Eta.notSet() : minMinutes = null, maxMinutes = null, notSet = true;
+
+  final int? minMinutes;
+  final int? maxMinutes;
+  final bool notSet;
+}
+
+/// 배달팁 안내. [applied] 는 상품액을 줬을 때만 있다(최종 금액은 주문 초안에서 확정).
+@immutable
+class OptionTip {
+  const OptionTip({this.base, this.applied, this.reason = TipReason.unknown});
+
+  final int? base;
+  final int? applied;
+  final TipReason reason;
+}
+
+/// 배송 방식 선택지. 값은 서버 판정을 그대로 옮긴다.
 @immutable
 class DeliveryOption {
-  const DeliveryOption(this.mode, {this.unavailableReason});
+  const DeliveryOption(
+    this.mode, {
+    this.availability = OptionAvailability.available,
+    this.reason,
+    this.eta,
+    this.tip,
+    this.earliestSlot,
+  });
 
   final DeliveryMode mode;
+  final OptionAvailability availability;
+  final UnavailableReason? reason;
+  final Eta? eta;
+  final OptionTip? tip;
+  final ArrivalWindow? earliestSlot;
 
-  /// BR-13: 지금 이 방식이 안 되는 이유(심야·휴무 등). 실서버에서는 아직 항상 null.
-  final String? unavailableReason;
-
-  bool get available => unavailableReason == null;
+  bool get available => availability == OptionAvailability.available;
 }
 
 /// 도착 구간. 날짜는 Asia/Seoul `YYYY-MM-DD`, 시각은 `HH:mm`.
@@ -83,6 +127,10 @@ class Quote {
     this.totalAmount,
     this.minOrderSatisfied,
     this.plannedShipments,
+    this.minOrderAmount,
+    this.minOrderShortfall,
+    this.deliveryTipBase,
+    this.firstPurchase = FirstPurchaseBenefit.unknown,
   });
 
   final int version;
@@ -95,11 +143,39 @@ class Quote {
   final int? bagFee;
   final int? totalAmount;
 
-  /// 최소 주문금액 충족 여부(서버 판정). 모르면 null. 부족액은 계약에 없다(BR-14).
+  /// 최소 주문금액 충족 여부(서버 판정). 모르면 null.
   final bool? minOrderSatisfied;
 
   /// 2 이상이면 분할배송(10,000g 초과).
   final int? plannedShipments;
+
+  /// 최소 주문 상품액(배달팁·봉투값 제외). 서버 값.
+  final int? minOrderAmount;
+
+  /// "N원 더 담기" 부족액(BR-14). 서버 값만 쓰고 앱이 빼기 계산하지 않는다.
+  final int? minOrderShortfall;
+
+  /// 무료 사유 적용 전 방식별 배달팁.
+  final int? deliveryTipBase;
+  final FirstPurchaseBenefit firstPurchase;
+}
+
+/// 첫 구매 무료배달 상태. 초안 단계는 EXPECTED 까지(확정은 결제 진입 때 서버가 한다).
+enum FirstPurchaseBenefit {
+  expected,
+  checkingOtherOrder,
+  confirmed,
+  notEligible,
+  unknown,
+}
+
+/// 결제 진입을 막는 사유(초안 `blockers`). 모두 보여 주고, 주버튼에는 서버가 준 순서의 첫 사유.
+enum DraftBlocker {
+  minOrderAmount,
+  deliveryModeUnavailable,
+  slotRequired,
+  slotUnavailable,
+  unknown,
 }
 
 enum HoldState { notNeeded, held, failed, released, unknown, other }
@@ -145,6 +221,7 @@ class OrderDraft {
     this.quote,
     this.resources,
     this.orderId,
+    this.blockers = const [],
   });
 
   final String draftId;
@@ -156,6 +233,14 @@ class OrderDraft {
 
   /// 확정 시에만 있다. 이것과 확정 상태가 있어야 "주문 완료"다.
   final String? orderId;
+
+  /// 결제 진입을 막는 사유(서버 순서). 최소주문 미달·방식 불가·슬롯 문제는 422 가 아니라 여기로 온다.
+  final List<DraftBlocker> blockers;
+
+  /// 견적 유효시간(10분)이 지난 초안. 서버는 status=EXPIRED·nextAction=RE_QUOTE 로 알린다(⑤ 안내 §3).
+  /// 새 주문 의도(purchaseIntentId)로 다시 만든다.
+  bool get expired =>
+      next == DraftNext.expired || status == OrderStatus.expired;
 
   /// 가격 동결·재고 예약 중 더 이른 만료(안내용). 앱 타이머로 확보를 풀지 않는다.
   DateTime? get earliestExpiry {
@@ -244,4 +329,25 @@ abstract final class CheckoutProblemCode {
   static const minOrderAmount = 'MIN_ORDER_AMOUNT';
   static const outOfServiceArea = 'OUT_OF_SERVICE_AREA';
   static const weightUnsplittable = 'WEIGHT_UNSPLITTABLE';
+  static const unsupported = 'UNSUPPORTED_ACTION';
+  static const accountNotPurchasable = 'ACCOUNT_NOT_PURCHASABLE';
+  static const serviceabilityUnknown = 'SERVICEABILITY_UNKNOWN';
+  static const skuNotSaleable = 'SKU_NOT_SALEABLE';
+  static const quantityLimitExceeded = 'QUANTITY_LIMIT_EXCEEDED';
+  static const priceNotSet = 'PRICE_NOT_SET';
+  static const configRequired = 'CONFIG_REQUIRED';
+  static const mfcChanged = 'MFC_CHANGED';
+
+  /// 초안 생성 거절(422·409 MFC_CHANGED). 같은 조건으로 다시 보내도 안 되므로 주문서로 넘어가지 않는다.
+  static const draftRejections = {
+    accountNotPurchasable,
+    outOfServiceArea,
+    serviceabilityUnknown,
+    skuNotSaleable,
+    quantityLimitExceeded,
+    priceNotSet,
+    weightUnsplittable,
+    configRequired,
+    mfcChanged,
+  };
 }

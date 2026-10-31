@@ -98,6 +98,29 @@ void main() {
     expect(s.draft.resources!.inventory, HoldState.held);
   });
 
+  test(
+    '견적 10분이 지나 서버가 EXPIRED·RE_QUOTE 를 주면 만료로 보고, 다시 만들 때 새 주문 의도를 쓴다',
+    () async {
+      await fillCartTo(5);
+      await draft().enter();
+      final firstIntent = c.read(checkoutSetupProvider).purchaseIntentId;
+      final firstDraft = state().draft.draftId;
+
+      now = now.add(const Duration(minutes: 11));
+      await draft().refresh();
+      expect(state().draft.expired, isTrue);
+      expect(state().canPay, isFalse);
+
+      await draft().recreate();
+      expect(
+        c.read(checkoutSetupProvider).purchaseIntentId,
+        isNot(firstIntent),
+      );
+      expect(state().draft.draftId, isNot(firstDraft));
+      expect(state().draft.expired, isFalse);
+    },
+  );
+
   test('3만 원 이상이면 배달팁 0원과 사유는 서버가 준다', () async {
     await fillCartTo(10); // 29,800 + 1,980 = 31,780
 

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pmart_core/pmart_core.dart' show ProblemFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
@@ -25,6 +26,78 @@ String tipReasonText(AppLocalizations l10n, TipReason r) => switch (r) {
   TipReason.none => l10n.tipNone,
   TipReason.unknown => l10n.tipUnknown,
 };
+
+String blockerText(AppLocalizations l10n, DraftBlocker b) => switch (b) {
+  DraftBlocker.minOrderAmount => l10n.blockerMinOrder,
+  DraftBlocker.deliveryModeUnavailable => l10n.blockerModeUnavailable,
+  DraftBlocker.slotRequired => l10n.blockerSlotRequired,
+  DraftBlocker.slotUnavailable => l10n.blockerSlotUnavailable,
+  DraftBlocker.unknown => l10n.blockerUnknown,
+};
+
+/// 최소주문 미달 안내. 부족액은 서버 값(minOrderShortfall)만 쓴다(BR-14).
+String minOrderText(AppLocalizations l10n, Quote? q) =>
+    switch (q?.minOrderShortfall) {
+      final int n when n > 0 => l10n.minOrderShortfall(formatKrw(n)),
+      _ => l10n.minOrderUnsatisfied,
+    };
+
+/// 초안 생성 거절(422·409) 사유와 고객이 갈 곳. 모르는 코드는 null(일반 오류 화면).
+({String text, String? route, String? action})? draftRejection(
+  AppLocalizations l10n,
+  Object? error,
+) {
+  if (error is! ProblemFailure) return null;
+  return switch (error.problem.code) {
+    CheckoutProblemCode.accountNotPurchasable => (
+      text: l10n.draftAccountNotPurchasable,
+      route: null,
+      action: null,
+    ),
+    CheckoutProblemCode.outOfServiceArea => (
+      text: l10n.addressNotServiceable,
+      route: '/addresses',
+      action: l10n.goAddresses,
+    ),
+    // 판정 불명은 배송 불가가 아니다.
+    CheckoutProblemCode.serviceabilityUnknown => (
+      text: l10n.draftServiceabilityUnknown,
+      route: '/addresses',
+      action: l10n.goAddresses,
+    ),
+    CheckoutProblemCode.mfcChanged => (
+      text: l10n.draftMfcChanged,
+      route: '/cart',
+      action: l10n.cartGoToCart,
+    ),
+    CheckoutProblemCode.skuNotSaleable => (
+      text: l10n.draftSkuNotSaleable,
+      route: '/cart',
+      action: l10n.cartGoToCart,
+    ),
+    CheckoutProblemCode.quantityLimitExceeded => (
+      text: l10n.draftQuantityLimit,
+      route: '/cart',
+      action: l10n.cartGoToCart,
+    ),
+    CheckoutProblemCode.priceNotSet => (
+      text: l10n.draftPriceNotSet,
+      route: '/cart',
+      action: l10n.cartGoToCart,
+    ),
+    CheckoutProblemCode.weightUnsplittable => (
+      text: l10n.draftWeightUnsplittable,
+      route: '/cart',
+      action: l10n.cartGoToCart,
+    ),
+    CheckoutProblemCode.configRequired => (
+      text: l10n.draftConfigRequired,
+      route: null,
+      action: null,
+    ),
+    _ => null,
+  };
+}
 
 String _left(Duration d) {
   final s = d.inSeconds.clamp(0, 359999);
@@ -73,10 +146,38 @@ class _OrderSheetScreenState extends ConsumerState<OrderSheetScreen> {
       AsyncError(error: final CheckoutBlocked b) => b.reason,
       _ => null,
     };
+    final rejection = switch (value) {
+      AsyncError(:final error) => draftRejection(l10n, error),
+      _ => null,
+    };
     return Scaffold(
       appBar: AppBar(title: Text(l10n.checkoutTitle)),
       body: blocked != null
           ? Center(child: Text(blockedText(l10n, blocked)))
+          : rejection != null
+          ? Center(
+              key: const ValueKey('draft-rejected'),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(rejection.text, textAlign: TextAlign.center),
+                    if (rejection case (
+                      route: final String route,
+                      action: final String action,
+                      text: _,
+                    )) ...[
+                      const SizedBox(height: 12),
+                      FilledButton(
+                        onPressed: () => context.go(route),
+                        child: Text(action),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            )
           : switch (value) {
               AsyncData(value: null) => const Center(
                 child: CircularProgressIndicator(),
@@ -120,7 +221,7 @@ class _Sheet extends ConsumerWidget {
             child: Text(l10n.checkoutCheckAgain),
           ),
         ),
-      if (draft.next == DraftNext.expired)
+      if (draft.expired)
         _Banner(
           key: const ValueKey('draft-expired'),
           icon: Icons.timer_off_outlined,
@@ -130,13 +231,29 @@ class _Sheet extends ConsumerWidget {
             child: Text(l10n.draftRecreate),
           ),
         ),
-      if (draft.quote?.minOrderSatisfied == false)
+      if (draft.quote?.minOrderSatisfied == false ||
+          draft.blockers.contains(DraftBlocker.minOrderAmount))
         _Banner(
           key: const ValueKey('min-order'),
           icon: Icons.info_outline,
-          // BR-14: 부족액은 계약에 없어서 금액 없이 안내한다(앱에서 계산하지 않는다).
-          text: l10n.minOrderUnsatisfied,
+          text: minOrderText(l10n, draft.quote),
+          action: TextButton(
+            onPressed: () => context.go('/cart'),
+            child: Text(l10n.cartGoToCart),
+          ),
         ),
+      // 최소주문 밖의 막는 사유도 모두 보인다(서버 순서).
+      for (final b in draft.blockers)
+        if (b != DraftBlocker.minOrderAmount)
+          _Banner(
+            key: ValueKey('blocker-${b.name}'),
+            icon: Icons.block,
+            text: blockerText(l10n, b),
+            action: TextButton(
+              onPressed: () => context.push('/checkout/delivery'),
+              child: Text(l10n.checkoutChange),
+            ),
+          ),
       if (state.checkoutUnknown)
         _Banner(
           key: const ValueKey('checkout-unknown'),
@@ -153,11 +270,13 @@ class _Sheet extends ConsumerWidget {
           icon: Icons.payment,
           text: l10n.checkoutAccepted,
         ),
-      if (state.lastStart is CheckoutRejected)
+      if (state.lastStart case CheckoutRejected(:final code))
         _Banner(
           key: const ValueKey('checkout-rejected'),
           icon: Icons.error_outline,
-          text: l10n.checkoutRejected,
+          text: code == CheckoutProblemCode.unsupported
+              ? l10n.checkoutNotYetSupported
+              : l10n.checkoutRejected,
         ),
       if (state.needsReconsent) _ReQuoteCard(state: state),
     ];
@@ -233,6 +352,16 @@ class _Sheet extends ConsumerWidget {
                     '${l10n.amountTip} (${tipReasonText(l10n, quote?.tipReason ?? TipReason.unknown)})',
                     _money(l10n, quote?.deliveryTip),
                   ),
+                  if (quote?.firstPurchase case final f
+                      when f == FirstPurchaseBenefit.expected ||
+                          f == FirstPurchaseBenefit.checkingOtherOrder)
+                    Text(
+                      f == FirstPurchaseBenefit.expected
+                          ? l10n.firstPurchaseExpected
+                          : l10n.firstPurchaseChecking,
+                      key: const ValueKey('first-purchase'),
+                      style: theme.textTheme.bodySmall,
+                    ),
                   _AmountRow(l10n.amountBag, _money(l10n, quote?.bagFee)),
                   const Divider(),
                   _AmountRow(
@@ -271,9 +400,14 @@ class _Sheet extends ConsumerWidget {
               child: CommandButton(
                 key: const ValueKey('pay'),
                 busy: state.paying,
-                label: switch (quote?.totalAmount) {
-                  final int t => l10n.payButton(formatKrw(t)),
-                  null => l10n.payButtonNoAmount,
+                // 막는 사유가 있으면 주버튼에 첫 사유를 쓴다(DraftBlocker 설명의 순서).
+                label: switch ((
+                  draft.blockers.firstOrNull,
+                  quote?.totalAmount,
+                )) {
+                  (final DraftBlocker b, _) => blockerText(l10n, b),
+                  (null, final int t) => l10n.payButton(formatKrw(t)),
+                  (null, null) => l10n.payButtonNoAmount,
                 },
                 onPressed: state.canPay
                     ? () async {
