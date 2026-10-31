@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../domain/auth.dart';
@@ -8,6 +9,12 @@ import 'auth_repository.dart';
 const googleServerClientId = String.fromEnvironment(
   'PMART_GOOGLE_SERVER_CLIENT_ID',
   defaultValue: '293585219605-p6akml03k4lpi01agvgah41g2imo1aes.apps.googleusercontent.com',
+);
+
+/// [시험 전용] 서버 인가 코드(authorizeServer) 실기기 시험. 기본 꺼짐, 출시 빌드에서는 켜도 동작하지 않는다.
+/// `--dart-define=PMART_GOOGLE_SERVER_AUTH_TEST=true` 로 켠다. ADR-0025 결정 뒤 지운다.
+const googleServerAuthCodeTest = bool.fromEnvironment(
+  'PMART_GOOGLE_SERVER_AUTH_TEST',
 );
 
 /// Google 설정 오류(Android OAuth 클라이언트 미등록·패키지 이름/SHA-1 불일치 = DEVELOPER_ERROR 등).
@@ -47,6 +54,9 @@ final class GoogleSocialTokenSource implements SocialTokenSource {
         serverClientId: serverClientId,
       ));
       final account = await _signIn.authenticate();
+      if (googleServerAuthCodeTest && !kReleaseMode) {
+        await _probeServerAuthCode(account);
+      }
       final idToken = account.authentication.idToken;
       // serverClientId 가 맞으면 ID 토큰이 온다. 없으면 설정 문제다.
       if (idToken == null || idToken.isEmpty) {
@@ -55,6 +65,26 @@ final class GoogleSocialTokenSource implements SocialTokenSource {
       return SocialCredential(idToken, accountLabel: account.email);
     } on GoogleSignInException catch (e) {
       return googleSignInFailure(e.code);
+    }
+  }
+
+  /// [시험 전용] 서버 인가 코드가 나오는지 확인한다(백엔드 handoff 2026-10-31 서버 인가 코드 시험, ADR-0025 초안).
+  /// 코드 값은 남기지 않고 null 여부·길이만 찍는다. 서버에는 보내지 않는다.
+  /// GoogleSignInServerAuthorization.toString 은 코드를 찍으므로 그 객체를 문자열로 바꾸지 않는다.
+  /// 결과와 상관없이 로그인은 지금처럼 ID 토큰으로 계속한다.
+  Future<void> _probeServerAuthCode(GoogleSignInAccount account) async {
+    try {
+      final server = await account.authorizationClient
+          .authorizeServer(const ['openid', 'email', 'profile']);
+      final code = server?.serverAuthCode;
+      debugPrint(
+        '[server-auth-test] serverAuthCode='
+        '${code == null ? 'null' : 'present(length=${code.length})'}',
+      );
+    } on GoogleSignInException catch (e) {
+      debugPrint('[server-auth-test] exception code=${e.code.name}');
+    } catch (e) {
+      debugPrint('[server-auth-test] unexpected ${e.runtimeType}');
     }
   }
 
