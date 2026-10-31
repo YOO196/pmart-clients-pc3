@@ -38,6 +38,7 @@
 | BR-28 | 높음 | 고객 | 비회원 둘러보기: `/categories/tree`·`/product-contents/**`·`/prices/**` 가 공개 경로가 아니고 비회원 장바구니 식별 방법 없음 | **RESOLVED**(2026-10-30): 둘러보기 공개(백엔드 `clients-notice-public-browse-and-test-data`), 비회원 장바구니 = 게스트 토큰(ADR-0022, `clients-notice-cart-and-guest-token`). 고객앱 비회원 토큰 반영됨 |
 | BR-29 | 높음 | 고객 | 주소 좌표(`AddressInput.geo`)의 출처: 앱에 주소 검색(좌표 제공)이 없어 회원 주소 판정이 늘 UNKNOWN | 결정됨(2026-10-31): 우편번호 검색 + 서버 좌표 변환(BR-30) + 카카오 지도 핀 조정. BR-30 회신 대기 |
 | BR-30 | 높음 | 고객 | 주소 → 좌표 변환 API(카카오 로컬, REST 키는 서버). 지도 핀 조정 전 시작 좌표 | OPEN(요청 `docs/handoff/2026-10-31-backend-address-geocoding.md`) |
+| BR-31 | 중간 | 백오피스 | 상품 목록 `GET /products` 에 검색어(상품명·ID) 파라미터가 없음. 콘텐츠 등록의 상품 고르기가 불러온 쪽 안에서만 찾는다 | OPEN |
 
 ---
 
@@ -219,3 +220,8 @@
 - 요청: `docs/handoff/2026-10-31-backend-address-geocoding.md`. 도로명주소 → 좌표 후보(필수), 좌표 → 주소(선택).
 - 이유: 카카오 로컬 API 는 REST API 키(비밀)가 필요하므로 앱이 직접 부르지 않는다. 키는 사용자가 백엔드 `deploy/lan/.secrets/backend.env` 에 넣어 두었다.
 - 클라이언트 원칙: 결과 0건과 조회 실패(카카오 장애·사용량 소진)를 구분해 표시한다. 주소 원문을 로그에 남기지 않는다.
+
+## BR-31 상품 목록 검색어 (백오피스)
+- 현황: `GET /products` 는 categoryId·saleState·size(최대 200)·cursor 만 받는다. 관리용 명칭이나 ID 로 찾는 파라미터가 없다.
+- 백오피스 임시: 콘텐츠 등록의 "승인된 상품" 드롭다운이 200개씩 불러와 그 안에서 거른다. 다 불러오지 않았으면 "없음"이라 하지 않고 "더 불러오기"를 보인다.
+- 요청: `GET /products?q=` (관리용 명칭 부분 일치, productId·baseProductId 일치). 상품 수가 늘면 필요하다.

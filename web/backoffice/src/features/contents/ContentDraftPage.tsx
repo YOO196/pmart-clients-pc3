@@ -16,6 +16,7 @@ import { useCommand } from '../../shared/useCommand';
 import { RequestApproval } from '../approvals/RequestApproval';
 import { multipart } from '../products/ProductImportPage';
 import { AuthedImage } from './AuthedImage';
+import { ProductPicker } from './ProductPicker';
 
 function ContentForm({
   initial,
@@ -71,7 +72,7 @@ function ContentForm({
         });
       }}
     >
-      {field('productId', m.contents.productId)}
+      <ProductPicker label={m.contents.productId} value={v.productId} onChange={(productId) => setV({ ...v, productId })} />
       {field('name', m.contents.name)}
       {field('description', m.contents.description, true)}
       {field('notices', m.contents.notices, true)}
