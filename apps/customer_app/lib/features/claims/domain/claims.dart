@@ -112,4 +112,30 @@ abstract final class ClaimProblemCode {
   static const quantityExceedsAvailable = 'QUANTITY_EXCEEDS_AVAILABLE';
   static const duplicateClaim = 'DUPLICATE_CLAIM';
   static const invalidState = 'INVALID_STATE';
+  static const partialCancelNotAllowed = 'PARTIAL_CANCEL_NOT_ALLOWED';
+  static const unsupportedAction = 'UNSUPPORTED_ACTION';
+
+  /// 앱 내부 표시: 서버가 501(미구현)로 답했다. 서버 code 가 아니다.
+  static const notImplemented = 'CLIENT_NOT_IMPLEMENTED';
 }
+
+/// 고객 취소는 주문 전체만(백엔드 handoff 2026-10-31 주문 취소 §2, OMS 8.4).
+/// 모든 행 × 서버가 준 미이행 수량. 미이행 0 인 행은 뺀다.
+/// 미이행 수량을 모르는 행이 있으면 null — 전체 취소 본문을 만들 수 없다(추측해 채우지 않는다).
+List<CancelLine>? wholeOrderCancelLines(
+  Iterable<({String orderLineId, int? unfulfilledQty})> lines,
+) {
+  final out = <CancelLine>[];
+  for (final l in lines) {
+    final q = l.unfulfilledQty;
+    if (q == null) return null;
+    if (q > 0) out.add(CancelLine(orderLineId: l.orderLineId, qty: q));
+  }
+  return out;
+}
+
+/// 더 바뀌지 않는 클레임 상태. 이 상태가 되면 진행 조회를 멈춘다.
+bool isClaimSettled(ClaimState s) =>
+    s == ClaimState.closed ||
+    s == ClaimState.rejected ||
+    s == ClaimState.withdrawn;

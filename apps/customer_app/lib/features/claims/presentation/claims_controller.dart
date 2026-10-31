@@ -32,14 +32,17 @@ final claimProvider = FutureProvider.autoDispose.family<ClaimView, String>(
   (ref, claimId) => ref.watch(claimsRepositoryProvider).get(claimId),
 );
 
-/// 품목별로 취소를 고를 수 있는 수량(안내용 상한). 실제 가능 수량은 서버가 판정한다.
-int cancellableHint(OrderLineView l) {
-  final n =
-      (l.originalQty ?? 0) -
-      (l.cancelledBeforeShipQty ?? 0) -
-      (l.handedOverQty ?? 0);
-  return n < 0 ? 0 : n;
-}
+/// 클레임 화면이 끝 상태(CLOSED·REJECTED·WITHDRAWN)가 될 때까지 다시 조회하는 간격.
+/// 백엔드: 보통 몇 초 안에 IN_PROGRESS → CLOSED(handoff 2026-10-31 주문 취소 §4).
+final claimRefreshIntervalProvider = Provider<Duration>(
+  (_) => const Duration(seconds: 3),
+);
+
+/// 주문 전체 취소 본문(모든 행 × 서버 미이행 수량). 모르는 행이 있으면 null.
+List<CancelLine>? cancelLinesOf(OrderDetail order) => wholeOrderCancelLines([
+  for (final l in order.lines)
+    (orderLineId: l.orderLineId, unfulfilledQty: l.unfulfilledQty),
+]);
 
 @immutable
 sealed class CommandOutcome<T> {
@@ -63,7 +66,10 @@ final class CommandUnknown<T> extends CommandOutcome<T> {
   const CommandUnknown();
 }
 
-/// 취소 접수. 같은 키·같은 본문 재전송은 기존 클레임을 돌려준다.
+/// 취소 접수. 한 번 누르면 한 번만 보낸다(자동 재전송 없음 — 백엔드 handoff 2026-10-31 주문 취소 §3).
+/// - 결과를 모르면(5xx·타임아웃) 다시 보내지 않고 내 클레임 조회로 접수 여부를 확인한다.
+/// - 그래도 모르면 키를 보관한다. 사용자가 "다시 확인"을 누를 때만 같은 키로 다시 보낸다(새 취소가 아니다).
+/// - 501(미구현)·4xx 는 거절로 끝낸다(재시도 안 함).
 class CancelRequester {
   CancelRequester(this._repo);
 
@@ -75,24 +81,28 @@ class CancelRequester {
     List<CancelLine> lines,
     CancelReason reason,
   ) async {
-    // 결과를 모르는 직전 시도가 있으면 같은 키로 다시 보낸다(새 취소가 아니다).
     final key = _key ??= IdempotencyKey.generate();
-    for (var i = 0; i < 3; i++) {
-      try {
-        final claim = await _repo.requestCancel(
-          orderId,
-          lines,
-          reason,
-          key: key,
-        );
+    try {
+      final claim = await _repo.requestCancel(orderId, lines, reason, key: key);
+      _key = null;
+      return CommandDone(claim);
+    } on UnknownResultFailure catch (f) {
+      if ((f.problem?.status ?? f.httpStatus) == 501) {
         _key = null;
-        return CommandDone(claim);
-      } on UnknownResultFailure {
-        continue;
-      } on ProblemFailure catch (f) {
-        _key = null;
-        return CommandRejected(f.problem.code);
+        return const CommandRejected(ClaimProblemCode.notImplemented);
       }
+    } on ProblemFailure catch (f) {
+      _key = null;
+      return CommandRejected(f.problem.code);
+    }
+    try {
+      final found = await _repo.findActiveCancel(orderId);
+      if (found != null) {
+        _key = null;
+        return CommandDone(found);
+      }
+    } on PmartFailure {
+      // 조회도 실패했다. 접수 여부를 모르는 채로 둔다.
     }
     return const CommandUnknown();
   }

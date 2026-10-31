@@ -76,6 +76,7 @@ base class MockOrdersRepository implements OrdersRepository {
           'handedOverQty': 0,
           'cancelledBeforeShipQty': 0,
           'deliveredQty': 0,
+          'unfulfilledQty': 3,
         },
       ],
       'shipments': [
@@ -273,7 +274,7 @@ base class MockOrdersRepository implements OrdersRepository {
           'deliveredQty': 0,
           'cancelledBeforeShipQty': 0,
           'returnedQty': 0,
-          'unfulfilledQty': 0,
+          'unfulfilledQty': l.quantity,
         },
     ];
     return {

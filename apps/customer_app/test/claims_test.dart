@@ -23,16 +23,109 @@ void main() {
     claims = MockClaimsRepository(orders: orders, latency: Duration.zero);
   });
 
-  Future<ClaimView> cancelSeed4(int qty) async {
-    final outcome = await CancelRequester(claims).submit('order-seed-4', [
-      CancelLine(orderLineId: 'ol-5', qty: qty),
-    ], CancelReason.changeOfMind);
+  // order-seed-4: ol-5 미이행 3개. 고객 취소는 주문 전체만.
+  const seed4All = [CancelLine(orderLineId: 'ol-5', qty: 3)];
+
+  Future<ClaimView> cancelSeed4() async {
+    final outcome = await CancelRequester(claims)
+        .submit('order-seed-4', seed4All, CancelReason.changeOfMind);
     return (outcome as CommandDone<ClaimView>).value;
   }
 
+  group('주문 전체 취소 본문', () {
+    test('모든 행 × 서버 미이행 수량, 미이행 0 인 행은 뺀다', () {
+      final lines = wholeOrderCancelLines([
+        (orderLineId: 'a', unfulfilledQty: 2),
+        (orderLineId: 'b', unfulfilledQty: 0),
+        (orderLineId: 'c', unfulfilledQty: 1),
+      ])!;
+      expect(
+        [for (final l in lines) (l.orderLineId, l.qty)],
+        [('a', 2), ('c', 1)],
+      );
+    });
+
+    test('미이행 수량을 모르는 행이 있으면 본문을 만들지 않는다', () {
+      expect(
+        wholeOrderCancelLines([
+          (orderLineId: 'a', unfulfilledQty: 2),
+          (orderLineId: 'b', unfulfilledQty: null),
+        ]),
+        isNull,
+      );
+    });
+  });
+
   group('취소 요청', () {
+    test('일부만 보내면 서버가 PARTIAL_CANCEL_NOT_ALLOWED 로 거절한다', () async {
+      final outcome = await CancelRequester(claims).submit('order-seed-4', [
+        const CancelLine(orderLineId: 'ol-5', qty: 1),
+      ], CancelReason.changeOfMind);
+      expect(
+        (outcome as CommandRejected<ClaimView>).code,
+        ClaimProblemCode.partialCancelNotAllowed,
+      );
+      expect(claims.claims, isEmpty);
+    });
+
+    test('501 은 한 번만 보내고 "준비 중" 거절로 끝낸다', () async {
+      final repo = _ScriptedClaims(orders: orders)
+        ..failures.add(
+          const UnknownResultFailure(
+            problem: Problem(status: 501, code: 'NOT_IMPLEMENTED'),
+          ),
+        );
+      final outcome = await CancelRequester(repo)
+          .submit('order-seed-4', seed4All, CancelReason.changeOfMind);
+      expect(
+        (outcome as CommandRejected<ClaimView>).code,
+        ClaimProblemCode.notImplemented,
+      );
+      expect(repo.sent, 1);
+    });
+
+    test('4xx 는 다시 보내지 않는다', () async {
+      final repo = _ScriptedClaims(orders: orders)
+        ..failures.add(
+          const ProblemFailure(
+            Problem(status: 422, code: ClaimProblemCode.duplicateClaim),
+          ),
+        );
+      final requester = CancelRequester(repo);
+      final outcome = await requester.submit(
+        'order-seed-4',
+        seed4All,
+        CancelReason.changeOfMind,
+      );
+      expect(outcome, isA<CommandRejected<ClaimView>>());
+      expect(repo.sent, 1);
+    });
+
+    test('결과를 모르면 다시 보내지 않고, 사용자가 다시 누를 때 같은 키로 보낸다', () async {
+      final repo = _ScriptedClaims(orders: orders)
+        ..failures.add(const UnknownResultFailure(httpStatus: 504));
+      final requester = CancelRequester(repo);
+
+      final first = await requester.submit(
+        'order-seed-4',
+        seed4All,
+        CancelReason.changeOfMind,
+      );
+      expect(first, isA<CommandUnknown<ClaimView>>());
+      expect(repo.sent, 1, reason: '자동 재전송 없음');
+
+      final second = await requester.submit(
+        'order-seed-4',
+        seed4All,
+        CancelReason.changeOfMind,
+      );
+      expect(second, isA<CommandDone<ClaimView>>());
+      expect(repo.sent, 2);
+      expect(repo.keys.toSet(), hasLength(1), reason: '같은 키');
+    });
+
     test('접수는 완료가 아니고, 조회하며 출고 중지 → 환불 진행 → 종결로 간다', () async {
-      final claim = await cancelSeed4(3);
+      final claim = await cancelSeed4();
       expect(claim.state, ClaimState.opened);
       expect(claim.refunds, isEmpty);
 
@@ -47,12 +140,13 @@ void main() {
       expect(orders.orderJson('order-seed-4')!['status'], 'CANCELLED');
     });
 
-    test('접수 응답을 잃으면 같은 키로 다시 보내 클레임을 하나만 만든다', () async {
+    test('접수 응답을 잃으면 다시 보내지 않고 내 클레임 조회로 접수를 확인한다', () async {
       claims.loseNextCreateResponse = true;
 
-      await cancelSeed4(1);
+      final claim = await cancelSeed4();
 
       expect(claims.claims, hasLength(1));
+      expect(claim.claimId, claims.claims.keys.single);
     });
 
     test('배송이 시작된 주문은 서버가 취소를 받지 않는다', () async {
@@ -69,7 +163,7 @@ void main() {
 
     test('철회는 확인 중을 거쳐 서버가 확정한다', () async {
       claims.holdAtOpened = true;
-      final claim = await cancelSeed4(1);
+      final claim = await cancelSeed4();
       final key = IdempotencyKey.generate();
 
       await claims.withdraw(
@@ -183,19 +277,54 @@ void main() {
       await t.tap(find.byKey(const ValueKey('cancel-order')));
       await t.pumpAndSettle();
 
-      final submit = find.byKey(const ValueKey('cancel-submit'));
-      FilledButton button() => t.widget<FilledButton>(
-        find.descendant(of: submit, matching: find.byType(FilledButton)),
+      // 수량 선택 없이 주문 전체(서버 미이행 수량)를 보인다.
+      expect(find.text('주문 전체가 취소돼요. 일부 상품만 취소할 수는 없어요'), findsOneWidget);
+      expect(find.byKey(const ValueKey('cancel-inc-ol-5')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('cancel-line-ol-5')),
+          matching: find.text('3개'),
+        ),
+        findsOneWidget,
       );
-      expect(button().onPressed, isNull, reason: '수량을 고르기 전');
-      await t.tap(find.byKey(const ValueKey('cancel-inc-ol-5')));
-      await t.pump();
-      await t.tap(submit);
+      await t.tap(find.byKey(const ValueKey('cancel-submit')));
       await t.pumpAndSettle();
 
       expect(find.text('요청을 접수했어요'), findsOneWidget);
       expect(find.textContaining('접수는 취소 완료가 아니에요'), findsOneWidget);
       expect(find.text('환불 완료'), findsNothing);
+      expect(claims.claims.values.single['lines'], [
+        containsPair('requestedQty', 3),
+      ]);
+    });
+
+    testWidgets('처리 내역은 스스로 다시 조회하고, PG 환불 성공 뒤에만 "환불 완료"', (t) async {
+      await openOrder(t, 'order-seed-4');
+      await t.tap(find.byKey(const ValueKey('cancel-order')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cancel-submit')));
+      await t.pumpAndSettle();
+      expect(find.text('요청을 접수했어요'), findsOneWidget);
+
+      Future<void> next() async {
+        await t.pump(const Duration(seconds: 3));
+        await t.pumpAndSettle();
+      }
+
+      await next();
+      expect(find.text('출고 중지를 확인하고 있어요'), findsOneWidget);
+      await next();
+      expect(find.text('취소·환불을 진행하고 있어요'), findsOneWidget);
+      expect(find.text('환불 진행 중'), findsOneWidget);
+      expect(find.text('환불 완료'), findsNothing);
+      await next();
+      expect(find.text('처리가 끝났어요'), findsOneWidget);
+      expect(find.text('환불 완료'), findsOneWidget);
+
+      // 끝 상태가 되면 더 조회하지 않는다.
+      final calls = claims.getCalls;
+      await next();
+      expect(claims.getCalls, calls);
     });
 
     testWidgets('도착 시간 변경은 확인 중 → 확정 뒤에만 바뀐 시간으로 보인다', (t) async {
@@ -219,4 +348,26 @@ void main() {
       );
     });
   });
+}
+
+/// 접수 응답을 차례로 실패시키는 목. 보낸 횟수·키를 센다.
+final class _ScriptedClaims extends MockClaimsRepository {
+  _ScriptedClaims({super.orders}) : super(latency: Duration.zero);
+
+  final failures = <PmartFailure>[];
+  final keys = <String>[];
+  int get sent => keys.length;
+
+  @override
+  Future<ClaimView> requestCancel(
+    String orderId,
+    List<CancelLine> lines,
+    CancelReason reason, {
+    String? detail,
+    required IdempotencyKey key,
+  }) async {
+    keys.add(key.value);
+    if (failures.isNotEmpty) throw failures.removeAt(0);
+    return super.requestCancel(orderId, lines, reason, key: key);
+  }
 }

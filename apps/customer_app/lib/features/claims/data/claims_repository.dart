@@ -18,6 +18,10 @@ abstract interface class ClaimsRepository {
 
   Future<ClaimView> get(String claimId);
 
+  /// 접수 결과를 모를 때의 짝 조회: 이 주문의 살아 있는 취소 클레임(철회·거절 제외, 최근 것).
+  /// `GET /claims?orderId=&type=CANCEL`. 없으면 null.
+  Future<ClaimView?> findActiveCancel(String orderId);
+
   /// `POST /claims/{id}/withdrawals`(202). 결과는 [withdrawal] 로 조회한다.
   Future<void> withdraw(
     String claimId, {
@@ -76,6 +80,27 @@ final class ApiClaimsRepository implements ClaimsRepository {
     return claimFromContract(
       res.data ?? (throw const ContractViolationFailure('Claim 본문 없음')),
     );
+  }
+
+  @override
+  Future<ClaimView?> findActiveCancel(String orderId) async {
+    final res = await pmartGuard(
+      () => _claims.listClaims(orderId: orderId, type: api.ClaimType.CANCEL),
+    );
+    final items =
+        res.data?.items ??
+        (throw const ContractViolationFailure('ClaimList 본문 없음'));
+    // 서버는 최근 순으로 준다(handoff 2026-10-31 §6).
+    for (final s in items) {
+      final id = s.claimId;
+      if (id == null || s.orderId != orderId) continue;
+      if (s.state == api.ClaimState.WITHDRAWN ||
+          s.state == api.ClaimState.REJECTED) {
+        continue;
+      }
+      return get(id);
+    }
+    return null;
   }
 
   @override

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -30,10 +32,19 @@ String cancelRejectText(AppLocalizations l10n, String code) => switch (code) {
   'ORDER_NOT_CANCELLABLE' || 'NOT_CANCELLABLE' => l10n.cancelNotCancellable,
   'QUANTITY_EXCEEDS_AVAILABLE' => l10n.cancelQtyExceeded,
   'DUPLICATE_CLAIM' => l10n.cancelDuplicate,
+  ClaimProblemCode.partialCancelNotAllowed => l10n.cancelPartialNotAllowed,
+  ClaimProblemCode.unsupportedAction ||
+  ClaimProblemCode.notImplemented => l10n.cancelUnsupported,
   _ => l10n.checkoutRejected,
 };
 
-/// SCR-CANCEL-001. "취소 요청" 버튼은 접수일 뿐 취소 완료가 아니다.
+/// 이 거절은 주문 상태가 바뀌었다는 뜻이라 주문 상세를 다시 불러온다(handoff 2026-10-31 §3).
+bool _refreshOrderOn(String code) =>
+    code == 'ORDER_NOT_CANCELLABLE' ||
+    code == 'QUANTITY_EXCEEDS_AVAILABLE' ||
+    code == ClaimProblemCode.partialCancelNotAllowed;
+
+/// SCR-CANCEL-001. 주문 전체 취소만(부분 취소 없음). 버튼은 접수일 뿐 취소 완료가 아니다.
 class CancelScreen extends ConsumerStatefulWidget {
   const CancelScreen({super.key, required this.orderId});
 
@@ -44,17 +55,12 @@ class CancelScreen extends ConsumerStatefulWidget {
 }
 
 class _CancelScreenState extends ConsumerState<CancelScreen> {
-  final _qty = <String, int>{};
   CancelReason _reason = CancelReason.changeOfMind;
   String? _message;
   bool _unknown = false;
 
-  Future<void> _submit(OrderDetail order) async {
+  Future<void> _submit(OrderDetail order, List<CancelLine> lines) async {
     final l10n = AppLocalizations.of(context);
-    final lines = [
-      for (final e in _qty.entries)
-        if (e.value > 0) CancelLine(orderLineId: e.key, qty: e.value),
-    ];
     final outcome = await ref
         .read(cancelRequesterProvider(widget.orderId))
         .submit(order.orderId, lines, _reason);
@@ -68,6 +74,9 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
           _unknown = false;
           _message = cancelRejectText(l10n, code);
         });
+        if (_refreshOrderOn(code)) {
+          ref.invalidate(orderDetailProvider(widget.orderId));
+        }
       case CommandUnknown():
         setState(() {
           _unknown = true;
@@ -86,53 +95,26 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
         state: uiStateOf(ref.watch(provider)),
         onRetry: () => ref.invalidate(provider),
         ready: (context, order) {
-          final any = _qty.values.any((q) => q > 0);
+          final lines = cancelLinesOf(order);
+          final qtyByLine = {
+            for (final c in lines ?? const <CancelLine>[]) c.orderLineId: c.qty,
+          };
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(l10n.cancelPickItems),
+              Text(switch (lines) {
+                null => l10n.cancelQtyUnavailable,
+                [] => l10n.cancelNothingLeft,
+                _ => l10n.cancelWholeOrderNote,
+              }, key: const ValueKey('cancel-scope')),
               for (final l in order.lines)
-                Builder(
-                  builder: (context) {
-                    final max = cancellableHint(l);
-                    final q = _qty[l.orderLineId] ?? 0;
-                    return ListTile(
-                      key: ValueKey('cancel-line-${l.orderLineId}'),
-                      contentPadding: EdgeInsets.zero,
-                      enabled: max > 0,
-                      title: Text(l.productName ?? l.sku),
-                      subtitle: Text(
-                        max > 0
-                            ? l10n.cancelUpTo(max)
-                            : l10n.cancelLineUnavailable,
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            key: ValueKey('cancel-dec-${l.orderLineId}'),
-                            onPressed: q > 0
-                                ? () => setState(
-                                    () => _qty[l.orderLineId] = q - 1,
-                                  )
-                                : null,
-                            icon: const Icon(Icons.remove),
-                          ),
-                          Text('$q'),
-                          IconButton(
-                            key: ValueKey('cancel-inc-${l.orderLineId}'),
-                            onPressed: q < max
-                                ? () => setState(
-                                    () => _qty[l.orderLineId] = q + 1,
-                                  )
-                                : null,
-                            icon: const Icon(Icons.add),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                if (qtyByLine[l.orderLineId] case final q?)
+                  ListTile(
+                    key: ValueKey('cancel-line-${l.orderLineId}'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(l.productName ?? l.sku),
+                    trailing: Text(l10n.cancelLineQty(q)),
+                  ),
               const SizedBox(height: 12),
               Text(l10n.cancelReason),
               RadioGroup<CancelReason>(
@@ -173,7 +155,10 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
                 key: const ValueKey('cancel-submit'),
                 // 결과를 모르면 같은 키로 다시 확인한다(새 취소 요청이 아니다).
                 label: _unknown ? l10n.checkoutCheckAgain : l10n.cancelSubmit,
-                onPressed: any ? () => _submit(order) : null,
+                onPressed: switch (lines) {
+                  final l? when l.isNotEmpty => () => _submit(order, l),
+                  _ => null,
+                },
               ),
             ],
           );
@@ -196,11 +181,32 @@ class ClaimScreen extends ConsumerStatefulWidget {
 class _ClaimScreenState extends ConsumerState<ClaimScreen> {
   RequestState? _withdrawal;
   bool _withdrawing = false;
+  Timer? _refresh;
+
+  @override
+  void dispose() {
+    _refresh?.cancel();
+    super.dispose();
+  }
+
+  /// 끝 상태가 될 때까지 잠깐씩 다시 조회한다. 조회 실패면 멈추고 화면의 다시 시도에 맡긴다.
+  void _scheduleRefresh(ClaimView? claim) {
+    _refresh?.cancel();
+    _refresh = null;
+    if (claim == null || isClaimSettled(claim.state)) return;
+    _refresh = Timer(ref.read(claimRefreshIntervalProvider), () {
+      if (mounted) ref.invalidate(claimProvider(widget.claimId));
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final provider = claimProvider(widget.claimId);
+    ref.listen(provider, (_, next) {
+      if (next.isLoading) return;
+      _scheduleRefresh(next.hasError ? null : next.value);
+    });
     return Scaffold(
       appBar: AppBar(title: Text(l10n.claimTitle)),
       body: UiStateView<ClaimView>(
@@ -244,13 +250,13 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
                   leading: Icon(
                     r.done ? Icons.check_circle_outline : Icons.hourglass_top,
                   ),
-                  title: Text(
-                    r.done
-                        ? l10n.refundDone
-                        : r.state == RefundState.failed
-                        ? l10n.refundFailed
-                        : l10n.refundInProgress,
-                  ),
+                  title: Text(switch (r) {
+                    _ when r.done => l10n.refundDone,
+                    RefundView(state: RefundState.failed) => l10n.refundFailed,
+                    RefundView(state: RefundState.unknown) =>
+                      l10n.refundChecking,
+                    _ => l10n.refundInProgress,
+                  }),
                   trailing: Text(switch (r.amount) {
                     final int a => formatKrw(a),
                     null => l10n.amountUnavailable,

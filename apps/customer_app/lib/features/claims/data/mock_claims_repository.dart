@@ -27,6 +27,9 @@ base class MockClaimsRepository implements ClaimsRepository {
   /// 접수 뒤 자동 진행을 멈춘다(철회 시연).
   bool holdAtOpened = false;
 
+  /// 클레임 상세 조회 횟수(시험용: 끝 상태 뒤 조회가 멈추는지).
+  int getCalls = 0;
+
   Future<void> _wait() => Future<void>.delayed(latency);
 
   ClaimView _out(Map<String, Object?> json) =>
@@ -51,6 +54,22 @@ base class MockClaimsRepository implements ClaimsRepository {
         status == 'CANCELLED') {
       throw const ProblemFailure(
         Problem(status: 422, code: ClaimProblemCode.orderNotCancellable),
+      );
+    }
+    // 서버처럼 주문 전체(모든 행 × 미이행 수량)만 받는다.
+    final unfulfilled = {
+      for (final l
+          in (order?['lines'] as List? ?? const [])
+              .cast<Map<String, Object?>>())
+        if ((l['unfulfilledQty'] as int? ?? 0) > 0)
+          l['orderLineId']: l['unfulfilledQty'] as int,
+    };
+    final requested = {for (final l in lines) l.orderLineId: l.qty};
+    if (order != null &&
+        (requested.length != unfulfilled.length ||
+            unfulfilled.entries.any((e) => requested[e.key] != e.value))) {
+      throw const ProblemFailure(
+        Problem(status: 422, code: ClaimProblemCode.partialCancelNotAllowed),
       );
     }
     final id = 'claim-${++_seq}';
@@ -129,6 +148,16 @@ base class MockClaimsRepository implements ClaimsRepository {
           orders!.overrides[orderId] = {
             ...order,
             'status': 'CANCELLED',
+            'lines': [
+              for (final l
+                  in (order['lines'] as List? ?? const [])
+                      .cast<Map<String, Object?>>())
+                {
+                  ...l,
+                  'unfulfilledQty': 0,
+                  'cancelledBeforeShipQty': l['originalQty'],
+                },
+            ],
             'payment': {'state': 'REFUNDED', 'refundedAmount': amount},
           };
         }
@@ -148,6 +177,7 @@ base class MockClaimsRepository implements ClaimsRepository {
   @override
   Future<ClaimView> get(String claimId) async {
     await _wait();
+    getCalls++;
     final c = claims[claimId];
     if (c == null) {
       throw const ProblemFailure(
@@ -157,6 +187,20 @@ base class MockClaimsRepository implements ClaimsRepository {
     final view = _out(c);
     _advance(c);
     return view;
+  }
+
+  @override
+  Future<ClaimView?> findActiveCancel(String orderId) async {
+    await _wait();
+    final c = claims.values.lastWhere(
+      (c) =>
+          c['orderId'] == orderId &&
+          c['type'] == 'CANCEL' &&
+          c['state'] != 'WITHDRAWN' &&
+          c['state'] != 'REJECTED',
+      orElse: () => const {},
+    );
+    return c.isEmpty ? null : _out(c);
   }
 
   @override
