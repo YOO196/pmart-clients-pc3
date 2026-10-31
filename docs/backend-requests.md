@@ -41,6 +41,8 @@
 | BR-31 | 중간 | 백오피스 | 상품 목록 `GET /products` 에 검색어(상품명·ID) 파라미터가 없음. 콘텐츠 등록의 상품 고르기가 불러온 쪽 안에서만 찾는다 | OPEN |
 | BR-32 | 높음 | 고객 | 휴대폰 번호 저장(`POST /me/profile-changes`)이 501. 배송지 받는 분·연락처 자동 채움에 쓸 본인 연락처(가리지 않은 값)·기본 수령정보가 없음 | OPEN(요청 `docs/handoff/2026-10-31-backend-customer-profile-and-refunds.md`) |
 | BR-33 | 중간 | 고객 | 내 취소·반품·환불 목록 경로가 없음(클레임 단건 환불 조회만) | OPEN(같은 요청서 §3) |
+| BR-34 | 높음 | 고객 | 주문서형 결제위젯: 결제 진입 전에 토스 clientKey(·customerKey)를 받을 경로가 없음(지금은 PAY 이후에만) | OPEN(요청 `docs/handoff/2026-10-31-backend-checkout-widget-and-product-names.md`) |
+| BR-35 | 높음 | 고객 | 주문·초안 품목 `productName`(주문 당시 사본)이 비어 와서 주문 내역에 SKU 가 보임 | OPEN(같은 요청서 §2) |
 
 ---
 
