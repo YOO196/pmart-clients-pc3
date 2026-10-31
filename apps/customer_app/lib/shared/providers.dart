@@ -119,3 +119,19 @@ TokenRefresher authRefresher({
     }
   };
 }
+
+/// 서버가 주는 이미지 주소는 게이트웨이 상대 경로다(`/api/v1/content-images/{imageId}`, 계약 Image.url).
+/// 실서버는 게이트웨이 출처(scheme://host:port)를 붙인다. 목은 완전한 주소를 쓰므로 null.
+final imageOriginProvider = Provider<String?>(
+  (ref) => ref.watch(envProvider) == PmartEnv.mock
+      ? null
+      : Uri.parse(ref.watch(apiBaseUrlProvider)).origin,
+);
+
+/// 이미지 주소를 그릴 수 있는 완전한 주소로 바꾼다. 출처를 모르는 상대 경로는 null(자리표시).
+String? resolveImageUrl(String? url, String? origin) {
+  if (url == null || url.isEmpty) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (origin == null || !url.startsWith('/')) return null;
+  return '$origin$url';
+}

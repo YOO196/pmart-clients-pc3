@@ -1,26 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../../l10n/gen/app_localizations.dart';
+import '../../../../shared/providers.dart';
 import '../../domain/catalog.dart';
 
 /// 상품 이미지. 주소가 없거나 받지 못하면 자리표시를 그린다.
-class ProductImage extends StatelessWidget {
+class ProductImage extends ConsumerWidget {
   const ProductImage({super.key, this.url, this.size = 72});
 
   final String? url;
   final double size;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final placeholder = Container(
       width: size,
       height: size,
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: Icon(Icons.image_outlined, size: size / 2),
     );
-    final u = url;
+    // 서버 이미지는 상대 경로라 게이트웨이 주소를 붙여야 받을 수 있다.
+    final u = resolveImageUrl(url, ref.watch(imageOriginProvider));
     if (u == null) return placeholder;
     return Image.network(
       u,
