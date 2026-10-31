@@ -9,6 +9,8 @@ import '../../checkout/domain/checkout.dart';
 import '../../checkout/presentation/checkout_controller.dart';
 import '../data/payment_repository.dart';
 import '../domain/payment.dart';
+import '../../../router.dart' show rootNavigatorKey;
+import 'toss_payment_page.dart';
 
 final paymentRepositoryProvider = Provider<PaymentRepository>(
   (ref) => switch (ref.watch(envProvider)) {
@@ -18,11 +20,11 @@ final paymentRepositoryProvider = Provider<PaymentRepository>(
   },
 );
 
-/// 토스 결제위젯 SDK 는 아직 붙이지 않았다. 실서버에서는 결제창을 열 수 없다고 돌려준다.
+/// 결제창. 실서버는 토스 결제위젯(SDK), 목은 인증 결과를 흉내 낸다.
 final pgLauncherProvider = Provider<PgLauncher>(
   (ref) => switch (ref.watch(envProvider)) {
     PmartEnv.mock => MockPgLauncher(),
-    PmartEnv.local => const UnconnectedPgLauncher(),
+    PmartEnv.local => TossPgLauncher(rootNavigatorKey),
   },
 );
 

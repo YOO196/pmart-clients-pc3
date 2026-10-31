@@ -6,7 +6,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../checkout/presentation/checkout_controller.dart';
 import '../../checkout/presentation/order_sheet_screen.dart'
     show checkoutFailureText;
-import '../data/payment_repository.dart' show UnconnectedPgLauncher;
+import 'toss_payment_page.dart' show TossPgLauncher;
 import '../domain/payment.dart';
 import 'payment_controller.dart';
 
@@ -18,7 +18,7 @@ String paymentPhaseText(AppLocalizations l10n, PaymentFlowState s) =>
       PaymentPhase.done => l10n.payDone,
       PaymentPhase.failed => switch (s.failureCode) {
         'USER_CANCELLED' => l10n.payCancelled,
-        UnconnectedPgLauncher.code => l10n.payNotConnected,
+        TossPgLauncher.resultMismatch => l10n.payResultMismatch,
         final String code => checkoutFailureText(l10n, code),
         null => l10n.payFailed,
       },

@@ -48,6 +48,7 @@ dependencies:
   pmart_api_claim:
     path: ../../packages/pmart_api/gen/claim
   google_sign_in: ^7.2.0
+  tosspayments_widget_sdk_flutter: ^2.3.0
 
 dev_dependencies:
   flutter_test:

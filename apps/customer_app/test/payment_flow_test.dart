@@ -8,6 +8,8 @@ import 'package:customer_app/features/checkout/presentation/checkout_controller.
 import 'package:customer_app/features/payment/data/payment_repository.dart';
 import 'package:customer_app/features/payment/domain/payment.dart';
 import 'package:customer_app/features/payment/presentation/payment_controller.dart';
+import 'package:customer_app/features/payment/presentation/toss_payment_page.dart';
+import 'package:tosspayments_widget_sdk_flutter/model/tosspayments_result.dart';
 
 import 'support/member_checkout.dart';
 
@@ -204,15 +206,66 @@ void main() {
     expect(pg.launches, 1);
   });
 
-  test('결제창 SDK 를 붙이기 전 실서버 결제창은 열리지 않는다고 돌려준다', () async {
-    final ret = await const UnconnectedPgLauncher().launch(
-      const PaymentEntry(
-        clientKey: 'k',
-        pgOrderId: 'pay-1',
-        amount: 1000,
-        orderName: 'x',
-      ),
+  group('토스 결제위젯 결과', () {
+    const entry = PaymentEntry(
+      clientKey: 'k',
+      pgOrderId: 'pay-1',
+      amount: 16880,
+      orderName: 'x',
     );
-    expect(ret, isA<PgFailed>());
+
+    test('성공은 인증일 뿐이고 결과의 주문번호·금액이 서버 값과 같을 때만 승인 요청으로 간다', () {
+      final ok = pgReturnFromToss(
+        Result(success: Success('pk-1', 'pay-1', 16880, null)),
+        entry,
+      );
+      expect(ok, isA<PgAuthenticated>());
+      expect((ok as PgAuthenticated).paymentKey, 'pk-1');
+
+      expect(
+        pgReturnFromToss(
+          Result(success: Success('pk-1', 'pay-1', 100, null)),
+          entry,
+        ),
+        isA<PgFailed>(),
+      );
+      expect(
+        pgReturnFromToss(
+          Result(success: Success('pk-1', 'pay-OTHER', 16880, null)),
+          entry,
+        ),
+        isA<PgFailed>(),
+      );
+    });
+
+    test('사용자 취소는 취소, 그 밖 실패는 실패, 승인 대기는 서버 조회', () {
+      expect(
+        pgReturnFromToss(
+          Result(fail: Fail(tossUserCancelCode, '취소', '')),
+          entry,
+        ),
+        isA<PgCancelled>(),
+      );
+      expect(
+        pgReturnFromToss(
+          Result(fail: Fail('REJECT_CARD', 'x', 'pay-1')),
+          entry,
+        ),
+        isA<PgFailed>(),
+      );
+      expect(
+        pgReturnFromToss(Result(pending: Pending('pk', 'pay-1', 16880)), entry),
+        isA<PgNoReturn>(),
+      );
+    });
+  });
+
+  test('결제창 결과가 주문과 맞지 않으면 승인 요청을 보내지 않는다', () async {
+    pg.next = const PgFailed(TossPgLauncher.resultMismatch);
+
+    final s = await run();
+
+    expect(s.phase, PaymentPhase.failed);
+    expect(checkout.authKeys, isEmpty);
   });
 }

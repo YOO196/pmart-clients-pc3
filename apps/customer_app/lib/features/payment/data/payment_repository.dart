@@ -93,20 +93,9 @@ final class ApiPaymentRepository implements PaymentRepository {
   }
 }
 
-/// 토스 결제창.
+/// 토스 결제창. 실서버는 `TossPgLauncher`(결제위젯 SDK), 목은 [MockPgLauncher].
 abstract interface class PgLauncher {
   Future<PgReturn> launch(PaymentEntry entry);
-}
-
-/// 실서버용 자리. 토스 결제위젯 SDK 를 붙이기 전에는 결제창을 열 수 없다고 돌려준다.
-/// (서버에는 인증 실패로 알려 이번 시도의 재고·슬롯을 바로 푼다.)
-final class UnconnectedPgLauncher implements PgLauncher {
-  const UnconnectedPgLauncher();
-
-  static const code = 'PG_SDK_NOT_CONNECTED';
-
-  @override
-  Future<PgReturn> launch(PaymentEntry entry) async => const PgFailed(code);
 }
 
 /// 목 결제창. [next] 결과를 돌려준다(기본: 인증 성공).
