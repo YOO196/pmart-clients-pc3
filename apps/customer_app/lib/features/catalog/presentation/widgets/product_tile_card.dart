@@ -50,6 +50,11 @@ class ProductTileCard extends StatelessWidget {
   final ProductTile tile;
   final VoidCallback? onTap;
 
+  /// 가로 진열(높이 고정)에서 카드 한 장의 높이. 이름 2줄·가격·평점·상태 문구가 들어가는 높이에
+  /// 기기 글자 크기 설정을 반영한다. 카드는 세로 목록(높이 무제한)에서도 쓰므로 Flexible 을 쓰지 않는다.
+  static double railHeight(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(176).clamp(176, 340).toDouble();
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);

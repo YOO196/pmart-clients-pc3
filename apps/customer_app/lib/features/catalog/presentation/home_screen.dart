@@ -111,7 +111,7 @@ class _SectionView extends ConsumerWidget {
               child: Text(l10n.sectionEmpty),
             )
           : SizedBox(
-              height: 132,
+              height: ProductTileCard.railHeight(context),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
