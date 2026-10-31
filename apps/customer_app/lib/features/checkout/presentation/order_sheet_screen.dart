@@ -363,7 +363,6 @@ class _Sheet extends ConsumerWidget {
                     OutOfStockPreference.cancelAll => l10n.oosAll,
                   }),
                   if (req.deliveryNote case final n?) Text(n),
-                  if (req.bagOptOut) Text(l10n.bagOptOut),
                 ],
               ),
               _Section(

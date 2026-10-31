@@ -29,7 +29,18 @@ class OrderListScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final value = ref.watch(orderListProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.ordersTitle)),
+      appBar: AppBar(
+        title: Text(l10n.ordersTitle),
+        // 결제 완료에서 주문 상세로 바로 오면(go) 뒤에 화면이 없다. 그때는 마이로 돌아간다.
+        leading: context.canPop()
+            ? null
+            : IconButton(
+                key: const ValueKey('orders-back'),
+                icon: const BackButtonIcon(),
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                onPressed: () => context.go('/my'),
+              ),
+      ),
       body: switch (value) {
         AsyncData(value: null) => LoginRequired(
           message: l10n.ordersLoginNeeded,

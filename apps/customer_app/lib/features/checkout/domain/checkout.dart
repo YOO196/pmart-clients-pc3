@@ -299,7 +299,6 @@ class DraftRequest {
     this.expectedMfcId,
     this.window,
     this.deliveryNote,
-    this.bagOptOut = false,
   });
 
   /// 같은 주문 의도 식별. "주문하기" 한 번에 하나.
@@ -311,7 +310,6 @@ class DraftRequest {
   final ArrivalWindow? window;
   final OutOfStockPreference outOfStock;
   final String? deliveryNote;
-  final bool bagOptOut;
 }
 
 /// 결제 진입 요청 결과. ACCEPTED 는 사가 시작일 뿐 재고·슬롯·결제 성공이 아니다.

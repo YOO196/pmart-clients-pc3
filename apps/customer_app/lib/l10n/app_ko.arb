@@ -358,8 +358,6 @@
   "oosOnly": "품절 상품만 빼고 받기",
   "oosAll": "품절이 생기면 전체 취소",
   "deliveryNote": "라이더 요청사항 (선택)",
-  "bagOptOut": "봉투 없이 받기",
-  "bagOptOutNote": "봉투를 받지 않아도 봉투값 100원은 그대로 청구돼요",
   "deliveryNext": "주문서로",
   "needShoppingAddress": "배달 주소를 먼저 골라 주세요",
   "goAddresses": "주소 고르기",

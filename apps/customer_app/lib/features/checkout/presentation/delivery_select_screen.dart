@@ -283,12 +283,6 @@ class _DeliveryBodyState extends ConsumerState<_DeliveryBody> {
                 decoration: InputDecoration(labelText: l10n.deliveryNote),
                 onChanged: setupCtl.setNote,
               ),
-              SwitchListTile(
-                value: setup.bagOptOut,
-                title: Text(l10n.bagOptOut),
-                subtitle: Text(l10n.bagOptOutNote),
-                onChanged: setupCtl.setBagOptOut,
-              ),
             ],
           ),
         ),

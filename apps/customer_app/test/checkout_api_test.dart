@@ -65,6 +65,8 @@ void main() {
     });
     expect(body['deliveryMode'], 'SCHEDULED');
     expect(body['outOfStockPreference'], 'CANCEL_OOS_ONLY');
+    // 봉투 없이 받기는 제공하지 않는다(봉투값은 서버가 늘 청구).
+    expect(body.containsKey('bagOptOut'), isFalse);
     expect(adapter.requests.single.headers['Idempotency-Key'], 'k-1');
   });
 

@@ -36,7 +36,6 @@ class CheckoutSetup {
     this.window,
     this.outOfStock = OutOfStockPreference.cancelOutOfStockOnly,
     this.deliveryNote = '',
-    this.bagOptOut = false,
     this.revision = 0,
   });
 
@@ -45,7 +44,6 @@ class CheckoutSetup {
   final ArrivalWindow? window;
   final OutOfStockPreference outOfStock;
   final String deliveryNote;
-  final bool bagOptOut;
   final int revision;
 
   /// 예약은 슬롯을 골라야 끝난다.
@@ -58,14 +56,12 @@ class CheckoutSetup {
     ArrivalWindow? Function()? window,
     OutOfStockPreference? outOfStock,
     String? deliveryNote,
-    bool? bagOptOut,
   }) => CheckoutSetup(
     purchaseIntentId: purchaseIntentId ?? this.purchaseIntentId,
     mode: mode ?? this.mode,
     window: window != null ? window() : this.window,
     outOfStock: outOfStock ?? this.outOfStock,
     deliveryNote: deliveryNote ?? this.deliveryNote,
-    bagOptOut: bagOptOut ?? this.bagOptOut,
     revision: revision + 1,
   );
 }
@@ -101,8 +97,6 @@ class CheckoutSetupController extends Notifier<CheckoutSetup> {
       state = state.copyWith(outOfStock: p);
 
   void setNote(String note) => state = state.copyWith(deliveryNote: note);
-
-  void setBagOptOut(bool v) => state = state.copyWith(bagOptOut: v);
 
   /// 주문이 확정되면 다음 주문을 위해 비운다.
   void finish() => state = const CheckoutSetup();
@@ -279,7 +273,6 @@ class DraftController extends AsyncNotifier<DraftState?> {
       deliveryNote: setup.deliveryNote.trim().isEmpty
           ? null
           : setup.deliveryNote.trim(),
-      bagOptOut: setup.bagOptOut,
     );
   }
 

@@ -123,5 +123,13 @@ void main() {
     expect(find.text('주문 상세'), findsOneWidget);
     expect(find.text('주문 확인'), findsOneWidget);
     expect(find.textContaining('서울우유 1L'), findsWidgets);
+
+    // 상세 → 주문 내역 → (뒤에 화면이 없으니) 마이로 돌아갈 수 있다.
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
+    expect(find.text('주문 내역'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('orders-back')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('my-orders')), findsOneWidget);
   });
 }

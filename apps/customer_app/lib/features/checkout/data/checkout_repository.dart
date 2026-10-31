@@ -267,7 +267,6 @@ api.CreateDraftRequest draftRequestToContract(DraftRequest r) =>
           api.CreateDraftRequestOutOfStockPreferenceEnum.CANCEL_ALL,
       },
       deliveryNote: r.deliveryNote,
-      bagOptOut: r.bagOptOut,
     );
 
 HoldState _hold(String? wire) => switch (wire) {
