@@ -2,7 +2,7 @@
 // 상품 승인으로 productId 가 생긴 뒤에만 제출할 수 있다(PRODUCT_NOT_LINKED).
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
 import { IMAGE_ROLES, type ContentDraft, type ContentDraftInput, type ImageRole } from '../../api/models';
@@ -89,6 +89,8 @@ function ContentForm({
 export function NewContentDraftPage() {
   const api = useApi();
   const navigate = useNavigate();
+  // 상품 상세의 "콘텐츠·이미지 등록"에서 오면 상품 ID 를 채운다.
+  const productId = useSearchParams()[0].get('productId') ?? '';
   const [openId, setOpenId] = useState('');
   const create = useCommand((body: ContentDraftInput, key) =>
     request('POST', api.content.POST('/content-drafts', { ...commandParams(key), body })).then((d) => {
@@ -118,7 +120,9 @@ export function NewContentDraftPage() {
           {m.search}
         </button>
       </form>
+      <p className="text-sm opacity-80">{m.contents.imageAfterSave}</p>
       <ContentForm
+        {...(productId ? { initial: { productId } } : {})}
         submitLabel={m.products.create}
         busy={create.busy}
         onSubmit={(input) => void create.run(input)}

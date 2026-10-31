@@ -168,6 +168,10 @@ export function ProductDetailPage() {
               <dt>{m.products.publishedAt}</dt>
               <dd>{p.publishedAt ? formatSeoul(p.publishedAt) : m.none}</dd>
             </dl>
+            {/* 고객용 상품명·설명·이미지는 콘텐츠(product-content-service, DISPLAY 승인)로 따로 등록한다. */}
+            <Link className="btn btn-sm" to={`/contents/drafts/new?productId=${encodeURIComponent(productId)}`}>
+              {m.products.addContent}
+            </Link>
             <h2 className="font-bold">{m.products.skus}</h2>
             <table className="table table-sm bg-base-100">
               <thead>

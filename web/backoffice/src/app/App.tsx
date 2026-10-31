@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { createBrowserRouter, createMemoryRouter, Navigate, NavLink, Outlet, RouterProvider } from 'react-router';
+import { createBrowserRouter, createMemoryRouter, Link, Navigate, NavLink, Outlet, RouterProvider } from 'react-router';
 
 import { ApprovalDetailPage } from '../features/approvals/ApprovalDetailPage';
 import { ApprovalInboxPage } from '../features/approvals/ApprovalInboxPage';
@@ -43,7 +43,9 @@ function Layout() {
     <div className="flex min-h-screen bg-base-200">
       <aside className="w-52 shrink-0 bg-base-100 shadow-sm">
         <div className="p-4">
-          <span className="text-lg font-bold">{m.appTitle}</span>
+          <Link to="/" className="text-lg font-bold" aria-label={m.goHome}>
+            {m.appTitle}
+          </Link>
           {isMock && <span className="badge badge-outline ml-2">{m.mockBadge}</span>}
         </div>
         <ul className="menu w-full">

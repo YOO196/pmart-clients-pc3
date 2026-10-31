@@ -1,6 +1,7 @@
 // 화면 문구(1차 한국어). 컴포넌트에 문구를 흩어 쓰지 않는다.
 export const messages = {
   appTitle: 'PMart 백오피스',
+  goHome: 'PMart 백오피스 홈으로',
   mockBadge: '목 데이터',
   loading: '불러오는 중이에요',
   empty: '표시할 내용이 없어요',
@@ -175,6 +176,7 @@ export const messages = {
 
   products: {
     draftTitle: '상품 등록(개별)',
+    addContent: '콘텐츠·이미지 등록',
     draftDetail: (id: string) => `상품 초안 ${id}`,
     internalName: '관리용 명칭',
     primaryCategoryId: '대표 카테고리 노드 ID',
@@ -239,6 +241,7 @@ export const messages = {
     imageRole: { MAIN: '대표', DESCRIPTION: '상세설명', DETAIL: '상세정보 표' } as const,
     sortOrder: '순서',
     uploadImage: '이미지 올리기',
+    imageAfterSave: '이미지(대표·상세설명·상세정보 표)는 초안을 저장한 뒤 다음 화면에서 올릴 수 있어요.',
     imageUnavailable: '이미지를 불러오지 못했어요',
     submittable: '제출 가능',
     notSubmittable: '아직 제출할 수 없어요',

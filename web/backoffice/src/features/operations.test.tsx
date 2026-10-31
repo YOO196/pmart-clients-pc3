@@ -66,3 +66,22 @@ describe('센터 취급', () => {
 });
 
 
+
+describe('이동', () => {
+  it('상단 PMart 로고를 누르면 홈(승인함)으로 간다', async () => {
+    const user = userEvent.setup();
+    renderAt('/prices');
+    await user.click(screen.getByRole('link', { name: 'PMart 백오피스 홈으로' }));
+    expect(await screen.findByRole('heading', { name: '승인함' })).toBeInTheDocument();
+  });
+
+  it('상품 상세의 "콘텐츠·이미지 등록"은 상품 ID 를 채운 콘텐츠 등록으로 가고 이미지 안내를 보인다', async () => {
+    const user = userEvent.setup();
+    renderAt('/products/P-00000001');
+    await user.click(await screen.findByRole('link', { name: '콘텐츠·이미지 등록' }));
+
+    expect(await screen.findByRole('heading', { name: '콘텐츠 등록(개별)' })).toBeInTheDocument();
+    expect(screen.getByLabelText('상품 ID(승인된 상품)')).toHaveValue('P-00000001');
+    expect(screen.getByText(/초안을 저장한 뒤 다음 화면에서 올릴 수 있어요/)).toBeInTheDocument();
+  });
+});
