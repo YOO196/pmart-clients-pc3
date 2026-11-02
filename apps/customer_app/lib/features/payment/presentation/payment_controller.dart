@@ -7,9 +7,12 @@ import '../../cart/presentation/cart_controller.dart';
 import '../../checkout/data/checkout_repository.dart';
 import '../../checkout/domain/checkout.dart';
 import '../../checkout/presentation/checkout_controller.dart';
+import '../../auth/domain/auth.dart' show MemberSession;
+import '../../auth/presentation/auth_controller.dart' show sessionProvider;
 import '../data/payment_repository.dart';
 import '../domain/payment.dart';
 import '../../../router.dart' show rootNavigatorKey;
+import 'pg_widget_session.dart';
 import 'toss_payment_page.dart';
 
 final paymentRepositoryProvider = Provider<PaymentRepository>(
@@ -20,13 +23,54 @@ final paymentRepositoryProvider = Provider<PaymentRepository>(
   },
 );
 
-/// 결제창. 실서버는 토스 결제위젯(SDK), 목은 인증 결과를 흉내 낸다.
+/// 결제위젯 설정(BR-34). 로그인 세션마다 한 번 받아 두고 재사용한다 — 세션이 바뀌면(다른 계정·로그아웃)
+/// 다시 받는다. 비회원이면 null(주문은 회원만 — 익명 키로 결제창을 열지 않는다).
+/// 실패(422 CONFIG_REQUIRED 등)는 오류로 남겨 주문서가 "결제를 준비하지 못했어요"를 보인다.
+final paymentWidgetConfigProvider = FutureProvider<PaymentWidgetConfig?>((
+  ref,
+) async {
+  if (ref.watch(sessionProvider) is! MemberSession) return null;
+  return ref.watch(paymentRepositoryProvider).widgetConfig();
+});
+
+/// 결제창(대체 경로). 주문서 안의 위젯 세션([activePgLauncherProvider])이 없을 때만 쓴다 —
+/// 앱을 다시 켜서 진행 중 결제를 복구할 때 등. 실서버는 토스 결제위젯 전체 화면, 목은 인증 결과를 흉내 낸다.
 final pgLauncherProvider = Provider<PgLauncher>(
   (ref) => switch (ref.watch(envProvider)) {
     PmartEnv.mock => MockPgLauncher(),
-    PmartEnv.local => TossPgLauncher(rootNavigatorKey),
+    PmartEnv.local => TossPgLauncher(
+      rootNavigatorKey,
+      () => ref.read(paymentWidgetConfigProvider).value,
+    ),
   },
 );
+
+/// 주문서 화면이 띄워 둔 결제위젯 세션. 주문서가 살아 있는 동안 결제 흐름은 이 세션으로 결제창을 연다.
+/// 화면 생명주기(dispose)에서 바꾸므로 알림이 없는 단순 보관소다(아무도 구독하지 않는다).
+final activePgLauncherProvider = Provider<ActivePgLauncher>(
+  (_) => ActivePgLauncher(),
+);
+
+class ActivePgLauncher {
+  PgLauncher? current;
+
+  void set(PgLauncher launcher) => current = launcher;
+
+  /// [launcher] 가 등록된 세션이면 내린다(다른 주문서가 올린 세션은 건드리지 않는다).
+  void clear(PgLauncher launcher) {
+    if (identical(current, launcher)) current = null;
+  }
+}
+
+/// 주문서형 결제위젯 세션 만들기. 실서버는 토스 위젯, 목은 안내 문구 + 목 결제창.
+final pgWidgetSessionFactoryProvider =
+    Provider<PgWidgetSession Function(PaymentWidgetConfig)>(
+      (ref) => switch (ref.watch(envProvider)) {
+        PmartEnv.mock =>
+          (_) => MockPgWidgetSession(ref.read(pgLauncherProvider)),
+        PmartEnv.local => TossPgWidgetSession.new,
+      },
+    );
 
 final pendingCommandStoreProvider = Provider<PendingCommandStore>(
   (ref) => PendingCommandStore(ref.watch(secureStoreProvider)),
@@ -195,7 +239,11 @@ class PaymentFlowController extends Notifier<PaymentFlowState> {
       return _finish(s);
     }
     _set(PaymentFlowState(phase: PaymentPhase.authenticating, entry: entry));
-    final ret = await ref.read(pgLauncherProvider).launch(entry);
+    // 주문서가 띄워 둔 위젯 세션이 있으면 그걸로(주문서형), 없으면 전체 화면 결제창(복구 경로).
+    final PgLauncher launcher =
+        ref.read(activePgLauncherProvider).current ??
+        ref.read(pgLauncherProvider);
+    final ret = await launcher.launch(entry);
     if (!ref.mounted) return;
     switch (ret) {
       case PgAuthenticated():

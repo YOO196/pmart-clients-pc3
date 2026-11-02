@@ -41,10 +41,10 @@
 | BR-31 | 중간 | 백오피스 | 상품 목록 `GET /products` 에 검색어(상품명·ID) 파라미터가 없음. 콘텐츠 등록의 상품 고르기가 불러온 쪽 안에서만 찾는다 | OPEN |
 | BR-32 | 높음 | 고객 | 휴대폰 번호 저장(`POST /me/profile-changes`)이 501. 배송지 받는 분·연락처 자동 채움에 쓸 본인 연락처(가리지 않은 값)·기본 수령정보가 없음 | OPEN(요청 `docs/handoff/2026-10-31-backend-customer-profile-and-refunds.md`) |
 | BR-33 | 중간 | 고객 | 내 취소·반품·환불 목록 경로가 없음(클레임 단건 환불 조회만) | OPEN(같은 요청서 §3) |
-| BR-34 | 높음 | 고객 | 주문서형 결제위젯: 결제 진입 전에 토스 clientKey(·customerKey)를 받을 경로가 없음(지금은 PAY 이후에만) | OPEN(요청 `docs/handoff/2026-10-31-backend-checkout-widget-and-product-names.md`) |
+| BR-34 | 높음 | 고객 | 주문서형 결제위젯: 결제 진입 전에 토스 clientKey(·customerKey)를 받을 경로가 없음(지금은 PAY 이후에만) | **RESOLVED**(2026-11-02, 백엔드 회신 `clients-reply-br34-payment-widget-config`·`clients-notice-toss-customer-key`): `GET /payment-widget-config` → {provider, clientKey, customerKey=accountId}. 고객앱 주문서형 결제위젯 반영 |
 | BR-35 | 높음 | 고객 | 주문·초안 품목 `productName`(주문 당시 사본)이 비어 와서 주문 내역에 SKU 가 보임 | OPEN(같은 요청서 §2) |
 | BR-36 | 중간 | 고객 | 상품 상세 `SaleOption.price` 가 항상 null(계약은 "pricing 사본"). 상세에 가격이 안 보임 | OPEN(요청 `docs/handoff/2026-11-02-backend-product-detail-price.md`). 앱은 `GET /prices?skus=` 로 채워 표시 중 |
-| BR-37 | 중간 | 고객 | 주문이 참조하는 고객 데이터(주소·수령인·연락처)의 주문 시점 불변성 보장 방식과 "주문 당시 배송지" 고객용 조회 경로 | OPEN(질문 `docs/handoff/2026-11-02-backend-order-customer-reference.md`) |
+| BR-37 | 중간 | 고객 | 주문이 참조하는 고객 데이터(주소·수령인·연락처)의 주문 시점 불변성 보장 방식과 "주문 당시 배송지" 고객용 조회 경로 | **RESOLVED**(2026-11-02, 백엔드 회신 `clients-reply-br37-order-shipping-snapshot`): 초안 생성 때 사본 고정 → `DraftDelivery.shippingAddress`·`Order.shippingAddress`. `contact.phoneRef` deprecated. 결제 진입 때 계정 재확인(422 `ACCOUNT_NOT_PURCHASABLE`). 고객앱 반영 |
 
 ---
 
@@ -242,3 +242,5 @@
 - 배경: 주문(`customer_order`)은 `account_id`·`shopping_address_id` 만 저장하고 주소 원문·수령인·연락처는 없다(ADR-0009 참조 ID 원칙). customer-service 주소는 제자리 수정·물리 삭제로 보이며 이력이 없다. 그런데 계약 `PATCH /me/addresses/{id}` 는 "확정 주문의 주소는 변경되지 않음"이라고 적혀 있다.
 - 질문: 그 보장이 어디서 이루어지는지, 확정 주문이 참조한 주소의 삭제를 막는지, 수령인·연락처를 주문 시점으로 고정하는지, 구매 가능 검증을 결제 진입에서 다시 하는지. 질문서 `docs/handoff/2026-11-02-backend-order-customer-reference.md`.
 - 고객앱 처리(회신 전): 주문 상세에 배송지를 보이지 않는다. 주소 ID 로 현재 주소를 조회해 "주문 당시 배송지"처럼 보이지 않는다.
+- 회신(2026-11-02, `../pmart-backend/docs/handoff/2026-11-02-clients-reply-br37-order-shipping-snapshot.md`): (1) 지금까지 미보장이었음 → 초안 생성 때 주소록을 복사해 고정, 확정 때 주문으로 옮김. 고객용은 `GET /orders/{id}`·초안 `delivery.shippingAddress`(가리지 않음, 배포 전 것은 null). (2) 주소 삭제는 지금 규칙 유지(주문은 사본). (3) 수령인·연락처 = 배송지 값으로 고정, `contact.phoneRef` 는 쓰지 않음(deprecated). (4) 결제 진입 때 계정 재확인 → 422 `ACCOUNT_NOT_PURCHASABLE`.
+- 고객앱 반영(2026-11-02): 주문서·주문 상세 "받는 곳" = `shippingAddress`(null 이면 "배송지 정보 없음"), 결제 진입 거절 문구, 백엔드 `312a51b` 계약 재생성.

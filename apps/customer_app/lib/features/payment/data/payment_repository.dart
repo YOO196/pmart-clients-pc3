@@ -8,6 +8,10 @@ import '../domain/payment.dart';
 /// 결제창 결과를 서버에 넘긴다(payment-service checkout 태그, ADR-0020).
 /// 결제창 진입 정보는 초안 조회(`OrderDraft.payment`)로 받는다.
 abstract interface class PaymentRepository {
+  /// `GET /payment-widget-config` — 주문서에 결제위젯을 그리기 위한 clientKey·customerKey(BR-34).
+  /// 회원 토큰만. 403 은 회원이 아님, 422 `CONFIG_REQUIRED` 는 서버에 키가 없음(결제를 열지 않는다).
+  Future<PaymentWidgetConfig> widgetConfig();
+
   /// `POST /payment-confirmations` — orderId(=pgOrderId)·paymentKey·amount 만 보낸다.
   /// 응답을 놓치면([AuthSubmitResult.unknown]) 다시 보내지 않고 조회로 확인한다.
   Future<AuthSubmitResult> submitAuth(
@@ -32,6 +36,20 @@ final class ApiPaymentRepository implements PaymentRepository {
     : _api = api.PmartApiPayment(dio: dio).getCheckoutApi();
 
   final api.CheckoutApi _api;
+
+  @override
+  Future<PaymentWidgetConfig> widgetConfig() async {
+    final res = await pmartGuard(() => _api.getPaymentWidgetConfig());
+    final c =
+        res.data ?? (throw const ContractViolationFailure('결제위젯 설정 본문 없음'));
+    return PaymentWidgetConfig(
+      provider: c.provider == api.PaymentWidgetConfigProviderEnum.TOSS_PAYMENTS
+          ? PgProvider.tossPayments
+          : PgProvider.unknown,
+      clientKey: c.clientKey,
+      customerKey: c.customerKey,
+    );
+  }
 
   @override
   Future<AuthSubmitResult> submitAuth(

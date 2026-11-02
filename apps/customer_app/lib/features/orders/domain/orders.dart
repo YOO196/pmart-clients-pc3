@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../shared/order_status.dart';
-import '../../checkout/domain/checkout.dart' show ArrivalWindow, Quote;
+import '../../checkout/domain/checkout.dart'
+    show ArrivalWindow, Quote, ShippingAddress;
 
 @immutable
 class OrderListItem {
@@ -115,12 +116,16 @@ class OrderDetail {
     this.paymentState,
     this.refundedAmount,
     this.claims = const [],
+    this.shippingAddress,
   });
 
   final String orderId;
   final int version;
   final OrderStatus status;
   final String? mfcId;
+
+  /// 주문 당시 배송지 사본(BR-37). null 이면 "배송지 정보 없음" — 주소록을 다시 부르지 않는다.
+  final ShippingAddress? shippingAddress;
   final String? deliveryMode;
   final ArrivalWindow? window;
   final Quote? quote;

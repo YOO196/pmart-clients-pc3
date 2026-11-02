@@ -35,23 +35,32 @@ PgReturn pgReturnFromToss(Result result, PaymentEntry entry) {
   return const PgNoReturn();
 }
 
-/// 토스 결제위젯(결제수단·약관)을 전체 화면으로 띄운다. 결제창 키(clientKey)는 서버 응답 값만 쓴다.
+/// 토스 결제위젯(결제수단·약관)을 전체 화면으로 띄운다. 주문서 안의 위젯 세션이 없을 때(앱 재시작 뒤
+/// 진행 중 결제 복구 등)만 쓴다. 키는 `GET /payment-widget-config` 응답([config])만 쓴다.
 final class TossPgLauncher implements PgLauncher {
-  const TossPgLauncher(this.navigator);
+  const TossPgLauncher(this.navigator, this.config);
 
   final GlobalKey<NavigatorState> navigator;
+
+  /// 지금 세션의 결제위젯 설정. 없으면(비회원·미조회) 결제창을 열지 않는다.
+  final PaymentWidgetConfig? Function() config;
 
   /// 결제창 결과의 주문번호·금액이 서버 값과 다름.
   static const resultMismatch = 'PG_RESULT_MISMATCH';
 
+  /// 결제위젯 설정이 없어 결제창을 열 수 없음.
+  static const configMissing = 'PG_CONFIG_REQUIRED';
+
   @override
   Future<PgReturn> launch(PaymentEntry entry) async {
+    final cfg = config();
+    if (cfg == null) return const PgFailed(configMissing);
     final nav = navigator.currentState;
     if (nav == null) return const PgNoReturn();
     final ret = await nav.push<PgReturn>(
       MaterialPageRoute(
         fullscreenDialog: true,
-        builder: (_) => TossPaymentPage(entry: entry),
+        builder: (_) => TossPaymentPage(entry: entry, config: cfg),
       ),
     );
     // 뒤로가기 등으로 결과 없이 닫힘 = 고객이 결제창을 닫았다.
@@ -60,9 +69,10 @@ final class TossPgLauncher implements PgLauncher {
 }
 
 class TossPaymentPage extends StatefulWidget {
-  const TossPaymentPage({super.key, required this.entry});
+  const TossPaymentPage({super.key, required this.entry, required this.config});
 
   final PaymentEntry entry;
+  final PaymentWidgetConfig config;
 
   @override
   State<TossPaymentPage> createState() => _TossPaymentPageState();
@@ -81,10 +91,10 @@ class _TossPaymentPageState extends State<TossPaymentPage> {
   @override
   void initState() {
     super.initState();
-    // 고객 식별값(customerKey)은 아직 정하지 않았다(결제 명세 D6). 정해질 때까지 비회원 값으로 시험한다.
+    // customerKey = 회원 accountId(결제 명세 D6, 2026-11-02). 서버 응답 값을 가공 없이 쓴다.
     _widget = PaymentWidget(
-      clientKey: widget.entry.clientKey,
-      customerKey: PaymentWidget.anonymous,
+      clientKey: widget.config.clientKey,
+      customerKey: widget.config.customerKey,
     );
     _render();
   }

@@ -6,6 +6,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../checkout/presentation/checkout_controller.dart';
 import '../../checkout/presentation/order_sheet_screen.dart'
     show checkoutFailureText;
+import 'pg_widget_session.dart' show pgAmountMismatchCode;
 import 'toss_payment_page.dart' show TossPgLauncher;
 import '../domain/payment.dart';
 import 'payment_controller.dart';
@@ -19,6 +20,9 @@ String paymentPhaseText(AppLocalizations l10n, PaymentFlowState s) =>
       PaymentPhase.failed => switch (s.failureCode) {
         'USER_CANCELLED' => l10n.payCancelled,
         TossPgLauncher.resultMismatch => l10n.payResultMismatch,
+        TossPgLauncher.configMissing => l10n.payConfigRequired,
+        pgAmountMismatchCode => l10n.payAmountMismatch,
+        'PG_RENDER_FAILED' => l10n.payRenderFailed,
         final String code => checkoutFailureText(l10n, code),
         null => l10n.payFailed,
       },

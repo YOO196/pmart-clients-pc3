@@ -99,6 +99,28 @@ void main() {
     );
   });
 
+  testWidgets('주문 상세의 받는 곳은 주문 당시 배송지 사본이다(BR-37)', (t) async {
+    await openOrders(t);
+    await t.tap(find.byKey(const ValueKey('order-order-seed-4')));
+    await t.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('shipping-address')), findsOneWidget);
+    expect(find.textContaining('올림픽로 300'), findsOneWidget);
+    expect(find.text('김피마 · 010-0000-0000'), findsOneWidget);
+  });
+
+  testWidgets('사본이 없는 주문(배포 전)은 "배송지 정보 없음"이고 현재 주소로 대신하지 않는다', (
+    t,
+  ) async {
+    await openOrders(t);
+    await t.tap(find.byKey(const ValueKey('order-order-seed-1')));
+    await t.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('shipping-address-none')), findsOneWidget);
+    expect(find.text('배송지 정보 없음'), findsOneWidget);
+    expect(find.textContaining('올림픽로'), findsNothing);
+  });
+
   testWidgets('취소 주문은 서버가 준 환불 완료 금액을 보인다', (t) async {
     await openOrders(t);
     await t.tap(find.byKey(const ValueKey('order-order-seed-3')));

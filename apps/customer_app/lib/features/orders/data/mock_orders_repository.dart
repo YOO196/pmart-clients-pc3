@@ -58,6 +58,11 @@ base class MockOrdersRepository implements OrdersRepository {
       'mfcId': 'MFC-MOCK-01',
       'deliveryMode': 'SCHEDULED',
       'arrivalWindow': {'date': '2026-10-24', 'start': '18:00', 'end': '19:00'},
+      'shippingAddress': {
+        ...mockShippingAddressJson,
+        'capturedAt': '2026-10-24T00:59:00Z',
+      },
+      // order-seed-1 은 사본 없음(배포 전 주문) → "배송지 정보 없음".
       'quote': {
         ..._quoteSeed,
         'itemAmount': 17940,
@@ -286,6 +291,9 @@ base class MockOrdersRepository implements OrdersRepository {
       if (d.request.window case final w?)
         'arrivalWindow': {'date': w.date, 'start': w.start, 'end': w.end},
       'quote': quote,
+      // 확정 때 초안의 배송지 사본을 그대로 옮긴다(BR-37).
+      'shippingAddress':
+          (d.json['delivery'] as Map<String, Object?>?)?['shippingAddress'],
       'lines': lines,
       'shipments': [
         {

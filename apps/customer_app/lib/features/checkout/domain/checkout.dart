@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../shared/order_status.dart';
+import '../../address/domain/address.dart' show EntranceMethod;
 import '../../payment/domain/payment.dart' show PaymentEntry;
 
 /// 한집(SINGLE) / 알뜰(BUNDLED) / 예약(SCHEDULED). 이름은 잠정("한집/알뜰/예약" 유지).
@@ -224,6 +225,41 @@ class CheckoutFailure {
   final String? step;
 }
 
+/// 주문 당시 배송지·수령 연락처 사본(계약 `ShippingAddress`, BR-37). 초안을 만들 때 서버가 주소록에서
+/// 복사해 고정하고 주문 확정 때 그대로 옮긴다. 주소록을 고치거나 지워도 바뀌지 않는다.
+///
+/// 2026-11-02 배포 전에 만든 초안·주문은 사본이 없다(null) — 그때 `shoppingAddressId` 로 현재 주소를
+/// 대신 보이지 않는다. [entranceNote] 는 출입 비밀번호일 수 있어 로그·분석 이벤트에 넣지 않는다.
+@immutable
+class ShippingAddress {
+  const ShippingAddress({
+    required this.roadAddress,
+    required this.detailAddress,
+    required this.receiverName,
+    required this.receiverPhone,
+    this.postalCode,
+    this.entranceMethod,
+    this.entranceNote,
+    this.lat,
+    this.lng,
+    this.capturedAt,
+  });
+
+  final String roadAddress;
+  final String detailAddress;
+  final String? postalCode;
+  final String receiverName;
+  final String receiverPhone;
+  final EntranceMethod? entranceMethod;
+  final String? entranceNote;
+  final double? lat;
+  final double? lng;
+  final DateTime? capturedAt;
+
+  @override
+  String toString() => 'ShippingAddress(capturedAt: $capturedAt)';
+}
+
 @immutable
 class OrderDraft {
   const OrderDraft({
@@ -237,6 +273,7 @@ class OrderDraft {
     this.blockers = const [],
     this.payment,
     this.checkoutFailure,
+    this.shippingAddress,
   });
 
   final String draftId;
@@ -245,6 +282,9 @@ class OrderDraft {
   final Quote? quote;
   final DraftResources? resources;
   final DraftNext next;
+
+  /// 초안 생성 때 고정된 배송지 사본(`delivery.shippingAddress`). 주문서의 "받는 곳"은 이 값이다.
+  final ShippingAddress? shippingAddress;
 
   /// 결제 진입 때 발급된다. 확정 상태와 함께 있어야 "주문 완료"다.
   final String? orderId;

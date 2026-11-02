@@ -6,8 +6,12 @@ import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_core/testing.dart';
 import 'package:pmart_ui/pmart_ui.dart' show initPmartFormatting;
 
+import 'package:customer_app/features/address/domain/address.dart'
+    show EntranceMethod;
 import 'package:customer_app/features/checkout/data/checkout_repository.dart';
 import 'package:customer_app/features/checkout/domain/checkout.dart';
+import 'package:customer_app/features/payment/data/payment_repository.dart';
+import 'package:customer_app/features/payment/domain/payment.dart';
 import 'package:customer_app/features/checkout/presentation/delivery_select_screen.dart'
     show windowText;
 import 'package:customer_app/shared/providers.dart';
@@ -214,6 +218,110 @@ void main() {
     expect(draft.quote?.minOrderAmount, 15000);
     expect(draft.quote?.deliveryTipBase, 4000);
     expect(draft.quote?.firstPurchase, FirstPurchaseBenefit.expected);
+  });
+
+  test('초안의 배송지 사본(delivery.shippingAddress)을 옮기고, 없으면 null 이다(BR-37)', () async {
+    final withCopy = await repo(
+      (_) => const FakeReply(
+        200,
+        body: {
+          'draftId': 'd-1',
+          'version': 1,
+          'status': 'DRAFT',
+          'nextAction': 'REVIEW',
+          'delivery': {
+            'deliveryMode': 'SINGLE',
+            'shoppingAddressId': 'addr-1',
+            'shippingAddress': {
+              'roadAddress': '부산광역시 부산진구 중앙대로 708',
+              'detailAddress': '101동 1001호',
+              'postalCode': '47296',
+              'receiverName': '홍길동',
+              'receiverPhone': '01012345678',
+              'entranceMethod': 'PASSWORD',
+              'entranceNote': '#1234',
+              'geo': {'lat': 35.1577, 'lng': 129.0599},
+              'capturedAt': '2026-11-02T07:10:00Z',
+            },
+          },
+        },
+      ),
+    ).getDraft('d-1');
+
+    final a = withCopy.shippingAddress!;
+    expect(a.roadAddress, '부산광역시 부산진구 중앙대로 708');
+    expect(a.receiverName, '홍길동');
+    expect(a.receiverPhone, '01012345678');
+    expect(a.entranceMethod, EntranceMethod.password);
+    expect(a.entranceNote, '#1234');
+    expect(a.lat, 35.1577);
+    expect(a.capturedAt, DateTime.utc(2026, 11, 2, 7, 10));
+
+    final without = await repo(
+      (_) => const FakeReply(
+        200,
+        body: {
+          'draftId': 'd-0',
+          'version': 1,
+          'status': 'DRAFT',
+          'nextAction': 'REVIEW',
+          'delivery': {'shoppingAddressId': 'addr-1', 'shippingAddress': null},
+        },
+      ),
+    ).getDraft('d-0');
+    expect(without.shippingAddress, isNull);
+  });
+
+  test('결제위젯 설정 GET /payment-widget-config 를 옮기고, 422 CONFIG_REQUIRED 는 오류다(BR-34)', () async {
+    ApiPaymentRepository payments(FakeReply reply) {
+      adapter = FakeAdapter((_, _) async => reply);
+      return ApiPaymentRepository(
+        createPmartDio(
+          baseUrl: 'http://test.invalid/api/v1',
+          sourceSystem: sourceSystem,
+          tokens: TokenStore(MemoryKeyValueStore()),
+          refresher: (_) async => null,
+          adapter: adapter,
+          delay: (_) async {},
+        ),
+      );
+    }
+
+    final cfg = await payments(
+      const FakeReply(
+        200,
+        body: {
+          'provider': 'TOSS_PAYMENTS',
+          'clientKey': 'test_gck_x',
+          'customerKey': 'CU-3f2a9c1e-7b4d-4e8a-9c21-5d6f0a1b2c3d',
+        },
+      ),
+    ).widgetConfig();
+    expect(adapter.requests.single.uri.path, '/api/v1/payment-widget-config');
+    expect(cfg.provider, PgProvider.tossPayments);
+    expect(cfg.clientKey, 'test_gck_x');
+    expect(cfg.customerKey, 'CU-3f2a9c1e-7b4d-4e8a-9c21-5d6f0a1b2c3d');
+    // 키는 toString 에 나오지 않는다(로그 금지).
+    expect(cfg.toString(), isNot(contains('test_gck_x')));
+    expect(cfg.toString(), isNot(contains('CU-3f2a')));
+
+    await expectLater(
+      payments(
+        const FakeReply.problem(422, {
+          'type': 'about:blank',
+          'title': 'config',
+          'status': 422,
+          'code': 'CONFIG_REQUIRED',
+        }),
+      ).widgetConfig(),
+      throwsA(
+        isA<ProblemFailure>().having(
+          (f) => f.problem.code,
+          'code',
+          'CONFIG_REQUIRED',
+        ),
+      ),
+    );
   });
 
   test('결제 진입 뒤 초안: PAY 면 결제창 정보, 실패면 checkoutFailure 를 옮긴다(⑥ 안내)', () async {

@@ -11,6 +11,7 @@ import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../checkout/presentation/delivery_select_screen.dart'
     show windowText;
 import '../../checkout/presentation/order_sheet_screen.dart' show tipReasonText;
+import '../../checkout/presentation/shipping_address_view.dart';
 import '../../../shared/order_status.dart';
 import '../domain/orders.dart';
 import 'orders_providers.dart';
@@ -179,6 +180,10 @@ class _OrderBody extends StatelessWidget {
               ),
             ),
           ),
+        const SizedBox(height: 16),
+        // 주문 당시 배송지 사본(BR-37). 주소록을 다시 부르지 않는다.
+        Text(l10n.checkoutAddress, style: theme.textTheme.titleMedium),
+        ShippingAddressView(address: o.shippingAddress),
         const SizedBox(height: 16),
         Text(l10n.checkoutItems, style: theme.textTheme.titleMedium),
         for (final l in o.lines) _LineTile(line: l),

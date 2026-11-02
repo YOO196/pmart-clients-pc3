@@ -24,6 +24,18 @@ final class MockDraft {
 /// 서버 승인 결과 시연(BR-01 목).
 enum MockApproval { approve, decline, unknown, mismatch, approveThenCancel }
 
+/// 목 배송지 사본(계약 `ShippingAddress`). 목 주소록(`mock_address_repository.dart`)의 쇼핑 주소와 같다.
+const mockShippingAddressJson = <String, Object?>{
+  'roadAddress': '서울 송파구 올림픽로 300',
+  'detailAddress': '101동 1001호',
+  'postalCode': '05551',
+  'receiverName': '김피마',
+  'receiverPhone': '010-0000-0000',
+  'entranceMethod': 'PASSWORD',
+  'entranceNote': '#1234',
+  'geo': {'lat': 37.5133, 'lng': 127.1028},
+};
+
 base class MockCheckoutRepository
     implements CheckoutRepository, PaymentRepository {
   MockCheckoutRepository({
@@ -58,6 +70,9 @@ base class MockCheckoutRepository
 
   /// 다음 초안 생성을 이 코드로 거절한다(422, MFC_CHANGED 는 409).
   String? rejectNextDraft;
+
+  /// 다음 결제 진입을 이 코드로 거절한다(422, 사가 시작 없음. 예: ACCOUNT_NOT_PURCHASABLE).
+  String? rejectNextCheckout;
 
   /// 다음 초안 생성을 "만들어졌지만 응답 잃음"으로 만든다.
   bool loseNextDraftResponse = false;
@@ -250,6 +265,14 @@ base class MockCheckoutRepository
           'payment': 'NOT_STARTED',
         },
         'nextAction': 'WAIT',
+        // 초안 생성 때 고정된 배송지 사본(BR-37). 목 주소록의 쇼핑 주소와 같은 값이다.
+        'delivery': {
+          'shoppingAddressId': request.shoppingAddressId,
+          'shippingAddress': {
+            ...mockShippingAddressJson,
+            'capturedAt': created.toUtc().toIso8601String(),
+          },
+        },
       },
       request,
       created,
@@ -326,6 +349,13 @@ base class MockCheckoutRepository
   }) async {
     await _wait();
     checkoutKeys.add(key.value);
+    if (rejectNextCheckout case final code?) {
+      // 결제 진입 자체의 422 거절(예: 초안 뒤 계정이 구매 불가로 바뀜 — ACCOUNT_NOT_PURCHASABLE). 사가 없음.
+      rejectNextCheckout = null;
+      return checkoutFailureToStart(
+        ProblemFailure(Problem(status: 422, code: code)),
+      );
+    }
     final d = drafts[draftId]!;
     final quote = d.json['quote']! as Map<String, Object?>;
     final current = quote['quoteVersion']! as int;
@@ -452,6 +482,17 @@ base class MockCheckoutRepository
       ..remove('payment');
     _setPayment(d, 'APPROVED');
     confirmedOrders[orderId] = d;
+  }
+
+  /// 목 결제위젯 설정. 목 결제창은 키를 쓰지 않는다.
+  @override
+  Future<PaymentWidgetConfig> widgetConfig() async {
+    await _wait();
+    return const PaymentWidgetConfig(
+      provider: PgProvider.tossPayments,
+      clientKey: 'test_gck_mock',
+      customerKey: 'CU-mock-account',
+    );
   }
 
   @override

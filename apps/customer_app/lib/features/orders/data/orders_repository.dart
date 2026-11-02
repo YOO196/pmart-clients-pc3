@@ -5,7 +5,8 @@ import 'package:pmart_api_order/pmart_api_order.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/order_status.dart';
-import '../../checkout/data/checkout_repository.dart' show quoteFromContract;
+import '../../checkout/data/checkout_repository.dart'
+    show quoteFromContract, shippingAddressFromContract;
 import '../../checkout/domain/checkout.dart' show ArrivalWindow;
 import '../../../shared/providers.dart' show sourceSystem;
 import '../../claims/data/claims_repository.dart' show requestStateOf;
@@ -146,6 +147,7 @@ OrderDetail orderFromContract(api.Order o) => OrderDetail(
     null => null,
   },
   quote: o.quote == null ? null : quoteFromContract(o.quote!),
+  shippingAddress: shippingAddressFromContract(o.shippingAddress),
   lines: [
     for (final l in o.lines ?? const <api.OrderLine>[])
       OrderLineView(

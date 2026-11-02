@@ -7,6 +7,7 @@ import 'package:pmart_core/pmart_core.dart';
 import '../../../shared/order_status.dart';
 import '../../../shared/providers.dart' show sourceSystem;
 import '../../payment/domain/payment.dart' show PaymentEntry;
+import '../../address/domain/address.dart' show EntranceMethod;
 import '../domain/checkout.dart';
 
 /// 배송 방식·슬롯·주문 초안·결제 진입. 조회 실패는 [PmartFailure] 로 던진다.
@@ -279,6 +280,33 @@ HoldState _hold(String? wire) => switch (wire) {
   _ => HoldState.other,
 };
 
+/// 주문 당시 배송지 사본(BR-37). 없거나(배포 전 초안·주문) 필수값이 비면 null — 현재 주소로 대신하지 않는다.
+ShippingAddress? shippingAddressFromContract(api.ShippingAddress? s) {
+  if (s == null) return null;
+  final road = s.roadAddress;
+  final name = s.receiverName;
+  final phone = s.receiverPhone;
+  if (road == null || name == null || phone == null) return null;
+  return ShippingAddress(
+    roadAddress: road,
+    detailAddress: s.detailAddress ?? '',
+    postalCode: s.postalCode,
+    receiverName: name,
+    receiverPhone: phone,
+    entranceMethod: switch (s.entranceMethod) {
+      api.ShippingAddressEntranceMethodEnum.FREE => EntranceMethod.free,
+      api.ShippingAddressEntranceMethodEnum.PASSWORD => EntranceMethod.password,
+      api.ShippingAddressEntranceMethodEnum.CALL => EntranceMethod.call,
+      api.ShippingAddressEntranceMethodEnum.OTHER => EntranceMethod.other,
+      _ => null,
+    },
+    entranceNote: s.entranceNote,
+    lat: s.geo?.lat?.toDouble(),
+    lng: s.geo?.lng?.toDouble(),
+    capturedAt: s.capturedAt,
+  );
+}
+
 OrderDraft draftFromContract(api.OrderDraft d) {
   final q = d.quote;
   final r = d.resources;
@@ -298,6 +326,7 @@ OrderDraft draftFromContract(api.OrderDraft d) {
       null => DraftNext.unknown,
     },
     quote: q?.quoteVersion == null ? null : quoteFromContract(q!),
+    shippingAddress: shippingAddressFromContract(d.delivery?.shippingAddress),
     payment: switch (d.payment) {
       api.OrderDraftPayment(
         clientKey: final String clientKey,

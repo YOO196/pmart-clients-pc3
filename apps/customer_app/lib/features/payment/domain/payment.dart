@@ -29,6 +29,28 @@ class PaymentEntry {
   String toString() => 'PaymentEntry($pgOrderId)';
 }
 
+enum PgProvider { tossPayments, unknown }
+
+/// 결제위젯 설정(`GET /payment-widget-config`, BR-34). 로그인 세션마다 한 번 받아 재사용한다.
+///
+/// `customerKey` 는 지금 회원 accountId 와 같다(결제 명세 D6). 받은 값을 가공하지 않고,
+/// 두 키 모두 로그·분석 이벤트에 넣지 않는다.
+@immutable
+class PaymentWidgetConfig {
+  const PaymentWidgetConfig({
+    required this.provider,
+    required this.clientKey,
+    required this.customerKey,
+  });
+
+  final PgProvider provider;
+  final String clientKey;
+  final String customerKey;
+
+  @override
+  String toString() => 'PaymentWidgetConfig(${provider.name})';
+}
+
 /// 결제창에서 돌아온 결과. 어느 것도 "주문 완료"가 아니다.
 @immutable
 sealed class PgReturn {

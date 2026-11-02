@@ -528,6 +528,25 @@
   "payRecovering": "결제 승인과 주문을 맞추는 중이에요",
   "payRefunding": "주문이 취소되어 결제 취소·환불을 확인하는 중이에요",
   "payStillChecking": "확인이 오래 걸리고 있어요. 잠시 뒤 다시 확인해 주세요",
+  "payMethods": "결제수단·약관",
+  "payMethodsMock": "목 결제창(실서버에서는 토스 결제위젯이 보여요)",
+  "payMethodsLoading": "결제수단을 불러오는 중",
+  "payConfigRequired": "결제를 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요",
+  "payConfigRetry": "다시 시도",
+  "payAmountMismatch": "결제 금액이 주문서와 달라 결제를 멈췄어요. 주문서를 다시 확인해 주세요",
+  "payRenderFailed": "결제수단을 불러오지 못했어요. 다시 시도해 주세요",
+  "shippingAddressUnavailable": "배송지 정보 없음",
+  "receiverLine": "{name} · {phone}",
+  "@receiverLine": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
   "payDoNotRetry": "결과가 나올 때까지 다시 결제하지 마세요. 두 번 결제되지 않도록 확인하고 있어요",
   "payOrderNumber": "주문번호 {orderId}",
   "@payOrderNumber": {

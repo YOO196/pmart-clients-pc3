@@ -10,9 +10,14 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_controller.dart';
 import '../../cart/presentation/cart_controller.dart';
+import '../../payment/domain/payment.dart';
+import '../../payment/presentation/payment_controller.dart';
+import '../../payment/presentation/payment_screen.dart' show paymentPhaseText;
+import '../../payment/presentation/pg_widget_session.dart';
 import '../domain/checkout.dart';
 import 'checkout_controller.dart';
 import 'delivery_select_screen.dart' show modeLabel, windowText;
+import 'shipping_address_view.dart';
 
 String _money(AppLocalizations l10n, int? amount) => switch (amount) {
   final int a => formatKrw(a),
@@ -205,13 +210,112 @@ class _OrderSheetScreenState extends ConsumerState<OrderSheetScreen> {
   }
 }
 
-class _Sheet extends ConsumerWidget {
+/// 주문서 본문. 주문서형 결제위젯(BR-34): 결제수단·약관 위젯을 여기 그리고, "결제하기"는 결제 진입 →
+/// 결제창 → 결과 확인까지 이 화면 위에서 진행한다. 완료·결과 불명·복구·환불일 때만 결제 화면으로 넘긴다.
+/// 결제창 실패·취소는 여기 배너로 보이고, 새 키로 다시 결제 진입할 수 있다.
+class _Sheet extends ConsumerStatefulWidget {
   const _Sheet({required this.state});
 
   final DraftState state;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_Sheet> createState() => _SheetState();
+}
+
+class _SheetState extends ConsumerState<_Sheet> {
+  PgWidgetSession? _session;
+  String? _sessionKey;
+  bool _navigated = false;
+
+  /// 이 화면에서 "결제하기"로 시작한 결제 흐름이 진행 중인지. 흐름 상태의 초기값(preparing)과 구분한다.
+  bool _flowStarted = false;
+
+  /// dispose 에서는 ref 를 쓸 수 없어 세션을 등록할 때 받아 둔다.
+  ActivePgLauncher? _active;
+
+  DraftState get state => widget.state;
+
+  @override
+  void dispose() {
+    final s = _session;
+    if (s != null) {
+      _active?.clear(s);
+      s.dispose();
+    }
+    super.dispose();
+  }
+
+  /// 결제위젯 설정이 있으면 세션을 만들어 결제 흐름이 쓰게 등록한다. 설정(계정)이 바뀌면 새로 만든다.
+  PgWidgetSession? _ensureSession(PaymentWidgetConfig? cfg) {
+    if (cfg == null) return null;
+    final key = '${cfg.clientKey}|${cfg.customerKey}';
+    if (_session != null && _sessionKey == key) return _session;
+    _session?.dispose();
+    final s = ref.read(pgWidgetSessionFactoryProvider)(cfg);
+    final active = ref.read(activePgLauncherProvider);
+    _session = s;
+    _sessionKey = key;
+    _active = active;
+    active.set(s);
+    return s;
+  }
+
+  bool _working(PaymentFlowState f) =>
+      _flowStarted &&
+      switch (f.phase) {
+        PaymentPhase.preparing ||
+        PaymentPhase.authenticating ||
+        PaymentPhase.confirming => !f.stillChecking,
+        _ => false,
+      };
+
+  /// 결제 화면으로 넘길 상태: 완료·복구·환불, 또는 확인이 오래 걸려 "다시 확인"이 필요할 때.
+  bool _handoff(PaymentFlowState f) => switch (f.phase) {
+    PaymentPhase.done ||
+    PaymentPhase.recovering ||
+    PaymentPhase.refunding => true,
+    _ => f.stillChecking,
+  };
+
+  void _onFlow(PaymentFlowState? prev, PaymentFlowState next, String draftId) {
+    if (!_flowStarted) return;
+    if (next.phase == PaymentPhase.failed && prev?.phase != PaymentPhase.failed) {
+      // 이번 결제 시도는 끝났다. 초안을 다시 읽어 결제 버튼을 새 키로 다시 연다.
+      setState(() => _flowStarted = false);
+      ref.read(draftControllerProvider.notifier).refresh();
+      return;
+    }
+    if (_handoff(next) && !_navigated) {
+      _navigated = true;
+      setState(() => _flowStarted = false);
+      context.push('/payments/$draftId');
+    }
+  }
+
+  Future<void> _pay(BuildContext context, AppLocalizations l10n) async {
+    final ctl = ref.read(draftControllerProvider.notifier);
+    final session = _session;
+    if (session != null && !await session.requiredTermsAgreed()) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.tossAgreementRequired)));
+      return;
+    }
+    final draftId = state.draft.draftId;
+    final start = await ctl.pay();
+    // 사가가 시작됐을 뿐이다. 결제 흐름이 PAY 를 기다렸다가 이 화면의 위젯으로 결제창을 연다.
+    if (start is CheckoutAccepted && mounted) {
+      setState(() {
+        _flowStarted = true;
+        _navigated = false;
+      });
+      unawaited(ref.read(paymentFlowProvider(draftId).notifier).run());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final ctl = ref.read(draftControllerProvider.notifier);
@@ -221,8 +325,21 @@ class _Sheet extends ConsumerWidget {
     final cart = ref.watch(cartControllerProvider).value?.cart;
     final address = ref.watch(addressBookProvider).value?.shoppingAddress;
     final req = state.request;
+    final config = ref.watch(paymentWidgetConfigProvider);
+    final session = _ensureSession(config.value);
+    final flowProvider = paymentFlowProvider(draft.draftId);
+    final flow = ref.watch(flowProvider);
+    ref.listen(flowProvider, (prev, next) => _onFlow(prev, next, draft.draftId));
 
     final banners = <Widget>[
+      // 결제창 실패·취소(이번 시도 끝). 서버가 확보분을 풀었고, 새 키로 다시 결제할 수 있다.
+      if (flow.phase == PaymentPhase.failed &&
+          flow.failureCode != draft.checkoutFailure?.code)
+        _Banner(
+          key: const ValueKey('pg-failed'),
+          icon: Icons.error_outline,
+          text: paymentPhaseText(l10n, flow),
+        ),
       if (draft.next == DraftNext.wait)
         _Banner(
           key: const ValueKey('draft-waiting'),
@@ -297,6 +414,9 @@ class _Sheet extends ConsumerWidget {
           text: switch (code) {
             CheckoutProblemCode.unsupported => l10n.checkoutNotYetSupported,
             CheckoutProblemCode.checkoutBlocked => l10n.checkoutBlocked,
+            // 초안 뒤 계정이 구매 불가로 바뀜(결제 진입 때 다시 확인, BR-37 회신 4).
+            CheckoutProblemCode.accountNotPurchasable =>
+              l10n.draftAccountNotPurchasable,
             _ => l10n.checkoutRejected,
           },
         ),
@@ -304,7 +424,7 @@ class _Sheet extends ConsumerWidget {
     ];
 
     final expiry = draft.earliestExpiry;
-    return Column(
+    final body = Column(
       children: [
         Expanded(
           child: ListView(
@@ -349,7 +469,10 @@ class _Sheet extends ConsumerWidget {
               _Section(
                 title: l10n.checkoutAddress,
                 children: [
-                  if (address != null) ...[
+                  // 초안에 고정된 배송지 사본(BR-37). 사본이 없는 옛 초안만 초안을 만든 현재 쇼핑 주소를 보인다.
+                  if (draft.shippingAddress case final a?)
+                    ShippingAddressView(address: a)
+                  else if (address != null) ...[
                     Text(address.label ?? address.roadAddress),
                     Text('${address.roadAddress} ${address.detailAddress}'),
                   ],
@@ -409,6 +532,16 @@ class _Sheet extends ConsumerWidget {
                     ),
                 ],
               ),
+              _Section(
+                title: l10n.payMethods,
+                children: [
+                  _PaymentWidgetArea(
+                    config: config,
+                    session: session,
+                    amount: quote?.totalAmount,
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -418,33 +551,112 @@ class _Sheet extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             child: SizedBox(
               width: double.infinity,
-              child: CommandButton(
-                key: const ValueKey('pay'),
-                busy: state.paying,
-                // 막는 사유가 있으면 주버튼에 첫 사유를 쓴다(DraftBlocker 설명의 순서).
-                label: switch ((
-                  draft.blockers.firstOrNull,
-                  quote?.totalAmount,
-                )) {
-                  (final DraftBlocker b, _) => blockerText(l10n, b),
-                  (null, final int t) => l10n.payButton(formatKrw(t)),
-                  (null, null) => l10n.payButtonNoAmount,
-                },
-                onPressed: state.canPay
-                    ? () async {
-                        final start = await ctl.pay();
-                        // 사가가 시작됐을 뿐이다. 결제 화면이 결과를 서버에서 확인한다.
-                        if (start is CheckoutAccepted && context.mounted) {
-                          await context.push('/payments/${draft.draftId}');
-                        }
-                      }
-                    : null,
+              child: ValueListenableBuilder<bool>(
+                valueListenable: session?.ready ?? _neverReady,
+                builder: (context, widgetReady, _) => CommandButton(
+                  key: const ValueKey('pay'),
+                  busy: state.paying || _working(flow),
+                  // 막는 사유가 있으면 주버튼에 첫 사유를 쓴다(DraftBlocker 설명의 순서).
+                  label: switch ((
+                    draft.blockers.firstOrNull,
+                    quote?.totalAmount,
+                  )) {
+                    (final DraftBlocker b, _) => blockerText(l10n, b),
+                    (null, final int t) => l10n.payButton(formatKrw(t)),
+                    (null, null) => l10n.payButtonNoAmount,
+                  },
+                  // 결제위젯이 그려져야 연다(설정 실패·비회원이면 열지 않는다).
+                  onPressed: state.canPay && widgetReady
+                      ? () => _pay(context, l10n)
+                      : null,
+                ),
               ),
             ),
           ),
         ),
       ],
     );
+    if (!_working(flow)) return body;
+    // 결제 진행 중(진입 대기·결제창·결과 확인). 이 화면 위에서 진행하고, 뒤로가기·재탭을 막는다.
+    return Stack(
+      children: [
+        body,
+        const ModalBarrier(dismissible: false, color: Colors.black38),
+        Center(
+          child: Card(
+            key: const ValueKey('pay-progress'),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    paymentPhaseText(l10n, flow),
+                    key: const ValueKey('pay-phase-inline'),
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  if (flow.phase == PaymentPhase.confirming) ...[
+                    const SizedBox(height: 8),
+                    Text(l10n.payDoNotRetry, textAlign: TextAlign.center),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 결제위젯 세션이 없을 때(비회원·설정 실패) 결제 버튼을 닫아 두는 값.
+final _neverReady = ValueNotifier<bool>(false);
+
+/// 결제수단·약관 위젯 영역. 설정 조회 중·실패·비회원은 위젯을 그리지 않는다(결제 버튼도 닫힌다).
+class _PaymentWidgetArea extends ConsumerWidget {
+  const _PaymentWidgetArea({
+    required this.config,
+    required this.session,
+    required this.amount,
+  });
+
+  final AsyncValue<PaymentWidgetConfig?> config;
+  final PgWidgetSession? session;
+  final int? amount;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    return switch (config) {
+      AsyncLoading() => Row(
+        key: const ValueKey('pg-config-loading'),
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 8),
+          Text(l10n.payMethodsLoading),
+        ],
+      ),
+      // 422 CONFIG_REQUIRED(서버에 키 없음)·조회 실패 모두 결제를 열지 않는다. 다시 받을 수 있다.
+      AsyncError() => _Banner(
+        key: const ValueKey('pg-config-failed'),
+        icon: Icons.error_outline,
+        text: l10n.payConfigRequired,
+        action: TextButton(
+          onPressed: () => ref.invalidate(paymentWidgetConfigProvider),
+          child: Text(l10n.payConfigRetry),
+        ),
+      ),
+      _ => switch ((session, amount)) {
+        (final PgWidgetSession s, final int a) => s.build(context, amount: a),
+        _ => const SizedBox.shrink(),
+      },
+    };
   }
 }
 
