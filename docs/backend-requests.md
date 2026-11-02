@@ -43,6 +43,7 @@
 | BR-33 | 중간 | 고객 | 내 취소·반품·환불 목록 경로가 없음(클레임 단건 환불 조회만) | OPEN(같은 요청서 §3) |
 | BR-34 | 높음 | 고객 | 주문서형 결제위젯: 결제 진입 전에 토스 clientKey(·customerKey)를 받을 경로가 없음(지금은 PAY 이후에만) | OPEN(요청 `docs/handoff/2026-10-31-backend-checkout-widget-and-product-names.md`) |
 | BR-35 | 높음 | 고객 | 주문·초안 품목 `productName`(주문 당시 사본)이 비어 와서 주문 내역에 SKU 가 보임 | OPEN(같은 요청서 §2) |
+| BR-36 | 중간 | 고객 | 상품 상세 `SaleOption.price` 가 항상 null(계약은 "pricing 사본"). 상세에 가격이 안 보임 | OPEN(요청 `docs/handoff/2026-11-02-backend-product-detail-price.md`). 앱은 `GET /prices?skus=` 로 채워 표시 중 |
 
 ---
 
@@ -229,3 +230,9 @@
 - 현황: `GET /products` 는 categoryId·saleState·size(최대 200)·cursor 만 받는다. 관리용 명칭이나 ID 로 찾는 파라미터가 없다.
 - 백오피스 임시: 콘텐츠 등록의 "승인된 상품" 드롭다운이 200개씩 불러와 그 안에서 거른다. 다 불러오지 않았으면 "없음"이라 하지 않고 "더 불러오기"를 보인다.
 - 요청: `GET /products?q=` (관리용 명칭 부분 일치, productId·baseProductId 일치). 상품 수가 늘면 필요하다.
+
+## BR-36 상품 상세 옵션 가격이 비어 옴 (고객앱)
+- 현황(LAN 2026-11-02): `GET /product-contents/{id}?mfcId=MFC-SEED-01` 의 `options[].price` 가 `null`. 같은 상품이 홈 카드(storefront)에는 `basePrice` 가 있고 `GET /prices/{sku}` 도 200 이다. product-content-service `ContentQueries` 주석 "가격은 pricing 의 것이라 넣지 않는다" — 의도적으로 안 채운다. 그러나 계약 `product-content-service.yaml` 의 `SaleOption.price` 설명은 "pricing 사본"이라 계약 설명과 구현이 다르다.
+- 영향: 고객앱 상세가 "가격 확인 중"으로만 보였다.
+- 앱 처리(2026-11-02): 상세 응답의 옵션 가격이 비면 `GET /prices?skus=` 로 표시 가격을 따로 읽어 합친다(`ApiCatalogRepository._pricesFor`). `notSet` 은 "판매 불가"·담기 비활성. 가격 조회 실패는 "가격 확인 중" 유지(0원·판매 불가로 확정하지 않음). 상세에 가격이 오면 가격 API 를 부르지 않으므로 백엔드가 채우기 시작해도 앱 변경은 없다.
+- 요청: (a) 상세에 pricing 사본을 채우든지, (b) 계약 설명을 "채우지 않는다. 표시 가격은 `/prices` 로 읽는다"로 고치든지 정해 달라. 요청서 `docs/handoff/2026-11-02-backend-product-detail-price.md`.

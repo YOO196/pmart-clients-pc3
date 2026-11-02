@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:pmart_api_pricing/pmart_api_pricing.dart' as pr;
 import 'package:pmart_api_product/pmart_api_product.dart' as pd;
 import 'package:pmart_api_product_content/pmart_api_product_content.dart' as pc;
 import 'package:pmart_api_search/pmart_api_search.dart' as sr;
@@ -42,12 +43,14 @@ final class ApiCatalogRepository implements CatalogRepository {
     : _storefront = sf.PmartApiStorefront(dio: dio).getStorefrontApi(),
       _categories = pd.PmartApiProduct(dio: dio).getCategoriesApi(),
       _search = sr.PmartApiSearch(dio: dio).getSearchApi(),
-      _contents = pc.PmartApiProductContent(dio: dio).getProductContentsApi();
+      _contents = pc.PmartApiProductContent(dio: dio).getProductContentsApi(),
+      _prices = pr.PmartApiPricing(dio: dio).getPricesApi();
 
   final sf.StorefrontApi _storefront;
   final pd.CategoriesApi _categories;
   final sr.SearchApi _search;
   final pc.ProductContentsApi _contents;
+  final pr.PricesApi _prices;
 
   @override
   Future<HomeView> home({String? mfcId, HomeTab? tab}) async {
@@ -128,8 +131,45 @@ final class ApiCatalogRepository implements CatalogRepository {
     final res = await pmartGuard(
       () => _contents.getProductContent(productId: productId, mfcId: mfcId),
     );
-    return productFromContract(_body(res.data, 'ProductContent'));
+    final content = _body(res.data, 'ProductContent');
+    return productFromContract(content, prices: await _pricesFor(content));
   }
+
+  /// 상세 응답의 옵션 `price` 가 비어 오면(백엔드 product-content 는 가격을 채우지 않는다, BR-36)
+  /// 표시 가격을 `GET /prices?skus=` 로 따로 읽는다. 가격 조회가 실패해도 상세는 보이고,
+  /// 그 옵션은 "가격 확인 중"으로 남는다(0원·판매 불가로 확정하지 않는다).
+  Future<OptionPrices?> _pricesFor(pc.ProductContent c) async {
+    final skus = [
+      for (final o in c.options ?? const <pc.SaleOption>[])
+        if (o.price?.basePrice == null && o.sku != null) o.sku!,
+    ];
+    if (skus.isEmpty) return null;
+    try {
+      // 계약은 style=form, explode=false(`skus=a,b`). dio 기본 배열 인코딩은 `skus=a&skus=b` 라 직접 잇는다.
+      final res = await pmartGuard(
+        () => _prices.listPrices(skus: [skus.join(',')]),
+      );
+      final body = res.data;
+      if (body == null) return null;
+      return OptionPrices(
+        prices: {
+          for (final p in body.items ?? const <pr.Price>[])
+            p.sku: (basePrice: p.basePrice, priceVersion: p.priceVersion),
+        },
+        notSet: {...?body.notSet},
+      );
+    } on PmartFailure {
+      return null;
+    }
+  }
+}
+
+/// `GET /prices?skus=` 결과. [notSet] 은 유효 가격이 없는 SKU(PRICE_NOT_SET, 판매 불가).
+final class OptionPrices {
+  const OptionPrices({required this.prices, required this.notSet});
+
+  final Map<String, ({int basePrice, int priceVersion})> prices;
+  final Set<String> notSet;
 }
 
 T _body<T>(T? data, String name) =>
@@ -299,7 +339,7 @@ List<FilterAttribute> filtersFromContract(sr.GetSearchFilters200Response r) => [
     ),
 ];
 
-ProductDetail productFromContract(pc.ProductContent c) {
+ProductDetail productFromContract(pc.ProductContent c, {OptionPrices? prices}) {
   final images = [...?c.images]
     ..sort((a, b) => (a.sortOrder ?? 0).compareTo(b.sortOrder ?? 0));
   final rating = c.rating;
@@ -327,7 +367,7 @@ ProductDetail productFromContract(pc.ProductContent c) {
         if (_saleState(o.saleState) != SaleState.saleStopped)
           SaleOption(
             sku: _required(o.sku, 'SaleOption.sku'),
-            label: o.label ?? o.sku!,
+            label: o.label,
             unitType: switch (o.unitType) {
               pc.SaleOptionUnitTypeEnum.E => UnitType.each,
               pc.SaleOptionUnitTypeEnum.B => UnitType.bundle,
@@ -335,8 +375,10 @@ ProductDetail productFromContract(pc.ProductContent c) {
             },
             unitsPerSku: o.unitsPerSku,
             capacityLabel: o.capacityLabel,
-            basePrice: o.price?.basePrice,
-            priceVersion: o.price?.priceVersion,
+            basePrice: o.price?.basePrice ?? prices?.prices[o.sku]?.basePrice,
+            priceVersion:
+                o.price?.priceVersion ?? prices?.prices[o.sku]?.priceVersion,
+            priceNotSet: prices?.notSet.contains(o.sku) ?? false,
             carried: o.availability?.carried,
             availability:
                 _saleState(o.saleState) == SaleState.temporarilySoldOut

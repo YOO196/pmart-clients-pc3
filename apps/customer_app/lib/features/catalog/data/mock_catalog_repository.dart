@@ -467,7 +467,8 @@ base class MockCatalogRepository implements CatalogRepository {
     'options': [
       {
         'sku': p.sku,
-        'label': '1개',
+        // 옵션이 없는 단일 SKU 상품은 label 이 없다(백엔드 안내 2026-10-31).
+        if (p.bundleSku != null) 'label': '1개',
         'unitType': 'E',
         'unitsPerSku': 1,
         'capacityLabel': p.capacity,

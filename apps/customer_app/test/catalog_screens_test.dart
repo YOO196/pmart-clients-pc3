@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
+import 'package:customer_app/features/cart/presentation/cart_screen.dart'
+    show AddToCartBar;
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/domain/catalog.dart';
 
@@ -206,7 +208,7 @@ void main() {
       expect(find.textContaining('0.0'), findsNothing);
     });
 
-    testWidgets('일시품절 옵션은 고를 수 없다', (t) async {
+    testWidgets('일시품절이면 담기를 열지 않고 품절로 보인다', (t) async {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();
       // 일시품절은 진열 맨 뒤라 화면 밖이다. 검색으로 찾는다.
@@ -216,11 +218,25 @@ void main() {
       await t.pumpAndSettle();
       await tapTile(t, 'P-0004');
 
-      final option = t.widget<RadioListTile<String>>(
-        find.byKey(const ValueKey('option-E-00000004')),
-      );
-      expect(option.enabled, isFalse);
+      expect(find.byKey(const ValueKey('option-E-00000004')), findsOneWidget);
       expect(find.textContaining('일시품절'), findsWidgets);
+      final add = t.widget<AddToCartBar>(find.byType(AddToCartBar));
+      expect(add.enabled, isFalse);
+    });
+
+    testWidgets('옵션이 하나뿐이면 옵션 선택이 없고 가격·담기만 보인다', (t) async {
+      await t.pumpWidget(testApp([]));
+      await t.pumpAndSettle();
+      await tapTile(t, 'P-0006');
+
+      expect(find.text('옵션 선택'), findsNothing);
+      expect(find.byType(RadioListTile<String>), findsNothing);
+      expect(find.byKey(const ValueKey('product-price')), findsOneWidget);
+      // 라벨이 없어도 SKU 코드는 보이지 않는다.
+      expect(find.textContaining('E-0000'), findsNothing);
+      final add = t.widget<AddToCartBar>(find.byType(AddToCartBar));
+      expect(add.enabled, isTrue);
+      expect(add.sku, 'E-00000006');
     });
 
     testWidgets('묶음 옵션은 별도 SKU 로 보인다', (t) async {

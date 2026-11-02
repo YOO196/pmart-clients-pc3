@@ -226,27 +226,34 @@ enum UnitType { each, bundle }
 class SaleOption {
   const SaleOption({
     required this.sku,
-    required this.label,
     required this.availability,
+    this.label,
     this.unitType,
     this.unitsPerSku,
     this.capacityLabel,
     this.basePrice,
     this.priceVersion,
+    this.priceNotSet = false,
     this.carried,
   });
 
   final String sku;
-  final String label;
+
+  /// 옵션 이름. 옵션 없이 SKU 가 하나뿐인 상품은 없다(SKU 코드를 대신 쓰지 않는다).
+  final String? label;
   final UnitType? unitType;
   final int? unitsPerSku;
   final String? capacityLabel;
   final int? basePrice;
   final int? priceVersion;
+
+  /// 유효 가격이 없다(PRICE_NOT_SET). 0원이 아니라 판매 불가다.
+  final bool priceNotSet;
   final Availability availability;
   final bool? carried;
 
   bool get canOfferAdd =>
+      !priceNotSet &&
       carried != false &&
       availability != Availability.soldOut &&
       availability != Availability.unknown;

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_api_product_content/pmart_api_product_content.dart' as pc;
 import 'package:pmart_api_storefront/pmart_api_storefront.dart' as sf;
@@ -112,6 +113,24 @@ void main() {
       expect(p.options.single.canOfferAdd, isFalse);
     });
 
+    test('라벨 없는 단일 SKU 옵션에 SKU 코드를 라벨로 쓰지 않는다', () {
+      final p = productFromContract(
+        pc.ProductContent.fromJson({
+          'productId': 'x',
+          'name': 'x',
+          'options': [
+            {
+              'sku': 'E-00000001',
+              'saleState': 'ON_SALE',
+              'availability': {'carried': true, 'state': 'AVAILABLE'},
+            },
+          ],
+        }),
+      );
+      expect(p.options.single.label, isNull);
+      expect(p.options.single.canOfferAdd, isTrue);
+    });
+
     test('가용 조회가 UNKNOWN 이면 품절도 가능도 아니다', () {
       final p = productFromContract(
         pc.ProductContent.fromJson({
@@ -128,6 +147,104 @@ void main() {
       );
       expect(p.options.single.availability, Availability.unknown);
       expect(p.options.single.canOfferAdd, isFalse);
+    });
+  });
+
+  group('실서버 상세 가격 (BR-36)', () {
+    const content = {
+      'productId': 'PRD-1',
+      'name': '고추장짜글이',
+      'options': [
+        {
+          'sku': 'E-00000017',
+          'saleState': 'ON_SALE',
+          'price': null,
+          'availability': {'carried': true, 'state': 'AVAILABLE'},
+        },
+        {
+          'sku': 'B-00000099',
+          'saleState': 'ON_SALE',
+          'availability': {'carried': true, 'state': 'AVAILABLE'},
+        },
+      ],
+    };
+
+    ApiCatalogRepository repoWith(FakeAdapter adapter) => ApiCatalogRepository(
+      createPmartDio(
+        baseUrl: 'http://test.invalid/api/v1',
+        sourceSystem: sourceSystem,
+        tokens: TokenStore(MemoryKeyValueStore()),
+        refresher: (_) async => null,
+        adapter: adapter,
+        delay: (_) async {},
+      ),
+    );
+
+    test('옵션 가격이 비어 오면 GET /prices?skus= 로 채우고, 미설정은 판매 불가', () async {
+      final adapter = FakeAdapter((options, _) async {
+        if (options.uri.path == '/api/v1/prices') {
+          expect(options.uri.queryParametersAll['skus'], [
+            'E-00000017,B-00000099',
+          ]);
+          return const FakeReply(
+            200,
+            body: {
+              'items': [
+                {
+                  'sku': 'E-00000017',
+                  'basePrice': 5480,
+                  'priceVersion': 1,
+                  'effectiveFrom': '2026-10-30T13:04:45Z',
+                },
+              ],
+              'notSet': ['B-00000099'],
+            },
+          );
+        }
+        return const FakeReply(200, body: content);
+      });
+
+      final p = await repoWith(adapter).product('PRD-1', mfcId: 'MFC-SEED-01');
+
+      final each = p.options.singleWhere((o) => o.sku == 'E-00000017');
+      expect(each.basePrice, 5480);
+      expect(each.priceVersion, 1);
+      expect(each.canOfferAdd, isTrue);
+      final bundle = p.options.singleWhere((o) => o.sku == 'B-00000099');
+      expect(bundle.basePrice, isNull);
+      expect(bundle.priceNotSet, isTrue);
+      expect(bundle.canOfferAdd, isFalse);
+    });
+
+    test('가격 조회가 실패해도 상세는 보이고 가격은 확인 중으로 남는다', () async {
+      final adapter = FakeAdapter((options, _) async {
+        if (options.uri.path == '/api/v1/prices') {
+          return const FakeReply.transport(DioExceptionType.connectionTimeout);
+        }
+        return const FakeReply(200, body: content);
+      });
+
+      final p = await repoWith(adapter).product('PRD-1');
+
+      expect(p.name, '고추장짜글이');
+      expect(p.options.map((o) => o.basePrice), everyElement(isNull));
+      expect(p.options.map((o) => o.priceNotSet), everyElement(isFalse));
+    });
+
+    test('상세에 가격이 이미 있으면 가격 API 를 부르지 않는다', () async {
+      final adapter = FakeAdapter((options, _) async {
+        expect(options.uri.path, isNot('/api/v1/prices'));
+        return FakeReply(
+          200,
+          body: MockCatalogRepository.productJson(
+            mockProducts.firstWhere((p) => p.productId == 'P-0001'),
+          ),
+        );
+      });
+
+      final p = await repoWith(adapter).product('P-0001');
+
+      expect(p.options.map((o) => o.basePrice), everyElement(isNotNull));
     });
   });
 

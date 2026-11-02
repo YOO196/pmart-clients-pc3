@@ -35,6 +35,7 @@
   "sectionRetry": "이 영역 다시 불러오기",
   "sectionEmpty": "보여줄 상품이 없어요",
   "priceUnavailable": "가격 확인 중",
+  "priceNotSet": "판매 불가",
   "ratingUnavailable": "평점 정보 없음",
   "ratingValue": "{rating} ({count})",
   "@ratingValue": {
@@ -117,6 +118,7 @@
   "filterUnavailable": "필터를 불러오지 못했어요",
   "productTitle": "상품 정보",
   "productOptions": "옵션 선택",
+  "optionDefault": "기본",
   "productDescription": "상품 설명",
   "productStorageGuide": "보관 방법",
   "productReturnGuide": "반품 안내",
