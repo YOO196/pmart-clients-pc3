@@ -6,7 +6,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
 import { ProblemFailure } from '../../api/failure';
-import { IMAGE_ROLES, type ContentDraft, type ContentDraftInput, type ImageRole, type ProductSummary } from '../../api/models';
+import type { ContentDraft, ContentDraftInput, ProductSummary } from '../../api/models';
 import { request } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback, reasonText } from '../../shared/Feedback';
@@ -15,8 +15,9 @@ import { QueryState } from '../../shared/QueryState';
 import { toUiState } from '../../shared/toUiState';
 import { useCommand } from '../../shared/useCommand';
 import { RequestApproval } from '../approvals/RequestApproval';
-import { multipart } from '../products/ProductImportPage';
 import { AuthedImage } from './AuthedImage';
+import { ImagePicker, type PendingImage } from './ImagePicker';
+import { uploadPendingImages, type UploadOutcome } from './imageUpload';
 import { NoticesJsonError, parseNoticesJson } from './noticesJson';
 import { ProductPicker } from './ProductPicker';
 
@@ -184,12 +185,21 @@ export function NewContentDraftPage() {
   // 상품 상세의 "콘텐츠·이미지 등록"에서 오면 상품 ID 를 채운다.
   const productId = useSearchParams()[0].get('productId') ?? '';
   const [openId, setOpenId] = useState('');
-  const create = useCommand((body: ContentDraftInput, key) =>
-    request('POST', api.content.POST('/content-drafts', { ...commandParams(key), body })).then((d) => {
-      void navigate(`/contents/drafts/${encodeURIComponent(d.draftId)}`);
-      return d;
-    }),
-  );
+  // 폼에서 고른 이미지. 초안이 만들어진 뒤(ID 가 생긴 뒤) 차례로 올린다(계약: 이미지는 초안에 붙는다).
+  const [pending, setPending] = useState<readonly PendingImage[]>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const create = useCommand(async (body: ContentDraftInput, key) => {
+    const d = await request('POST', api.content.POST('/content-drafts', { ...commandParams(key), body }));
+    let outcome: UploadOutcome = { uploaded: [], failed: [] };
+    if (pending.length > 0) {
+      outcome = await uploadPendingImages(api, d.draftId, pending, d.images ?? [], (done, total) => setProgress({ done, total }));
+      setProgress(null);
+      setPending(outcome.failed.map((f) => f.image));
+    }
+    // 전부 올라갔으면 초안 화면으로. 일부 실패면 이 화면에 남아 알리고, 초안 화면 링크를 보인다.
+    if (outcome.failed.length === 0) void navigate(`/contents/drafts/${encodeURIComponent(d.draftId)}`);
+    return { draft: d, ...outcome };
+  });
   return (
     <section className="space-y-4">
       <h1 className="text-xl font-bold">{m.contents.draftTitle}</h1>
@@ -212,76 +222,73 @@ export function NewContentDraftPage() {
           {m.search}
         </button>
       </form>
-      <p className="text-sm opacity-80">{m.contents.imageAfterSave}</p>
       <ContentForm
         {...(productId ? { initial: { productId } } : {})}
         submitLabel={m.products.create}
         busy={create.busy}
         onSubmit={(input) => void create.run(input)}
       />
-      <CommandFeedback command={create} />
+      <div className="space-y-2 rounded-box bg-base-100 p-4">
+        <h2 className="font-bold">{m.contents.images}</h2>
+        <p className="text-sm opacity-80">{m.contents.imageAfterSave}</p>
+        <ImagePicker pending={pending} onChange={setPending} disabled={create.busy} />
+        {pending.length > 0 && !create.busy && <p className="text-sm">{m.contents.imagesPending(pending.length)}</p>}
+        {progress && (
+          <p role="status" className="text-sm">
+            {m.contents.imageUploading(progress.done, progress.total)}
+          </p>
+        )}
+      </div>
+      <CommandFeedback command={create}>
+        {(r) =>
+          r.failed.length > 0 ? (
+            <p role="status" className="text-warning text-sm">
+              {m.contents.imageUploadPartial(r.uploaded.length, r.failed.length)}{' '}
+              <Link className="link" to={`/contents/drafts/${encodeURIComponent(r.draft.draftId)}`}>
+                {m.contents.openDraft}
+              </Link>
+            </p>
+          ) : null
+        }
+      </CommandFeedback>
     </section>
   );
 }
 
-function ImageUpload({ draft }: { readonly draft: ContentDraft }) {
+/** 기존 초안의 이미지. 고르는 즉시 한 장씩 올리고(Eum 방식) 초안을 다시 읽는다. */
+function DraftImages({ draft }: { readonly draft: ContentDraft }) {
   const api = useApi();
   const queryClient = useQueryClient();
-  const [file, setFile] = useState<File | null>(null);
-  const [role, setRole] = useState<ImageRole>('MAIN');
-  const [sortOrder, setSortOrder] = useState('0');
-  const upload = useCommand(async (v: { file: File; role: ImageRole; sortOrder: number }, key) => {
-    const img = await request(
-      'POST',
-      api.content.POST('/content-drafts/{draftId}/images', {
-        ...commandParams(key, { path: { draftId: draft.draftId } }),
-        body: { file: '', role: v.role, sortOrder: v.sortOrder },
-        ...multipart({ file: v.file, role: v.role, sortOrder: String(v.sortOrder) }),
-      }),
-    );
+  const [pending, setPending] = useState<readonly PendingImage[]>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const upload = useCommand(async (images: readonly PendingImage[]) => {
+    const outcome = await uploadPendingImages(api, draft.draftId, images, draft.images ?? [], (done, total) => setProgress({ done, total }));
+    setProgress(null);
     await queryClient.invalidateQueries({ queryKey: ['content', 'draft', draft.draftId] });
-    return img;
+    setPending(outcome.failed.map((f) => f.image));
+    return outcome;
   });
+  const onChange = (next: readonly PendingImage[]) => {
+    setPending(next);
+    const added = next.filter((p) => !pending.some((q) => q.id === p.id));
+    if (added.length > 0 && !upload.busy) void upload.run(added);
+  };
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-end gap-2">
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          aria-label={m.contents.uploadImage}
-          className="file-input file-input-sm"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-        />
-        <select
-          aria-label={m.contents.images}
-          className="select select-sm w-36"
-          value={role}
-          onChange={(e) => setRole(IMAGE_ROLES.find((r) => r === e.target.value) ?? 'MAIN')}
-        >
-          {IMAGE_ROLES.map((r) => (
-            <option key={r} value={r}>
-              {m.contents.imageRole[r]}
-            </option>
-          ))}
-        </select>
-        <input
-          aria-label={m.contents.sortOrder}
-          className="input input-sm w-20"
-          inputMode="numeric"
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value)}
-        />
-        <button
-          type="button"
-          className="btn btn-sm"
-          disabled={!file || upload.busy}
-          onClick={() => file && void upload.run({ file, role, sortOrder: /^\d+$/.test(sortOrder) ? Number(sortOrder) : 0 })}
-        >
-          {m.contents.uploadImage}
-        </button>
-      </div>
-      <CommandFeedback command={upload} />
+      <ImagePicker pending={pending} onChange={onChange} existing={draft.images ?? []} disabled={upload.busy} />
+      {progress && (
+        <p role="status" className="text-sm">
+          {m.contents.imageUploading(progress.done, progress.total)}
+        </p>
+      )}
+      <CommandFeedback command={upload}>
+        {(r) => (
+          <p role="status" className={`text-sm ${r.failed.length > 0 ? 'text-warning' : 'text-success'}`}>
+            {r.failed.length > 0 ? m.contents.imageUploadPartial(r.uploaded.length, r.failed.length) : m.contents.imageUploaded(r.uploaded.length)}
+          </p>
+        )}
+      </CommandFeedback>
     </div>
   );
 }
@@ -344,15 +351,18 @@ export function ContentDraftPage() {
 
             <div className="space-y-2 rounded-box bg-base-100 p-4">
               <h2 className="font-bold">{m.contents.images}</h2>
-              <div className="flex flex-wrap gap-3">
-                {(d.images ?? []).map((img) => (
-                  <figure key={img.imageId} className="w-32 text-xs">
-                    <AuthedImage imageId={img.imageId} alt={`${m.contents.imageRole[img.role]} ${img.sortOrder}`} className="h-32 w-32 object-contain" />
-                    <figcaption>{`${m.contents.imageRole[img.role]} · ${img.sortOrder}`}</figcaption>
-                  </figure>
-                ))}
-              </div>
-              {d.state === 'DRAFT' && <ImageUpload draft={d} />}
+              {d.state === 'DRAFT' ? (
+                <DraftImages key={d.images?.length ?? 0} draft={d} />
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {(d.images ?? []).map((img) => (
+                    <figure key={img.imageId} className="w-32 text-xs">
+                      <AuthedImage imageId={img.imageId} alt={`${m.contents.imageRole[img.role]} ${img.sortOrder}`} className="h-32 w-32 object-contain" />
+                      <figcaption>{`${m.contents.imageRole[img.role]} · ${img.sortOrder}`}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
             </div>
 
             {d.state === 'DRAFT' && (

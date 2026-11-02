@@ -7,7 +7,8 @@ import { API_BASE } from '../../api/client';
 import { renderAt } from '../../test/render';
 import { server } from '../../test/server';
 
-const field = (name: string) => screen.getByLabelText<HTMLInputElement | HTMLTextAreaElement>(name);
+// 이미지 영역에도 같은 이름(상세설명 등)이 있어 입력란만 고른다.
+const field = (name: string) => screen.getByRole('textbox', { name });
 
 describe('콘텐츠 등록 — 승인된 상품 고르기(드롭다운)', () => {
   it('드롭다운에서 상품을 고르면 상품 ID 가 채워지고, 게시된 콘텐츠가 있으면 다섯 칸을 자동 기입한다', async () => {

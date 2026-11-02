@@ -385,7 +385,9 @@ export const catalogHandlers = [
       const roleField = form.get('role');
       const role = typeof roleField === 'string' ? roleField : '';
       const sortOrder = Number(form.get('sortOrder') ?? 0);
-      if (!(file instanceof Blob) || !['MAIN', 'DESCRIPTION', 'DETAIL'].includes(role) || (role === 'MAIN' && sortOrder !== 0)) {
+      // 테스트(Node fetch/msw)에서는 파일이 다른 Blob 구현으로 올 수 있어 instanceof 대신 모양으로 본다.
+      const isFile = (x: unknown): x is Blob => typeof x === 'object' && x !== null && typeof (x as Blob).arrayBuffer === 'function';
+      if (!isFile(file) || !['MAIN', 'DESCRIPTION', 'DETAIL'].includes(role) || (role === 'MAIN' && sortOrder !== 0)) {
         return problem(422, 'IMAGE_INVALID');
       }
       const imageId = nextId('img');

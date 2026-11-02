@@ -82,6 +82,7 @@ describe('이동', () => {
 
     expect(await screen.findByRole('heading', { name: '콘텐츠 등록(개별)' })).toBeInTheDocument();
     expect(screen.getByLabelText('상품 ID(승인된 상품)')).toHaveValue('P-00000001');
-    expect(screen.getByText(/초안을 저장한 뒤 다음 화면에서 올릴 수 있어요/)).toBeInTheDocument();
+    expect(screen.getByText(/초안과 함께 올라가요/)).toBeInTheDocument();
+    expect(screen.getByLabelText('대표 이미지 추가')).toBeInTheDocument();
   });
 });
