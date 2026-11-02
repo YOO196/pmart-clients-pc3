@@ -203,9 +203,16 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final provider = claimProvider(widget.claimId);
-    ref.listen(provider, (_, next) {
+    ref.listen(provider, (prev, next) {
       if (next.isLoading) return;
-      _scheduleRefresh(next.hasError ? null : next.value);
+      final claim = next.hasError ? null : next.value;
+      _scheduleRefresh(claim);
+      // 클레임이 나아가면 주문 상태도 바뀐다(출고 중지·취소·환불). 아래에 열려 있는 주문 상세·목록이
+      // 돌아갔을 때 옛 상태를 보이지 않도록 다시 읽게 한다.
+      if (claim != null && claim.state != prev?.value?.state) {
+        ref.invalidate(orderDetailProvider(claim.orderId));
+        ref.invalidate(orderListProvider);
+      }
     });
     return Scaffold(
       appBar: AppBar(title: Text(l10n.claimTitle)),

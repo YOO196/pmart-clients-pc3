@@ -327,6 +327,42 @@ void main() {
       expect(claims.getCalls, calls);
     });
 
+    testWidgets('취소가 끝난 뒤 주문 상세·목록으로 돌아가면 새로고침 없이 "주문 취소"로 보인다', (
+      t,
+    ) async {
+      await openOrder(t, 'order-seed-4');
+      expect(find.byKey(const ValueKey('cancel-order')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('cancel-order')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cancel-submit')));
+      await t.pumpAndSettle();
+      for (var i = 0; i < 3; i++) {
+        await t.pump(const Duration(seconds: 3));
+        await t.pumpAndSettle();
+      }
+      expect(find.text('처리가 끝났어요'), findsOneWidget);
+
+      // 처리 내역 → 주문 상세
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+      expect(
+        t.widget<Text>(find.byKey(const ValueKey('order-status'))).data,
+        '주문 취소',
+      );
+      expect(find.byKey(const ValueKey('cancel-order')), findsNothing);
+
+      // 주문 상세 → 주문 내역
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('order-order-seed-4')),
+          matching: find.text('주문 취소'),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('도착 시간 변경은 확인 중 → 확정 뒤에만 바뀐 시간으로 보인다', (t) async {
       await openOrder(t, 'order-seed-4');
       await t.tap(find.byKey(const ValueKey('reschedule')));

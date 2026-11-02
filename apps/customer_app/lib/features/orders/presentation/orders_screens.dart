@@ -68,7 +68,11 @@ class OrderListScreen extends ConsumerWidget {
                       ].join(' · '),
                     ),
                     trailing: Text(_money(l10n, o.totalAmount)),
-                    onTap: () => context.push('/orders/${o.orderId}'),
+                    onTap: () async {
+                      await context.push('/orders/${o.orderId}');
+                      // 상세에서 취소·변경을 했을 수 있다. 돌아오면 목록을 다시 읽는다.
+                      if (context.mounted) ref.invalidate(orderListProvider);
+                    },
                   ),
               ],
             ),
@@ -103,17 +107,25 @@ class OrderDetailScreen extends ConsumerWidget {
   }
 }
 
-class _OrderBody extends StatelessWidget {
+class _OrderBody extends ConsumerWidget {
   const _OrderBody({required this.order});
 
   final OrderDetail order;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final o = order;
     final byLine = {for (final l in o.lines) l.orderLineId: l};
+
+    /// 취소·변경·처리 내역 화면에 다녀오면 주문이 바뀌었을 수 있다. 돌아올 때 상세·목록을 다시 읽는다.
+    Future<void> visit(String location) async {
+      await context.push(location);
+      if (!context.mounted) return;
+      ref.invalidate(orderDetailProvider(o.orderId));
+      ref.invalidate(orderListProvider);
+    }
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -210,14 +222,14 @@ class _OrderBody extends StatelessWidget {
             leading: const Icon(Icons.assignment_return_outlined),
             title: Text(l10n.claimTitle),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/claims/${c.claimId}'),
+            onTap: () => visit('/claims/${c.claimId}'),
           ),
         const SizedBox(height: 16),
         // 버튼은 요청 진입일 뿐이다. 가능 여부는 서버가 판정한다.
         if (o.deliveryMode == 'SCHEDULED' && o.status == OrderStatus.confirmed)
           OutlinedButton(
             key: const ValueKey('reschedule'),
-            onPressed: () => context.push('/orders/${o.orderId}/reschedule'),
+            onPressed: () => visit('/orders/${o.orderId}/reschedule'),
             child: Text(l10n.rescheduleTitle),
           ),
         if (switch (o.status) {
@@ -228,7 +240,7 @@ class _OrderBody extends StatelessWidget {
         })
           OutlinedButton(
             key: const ValueKey('cancel-order'),
-            onPressed: () => context.push('/orders/${o.orderId}/cancel'),
+            onPressed: () => visit('/orders/${o.orderId}/cancel'),
             child: Text(l10n.cancelTitle),
           ),
       ],
