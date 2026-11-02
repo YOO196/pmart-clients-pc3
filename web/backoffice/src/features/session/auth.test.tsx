@@ -3,9 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { loginOperator, refreshOperatorTokens } from '../../api/auth';
-import { createApi, SOURCE_SYSTEM } from '../../api/client';
+import { createApi, SOURCE_SYSTEM, tokens } from '../../api/client';
 import { request } from '../../api/pmartFetch';
 import { createPmartFetch } from '../../api/pmartFetch';
+import { SESSION_STORAGE_KEY } from '../../api/sessionPersistence';
 import { TokenStore } from '../../api/tokens';
 import { App } from '../../app/App';
 import { mockAuthPolicy } from '../../mocks/authHandlers';
@@ -66,6 +67,40 @@ describe('운영자 로그인 화면', () => {
       expect(list?.headers.get('Authorization')).toMatch(/^Bearer /);
     });
     rec.stop();
+  });
+
+  it('새로고침(앱 다시 마운트)해도 이 탭에 보관한 refresh token 으로 세션을 되살려 로그인 화면으로 보내지 않는다', async () => {
+    const user = userEvent.setup();
+    const first = render(<App memory initialPath="/products" />);
+    await screen.findByRole('heading', { name: '운영자 로그인' });
+    await login(user, 'md');
+    expect(await screen.findByRole('heading', { name: '상품 조회' })).toBeInTheDocument();
+    const saved = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    expect(saved).toContain('"refreshToken"');
+    expect(saved).not.toContain(tokens.accessToken ?? '--'); // access 는 저장하지 않는다
+    const savedRefresh = (JSON.parse(saved!) as { refreshToken: string }).refreshToken;
+
+    // 새로고침: 메모리 토큰은 사라지고 sessionStorage 만 남는다.
+    first.unmount();
+    tokens.accessToken = null;
+    sessionStorage.setItem(SESSION_STORAGE_KEY, saved!);
+    render(<App memory initialPath="/products" />);
+
+    expect(await screen.findByRole('heading', { name: '상품 조회' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '운영자 로그인' })).not.toBeInTheDocument();
+    // 복원된 세션은 토큰 클레임으로 표시한다(로그인 응답의 표시 이름은 없다).
+    expect(screen.getByRole('link', { name: /내 세션: / })).toBeInTheDocument();
+    // refresh 는 회전된다(같은 값을 다시 쓰지 않는다).
+    const rotated = (JSON.parse(sessionStorage.getItem(SESSION_STORAGE_KEY)!) as { refreshToken: string }).refreshToken;
+    expect(rotated).not.toBe(savedRefresh);
+  });
+
+  it('보관한 refresh token 이 더는 유효하지 않으면(세션 종료) 보관을 지우고 로그인 화면으로 보낸다', async () => {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ refreshToken: 'rt-gone', deviceId: 'dev-1' }));
+    render(<App memory initialPath="/products" />);
+
+    expect(await screen.findByRole('heading', { name: '운영자 로그인' })).toBeInTheDocument();
+    expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
   });
 
   it('아이디·비밀번호가 틀리면 LOGIN_FAILED 문구, 5번 틀리면 ACCOUNT_LOCKED', async () => {

@@ -63,6 +63,7 @@
 ## BR-03 토큰 보관 방식
 - auth-service.yaml `info.description`: "쿠키/CSRF 방식은 [팀 확인 필요]". 게이트웨이 `default-filters: RemoveRequestHeader=Cookie`.
 - 클라이언트 임시안: 모바일은 Bearer + refresh(보안 저장소). 웹은 access token 메모리 보관. 웹 refresh 를 HttpOnly 쿠키로 할지 결정 필요.
+- 2026-11-02 백오피스 임시: 새로고침마다 로그인되는 문제로, refresh token + 기기 ID 만 탭 범위 `sessionStorage` 에 두고 시작 때 refresh 회전 1회로 세션을 되살린다(`web/backoffice/src/api/sessionPersistence.ts`). access token 은 저장하지 않고 localStorage 는 쓰지 않는다. 쿠키 방식이 정해지면 이 파일을 지운다.
 
 ## BR-04 CORS
 - 게이트웨이에 CORS 설정 없음. 개발은 Vite 프록시로 우회 가능. 운영에서 관리자 웹을 게이트웨이와 같은 출처로 배포할지, 허용 출처를 둘지 결정 필요.

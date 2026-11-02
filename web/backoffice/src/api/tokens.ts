@@ -1,6 +1,7 @@
-// 토큰은 메모리에만 둔다(localStorage 금지, BR-03). 새로고침하면 다시 로그인한다.
+// access token 은 메모리에만 둔다(localStorage 금지, BR-03). refresh token 과 기기 ID 는 새로고침 복원을 위해
+// 이 탭의 sessionStorage 에만 둔다(`sessionPersistence.ts`, 탭을 닫으면 사라진다) — BR-03(쿠키) 확정 전까지의 방식.
 // refresh token 은 한 번만 쓴다(ADR-0018 회전): 갱신 응답의 새 값으로 바로 바꾼다.
-// X-Device-Id 도 이 탭의 메모리에 둔다. 갱신 때 로그인 때와 같은 값을 보내야 하고, refresh 가 메모리에만 있으니 탭 단위로 충분하다.
+// X-Device-Id 는 갱신 때 로그인 때와 같은 값을 보내야 하므로 refresh 와 함께 복원한다.
 
 import { randomUuid } from './uuid';
 
@@ -16,8 +17,18 @@ export class TokenStore {
   private access: string | null = null;
   private refresh: string | null = null;
   private listeners = new Set<Listener>();
+  private device: string = randomUuid();
+
   /** 이 탭의 기기 ID(로그인·갱신에 같은 값) */
-  readonly deviceId: string = randomUuid();
+  get deviceId(): string {
+    return this.device;
+  }
+
+  /** 새로고침 복원: 저장해 둔 refresh token 과 기기 ID 를 되살린다(access 는 갱신으로 받는다). 알리지 않는다. */
+  restore(refreshToken: string, deviceId: string): void {
+    this.refresh = refreshToken;
+    this.device = deviceId;
+  }
 
   get accessToken(): string | null {
     return this.access;

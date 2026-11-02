@@ -225,6 +225,7 @@ export const messages = {
     importTitle: '상품 일괄 등록(seed-v1)',
     zipFile: 'seed-v1.zip',
     upload: '업로드·검증',
+    uploadAnother: '다른 파일 올리기',
     batch: (id: string) => `배치 ${id}`,
     counts: (total: number, valid: number, invalid: number) => `전체 ${total} · 유효 ${valid} · 오류 ${invalid}`,
     submitBatch: '유효 행 제출 준비',

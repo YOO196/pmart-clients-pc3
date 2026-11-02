@@ -47,10 +47,11 @@ export function ZipUpload({
   );
 }
 
-export function NewProductImportPage() {
+/** seed-v1.zip 을 올려 배치를 만들고(검증까지 서버가 한다) 그 배치 화면으로 간다. */
+function useImportUpload() {
   const api = useApi();
   const navigate = useNavigate();
-  const upload = useCommand((file: File, key) =>
+  return useCommand((file: File, key) =>
     request(
       'POST',
       api.product.POST('/product-import-batches', { ...commandParams(key), body: { file: '' }, ...multipart({ file }) }),
@@ -59,15 +60,28 @@ export function NewProductImportPage() {
       return b;
     }),
   );
+}
+
+export function NewProductImportPage() {
+  const upload = useImportUpload();
   return (
     <section className="space-y-4">
       <h1 className="text-xl font-bold">{m.products.importTitle}</h1>
-      <ZipUpload
-        busy={upload.busy}
-        onUpload={(file) => void upload.run(file)}
-      />
+      <ZipUpload busy={upload.busy} onUpload={(file) => void upload.run(file)} />
       <CommandFeedback command={upload} />
     </section>
+  );
+}
+
+/** 배치 화면에서 바로 다른 파일을 올린다(다른 메뉴로 갔다 올 필요 없음). 배치가 바뀌면 새로 시작한다(key). */
+function AnotherUpload() {
+  const upload = useImportUpload();
+  return (
+    <div className="space-y-2">
+      <h2 className="font-bold">{m.products.uploadAnother}</h2>
+      <ZipUpload busy={upload.busy} onUpload={(file) => void upload.run(file)} />
+      <CommandFeedback command={upload} />
+    </div>
   );
 }
 
@@ -160,6 +174,7 @@ export function ProductImportPage() {
           </>
         )}
       </QueryState>
+      <AnotherUpload key={batchId} />
     </section>
   );
 }
