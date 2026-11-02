@@ -91,6 +91,32 @@ const sku = (n: number, productId: string, saleState: ProductDetail['saleState']
   publishedAt: '2026-10-29T01:00:00Z',
 });
 
+/** 게시된 콘텐츠 1건(사과). 콘텐츠 등록에서 상품을 고르면 이 값으로 자동 기입된다. 미역국은 게시된 콘텐츠 없음. */
+function seedContentDrafts(): Map<string, ContentDraft> {
+  const published: ContentDraft = {
+    draftId: 'cd-seed-published-1',
+    sourceSystem: null,
+    sourceKey: null,
+    productId: 'P-00000001',
+    state: 'PUBLISHED',
+    input: {
+      productId: 'P-00000001',
+      name: '사과 1.5kg',
+      description: '아삭한 부사 사과',
+      storageGuide: '냉장 보관',
+      returnGuide: '신선식품은 받은 뒤 24시간 안에',
+      notices: ['원산지: 국산', '품종: 부사'],
+    },
+    images: [],
+    draftHash: null,
+    approvalId: 'apv-seed-content-1',
+    contentVersion: 1,
+    version: 1,
+    updatedAt: '2026-10-29T01:00:00Z',
+  };
+  return new Map([[published.draftId, published]]);
+}
+
 export function createDb(): MockDb {
   const products = new Map<string, ProductDetail>();
   for (const [i, name] of [
@@ -176,7 +202,7 @@ export function createDb(): MockDb {
     products,
     productDrafts: new Map(),
     importBatches: new Map(),
-    contentDrafts: new Map(),
+    contentDrafts: seedContentDrafts(),
     contentBatches: new Map(),
     images: new Map(),
     changeRequests: new Map(),

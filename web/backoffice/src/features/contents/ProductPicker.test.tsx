@@ -7,52 +7,70 @@ import { API_BASE } from '../../api/client';
 import { renderAt } from '../../test/render';
 import { server } from '../../test/server';
 
-describe('콘텐츠 등록 — 승인된 상품 고르기', () => {
-  it('입력란에 커서를 두면 승인된 상품 목록이 열리고, 검색해서 고르면 상품 ID 가 채워진다', async () => {
+const field = (name: string) => screen.getByLabelText<HTMLInputElement | HTMLTextAreaElement>(name);
+
+describe('콘텐츠 등록 — 승인된 상품 고르기(드롭다운)', () => {
+  it('드롭다운에서 상품을 고르면 상품 ID 가 채워지고, 게시된 콘텐츠가 있으면 다섯 칸을 자동 기입한다', async () => {
     const user = userEvent.setup();
     renderAt('/contents/drafts/new');
-    const input = screen.getByRole('combobox', { name: '상품 ID(승인된 상품)' });
+    const select = screen.getByRole('combobox', { name: '상품 ID(승인된 상품)' });
+    await screen.findByRole('option', { name: /사과 1.5kg/ });
+    expect(within(select).getAllByRole('option')).toHaveLength(3); // 안내 1 + 상품 2
 
-    await user.click(input);
-    const list = await screen.findByRole('listbox', { name: '승인된 상품' });
-    expect(within(list).getAllByRole('option')).toHaveLength(2);
+    await user.selectOptions(select, 'P-00000001');
 
-    await user.type(input, '미역');
-    expect(within(list).getAllByRole('option')).toHaveLength(1);
-    await user.click(within(list).getByRole('option', { name: /소고기 미역국/ }));
-
-    expect(input).toHaveValue('P-00000002');
-    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(select).toHaveValue('P-00000001');
+    expect(await screen.findByText('게시된 콘텐츠로 상품명·상세설명·고시 정보·보관 안내·반품 안내를 채웠어요')).toBeInTheDocument();
+    expect(field('고객용 상품명')).toHaveValue('사과 1.5kg');
+    expect(field('상세설명')).toHaveValue('아삭한 부사 사과');
+    expect(field('고시 정보("항목: 값", 줄마다 하나)')).toHaveValue('원산지: 국산\n품종: 부사');
+    expect(field('보관 안내')).toHaveValue('냉장 보관');
+    expect(field('반품 안내')).toHaveValue('신선식품은 받은 뒤 24시간 안에');
   });
 
-  it('키보드로도 고를 수 있다', async () => {
+  it('게시된 콘텐츠가 없는 상품은 상품명(관리용 명칭)만 채우고 나머지는 비워 둔다', async () => {
     const user = userEvent.setup();
     renderAt('/contents/drafts/new');
-    const input = screen.getByRole('combobox', { name: '상품 ID(승인된 상품)' });
+    const select = screen.getByRole('combobox', { name: '상품 ID(승인된 상품)' });
+    await screen.findByRole('option', { name: /소고기 미역국/ });
 
-    await user.click(input);
-    await screen.findByRole('listbox');
-    await user.keyboard('{ArrowDown}{Enter}');
+    await user.selectOptions(select, 'P-00000002');
 
-    expect(input).toHaveValue('P-00000002');
+    expect(await screen.findByText('게시된 콘텐츠가 없어 상품명(관리용 명칭)만 채웠어요')).toBeInTheDocument();
+    expect(field('고객용 상품명')).toHaveValue('소고기 미역국 500g');
+    expect(field('상세설명')).toHaveValue('');
+    expect(field('고시 정보("항목: 값", 줄마다 하나)')).toHaveValue('');
   });
 
-  it('목록 조회 실패는 "없음"이 아니라 오류로 보인다', async () => {
+  it('상품이 골라지면 오른쪽 X 가 보이고, 누르면 폼 전체가 비워진다', async () => {
+    const user = userEvent.setup();
+    renderAt('/contents/drafts/new');
+    const select = screen.getByRole('combobox', { name: '상품 ID(승인된 상품)' });
+    await screen.findByRole('option', { name: /사과 1.5kg/ });
+    expect(screen.queryByRole('button', { name: '전체 지우기' })).not.toBeInTheDocument();
+
+    await user.selectOptions(select, 'P-00000001');
+    await screen.findByText(/채웠어요/);
+    await user.click(screen.getByRole('button', { name: '전체 지우기' }));
+
+    expect(select).toHaveValue('');
+    expect(field('고객용 상품명')).toHaveValue('');
+    expect(field('고시 정보("항목: 값", 줄마다 하나)')).toHaveValue('');
+    expect(screen.queryByRole('button', { name: '전체 지우기' })).not.toBeInTheDocument();
+  });
+
+  it('목록 조회 실패는 빈 드롭다운이 아니라 오류로 보인다', async () => {
     server.use(
       http.get(`${API_BASE}/products`, () =>
         HttpResponse.json({ status: 503, code: 'DEPENDENCY_UNAVAILABLE', retryable: false }, { status: 503 }),
       ),
     );
-    const user = userEvent.setup();
     renderAt('/contents/drafts/new');
 
-    await user.click(screen.getByRole('combobox', { name: '상품 ID(승인된 상품)' }));
-
     expect(await screen.findByRole('alert')).toBeInTheDocument();
-    expect(screen.queryByText('찾는 상품이 없어요')).not.toBeInTheDocument();
   });
 
-  it('다 불러오지 않은 상태에서 못 찾으면 없다고 단정하지 않고 더 불러오게 한다', async () => {
+  it('다 불러오지 않았으면 "더 불러오기"가 보이고, 누르면 다음 쪽 상품이 드롭다운에 더해진다', async () => {
     server.use(
       http.get(`${API_BASE}/products`, ({ request }) => {
         const cursor = new URL(request.url).searchParams.get('cursor');
@@ -65,15 +83,12 @@ describe('콘텐츠 등록 — 승인된 상품 고르기', () => {
     );
     const user = userEvent.setup();
     renderAt('/contents/drafts/new');
-    const input = screen.getByRole('combobox', { name: '상품 ID(승인된 상품)' });
-
-    await user.click(input);
-    await screen.findByRole('listbox');
-    await user.type(input, '귤');
-    expect(screen.getByText('불러온 1개 안에는 없어요. 더 불러와서 찾아 보세요')).toBeInTheDocument();
+    await screen.findByRole('option', { name: /사과 1.5kg/ });
+    expect(screen.queryByRole('option', { name: /귤 3kg/ })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '더 불러오기(지금 1개)' }));
-    await user.click(await screen.findByRole('option', { name: /귤 3kg/ }));
-    expect(input).toHaveValue('P-00000099');
+
+    expect(await screen.findByRole('option', { name: /귤 3kg/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /더 불러오기/ })).not.toBeInTheDocument();
   });
 });

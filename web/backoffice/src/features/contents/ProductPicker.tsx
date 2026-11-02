@@ -1,9 +1,10 @@
-// 승인된 상품 고르기(콘텐츠 등록용). 목록은 GET /products 를 쪽 단위로 불러온다.
-// 서버 검색어 파라미터가 없어(BR-31) 불러온 범위 안에서만 거른다. 다 불러오지 않았으면 "없음"으로 단정하지 않는다.
+// 승인된 상품 고르기(콘텐츠 등록용). 검색·필터 없는 드롭다운(사용자 결정 2026-11-02).
+// 목록은 GET /products 를 쪽 단위로 불러온다. 다 불러오지 않았으면 "더 불러오기"를 보인다.
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useId, useMemo, useRef, useState } from 'react';
+import { useId, useMemo } from 'react';
 
 import { PmartFailure } from '../../api/failure';
+import type { ProductSummary } from '../../api/models';
 import { request } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
 import { FailureAlert } from '../../shared/Feedback';
@@ -15,20 +16,20 @@ export function ProductPicker({
   label,
   value,
   onChange,
+  onClear,
 }: {
   readonly label: string;
   readonly value: string;
-  readonly onChange: (productId: string) => void;
+  /** 고른 상품. 목록에 없는 ID(상품 상세에서 넘어온 값 등)면 product 는 없다. */
+  readonly onChange: (productId: string, product?: ProductSummary) => void;
+  /** 상품이 골라져 있을 때 오른쪽 X — 폼 전체를 비운다. */
+  readonly onClear?: () => void;
 }) {
   const api = useApi();
-  const listId = useId();
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectId = useId();
 
   const query = useInfiniteQuery({
     queryKey: ['product', 'picker'],
-    enabled: open,
     initialPageParam: '',
     queryFn: ({ pageParam }) =>
       request(
@@ -41,108 +42,45 @@ export function ProductPicker({
   });
 
   const loaded = useMemo(() => query.data?.pages.flatMap((p) => p.items ?? []) ?? [], [query.data]);
-  const term = value.trim().toLowerCase();
-  const matches = useMemo(
-    () =>
-      term
-        ? loaded.filter((p) =>
-            [p.productId, p.internalName, p.baseProductId].some((x) => x?.toLowerCase().includes(term)),
-          )
-        : loaded,
-    [loaded, term],
-  );
-
-  const pick = (productId: string) => {
-    onChange(productId);
-    setOpen(false);
-  };
-  const show = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    setOpen(true);
-  };
-  // 목록 항목을 누를 시간을 준 뒤 닫는다.
-  const hideSoon = () => {
-    closeTimer.current = setTimeout(() => setOpen(false), 150);
-  };
+  const known = loaded.some((p) => p.productId === value);
 
   return (
-    <div className="relative flex flex-col gap-1 text-sm" onMouseEnter={show} onMouseLeave={hideSoon}>
-      <label htmlFor={`${listId}-input`}>{label}</label>
-      <input
-        id={`${listId}-input`}
-        role="combobox"
-        aria-expanded={open}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        autoComplete="off"
-        placeholder={m.contents.pickerPlaceholder}
-        className="input input-sm w-full"
-        value={value}
-        onFocus={show}
-        onBlur={hideSoon}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setActive(0);
-          setOpen(true);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setOpen(true);
-            setActive((i) => Math.min(i + 1, Math.max(matches.length - 1, 0)));
-          } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setActive((i) => Math.max(i - 1, 0));
-          } else if (e.key === 'Enter' && open && matches[active]?.productId) {
-            e.preventDefault();
-            pick(matches[active].productId);
-          } else if (e.key === 'Escape') {
-            setOpen(false);
-          }
-        }}
-      />
-      {open && (
-        <div className="absolute top-full z-20 mt-1 w-full rounded-box bg-base-100 p-2 shadow-lg">
-          {query.isPending && <p className="p-2 opacity-70">{m.loading}</p>}
-          {query.error instanceof PmartFailure && <FailureAlert failure={query.error} />}
-          {query.isSuccess && (
-            <>
-              <ul id={listId} role="listbox" aria-label={m.contents.pickerList} className="max-h-64 overflow-y-auto">
-                {matches.map((p, i) => (
-                  <li
-                    key={p.productId}
-                    role="option"
-                    aria-selected={i === active}
-                    className={`cursor-pointer rounded px-2 py-1 ${i === active ? 'bg-base-200' : ''}`}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onMouseEnter={() => setActive(i)}
-                    onClick={() => p.productId && pick(p.productId)}
-                  >
-                    <span className="font-medium">{p.internalName ?? m.none}</span>
-                    <span className="ml-2 opacity-70">{p.productId}</span>
-                    {p.saleState && <span className="ml-2 opacity-70">{m.products.saleStateName[p.saleState]}</span>}
-                  </li>
-                ))}
-              </ul>
-              {matches.length === 0 && (
-                <p className="p-2 opacity-70">
-                  {query.hasNextPage ? m.contents.pickerNoneYet(loaded.length) : m.contents.pickerNone}
-                </p>
-              )}
-              {query.hasNextPage && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-xs mt-1"
-                  disabled={query.isFetchingNextPage}
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => void query.fetchNextPage()}
-                >
-                  {m.contents.pickerMore(loaded.length)}
-                </button>
-              )}
-            </>
-          )}
-        </div>
+    <div className="flex flex-col gap-1 text-sm">
+      <label htmlFor={selectId}>{label}</label>
+      <div className="flex items-center gap-2">
+        <select
+          id={selectId}
+          className="select select-sm w-full"
+          value={value}
+          disabled={query.isPending}
+          onChange={(e) => {
+            const id = e.target.value;
+            onChange(
+              id,
+              loaded.find((p) => p.productId === id),
+            );
+          }}
+        >
+          <option value="">{query.isPending ? m.loading : m.contents.pickerSelect}</option>
+          {/* 목록에 없는 값(상품 상세에서 넘어온 ID 등)도 선택된 채로 보인다 */}
+          {value && !known && <option value={value}>{value}</option>}
+          {loaded.map((p) => (
+            <option key={p.productId} value={p.productId ?? ''}>
+              {`${p.internalName ?? m.none} · ${p.productId ?? ''}${p.saleState ? ` · ${m.products.saleStateName[p.saleState]}` : ''}`}
+            </option>
+          ))}
+        </select>
+        {value && onClear && (
+          <button type="button" className="btn btn-ghost btn-sm btn-square" aria-label={m.contents.clearAll} title={m.contents.clearAll} onClick={onClear}>
+            ✕
+          </button>
+        )}
+      </div>
+      {query.error instanceof PmartFailure && <FailureAlert failure={query.error} />}
+      {query.hasNextPage && (
+        <button type="button" className="btn btn-ghost btn-xs self-start" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>
+          {m.contents.pickerMore(loaded.length)}
+        </button>
       )}
     </div>
   );

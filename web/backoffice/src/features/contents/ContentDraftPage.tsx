@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
-import { IMAGE_ROLES, type ContentDraft, type ContentDraftInput, type ImageRole } from '../../api/models';
+import { ProblemFailure } from '../../api/failure';
+import { IMAGE_ROLES, type ContentDraft, type ContentDraftInput, type ImageRole, type ProductSummary } from '../../api/models';
 import { request } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback, reasonText } from '../../shared/Feedback';
@@ -16,6 +17,7 @@ import { useCommand } from '../../shared/useCommand';
 import { RequestApproval } from '../approvals/RequestApproval';
 import { multipart } from '../products/ProductImportPage';
 import { AuthedImage } from './AuthedImage';
+import { NoticesJsonError, parseNoticesJson } from './noticesJson';
 import { ProductPicker } from './ProductPicker';
 
 function ContentForm({
@@ -49,6 +51,67 @@ function ContentForm({
     </label>
   );
   const opt = (s: string) => (s.trim() ? s.trim() : null);
+  const [jsonNote, setJsonNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [pickNote, setPickNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const api = useApi();
+
+  /** 상품을 고르면 게시된 콘텐츠(GET /product-contents/{productId})로 다섯 칸을 채운다. 없으면(404) 관리용 명칭만. */
+  const pickProduct = async (productId: string, product?: ProductSummary) => {
+    setPickNote(null);
+    if (!productId) {
+      setV({ ...v, productId: '' });
+      return;
+    }
+    const base = { ...v, productId };
+    try {
+      const c = await request('GET', api.content.GET('/product-contents/{productId}', { params: { path: { productId } } }));
+      setV({
+        ...base,
+        name: c.name ?? base.name,
+        description: c.description ?? base.description,
+        storageGuide: c.storageGuide ?? base.storageGuide,
+        returnGuide: c.returnGuide ?? base.returnGuide,
+        notices: (c.notices ?? []).join('\n') || base.notices,
+      });
+      setPickNote({ ok: true, text: m.contents.autoFilled });
+    } catch (e) {
+      if (e instanceof ProblemFailure && e.problem.status === 404) {
+        setV({ ...base, name: base.name.trim() ? base.name : (product?.internalName ?? '') });
+        setPickNote({ ok: true, text: m.contents.autoFilledNameOnly });
+      } else {
+        // 조회 실패는 "게시된 콘텐츠 없음"이 아니다. 상품 ID 만 두고 알린다.
+        setV(base);
+        setPickNote({ ok: false, text: m.contents.autoFillFailed });
+      }
+    }
+  };
+
+  const clearAll = () => {
+    setV({ productId: '', name: '', description: '', storageGuide: '', returnGuide: '', notices: '' });
+    setPickNote(null);
+    setJsonNote(null);
+  };
+
+  /** 고시 정보 JSON 파일로 채운다. notices 는 바꿔 넣고, 상품명·설명·안내는 빈 칸만 채운다. */
+  const fillFromJson = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const parsed = parseNoticesJson(await file.text());
+      const next = { ...v, notices: parsed.notices.join('\n') };
+      let extra = 0;
+      for (const k of ['name', 'description', 'storageGuide', 'returnGuide'] as const) {
+        const value = parsed.fields[k];
+        if (value && !v[k].trim()) {
+          next[k] = value;
+          extra += 1;
+        }
+      }
+      setV(next);
+      setJsonNote({ ok: true, text: m.contents.noticesJsonFilled(parsed.notices.length, extra) });
+    } catch (e) {
+      setJsonNote({ ok: false, text: m.contents.noticesJsonInvalid(e instanceof NoticesJsonError ? e.message : String(e)) });
+    }
+  };
 
   return (
     <form
@@ -72,10 +135,38 @@ function ContentForm({
         });
       }}
     >
-      <ProductPicker label={m.contents.productId} value={v.productId} onChange={(productId) => setV({ ...v, productId })} />
+      <div className="flex flex-col gap-1 md:col-span-2">
+        <ProductPicker label={m.contents.productId} value={v.productId} onChange={(id, product) => void pickProduct(id, product)} onClear={clearAll} />
+        {pickNote && (
+          <span role="status" className={`text-sm ${pickNote.ok ? 'text-success' : 'text-error'}`}>
+            {pickNote.text}
+          </span>
+        )}
+      </div>
       {field('name', m.contents.name)}
       {field('description', m.contents.description, true)}
       {field('notices', m.contents.notices, true)}
+      <div className="flex flex-col gap-1 text-sm md:col-span-2">
+        <label className="flex flex-wrap items-center gap-2">
+          {m.contents.noticesJson}
+          <input
+            type="file"
+            accept="application/json,.json"
+            aria-label={m.contents.noticesJson}
+            className="file-input file-input-sm"
+            onChange={(e) => {
+              void fillFromJson(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+        </label>
+        <span className="text-xs opacity-70">{m.contents.noticesJsonHint}</span>
+        {jsonNote && (
+          <span role="status" className={jsonNote.ok ? 'text-success' : 'text-error'}>
+            {jsonNote.text}
+          </span>
+        )}
+      </div>
       {field('storageGuide', m.contents.storageGuide)}
       {field('returnGuide', m.contents.returnGuide)}
       <div className="md:col-span-2">

@@ -344,6 +344,24 @@ export const catalogHandlers = [
     const d = db.contentDrafts.get(String(params['id']));
     return d ? HttpResponse.json(viewContent(d)) : problem(404, 'NOT_FOUND');
   }),
+  // 게시된 콘텐츠(고객 공개 API). 콘텐츠 등록의 상품 선택 자동 기입이 읽는다. 게시된 것이 없으면 404.
+  http.get(`${API_BASE}/product-contents/:id`, ({ params }) => {
+    const productId = String(params['id']);
+    const d = [...db.contentDrafts.values()].find((c) => c.state === 'PUBLISHED' && c.productId === productId);
+    if (!d) return problem(404, 'NOT_FOUND');
+    const i = d.input ?? {};
+    return HttpResponse.json({
+      productId,
+      contentVersion: d.contentVersion ?? 1,
+      name: i.name,
+      description: i.description ?? null,
+      storageGuide: i.storageGuide ?? null,
+      returnGuide: i.returnGuide ?? null,
+      notices: i.notices ?? [],
+      images: [],
+      options: [],
+    });
+  }),
   http.put(`${API_BASE}/content-drafts/:id`, async ({ request, params }) => {
     const input = (await request.json()) as ContentDraftInput;
     return idempotent(request, () => {
