@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { commandParams } from '../../api/command';
 import { ProblemFailure } from '../../api/failure';
-import type { CategoryNode, CategoryTreeDraftRequest } from '../../api/models';
+import type { CategoryAdditionRequest, CategoryNode, CategoryTreeDraftRequest } from '../../api/models';
 import { request } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback } from '../../shared/Feedback';
@@ -204,11 +204,110 @@ function DraftUpload() {
   );
 }
 
+/** seed-v1 기준파일의 categories.json 으로 "없는 카테고리만" 더하는 트리 초안(백엔드 요청 2026-11-02 §3-1). */
+function AdditionUpload() {
+  const api = useApi();
+  const [file, setFile] = useState<File | null>(null);
+  const [formatError, setFormatError] = useState(false);
+  const tree = useQuery({
+    queryKey: ['product', 'category-tree'],
+    queryFn: () => request('GET', api.product.GET('/categories/tree', {})),
+  });
+  const create = useCommand((body: CategoryAdditionRequest, key) =>
+    request('POST', api.product.POST('/category-tree-additions', { ...commandParams(key), body })),
+  );
+  const version = create.phase.kind === 'done' ? create.phase.result.version : null;
+  const status = useQuery({
+    queryKey: ['product', 'category-tree-version', version],
+    enabled: version !== null,
+    queryFn: () =>
+      request('GET', api.product.GET('/category-tree-versions/{version}', { params: { path: { version: version ?? 0 } } })),
+  });
+  const nothingToAdd = create.phase.kind === 'rejected' && create.phase.failure instanceof ProblemFailure && create.phase.failure.problem.code === 'NOTHING_TO_ADD';
+  const conflict = create.phase.kind === 'rejected' && create.phase.failure instanceof ProblemFailure && create.phase.failure.problem.code === 'CATEGORY_CONFLICT';
+
+  const onSubmit = async () => {
+    if (!file) return;
+    try {
+      const c = (await readJson(file)) as { categories?: unknown };
+      if (!Array.isArray(c.categories)) throw new Error('format');
+      setFormatError(false);
+      // 묶음 본문을 그대로 보낸다(백엔드가 pmartCategoryIdLevels·bmartPath 를 읽는다).
+      await create.run({ categories: c.categories as CategoryAdditionRequest['categories'] });
+    } catch {
+      setFormatError(true);
+    }
+  };
+
+  return (
+    <div className="space-y-3 rounded-box bg-base-100 p-4">
+      <h2 className="font-bold">{m.categories.additionTitle}</h2>
+      <p className="text-sm opacity-80">{m.categories.additionHint}</p>
+      <label className="flex flex-col text-sm">
+        {m.categories.additionFile}
+        <input
+          type="file"
+          accept="application/json,.json"
+          aria-label={m.categories.additionFile}
+          className="file-input file-input-sm"
+          onChange={(e) => {
+            setFile(e.target.files?.[0] ?? null);
+            if (create.phase.kind !== 'running') create.reset();
+          }}
+        />
+      </label>
+      {formatError && <p className="text-error text-sm">{m.categories.additionInvalid}</p>}
+      <button type="button" className="btn btn-sm" disabled={!file || create.busy || create.phase.kind === 'done'} onClick={() => void onSubmit()}>
+        {m.categories.additionSubmit}
+      </button>
+      {nothingToAdd ? (
+        <p role="status" className="alert alert-info text-sm">
+          {m.categories.additionNothing}
+        </p>
+      ) : conflict ? (
+        <p role="alert" className="alert alert-error text-sm">
+          {m.categories.additionConflict}
+        </p>
+      ) : (
+        <CommandFeedback command={create}>
+          {(v) => {
+            const current = tree.data?.version;
+            const stale = v.baseVersion != null && current !== undefined && current !== v.baseVersion;
+            return (
+              <div className="space-y-2 text-sm">
+                <p role="status">{m.categories.additionCreated(v.version, v.baseVersion ?? null)}</p>
+                <p>
+                  {m.categories.additionAdded(v.addedCategoryIds?.length ?? 0)}
+                  {(v.addedCategoryIds?.length ?? 0) > 0 && <span className="ml-2 opacity-70">{(v.addedCategoryIds ?? []).join(', ')}</span>}
+                </p>
+                {(v.skippedPaths?.length ?? 0) > 0 && (
+                  <p className="text-warning">{`${m.categories.additionSkipped(v.skippedPaths?.length ?? 0)}: ${(v.skippedPaths ?? []).join(' / ')}`}</p>
+                )}
+                {stale && <p className="text-warning">{m.categories.additionStale(v.baseVersion ?? 0, current ?? 0)}</p>}
+                {status.data && (
+                  <p>
+                    {`${m.categories.state}: ${status.data.state}`}
+                    <button type="button" className="btn btn-ghost btn-xs" onClick={() => void status.refetch()}>
+                      {m.checkAgain}
+                    </button>
+                  </p>
+                )}
+                {v.approvalRequest && <RequestApproval body={v.approvalRequest} />}
+              </div>
+            );
+          }}
+        </CommandFeedback>
+      )}
+    </div>
+  );
+}
+
 export function CategoryTreePage() {
   return (
     <section className="space-y-4">
       <h1 className="text-xl font-bold">{m.categories.title}</h1>
       <TreeView />
+      <AdditionUpload />
       <DraftUpload />
     </section>
   );

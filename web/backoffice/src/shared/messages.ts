@@ -172,6 +172,20 @@ export const messages = {
     filterGroupCount: '필터 그룹',
     exposed: '노출',
     hidden: '숨김',
+    additionTitle: '기준파일(seed-v1) 카테고리 추가',
+    additionHint:
+      '묶음의 categories.json 을 고르면 발효 트리에 없는 카테고리만 더한 새 트리 초안을 만들어요. 기존 노드·필터는 그대로예요. 승인·발효 뒤 상품 일괄 등록으로 넘어가요.',
+    additionFile: 'categories.json(seed-v1)',
+    additionSubmit: '없는 카테고리만 추가',
+    additionInvalid: '파일 형식이 맞지 않아요. seed-v1 categories.json 의 categories 배열이 필요해요.',
+    additionCreated: (v: number, base: number | null) =>
+      `트리 버전 ${v} 초안을 만들었어요(발효 버전 ${base ?? '없음'} 기준).`,
+    additionAdded: (n: number) => `새로 더한 카테고리 ${n}개`,
+    additionSkipped: (n: number) => `id 가 없어 건너뛴 경로 ${n}개(묶음에서 매핑 안 됨)`,
+    additionNothing: '추가할 카테고리가 없어요(모두 이미 있어요). 바로 상품 일괄 등록으로 넘어가면 돼요.',
+    additionConflict: '같은 id 가 다른 이름으로 있거나 같은 경로가 다른 id 로 있어요. 묶음의 categories.json 을 확인해 주세요.',
+    additionStale: (base: number, current: number) =>
+      `이 초안은 발효 버전 ${base} 기준인데 지금 발효 버전은 ${current} 이에요. 다시 만들어 주세요.`,
   },
 
   products: {
@@ -229,6 +243,11 @@ export const messages = {
     batch: (id: string) => `배치 ${id}`,
     counts: (total: number, valid: number, invalid: number) => `전체 ${total} · 유효 ${valid} · 오류 ${invalid}`,
     submitBatch: '유효 행 제출 준비',
+    fillInvalid: '빠진 값 채우기',
+    fillInvalidHint: '묶음에는 중량(g)·보관 방식이 대부분 없어요. 상품명·용량을 보고 운영자가 채운 뒤 저장하면 다시 검증해요(미리 채워 넣지 않아요).',
+    fillSave: '저장·재검증',
+    fillSaved: (name: string) => `${name} 저장했어요`,
+    volumeHint: (ml: number | undefined) => (ml === undefined ? '용량 -' : `용량 ${ml}mL`),
     excluded: '제외된 초안',
     idMap: 'id-map.json 내려받기',
     listTitle: '상품 조회',

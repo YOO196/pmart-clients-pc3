@@ -48,6 +48,8 @@ export type CategoryNode = P['CategoryNode'];
 export type FilterGroup = P['FilterGroup'];
 export type CategoryTreeDraftRequest = P['CategoryTreeDraftRequest'];
 export type CategoryTreeVersion = P['CategoryTreeVersion'];
+/** seed-v1 묶음의 categories.json 본문(없는 노드만 더하는 트리 초안, `POST /category-tree-additions`) */
+export type CategoryAdditionRequest = P['CategoryAdditionRequest'];
 export type ProductDraftInput = P['ProductDraftInput'];
 export type ProductDraft = P['ProductDraft'];
 export type ImportBatch = P['ImportBatch'];

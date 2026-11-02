@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import type {
+  CategoryAdditionRequest,
   CategoryNode,
   CategoryTreeDraftRequest,
   ContentDraft,
@@ -172,6 +173,67 @@ export const catalogHandlers = [
           targetRef: `categoryTreeVersion:${version}`,
           allowedActions: ['APPLY_CATEGORY_TREE'],
           summary: `카테고리 트리 v${version} (노드 ${nodes.length})`,
+          lines: [{ lineKey: String(version) }],
+        },
+      };
+      db.treeVersions.set(version, { ...v, nodes });
+      return { status: 201, body: v };
+    });
+  }),
+  // seed-v1 categories.json → 발효 트리에 없는 노드만 더한 초안(2026-11-02 백엔드 요청 §2-2)
+  http.post(`${API_BASE}/category-tree-additions`, async ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    const body = (await request.json()) as CategoryAdditionRequest;
+    return idempotent(request, () => {
+      const base = db.tree;
+      const existing = new Map((base?.nodes ?? []).map((n) => [n.categoryId, n]));
+      const byPath = new Map((base?.nodes ?? []).map((n) => [n.path ?? n.name, n.categoryId]));
+      const levels = ['TOP', 'SUB', 'CHIP1', 'CHIP2'] as const;
+      const added: CategoryNode[] = [];
+      const skipped: string[] = [];
+      for (const c of body.categories) {
+        const ids = c.pmartCategoryIdLevels;
+        if (!ids || ids.length === 0) {
+          skipped.push(c.bmartPath.join(' > '));
+          continue;
+        }
+        for (let i = 0; i < ids.length; i++) {
+          const id = ids[i]!;
+          const name = c.bmartPath[i] ?? id;
+          const path = c.bmartPath.slice(0, i + 1).join(' > ');
+          const known = existing.get(id);
+          if (known) {
+            if (known.name !== name) return problem(400, 'CATEGORY_CONFLICT');
+            continue;
+          }
+          const other = byPath.get(path);
+          if (other && other !== id) return problem(400, 'CATEGORY_CONFLICT');
+          const node: CategoryNode = { categoryId: id, parentId: i === 0 ? null : ids[i - 1]!, level: levels[i] ?? 'CHIP2', name, path, sortOrder: 99, exposed: true };
+          existing.set(id, node);
+          byPath.set(path, id);
+          added.push(node);
+        }
+      }
+      if (added.length === 0) return problem(422, 'NOTHING_TO_ADD');
+      const version = Math.max(base?.version ?? 0, ...db.treeVersions.keys()) + 1;
+      const nodes = [...(base?.nodes ?? []), ...added];
+      const v = {
+        version,
+        state: 'DRAFT' as const,
+        nodeCount: nodes.length,
+        filterGroupCount: Object.keys(base?.filters ?? {}).length,
+        countsByLevel: {},
+        approvalId: null,
+        effectiveFrom: null,
+        baseVersion: base?.version ?? null,
+        addedCategoryIds: added.map((n) => n.categoryId),
+        skippedPaths: skipped,
+        approvalRequest: {
+          type: 'PRODUCT' as const,
+          targetService: 'product-service' as const,
+          targetRef: `categoryTreeVersion:${version}`,
+          allowedActions: ['APPLY_CATEGORY_TREE'],
+          summary: `카테고리 추가 v${version} (+${added.length})`,
           lines: [{ lineKey: String(version) }],
         },
       };
