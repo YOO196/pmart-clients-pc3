@@ -18,8 +18,8 @@ import 'claims_controller.dart';
 
 String claimStateText(AppLocalizations l10n, ClaimState s) => switch (s) {
   ClaimState.opened => l10n.clOpened,
-  ClaimState.underReview => l10n.clUnderReview,
-  ClaimState.stopPending => l10n.clStopPending,
+  // 출고 중지 확인(STOP_PENDING)은 내부 단계라 고객에게는 "확인 중"으로만 보인다(2026-11-02 사용자 결정).
+  ClaimState.underReview || ClaimState.stopPending => l10n.clUnderReview,
   ClaimState.decided => l10n.clDecided,
   ClaimState.inProgress => l10n.clInProgress,
   ClaimState.closed => l10n.clClosed,

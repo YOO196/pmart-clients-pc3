@@ -312,7 +312,7 @@ void main() {
       }
 
       await next();
-      expect(find.text('출고 중지를 확인하고 있어요'), findsOneWidget);
+      expect(find.text('확인하고 있어요'), findsOneWidget);
       await next();
       expect(find.text('취소·환불을 진행하고 있어요'), findsOneWidget);
       expect(find.text('환불 진행 중'), findsOneWidget);

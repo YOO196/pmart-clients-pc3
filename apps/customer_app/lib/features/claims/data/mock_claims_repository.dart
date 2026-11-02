@@ -5,7 +5,7 @@ import '../../orders/data/mock_orders_repository.dart';
 import '../domain/claims.dart';
 import 'claims_repository.dart';
 
-/// 목 구현. 취소는 조회할 때마다 접수 → 출고 중지 확인 → 환불 진행 → 종결로 나아간다.
+/// 목 구현. 취소는 조회할 때마다 접수 → 출고 중지 확인(고객에게는 "확인 중") → 환불 진행 → 종결로 나아간다.
 /// 배송이 시작된 주문은 취소를 받지 않는다(ORDER_NOT_CANCELLABLE).
 base class MockClaimsRepository implements ClaimsRepository {
   MockClaimsRepository({
