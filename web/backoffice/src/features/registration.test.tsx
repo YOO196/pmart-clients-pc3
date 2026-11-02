@@ -14,7 +14,7 @@ describe('상품 등록 → 승인 요청 → 승인 → 반영', () => {
     const md = renderAt('/products/drafts/new');
 
     await user.type(screen.getByLabelText('관리용 명칭'), '테스트 사과');
-    await user.type(screen.getByLabelText('대표 카테고리 노드 ID'), 'p01-c01-l01');
+    await user.selectOptions(await screen.findByLabelText('대표 카테고리'), 'p01-c01-l01');
     await user.type(screen.getByLabelText('중량(g)'), '1000');
     await user.selectOptions(screen.getByLabelText('보관 방식'), 'CHILLED');
     await user.click(screen.getByRole('button', { name: '초안 저장' }));
@@ -66,7 +66,7 @@ describe('상품 등록 → 승인 요청 → 승인 → 반영', () => {
     const user = userEvent.setup();
     renderAt('/products/drafts/new');
     await user.type(screen.getByLabelText('관리용 명칭'), '중량 없는 상품');
-    await user.type(screen.getByLabelText('대표 카테고리 노드 ID'), 'p01');
+    await user.selectOptions(await screen.findByLabelText('대표 카테고리'), 'p01');
     await user.click(screen.getByRole('button', { name: '초안 저장' }));
 
     expect(await screen.findByText('INVALID')).toBeInTheDocument();
