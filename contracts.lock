@@ -1,13 +1,11 @@
 {
   "dart": {
-    "backendCommit": "1fd370c2274ce4f352fca2114f7089d35f2c399e",
+    "backendCommit": "82fafc9f9528a5f0d5b9c57351b620566f46e84b",
     "backendContractsDirty": false,
-    "generatedAt": "2026-11-02T08:37:17.202276Z",
+    "generatedAt": "2026-11-02T11:43:16.453781Z",
     "generator": "openapi-generator-cli 7.26.0 (dart-dio, json_serializable)",
     "regenerated": [
-      "customer-service",
-      "order-service",
-      "payment-service"
+      "order-service"
     ],
     "services": {
       "auth-service": [
@@ -78,9 +76,9 @@
     }
   },
   "web": {
-    "backendCommit": "f427fde8260080fedd9612aaeb3314624f88fbf8",
+    "backendCommit": "46e8dc259d688e7366d6fe43c187cbf98f8cba2a",
     "backendContractsDirty": false,
-    "generatedAt": "2026-10-30T07:51:53.129Z",
+    "generatedAt": "2026-11-02T12:00:42.116Z",
     "generator": "openapi-typescript 7.13.0 (TS 5.9)",
     "services": [
       "ai-assistant-service",

@@ -268,7 +268,8 @@ class _LineTile extends StatelessWidget {
     return ListTile(
       key: ValueKey('line-${l.orderLineId}'),
       contentPadding: EdgeInsets.zero,
-      title: Text(l.productName ?? l.sku),
+      // 주문 당시 상품명·옵션 사본(BR-35). 없을 때만 sku.
+      title: Text(l.title),
       subtitle: notes.isEmpty ? null : Text(notes.join(' · ')),
       trailing: Text(
         [

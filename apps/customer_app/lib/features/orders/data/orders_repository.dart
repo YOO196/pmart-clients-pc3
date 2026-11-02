@@ -154,6 +154,7 @@ OrderDetail orderFromContract(api.Order o) => OrderDetail(
         orderLineId: _need(l.orderLineId, 'OrderLine.orderLineId'),
         sku: _need(l.sku, 'OrderLine.sku'),
         productName: l.productName,
+        optionLabel: l.optionLabel,
         unitPrice: l.unitPrice,
         originalQty: l.originalQty,
         cancelledBeforeShipQty: l.cancelledBeforeShipQty,

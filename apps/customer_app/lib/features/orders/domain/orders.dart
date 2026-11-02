@@ -29,13 +29,15 @@ class OrderPage {
   final String? nextCursor;
 }
 
-/// 주문 품목. 이름·단가는 주문 당시 스냅샷이다. 수량은 서버가 나눠 준 값만 쓴다.
+/// 주문 품목. 이름·옵션 라벨·단가는 주문 당시 사본(BR-35, 초안 때 고정)이다. 수량은 서버가 나눠 준 값만 쓴다.
+/// 이름이 없으면(사본 조회 실패·2026-11-02 이전 주문) 그때만 sku 로 대신 보인다.
 @immutable
 class OrderLineView {
   const OrderLineView({
     required this.orderLineId,
     required this.sku,
     this.productName,
+    this.optionLabel,
     this.unitPrice,
     this.originalQty,
     this.cancelledBeforeShipQty,
@@ -48,7 +50,16 @@ class OrderLineView {
   final String orderLineId;
   final String sku;
   final String? productName;
+
+  /// 옵션 라벨 사본. 단일 옵션 상품은 null 일 수 있다(상세 화면의 옵션 숨김 정책과 같다).
+  final String? optionLabel;
   final int? unitPrice;
+
+  /// 화면 제목: 상품명(+ 옵션). 이름이 없을 때만 sku.
+  String get title => [
+    productName ?? sku,
+    if (productName != null && optionLabel != null) optionLabel!,
+  ].join(' · ');
   final int? originalQty;
   final int? cancelledBeforeShipQty;
   final int? handedOverQty;

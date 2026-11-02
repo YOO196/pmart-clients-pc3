@@ -46,6 +46,9 @@ Widget testApp(
   retry: (_, _) => null,
   overrides: [
     envProvider.overrideWithValue(PmartEnv.mock),
+    onSessionExpiredProvider.overrideWith(
+      (ref) => ref.read(sessionExpiryHandlerProvider),
+    ),
     catalogRepositoryProvider.overrideWithValue(
       catalog ?? MockCatalogRepository(latency: Duration.zero),
     ),

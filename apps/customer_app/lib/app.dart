@@ -10,6 +10,9 @@ import 'l10n/gen/app_localizations.dart';
 import 'router.dart';
 import 'shared/providers.dart';
 
+/// 화면 어디서든 세션 안내(스낵바)를 띄우기 위한 루트 메신저.
+final rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
 class CustomerApp extends ConsumerWidget {
   const CustomerApp({super.key});
 
@@ -17,10 +20,39 @@ class CustomerApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // 저장된 세션 확인(한 번). 결과는 sessionProvider 로 퍼진다.
     ref.watch(sessionRestoreProvider);
+    // 세션이 끝났을 때 한 번 알린다: 조용히 이어졌으면 짧게, 안 됐으면 "다시 로그인" 버튼과 함께.
+    ref.listen(sessionNoticeProvider, (_, notice) {
+      if (notice == null) return;
+      ref.read(sessionNoticeProvider.notifier).clear();
+      final messenger = rootScaffoldMessengerKey.currentState;
+      final ctx = rootScaffoldMessengerKey.currentContext;
+      if (messenger == null || ctx == null) return;
+      final l10n = AppLocalizations.of(ctx);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        switch (notice) {
+          SessionNotice.renewed => SnackBar(
+            key: const ValueKey('session-renewed'),
+            content: Text(l10n.sessionRenewed),
+          ),
+          SessionNotice.expired => SnackBar(
+            key: const ValueKey('session-expired'),
+            content: Text(l10n.sessionExpiredNotice),
+            duration: const Duration(seconds: 8),
+            action: SnackBarAction(
+              label: l10n.sessionExpiredLogin,
+              // 로그인은 현재 화면 위에 열리고, 끝나면 그 화면으로 돌아온다(입력값 유지).
+              onPressed: () => ref.read(routerProvider).push('/login'),
+            ),
+          ),
+        },
+      );
+    });
     return _app(ref);
   }
 
   Widget _app(WidgetRef ref) => MaterialApp.router(
+    scaffoldMessengerKey: rootScaffoldMessengerKey,
     onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
     theme: PmartTheme.light(),
     darkTheme: PmartTheme.dark(),

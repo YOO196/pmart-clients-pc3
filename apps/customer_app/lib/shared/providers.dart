@@ -70,6 +70,9 @@ final guestDioProvider = Provider<Dio>((ref) {
 });
 
 /// 실서버(local) 연동용 Dio(회원 토큰). 목 모드에서는 만들지 않는다.
+///
+/// 갱신이 거절되면(세션 종료) 인터셉터가 토큰을 지운 뒤 [onSessionExpired] 를 부른다 → 세션 컨트롤러가
+/// 조용한 재로그인을 시도하고 안 되면 비회원으로 바꾼다(백엔드 요청 2026-11-02 세션 만료 §3).
 final dioProvider = Provider<Dio>((ref) {
   final baseUrl = ref.watch(apiBaseUrlProvider);
   final deviceId = ref.watch(deviceIdProvider);
@@ -79,9 +82,13 @@ final dioProvider = Provider<Dio>((ref) {
     tokens: ref.watch(tokenStoreProvider),
     deviceId: deviceId,
     refresher: authRefresher(baseUrl: baseUrl, deviceId: deviceId),
+    onSessionExpired: () => ref.read(onSessionExpiredProvider)(),
     log: kDebugMode ? debugPrint : null,
   );
 });
+
+/// 세션 종료 때 할 일. 앱은 세션 컨트롤러를 연결한다(`auth_controller.dart`). 순환 의존을 피하려고 간접 호출한다.
+final onSessionExpiredProvider = Provider<void Function()>((_) => () {});
 
 /// `POST /auth/tokens` 로 토큰을 회전한다.
 ///

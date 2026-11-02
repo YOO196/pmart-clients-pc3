@@ -12,6 +12,10 @@ import '../domain/auth.dart';
 abstract interface class SocialTokenSource {
   /// 제공자 장애면 [SocialProviderDown] 을 던진다.
   Future<SocialCredential?> obtain(SocialProvider provider);
+
+  /// 조용한 재로그인(화면 없이). 세션이 끝났을 때 먼저 시도한다(백엔드 요청 2026-11-02 세션 만료 §3-2).
+  /// 못 받으면 null — 던지지 않는다.
+  Future<SocialCredential?> obtainSilently(SocialProvider provider);
 }
 
 final class SocialProviderDown implements Exception {

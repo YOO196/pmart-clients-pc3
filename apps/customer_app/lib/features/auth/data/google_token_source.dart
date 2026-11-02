@@ -68,6 +68,26 @@ final class GoogleSocialTokenSource implements SocialTokenSource {
     }
   }
 
+  /// 조용한 재로그인: 계정 선택 창 없이 지난번 계정으로 ID 토큰을 받는다(google_sign_in 7 `attemptLightweightAuthentication`).
+  /// 세션이 끝났을 때 먼저 시도하고, 안 되면 호출자가 로그인 화면으로 안내한다. 실패는 null 로 돌려 던지지 않는다.
+  @override
+  Future<SocialCredential?> obtainSilently(SocialProvider provider) async {
+    if (provider != SocialProvider.google) return null;
+    try {
+      await (_initialized ??= _signIn.initialize(
+        serverClientId: serverClientId,
+      ));
+      final account = await _signIn.attemptLightweightAuthentication();
+      final idToken = account?.authentication.idToken;
+      if (account == null || idToken == null || idToken.isEmpty) return null;
+      return SocialCredential(idToken, accountLabel: account.email);
+    } on GoogleSignInException {
+      return null;
+    } on Object {
+      return null;
+    }
+  }
+
   /// [시험 전용] 서버 인가 코드가 나오는지 확인한다(백엔드 handoff 2026-10-31 서버 인가 코드 시험, ADR-0025 초안).
   /// 코드 값은 남기지 않고 null 여부·길이만 찍는다. 서버에는 보내지 않는다.
   /// GoogleSignInServerAuthorization.toString 은 코드를 찍으므로 그 객체를 문자열로 바꾸지 않는다.

@@ -112,7 +112,7 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
                   ListTile(
                     key: ValueKey('cancel-line-${l.orderLineId}'),
                     contentPadding: EdgeInsets.zero,
-                    title: Text(l.productName ?? l.sku),
+                    title: Text(l.title),
                     trailing: Text(l10n.cancelLineQty(q)),
                   ),
               const SizedBox(height: 12),
@@ -235,7 +235,18 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
                 ListTile(
                   key: ValueKey('claim-line-${l.orderLineId}'),
                   contentPadding: EdgeInsets.zero,
-                  title: Text(l.sku ?? l.orderLineId),
+                  // 클레임 응답에는 이름이 없다(BR-35 회신 §3). 주문 상세의 품목 사본과 orderLineId 로 맞춘다.
+                  title: Text(
+                    ref
+                            .watch(orderDetailProvider(c.orderId))
+                            .value
+                            ?.lines
+                            .where((o) => o.orderLineId == l.orderLineId)
+                            .firstOrNull
+                            ?.title ??
+                        l.sku ??
+                        l.orderLineId,
+                  ),
                   subtitle: Text(
                     [
                       if (l.requestedQty case final q?) l10n.claimRequested(q),

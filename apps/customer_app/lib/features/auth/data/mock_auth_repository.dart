@@ -6,16 +6,36 @@ import 'auth_repository.dart';
 
 /// 목 제공자. [cancelled] 제공자는 고객 취소, [down] 은 제공자 장애로 끝난다.
 final class MockSocialTokenSource implements SocialTokenSource {
-  MockSocialTokenSource({this.cancelled = const {}, this.down = const {}});
+  MockSocialTokenSource({
+    this.cancelled = const {},
+    this.down = const {},
+    this.silentUnavailable = const {},
+  });
 
   final Set<SocialProvider> cancelled;
   final Set<SocialProvider> down;
+
+  /// 조용한 재로그인이 안 되는 제공자(지난번 계정 없음 등).
+  final Set<SocialProvider> silentUnavailable;
+  int silentAttempts = 0;
 
   @override
   Future<SocialCredential?> obtain(SocialProvider provider) async {
     if (down.contains(provider)) throw const SocialProviderDown();
     if (cancelled.contains(provider)) return null;
     // 목은 제공자 창 없이 바로 성공한다. 실제 계정이 아님을 이름으로 드러낸다.
+    return SocialCredential(
+      'mock-provider-token-${provider.name}',
+      accountLabel: 'mock-${provider.name}@pmart.invalid',
+    );
+  }
+
+  @override
+  Future<SocialCredential?> obtainSilently(SocialProvider provider) async {
+    silentAttempts++;
+    if (silentUnavailable.contains(provider) || down.contains(provider)) {
+      return null;
+    }
     return SocialCredential(
       'mock-provider-token-${provider.name}',
       accountLabel: 'mock-${provider.name}@pmart.invalid',

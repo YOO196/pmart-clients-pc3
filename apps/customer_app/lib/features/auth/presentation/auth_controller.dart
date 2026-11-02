@@ -37,6 +37,12 @@ final loginProvidersProvider = Provider<List<SocialProvider>>(
 /// 결과 불명 로그인의 같은 키 재전송 횟수.
 final loginResolveAttemptsProvider = Provider<int>((_) => 2);
 
+/// `dioProvider` 의 세션 종료 콜백을 세션 컨트롤러에 연결한다. 앱 루트(`ProviderScope`)에서 이 값으로
+/// `onSessionExpiredProvider` 를 덮는다.
+final sessionExpiryHandlerProvider = Provider<void Function()>(
+  (ref) => () => ref.read(sessionProvider.notifier).expired(),
+);
+
 /// 앱 시작 때 한 번: 저장된 refresh token 이 있으면 세션을 되살린다. 실패하면 비회원으로 둔다.
 final sessionRestoreProvider = FutureProvider<void>(
   (ref) => ref.read(sessionProvider.notifier).restore(),
@@ -47,9 +53,78 @@ final sessionProvider = NotifierProvider<SessionController, Session>(
   SessionController.new,
 );
 
+/// 세션에 관해 한 번 알릴 것(스낵바). 읽은 쪽이 지운다.
+enum SessionNotice {
+  /// 세션이 끝나 조용히 다시 로그인했다.
+  renewed,
+
+  /// 세션이 끝났고 조용한 재로그인도 안 됐다 → "다시 로그인해 주세요".
+  expired,
+}
+
+final sessionNoticeProvider =
+    NotifierProvider<SessionNoticeController, SessionNotice?>(
+      SessionNoticeController.new,
+    );
+
+class SessionNoticeController extends Notifier<SessionNotice?> {
+  @override
+  SessionNotice? build() => null;
+
+  void set(SessionNotice notice) => state = notice;
+
+  void clear() => state = null;
+}
+
 class SessionController extends Notifier<Session> {
+  /// 만료 처리 중(동시에 여러 요청이 만료를 받아도 한 번만).
+  Future<void>? _expiring;
+
   @override
   Session build() => const GuestSession();
+
+  /// 인증 인터셉터가 토큰 갱신 거절(세션 종료)을 알렸다. 토큰은 이미 지워졌다.
+  /// 조용한 재로그인(Google 지난 계정)을 먼저 시도하고, 성공하면 회원을 유지한다.
+  /// 안 되면 비회원으로 바꾸고 "다시 로그인" 안내를 올린다. 비회원 장바구니 토큰은 건드리지 않는다.
+  Future<void> expired() =>
+      _expiring ??= _handleExpiry().whenComplete(() => _expiring = null);
+
+  Future<void> _handleExpiry() async {
+    final current = state;
+    if (current is! MemberSession) return;
+    final provider = current.provider ?? SocialProvider.google;
+    try {
+      final credential = await ref
+          .read(socialTokenSourceProvider)
+          .obtainSilently(provider);
+      if (!ref.mounted) return;
+      if (credential != null) {
+        final outcome = await ref
+            .read(authRepositoryProvider)
+            .login(
+              provider,
+              credential.token,
+              purpose: LoginPurpose.general,
+              key: IdempotencyKey.generate(),
+            );
+        if (!ref.mounted) return;
+        if (outcome is LoginMember) {
+          await signIn(
+            outcome,
+            provider: provider,
+            accountLabel: credential.accountLabel,
+          );
+          ref.read(sessionNoticeProvider.notifier).set(SessionNotice.renewed);
+          return;
+        }
+      }
+    } on Object {
+      // 조용한 재로그인 실패(제공자 장애·불명 포함)는 아래 안내로 간다. 새 로그인 시도는 고객이 한다.
+    }
+    if (!ref.mounted) return;
+    state = const GuestSession();
+    ref.read(sessionNoticeProvider.notifier).set(SessionNotice.expired);
+  }
 
   Future<void> signIn(
     LoginMember member, {

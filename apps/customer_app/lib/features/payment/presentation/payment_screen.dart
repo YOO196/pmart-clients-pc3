@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../auth/domain/auth.dart' show MemberSession;
+import '../../auth/presentation/auth_controller.dart' show sessionProvider;
 import '../../checkout/presentation/checkout_controller.dart';
 import '../../checkout/presentation/order_sheet_screen.dart'
     show checkoutFailureText;
@@ -55,6 +57,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final provider = paymentFlowProvider(widget.draftId);
     final s = ref.watch(provider);
     final ctl = ref.read(provider.notifier);
+    // 결제 중 세션이 끝났다가 다시 로그인되면 결제 결과부터 확인한다(결제를 다시 시작하지 않는다).
+    ref.listen(sessionProvider, (prev, next) {
+      if (prev is! MemberSession && next is MemberSession) ctl.checkAgain();
+    });
     final working = switch (s.phase) {
       PaymentPhase.preparing ||
       PaymentPhase.authenticating ||
