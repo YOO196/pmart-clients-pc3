@@ -44,6 +44,7 @@
 | BR-34 | 높음 | 고객 | 주문서형 결제위젯: 결제 진입 전에 토스 clientKey(·customerKey)를 받을 경로가 없음(지금은 PAY 이후에만) | OPEN(요청 `docs/handoff/2026-10-31-backend-checkout-widget-and-product-names.md`) |
 | BR-35 | 높음 | 고객 | 주문·초안 품목 `productName`(주문 당시 사본)이 비어 와서 주문 내역에 SKU 가 보임 | OPEN(같은 요청서 §2) |
 | BR-36 | 중간 | 고객 | 상품 상세 `SaleOption.price` 가 항상 null(계약은 "pricing 사본"). 상세에 가격이 안 보임 | OPEN(요청 `docs/handoff/2026-11-02-backend-product-detail-price.md`). 앱은 `GET /prices?skus=` 로 채워 표시 중 |
+| BR-37 | 중간 | 고객 | 주문이 참조하는 고객 데이터(주소·수령인·연락처)의 주문 시점 불변성 보장 방식과 "주문 당시 배송지" 고객용 조회 경로 | OPEN(질문 `docs/handoff/2026-11-02-backend-order-customer-reference.md`) |
 
 ---
 
@@ -236,3 +237,8 @@
 - 영향: 고객앱 상세가 "가격 확인 중"으로만 보였다.
 - 앱 처리(2026-11-02): 상세 응답의 옵션 가격이 비면 `GET /prices?skus=` 로 표시 가격을 따로 읽어 합친다(`ApiCatalogRepository._pricesFor`). `notSet` 은 "판매 불가"·담기 비활성. 가격 조회 실패는 "가격 확인 중" 유지(0원·판매 불가로 확정하지 않음). 상세에 가격이 오면 가격 API 를 부르지 않으므로 백엔드가 채우기 시작해도 앱 변경은 없다.
 - 요청: (a) 상세에 pricing 사본을 채우든지, (b) 계약 설명을 "채우지 않는다. 표시 가격은 `/prices` 로 읽는다"로 고치든지 정해 달라. 요청서 `docs/handoff/2026-11-02-backend-product-detail-price.md`.
+
+## BR-37 주문이 참조하는 고객 데이터의 불변성 (고객앱)
+- 배경: 주문(`customer_order`)은 `account_id`·`shopping_address_id` 만 저장하고 주소 원문·수령인·연락처는 없다(ADR-0009 참조 ID 원칙). customer-service 주소는 제자리 수정·물리 삭제로 보이며 이력이 없다. 그런데 계약 `PATCH /me/addresses/{id}` 는 "확정 주문의 주소는 변경되지 않음"이라고 적혀 있다.
+- 질문: 그 보장이 어디서 이루어지는지, 확정 주문이 참조한 주소의 삭제를 막는지, 수령인·연락처를 주문 시점으로 고정하는지, 구매 가능 검증을 결제 진입에서 다시 하는지. 질문서 `docs/handoff/2026-11-02-backend-order-customer-reference.md`.
+- 고객앱 처리(회신 전): 주문 상세에 배송지를 보이지 않는다. 주소 ID 로 현재 주소를 조회해 "주문 당시 배송지"처럼 보이지 않는다.
