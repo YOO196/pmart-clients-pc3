@@ -53,6 +53,7 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 | 상품 조회·판매 상태 | `/products`, `/products/:id` | `GET /products`, `/skus`, `/barcodes`, `POST …/sale-state-changes` + 짝 조회 |
 | 콘텐츠 등록·일괄 | `/contents/drafts/*`, `/contents/import/*` | `/content-drafts*`, 이미지 업로드, `/content-import-batches*` |
 | 가격 | `/prices?sku=` | `GET /prices/{sku}`(PRICE_NOT_SET = 미설정), `/price-versions/{sku}`, PRICE 변경 요청, `POST /price-version-applications` + 짝 조회 |
+| 가격 일괄 등록 | `/prices/import`, `/prices/import/:id` | pricing `/price-import-batches*`(2026-11-03 안내): 같은 seed-v1 zip 업로드 → 서버가 묶음 가격으로 행을 채움(화면은 zip 을 풀지 않음) → 행 `PUT …/lines/{seedProductId}`(고치기·되돌리기·빼기, `X-Expected-Version`) · `POST …/refreshes`(다시 대조) → `POST …/submissions`(공통 효력 시각, 잠김) → 응답 `approvalRequest` 그대로 PRICE 승인 요청 한 건 → 승인 뒤 `GET` 으로 행별 `result`. 상품 일괄 등록 승인(SKU 발급) 뒤에만 가능 |
 | 센터 취급 | `/handlings?type=&center=` | `/mfcs/{id}/sku-handlings`·`/cdcs/{id}/sku-handlings`, `…/sku-handling-batches` |
 
 공통 흐름: 정본 "제출 준비" 응답의 `approvalRequest` → approval `POST /change-requests` → `…/submissions`(approvalId). 두 요청 키는 사용자 행위 키 하나에서 만든다(`{key}:cr`, `{key}:submit`). 판매중지·가격은 화면이 변경 요청 본문을 직접 만든다(handoff §4.3·§4.5).

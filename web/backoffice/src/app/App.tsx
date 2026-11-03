@@ -9,6 +9,7 @@ import { CategoryTreePage } from '../features/categories/CategoryTreePage';
 import { ContentDraftPage, NewContentDraftPage } from '../features/contents/ContentDraftPage';
 import { ContentImportPage, NewContentImportPage } from '../features/contents/ContentImportPage';
 import { SkuHandlingPage } from '../features/handlings/SkuHandlingPage';
+import { NewPriceImportPage, PriceImportPage } from '../features/prices/PriceImportPage';
 import { PricePage } from '../features/prices/PricePage';
 import { ProductDetailPage } from '../features/products/ProductDetailPage';
 import { NewProductDraftPage, ProductDraftPage } from '../features/products/ProductDraftPage';
@@ -32,6 +33,7 @@ const nav: ReadonlyArray<readonly [string, string]> = [
   ['/contents/drafts/new', m.nav.contentNew],
   ['/contents/import', m.nav.contentImport],
   ['/prices', m.nav.prices],
+  ['/prices/import', m.nav.priceImport],
   ['/handlings', m.nav.handlings],
   ['/views/approval-inbox', m.nav.bffInbox],
   ['/operators', m.nav.operators],
@@ -96,6 +98,8 @@ const routes = [
       { path: 'contents/import', element: guarded(<NewContentImportPage />) },
       { path: 'contents/import/:batchId', element: guarded(<ContentImportPage />) },
       { path: 'prices', element: guarded(<PricePage />) },
+      { path: 'prices/import', element: guarded(<NewPriceImportPage />) },
+      { path: 'prices/import/:batchId', element: guarded(<PriceImportPage />) },
       { path: 'handlings', element: guarded(<SkuHandlingPage />) },
     ],
   },

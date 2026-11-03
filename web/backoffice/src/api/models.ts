@@ -69,6 +69,14 @@ export type ProductContent = C['ProductContent'];
 // 가격
 export type Price = Pr['Price'];
 export type PriceVersion = Pr['PriceVersion'];
+/** 가격 일괄 등록(백엔드 안내 2026-11-03): seed-v1 zip → 행(묶음 가격 미리 채움) → 고치기·빼기 → 제출 → PRICE 승인 한 건 */
+export type PriceImportBatch = Pr['PriceImportBatch'];
+export type PriceImportLine = Pr['PriceImportLine'];
+export type PriceImportLineUpdate = Pr['PriceImportLineUpdate'];
+export type PriceImportSubmissionResult = Pr['PriceImportSubmissionResult'];
+export type PriceImportBatchState = PriceImportBatch['state'];
+export type PriceImportLineStatus = PriceImportLine['status'];
+export type PriceChangeType = NonNullable<PriceImportLine['changeType']>;
 
 // 센터 취급 (MFC·CDC 같은 모양. CDC 의 logistics 는 화면에서 쓰지 않는다)
 export type SkuHandling = H['SkuHandling'];
@@ -77,4 +85,4 @@ export type SkuHandlingResult = H['SkuHandlingResult'];
 export type SkuHandlingBatchResult = H['SkuHandlingBatchResult'];
 
 /** 정본 서비스의 "제출 준비" 응답이 돌려주는 승인 요청 본문(그대로 POST /change-requests). */
-export type ApprovalRequestBody = P['ApprovalRequestBody'] | C['ContentApprovalRequestBody'] | ChangeRequestBody;
+export type ApprovalRequestBody = P['ApprovalRequestBody'] | C['ContentApprovalRequestBody'] | Pr['PriceApprovalRequestBody'] | ChangeRequestBody;

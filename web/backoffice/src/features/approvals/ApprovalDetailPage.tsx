@@ -25,6 +25,20 @@ const isWatching = (a: ApprovalDetail) =>
   (a.reviewState === 'APPROVED' || a.reviewState === 'PARTIALLY_APPROVED') &&
   !FINAL_EXECUTION.includes(a.executionState ?? 'NOT_REQUESTED');
 
+/** 가격 행 attributes {previousPrice, basePrice, changeType, productName} 가 있으면 읽기 쉽게. 없는 값은 "-"(0 으로 바꾸지 않는다). */
+function PriceLineAttributes({ attributes }: { readonly attributes: Record<string, unknown> | undefined }) {
+  if (!attributes || !('changeType' in attributes || 'previousPrice' in attributes)) return null;
+  const amount = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 ? formatKrw(v) : m.none);
+  const changeType = typeof attributes['changeType'] === 'string' ? attributes['changeType'] : '';
+  const changeName = (m.prices.changeTypeName as Readonly<Record<string, string>>)[changeType] ?? changeType;
+  const name = typeof attributes['productName'] === 'string' ? attributes['productName'] : m.none;
+  return (
+    <p className="text-sm" data-testid="price-line">
+      {`${name} · ${amount(attributes['previousPrice'])} → ${amount(attributes['basePrice'])}${changeName ? ` · ${changeName}` : ''}`}
+    </p>
+  );
+}
+
 export function ApprovalDetailPage() {
   const { approvalId = '' } = useParams();
   const api = useApi();
@@ -124,6 +138,8 @@ export function ApprovalDetailPage() {
                       <td>{l.lineKey}</td>
                       <td>{l.requestedAmount === undefined ? '' : formatKrw(l.requestedAmount)}</td>
                       <td>
+                        {/* 가격 일괄 등록 행(백엔드 안내 2026-11-03 §1-5): 승인자가 이전 → 새 가격·구분·상품명을 바로 본다 */}
+                        <PriceLineAttributes attributes={l.attributes} />
                         <code className="text-xs break-all">{l.attributes ? JSON.stringify(l.attributes) : ''}</code>
                       </td>
                     </tr>

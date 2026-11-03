@@ -9,6 +9,7 @@ import type {
   ContentImportBatch,
   FilterGroup,
   ImportBatch,
+  PriceImportBatch,
   PriceVersion,
   ProductDetail,
   ProductDraft,
@@ -60,6 +61,7 @@ export interface MockDb {
   /** 판매중지에 이미 쓴 승인 */
   usedApprovals: Set<string>;
   prices: Map<string, PriceVersion[]>;
+  priceBatches: Map<string, PriceImportBatch>;
   handlings: Map<string, Map<string, SkuHandling>>;
   /** 멱등: method path key → 응답 */
   idempotent: Map<string, { status: number; body: unknown }>;
@@ -225,6 +227,7 @@ export function createDb(): MockDb {
         ],
       ],
     ]),
+    priceBatches: new Map(),
     handlings: new Map(),
     idempotent: new Map(),
     commandResults: new Map(),
