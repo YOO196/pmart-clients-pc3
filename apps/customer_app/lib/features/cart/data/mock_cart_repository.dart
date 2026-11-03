@@ -168,9 +168,16 @@ base class MockCartRepository implements CartRepository {
 
   @override
   Future<Cart> get(String cartId) async {
-    await _wait();
+    gets++;
+    await Future<void>.delayed(getLatency ?? latency);
     return _cart();
   }
+
+  /// 조회(`GET /carts/{id}`)만 따로 늦추고 싶을 때. null 이면 [latency].
+  Duration? getLatency;
+
+  /// 조회 횟수(왕복 수 시험용).
+  int gets = 0;
 
   ProblemFailure _reject(String code, {Map<String, Object?> raw = const {}}) =>
       ProblemFailure(

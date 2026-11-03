@@ -360,9 +360,10 @@ class _CartSummaryBar extends ConsumerWidget {
                   Text(l10n.cartSelectedTotal),
                   const Spacer(),
                   Text(
-                    // 서버 합계만 보인다. 없으면 0원이 아니라 "확인할 수 없어요".
+                    // 서버 합계만 보인다. 변경 확정 뒤 다시 읽는 동안은 "확인 중", 없으면 0원이 아니라 "확인할 수 없어요".
                     switch (cart.selectedItemAmount) {
                       final int a => formatKrw(a),
+                      null when state.amountStale => l10n.cartAmountChecking,
                       null => l10n.cartAmountUnavailable,
                     },
                     key: const ValueKey('cart-total'),

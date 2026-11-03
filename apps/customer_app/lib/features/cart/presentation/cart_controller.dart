@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
@@ -69,15 +71,20 @@ class CartState {
     this.sync = CartSync.stable,
     this.busyItemId,
     this.notice,
+    this.amountStale = false,
   });
 
-  /// 서버가 마지막으로 확정한 장바구니. 낙관적 반영을 하지 않는다.
+  /// 서버가 마지막으로 확정한 장바구니. 낙관적 반영을 하지 않는다 — 수량·선택·삭제는 서버가 APPLIED 로 확정한 뒤에만
+  /// 응답 버전으로 반영한다([amountStale] 동안 합계는 비어 있고 뒤에서 다시 읽는다).
   final Cart cart;
   final CartSync sync;
 
   /// 진행 중·불명인 변경이 걸린 품목(담기는 null).
   final String? busyItemId;
   final CartNotice? notice;
+
+  /// 변경은 확정됐지만 서버 합계·표시 사본을 아직 다시 읽지 못했다(합계 "확인 중").
+  final bool amountStale;
 
   bool get canChange => sync == CartSync.stable;
 }
@@ -89,6 +96,12 @@ final cartControllerProvider = AsyncNotifierProvider<CartController, CartState>(
 class CartController extends AsyncNotifier<CartState> {
   /// 결과 불명인 변경의 키. 원결과 조회에만 쓴다(같은 행위의 재전송도 이 키).
   IdempotencyKey? _unknownKey;
+
+  /// 결과 불명인 변경 자체(확정되면 반영할 내용).
+  CartChange? _unknownChange;
+
+  /// 변경 세대. 뒤에서 다시 읽은 장바구니가 그 사이 생긴 새 변경을 덮지 않게 한다.
+  int _epoch = 0;
 
   CartRepository get _repo => ref.read(cartRepositoryProvider);
 
@@ -114,6 +127,7 @@ class CartController extends AsyncNotifier<CartState> {
     final current = _current;
     if (current == null || !current.canChange) return null;
     final key = IdempotencyKey.generate();
+    _epoch++;
     final itemId = switch (change) {
       AddItem() => null,
       SetQuantity(:final cartItemId) => cartItemId,
@@ -132,6 +146,7 @@ class CartController extends AsyncNotifier<CartState> {
     if (!ref.mounted) return outcome;
     if (outcome is CartChangeUnknown) {
       _unknownKey = key;
+      _unknownChange = change;
       _set(
         CartState(
           cart: current.cart,
@@ -141,7 +156,7 @@ class CartController extends AsyncNotifier<CartState> {
       );
       return _resolve(attempts: ref.read(cartResolvePolicyProvider).attempts);
     }
-    return _settle(outcome);
+    return _settle(outcome, change);
   }
 
   /// "다시 확인". 원결과만 조회한다(변경을 다시 보내지 않는다).
@@ -159,18 +174,31 @@ class CartController extends AsyncNotifier<CartState> {
       if (!ref.mounted) return null;
       if (outcome is! CartChangeUnknown) {
         _unknownKey = null;
-        return _settle(outcome);
+        final change = _unknownChange;
+        _unknownChange = null;
+        return _settle(outcome, change);
       }
     }
     // 아직 모른다. "확인 중"을 유지하고 같은 행위를 새로 실행하지 못하게 둔다.
     return const CartChangeUnknown();
   }
 
-  Future<CartChangeOutcome> _settle(CartChangeOutcome outcome) async {
+  Future<CartChangeOutcome> _settle(
+    CartChangeOutcome outcome,
+    CartChange? change,
+  ) async {
     final current = _current!;
     switch (outcome) {
-      case CartChangeApplied():
-        await _reload(current.cart, notice: null);
+      case CartChangeApplied(:final cartVersion):
+        // 담기(새 행)는 표시용 사본이 필요해 다시 읽는다. 수량·선택·삭제는 서버가 확정한 내용을 응답 버전으로
+        // 바로 반영하고(왕복 1회), 서버 합계·사본은 뒤에서 다시 읽어 채운다(BR-43 회신 전 임시).
+        if (change == null || change is AddItem) {
+          await _reload(current.cart, notice: null);
+        } else {
+          final local = current.cart.applied(change, cartVersion: cartVersion);
+          _set(CartState(cart: local, amountStale: true));
+          unawaited(_reloadInBackground(local));
+        }
       case CartVersionConflict():
         await _reload(
           current.cart,
@@ -195,6 +223,21 @@ class CartController extends AsyncNotifier<CartState> {
     }
   }
 
+  /// 확정된 변경을 반영한 뒤 서버 합계·표시 사본을 뒤에서 다시 읽는다. 그 사이 새 변경이 시작됐으면 결과를 버린다
+  /// (그 변경이 끝날 때 다시 읽는다). 실패하면 합계는 "확인할 수 없어요"로 남고 안내를 올린다.
+  Future<void> _reloadInBackground(Cart local) async {
+    final epoch = _epoch;
+    try {
+      final fresh = await _repo.get(local.cartId);
+      if (!ref.mounted || _epoch != epoch) return;
+      final current = _current;
+      _set(CartState(cart: fresh, notice: current?.notice));
+    } on PmartFailure {
+      if (!ref.mounted || _epoch != epoch) return;
+      _set(CartState(cart: local, notice: const NoticeReloadFailed()));
+    }
+  }
+
   /// 안내를 지운다(고객이 확인함).
   void dismissNotice() {
     final current = _current;
@@ -204,6 +247,7 @@ class CartController extends AsyncNotifier<CartState> {
         cart: current.cart,
         sync: current.sync,
         busyItemId: current.busyItemId,
+        amountStale: current.amountStale,
       ),
     );
   }

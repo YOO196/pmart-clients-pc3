@@ -79,13 +79,24 @@ void main() {
     );
   });
 
-  test('반영 뒤 합계는 서버 값으로 다시 받는다', () async {
+  test('선택 변경은 응답으로 바로 반영되고, 합계는 뒤에서 서버 값으로 다시 받는다', () async {
+    final versionBefore = state().cart.version;
     await controller().submit(
       SetSelected(cartItemId: line('E-00000005').cartItemId, selected: false),
     );
-    // 서울우유 2,980 × 2 만 남는다(목 서버 계산).
-    expect(state().cart.selectedItemAmount, 5960);
+    // 서버가 APPLIED 로 확정한 선택·버전은 바로 반영. 합계는 앱이 계산하지 않고 비워 둔다(확인 중).
     expect(line('E-00000005').selected, isFalse);
+    expect(state().cart.version, versionBefore + 1);
+    expect(state().amountStale, isTrue);
+    expect(state().cart.selectedItemAmount, isNull);
+    expect(state().canChange, isTrue);
+
+    for (var i = 0; i < 20 && state().amountStale; i++) {
+      await Future<void>.delayed(Duration.zero);
+    }
+    // 서울우유 2,980 × 2 만 남는다(목 서버 계산).
+    expect(state().amountStale, isFalse);
+    expect(state().cart.selectedItemAmount, 5960);
   });
 
   test('응답을 잃은 변경은 같은 키 원결과 조회로 반영 확인하고 두 번 적용하지 않는다', () async {

@@ -21,6 +21,7 @@
   },
   "cartSelectedAmountNote": "결제 금액은 주문서에서 확인해요",
   "cartAmountUnavailable": "합계를 확인할 수 없어요",
+  "cartAmountChecking": "합계 확인 중",
   "cartEmpty": "담은 상품이 없어요",
   "mockModeBadge": "목 데이터",
   "navHome": "홈",

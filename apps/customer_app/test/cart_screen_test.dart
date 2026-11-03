@@ -121,6 +121,45 @@ void main() {
     );
   });
 
+  testWidgets('수량 변경은 서버가 확정한 응답으로 바로 반영하고, 합계는 뒤에서 다시 읽어 채운다(BR-43 전 임시)', (
+    t,
+  ) async {
+    cart.getLatency = const Duration(milliseconds: 500);
+    await t.pumpWidget(testApp(const [], cart: cart));
+    await _openCartTab(t);
+    final gets = cart.gets;
+
+    await t.tap(find.byKey(const ValueKey('cart-inc-ci-1')));
+    await t.pump(const Duration(milliseconds: 50));
+
+    // 변경 응답(APPLIED)만으로 수량·줄 금액이 바뀌고 다른 변경도 바로 할 수 있다. 합계는 아직 "확인 중".
+    final qty = t.widget<Text>(find.byKey(const ValueKey('cart-qty-ci-1')));
+    expect(qty.data, '3개');
+    expect(qty.style?.color, isNull);
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('cart-amount-ci-1'))).data,
+      '8,940원',
+    );
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('cart-total'))).data,
+      '합계 확인 중',
+    );
+    expect(
+      t
+          .widget<IconButton>(find.byKey(const ValueKey('cart-inc-ci-2')))
+          .onPressed,
+      isNotNull,
+    );
+
+    await t.pump(const Duration(milliseconds: 600));
+    await t.pumpAndSettle();
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('cart-total'))).data,
+      '10,920원',
+    );
+    expect(cart.gets, gets + 1);
+  });
+
   testWidgets('가용 불명은 이유를 나눠 보인다 — 재고 원천 장애 / 배송지 미정', (t) async {
     cart.inventoryDown = true;
     await t.pumpWidget(testApp(const [], cart: cart));

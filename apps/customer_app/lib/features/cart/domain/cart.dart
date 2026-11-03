@@ -45,6 +45,22 @@ class CartLine {
       saleState == SaleState.onSale &&
       availability != LineAvailability.soldOut &&
       availability != LineAvailability.notCarried;
+
+  /// 서버가 APPLIED 로 확정한 수량·선택을 반영한 사본(표시용 사본은 그대로).
+  CartLine copyWith({int? quantity, bool? selected}) => CartLine(
+    cartItemId: cartItemId,
+    sku: sku,
+    productId: productId,
+    quantity: quantity ?? this.quantity,
+    selected: selected ?? this.selected,
+    name: name,
+    optionLabel: optionLabel,
+    imageUrl: imageUrl,
+    unitPrice: unitPrice,
+    saleState: saleState,
+    availability: availability,
+    availableQty: availableQty,
+  );
 }
 
 @immutable
@@ -81,6 +97,35 @@ class Cart {
 
   CartLine? lineForSku(String sku) =>
       lines.where((l) => l.sku == sku).firstOrNull;
+
+  /// 서버가 APPLIED 로 확정한 변경(수량·선택·삭제)을 응답 버전으로 반영한 사본. 합계는 서버가 다시 줘야 하므로 비운다.
+  Cart applied(CartChange change, {required int? cartVersion}) {
+    final next = switch (change) {
+      AddItem() => lines, // 새 행은 표시용 사본이 필요해 여기서 만들지 않는다(다시 읽는다)
+      SetQuantity(:final cartItemId, :final quantity) => [
+        for (final l in lines)
+          l.cartItemId == cartItemId ? l.copyWith(quantity: quantity) : l,
+      ],
+      SetSelected(:final cartItemId, :final selected) => [
+        for (final l in lines)
+          l.cartItemId == cartItemId ? l.copyWith(selected: selected) : l,
+      ],
+      RemoveItem(:final cartItemId) => [
+        for (final l in lines)
+          if (l.cartItemId != cartItemId) l,
+      ],
+    };
+    return Cart(
+      cartId: cartId,
+      version: cartVersion ?? version + 1,
+      isMember: isMember,
+      lines: next,
+      mfcId: mfcId,
+      selectedItemAmount: null,
+      expiresAt: expiresAt,
+      sources: sources,
+    );
+  }
 
   bool get hasSelectedPurchasable =>
       lines.any((l) => l.selected && l.purchasable);
