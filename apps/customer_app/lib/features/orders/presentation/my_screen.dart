@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../profile/domain/profile.dart';
 import '../../profile/presentation/my_info_screen.dart' show myInfoSummary;
+import '../../profile/presentation/profile_avatar.dart';
 import '../../profile/presentation/profile_controller.dart';
 
 /// SCR-ACCOUNT-001(일부). 주문 내역·주소 관리·로그인/로그아웃 진입.
@@ -24,6 +26,7 @@ class MyScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final session = ref.watch(sessionProvider);
     final member = session is MemberSession;
+    final profile = ref.watch(profileProvider).value;
     return Scaffold(
       appBar: AppBar(title: Text(l10n.navMy)),
       body: ListView(
@@ -31,14 +34,19 @@ class MyScreen extends ConsumerWidget {
           if (session is MemberSession)
             ListTile(
               key: const ValueKey('my-account'),
-              leading: const Icon(Icons.account_circle_outlined),
+              // Google 프로필(이름·이메일·사진)은 서버가 로그인마다 최신으로 바꾼다(ADR-0024). 없으면 제공자 SDK 계정 표시.
+              leading: ProfileAvatar(profile: profile),
               title: Text(switch (session.provider) {
                 final SocialProvider p => l10n.myLoggedInWith(
                   providerName(l10n, p),
                 ),
                 null => l10n.myLoggedIn,
               }),
-              subtitle: Text(session.accountLabel ?? l10n.myAccountUnknown),
+              subtitle: Text(
+                providerAccountText(profile) ??
+                    session.accountLabel ??
+                    l10n.myAccountUnknown,
+              ),
             ),
           if (member)
             ListTile(
@@ -84,4 +92,14 @@ class MyScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// 계정 줄에 보일 Google 프로필 "이름 · 이메일". 둘 다 없으면 null(제공자 SDK 계정 표시로 대신한다).
+String? providerAccountText(Profile? p) {
+  if (p == null) return null;
+  final parts = [
+    if (p.hasProviderName) p.name!.trim(),
+    if (p.hasEmail) p.email!.trim(),
+  ];
+  return parts.isEmpty ? null : parts.join(' · ');
 }

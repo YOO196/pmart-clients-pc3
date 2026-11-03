@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:pmart_core/pmart_core.dart';
 
 import '../domain/profile.dart';
@@ -12,6 +14,16 @@ final class MockProfileRepository implements ProfileRepository {
 
   /// 새로 가입한 계정처럼 이름이 비어 있다.
   String? nickname;
+
+  /// 로그인 제공자(Google) 프로필. 기본은 없음(카카오·네이버 목 로그인처럼). 테스트에서 채운다.
+  String? name;
+  String? email;
+  bool? emailVerified;
+  String? profileImageUrl;
+
+  /// `GET /me/profile-image` 가 돌려줄 사진. null 이면 사본 없음(404).
+  Uint8List? imageBytes;
+  int imageReads = 0;
   int _version = 1;
 
   /// 다음 변경을 501(미구현)로 만든다.
@@ -33,7 +45,18 @@ final class MockProfileRepository implements ProfileRepository {
       version: _version,
       nickname: nickname,
       phoneMasked: _phone == null ? null : mask(_phone!),
+      name: name,
+      email: email,
+      emailVerified: emailVerified,
+      profileImageUrl: profileImageUrl,
     );
+  }
+
+  @override
+  Future<Uint8List?> profileImage() async {
+    await _wait();
+    imageReads++;
+    return imageBytes;
   }
 
   @override

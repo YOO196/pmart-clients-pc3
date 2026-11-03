@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:pmart_api_customer/pmart_api_customer.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
@@ -21,6 +23,10 @@ abstract interface class ProfileRepository {
 
   /// `GET /me/profile-changes/{requestId}` 짝 조회.
   Future<ProfileChangeOutcome> change(String requestId);
+
+  /// `GET /me/profile-image` — 로그인 제공자 사진의 서버 사본(본인 토큰 필요, ADR-0024).
+  /// 사본이 아직 없으면(404) null. 그 밖의 실패는 [PmartFailure] 로 던진다.
+  Future<Uint8List?> profileImage();
 }
 
 final class ApiProfileRepository implements ProfileRepository {
@@ -33,14 +39,21 @@ final class ApiProfileRepository implements ProfileRepository {
   Future<Profile> get() async {
     final res = await pmartGuard(() => _api.getMyProfile());
     final p = res.data ?? (throw const ContractViolationFailure('프로필 본문 없음'));
-    return Profile(
-      accountId:
-          p.accountId ?? (throw const ContractViolationFailure('accountId 없음')),
-      version:
-          p.version ?? (throw const ContractViolationFailure('version 없음')),
-      nickname: p.nickname,
-      phoneMasked: p.phoneMasked,
-    );
+    return profileFromContract(p);
+  }
+
+  @override
+  Future<Uint8List?> profileImage() async {
+    try {
+      final res = await pmartGuard(() => _api.getMyProfileImage());
+      final bytes = res.data;
+      return (bytes == null || bytes.isEmpty) ? null : bytes;
+    } on ProblemFailure catch (f) {
+      if (f.problem.status == 404 || f.problem.code == ProblemCode.notFound) {
+        return null;
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -102,3 +115,19 @@ ProfileChangeOutcome profileChangeFailure(PmartFailure f) => switch (f) {
   ProblemFailure(:final problem) => ProfileChangeRejected(problem.code),
   _ => const ProfileChangeUnknown(),
 };
+
+/// 계약 `Profile` → 화면 모델. 빈 문자열은 "없음"(null)으로 둔다(Google 값은 없을 수 있다).
+Profile profileFromContract(api.Profile p) {
+  String? text(String? v) => (v == null || v.trim().isEmpty) ? null : v;
+  return Profile(
+    accountId:
+        p.accountId ?? (throw const ContractViolationFailure('accountId 없음')),
+    version: p.version ?? (throw const ContractViolationFailure('version 없음')),
+    nickname: p.nickname,
+    phoneMasked: p.phoneMasked,
+    name: text(p.name),
+    email: text(p.email),
+    emailVerified: p.emailVerified,
+    profileImageUrl: text(p.profileImageUrl),
+  );
+}

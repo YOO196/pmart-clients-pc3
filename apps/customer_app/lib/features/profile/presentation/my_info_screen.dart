@@ -5,6 +5,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../domain/profile.dart';
+import 'profile_avatar.dart';
 import 'profile_controller.dart';
 
 /// 마이 목록에 보일 한 줄 요약(이름 · 가린 번호).
@@ -113,6 +114,8 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                _ProviderProfile(profile: profile),
+                const SizedBox(height: 16),
                 Text(widget.signup ? l10n.infoSignupGuide : l10n.infoGuide),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -163,6 +166,59 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
             ),
           ),
         },
+      ),
+    );
+  }
+}
+
+/// 로그인 제공자(Google) 프로필: 사진·이름·이메일. 서버가 로그인마다 최신으로 바꾸고 여기서는 바꿀 수 없다(ADR-0024).
+/// 값이 없으면 "정보 없음"으로 둔다(빈칸을 다른 값으로 채우지 않는다).
+class _ProviderProfile extends StatelessWidget {
+  const _ProviderProfile({required this.profile});
+
+  final Profile profile;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final emailLine = profile.hasEmail
+        ? switch (profile.emailVerified) {
+            true => l10n.infoEmailVerified(profile.email!.trim()),
+            _ => profile.email!.trim(),
+          }
+        : l10n.infoGoogleEmailNotSet;
+    return Card(
+      key: const ValueKey('info-google'),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            ProfileAvatar(profile: profile, radius: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    profile.hasProviderName
+                        ? profile.name!.trim()
+                        : l10n.infoGoogleNameNotSet,
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  Text(emailLine, style: theme.textTheme.bodySmall),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.infoGoogleNote,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

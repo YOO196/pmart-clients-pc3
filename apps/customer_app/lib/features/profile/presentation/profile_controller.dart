@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 
@@ -18,6 +20,12 @@ final profileRepositoryProvider = Provider<ProfileRepository>(
 /// 접수(ACCEPTED) 뒤 반영 확인 조회 간격·횟수.
 final profilePollPolicyProvider = Provider<({Duration interval, int attempts})>(
   (_) => (interval: const Duration(seconds: 1), attempts: 5),
+);
+
+/// 프로필 사진 사본 바이트. 키는 `Profile.profileImageUrl`(사진이 바뀌면 `v` 가 바뀌어 다시 받는다). 사본이 없으면 null.
+/// 본인 토큰이 필요한 경로라 Image.network 대신 인증 Dio(getMyProfileImage)로 받는다.
+final profileImageProvider = FutureProvider.family<Uint8List?, String>(
+  (ref, url) => ref.watch(profileRepositoryProvider).profileImage(),
 );
 
 /// 본인 프로필. 비회원이면 null.

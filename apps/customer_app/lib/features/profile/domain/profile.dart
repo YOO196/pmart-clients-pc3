@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 /// 본인 프로필(계약 `Profile`). 이름은 nickname, 연락처는 서버가 가린 값만 받는다.
+/// Google 프로필(이름·이메일·사진)은 로그인마다 서버가 최신으로 바꾸고 앱은 표시만 한다(ADR-0024, 백엔드 안내 2026-10-31).
 @immutable
 class Profile {
   const Profile({
@@ -8,11 +9,31 @@ class Profile {
     required this.version,
     this.nickname,
     this.phoneMasked,
+    this.name,
+    this.email,
+    this.emailVerified,
+    this.profileImageUrl,
   });
 
   final String accountId;
   final int version;
   final String? nickname;
+
+  /// 로그인 제공자(Google) 프로필 이름. 없을 수 있다.
+  final String? name;
+
+  /// 로그인 제공자가 준 이메일. 없을 수 있다.
+  final String? email;
+
+  /// 제공자가 이메일을 확인했는지. 모르면 null.
+  final bool? emailVerified;
+
+  /// 프로필 사진 사본의 게이트웨이 상대 경로(`/api/v1/me/profile-image?v=…`). 본인 토큰이 있어야 받는다. 사본이 없으면 null.
+  final String? profileImageUrl;
+
+  bool get hasProviderName => name?.trim().isNotEmpty ?? false;
+  bool get hasEmail => email?.trim().isNotEmpty ?? false;
+  bool get hasProfileImage => profileImageUrl?.isNotEmpty ?? false;
 
   /// 서버가 가린 휴대폰 번호(예: 010-****-1234). 없으면 아직 등록하지 않았다.
   final String? phoneMasked;

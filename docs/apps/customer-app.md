@@ -22,7 +22,7 @@ Commerce 문서의 PPC = MFC. 1차 제외: 쿠폰·프로모션·할인 배너·
 | 취소·반품·교환 | SCR-CANCEL-001, CLAIM-FORM/DETAIL-001 | `POST /claims`(CANCEL/RETURN/EXCHANGE), `GET /claims`, `GET /claims/{id}`, `POST /claims/{id}/withdrawals`, `GET /claims/{id}/refunds` | |
 | 리뷰 | SCR-REVIEW-LIST/EDIT-001 | `GET /me/review-eligibilities`, `POST /reviews`, `PATCH/DELETE /reviews/{id}` | |
 | 알림 | SCR-NOTICE-001 | `GET /me/notifications`, `…/{id}`, `POST …/{id}/reads`, `GET /me/notification-settings`, `POST /me/notification-setting-changes` | |
-| 마이·탈퇴 | SCR-ACCOUNT-001, WITHDRAW-001 | `GET /me`, `POST /me/profile-changes`, `POST /me/withdrawals`, `GET /me/withdrawals/{id}`, `POST …/revocations` | |
+| 마이·탈퇴 | SCR-ACCOUNT-001, WITHDRAW-001 | `GET /me`(Google 이름·이메일·사진 경로, ADR-0024), `GET /me/profile-image`(본인 토큰, 인증 Dio 로 바이트 → 기본 아바타 대체), `POST /me/profile-changes`, `POST /me/withdrawals`, `GET /me/withdrawals/{id}`, `POST …/revocations` | Google 값은 서버가 로그인마다 최신으로 바꾸고 앱은 표시만. 없으면 "정보 없음"·기본 아바타 |
 | 고객센터 | SCR-SUPPORT-001, CHAT-001 | 고객용 경로 없음(case `cs-intakes` 는 운영자 접수). `[결정 필요]` 상담 채널 | |
 
 비회원: 둘러보기·장바구니까지. 주문서부터 로그인.
