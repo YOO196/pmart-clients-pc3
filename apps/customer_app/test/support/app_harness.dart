@@ -19,6 +19,9 @@ import 'package:customer_app/features/cart/presentation/cart_controller.dart';
 import 'package:customer_app/features/checkout/data/checkout_repository.dart';
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
+import 'package:customer_app/features/claims/data/claims_repository.dart';
+import 'package:customer_app/features/claims/data/mock_claims_repository.dart';
+import 'package:customer_app/features/claims/presentation/claims_controller.dart';
 import 'package:customer_app/features/catalog/data/catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/presentation/catalog_providers.dart';
@@ -38,6 +41,7 @@ Widget testApp(
   CartRepository? cart,
   CheckoutRepository? checkout,
   OrdersRepository? orders,
+  ClaimsRepository? claims,
   MockAuthRepository? auth,
   ProfileRepository? profile,
   FakeAddressPicker? addressPicker,
@@ -71,6 +75,17 @@ Widget testApp(
     ),
     ordersRepositoryProvider.overrideWithValue(
       orders ?? MockOrdersRepository(latency: Duration.zero),
+    ),
+    // 주문 상세가 처리 내역(GET /claims?orderId=)을 받으므로 지연 없는 목을 늘 둔다.
+    claimsRepositoryProvider.overrideWithValue(
+      claims ??
+          MockClaimsRepository(
+            latency: Duration.zero,
+            orders: switch (orders) {
+              final MockOrdersRepository m => m,
+              _ => null,
+            },
+          ),
     ),
     profileRepositoryProvider.overrideWithValue(
       profile ?? MockProfileRepository(latency: Duration.zero),

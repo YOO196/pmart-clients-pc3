@@ -6,9 +6,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
+import 'package:customer_app/features/cart/domain/cart.dart';
+import 'package:customer_app/features/catalog/domain/catalog.dart'
+    show SaleState;
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/domain/checkout.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
+import 'package:customer_app/features/checkout/presentation/order_sheet_screen.dart'
+    show orderSheetLineTitle;
+import 'package:customer_app/shared/order_status.dart';
 import 'package:customer_app/features/payment/data/payment_repository.dart';
 import 'package:customer_app/features/payment/domain/payment.dart';
 import 'package:customer_app/features/payment/presentation/payment_controller.dart';
@@ -83,6 +89,85 @@ void main() {
       )
       .onPressed;
 
+  test('주문서 품목 제목은 초안의 상품명 사본 → 장바구니 이름 → sku 순이다(BR-35)', () {
+    const line = DraftLine(cartItemId: 'ci-1', sku: 'E-00000001', quantity: 2);
+    OrderDraft draft(List<DraftLineView> lines) => OrderDraft(
+      draftId: 'd',
+      version: 1,
+      status: OrderStatus.draft,
+      next: DraftNext.review,
+      lines: lines,
+    );
+    const cart = Cart(
+      cartId: 'c',
+      version: 1,
+      isMember: true,
+      lines: [
+        CartLine(
+          cartItemId: 'ci-1',
+          sku: 'E-00000001',
+          quantity: 2,
+          selected: true,
+          saleState: SaleState.onSale,
+          availability: LineAvailability.available,
+          name: '장바구니 이름',
+        ),
+      ],
+    );
+
+    expect(
+      orderSheetLineTitle(
+        draft(const [
+          DraftLineView(
+            sku: 'E-00000001',
+            cartItemId: 'ci-1',
+            productName: '서울우유 1L',
+            optionLabel: '1L',
+          ),
+        ]),
+        cart,
+        line,
+      ),
+      '서울우유 1L · 1L',
+    );
+    // cartItemId 가 없는 사본은 sku 로 맞춘다. 옵션 라벨이 없으면 이름만.
+    expect(
+      orderSheetLineTitle(
+        draft(const [DraftLineView(sku: 'E-00000001', productName: '서울우유 1L')]),
+        cart,
+        line,
+      ),
+      '서울우유 1L',
+    );
+    // 사본이 비어 오면(조회 실패) 장바구니 이름, 그것도 없으면 sku.
+    expect(
+      orderSheetLineTitle(
+        draft(const [DraftLineView(sku: 'E-00000001', cartItemId: 'ci-1')]),
+        cart,
+        line,
+      ),
+      '장바구니 이름',
+    );
+    expect(orderSheetLineTitle(draft(const []), null, line), 'E-00000001');
+  });
+
+  testWidgets('주문서 품목은 초안에 고정된 상품명 사본으로 보인다(BR-35)', (t) async {
+    final checkout = MockCheckoutRepository(
+      latency: Duration.zero,
+      now: () => now,
+    );
+    await toOrderSheet(t, checkout);
+
+    final draft = checkout.drafts.values.single;
+    expect(
+      (draft.json['lines'] as List).cast<Map<String, Object?>>().first,
+      containsPair('productName', '서울우유 1L'),
+    );
+    expect(find.text('서울우유 1L · 5개'), findsOneWidget);
+    expect(find.text('감자칩 오리지널 110g · 1개'), findsOneWidget);
+    expect(find.textContaining('E-0000'), findsNothing);
+  });
+
   testWidgets('주문서 "받는 곳"은 초안에 고정된 배송지 사본이다(BR-37)', (t) async {
     final checkout = MockCheckoutRepository(
       latency: Duration.zero,
@@ -99,9 +184,7 @@ void main() {
     expect(payOnPressed(t), isNotNull);
   });
 
-  testWidgets('결제위젯 설정이 없으면(CONFIG_REQUIRED) 결제를 열지 않고, 다시 받으면 연다', (
-    t,
-  ) async {
+  testWidgets('결제위젯 설정이 없으면(CONFIG_REQUIRED) 결제를 열지 않고, 다시 받으면 연다', (t) async {
     final checkout = _NoWidgetConfig(now: () => now);
     await toOrderSheet(t, checkout);
 
@@ -165,10 +248,7 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('checkout-rejected')), findsOneWidget);
-    expect(
-      find.text('지금은 이 계정으로 주문할 수 없어요. 고객센터로 문의해 주세요'),
-      findsOneWidget,
-    );
+    expect(find.text('지금은 이 계정으로 주문할 수 없어요. 고객센터로 문의해 주세요'), findsOneWidget);
     expect(pg.launches, 0);
     expect(find.text('주문서'), findsOneWidget);
   });

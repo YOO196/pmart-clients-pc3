@@ -32,6 +32,14 @@ final claimProvider = FutureProvider.autoDispose.family<ClaimView, String>(
   (ref, claimId) => ref.watch(claimsRepositoryProvider).get(claimId),
 );
 
+/// 주문의 처리 내역 목록. 주문 상세의 `claims` 는 서버가 아직 비워 보내므로 `GET /claims?orderId=` 로 받는다
+/// (백엔드 안내 2026-10-31 주문 취소 §6). 조회 실패는 "없음"이 아니라 실패로 보인다.
+final orderClaimsProvider = FutureProvider.autoDispose
+    .family<List<ClaimSummaryView>, String>(
+      (ref, orderId) =>
+          ref.watch(claimsRepositoryProvider).listForOrder(orderId),
+    );
+
 /// 클레임 화면이 끝 상태(CLOSED·REJECTED·WITHDRAWN)가 될 때까지 다시 조회하는 간격.
 /// 백엔드: 보통 몇 초 안에 IN_PROGRESS → CLOSED(handoff 2026-10-31 주문 취소 §4).
 final claimRefreshIntervalProvider = Provider<Duration>(

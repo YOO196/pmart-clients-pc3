@@ -18,6 +18,10 @@ abstract interface class ClaimsRepository {
 
   Future<ClaimView> get(String claimId);
 
+  /// 이 주문의 처리 내역 목록(`GET /claims?orderId=`, 최근 순). 주문 상세의 `claims` 는 서버가 아직 비워 보낸다
+  /// (백엔드 안내 2026-10-31 주문 취소 §6). 실패는 던진다(빈 목록으로 바꾸지 않는다).
+  Future<List<ClaimSummaryView>> listForOrder(String orderId);
+
   /// 접수 결과를 모를 때의 짝 조회: 이 주문의 살아 있는 취소 클레임(철회·거절 제외, 최근 것).
   /// `GET /claims?orderId=&type=CANCEL`. 없으면 null.
   Future<ClaimView?> findActiveCancel(String orderId);
@@ -80,6 +84,25 @@ final class ApiClaimsRepository implements ClaimsRepository {
     return claimFromContract(
       res.data ?? (throw const ContractViolationFailure('Claim 본문 없음')),
     );
+  }
+
+  @override
+  Future<List<ClaimSummaryView>> listForOrder(String orderId) async {
+    final res = await pmartGuard(() => _claims.listClaims(orderId: orderId));
+    final items =
+        res.data?.items ??
+        (throw const ContractViolationFailure('ClaimList 본문 없음'));
+    return [
+      for (final s in items)
+        if (s.claimId case final id?)
+          ClaimSummaryView(
+            claimId: id,
+            orderId: s.orderId ?? orderId,
+            type: claimTypeFromWire(s.type?.value),
+            state: claimStateFromWire(s.state?.value),
+            openedAt: s.openedAt,
+          ),
+    ];
   }
 
   @override
@@ -146,23 +169,8 @@ ClaimView claimFromContract(api.Claim c) => ClaimView(
   claimId: c.claimId ?? (throw const ContractViolationFailure('claimId 없음')),
   version: c.version ?? 0,
   orderId: c.orderId ?? '',
-  type: switch (c.type) {
-    api.ClaimType.CANCEL => ClaimType.cancel,
-    api.ClaimType.RETURN => ClaimType.returnItems,
-    api.ClaimType.EXCHANGE => ClaimType.exchange,
-    null => ClaimType.unknown,
-  },
-  state: switch (c.state) {
-    api.ClaimState.OPENED => ClaimState.opened,
-    api.ClaimState.UNDER_REVIEW => ClaimState.underReview,
-    api.ClaimState.STOP_PENDING => ClaimState.stopPending,
-    api.ClaimState.DECIDED => ClaimState.decided,
-    api.ClaimState.IN_PROGRESS => ClaimState.inProgress,
-    api.ClaimState.CLOSED => ClaimState.closed,
-    api.ClaimState.WITHDRAWN => ClaimState.withdrawn,
-    api.ClaimState.REJECTED => ClaimState.rejected,
-    null => ClaimState.unknown,
-  },
+  type: claimTypeFromWire(c.type?.value),
+  state: claimStateFromWire(c.state?.value),
   lines: [
     for (final l in c.lines ?? const <api.ClaimLine>[])
       if (l.orderLineId != null)

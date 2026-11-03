@@ -12,6 +12,11 @@ import '../../checkout/presentation/delivery_select_screen.dart'
     show windowText;
 import '../../checkout/presentation/order_sheet_screen.dart' show tipReasonText;
 import '../../checkout/presentation/shipping_address_view.dart';
+import '../../claims/domain/claims.dart';
+import '../../claims/presentation/claims_controller.dart'
+    show orderClaimsProvider;
+import '../../claims/presentation/claims_screens.dart'
+    show claimStateText, claimTypeText;
 import '../../../shared/order_status.dart';
 import '../domain/orders.dart';
 import 'orders_providers.dart';
@@ -124,8 +129,10 @@ class _OrderBody extends ConsumerWidget {
       await context.push(location);
       if (!context.mounted) return;
       ref.invalidate(orderDetailProvider(o.orderId));
+      ref.invalidate(orderClaimsProvider(o.orderId));
       ref.invalidate(orderListProvider);
     }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -184,9 +191,10 @@ class _OrderBody extends ConsumerWidget {
                         ),
                     ],
                   ),
+                  // 주문 당시 상품명·옵션 사본(BR-35). 없을 때만 sku.
                   for (final sl in s.lines)
                     Text(
-                      '${byLine[sl.orderLineId]?.productName ?? sl.orderLineId} · ${l10n.cartLineQuantity(sl.qty)}',
+                      '${byLine[sl.orderLineId]?.title ?? sl.orderLineId} · ${l10n.cartLineQuantity(sl.qty)}',
                     ),
                 ],
               ),
@@ -215,15 +223,7 @@ class _OrderBody extends ConsumerWidget {
             formatKrw(o.refundedAmount!),
             key: const ValueKey('refunded'),
           ),
-        for (final c in o.claims)
-          ListTile(
-            key: ValueKey('order-claim-${c.claimId}'),
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.assignment_return_outlined),
-            title: Text(l10n.claimTitle),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => visit('/claims/${c.claimId}'),
-          ),
+        _ClaimsSection(order: o, onVisit: visit),
         const SizedBox(height: 16),
         // 버튼은 요청 진입일 뿐이다. 가능 여부는 서버가 판정한다.
         if (o.deliveryMode == 'SCHEDULED' && o.status == OrderStatus.confirmed)
@@ -242,6 +242,82 @@ class _OrderBody extends ConsumerWidget {
             key: const ValueKey('cancel-order'),
             onPressed: () => visit('/orders/${o.orderId}/cancel'),
             child: Text(l10n.cancelTitle),
+          ),
+      ],
+    );
+  }
+}
+
+/// 주문의 처리 내역(취소·반품·교환). 서버는 주문 상세의 `claims` 를 아직 비워 보내므로 `GET /claims?orderId=` 로 받고,
+/// 상세에 들어 있는 항목이 있으면 합친다. 조회 실패는 "내역 없음"으로 보이지 않는다.
+class _ClaimsSection extends ConsumerWidget {
+  const _ClaimsSection({required this.order, required this.onVisit});
+
+  final OrderDetail order;
+  final Future<void> Function(String location) onVisit;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final provider = orderClaimsProvider(order.orderId);
+    final value = ref.watch(provider);
+    final fetched = value.value ?? const <ClaimSummaryView>[];
+    final ids = {for (final c in fetched) c.claimId};
+    final items = [
+      ...fetched,
+      for (final c in order.claims)
+        if (!ids.contains(c.claimId))
+          ClaimSummaryView(
+            claimId: c.claimId,
+            orderId: order.orderId,
+            type: claimTypeFromWire(c.type),
+            state: claimStateFromWire(c.state),
+          ),
+    ];
+    // 취소한 주문이 아니면 처리 내역 영역을 두지 않는다. 조회 실패도 취소된 주문(내역이 있어야 하는 주문)에서만
+    // 보인다 — 취소하지 않은 주문마다 실패 문구가 뜨지 않게(사용자 요청 2026-11-03).
+    final failed =
+        value.hasError &&
+        !value.hasValue &&
+        (order.status == OrderStatus.cancelled || order.claims.isNotEmpty);
+    if (items.isEmpty && !failed) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text(l10n.orderClaimsTitle, style: theme.textTheme.titleMedium),
+        if (failed)
+          Row(
+            key: const ValueKey('order-claims-failed'),
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.orderClaimsLoadFailed,
+                  style: TextStyle(color: theme.colorScheme.error),
+                ),
+              ),
+              TextButton(
+                onPressed: () => ref.invalidate(provider),
+                child: Text(l10n.checkoutCheckAgain),
+              ),
+            ],
+          ),
+        for (final c in items)
+          ListTile(
+            key: ValueKey('order-claim-${c.claimId}'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.assignment_return_outlined),
+            title: Text(claimTypeText(l10n, c.type)),
+            subtitle: Text(
+              [
+                claimStateText(l10n, c.state),
+                if (c.openedAt case final t?)
+                  l10n.claimOpenedAt(formatSeoulDateTime(t)),
+              ].join(' · '),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => onVisit('/claims/${c.claimId}'),
           ),
       ],
     );

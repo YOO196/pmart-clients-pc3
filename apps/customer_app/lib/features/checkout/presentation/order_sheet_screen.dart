@@ -9,6 +9,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_controller.dart';
+import '../../cart/domain/cart.dart' show Cart;
 import '../../cart/presentation/cart_controller.dart';
 import '../../payment/domain/payment.dart';
 import '../../payment/presentation/payment_controller.dart';
@@ -23,6 +24,19 @@ String _money(AppLocalizations l10n, int? amount) => switch (amount) {
   final int a => formatKrw(a),
   null => l10n.amountUnavailable,
 };
+
+/// 주문서 품목 제목. 초안에 고정된 상품명·옵션 사본(BR-35) → 장바구니 이름 → sku 순. 사본은 cartItemId, 없으면 sku 로 맞춘다.
+String orderSheetLineTitle(OrderDraft draft, Cart? cart, DraftLine l) {
+  final server =
+      draft.lines.where((d) => d.cartItemId == l.cartItemId).firstOrNull ??
+      draft.lines.where((d) => d.sku == l.sku).firstOrNull;
+  return server?.title ??
+      cart?.lines
+          .where((c) => c.cartItemId == l.cartItemId)
+          .firstOrNull
+          ?.name ??
+      l.sku;
+}
 
 String tipReasonText(AppLocalizations l10n, TipReason r) => switch (r) {
   TipReason.standard => l10n.tipStandard,
@@ -279,7 +293,8 @@ class _SheetState extends ConsumerState<_Sheet> {
 
   void _onFlow(PaymentFlowState? prev, PaymentFlowState next, String draftId) {
     if (!_flowStarted) return;
-    if (next.phase == PaymentPhase.failed && prev?.phase != PaymentPhase.failed) {
+    if (next.phase == PaymentPhase.failed &&
+        prev?.phase != PaymentPhase.failed) {
       // 이번 결제 시도는 끝났다. 초안을 다시 읽어 결제 버튼을 새 키로 다시 연다.
       setState(() => _flowStarted = false);
       ref.read(draftControllerProvider.notifier).refresh();
@@ -297,9 +312,8 @@ class _SheetState extends ConsumerState<_Sheet> {
     final session = _session;
     if (session != null && !await session.requiredTermsAgreed()) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(l10n.tossAgreementRequired)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(l10n.tossAgreementRequired)));
       return;
     }
     final draftId = state.draft.draftId;
@@ -329,7 +343,10 @@ class _SheetState extends ConsumerState<_Sheet> {
     final session = _ensureSession(config.value);
     final flowProvider = paymentFlowProvider(draft.draftId);
     final flow = ref.watch(flowProvider);
-    ref.listen(flowProvider, (prev, next) => _onFlow(prev, next, draft.draftId));
+    ref.listen(
+      flowProvider,
+      (prev, next) => _onFlow(prev, next, draft.draftId),
+    );
 
     final banners = <Widget>[
       // 결제창 실패·취소(이번 시도 끝). 서버가 확보분을 풀었고, 새 키로 다시 결제할 수 있다.
@@ -444,7 +461,7 @@ class _SheetState extends ConsumerState<_Sheet> {
                 children: [
                   for (final l in req.lines)
                     Text(
-                      '${cart?.lines.where((c) => c.cartItemId == l.cartItemId).firstOrNull?.name ?? l.sku} · ${l10n.cartLineQuantity(l.quantity)}',
+                      '${orderSheetLineTitle(draft, cart, l)} · ${l10n.cartLineQuantity(l.quantity)}',
                     ),
                 ],
               ),

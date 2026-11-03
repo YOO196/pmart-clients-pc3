@@ -16,13 +16,13 @@ Commerce 문서의 PPC = MFC. 1차 제외: 쿠폰·프로모션·할인 배너·
 | 장바구니 | SCR-CART-001, CART-MERGE-001 | `POST /carts`, `GET /carts/{id}`, `POST /carts/{id}/items`, `PATCH/DELETE /carts/{id}/items/{itemId}`, `GET /carts/{id}/change-requests/{requestId}`, `POST/GET /carts/{id}/merges` | 비회원은 비회원 토큰(`POST /auth/guest-sessions`, typ=GUEST, ADR-0022). 병합은 회원 토큰 + `X-Guest-Token` |
 | 배송 방식·슬롯 | SCR-DELIVERY-SELECT-001 | `GET /slots`, `GET /delivery-conditions` | |
 | 주문서·결제 | SCR-CHECKOUT-001, PAYMENT-001 | `POST /order-drafts`, `GET /order-drafts/{id}`, `POST /order-drafts/{id}/checkouts` + **토스 결제(BR-01)** | |
-| 주문내역·상세 | SCR-ORDER-LIST/DETAIL-001 | `GET /orders`, `GET /orders/{id}` | |
+| 주문내역·상세 | SCR-ORDER-LIST/DETAIL-001 | `GET /orders`, `GET /orders/{id}`, `GET /claims?orderId=`(처리 내역 목록) | |
 | 배송 추적 | SCR-TRACK-001 | `GET /deliveries/{id}/eta`, `GET /deliveries/{id}/stream`(SSE) | |
 | 예약시간 변경 | SCR-RESCHEDULE-001 | `POST /orders/{id}/reservation-time-changes` (+짝 조회) | |
 | 취소·반품·교환 | SCR-CANCEL-001, CLAIM-FORM/DETAIL-001 | `POST /claims`(CANCEL/RETURN/EXCHANGE), `GET /claims`, `GET /claims/{id}`, `POST /claims/{id}/withdrawals`, `GET /claims/{id}/refunds` | |
 | 리뷰 | SCR-REVIEW-LIST/EDIT-001 | `GET /me/review-eligibilities`, `POST /reviews`, `PATCH/DELETE /reviews/{id}` | |
 | 알림 | SCR-NOTICE-001 | `GET /me/notifications`, `…/{id}`, `POST …/{id}/reads`, `GET /me/notification-settings`, `POST /me/notification-setting-changes` | |
-| 마이·탈퇴 | SCR-ACCOUNT-001, WITHDRAW-001 | `GET /me`(Google 이름·이메일·사진 경로, ADR-0024), `GET /me/profile-image`(본인 토큰, 인증 Dio 로 바이트 → 기본 아바타 대체), `POST /me/profile-changes`, `POST /me/withdrawals`, `GET /me/withdrawals/{id}`, `POST …/revocations` | Google 값은 서버가 로그인마다 최신으로 바꾸고 앱은 표시만. 없으면 "정보 없음"·기본 아바타 |
+| 마이페이지·탈퇴 | SCR-ACCOUNT-001, WITHDRAW-001 | `GET /me`(Google 이름·이메일·사진 경로, ADR-0024), `GET /me/profile-image`(본인 토큰, 인증 Dio 로 바이트 → 기본 아바타 대체), `POST /me/profile-changes`, `POST /me/withdrawals`, `GET /me/withdrawals/{id}`, `POST …/revocations` | Google 값은 서버가 로그인마다 최신으로 바꾸고 앱은 표시만. 없으면 "정보 없음"·기본 아바타 |
 | 고객센터 | SCR-SUPPORT-001, CHAT-001 | 고객용 경로 없음(case `cs-intakes` 는 운영자 접수). `[결정 필요]` 상담 채널 | |
 
 비회원: 둘러보기·장바구니까지. 주문서부터 로그인.
@@ -35,7 +35,7 @@ Commerce 문서의 PPC = MFC. 1차 제외: 쿠폰·프로모션·할인 배너·
 - 같은 이메일로 계정 병합 안 함. 필수/선택 동의 분리, 선택 거부해도 구매 가능. 동의·앱 알림 설정·OS 권한은 서로 다른 값.
 - 일반 로그인 후 회원 장바구니로 전환(자동 병합 없음). 주문서에서 로그인(`purpose=CHECKOUT`)하면 병합 확인 화면.
 - 실서버 제공자는 Google 만(백엔드 ADR-0019, 2026-10-30). `google_sign_in` 으로 ID 토큰 → `providerToken`. serverClientId = 백엔드 안내의 웹 클라이언트 ID(`--dart-define=PMART_GOOGLE_SERVER_CLIENT_ID` 로 바꿀 수 있음). Android OAuth 클라이언트(패키지 `com.pmart.customer_app` + 서명 SHA-1) 등록 필요. 카카오·네이버 버튼은 실서버 모드에서 숨김(501). 애플은 Android 만 개발이라 없음(ADR-0002).
-- 마이 탭에 로그인 제공자·계정(제공자 SDK 의 이메일, 기기 화면에만, 저장 안 함)을 보인다. 목 계정은 `mock-…@pmart.invalid`. 앱 재시작으로 복원한 세션은 계정 표시가 없다.
+- 마이페이지 탭에 로그인 제공자·계정(제공자 SDK 의 이메일, 기기 화면에만, 저장 안 함)을 보인다. 목 계정은 `mock-…@pmart.invalid`. 앱 재시작으로 복원한 세션은 계정 표시가 없다.
 - 목 모드는 앱 모서리 "목 데이터" 띠와 로그인 화면 안내로 표시한다(목 로그인은 제공자 창 없이 항상 성공).
 - 앱 시작 때 저장된 refresh token 이 있으면 `GET /auth/sessions/current` 로 세션 복원(서버가 확인한 CUSTOMER 만 회원). 로그아웃은 토큰 삭제 + Google 계정 선택 해제(서버 `POST /auth/logouts` 는 아직 부르지 않음).
 
@@ -76,6 +76,8 @@ Commerce 문서의 PPC = MFC. 1차 제외: 쿠폰·프로모션·할인 배너·
 
 **주문·배송** (C 1851-1976)
 - 상세는 주문 당시 스냅샷 + 원천별 `asOf`. 10,000g 초과는 분할배송: 배송별 품목·ETA·상태.
+- 품목·배송 품목·주문서 품목은 주문(초안) 당시 상품명·옵션 사본(BR-35, `OrderLine`/`DraftLine.productName`·`optionLabel`)으로 보인다. 사본이 비어 오면(조회 실패·2026-11-02 이전 주문) 주문서는 장바구니 이름, 주문 상세는 sku 로만 대신한다 — 현재 상품명으로 채우지 않는다.
+- 처리 내역(취소·반품·교환)은 `GET /claims?orderId=` 로 받아 "종류 · 상태 · 접수 시각"으로 보이고 줄을 누르면 처리 내역 화면. 주문 응답의 `claims` 는 서버가 아직 비워 보낸다(2026-10-31 안내 §6). 내역이 없으면 영역을 두지 않는다. 조회 실패 문구(+ 다시 확인)는 취소된 주문(`CANCELLED` 또는 응답 `claims` 있음)에서만 보인다 — 취소하지 않은 주문마다 실패 문구가 뜨지 않게(2026-11-03 사용자 요청). 그 대가로 취소 확정 전(`CONFIRMED` + 클레임 접수 중) 주문의 조회 실패는 보이지 않는다.
 - 위치 조회 실패 ≠ 배송 실패. 다른 고객 주소·전체 동선 비노출.
 - "같은 상품 담기"는 현재 조건 새 담기(과거 무료배달 승계 없음).
 

@@ -52,7 +52,7 @@ void main() {
     addTearDown(t.view.reset);
     await t.pumpWidget(testApp(const [], orders: orders));
     await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
+    await t.tap(find.text('마이페이지').last);
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
@@ -65,7 +65,7 @@ void main() {
   testWidgets('비회원은 주문 내역 대신 로그인 안내를 본다', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
+    await t.tap(find.text('마이페이지').last);
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-orders')));
     await t.pumpAndSettle();

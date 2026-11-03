@@ -274,6 +274,7 @@ class OrderDraft {
     this.payment,
     this.checkoutFailure,
     this.shippingAddress,
+    this.lines = const [],
   });
 
   final String draftId;
@@ -285,6 +286,9 @@ class OrderDraft {
 
   /// 초안 생성 때 고정된 배송지 사본(`delivery.shippingAddress`). 주문서의 "받는 곳"은 이 값이다.
   final ShippingAddress? shippingAddress;
+
+  /// 서버가 받아들인 품목(`lines[]`). 상품명·옵션 라벨은 초안 때 고정된 사본(BR-35)이다.
+  final List<DraftLineView> lines;
 
   /// 결제 진입 때 발급된다. 확정 상태와 함께 있어야 "주문 완료"다.
   final String? orderId;
@@ -313,6 +317,32 @@ class OrderDraft {
     if (b == null) return a;
     return a.isBefore(b) ? a : b;
   }
+}
+
+/// 초안 응답의 품목. 이름·옵션 라벨은 주문 당시 사본(BR-35) — 조회 실패면 null(지어내지 않는다).
+@immutable
+class DraftLineView {
+  const DraftLineView({
+    required this.sku,
+    this.cartItemId,
+    this.productName,
+    this.optionLabel,
+    this.quantity,
+    this.unitPrice,
+  });
+
+  final String sku;
+  final String? cartItemId;
+  final String? productName;
+  final String? optionLabel;
+  final int? quantity;
+  final int? unitPrice;
+
+  /// 화면 제목: 상품명(+ 옵션). 이름 사본이 없으면 null(호출 쪽이 장바구니 이름 → sku 순으로 대신한다).
+  String? get title => switch (productName) {
+    final n? => [n, ?optionLabel].join(' · '),
+    null => null,
+  };
 }
 
 @immutable

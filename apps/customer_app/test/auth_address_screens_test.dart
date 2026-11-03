@@ -47,7 +47,7 @@ void main() {
   testWidgets('회원은 로그인 뒤 서버 주소록이 보인다', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
+    await t.tap(find.text('마이페이지').last);
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
@@ -61,7 +61,7 @@ void main() {
   testWidgets('Android 로그인 화면에는 애플 로그인 버튼이 없다(ADR-0002)', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
+    await t.tap(find.text('마이페이지').last);
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
@@ -84,7 +84,7 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
+    await t.tap(find.text('마이페이지').last);
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
@@ -108,7 +108,7 @@ void main() {
       ]),
     );
     await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
+    await t.tap(find.text('마이페이지').last);
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
@@ -124,7 +124,7 @@ void main() {
   testWidgets('필수 동의를 모두 골라야 시작할 수 있다', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
+    await t.tap(find.text('마이페이지').last);
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
@@ -188,7 +188,7 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
+    await t.tap(find.text('마이페이지').last);
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
@@ -228,7 +228,7 @@ void main() {
     addTearDown(t.view.reset);
     await t.pumpWidget(testApp(const [], addressPicker: picker));
     await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
+    await t.tap(find.text('마이페이지').last);
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();

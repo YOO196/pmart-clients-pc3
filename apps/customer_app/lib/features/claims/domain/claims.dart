@@ -73,6 +73,47 @@ class RefundView {
 }
 
 @immutable
+/// 클레임 목록 항목(`GET /claims?orderId=`). 주문 상세의 `claims` 는 서버가 아직 비워 보내므로
+/// 주문의 처리 내역은 이 목록으로 보인다(백엔드 안내 2026-10-31 주문 취소 §6).
+@immutable
+class ClaimSummaryView {
+  const ClaimSummaryView({
+    required this.claimId,
+    required this.orderId,
+    required this.type,
+    required this.state,
+    this.openedAt,
+  });
+
+  final String claimId;
+  final String orderId;
+  final ClaimType type;
+  final ClaimState state;
+  final DateTime? openedAt;
+}
+
+/// 계약 ClaimType 문자열 → 앱 값. 모르는 값은 unknown.
+ClaimType claimTypeFromWire(String? wire) => switch (wire) {
+  'CANCEL' => ClaimType.cancel,
+  'RETURN' => ClaimType.returnItems,
+  'EXCHANGE' => ClaimType.exchange,
+  _ => ClaimType.unknown,
+};
+
+/// 계약 ClaimState 문자열 → 앱 값. 모르는 값은 unknown.
+ClaimState claimStateFromWire(String? wire) => switch (wire) {
+  'OPENED' => ClaimState.opened,
+  'UNDER_REVIEW' => ClaimState.underReview,
+  'STOP_PENDING' => ClaimState.stopPending,
+  'DECIDED' => ClaimState.decided,
+  'IN_PROGRESS' => ClaimState.inProgress,
+  'CLOSED' => ClaimState.closed,
+  'WITHDRAWN' => ClaimState.withdrawn,
+  'REJECTED' => ClaimState.rejected,
+  _ => ClaimState.unknown,
+};
+
+@immutable
 class ClaimView {
   const ClaimView({
     required this.claimId,

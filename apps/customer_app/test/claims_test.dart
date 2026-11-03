@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart' show DioExceptionType;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart';
@@ -240,12 +241,12 @@ void main() {
       await t.pumpWidget(
         testApp(
           orders: orders,
+          claims: claims,
           checkout: MockCheckoutRepository(
             latency: Duration.zero,
             now: () => now,
           ),
           [
-            claimsRepositoryProvider.overrideWithValue(claims),
             clockProvider.overrideWithValue(() => now),
             requestPollPolicyProvider.overrideWithValue((
               interval: Duration.zero,
@@ -255,7 +256,7 @@ void main() {
         ),
       );
       await t.pumpAndSettle();
-      await t.tap(find.text('마이').last);
+      await t.tap(find.text('마이페이지').last);
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('my-login')));
       await t.pumpAndSettle();
@@ -327,9 +328,7 @@ void main() {
       expect(claims.getCalls, calls);
     });
 
-    testWidgets('취소가 끝난 뒤 주문 상세·목록으로 돌아가면 새로고침 없이 "주문 취소"로 보인다', (
-      t,
-    ) async {
+    testWidgets('취소가 끝난 뒤 주문 상세·목록으로 돌아가면 새로고침 없이 "주문 취소"로 보인다', (t) async {
       await openOrder(t, 'order-seed-4');
       expect(find.byKey(const ValueKey('cancel-order')), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('cancel-order')));
@@ -383,7 +382,81 @@ void main() {
         contains('오후 8:00'),
       );
     });
+
+    testWidgets(
+      '주문 상세의 처리 내역은 주문 응답의 claims 가 비어도 GET /claims?orderId= 로 받아 보인다',
+      (t) async {
+        await openOrder(t, 'order-seed-4');
+        expect(find.byKey(const ValueKey('order-claim-claim-1')), findsNothing);
+        await t.tap(find.byKey(const ValueKey('cancel-order')));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('cancel-submit')));
+        await t.pumpAndSettle();
+        expect(find.text('요청을 접수했어요'), findsOneWidget);
+
+        // 처리 내역 → 주문 상세. 주문 응답의 claims 는 서버처럼 비어 있다.
+        await t.tap(find.byType(BackButton));
+        await t.pumpAndSettle();
+        expect(orders.orderJson('order-seed-4')!['claims'], isEmpty);
+        final tile = find.byKey(const ValueKey('order-claim-claim-1'));
+        expect(tile, findsOneWidget);
+        expect(
+          find.descendant(of: tile, matching: find.text('취소 요청')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: tile, matching: find.textContaining('접수')),
+          findsOneWidget,
+        );
+
+        // 줄을 누르면 처리 내역 화면으로 간다.
+        await t.tap(tile);
+        await t.pumpAndSettle();
+        expect(find.byKey(const ValueKey('claim-state')), findsOneWidget);
+      },
+    );
+
+    testWidgets('취소하지 않은 주문에는 처리 내역 영역이 없다 — 조회가 실패해도 보이지 않는다', (t) async {
+      final failing = _ListDownClaims(orders: orders);
+      claims = failing;
+      await openOrder(t, 'order-seed-4'); // CONFIRMED, 내역 없음
+      expect(find.text('처리 내역'), findsNothing);
+      expect(find.byKey(const ValueKey('order-claims-failed')), findsNothing);
+    });
+
+    testWidgets('취소한 주문의 처리 내역 조회 실패는 "내역 없음"이 아니라 실패로 보이고 다시 확인할 수 있다', (
+      t,
+    ) async {
+      final failing = _ListDownClaims(orders: orders);
+      claims = failing;
+      await openOrder(t, 'order-seed-3'); // CANCELLED
+      expect(find.byKey(const ValueKey('order-claims-failed')), findsOneWidget);
+      expect(find.text('처리 내역을 불러오지 못했어요'), findsOneWidget);
+
+      failing.down = false;
+      await t.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey('order-claims-failed')),
+          matching: find.text('다시 확인'),
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('order-claims-failed')), findsNothing);
+    });
   });
+}
+
+/// 처리 내역 목록 조회만 실패하는 목.
+final class _ListDownClaims extends MockClaimsRepository {
+  _ListDownClaims({super.orders}) : super(latency: Duration.zero);
+
+  bool down = true;
+
+  @override
+  Future<List<ClaimSummaryView>> listForOrder(String orderId) async {
+    if (down) throw const NetworkFailure(DioExceptionType.connectionError);
+    return super.listForOrder(orderId);
+  }
 }
 
 /// 접수 응답을 차례로 실패시키는 목. 보낸 횟수·키를 센다.

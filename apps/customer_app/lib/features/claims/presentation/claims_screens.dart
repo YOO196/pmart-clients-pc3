@@ -28,6 +28,14 @@ String claimStateText(AppLocalizations l10n, ClaimState s) => switch (s) {
   ClaimState.unknown => l10n.osUnknown,
 };
 
+/// 주문 상세의 처리 내역 줄 제목. 모르는 종류는 일반 제목으로.
+String claimTypeText(AppLocalizations l10n, ClaimType t) => switch (t) {
+  ClaimType.cancel => l10n.claimTypeCancel,
+  ClaimType.returnItems => l10n.claimTypeReturn,
+  ClaimType.exchange => l10n.claimTypeExchange,
+  ClaimType.unknown => l10n.claimTitle,
+};
+
 String cancelRejectText(AppLocalizations l10n, String code) => switch (code) {
   'ORDER_NOT_CANCELLABLE' || 'NOT_CANCELLABLE' => l10n.cancelNotCancellable,
   'QUANTITY_EXCEEDS_AVAILABLE' => l10n.cancelQtyExceeded,
@@ -211,6 +219,7 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
       // 돌아갔을 때 옛 상태를 보이지 않도록 다시 읽게 한다.
       if (claim != null && claim.state != prev?.value?.state) {
         ref.invalidate(orderDetailProvider(claim.orderId));
+        ref.invalidate(orderClaimsProvider(claim.orderId));
         ref.invalidate(orderListProvider);
       }
     });

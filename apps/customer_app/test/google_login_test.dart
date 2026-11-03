@@ -105,7 +105,7 @@ void main() {
   testWidgets('목 모드 로그인 화면은 실제 Google 로그인이 아니라고 알린다', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
+    await t.tap(find.text('마이페이지').last);
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
@@ -120,7 +120,7 @@ void main() {
   testWidgets('로그인하면 마이에 제공자와 계정(목은 가짜 계정)이 보인다', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
-    await t.tap(find.text('마이').last);
+    await t.tap(find.text('마이페이지').last);
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
@@ -152,7 +152,7 @@ void main() {
       testWidgets(code, (t) async {
         await t.pumpWidget(testApp(const [], auth: _RejectingAuth(code)));
         await t.pumpAndSettle();
-        await t.tap(find.text('마이').last);
+        await t.tap(find.text('마이페이지').last);
         await t.pumpAndSettle();
         await t.tap(find.byKey(const ValueKey('my-login')));
         await t.pumpAndSettle();

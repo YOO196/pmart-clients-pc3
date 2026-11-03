@@ -23,7 +23,7 @@ final _png = Uint8List.fromList(const [
 ]);
 
 Future<void> _loginKakao(WidgetTester t) async {
-  await t.tap(find.text('마이').last);
+  await t.tap(find.text('마이페이지').last);
   await t.pumpAndSettle();
   await t.tap(find.byKey(const ValueKey('my-login')));
   await t.pumpAndSettle();

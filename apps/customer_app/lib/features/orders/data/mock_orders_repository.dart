@@ -4,7 +4,6 @@ import 'package:pmart_api_delivery_tracking/pmart_api_delivery_tracking.dart'
 import 'package:pmart_api_order/pmart_api_order.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
 
-import '../../catalog/data/mock_catalog_repository.dart' show mockProducts;
 import '../../checkout/data/mock_checkout_repository.dart';
 import '../../checkout/domain/checkout.dart' show ArrivalWindow;
 import '../../claims/domain/claims.dart' show RequestState;
@@ -30,14 +29,6 @@ base class MockOrdersRepository implements OrdersRepository {
   final overrides = <String, Map<String, Object?>>{};
 
   Future<void> _wait() => Future<void>.delayed(latency);
-
-  static String _name(String sku) {
-    for (final p in mockProducts) {
-      if (p.sku == sku) return p.name;
-      if (p.bundleSku == sku) return '${p.name} 2개 묶음';
-    }
-    return sku;
-  }
 
   static const _quoteSeed = {
     'quoteVersion': 1,
@@ -245,7 +236,7 @@ base class MockOrdersRepository implements OrdersRepository {
       ],
       'payment': {'state': 'REFUNDED', 'refundedAmount': 18900},
       'claims': [
-        {'claimId': 'clm-1', 'type': 'CANCEL', 'state': 'COMPLETED'},
+        {'claimId': 'clm-1', 'type': 'CANCEL', 'state': 'CLOSED'},
       ],
       'sources': [
         {
@@ -272,7 +263,8 @@ base class MockOrdersRepository implements OrdersRepository {
         {
           'orderLineId': '$orderId-l${++i}',
           'sku': l.sku,
-          'productName': _name(l.sku),
+          // 확정 때 초안의 상품명 사본을 그대로 옮긴다(BR-35).
+          'productName': MockCheckoutRepository.nameOf(l.sku),
           'unitPrice': MockCheckoutRepository.priceOf(l.sku),
           'originalQty': l.quantity,
           'handedOverQty': 0,

@@ -327,6 +327,18 @@ OrderDraft draftFromContract(api.OrderDraft d) {
     },
     quote: q?.quoteVersion == null ? null : quoteFromContract(q!),
     shippingAddress: shippingAddressFromContract(d.delivery?.shippingAddress),
+    lines: [
+      for (final l in d.lines ?? const <api.DraftLine>[])
+        if (l.sku case final sku?)
+          DraftLineView(
+            sku: sku,
+            cartItemId: l.cartItemId,
+            productName: l.productName,
+            optionLabel: l.optionLabel,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+          ),
+    ],
     payment: switch (d.payment) {
       api.OrderDraftPayment(
         clientKey: final String clientKey,

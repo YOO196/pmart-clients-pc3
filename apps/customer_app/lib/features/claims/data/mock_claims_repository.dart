@@ -85,6 +85,7 @@ base class MockClaimsRepository implements ClaimsRepository {
       'orderId': orderId,
       'type': 'CANCEL',
       'state': 'OPENED',
+      'openedAt': orders?.now().toUtc().toIso8601String(),
       'reason': 'CHANGE_OF_MIND',
       'lines': [
         for (final l in lines)
@@ -100,15 +101,7 @@ base class MockClaimsRepository implements ClaimsRepository {
     };
     claims[id] = json;
     _byKey[key.value] = id;
-    if (order != null) {
-      orders!.overrides[orderId] = {
-        ...order,
-        'claims': [
-          ...?(order['claims'] as List?),
-          {'claimId': id, 'type': 'CANCEL', 'state': 'OPENED'},
-        ],
-      };
-    }
+    // 서버처럼 주문 상세의 `claims` 는 비워 둔다. 처리 내역은 [listForOrder] 로 보인다.
     if (loseNextCreateResponse) {
       loseNextCreateResponse = false;
       throw UnknownResultFailure(requestId: key.value, httpStatus: 504);
@@ -187,6 +180,29 @@ base class MockClaimsRepository implements ClaimsRepository {
     final view = _out(c);
     _advance(c);
     return view;
+  }
+
+  @override
+  Future<List<ClaimSummaryView>> listForOrder(String orderId) async {
+    await _wait();
+    final mine = [
+      for (final c in claims.values)
+        if (c['orderId'] == orderId) _out(c),
+    ];
+    // 서버는 최근 순으로 준다.
+    return [
+      for (final v in mine.reversed)
+        ClaimSummaryView(
+          claimId: v.claimId,
+          orderId: v.orderId,
+          type: v.type,
+          state: v.state,
+          openedAt: switch (claims[v.claimId]!['openedAt']) {
+            final String s => DateTime.parse(s),
+            _ => null,
+          },
+        ),
+    ];
   }
 
   @override

@@ -182,6 +182,15 @@ base class MockCheckoutRepository
     throw ArgumentError(sku);
   }
 
+  /// 초안·주문에 고정되는 고객용 상품명 사본(BR-35). 모르는 sku 면 null(서버도 조회 실패면 비운다).
+  static String? nameOf(String sku) {
+    for (final p in mockProducts) {
+      if (p.sku == sku) return p.name;
+      if (p.bundleSku == sku) return '${p.name} 2개 묶음';
+    }
+    return null;
+  }
+
   Map<String, Object?> _quote(
     DraftRequest r,
     int version,
@@ -250,6 +259,17 @@ base class MockCheckoutRepository
         'status': 'RESOURCE_PENDING',
         'mfcId': request.expectedMfcId,
         'quote': _quote(request, 1, created),
+        // 초안 때 고정되는 상품명 사본(BR-35). 서버가 조회에 실패하면 null 로 온다.
+        'lines': [
+          for (final l in request.lines)
+            {
+              'cartItemId': l.cartItemId,
+              'sku': l.sku,
+              'productName': nameOf(l.sku),
+              'quantity': l.quantity,
+              'unitPrice': priceOf(l.sku),
+            },
+        ],
         'createdAt': created.toUtc().toIso8601String(),
         // 최소주문 미달은 거절이 아니라 막는 사유로 준다(계약 DraftBlocker).
         'blockers': [
