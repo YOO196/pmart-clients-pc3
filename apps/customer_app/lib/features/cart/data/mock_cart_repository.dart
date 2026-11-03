@@ -53,6 +53,15 @@ base class MockCartRepository implements CartRepository {
   /// 원결과 조회가 몇 번 더 실패할지(조회 불가 시연).
   int lookupFailures = 0;
 
+  /// 재고 원천(mfc-inventory-service)을 못 받은 상태: 모든 줄 가용 UNKNOWN + `sources` 에 UNAVAILABLE.
+  bool inventoryDown = false;
+
+  /// 담당 MFC 가 없는 장바구니(배송지 미정): 재고를 조회하지 않아 가용 UNKNOWN, `mfcId` null.
+  bool noMfc = false;
+
+  /// 받은 변경 명령(재전송 포함) 순서대로. 테스트가 "몇 번 보냈는지"를 본다.
+  final changes = <CartChange>[];
+
   /// 다른 기기에서 장바구니를 바꾼 것처럼 버전을 올린다(버전 충돌 시연).
   void bumpVersionElsewhere() => version++;
 
@@ -115,8 +124,10 @@ base class MockCartRepository implements CartRepository {
           'unitPrice': s.price,
           'priceVersion': 1,
           'saleState': s.saleState,
-          'availability': s.availability,
-          'availableQty': s.availability == 'LOW' ? lowStockQty : null,
+          'availability': (inventoryDown || noMfc) ? 'UNKNOWN' : s.availability,
+          'availableQty': s.availability == 'LOW' && !inventoryDown && !noMfc
+              ? lowStockQty
+              : null,
         },
       });
     }
@@ -125,11 +136,25 @@ base class MockCartRepository implements CartRepository {
       'cartVersion': version,
       'ownerType': 'GUEST',
       'accountId': null,
-      'mfcId': 'MFC-MOCK-01',
+      'mfcId': noMfc ? null : 'MFC-MOCK-01',
       'items': items,
       'selectedItemAmount': amount,
       'lastChangedAt': '2026-10-24T06:00:00Z',
       'expiresAt': '2026-11-23T06:00:00Z',
+      'sources': [
+        {
+          'system': 'pricing-service',
+          'asOf': {'asOf': '2026-10-24T06:00:00Z', 'freshness': 'CURRENT'},
+        },
+        if (!noMfc)
+          {
+            'system': 'mfc-inventory-service',
+            'asOf': {
+              'asOf': '2026-10-24T06:00:00Z',
+              'freshness': inventoryDown ? 'UNAVAILABLE' : 'CURRENT',
+            },
+          },
+      ],
     };
   }
 
@@ -200,6 +225,7 @@ base class MockCartRepository implements CartRepository {
     required int expectedVersion,
   }) async {
     await _wait();
+    changes.add(change);
     // 같은 키 재전송은 기존 결과를 돌려준다(중복 적용 없음).
     if (dropNextRequest) {
       dropNextRequest = false;

@@ -46,6 +46,8 @@ Widget testApp(
   ProfileRepository? profile,
   FakeAddressPicker? addressPicker,
   MockAddressRepository? address,
+  /// 수량 ± 모아 보내기 대기. 기본 0(탭 직후 pumpAndSettle 로 반영). 모아 보내기를 시험할 때만 늘린다.
+  Duration stepperDelay = Duration.zero,
 }) => ProviderScope(
   retry: (_, _) => null,
   overrides: [
@@ -59,6 +61,7 @@ Widget testApp(
     cartRepositoryProvider.overrideWithValue(
       cart ?? MockCartRepository(latency: Duration.zero),
     ),
+    cartStepperDelayProvider.overrideWithValue(stepperDelay),
     authRepositoryProvider.overrideWithValue(
       auth ?? MockAuthRepository(latency: Duration.zero),
     ),

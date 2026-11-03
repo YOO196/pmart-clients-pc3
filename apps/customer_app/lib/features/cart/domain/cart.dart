@@ -57,6 +57,7 @@ class Cart {
     this.mfcId,
     this.selectedItemAmount,
     this.expiresAt,
+    this.sources = const [],
   });
 
   final String cartId;
@@ -71,11 +72,32 @@ class Cart {
   final int? selectedItemAmount;
   final DateTime? expiresAt;
 
+  /// 표시용 사본의 원천별 신선도(계약 `Cart.sources`). 어느 원천을 못 받았는지 안내에 쓴다.
+  final List<CartSource> sources;
+
+  /// 재고 원천(mfc-inventory-service)을 못 받았다 → 가용 UNKNOWN 은 "재고 정보 없음"이지 품절·0 이 아니다.
+  bool get inventoryUnavailable =>
+      sources.any((s) => s.system == CartSource.inventory && s.unavailable);
+
   CartLine? lineForSku(String sku) =>
       lines.where((l) => l.sku == sku).firstOrNull;
 
   bool get hasSelectedPurchasable =>
       lines.any((l) => l.selected && l.purchasable);
+}
+
+/// 장바구니 표시용 사본의 원천 하나(계약 `Cart.sources[]`).
+@immutable
+class CartSource {
+  const CartSource({required this.system, required this.unavailable});
+
+  /// 재고 가용 원천 이름(백엔드 cart-service `CartView` 가 쓰는 값).
+  static const inventory = 'mfc-inventory-service';
+
+  final String system;
+
+  /// `asOf.freshness == UNAVAILABLE`.
+  final bool unavailable;
 }
 
 /// 고객의 장바구니 변경 의도 1회. 수량은 항상 절대값이다(합산 아님).

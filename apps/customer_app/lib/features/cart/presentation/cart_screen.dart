@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -89,9 +91,12 @@ class _CartBody extends ConsumerWidget {
                         _CartLineTile(
                           line: line,
                           enabled: state.canChange,
+                          unknown: state.sync == CartSync.unknown,
                           busy:
                               state.busyItemId == line.cartItemId &&
                               state.sync != CartSync.stable,
+                          mfcKnown: cart.mfcId != null,
+                          stockUnavailable: cart.inventoryUnavailable,
                         ),
                     ],
                   ),
@@ -103,27 +108,87 @@ class _CartBody extends ConsumerWidget {
   }
 }
 
-class _CartLineTile extends ConsumerWidget {
+class _CartLineTile extends ConsumerStatefulWidget {
   const _CartLineTile({
     required this.line,
     required this.enabled,
+    required this.unknown,
     required this.busy,
+    required this.mfcKnown,
+    required this.stockUnavailable,
   });
 
   final CartLine line;
+
+  /// 지금 바로 변경을 보낼 수 있는지(선택·삭제용). 수량 ± 는 모아 보내므로 진행 중에도 누를 수 있다.
   final bool enabled;
+
+  /// 직전 변경이 결과 불명 — 확인될 때까지 모든 변경을 막는다.
+  final bool unknown;
   final bool busy;
 
-  Future<void> _decrease(BuildContext context, WidgetRef ref) async {
-    final controller = ref.read(cartControllerProvider.notifier);
-    if (line.quantity > 1) {
-      await controller.submit(
-        SetQuantity(cartItemId: line.cartItemId, quantity: line.quantity - 1),
-      );
+  /// 장바구니에 담당 MFC 가 있는지(없으면 재고를 조회하지 않아 가용이 불명이다).
+  final bool mfcKnown;
+
+  /// 재고 원천을 못 받았다(응답 `sources`).
+  final bool stockUnavailable;
+
+  @override
+  ConsumerState<_CartLineTile> createState() => _CartLineTileState();
+}
+
+class _CartLineTileState extends ConsumerState<_CartLineTile> {
+  CartLine get line => widget.line;
+  bool get enabled => widget.enabled;
+  bool get busy => widget.busy;
+
+  /// 아직 보내지 않은 목표 수량(연속 탭을 모은다). null 이면 서버 확정 수량 그대로.
+  int? _pending;
+  Timer? _timer;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  /// ± 한 번. 잠깐 기다렸다가 최종 수량 한 번만 보낸다(탭마다 왕복 2번 하지 않게). 1 아래로는 삭제 확인.
+  void _bump(int delta) {
+    final next = (_pending ?? line.quantity) + delta;
+    if (next < 1) {
+      _timer?.cancel();
+      setState(() => _pending = null);
+      unawaited(_confirmRemove(context, ref));
       return;
     }
-    // 1에서 "-" 는 삭제 확인을 거친다.
-    await _confirmRemove(context, ref);
+    setState(() => _pending = next);
+    _arm(ref.read(cartStepperDelayProvider));
+  }
+
+  void _arm(Duration delay) {
+    _timer?.cancel();
+    _timer = Timer(delay, () => unawaited(_flush()));
+  }
+
+  Future<void> _flush() async {
+    if (!mounted) return;
+    final qty = _pending;
+    if (qty == null) return;
+    final state = ref.read(cartControllerProvider).value;
+    if (state == null) return;
+    // 다른 변경이 진행 중이면 끝난 뒤 다시 시도한다(결과 불명이면 버튼이 막혀 있어 여기 오지 않는다).
+    if (!state.canChange) return _arm(const Duration(milliseconds: 100));
+    if (qty == line.quantity) {
+      setState(() => _pending = null);
+      return;
+    }
+    final outcome = await ref
+        .read(cartControllerProvider.notifier)
+        .submit(SetQuantity(cartItemId: line.cartItemId, quantity: qty));
+    if (!mounted) return;
+    if (outcome == null) return _arm(const Duration(milliseconds: 100));
+    // 보내는 동안 또 눌렀으면(_pending 이 바뀜) 타이머가 다시 보낸다. 아니면 서버 확정본으로 돌아간다.
+    if (_pending == qty) setState(() => _pending = null);
   }
 
   Future<void> _confirmRemove(BuildContext context, WidgetRef ref) async {
@@ -154,7 +219,7 @@ class _CartLineTile extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final controller = ref.read(cartControllerProvider.notifier);
@@ -163,7 +228,11 @@ class _CartLineTile extends ConsumerWidget {
       (SaleState.temporarilySoldOut, _) ||
       (_, LineAvailability.soldOut) => l10n.cartLineSoldOut,
       (_, LineAvailability.notCarried) => l10n.cartLineNotCarried,
-      (SaleState.unknown, _) ||
+      (SaleState.unknown, _) => l10n.cartLineUnknown,
+      // 가용 불명은 "확인 중"이 아니라 왜 모르는지로 나눈다: 배송지 미정(재고 조회 안 함) / 재고 원천 장애.
+      (_, LineAvailability.unknown) when !widget.mfcKnown => l10n.cartLineNoMfc,
+      (_, LineAvailability.unknown) when widget.stockUnavailable =>
+        l10n.cartLineStockUnavailable,
       (_, LineAvailability.unknown) => l10n.cartLineUnknown,
       (_, LineAvailability.low) => switch (line.availableQty) {
         final int n => l10n.cartLineAvailableQty(n),
@@ -198,10 +267,14 @@ class _CartLineTile extends ConsumerWidget {
                   Text(line.name ?? line.sku, style: theme.textTheme.bodyLarge),
                   if (line.optionLabel case final String label)
                     Text(label, style: theme.textTheme.bodySmall),
+                  // 담은 수량만큼의 금액(단가 × 수량). 서버 합계(selectedItemAmount)와 같은 식이며 표시용이다.
+                  // 주문 금액은 견적·주문서의 서버 값으로만 확정한다(사용자 요청 2026-11-03: "개당" 대신 수량 금액).
                   Text(switch (line.unitPrice) {
-                    final int p => l10n.cartUnitPrice(formatKrw(p)),
+                    final int p => l10n.cartLineAmount(
+                      formatKrw(p * line.quantity),
+                    ),
                     null => l10n.priceUnavailable,
-                  }),
+                  }, key: ValueKey('cart-amount-$id')),
                   if (reason != null)
                     Text(
                       reason,
@@ -216,30 +289,30 @@ class _CartLineTile extends ConsumerWidget {
                         key: ValueKey('cart-dec-$id'),
                         tooltip: l10n.cartDecrease,
                         icon: const Icon(Icons.remove),
-                        onPressed: enabled
-                            ? () => _decrease(context, ref)
+                        onPressed: widget.unknown ? null : () => _bump(-1),
+                      ),
+                      // 모아 보내는 중·서버 반영 중에는 목표 수량을 흐리게 + 진행 표시. 확정되면 보통 글씨.
+                      Text(
+                        l10n.cartLineQuantity(_pending ?? line.quantity),
+                        key: ValueKey('cart-qty-$id'),
+                        style: (_pending != null || busy)
+                            ? TextStyle(color: theme.colorScheme.outline)
                             : null,
                       ),
-                      busy
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(
-                              l10n.cartLineQuantity(line.quantity),
-                              key: ValueKey('cart-qty-$id'),
-                            ),
+                      if (_pending != null || busy)
+                        const Padding(
+                          padding: EdgeInsets.only(left: 6),
+                          child: SizedBox.square(
+                            dimension: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
                       IconButton(
                         key: ValueKey('cart-inc-$id'),
                         tooltip: l10n.cartIncrease,
                         icon: const Icon(Icons.add),
-                        onPressed: (enabled && line.purchasable)
-                            ? () => controller.submit(
-                                SetQuantity(
-                                  cartItemId: id,
-                                  quantity: line.quantity + 1,
-                                ),
-                              )
+                        onPressed: (!widget.unknown && line.purchasable)
+                            ? () => _bump(1)
                             : null,
                       ),
                       const Spacer(),

@@ -13,7 +13,7 @@ Commerce 문서의 PPC = MFC. 1차 제외: 쿠폰·프로모션·할인 배너·
 | 홈 | SCR-HOME-001 | `GET /storefront/home`, `/storefront/tabs/{tabKey}`, `/storefront/sections/{id}/items`, `/storefront/banners` | 공개 |
 | 카테고리·검색 | SCR-CATEGORY/SEARCH/LIST/FILTER-001 | `GET /categories/tree`, `GET /search/products`, `/search/suggestions`, `/search/filters`, `GET/DELETE /me/recent-searches` | 검색 공개 |
 | 상품 | SCR-PRODUCT-001, OPTION-001 | `GET /product-contents/{productId}`, `GET /product-contents?…`(카드 일괄), `GET /prices`, `GET /products/{id}/reviews` | 리뷰 공개 |
-| 장바구니 | SCR-CART-001, CART-MERGE-001 | `POST /carts`, `GET /carts/{id}`, `POST /carts/{id}/items`, `PATCH/DELETE /carts/{id}/items/{itemId}`, `GET /carts/{id}/change-requests/{requestId}`, `POST/GET /carts/{id}/merges` | 비회원은 비회원 토큰(`POST /auth/guest-sessions`, typ=GUEST, ADR-0022). 병합은 회원 토큰 + `X-Guest-Token` |
+| 장바구니 | SCR-CART-001, CART-MERGE-001 | `POST /carts`, `GET /carts/{id}`, `POST /carts/{id}/items`, `PATCH/DELETE /carts/{id}/items/{itemId}`, `GET /carts/{id}/change-requests/{requestId}`, `POST/GET /carts/{id}/merges` | 비회원은 비회원 토큰(`POST /auth/guest-sessions`, typ=GUEST, ADR-0022). 병합은 회원 토큰 + `X-Guest-Token`. 가용 UNKNOWN 안내는 `mfcId` null(배송지 미정)·`sources[]` 의 mfc-inventory UNAVAILABLE(재고 원천 장애)·그 밖으로 나눈다. 수량 ± 는 350ms 모아 최종 수량 1회 전송(목표 수량은 흐리게, 확정은 서버 값). 품목 줄 금액 = `display.unitPrice × quantity`(표시용, 서버 `selectedItemAmount` 와 같은 식. 계약에 행 금액이 없음). 합계·주문 금액은 서버 값만 |
 | 배송 방식·슬롯 | SCR-DELIVERY-SELECT-001 | `GET /slots`, `GET /delivery-conditions` | |
 | 주문서·결제 | SCR-CHECKOUT-001, PAYMENT-001 | `POST /order-drafts`, `GET /order-drafts/{id}`, `POST /order-drafts/{id}/checkouts` + **토스 결제(BR-01)** | |
 | 주문내역·상세 | SCR-ORDER-LIST/DETAIL-001 | `GET /orders`, `GET /orders/{id}`, `GET /claims?orderId=`(처리 내역 목록) | |
@@ -22,7 +22,7 @@ Commerce 문서의 PPC = MFC. 1차 제외: 쿠폰·프로모션·할인 배너·
 | 취소·반품·교환 | SCR-CANCEL-001, CLAIM-FORM/DETAIL-001 | `POST /claims`(CANCEL/RETURN/EXCHANGE), `GET /claims`, `GET /claims/{id}`, `POST /claims/{id}/withdrawals`, `GET /claims/{id}/refunds` | |
 | 리뷰 | SCR-REVIEW-LIST/EDIT-001 | `GET /me/review-eligibilities`, `POST /reviews`, `PATCH/DELETE /reviews/{id}` | |
 | 알림 | SCR-NOTICE-001 | `GET /me/notifications`, `…/{id}`, `POST …/{id}/reads`, `GET /me/notification-settings`, `POST /me/notification-setting-changes` | |
-| 마이페이지·탈퇴 | SCR-ACCOUNT-001, WITHDRAW-001 | `GET /me`(Google 이름·이메일·사진 경로, ADR-0024), `GET /me/profile-image`(본인 토큰, 인증 Dio 로 바이트 → 기본 아바타 대체), `POST /me/profile-changes`, `POST /me/withdrawals`, `GET /me/withdrawals/{id}`, `POST …/revocations` | Google 값은 서버가 로그인마다 최신으로 바꾸고 앱은 표시만. 없으면 "정보 없음"·기본 아바타 |
+| 마이페이지·탈퇴 | SCR-ACCOUNT-001, WITHDRAW-001 | `GET /me`(Google 이름·이메일·사진 경로, ADR-0024), `GET /me/profile-image`(본인 토큰, 인증 Dio 로 바이트 → 기본 아바타 대체), `POST /me/profile-changes`, `POST /me/withdrawals`, `GET /me/withdrawals/{id}`, `POST …/revocations` | Google 값은 서버가 로그인마다 최신으로 바꾸고 앱은 표시만. 없으면 "정보 없음"·기본 아바타. 내 정보 저장은 닉네임만(`{nickname}` 즉시 APPLIED, 2026-11-03 안내). 연락처(phone)는 서버가 본인 확인 방식을 정한 뒤 열림 — 칸을 잠그고 보내지 않는다(보내면 400) |
 | 고객센터 | SCR-SUPPORT-001, CHAT-001 | 고객용 경로 없음(case `cs-intakes` 는 운영자 접수). `[결정 필요]` 상담 채널 | |
 
 비회원: 둘러보기·장바구니까지. 주문서부터 로그인.

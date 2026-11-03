@@ -40,6 +40,12 @@ void main() {
       t.widget<Text>(find.byKey(const ValueKey('cart-total'))).data,
       '7,940원',
     );
+    // 품목 줄은 "개당 단가"가 아니라 담은 수량만큼의 금액(단가 2,980 × 2개).
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('cart-amount-ci-1'))).data,
+      '5,960원',
+    );
+    expect(find.textContaining('개당'), findsNothing);
   });
 
   testWidgets('조회 실패는 빈 장바구니가 아니라 오류로 보인다', (t) async {
@@ -62,9 +68,77 @@ void main() {
       '3개',
     );
     expect(
+      t.widget<Text>(find.byKey(const ValueKey('cart-amount-ci-1'))).data,
+      '8,940원',
+    );
+    expect(
       t.widget<Text>(find.byKey(const ValueKey('cart-total'))).data,
       '10,920원',
     );
+  });
+
+  testWidgets('연속으로 누른 수량 ± 는 모아서 최종 수량 한 번만 보낸다', (t) async {
+    await t.pumpWidget(
+      testApp(
+        const [],
+        cart: cart,
+        stepperDelay: const Duration(milliseconds: 300),
+      ),
+    );
+    await _openCartTab(t);
+    final sent = cart.changes.length;
+
+    // 2개 → + + + - = 4개. 기다리는 동안은 목표 수량을 바로 보이되 서버에는 아직 안 보냈다.
+    for (final key in [
+      'cart-inc-ci-1',
+      'cart-inc-ci-1',
+      'cart-inc-ci-1',
+      'cart-dec-ci-1',
+    ]) {
+      await t.tap(find.byKey(ValueKey(key)));
+      await t.pump(const Duration(milliseconds: 50));
+    }
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('cart-qty-ci-1'))).data,
+      '4개',
+    );
+    expect(cart.changes.length, sent);
+
+    await t.pump(const Duration(milliseconds: 300));
+    await t.pumpAndSettle();
+    expect(cart.changes.length, sent + 1);
+    expect(
+      cart.changes.last,
+      isA<SetQuantity>().having((c) => c.quantity, 'quantity', 4),
+    );
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('cart-qty-ci-1'))).data,
+      '4개',
+    );
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('cart-amount-ci-1'))).data,
+      '11,920원',
+    );
+  });
+
+  testWidgets('가용 불명은 이유를 나눠 보인다 — 재고 원천 장애 / 배송지 미정', (t) async {
+    cart.inventoryDown = true;
+    await t.pumpWidget(testApp(const [], cart: cart));
+    await _openCartTab(t);
+    expect(find.text('재고 정보를 받지 못했어요. 결제할 때 다시 확인해요'), findsNWidgets(2));
+    expect(find.text('판매 상태를 확인하는 중이에요'), findsNothing);
+    // 재고를 몰라도 판매 중이면 수량은 바꿀 수 있다(결제 때 다시 잡는다).
+    expect(
+      t
+          .widget<IconButton>(find.byKey(const ValueKey('cart-inc-ci-1')))
+          .onPressed,
+      isNotNull,
+    );
+
+    final noMfc = MockCartRepository(latency: Duration.zero)..noMfc = true;
+    await t.pumpWidget(testApp(const [], cart: noMfc));
+    await _openCartTab(t);
+    expect(find.text('배송지를 정하면 재고를 확인해요'), findsNWidgets(2));
   });
 
   testWidgets('1개에서 -는 삭제를 확인한다', (t) async {

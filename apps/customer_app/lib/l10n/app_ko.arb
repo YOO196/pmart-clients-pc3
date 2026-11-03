@@ -143,8 +143,8 @@
       }
     }
   },
-  "cartUnitPrice": "개당 {price}",
-  "@cartUnitPrice": {
+  "cartLineAmount": "{price}",
+  "@cartLineAmount": {
     "placeholders": {
       "price": {
         "type": "String"
@@ -169,6 +169,8 @@
   "cartLineNotCarried": "지금 주소로는 배달하지 않는 상품이에요",
   "cartLineSaleStopped": "판매가 끝난 상품이에요",
   "cartLineUnknown": "판매 상태를 확인하는 중이에요",
+  "cartLineNoMfc": "배송지를 정하면 재고를 확인해요",
+  "cartLineStockUnavailable": "재고 정보를 받지 못했어요. 결제할 때 다시 확인해요",
   "cartLineLowStock": "남은 수량이 적어요",
   "cartLineAvailableQty": "지금 {count}개까지 있어요",
   "@cartLineAvailableQty": {
@@ -232,11 +234,12 @@
   "loginTitle": "로그인",
   "infoTitle": "내 정보",
   "infoSignupTitle": "내 정보 등록",
-  "infoSignupGuide": "주문·배달에 쓸 이름과 휴대폰 번호를 입력해 주세요",
-  "infoGuide": "주문·배달에 쓸 이름과 휴대폰 번호예요. 이미 결제한 주문의 받는 분·연락처는 바뀌지 않아요",
+  "infoSignupGuide": "주문·배달에 쓸 이름을 입력해 주세요. 휴대폰 번호 등록은 준비 중이에요",
+  "infoGuide": "주문·배달에 쓸 이름이에요. 이미 결제한 주문의 받는 분·연락처는 바뀌지 않아요",
   "infoName": "이름",
   "infoNameInvalid": "이름을 입력해 주세요(30자 이내)",
   "infoPhone": "휴대폰 번호",
+  "infoPhonePending": "휴대폰 번호 변경은 준비 중이에요. 지금은 이름만 저장돼요",
   "infoPhoneCurrent": "지금 번호 {phone}. 바꿀 때만 입력해 주세요",
   "@infoPhoneCurrent": {
     "placeholders": {
@@ -252,7 +255,7 @@
   "infoRejected": "저장하지 못했어요. 입력한 내용을 확인하고 다시 시도해 주세요",
   "infoUnknown": "저장됐는지 확인하지 못했어요. 내 정보에서 다시 확인해 주세요",
   "infoLater": "나중에 하기",
-  "infoNotSet": "이름·휴대폰 번호를 등록해 주세요",
+  "infoNotSet": "이름을 등록해 주세요",
   "infoNameNotSet": "이름 없음",
   "infoPhoneNotSet": "휴대폰 번호 없음",
   "infoLoadFailed": "불러오지 못했어요",

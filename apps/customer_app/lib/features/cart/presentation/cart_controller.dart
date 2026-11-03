@@ -27,6 +27,11 @@ final cartResolvePolicyProvider = Provider<({Duration interval, int attempts})>(
   (_) => (interval: const Duration(seconds: 2), attempts: 5),
 );
 
+/// 수량 ± 를 모아 보내는 대기 시간. 연속 탭을 최종 수량 한 번으로 보낸다(탭마다 왕복 2번 하지 않게).
+final cartStepperDelayProvider = Provider<Duration>(
+  (_) => const Duration(milliseconds: 350),
+);
+
 /// 장바구니 변경 상태(C 1265: CART_STABLE / CHANGE_PENDING / CHANGE_UNKNOWN).
 enum CartSync { stable, pending, unknown }
 

@@ -8,18 +8,20 @@ import '../domain/profile.dart';
 import 'profile_avatar.dart';
 import 'profile_controller.dart';
 
-/// 마이 목록에 보일 한 줄 요약(이름 · 가린 번호).
+/// 마이 목록에 보일 한 줄 요약(이름 · 가린 번호). 번호는 등록된 것이 있을 때만 붙인다
+/// (연락처 등록은 서버가 아직 열지 않아 "번호 없음"을 따로 보이지 않는다, 2026-11-03 안내).
 String myInfoSummary(AppLocalizations l10n, Profile p) {
   final name = p.nickname?.trim() ?? '';
   if (name.isEmpty && !p.hasPhone) return l10n.infoNotSet;
   return [
     name.isEmpty ? l10n.infoNameNotSet : name,
-    p.hasPhone ? p.phoneMasked! : l10n.infoPhoneNotSet,
+    if (p.hasPhone) p.phoneMasked!,
   ].join(' · ');
 }
 
-/// SCR-ACCOUNT 내 정보: 이름·휴대폰 번호. 회원가입 직후([signup])와 마이에서 같은 화면을 쓴다.
+/// SCR-ACCOUNT 내 정보: 이름(닉네임). 회원가입 직후([signup])와 마이에서 같은 화면을 쓴다.
 /// 저장은 서버 결과(APPLIED)로만 확정한다.
+/// 휴대폰 번호는 서버가 연락처 변경을 아직 열지 않아(보내면 400, 2026-11-03 안내) 칸을 잠그고 보내지 않는다.
 ///
 /// 가입 직후에는 저장할 때까지 닫지 않는다. 서버가 저장을 제공하지 않거나(501)
 /// 결과를 확인하지 못했을 때만 "나중에 하기"를 연다(가입을 막지 않는다).
@@ -35,14 +37,12 @@ class MyInfoScreen extends ConsumerStatefulWidget {
 class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
-  final _phone = TextEditingController();
   bool _filled = false;
   ProfileChangeOutcome? _last;
 
   @override
   void dispose() {
     _name.dispose();
-    _phone.dispose();
     super.dispose();
   }
 
@@ -54,19 +54,15 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final name = _name.text.trim();
-    final phone = _phone.text.trim();
-    // 바뀐 항목만 보낸다. 번호는 새로 입력했을 때만.
+    // 바뀐 항목만 보낸다. 번호는 서버가 아직 받지 않으므로 보내지 않는다.
     final nameChanged = name != (current?.nickname?.trim() ?? '');
-    if (!nameChanged && phone.isEmpty) {
+    if (!nameChanged) {
       messenger.showSnackBar(SnackBar(content: Text(l10n.infoNothingChanged)));
       return;
     }
     final outcome = await ref
         .read(profileProvider.notifier)
-        .changeProfile(
-          name: nameChanged ? name : null,
-          phone: phone.isEmpty ? null : phone,
-        );
+        .changeProfile(name: name);
     if (!mounted) return;
     setState(() => _last = outcome);
     if (outcome is ProfileChangeApplied) {
@@ -127,24 +123,15 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
                       NameInput.valid(v ?? '') ? null : l10n.infoNameInvalid,
                 ),
                 const SizedBox(height: 8),
+                // 연락처는 서버가 본인 확인 방식을 정한 뒤 연다. 그때까지 잠근 칸으로 두고 등록된 번호만 보인다.
                 TextFormField(
                   key: const ValueKey('info-phone'),
-                  controller: _phone,
-                  keyboardType: TextInputType.phone,
-                  maxLength: 13,
+                  enabled: false,
+                  initialValue: hasPhone ? profile.phoneMasked : '',
                   decoration: InputDecoration(
                     labelText: l10n.infoPhone,
-                    hintText: '010-1234-5678',
-                    helperText: hasPhone
-                        ? l10n.infoPhoneCurrent(profile.phoneMasked!)
-                        : null,
+                    helperText: l10n.infoPhonePending,
                   ),
-                  // 등록된 번호가 있으면 비워 둘 수 있다(그대로 둠). 없으면 필수.
-                  validator: (v) {
-                    final raw = v?.trim() ?? '';
-                    if (raw.isEmpty && hasPhone) return null;
-                    return PhoneInput.valid(raw) ? null : l10n.infoPhoneInvalid;
-                  },
                 ),
                 if (message != null) ...[
                   const SizedBox(height: 8),

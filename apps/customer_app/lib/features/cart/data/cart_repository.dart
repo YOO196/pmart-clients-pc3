@@ -152,6 +152,16 @@ Cart cartFromContract(api.Cart c) => Cart(
   mfcId: c.mfcId,
   selectedItemAmount: c.selectedItemAmount,
   expiresAt: c.expiresAt,
+  sources: [
+    for (final s in c.sources ?? const <api.CartSourcesInner>[])
+      if (s.system case final system?)
+        CartSource(
+          system: system,
+          unavailable:
+              s.asOf?.freshness ==
+              api.CartSourcesInnerAsOfFreshnessEnum.UNAVAILABLE,
+        ),
+  ],
   lines: [
     for (final i in c.items)
       CartLine(

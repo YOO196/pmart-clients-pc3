@@ -10,7 +10,9 @@ final class MockProfileRepository implements ProfileRepository {
   MockProfileRepository({this.latency = const Duration(milliseconds: 200)});
 
   final Duration latency;
-  String? _phone;
+
+  /// 등록된 휴대폰 번호(서버가 가려서 돌려준다). 연락처 변경은 아직 열리지 않아 여기서는 바뀌지 않는다.
+  String? phone;
 
   /// 새로 가입한 계정처럼 이름이 비어 있다.
   String? nickname;
@@ -44,7 +46,7 @@ final class MockProfileRepository implements ProfileRepository {
       accountId: 'acct-mock-1',
       version: _version,
       nickname: nickname,
-      phoneMasked: _phone == null ? null : mask(_phone!),
+      phoneMasked: phone == null ? null : mask(phone!),
       name: name,
       email: email,
       emailVerified: emailVerified,
@@ -74,8 +76,11 @@ final class MockProfileRepository implements ProfileRepository {
     if (expectedVersion != _version) {
       return const ProfileChangeRejected(ProblemCode.versionConflict);
     }
+    // 서버처럼 연락처 변경은 아직 받지 않는다(2026-11-03 안내: phone 이 오면 400 VALIDATION_FAILED).
+    if (phone != null) {
+      return const ProfileChangeRejected(ProblemCode.validationFailed);
+    }
     if (nickname != null) this.nickname = nickname;
-    if (phone != null) _phone = phone;
     _version++;
     return const ProfileChangeApplied();
   }
