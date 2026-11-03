@@ -269,7 +269,10 @@ export function ProductDraftForm({
             className="select select-sm w-full"
             value={v.primaryCategoryId}
             disabled={tree.isPending}
-            onChange={(e) => set('primaryCategoryId', e.target.value)}
+            // 대표 카테고리는 노출 카테고리에 자동으로 들어간다(서버도 categoryIds 맨 앞에 대표를 둔다). 따로 고른 목록에서는 뺀다.
+            onChange={(e) =>
+              setV((prev) => ({ ...prev, primaryCategoryId: e.target.value, categoryIds: prev.categoryIds.filter((id) => id !== e.target.value) }))
+            }
           >
             <option value="">{tree.isPending ? m.loading : m.products.categoryPick}</option>
             {v.primaryCategoryId && !nodeById.has(v.primaryCategoryId) && <option value={v.primaryCategoryId}>{v.primaryCategoryId}</option>}
@@ -296,8 +299,8 @@ export function ProductDraftForm({
             }
           >
             {nodes.map((n) => (
-              <option key={n.categoryId} value={n.categoryId}>
-                {n.path ?? n.name}
+              <option key={n.categoryId} value={n.categoryId} disabled={n.categoryId === v.primaryCategoryId}>
+                {n.categoryId === v.primaryCategoryId ? `${n.path ?? n.name} (${m.products.primaryTag})` : (n.path ?? n.name)}
               </option>
             ))}
           </select>
@@ -310,8 +313,11 @@ export function ProductDraftForm({
             </button>
           </div>
         )}
-        {v.categoryIds.length > 0 && (
+        {(v.primaryCategoryId !== '' || v.categoryIds.length > 0) && (
           <ul className="flex flex-wrap gap-1 md:col-span-2" aria-label={m.products.selectedCategories}>
+            {v.primaryCategoryId !== '' && (
+              <li className="badge badge-primary badge-outline gap-1">{`${label(v.primaryCategoryId)} · ${m.products.primaryTag}`}</li>
+            )}
             {v.categoryIds.map((id) => (
               <li key={id} className="badge badge-outline gap-1">
                 {label(id)}

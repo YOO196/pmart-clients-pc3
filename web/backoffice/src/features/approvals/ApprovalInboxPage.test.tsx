@@ -14,7 +14,8 @@ describe('승인함 (목 모드, MSW)', () => {
   it('원천·신선도와 함께 목록을 보여 준다', async () => {
     render(<App memory initialPath="/views/approval-inbox" initialToken={as.md} />);
 
-    expect(await screen.findByText('dos-mock-1')).toBeInTheDocument();
+    // 건 ID 는 승인 상세(승인·반려 버튼이 있는 화면)로 가는 링크다.
+    expect(await screen.findByRole('link', { name: 'dos-mock-1' })).toHaveAttribute('href', '/approvals/dos-mock-1');
     expect(screen.getByText(/approval-service · 정본 · 최신/)).toBeInTheDocument();
     expect(screen.getByText(/order-service · 사본 · 지연/)).toBeInTheDocument();
     expect(screen.getByText('목 데이터')).toBeInTheDocument();

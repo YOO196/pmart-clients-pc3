@@ -45,11 +45,11 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 |---|---|---|
 | 로그인 | `/login` | auth `POST /auth/operator-logins`(Idempotency-Key 없음, `X-Device-Id`). 실패 `LOGIN_FAILED`·`ACCOUNT_LOCKED` |
 | 내 세션 | `/session` | `GET /auth/sessions/current`, `POST /auth/password-changes`(204), `POST /auth/logouts` |
-| 운영자 계정 | `/operators` | `GET`·`POST /operator-accounts`, `PUT …/{id}`(X-Expected-Version), `POST …/{id}/password-resets` — OPERATOR_ADMIN |
+| 운영자 계정 | `/operators` | `GET`·`POST /operator-accounts`, `PUT …/{id}`(X-Expected-Version), `POST …/{id}/password-resets` — OPERATOR_ADMIN. 센터는 center-master `GET /centers` 목록에서 다중 선택(`CenterPicker`), 목록에 없는 기존 ID 는 "(목록에 없음)"으로 유지 |
 | 승인함·상세 | `/approvals`, `/approvals/:id` | approval `GET /approvals`, `GET /approvals/{id}`, `POST …/decisions`(APPROVE·REJECT 만) |
 | 카테고리 트리 | `/categories` | product `GET /categories/tree`, `…/filters`, `POST /category-tree-versions` |
-| 상품 등록 | `/products/drafts/new`, `/products/drafts/:id` | `/product-drafts*` → 제출 준비 → 승인 요청 |
-| 상품 일괄 | `/products/import`, `/products/import/:id` | `/product-import-batches*`, id-map 내려받기. 유효·오류 수와 "유효 행 제출 준비" 활성은 응답 `drafts[]` 에서 직접 센다(서버 `validCount` 는 업로드 때 값, BR-38) |
+| 상품 등록 | `/products/drafts/new`, `/products/drafts/:id` | `/product-drafts*` → 제출 준비 → 승인 요청. 대표 카테고리는 노출 목록에 자동 포함(화면은 "대표" 배지로 맨 앞, 전송은 `primaryCategoryId` + 나머지 `categoryIds` — 서버가 대표를 맨 앞에 합친다) |
+| 상품 일괄 | `/products/import`, `/products/import/:id` | `/product-import-batches*`, id-map 내려받기. 제출 뒤 "승인 요청 현황": `GET /approvals?type=PRODUCT` 에서 `targetRef=productImportBatch:{batchId}` 로 찾아 승인 상세 링크, 아직 안 올린 승인 요청 본문은 탭 sessionStorage(`batchApprovalStore.ts`)에 두어 승인 상세에 다녀와도 "승인 요청" 버튼이 남는다. 유효·오류 수와 "유효 행 제출 준비" 활성은 응답 `drafts[]` 에서 직접 센다(서버 `validCount` 는 업로드 때 값, BR-38) |
 | 상품 조회·판매 상태 | `/products`, `/products/:id` | `GET /products`, `/skus`, `/barcodes`, `POST …/sale-state-changes` + 짝 조회 |
 | 콘텐츠 등록·일괄 | `/contents/drafts/*`, `/contents/import/*` | `/content-drafts*`, 이미지 업로드, `/content-import-batches*` |
 | 가격 | `/prices?sku=` | `GET /prices/{sku}`(PRICE_NOT_SET = 미설정), `/price-versions/{sku}`, PRICE 변경 요청, `POST /price-version-applications` + 짝 조회 |

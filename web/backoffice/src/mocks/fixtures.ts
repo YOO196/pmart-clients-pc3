@@ -1,5 +1,18 @@
 // 계약(backoffice-bff.yaml) 모양 픽스처. 계약에 없는 필드는 넣지 않는다.
+import type { paths as CenterPaths } from '../api/generated/center-master';
 import type { ApprovalInboxView } from '../api/views';
+
+type CenterList = CenterPaths['/centers']['get']['responses']['200']['content']['application/json'];
+
+/** 센터 목록(center-master-service `GET /centers`). 운영자 계정의 센터 선택에 쓴다. */
+export const centerList: CenterList = {
+  items: [
+    { centerId: 'CDC01', type: 'CDC', name: '수도권 CDC', state: 'ACTIVE', address: '경기 이천시' },
+    { centerId: 'MFC-BSN-01', type: 'MFC', name: '부산진구 MFC', state: 'ACTIVE', address: '부산 부산진구' },
+    { centerId: 'MFC-SEL-01', type: 'MFC', name: '송파 MFC', state: 'PLANNED', address: '서울 송파구' },
+  ],
+  page: { nextCursor: null, size: 50 },
+};
 
 export const approvalInbox: ApprovalInboxView = {
   sources: [

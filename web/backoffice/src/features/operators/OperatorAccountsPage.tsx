@@ -1,14 +1,15 @@
 // 운영자 계정 관리(OPERATOR_ADMIN, ADR-0018 §4): 목록·생성·역할/센터/상태 수정(X-Expected-Version)·비밀번호 초기화.
 // 권한 판정은 서버(403 → FORBIDDEN 화면). 바뀐 역할은 다음 로그인·토큰 갱신부터 반영된다.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import type { OperatorAccount } from '../../api/auth';
 import { commandParams } from '../../api/command';
+import { PmartFailure } from '../../api/failure';
 import { request, requestNoContent } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
-import { CommandFeedback } from '../../shared/Feedback';
+import { CommandFeedback, FailureAlert } from '../../shared/Feedback';
 import { formatSeoul } from '../../shared/format';
 import { messages as m } from '../../shared/messages';
 import { QueryState } from '../../shared/QueryState';
@@ -23,17 +24,76 @@ const list = (s: string) =>
 
 const KEY = ['auth', 'operators'];
 
+/**
+ * 센터 선택(여러 개). 목록은 center-master `GET /centers`. 목록 조회에 실패해도 계정 화면은 쓸 수 있게
+ * 이미 고른 ID 는 "(목록에 없음)" 으로 남겨 두고 실패는 표시만 한다(사용자 요청 2026-11-03: 쉼표 입력 → 드롭다운).
+ */
+function CenterPicker({ value, onChange }: { readonly value: readonly string[]; readonly onChange: (next: string[]) => void }) {
+  const api = useApi();
+  const selectId = useId();
+  const query = useQuery({
+    queryKey: ['center', 'list'],
+    queryFn: () => request('GET', api.center.GET('/centers', { params: { query: { size: 100 } } })),
+  });
+  const centers = query.data?.items ?? [];
+  const known = new Set(centers.map((c) => c.centerId));
+  const label = (id: string) => {
+    const c = centers.find((x) => x.centerId === id);
+    return c ? `${c.name ?? id} · ${id}` : m.operators.centersUnknown(id);
+  };
+  return (
+    <div className="flex flex-col gap-1 text-sm">
+      <label htmlFor={selectId}>{m.operators.centers}</label>
+      <select
+        id={selectId}
+        multiple
+        size={4}
+        className="select select-sm w-72"
+        value={[...value]}
+        disabled={query.isPending}
+        onChange={(e) => onChange([...e.target.selectedOptions].map((o) => o.value))}
+      >
+        {/* 목록에 없는 값(예전 데이터)도 선택된 채로 보인다 */}
+        {value.filter((id) => !known.has(id)).map((id) => (
+          <option key={id} value={id}>
+            {m.operators.centersUnknown(id)}
+          </option>
+        ))}
+        {centers.map((c) => (
+          <option key={c.centerId} value={c.centerId ?? ''}>
+            {`${c.name ?? m.none} · ${c.centerId ?? ''}${c.type ? ` · ${c.type}` : ''}${c.state && c.state !== 'ACTIVE' ? ` · ${c.state}` : ''}`}
+          </option>
+        ))}
+      </select>
+      <span className="text-xs opacity-70">{query.isPending ? m.loading : m.operators.centersHint}</span>
+      {value.length > 0 && (
+        <ul className="flex flex-wrap gap-1" aria-label={m.operators.centers}>
+          {value.map((id) => (
+            <li key={id} className="badge badge-outline gap-1">
+              {label(id)}
+              <button type="button" aria-label={`${label(id)} 빼기`} onClick={() => onChange(value.filter((x) => x !== id))}>
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {query.error instanceof PmartFailure && <FailureAlert failure={query.error} />}
+    </div>
+  );
+}
+
 function CreateAccount() {
   const api = useApi();
   const queryClient = useQueryClient();
-  const [v, setV] = useState({ loginId: '', displayName: '', initialPassword: '', roles: '', centers: '' });
+  const [v, setV] = useState({ loginId: '', displayName: '', initialPassword: '', roles: '', centers: [] as string[] });
   const cmd = useCommand(async (body: { loginId: string; displayName: string; initialPassword: string; roles: string[]; centers: string[] }, key) => {
     const a = await request('POST', api.auth.POST('/operator-accounts', { ...commandParams(key), body }));
-    setV({ loginId: '', displayName: '', initialPassword: '', roles: '', centers: '' });
+    setV({ loginId: '', displayName: '', initialPassword: '', roles: '', centers: [] });
     await queryClient.invalidateQueries({ queryKey: KEY });
     return a;
   });
-  const field = (k: keyof typeof v, label: string, type = 'text') => (
+  const field = (k: 'loginId' | 'displayName' | 'initialPassword' | 'roles', label: string, type = 'text') => (
     <label className="flex flex-col gap-1 text-sm">
       {label}
       <input
@@ -58,7 +118,7 @@ function CreateAccount() {
             displayName: v.displayName.trim(),
             initialPassword: v.initialPassword,
             roles: list(v.roles),
-            centers: list(v.centers),
+            centers: v.centers,
           });
       }}
     >
@@ -68,7 +128,7 @@ function CreateAccount() {
         {field('displayName', m.operators.displayName)}
         {field('initialPassword', m.operators.initialPassword, 'password')}
         {field('roles', m.operators.roles)}
-        {field('centers', m.operators.centers)}
+        <CenterPicker value={v.centers} onChange={(centers) => setV({ ...v, centers })} />
       </div>
       <p className="text-xs opacity-70">{`${m.operators.knownRoles} · ${m.password.rule}`}</p>
       <button type="submit" className="btn btn-primary btn-sm" disabled={!ok || cmd.busy}>
@@ -92,7 +152,7 @@ function AccountRow({ account }: { readonly account: OperatorAccount }) {
   const [v, setV] = useState({
     displayName: account.displayName,
     roles: account.roles.join(', '),
-    centers: account.centers.join(', '),
+    centers: [...account.centers],
     state: account.state,
   });
   const [temp, setTemp] = useState('');
@@ -150,10 +210,7 @@ function AccountRow({ account }: { readonly account: OperatorAccount }) {
                 {m.operators.roles}
                 <input className="input input-sm w-72" value={v.roles} onChange={(e) => setV({ ...v, roles: e.target.value })} />
               </label>
-              <label className="flex flex-col text-sm">
-                {m.operators.centers}
-                <input className="input input-sm" value={v.centers} onChange={(e) => setV({ ...v, centers: e.target.value })} />
-              </label>
+              <CenterPicker value={v.centers} onChange={(centers) => setV({ ...v, centers })} />
               <label className="flex flex-col text-sm">
                 {m.operators.state}
                 <select
@@ -169,7 +226,7 @@ function AccountRow({ account }: { readonly account: OperatorAccount }) {
                 type="button"
                 className="btn btn-primary btn-sm"
                 disabled={save.busy || !v.displayName.trim()}
-                onClick={() => void save.run({ displayName: v.displayName.trim(), roles: list(v.roles), centers: list(v.centers), state: v.state })}
+                onClick={() => void save.run({ displayName: v.displayName.trim(), roles: list(v.roles), centers: v.centers, state: v.state })}
               >
                 {m.operators.save}
               </button>

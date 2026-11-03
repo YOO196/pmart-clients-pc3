@@ -47,10 +47,11 @@ export function ProductPicker({
   return (
     <div className="flex flex-col gap-1 text-sm">
       <label htmlFor={selectId}>{label}</label>
-      <div className="flex items-center gap-2">
+      {/* X 는 드롭다운 상자 안(오른쪽 화살표 왼쪽)에 겹쳐 둔다. */}
+      <div className="relative">
         <select
           id={selectId}
-          className="select select-sm w-full"
+          className={`select select-sm w-full${value && onClear ? ' pr-14' : ''}`}
           value={value}
           disabled={query.isPending}
           onChange={(e) => {
@@ -71,7 +72,13 @@ export function ProductPicker({
           ))}
         </select>
         {value && onClear && (
-          <button type="button" className="btn btn-ghost btn-sm btn-square" aria-label={m.contents.clearAll} title={m.contents.clearAll} onClick={onClear}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs btn-circle absolute top-1/2 right-8 -translate-y-1/2"
+            aria-label={m.contents.clearAll}
+            title={m.contents.clearAll}
+            onClick={onClear}
+          >
             ✕
           </button>
         )}

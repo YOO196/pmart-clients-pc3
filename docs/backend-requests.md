@@ -47,6 +47,9 @@
 | BR-37 | 중간 | 고객 | 주문이 참조하는 고객 데이터(주소·수령인·연락처)의 주문 시점 불변성 보장 방식과 "주문 당시 배송지" 고객용 조회 경로 | **RESOLVED**(2026-11-02, 백엔드 회신 `clients-reply-br37-order-shipping-snapshot`): 초안 생성 때 사본 고정 → `DraftDelivery.shippingAddress`·`Order.shippingAddress`. `contact.phoneRef` deprecated. 결제 진입 때 계정 재확인(422 `ACCOUNT_NOT_PURCHASABLE`). 고객앱 반영 |
 | BR-38 | 중간 | 백오피스 | 상품 일괄 등록 배치의 `validCount`·`invalidCount` 가 업로드 때 값으로 고정돼 행을 고친 뒤(`PUT /product-drafts/{id}`) 맞지 않음. 유효 0 → 화면이 제출 버튼을 잠갔음 | OPEN(요청 `docs/handoff/2026-11-03-backend-product-import-batch.md`). 백오피스는 배치 응답의 행에서 직접 세어 표시·활성 판단 |
 | BR-39 | 중간 | 백오피스 | 이미 등록(APPLIED)된 seed 상품 ID 를 다시 올리면 새 초안이 생겨 바코드 없는 상품은 중복 등록될 수 있음. 업로드 검증에 "이미 상품 X 로 등록됨" 검사 요청 | OPEN(요청 `docs/handoff/2026-11-03-backend-product-import-batch.md`) |
+| BR-40 | 중간 | 백오피스 | bff `GET /views/approval-inbox`(통합 승인함) 가 501 — `ViewsController` 가 빈 구현이라 메뉴 "통합 승인함(bff)" 이 열리지 않음 | OPEN(요청 `docs/handoff/2026-11-03-backend-approval-inbox-and-batch-approval.md`). 승인·반려는 "승인함"(`/approvals`, approval-service 직접) 으로 가능 |
+| BR-41 | 중간 | 백오피스 | 제출(SUBMITTED)한 일괄 등록 배치의 승인 요청 본문·승인 ID 를 서버에서 다시 읽을 길이 없음(초안 `approvalId` 는 반영 때만 채움). 화면 이동·새로고침 뒤 "승인 요청"·"승인 상세 보기" 가 사라졌음 | OPEN(같은 요청서 §2). 백오피스는 승인 목록 targetRef 조회 + 탭 sessionStorage 로 우회 |
+| BR-42 | 중간 | 고객 | cart-service 표시용 조회(product·content·pricing·mfc-inventory)에 연결·읽기 timeout 이 없고 순차 호출 — 한 원천(PC3 꺼짐 등)이 안 닿으면 장바구니 조회·담기마다 그만큼 느려짐 | OPEN(2026-11-03). 앱은 UNKNOWN 을 "확인 중"으로 표시 |
 
 ---
 
@@ -259,3 +262,20 @@
 - 영향: 바코드가 있는 상품은 `BARCODE_CONFLICT` 로 걸리지만, 바코드가 없는 상품은 새 초안이 VALID 로 통과해 제출·승인하면 같은 상품이 한 번 더 등록된다(상품 ID·SKU 가 하나 더 발급). id-map 의 seedProductId → 상품 짝도 둘이 된다.
 - 요청: 업로드 검증에 "이 seed 상품 ID 는 이미 상품 {productId} 로 등록됨" 검사를 넣어 달라. 처리 방식은 백엔드가 정하면 된다 — 예: INVALID 문제 코드(가칭 `SOURCE_KEY_ALREADY_APPLIED`, detail 에 productId)로 표시하거나, 기존 상품의 수정 초안으로 upsert. 문제 코드로 가면 코드 값만 알려 주면 백오피스가 문구를 붙인다. 같은 구조면 콘텐츠 일괄 등록도 함께.
 - 백오피스: 변경 없음(서버 검증 결과를 표시만 한다).
+
+## BR-40 통합 승인함(bff) 미구현 (백오피스)
+- 현황(코드 읽기 2026-11-03): `services/backoffice-bff` 의 `ViewsController` 가 `implements ViewsApi {}` 로 비어 있어 계약 `GET /views/approval-inbox`(및 다른 views) 가 인터페이스 default 로 501 을 돌려준다. 백오피스 메뉴 "통합 승인함(bff)" 은 이 경로를 읽는다.
+- 영향: 운영자가 그 메뉴를 열면 목록이 안 나온다. 승인·반려는 승인 상세(`/approvals/{approvalId}`, approval-service 직접)에서 되므로 메뉴 "승인함"(`/approvals`) 으로는 가능하다.
+- 요청: (a) `GET /views/approval-inbox` 를 구현해 달라(항목에 `dossierId` = approval-service 승인 ID 인지 확인 요망 — 백오피스는 그 값으로 상세 링크를 만든다), 또는 (b) 구현 시점이 멀면 알려 달라 — 그때까지 백오피스가 메뉴를 숨긴다.
+
+## BR-41 제출한 일괄 등록 배치의 승인 요청 본문·승인 ID 재조회 (백오피스)
+- 현황: `POST /product-import-batches/{batchId}/submissions` 응답의 `approvalRequest` 는 그 응답에만 있다. 배치가 SUBMITTED 가 된 뒤 같은 경로를 다시 부르면 422(`NOTHING_TO_SUBMIT`)이고, 같은 Idempotency-Key 재전송만 같은 응답을 준다. 초안의 `approvalId` 는 승인 반영(APPLIED/REJECTED) 때만 채워져(`DraftStore`), 승인 요청을 올린 직후에는 배치·초안 어디에도 승인 ID 가 없다.
+- 영향: 운영자가 제출 뒤 승인 상세에 다녀오거나 새로고침하면 "승인 요청" 버튼과 "승인 상세 보기" 링크가 사라졌다. 승인 요청을 아직 안 올린 상태에서 화면을 떠나면 본문을 되찾을 수 없어 배치가 제출된 채 승인 요청만 빠질 수 있다.
+- 백오피스 처리(2026-11-03): `GET /approvals?type=PRODUCT` 에서 `targetRef = productImportBatch:{batchId}` 인 건을 찾아 링크를 보이고, 아직 안 올린 승인 요청 본문은 탭 sessionStorage 에 둔다(탭을 닫으면 사라짐, 50건 넘는 목록은 못 찾음).
+- 요청(택1 또는 조합): (a) `GET /product-import-batches/{batchId}` 응답에 제출 결과(`submittedDraftIds`·`excludedDraftIds`·`approvalRequest`)와 올린 `approvalId` 를 넣어 달라. (b) approval-service 가 변경 요청 제출 때 정본 서비스에 알려 초안·배치의 `approvalId` 를 바로 채워 달라(지금은 반영 때만). (c) 최소한 `GET …/submissions`(또는 `/submission`) 로 마지막 제출 응답을 다시 읽게 해 달라. 콘텐츠·가격 일괄 등록 배치도 같은 구조면 함께.
+
+## BR-42 cart-service 표시용 조회의 timeout·병렬화 (고객앱)
+- 현황(LAN 2026-11-03, 사용자 확인: PC3 꺼짐): cart-service(pc2)는 `GET /carts/{id}` 마다 `CartView.view` 에서 product-service·product-content-service·pricing-service·mfc-inventory-service(pc3) 를 **순차** 호출하고, 담기(`POST …/items`)도 product-service 를 먼저 부른다. `CatalogClient` 의 `RestClient.Builder` 에 연결·읽기 timeout 이 없다(`spring.http.client.*` 미설정. payment·delivery-serviceability 는 설정돼 있음).
+- 영향: mfc-inventory-service 가 꺼져 있으면 모든 줄이 `availability=UNKNOWN`(앱 "판매 상태를 확인하는 중이에요")이 되는 건 설계대로지만, 연결 실패를 기다리는 시간만큼 장바구니 조회와 담기(담기 → APPLIED → 다시 읽기)가 매번 느려진다. 원천 하나의 장애가 장바구니 전체 응답 시간을 끌어내린다.
+- 요청: (a) cart-service 외부 호출에 짧은 연결·읽기 timeout(예: 연결 1초·읽기 2~3초)을 두어 실패를 빨리 UNKNOWN 으로 넘긴다. (b) 표시용 조회 네 개를 병렬로 부른다. (c) 가능하면 원천 장애가 잠시 이어질 때 반복 대기하지 않게(circuit breaker 등) — 방식은 백엔드가 정한다.
+- 앱 처리: 변경 없음. UNKNOWN 은 계속 "확인 중"(0·품절 아님). 응답 `sources[]` 로 어느 원천이 UNAVAILABLE 인지 보이는 개선은 별도 검토.

@@ -126,4 +126,54 @@ describe('상품 일괄 등록', () => {
     const links = screen.getAllByRole('link', { name: '초안 수정' });
     expect(links.map((l) => l.getAttribute('href'))).toEqual(['/products/drafts/pd-fixed', '/products/drafts/pd-broken']);
   });
+
+  it('제출 → 승인 요청 뒤 화면을 다시 열어도(승인 상세에 다녀옴) 승인 상세 링크가 남는다', async () => {
+    const draft: ProductDraft = {
+      draftId: 'pd-ok',
+      batchId: 'pib-seed-4',
+      sourceSystem: 'bmart-capture',
+      sourceKey: 'bm-9',
+      state: 'DRAFT',
+      input: { product: { internalName: '부사 사과 1kg', primaryCategoryId: 'p01-c01-l01' }, skus: [{ unitType: 'E', unitsPerSku: 1, weightG: 1000, storageType: 'CHILLED' }] },
+      validationState: 'VALID',
+      problems: [],
+      draftHash: null,
+      approvalId: null,
+      resultProductId: null,
+      resultSkus: [],
+      version: 1,
+      updatedAt: '2026-11-03T00:00:00Z',
+    };
+    db.productDrafts.set(draft.draftId, draft);
+    const batch: ImportBatch = {
+      batchId: 'pib-seed-4',
+      format: 'SEED_V1',
+      sourceSystem: 'bmart-capture',
+      state: 'VALIDATED',
+      productCount: 1,
+      validCount: 1,
+      invalidCount: 0,
+      drafts: [draft],
+      createdAt: '2026-11-03T00:00:00Z',
+    };
+    db.importBatches.set(batch.batchId, batch);
+    const user = userEvent.setup();
+    const first = renderAt('/products/import/pib-seed-4');
+
+    await user.click(await screen.findByRole('button', { name: '유효 행 제출 준비' }));
+    // 배치가 SUBMITTED 로 바뀌고 승인 요청 현황 영역에 "승인 요청" 버튼이 보인다.
+    await user.click(await screen.findByRole('button', { name: '승인 요청' }));
+    expect(await screen.findByText(/승인 요청을 올렸어요\. 승인 번호 /)).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '승인 상세 보기' })).toHaveLength(1);
+    first.stop();
+    first.unmount();
+
+    // 승인 상세에 다녀온 것처럼 다시 연다. 승인 목록(targetRef = productImportBatch:pib-seed-4)에서 찾아 링크를 보인다.
+    renderAt('/products/import/pib-seed-4');
+    const link = await screen.findByRole('link', { name: '승인 상세 보기' });
+    expect(link.getAttribute('href')).toMatch(/^\/approvals\/apv-/);
+    expect(screen.queryByRole('button', { name: '승인 요청' })).not.toBeInTheDocument();
+    // 승인 목록 조회가 끝나면 심사 상태도 붙는다.
+    expect(await screen.findByText(/· 심사 대기$/)).toBeInTheDocument();
+  });
 });

@@ -4,7 +4,7 @@ import { API_BASE } from '../api/client';
 import { approvalHandlers } from './approvalHandlers';
 import { authHandlers } from './authHandlers';
 import { catalogHandlers } from './catalogHandlers';
-import { approvalInbox } from './fixtures';
+import { approvalInbox, centerList } from './fixtures';
 import { priceImportHandlers } from './priceImportHandlers';
 import { pricingHandlers } from './pricingHandlers';
 import { operator, unauthorized } from './support';
@@ -22,6 +22,7 @@ const gateway = http.all(`${API_BASE}/*`, ({ request }) => {
 export const handlers = [
   gateway,
   http.get(`${API_BASE}/views/approval-inbox`, () => HttpResponse.json(approvalInbox)),
+  http.get(`${API_BASE}/centers`, () => HttpResponse.json(centerList)),
   ...authHandlers,
   ...approvalHandlers,
   ...catalogHandlers,

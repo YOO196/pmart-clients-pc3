@@ -5,6 +5,7 @@ import type { paths as ApprovalPaths } from './generated/approval';
 import type { paths as AuthPaths } from './generated/auth';
 import type { paths as BffPaths } from './generated/backoffice-bff';
 import type { paths as CdcInventoryPaths } from './generated/cdc-inventory';
+import type { paths as CenterPaths } from './generated/center-master';
 import type { paths as MfcInventoryPaths } from './generated/mfc-inventory';
 import type { paths as PricingPaths } from './generated/pricing';
 import type { paths as ProductPaths } from './generated/product';
@@ -34,6 +35,7 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     pricing: createClient<PricingPaths>(options),
     mfcInventory: createClient<MfcInventoryPaths>(options),
     cdcInventory: createClient<CdcInventoryPaths>(options),
+    center: createClient<CenterPaths>(options),
   };
 }
 

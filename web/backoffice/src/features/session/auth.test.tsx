@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -220,11 +220,17 @@ describe('운영자 계정 관리', () => {
     await user.type(screen.getByLabelText('표시 이름'), 'MD 최');
     await user.type(screen.getByLabelText('초기 비밀번호'), 'initial-pass-1');
     await user.type(screen.getAllByLabelText('역할(쉼표 구분)')[0]!, 'MD');
+    // 센터는 center-master 목록에서 고른다(쉼표 입력 아님).
+    const centers = screen.getAllByLabelText('센터(여러 개 선택)')[0]!;
+    await within(centers).findByRole('option', { name: '부산진구 MFC · MFC-BSN-01 · MFC' });
+    await user.selectOptions(centers, ['MFC-BSN-01', 'CDC01']);
     await user.click(screen.getByRole('button', { name: '계정 만들기' }));
 
     expect(await screen.findByText(/계정 md2 를 만들었어요/)).toBeInTheDocument();
     expect(await screen.findByRole('cell', { name: 'md2' })).toBeInTheDocument();
-    expect(view.mutations('/operator-accounts')[0]?.headers.get('Idempotency-Key')).toBeTruthy();
+    const post = view.mutations('/operator-accounts')[0]!;
+    expect(post.headers.get('Idempotency-Key')).toBeTruthy();
+    expect(((await post.json()) as { centers: string[] }).centers).toEqual(['CDC01', 'MFC-BSN-01']);
     expect([...db.accounts.values()].find((a) => a.account.loginId === 'md2')?.account.passwordChangeRequired).toBe(true);
     view.stop();
   });

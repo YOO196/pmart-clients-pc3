@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router';
 
 import { useApi } from '../../app/ApiContext';
 import { request } from '../../api/pmartFetch';
@@ -46,7 +47,16 @@ export function ApprovalInboxPage() {
               <tbody>
                 {(view.items ?? []).map((item, i) => (
                   <tr key={item.dossierId ?? `row-${i}`}>
-                    <td>{item.dossierId ?? '-'}</td>
+                    <td>
+                      {/* 승인·반려는 승인 상세에서 한다. dossierId 는 approval-service 의 승인 ID(approval 표의 키)와 같다. */}
+                      {item.dossierId ? (
+                        <Link className="link" to={`/approvals/${encodeURIComponent(item.dossierId)}`}>
+                          {item.dossierId}
+                        </Link>
+                      ) : (
+                        '-'
+                      )}
+                    </td>
                     <td>{item.approvalType ?? '-'}</td>
                     <td>{item.reviewState ?? '-'}</td>
                     <td>{item.executionState ?? '-'}</td>
