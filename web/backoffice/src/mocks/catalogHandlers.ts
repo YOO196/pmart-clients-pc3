@@ -58,6 +58,16 @@ function validate(input: ProductDraftInput): Pick<ProductDraft, 'validationState
   return { validationState: problems.length ? 'INVALID' : 'VALID', problems, resolvedCategoryIds: ids.filter((id) => known.has(id)) };
 }
 
+/** 같은 원천 키로 이미 등록된 상품(반영된 초안). 있으면 재업로드 = 그 상품의 새 버전(BR-39 회신 2026-11-03). */
+function registrationOf(input: ProductDraftInput): Pick<ProductDraft, 'registration' | 'existingProductId' | 'existingSkus'> {
+  const applied = input.sourceKey
+    ? [...db.productDrafts.values()].find((p) => p.sourceSystem === (input.sourceSystem ?? null) && p.sourceKey === input.sourceKey && p.resultProductId)
+    : undefined;
+  return applied
+    ? { registration: 'UPDATE', existingProductId: applied.resultProductId ?? null, existingSkus: applied.resultSkus ?? [] }
+    : { registration: 'NEW', existingProductId: null, existingSkus: [] };
+}
+
 function newProductDraft(input: ProductDraftInput, batchId: string | null = null): ProductDraft {
   const d: ProductDraft = {
     draftId: nextId('pd'),
@@ -73,6 +83,7 @@ function newProductDraft(input: ProductDraftInput, batchId: string | null = null
     version: 0,
     updatedAt: timestamp(),
     ...validate(input),
+    ...registrationOf(input),
   };
   db.productDrafts.set(d.draftId, d);
   return d;
@@ -84,7 +95,18 @@ const productApproval = (targetRef: string, drafts: readonly ProductDraft[], sum
   targetRef,
   allowedActions: ['ISSUE_SKU', 'PUBLISH_PRODUCT_VERSION'],
   summary,
-  lines: drafts.map((d) => ({ lineKey: d.draftId, targetRef: `productDraft:${d.draftId}`, attributes: { draftId: d.draftId, draftHash: d.draftHash, sourceKey: d.sourceKey } })),
+  lines: drafts.map((d) => ({
+    lineKey: d.draftId,
+    targetRef: `productDraft:${d.draftId}`,
+    attributes: {
+      draftId: d.draftId,
+      draftHash: d.draftHash,
+      sourceKey: d.sourceKey,
+      internalName: d.input?.product.internalName,
+      registration: d.registration ?? 'NEW',
+      ...(d.registration === 'UPDATE' ? { existingProductId: d.existingProductId, existingSkus: d.existingSkus } : {}),
+    },
+  })),
 });
 
 function contentProblems(d: ContentDraft): NonNullable<ContentDraft['problems']> {
@@ -184,62 +206,12 @@ export const catalogHandlers = [
   http.post(`${API_BASE}/category-tree-additions`, async ({ request }) => {
     if (!operator(request)) return unauthorized();
     const body = (await request.json()) as CategoryAdditionRequest;
-    return idempotent(request, () => {
-      const base = db.tree;
-      const existing = new Map((base?.nodes ?? []).map((n) => [n.categoryId, n]));
-      const byPath = new Map((base?.nodes ?? []).map((n) => [n.path ?? n.name, n.categoryId]));
-      const levels = ['TOP', 'SUB', 'CHIP1', 'CHIP2'] as const;
-      const added: CategoryNode[] = [];
-      const skipped: string[] = [];
-      for (const c of body.categories) {
-        const ids = c.pmartCategoryIdLevels;
-        if (!ids || ids.length === 0) {
-          skipped.push(c.bmartPath.join(' > '));
-          continue;
-        }
-        for (let i = 0; i < ids.length; i++) {
-          const id = ids[i]!;
-          const name = c.bmartPath[i] ?? id;
-          const path = c.bmartPath.slice(0, i + 1).join(' > ');
-          const known = existing.get(id);
-          if (known) {
-            if (known.name !== name) return problem(400, 'CATEGORY_CONFLICT');
-            continue;
-          }
-          const other = byPath.get(path);
-          if (other && other !== id) return problem(400, 'CATEGORY_CONFLICT');
-          const node: CategoryNode = { categoryId: id, parentId: i === 0 ? null : ids[i - 1]!, level: levels[i] ?? 'CHIP2', name, path, sortOrder: 99, exposed: true };
-          existing.set(id, node);
-          byPath.set(path, id);
-          added.push(node);
-        }
-      }
-      if (added.length === 0) return problem(422, 'NOTHING_TO_ADD');
-      const version = Math.max(base?.version ?? 0, ...db.treeVersions.keys()) + 1;
-      const nodes = [...(base?.nodes ?? []), ...added];
-      const v = {
-        version,
-        state: 'DRAFT' as const,
-        nodeCount: nodes.length,
-        filterGroupCount: Object.keys(base?.filters ?? {}).length,
-        countsByLevel: {},
-        approvalId: null,
-        effectiveFrom: null,
-        baseVersion: base?.version ?? null,
-        addedCategoryIds: added.map((n) => n.categoryId),
-        skippedPaths: skipped,
-        approvalRequest: {
-          type: 'PRODUCT' as const,
-          targetService: 'product-service' as const,
-          targetRef: `categoryTreeVersion:${version}`,
-          allowedActions: ['APPLY_CATEGORY_TREE'],
-          summary: `카테고리 추가 v${version} (+${added.length})`,
-          lines: [{ lineKey: String(version) }],
-        },
-      };
-      db.treeVersions.set(version, { ...v, nodes });
-      return { status: 201, body: v };
-    });
+    return idempotent(request, () => addCategories(body));
+  }),
+  // seed-v1 zip 업로드(백엔드 회신 2026-11-03 §3). 목은 zip 을 풀지 않고, 묶음에 든 것으로 치는 고정 categories 를 같은 규칙으로 더한다.
+  http.post(`${API_BASE}/category-tree-addition-uploads`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    return idempotent(request, () => addCategories(zipBundleCategories));
   }),
   http.get(`${API_BASE}/category-tree-versions/:v`, ({ params }) => {
     const v = db.treeVersions.get(Number(params['v']));
@@ -534,3 +506,66 @@ export const catalogHandlers = [
     }),
   ),
 ];
+
+/** 없는 카테고리만 더한 트리 초안(JSON 본문·zip 업로드 공통, 목 규칙). */
+function addCategories(body: CategoryAdditionRequest) {
+  const base = db.tree;
+  const existing = new Map((base?.nodes ?? []).map((n) => [n.categoryId, n]));
+  const byPath = new Map((base?.nodes ?? []).map((n) => [n.path ?? n.name, n.categoryId]));
+  const levels = ['TOP', 'SUB', 'CHIP1', 'CHIP2'] as const;
+  const added: CategoryNode[] = [];
+  const skipped: string[] = [];
+  for (const c of body.categories) {
+    const ids = c.pmartCategoryIdLevels;
+    if (!ids || ids.length === 0) {
+      skipped.push(c.bmartPath.join(' > '));
+      continue;
+    }
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i]!;
+      const name = c.bmartPath[i] ?? id;
+      const path = c.bmartPath.slice(0, i + 1).join(' > ');
+      const known = existing.get(id);
+      if (known) {
+        if (known.name !== name) return problem(400, 'CATEGORY_CONFLICT');
+        continue;
+      }
+      const other = byPath.get(path);
+      if (other && other !== id) return problem(400, 'CATEGORY_CONFLICT');
+      const node: CategoryNode = { categoryId: id, parentId: i === 0 ? null : ids[i - 1]!, level: levels[i] ?? 'CHIP2', name, path, sortOrder: 99, exposed: true };
+      existing.set(id, node);
+      byPath.set(path, id);
+      added.push(node);
+    }
+  }
+  if (added.length === 0) return problem(422, 'NOTHING_TO_ADD');
+  const version = Math.max(base?.version ?? 0, ...db.treeVersions.keys()) + 1;
+  const nodes = [...(base?.nodes ?? []), ...added];
+  const v = {
+    version,
+    state: 'DRAFT' as const,
+    nodeCount: nodes.length,
+    filterGroupCount: Object.keys(base?.filters ?? {}).length,
+    countsByLevel: {},
+    approvalId: null,
+    effectiveFrom: null,
+    baseVersion: base?.version ?? null,
+    addedCategoryIds: added.map((n) => n.categoryId),
+    skippedPaths: skipped,
+    approvalRequest: {
+      type: 'PRODUCT' as const,
+      targetService: 'product-service' as const,
+      targetRef: `categoryTreeVersion:${version}`,
+      allowedActions: ['APPLY_CATEGORY_TREE'],
+      summary: `카테고리 추가 v${version} (+${added.length})`,
+      lines: [{ lineKey: String(version) }],
+    },
+  };
+  db.treeVersions.set(version, { ...v, nodes });
+  return { status: 201, body: v };
+}
+
+/** zip 안에 들어 있다고 치는 seed-v1 categories(목). 냉동·간편식 > 만두 > 고기만두 세 단계가 새로 더해진다. */
+const zipBundleCategories: CategoryAdditionRequest = {
+  categories: [{ bmartPath: ['냉동·간편식', '만두', '고기만두'], pmartCategoryIdLevels: ['p09', 'p09-c01', 'p09-c01-l01'], pmartCategoryId: 'p09-c01-l01' }],
+};

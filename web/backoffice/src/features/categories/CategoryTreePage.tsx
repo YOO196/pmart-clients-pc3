@@ -14,6 +14,7 @@ import { QueryState } from '../../shared/QueryState';
 import { toUiState } from '../../shared/toUiState';
 import { useCommand } from '../../shared/useCommand';
 import { RequestApproval } from '../approvals/RequestApproval';
+import { multipart } from '../products/ProductImportPage';
 
 const NOT_EFFECTIVE = 'CATEGORY_TREE_NOT_EFFECTIVE';
 
@@ -213,8 +214,14 @@ function AdditionUpload() {
     queryKey: ['product', 'category-tree'],
     queryFn: () => request('GET', api.product.GET('/categories/tree', {})),
   });
-  const create = useCommand((body: CategoryAdditionRequest, key) =>
-    request('POST', api.product.POST('/category-tree-additions', { ...commandParams(key), body })),
+  // JSON 본문(categories.json) 또는 seed-v1 zip(백엔드 회신 2026-11-03 §3: 서버가 묶음의 categories.json 을 꺼내 같은 규칙으로 처리).
+  const create = useCommand((arg: CategoryAdditionRequest | File, key) =>
+    arg instanceof File
+      ? request(
+          'POST',
+          api.product.POST('/category-tree-addition-uploads', { ...commandParams(key), body: { file: '' }, ...multipart({ file: arg }) }),
+        )
+      : request('POST', api.product.POST('/category-tree-additions', { ...commandParams(key), body: arg })),
   );
   const version = create.phase.kind === 'done' ? create.phase.result.version : null;
   const status = useQuery({
@@ -228,6 +235,11 @@ function AdditionUpload() {
 
   const onSubmit = async () => {
     if (!file) return;
+    if (/\.zip$/i.test(file.name)) {
+      setFormatError(false);
+      await create.run(file);
+      return;
+    }
     try {
       const c = (await readJson(file)) as { categories?: unknown };
       if (!Array.isArray(c.categories)) throw new Error('format');
@@ -247,7 +259,7 @@ function AdditionUpload() {
         {m.categories.additionFile}
         <input
           type="file"
-          accept="application/json,.json"
+          accept="application/json,.json,application/zip,.zip"
           aria-label={m.categories.additionFile}
           className="file-input file-input-sm"
           onChange={(e) => {

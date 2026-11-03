@@ -45,11 +45,12 @@
 | BR-35 | 높음 | 고객 | 주문·초안 품목 `productName`(주문 당시 사본)이 비어 와서 주문 내역에 SKU 가 보임 | OPEN(같은 요청서 §2) |
 | BR-36 | 중간 | 고객 | 상품 상세 `SaleOption.price` 가 항상 null(계약은 "pricing 사본"). 상세에 가격이 안 보임 | OPEN(요청 `docs/handoff/2026-11-02-backend-product-detail-price.md`). 앱은 `GET /prices?skus=` 로 채워 표시 중 |
 | BR-37 | 중간 | 고객 | 주문이 참조하는 고객 데이터(주소·수령인·연락처)의 주문 시점 불변성 보장 방식과 "주문 당시 배송지" 고객용 조회 경로 | **RESOLVED**(2026-11-02, 백엔드 회신 `clients-reply-br37-order-shipping-snapshot`): 초안 생성 때 사본 고정 → `DraftDelivery.shippingAddress`·`Order.shippingAddress`. `contact.phoneRef` deprecated. 결제 진입 때 계정 재확인(422 `ACCOUNT_NOT_PURCHASABLE`). 고객앱 반영 |
-| BR-38 | 중간 | 백오피스 | 상품 일괄 등록 배치의 `validCount`·`invalidCount` 가 업로드 때 값으로 고정돼 행을 고친 뒤(`PUT /product-drafts/{id}`) 맞지 않음. 유효 0 → 화면이 제출 버튼을 잠갔음 | OPEN(요청 `docs/handoff/2026-11-03-backend-product-import-batch.md`). 백오피스는 배치 응답의 행에서 직접 세어 표시·활성 판단 |
-| BR-39 | 중간 | 백오피스 | 이미 등록(APPLIED)된 seed 상품 ID 를 다시 올리면 새 초안이 생겨 바코드 없는 상품은 중복 등록될 수 있음. 업로드 검증에 "이미 상품 X 로 등록됨" 검사 요청 | OPEN(요청 `docs/handoff/2026-11-03-backend-product-import-batch.md`) |
+| BR-38 | 중간 | 백오피스 | 상품 일괄 등록 배치의 `validCount`·`invalidCount` 가 업로드 때 값으로 고정돼 행을 고친 뒤(`PUT /product-drafts/{id}`) 맞지 않음. 유효 0 → 화면이 제출 버튼을 잠갔음 | **RESOLVED**(2026-11-03 회신 `clients-reply-br39-category-zip` §4): 서버가 조회 때 행 기준으로 셈(수정 18:54, LAN 배포 대기). 백오피스 행 기준 집계는 그대로 둠 |
+| BR-39 | 중간 | 백오피스 | 이미 등록(APPLIED)된 seed 상품 ID 를 다시 올리면 새 초안이 생겨 바코드 없는 상품은 중복 등록될 수 있음. 업로드 검증에 "이미 상품 X 로 등록됨" 검사 요청 | **RESOLVED**(2026-11-03 회신 §1·2): 승인해도 중복 등록 아님(기존 상품의 새 버전, SKU 유지). 초안 `registration` NEW/UPDATE·`existingProductId`·`existingSkus` 추가 → 백오피스 구분 열·안내·승인 상세 반영(19:20) |
 | BR-40 | 중간 | 백오피스 | bff `GET /views/approval-inbox`(통합 승인함) 가 501 — `ViewsController` 가 빈 구현이라 메뉴 "통합 승인함(bff)" 이 열리지 않음 | OPEN(요청 `docs/handoff/2026-11-03-backend-approval-inbox-and-batch-approval.md`). 승인·반려는 "승인함"(`/approvals`, approval-service 직접) 으로 가능 |
 | BR-41 | 중간 | 백오피스 | 제출(SUBMITTED)한 일괄 등록 배치의 승인 요청 본문·승인 ID 를 서버에서 다시 읽을 길이 없음(초안 `approvalId` 는 반영 때만 채움). 화면 이동·새로고침 뒤 "승인 요청"·"승인 상세 보기" 가 사라졌음 | OPEN(같은 요청서 §2). 백오피스는 승인 목록 targetRef 조회 + 탭 sessionStorage 로 우회 |
 | BR-42 | 중간 | 고객 | cart-service 표시용 조회(product·content·pricing·mfc-inventory)에 연결·읽기 timeout 이 없고 순차 호출 — 한 원천(PC3 꺼짐 등)이 안 닿으면 장바구니 조회·담기마다 그만큼 느려짐 | OPEN(2026-11-03). 앱은 UNKNOWN 을 "확인 중"으로 표시 |
+| BR-43 | 높음 | 고객 | 장바구니 변경(담기·수량·선택·삭제) 응답에 갱신된 장바구니(`Cart`)가 없어 앱이 매번 `GET /carts/{id}` 를 한 번 더 부름(탭당 왕복 2회) | OPEN(요청 `docs/handoff/2026-11-03-backend-cart-latency.md`). 앱은 수량·선택·삭제를 응답 버전으로 즉시 반영하고 합계는 뒤에서 다시 읽음 |
 
 ---
 
@@ -279,3 +280,9 @@
 - 영향: mfc-inventory-service 가 꺼져 있으면 모든 줄이 `availability=UNKNOWN`(앱 "판매 상태를 확인하는 중이에요")이 되는 건 설계대로지만, 연결 실패를 기다리는 시간만큼 장바구니 조회와 담기(담기 → APPLIED → 다시 읽기)가 매번 느려진다. 원천 하나의 장애가 장바구니 전체 응답 시간을 끌어내린다.
 - 요청: (a) cart-service 외부 호출에 짧은 연결·읽기 timeout(예: 연결 1초·읽기 2~3초)을 두어 실패를 빨리 UNKNOWN 으로 넘긴다. (b) 표시용 조회 네 개를 병렬로 부른다. (c) 가능하면 원천 장애가 잠시 이어질 때 반복 대기하지 않게(circuit breaker 등) — 방식은 백엔드가 정한다.
 - 앱 처리: 변경 없음. UNKNOWN 은 계속 "확인 중"(0·품절 아님). 응답 `sources[]` 로 어느 원천이 UNAVAILABLE 인지 보이는 개선은 별도 검토.
+
+## BR-43 장바구니 변경 응답에 갱신된 장바구니 포함 (고객앱)
+- 현황: `POST /carts/{id}/items`·`PATCH/DELETE …/items/{itemId}` 의 `CartChangeResult` 는 `status`·`cartVersion`·`cartItemId` 만 준다. 앱은 표시용 사본(이름·단가·가용)과 서버 합계(`selectedItemAmount`)를 얻으려고 반영 확인 뒤 `GET /carts/{id}` 를 한 번 더 부른다 → 탭 한 번 = 왕복 2회. 그 GET 은 서버 안에서 표시용 조회 4곳을 순차로 부른다(BR-42).
+- 영향: 담기·수량 변경이 느리다(사용자 체감 2026-11-03, PC3 켜도 여전함). 연속 탭은 앱이 모아 보내도록 했지만 왕복 2회 구조는 그대로다.
+- 앱 처리(2026-11-03): 수량·선택·삭제는 응답 `cartVersion` 으로 장바구니를 바로 갱신하고(서버가 APPLIED 로 확정한 내용만), 합계는 "확인 중"으로 두었다가 뒤에서 `GET` 으로 채운다. 담기(새 행)는 사본이 필요해 그대로 다시 읽는다.
+- 요청: (a) 변경 응답(`CartChangeResult`)에 갱신된 `Cart`(또는 최소한 `selectedItemAmount` 와 바뀐 `CartItem`)를 넣어 달라. 그러면 앱의 두 번째 왕복이 없어진다. (b) BR-42 의 표시용 조회 병렬화·timeout 과 함께.

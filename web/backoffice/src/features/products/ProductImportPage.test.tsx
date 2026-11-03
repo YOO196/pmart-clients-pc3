@@ -176,4 +176,43 @@ describe('상품 일괄 등록', () => {
     // 승인 목록 조회가 끝나면 심사 상태도 붙는다.
     expect(await screen.findByText(/· 심사 대기$/)).toBeInTheDocument();
   });
+
+  it('재업로드 행은 "기존 상품 갱신"(상품 ID 링크)으로 구분하고 제출 전에 갱신 안내를 보인다(BR-39 회신)', async () => {
+    const base = {
+      batchId: 'pib-seed-5',
+      sourceSystem: 'bmart-capture',
+      input: { product: { internalName: '부사 사과 1kg', primaryCategoryId: 'p01-c01-l01' }, skus: [{ unitType: 'E', unitsPerSku: 1, weightG: 1000, storageType: 'CHILLED' }] },
+      state: 'DRAFT',
+      validationState: 'VALID',
+      problems: [],
+      draftHash: null,
+      approvalId: null,
+      resultProductId: null,
+      resultSkus: [],
+      version: 1,
+      updatedAt: '2026-11-03T00:00:00Z',
+    } satisfies Partial<ProductDraft>;
+    const update: ProductDraft = { ...base, draftId: 'pd-upd', sourceKey: 'bm-1', registration: 'UPDATE', existingProductId: 'PRD-1', existingSkus: ['E-00000001'] };
+    const fresh: ProductDraft = { ...base, draftId: 'pd-new', sourceKey: 'bm-2', registration: 'NEW', existingProductId: null, existingSkus: [] };
+    db.productDrafts.set(update.draftId, update);
+    db.productDrafts.set(fresh.draftId, fresh);
+    const batch: ImportBatch = {
+      batchId: 'pib-seed-5',
+      format: 'SEED_V1',
+      sourceSystem: 'bmart-capture',
+      state: 'VALIDATED',
+      productCount: 2,
+      validCount: 2,
+      invalidCount: 0,
+      drafts: [update, fresh],
+      createdAt: '2026-11-03T00:00:00Z',
+    };
+    db.importBatches.set(batch.batchId, batch);
+    renderAt('/products/import/pib-seed-5');
+
+    expect(await screen.findByText(/기존 상품 1개가 이 묶음 값으로 바뀌어요/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'PRD-1' })).toHaveAttribute('href', '/products/PRD-1');
+    expect(screen.getByText('기존 상품 갱신')).toBeInTheDocument();
+    expect(screen.getByText('새 상품')).toBeInTheDocument();
+  });
 });

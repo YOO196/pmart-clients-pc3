@@ -178,8 +178,8 @@ export const messages = {
     hidden: '숨김',
     additionTitle: '기준파일(seed-v1) 카테고리 추가',
     additionHint:
-      '묶음의 categories.json 을 고르면 발효 트리에 없는 카테고리만 더한 새 트리 초안을 만들어요. 기존 노드·필터는 그대로예요. 승인·발효 뒤 상품 일괄 등록으로 넘어가요.',
-    additionFile: 'categories.json(seed-v1)',
+      '묶음의 categories.json 을 고르거나 상품·콘텐츠·가격 일괄 등록에 쓰는 seed-v1 zip 을 그대로 올리면, 발효 트리에 없는 카테고리만 더한 새 트리 초안을 만들어요. 기존 노드·필터는 그대로예요. 승인·발효 뒤 상품 일괄 등록으로 넘어가요.',
+    additionFile: 'categories.json 또는 seed-v1 zip',
     additionSubmit: '없는 카테고리만 추가',
     additionInvalid: '파일 형식이 맞지 않아요. seed-v1 categories.json 의 categories 배열이 필요해요.',
     additionCreated: (v: number, base: number | null) =>
@@ -254,6 +254,10 @@ export const messages = {
     fillSaved: (name: string) => `${name} 저장했어요`,
     volumeHint: (ml: number | undefined) => (ml === undefined ? '용량 -' : `용량 ${ml}mL`),
     excluded: '제외된 초안',
+    registration: '구분',
+    registrationName: { NEW: '새 상품', UPDATE: '기존 상품 갱신' } as const,
+    existingSkus: (skus: string) => `SKU ${skus} 유지`,
+    updateNotice: (n: number) => `기존 상품 ${n}개가 이 묶음 값으로 바뀌어요. 승인하면 새 버전이 되고 SKU 는 그대로예요.`,
     idMap: 'id-map.json 내려받기',
     approvals: '승인 요청 현황',
     approvalNotFound: '이 배치의 승인 요청을 찾지 못했어요. 다른 탭에서 올렸거나 목록이 50건을 넘으면 승인 목록에서 확인해 주세요.',

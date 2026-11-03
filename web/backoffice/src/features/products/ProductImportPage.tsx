@@ -278,6 +278,14 @@ export function ProductImportPage() {
             {(b.drafts ?? []).some((d) => d.state === 'DRAFT' && d.validationState !== 'VALID') && (
               <p className="text-sm opacity-80">{m.products.fillInvalidHint}</p>
             )}
+            {(() => {
+              const updates = (b.drafts ?? []).filter((d) => d.state === 'DRAFT' && d.registration === 'UPDATE').length;
+              return updates > 0 ? (
+                <p role="status" className="alert alert-warning text-sm">
+                  {m.products.updateNotice(updates)}
+                </p>
+              ) : null;
+            })()}
             <table className="table table-sm bg-base-100">
               <tbody>
                 {(b.drafts ?? []).map((d) => (
@@ -288,6 +296,21 @@ export function ProductImportPage() {
                       </Link>
                     </td>
                     <td>{d.sourceKey ?? m.none}</td>
+                    <td>
+                      {/* 재업로드 = 기존 상품의 새 버전(BR-39 회신). 승인자·운영자가 새 등록인지 갱신인지 바로 본다. */}
+                      {d.registration === 'UPDATE' ? (
+                        <span className="badge badge-warning badge-sm gap-1" title={m.products.registrationName.UPDATE}>
+                          {m.products.registrationName.UPDATE}
+                          {d.existingProductId && (
+                            <Link className="link" to={`/products/${encodeURIComponent(d.existingProductId)}`}>
+                              {d.existingProductId}
+                            </Link>
+                          )}
+                        </span>
+                      ) : d.registration === 'NEW' ? (
+                        <span className="badge badge-ghost badge-sm">{m.products.registrationName.NEW}</span>
+                      ) : null}
+                    </td>
                     <td>{d.input?.product.internalName ?? m.none}</td>
                     <td>
                       <DraftProblems draft={d} />

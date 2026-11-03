@@ -25,7 +25,7 @@ describe('카테고리 트리 — 기준파일(seed-v1) 카테고리 추가', ()
     await screen.findByText(/발효 버전 1/);
 
     upload(
-      screen.getByLabelText('categories.json(seed-v1)'),
+      screen.getByLabelText('categories.json 또는 seed-v1 zip'),
       jsonFile(
         seedCategories([
           { ids: ['p01', 'p01-c01', 'p01-c01-l01'], path: ['과일·채소', '과일', '사과·배'] }, // 모두 있음
@@ -58,7 +58,7 @@ describe('카테고리 트리 — 기준파일(seed-v1) 카테고리 추가', ()
     await screen.findByText(/발효 버전 1/);
 
     upload(
-      screen.getByLabelText('categories.json(seed-v1)'),
+      screen.getByLabelText('categories.json 또는 seed-v1 zip'),
       jsonFile(seedCategories([{ ids: ['p01', 'p01-c01'], path: ['과일·채소', '과일'] }])),
     );
     await user.click(screen.getByRole('button', { name: '없는 카테고리만 추가' }));
@@ -72,11 +72,28 @@ describe('카테고리 트리 — 기준파일(seed-v1) 카테고리 추가', ()
     const view = renderAt('/categories');
     await screen.findByText(/발효 버전 1/);
 
-    upload(screen.getByLabelText('categories.json(seed-v1)'), jsonFile({ nodes: [] }));
+    upload(screen.getByLabelText('categories.json 또는 seed-v1 zip'), jsonFile({ nodes: [] }));
     await user.click(screen.getByRole('button', { name: '없는 카테고리만 추가' }));
 
     expect(await screen.findByText(/seed-v1 categories.json 의 categories 배열이 필요해요/)).toBeInTheDocument();
     expect(view.mutations('/category-tree-additions')).toHaveLength(0);
+    view.stop();
+  });
+
+  it('seed-v1 zip 을 올리면 zip 업로드 경로로 보내고(묶음을 풀지 않음) 결과는 JSON 과 같다', async () => {
+    const user = userEvent.setup();
+    const view = renderAt('/categories');
+    await screen.findByText(/발효 버전 1/);
+
+    upload(screen.getByLabelText('categories.json 또는 seed-v1 zip'), new File(['zip-bytes'], 'seed-v1.zip', { type: 'application/zip' }));
+    await user.click(screen.getByRole('button', { name: '없는 카테고리만 추가' }));
+
+    expect(await screen.findByText('트리 버전 2 초안을 만들었어요(발효 버전 1 기준).')).toBeInTheDocument();
+    expect(screen.getByText('새로 더한 카테고리 3개')).toBeInTheDocument();
+    expect(view.mutations('/category-tree-additions')).toHaveLength(0);
+    const post = view.mutations('/category-tree-addition-uploads')[0]!;
+    expect(post.headers.get('Idempotency-Key')).toBeTruthy();
+    expect(post.headers.get('content-type')).toMatch(/^multipart\/form-data/);
     view.stop();
   });
 });

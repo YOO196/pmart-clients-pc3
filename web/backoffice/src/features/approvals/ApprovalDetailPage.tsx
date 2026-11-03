@@ -25,6 +25,24 @@ const isWatching = (a: ApprovalDetail) =>
   (a.reviewState === 'APPROVED' || a.reviewState === 'PARTIALLY_APPROVED') &&
   !FINAL_EXECUTION.includes(a.executionState ?? 'NOT_REQUESTED');
 
+/** 상품 행 attributes {registration, existingProductId, existingSkus, internalName}: 재업로드(UPDATE)면 기존 상품 갱신임을 보인다. */
+function ProductLineAttributes({ attributes }: { readonly attributes: Record<string, unknown> | undefined }) {
+  if (!attributes || !('registration' in attributes)) return null;
+  const registration = attributes['registration'];
+  const name = typeof attributes['internalName'] === 'string' ? attributes['internalName'] : null;
+  if (registration !== 'UPDATE') {
+    return <p className="text-sm">{`${name ?? ''} ${m.products.registrationName.NEW}`.trim()}</p>;
+  }
+  const productId = typeof attributes['existingProductId'] === 'string' ? attributes['existingProductId'] : m.none;
+  const skus = Array.isArray(attributes['existingSkus']) ? (attributes['existingSkus'] as unknown[]).filter((s) => typeof s === 'string').join(', ') : '';
+  return (
+    <p className="text-sm">
+      <span className="badge badge-warning badge-sm mr-1">{m.products.registrationName.UPDATE}</span>
+      {`${name ? `${name} · ` : ''}${productId}${skus ? ` · ${m.products.existingSkus(skus)}` : ''}`}
+    </p>
+  );
+}
+
 /** 가격 행 attributes {previousPrice, basePrice, changeType, productName} 가 있으면 읽기 쉽게. 없는 값은 "-"(0 으로 바꾸지 않는다). */
 function PriceLineAttributes({ attributes }: { readonly attributes: Record<string, unknown> | undefined }) {
   if (!attributes || !('changeType' in attributes || 'previousPrice' in attributes)) return null;
@@ -140,6 +158,8 @@ export function ApprovalDetailPage() {
                       <td>
                         {/* 가격 일괄 등록 행(백엔드 안내 2026-11-03 §1-5): 승인자가 이전 → 새 가격·구분·상품명을 바로 본다 */}
                         <PriceLineAttributes attributes={l.attributes} />
+                        {/* 상품 등록 행(BR-39 회신): 재업로드면 "기존 상품 갱신"을 먼저 보인다 */}
+                        <ProductLineAttributes attributes={l.attributes} />
                         <code className="text-xs break-all">{l.attributes ? JSON.stringify(l.attributes) : ''}</code>
                       </td>
                     </tr>
