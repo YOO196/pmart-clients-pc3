@@ -16,8 +16,7 @@ import { messages as m } from '../../shared/messages';
 import { QueryState } from '../../shared/QueryState';
 import { toUiState } from '../../shared/toUiState';
 import { useCommand } from '../../shared/useCommand';
-import { RequestApproval } from '../approvals/RequestApproval';
-import { multipart, ZipUpload } from '../products/ProductImportPage';
+import { BatchApprovals, multipart, ZipUpload } from '../products/ProductImportPage';
 import { seoulInputToIso } from './PricePage';
 
 const batchKey = (batchId: string) => ['pricing', 'import-batch', batchId] as const;
@@ -280,14 +279,13 @@ export function PriceImportPage() {
             </div>
             <CommandFeedback command={submit}>
               {(r) => (
-                <div className="space-y-2">
-                  <p role="status" className="text-sm">
-                    {m.prices.submitted(r.approvalRequest.lines.length)}
-                  </p>
-                  <RequestApproval body={r.approvalRequest} />
-                </div>
+                <p role="status" className="text-sm">
+                  {m.prices.submitted(r.approvalRequest.lines.length)}
+                </p>
               )}
             </CommandFeedback>
+            {/* BR-41 회신: 승인 대기 동안 배치 조회의 approvalRequest 로 "승인 요청"을, 승인 목록(targetRef)으로 상세 링크를 보인다. */}
+            {b.state !== 'DRAFT' && <BatchApprovals targetRef={`priceImportBatch:${batchId}`} pending={b.approvalRequest} />}
           </>
         )}
       </QueryState>

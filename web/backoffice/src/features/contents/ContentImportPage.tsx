@@ -1,5 +1,5 @@
 // 콘텐츠 일괄 등록(seed-v1 zip) → 상품별 결과 → 제출 가능한 초안 제출 준비 → DISPLAY 승인.
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
@@ -10,8 +10,7 @@ import { messages as m } from '../../shared/messages';
 import { QueryState } from '../../shared/QueryState';
 import { toUiState } from '../../shared/toUiState';
 import { useCommand } from '../../shared/useCommand';
-import { RequestApproval } from '../approvals/RequestApproval';
-import { multipart, ZipUpload } from '../products/ProductImportPage';
+import { BatchApprovals, multipart, ZipUpload } from '../products/ProductImportPage';
 
 export function NewContentImportPage() {
   const api = useApi();
@@ -44,12 +43,16 @@ export function ContentImportPage() {
     queryKey: ['content', 'import-batch', batchId],
     queryFn: () => request('GET', api.content.GET('/content-import-batches/{batchId}', { params: { path: { batchId } } })),
   });
-  const submit = useCommand((_: null, key) =>
-    request(
+  const queryClient = useQueryClient();
+  const submit = useCommand(async (_: null, key) => {
+    const r = await request(
       'POST',
       api.content.POST('/content-import-batches/{batchId}/submissions', { ...commandParams(key, { path: { batchId } }) }),
-    ),
-  );
+    );
+    // 배치를 다시 읽으면(SUBMITTED) 서버의 pendingSubmission 으로 승인 요청 현황 영역이 그려진다(BR-41).
+    await queryClient.invalidateQueries({ queryKey: ['content', 'import-batch', batchId] });
+    return r;
+  });
 
   return (
     <section className="space-y-4">
@@ -90,15 +93,15 @@ export function ContentImportPage() {
               </button>
             )}
             <CommandFeedback command={submit}>
-              {(r) => (
-                <div className="space-y-2">
-                  {(r.excludedDraftIds?.length ?? 0) > 0 && (
-                    <p className="text-sm">{`${m.products.excluded}: ${(r.excludedDraftIds ?? []).join(', ')}`}</p>
-                  )}
-                  <RequestApproval body={r.approvalRequest} />
-                </div>
-              )}
+              {(r) =>
+                (r.excludedDraftIds?.length ?? 0) > 0 ? (
+                  <p className="text-sm">{`${m.products.excluded}: ${(r.excludedDraftIds ?? []).join(', ')}`}</p>
+                ) : null
+              }
             </CommandFeedback>
+            {b.state !== 'UPLOADED' && (
+              <BatchApprovals targetRef={`contentImportBatch:${batchId}`} pending={b.pendingSubmission?.approvalRequest} />
+            )}
           </>
         )}
       </QueryState>

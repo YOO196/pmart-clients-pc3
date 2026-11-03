@@ -47,10 +47,10 @@
 | BR-37 | 중간 | 고객 | 주문이 참조하는 고객 데이터(주소·수령인·연락처)의 주문 시점 불변성 보장 방식과 "주문 당시 배송지" 고객용 조회 경로 | **RESOLVED**(2026-11-02, 백엔드 회신 `clients-reply-br37-order-shipping-snapshot`): 초안 생성 때 사본 고정 → `DraftDelivery.shippingAddress`·`Order.shippingAddress`. `contact.phoneRef` deprecated. 결제 진입 때 계정 재확인(422 `ACCOUNT_NOT_PURCHASABLE`). 고객앱 반영 |
 | BR-38 | 중간 | 백오피스 | 상품 일괄 등록 배치의 `validCount`·`invalidCount` 가 업로드 때 값으로 고정돼 행을 고친 뒤(`PUT /product-drafts/{id}`) 맞지 않음. 유효 0 → 화면이 제출 버튼을 잠갔음 | **RESOLVED**(2026-11-03 회신 `clients-reply-br39-category-zip` §4): 서버가 조회 때 행 기준으로 셈(수정 18:54, LAN 배포 대기). 백오피스 행 기준 집계는 그대로 둠 |
 | BR-39 | 중간 | 백오피스 | 이미 등록(APPLIED)된 seed 상품 ID 를 다시 올리면 새 초안이 생겨 바코드 없는 상품은 중복 등록될 수 있음. 업로드 검증에 "이미 상품 X 로 등록됨" 검사 요청 | **RESOLVED**(2026-11-03 회신 §1·2): 승인해도 중복 등록 아님(기존 상품의 새 버전, SKU 유지). 초안 `registration` NEW/UPDATE·`existingProductId`·`existingSkus` 추가 → 백오피스 구분 열·안내·승인 상세 반영(19:20) |
-| BR-40 | 중간 | 백오피스 | bff `GET /views/approval-inbox`(통합 승인함) 가 501 — `ViewsController` 가 빈 구현이라 메뉴 "통합 승인함(bff)" 이 열리지 않음 | OPEN(요청 `docs/handoff/2026-11-03-backend-approval-inbox-and-batch-approval.md`). 승인·반려는 "승인함"(`/approvals`, approval-service 직접) 으로 가능 |
-| BR-41 | 중간 | 백오피스 | 제출(SUBMITTED)한 일괄 등록 배치의 승인 요청 본문·승인 ID 를 서버에서 다시 읽을 길이 없음(초안 `approvalId` 는 반영 때만 채움). 화면 이동·새로고침 뒤 "승인 요청"·"승인 상세 보기" 가 사라졌음 | OPEN(같은 요청서 §2). 백오피스는 승인 목록 targetRef 조회 + 탭 sessionStorage 로 우회 |
-| BR-42 | 중간 | 고객 | cart-service 표시용 조회(product·content·pricing·mfc-inventory)에 연결·읽기 timeout 이 없고 순차 호출 — 한 원천(PC3 꺼짐 등)이 안 닿으면 장바구니 조회·담기마다 그만큼 느려짐 | OPEN(2026-11-03). 앱은 UNKNOWN 을 "확인 중"으로 표시 |
-| BR-43 | 높음 | 고객 | 장바구니 변경(담기·수량·선택·삭제) 응답에 갱신된 장바구니(`Cart`)가 없어 앱이 매번 `GET /carts/{id}` 를 한 번 더 부름(탭당 왕복 2회) | OPEN(요청 `docs/handoff/2026-11-03-backend-cart-latency.md`). 앱은 수량·선택·삭제를 응답 버전으로 즉시 반영하고 합계는 뒤에서 다시 읽음 |
+| BR-40 | 중간 | 백오피스 | bff `GET /views/approval-inbox`(통합 승인함) 가 501 — `ViewsController` 가 빈 구현이라 메뉴 "통합 승인함(bff)" 이 열리지 않음 | **RESOLVED**(2026-11-03 회신 `clients-reply-br40-br43` §1, 19:40 LAN 배포): bff 승인함 구현, `dossierId` = 승인 ID(`approvalId` 도 줌), 장애 시 빈 목록 + `unavailableSources`. 백오피스 링크 반영 |
+| BR-41 | 중간 | 백오피스 | 제출(SUBMITTED)한 일괄 등록 배치의 승인 요청 본문·승인 ID 를 서버에서 다시 읽을 길이 없음(초안 `approvalId` 는 반영 때만 채움). 화면 이동·새로고침 뒤 "승인 요청"·"승인 상세 보기" 가 사라졌음 | **RESOLVED**(회신 §2, 19:40 배포): 배치 조회의 `pendingSubmission`(상품·콘텐츠)·`approvalRequest`(가격) + `GET /approvals?targetRef=`. 백오피스 반영(sessionStorage 우회 제거) |
+| BR-42 | 중간 | 고객 | cart-service 표시용 조회(product·content·pricing·mfc-inventory)에 연결·읽기 timeout 이 없고 순차 호출 — 한 원천(PC3 꺼짐 등)이 안 닿으면 장바구니 조회·담기마다 그만큼 느려짐 | **RESOLVED**(회신 §3, 19:40 배포): 표시용 조회 4곳 동시 호출. timeout 은 공통 기본(연결 1초·응답 5초)이 이미 있었음(요청서 정정). 앱 변경 없음 |
+| BR-43 | 높음 | 고객 | 장바구니 변경(담기·수량·선택·삭제) 응답에 갱신된 장바구니(`Cart`)가 없어 앱이 매번 `GET /carts/{id}` 를 한 번 더 부름(탭당 왕복 2회) | **RESOLVED**(회신 §4, 19:40 배포): `CartChangeResult.cart`(GET 과 같은 모양). 앱 반영 — 응답의 cart 로 끝냄(왕복 1회), 없으면 옛 경로 |
 
 ---
 

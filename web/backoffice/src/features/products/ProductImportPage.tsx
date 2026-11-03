@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
 import { PmartFailure } from '../../api/failure';
-import { type ImportBatch, STORAGE_TYPES, type ProductDraft, type ProductDraftInput, type StorageType } from '../../api/models';
+import { type ApprovalRequestBody, type ImportBatch, STORAGE_TYPES, type ProductDraft, type ProductDraftInput, type StorageType } from '../../api/models';
 import { request } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback, FailureAlert } from '../../shared/Feedback';
@@ -14,37 +14,25 @@ import { QueryState } from '../../shared/QueryState';
 import { toUiState } from '../../shared/toUiState';
 import { useCommand } from '../../shared/useCommand';
 import { RequestApproval } from '../approvals/RequestApproval';
-import { type BatchApprovalMemo, loadBatchApproval, saveBatchApproval } from './batchApprovalStore';
 import { DraftProblems } from './ProductDraftPage';
 
-/** 배치 승인 요청의 targetRef 접두어(백엔드 `ProductDraftService.BATCH_PREFIX`, 목도 같다). */
-export const BATCH_APPROVAL_TARGET_PREFIX = 'productImportBatch:';
-
 /**
- * 제출한 배치의 승인 요청 현황. 승인 목록(`GET /approvals?type=PRODUCT`)에서 targetRef 로 찾아 링크를 보이고,
- * 아직 올리지 않은 승인 요청 본문이 이 탭에 남아 있으면 "승인 요청" 버튼을 다시 보인다.
- * 제출 응답은 서버가 다시 주지 않으므로(배치는 SUBMITTED) 승인 상세에 다녀와도 버튼·링크가 사라지지 않게 한다.
+ * 제출한 배치의 승인 요청 현황(BR-41 회신 2026-11-03). 승인 목록을 `GET /approvals?targetRef=` 로 정확히 찾아 링크·심사 상태를 보이고,
+ * 아직 올리지 않았으면 배치 조회가 돌려준 제출 본문(`pendingSubmission.approvalRequest` 등)으로 "승인 요청" 버튼을 보인다.
+ * 화면을 떠났다 와도 서버 값으로 다시 그리므로 탭 저장소가 필요 없다. 상품·콘텐츠·가격 배치가 같이 쓴다.
  */
-function BatchApprovals({ batchId }: { readonly batchId: string }) {
+export function BatchApprovals({ targetRef, pending }: { readonly targetRef: string; readonly pending?: ApprovalRequestBody | null | undefined }) {
   const api = useApi();
   const queryClient = useQueryClient();
-  const [memo, setMemo] = useState<BatchApprovalMemo | null>(() => loadBatchApproval(batchId));
-  const remember = (next: BatchApprovalMemo) => {
-    saveBatchApproval(batchId, next);
-    setMemo(next);
-  };
-  const targetRef = `${BATCH_APPROVAL_TARGET_PREFIX}${batchId}`;
+  // 이 화면에서 올린 승인 ID. RequestApproval 이 결과(승인 번호·링크)를 보이는 동안 목록에서 겹쳐 보이지 않게 뺀다.
+  const [requested, setRequested] = useState<string | null>(null);
   const list = useQuery({
-    queryKey: ['approval', 'list', 'PRODUCT', 'batch', batchId],
-    queryFn: () => request('GET', api.approval.GET('/approvals', { params: { query: { type: 'PRODUCT', size: 50 } } })),
+    queryKey: ['approval', 'list', 'target', targetRef],
+    queryFn: () => request('GET', api.approval.GET('/approvals', { params: { query: { targetRef, size: 50 } } })),
   });
-  // 이 화면에서 올릴 승인 요청 본문. 올린 뒤에도 이 마운트 동안은 RequestApproval 이 결과(승인 번호·링크)를 보이므로
-  // 그 승인 ID 는 아래 목록에서 뺀다(두 번 보이지 않게). 다시 열면 목록에서만 보인다.
-  const [pending] = useState(() => (memo?.approvalId ? undefined : memo?.approvalRequest));
-  const found = (list.data?.items ?? []).filter((a) => a.targetRef === targetRef && a.approvalId);
-  const ids = [...new Set([...found.map((a) => a.approvalId!), ...(memo?.approvalId ? [memo.approvalId] : [])])].filter(
-    (id) => !(pending && id === memo?.approvalId),
-  );
+  const found = (list.data?.items ?? []).filter((a) => a.targetRef === targetRef && a.approvalId && a.approvalId !== requested);
+  const ids = found.map((a) => a.approvalId ?? '');
+  const showRequest = !!pending && list.isSuccess && (found.length === 0 || requested !== null);
 
   return (
     <div className="space-y-2 rounded-box bg-base-100 p-4" aria-label={m.products.approvals}>
@@ -73,23 +61,16 @@ function BatchApprovals({ batchId }: { readonly batchId: string }) {
           </button>
         </div>
       )}
-      {pending && (
+      {showRequest && pending && (
         <RequestApproval
           body={pending}
           onRequested={(r) => {
-            remember({ ...(r.approvalId ? { approvalId: r.approvalId } : { approvalRequest: pending }) });
+            setRequested(r.approvalId ?? '');
             void queryClient.invalidateQueries({ queryKey: ['approval', 'list'] });
           }}
         />
       )}
-      {!pending && ids.length === 0 && list.isSuccess && (
-        <p className="text-sm">
-          {m.products.approvalNotFound}{' '}
-          <Link className="link" to="/approvals?type=PRODUCT">
-            {m.products.approvalList}
-          </Link>
-        </p>
-      )}
+      {list.isSuccess && ids.length === 0 && !pending && requested === null && <p className="text-sm">{m.products.approvalNone}</p>}
     </div>
   );
 }
@@ -252,8 +233,7 @@ export function ProductImportPage() {
       'POST',
       api.product.POST('/product-import-batches/{batchId}/submissions', { ...commandParams(key, { path: { batchId } }) }),
     );
-    // 승인 요청 본문은 서버가 다시 주지 않는다. 이 탭에 남겨 두고 배치를 다시 읽는다(SUBMITTED → 승인 현황 영역).
-    saveBatchApproval(batchId, { approvalRequest: r.approvalRequest });
+    // 배치를 다시 읽으면(SUBMITTED) 서버의 pendingSubmission 으로 승인 요청 현황 영역이 그려진다(BR-41).
     await queryClient.invalidateQueries({ queryKey: ['product', 'import-batch', batchId] });
     return r;
   });
@@ -355,7 +335,9 @@ export function ProductImportPage() {
                 ) : null
               }
             </CommandFeedback>
-            {b.state !== 'VALIDATED' && <BatchApprovals key={batchId} batchId={batchId} />}
+            {b.state !== 'VALIDATED' && (
+              <BatchApprovals targetRef={`productImportBatch:${batchId}`} pending={b.pendingSubmission?.approvalRequest} />
+            )}
           </>
           );
         }}

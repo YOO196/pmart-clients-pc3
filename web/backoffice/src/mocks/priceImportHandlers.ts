@@ -163,33 +163,42 @@ export const priceImportHandlers = [
       const ready = checked.lines.filter((l) => l.status === 'READY');
       if (ready.length === 0) return problem(422, 'NOTHING_TO_SUBMIT');
       const targetRef = `priceImportBatch:${b.batchId}`;
-      const next = bump({ ...checked, state: 'SUBMITTED', effectiveFrom, approvalTargetRef: targetRef, submittedAt: timestamp() });
-      db.priceBatches.set(next.batchId, next);
-      const approvalRequest = {
-        type: 'PRICE' as const,
-        targetService: 'pricing-service' as const,
-        targetRef,
-        allowedActions: ['APPLY_PRICE_VERSION'],
-        summary: `가격 일괄 등록 ${ready.length}건`,
-        ...(effectiveFrom ? { requestedEffectiveFrom: effectiveFrom } : {}),
-        lines: ready.map((l) => ({
-          lineKey: l.sku ?? '',
-          requestedAmount: l.basePrice ?? 0,
-          attributes: {
-            sku: l.sku,
-            basePrice: l.basePrice,
-            ...(effectiveFrom ? { effectiveFrom } : {}),
-            previousPrice: l.currentPrice ?? null,
-            changeType: l.changeType,
-            seedProductId: l.seedProductId,
-            productName: l.productName,
-          },
-        })),
-      };
-      return { status: 200, body: { batch: next, approvalRequest }};
+      const next = bump({ ...checked, state: 'SUBMITTED' as const, effectiveFrom, approvalTargetRef: targetRef, submittedAt: timestamp() });
+      // BR-41 회신: 승인 대기 동안 배치 조회가 제출 본문(approvalRequest)을 다시 준다.
+      const withRequest = { ...next, approvalRequest: priceApprovalRequest(next) };
+      db.priceBatches.set(next.batchId, withRequest);
+      return { status: 200, body: { batch: withRequest, approvalRequest: withRequest.approvalRequest } };
     });
   }),
 ];
+
+/** 제출 본문(PRICE 승인 요청). 제출 응답과 승인 대기 중 배치 조회가 같은 값을 돌려준다(BR-41). */
+function priceApprovalRequest(b: PriceImportBatch) {
+  const ready = b.lines.filter((l) => l.status === 'READY');
+  const effectiveFrom = b.effectiveFrom ?? null;
+  const targetRef = b.approvalTargetRef ?? `priceImportBatch:${b.batchId}`;
+  return {
+    type: 'PRICE' as const,
+    targetService: 'pricing-service' as const,
+    targetRef,
+    allowedActions: ['APPLY_PRICE_VERSION'],
+    summary: `가격 일괄 등록 ${ready.length}건`,
+    ...(effectiveFrom ? { requestedEffectiveFrom: effectiveFrom } : {}),
+    lines: ready.map((l) => ({
+      lineKey: l.sku ?? '',
+      requestedAmount: l.basePrice ?? 0,
+      attributes: {
+        sku: l.sku,
+        basePrice: l.basePrice,
+        ...(effectiveFrom ? { effectiveFrom } : {}),
+        previousPrice: l.currentPrice ?? null,
+        changeType: l.changeType,
+        seedProductId: l.seedProductId,
+        productName: l.productName,
+      },
+    })),
+  };
+}
 
 /** 승인 결정 → 배치 결과(effects.decide 에서 부른다). 승인이면 가격 버전이 생긴 행은 APPLIED, 반려면 전부 REJECTED. */
 export function settlePriceImportBatch(targetRef: string | null | undefined, approvalId: string, approved: boolean): void {

@@ -48,10 +48,10 @@ export function ApprovalInboxPage() {
                 {(view.items ?? []).map((item, i) => (
                   <tr key={item.dossierId ?? `row-${i}`}>
                     <td>
-                      {/* 승인·반려는 승인 상세에서 한다. dossierId 는 approval-service 의 승인 ID(approval 표의 키)와 같다. */}
-                      {item.dossierId ? (
-                        <Link className="link" to={`/approvals/${encodeURIComponent(item.dossierId)}`}>
-                          {item.dossierId}
+                      {/* 승인·반려는 승인 상세에서 한다. BR-40 회신: dossierId = approval-service 승인 ID(approvalId 로도 온다). */}
+                      {(item.approvalId ?? item.dossierId) ? (
+                        <Link className="link" to={`/approvals/${encodeURIComponent(item.approvalId ?? item.dossierId ?? '')}`}>
+                          {item.dossierId ?? item.approvalId}
                         </Link>
                       ) : (
                         '-'

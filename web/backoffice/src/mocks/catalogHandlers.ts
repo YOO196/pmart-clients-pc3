@@ -277,7 +277,18 @@ export const catalogHandlers = [
   http.get(`${API_BASE}/product-import-batches/:id`, ({ params }) => {
     const b = db.importBatches.get(String(params['id']));
     if (!b) return problem(404, 'NOT_FOUND');
-    return HttpResponse.json({ ...b, drafts: (b.drafts ?? []).map((d) => db.productDrafts.get(d.draftId) ?? d) });
+    const drafts = (b.drafts ?? []).map((d) => db.productDrafts.get(d.draftId) ?? d);
+    // BR-41 회신: 승인 대기(SUBMITTED) 동안 잠긴 행으로 제출 응답과 같은 본문을 다시 만든다.
+    const locked = drafts.filter((d) => d.state === 'SUBMITTED');
+    const pendingSubmission =
+      b.state === 'SUBMITTED' && locked.length > 0
+        ? {
+            submittedDraftIds: locked.map((d) => d.draftId),
+            excludedDraftIds: drafts.filter((d) => d.state !== 'SUBMITTED').map((d) => d.draftId),
+            approvalRequest: productApproval(`productImportBatch:${b.batchId}`, locked, `상품 일괄 등록 ${locked.length}건`),
+          }
+        : undefined;
+    return HttpResponse.json({ ...b, drafts, ...(pendingSubmission ? { pendingSubmission } : {}) });
   }),
   http.post(`${API_BASE}/product-import-batches/:id/submissions`, ({ request, params }) =>
     idempotent(request, () => {
@@ -474,12 +485,24 @@ export const catalogHandlers = [
   http.get(`${API_BASE}/content-import-batches/:id`, ({ params }) => {
     const b = db.contentBatches.get(String(params['id']));
     if (!b) return problem(404, 'NOT_FOUND');
+    const drafts = (b.items ?? []).flatMap((it) => (it.draftId && db.contentDrafts.get(it.draftId) ? [viewContent(db.contentDrafts.get(it.draftId) as ContentDraft)] : []));
+    // BR-41 회신: 승인 대기(SUBMITTED) 동안 잠긴 행으로 제출 응답과 같은 본문을 다시 만든다.
+    const locked = drafts.filter((d) => d.state === 'SUBMITTED');
+    const pendingSubmission =
+      b.state === 'SUBMITTED' && locked.length > 0
+        ? {
+            submittedDraftIds: locked.map((d) => d.draftId),
+            excludedDraftIds: drafts.filter((d) => d.state !== 'SUBMITTED').map((d) => d.draftId),
+            approvalRequest: contentApproval(`contentImportBatch:${b.batchId}`, locked, `콘텐츠 일괄 게시 ${locked.length}건`),
+          }
+        : undefined;
     return HttpResponse.json({
       ...b,
       items: (b.items ?? []).map((it) => {
         const d = it.draftId ? db.contentDrafts.get(it.draftId) : undefined;
         return d ? { ...it, draft: viewContent(d) } : it;
       }),
+      ...(pendingSubmission ? { pendingSubmission } : {}),
     });
   }),
   http.post(`${API_BASE}/content-import-batches/:id/submissions`, ({ request, params }) =>

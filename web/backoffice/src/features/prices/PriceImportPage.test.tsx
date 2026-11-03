@@ -105,7 +105,8 @@ describe('가격 일괄 등록', () => {
     expect(submission.headers.get('X-Expected-Version')).toBe('0');
     expect(await submission.json()).toEqual({});
 
-    await user.click(screen.getByRole('button', { name: '승인 요청' }));
+    // 승인 요청 버튼은 배치 조회의 approvalRequest + 승인 목록(targetRef) 조회가 끝난 뒤 보인다(BR-41).
+    await user.click(await screen.findByRole('button', { name: '승인 요청' }));
     expect(await screen.findByText(/승인 요청을 올렸어요\. 승인 번호 /)).toBeInTheDocument();
     const cr = view.mutations('/change-requests')[0]!;
     const body = (await cr.json()) as { type: string; targetRef: string; lines: { lineKey: string; requestedAmount: number; attributes: Record<string, unknown> }[] };

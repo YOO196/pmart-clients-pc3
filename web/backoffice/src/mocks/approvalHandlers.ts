@@ -97,6 +97,8 @@ export const approvalHandlers = [
     const items = [...db.approvals.values()]
       .filter((a) => !q.get('type') || a.type === q.get('type'))
       .filter((a) => !q.get('reviewState') || a.reviewState === q.get('reviewState'))
+      // BR-41 회신: 대상 참조 정확히 일치(예 productImportBatch:{batchId})
+      .filter((a) => !q.get('targetRef') || a.targetRef === q.get('targetRef'))
       .sort((a, b) => (b.submittedAt ?? '').localeCompare(a.submittedAt ?? ''));
     return HttpResponse.json({ items, page: { nextCursor: null, size: items.length } });
   }),

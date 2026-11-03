@@ -32,6 +32,7 @@ export const approvalInbox: ApprovalInboxView = {
   items: [
     {
       dossierId: 'dos-mock-1',
+      approvalId: 'dos-mock-1', // BR-40 회신: dossierId = approval-service 승인 ID(같은 값을 approvalId 로도 준다)
       approvalType: 'PRICE_CHANGE',
       requestState: 'SUBMITTED',
       reviewState: 'PENDING',
