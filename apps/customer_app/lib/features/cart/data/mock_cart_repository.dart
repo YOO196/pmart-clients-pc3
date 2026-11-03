@@ -62,6 +62,9 @@ base class MockCartRepository implements CartRepository {
   /// 받은 변경 명령(재전송 포함) 순서대로. 테스트가 "몇 번 보냈는지"를 본다.
   final changes = <CartChange>[];
 
+  /// 변경 응답에 `cart` 를 넣지 않는다(BR-43 전 서버 시연 — 앱이 다시 읽는 경로).
+  bool omitCartInResult = false;
+
   /// 다른 기기에서 장바구니를 바꾼 것처럼 버전을 올린다(버전 충돌 시연).
   void bumpVersionElsewhere() => version++;
 
@@ -266,6 +269,8 @@ base class MockCartRepository implements CartRepository {
         'selected': selected,
         'cartVersion': version,
         'appliedRequestId': key.value,
+        // BR-43 회신: 응답에 장바구니 전체(GET 과 같은 모양). 옛 서버 시연은 [omitCartInResult].
+        if (!omitCartInResult) 'cart': cartJson(),
       };
       _results[key.value] = result;
       if (loseNextResponse) {

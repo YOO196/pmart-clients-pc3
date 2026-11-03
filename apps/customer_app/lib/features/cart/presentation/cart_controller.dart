@@ -189,9 +189,15 @@ class CartController extends AsyncNotifier<CartState> {
   ) async {
     final current = _current!;
     switch (outcome) {
-      case CartChangeApplied(:final cartVersion):
-        // 담기(새 행)는 표시용 사본이 필요해 다시 읽는다. 수량·선택·삭제는 서버가 확정한 내용을 응답 버전으로
-        // 바로 반영하고(왕복 1회), 서버 합계·사본은 뒤에서 다시 읽어 채운다(BR-43 회신 전 임시).
+      case CartChangeApplied(:final cartVersion, :final cart):
+        // 응답에 장바구니 전체가 오면(BR-43, cart-service 2026-11-03 배포) 그걸로 끝낸다 — 왕복 1회, 합계도 서버 값.
+        // 결과 조회로 받은 cart 는 "지금" 장바구니라 이 변경보다 뒤일 수 있지만 더 최신이므로 그대로 쓴다.
+        if (cart != null) {
+          _set(CartState(cart: cart));
+          break;
+        }
+        // (cart 가 없는 옛 서버) 담기(새 행)는 표시용 사본이 필요해 다시 읽는다. 수량·선택·삭제는 서버가 확정한 내용을
+        // 응답 버전으로 바로 반영하고(왕복 1회), 서버 합계·사본은 뒤에서 다시 읽어 채운다.
         if (change == null || change is AddItem) {
           await _reload(current.cart, notice: null);
         } else {

@@ -202,9 +202,13 @@ sealed class CartChangeOutcome {
 
 /// 서버가 반영했다.
 final class CartChangeApplied extends CartChangeOutcome {
-  const CartChangeApplied({required this.cartVersion});
+  const CartChangeApplied({required this.cartVersion, this.cart});
 
   final int? cartVersion;
+
+  /// 응답 시점의 장바구니 전체(BR-43 회신 2026-11-03: `GET /carts/{id}` 와 같은 모양). 있으면 다시 읽지 않는다.
+  /// 결과 조회(change-requests)의 것은 "지금" 장바구니라 그 변경 직후가 아닐 수 있다 — [cartVersion] 으로 비교.
+  final Cart? cart;
 }
 
 /// 서버가 거절했다(업무 규칙). [code] 로 문구를 고른다.

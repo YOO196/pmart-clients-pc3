@@ -205,6 +205,10 @@ CartChangeOutcome changeResultFromContract(api.CartChangeResult? r) {
   return switch (r.status) {
     api.CartChangeResultStatusEnum.APPLIED => CartChangeApplied(
       cartVersion: r.cartVersion ?? r.version,
+      cart: switch (r.cart) {
+        final c? => cartFromContract(c),
+        null => null,
+      },
     ),
     api.CartChangeResultStatusEnum.REJECTED => CartChangeRejected(
       r.nextAction ?? ProblemCode.domainRejected,

@@ -121,10 +121,33 @@ void main() {
     );
   });
 
-  testWidgets('수량 변경은 서버가 확정한 응답으로 바로 반영하고, 합계는 뒤에서 다시 읽어 채운다(BR-43 전 임시)', (
+  testWidgets('변경 응답에 장바구니가 오면(BR-43) 그걸로 끝낸다 — 합계까지 바로, 다시 읽지 않는다', (t) async {
+    cart.getLatency = const Duration(milliseconds: 500);
+    await t.pumpWidget(testApp(const [], cart: cart));
+    await _openCartTab(t);
+    final gets = cart.gets;
+
+    await t.tap(find.byKey(const ValueKey('cart-inc-ci-1')));
+    await t.pump(const Duration(milliseconds: 50));
+
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('cart-qty-ci-1'))).data,
+      '3개',
+    );
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('cart-total'))).data,
+      '10,920원',
+    );
+    await t.pumpAndSettle();
+    expect(cart.gets, gets);
+  });
+
+  testWidgets('변경 응답에 장바구니가 없는 옛 서버면 응답 버전으로 바로 반영하고, 합계는 뒤에서 다시 읽어 채운다', (
     t,
   ) async {
-    cart.getLatency = const Duration(milliseconds: 500);
+    cart
+      ..omitCartInResult = true
+      ..getLatency = const Duration(milliseconds: 500);
     await t.pumpWidget(testApp(const [], cart: cart));
     await _openCartTab(t);
     final gets = cart.gets;
