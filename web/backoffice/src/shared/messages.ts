@@ -71,6 +71,7 @@ export const messages = {
     memoryNote: '토큰은 이 탭의 메모리에만 둬요. 새로고침하거나 탭을 닫으면 다시 로그인해요(세션은 최대 12시간).',
     mockAccounts: '목 계정(비밀번호는 모두 pmart-local)',
     passwordChangeRequired: '임시 비밀번호로 로그인했어요. 비밀번호를 바꿔 주세요.',
+    unknownBody: '로그인 결과를 받지 못했어요. 잠시 뒤 다시 로그인해 주세요.',
   },
 
   password: {

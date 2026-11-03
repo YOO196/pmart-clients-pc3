@@ -61,7 +61,8 @@ export function LoginPage() {
         <button type="submit" className="btn btn-primary w-full" disabled={cmd.phase.kind === 'running' || !loginId.trim() || !password}>
           {m.login.submit}
         </button>
-        <CommandFeedback command={cmd} />
+        {/* 로그인은 상태를 남기지 않으므로 결과 불명이어도 "같은 요청으로 결과 확인" 대신 다시 로그인하면 된다. */}
+        <CommandFeedback command={cmd} unknown={{ body: m.login.unknownBody, resend: false }} />
         <p className="text-xs opacity-70">{m.login.memoryNote}</p>
       </form>
       {isMock && (

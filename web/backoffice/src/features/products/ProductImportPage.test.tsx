@@ -82,4 +82,48 @@ describe('상품 일괄 등록', () => {
     // 파일을 고르기 전에는 올릴 수 없다
     expect(within(another).getByRole('button', { name: '업로드·검증' })).toBeDisabled();
   });
+
+  it('서버의 validCount 가 업로드 때 값(0)이어도 VALID 행이 있으면 유효 수를 행에서 세어 보이고 제출 버튼을 연다(BR-38)', async () => {
+    const base: Omit<ProductDraft, 'draftId' | 'sourceKey' | 'state' | 'validationState' | 'problems'> = {
+      batchId: 'pib-seed-3',
+      sourceSystem: 'bmart-capture',
+      input: { product: { internalName: '부사 사과 1kg', primaryCategoryId: 'p01-c01-l01' }, skus: [{ unitType: 'E', unitsPerSku: 1, weightG: 1000, storageType: 'CHILLED' }] },
+      draftHash: null,
+      approvalId: null,
+      resultProductId: null,
+      resultSkus: [],
+      version: 1,
+      updatedAt: '2026-11-03T00:00:00Z',
+    };
+    const fixed: ProductDraft = { ...base, draftId: 'pd-fixed', sourceKey: 'bm-1', state: 'DRAFT', validationState: 'VALID', problems: [] };
+    const broken: ProductDraft = {
+      ...base,
+      draftId: 'pd-broken',
+      sourceKey: 'bm-2',
+      state: 'DRAFT',
+      validationState: 'INVALID',
+      problems: [{ code: 'WEIGHT_REQUIRED', field: 'skus[0].weightG' }],
+    };
+    db.productDrafts.set(fixed.draftId, fixed);
+    db.productDrafts.set(broken.draftId, broken);
+    const batch: ImportBatch = {
+      batchId: 'pib-seed-3',
+      format: 'SEED_V1',
+      sourceSystem: 'bmart-capture',
+      state: 'VALIDATED',
+      productCount: 2,
+      validCount: 0, // 서버는 업로드 때 수를 그대로 둔다
+      invalidCount: 2,
+      drafts: [fixed, broken],
+      createdAt: '2026-11-03T00:00:00Z',
+    };
+    db.importBatches.set(batch.batchId, batch);
+    renderAt('/products/import/pib-seed-3');
+
+    expect(await screen.findByText('VALIDATED · 전체 2 · 유효 1 · 오류 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '유효 행 제출 준비' })).toBeEnabled();
+    // VALID 행도 제출 전이면 초안 화면에서 다시 고칠 수 있다(행마다 "초안 수정" 링크).
+    const links = screen.getAllByRole('link', { name: '초안 수정' });
+    expect(links.map((l) => l.getAttribute('href'))).toEqual(['/products/drafts/pd-fixed', '/products/drafts/pd-broken']);
+  });
 });

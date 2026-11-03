@@ -45,6 +45,8 @@
 | BR-35 | 높음 | 고객 | 주문·초안 품목 `productName`(주문 당시 사본)이 비어 와서 주문 내역에 SKU 가 보임 | OPEN(같은 요청서 §2) |
 | BR-36 | 중간 | 고객 | 상품 상세 `SaleOption.price` 가 항상 null(계약은 "pricing 사본"). 상세에 가격이 안 보임 | OPEN(요청 `docs/handoff/2026-11-02-backend-product-detail-price.md`). 앱은 `GET /prices?skus=` 로 채워 표시 중 |
 | BR-37 | 중간 | 고객 | 주문이 참조하는 고객 데이터(주소·수령인·연락처)의 주문 시점 불변성 보장 방식과 "주문 당시 배송지" 고객용 조회 경로 | **RESOLVED**(2026-11-02, 백엔드 회신 `clients-reply-br37-order-shipping-snapshot`): 초안 생성 때 사본 고정 → `DraftDelivery.shippingAddress`·`Order.shippingAddress`. `contact.phoneRef` deprecated. 결제 진입 때 계정 재확인(422 `ACCOUNT_NOT_PURCHASABLE`). 고객앱 반영 |
+| BR-38 | 중간 | 백오피스 | 상품 일괄 등록 배치의 `validCount`·`invalidCount` 가 업로드 때 값으로 고정돼 행을 고친 뒤(`PUT /product-drafts/{id}`) 맞지 않음. 유효 0 → 화면이 제출 버튼을 잠갔음 | OPEN(요청 `docs/handoff/2026-11-03-backend-product-import-batch.md`). 백오피스는 배치 응답의 행에서 직접 세어 표시·활성 판단 |
+| BR-39 | 중간 | 백오피스 | 이미 등록(APPLIED)된 seed 상품 ID 를 다시 올리면 새 초안이 생겨 바코드 없는 상품은 중복 등록될 수 있음. 업로드 검증에 "이미 상품 X 로 등록됨" 검사 요청 | OPEN(요청 `docs/handoff/2026-11-03-backend-product-import-batch.md`) |
 
 ---
 
@@ -245,3 +247,15 @@
 - 고객앱 처리(회신 전): 주문 상세에 배송지를 보이지 않는다. 주소 ID 로 현재 주소를 조회해 "주문 당시 배송지"처럼 보이지 않는다.
 - 회신(2026-11-02, `../pmart-backend/docs/handoff/2026-11-02-clients-reply-br37-order-shipping-snapshot.md`): (1) 지금까지 미보장이었음 → 초안 생성 때 주소록을 복사해 고정, 확정 때 주문으로 옮김. 고객용은 `GET /orders/{id}`·초안 `delivery.shippingAddress`(가리지 않음, 배포 전 것은 null). (2) 주소 삭제는 지금 규칙 유지(주문은 사본). (3) 수령인·연락처 = 배송지 값으로 고정, `contact.phoneRef` 는 쓰지 않음(deprecated). (4) 결제 진입 때 계정 재확인 → 422 `ACCOUNT_NOT_PURCHASABLE`.
 - 고객앱 반영(2026-11-02): 주문서·주문 상세 "받는 곳" = `shippingAddress`(null 이면 "배송지 정보 없음"), 결제 진입 거절 문구, 백엔드 `312a51b` 계약 재생성.
+
+## BR-38 상품 일괄 등록 배치의 유효·오류 수가 행 수정 뒤 갱신되지 않음 (백오피스)
+- 현황(LAN 2026-11-03): `POST /product-import-batches` 는 업로드 때 행을 검증해 `validCount`·`invalidCount` 를 저장한다(`ProductDraftService.uploadBatch` → `DraftStore.updateBatchCounts`). 그 뒤 운영자가 INVALID 행의 빠진 값을 채워 `PUT /product-drafts/{draftId}` 로 저장하면 그 행은 다시 검증돼 `VALID` 가 되지만(`ProductDraftService.update`) 배치의 수는 다시 세지 않는다. `GET /product-import-batches/{batchId}` 는 고친 행은 `VALID` 로, 배치 요약은 여전히 "유효 0" 으로 돌려준다.
+- 영향: 백오피스가 `validCount === 0` 이면 "유효 행 제출 준비"를 잠가 두어, 올릴 때 전부 INVALID 였던 배치는 행을 고쳐도 제출할 수 없었다. 제출(`POST …/submissions`) 자체는 행을 직접 보고 `DRAFT`+`VALID` 만 잠그므로 버튼만 풀리면 된다.
+- 백오피스 처리(2026-11-03): 요약 줄의 유효·오류 수와 제출 버튼 활성을 응답의 `drafts[]` 에서 직접 센다(`batchCounts`). 행 목록이 없으면 서버 수를 쓴다.
+- 요청: 초안 수정·제출 뒤 배치의 `validCount`·`invalidCount`(필요하면 `productCount`)를 다시 세어 주거나, 계약에 "업로드 때 값, 이후 갱신 안 함"이라고 적어 달라. 콘텐츠 일괄 등록 배치도 같은 구조면 함께.
+
+## BR-39 이미 등록된 seed 상품 ID 재업로드 검사 (백오피스)
+- 현황(백엔드 읽기 2026-11-03): `POST /product-import-batches` 는 (sourceSystem, seedProductId) 로 초안을 upsert 하는데, `DraftStore.findOpen` 이 `state IN ('DRAFT','SUBMITTED')` 만 찾는다. 승인 반영이 끝난(`APPLIED`) 초안은 "열린 초안"이 아니라서 같은 seed 상품 ID 를 다시 올리면 **새 초안이 생긴다**. 업로드 검증(`DraftRules`)은 바코드만 본다 — 빈 바코드, 초안 안 중복(`BARCODE_DUPLICATED_IN_DRAFT`), 다른 활성 SKU 가 쓰는 바코드(`BARCODE_CONFLICT`).
+- 영향: 바코드가 있는 상품은 `BARCODE_CONFLICT` 로 걸리지만, 바코드가 없는 상품은 새 초안이 VALID 로 통과해 제출·승인하면 같은 상품이 한 번 더 등록된다(상품 ID·SKU 가 하나 더 발급). id-map 의 seedProductId → 상품 짝도 둘이 된다.
+- 요청: 업로드 검증에 "이 seed 상품 ID 는 이미 상품 {productId} 로 등록됨" 검사를 넣어 달라. 처리 방식은 백엔드가 정하면 된다 — 예: INVALID 문제 코드(가칭 `SOURCE_KEY_ALREADY_APPLIED`, detail 에 productId)로 표시하거나, 기존 상품의 수정 초안으로 upsert. 문제 코드로 가면 코드 값만 알려 주면 백오피스가 문구를 붙인다. 같은 구조면 콘텐츠 일괄 등록도 함께.
+- 백오피스: 변경 없음(서버 검증 결과를 표시만 한다).

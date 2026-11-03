@@ -49,7 +49,7 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 | 승인함·상세 | `/approvals`, `/approvals/:id` | approval `GET /approvals`, `GET /approvals/{id}`, `POST …/decisions`(APPROVE·REJECT 만) |
 | 카테고리 트리 | `/categories` | product `GET /categories/tree`, `…/filters`, `POST /category-tree-versions` |
 | 상품 등록 | `/products/drafts/new`, `/products/drafts/:id` | `/product-drafts*` → 제출 준비 → 승인 요청 |
-| 상품 일괄 | `/products/import`, `/products/import/:id` | `/product-import-batches*`, id-map 내려받기 |
+| 상품 일괄 | `/products/import`, `/products/import/:id` | `/product-import-batches*`, id-map 내려받기. 유효·오류 수와 "유효 행 제출 준비" 활성은 응답 `drafts[]` 에서 직접 센다(서버 `validCount` 는 업로드 때 값, BR-38) |
 | 상품 조회·판매 상태 | `/products`, `/products/:id` | `GET /products`, `/skus`, `/barcodes`, `POST …/sale-state-changes` + 짝 조회 |
 | 콘텐츠 등록·일괄 | `/contents/drafts/*`, `/contents/import/*` | `/content-drafts*`, 이미지 업로드, `/content-import-batches*` |
 | 가격 | `/prices?sku=` | `GET /prices/{sku}`(PRICE_NOT_SET = 미설정), `/price-versions/{sku}`, PRICE 변경 요청, `POST /price-version-applications` + 짝 조회 |

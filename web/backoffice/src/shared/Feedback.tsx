@@ -43,9 +43,12 @@ export function FailureAlert({ failure }: { readonly failure: PmartFailure }) {
 export function CommandFeedback<V, T>({
   command,
   children,
+  unknown,
 }: {
   readonly command: Command<V, T>;
   readonly children?: (result: T) => ReactNode;
+  /** 결과 불명 표시 조정. 상태를 남기지 않는 명령(로그인)은 본문을 바꾸고 "같은 요청으로 결과 확인"을 뺀다. */
+  readonly unknown?: { readonly body?: string; readonly resend?: boolean };
 }) {
   const { phase } = command;
   switch (phase.kind) {
@@ -64,13 +67,24 @@ export function CommandFeedback<V, T>({
       return <FailureAlert failure={phase.failure} />;
     case 'unknown':
       return (
-        <div role="alert" data-state="unknown" className="alert alert-info flex-col items-start">
-          <span className="font-bold">{m.unknownTitle}</span>
-          <span>{m.unknownBody}</span>
-          {phase.failure.requestId && <span className="text-xs opacity-70">{m.requestId(phase.failure.requestId)}</span>}
-          <button type="button" className="btn btn-sm btn-outline" onClick={() => void command.resend()}>
-            {m.resend}
-          </button>
+        // 좁은 폼(로그인)에서도 길게 늘어지지 않게: 작은 글자, 문의 번호는 줄바꿈 허용, 버튼은 작게.
+        <div
+          role="alert"
+          data-state="unknown"
+          className="alert alert-info alert-soft alert-vertical items-start gap-1 py-3 text-sm sm:alert-horizontal sm:items-center"
+        >
+          <div className="min-w-0 flex-1 space-y-0.5">
+            <p className="font-bold">{m.unknownTitle}</p>
+            <p>{unknown?.body ?? m.unknownBody}</p>
+            {phase.failure.requestId && (
+              <p className="text-xs break-all opacity-70 select-all">{m.requestId(phase.failure.requestId)}</p>
+            )}
+          </div>
+          {(unknown?.resend ?? true) && (
+            <button type="button" className="btn btn-xs btn-outline shrink-0" onClick={() => void command.resend()}>
+              {m.resend}
+            </button>
+          )}
         </div>
       );
   }

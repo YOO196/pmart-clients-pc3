@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
-import { STORAGE_TYPES, type ProductDraft, type ProductDraftInput, type StorageType } from '../../api/models';
+import { type ImportBatch, STORAGE_TYPES, type ProductDraft, type ProductDraftInput, type StorageType } from '../../api/models';
 import { request } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback } from '../../shared/Feedback';
@@ -149,6 +149,17 @@ function downloadJson(name: string, value: unknown) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * 배치의 유효·오류 수를 응답의 행에서 직접 센다. 서버의 `validCount`·`invalidCount` 는 업로드 때 값으로 고정돼
+ * 행을 고쳐 VALID 가 된 뒤에도 "유효 0" 이다(BR-38). 행 목록이 없을 때만 서버 수를 쓴다.
+ */
+export function batchCounts(b: Pick<ImportBatch, 'validCount' | 'invalidCount' | 'drafts'>): { valid: number; invalid: number } {
+  const drafts = b.drafts;
+  if (!drafts) return { valid: b.validCount, invalid: b.invalidCount };
+  const valid = drafts.filter((d) => d.validationState === 'VALID').length;
+  return { valid, invalid: drafts.length - valid };
+}
+
 export function ProductImportPage() {
   const { batchId = '' } = useParams();
   const api = useApi();
@@ -175,9 +186,11 @@ export function ProductImportPage() {
     <section className="space-y-4">
       <h1 className="text-xl font-bold">{m.products.batch(batchId)}</h1>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
-        {(b) => (
+        {(b) => {
+          const counts = batchCounts(b);
+          return (
           <>
-            <p className="text-sm">{`${b.state} · ${m.products.counts(b.productCount, b.validCount, b.invalidCount)}`}</p>
+            <p className="text-sm">{`${b.state} · ${m.products.counts(b.productCount, counts.valid, counts.invalid)}`}</p>
             {(b.drafts ?? []).some((d) => d.state === 'DRAFT' && d.validationState !== 'VALID') && (
               <p className="text-sm opacity-80">{m.products.fillInvalidHint}</p>
             )}
@@ -197,6 +210,12 @@ export function ProductImportPage() {
                       {d.state === 'DRAFT' && d.validationState !== 'VALID' && d.input && (
                         <FillMissing key={`${d.draftId}-${d.version}`} draft={d} batchId={batchId} />
                       )}
+                      {/* VALID 가 된 뒤에도 제출(잠금) 전이면 초안 화면에서 전체를 고칠 수 있다. */}
+                      {d.state === 'DRAFT' && (
+                        <Link className="link text-sm" to={`/products/drafts/${encodeURIComponent(d.draftId)}`}>
+                          {m.products.update}
+                        </Link>
+                      )}
                     </td>
                     <td>{d.resultSkus?.join(', ') ?? ''}</td>
                   </tr>
@@ -208,7 +227,7 @@ export function ProductImportPage() {
                 <button
                   type="button"
                   className="btn btn-sm"
-                  disabled={submit.busy || submit.phase.kind === 'done' || b.validCount === 0}
+                  disabled={submit.busy || submit.phase.kind === 'done' || counts.valid === 0}
                   onClick={() => void submit.run(null)}
                 >
                   {m.products.submitBatch}
@@ -233,7 +252,8 @@ export function ProductImportPage() {
               )}
             </CommandFeedback>
           </>
-        )}
+          );
+        }}
       </QueryState>
       <AnotherUpload key={batchId} />
     </section>
