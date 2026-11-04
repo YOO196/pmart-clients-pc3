@@ -42,7 +42,7 @@
 | BR-32 | 높음 | 고객 | 휴대폰 번호 저장(`POST /me/profile-changes`)이 501. 배송지 받는 분·연락처 자동 채움에 쓸 본인 연락처(가리지 않은 값)·기본 수령정보가 없음 | OPEN(요청 `docs/handoff/2026-10-31-backend-customer-profile-and-refunds.md`) |
 | BR-33 | 중간 | 고객 | 내 취소·반품·환불 목록 경로가 없음(클레임 단건 환불 조회만) | OPEN(같은 요청서 §3) |
 | BR-34 | 높음 | 고객 | 주문서형 결제위젯: 결제 진입 전에 토스 clientKey(·customerKey)를 받을 경로가 없음(지금은 PAY 이후에만) | **RESOLVED**(2026-11-02, 백엔드 회신 `clients-reply-br34-payment-widget-config`·`clients-notice-toss-customer-key`): `GET /payment-widget-config` → {provider, clientKey, customerKey=accountId}. 고객앱 주문서형 결제위젯 반영 |
-| BR-35 | 높음 | 고객 | 주문·초안 품목 `productName`(주문 당시 사본)이 비어 와서 주문 내역에 SKU 가 보임 | OPEN(같은 요청서 §2) |
+| BR-35 | 높음 | 고객 | 주문·초안 품목 `productName`(주문 당시 사본)이 비어 와서 주문 내역에 SKU 가 보임 | **RESOLVED**(회신 `../pmart-backend/docs/handoff/2026-11-02-clients-reply-br35-product-name-snapshot.md`, 초안·주문 `productName`·`optionLabel` 사본). 고객앱 반영 2026-11-02(주문 상세·취소 화면 품목 제목, 이름 없으면 sku) |
 | BR-36 | 중간 | 고객 | 상품 상세 `SaleOption.price` 가 항상 null(계약은 "pricing 사본"). 상세에 가격이 안 보임 | OPEN(요청 `docs/handoff/2026-11-02-backend-product-detail-price.md`). 앱은 `GET /prices?skus=` 로 채워 표시 중 |
 | BR-37 | 중간 | 고객 | 주문이 참조하는 고객 데이터(주소·수령인·연락처)의 주문 시점 불변성 보장 방식과 "주문 당시 배송지" 고객용 조회 경로 | **RESOLVED**(2026-11-02, 백엔드 회신 `clients-reply-br37-order-shipping-snapshot`): 초안 생성 때 사본 고정 → `DraftDelivery.shippingAddress`·`Order.shippingAddress`. `contact.phoneRef` deprecated. 결제 진입 때 계정 재확인(422 `ACCOUNT_NOT_PURCHASABLE`). 고객앱 반영 |
 | BR-38 | 중간 | 백오피스 | 상품 일괄 등록 배치의 `validCount`·`invalidCount` 가 업로드 때 값으로 고정돼 행을 고친 뒤(`PUT /product-drafts/{id}`) 맞지 않음. 유효 0 → 화면이 제출 버튼을 잠갔음 | **RESOLVED**(2026-11-03 회신 `clients-reply-br39-category-zip` §4): 서버가 조회 때 행 기준으로 셈(수정 18:54, LAN 배포 대기). 백오피스 행 기준 집계는 그대로 둠 |
@@ -53,7 +53,7 @@
 | BR-43 | 높음 | 고객 | 장바구니 변경(담기·수량·선택·삭제) 응답에 갱신된 장바구니(`Cart`)가 없어 앱이 매번 `GET /carts/{id}` 를 한 번 더 부름(탭당 왕복 2회) | **RESOLVED**(회신 §4, 19:40 배포): `CartChangeResult.cart`(GET 과 같은 모양). 앱 반영 — 응답의 cart 로 끝냄(왕복 1회), 없으면 옛 경로 |
 | BR-44 | 중간 | 백오피스 | 콘텐츠 일괄 등록: 이미 게시된 콘텐츠를 고쳐 다시 올린 행도 신규와 똑같이 `CREATED` — 초안·승인 행에 신규/기존 게시 갱신 구분(`registration`·기존 게시 버전)이 없음 | OPEN(요청 `docs/handoff/2026-11-04-backend-content-import-registration.md`) |
 | BR-45 | 낮음 | 백오피스 | 승인 상세 `lines[].requestedAmount` 가 금액 없는 행에서 `null` — 계약 Money 는 nullable 아님(생략만 가능). 응답 생략 또는 계약 nullable 로 | OPEN(안내 `docs/handoff/2026-11-04-backend-approval-screen-fixes.md` §2). 백오피스는 null·생략 모두 빈칸 |
-| BR-46 | 중간 | 백오피스 | 업무 도우미(정책 RAG): ai-assistant-service 계약이 3단계 초안 — 절·문서 버전·확정/제안/미결정 구분·문서 열람·GET 출처·질문 목록·응답 유실 복구·진행 상태·장애/권한 구분·게이트웨이 라우트 없음 | OPEN(요청 `docs/handoff/2026-11-04-backend-ai-assistant-contract.md`). 백오피스는 목 모드 화면만, 실서버 미연결 |
+| BR-46 | 중간 | 백오피스 | 업무 도우미(정책 RAG): ai-assistant-service 계약이 3단계 초안 — 절·문서 버전·확정/제안/미결정 구분·문서 열람·GET 출처·질문 목록·응답 유실 복구·진행 상태·장애/권한 구분·게이트웨이 라우트 없음 | **대부분 해소**(백엔드 계약 1.0.0·안내 `../pmart-backend/docs/handoff/2026-11-04-clients-request-ai-assistant.md`, ADR-0036). 남음: 질문 목록·원문 열람(선택)·상태 확인 경로 게이트웨이 공개·**LAN 배포**. 대조 `docs/handoff/2026-11-04-backend-ai-assistant-contract.md` §4. 백오피스는 아직 초안 기준 목 화면 |
 | BR-47 | 높음 | 고객 | 상품 검색 `mfcId` 지정 시 LAN 센터의 전 상품이 미취급(carried=false)으로 빠짐 — `total` 은 뺀 상품 포함("1개"인데 빈 목록), 빈 페이지에 `nextCursor`, 미취급 숨김/구분 정책 확인 | OPEN(요청 `docs/handoff/2026-11-04-backend-search-not-carried.md`). 고객앱은 회신 전 변경 없음 |
 | BR-48 | 중간 | 백오피스 | 카테고리 추가(`/category-tree-additions`·`-uploads`)에 이미 있는 카테고리만 올리면 계약의 422 `NOTHING_TO_ADD` 대신 500 `INTERNAL_ERROR` | OPEN(요청 `docs/handoff/2026-11-04-backend-category-addition-500.md`). 백오피스는 서버 오류 안내 + 문의 번호 |
 

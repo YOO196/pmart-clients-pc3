@@ -32,3 +32,27 @@
 ## 3. 확정 뒤 클라이언트 작업
 - 계약 재생성(`npm run gen:api`) → 생성 클라이언트 + 공통 `pmartFetch`(인증·헤더)·`request()`(실패 분류)로 어댑터를 만들어 `AssistantPort` 에 끼운다. 화면·테스트는 그대로 두고, 목을 확정 계약에 맞춘다.
 - 실서버 확인은 LAN 에서 따로 보고한다.
+
+## 4. 대조 — 백엔드 계약 1.0.0·안내(`../pmart-backend/docs/handoff/2026-11-04-clients-request-ai-assistant.md`, ADR-0036)
+이 요청서를 보내기 전에 백엔드가 계약을 확정해 보냈다. 위 §1 표를 1.0.0 과 맞춰 본 결과:
+
+| # | 요청 | 1.0.0 |
+|---|---|---|
+| 1 | 절·문서 버전·제목 | `section`·`documentVersion`·`effectiveDate`. 제목 필드는 없고 `path`(저장소 상대 경로)·`documentId` — **해소(제목은 path 로)** |
+| 2 | 확정/제안/미결정 | `authority` 6값(CONFIRMED·ADOPTED_DESIGN·PROPOSAL·ASSUMPTION·UNDECIDED·EXTERNAL_REFERENCE) + `lifecycleStatus`·`supersededBy` — **해소(더 세분)** |
+| 3 | 검증된 식별자 | 서버가 검색에 쓰인 청크 메타데이터로 만든다고 명시, 경로는 저장소 상대 — **해소** |
+| 4 | 원문 여는 방법 | 열람 경로 없음. 대신 `excerpt`(청크 전문) — **부분(링크 없음, 발췌로 대신)** |
+| 5 | GET 에 출처 | `GET /{answerId}` 가 같은 `PolicyAnswer` — **해소** |
+| 6 | 질문 목록 | 없음 — **남음** |
+| 7 | 응답 유실 복구 | `GET /policy-questions?requestId=` + 409 INVALID_STATE 면 같은 키로 POST — **해소** |
+| 8 | 진행 상태 | 202 `PROCESSING` + `Retry-After` — **해소** |
+| 9 | 장애 구분 | 503 `DEPENDENCY_UNAVAILABLE`, 422 `CONFIG_REQUIRED`. 상태 확인은 `/actuator/health`(게이트웨이 경유 여부 미기재) — **대부분 해소** |
+| 10 | 권한 | 운영자 토큰만, 403 vs `FORBIDDEN_SCOPE`(1차 정상 경로에선 안 나옴), 저장 답변은 본인+현재 권한 아니면 404 — **해소** |
+| 11 | context 키 | `screen`·`centerId` — **해소** |
+| 12 | 필수 필드 | `answerId`·`requestId`·`state`·`answer`·`citations`·`answerMode`·`retrievalMode`·`askedAt` required — **해소** |
+| 13 | 게이트웨이 | `/api/v1/assistant/**` 선언, **LAN 배포 전**(pmart-config 미반영) — **남음(배포)** |
+| 14 | 본문 형식 | `answer: string`, 기준선은 발췌 텍스트 — **해소(일반 텍스트로 그림)** |
+
+남은 요청: 질문 목록(#6), 원문 열람(#4, 선택), 화면용 상태 확인 경로의 게이트웨이 공개 여부(#9), LAN 배포(#13). → 이 요청서는 그대로 보내지 않고 이 남은 항목만 전달한다.
+
+클라이언트가 바꿀 것(1.0.0 기준): 상태 6값(REALTIME_DATA_REQUIRED·OUT_OF_SCOPE·PROCESSING 추가), 인용 모델(path·authority·lifecycle·implementationEvidence·asOf{snapshotId,sourceRevision,sourceDirty,indexedAt}·excerpt 접기), 기준선 표시(answerMode·retrievalMode), 202 처리(Retry-After 뒤 `?requestId=` 조회), GET 409 INVALID_STATE → 같은 키 POST, 422 CONFIG_REQUIRED 안내, 계약 재생성 후 실서버 어댑터.
