@@ -124,6 +124,7 @@
   "productStorageGuide": "보관 방법",
   "productReturnGuide": "반품 안내",
   "productNotices": "알려드려요",
+  "productDetailInfo": "상세 정보",
   "productNotFound": "판매하지 않는 상품이에요",
   "unitBundle": "묶음 {units}개",
   "@unitBundle": {

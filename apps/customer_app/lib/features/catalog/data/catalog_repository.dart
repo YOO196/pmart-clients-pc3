@@ -339,6 +339,11 @@ List<FilterAttribute> filtersFromContract(sr.GetSearchFilters200Response r) => [
     ),
 ];
 
+List<String> _imageUrlsOf(List<pc.Image> sorted, pc.ImageRoleEnum role) => [
+  for (final i in sorted)
+    if (i.role == role && i.url != null && i.url!.isNotEmpty) i.url!,
+];
+
 ProductDetail productFromContract(pc.ProductContent c, {OptionPrices? prices}) {
   final images = [...?c.images]
     ..sort((a, b) => (a.sortOrder ?? 0).compareTo(b.sortOrder ?? 0));
@@ -346,11 +351,12 @@ ProductDetail productFromContract(pc.ProductContent c, {OptionPrices? prices}) {
   return ProductDetail(
     productId: _required(c.productId, 'ProductContent.productId'),
     name: _required(c.name, 'ProductContent.name'),
-    imageUrls: [
-      if (c.mainImage?.url case final String url) url,
-      for (final i in images)
-        if (i.role != pc.ImageRoleEnum.MAIN && i.url != null) i.url!,
-    ],
+    mainImageUrl:
+        c.mainImage?.url ??
+        images.where((i) => i.role == pc.ImageRoleEnum.MAIN).firstOrNull?.url,
+    // 역할(role)별로 나눈다. 역할이 없는 이미지는 어디에 둘지 모르므로 쓰지 않는다.
+    descriptionImageUrls: _imageUrlsOf(images, pc.ImageRoleEnum.DESCRIPTION),
+    detailImageUrls: _imageUrlsOf(images, pc.ImageRoleEnum.DETAIL),
     description: c.description,
     storageGuide: c.storageGuide,
     returnGuide: c.returnGuide,

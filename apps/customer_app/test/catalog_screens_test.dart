@@ -13,6 +13,28 @@ import 'package:customer_app/features/catalog/domain/catalog.dart';
 
 import 'support/app_harness.dart';
 
+/// 상세설명·상세정보 이미지가 있는 상품 상세.
+final class _WithContentImages extends MockCatalogRepository {
+  _WithContentImages() : super(latency: Duration.zero);
+
+  @override
+  Future<ProductDetail> product(String productId, {String? mfcId}) async {
+    final p = await super.product(productId, mfcId: mfcId);
+    return ProductDetail(
+      productId: p.productId,
+      name: p.name,
+      options: p.options,
+      description: p.description,
+      notices: p.notices,
+      descriptionImageUrls: const [
+        'https://img.test/d0',
+        'https://img.test/d1',
+      ],
+      detailImageUrls: const ['https://img.test/t0'],
+    );
+  }
+}
+
 /// 홈 조회 자체가 실패하는 저장소.
 final class _HomeDown extends MockCatalogRepository {
   _HomeDown() : super(latency: Duration.zero);
@@ -195,6 +217,31 @@ void main() {
   });
 
   group('상품 상세', () {
+    testWidgets('상세설명 이미지를 순서대로, 상세정보 표는 따로 보인다', (t) async {
+      await t.pumpWidget(testApp([], catalog: _WithContentImages()));
+      await t.pumpAndSettle();
+      await tapTile(t, 'P-0006');
+
+      final d0 = find.byKey(const ValueKey('description-image-0'));
+      final d1 = find.byKey(const ValueKey('description-image-1'));
+      final t0 = find.byKey(const ValueKey('detail-image-0'));
+      await t.scrollUntilVisible(t0, 200);
+      expect(d0, findsOneWidget);
+      expect(d1, findsOneWidget);
+      expect(find.text('상세 정보'), findsOneWidget);
+      expect(t.getTopLeft(d0).dy, lessThan(t.getTopLeft(d1).dy));
+      expect(t.getTopLeft(d1).dy, lessThan(t.getTopLeft(t0).dy));
+    });
+
+    testWidgets('이미지가 없으면 상세 정보 칸을 만들지 않는다', (t) async {
+      await t.pumpWidget(testApp([]));
+      await t.pumpAndSettle();
+      await tapTile(t, 'P-0006');
+
+      expect(find.byKey(const ValueKey('description-image-0')), findsNothing);
+      expect(find.text('상세 정보'), findsNothing);
+    });
+
     testWidgets('평점이 없으면 0점이 아니라 "평점 정보 없음"이다', (t) async {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();

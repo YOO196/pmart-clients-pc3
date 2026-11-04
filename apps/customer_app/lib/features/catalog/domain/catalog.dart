@@ -273,7 +273,9 @@ class ProductDetail {
     required this.productId,
     required this.name,
     required this.options,
-    this.imageUrls = const [],
+    this.mainImageUrl,
+    this.descriptionImageUrls = const [],
+    this.detailImageUrls = const [],
     this.description,
     this.storageGuide,
     this.returnGuide,
@@ -284,7 +286,15 @@ class ProductDetail {
 
   final String productId;
   final String name;
-  final List<String> imageUrls;
+
+  /// 대표 이미지(계약 mainImage, 없으면 images 의 MAIN).
+  final String? mainImageUrl;
+
+  /// 상세설명 롱이미지 조각(role DESCRIPTION). sortOrder 순서대로 이어 붙여 보인다.
+  final List<String> descriptionImageUrls;
+
+  /// 상세정보 표 이미지(role DETAIL). sortOrder 순서.
+  final List<String> detailImageUrls;
   final String? description;
   final String? storageGuide;
   final String? returnGuide;

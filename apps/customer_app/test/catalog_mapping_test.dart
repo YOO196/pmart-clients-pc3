@@ -90,6 +90,64 @@ void main() {
   });
 
   group('상품 상세 변환', () {
+    test('이미지를 역할별로 나누고 sortOrder 순서로 둔다', () {
+      String u(String id) => '/api/v1/content-images/$id';
+      final p = productFromContract(
+        pc.ProductContent.fromJson({
+          'productId': 'x',
+          'name': 'x',
+          'mainImage': {'imageId': 'M', 'url': u('M'), 'role': 'MAIN'},
+          'images': [
+            {
+              'imageId': 'D2',
+              'url': u('D2'),
+              'role': 'DESCRIPTION',
+              'sortOrder': 2,
+            },
+            {'imageId': 'T0', 'url': u('T0'), 'role': 'DETAIL', 'sortOrder': 0},
+            {'imageId': 'M', 'url': u('M'), 'role': 'MAIN', 'sortOrder': 0},
+            {
+              'imageId': 'D0',
+              'url': u('D0'),
+              'role': 'DESCRIPTION',
+              'sortOrder': 0,
+            },
+            {
+              'imageId': 'D1',
+              'url': u('D1'),
+              'role': 'DESCRIPTION',
+              'sortOrder': 1,
+            },
+            {'imageId': 'N', 'url': u('N'), 'sortOrder': 0}, // 역할 없음
+          ],
+          'options': const <Object>[],
+        }),
+      );
+      expect(p.mainImageUrl, u('M'));
+      expect(p.descriptionImageUrls, [u('D0'), u('D1'), u('D2')]);
+      expect(p.detailImageUrls, [u('T0')]);
+    });
+
+    test('mainImage 가 없으면 images 의 MAIN 을 대표로 쓴다', () {
+      final p = productFromContract(
+        pc.ProductContent.fromJson({
+          'productId': 'x',
+          'name': 'x',
+          'images': [
+            {
+              'imageId': 'M',
+              'url': '/api/v1/content-images/M',
+              'role': 'MAIN',
+              'sortOrder': 0,
+            },
+          ],
+          'options': const <Object>[],
+        }),
+      );
+      expect(p.mainImageUrl, '/api/v1/content-images/M');
+      expect(p.descriptionImageUrls, isEmpty);
+    });
+
     test('평점 집계가 없으면 null 이다(0점·0건 아님)', () {
       final p = productFromContract(
         pc.ProductContent.fromJson(

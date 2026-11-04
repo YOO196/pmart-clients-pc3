@@ -8,6 +8,7 @@ import '../../../shared/ui_state_of.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
 import '../../cart/presentation/cart_screen.dart' show AddToCartBar;
+import 'widgets/content_image.dart';
 import 'widgets/product_tile_card.dart';
 
 /// SCR-PRODUCT-001·OPTION-001. 가격·가용은 사본이다. 구매 가능 확정은 장바구니·주문서 서버 판정.
@@ -69,7 +70,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Center(child: ProductImage(url: p.imageUrls.firstOrNull, size: 220)),
+        Center(child: ProductImage(url: p.mainImageUrl, size: 220)),
         const SizedBox(height: 16),
         Text(p.name, style: theme.textTheme.headlineSmall),
         const SizedBox(height: 4),
@@ -92,10 +93,16 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           ),
         ],
         Text(l10n.priceNote, style: theme.textTheme.bodySmall),
-        if (p.description case final String d) ...[
+        if (p.description != null || p.descriptionImageUrls.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text(l10n.productDescription, style: theme.textTheme.titleMedium),
-          Text(d),
+          if (p.description case final String d) Text(d),
+          if (p.descriptionImageUrls.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            // 롱이미지 조각은 sortOrder 순서로 간격 없이 이어 붙인다.
+            for (final (i, url) in p.descriptionImageUrls.indexed)
+              ContentImage(key: ValueKey('description-image-$i'), url: url),
+          ],
         ],
         if (p.storageGuide case final String g) ...[
           const SizedBox(height: 16),
@@ -111,6 +118,13 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           const SizedBox(height: 16),
           Text(l10n.productNotices, style: theme.textTheme.titleMedium),
           for (final n in p.notices) Text('· $n'),
+        ],
+        if (p.detailImageUrls.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(l10n.productDetailInfo, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          for (final (i, url) in p.detailImageUrls.indexed)
+            ContentImage(key: ValueKey('detail-image-$i'), url: url),
         ],
       ],
     );
