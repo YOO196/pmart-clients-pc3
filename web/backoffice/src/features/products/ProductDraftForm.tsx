@@ -9,6 +9,7 @@ import { request } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
 import { FailureAlert } from '../../shared/Feedback';
 import { messages as m } from '../../shared/messages';
+import { MultiSelectDropdown } from '../../shared/MultiSelectDropdown';
 import { parseProductJson, ProductJsonError, type SkuJson } from './productJson';
 
 interface SkuRow {
@@ -283,28 +284,23 @@ export function ProductDraftForm({
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-sm">
-          {m.products.categories}
-          <select
-            multiple
-            size={5}
-            className="select select-sm w-full"
+        <div className="flex flex-col gap-1">
+          <MultiSelectDropdown
+            label={m.products.categories}
+            options={nodes.map((n) => ({
+              value: n.categoryId,
+              label: n.categoryId === v.primaryCategoryId ? `${n.path ?? n.name} (${m.products.primaryTag})` : (n.path ?? n.name),
+              // 대표 카테고리는 자동으로 들어가므로 따로 고르지 않는다
+              disabled: n.categoryId === v.primaryCategoryId,
+            }))}
             value={v.categoryIds}
+            onChange={(next) => set('categoryIds', next)}
+            placeholder={tree.isPending ? m.loading : m.products.categoriesPick}
+            selectedText={m.products.categoriesSelected}
             disabled={tree.isPending}
-            onChange={(e) =>
-              set(
-                'categoryIds',
-                [...e.target.selectedOptions].map((o) => o.value),
-              )
-            }
-          >
-            {nodes.map((n) => (
-              <option key={n.categoryId} value={n.categoryId} disabled={n.categoryId === v.primaryCategoryId}>
-                {n.categoryId === v.primaryCategoryId ? `${n.path ?? n.name} (${m.products.primaryTag})` : (n.path ?? n.name)}
-              </option>
-            ))}
-          </select>
-        </label>
+          />
+          <span className="text-xs opacity-70">{m.products.categoriesHint}</span>
+        </div>
         {tree.error instanceof PmartFailure && (
           <div className="md:col-span-2">
             <FailureAlert failure={tree.error} />

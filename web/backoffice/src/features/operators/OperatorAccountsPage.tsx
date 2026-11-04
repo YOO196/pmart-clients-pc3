@@ -1,7 +1,7 @@
 // 운영자 계정 관리(OPERATOR_ADMIN, ADR-0018 §4): 목록·생성·역할/센터/상태 수정(X-Expected-Version)·비밀번호 초기화.
 // 권한 판정은 서버(403 → FORBIDDEN 화면). 바뀐 역할은 다음 로그인·토큰 갱신부터 반영된다.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import type { OperatorAccount } from '../../api/auth';
@@ -12,6 +12,7 @@ import { useApi } from '../../app/ApiContext';
 import { CommandFeedback, FailureAlert } from '../../shared/Feedback';
 import { formatSeoul } from '../../shared/format';
 import { messages as m } from '../../shared/messages';
+import { MultiSelectDropdown } from '../../shared/MultiSelectDropdown';
 import { QueryState } from '../../shared/QueryState';
 import { toUiState } from '../../shared/toUiState';
 import { useCommand } from '../../shared/useCommand';
@@ -30,7 +31,6 @@ const KEY = ['auth', 'operators'];
  */
 function CenterPicker({ value, onChange }: { readonly value: readonly string[]; readonly onChange: (next: string[]) => void }) {
   const api = useApi();
-  const selectId = useId();
   const query = useQuery({
     queryKey: ['center', 'list'],
     queryFn: () => request('GET', api.center.GET('/centers', { params: { query: { size: 100 } } })),
@@ -41,31 +41,25 @@ function CenterPicker({ value, onChange }: { readonly value: readonly string[]; 
     const c = centers.find((x) => x.centerId === id);
     return c ? `${c.name ?? id} · ${id}` : m.operators.centersUnknown(id);
   };
+  const options = [
+    // 목록에 없는 값(예전 데이터)도 선택된 채로 보인다
+    ...value.filter((id) => !known.has(id)).map((id) => ({ value: id, label: m.operators.centersUnknown(id) })),
+    ...centers.map((c) => ({
+      value: c.centerId ?? '',
+      label: `${c.name ?? m.none} · ${c.centerId ?? ''}${c.type ? ` · ${c.type}` : ''}${c.state && c.state !== 'ACTIVE' ? ` · ${c.state}` : ''}`,
+    })),
+  ];
   return (
-    <div className="flex flex-col gap-1 text-sm">
-      <label htmlFor={selectId}>{m.operators.centers}</label>
-      <select
-        id={selectId}
-        multiple
-        size={4}
-        className="select select-sm w-72"
-        value={[...value]}
+    <div className="flex w-72 flex-col gap-1 text-sm">
+      <MultiSelectDropdown
+        label={m.operators.centers}
+        options={options}
+        value={value}
+        onChange={onChange}
+        placeholder={query.isPending ? m.loading : m.operators.centersPick}
+        selectedText={m.operators.centersSelected}
         disabled={query.isPending}
-        onChange={(e) => onChange([...e.target.selectedOptions].map((o) => o.value))}
-      >
-        {/* 목록에 없는 값(예전 데이터)도 선택된 채로 보인다 */}
-        {value.filter((id) => !known.has(id)).map((id) => (
-          <option key={id} value={id}>
-            {m.operators.centersUnknown(id)}
-          </option>
-        ))}
-        {centers.map((c) => (
-          <option key={c.centerId} value={c.centerId ?? ''}>
-            {`${c.name ?? m.none} · ${c.centerId ?? ''}${c.type ? ` · ${c.type}` : ''}${c.state && c.state !== 'ACTIVE' ? ` · ${c.state}` : ''}`}
-          </option>
-        ))}
-      </select>
-      <span className="text-xs opacity-70">{query.isPending ? m.loading : m.operators.centersHint}</span>
+      />
       {value.length > 0 && (
         <ul className="flex flex-wrap gap-1" aria-label={m.operators.centers}>
           {value.map((id) => (

@@ -18,13 +18,16 @@ describe('상품 등록 폼', () => {
     await user.selectOptions(primary, 'p01-c01');
     // 대표 카테고리 필터(목: 원산지 국산/수입)
     await user.click(await screen.findByLabelText('원산지: 국산'));
-    await user.selectOptions(screen.getByLabelText(/^노출 카테고리\(/), ['p01-c01-l01', 'p03-c01']);
+    await user.click(screen.getByRole('button', { name: '노출 카테고리' }));
+    await user.click(screen.getByRole('checkbox', { name: '과일·채소 > 과일 > 사과·배' }));
+    await user.click(screen.getByRole('checkbox', { name: '국·탕·찌개 > 국·국밥' }));
     // 대표 카테고리는 노출 목록에 자동으로 들어가 맨 앞에 "대표"로 보이고 뺄 수 없다.
     const chosen = within(screen.getByRole('list', { name: '고른 노출 카테고리' })).getAllByRole('listitem');
     expect(chosen).toHaveLength(3);
     expect(chosen[0]).toHaveTextContent('과일·채소 > 과일 · 대표');
     expect(within(chosen[0]!).queryByRole('button')).toBeNull();
-    expect(screen.getByRole('option', { name: '과일·채소 > 과일 (대표)' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: '과일·채소 > 과일 (대표)' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '노출 카테고리' })).toHaveTextContent('노출 카테고리 2개 선택');
     await user.click(screen.getByRole('button', { name: '국·탕·찌개 > 국·국밥 빼기' }));
 
     await user.type(screen.getByLabelText('관리용 명칭'), '사과');

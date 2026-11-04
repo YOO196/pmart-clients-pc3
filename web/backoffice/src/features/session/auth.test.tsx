@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -221,9 +221,16 @@ describe('운영자 계정 관리', () => {
     await user.type(screen.getByLabelText('초기 비밀번호'), 'initial-pass-1');
     await user.type(screen.getAllByLabelText('역할(쉼표 구분)')[0]!, 'MD');
     // 센터는 center-master 목록에서 고른다(쉼표 입력 아님).
-    const centers = screen.getAllByLabelText('센터(여러 개 선택)')[0]!;
-    await within(centers).findByRole('option', { name: '부산진구 MFC · MFC-BSN-01 · MFC' });
-    await user.selectOptions(centers, ['MFC-BSN-01', 'CDC01']);
+    // 닫힌 드롭다운을 열고 체크박스로 여러 개 고른다.
+    const centers = screen.getAllByRole('button', { name: '센터' })[0]!;
+    await waitFor(() => expect(centers).toBeEnabled());
+    expect(centers).toHaveTextContent('센터를 고르세요');
+    await user.click(centers);
+    await user.click(await screen.findByRole('checkbox', { name: '부산진구 MFC · MFC-BSN-01 · MFC' }));
+    await user.click(screen.getByRole('checkbox', { name: /CDC01/ }));
+    expect(centers).toHaveTextContent('센터 2개 선택');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('checkbox', { name: /CDC01/ })).toBeNull();
     await user.click(screen.getByRole('button', { name: '계정 만들기' }));
 
     expect(await screen.findByText(/계정 md2 를 만들었어요/)).toBeInTheDocument();
