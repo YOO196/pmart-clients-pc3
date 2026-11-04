@@ -1,9 +1,12 @@
 import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
+import { API_BASE } from '../../api/client';
 import { db } from '../../mocks/db';
 import { renderAt } from '../../test/render';
+import { server } from '../../test/server';
 
 const jsonFile = (obj: unknown) => new File([JSON.stringify(obj)], 'categories.json', { type: 'application/json' });
 const upload = (input: HTMLElement, file: File) => fireEvent.change(input, { target: { files: [file] } });
@@ -65,6 +68,32 @@ describe('카테고리 트리 — 기준파일(seed-v1) 카테고리 추가', ()
 
     expect(await screen.findByRole('status')).toHaveTextContent('추가할 카테고리가 없어요');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('서버가 500 INTERNAL_ERROR 를 주면 "거절됐어요"·코드 대신 서버 오류 안내와 문의 번호를 보인다(BR-48)', async () => {
+    server.use(
+      http.post(`${API_BASE}/category-tree-additions`, () =>
+        HttpResponse.json(
+          { type: 'about:blank', status: 500, code: 'INTERNAL_ERROR', retryable: false, traceId: 'trace-500' },
+          { status: 500, headers: { 'content-type': 'application/problem+json', 'x-request-id': 'req-500' } },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAt('/categories');
+    await screen.findByText(/발효 버전 1/);
+
+    upload(
+      screen.getByLabelText('categories.json 또는 seed-v1 zip'),
+      jsonFile(seedCategories([{ ids: ['p01', 'p01-c01'], path: ['과일·채소', '과일'] }])),
+    );
+    await user.click(screen.getByRole('button', { name: '없는 카테고리만 추가' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('서버가 카테고리 추가를 처리하지 못했어요');
+    expect(alert).toHaveTextContent('req-500');
+    expect(alert).not.toHaveTextContent('요청이 거절됐어요');
+    expect(alert).not.toHaveTextContent('INTERNAL_ERROR');
   });
 
   it('형식이 아니면(categories 배열 없음) 보내지 않고 안내한다', async () => {

@@ -55,6 +55,7 @@
 | BR-45 | 낮음 | 백오피스 | 승인 상세 `lines[].requestedAmount` 가 금액 없는 행에서 `null` — 계약 Money 는 nullable 아님(생략만 가능). 응답 생략 또는 계약 nullable 로 | OPEN(안내 `docs/handoff/2026-11-04-backend-approval-screen-fixes.md` §2). 백오피스는 null·생략 모두 빈칸 |
 | BR-46 | 중간 | 백오피스 | 업무 도우미(정책 RAG): ai-assistant-service 계약이 3단계 초안 — 절·문서 버전·확정/제안/미결정 구분·문서 열람·GET 출처·질문 목록·응답 유실 복구·진행 상태·장애/권한 구분·게이트웨이 라우트 없음 | OPEN(요청 `docs/handoff/2026-11-04-backend-ai-assistant-contract.md`). 백오피스는 목 모드 화면만, 실서버 미연결 |
 | BR-47 | 높음 | 고객 | 상품 검색 `mfcId` 지정 시 LAN 센터의 전 상품이 미취급(carried=false)으로 빠짐 — `total` 은 뺀 상품 포함("1개"인데 빈 목록), 빈 페이지에 `nextCursor`, 미취급 숨김/구분 정책 확인 | OPEN(요청 `docs/handoff/2026-11-04-backend-search-not-carried.md`). 고객앱은 회신 전 변경 없음 |
+| BR-48 | 중간 | 백오피스 | 카테고리 추가(`/category-tree-additions`·`-uploads`)에 이미 있는 카테고리만 올리면 계약의 422 `NOTHING_TO_ADD` 대신 500 `INTERNAL_ERROR` | OPEN(요청 `docs/handoff/2026-11-04-backend-category-addition-500.md`). 백오피스는 서버 오류 안내 + 문의 번호 |
 
 ---
 
@@ -308,3 +309,8 @@
 - 영향: 고객앱 검색이 "1개"와 "검색 결과가 없어요"를 함께 보인다. 빈 페이지 뒤에 더 있는지 알 수 없다.
 - 요청: ① 센터 취급 데이터 확인 ② total 을 뺀 뒤 기준으로(또는 의미 명시) ③ 빈 페이지+커서 없애거나 계속 조회 규칙 명시 ④ 미취급 숨김/구분 정책 확정(Commerce §3627).
 - 고객앱: 회신 전 변경 없음.
+
+## BR-48 카테고리 추가 — 이미 있는 카테고리만 올리면 500 (백오피스)
+- 현황(LAN 2026-11-04): 계약·코드는 422 `NOTHING_TO_ADD` 인데 응답이 500 `INTERNAL_ERROR`.
+- 요청: 원인 확인(문의 번호는 사용자가 전달), 계약대로 422.
+- 백오피스: 이 화면에서 `INTERNAL_ERROR` 면 서버 오류 안내 + 문의 번호. 전역 `INTERNAL_ERROR` 문구 추가.

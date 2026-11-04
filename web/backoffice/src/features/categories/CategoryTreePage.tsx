@@ -232,6 +232,11 @@ function AdditionUpload() {
   });
   const nothingToAdd = create.phase.kind === 'rejected' && create.phase.failure instanceof ProblemFailure && create.phase.failure.problem.code === 'NOTHING_TO_ADD';
   const conflict = create.phase.kind === 'rejected' && create.phase.failure instanceof ProblemFailure && create.phase.failure.problem.code === 'CATEGORY_CONFLICT';
+  // 이미 있는 카테고리만 올리면 계약상 422 NOTHING_TO_ADD 인데 LAN 서버가 500 INTERNAL_ERROR 를 준다(BR-48). 원인 단정 없이 서버 오류로 안내한다.
+  const serverError =
+    create.phase.kind === 'rejected' && create.phase.failure instanceof ProblemFailure && create.phase.failure.problem.code === 'INTERNAL_ERROR'
+      ? create.phase.failure
+      : null;
 
   const onSubmit = async () => {
     if (!file) return;
@@ -280,6 +285,11 @@ function AdditionUpload() {
         <p role="alert" className="alert alert-error text-sm">
           {m.categories.additionConflict}
         </p>
+      ) : serverError ? (
+        <div role="alert" data-code="INTERNAL_ERROR" className="alert alert-warning flex-col items-start text-sm">
+          <span>{m.categories.additionServerError}</span>
+          {serverError.requestId && <span className="text-xs opacity-70 select-all">{m.requestId(serverError.requestId)}</span>}
+        </div>
       ) : (
         <CommandFeedback command={create}>
           {(v) => {

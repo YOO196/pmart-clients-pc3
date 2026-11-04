@@ -189,6 +189,8 @@ export const messages = {
     additionAdded: (n: number) => `새로 더한 카테고리 ${n}개`,
     additionSkipped: (n: number) => `id 가 없어 건너뛴 경로 ${n}개(묶음에서 매핑 안 됨)`,
     additionNothing: '추가할 카테고리가 없어요(모두 이미 있어요). 바로 상품 일괄 등록으로 넘어가면 돼요.',
+    additionServerError:
+      '서버가 카테고리 추가를 처리하지 못했어요(서버 오류). 위 트리에 올리려던 카테고리가 이미 모두 있다면 바로 상품 일괄 등록으로 넘어가도 돼요. 아래 문의 번호를 백엔드에 알려 주세요.',
     additionConflict: '같은 id 가 다른 이름으로 있거나 같은 경로가 다른 id 로 있어요. 묶음의 categories.json 을 확인해 주세요.',
     additionStale: (base: number, current: number) =>
       `이 초안은 발효 버전 ${base} 기준인데 지금 발효 버전은 ${current} 이에요. 다시 만들어 주세요.`,
@@ -508,6 +510,7 @@ export const messages = {
     DEPENDENCY_UNAVAILABLE: '연결된 서비스에 닿지 못했어요. 잠시 후 다시 해 주세요.',
     RATE_LIMITED: '요청이 많아요. 잠시 후 다시 해 주세요.',
     COMMAND_REJECTED: '요청이 거절됐어요.',
+    INTERNAL_ERROR: '서버에서 처리하지 못했어요(서버 오류). 아래 문의 번호를 백엔드에 알려 주세요.',
     LOGIN_FAILED: '아이디 또는 비밀번호가 맞지 않아요.',
     ACCOUNT_LOCKED: '로그인 실패가 이어져 계정이 잠겼어요. 잠시 뒤 다시 하거나 관리자에게 비밀번호 초기화를 요청해 주세요.',
     PASSWORD_POLICY: '비밀번호 규칙에 맞지 않아요(10자 이상, 아이디와 다르게).',
