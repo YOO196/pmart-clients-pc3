@@ -5,12 +5,13 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { commandParams } from '../../api/command';
 import { request } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
-import { CommandFeedback, reasonText } from '../../shared/Feedback';
+import { CommandFeedback } from '../../shared/Feedback';
 import { messages as m } from '../../shared/messages';
 import { QueryState } from '../../shared/QueryState';
 import { toUiState } from '../../shared/toUiState';
 import { useCommand } from '../../shared/useCommand';
 import { BatchApprovals, multipart, ZipUpload } from '../products/ProductImportPage';
+import { type ImportItem, rowStatus, type RowStatus, rowSummary } from './importRowStatus';
 
 export function NewContentImportPage() {
   const api = useApi();
@@ -61,25 +62,42 @@ export function ContentImportPage() {
         {(b) => (
           <>
             <p className="text-sm">{`${b.state} · ${b.productCount}`}</p>
+            <p role="status" data-testid="row-summary" className="text-sm">
+              {rowSummary(b.items ?? [])}
+            </p>
             <table className="table table-sm bg-base-100">
+              <thead>
+                <tr>
+                  <th>{m.contents.rowHead.draft}</th>
+                  <th>{m.contents.rowHead.sourceKey}</th>
+                  <th>{m.contents.rowHead.outcome}</th>
+                  <th>{m.contents.rowHead.name}</th>
+                  <th>{m.contents.rowHead.status}</th>
+                </tr>
+              </thead>
               <tbody>
-                {(b.items ?? []).map((it, i) => (
-                  <tr key={it.draftId ?? i}>
-                    <td>
-                      {it.draftId ? (
-                        <Link className="link" to={`/contents/drafts/${encodeURIComponent(it.draftId)}`}>
-                          {it.draftId}
-                        </Link>
-                      ) : (
-                        m.none
-                      )}
-                    </td>
-                    <td>{it.sourceKey ?? m.none}</td>
-                    <td>{it.outcome ? m.contents.outcome[it.outcome] : m.none}</td>
-                    <td>{it.draft?.input?.name ?? m.none}</td>
-                    <td>{it.draft?.submittable ? m.contents.submittable : (it.draft?.problems ?? []).map((p) => reasonText(p.code)).join(', ')}</td>
-                  </tr>
-                ))}
+                {(b.items ?? []).map((it, i) => {
+                  const st = rowStatus(it);
+                  return (
+                    <tr key={it.draftId ?? i} data-row-kind={st.kind}>
+                      <td>
+                        {it.draftId ? (
+                          <Link className="link" to={`/contents/drafts/${encodeURIComponent(it.draftId)}`}>
+                            {it.draftId}
+                          </Link>
+                        ) : (
+                          m.none
+                        )}
+                      </td>
+                      <td>{it.sourceKey ?? m.none}</td>
+                      <td>{it.outcome ? m.contents.outcome[it.outcome] : m.none}</td>
+                      <td>{it.draft?.input?.name ?? m.none}</td>
+                      <td>
+                        <RowStatusView status={st} />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
             {b.state === 'UPLOADED' && (
@@ -93,11 +111,7 @@ export function ContentImportPage() {
               </button>
             )}
             <CommandFeedback command={submit}>
-              {(r) =>
-                (r.excludedDraftIds?.length ?? 0) > 0 ? (
-                  <p className="text-sm">{`${m.products.excluded}: ${(r.excludedDraftIds ?? []).join(', ')}`}</p>
-                ) : null
-              }
+              {(r) => <ExcludedList ids={r.excludedDraftIds ?? []} items={b.items ?? []} />}
             </CommandFeedback>
             {b.state !== 'UPLOADED' && (
               <BatchApprovals targetRef={`contentImportBatch:${batchId}`} pending={b.pendingSubmission?.approvalRequest} />
@@ -106,5 +120,50 @@ export function ContentImportPage() {
         )}
       </QueryState>
     </section>
+  );
+}
+
+const KIND_CLASS: Record<RowStatus['kind'], string> = {
+  ready: 'text-success',
+  problems: 'text-error',
+  rejected: 'text-error',
+  none: 'text-error',
+  published: 'opacity-70',
+  locked: 'text-warning',
+};
+
+function RowStatusView({ status }: { readonly status: RowStatus }) {
+  return (
+    <div className="text-sm">
+      <span className={KIND_CLASS[status.kind]}>{status.text}</span>
+      {status.reasons.length > 0 && (
+        <ul className="list-disc pl-5">
+          {status.reasons.map((r, i) => (
+            <li key={`${r}-${i}`}>{r}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** 제출 준비에서 빠진 초안을 ID 만이 아니라 사유와 함께 보인다(사유는 배치 행의 서버 값). */
+function ExcludedList({ ids, items }: { readonly ids: readonly string[]; readonly items: readonly ImportItem[] }) {
+  if (ids.length === 0) return null;
+  return (
+    <div className="space-y-1 text-sm" aria-label={m.contents.excludedTitle(ids.length)}>
+      <p className="font-bold">{m.contents.excludedTitle(ids.length)}</p>
+      <ul className="list-disc pl-5">
+        {ids.map((id) => {
+          const it = items.find((x) => x.draftId === id);
+          const st = it ? rowStatus(it) : null;
+          return (
+            <li key={id}>
+              {`${id}${it?.sourceKey ? ` (${it.sourceKey})` : ''}: ${st ? [st.text, ...st.reasons].join(' · ') : m.none}`}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

@@ -8,7 +8,7 @@ import { PmartFailure } from '../../api/failure';
 import { type ApprovalRequestBody, type ImportBatch, STORAGE_TYPES, type ProductDraft, type ProductDraftInput, type StorageType } from '../../api/models';
 import { request } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
-import { CommandFeedback, FailureAlert } from '../../shared/Feedback';
+import { CommandFeedback, FailureAlert, reasonText } from '../../shared/Feedback';
 import { messages as m } from '../../shared/messages';
 import { QueryState } from '../../shared/QueryState';
 import { toUiState } from '../../shared/toUiState';
@@ -331,7 +331,19 @@ export function ProductImportPage() {
             <CommandFeedback command={submit}>
               {(r) =>
                 (r.excludedDraftIds?.length ?? 0) > 0 ? (
-                  <p className="text-sm">{`${m.products.excluded}: ${(r.excludedDraftIds ?? []).join(', ')}`}</p>
+                  // 빠진 초안은 ID 와 함께 배치 행의 서버 사유(검증 상태·problems)를 보인다.
+                  <div className="space-y-1 text-sm" aria-label={m.products.excluded}>
+                    <p className="font-bold">{`${m.products.excluded} ${r.excludedDraftIds?.length ?? 0}`}</p>
+                    <ul className="list-disc pl-5">
+                      {(r.excludedDraftIds ?? []).map((id) => {
+                        const d = (b.drafts ?? []).find((x) => x.draftId === id);
+                        const why = d
+                          ? [`${d.state} · ${d.validationState}`, ...(d.problems ?? []).map((p) => `${reasonText(p.code)}${p.field ? ` (${p.field})` : ''}`)].join(' · ')
+                          : m.none;
+                        return <li key={id}>{`${id}${d?.sourceKey ? ` (${d.sourceKey})` : ''}: ${why}`}</li>;
+                      })}
+                    </ul>
+                  </div>
                 ) : null
               }
             </CommandFeedback>

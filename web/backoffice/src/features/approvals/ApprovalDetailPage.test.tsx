@@ -29,6 +29,45 @@ describe('승인 상세 (목 모드, MSW)', () => {
     expect(screen.getByRole('button', { name: '승인' })).toBeInTheDocument();
   });
 
+  it('재고 승인 행의 숫자는 "원"이 아니라 수량(개)으로, 가격 승인만 원으로 보인다', async () => {
+    const detail = (id: string, type: string, lines: unknown[]) => ({
+      approvalId: id,
+      type,
+      requesterId: 'OP-someone-else',
+      reviewState: 'REVIEW_PENDING',
+      executionState: 'NOT_REQUESTED',
+      version: 1,
+      lines,
+      decisions: [],
+    });
+    server.use(
+      http.get(`${API_BASE}/approvals/AP-stock`, () =>
+        HttpResponse.json(
+          detail('AP-stock', 'INITIAL_STOCK', [
+            { lineKey: 'L-1', requestedAmount: 10, attributes: { mfcId: 'MFC-BSN-01', sku: 'E-00000001', qty: 10 } },
+            { lineKey: 'L-2', requestedQty: 1200, attributes: { mfcId: 'MFC-BSN-01', sku: 'E-00000002' } },
+          ]),
+        ),
+      ),
+      http.get(`${API_BASE}/approvals/AP-price`, () =>
+        HttpResponse.json(detail('AP-price', 'PRICE', [{ lineKey: 'E-00000002', requestedAmount: 3900, attributes: { basePrice: 3900 } }])),
+      ),
+    );
+    const view = render(<App memory initialPath="/approvals/AP-stock" initialToken={as.md} />);
+    expect(await screen.findByText('L-1')).toBeInTheDocument();
+    const qty = screen.getAllByTestId('line-qty').map((e) => e.textContent);
+    const amount = screen.getAllByTestId('line-amount').map((e) => e.textContent);
+    expect(qty).toEqual(['10개', '1,200개']);
+    expect(amount).toEqual(['', '']);
+    expect(screen.queryByText(/원$/)).toBeNull();
+    view.unmount();
+
+    render(<App memory initialPath="/approvals/AP-price" initialToken={as.md} />);
+    expect(await screen.findByText('E-00000002')).toBeInTheDocument();
+    expect(screen.getByTestId('line-amount')).toHaveTextContent('3,900원');
+    expect(screen.getByTestId('line-qty')).toHaveTextContent('');
+  });
+
   it('승인 뒤 반영이 같은 상태로 머물면 "확인 중"을 끝내고 다시 확인 안내를 보인다', async () => {
     let decided = false;
     const detail = () => ({

@@ -6,7 +6,7 @@ import { useParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
 import { CommandRejectedFailure, UnknownResultFailure } from '../../api/failure';
-import type { ApprovalDetail, ExecutionState, ReviewState, SupportedDecision } from '../../api/models';
+import type { ApprovalDetail, ApprovalLine, ExecutionState, ReviewState, SupportedDecision } from '../../api/models';
 import { request } from '../../api/pmartFetch';
 import { pollConfig, pollUntil } from '../../api/poll';
 import { useApi } from '../../app/ApiContext';
@@ -55,6 +55,26 @@ function PriceLineAttributes({ attributes }: { readonly attributes: Record<strin
       {`${name} · ${amount(attributes['previousPrice'])} → ${amount(attributes['basePrice'])}${changeName ? ` · ${changeName}` : ''}`}
     </p>
   );
+}
+
+type Line = ApprovalLine;
+
+/** 금액(원)으로 읽는 승인 유형. 그 밖(재고·상품·콘텐츠 등)의 숫자는 돈이 아니므로 "원"을 붙이지 않는다. */
+const MONEY_TYPES: ReadonlySet<string> = new Set(['PRICE', 'REFUND_CLAIM']);
+const isCount = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+
+/** 수량: 계약 requestedQty, 없으면 행 attributes.qty(초기 보유·재고 행). 없으면 빈칸(0 으로 채우지 않는다). */
+function lineQtyText(l: Line): string {
+  const q = isCount(l.requestedQty) ? l.requestedQty : isCount(l.attributes?.['qty']) ? l.attributes['qty'] : null;
+  return q === null ? '' : m.approvals.qtyUnit(q);
+}
+
+/** 금액: 금액 유형만 원으로. 다른 유형에 숫자가 오면 단위 없이 그대로(돈으로 단정하지 않음). 금액 없는 행은 서버가 null 로 준다. */
+function lineAmountText(type: string | undefined, l: Line): string {
+  const v = l.requestedAmount;
+  if (v === undefined || v === null) return '';
+  if (type && MONEY_TYPES.has(type)) return formatKrw(v);
+  return lineQtyText(l) === '' ? String(v) : '';
 }
 
 export function ApprovalDetailPage() {
@@ -154,12 +174,20 @@ export function ApprovalDetailPage() {
 
               <h2 className="font-bold">{m.approvals.lines}</h2>
               <table className="table table-sm bg-base-100">
+                <thead>
+                  <tr>
+                    <th>{m.approvals.lineHead.key}</th>
+                    <th>{m.approvals.lineHead.qty}</th>
+                    <th>{m.approvals.lineHead.amount}</th>
+                    <th>{m.approvals.lineHead.detail}</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {(a.lines ?? []).map((l) => (
                     <tr key={l.lineKey}>
                       <td>{l.lineKey}</td>
-                      <td>{/* 금액 없는 행(상품·콘텐츠 등)은 서버가 null 로 준다 */}
-                        {l.requestedAmount === undefined || l.requestedAmount === null ? '' : formatKrw(l.requestedAmount)}</td>
+                      <td data-testid="line-qty">{lineQtyText(l)}</td>
+                      <td data-testid="line-amount">{lineAmountText(a.type, l)}</td>
                       <td>
                         {/* 가격 일괄 등록 행(백엔드 안내 2026-11-03 §1-5): 승인자가 이전 → 새 가격·구분·상품명을 바로 본다 */}
                         <PriceLineAttributes attributes={l.attributes} />

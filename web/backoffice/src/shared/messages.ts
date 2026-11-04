@@ -128,6 +128,8 @@ export const messages = {
     filterAll: '전체',
     detailTitle: '승인 상세',
     lines: '승인 행',
+    lineHead: { key: '행', qty: '수량', amount: '금액', detail: '내용' } as const,
+    qtyUnit: (n: number) => `${n.toLocaleString('ko-KR')}개`,
     decisions: '결정 이력',
     receipts: '반영 확인',
     approve: '승인',
@@ -338,6 +340,21 @@ export const messages = {
     importTitle: '콘텐츠 일괄 등록(seed-v1)',
     published: '게시된 콘텐츠',
     outcome: { CREATED: '새로 만듦', UPDATED: '갱신', UNCHANGED: '변경 없음', LOCKED: '잠김(제출됨)' } as const,
+    // 일괄 등록 행의 "제출 여부·사유". 서버 값(초안 상태·submittable·problems·outcome)만으로 고른다.
+    rowHead: { draft: '초안', sourceKey: '원천 키', outcome: '업로드 결과', name: '상품명', status: '제출 여부·사유' } as const,
+    rowStatus: {
+      ready: '제출 가능',
+      readySame: '제출 가능(이전 업로드와 같은 초안)',
+      problems: '고쳐야 제출할 수 있어요',
+      published: '이미 게시된 내용과 같아 제출하지 않아요',
+      lockedOther: '다른 제출로 승인 대기 중이라 이번에 바꾸지 않아요',
+      submitted: '승인 대기 중',
+      rejected: '반려됐어요',
+      noDraft: '초안 정보가 없어요',
+    } as const,
+    rowSummary: (ready: number, published: number, locked: number, problems: number) =>
+      `제출 가능 ${ready} · 이미 게시됨 ${published} · 승인 대기 ${locked} · 고칠 것 있음 ${problems}`,
+    excludedTitle: (n: number) => `제출에서 빠진 초안 ${n}개`,
   },
 
   prices: {
