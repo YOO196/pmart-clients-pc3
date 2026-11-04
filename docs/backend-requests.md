@@ -54,6 +54,7 @@
 | BR-44 | 중간 | 백오피스 | 콘텐츠 일괄 등록: 이미 게시된 콘텐츠를 고쳐 다시 올린 행도 신규와 똑같이 `CREATED` — 초안·승인 행에 신규/기존 게시 갱신 구분(`registration`·기존 게시 버전)이 없음 | OPEN(요청 `docs/handoff/2026-11-04-backend-content-import-registration.md`) |
 | BR-45 | 낮음 | 백오피스 | 승인 상세 `lines[].requestedAmount` 가 금액 없는 행에서 `null` — 계약 Money 는 nullable 아님(생략만 가능). 응답 생략 또는 계약 nullable 로 | OPEN(안내 `docs/handoff/2026-11-04-backend-approval-screen-fixes.md` §2). 백오피스는 null·생략 모두 빈칸 |
 | BR-46 | 중간 | 백오피스 | 업무 도우미(정책 RAG): ai-assistant-service 계약이 3단계 초안 — 절·문서 버전·확정/제안/미결정 구분·문서 열람·GET 출처·질문 목록·응답 유실 복구·진행 상태·장애/권한 구분·게이트웨이 라우트 없음 | OPEN(요청 `docs/handoff/2026-11-04-backend-ai-assistant-contract.md`). 백오피스는 목 모드 화면만, 실서버 미연결 |
+| BR-47 | 높음 | 고객 | 상품 검색 `mfcId` 지정 시 LAN 센터의 전 상품이 미취급(carried=false)으로 빠짐 — `total` 은 뺀 상품 포함("1개"인데 빈 목록), 빈 페이지에 `nextCursor`, 미취급 숨김/구분 정책 확인 | OPEN(요청 `docs/handoff/2026-11-04-backend-search-not-carried.md`). 고객앱은 회신 전 변경 없음 |
 
 ---
 
@@ -301,3 +302,9 @@
 - 영향: 절·문서 버전·확정/제안/미결정 구분·문서 열람·질문 목록·응답 유실 뒤 복구(키 기반 짝 조회)·진행 상태·장애 구분을 계약으로 보일 수 없다.
 - 요청: 요청서 §1 표 14항목(필드·경로·required·라우트·본문 형식).
 - 백오피스: `/assistant` 화면 + `AssistantPort`(목 모드만 `draftMock`, BR-46 확장 필드는 목에서만). local·LAN 은 호출하지 않고 "연결 전" 안내.
+
+## BR-47 상품 검색 — 센터 지정 시 전 상품 미취급·total 불일치·빈 페이지 (고객앱)
+- 현황(LAN 2026-11-04): `GET /search/products?mfcId=MFC-BSN-01`(또는 MFC-SEED-01) → 검색어 없이 total 162·items 0·nextCursor 있음. `q=탄산수` → total 1·items 0. `includeNotCarried=true` 면 `carried: false` 로 나옴.
+- 영향: 고객앱 검색이 "1개"와 "검색 결과가 없어요"를 함께 보인다. 빈 페이지 뒤에 더 있는지 알 수 없다.
+- 요청: ① 센터 취급 데이터 확인 ② total 을 뺀 뒤 기준으로(또는 의미 명시) ③ 빈 페이지+커서 없애거나 계속 조회 규칙 명시 ④ 미취급 숨김/구분 정책 확정(Commerce §3627).
+- 고객앱: 회신 전 변경 없음.
