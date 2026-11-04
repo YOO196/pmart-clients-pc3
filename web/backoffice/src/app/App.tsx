@@ -1,10 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { createBrowserRouter, createMemoryRouter, Link, Navigate, NavLink, Outlet, RouterProvider } from 'react-router';
 
 import { ApprovalDetailPage } from '../features/approvals/ApprovalDetailPage';
 import { ApprovalInboxPage } from '../features/approvals/ApprovalInboxPage';
 import { ApprovalListPage } from '../features/approvals/ApprovalListPage';
+import { AssistantProvider } from '../features/assistant/AssistantContext';
+import { AssistantAnswerPage, AssistantPage } from '../features/assistant/AssistantPage';
+import { createDraftAssistantMock } from '../features/assistant/draftMock';
+import { notConnectedAssistant, type AssistantPort } from '../features/assistant/port';
 import { CategoryTreePage } from '../features/categories/CategoryTreePage';
 import { ContentDraftPage, NewContentDraftPage } from '../features/contents/ContentDraftPage';
 import { ContentImportPage, NewContentImportPage } from '../features/contents/ContentImportPage';
@@ -37,7 +41,13 @@ const nav: ReadonlyArray<readonly [string, string]> = [
   ['/handlings', m.nav.handlings],
   ['/views/approval-inbox', m.nav.bffInbox],
   ['/operators', m.nav.operators],
+  // 메뉴는 모두에게 보인다. 업무 도우미 권한은 서버가 판정한다(403·FORBIDDEN_SCOPE).
+  ['/assistant', m.nav.assistant],
 ];
+
+/** 업무 도우미: 목 모드만 계약 확정 전 목(BR-46), 실서버 모드는 연결하지 않는다. */
+const defaultAssistantPort = (): AssistantPort =>
+  import.meta.env.VITE_PMART_ENV === 'mock' ? createDraftAssistantMock({ delayMs: 400 }) : notConnectedAssistant;
 
 function Layout() {
   const { session, operator } = useSession();
@@ -101,6 +111,8 @@ const routes = [
       { path: 'prices/import', element: guarded(<NewPriceImportPage />) },
       { path: 'prices/import/:batchId', element: guarded(<PriceImportPage />) },
       { path: 'handlings', element: guarded(<SkuHandlingPage />) },
+      { path: 'assistant', element: guarded(<AssistantPage />) },
+      { path: 'assistant/answers/:answerId', element: guarded(<AssistantAnswerPage />) },
     ],
   },
 ];
@@ -115,18 +127,24 @@ export function App({
   memory = false,
   initialPath = '/',
   initialToken,
+  assistantPort,
 }: {
   readonly queryClient?: QueryClient;
   readonly memory?: boolean;
   readonly initialPath?: string;
   /** 테스트·목 모드에서 바로 세션을 시작한다. */
   readonly initialToken?: string;
+  /** 테스트에서 업무 도우미 목 시나리오를 주입한다. */
+  readonly assistantPort?: AssistantPort;
 }) {
   const router = memory ? createMemoryRouter(routes, { initialEntries: [initialPath] }) : createBrowserRouter(routes);
+  const [port] = useState(() => assistantPort ?? defaultAssistantPort());
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider {...(initialToken ? { initialToken } : {})}>
-        <RouterProvider router={router} />
+        <AssistantProvider port={port}>
+          <RouterProvider router={router} />
+        </AssistantProvider>
       </SessionProvider>
     </QueryClientProvider>
   );

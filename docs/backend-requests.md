@@ -53,6 +53,7 @@
 | BR-43 | 높음 | 고객 | 장바구니 변경(담기·수량·선택·삭제) 응답에 갱신된 장바구니(`Cart`)가 없어 앱이 매번 `GET /carts/{id}` 를 한 번 더 부름(탭당 왕복 2회) | **RESOLVED**(회신 §4, 19:40 배포): `CartChangeResult.cart`(GET 과 같은 모양). 앱 반영 — 응답의 cart 로 끝냄(왕복 1회), 없으면 옛 경로 |
 | BR-44 | 중간 | 백오피스 | 콘텐츠 일괄 등록: 이미 게시된 콘텐츠를 고쳐 다시 올린 행도 신규와 똑같이 `CREATED` — 초안·승인 행에 신규/기존 게시 갱신 구분(`registration`·기존 게시 버전)이 없음 | OPEN(요청 `docs/handoff/2026-11-04-backend-content-import-registration.md`) |
 | BR-45 | 낮음 | 백오피스 | 승인 상세 `lines[].requestedAmount` 가 금액 없는 행에서 `null` — 계약 Money 는 nullable 아님(생략만 가능). 응답 생략 또는 계약 nullable 로 | OPEN(안내 `docs/handoff/2026-11-04-backend-approval-screen-fixes.md` §2). 백오피스는 null·생략 모두 빈칸 |
+| BR-46 | 중간 | 백오피스 | 업무 도우미(정책 RAG): ai-assistant-service 계약이 3단계 초안 — 절·문서 버전·확정/제안/미결정 구분·문서 열람·GET 출처·질문 목록·응답 유실 복구·진행 상태·장애/권한 구분·게이트웨이 라우트 없음 | OPEN(요청 `docs/handoff/2026-11-04-backend-ai-assistant-contract.md`). 백오피스는 목 모드 화면만, 실서버 미연결 |
 
 ---
 
@@ -294,3 +295,9 @@
 - 영향: 고객 결과는 맞다(승인 → 같은 상품의 새 `contentVersion`). 운영자·승인자가 기존 고객 노출 콘텐츠를 덮어쓰는지 화면에서 볼 수 없다.
 - 요청: BR-39 처럼 초안(배치 `items[].draft` 포함)과 승인 행 attributes 에 `registration`(NEW/UPDATE)과 기존 게시 버전(`publishedContentVersion` 등). 이름·모양은 백엔드가 정함.
 - 백오피스: 회신 전 변경 없음. 회신 뒤 구분 열·안내·승인 상세 표시.
+
+## BR-46 업무 도우미(ai-assistant-service) 계약 확정 (백오피스)
+- 현황: `ai-assistant-service.yaml` 은 x-stage 3 "자리 표시용 초안". 게이트웨이 라우트 없음. 출처는 `docRef`·`policyVersion`·`asOf` 뿐, GET 에는 출처 없음, 질의는 동기 200 만.
+- 영향: 절·문서 버전·확정/제안/미결정 구분·문서 열람·질문 목록·응답 유실 뒤 복구(키 기반 짝 조회)·진행 상태·장애 구분을 계약으로 보일 수 없다.
+- 요청: 요청서 §1 표 14항목(필드·경로·required·라우트·본문 형식).
+- 백오피스: `/assistant` 화면 + `AssistantPort`(목 모드만 `draftMock`, BR-46 확장 필드는 목에서만). local·LAN 은 호출하지 않고 "연결 전" 안내.
