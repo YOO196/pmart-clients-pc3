@@ -22,12 +22,15 @@ export { SOURCE_SYSTEM };
  */
 export const API_BASE = import.meta.env.VITE_PMART_API_BASE || `${globalThis.location.origin}/api/v1`;
 
+/** bff 계약 servers.url = /api/v1/backoffice (게이트웨이 라우트 /api/v1/backoffice/views/**·commands/**). */
+export const BFF_BASE = `${API_BASE}/backoffice`;
+
 export const tokens = new TokenStore();
 
 export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
   const options = { baseUrl, fetch: pmartFetch };
   return {
-    bff: createClient<BffPaths>(options),
+    bff: createClient<BffPaths>({ ...options, baseUrl: `${baseUrl}/backoffice` }),
     auth: createClient<AuthPaths>(options),
     approval: createClient<ApprovalPaths>(options),
     product: createClient<ProductPaths>(options),

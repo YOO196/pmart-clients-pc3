@@ -2,13 +2,13 @@ import { render, screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
-import { API_BASE } from '../../api/client';
+import { BFF_BASE } from '../../api/client';
 import { App } from '../../app/App';
 import { approvalInbox } from '../../mocks/fixtures';
 import { as } from '../../test/render';
 import { server } from '../../test/server';
 
-const inbox = `${API_BASE}/views/approval-inbox`;
+const inbox = `${BFF_BASE}/views/approval-inbox`;
 
 describe('승인함 (목 모드, MSW)', () => {
   it('원천·신선도와 함께 목록을 보여 준다', async () => {

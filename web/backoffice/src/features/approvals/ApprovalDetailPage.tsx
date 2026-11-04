@@ -99,8 +99,12 @@ export function ApprovalDetailPage() {
     return res;
   });
 
+  // 폴링 응답이 앞과 같으면 data 가 그대로라 다시 그리지 않는다 → 30회가 끝나도 "확인 중"이 계속 돌았다.
+  // dataUpdatedAt 은 응답마다 바뀌므로 읽어 두면(관찰 대상) 매 응답 뒤 다시 그려 횟수 초과를 화면에 보인다.
+  const lastFetchedAt = query.dataUpdatedAt;
+
   return (
-    <section className="space-y-4">
+    <section className="space-y-4" data-fetched-at={lastFetchedAt}>
       <h1 className="text-xl font-bold">{`${m.approvals.detailTitle} ${approvalId}`}</h1>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(a) => {
@@ -154,7 +158,8 @@ export function ApprovalDetailPage() {
                   {(a.lines ?? []).map((l) => (
                     <tr key={l.lineKey}>
                       <td>{l.lineKey}</td>
-                      <td>{l.requestedAmount === undefined ? '' : formatKrw(l.requestedAmount)}</td>
+                      <td>{/* 금액 없는 행(상품·콘텐츠 등)은 서버가 null 로 준다 */}
+                        {l.requestedAmount === undefined || l.requestedAmount === null ? '' : formatKrw(l.requestedAmount)}</td>
                       <td>
                         {/* 가격 일괄 등록 행(백엔드 안내 2026-11-03 §1-5): 승인자가 이전 → 새 가격·구분·상품명을 바로 본다 */}
                         <PriceLineAttributes attributes={l.attributes} />

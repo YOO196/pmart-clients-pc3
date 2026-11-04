@@ -51,6 +51,8 @@
 | BR-41 | 중간 | 백오피스 | 제출(SUBMITTED)한 일괄 등록 배치의 승인 요청 본문·승인 ID 를 서버에서 다시 읽을 길이 없음(초안 `approvalId` 는 반영 때만 채움). 화면 이동·새로고침 뒤 "승인 요청"·"승인 상세 보기" 가 사라졌음 | **RESOLVED**(회신 §2, 19:40 배포): 배치 조회의 `pendingSubmission`(상품·콘텐츠)·`approvalRequest`(가격) + `GET /approvals?targetRef=`. 백오피스 반영(sessionStorage 우회 제거) |
 | BR-42 | 중간 | 고객 | cart-service 표시용 조회(product·content·pricing·mfc-inventory)에 연결·읽기 timeout 이 없고 순차 호출 — 한 원천(PC3 꺼짐 등)이 안 닿으면 장바구니 조회·담기마다 그만큼 느려짐 | **RESOLVED**(회신 §3, 19:40 배포): 표시용 조회 4곳 동시 호출. timeout 은 공통 기본(연결 1초·응답 5초)이 이미 있었음(요청서 정정). 앱 변경 없음 |
 | BR-43 | 높음 | 고객 | 장바구니 변경(담기·수량·선택·삭제) 응답에 갱신된 장바구니(`Cart`)가 없어 앱이 매번 `GET /carts/{id}` 를 한 번 더 부름(탭당 왕복 2회) | **RESOLVED**(회신 §4, 19:40 배포): `CartChangeResult.cart`(GET 과 같은 모양). 앱 반영 — 응답의 cart 로 끝냄(왕복 1회), 없으면 옛 경로 |
+| BR-44 | 중간 | 백오피스 | 콘텐츠 일괄 등록: 이미 게시된 콘텐츠를 고쳐 다시 올린 행도 신규와 똑같이 `CREATED` — 초안·승인 행에 신규/기존 게시 갱신 구분(`registration`·기존 게시 버전)이 없음 | OPEN(요청 `docs/handoff/2026-11-04-backend-content-import-registration.md`) |
+| BR-45 | 낮음 | 백오피스 | 승인 상세 `lines[].requestedAmount` 가 금액 없는 행에서 `null` — 계약 Money 는 nullable 아님(생략만 가능). 응답 생략 또는 계약 nullable 로 | OPEN(안내 `docs/handoff/2026-11-04-backend-approval-screen-fixes.md` §2). 백오피스는 null·생략 모두 빈칸 |
 
 ---
 
@@ -286,3 +288,9 @@
 - 영향: 담기·수량 변경이 느리다(사용자 체감 2026-11-03, PC3 켜도 여전함). 연속 탭은 앱이 모아 보내도록 했지만 왕복 2회 구조는 그대로다.
 - 앱 처리(2026-11-03): 수량·선택·삭제는 응답 `cartVersion` 으로 장바구니를 바로 갱신하고(서버가 APPLIED 로 확정한 내용만), 합계는 "확인 중"으로 두었다가 뒤에서 `GET` 으로 채운다. 담기(새 행)는 사본이 필요해 그대로 다시 읽는다.
 - 요청: (a) 변경 응답(`CartChangeResult`)에 갱신된 `Cart`(또는 최소한 `selectedItemAmount` 와 바뀐 `CartItem`)를 넣어 달라. 그러면 앱의 두 번째 왕복이 없어진다. (b) BR-42 의 표시용 조회 병렬화·timeout 과 함께.
+
+## BR-44 콘텐츠 일괄 등록의 신규 / 기존 게시 콘텐츠 갱신 구분 (백오피스)
+- 현황(백엔드 코드 읽기 2026-11-04, HEAD `4342c58`): seed 업로드는 열린 초안(DRAFT·SUBMITTED)만 upsert 한다. 열린 초안이 없으면 최근 게시본과 해시만 비교해 다르면 새 초안을 만들고 `CREATED` 로 돌려준다 → 이미 게시된 콘텐츠의 수정본과 처음 올리는 콘텐츠가 구분되지 않는다. `ContentDraft`·승인 행 attributes 에 기존 게시 여부·버전이 없다.
+- 영향: 고객 결과는 맞다(승인 → 같은 상품의 새 `contentVersion`). 운영자·승인자가 기존 고객 노출 콘텐츠를 덮어쓰는지 화면에서 볼 수 없다.
+- 요청: BR-39 처럼 초안(배치 `items[].draft` 포함)과 승인 행 attributes 에 `registration`(NEW/UPDATE)과 기존 게시 버전(`publishedContentVersion` 등). 이름·모양은 백엔드가 정함.
+- 백오피스: 회신 전 변경 없음. 회신 뒤 구분 열·안내·승인 상세 표시.

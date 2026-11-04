@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 
-import { API_BASE } from '../api/client';
+import { API_BASE, BFF_BASE } from '../api/client';
 import { approvalHandlers } from './approvalHandlers';
 import { authHandlers } from './authHandlers';
 import { catalogHandlers } from './catalogHandlers';
@@ -21,7 +21,7 @@ const gateway = http.all(`${API_BASE}/*`, ({ request }) => {
 
 export const handlers = [
   gateway,
-  http.get(`${API_BASE}/views/approval-inbox`, () => HttpResponse.json(approvalInbox)),
+  http.get(`${BFF_BASE}/views/approval-inbox`, () => HttpResponse.json(approvalInbox)),
   http.get(`${API_BASE}/centers`, () => HttpResponse.json(centerList)),
   ...authHandlers,
   ...approvalHandlers,
