@@ -61,14 +61,15 @@ void main() {
   }
 
   group('목적지 → 앱 경로', () {
-    test('주문·배송·클레임만 이동하고 나머지는 상세에 머문다', () {
+    test('주문·배송·클레임·환불만 이동하고 나머지는 상세에 머문다', () {
       String? r(NoticeDestinationType? type, [String? ref = 'x-1']) =>
           noticeRoute(NoticeDestination(type: type, ref: ref));
       expect(r(NoticeDestinationType.order), '/orders/x-1');
       expect(r(NoticeDestinationType.delivery), '/deliveries/x-1');
       expect(r(NoticeDestinationType.claim), '/claims/x-1');
+      // REFUND 의 ref 는 claimId — 클레임 처리 내역으로 간다(백엔드 회신 2026-11-05 §1)
+      expect(r(NoticeDestinationType.refund), '/claims/x-1');
       for (final t in [
-        NoticeDestinationType.refund,
         NoticeDestinationType.dispatchOffer,
         NoticeDestinationType.caseFile,
         NoticeDestinationType.notice,
@@ -218,16 +219,19 @@ void main() {
       expect(find.byType(TrackingScreen), findsNothing);
     });
 
-    testWidgets('환불·공지처럼 앱 화면이 없는 목적지는 알림 상세에 머문다', (t) async {
+    testWidgets('환불 알림은 ref(claimId)의 클레임 처리 내역으로 간다', (t) async {
       final repo = MockNotificationsRepository(latency: Duration.zero);
       await open(t, repo);
       await t.tap(card('ntf-3'));
       await t.pumpAndSettle();
-      expect(find.byType(NotificationDetailScreen), findsOneWidget);
-      expect(find.text('환불을 마쳤어요'), findsOneWidget);
-      expect(find.byKey(const ValueKey('notice-go')), findsNothing);
+      final claim = t.widget<ClaimScreen>(find.byType(ClaimScreen));
+      expect(claim.claimId, 'claim-1');
+      expect(find.byType(NotificationDetailScreen), findsNothing);
+    });
 
-      await back(t);
+    testWidgets('공지처럼 앱 화면이 없는 목적지는 알림 상세에 머문다', (t) async {
+      final repo = MockNotificationsRepository(latency: Duration.zero);
+      await open(t, repo);
       await t.tap(card('ntf-4'));
       await t.pumpAndSettle();
       expect(find.byType(NotificationDetailScreen), findsOneWidget);

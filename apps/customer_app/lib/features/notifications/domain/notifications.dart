@@ -76,9 +76,10 @@ class NoticePage {
   final String? nextCursor;
 }
 
-/// 알림을 눌렀을 때 갈 앱 경로. 앱에 화면이 없는 목적지(환불·공지 등)나 참조가 없으면 null(알림 상세에 머문다).
+/// 알림을 눌렀을 때 갈 앱 경로. 앱에 화면이 없는 목적지(공지 등)나 참조가 없으면 null(알림 상세에 머문다).
 ///
-/// - REFUND: 계약에 `ref` 가 환불 ID 인지 클레임 ID 인지 정해져 있지 않아 이동하지 않는다.
+/// - REFUND: `ref` 는 claimId 다(notification-service 0.1.1 `Destination.ref`). 환불은 클레임 아래에서 보므로
+///   클레임 처리 내역으로 간다.
 /// - DISPATCH_OFFER·CASE: 라이더·운영자용 목적지다.
 String? noticeRoute(NoticeDestination? d) {
   final ref = d?.ref;
@@ -87,7 +88,8 @@ String? noticeRoute(NoticeDestination? d) {
   return switch (d.type) {
     NoticeDestinationType.order => '/orders/$id',
     NoticeDestinationType.delivery => '/deliveries/$id',
-    NoticeDestinationType.claim => '/claims/$id',
+    NoticeDestinationType.claim ||
+    NoticeDestinationType.refund => '/claims/$id',
     _ => null,
   };
 }

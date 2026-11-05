@@ -248,7 +248,7 @@ final class MockNotificationsRepository implements NotificationsRepository {
       'category': 'REFUND',
       'title': '환불을 마쳤어요',
       'body': '결제 수단에 따라 3~5영업일 뒤 반영돼요.',
-      'destination': {'type': 'REFUND', 'ref': 'rf-claim-1'},
+      'destination': {'type': 'REFUND', 'ref': 'claim-1'},
       'sourceEventId': 'evt-3',
       'sourceEventType': 'RefundResult',
       'state': 'NOTICE_READ',
