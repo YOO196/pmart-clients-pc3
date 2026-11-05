@@ -46,6 +46,14 @@ class CartLine {
       availability != LineAvailability.soldOut &&
       availability != LineAvailability.notCarried;
 
+  /// 서버 사본이 지금 살 수 없다고 확정한 품목(일시품절·판매중지·가용 0·미취급). 판매 상태·가용을 모르는 것(UNKNOWN)은
+  /// 넣지 않는다 — 모르는 것을 품절로 단정하지 않는다.
+  bool get definitelyUnavailable =>
+      saleState == SaleState.temporarilySoldOut ||
+      saleState == SaleState.saleStopped ||
+      availability == LineAvailability.soldOut ||
+      availability == LineAvailability.notCarried;
+
   /// 서버가 APPLIED 로 확정한 수량·선택을 반영한 사본(표시용 사본은 그대로).
   CartLine copyWith({int? quantity, bool? selected}) => CartLine(
     cartItemId: cartItemId,

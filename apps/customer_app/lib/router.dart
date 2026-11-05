@@ -10,11 +10,16 @@ import 'features/checkout/presentation/delivery_select_screen.dart';
 import 'features/checkout/presentation/order_sheet_screen.dart';
 import 'features/claims/presentation/claims_screens.dart';
 import 'features/catalog/presentation/category_screen.dart';
+import 'features/notifications/presentation/notifications_screens.dart';
 import 'features/payment/presentation/payment_screen.dart';
 import 'features/profile/presentation/my_info_screen.dart';
+import 'features/reviews/domain/reviews.dart' show ReviewTarget;
+import 'features/reviews/presentation/reviews_screens.dart';
 import 'features/orders/presentation/my_screen.dart';
 import 'features/orders/presentation/orders_screens.dart';
+import 'features/catalog/presentation/home_providers.dart' show SectionRef;
 import 'features/catalog/presentation/home_screen.dart';
+import 'features/catalog/presentation/section_items_screen.dart';
 import 'features/catalog/presentation/product_detail_screen.dart';
 import 'features/catalog/presentation/product_list_screen.dart';
 import 'features/catalog/presentation/search_screen.dart';
@@ -104,14 +109,37 @@ final routerProvider = Provider<GoRouter>(
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/deliveries/:deliveryId',
-        builder: (_, state) =>
-            TrackingScreen(deliveryId: state.pathParameters['deliveryId']!),
+        // orderId 는 주문 상세에서 들어올 때만 붙는다(알림에서 열면 배송 정보만으로 그린다).
+        builder: (_, state) => TrackingScreen(
+          deliveryId: state.pathParameters['deliveryId']!,
+          orderId: state.uri.queryParameters['orderId'],
+        ),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/claims/:claimId',
         builder: (_, state) =>
             ClaimScreen(claimId: state.pathParameters['claimId']!),
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/notifications',
+        builder: (_, _) => const NotificationCenterScreen(),
+        routes: [
+          // 'settings' 를 ':notificationId' 보다 먼저 둔다.
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'settings',
+            builder: (_, _) => const NotificationSettingsScreen(),
+          ),
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: ':notificationId',
+            builder: (_, state) => NotificationDetailScreen(
+              notificationId: state.pathParameters['notificationId']!,
+            ),
+          ),
+        ],
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
@@ -148,11 +176,44 @@ final routerProvider = Provider<GoRouter>(
           title: state.uri.queryParameters['title'],
         ),
       ),
+      // 홈 영역 "전체보기". 영역·홈 구성 버전은 홈에서 넘긴다(없으면 홈으로).
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/sections/:sectionId',
+        redirect: (_, state) => state.extra is SectionRef ? null : '/',
+        builder: (_, state) =>
+            SectionItemsScreen(target: state.extra! as SectionRef),
+      ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/products/:productId',
         builder: (_, state) =>
             ProductDetailScreen(productId: state.pathParameters['productId']!),
+        routes: [
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'reviews',
+            builder: (_, state) => ProductReviewsScreen(
+              productId: state.pathParameters['productId']!,
+            ),
+          ),
+        ],
+      ),
+      // 리뷰 관리(리뷰 쓰기·내가 쓴 리뷰). 작성 화면은 대상(ReviewTarget)을 넘겨 받는다(없으면 리뷰 관리로).
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/reviews',
+        builder: (_, _) => const ReviewManageScreen(),
+        routes: [
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'write',
+            redirect: (_, state) =>
+                state.extra is ReviewTarget ? null : '/reviews',
+            builder: (_, state) =>
+                ReviewWriteScreen(target: state.extra! as ReviewTarget),
+          ),
+        ],
       ),
     ],
   ),

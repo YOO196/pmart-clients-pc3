@@ -12,12 +12,13 @@ import '../domain/catalog.dart';
 abstract interface class CatalogRepository {
   Future<HomeView> home({String? mfcId, HomeTab? tab});
 
-  /// 영역 하나만 다시 조회한다(UNAVAILABLE 영역 재시도·더보기).
+  /// 영역 하나만 다시 조회한다(UNAVAILABLE 영역 재시도·전체보기). [cursor] 는 다음 묶음.
   /// 홈 구성이 바뀌었으면 `LAYOUT_VERSION_CHANGED` [ProblemFailure].
   Future<HomeSection> section(
     HomeSection section, {
     required int layoutVersion,
     String? mfcId,
+    String? cursor,
   });
 
   Future<List<CategoryNode>> categories();
@@ -65,12 +66,14 @@ final class ApiCatalogRepository implements CatalogRepository {
     HomeSection section, {
     required int layoutVersion,
     String? mfcId,
+    String? cursor,
   }) async {
     final res = await pmartGuard(
       () => _storefront.listSectionItems(
         sectionId: section.sectionId,
         mfcId: mfcId,
         layoutVersion: layoutVersion,
+        cursor: cursor,
       ),
     );
     return sectionItemsFromContract(section, _body(res.data, 'SectionItems'));
@@ -261,6 +264,7 @@ HomeView homeFromContract(sf.HomeLayout h) => HomeView(
           (s.items ?? const <sf.DisplayItem>[]).map(_tileFromDisplay),
         ),
         nextCursor: s.nextCursor,
+        viewAllRef: s.viewAllRef,
       ),
   ],
 );
@@ -278,6 +282,7 @@ HomeSection sectionItemsFromContract(
     (r.items ?? const <sf.DisplayItem>[]).map(_tileFromDisplay),
   ),
   nextCursor: r.page?.nextCursor,
+  viewAllRef: base.viewAllRef,
 );
 
 List<CategoryNode> categoriesFromContract(pd.GetCategoryTree200Response r) {

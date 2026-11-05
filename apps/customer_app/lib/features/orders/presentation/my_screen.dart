@@ -68,6 +68,24 @@ class MyScreen extends ConsumerWidget {
             onTap: () => context.push('/orders'),
           ),
           ListTile(
+            key: const ValueKey('my-reviews'),
+            leading: const Icon(Icons.rate_review_outlined),
+            title: Text(l10n.reviewManageTitle),
+            onTap: () => context.push('/reviews'),
+          ),
+          ListTile(
+            key: const ValueKey('my-notifications'),
+            leading: const Icon(Icons.notifications_none),
+            title: Text(l10n.noticeTitle),
+            onTap: () => context.push('/notifications'),
+          ),
+          ListTile(
+            key: const ValueKey('my-notification-settings'),
+            leading: const Icon(Icons.tune),
+            title: Text(l10n.noticeSettingsTitle),
+            onTap: () => context.push('/notifications/settings'),
+          ),
+          ListTile(
             leading: const Icon(Icons.place_outlined),
             title: Text(l10n.addressTitle),
             onTap: () => context.push('/addresses'),

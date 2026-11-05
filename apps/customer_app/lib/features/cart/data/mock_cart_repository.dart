@@ -31,6 +31,14 @@ base class MockCartRepository implements CartRepository {
   }
 
   final Duration latency;
+
+  /// 시험용: 담을 수 없는 상태(품절 등)가 된 품목을 이미 담겨 선택된 채로 둔다(담기 검사를 거치지 않음).
+  void seedLine(String sku, int quantity, {bool selected = true}) {
+    _lines.add(
+      _MockLine('ci-${_nextId++}', sku, quantity)..selected = selected,
+    );
+  }
+
   static const cartId = 'cart-mock-1';
 
   /// 기초상품 낱개 환산 합계 상한(C 1068). 실제 값은 서버(product) 판정이다.

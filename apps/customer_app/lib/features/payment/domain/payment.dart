@@ -142,3 +142,13 @@ class PaymentFlowState {
 
 /// 승인 요청(`POST /payment-confirmations`) 결과. accepted 도 결제 완료가 아니다(주문 확정은 초안 조회로).
 enum AuthSubmitResult { accepted, rejected, unknown }
+
+/// 결제 상태 조회(`GET /payments/{paymentAttemptId}`, 계약 `CheckoutPayment`)에서 화면이 쓰는 부분. 카드 정보는 없다.
+@immutable
+class PaymentSummary {
+  const PaymentSummary({this.method, this.approvedAt});
+
+  /// 토스 결제수단(승인 시, 예: 카드·간편결제). 서버 문자열을 그대로 보인다. 없으면 null.
+  final String? method;
+  final DateTime? approvedAt;
+}

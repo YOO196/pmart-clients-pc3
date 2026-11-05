@@ -7,6 +7,8 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
+import '../../reviews/presentation/reviews_screens.dart'
+    show ProductReviewsPreview;
 import '../../cart/presentation/cart_screen.dart' show AddToCartBar;
 import 'widgets/content_image.dart';
 import 'widgets/product_tile_card.dart';
@@ -78,6 +80,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           ratingText(l10n, p.rating?.average, p.rating?.count),
           key: const ValueKey('product-rating'),
         ),
+        // 별점 줄 아래 리뷰 미리보기(GET /products/{id}/reviews). 실패는 "리뷰 없음"이 아니라 실패로 보인다.
+        const SizedBox(height: 8),
+        ProductReviewsPreview(productId: p.productId),
         const SizedBox(height: 16),
         // 옵션이 하나뿐이면 고를 것이 없으니 가격·재고만 보이고, 둘 이상일 때만 옵션 선택을 연다.
         if (p.options case [final only])

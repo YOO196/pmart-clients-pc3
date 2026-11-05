@@ -1,6 +1,7 @@
 import 'package:pmart_api_delivery_capacity/pmart_api_delivery_capacity.dart'
     as cap;
 import 'package:pmart_api_order/pmart_api_order.dart' as api;
+import 'package:dio/dio.dart' show DioExceptionType;
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../catalog/data/mock_catalog_repository.dart' show mockProducts;
@@ -496,12 +497,52 @@ base class MockCheckoutRepository
 
   void _approve(MockDraft d) {
     final orderId = d.json['orderId']! as String;
+    if ((d.json['payment'] as Map<String, Object?>?)?['paymentAttemptId']
+        case final String attempt) {
+      _approvedAttempts[orderId] = attempt;
+    }
     d.json
       ..['status'] = 'CONFIRMED'
       ..['nextAction'] = 'DONE'
       ..remove('payment');
     _setPayment(d, 'APPROVED');
     confirmedOrders[orderId] = d;
+  }
+
+  /// 확정된 주문의 결제 시도 ID(주문 목이 `Order.payment.paymentAttemptId` 로 옮긴다).
+  final _approvedAttempts = <String, String>{};
+
+  String? approvedAttemptOf(String orderId) => _approvedAttempts[orderId];
+
+  /// 결제 상태 조회(`GET /payments/{id}`)를 실패시킨다(조회 실패 시연).
+  bool paymentLookupFails = false;
+
+  /// 결제 상태 조회 횟수.
+  int paymentLookups = 0;
+
+  /// 지난 주문 목(order-seed-*)의 결제 시도와 결제수단.
+  static const seededPaymentMethods = {
+    'pa-1': '카드',
+    'pa-2': '간편결제',
+    'pa-4': '카드',
+  };
+
+  @override
+  Future<PaymentSummary> payment(String paymentAttemptId) async {
+    await _wait();
+    paymentLookups++;
+    if (paymentLookupFails) {
+      throw const NetworkFailure(DioExceptionType.connectionError);
+    }
+    final method =
+        seededPaymentMethods[paymentAttemptId] ??
+        (_approvedAttempts.containsValue(paymentAttemptId) ? '카드' : null);
+    if (method == null) {
+      throw const ProblemFailure(
+        Problem(status: 404, code: ProblemCode.notFound),
+      );
+    }
+    return PaymentSummary(method: method);
   }
 
   /// 목 결제위젯 설정. 목 결제창은 키를 쓰지 않는다.

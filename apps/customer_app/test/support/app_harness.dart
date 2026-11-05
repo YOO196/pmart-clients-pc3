@@ -25,6 +25,9 @@ import 'package:customer_app/features/claims/presentation/claims_controller.dart
 import 'package:customer_app/features/catalog/data/catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/presentation/catalog_providers.dart';
+import 'package:customer_app/features/notifications/data/mock_notifications_repository.dart';
+import 'package:customer_app/features/notifications/data/notifications_repository.dart';
+import 'package:customer_app/features/notifications/presentation/notifications_controller.dart';
 import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
 import 'package:customer_app/features/orders/data/orders_repository.dart';
 import 'package:customer_app/features/orders/presentation/orders_providers.dart';
@@ -32,6 +35,9 @@ import 'package:customer_app/features/payment/presentation/payment_controller.da
 import 'package:customer_app/features/profile/data/mock_profile_repository.dart';
 import 'package:customer_app/features/profile/data/profile_repository.dart';
 import 'package:customer_app/features/profile/presentation/profile_controller.dart';
+import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
+import 'package:customer_app/features/reviews/data/reviews_repository.dart';
+import 'package:customer_app/features/reviews/presentation/reviews_controller.dart';
 import 'package:customer_app/shared/providers.dart';
 
 /// 목 모드 앱. 둘러보기는 [catalog](기본: 지연 없는 목)를 쓰고 [overrides] 를 더한다.
@@ -44,8 +50,11 @@ Widget testApp(
   ClaimsRepository? claims,
   MockAuthRepository? auth,
   ProfileRepository? profile,
+  NotificationsRepository? notifications,
+  ReviewsRepository? reviews,
   FakeAddressPicker? addressPicker,
   MockAddressRepository? address,
+
   /// 수량 ± 모아 보내기 대기. 기본 0(탭 직후 pumpAndSettle 로 반영). 모아 보내기를 시험할 때만 늘린다.
   Duration stepperDelay = Duration.zero,
 }) => ProviderScope(
@@ -93,6 +102,17 @@ Widget testApp(
     profileRepositoryProvider.overrideWithValue(
       profile ?? MockProfileRepository(latency: Duration.zero),
     ),
+    notificationsRepositoryProvider.overrideWithValue(
+      notifications ?? MockNotificationsRepository(latency: Duration.zero),
+    ),
+    // 상품 상세·주문 상세가 리뷰를 조회하므로 지연 없는 목을 늘 둔다.
+    reviewsRepositoryProvider.overrideWithValue(
+      reviews ?? MockReviewsRepository(latency: Duration.zero),
+    ),
+    noticePollPolicyProvider.overrideWithValue((
+      interval: Duration.zero,
+      attempts: 3,
+    )),
     // 주소 검색(웹뷰)·카카오 지도는 시험에서 띄울 수 없어 가짜로 바꾼다.
     ...(addressPicker ?? FakeAddressPicker()).overrides,
     // 보안 저장소 대신 메모리 저장소(플랫폼 채널 없음).
@@ -136,7 +156,16 @@ final class FakeAddressPicker {
 
 /// 가로 진열 안의 상품을 화면에 보이게 한 뒤 누른다.
 Future<void> tapTile(WidgetTester t, String productId) async {
-  final tile = find.byKey(ValueKey('tile-$productId')).first;
+  final tiles = find.byKey(ValueKey('tile-$productId'));
+  // 홈 위쪽 카드(배송 요약·탭)에 밀려 아직 만들지 않은 영역이면 세로로 내려 찾는다.
+  if (tiles.evaluate().isEmpty) {
+    await t.scrollUntilVisible(
+      tiles,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+  }
+  final tile = tiles.first;
   await t.ensureVisible(tile);
   await t.pumpAndSettle();
   await t.tap(tile);

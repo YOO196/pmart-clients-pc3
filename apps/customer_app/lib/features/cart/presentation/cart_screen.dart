@@ -13,6 +13,7 @@ import '../../catalog/presentation/widgets/product_tile_card.dart'
 import '../domain/cart.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../checkout/domain/checkout.dart' show DeliveryOption, TipReason;
 import '../../checkout/presentation/checkout_controller.dart';
 import 'cart_controller.dart';
 import 'cart_messages.dart';
@@ -80,13 +81,21 @@ class _CartBody extends ConsumerWidget {
           child: cart.lines.isEmpty
               ? Center(
                   key: const ValueKey('cart-empty'),
-                  child: Text(l10n.cartEmpty),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(l10n.cartEmpty),
+                      const SizedBox(height: 12),
+                      const _AddMoreButton(),
+                    ],
+                  ),
                 )
               : RefreshIndicator(
                   onRefresh: controller.refresh,
                   child: ListView(
                     padding: const EdgeInsets.all(12),
                     children: [
+                      _CartHeader(state: state),
                       for (final line in cart.lines)
                         _CartLineTile(
                           line: line,
@@ -98,6 +107,8 @@ class _CartBody extends ConsumerWidget {
                           mfcKnown: cart.mfcId != null,
                           stockUnavailable: cart.inventoryUnavailable,
                         ),
+                      const SizedBox(height: 4),
+                      const Center(child: _AddMoreButton()),
                     ],
                   ),
                 ),
@@ -106,6 +117,94 @@ class _CartBody extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// 목록 머리: 보관 기한(서버 `expiresAt` 날짜만 보인다) · 선택 삭제.
+class _CartHeader extends ConsumerWidget {
+  const _CartHeader({required this.state});
+
+  final CartState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final selected = state.cart.lines.where((l) => l.selected).length;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          if (state.cart.expiresAt case final at?)
+            Expanded(
+              child: Text(
+                l10n.cartExpiresAt(seoulDate(at)),
+                key: const ValueKey('cart-expires'),
+                style: theme.textTheme.bodySmall,
+              ),
+            )
+          else
+            const Spacer(),
+          TextButton.icon(
+            key: const ValueKey('cart-remove-selected'),
+            icon: const Icon(Icons.delete_outline, size: 18),
+            label: Text(l10n.cartRemoveSelected),
+            onPressed: (state.canChange && selected > 0)
+                ? () => _confirmRemoveSelected(context, ref, selected)
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmRemoveSelected(
+    BuildContext context,
+    WidgetRef ref,
+    int count,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.cartRemoveSelectedConfirmTitle(count)),
+        content: Text(l10n.cartRemoveSelectedConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cartRemoveConfirmCancel),
+          ),
+          FilledButton(
+            key: const ValueKey('cart-remove-selected-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.cartRemoveConfirmOk),
+          ),
+        ],
+      ),
+    );
+    // 결과 안내(거절·충돌·불명)는 컨트롤러가 장바구니 안내 띠로 올린다.
+    if (ok ?? false) {
+      await ref.read(cartControllerProvider.notifier).removeSelected();
+    }
+  }
+}
+
+/// 서버 시각 → 서울 날짜 `YYYY-MM-DD`(표시 전용. 기한 판정에 쓰지 않는다).
+String seoulDate(DateTime instant) {
+  final d = toSeoulWallClock(instant);
+  return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+}
+
+/// "+ 상품 추가" — 쇼핑(홈)으로 돌아간다. 장바구니는 그대로.
+class _AddMoreButton extends StatelessWidget {
+  const _AddMoreButton();
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+    key: const ValueKey('cart-add-more'),
+    icon: const Icon(Icons.add),
+    label: Text(AppLocalizations.of(context).cartAddMore),
+    onPressed: () => context.go('/'),
+  );
 }
 
 class _CartLineTile extends ConsumerStatefulWidget {
@@ -241,6 +340,7 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
       _ => null,
     };
     final id = line.cartItemId;
+    final shown = _pending ?? line.quantity;
     return Card(
       key: ValueKey('cart-line-$id'),
       child: Padding(
@@ -251,8 +351,9 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
             Checkbox(
               key: ValueKey('cart-select-$id'),
               value: line.selected,
-              // 구매 불가 품목은 선택만 막는다(삭제는 가능).
-              onChanged: (enabled && line.purchasable)
+              // 구매 불가 품목은 새로 고르는 것만 막는다. 이미 선택된 채 품절·미취급이 됐으면
+              // 해제는 할 수 있어야 한다(선택 합계에서 빼려면). 삭제는 언제나 가능.
+              onChanged: (enabled && (line.purchasable || line.selected))
                   ? (v) => controller.submit(
                       SetSelected(cartItemId: id, selected: v ?? false),
                     )
@@ -285,10 +386,15 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
                     ),
                   Row(
                     children: [
+                      // 1개에서는 - 대신 휴지통(누르면 같은 삭제 확인).
                       IconButton(
                         key: ValueKey('cart-dec-$id'),
-                        tooltip: l10n.cartDecrease,
-                        icon: const Icon(Icons.remove),
+                        tooltip: shown <= 1
+                            ? l10n.cartRemove
+                            : l10n.cartDecrease,
+                        icon: Icon(
+                          shown <= 1 ? Icons.delete_outline : Icons.remove,
+                        ),
                         onPressed: widget.unknown ? null : () => _bump(-1),
                       ),
                       // 모아 보내는 중·서버 반영 중에는 목표 수량을 흐리게 + 진행 표시. 확정되면 보통 글씨.
@@ -345,6 +451,9 @@ class _CartSummaryBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final purchasable = cart.lines
+        .where((l) => l.selected && l.purchasable)
+        .length;
     return Material(
       elevation: 8,
       child: SafeArea(
@@ -377,14 +486,36 @@ class _CartSummaryBar extends ConsumerWidget {
               ),
               if (state.sync == CartSync.pending)
                 Text(l10n.cartChangePending, style: theme.textTheme.bodySmall),
-              const SizedBox(height: 8),
+              if (cart.hasSelectedPurchasable) const _FirstPurchaseHint(),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const ValueKey('cart-fee-info'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  icon: const Icon(Icons.info_outline, size: 16),
+                  label: Text(l10n.cartFeeInfo),
+                  onPressed: () => _showFeeInfo(context),
+                ),
+              ),
+              const SizedBox(height: 4),
               FilledButton(
                 key: const ValueKey('cart-order'),
                 // "주문하기"는 PG 진입이 아니다. 배송 방식 선택 → 주문서로 간다.
                 onPressed: (state.canChange && cart.hasSelectedPurchasable)
                     ? () => _order(context, ref)
                     : null,
-                child: Text(l10n.cartOrder),
+                // 개수는 지금 고를 수 있는 선택 품목 수(안내), 금액은 서버 합계 그대로(앱에서 더하지 않는다).
+                child: Text(switch ((purchasable, cart.selectedItemAmount)) {
+                  (0, _) => l10n.cartOrder,
+                  (final n, final int a) => l10n.cartOrderCountAmount(
+                    n,
+                    formatKrw(a),
+                  ),
+                  (final n, null) => l10n.cartOrderCount(n),
+                }, key: const ValueKey('cart-order-label')),
               ),
             ],
           ),
@@ -392,6 +523,62 @@ class _CartSummaryBar extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// 첫 구매 무료배달 "적용 예상" 한 줄. 서버 `GET /delivery-options?itemAmount=` 의 `deliveryTip.reason=FIRST_PURCHASE`
+/// (회원만)가 있을 때만 보인다. 확정은 주문서·결제 때 서버가 한다. 조회 실패·미정이면 줄을 두지 않는다(무료 아님으로 단정하지 않음).
+class _FirstPurchaseHint extends ConsumerWidget {
+  const _FirstPurchaseHint();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(sessionProvider) is! MemberSession) {
+      return const SizedBox.shrink();
+    }
+    final options = ref.watch(deliveryOptionsProvider).value;
+    final expected = (options ?? const <DeliveryOption>[]).any(
+      (o) => o.available && o.tip?.reason == TipReason.firstPurchase,
+    );
+    if (!expected) return const SizedBox.shrink();
+    return Text(
+      AppLocalizations.of(context).firstPurchaseExpected,
+      key: const ValueKey('cart-first-purchase'),
+      style: Theme.of(context).textTheme.bodySmall,
+    );
+  }
+}
+
+/// 배달팁·봉투값 안내(정적 문구. 업무 문서 Commerce §8.3 기준. 금액은 서버 견적으로만 보인다).
+Future<void> _showFeeInfo(BuildContext context) {
+  final l10n = AppLocalizations.of(context);
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) {
+      final theme = Theme.of(context);
+      return SafeArea(
+        child: Padding(
+          key: const ValueKey('cart-fee-sheet'),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.cartFeeTipTitle, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(l10n.cartFeeTipBody),
+              const SizedBox(height: 16),
+              Text(l10n.cartFeeBagTitle, style: theme.textTheme.titleMedium),
+              const SizedBox(height: 4),
+              Text(l10n.cartFeeBagBody),
+              const SizedBox(height: 16),
+              Text(l10n.cartFeeMinOrderNote, style: theme.textTheme.bodySmall),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }
 
 /// 상품 상세 하단의 담기 막대. 수량은 절대값이다(이미 담겼으면 그 수량에서 시작).

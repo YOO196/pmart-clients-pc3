@@ -28,4 +28,17 @@ String cartNoticeText(AppLocalizations l10n, CartNotice notice) =>
       NoticeReloadedAfterConflict() => l10n.cartNoticeConflict,
       NoticeNotApplied() => l10n.cartNoticeNotApplied,
       NoticeReloadFailed() => l10n.cartNoticeReloadFailed,
+      NoticeSoldOutDeselected(:final count) => l10n.cartNoticeSoldOutDeselected(
+        count,
+      ),
+    };
+
+/// 다른 화면에서 담은 결과 한 줄(상품 카드 `+` 등). 서버가 확정한 결과만 "담았어요"로 보인다.
+String cartOutcomeText(AppLocalizations l10n, CartChangeOutcome outcome) =>
+    switch (outcome) {
+      CartChangeApplied() => l10n.cartAdded,
+      CartChangeRejected() => cartRejectionText(l10n, outcome),
+      CartVersionConflict() => l10n.cartNoticeConflict,
+      CartChangeUnknown() => l10n.cartChangeUnknown,
+      CartChangeNotApplied() => l10n.cartNoticeNotApplied,
     };

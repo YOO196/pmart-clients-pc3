@@ -7,6 +7,8 @@ import 'package:pmart_ui/pmart_ui.dart';
 import 'package:customer_app/features/cart/data/mock_cart_repository.dart';
 import 'package:customer_app/features/cart/domain/cart.dart';
 import 'package:customer_app/features/cart/presentation/cart_controller.dart';
+import 'package:customer_app/features/catalog/presentation/home_screen.dart';
+import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 
 import 'support/app_harness.dart';
 
@@ -203,6 +205,33 @@ void main() {
     expect(find.text('배송지를 정하면 재고를 확인해요'), findsNWidgets(2));
   });
 
+  testWidgets('선택된 채 품절된 품목은 열자마자 선택에서 빠지고(삭제 아님) 안내가 뜬다', (t) async {
+    cart.seedLine('E-00000004', 1); // 일시품절 상품(P-0004)이 선택된 채 담겨 있다
+    // 세 줄이 한 화면에 다 그려지게 세로를 늘린다(목록 머리·안내 줄이 자리를 차지한다).
+    t.view
+      ..physicalSize = const Size(800, 1400)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const [], cart: cart));
+    await _openCartTab(t);
+
+    final box = find.byKey(const ValueKey('cart-select-ci-3'));
+    await t.ensureVisible(box);
+    // 서버에 선택 해제를 보내 확정된 결과로 그린다. 품목은 남아 있고 다시 고를 수 없다.
+    expect(t.widget<Checkbox>(box).value, isFalse);
+    expect(t.widget<Checkbox>(box).onChanged, isNull);
+    expect(find.byKey(const ValueKey('cart-line-ci-3')), findsOneWidget);
+    expect(
+      find.text('품절·구매할 수 없는 상품 1개는 선택에서 뺐어요. 장바구니에는 남아 있어요.'),
+      findsOneWidget,
+    );
+    // 판매 중인 다른 품목의 선택은 건드리지 않는다.
+    expect(
+      t.widget<Checkbox>(find.byKey(const ValueKey('cart-select-ci-1'))).value,
+      isTrue,
+    );
+  });
+
   testWidgets('1개에서 -는 삭제를 확인한다', (t) async {
     await t.pumpWidget(testApp(const [], cart: cart));
     await _openCartTab(t);
@@ -294,5 +323,163 @@ void main() {
 
     expect(find.textContaining('낱개 기준 10개까지'), findsOneWidget);
     expect(find.text('장바구니에 2개 있어요'), findsOneWidget);
+  });
+
+  group('장바구니 구성 보강(레퍼런스 반영 A)', () {
+    testWidgets('수량 1이면 - 대신 휴지통, 2 이상이면 - 이다(누르면 같은 삭제 확인)', (t) async {
+      await t.pumpWidget(testApp(const [], cart: cart));
+      await _openCartTab(t);
+
+      Icon iconOf(String key) => t.widget<Icon>(
+        find.descendant(
+          of: find.byKey(ValueKey(key)),
+          matching: find.byType(Icon),
+        ),
+      );
+      expect(iconOf('cart-dec-ci-2').icon, Icons.delete_outline);
+      expect(iconOf('cart-dec-ci-1').icon, Icons.remove);
+
+      await t.tap(find.byKey(const ValueKey('cart-dec-ci-2')));
+      await t.pumpAndSettle();
+      expect(find.text('상품을 뺄까요?'), findsOneWidget);
+    });
+
+    testWidgets('주문 버튼 안에 고를 수 있는 선택 품목 수와 서버 합계, 머리에 서버 보관 기한', (t) async {
+      await t.pumpWidget(testApp(const [], cart: cart));
+      await _openCartTab(t);
+
+      expect(
+        t.widget<Text>(find.byKey(const ValueKey('cart-order-label'))).data,
+        '2개 · 7,940원 주문하기',
+      );
+      // expiresAt 2026-11-23T06:00Z → 서울 2026-11-23.
+      expect(
+        t.widget<Text>(find.byKey(const ValueKey('cart-expires'))).data,
+        '2026-11-23까지 보관돼요',
+      );
+    });
+
+    testWidgets('선택 삭제는 선택 품목을 하나씩 서버에 지운다', (t) async {
+      await t.pumpWidget(testApp(const [], cart: cart));
+      await _openCartTab(t);
+      final sent = cart.changes.length;
+
+      await t.tap(find.byKey(const ValueKey('cart-remove-selected')));
+      await t.pumpAndSettle();
+      expect(find.text('선택한 상품 2개를 뺄까요?'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('cart-remove-selected-confirm')));
+      await t.pumpAndSettle();
+
+      final sentNow = cart.changes.sublist(sent);
+      expect(sentNow, hasLength(2));
+      expect(sentNow, everyElement(isA<RemoveItem>()));
+      expect(find.byKey(const ValueKey('cart-empty')), findsOneWidget);
+    });
+
+    testWidgets('선택 삭제 중 반영되지 않은 결과(버전 충돌)가 나오면 멈추고 안내한다', (t) async {
+      await t.pumpWidget(testApp(const [], cart: cart));
+      await _openCartTab(t);
+      final sent = cart.changes.length;
+      cart.bumpVersionElsewhere();
+
+      await t.tap(find.byKey(const ValueKey('cart-remove-selected')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cart-remove-selected-confirm')));
+      await t.pumpAndSettle();
+
+      // 첫 품목이 충돌로 거절되면 나머지는 보내지 않는다. 두 줄 다 남아 있다.
+      expect(cart.changes.sublist(sent), hasLength(1));
+      expect(find.byKey(const ValueKey('cart-line-ci-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('cart-line-ci-2')), findsOneWidget);
+      expect(
+        find.text('다른 곳에서 장바구니가 바뀌어 최신 내용으로 다시 불러왔어요. 다시 확인해 주세요.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('선택 품목이 없으면 선택 삭제·주문을 누를 수 없다', (t) async {
+      await t.pumpWidget(testApp(const [], cart: cart));
+      await _openCartTab(t);
+      for (final id in ['ci-1', 'ci-2']) {
+        await t.tap(find.byKey(ValueKey('cart-select-$id')));
+        await t.pumpAndSettle();
+      }
+      expect(
+        t
+            .widget<TextButton>(
+              find.byKey(const ValueKey('cart-remove-selected')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(
+        t.widget<Text>(find.byKey(const ValueKey('cart-order-label'))).data,
+        '주문하기',
+      );
+    });
+
+    testWidgets('"상품 추가"는 홈으로 간다', (t) async {
+      t.view
+        ..physicalSize = const Size(800, 1400)
+        ..devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(testApp(const [], cart: cart));
+      await _openCartTab(t);
+
+      await t.ensureVisible(find.byKey(const ValueKey('cart-add-more')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cart-add-more')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('cart-add-more')), findsNothing);
+      expect(find.byType(HomeScreen), findsOneWidget);
+    });
+
+    testWidgets('배달팁·봉투값 안내는 아래 시트로 정적 문구를 보인다(금액 숫자 없음)', (t) async {
+      await t.pumpWidget(testApp(const [], cart: cart));
+      await _openCartTab(t);
+
+      await t.tap(find.byKey(const ValueKey('cart-fee-info')));
+      await t.pumpAndSettle();
+      final sheet = find.byKey(const ValueKey('cart-fee-sheet'));
+      expect(sheet, findsOneWidget);
+      expect(
+        find.descendant(of: sheet, matching: find.textContaining('주문마다 한 번만')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: sheet, matching: find.textContaining('원')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('첫 구매 무료배달은 회원·서버 사유 FIRST_PURCHASE 일 때만 "예정"으로 보인다', (
+      t,
+    ) async {
+      final checkout = MockCheckoutRepository(
+        latency: Duration.zero,
+        now: () => DateTime.utc(2026, 10, 24, 3),
+      );
+      await t.pumpWidget(testApp(const [], cart: cart, checkout: checkout));
+      await _openCartTab(t);
+      // 비회원은 묻지 않는다.
+      expect(find.byKey(const ValueKey('cart-first-purchase')), findsNothing);
+
+      await t.tap(find.text('마이페이지').last);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('my-login')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('login-kakao')));
+      await t.pumpAndSettle();
+      await _openCartTab(t);
+      // 첫 구매 대상이 아니면 줄이 없다.
+      expect(find.byKey(const ValueKey('cart-first-purchase')), findsNothing);
+
+      checkout.firstPurchase = true;
+      // 서버 값이 바뀌었다고 가정하고 장바구니를 다시 받는다(합계가 바뀌면 다시 묻는다).
+      await t.tap(find.byKey(const ValueKey('cart-inc-ci-1')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('cart-first-purchase')), findsOneWidget);
+      expect(find.text('첫 구매 무료배달 예정(결제할 때 확정돼요)'), findsOneWidget);
+    });
   });
 }

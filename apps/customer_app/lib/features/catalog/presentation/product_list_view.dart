@@ -107,7 +107,7 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
               itemCount: list.items.length + (list.hasMore ? 1 : 0),
               itemBuilder: (context, i) {
                 if (i == list.items.length) {
-                  return _LoadMore(
+                  return LoadMoreFooter(
                     list: list,
                     onLoadMore: () => ref.read(provider.notifier).loadMore(),
                   );
@@ -126,8 +126,13 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
   }
 }
 
-class _LoadMore extends StatelessWidget {
-  const _LoadMore({required this.list, required this.onLoadMore});
+/// 목록 끝의 "더 보기"·다음 묶음 실패 안내(받은 목록은 그대로 둔다).
+class LoadMoreFooter extends StatelessWidget {
+  const LoadMoreFooter({
+    super.key,
+    required this.list,
+    required this.onLoadMore,
+  });
 
   final ProductListState list;
   final VoidCallback onLoadMore;

@@ -177,10 +177,10 @@ base class MockCatalogRepository implements CatalogRepository {
   ];
 
   List<MockProduct> _sectionProducts(String sectionId) => switch (sectionId) {
-    'S-RANK' => [
+    'S-RANK' || 'S-RANK-TOP' => [
       ...mockProducts,
     ]..sort((a, b) => b.popularity.compareTo(a.popularity)),
-    'S-NEW' => mockProducts.where((p) => p.newness > 0).toList(),
+    'S-NEW' || 'S-NEW-ALL' => mockProducts.where((p) => p.newness > 0).toList(),
     _ => mockProducts.where((p) => p.categoryId != 'C-CHIPS').toList(),
   };
 
@@ -215,14 +215,52 @@ base class MockCatalogRepository implements CatalogRepository {
                   for (final p in _sectionProducts(id)) displayItemJson(p),
                 ],
                 'nextCursor': null,
+                'viewAllRef': id,
               },
     ],
   };
 
+  /// 랭킹·신상품 탭 구성(계약 `GET /storefront/home?tab=`). 순위·NEW 배지는 서버 값으로 준다.
+  Map<String, Object?> tabJson(HomeTab tab) {
+    final (wire, id, kind, title) = switch (tab) {
+      HomeTab.ranking => ('RANKING', 'S-RANK-TOP', 'RANKING', '지금 TOP'),
+      _ => ('NEW', 'S-NEW-ALL', 'NEW', '이번 주 신상품'),
+    };
+    final products = _sectionProducts(
+      tab == HomeTab.ranking ? 'S-RANK' : 'S-NEW',
+    );
+    return {
+      'layoutVersion': 7,
+      'tab': wire,
+      'tabs': ['HOME', 'RANKING', 'NEW'],
+      'banners': const <Object?>[],
+      'sections': [
+        {
+          'sectionId': id,
+          'kind': kind,
+          'title': title,
+          'state': 'OK',
+          'items': [
+            for (final (i, p) in products.indexed)
+              {
+                ...displayItemJson(p),
+                if (tab == HomeTab.ranking) ...{'badge': 'RANK', 'rank': i + 1},
+              },
+          ],
+          'nextCursor': null,
+        },
+      ],
+    };
+  }
+
   @override
   Future<HomeView> home({String? mfcId, HomeTab? tab}) async {
     await _wait();
-    return homeFromContract(sf.HomeLayout.fromJson(homeJson()));
+    return homeFromContract(
+      sf.HomeLayout.fromJson(
+        tab == null || tab == HomeTab.home ? homeJson() : tabJson(tab),
+      ),
+    );
   }
 
   @override
@@ -230,6 +268,7 @@ base class MockCatalogRepository implements CatalogRepository {
     HomeSection section, {
     required int layoutVersion,
     String? mfcId,
+    String? cursor,
   }) async {
     await _wait();
     if (layoutVersion != 7) {
@@ -237,15 +276,22 @@ base class MockCatalogRepository implements CatalogRepository {
         Problem(status: 409, code: 'LAYOUT_VERSION_CHANGED'),
       );
     }
+    // 서버 흉내: [pageSize] 씩 끊어 주고 남았으면 다음 커서를 준다.
+    final all = _sectionProducts(section.sectionId);
+    final start = int.tryParse(cursor ?? '') ?? 0;
+    final end = (start + pageSize).clamp(0, all.length);
     return sectionItemsFromContract(
       section,
       sf.ListSectionItems200Response.fromJson({
         'sectionId': section.sectionId,
         'items': [
-          for (final p in _sectionProducts(section.sectionId))
+          for (final p in all.sublist(start.clamp(0, all.length), end))
             displayItemJson(p),
         ],
-        'page': {'nextCursor': null, 'size': 50},
+        'page': {
+          'nextCursor': end < all.length ? '$end' : null,
+          'size': pageSize,
+        },
       }),
     );
   }

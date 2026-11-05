@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../shared/order_status.dart';
 import '../../checkout/domain/checkout.dart'
-    show ArrivalWindow, Quote, ShippingAddress;
+    show ArrivalWindow, OutOfStockPreference, Quote, ShippingAddress;
 
 @immutable
 class OrderListItem {
@@ -125,7 +125,10 @@ class OrderDetail {
     this.window,
     this.quote,
     this.paymentState,
+    this.paymentAttemptId,
     this.refundedAmount,
+    this.deliveryNote,
+    this.outOfStock,
     this.claims = const [],
     this.shippingAddress,
   });
@@ -143,6 +146,15 @@ class OrderDetail {
   final List<OrderLineView> lines;
   final List<ShipmentView> shipments;
   final String? paymentState;
+
+  /// 결제 시도 ID(`Order.payment.paymentAttemptId`). 결제 수단은 이것으로 `GET /payments/{id}` 를 묻는다. 없으면 null.
+  final String? paymentAttemptId;
+
+  /// 고객이 남긴 배달 요청사항(`Order.deliveryNote`). 없으면 null.
+  final String? deliveryNote;
+
+  /// 품절 시 처리(`Order.outOfStockPreference`). 값이 없으면 null(표시하지 않음).
+  final OutOfStockPreference? outOfStock;
 
   /// 서버가 준 환불 성공액. 앱이 계산하지 않는다.
   final int? refundedAmount;
@@ -196,4 +208,18 @@ class DeliveryEtaView {
   final bool delayAlert;
   final DateTime? asOf;
   final Freshness freshness;
+
+  /// 실시간 구독의 STAGE_CHANGED(단계만 옴)를 반영한 사본. 도착 예상 수치는 그대로 둔다.
+  DeliveryEtaView withStage(DeliveryStage next) => DeliveryEtaView(
+    deliveryId: deliveryId,
+    stage: next,
+    status: status,
+    etaAt: etaAt,
+    remainingSeconds: remainingSeconds,
+    delayedBySeconds: delayedBySeconds,
+    window: window,
+    delayAlert: delayAlert,
+    asOf: asOf,
+    freshness: freshness,
+  );
 }

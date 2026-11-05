@@ -26,6 +26,10 @@ abstract interface class PaymentRepository {
     String errorCode, {
     required IdempotencyKey key,
   });
+
+  /// `GET /payments/{orderId}` — 경로의 orderId 는 결제 시도 ID(`Order.payment.paymentAttemptId`, 계약
+  /// `CheckoutPayment.orderId = paymentAttemptId`). 본인 것만, 아니면 404. 실패는 [PmartFailure] 로 던진다.
+  Future<PaymentSummary> payment(String paymentAttemptId);
 }
 
 /// 토스 결제창이 사용자 취소로 돌려주는 코드.
@@ -88,6 +92,21 @@ final class ApiPaymentRepository implements PaymentRepository {
         _ => AuthSubmitResult.rejected,
       };
     }
+  }
+
+  @override
+  Future<PaymentSummary> payment(String paymentAttemptId) async {
+    final res = await pmartGuard(
+      () => _api.getCheckoutPayment(orderId: paymentAttemptId),
+    );
+    final p = res.data ?? (throw const ContractViolationFailure('결제 상태 본문 없음'));
+    return PaymentSummary(
+      method: switch (p.method?.trim()) {
+        final m? when m.isNotEmpty => m,
+        _ => null,
+      },
+      approvedAt: p.approvedAt,
+    );
   }
 
   @override

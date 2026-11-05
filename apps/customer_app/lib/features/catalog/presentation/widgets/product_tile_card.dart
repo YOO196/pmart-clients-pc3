@@ -6,6 +6,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/providers.dart';
 import '../../domain/catalog.dart';
+import 'quick_add_button.dart';
 
 /// 상품 이미지. 주소가 없거나 받지 못하면 자리표시를 그린다.
 class ProductImage extends ConsumerWidget {
@@ -45,10 +46,18 @@ String ratingText(AppLocalizations l10n, double? rating, int? count) =>
       );
 
 class ProductTileCard extends StatelessWidget {
-  const ProductTileCard({super.key, required this.tile, this.onTap});
+  const ProductTileCard({
+    super.key,
+    required this.tile,
+    this.onTap,
+    this.quickAdd = true,
+  });
 
   final ProductTile tile;
   final VoidCallback? onTap;
+
+  /// 이미지 위 `+` 바로 담기. 담을 수 있어 보이는 카드에만 보인다([QuickAddButton.offeredFor]).
+  final bool quickAdd;
 
   /// 가로 진열(높이 고정)에서 카드 한 장의 높이. 이름 2줄·가격·평점·상태 문구가 들어가는 높이에
   /// 기기 글자 크기 설정을 반영한다. 카드는 세로 목록(높이 무제한)에서도 쓰므로 Flexible 을 쓰지 않는다.
@@ -77,7 +86,18 @@ class ProductTileCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ProductImage(url: tile.imageUrl),
+                // 담기 버튼은 카드(상세 이동)와 따로 눌린다 — 상세 이동이 담기로 실행되지 않는다.
+                Stack(
+                  children: [
+                    ProductImage(url: tile.imageUrl),
+                    if (quickAdd && QuickAddButton.offeredFor(tile))
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: QuickAddButton(tile: tile),
+                      ),
+                  ],
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

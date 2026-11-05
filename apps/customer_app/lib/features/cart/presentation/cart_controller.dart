@@ -64,6 +64,13 @@ final class NoticeReloadFailed extends CartNotice {
   const NoticeReloadFailed();
 }
 
+/// 선택돼 있던 품절·판매 불가 품목을 선택에서 뺐다(삭제하지 않음). 고객에게 바뀐 사실을 알린다(Commerce §장바구니 재진입).
+final class NoticeSoldOutDeselected extends CartNotice {
+  const NoticeSoldOutDeselected(this.count);
+
+  final int count;
+}
+
 @immutable
 class CartState {
   const CartState({
@@ -105,6 +112,16 @@ class CartController extends AsyncNotifier<CartState> {
 
   CartRepository get _repo => ref.read(cartRepositoryProvider);
 
+  /// 자동 선택 해제를 이미 시도한 품목(같은 품목을 반복해서 보내지 않는다 — 거절·불명이어도 다시 자동으로 보내지 않음).
+  final Set<String> _autoTried = {};
+
+  /// 이번 자동 해제로 뺀 품목 수(끝나면 안내로 한 번 보인다).
+  int _autoDeselected = 0;
+  bool _autoRunning = false;
+
+  /// 선택 삭제가 품목을 차례로 지우는 중. 그동안 자동 선택 해제가 끼어들지 않는다.
+  bool _bulkRunning = false;
+
   @override
   Future<CartState> build() async {
     _unknownKey = null;
@@ -113,13 +130,68 @@ class CartController extends AsyncNotifier<CartState> {
     final cart = await ref
         .watch(cartRepositoryProvider)
         .open(mfcId: ref.watch(currentMfcIdProvider));
+    _autoTried.clear();
+    _autoDeselected = 0;
+    _scheduleAutoDeselect();
     return CartState(cart: cart);
   }
 
   CartState? get _current => state.value;
 
   void _set(CartState next) {
-    if (ref.mounted) state = AsyncData(next);
+    if (!ref.mounted) return;
+    state = AsyncData(next);
+    _scheduleAutoDeselect();
+  }
+
+  /// 선택된 채 품절·판매 불가가 된 품목은 바로 선택에서 뺀다. 선택의 정본은 서버라 SetSelected(false) 를 보내고,
+  /// 서버가 확정한 장바구니·합계로 다시 그린다(합계를 화면에서 계산하지 않는다). 품목은 지우지 않는다.
+  void _scheduleAutoDeselect() {
+    if (_autoRunning) return;
+    // 이벤트 큐 다음 차례에 — build 가 끝나 상태가 놓인 뒤에 본다.
+    Future<void>(_autoDeselectNext);
+  }
+
+  Future<void> _autoDeselectNext() async {
+    if (!ref.mounted || _autoRunning || _bulkRunning) return;
+    final current = _current;
+    if (current == null || !current.canChange) return;
+    final target = current.cart.lines
+        .where(
+          (l) =>
+              l.selected &&
+              l.definitelyUnavailable &&
+              !_autoTried.contains(l.cartItemId),
+        )
+        .firstOrNull;
+    if (target == null) {
+      if (_autoDeselected > 0) {
+        final n = _autoDeselected;
+        _autoDeselected = 0;
+        // 다른 안내(거절 등)가 떠 있으면 그것을 덮지 않는다.
+        if (current.notice == null) {
+          state = AsyncData(
+            CartState(
+              cart: current.cart,
+              amountStale: current.amountStale,
+              notice: NoticeSoldOutDeselected(n),
+            ),
+          );
+        }
+      }
+      return;
+    }
+    _autoTried.add(target.cartItemId);
+    _autoRunning = true;
+    try {
+      final outcome = await submit(
+        SetSelected(cartItemId: target.cartItemId, selected: false),
+      );
+      if (outcome is CartChangeApplied) _autoDeselected++;
+    } finally {
+      _autoRunning = false;
+    }
+    _scheduleAutoDeselect();
   }
 
   /// 변경 1회. 진행 중이거나 결과 불명인 변경이 있으면 받지 않는다(null).
@@ -157,6 +229,55 @@ class CartController extends AsyncNotifier<CartState> {
       return _resolve(attempts: ref.read(cartResolvePolicyProvider).attempts);
     }
     return _settle(outcome, change);
+  }
+
+  /// 선택 삭제. 일괄 삭제 경로가 없어(계약은 품목별 `DELETE /carts/{id}/items/{itemId}` 만) 선택된 품목을 하나씩
+  /// [submit]([RemoveItem]) 으로 지운다. 반영(APPLIED)이 아닌 결과(거절·충돌·미적용·불명)가 나오면 거기서 멈추고
+  /// 그 결과의 안내를 그대로 둔다 — 나머지는 지우지 않는다. 마지막 결과를 돌려준다(시작하지 못하면 null).
+  Future<CartChangeOutcome?> removeSelected() async {
+    final current = _current;
+    if (current == null || !current.canChange || _bulkRunning) return null;
+    final ids = [
+      for (final l in current.cart.lines)
+        if (l.selected) l.cartItemId,
+    ];
+    if (ids.isEmpty) return null;
+    _bulkRunning = true;
+    CartChangeOutcome? last;
+    try {
+      for (final id in ids) {
+        final now = _current;
+        if (now == null) break;
+        // 그 사이 이미 빠진 품목(다시 읽은 장바구니에 없음)은 건너뛴다.
+        if (now.cart.lines.every((l) => l.cartItemId != id)) continue;
+        last = await submit(RemoveItem(cartItemId: id));
+        if (last is! CartChangeApplied || !ref.mounted) break;
+      }
+    } finally {
+      _bulkRunning = false;
+    }
+    if (ref.mounted) _scheduleAutoDeselect();
+    return last;
+  }
+
+  /// 다른 화면(주문 상세의 "같은 상품 담기" 등)에서 보내는 변경. 장바구니를 아직 안 읽었으면 읽고, 다른 변경이 진행 중이면
+  /// 끝날 때까지 잠깐 기다렸다가 [submit] 한다. 결과 불명인 변경이 걸려 있거나 끝내 바쁘면 null(보내지 않음).
+  /// 장바구니 조회 실패는 [PmartFailure] 로 던진다.
+  Future<CartChangeOutcome?> submitWhenReady(
+    CartChange change, {
+    int attempts = 20,
+    Duration step = const Duration(milliseconds: 100),
+  }) async {
+    for (var i = 0; ; i++) {
+      final s = await future;
+      if (!ref.mounted || s.sync == CartSync.unknown) return null;
+      if (s.canChange && !_bulkRunning && !_autoRunning) {
+        final outcome = await submit(change);
+        if (outcome != null) return outcome;
+      }
+      if (i >= attempts) return null;
+      await Future<void>.delayed(step);
+    }
   }
 
   /// "다시 확인". 원결과만 조회한다(변경을 다시 보내지 않는다).

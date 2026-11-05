@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:pmart_api_delivery_tracking/pmart_api_delivery_tracking.dart'
     as trk;
@@ -5,9 +7,12 @@ import 'package:pmart_api_order/pmart_api_order.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../checkout/data/mock_checkout_repository.dart';
-import '../../checkout/domain/checkout.dart' show ArrivalWindow;
+import '../../checkout/domain/checkout.dart'
+    show ArrivalWindow, OutOfStockPreference;
+import '../../../shared/order_status.dart';
 import '../../claims/domain/claims.dart' show RequestState;
 import '../domain/orders.dart';
+import '../domain/tracking.dart';
 import 'orders_repository.dart';
 
 /// 목 구현. 지난 주문 3건(분할배송 진행 중·완료·취소)과, 목 결제로 확정된 주문을 함께 보여 준다.
@@ -21,6 +26,9 @@ base class MockOrdersRepository implements OrdersRepository {
   final MockCheckoutRepository? checkout;
   final Duration latency;
   final DateTime Function() now;
+
+  /// 목록 조회에 쓴 상태 조건(순서대로). 시험이 "어떤 status 로 물었는지"를 본다.
+  final listStatuses = <OrderStatus?>[];
 
   /// 배송 위치 조회 실패 시연(주문·배송 상태와 별개).
   bool etaFails = false;
@@ -85,7 +93,13 @@ base class MockOrdersRepository implements OrdersRepository {
           'state': 'PLANNED',
         },
       ],
-      'payment': {'state': 'APPROVED', 'refundedAmount': 0},
+      'outOfStockPreference': 'CANCEL_OOS_ONLY',
+      'deliveryNote': '문 앞에 두고 벨은 누르지 말아 주세요',
+      'payment': {
+        'paymentAttemptId': 'pa-4',
+        'state': 'APPROVED',
+        'refundedAmount': 0,
+      },
       'claims': <Object?>[],
       'sources': [
         {
@@ -199,7 +213,12 @@ base class MockOrdersRepository implements OrdersRepository {
           'state': 'DELIVERED',
         },
       ],
-      'payment': {'state': 'APPROVED', 'refundedAmount': 0},
+      'outOfStockPreference': 'CANCEL_ALL',
+      'payment': {
+        'paymentAttemptId': 'pa-2',
+        'state': 'APPROVED',
+        'refundedAmount': 0,
+      },
       'sources': [
         {
           'system': 'order-service',
@@ -298,7 +317,16 @@ base class MockOrdersRepository implements OrdersRepository {
           'state': 'PLANNED',
         },
       ],
-      'payment': {'state': 'APPROVED', 'refundedAmount': 0},
+      'outOfStockPreference': switch (d.request.outOfStock) {
+        OutOfStockPreference.cancelOutOfStockOnly => 'CANCEL_OOS_ONLY',
+        OutOfStockPreference.cancelAll => 'CANCEL_ALL',
+      },
+      'deliveryNote': ?d.request.deliveryNote,
+      'payment': {
+        'paymentAttemptId': ?checkout?.approvedAttemptOf(orderId),
+        'state': 'APPROVED',
+        'refundedAmount': 0,
+      },
       'claims': [],
       'sources': [
         {
@@ -324,20 +352,25 @@ base class MockOrdersRepository implements OrdersRepository {
   Map<String, Object?>? orderJson(String orderId) => _all()[orderId];
 
   @override
-  Future<OrderPage> list({String? cursor}) async {
+  Future<OrderPage> list({String? cursor, OrderStatus? status}) async {
     await _wait();
+    listStatuses.add(status);
     final all = _all();
+    // 서버 흉내: status 를 주면 그 상태만(계약 `GET /orders?status=`).
+    final wire = orderStatusToWire(status)?.value;
     return orderPageFromContract(
       api.ListOrders200Response.fromJson({
         'items': [
           for (final e in all.entries)
-            {
-              'orderId': e.key,
-              'status': e.value['status'],
-              'orderedAt': _orderedAt[e.key] ?? now().toUtc().toIso8601String(),
-              'totalAmount': (e.value['quote']! as Map)['totalAmount'],
-              'itemCount': (e.value['lines']! as List).length,
-            },
+            if (wire == null || e.value['status'] == wire)
+              {
+                'orderId': e.key,
+                'status': e.value['status'],
+                'orderedAt':
+                    _orderedAt[e.key] ?? now().toUtc().toIso8601String(),
+                'totalAmount': (e.value['quote']! as Map)['totalAmount'],
+                'itemCount': (e.value['lines']! as List).length,
+              },
         ],
         'page': {'nextCursor': null, 'size': 50},
       }),
@@ -393,6 +426,62 @@ base class MockOrdersRepository implements OrdersRepository {
       },
     };
     return etaFromContract(deliveryId, trk.DeliveryEta.fromJson(json));
+  }
+
+  /// 실시간 구독 실패 시연(연결 즉시 오류). 주기 조회로 넘어가는지 본다.
+  bool trackFails = false;
+
+  /// 배송별 열린 구독. 시험이 [emitTracking] 으로 이벤트를 흘리고, 화면을 닫으면 비는지 본다.
+  final openTracks = <String, List<StreamController<TrackingEvent>>>{};
+
+  /// 지금까지 연 구독 수(재연결 확인용).
+  int trackOpens = 0;
+
+  /// 열린 구독 수.
+  int get openTrackCount =>
+      openTracks.values.fold(0, (n, list) => n + list.length);
+
+  /// 열린 구독에 이벤트를 흘린다.
+  void emitTracking(String deliveryId, TrackingEvent e) {
+    for (final c in [...?openTracks[deliveryId]]) {
+      c.add(e);
+    }
+  }
+
+  /// 열린 구독을 끊는다(서버·망 끊김 흉내). [error] 가 있으면 오류로 끝낸다.
+  Future<void> dropTracking(String deliveryId, {Object? error}) async {
+    for (final c in [...?openTracks[deliveryId]]) {
+      if (error != null) c.addError(error);
+      await c.close();
+    }
+  }
+
+  @override
+  Stream<TrackingEvent> track(String deliveryId, {String? lastEventId}) {
+    trackOpens++;
+    late final StreamController<TrackingEvent> c;
+    c = StreamController<TrackingEvent>(
+      onListen: () {
+        if (trackFails) {
+          c
+            ..addError(const NetworkFailure(DioExceptionType.connectionError))
+            ..close();
+          return;
+        }
+        (openTracks[deliveryId] ??= []).add(c);
+        // 연결되면 서버가 HEARTBEAT 를 보낸다(목은 바로 한 번).
+        c.add(const TrackingEvent(type: TrackingEventType.heartbeat));
+      },
+      onCancel: () => _forget(deliveryId, c),
+    );
+    c.done.then((_) => _forget(deliveryId, c));
+    return c.stream;
+  }
+
+  void _forget(String deliveryId, StreamController<TrackingEvent> c) {
+    final list = openTracks[deliveryId];
+    list?.remove(c);
+    if (list != null && list.isEmpty) openTracks.remove(deliveryId);
   }
 
   final _timeChanges =

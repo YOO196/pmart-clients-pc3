@@ -77,6 +77,7 @@ class HomeSection {
     required this.items,
     this.subtitle,
     this.nextCursor,
+    this.viewAllRef,
   });
 
   final String sectionId;
@@ -88,6 +89,13 @@ class HomeSection {
   final bool available;
   final List<ProductTile> items;
   final String? nextCursor;
+
+  /// 서버가 준 "전체보기" 연결(계약 `Section.viewAllRef`). 형식은 계약에 정해져 있지 않아 있는지만 본다.
+  final String? viewAllRef;
+
+  /// 전체보기를 보여도 되는지. 서버가 연결을 주었거나 다음 묶음이 있을 때만(앱이 임의로 만들지 않는다).
+  bool get hasViewAll =>
+      available && (viewAllRef != null || nextCursor != null);
 }
 
 enum HomeTab { home, ranking, isNew }

@@ -10,13 +10,15 @@ import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
 import 'package:customer_app/features/orders/data/orders_repository.dart';
 import 'package:customer_app/features/orders/domain/orders.dart';
 
+import 'package:customer_app/shared/order_status.dart';
+
 import 'support/app_harness.dart';
 
 base class _ListDown extends MockOrdersRepository {
   _ListDown() : super(latency: Duration.zero);
 
   @override
-  Future<OrderPage> list({String? cursor}) async =>
+  Future<OrderPage> list({String? cursor, OrderStatus? status}) async =>
       throw const NetworkFailure(DioExceptionType.connectionError);
 }
 
@@ -109,9 +111,7 @@ void main() {
     expect(find.text('김피마 · 010-0000-0000'), findsOneWidget);
   });
 
-  testWidgets('사본이 없는 주문(배포 전)은 "배송지 정보 없음"이고 현재 주소로 대신하지 않는다', (
-    t,
-  ) async {
+  testWidgets('사본이 없는 주문(배포 전)은 "배송지 정보 없음"이고 현재 주소로 대신하지 않는다', (t) async {
     await openOrders(t);
     await t.tap(find.byKey(const ValueKey('order-order-seed-1')));
     await t.pumpAndSettle();
