@@ -38,7 +38,10 @@ final class PmartHeadersInterceptor extends Interceptor {
   ) async {
     final headers = options.headers;
     headers['X-Source-System'] = sourceSystem;
-    headers['Accept'] = 'application/json, application/problem+json';
+    // 호출 쪽이 정한 Accept(예: SSE 의 text/event-stream)는 덮지 않는다.
+    if (headers['Accept'] == null && headers['accept'] == null) {
+      headers['Accept'] = 'application/json, application/problem+json';
+    }
 
     if (isMutation(options)) {
       final key = options.extra[PmartExtra.idempotencyKey];
