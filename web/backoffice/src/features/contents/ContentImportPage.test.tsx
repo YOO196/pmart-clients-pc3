@@ -25,9 +25,14 @@ const batch = {
   state: 'UPLOADED',
   productCount: 4,
   items: [
-    { sourceKey: 'k-ready', draftId: 'cd-ready', outcome: 'CREATED', draft: draft('cd-ready', 'DRAFT', true) },
+    { sourceKey: 'k-ready', draftId: 'cd-ready', outcome: 'CREATED', draft: { ...draft('cd-ready', 'DRAFT', true), registration: 'NEW' } },
     { sourceKey: 'k-pub', draftId: 'cd-pub', outcome: 'UNCHANGED', draft: draft('cd-pub', 'PUBLISHED', false) },
-    { sourceKey: 'k-lock', draftId: 'cd-lock', outcome: 'LOCKED', draft: draft('cd-lock', 'SUBMITTED', false) },
+    {
+      sourceKey: 'k-lock',
+      draftId: 'cd-lock',
+      outcome: 'LOCKED',
+      draft: { ...draft('cd-lock', 'SUBMITTED', false), registration: 'UPDATE', publishedContentVersion: 2, publishedDraftId: 'cd-old', publishedAt: '2026-11-01T01:00:00Z' },
+    },
     {
       sourceKey: 'k-bad',
       draftId: 'cd-bad',
@@ -73,5 +78,16 @@ describe('콘텐츠 일괄 등록 — 행마다 제출 여부·사유', () => {
     expect(lines).toHaveLength(3);
     expect(lines[0]).toHaveTextContent('cd-pub (k-pub): 이미 게시된 내용과 같아 제출하지 않아요');
     expect(lines[2]).toHaveTextContent('cd-bad (k-bad): 고쳐야 제출할 수 있어요 · 상품 승인 전이에요 (productId) — 원천 키로 연결된 상품이 없음');
+  });
+  it('신규/기존 게시 갱신(BR-44): 서버 registration 그대로 — 갱신이면 지금 게시본 버전, 게시된 초안은 "-"', async () => {
+    server.use(http.get(`${API_BASE}/content-import-batches/cib-1`, () => HttpResponse.json(batch)));
+    renderAt('/contents/import/cib-1');
+    expect(await screen.findByRole('columnheader', { name: '구분' })).toBeInTheDocument();
+    const row = (key: string) => screen.getByRole('cell', { name: key }).closest('tr') as HTMLElement;
+    expect(within(row('k-ready')).getByText('새 콘텐츠')).toBeInTheDocument();
+    expect(within(row('k-lock')).getByText('기존 게시 갱신')).toBeInTheDocument();
+    expect(row('k-lock')).toHaveTextContent('지금 게시본 v2');
+    expect(row('k-pub').querySelector('[data-registration="none"]')).not.toBeNull(); // 게시된 초안: 서버 null → "-"
+    expect(row('k-bad').querySelector('[data-registration="none"]')).not.toBeNull(); // 값이 없으면 추정하지 않는다
   });
 });

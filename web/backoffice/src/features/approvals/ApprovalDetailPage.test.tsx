@@ -94,4 +94,33 @@ describe('승인 상세 (목 모드, MSW)', () => {
     expect(await screen.findByText('반영 결과는 해당 등록 화면(상품·가격·콘텐츠 일괄 등록)에서 확인해 주세요. 이 화면의 반영 상태는 아직 바로 바뀌지 않아요.')).toBeInTheDocument();
     expect(screen.queryByText('정본 반영을 확인하고 있어요')).not.toBeInTheDocument();
   });
+  it('콘텐츠 게시 승인 행(BR-44): 기존 게시 갱신이면 지금 게시본 버전을 보이고, 상품용 "기존 상품 갱신"으로 쓰지 않는다', async () => {
+    server.use(
+      http.get(`${API_BASE}/approvals/AP-content`, () =>
+        HttpResponse.json({
+          approvalId: 'AP-content',
+          type: 'DISPLAY',
+          targetService: 'product-content-service',
+          targetRef: 'contentImportBatch:cib-1',
+          requesterId: 'OP-someone-else',
+          reviewState: 'REVIEW_PENDING',
+          executionState: 'NOT_REQUESTED',
+          version: 1,
+          lines: [
+            { lineKey: 'cd-new', attributes: { draftId: 'cd-new', name: '사과', registration: 'NEW' } },
+            { lineKey: 'cd-upd', attributes: { draftId: 'cd-upd', name: '배', registration: 'UPDATE', publishedContentVersion: 3 } },
+          ],
+          decisions: [],
+        }),
+      ),
+    );
+    render(<App memory initialPath="/approvals/AP-content" initialToken={as.md} />);
+    expect(await screen.findByText('cd-new')).toBeInTheDocument();
+    const marks = screen.getAllByTestId('content-registration');
+    expect(marks[0]).toHaveTextContent('새 콘텐츠');
+    expect(marks[1]).toHaveTextContent('기존 게시 갱신');
+    expect(marks[1]).toHaveTextContent('지금 게시본 v3');
+    expect(screen.queryByText('기존 상품 갱신')).not.toBeInTheDocument();
+    expect(screen.queryByText(/새 상품/)).not.toBeInTheDocument();
+  });
 });

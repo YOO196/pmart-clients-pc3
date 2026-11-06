@@ -17,6 +17,7 @@ import { messages as m } from '../../shared/messages';
 import { QueryState } from '../../shared/QueryState';
 import { toUiState } from '../../shared/toUiState';
 import { useCommand } from '../../shared/useCommand';
+import { ContentRegistration } from '../contents/ContentRegistration';
 
 const OPEN_REVIEW: readonly ReviewState[] = ['REVIEW_PENDING', 'EVIDENCE_REQUIRED'];
 const FINAL_EXECUTION: readonly ExecutionState[] = ['APPLIED', 'PARTIAL', 'REJECTED'];
@@ -192,7 +193,21 @@ export function ApprovalDetailPage() {
                         {/* 가격 일괄 등록 행(백엔드 안내 2026-11-03 §1-5): 승인자가 이전 → 새 가격·구분·상품명을 바로 본다 */}
                         <PriceLineAttributes attributes={l.attributes} />
                         {/* 상품 등록 행(BR-39 회신): 재업로드면 "기존 상품 갱신"을 먼저 보인다 */}
-                        <ProductLineAttributes attributes={l.attributes} />
+                        {/* 콘텐츠 게시 행(BR-44 회신): 이미 게시된 콘텐츠를 바꾸는 건이면 "기존 게시 갱신" + 지금 게시본 버전 */}
+                        {a.targetService === 'product-content-service' ? (
+                          l.attributes && 'registration' in l.attributes && (
+                            <p className="text-sm" data-testid="content-registration">
+                              <ContentRegistration
+                                value={{
+                                  registration: typeof l.attributes['registration'] === 'string' ? l.attributes['registration'] : null,
+                                  publishedContentVersion: l.attributes['publishedContentVersion'],
+                                }}
+                              />
+                            </p>
+                          )
+                        ) : (
+                          <ProductLineAttributes attributes={l.attributes} />
+                        )}
                         <code className="text-xs break-all">{l.attributes ? JSON.stringify(l.attributes) : ''}</code>
                       </td>
                     </tr>

@@ -118,10 +118,24 @@ function contentProblems(d: ContentDraft): NonNullable<ContentDraft['problems']>
 }
 
 /** 조회 때마다 제출 가능 여부를 다시 계산(상품 승인으로 연결되면 바뀐다) */
+/**
+ * 신규/기존 게시 갱신(BR-44, 백엔드 회신 2026-11-04): 심사 전 초안(DRAFT·SUBMITTED)만. 연결 상품 또는 같은 원천 키에
+ * 이미 게시된 콘텐츠가 있으면 UPDATE(+ 지금 게시본). 게시·반려된 초안은 null.
+ */
+function contentRegistrationOf(d: ContentDraft): Pick<ContentDraft, 'registration' | 'publishedContentVersion' | 'publishedDraftId' | 'publishedAt'> {
+  if (d.state !== 'DRAFT' && d.state !== 'SUBMITTED') return { registration: null, publishedContentVersion: null, publishedDraftId: null, publishedAt: null };
+  const pub = [...db.contentDrafts.values()].find(
+    (p) => p.state === 'PUBLISHED' && p.draftId !== d.draftId && ((d.productId && p.productId === d.productId) || (d.sourceKey && p.sourceKey === d.sourceKey)),
+  );
+  return pub
+    ? { registration: 'UPDATE', publishedContentVersion: pub.contentVersion ?? null, publishedDraftId: pub.draftId, publishedAt: pub.updatedAt ?? null }
+    : { registration: 'NEW', publishedContentVersion: null, publishedDraftId: null, publishedAt: null };
+}
+
 function viewContent(d: ContentDraft): ContentDraft {
-  if (d.state !== 'DRAFT') return d;
+  if (d.state !== 'DRAFT') return { ...d, ...contentRegistrationOf(d) };
   const problems = contentProblems(d);
-  return { ...d, problems, submittable: problems.length === 0 };
+  return { ...d, ...contentRegistrationOf(d), problems, submittable: problems.length === 0 };
 }
 
 function newContentDraft(input: ContentDraftInput): ContentDraft {
@@ -156,7 +170,17 @@ const contentApproval = (targetRef: string, drafts: readonly ContentDraft[], sum
   lines: drafts.map((d) => ({
     lineKey: d.draftId,
     targetRef: `contentDraft:${d.draftId}`,
-    attributes: { draftId: d.draftId, draftHash: d.draftHash, productId: d.productId, name: d.input?.name },
+    attributes: (() => {
+      const r = contentRegistrationOf(d);
+      return {
+        draftId: d.draftId,
+        draftHash: d.draftHash,
+        productId: d.productId,
+        name: d.input?.name,
+        registration: r.registration,
+        ...(r.registration === 'UPDATE' ? { publishedContentVersion: r.publishedContentVersion } : {}),
+      };
+    })(),
   })),
 });
 

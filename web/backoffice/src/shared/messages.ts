@@ -342,7 +342,10 @@ export const messages = {
     published: '게시된 콘텐츠',
     outcome: { CREATED: '새로 만듦', UPDATED: '갱신', UNCHANGED: '변경 없음', LOCKED: '잠김(제출됨)' } as const,
     // 일괄 등록 행의 "제출 여부·사유". 서버 값(초안 상태·submittable·problems·outcome)만으로 고른다.
-    rowHead: { draft: '초안', sourceKey: '원천 키', outcome: '업로드 결과', name: '상품명', status: '제출 여부·사유' } as const,
+    rowHead: { draft: '초안', sourceKey: '원천 키', outcome: '업로드 결과', registration: '구분', name: '상품명', status: '제출 여부·사유' } as const,
+    // BR-44: 심사 전 초안만 서버가 채운다(게시·반려된 초안은 null → "-").
+    registrationName: { NEW: '새 콘텐츠', UPDATE: '기존 게시 갱신' } as const,
+    publishedNow: (version: string, at: string) => `지금 게시본 ${version}${at ? ` · ${at}` : ''}`,
     rowStatus: {
       ready: '제출 가능',
       readySame: '제출 가능(이전 업로드와 같은 초안)',

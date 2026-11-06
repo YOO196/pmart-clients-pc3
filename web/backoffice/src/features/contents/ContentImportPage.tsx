@@ -11,6 +11,7 @@ import { QueryState } from '../../shared/QueryState';
 import { toUiState } from '../../shared/toUiState';
 import { useCommand } from '../../shared/useCommand';
 import { BatchApprovals, multipart, ZipUpload } from '../products/ProductImportPage';
+import { ContentRegistration } from './ContentRegistration';
 import { type ImportItem, rowStatus, type RowStatus, rowSummary } from './importRowStatus';
 
 export function NewContentImportPage() {
@@ -71,6 +72,7 @@ export function ContentImportPage() {
                   <th>{m.contents.rowHead.draft}</th>
                   <th>{m.contents.rowHead.sourceKey}</th>
                   <th>{m.contents.rowHead.outcome}</th>
+                  <th>{m.contents.rowHead.registration}</th>
                   <th>{m.contents.rowHead.name}</th>
                   <th>{m.contents.rowHead.status}</th>
                 </tr>
@@ -91,6 +93,9 @@ export function ContentImportPage() {
                       </td>
                       <td>{it.sourceKey ?? m.none}</td>
                       <td>{it.outcome ? m.contents.outcome[it.outcome] : m.none}</td>
+                      <td>
+                        <ContentRegistration value={it.draft ?? {}} />
+                      </td>
                       <td>{it.draft?.input?.name ?? m.none}</td>
                       <td>
                         <RowStatusView status={st} />
