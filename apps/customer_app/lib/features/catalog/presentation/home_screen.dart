@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,10 +35,67 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   HomeTab _tab = HomeTab.home;
 
+  GoRouter? _router;
+  String? _lastPath;
+
+  /// 마지막 홈 조회가 끝난 시각(성공·실패 모두). null 이면 아직 첫 조회 중이다.
+  DateTime? _loadedAt;
+
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual(homeProvider, (_, next) {
+      if (next.isLoading) return;
+      _loadedAt = ref.read(homeClockProvider)();
+    }, fireImmediately: true);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final router = GoRouter.maybeOf(context);
+    if (router == _router) return;
+    _router?.routerDelegate.removeListener(_onRouteChanged);
+    _router = router;
+    _lastPath = _path;
+    router?.routerDelegate.addListener(_onRouteChanged);
+  }
+
+  @override
+  void dispose() {
+    _router?.routerDelegate.removeListener(_onRouteChanged);
+    super.dispose();
+  }
+
+  /// 맨 위 화면의 위치. `push` 로 올린 화면(상품 상세 등)은 `uri` 가 그대로라 맨 위 경로로 본다.
+  String? get _path =>
+      _router?.routerDelegate.currentConfiguration.lastOrNull?.matchedLocation;
+
+  /// 홈이 다시 보이면(상세에서 뒤로·다른 탭에서 홈으로) 오래된 홈을 다시 읽는다.
+  void _onRouteChanged() {
+    final path = _path;
+    final was = _lastPath;
+    _lastPath = path;
+    if (path != '/' || was == '/') return;
+    // 내비게이션 알림 안에서 provider 를 바꾸지 않게 한 박자 뒤에 한다
+    scheduleMicrotask(() {
+      if (mounted) _refreshIfStale();
+    });
+  }
+
+  void _refreshIfStale() {
+    final at = _loadedAt;
+    if (at == null) return; // 첫 조회 중
+    if (ref.read(homeClockProvider)().difference(at) < homeStaleAfter) return;
+    _refresh().ignore(); // 실패는 홈 화면이 오류로 보인다
+  }
+
   Future<HomeView> _refresh() {
     ref
       ..invalidate(homeDeliveryOptionsProvider)
-      ..invalidate(homeInProgressOrderProvider);
+      ..invalidate(homeInProgressOrderProvider)
+      // 다시 불러온 영역도 새 홈 응답으로 바꾼다(남겨 두면 그 영역만 옛 가격이다)
+      ..invalidate(sectionRetryProvider);
     if (_tab != HomeTab.home) ref.invalidate(homeTabProvider(_tab));
     return ref.refresh(homeProvider.future);
   }
@@ -45,6 +104,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final mock = ref.watch(envProvider) == PmartEnv.mock;
+    // 새로 고침(invalidate·refresh) 중에는 Riverpod 가 이전 홈을 AsyncData 로 둔다 — 자리 표시로 깜빡이지 않는다.
+    // 쇼핑 주소가 바뀐 재조회는 AsyncLoading 이라 자리 표시를 보인다(다른 센터 상품을 남기지 않는다).
     final state = uiStateOf(
       ref.watch(homeProvider),
       isEmpty: (h) => h.sections.isEmpty && h.banners.isEmpty,

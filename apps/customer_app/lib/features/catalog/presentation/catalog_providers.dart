@@ -15,6 +15,13 @@ final catalogRepositoryProvider = Provider<CatalogRepository>(
   },
 );
 
+/// 홈이 다시 보일 때(상세에서 뒤로·다른 탭에서 홈으로) 마지막 조회가 이보다 오래됐으면 다시 읽는다.
+/// 홈은 화면을 떠나도 남아 있어, 다시 읽지 않으면 승인·발효된 새 가격이 상세와 다르게 보인다.
+const homeStaleAfter = Duration(minutes: 1);
+
+/// 지금 시각. 테스트가 시간을 넘길 수 있게 둔다.
+final homeClockProvider = Provider<DateTime Function()>((_) => DateTime.now);
+
 /// 홈 구성. 쇼핑 주소(센터)가 바뀌면 다시 조회한다.
 final homeProvider = FutureProvider<HomeView>(
   (ref) => ref
