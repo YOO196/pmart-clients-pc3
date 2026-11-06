@@ -56,6 +56,7 @@
 | BR-46 | 중간 | 백오피스 | 업무 도우미(정책 RAG): ai-assistant-service 계약이 3단계 초안 — 절·문서 버전·확정/제안/미결정 구분·문서 열람·GET 출처·질문 목록·응답 유실 복구·진행 상태·장애/권한 구분·게이트웨이 라우트 없음 | **대부분 해소**(백엔드 계약 1.0.0·안내 `../pmart-backend/docs/handoff/2026-11-04-clients-request-ai-assistant.md`, ADR-0036). 남음: 질문 목록·원문 열람(선택)·상태 확인 경로 게이트웨이 공개·**LAN 배포**. 대조 `docs/handoff/2026-11-04-backend-ai-assistant-contract.md` §4. 백오피스는 아직 초안 기준 목 화면 |
 | BR-47 | 높음 | 고객 | 상품 검색 `mfcId` 지정 시 LAN 센터의 전 상품이 미취급(carried=false)으로 빠짐 — `total` 은 뺀 상품 포함("1개"인데 빈 목록), 빈 페이지에 `nextCursor`, 미취급 숨김/구분 정책 확인 | OPEN(요청 `docs/handoff/2026-11-04-backend-search-not-carried.md`). 고객앱은 회신 전 변경 없음 |
 | BR-48 | 중간 | 백오피스 | 카테고리 추가(`/category-tree-additions`·`-uploads`)에 이미 있는 카테고리만 올리면 계약의 422 `NOTHING_TO_ADD` 대신 500 `INTERNAL_ERROR` | OPEN(요청 `docs/handoff/2026-11-04-backend-category-addition-500.md`). 백오피스는 서버 오류 안내 + 문의 번호 |
+| BR-49 | 중간 | 고객 | 홈·탭·섹션 진열(`storefront`)이 `mfcId` 를 줘도 미취급을 거르지 않음(`carried` 늘 null, 없는 센터도 10건) — 검색처럼 빼 달라, 빈 섹션 규칙, 숨김 정책 확인 | OPEN(요청 `docs/handoff/2026-11-05-backend-storefront-not-carried.md`). 고객앱은 서버 항목 그대로 |
 
 ---
 
@@ -314,3 +315,9 @@
 - 현황(LAN 2026-11-04): 계약·코드는 422 `NOTHING_TO_ADD` 인데 응답이 500 `INTERNAL_ERROR`.
 - 요청: 원인 확인(문의 번호는 사용자가 전달), 계약대로 422.
 - 백오피스: 이 화면에서 `INTERNAL_ERROR` 면 서버 오류 안내 + 문의 번호. 전역 `INTERNAL_ERROR` 문구 추가.
+
+## BR-49 홈·섹션 진열 — 센터 지정 시 미취급 상품 빼기 (고객앱)
+- 현황(LAN 2026-11-05): `storefront/home?mfcId=MFC-SEED-01` 10건·섹션 항목 50건 모두 `carried: null`, LAN 에 없는 `MFC-BSN-01` 도 10건. 같은 센터 검색은 미취급을 거름(`total: 0`).
+- 사용자 결정: 연결된 MFC 가 취급하지 않는 상품은 안 보인다(검색·진열 모두).
+- 요청: ① mfcId 지정 시 진열에서 미취급 제외(검색과 같은 판정) ② 빈 섹션·페이지 규칙 ③ `carried` 채우기 또는 계약 명시 ④ 업무 문서("구분 표시")와 다른 정책 반영 판단.
+- 고객앱: 서버 항목 그대로 그림. null 을 판정하지 않음.

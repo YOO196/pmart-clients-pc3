@@ -135,9 +135,10 @@ export const messages = {
     approve: '승인',
     reject: '반려',
     commentLabel: '의견(선택)',
-    decided: '결정을 기록했어요. 심사 결과와 반영 결과는 아래 상태로 확인해요.',
+    decided: '결정을 기록했어요. 심사 결과는 아래 상태로, 반영 결과는 해당 등록 화면에서 확인해요.',
     executionWaiting: '정본 반영을 확인하고 있어요',
-    executionTimeout: '아직 정본 반영이 확인되지 않았어요. 잠시 후 다시 확인해 주세요.',
+    // 반영 회신(Receipt)이 백엔드에 아직 없어 이 화면의 반영 상태는 바뀌지 않는다(BR-45 회신 2026-11-04). 결과는 각 등록 화면에서 본다.
+    executionTimeout: '반영 결과는 해당 등록 화면(상품·가격·콘텐츠 일괄 등록)에서 확인해 주세요. 이 화면의 반영 상태는 아직 바로 바뀌지 않아요.',
     selfApproval: '자기 요청은 승인할 수 없어요',
     requestApproval: '승인 요청',
     requested: (id: string) => `승인 요청을 올렸어요. 승인 번호 ${id}`,
