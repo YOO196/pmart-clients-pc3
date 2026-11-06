@@ -59,7 +59,7 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 공통 흐름: 정본 "제출 준비" 응답의 `approvalRequest` → approval `POST /change-requests` → `…/submissions`(approvalId). 두 요청 키는 사용자 행위 키 하나에서 만든다(`{key}:cr`, `{key}:submit`). 판매중지·가격은 화면이 변경 요청 본문을 직접 만든다(handoff §4.3·§4.5).
 승인 뒤 정본 반영은 비동기라 승인 상세에서 1초 간격·최대 30회 폴링하고, 끝나지 않으면 "아직 확인되지 않음 + 다시 확인"으로 둔다.
 토큰(ADR-0018): access·refresh 모두 탭 메모리(새로고침 = 재로그인, localStorage 금지). 401 → pmartFetch single-flight 로 `POST /auth/tokens` 한 번(회전된 refresh 로 즉시 교체) → 원 요청 재전송. `TOKEN_INVALID`·`TOKEN_REUSED`·`SESSION_EXPIRED` 면 토큰을 지우고 로그인 화면(`/login?from=`). 갱신 결과 불명이면 같은 refresh 를 다시 보내지 않는다(재사용으로 세션이 끊김). `X-Device-Id` 는 탭마다 UUID(refresh 도 탭 메모리라 충분).
-실행 모드: `dev`(목) / `dev:local`(Vite 프록시 → localhost:8080, 첫 관리자 admin / pmart-local) / `dev:lan`·`build:lan`(게이트웨이 `http://D603-16:8080/api/v1` 직접, 브라우저는 `http://D603-16` 으로 열어야 CORS 통과).
+실행 모드: `dev`(목) / `dev:local`(Vite 프록시 → localhost:8080, 첫 관리자 admin / pmart-local) / `dev:lan`·`build:lan`(게이트웨이 `http://192.168.0.40:8080/api/v1` 직접, 브라우저는 `http://192.168.0.40` 으로 연다. 이름 `d603-16` 은 다른 PC 에서 IPv6 링크 로컬로 풀려 안 열림 — 2026-11-06).
 막힌 것: 이미지 인증(BR-25), 초안 목록(BR-26), 센터 목록(center-master 다음 작업 → 센터 ID 입력).
 
 ## 2-2. 업무 도우미 (정책·업무 절차 질의응답, 2026-11-04, BR-46)
