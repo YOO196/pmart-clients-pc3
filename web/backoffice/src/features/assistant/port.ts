@@ -1,9 +1,10 @@
 // 업무 도우미 연동 포트. 화면은 이 인터페이스만 안다.
-// - 지금: 목 모드는 draftMock(계약 확정 전 화면용, BR-46), 실서버 모드(local·lan)는 notConnected(호출하지 않음).
-// - 계약 확정 뒤: 생성 클라이언트(api/generated/ai-assistant) + pmartFetch(인증·Idempotency-Key·X-Source-System) + request()
-//   로 어댑터를 만들어 여기에 끼운다. 화면·테스트는 그대로 둔다.
+// - 지금: 목 모드는 draftMock(계약 1.1.0 모양), 실서버 모드(local·lan)는 notConnected(호출하지 않음).
+//   서비스가 LAN 에 배포되지 않았다(BR-46 #13, 사용자 결정으로 보류 — 게이트웨이 경로는 있으나 부르면 503).
+// - 배포 안내 뒤: 생성 타입(api/generated/ai-assistant) + pmartFetch(인증·Idempotency-Key·X-Source-System)로
+//   어댑터를 만들어 여기에 끼운다. 화면·테스트는 그대로 둔다.
 import type { IdempotencyKey } from '../../api/command';
-import type { AssistantAnswer, AssistantHealth } from './model';
+import type { AssistantAnswer, HistoryPage } from './model';
 
 export interface AssistantPort {
   /** connected=false 면 화면은 호출하지 않고 "연결 전" 안내만 보인다. */
@@ -13,26 +14,29 @@ export interface AssistantPort {
   /** 목만: 시나리오 꼬리표(화면 안내용). */
   readonly mockHints?: readonly string[];
   /**
-   * 질의. 실패는 PmartFailure 로 던진다(api/failure 분류 그대로):
-   * Problem(4xx) = 거절 확정, UnknownResultFailure(타임아웃·5xx·응답 유실) = 결과 불명 → 같은 키로 다시 보낸다.
+   * 질의 POST /assistant/policy-questions. 200 완료 또는 202 처리 중(state=PROCESSING)을 돌려준다.
+   * 실패는 PmartFailure 로 던진다(api/failure 분류 그대로):
+   * Problem(4xx: 403·409 IDEMPOTENCY_CONFLICT·422 CONFIG_REQUIRED) = 거절 확정,
+   * UnknownResultFailure(타임아웃·503 DEPENDENCY_UNAVAILABLE·응답 유실) = 결과 불명 → 같은 키로 다시 보낸다.
    */
   ask(question: string, key: IdempotencyKey): Promise<AssistantAnswer>;
-  /** 답변 조회(질의의 짝 조회). 없거나 남의 답변이면 Problem NOT_FOUND. */
+  /** 답변 다시 보기 GET /assistant/policy-questions/{answerId}. 없거나 남의 답변·현재 권한 없음 = NOT_FOUND. */
   get(answerId: string): Promise<AssistantAnswer>;
-  health(): Promise<AssistantHealth>;
+  /** 내 질문 목록 GET /assistant/question-history (최근 순). */
+  history(cursor?: string): Promise<HistoryPage>;
 }
 
 export class AssistantNotConnectedError extends Error {
   constructor() {
-    super('ai-assistant-service 계약 확정 전(BR-46) — 호출하지 않는다');
+    super('ai-assistant-service 가 LAN 에 배포되기 전(BR-46) — 호출하지 않는다');
   }
 }
 
-/** 실서버 모드 기본값. 계약이 초안이라 서버 동작을 추측해 부르지 않는다. */
+/** 실서버 모드 기본값. 서비스가 배포되지 않아 부르지 않는다. */
 export const notConnectedAssistant: AssistantPort = {
   connected: false,
   mock: false,
   ask: () => Promise.reject(new AssistantNotConnectedError()),
   get: () => Promise.reject(new AssistantNotConnectedError()),
-  health: () => Promise.reject(new AssistantNotConnectedError()),
+  history: () => Promise.reject(new AssistantNotConnectedError()),
 };

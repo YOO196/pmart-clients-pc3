@@ -62,14 +62,16 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 실행 모드: `dev`(목) / `dev:local`(Vite 프록시 → localhost:8080, 첫 관리자 admin / pmart-local) / `dev:lan`·`build:lan`(게이트웨이 `http://192.168.0.40:8080/api/v1` 직접, 브라우저는 `http://192.168.0.40` 으로 연다. 이름 `d603-16` 은 다른 PC 에서 IPv6 링크 로컬로 풀려 안 열림 — 2026-11-06).
 막힌 것: 이미지 인증(BR-25), 초안 목록(BR-26), 센터 목록(center-master 다음 작업 → 센터 ID 입력).
 
-## 2-2. 업무 도우미 (정책·업무 절차 질의응답, 2026-11-04, BR-46)
-- 경로 `/assistant`(질문·답변·이번 화면의 답변 기록), `/assistant/answers/:answerId`(기존 답변 조회 = 질의의 짝 조회). 코드 `src/features/assistant/`.
-- 읽기 전용. 주문·재고·환불·승인 변경 버튼, AI 자동 실행 없음. 메뉴는 숨기지 않고 권한은 서버 판정(403·`FORBIDDEN_SCOPE`).
-- 계약 `ai-assistant-service.yaml` 은 3단계 초안 → 화면은 `AssistantPort` 뒤에 둔다. 목 모드만 `draftMock`(화면에 "계약 확정 전" 표시), local·LAN 빌드는 호출하지 않고 "연결 전" 안내.
-- 질의: 새 전송 = 새 Idempotency-Key, 결과 불명은 같은 키·같은 질문으로만 재확인. 답을 받은 질문을 그대로 다시 보내지 않는다(질문을 고치거나 "새 질문").
-- 표시: 답변은 일반 텍스트(HTML·마크다운 해석 없음). 출처는 문서 식별자·절·문서 버전·정책 버전·기준 시점·확정/제안/미결정(없으면 "구분 정보 없음"). 경로 모양 식별자는 가린다. 링크 없음(문서 열람은 BR-46).
-- 상태: 근거 없음(`NO_GROUNDING`) ≠ 오류, 권한 범위 밖 ≠ 403, 서비스 장애(health DOWN → 새 질문 막음), 결과 확인 중(결과 불명).
-- 계정 전환·로그아웃: 질문·답변 기록·`['assistant']` 캐시 삭제, 화면 상태 새로 시작.
+## 2-2. 업무 도우미 (정책·업무 절차 질의응답, 2026-11-04, BR-46 / 계약 1.1.0 반영 2026-11-06)
+- 경로 `/assistant`(질문·답변·내 질문 목록), `/assistant/answers/:answerId`(답변 다시 보기). 코드 `src/features/assistant/`.
+- 읽기 전용. 주문·재고·환불·승인 변경 버튼, AI 자동 실행 없음. 메뉴는 숨기지 않고 권한은 서버 판정(403·404).
+- 계약 `ai-assistant-service.yaml` 1.1.0(ADR-0036). 화면은 `AssistantPort` 뒤에 둔다. 서비스가 LAN 에 배포되지 않아(BR-46 #13 보류) 목 모드만 `draftMock`(계약 모양, "서버 LAN 배포 전" 표시), local·LAN 빌드는 호출하지 않고 "연결 전" 안내. 배포 안내가 오면 생성 타입 + pmartFetch 어댑터를 끼운다.
+- 질의 `POST /assistant/policy-questions`: 새 전송 = 새 Idempotency-Key. 결과 불명(타임아웃·503 `DEPENDENCY_UNAVAILABLE`·응답 유실)과 202 `PROCESSING` 은 같은 키·같은 질문으로만 재확인(계약: 같은 키 = 같은 답). 답을 받은 질문을 그대로 다시 보내지 않는다(질문을 고치거나 "새 질문"). 403·409·422 `CONFIG_REQUIRED` 는 거절로 확정.
+- 표시: 답변·근거 본문은 일반 텍스트(HTML·마크다운 해석 없음). 기준선(`BASELINE_EXTRACTIVE`·`BASELINE_HASH`)이면 "품질 미검증" 안내. 인용은 지위(authority 6종)·생애(ACTIVE 외만 표시, 대체 문서·대체 제안)·구현 기록(날짜 기준, 현재 구현 보장 아님)을 따로, 저장소 상대 경로·절·문서 버전·기준일·색인 시점(스냅샷·revision·커밋 안 된 변경)·근거 본문(접기). 상대 경로가 아니면 가린다. 링크 없음(1차에 문서 열람 API 없음).
+- 상태: `NO_GROUNDING`·`REALTIME_DATA_REQUIRED`·`OUT_OF_SCOPE`·`FORBIDDEN_SCOPE` 는 각자 안내(서버 안내 문장 함께) ≠ 오류. 상태 확인(health) 경로는 게이트웨이에 없어 응답 코드로만 구분.
+- 내 질문 목록 `GET /assistant/question-history`(최근 순, 커서 "더 보기"). 질문 원문은 서버가 저장하지 않아 `answerPreview` 로 구분. 조회 실패는 오류로(빈 목록 아님). 질의 뒤 목록 다시 조회.
+- 답변 다시 보기 `GET /assistant/policy-questions/{answerId}`: 202 처리 중이면 "다시 확인", 404·409 는 오류로.
+- 계정 전환·로그아웃: 이전 계정의 `['assistant', owner]` 캐시 삭제, 화면 상태 새로 시작.
 
 ## 3. 기술 메모
 - 개발: Vite 프록시 `/api → http://localhost:8080` (CORS 없음, BR-04). 목은 MSW.

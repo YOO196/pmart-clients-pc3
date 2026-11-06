@@ -1,60 +1,93 @@
-// 초안 계약(생성 타입) 응답 → 화면 모델. 목과 (계약 확정 뒤) 실서버 어댑터가 같이 쓴다.
-// 초안 스키마는 필드가 모두 선택이다. 화면에 꼭 필요한 값(answerId·state)이 없으면 빈 값으로 메우지 않고 계약 위반으로 던진다.
+// 계약(생성 타입, ai-assistant-service 1.1.0) 응답 → 화면 모델. 목과 실서버 어댑터가 같이 쓴다.
+// 계약 필수 값이 없거나 enum 밖이면 빈 값으로 메우지 않고 계약 위반으로 던진다(화면은 오류로 보인다).
 import { ContractViolationFailure } from '../../api/failure';
-import type { operations } from '../../api/generated/ai-assistant';
-import { ANSWER_STATES, type AssistantAnswer, type Citation, type Grounding } from './model';
+import type { components } from '../../api/generated/ai-assistant';
+import {
+  ANSWER_MODES,
+  ANSWER_STATES,
+  AUTHORITIES,
+  LIFECYCLE_STATUSES,
+  RETRIEVAL_MODES,
+  type AssistantAnswer,
+  type Citation,
+  type HistoryItem,
+  type HistoryPage,
+} from './model';
 
-export type DraftAskResponse = operations['askPolicyQuestion']['responses'][200]['content']['application/json'];
-export type DraftGetResponse = operations['getPolicyAnswer']['responses'][200]['content']['application/json'];
-type DraftCitation = NonNullable<DraftAskResponse['citations']>[number];
+type S = components['schemas'];
+export type AnswerWire = S['PolicyAnswer'];
+export type CitationWire = S['Citation'];
+export type HistoryWire = S['QuestionHistoryPage'];
 
-/** BR-46 로 요청한 확장(초안 계약에 없음). 목만 채운다. */
-export interface Br46CitationExtension {
-  readonly title?: string;
-  readonly section?: string;
-  readonly docVersion?: string;
-  readonly grounding?: Grounding;
+const text = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
+const orNull = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+
+function oneOf<T extends string>(values: readonly T[], v: unknown, field: string, requestId?: string): T {
+  if (typeof v === 'string' && (values as readonly string[]).includes(v)) return v as T;
+  throw new ContractViolationFailure(`${field} 값 이상: ${String(v)}`, requestId);
 }
-export interface Br46AnswerExtension {
-  readonly question?: string;
-  readonly answeredAt?: string;
-  /** 초안 POST 의 citations 에 BR-46 확장을 더한 모양. 초안 GET 에는 citations 가 없다 — BR-46 에서 같은 모양을 요청. */
-  readonly citations?: ReadonlyArray<DraftCitation & Br46CitationExtension>;
+
+function need(v: unknown, field: string, requestId?: string): string {
+  if (text(v)) return v;
+  throw new ContractViolationFailure(`${field} 없음`, requestId);
 }
 
-export type AskWire = Omit<DraftAskResponse, 'citations'> & Br46AnswerExtension;
-export type GetWire = DraftGetResponse & Br46AnswerExtension;
-
-const GROUNDINGS: readonly Grounding[] = ['CONFIRMED_POLICY', 'DESIGN_PROPOSAL', 'UNDECIDED'];
-
-function citationFrom(c: DraftCitation & Br46CitationExtension): Citation | null {
-  if (typeof c.docRef !== 'string' || c.docRef.length === 0) return null; // 식별자 없는 출처는 출처로 보이지 않는다
+function citationFrom(c: CitationWire, requestId?: string): Citation {
+  const asOf = c.asOf as Partial<CitationWire['asOf']> | undefined;
   return {
-    docRef: c.docRef,
-    policyVersion: typeof c.policyVersion === 'number' ? c.policyVersion : null,
-    ...(c.asOf?.asOf ? { asOf: c.asOf.asOf } : {}),
-    ...(c.asOf?.freshness ? { freshness: c.asOf.freshness } : {}),
-    ...(c.title ? { title: c.title } : {}),
-    ...(c.section ? { section: c.section } : {}),
-    ...(c.docVersion ? { docVersion: c.docVersion } : {}),
-    ...(c.grounding && GROUNDINGS.includes(c.grounding) ? { grounding: c.grounding } : {}),
+    chunkId: need(c.chunkId, 'citations[].chunkId', requestId),
+    documentId: need(c.documentId, 'citations[].documentId', requestId),
+    path: need(c.path, 'citations[].path', requestId),
+    section: orNull(c.section),
+    authority: oneOf(AUTHORITIES, c.authority, 'citations[].authority', requestId),
+    lifecycleStatus: oneOf(LIFECYCLE_STATUSES, c.lifecycleStatus, 'citations[].lifecycleStatus', requestId),
+    supersededBy: orNull(c.supersededBy),
+    proposedSupersededBy: Array.isArray(c.proposedSupersededBy) ? c.proposedSupersededBy.filter(text) : [],
+    implementationEvidence:
+      c.implementationEvidence && text(c.implementationEvidence.recordDate)
+        ? { recordDate: c.implementationEvidence.recordDate, note: orNull(c.implementationEvidence.note) }
+        : null,
+    documentVersion: orNull(c.documentVersion),
+    effectiveDate: orNull(c.effectiveDate),
+    asOf: {
+      snapshotId: need(asOf?.snapshotId, 'citations[].asOf.snapshotId', requestId),
+      sourceRevision: orNull(asOf?.sourceRevision),
+      sourceDirty: asOf?.sourceDirty === true,
+      indexedAt: need(asOf?.indexedAt, 'citations[].asOf.indexedAt', requestId),
+    },
+    excerpt: typeof c.excerpt === 'string' ? c.excerpt : '',
   };
 }
 
-export function answerFromWire(w: AskWire | GetWire, requestId?: string): AssistantAnswer {
-  if (typeof w.answerId !== 'string' || w.answerId.length === 0) {
-    throw new ContractViolationFailure('answerId 없음', requestId);
-  }
-  if (!w.state || !ANSWER_STATES.includes(w.state)) {
-    throw new ContractViolationFailure(`state 값 이상: ${String(w.state)}`, requestId);
-  }
-  const citations = 'citations' in w && Array.isArray(w.citations) ? w.citations : undefined;
+export function answerFromWire(w: AnswerWire, requestId?: string): AssistantAnswer {
+  if (!Array.isArray(w.citations)) throw new ContractViolationFailure('citations 없음', requestId);
   return {
-    answerId: w.answerId,
-    state: w.state,
+    answerId: need(w.answerId, 'answerId', requestId),
+    requestId: need(w.requestId, 'requestId', requestId),
+    state: oneOf(ANSWER_STATES, w.state, 'state', requestId),
     answer: typeof w.answer === 'string' ? w.answer : '',
-    citations: citations === undefined ? null : citations.map(citationFrom).filter((c): c is Citation => c !== null),
-    ...(w.question ? { question: w.question } : {}),
-    ...(w.answeredAt ? { answeredAt: w.answeredAt } : {}),
+    citations: w.citations.map((c) => citationFrom(c, requestId)),
+    answerMode: oneOf(ANSWER_MODES, w.answerMode, 'answerMode', requestId),
+    retrievalMode: oneOf(RETRIEVAL_MODES, w.retrievalMode, 'retrievalMode', requestId),
+    indexSnapshotId: orNull(w.indexSnapshotId),
+    askedAt: need(w.askedAt, 'askedAt', requestId),
+  };
+}
+
+export function historyFromWire(w: HistoryWire, requestId?: string): HistoryPage {
+  if (!Array.isArray(w.items)) throw new ContractViolationFailure('items 없음', requestId);
+  return {
+    items: w.items.map(
+      (i): HistoryItem => ({
+        answerId: need(i.answerId, 'items[].answerId', requestId),
+        requestId: need(i.requestId, 'items[].requestId', requestId),
+        state: oneOf(ANSWER_STATES, i.state, 'items[].state', requestId),
+        question: orNull(i.question),
+        answerPreview: orNull(i.answerPreview),
+        citationCount: typeof i.citationCount === 'number' ? i.citationCount : null,
+        askedAt: need(i.askedAt, 'items[].askedAt', requestId),
+      }),
+    ),
+    nextCursor: text(w.page?.nextCursor) ? w.page.nextCursor : null,
   };
 }

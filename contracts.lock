@@ -76,9 +76,9 @@
     }
   },
   "web": {
-    "backendCommit": "8b359f3f5a7734c1999246ebf2a1745a85fe347d",
+    "backendCommit": "6a955de1d71097ec15a2a8eab3a6aac831cda58b",
     "backendContractsDirty": false,
-    "generatedAt": "2026-11-03T10:28:22.016Z",
+    "generatedAt": "2026-11-06T02:39:29.358Z",
     "generator": "openapi-typescript 7.13.0 (TS 5.9)",
     "services": [
       "_internal-dead-letters",
