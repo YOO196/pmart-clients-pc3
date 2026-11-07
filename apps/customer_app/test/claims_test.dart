@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
+import 'package:pmart_api_claim/pmart_api_claim.dart' as api;
 
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/domain/checkout.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
+import 'package:customer_app/features/claims/data/claims_repository.dart'
+    show claimFromContract;
 import 'package:customer_app/features/claims/data/mock_claims_repository.dart';
 import 'package:customer_app/features/claims/domain/claims.dart';
 import 'package:customer_app/features/claims/presentation/claims_controller.dart';
@@ -55,6 +58,26 @@ void main() {
         isNull,
       );
     });
+  });
+
+  test('사유 FULFILLMENT_REJECTED 는 깨지지 않고 자동 취소로 읽는다', () {
+    final view = claimFromContract(
+      api.Claim.fromJson({
+        'claimId': 'c-1',
+        'version': 1,
+        'orderId': 'o-1',
+        'type': 'CANCEL',
+        'state': 'STOP_PENDING',
+        'reason': 'FULFILLMENT_REJECTED',
+      }),
+    );
+    expect(view.autoCancelled, isTrue);
+    expect(
+      claimFromContract(
+        api.Claim.fromJson({'claimId': 'c-2', 'reason': 'CHANGE_OF_MIND'}),
+      ).autoCancelled,
+      isFalse,
+    );
   });
 
   group('취소 요청', () {
@@ -415,6 +438,66 @@ void main() {
         expect(find.byKey(const ValueKey('claim-state')), findsOneWidget);
       },
     );
+
+    group('자동 전체 취소(MFC 작업 거절, 백엔드 공지 2026-11-07)', () {
+      testWidgets('처리 내역은 자동 취소 안내를 보이고 "접수" 안내·"요청하신" 문구가 없다', (t) async {
+        final id = claims.seedSystemCancel('order-seed-4');
+        await openOrder(t, 'order-seed-4');
+        await t.tap(find.byKey(ValueKey('order-claim-$id')));
+        await t.pumpAndSettle();
+        expect(
+          find.text('상품 준비가 어려워 주문을 자동으로 취소하고 있어요. 결제하신 금액은 전액 환불됩니다.'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('접수는 취소 완료가 아니에요'), findsNothing);
+        expect(find.textContaining('요청하신'), findsNothing);
+        expect(find.text('환불 완료'), findsNothing);
+      });
+
+      testWidgets('취소된 주문 상세는 최근 취소 클레임 사유로 자동 취소를 안내한다', (t) async {
+        claims.seedSystemCancel('order-seed-3');
+        await openOrder(t, 'order-seed-3');
+        await t.pump(const Duration(seconds: 1));
+        await t.pumpAndSettle();
+        expect(
+          (t.widget(
+            find.byKey(const ValueKey('order-auto-cancelled')),
+          ) as Text).data,
+          '상품 준비가 어려워 주문이 자동 취소되었어요. 결제하신 금액은 전액 환불됩니다.',
+        );
+      });
+
+      testWidgets('고객이 직접 취소한 주문에는 자동 취소 안내가 없다', (t) async {
+        await openOrder(t, 'order-seed-4');
+        await t.tap(find.byKey(const ValueKey('cancel-order')));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('cancel-submit')));
+        await t.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('claim-auto-cancelled')),
+          findsNothing,
+        );
+        expect(find.textContaining('접수는 취소 완료가 아니에요'), findsOneWidget);
+      });
+
+      testWidgets('자동 취소 중에 취소를 누르면 "이미 취소가 진행 중"을 알리고 그 처리 내역으로 간다', (
+        t,
+      ) async {
+        final id = claims.seedSystemCancel('order-seed-4');
+        await openOrder(t, 'order-seed-4');
+        await t.tap(find.byKey(const ValueKey('cancel-order')));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('cancel-submit')));
+        await t.pumpAndSettle();
+        expect(find.text('이미 취소가 진행 중이에요'), findsOneWidget); // 스낵바
+        expect(
+          find.byKey(const ValueKey('claim-auto-cancelled')),
+          findsOneWidget,
+        );
+        // 새 클레임을 만들지 않았다
+        expect(claims.claims.keys, [id]);
+      });
+    });
 
     testWidgets('취소하지 않은 주문에는 처리 내역 영역이 없다 — 조회가 실패해도 보이지 않는다', (t) async {
       final failing = _ListDownClaims(orders: orders);

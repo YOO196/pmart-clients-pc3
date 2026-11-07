@@ -171,6 +171,7 @@ ClaimView claimFromContract(api.Claim c) => ClaimView(
   orderId: c.orderId ?? '',
   type: claimTypeFromWire(c.type?.value),
   state: claimStateFromWire(c.state?.value),
+  autoCancelled: c.reason == api.ClaimReason.FULFILLMENT_REJECTED,
   lines: [
     for (final l in c.lines ?? const <api.ClaimLine>[])
       if (l.orderLineId != null)

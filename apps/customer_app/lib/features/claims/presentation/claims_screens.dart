@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pmart_core/pmart_core.dart' show PmartFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/order_status.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../checkout/domain/checkout.dart';
 import '../../checkout/presentation/checkout_controller.dart';
@@ -77,6 +79,29 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
       case CommandDone(:final value):
         ref.invalidate(orderDetailProvider(widget.orderId));
         context.pushReplacement('/claims/${value.claimId}');
+      case CommandRejected(:final code)
+          when code == ClaimProblemCode.duplicateClaim:
+        // 이미 취소가 진행 중이다(자동 취소 포함) — 안내하고 그 처리 내역으로 보낸다(백엔드 공지 2026-11-07 C4)
+        final messenger = ScaffoldMessenger.of(context);
+        ClaimView? found;
+        try {
+          found = await ref
+              .read(claimsRepositoryProvider)
+              .findActiveCancel(widget.orderId);
+        } on PmartFailure {
+          found = null; // 찾지 못하면 이 화면에 안내만 남긴다
+        }
+        if (!mounted) return;
+        ref.invalidate(orderDetailProvider(widget.orderId));
+        if (found != null) {
+          messenger.showSnackBar(SnackBar(content: Text(l10n.cancelDuplicate)));
+          context.pushReplacement('/claims/${found.claimId}');
+          return;
+        }
+        setState(() {
+          _unknown = false;
+          _message = l10n.cancelDuplicate;
+        });
       case CommandRejected(:final code):
         setState(() {
           _unknown = false;
@@ -238,7 +263,21 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
                 key: const ValueKey('claim-state'),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
-              if (c.state == ClaimState.opened) Text(l10n.claimAcceptedNote),
+              if (c.autoCancelled)
+                Text(
+                  // 주문 취소가 확정되기 전에는 "취소되었어요"라고 하지 않는다
+                  c.state == ClaimState.closed ||
+                          ref
+                                  .watch(orderDetailProvider(c.orderId))
+                                  .value
+                                  ?.status ==
+                              OrderStatus.cancelled
+                      ? l10n.claimAutoCancelled
+                      : l10n.claimAutoCancelling,
+                  key: const ValueKey('claim-auto-cancelled'),
+                )
+              else if (c.state == ClaimState.opened)
+                Text(l10n.claimAcceptedNote),
               const SizedBox(height: 12),
               for (final l in c.lines)
                 ListTile(

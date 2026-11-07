@@ -46,6 +46,17 @@ base class MockClaimsRepository implements ClaimsRepository {
     await _wait();
     final existing = _byKey[key.value];
     if (existing != null) return _out(claims[existing]!);
+    // 서버처럼 진행 중인 취소(자동 취소 포함)가 있으면 새로 받지 않는다.
+    if (claims.values.any(
+      (c) =>
+          c['orderId'] == orderId &&
+          c['type'] == 'CANCEL' &&
+          !const {'WITHDRAWN', 'REJECTED', 'CLOSED'}.contains(c['state']),
+    )) {
+      throw const ProblemFailure(
+        Problem(status: 422, code: ClaimProblemCode.duplicateClaim),
+      );
+    }
     final order = orders?.orderJson(orderId);
     final status = order?['status'];
     if (status == 'IN_DELIVERY' ||
@@ -107,6 +118,38 @@ base class MockClaimsRepository implements ClaimsRepository {
       throw UnknownResultFailure(requestId: key.value, httpStatus: 504);
     }
     return _out(json);
+  }
+
+  /// 시스템 자동 전체 취소(MFC 작업 거절 뒤)를 만든다. 서버처럼 출고 중지 확인부터 시작한다(백엔드 공지 2026-11-07).
+  String seedSystemCancel(String orderId) {
+    final order = orders?.orderJson(orderId);
+    final id = 'claim-${++_seq}';
+    claims[id] = <String, Object?>{
+      'claimId': id,
+      'version': 1,
+      'orderId': orderId,
+      'type': 'CANCEL',
+      'state': 'STOP_PENDING',
+      'openedAt': orders?.now().toUtc().toIso8601String(),
+      'reason': 'FULFILLMENT_REJECTED',
+      'lines': [
+        for (final l
+            in (order?['lines'] as List? ?? const [])
+                .cast<Map<String, Object?>>())
+          if ((l['unfulfilledQty'] as int? ?? 0) > 0)
+            {
+              'claimLineId': '$id-${l['orderLineId']}',
+              'orderLineId': l['orderLineId'],
+              'requestedQty': l['unfulfilledQty'],
+              'decision': 'PENDING',
+              'refundAmount':
+                  (l['unitPrice'] as int? ?? 0) *
+                  (l['unfulfilledQty'] as int? ?? 0),
+            },
+      ],
+      'refunds': <Object?>[],
+    };
+    return id;
   }
 
   void _advance(Map<String, Object?> c) {

@@ -123,6 +123,7 @@ class ClaimView {
     required this.state,
     required this.lines,
     required this.refunds,
+    this.autoCancelled = false,
   });
 
   final String claimId;
@@ -132,6 +133,10 @@ class ClaimView {
   final ClaimState state;
   final List<ClaimLineView> lines;
   final List<RefundView> refunds;
+
+  /// MFC 가 작업을 받지 못해 시스템이 자동으로 연 전체 취소(`reason = FULFILLMENT_REJECTED`, 백엔드 공지 2026-11-07).
+  /// 고객이 접수한 클레임이 아니므로 "요청하신" 같은 문구를 쓰지 않는다.
+  final bool autoCancelled;
 
   /// 철회는 심사 전(접수 상태)까지만 고를 수 있다. 최종 판정은 서버.
   bool get canWithdraw => state == ClaimState.opened;

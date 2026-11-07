@@ -15,7 +15,7 @@ import '../../checkout/presentation/order_sheet_screen.dart' show tipReasonText;
 import '../../checkout/presentation/shipping_address_view.dart';
 import '../../claims/domain/claims.dart';
 import '../../claims/presentation/claims_controller.dart'
-    show orderClaimsProvider;
+    show claimProvider, orderClaimsProvider;
 import '../../claims/presentation/claims_screens.dart'
     show claimStateText, claimTypeText;
 import '../../../shared/order_status.dart';
@@ -371,6 +371,11 @@ class _ClaimsSection extends ConsumerWidget {
               ),
             ],
           ),
+        // 취소된 주문이면 가장 최근 취소 클레임의 사유로 자동 취소인지 본다(주문 상세 `claims` 는 아직 비어 있다)
+        if (order.status == OrderStatus.cancelled)
+          if (items.where((c) => c.type == ClaimType.cancel).firstOrNull
+              case final latest?)
+            _AutoCancelNotice(claimId: latest.claimId),
         for (final c in items)
           ListTile(
             key: ValueKey('order-claim-${c.claimId}'),
@@ -388,6 +393,27 @@ class _ClaimsSection extends ConsumerWidget {
             onTap: () => onVisit('/claims/${c.claimId}'),
           ),
       ],
+    );
+  }
+}
+
+/// 시스템 자동 전체 취소 안내(백엔드 공지 2026-11-07). 주문이 취소로 확정된 뒤에만 그린다.
+/// 클레임 조회가 실패하거나 아직이면 아무것도 보이지 않는다 — 처리 내역 줄은 그대로 있어 눌러 볼 수 있다.
+class _AutoCancelNotice extends ConsumerWidget {
+  const _AutoCancelNotice({required this.claimId});
+
+  final String claimId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auto = ref.watch(claimProvider(claimId)).value?.autoCancelled;
+    if (auto != true) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Text(
+        AppLocalizations.of(context).claimAutoCancelled,
+        key: const ValueKey('order-auto-cancelled'),
+      ),
     );
   }
 }
