@@ -162,51 +162,21 @@ void main() {
 
     await tapKey(t, 'guide-ok');
     expect(work.nextCalls, 1);
-    // 들고 있는 작업(진행 중 패킹)이 먼저.
-    expect(find.byKey(const ValueKey('assigned-task-mock-2')), findsOneWidget);
-    expect(
-      t.widget<Text>(find.byKey(const ValueKey('assigned-type'))).data,
-      '패킹',
-    );
-
-    await tapKey(t, 'run-task');
-    expect(find.text('작업 상세'), findsOneWidget);
-    await t.tap(find.byType(BackButton));
-    await t.pumpAndSettle();
-    // 돌아오면 다시 받는다 — 끝나지 않았으니 같은 작업.
-    expect(work.nextCalls, 2);
-    expect(find.byKey(const ValueKey('assigned-task-mock-2')), findsOneWidget);
-
-    // 패킹이 끝났으면 다음은 피킹.
-    tasks.taskJson('task-mock-2')['state'] = 'COMPLETED';
-    await tapKey(t, 'run-task');
-    await t.tap(find.byType(BackButton));
-    await t.pumpAndSettle();
+    // 주문은 피킹부터(같은 주문 패킹은 피킹이 끝나야 열린다).
     expect(find.byKey(const ValueKey('assigned-task-mock-1')), findsOneWidget);
     expect(
       t.widget<Text>(find.byKey(const ValueKey('assigned-type'))).data,
       '피킹',
     );
 
-    await tapKey(t, 'session-end');
-    expect(find.byKey(const ValueKey('area-pickPack')), findsOneWidget);
-  });
-
-  testWidgets('피킹을 시작하고 뒤로 나오면 근무 화면이 다시 받는다(버튼이 돌지 않는다)', (t) async {
-    tasks.taskJson('task-mock-2')['state'] = 'COMPLETED';
-    await pumpApp(t);
-    await tapKey(t, 'area-pickPack');
-    await tapKey(t, 'guide-ok');
-    expect(find.byKey(const ValueKey('assigned-task-mock-1')), findsOneWidget);
-    final before = work.nextCalls;
+    // "작업 시작" 한 번 — 작업 상세 없이 바로 피킹(장바구니 단계).
     await tapKey(t, 'run-task');
-    await tapKey(t, 'start');
-    expect(find.text('피킹'), findsOneWidget);
-    await t.tap(find.byType(BackButton)); // 피킹 → 작업 상세
+    expect(find.text('작업 상세'), findsNothing);
+    expect(find.byKey(const ValueKey('cart-scan')), findsOneWidget);
+    await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
-    await t.tap(find.byType(BackButton)); // 작업 상세 → 근무 화면
-    await t.pumpAndSettle();
-    expect(work.nextCalls, greaterThan(before));
+    // 돌아오면 다시 받는다 — 들고 있는 같은 피킹. 버튼이 돌지 않는다.
+    expect(work.nextCalls, 2);
     expect(find.byKey(const ValueKey('assigned-task-mock-1')), findsOneWidget);
     expect(
       find.descendant(
@@ -215,6 +185,48 @@ void main() {
       ),
       findsNothing,
     );
+
+    await tapKey(t, 'session-end');
+    expect(find.byKey(const ValueKey('area-pickPack')), findsOneWidget);
+  });
+
+  testWidgets('피패킹은 한 주문: 장바구니 → 칸마다 집기 → 패킹대로 → 같은 주문 패킹(같은 장바구니)', (t) async {
+    await pumpApp(t);
+    await tapKey(t, 'area-pickPack');
+    await tapKey(t, 'guide-ok');
+    await tapKey(t, 'run-task');
+
+    Future<void> scanTo(String id, String code) async {
+      await t.enterText(find.byKey(ValueKey(id)), code);
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await t.pumpAndSettle();
+    }
+
+    await scanTo('cart-scan', 'CRT-C-02');
+    for (final (loc, code) in [
+      ('C-S1-01-1-01', MockTaskRepository.yogurtBarcode),
+      ('C-S1-02-2-05', MockTaskRepository.milkBarcode),
+      ('C-S2-04-1-10', MockTaskRepository.milkBarcode),
+      ('F-S1-01-1-03', MockTaskRepository.dumplingBarcode),
+      ('A-S3-01-1-10', MockTaskRepository.chipsBarcode),
+    ]) {
+      await scanTo('pick-loc-scan', loc);
+      await scanTo('scan-field', code);
+    }
+    expect(find.text('피킹을 다 했어요.\n장바구니를 들고 패킹대로 가요'), findsOneWidget);
+    expect(tasks.taskJson('shp-1-PACK')['state'], 'ASSIGNED');
+
+    // 패킹대 도착 → 같은 주문의 패킹이 바로 열린다.
+    await tapKey(t, 'to-pack');
+    expect(find.text('패킹'), findsOneWidget);
+    expect(find.text('주문 order-seed-1 · 상품 4종 5개'), findsOneWidget);
+    await scanTo('station-scan', 'PAK-C-01');
+    // 피킹한 장바구니가 아니면 받지 않는다.
+    await scanTo('pack-cart-scan', 'CRT-C-01');
+    expect(find.text('이 주문을 피킹한 장바구니가 아니에요'), findsWidgets);
+    await scanTo('pack-cart-scan', 'CRT-C-02');
+    expect(find.byKey(const ValueKey('request-dispatch')), findsOneWidget);
+    expect(t.takeException(), isNull);
   });
 
   testWidgets('검수: 줄 작업이 없으면 "지금 할 작업이 없어요" + 다시 받기', (t) async {
@@ -233,7 +245,7 @@ void main() {
     await tapKey(t, 'guide-ok');
     expect(find.byKey(const ValueKey('session-unknown')), findsOneWidget);
     await tapKey(t, 'session-retry');
-    expect(find.byKey(const ValueKey('assigned-task-mock-2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('assigned-task-mock-1')), findsOneWidget);
   });
 
   testWidgets('휴게 중에는 업무를 눌러도 안내로 가지 않는다', (t) async {

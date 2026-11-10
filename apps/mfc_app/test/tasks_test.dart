@@ -456,18 +456,18 @@ void main() {
     });
   });
 
-  testWidgets('작업 상세 → 시작 확정 → 피킹 스캔 → 실적 전송 상태', (t) async {
+  testWidgets('작업 시작 한 번 → 피킹 스캔 → 실적 전송·확정', (t) async {
     t.view
       ..physicalSize = const Size(800, 2000)
       ..devicePixelRatio = 1;
     addTearDown(t.view.reset);
     final repo = MockTaskRepository(latency: Duration.zero)..confirmPolls = 2;
-    await t.pumpWidget(_app(repo, MemoryKeyValueStore()));
+    final store = MemoryKeyValueStore();
+    await t.pumpWidget(_app(repo, store));
     await t.pumpAndSettle();
 
+    // 작업 상세 없이 — 열면 시작 판정을 받고 바로 피킹.
     await openRoute(t, '/tasks/task-mock-1');
-    await t.tap(find.byKey(const ValueKey('start')));
-    await t.pumpAndSettle();
 
     expect(find.text('피킹'), findsOneWidget);
     await scanTo(t, 'cart-scan', 'CRT-C-01');
@@ -489,13 +489,17 @@ void main() {
     await t.testTextInput.receiveAction(TextInputAction.done);
     // 칸 몫(1개)을 채우면 버튼 없이 바로 보낸다.
     await t.pumpAndSettle();
-    expect(find.text('확정 대기'), findsOneWidget);
+    // 접수만 됨(확정 대기) — 확정 수는 그대로, 다음 칸 지시로 넘어간다.
+    expect(find.textContaining('확정 0 / 지시 5'), findsOneWidget);
     expect(find.text('C-S1-02-2-05'), findsOneWidget, reason: '다음 칸 지시');
+    final queued = (await t.runAsync(
+      () => FieldQueue(store, name: 'mfc').items(),
+    ))!;
+    expect(queued.single.state, QueueItemState.awaitingConfirm);
 
     await t.tap(find.byKey(const ValueKey('sync')));
     await t.pumpAndSettle();
-    expect(find.text('반영'), findsOneWidget);
-    expect(find.textContaining('확정 1 / 지시 4'), findsOneWidget);
+    expect(find.textContaining('확정 1 / 지시 5'), findsOneWidget);
   });
 
   testWidgets('결과 불명인 실적이 있으면 다시 집지 말라고 안내한다', (t) async {
@@ -507,9 +511,8 @@ void main() {
       ..loseNextExecutionResponse = true;
     await t.pumpWidget(_app(repo, MemoryKeyValueStore()));
     await t.pumpAndSettle();
+    // 작업 상세 없이 — 열면 시작 판정을 받고 바로 피킹.
     await openRoute(t, '/tasks/task-mock-1');
-    await t.tap(find.byKey(const ValueKey('start')));
-    await t.pumpAndSettle();
     await scanTo(t, 'cart-scan', 'CRT-C-01');
     await scanTo(t, 'pick-loc-scan', 'C-S1-01-1-01');
     await t.enterText(
@@ -520,6 +523,5 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('do-not-redo')), findsOneWidget);
-    expect(find.text('확인 중'), findsOneWidget);
   });
 }

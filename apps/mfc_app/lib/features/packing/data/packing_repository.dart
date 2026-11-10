@@ -17,6 +17,9 @@ abstract interface class PackingRepository {
     required TemperatureZone zone,
     bool containsAlcohol = false,
     String? packedBy,
+
+    /// 포장 위치(패킹대 `PAK-…`). 계약 packingLocation.
+    String? packingLocation,
     required IdempotencyKey key,
   });
 
@@ -59,6 +62,7 @@ final class ApiPackingRepository implements PackingRepository {
     required TemperatureZone zone,
     bool containsAlcohol = false,
     String? packedBy,
+    String? packingLocation,
     required IdempotencyKey key,
   }) => _pack(
     () => _shipments.sealPackage(
@@ -78,6 +82,7 @@ final class ApiPackingRepository implements PackingRepository {
             api.SealPackageRequestTemperatureZoneEnum.FROZEN,
         },
         packedBy: packedBy,
+        packingLocation: packingLocation,
       ),
       extra: commandOptions(key).extra,
     ),

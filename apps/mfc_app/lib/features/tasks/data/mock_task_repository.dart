@@ -8,16 +8,22 @@ import 'task_repository.dart';
 
 /// 목 구현. 계약(`mfc-fulfillment-service.yaml`) 모양 JSON 을 생성 모델로 읽는다.
 ///
-/// - task-mock-1: 배정된 피킹(3행). 시작·피킹 시연.
-/// - task-mock-2: 진행 중 패킹.
+/// - task-mock-1: 배정된 피킹(4행, 출하 shp-1). 피킹이 끝나면 같은 주문의 패킹 shp-1-PACK 이
+///   같은 작업자에게 배정된다(피킹·패킹 동일 인원 — 업무 문서 §7-6, 서버 보장은 BR-52 R20).
+/// - task-mock-2: 진행 중 패킹(출하 shp-2) — [packDemo] 일 때만(패킹 화면 단독 시험).
 /// - task-mock-3: 막힌 피킹(결품 보고).
 /// - task-mock-4: 다른 작업자가 이미 시작한 피킹(ALREADY_STARTED 시연).
 base class MockTaskRepository implements TaskRepository {
-  MockTaskRepository({this.latency = const Duration(milliseconds: 300)}) {
+  MockTaskRepository({
+    this.latency = const Duration(milliseconds: 300),
+    bool packDemo = false,
+  }) {
     _tasks
       ..['task-mock-1'] = _pickTask()
-      ..['shp-9-RETURN'] = returnTask()
-      ..['task-mock-2'] = {
+      ..['shp-1-PACK'] = _packOf(_pickTask(), 'shp-1-PACK')
+      ..['shp-9-RETURN'] = returnTask();
+    if (packDemo) {
+      _tasks['task-mock-2'] = {
         'taskId': 'task-mock-2',
         'taskType': 'PACK',
         'state': 'IN_PROGRESS',
@@ -73,7 +79,9 @@ base class MockTaskRepository implements TaskRepository {
             'pendingQty': 0,
           },
         ],
-      }
+      };
+    }
+    _tasks
       ..['task-mock-3'] = {
         ..._pickTask(id: 'task-mock-3'),
         'state': 'BLOCKED',
@@ -163,6 +171,35 @@ base class MockTaskRepository implements TaskRepository {
 
   Future<void> _wait() => Future<void>.delayed(latency);
 
+  /// 피킹 작업의 같은 주문 패킹 — 피킹이 끝나기 전에는 대기(WAITING).
+  static Map<String, Object?> _packOf(Map<String, Object?> pick, String id) => {
+    'taskId': id,
+    'taskType': 'PACK',
+    'state': 'WAITING',
+    'version': 1,
+    'mfcId': pick['mfcId'],
+    'shipmentId': pick['shipmentId'],
+    'assignment': {'workerId': workerId, 'assignmentVersion': 1},
+    'lineCount': (pick['lines']! as List).length,
+    'plannedQty': pick['plannedQty'],
+    'remainingQty': pick['plannedQty'],
+    'lines': [
+      for (final l in (pick['lines']! as List).cast<Map<String, Object?>>())
+        {
+          'taskLineId': '$id:${l['orderLineId']}',
+          'orderLineId': l['orderLineId'],
+          'sku': l['sku'],
+          'productName': l['productName'],
+          'barcode': l['barcode'],
+          'plannedQty': l['plannedQty'],
+          'completedQty': 0,
+          'cancelledQty': 0,
+          'remainingQty': l['plannedQty'],
+          'pendingQty': 0,
+        },
+    ],
+  };
+
   static Map<String, Object?> _pickTask({String id = 'task-mock-1'}) => {
     'taskId': id,
     'taskType': 'PICK',
@@ -172,11 +209,11 @@ base class MockTaskRepository implements TaskRepository {
     'fulfillmentId': 'ful-1',
     'shipmentId': 'shp-1',
     'assignment': {'workerId': workerId, 'assignmentVersion': 2},
-    'lineCount': 3,
-    'plannedQty': 4,
-    'headline': {'productName': '그릭요거트 플레인 400g', 'otherLineCount': 2},
+    'lineCount': 4,
+    'plannedQty': 5,
+    'headline': {'productName': '그릭요거트 플레인 400g', 'otherLineCount': 3},
     'completedQty': 0,
-    'remainingQty': 4,
+    'remainingQty': 5,
     'promisedReadyAt': '2026-10-24T06:20:00Z',
     'createdAt': '2026-10-24T06:00:00Z',
     'lines': [
@@ -237,6 +274,34 @@ base class MockTaskRepository implements TaskRepository {
         'remainingQty': 2,
         'pendingQty': 0,
       },
+      // 방문 순서: 냉장 → 냉동 → 상온(서버 계산).
+      {
+        'taskLineId': '$id-l4',
+        'orderLineId': 'ol-4',
+        'sku': 'E-00000031',
+        'productName': '냉동 왕만두 1kg',
+        'barcode': dumplingBarcode,
+        'locationId': 'F-S1-01-1-03',
+        'lotId': 'LOT-D-1101',
+        'expiresOn': '2027-05-01',
+        'picks': [
+          {
+            'lotId': 'LOT-D-1101',
+            'expiresOn': '2027-05-01',
+            'remainingQty': 1,
+            'visitSeq': 3,
+            'pickStatus': 'OK',
+            'locations': [
+              {'locationCode': 'F-S1-01-1-03', 'qty': 5, 'allocatedQty': 1},
+            ],
+          },
+        ],
+        'plannedQty': 1,
+        'completedQty': 0,
+        'cancelledQty': 0,
+        'remainingQty': 1,
+        'pendingQty': 0,
+      },
       {
         'taskLineId': '$id-l3',
         'orderLineId': 'ol-3',
@@ -248,7 +313,7 @@ base class MockTaskRepository implements TaskRepository {
           {
             'lotId': 'LOT-C-0901',
             'remainingQty': 1,
-            'visitSeq': 3,
+            'visitSeq': 4,
             'pickStatus': 'OK',
             'locations': [
               {'locationCode': 'A-S3-01-1-10', 'qty': 12, 'allocatedQty': 1},
@@ -455,6 +520,16 @@ base class MockTaskRepository implements TaskRepository {
     );
     if (!pending && allDone && t['state'] == 'IN_PROGRESS') {
       t['state'] = 'COMPLETED';
+      // 피킹이 끝나면 같은 주문의 패킹이 같은 작업자에게 열린다.
+      if (t['taskType'] == 'PICK') {
+        for (final x in _tasks.values) {
+          if (x['taskType'] == 'PACK' &&
+              x['shipmentId'] == t['shipmentId'] &&
+              x['state'] == 'WAITING') {
+            x['state'] = 'ASSIGNED';
+          }
+        }
+      }
     }
     t['version'] = (t['version']! as int) + 1;
   }

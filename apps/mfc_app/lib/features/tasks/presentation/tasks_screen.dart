@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../packing/presentation/packing_screen.dart';
 import '../../work/domain/work.dart';
 import '../../work/presentation/work_screens.dart' show backToSession;
+import '../../work/presentation/work_controller.dart' show continueToPack;
+import 'return_screen.dart';
 import '../../../shared/field_widgets.dart';
 import '../../../shared/scanner/scan_input.dart';
 import '../../../shared/scanner/scanner.dart';
@@ -49,110 +51,115 @@ String startRejectText(AppLocalizations l10n, String? code) => switch (code) {
   _ => l10n.startInvalidState,
 };
 
-/// 작업 상세·시작. 시작 확정 전에는 피킹 화면으로 가지 않는다.
-class TaskDetailScreen extends ConsumerWidget {
-  const TaskDetailScreen({super.key, required this.taskId});
+/// 작업 실행 입구. 근무 화면의 "작업 시작" 한 번으로 시작 판정을 받고 바로 실행 화면을 그린다
+/// (작업 상세 화면을 거치지 않는다). 시작 확정 전에는 실행 화면을 보이지 않는다.
+class TaskRunScreen extends ConsumerStatefulWidget {
+  const TaskRunScreen({super.key, required this.taskId});
 
   final String taskId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
-    final provider = taskDetailProvider(taskId);
-    final flow = ref.watch(startFlowProvider(taskId));
-    final me = ref.watch(currentWorkerIdProvider);
-    ref.listen(startFlowProvider(taskId), (_, next) {
-      if (next.phase == StartPhase.applied) {
-        final kind = ref.read(provider).value?.kind;
-        // 교체하지 않고 쌓는다 — 뒤로 가면 작업 상세, 그다음 근무 화면(다시 받기).
-        context.push('/tasks/$taskId/${taskRoute(kind)}');
-      }
+  ConsumerState<TaskRunScreen> createState() => _TaskRunScreenState();
+}
+
+class _TaskRunScreenState extends ConsumerState<TaskRunScreen> {
+  bool _requested = false;
+  bool _running = false;
+
+  void _start(TaskDetailView t) {
+    if (_requested) return;
+    _requested = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(startFlowProvider(widget.taskId).notifier).start(t);
     });
+  }
+
+  WorkArea _areaOf(TaskKind k) =>
+      k == TaskKind.returnToShelf ? WorkArea.stockMove : WorkArea.pickPack;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final id = widget.taskId;
+    final detail = ref.watch(taskDetailProvider(id));
+    final flow = ref.watch(startFlowProvider(id));
+    final me = ref.watch(currentWorkerIdProvider);
+    final t = detail.value;
+    // 한 번 실행 화면을 열면 끝(완료) 단계까지 그 화면에 머문다.
+    if (t != null &&
+        (_running ||
+            t.state == TaskState.inProgress && t.activeStartWorkerId == me)) {
+      _running = true;
+      return switch (t.kind) {
+        TaskKind.pack => PackingScreen(taskId: id),
+        TaskKind.returnToShelf => ReturnShelfScreen(taskId: id),
+        _ => PickingScreen(taskId: id),
+      };
+    }
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.taskDetailTitle)),
+      appBar: AppBar(title: Text(l10n.taskStarting)),
       body: UiStateView<TaskDetailView>(
-        state: uiStateOf(ref.watch(provider)),
-        onRetry: () => ref.invalidate(provider),
+        state: uiStateOf(detail),
+        onRetry: () => ref.invalidate(taskDetailProvider(id)),
         ready: (context, t) {
-          final startedByMe =
-              t.state == TaskState.inProgress && t.activeStartWorkerId == me;
+          if (t.state == TaskState.assigned && t.kind != TaskKind.dispatch) {
+            if (flow.phase == StartPhase.idle) _start(t);
+          }
           final message = switch (flow.phase) {
             StartPhase.rejected => startRejectText(l10n, flow.rejectCode),
             StartPhase.notStarted => l10n.startNotStarted,
             StartPhase.unknown => l10n.startUnknown,
             StartPhase.clientError => l10n.startClientError,
+            _
+                when t.state != TaskState.assigned &&
+                    t.state != TaskState.inProgress =>
+              l10n.taskNotRunnable(taskStateText(l10n, t.state)),
+            _ when t.state == TaskState.inProgress => l10n.startAlreadyStarted,
             _ => null,
           };
-          return ListView(
+          if (message == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final retry =
+              flow.phase == StartPhase.unknown ||
+              flow.phase == StartPhase.notStarted;
+          return Padding(
             padding: const EdgeInsets.all(16),
-            children: [
-              Text(
-                '${taskKindText(l10n, t.kind)} · ${taskStateText(l10n, t.state)}',
-                key: const ValueKey('task-state'),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              Text(l10n.taskProgress(t.totalCompleted, t.totalPlanned)),
-              if (t.blockReason case final r?)
-                Text(l10n.taskBlocked(r), key: const ValueKey('block-reason')),
-              if (t.assignmentVersion case final v?)
-                Text(l10n.assignmentVersion(v)),
-              const SizedBox(height: 12),
-              for (final l in t.lines)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(l.productName ?? l.sku),
-                  subtitle: Text(
-                    [
-                      ?l.locationId,
-                      l10n.lineQty(
-                        l.plannedQty,
-                        l.completedQty,
-                        l.remainingQty,
-                      ),
-                    ].join(' · '),
-                  ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  message,
+                  key: const ValueKey('start-message'),
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-              if (message != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    message,
-                    key: const ValueKey('start-message'),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                if (t.blockReason case final r?)
+                  Text(
+                    l10n.taskBlocked(r),
+                    key: const ValueKey('block-reason'),
+                  ),
+                const Spacer(),
+                if (retry)
+                  CommandButton(
+                    key: const ValueKey('start'),
+                    busy: flow.phase == StartPhase.starting,
+                    label: flow.phase == StartPhase.unknown
+                        ? l10n.checkAgain
+                        : l10n.retry,
+                    onPressed: () =>
+                        ref.read(startFlowProvider(id).notifier).start(t),
+                  )
+                else
+                  FilledButton(
+                    key: const ValueKey('next-task'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(56),
                     ),
+                    onPressed: () => backToSession(context, _areaOf(t.kind)),
+                    child: Text(l10n.nextTask),
                   ),
-                ),
-              const SizedBox(height: 8),
-              if (startedByMe)
-                // 키를 잃었어도 활성 시작이 본인이면 이어서 한다(새 키로 다시 시작하지 않는다).
-                FilledButton(
-                  key: const ValueKey('continue-picking'),
-                  onPressed: () =>
-                      context.push('/tasks/$taskId/${taskRoute(t.kind)}'),
-                  child: Text(switch (t.kind) {
-                    TaskKind.pack => l10n.continuePacking,
-                    TaskKind.returnToShelf => l10n.continueReturn,
-                    _ => l10n.continuePicking,
-                  }),
-                )
-              else if (t.state == TaskState.assigned &&
-                  t.kind != TaskKind.dispatch)
-                CommandButton(
-                  key: const ValueKey('start'),
-                  busy: flow.phase == StartPhase.starting,
-                  label: switch (flow.phase) {
-                    StartPhase.unknown => l10n.checkAgain,
-                    StartPhase.notStarted => l10n.retry,
-                    _ => l10n.startTask,
-                  },
-                  onPressed: flow.phase == StartPhase.clientError
-                      ? null
-                      : () => ref
-                            .read(startFlowProvider(taskId).notifier)
-                            .start(t),
-                ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -315,7 +322,8 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                   cameraTitle: l10n.pickCameraTitle,
                   continuous: false,
                   autofocus: false,
-                  onScan: (code) => _ctl.scanCart(code)
+                  onScan: (code) =>
+                      _ctl.scanCart(code, shipmentId: task.shipmentId)
                       ? const ScanFeedback.ok()
                       : ScanFeedback.error(l10n.pickNotCart),
                 ),
@@ -438,15 +446,14 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                     child: Text(l10n.reportShortage),
                   ),
                 ],
-              ] else ...[
+              ] else if (task.state == TaskState.blocked) ...[
+                // 결품 보고로 막혔다 — 고객 확인 전에는 패킹하지 않는다(WK-06).
                 Text(
-                  task.lines.every((l) => l.done)
-                      ? l10n.pickAllConfirmed
-                      : l10n.pickWaitingConfirm,
-                  key: const ValueKey('pick-finished'),
+                  l10n.pickBlocked(task.blockReason ?? '-'),
+                  key: const ValueKey('pick-blocked'),
+                  style: theme.textTheme.titleMedium,
                 ),
-                const SizedBox(height: 8),
-                // 다음 작업은 서버가 정한다 — 근무 화면으로 돌아가 다시 받는다.
+                const SizedBox(height: 16),
                 FilledButton(
                   key: const ValueKey('next-task'),
                   style: FilledButton.styleFrom(
@@ -455,30 +462,44 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                   onPressed: () => backToSession(context, WorkArea.pickPack),
                   child: Text(l10n.nextTask),
                 ),
-              ],
-              const Divider(height: 32),
-              Text(l10n.queueTitle, style: theme.textTheme.titleMedium),
-              for (final q in queue)
-                ListTile(
-                  key: ValueKey('queue-${q.id}'),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(queueStateText(l10n, q.state)),
-                  subtitle: q.rejectCode == null ? null : Text(q.rejectCode!),
+              ] else if (task.lines.every((l) => l.done)) ...[
+                // 4. 피킹 끝 — 장바구니를 들고 패킹대로(피킹·패킹 같은 사람, 업무 문서 §7-6).
+                const SizedBox(height: 24),
+                const Icon(Icons.shopping_cart_checkout, size: 64),
+                Text(
+                  l10n.pickToPack,
+                  key: const ValueKey('pick-finished'),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleLarge,
                 ),
-              const Divider(height: 32),
-              for (final l in task.lines)
-                ListTile(
-                  key: ValueKey('line-${l.orderLineId}'),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    l.done ? Icons.check_circle : Icons.radio_button_unchecked,
+                const SizedBox(height: 24),
+                FilledButton(
+                  key: const ValueKey('to-pack'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
                   ),
-                  title: Text(l.productName ?? l.sku),
-                  subtitle: Text(
-                    l10n.lineQty(l.plannedQty, l.completedQty, l.remainingQty),
-                  ),
+                  onPressed: () => continueToPack(context, ref),
+                  child: Text(l10n.pickStartPacking),
+                ),
+              ] else ...[
+                // 보낸 실적이 아직 확정되지 않았다 — 다시 집지 않는다.
+                Text(
+                  l10n.pickWaitingConfirm,
+                  key: const ValueKey('pick-finished'),
+                ),
+                const SizedBox(height: 8),
+                CommandButton(
+                  key: const ValueKey('check-again'),
+                  busy: picking.syncing,
+                  label: l10n.checkAgain,
+                  onPressed: _ctl.sync,
+                ),
+              ],
+              if (queue.any((q) => q.state == QueueItemState.rejected))
+                Text(
+                  l10n.pickRejectedSome,
+                  key: const ValueKey('pick-rejected'),
+                  style: TextStyle(color: theme.colorScheme.error),
                 ),
             ],
           );

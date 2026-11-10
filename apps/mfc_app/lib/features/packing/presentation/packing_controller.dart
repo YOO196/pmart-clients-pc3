@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 
+import '../../../shared/codes.dart';
 import '../../../shared/product_hints.dart';
 import '../../../shared/providers.dart';
 import '../../tasks/data/task_repository.dart' show packPayload;
@@ -26,6 +27,11 @@ final shipmentProvider = FutureProvider.autoDispose
       (ref, id) => ref.watch(packingRepositoryProvider).shipment(id),
     );
 
+/// 패킹대·장바구니·랙 스캔 오류.
+/// notStation = 패킹대(PAK) 아님, notCart = 장바구니(CRT) 아님,
+/// otherCart = 이 주문을 피킹한 장바구니가 아님, notRack = 출하대기(DSP) 아님.
+enum PackStepError { notStation, notCart, otherCart, notRack }
+
 /// otherZone = 지금 봉투와 다른 온도대 상품(WK-07 온도별 포장).
 enum PackScan { matched, wrongItem, overExpected, otherZone }
 
@@ -43,7 +49,23 @@ class PackingState {
     this.dispatchBusy = false,
     this.dispatchUnknown = false,
     this.dispatchRejectCode,
+    this.station,
+    this.cart,
+    this.rack,
+    this.stepError,
   });
+
+  /// 패킹대(포장 위치 `PAK-…`) — 밀봉 본문 packingLocation.
+  final String? station;
+
+  /// 확인한 장바구니(`CRT-…`).
+  final String? cart;
+
+  /// 올려둔 출하대기 랙(`DSP-…`). 보낼 곳이 계약에 없다(BR-52 R20) — 화면 확인만.
+  final String? rack;
+
+  /// 패킹대·장바구니·랙 스캔 오류.
+  final PackStepError? stepError;
 
   /// 지금 담고 있는 포장의 수량(밀봉 전). orderLineId → 수량.
   final Map<String, int> bag;
@@ -76,7 +98,15 @@ class PackingState {
     bool? dispatchBusy,
     bool? dispatchUnknown,
     String? Function()? dispatchRejectCode,
+    String? Function()? station,
+    String? Function()? cart,
+    String? Function()? rack,
+    PackStepError? Function()? stepError,
   }) => PackingState(
+    station: station != null ? station() : this.station,
+    cart: cart != null ? cart() : this.cart,
+    rack: rack != null ? rack() : this.rack,
+    stepError: stepError != null ? stepError() : this.stepError,
     bag: bag ?? this.bag,
     zone: zone ?? this.zone,
     lastScan: lastScan ?? this.lastScan,
@@ -166,6 +196,45 @@ class PackingController extends Notifier<PackingState> {
 
   void setZone(TemperatureZone z) => state = state.copyWith(zone: z);
 
+  PackingState get current => state;
+
+  /// 1. 패킹대 칸(`PAK-…`).
+  bool scanStation(String code) {
+    final c = code.trim();
+    final ok = isMfcLocation(c) && c.startsWith('PAK-');
+    state = state.copyWith(
+      station: ok ? () => c : null,
+      stepError: () => ok ? null : PackStepError.notStation,
+    );
+    return ok;
+  }
+
+  /// 2. 장바구니 — 이 주문을 피킹한 장바구니를 이 기기가 알면 같은지 본다.
+  bool scanCart(String code, {String? expected}) {
+    final c = code.trim();
+    final PackStepError? err = !isCartLocation(c)
+        ? PackStepError.notCart
+        : expected != null && expected != c
+        ? PackStepError.otherCart
+        : null;
+    state = state.copyWith(
+      cart: err == null ? () => c : null,
+      stepError: () => err,
+    );
+    return err == null;
+  }
+
+  /// 5. 출하대기 랙(`DSP-…`).
+  bool scanRack(String code) {
+    final c = code.trim();
+    final ok = isMfcLocation(c) && c.startsWith('DSP-');
+    state = state.copyWith(
+      rack: ok ? () => c : null,
+      stepError: () => ok ? null : PackStepError.notRack,
+    );
+    return ok;
+  }
+
   /// 밀봉 → 포장 QR. 결과를 모르면 같은 키로만 다시 보낸다(포장이 두 개 생기지 않게).
   Future<void> seal(TaskDetailView task, ShipmentView s) async {
     if (state.busy || (state.bag.isEmpty && !state.sealUnknown)) return;
@@ -188,6 +257,7 @@ class PackingController extends Notifier<PackingState> {
         bagCount: 1,
         zone: state.zone,
         packedBy: ref.read(currentWorkerIdProvider),
+        packingLocation: state.station,
         key: key,
       );
       if (!ref.mounted) return;
@@ -195,7 +265,12 @@ class PackingController extends Notifier<PackingState> {
     switch (outcome) {
       case PackDone(:final package):
         _sealKey = null;
-        state = PackingState(zone: state.zone, lastSealed: package);
+        state = PackingState(
+          zone: state.zone,
+          lastSealed: package,
+          station: state.station,
+          cart: state.cart,
+        );
       case PackRejected(:final code):
         _sealKey = null;
         state = state.copyWith(busy: false, rejectCode: () => code);

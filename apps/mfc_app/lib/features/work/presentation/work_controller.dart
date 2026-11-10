@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart';
@@ -137,4 +138,25 @@ Future<void> setOnBreak(WidgetRef ref, {required bool on}) async {
     await repo.endBreak(mfc, me, key: key);
   }
   ref.invalidate(meProvider);
+}
+
+/// 피킹을 끝내고 패킹대로 — 서버에 다음 작업을 받아, 패킹이면 바로 그 패킹을 연다.
+/// 다른 작업이면 근무 화면이 보인다(같은 주문 패킹을 피킹한 사람에게 주는지는 BR-52 R20).
+Future<void> continueToPack(BuildContext context, WidgetRef ref) async {
+  final outcome = await ref
+      .read(workRepositoryProvider)
+      .next(
+        ref.read(currentMfcIdProvider),
+        ref.read(currentWorkerIdProvider),
+        WorkArea.pickPack,
+        key: IdempotencyKey.generate(),
+      );
+  if (!context.mounted) return;
+  ref.invalidate(workSessionProvider(WorkArea.pickPack));
+  if (outcome case NextAssigned(:final task) when task.taskType == 'PACK') {
+    context.go('/work/${WorkArea.pickPack.name}');
+    await context.push(task.route!);
+    return;
+  }
+  context.go('/work/${WorkArea.pickPack.name}');
 }

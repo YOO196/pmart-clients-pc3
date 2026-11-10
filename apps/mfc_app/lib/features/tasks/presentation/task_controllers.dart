@@ -254,6 +254,20 @@ class PickingState {
   );
 }
 
+/// 출하 → 피킹에 쓴 장바구니. 패킹대에서 장바구니를 찍어 같은 주문인지 확인한다.
+/// 실행 본문에 넣을 곳이 없어(BR-52 R19 3) 이 기기에만 둔다.
+final orderCartProvider = NotifierProvider<OrderCarts, Map<String, String>>(
+  OrderCarts.new,
+);
+
+class OrderCarts extends Notifier<Map<String, String>> {
+  @override
+  Map<String, String> build() => const {};
+
+  void set(String shipmentId, String cart) =>
+      state = {...state, shipmentId: cart};
+}
+
 final pickingProvider = NotifierProvider.autoDispose
     .family<PickingController, PickingState, String>(PickingController.new);
 
@@ -265,11 +279,14 @@ class PickingController extends Notifier<PickingState> {
   @override
   PickingState build() => const PickingState();
 
-  /// 장바구니 바코드. 장바구니 코드가 아니면 false.
-  bool scanCart(String code) {
+  /// 장바구니 바코드. 장바구니 코드가 아니면 false. 패킹대에서 같은 장바구니인지 본다.
+  bool scanCart(String code, {String? shipmentId}) {
     final c = code.trim();
     if (!isCartLocation(c)) return false;
     state = state.copyWith(cart: () => c);
+    if (shipmentId != null) {
+      ref.read(orderCartProvider.notifier).set(shipmentId, c);
+    }
     return true;
   }
 

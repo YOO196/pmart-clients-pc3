@@ -48,7 +48,7 @@ void main() {
   ];
 
   setUp(() {
-    tasks = MockTaskRepository(latency: Duration.zero);
+    tasks = MockTaskRepository(latency: Duration.zero, packDemo: true);
     packing = MockPackingRepository(latency: Duration.zero);
   });
 
@@ -345,9 +345,9 @@ void main() {
     });
   });
 
-  testWidgets('패킹 화면: 예상 분 넣고 배차 요청 → 스캔 → 밀봉(QR) → 출하 준비 → 패킹 완료', (t) async {
+  Future<void> openPacking(WidgetTester t) async {
     t.view
-      ..physicalSize = const Size(800, 2400)
+      ..physicalSize = const Size(412, 915)
       ..devicePixelRatio = 1;
     addTearDown(t.view.reset);
     await t.pumpWidget(
@@ -358,120 +358,107 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
+    // 진행 중인 내 패킹 — 작업 상세 없이 바로 패킹 화면.
     await openRoute(t, '/tasks/task-mock-2');
-    await t.tap(find.byKey(const ValueKey('continue-picking')));
-    await t.pumpAndSettle();
     expect(find.text('패킹'), findsOneWidget);
+  }
 
-    // 분을 넣기 전에는 요청할 수 없다.
-    expect(
+  Future<void> scanTo(WidgetTester t, String id, String code) async {
+    await t.enterText(find.byKey(ValueKey(id)), code);
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pumpAndSettle();
+  }
+
+  bool enabled(WidgetTester t, String key) =>
       t
           .widget<FilledButton>(
             find.descendant(
-              of: find.byKey(const ValueKey('request-dispatch')),
+              of: find.byKey(ValueKey(key)),
               matching: find.byType(FilledButton),
             ),
           )
-          .onPressed,
-      isNull,
-    );
-    expect(
-      find.byKey(const ValueKey('pack-minutes')),
-      findsNothing,
-      reason: 'PDA 는 키보드 입력 대신 버튼',
-    );
+          .onPressed !=
+      null;
+
+  testWidgets('패킹 화면: 패킹대 → 장바구니 → 배차 요청 → 온도대별 봉투(라벨 자동) → 출하대기 랙 → 끝', (
+    t,
+  ) async {
+    await openPacking(t);
+    expect(find.byKey(const ValueKey('pack-order')), findsOneWidget);
+
+    // 1. 패킹대.
+    await scanTo(t, 'station-scan', 'C-S1-01-1-01');
+    expect(find.text('패킹대(PAK) 바코드가 아니에요'), findsWidgets);
+    await scanTo(t, 'station-scan', 'PAK-C-02');
+
+    // 2. 장바구니(이 기기가 피킹 장바구니를 모르면 장바구니 형식만 본다).
+    await scanTo(t, 'pack-cart-scan', 'PAK-C-02');
+    expect(find.byKey(const ValueKey('pack-step-error')), findsOneWidget);
+    await scanTo(t, 'pack-cart-scan', 'CRT-C-01');
+
+    // 3. 배차 — 고르기 전에는 요청할 수 없다. 키보드 입력칸 없음.
+    expect(find.byKey(const ValueKey('pack-scan')), findsNothing);
+    expect(find.byKey(const ValueKey('pack-minutes')), findsNothing);
+    expect(enabled(t, 'request-dispatch'), isFalse);
     await t.tap(find.byKey(const ValueKey('pack-min-10')));
     await t.pump();
     await t.tap(find.byKey(const ValueKey('request-dispatch')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('dispatch-requested')), findsOneWidget);
-    expect(find.text('배차를 요청했어요'), findsOneWidget);
 
-    Future<void> scan(String code) async {
-      await t.enterText(find.byKey(const ValueKey('pack-scan')), code);
-      await t.testTextInput.receiveAction(TextInputAction.done);
-      await t.pump();
-    }
-
-    expect(
-      find.byKey(const ValueKey('zone-select')),
-      findsNothing,
-      reason: '온도대는 상품 정보로 — 작업자가 고르지 않는다',
-    );
+    // 4. 담기 — 온도대는 상품 정보로, 다른 온도대는 같은 봉투에 안 담는다.
+    expect(find.byKey(const ValueKey('zone-select')), findsNothing);
     expect(find.text('봉투 온도대는 처음 담는 상품으로 정해져요'), findsOneWidget);
-    await scan(MockTaskRepository.yogurtBarcode);
+    await scanTo(t, 'pack-scan', MockTaskRepository.yogurtBarcode);
     expect(find.text('지금 봉투: 냉장'), findsOneWidget);
-    await scan(MockTaskRepository.dumplingBarcode);
+    await scanTo(t, 'pack-scan', MockTaskRepository.dumplingBarcode);
     expect(find.byKey(const ValueKey('pack-scan-error')), findsOneWidget);
-    await scan(MockTaskRepository.milkBarcode);
-    await scan(MockTaskRepository.milkBarcode);
+    await scanTo(t, 'pack-scan', MockTaskRepository.milkBarcode);
+    await scanTo(t, 'pack-scan', MockTaskRepository.milkBarcode);
     await t.tap(find.byKey(const ValueKey('seal')));
     await t.pumpAndSettle();
     // 밀봉하면 라벨이 바로 나온다(프린터 없음 = 미리보기).
     expect(find.byKey(const ValueKey('label-preview')), findsOneWidget);
     await closeLabel(t);
+    expect(packing.sealedAt['pkg-1'], 'PAK-C-02', reason: '밀봉 본문 포장 위치 = 패킹대');
 
-    await scan(MockTaskRepository.dumplingBarcode);
+    await scanTo(t, 'pack-scan', MockTaskRepository.dumplingBarcode);
     expect(find.text('지금 봉투: 냉동'), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('seal')));
     await t.pumpAndSettle();
     await closeLabel(t);
 
-    expect(find.textContaining('PKG:pkg-'), findsNWidgets(2));
+    // 5. 출하대기 랙.
     expect(find.text('모든 상품을 담았어요(출하 준비)'), findsOneWidget);
-
+    expect(
+      t
+          .widget<FilledButton>(find.byKey(const ValueKey('finish-packing')))
+          .onPressed,
+      isNull,
+    );
+    await scanTo(t, 'rack-scan', 'PAK-C-02');
+    expect(find.text('출하대기 랙(DSP) 바코드가 아니에요'), findsWidgets);
+    await scanTo(t, 'rack-scan', 'DSP-A-01');
     await t.tap(find.byKey(const ValueKey('finish-packing')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('packing-finished')), findsOneWidget);
-
-    // 점원 요청이 이미 있어 자동 요청으로 바뀌지 않는다.
-    expect(find.text('배차를 요청했어요'), findsOneWidget);
+    expect(find.text('패킹을 끝냈어요 — 출하대기 DSP-A-01'), findsOneWidget);
+    expect(tasks.taskJson('task-mock-2')['state'], 'COMPLETED');
   });
 
-  testWidgets('패킹 화면: 배차 요청 없이 출하 준비가 되면 요청하라고 경고', (t) async {
-    t.view
-      ..physicalSize = const Size(800, 2400)
-      ..devicePixelRatio = 1;
-    addTearDown(t.view.reset);
-    await t.pumpWidget(
-      ProviderScope(
-        retry: (_, _) => null,
-        overrides: overrides(),
-        child: const MfcApp(),
-      ),
-    );
-    await t.pumpAndSettle();
-    await openRoute(t, '/tasks/task-mock-2');
-    await t.tap(find.byKey(const ValueKey('continue-picking')));
-    await t.pumpAndSettle();
-    expect(find.byKey(const ValueKey('dispatch-missing')), findsNothing);
-
-    for (final bag in [
-      [
-        MockTaskRepository.yogurtBarcode,
-        MockTaskRepository.milkBarcode,
-        MockTaskRepository.milkBarcode,
-      ],
-      [MockTaskRepository.dumplingBarcode],
-    ]) {
-      for (final code in bag) {
-        await t.enterText(find.byKey(const ValueKey('pack-scan')), code);
-        await t.testTextInput.receiveAction(TextInputAction.done);
-        await t.pump();
-      }
-      await t.tap(find.byKey(const ValueKey('seal')));
-      await t.pumpAndSettle();
-      await closeLabel(t);
-    }
-
-    expect(find.byKey(const ValueKey('dispatch-missing')), findsOneWidget);
-    expect(find.byKey(const ValueKey('dispatch-requested')), findsNothing);
-
+  testWidgets('패킹 화면: 배차를 요청해야 담기로 간다(직원 요청만, 자동 요청 없음)', (t) async {
+    await openPacking(t);
+    await scanTo(t, 'station-scan', 'PAK-C-01');
+    await scanTo(t, 'pack-cart-scan', 'CRT-C-01');
+    expect(find.text('포장을 시작해요. 예상 포장 시간을 고르고 배차를 요청해요'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pack-scan')), findsNothing);
     await t.tap(find.byKey(const ValueKey('pack-min-5')));
     await t.pump();
     await t.tap(find.byKey(const ValueKey('request-dispatch')));
     await t.pumpAndSettle();
-    expect(find.byKey(const ValueKey('dispatch-missing')), findsNothing);
-    expect(find.text('배차를 요청했어요'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pack-scan')), findsOneWidget);
+    final s = await t.runAsync(() => packing.shipment('shp-2'));
+    expect(s!.dispatchRequest?.trigger, DispatchTrigger.manual);
+    expect(s.dispatchRequest?.estimatedPackMinutes, 5);
   });
 }

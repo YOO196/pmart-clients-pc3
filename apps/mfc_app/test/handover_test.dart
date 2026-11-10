@@ -31,7 +31,7 @@ void main() {
   List<Override> overrides() => [
     envProvider.overrideWithValue(PmartEnv.mock),
     taskRepositoryProvider.overrideWithValue(
-      MockTaskRepository(latency: Duration.zero),
+      MockTaskRepository(latency: Duration.zero, packDemo: true),
     ),
     packingRepositoryProvider.overrideWithValue(
       MockPackingRepository(latency: Duration.zero),

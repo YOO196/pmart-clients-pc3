@@ -5,7 +5,9 @@ import 'package:pmart_core/pmart_core.dart';
 import '../domain/packing.dart';
 import 'packing_repository.dart';
 
-/// 목 구현. 출하 shp-2(task-mock-2 패킹): 그릭요거트 1 + 서울우유 2(냉장) + 냉동 왕만두 1(냉동)을 담는다.
+/// 목 구현.
+/// - 출하 shp-1(task-mock-1 피킹 → shp-1-PACK): 요거트 1·우유 2(냉장) + 왕만두 1(냉동) + 감자칩 1(상온).
+/// - 출하 shp-2(task-mock-2 패킹 시연): 요거트 1·우유 2(냉장) + 왕만두 1(냉동).
 /// 모든 수량이 밀봉되면 출하가 READY 가 된다. 담을 수량을 넘으면 CONTENT_MISMATCH.
 /// 배차는 직원 요청만 쓴다(2026-11-10 사용자 결정) — READY 가 돼도 자동 요청을 만들지 않는다.
 base class MockPackingRepository implements PackingRepository {
@@ -17,18 +19,30 @@ base class MockPackingRepository implements PackingRepository {
   final Duration latency;
   final DateTime Function() _now;
 
-  /// 출하 shp-2 가 담아야 할 수량(피킹 확정분).
-  static const expected = {'ol-1': 1, 'ol-2': 2, 'ol-4': 1};
-
-  final _shipment = <String, Object?>{
-    'shipmentId': 'shp-2',
-    'fulfillmentId': 'ful-2',
-    'orderId': 'order-seed-4',
-    'deliveryId': 'dlv-2',
-    'version': 1,
-    'state': 'PREPARING',
-    'packages': <Map<String, Object?>>[],
+  /// 출하마다 담아야 할 수량(피킹 확정분).
+  static const expectedOf = {
+    'shp-1': {'ol-1': 1, 'ol-2': 2, 'ol-4': 1, 'ol-3': 1},
+    'shp-2': {'ol-1': 1, 'ol-2': 2, 'ol-4': 1},
   };
+
+  /// 패킹대 칸(포장 위치).
+  static const stations = ['PAK-C-01', 'PAK-C-02', 'PAK-C-03'];
+
+  final _shipments = <String, Map<String, Object?>>{
+    for (final (id, n) in const [('shp-1', 1), ('shp-2', 4)])
+      id: <String, Object?>{
+        'shipmentId': id,
+        'fulfillmentId': 'ful-${id.substring(4)}',
+        'orderId': 'order-seed-$n',
+        'deliveryId': 'dlv-${id.substring(4)}',
+        'version': 1,
+        'state': 'PREPARING',
+        'packages': <Map<String, Object?>>[],
+      },
+  };
+
+  /// 밀봉 때 받은 포장 위치(패킹대).
+  final sealedAt = <String, String?>{};
   final _byKey = <String, String>{};
 
   /// 받은 배차 요청 횟수(같은 키 재전송 포함).
@@ -46,12 +60,28 @@ base class MockPackingRepository implements PackingRepository {
 
   Future<void> _wait() => Future<void>.delayed(latency);
 
-  List<Map<String, Object?>> get _packages =>
-      (_shipment['packages']! as List).cast<Map<String, Object?>>();
+  /// 출하 — 목에 없는 출하(인계 화면의 다른 포장 등)는 빈 출하로 만든다.
+  Map<String, Object?> _ship(String id) => _shipments.putIfAbsent(
+    id,
+    () => <String, Object?>{
+      'shipmentId': id,
+      'orderId': 'order-$id',
+      'deliveryId': 'dlv-$id',
+      'version': 1,
+      'state': 'PREPARING',
+      'packages': <Map<String, Object?>>[],
+    },
+  );
+
+  List<Map<String, Object?>> _packagesOf(String shipmentId) =>
+      (_ship(shipmentId)['packages']! as List).cast<Map<String, Object?>>();
+
+  Iterable<Map<String, Object?>> get _allPackages =>
+      _shipments.keys.expand(_packagesOf);
 
   /// fence 를 걸어 인계 중인 것처럼 만든다(재포장 차단 시연).
   void startHandover(String packageId) {
-    _packages.firstWhere((p) => p['packageId'] == packageId)['fence'] = {
+    _allPackages.firstWhere((p) => p['packageId'] == packageId)['fence'] = {
       'state': 'HANDOVER_IN_PROGRESS',
       'fenceVersion': 1,
       'riderId': 'rider-mock-1',
@@ -61,12 +91,12 @@ base class MockPackingRepository implements PackingRepository {
   @override
   Future<ShipmentView> shipment(String shipmentId) async {
     await _wait();
-    return shipmentFromContract(api.Shipment.fromJson(_shipment));
+    return shipmentFromContract(api.Shipment.fromJson(_ship(shipmentId)));
   }
 
-  Map<String, int> _packed() {
+  Map<String, int> _packed(String shipmentId) {
     final m = <String, int>{};
-    for (final p in _packages) {
+    for (final p in _packagesOf(shipmentId)) {
       if (p['state'] != 'SEALED' && p['state'] != 'HANDED_OVER') continue;
       for (final c in (p['contents']! as List).cast<Map<String, Object?>>()) {
         final id = c['orderLineId']! as String;
@@ -87,21 +117,24 @@ base class MockPackingRepository implements PackingRepository {
     required TemperatureZone zone,
     bool containsAlcohol = false,
     String? packedBy,
+    String? packingLocation,
     required IdempotencyKey key,
   }) async {
     await _wait();
     final existing = _byKey[key.value];
     if (existing != null) {
-      return _done(_packages.firstWhere((p) => p['packageId'] == existing));
+      return _done(_allPackages.firstWhere((p) => p['packageId'] == existing));
     }
-    if (_shipment['state'] != 'PREPARING' && _shipment['state'] != 'READY') {
+    final shipment = _ship(shipmentId);
+    final expected = (expectedOf[shipmentId] ?? const <String, int>{});
+    if (shipment['state'] != 'PREPARING' && shipment['state'] != 'READY') {
       return packFailureToOutcome(
         const ProblemFailure(
           Problem(status: 409, code: PackProblemCode.invalidState),
         ),
       );
     }
-    final packed = _packed();
+    final packed = _packed(shipmentId);
     for (final c in contents) {
       final room =
           (expected[c.orderLineId] ?? 0) - (packed[c.orderLineId] ?? 0);
@@ -118,7 +151,7 @@ base class MockPackingRepository implements PackingRepository {
       'packageId': id,
       'packageVersion': 1,
       'shipmentId': shipmentId,
-      'orderId': _shipment['orderId'],
+      'orderId': shipment['orderId'],
       'version': 1,
       'state': 'SEALED',
       'qrCode': 'PKG:$id:1',
@@ -137,9 +170,10 @@ base class MockPackingRepository implements PackingRepository {
       'fence': {'state': 'NONE', 'fenceVersion': 0},
       'sealedAt': '2026-10-24T06:30:00Z',
     };
-    _packages.add(p);
+    _packagesOf(shipmentId).add(p);
     _byKey[key.value] = id;
-    _refreshShipment();
+    sealedAt[id] = packingLocation;
+    _refreshShipment(shipmentId);
     if (loseNextSealResponse) {
       loseNextSealResponse = false;
       return packFailureToOutcome(
@@ -149,18 +183,21 @@ base class MockPackingRepository implements PackingRepository {
     return _done(p);
   }
 
-  void _refreshShipment() {
-    final packed = _packed();
-    final all = expected.entries.every((e) => (packed[e.key] ?? 0) >= e.value);
-    _shipment
+  void _refreshShipment(String shipmentId) {
+    final packed = _packed(shipmentId);
+    final all = (expectedOf[shipmentId] ?? const <String, int>{}).entries.every(
+      (e) => (packed[e.key] ?? 0) >= e.value,
+    );
+    final shipment = _ship(shipmentId);
+    shipment
       ..['state'] = all ? 'READY' : 'PREPARING'
-      ..['version'] = (_shipment['version']! as int) + 1;
+      ..['version'] = (shipment['version']! as int) + 1;
   }
 
-  Map<String, Object?> _dispatchJson(int minutes) {
+  Map<String, Object?> _dispatchJson(String shipmentId, int minutes) {
     final now = _now().toUtc();
     return {
-      'shipmentId': _shipment['shipmentId'],
+      'shipmentId': shipmentId,
       'trigger': 'MANUAL',
       'estimatedPackMinutes': minutes,
       'estimatedReadyAt': now.add(Duration(minutes: minutes)).toIso8601String(),
@@ -178,9 +215,10 @@ base class MockPackingRepository implements PackingRepository {
     await _wait();
     final existing = _byKey[key.value];
     if (existing != null) {
-      return _done(_packages.firstWhere((p) => p['packageId'] == existing));
+      return _done(_allPackages.firstWhere((p) => p['packageId'] == existing));
     }
-    final old = _packages.firstWhere((p) => p['packageId'] == packageId);
+    final old = _allPackages.firstWhere((p) => p['packageId'] == packageId);
+    final shipmentId = old['shipmentId']! as String;
     final fence = (old['fence'] as Map?)?['state'];
     if (old['state'] != 'SEALED' || (fence != null && fence != 'NONE')) {
       return packFailureToOutcome(
@@ -202,9 +240,9 @@ base class MockPackingRepository implements PackingRepository {
       'qrCode': 'PKG:$id:$version',
       'invalidatedReason': null,
     };
-    _packages.add(p);
+    _packagesOf(shipmentId).add(p);
     _byKey[key.value] = id;
-    _refreshShipment();
+    _refreshShipment(shipmentId);
     return _done(p);
   }
 
@@ -220,7 +258,8 @@ base class MockPackingRepository implements PackingRepository {
       return const DispatchRejected(PackProblemCode.invalidState);
     }
     // 출고당 한 번 — 이미 있으면 그 요청을 돌려준다.
-    final d = _shipment['dispatchRequest'] ??= _dispatchJson(
+    final d = _ship(shipmentId)['dispatchRequest'] ??= _dispatchJson(
+      shipmentId,
       estimatedPackMinutes,
     );
     if (loseNextDispatchResponse) {

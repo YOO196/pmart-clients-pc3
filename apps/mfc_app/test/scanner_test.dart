@@ -143,9 +143,8 @@ void main() {
       MockTaskRepository.yogurtBarcode,
     ]);
     await pumpApp(t);
+    // 작업 상세 없이 — 열면 시작 판정을 받고 바로 피킹.
     await openRoute(t, '/tasks/task-mock-1');
-    await t.tap(find.byKey(const ValueKey('start')));
-    await t.pumpAndSettle();
     for (final (id, code) in [
       ('cart-scan', 'CRT-C-01'),
       ('pick-loc-scan', 'C-S1-01-1-01'),

@@ -93,9 +93,8 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
+    // 작업 상세 없이 — 열면 시작 판정을 받고 바로 피킹.
     await openRoute(t, '/tasks/task-mock-1');
-    await t.tap(find.byKey(const ValueKey('start')));
-    await t.pumpAndSettle();
 
     Future<void> scanTo(String id, String code) async {
       await t.enterText(find.byKey(ValueKey(id)), code);

@@ -171,7 +171,7 @@ void main() {
   List<Override> appOverrides() => [
     envProvider.overrideWithValue(PmartEnv.mock),
     taskRepositoryProvider.overrideWithValue(
-      MockTaskRepository(latency: Duration.zero),
+      MockTaskRepository(latency: Duration.zero, packDemo: true),
     ),
     packingRepositoryProvider.overrideWithValue(
       MockPackingRepository(latency: Duration.zero),
@@ -193,7 +193,18 @@ void main() {
     );
     await t.pumpAndSettle();
     await openRoute(t, '/tasks/task-mock-2');
-    await t.tap(find.byKey(const ValueKey('continue-picking')));
+    // 패킹대 → 장바구니 → 배차 요청 → 담기.
+    for (final (id, code) in [
+      ('station-scan', 'PAK-C-01'),
+      ('pack-cart-scan', 'CRT-C-01'),
+    ]) {
+      await t.enterText(find.byKey(ValueKey(id)), code);
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await t.pumpAndSettle();
+    }
+    await t.tap(find.byKey(const ValueKey('pack-min-5')));
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('request-dispatch')));
     await t.pumpAndSettle();
 
     await t.enterText(

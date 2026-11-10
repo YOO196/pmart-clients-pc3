@@ -319,19 +319,16 @@ void main() {
     expect(find.byKey(const ValueKey('count-reported')), findsOneWidget);
   });
 
-  testWidgets('피패킹: 폰 화면에서 서버가 준 패킹 → 이어서 패킹, 피킹 시작 → 피킹 화면(넘침 없음)', (t) async {
+  testWidgets('피패킹: 폰 화면에서 피킹 시작 → 바로 피킹 화면(넘침 없음) → 뒤로 오면 같은 작업', (t) async {
     await open(t, 'pickPack');
-    expect(find.byKey(const ValueKey('assigned-task-mock-2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('assigned-task-mock-1')), findsOneWidget);
     await tapKey(t, 'run-task');
-    await tapKey(t, 'continue-picking');
-    expect(find.text('패킹'), findsOneWidget);
-    expect(find.byKey(const ValueKey('pack-min-5')), findsOneWidget);
+    expect(find.text('피킹'), findsOneWidget);
+    expect(find.byKey(const ValueKey('cart-scan')), findsOneWidget);
     expect(t.takeException(), isNull);
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
-    await t.tap(find.byType(BackButton));
-    await t.pumpAndSettle();
-    expect(find.byKey(const ValueKey('assigned-task-mock-2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('assigned-task-mock-1')), findsOneWidget);
   });
 
   testWidgets('취소품 복귀: 시작 → 포장 위치 확인 → 추천 선반 스캔 → 실적(큐·같은 키) → 확정 → 끝', (
@@ -382,7 +379,6 @@ void main() {
     await tapKey(t, 'guide-ok');
     expect(find.byKey(const ValueKey('assigned-shp-9-RETURN')), findsOneWidget);
     await tapKey(t, 'run-task');
-    await tapKey(t, 'start');
 
     // 복귀 화면.
     expect(find.text('돌려놓을 수량 2개'), findsOneWidget);
