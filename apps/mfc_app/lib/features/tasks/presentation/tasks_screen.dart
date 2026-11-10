@@ -14,6 +14,7 @@ String taskKindText(AppLocalizations l10n, TaskKind k) => switch (k) {
   TaskKind.pick => l10n.taskTypePick,
   TaskKind.pack => l10n.taskTypePack,
   TaskKind.dispatch => l10n.taskTypeDispatch,
+  TaskKind.returnToShelf => l10n.taskTypeReturn,
 };
 
 String taskStateText(AppLocalizations l10n, TaskState s) => switch (s) {
@@ -49,6 +50,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
       appBar: AppBar(
         title: Text(l10n.tasksTitle),
         actions: [
+          IconButton(
+            key: const ValueKey('open-handover-checks'),
+            tooltip: l10n.handoverChecksMenu,
+            icon: const Icon(Icons.assignment_turned_in_outlined),
+            onPressed: () => context.push('/handover-checks'),
+          ),
           if (mock)
             Padding(
               padding: const EdgeInsets.only(right: 12),
@@ -200,7 +207,12 @@ class TaskDetailScreen extends ConsumerWidget {
                   ),
                 ),
               const SizedBox(height: 8),
-              if (startedByMe)
+              if (t.kind == TaskKind.returnToShelf)
+                Text(
+                  l10n.returnTaskNotYet,
+                  key: const ValueKey('return-not-yet'),
+                )
+              else if (startedByMe)
                 // 키를 잃었어도 활성 시작이 본인이면 이어서 한다(새 키로 다시 시작하지 않는다).
                 FilledButton(
                   key: const ValueKey('continue-picking'),

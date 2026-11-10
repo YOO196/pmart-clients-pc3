@@ -25,6 +25,8 @@ dependencies:
     path: ../../packages/pmart_api/gen/mfc-fulfillment
   pmart_api_delivery_dispatch:
     path: ../../packages/pmart_api/gen/delivery-dispatch
+  pmart_api_delivery_tracking:
+    path: ../../packages/pmart_api/gen/delivery-tracking
 
 dev_dependencies:
   flutter_test:

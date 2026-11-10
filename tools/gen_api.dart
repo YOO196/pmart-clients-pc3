@@ -37,7 +37,7 @@ const services = <String, List<String>>{
   'claim-service': ['customer'],
   'review-service': ['customer'],
   'notification-service': ['customer', 'rider'],
-  'delivery-tracking-service': ['customer', 'rider'],
+  'delivery-tracking-service': ['customer', 'rider', 'mfc'],
   'delivery-dispatch-service': ['rider'],
   'delivery-execution-service': ['rider'],
   'rider-service': ['rider'],

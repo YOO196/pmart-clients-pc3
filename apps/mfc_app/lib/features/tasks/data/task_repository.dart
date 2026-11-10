@@ -238,6 +238,7 @@ TaskKind _kind(api.TaskType? t) => switch (t) {
   api.TaskType.PICK => TaskKind.pick,
   api.TaskType.PACK => TaskKind.pack,
   api.TaskType.DISPATCH => TaskKind.dispatch,
+  api.TaskType.RETURN => TaskKind.returnToShelf,
   null => throw const ContractViolationFailure('taskType 없음'),
 };
 

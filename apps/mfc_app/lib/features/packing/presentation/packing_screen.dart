@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
@@ -198,6 +199,14 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                       ),
                       // 라벨 프린터는 미정이라 QR 값을 보인다. 재출력은 같은 포장 ID.
                       subtitle: Text(p.qrCode ?? '-'),
+                      // 인계 판정·라이더 픽업 예정은 포장 단위로 본다.
+                      onTap:
+                          p.state == PackageState.sealed ||
+                              p.state == PackageState.handedOver
+                          ? () => context.push(
+                              '/packages/${p.packageId}/handover',
+                            )
+                          : null,
                       trailing: p.canRepack
                           ? TextButton(
                               key: ValueKey('repack-${p.packageId}'),

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-enum TaskKind { pick, pack, dispatch }
+/// returnToShelf = 취소품 복귀(RETURN, fulfillment 0.4.6). 실행 화면은 아직 없다.
+enum TaskKind { pick, pack, dispatch, returnToShelf }
 
 /// 계약 TaskState. 종료 상태(완료·부분 종결·실패·취소)에서는 다시 시작할 수 없다.
 enum TaskState {

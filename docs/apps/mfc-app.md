@@ -13,7 +13,7 @@
 | 피킹 | `POST /tasks/{taskId}/executions`, `GET …/executions/{executionId}`, `GET /barcodes/{barcode}` | 지시 행은 `GET /tasks/{taskId}` 의 `lines[]` |
 | 패킹 | `GET /shipments/{id}`, `POST /shipments/{id}/packages`(밀봉 → 포장 QR), `GET /packages/{id}`, `POST /packages/{id}/repackings` | |
 | 배차 요청 | `POST /dispatch-requests`, `GET /dispatch-requests/{requestId}`, `GET /deliveries/{id}/dispatch` | 패킹 소요시간 입력 |
-| 인계 확인 | `GET /packages/{id}/handover-resolution`, `GET /deliveries/{id}/eta` | 라이더 스캔 결과 반영 |
+| 인계 확인 | `GET /packages?mfcId=&checkRequired=true`, `GET /packages/{id}/handover-resolution`, `POST /packages/{id}/handover-checks`, `GET /deliveries/{id}/eta`(pickupEta) | 라이더 스캔 결과 반영. 허가 만료 뒤 점원 확인(D-1, fulfillment 0.4.4·0.4.9). §6-1 |
 | 입고 | `GET /inbound-promises`, `GET /inbound-promises/{trfId}`, `POST …/arrivals`, `POST …/receipts` (+짝 조회) | 2단계(공급 루프)에 본격 사용. 1차는 초기 보유·회수 반입 |
 | 회수품 반입 | `POST /return-receipts`, `GET /return-receipts/{id}` | 반입 즉시 격리 |
 | 회수품 검수·품질 | `POST /return-inspections`, `POST /quality-decisions`, `POST /disposal-approvals` | 요청자·승인자 분리 |
@@ -65,6 +65,21 @@
 - 라이더가 포장 QR을 스캔 → fence `HANDOVER_IN_PROGRESS` → 커밋 → 재고 H/E/R 차감 → `HANDED_OVER`.
 - fence 동안 그 포장의 취소·재포장·다른 기사 인계 보류. 불명·만료 시 시간 경과로 원상복구하지 않고 대사.
 - `[결정 필요]` 점원 쪽 QR 표시 화면이 필요한지(현재는 포장 라벨 QR 스캔 방식으로 해석).
+
+### 6-1. 점원 인계 확인 (백엔드 공지 `2026-11-08-clients-notice-handover-check.md`)
+라이더가 QR을 찍은 뒤 확정 없이 허가가 만료되면 실물이 라이더에게 갔을 수 있다. 점원이 포장대에서 실물을 보고 확인한다.
+
+| 버튼 | 본문 `result` | 서버 결과 | 앱 |
+|---|---|---|---|
+| 포장대에 있음 | `AT_STATION` | 허가 해제 → 다른 라이더가 다시 찍을 수 있음 | 확인 대화상자 후 전송 |
+| 포장대에 없음 | `TAKEN_BY_RIDER` | 허가 라이더에게 인계 확정, 재고 인계 전기 | **되돌릴 수 없어** 경고 대화상자 후 전송 |
+| — | 409 `FENCE_ACTIVE` | 허가가 아직 살아 있음 | "라이더가 픽업을 마치는지 기다려 주세요", 다시 조회 |
+| — | 409 `INVALID_STATE` | 확인할 허가 없음(이미 처리됐을 수 있음) | 안내 후 다시 조회 |
+| — | 응답 없음·`IDEMPOTENCY_CONFLICT`(retryable) | 결과 불명 | 같은 키로 자동 재전송 2회, 그래도 모르면 "다시 확인"(보냈던 값으로만) |
+
+- 화면: 작업 목록 상단 "인계 확인" → 확인 필요 목록(만료 오래된 순, 놓인 위치·라이더·만료 시각). 포장별 "인계 상태" 화면은 판정·허가·재고 반영·마지막 확인·라이더 픽업 ETA. 패킹 화면의 포장을 눌러도 들어간다.
+- 재고 반영 `APPLIED` 만 "재고 차감 완료"로 보인다. `PROCESSING` = 확정 대기, `UNKNOWN_RESULT`·값 없음 = "다시 건네지 마세요", `REJECTED` = 관리자 대사 필요(재인계·재포장 금지).
+- 키는 화면 상태에만 둔다. 앱을 다시 켜서 키를 잃어도 판정 조회의 `checkRequired`·`lastCheck` 로 반영 여부를 알 수 있다(새 키 재전송은 409 `INVALID_STATE`).
 
 ## 7. 입고·적치·실사
 - 입고(IV-02): 차량 확인 → 냉동·냉장 우선 하차 → 바코드·수량·소비기한 검수 → 판정(정상/초과/부족/손상/미발주/온도이탈) → 위치 등록. 입력: 인수·정상·격리·보류 수량, 로트, 증빙 사진(BR-07).

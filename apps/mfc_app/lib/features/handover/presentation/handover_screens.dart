@@ -1,0 +1,442 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pmart_ui/pmart_ui.dart';
+
+import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/ui_state_of.dart';
+import '../../packing/domain/packing.dart';
+import '../../packing/presentation/packing_controller.dart'
+    show shipmentProvider;
+import '../../packing/presentation/packing_screen.dart' show packageStateText;
+import '../domain/handover.dart';
+import 'handover_controller.dart';
+
+String verdictText(AppLocalizations l10n, HandoverVerdict v) => switch (v) {
+  HandoverVerdict.ready => l10n.verdictReady,
+  HandoverVerdict.stopped => l10n.verdictStopped,
+  HandoverVerdict.inProgress => l10n.verdictInProgress,
+  HandoverVerdict.handedOver => l10n.verdictHandedOver,
+  HandoverVerdict.unknown => l10n.verdictUnknown,
+};
+
+String fenceText(AppLocalizations l10n, HandoverView h) => switch (h.fence) {
+  FenceState.none => l10n.fenceNone,
+  FenceState.inProgress => switch (h.fenceExpiresAt) {
+    final t? => l10n.fenceInProgressUntil(formatSeoulTime(t)),
+    null => l10n.fenceInProgress,
+  },
+  FenceState.committed => l10n.fenceCommitted,
+  FenceState.expired => l10n.fenceExpired,
+  FenceState.unknown => l10n.fenceUnknown,
+};
+
+String inventoryText(AppLocalizations l10n, InventoryApply i) => switch (i) {
+  InventoryApply.notRequested => l10n.invNotRequested,
+  InventoryApply.processing => l10n.invProcessing,
+  InventoryApply.applied => l10n.invApplied,
+  InventoryApply.rejected => l10n.invRejected,
+  InventoryApply.unknownResult => l10n.invUnknown,
+};
+
+String? lastCheckText(AppLocalizations l10n, LastCheckView? c) {
+  if (c == null) return null;
+  final time = c.checkedAt == null ? '-' : formatSeoulTime(c.checkedAt!);
+  return switch (c.result) {
+    HandoverCheck.atStation => l10n.lastCheckAtStation(time),
+    HandoverCheck.takenByRider => l10n.lastCheckTaken(time),
+  };
+}
+
+/// 확인 거절·불명·완료 안내. 없으면 null.
+String? checkFlowMessage(AppLocalizations l10n, CheckFlow f) =>
+    switch (f.phase) {
+      CheckPhase.idle => null,
+      CheckPhase.sending => l10n.checkSending,
+      CheckPhase.unknown => l10n.checkUnknown,
+      CheckPhase.done =>
+        f.result?.verdict == HandoverVerdict.handedOver
+            ? l10n.checkDoneTaken
+            : l10n.checkDoneAtStation,
+      CheckPhase.rejected => switch (f.rejectCode) {
+        HandoverProblemCode.fenceActive => l10n.checkFenceActive,
+        HandoverProblemCode.invalidState => l10n.checkInvalidState,
+        'IDEMPOTENCY_CONFLICT' => l10n.checkClientError,
+        final c => l10n.checkRejected(c ?? '-'),
+      },
+    };
+
+/// 확인 버튼 두 개. "포장대에 없음"은 재고가 빠지는 확정이라 한 번 더 묻는다.
+class HandoverCheckButtons extends ConsumerWidget {
+  const HandoverCheckButtons({super.key, required this.item});
+
+  final HandoverView item;
+
+  Future<bool> _confirm(BuildContext context, String title, String body) async {
+    final l10n = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(body),
+        actions: [
+          TextButton(
+            key: const ValueKey('confirm-cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.confirmCancel),
+          ),
+          FilledButton(
+            key: const ValueKey('confirm-ok'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.confirmOk),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  /// 보내고, 완료·거절이면 알림으로도 보인다(목록이 다시 조회되면 이 항목이 사라질 수 있다).
+  Future<void> _send(
+    BuildContext context,
+    WidgetRef ref,
+    HandoverCheck value,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final provider = checkFlowProvider(item.packageId);
+    // 응답을 기다리는 동안 컨트롤러가 사라지지 않게 붙들어 둔다.
+    final sub = ref.listenManual(provider, (_, _) {});
+    try {
+      await ref.read(provider.notifier).submit(value);
+      if (!context.mounted) return;
+      final flow = ref.read(provider);
+      if (flow.phase == CheckPhase.done || flow.phase == CheckPhase.rejected) {
+        final text = checkFlowMessage(l10n, flow);
+        if (text != null) {
+          messenger.showSnackBar(SnackBar(content: Text(text)));
+        }
+      }
+    } finally {
+      sub.close();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final id = item.packageId;
+    final flow = ref.watch(checkFlowProvider(id));
+    final message = checkFlowMessage(l10n, flow);
+    final unknown = flow.phase == CheckPhase.unknown;
+    final busy = flow.phase == CheckPhase.sending;
+    final clientError =
+        flow.phase == CheckPhase.rejected &&
+        flow.rejectCode == 'IDEMPOTENCY_CONFLICT';
+    final canSend = !busy && !clientError && flow.phase != CheckPhase.done;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (message != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              message,
+              key: ValueKey('check-message-$id'),
+              style: flow.phase == CheckPhase.rejected || unknown
+                  ? TextStyle(color: theme.colorScheme.error)
+                  : null,
+            ),
+          ),
+        if (unknown)
+          // 결과를 모를 때는 보냈던 확인만 같은 키로 다시 보낸다.
+          CommandButton(
+            key: ValueKey('check-again-$id'),
+            label: l10n.checkAgain,
+            busy: busy,
+            onPressed: () => _send(context, ref, flow.pending!),
+          )
+        else if (flow.phase != CheckPhase.done)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  key: ValueKey('check-at-station-$id'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                  ),
+                  onPressed: canSend
+                      ? () async {
+                          if (await _confirm(
+                            context,
+                            l10n.confirmAtStationTitle,
+                            l10n.confirmAtStationBody,
+                          )) {
+                            if (!context.mounted) return;
+                            await _send(context, ref, HandoverCheck.atStation);
+                          }
+                        }
+                      : null,
+                  child: Text(l10n.checkAtStation),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  key: ValueKey('check-taken-$id'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                    backgroundColor: theme.colorScheme.error,
+                    foregroundColor: theme.colorScheme.onError,
+                  ),
+                  onPressed: canSend
+                      ? () async {
+                          if (await _confirm(
+                            context,
+                            l10n.confirmTakenTitle,
+                            l10n.confirmTakenBody(item.riderId ?? '-'),
+                          )) {
+                            if (!context.mounted) return;
+                            await _send(
+                              context,
+                              ref,
+                              HandoverCheck.takenByRider,
+                            );
+                          }
+                        }
+                      : null,
+                  child: Text(l10n.checkTaken),
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+/// 센터 전체 점원 확인 필요 포장(`GET /packages?checkRequired=true`).
+class HandoverChecksScreen extends ConsumerWidget {
+  const HandoverChecksScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.handoverChecksTitle)),
+      body: UiStateView<HandoverCheckList>(
+        state: uiStateOf(
+          ref.watch(handoverChecksProvider),
+          isEmpty: (l) => l.items.isEmpty,
+        ),
+        onRetry: () => ref.invalidate(handoverChecksProvider),
+        empty: (_) => RefreshIndicator(
+          onRefresh: () => ref.refresh(handoverChecksProvider.future),
+          child: ListView(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  key: const ValueKey('checks-empty'),
+                  child: Text(l10n.handoverChecksEmpty),
+                ),
+              ),
+            ],
+          ),
+        ),
+        ready: (context, list) => RefreshIndicator(
+          onRefresh: () => ref.refresh(handoverChecksProvider.future),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Text(l10n.handoverChecksIntro),
+              if (!list.fresh)
+                ListTile(
+                  key: const ValueKey('checks-stale'),
+                  leading: const Icon(Icons.info_outline),
+                  title: Text(l10n.viewStale),
+                ),
+              const SizedBox(height: 8),
+              for (final h in list.items)
+                Card(
+                  key: ValueKey('check-item-${h.packageId}'),
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          h.packingLocation == null
+                              ? l10n.hoLocationUnknown
+                              : l10n.hoLocation(h.packingLocation!),
+                          style: theme.textTheme.titleLarge,
+                        ),
+                        Text(
+                          l10n.hoPackage(
+                            h.packageId,
+                            '${h.packageVersion ?? '-'}',
+                          ),
+                        ),
+                        if (h.orderId != null) Text(l10n.hoOrder(h.orderId!)),
+                        Text(l10n.hoRider(h.riderId ?? '-')),
+                        if (h.fenceExpiresAt != null)
+                          Text(
+                            l10n.hoExpiredAt(
+                              formatSeoulTime(h.fenceExpiresAt!),
+                            ),
+                          ),
+                        const SizedBox(height: 8),
+                        HandoverCheckButtons(item: h),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            key: ValueKey('open-handover-${h.packageId}'),
+                            onPressed: () => context.push(
+                              '/packages/${h.packageId}/handover',
+                            ),
+                            child: Text(l10n.viewHandover),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 포장 한 건의 인계 판정(`GET /packages/{id}/handover-resolution`) + 라이더 픽업 ETA.
+class PackageHandoverScreen extends ConsumerWidget {
+  const PackageHandoverScreen({super.key, required this.packageId});
+
+  final String packageId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final provider = handoverProvider(packageId);
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.handoverTitle)),
+      body: UiStateView<HandoverView>(
+        state: uiStateOf(ref.watch(provider)),
+        onRetry: () => ref.invalidate(provider),
+        ready: (context, h) {
+          final warn =
+              h.inventory == InventoryApply.rejected ||
+              h.inventory == InventoryApply.unknownResult;
+          final last = lastCheckText(l10n, h.lastCheck);
+          return RefreshIndicator(
+            onRefresh: () => ref.refresh(provider.future),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Text(
+                  verdictText(l10n, h.verdict),
+                  key: const ValueKey('verdict'),
+                  style: theme.textTheme.headlineSmall,
+                ),
+                if (!h.fresh)
+                  ListTile(
+                    key: const ValueKey('handover-stale'),
+                    leading: const Icon(Icons.info_outline),
+                    title: Text(l10n.viewStale),
+                  ),
+                const SizedBox(height: 8),
+                Text(l10n.hoPackage(h.packageId, '${h.packageVersion ?? '-'}')),
+                Text(packageStateText(l10n, h.packageState)),
+                if (h.orderId != null) Text(l10n.hoOrder(h.orderId!)),
+                if (h.packingLocation != null)
+                  Text(l10n.hoLocation(h.packingLocation!)),
+                if (h.riderId != null) Text(l10n.hoRider(h.riderId!)),
+                const Divider(height: 24),
+                Text(fenceText(l10n, h), key: const ValueKey('fence')),
+                Text(
+                  inventoryText(l10n, h.inventory),
+                  key: const ValueKey('inventory'),
+                  style: warn
+                      ? TextStyle(
+                          color: theme.colorScheme.error,
+                          fontWeight: FontWeight.bold,
+                        )
+                      : null,
+                ),
+                if (last != null) Text(last, key: const ValueKey('last-check')),
+                if (h.checkRequired) ...[
+                  const SizedBox(height: 12),
+                  Chip(
+                    key: const ValueKey('check-required'),
+                    label: Text(l10n.checkRequiredBadge),
+                  ),
+                  HandoverCheckButtons(item: h),
+                ],
+                if (h.verdict != HandoverVerdict.handedOver &&
+                    h.shipmentId != null) ...[
+                  const Divider(height: 24),
+                  Text(l10n.etaTitle, style: theme.textTheme.titleMedium),
+                  _PickupEta(shipmentId: h.shipmentId!),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PickupEta extends ConsumerWidget {
+  const _PickupEta({required this.shipmentId});
+
+  final String shipmentId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final shipment = shipmentProvider(shipmentId);
+    return UiStateView<ShipmentView>(
+      state: uiStateOf(ref.watch(shipment)),
+      onRetry: () => ref.invalidate(shipment),
+      ready: (context, s) {
+        final deliveryId = s.deliveryId;
+        if (deliveryId == null) return Text(l10n.etaNoDelivery);
+        final eta = pickupEtaProvider(deliveryId);
+        return UiStateView<PickupEtaView>(
+          state: uiStateOf(ref.watch(eta)),
+          onRetry: () => ref.invalidate(eta),
+          ready: (context, e) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_etaText(l10n, e), key: const ValueKey('pickup-eta')),
+              if (!e.fresh) Text(l10n.viewStale),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _etaText(AppLocalizations l10n, PickupEtaView e) {
+    if (e.stage == DeliveryStage.unassigned) return l10n.etaUnassigned;
+    return switch (e.status) {
+      EtaStatus.available => switch ((e.etaAt, e.remainingSeconds)) {
+        (final t?, final r?) => l10n.etaAvailable(
+          formatSeoulTime(t),
+          (r / 60).ceil(),
+        ),
+        (final t?, null) => l10n.etaAvailableNoRemain(formatSeoulTime(t)),
+        _ => l10n.etaPending,
+      },
+      EtaStatus.locating => l10n.etaLocating,
+      EtaStatus.pending || EtaStatus.unknown => l10n.etaPending,
+      EtaStatus.finalized => l10n.etaFinal,
+    };
+  }
+}

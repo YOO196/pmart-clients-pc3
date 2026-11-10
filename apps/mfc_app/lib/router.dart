@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/handover/presentation/handover_screens.dart';
 import 'features/packing/presentation/packing_screen.dart';
 import 'features/tasks/presentation/tasks_screen.dart';
 
@@ -10,6 +11,15 @@ final routerProvider = Provider<GoRouter>(
     initialLocation: '/',
     routes: [
       GoRoute(path: '/', builder: (_, _) => const TasksScreen()),
+      GoRoute(
+        path: '/handover-checks',
+        builder: (_, _) => const HandoverChecksScreen(),
+      ),
+      GoRoute(
+        path: '/packages/:packageId/handover',
+        builder: (_, s) =>
+            PackageHandoverScreen(packageId: s.pathParameters['packageId']!),
+      ),
       GoRoute(
         path: '/tasks/:taskId',
         builder: (_, s) =>
