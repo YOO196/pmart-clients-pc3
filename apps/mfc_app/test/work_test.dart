@@ -192,6 +192,31 @@ void main() {
     expect(find.byKey(const ValueKey('area-pickPack')), findsOneWidget);
   });
 
+  testWidgets('피킹을 시작하고 뒤로 나오면 근무 화면이 다시 받는다(버튼이 돌지 않는다)', (t) async {
+    tasks.taskJson('task-mock-2')['state'] = 'COMPLETED';
+    await pumpApp(t);
+    await tapKey(t, 'area-pickPack');
+    await tapKey(t, 'guide-ok');
+    expect(find.byKey(const ValueKey('assigned-task-mock-1')), findsOneWidget);
+    final before = work.nextCalls;
+    await tapKey(t, 'run-task');
+    await tapKey(t, 'start');
+    expect(find.text('피킹'), findsOneWidget);
+    await t.tap(find.byType(BackButton)); // 피킹 → 작업 상세
+    await t.pumpAndSettle();
+    await t.tap(find.byType(BackButton)); // 작업 상세 → 근무 화면
+    await t.pumpAndSettle();
+    expect(work.nextCalls, greaterThan(before));
+    expect(find.byKey(const ValueKey('assigned-task-mock-1')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('run-task')),
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets('검수: 줄 작업이 없으면 "지금 할 작업이 없어요" + 다시 받기', (t) async {
     await pumpApp(t);
     await tapKey(t, 'area-inspection');

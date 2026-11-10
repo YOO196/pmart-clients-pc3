@@ -177,10 +177,13 @@ ConfirmResult executionStateToConfirm(String? wire) => switch (wire) {
 api.TaskExecutionRequest executionRequestFromPayload(
   Map<String, Object?> p,
 ) => api.TaskExecutionRequest(
-  executionType: api.TaskExecutionRequestExecutionTypeEnum.PICK,
+  executionType: p['executionType'] == 'RETURN'
+      ? api.TaskExecutionRequestExecutionTypeEnum.RETURN
+      : api.TaskExecutionRequestExecutionTypeEnum.PICK,
   workerId: p['workerId']! as String,
   assignmentVersion: p['assignmentVersion'] as int?,
   fromLocation: p['fromLocation'] as String?,
+  toLocation: p['toLocation'] as String?,
   lines: [
     for (final l in (p['lines']! as List).cast<Map<String, Object?>>())
       api.TaskExecutionRequestLinesInner(
@@ -230,6 +233,31 @@ Map<String, Object?> pickPayload({
           'reason': s.reason.name.toUpperCase(),
           'note': ?s.note,
         },
+    },
+  ],
+};
+
+/// 취소품 복귀 실행 1건의 큐 payload — 포장 위치 → 선반, LOT 필수(fulfillment 0.3.0).
+Map<String, Object?> returnPayload({
+  required String workerId,
+  required int? assignmentVersion,
+  required TaskLineView line,
+  required String lotId,
+  required String fromLocation,
+  required String toLocation,
+  required int qty,
+}) => {
+  'executionType': 'RETURN',
+  'workerId': workerId,
+  'assignmentVersion': ?assignmentVersion,
+  'fromLocation': fromLocation,
+  'toLocation': toLocation,
+  'lines': [
+    {
+      'orderLineId': line.orderLineId,
+      'sku': line.sku,
+      'lotId': lotId,
+      'pickedQty': qty,
     },
   ],
 };
@@ -319,6 +347,7 @@ TaskDetailView taskDetailFromContract(api.TaskDetail d) => TaskDetailView(
                 _ => PickStatus.unknown,
               },
               notice: p.notice,
+              suggestedToLocations: p.suggestedToLocations ?? const [],
               locations: [
                 for (final c
                     in p.locations ??

@@ -7,6 +7,7 @@ import 'features/quality/presentation/quality_screens.dart';
 import 'features/stock_count/presentation/stock_count_screen.dart';
 import 'features/stock_move/presentation/stock_move_screens.dart';
 import 'features/packing/presentation/packing_screen.dart';
+import 'features/tasks/presentation/return_screen.dart';
 import 'features/tasks/presentation/tasks_screen.dart';
 import 'features/work/domain/work.dart';
 import 'features/work/presentation/work_screens.dart';
@@ -85,6 +86,11 @@ final routerProvider = Provider<GoRouter>(
             path: 'pick',
             builder: (_, s) =>
                 PickingScreen(taskId: s.pathParameters['taskId']!),
+          ),
+          GoRoute(
+            path: 'return',
+            builder: (_, s) =>
+                ReturnShelfScreen(taskId: s.pathParameters['taskId']!),
           ),
           GoRoute(
             path: 'pack',

@@ -37,6 +37,8 @@ class InboundLine {
     this.lotId,
     this.productName,
     this.barcode,
+    this.unitsPerBox,
+    this.boxCount,
     this.receivedQty = 0,
     this.quarantinedQty = 0,
     this.pendingQty = 0,
@@ -48,6 +50,10 @@ class InboundLine {
   /// 표시용 상품명·스캔 대조값 — 계약 입고 예정 행에 없다(BR-53). 목만 채운다.
   final String? productName;
   final String? barcode;
+
+  /// 박스 입수·예정 박스 수 — 계약에 없다(BR-53 R17). 목만. 수량(expectedQty)은 판매 단위.
+  final int? unitsPerBox;
+  final int? boxCount;
   final int expectedQty;
   final int receivedQty;
   final int quarantinedQty;
@@ -83,7 +89,25 @@ class InboundPromiseView {
     this.eta,
     this.arrivedAt,
     this.receipts = const [],
+    this.rollContainers,
+    this.boxes,
+    this.temperatureZone,
+    this.boxList = const [],
   });
+
+  /// 차량 적재 단위(롤테이너 R/T)·박스 수·온도대 — 계약 입고 예정에 없다(BR-53 R17). 목만.
+  final int? rollContainers;
+  final int? boxes;
+  final String? temperatureZone;
+
+  /// 이 송장의 박스 하나하나(박스 바코드 = 번호 자체, 채번 지침 G-05). 계약에 없다(BR-53 R17) — 목만.
+  /// 비어 있으면 박스 검수 없이 상품별 계수로 한다.
+  final List<InboundBox> boxList;
+
+  List<InboundBox> boxesOf(InboundLine l) => [
+    for (final b in boxList)
+      if (b.lineKey == l.key) b,
+  ];
 
   final String trfId;
   final int version;
@@ -95,6 +119,23 @@ class InboundPromiseView {
   final List<ReceiptView> receipts;
 
   int get expectedTotal => lines.fold(0, (s, l) => s + l.expectedQty);
+}
+
+/// 송장의 박스 하나. 한 박스엔 한 상품(행)만 — 입수만큼 들어 있어야 한다.
+@immutable
+class InboundBox {
+  const InboundBox({
+    required this.boxId,
+    required this.lineKey,
+    required this.unitsPerBox,
+  });
+
+  /// `BOX-{8자리}` — 스캔값도 이 번호.
+  final String boxId;
+
+  /// 어느 행(SKU·LOT)의 박스인지([InboundLine.key]).
+  final String lineKey;
+  final int unitsPerBox;
 }
 
 /// 한 행의 현장 계수. 인수 = 정상 + 격리 + 미판정(IV-02).

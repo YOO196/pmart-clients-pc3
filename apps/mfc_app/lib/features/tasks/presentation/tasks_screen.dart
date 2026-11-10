@@ -33,6 +33,13 @@ String taskStateText(AppLocalizations l10n, TaskState s) => switch (s) {
   TaskState.unknown => l10n.tsUnknown,
 };
 
+/// 작업 종류별 실행 화면 경로(작업 상세 아래).
+String taskRoute(TaskKind? k) => switch (k) {
+  TaskKind.pack => 'pack',
+  TaskKind.returnToShelf => 'return',
+  _ => 'pick',
+};
+
 String startRejectText(AppLocalizations l10n, String? code) => switch (code) {
   TaskProblemCode.alreadyStarted => l10n.startAlreadyStarted,
   TaskProblemCode.notAssignee => l10n.startNotAssignee,
@@ -56,9 +63,8 @@ class TaskDetailScreen extends ConsumerWidget {
     ref.listen(startFlowProvider(taskId), (_, next) {
       if (next.phase == StartPhase.applied) {
         final kind = ref.read(provider).value?.kind;
-        context.pushReplacement(
-          '/tasks/$taskId/${kind == TaskKind.pack ? 'pack' : 'pick'}',
-        );
+        // 교체하지 않고 쌓는다 — 뒤로 가면 작업 상세, 그다음 근무 화면(다시 받기).
+        context.push('/tasks/$taskId/${taskRoute(kind)}');
       }
     });
     return Scaffold(
@@ -117,23 +123,17 @@ class TaskDetailScreen extends ConsumerWidget {
                   ),
                 ),
               const SizedBox(height: 8),
-              if (t.kind == TaskKind.returnToShelf)
-                Text(
-                  l10n.returnTaskNotYet,
-                  key: const ValueKey('return-not-yet'),
-                )
-              else if (startedByMe)
+              if (startedByMe)
                 // 키를 잃었어도 활성 시작이 본인이면 이어서 한다(새 키로 다시 시작하지 않는다).
                 FilledButton(
                   key: const ValueKey('continue-picking'),
-                  onPressed: () => context.push(
-                    '/tasks/$taskId/${t.kind == TaskKind.pack ? 'pack' : 'pick'}',
-                  ),
-                  child: Text(
-                    t.kind == TaskKind.pack
-                        ? l10n.continuePacking
-                        : l10n.continuePicking,
-                  ),
+                  onPressed: () =>
+                      context.push('/tasks/$taskId/${taskRoute(t.kind)}'),
+                  child: Text(switch (t.kind) {
+                    TaskKind.pack => l10n.continuePacking,
+                    TaskKind.returnToShelf => l10n.continueReturn,
+                    _ => l10n.continuePicking,
+                  }),
                 )
               else if (t.state == TaskState.assigned &&
                   t.kind != TaskKind.dispatch)

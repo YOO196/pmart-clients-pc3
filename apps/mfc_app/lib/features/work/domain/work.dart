@@ -115,7 +115,7 @@ class AssignedTask {
   /// 이 앱의 실행 화면 경로. 없으면 null.
   /// RECEIVE 의 taskId 는 입고 예정 trfId 로 본다 — 계약에 없음(BR-52).
   String? get route => switch (taskType) {
-    'PICK' || 'PACK' => '/tasks/$taskId',
+    'PICK' || 'PACK' || 'RETURN' => '/tasks/$taskId',
     'RECEIVE' => '/inbound/$taskId',
     // INSPECT taskId = 입고 작업 ID, RETURN_INSPECT taskId = 반입 ID(가정 — BR-52 R2·R12).
     'INSPECT' => '/quality/inspect/$taskId',

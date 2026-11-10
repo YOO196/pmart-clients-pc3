@@ -28,7 +28,13 @@ enum InboundPhase {
   /// 1단계: 도착 등록·하차.
   arrival,
 
-  /// 2단계: 상품별 수령 계수.
+  /// 2단계(박스가 있으면): 박스 검수 — 예정 박스가 다 왔는지, 박스째 파손인지.
+  boxCheck,
+
+  /// 3단계(박스가 있으면): 박스를 하나씩 열어 안의 낱개 검수.
+  boxInspect,
+
+  /// 2단계(박스 목록이 없을 때 — 계약 그대로): 상품별 수령 계수.
   counting,
 
   /// 3단계: 확인 후 수령 등록.
@@ -49,6 +55,9 @@ enum InboundPhase {
 /// 스캔 결과.
 enum InboundScan { counted, otherLine, unknownCode }
 
+/// 박스 스캔 결과.
+enum BoxScan { ok, already, notThisTruck }
+
 @immutable
 class InboundState {
   const InboundState({
@@ -61,7 +70,29 @@ class InboundState {
     this.code,
     this.receiptId,
     this.lastScan,
+    this.arrived = const {},
+    this.damaged = const {},
+    this.boxCounts = const {},
+    this.selectedBox,
+    this.lastBox,
+    this.lastBoxScan,
   });
+
+  /// 박스 검수: 확인한 박스 ID.
+  final Set<String> arrived;
+
+  /// 박스째 파손 — 열지 않고 입수 전부 격리.
+  final Set<String> damaged;
+
+  /// 박스별 낱개 검수 결과(있으면 그 박스는 검수 끝).
+  final Map<String, ReceiptCount> boxCounts;
+
+  /// 지금 열어 보는 박스.
+  final String? selectedBox;
+
+  /// 마지막으로 확인한 박스(파손 표시용).
+  final String? lastBox;
+  final BoxScan? lastBoxScan;
 
   final InboundPhase phase;
   final InboundPromiseView? promise;
@@ -98,6 +129,12 @@ class InboundState {
     String? Function()? code,
     String? Function()? receiptId,
     InboundScan? Function()? lastScan,
+    Set<String>? arrived,
+    Set<String>? damaged,
+    Map<String, ReceiptCount>? boxCounts,
+    String? Function()? selectedBox,
+    String? Function()? lastBox,
+    BoxScan? Function()? lastBoxScan,
   }) => InboundState(
     phase: phase ?? this.phase,
     promise: promise ?? this.promise,
@@ -108,7 +145,63 @@ class InboundState {
     code: code != null ? code() : this.code,
     receiptId: receiptId != null ? receiptId() : this.receiptId,
     lastScan: lastScan != null ? lastScan() : this.lastScan,
+    arrived: arrived ?? this.arrived,
+    damaged: damaged ?? this.damaged,
+    boxCounts: boxCounts ?? this.boxCounts,
+    selectedBox: selectedBox != null ? selectedBox() : this.selectedBox,
+    lastBox: lastBox != null ? lastBox() : this.lastBox,
+    lastBoxScan: lastBoxScan != null ? lastBoxScan() : this.lastBoxScan,
   );
+
+  bool get usesBoxes => promise?.boxList.isNotEmpty ?? false;
+
+  InboundBox? boxById(String id) =>
+      promise?.boxList.where((b) => b.boxId == id).firstOrNull;
+
+  /// 열어 볼 박스 = 확인했고 박스째 파손이 아닌 것.
+  List<InboundBox> get openable => [
+    for (final b in promise?.boxList ?? const <InboundBox>[])
+      if (arrived.contains(b.boxId) && !damaged.contains(b.boxId)) b,
+  ];
+
+  bool get allBoxesInspected =>
+      openable.every((b) => boxCounts.containsKey(b.boxId));
+
+  /// 박스 결과를 상품(행)별로 합친다. 미도착 박스는 0, 박스째 파손은 입수 전부 격리(파손).
+  Map<String, ReceiptCount> get aggregated {
+    final out = <String, ReceiptCount>{};
+    for (final l in promise?.lines ?? const <InboundLine>[]) {
+      var n = 0;
+      var q = 0;
+      var pend = 0;
+      DiscrepancyReason? reason;
+      for (final b in promise!.boxesOf(l)) {
+        if (!arrived.contains(b.boxId)) continue;
+        if (damaged.contains(b.boxId)) {
+          q += b.unitsPerBox;
+          reason ??= DiscrepancyReason.damaged;
+          continue;
+        }
+        final c = boxCounts[b.boxId];
+        if (c == null) continue;
+        n += c.normal;
+        q += c.quarantined;
+        pend += c.pending;
+        if (c.quarantined > 0) {
+          reason = reason == DiscrepancyReason.temperature
+              ? reason
+              : (c.quarantineReason ?? reason);
+        }
+      }
+      out[l.key] = ReceiptCount(
+        normal: n,
+        quarantined: q,
+        pending: pend,
+        quarantineReason: q > 0 ? (reason ?? DiscrepancyReason.damaged) : null,
+      );
+    }
+    return out;
+  }
 }
 
 /// 입고 1건(TRF). 서버가 준 입고 작업을 단계별로 진행한다.
@@ -148,10 +241,12 @@ class InboundFlowController extends Notifier<InboundState> {
     final phase = switch (p.state) {
       PromiseState.expected => InboundPhase.arrival,
       PromiseState.receiving when open != null => InboundPhase.applying,
-      PromiseState.receiving =>
-        state.phase == InboundPhase.review
-            ? InboundPhase.review
-            : InboundPhase.counting,
+      PromiseState.receiving when state.phase == InboundPhase.review =>
+        InboundPhase.review,
+      PromiseState.receiving when state.phase == InboundPhase.boxInspect =>
+        InboundPhase.boxInspect,
+      PromiseState.receiving when p.boxList.isNotEmpty => InboundPhase.boxCheck,
+      PromiseState.receiving => InboundPhase.counting,
       PromiseState.tinPosted => InboundPhase.applied,
       PromiseState.cancelled => InboundPhase.cancelled,
       PromiseState.unknown => InboundPhase.loadError,
@@ -192,6 +287,87 @@ class InboundFlowController extends Notifier<InboundState> {
     }
   }
 
+  // ───── 박스 검수 ─────
+
+  /// 박스 바코드(박스 번호). 이 송장 박스면 확인.
+  BoxScan scanBox(String code) {
+    final id = code.trim();
+    final b = state.boxById(id);
+    final BoxScan r;
+    if (b == null) {
+      r = BoxScan.notThisTruck;
+    } else if (state.arrived.contains(id)) {
+      r = BoxScan.already;
+    } else {
+      state = state.copyWith(arrived: {...state.arrived, id});
+      r = BoxScan.ok;
+    }
+    state = state.copyWith(
+      lastBoxScan: () => r,
+      lastBox: b == null ? null : () => id,
+    );
+    return r;
+  }
+
+  /// 박스째 파손 표시/해제(확인한 박스만).
+  void toggleDamaged(String boxId) {
+    if (!state.arrived.contains(boxId)) return;
+    final d = {...state.damaged};
+    if (!d.remove(boxId)) d.add(boxId);
+    state = state.copyWith(damaged: d);
+  }
+
+  /// 박스 검수 끝 → 박스 열기. 안 온 박스는 미도착으로 남는다.
+  void finishBoxCheck() {
+    if (state.arrived.isEmpty) return;
+    state = state.copyWith(phase: InboundPhase.boxInspect);
+  }
+
+  void backToBoxCheck() => state = state.copyWith(
+    phase: InboundPhase.boxCheck,
+    selectedBox: () => null,
+  );
+
+  // ───── 박스별 낱개 검수 ─────
+
+  /// 박스를 연다(목록에서 누르거나 박스 바코드 스캔).
+  bool openBox(String code) {
+    final id = code.trim();
+    final ok = state.openable.any((b) => b.boxId == id);
+    if (ok) state = state.copyWith(selectedBox: () => id);
+    return ok;
+  }
+
+  void closeBox() => state = state.copyWith(selectedBox: () => null);
+
+  /// 지금 박스의 검수 결과(아직이면 0).
+  ReceiptCount boxCountOf(String id) =>
+      state.boxCounts[id] ?? const ReceiptCount();
+
+  void setBoxCount(String id, ReceiptCount c) =>
+      state = state.copyWith(boxCounts: {...state.boxCounts, id: c});
+
+  /// 박스 검수 저장 — 격리가 있으면 사유를 골라야 한다.
+  void saveBox() {
+    final id = state.selectedBox;
+    if (id == null) return;
+    final c = boxCountOf(id);
+    if (!c.complete) return;
+    state = state.copyWith(
+      boxCounts: {...state.boxCounts, id: c},
+      selectedBox: () => null,
+    );
+  }
+
+  /// 모든 박스를 열어 봤으면 상품별로 합쳐 확인 단계로.
+  void boxesToReview() {
+    if (!state.allBoxesInspected) return;
+    state = state.copyWith(
+      counts: state.aggregated,
+      phase: InboundPhase.review,
+    );
+  }
+
   /// 상품 스캔: 지금 행의 바코드면 정상 +1.
   InboundScan scan(String code) {
     final l = state.line;
@@ -211,6 +387,13 @@ class InboundFlowController extends Notifier<InboundState> {
 
   void setCount(InboundLine l, ReceiptCount c) => _set(l, c);
 
+  /// 박스째 정상 +입수(박스 바코드가 계약에 없어 버튼으로 — BR-53 R17).
+  void addBox(InboundLine l) {
+    final per = l.unitsPerBox;
+    if (per == null) return;
+    _set(l, state.countOf(l).copyWith(normal: state.countOf(l).normal + per));
+  }
+
   void _set(InboundLine l, ReceiptCount c) =>
       state = state.copyWith(counts: {...state.counts, l.key: c});
 
@@ -225,7 +408,11 @@ class InboundFlowController extends Notifier<InboundState> {
 
   void back() {
     if (state.phase == InboundPhase.review) {
-      state = state.copyWith(phase: InboundPhase.counting);
+      state = state.copyWith(
+        phase: state.usesBoxes
+            ? InboundPhase.boxInspect
+            : InboundPhase.counting,
+      );
     } else if (state.index > 0) {
       state = state.copyWith(index: state.index - 1, lastScan: () => null);
     }

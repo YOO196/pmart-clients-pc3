@@ -16,6 +16,7 @@ base class MockTaskRepository implements TaskRepository {
   MockTaskRepository({this.latency = const Duration(milliseconds: 300)}) {
     _tasks
       ..['task-mock-1'] = _pickTask()
+      ..['shp-9-RETURN'] = returnTask()
       ..['task-mock-2'] = {
         'taskId': 'task-mock-2',
         'taskType': 'PACK',
@@ -73,6 +74,44 @@ base class MockTaskRepository implements TaskRepository {
 
   final Duration latency;
   static const workerId = 'OP-mock-1';
+
+  /// 취소품 복귀 작업(집품 뒤 취소된 주문의 요거트 2개 — 포장 위치 PAK-C-03 → 선반).
+  static Map<String, Object?> returnTask() => {
+    'taskId': 'shp-9-RETURN',
+    'taskType': 'RETURN',
+    'state': 'ASSIGNED',
+    'version': 1,
+    'mfcId': 'MFC-MOCK-01',
+    'shipmentId': 'shp-9',
+    'assignment': {'workerId': workerId, 'assignmentVersion': 1},
+    'lineCount': 1,
+    'plannedQty': 2,
+    'remainingQty': 2,
+    'lines': [
+      {
+        'taskLineId': 'shp-9-RETURN:ol-91',
+        'orderLineId': 'ol-91',
+        'sku': 'E-00000002',
+        'productName': '그릭요거트 플레인 400g',
+        'lotId': 'LOT-Y-1024',
+        'plannedQty': 2,
+        'completedQty': 0,
+        'cancelledQty': 0,
+        'remainingQty': 2,
+        'pendingQty': 0,
+        'picks': [
+          {
+            'lotId': 'LOT-Y-1024',
+            'remainingQty': 2,
+            'locations': [
+              {'locationCode': 'PAK-C-03', 'qty': 2},
+            ],
+            'suggestedToLocations': ['C-S1-01-1-01'],
+          },
+        ],
+      },
+    ],
+  };
   static const milkBarcode = '8801115114154';
   static const yogurtBarcode = '8801115220015';
   static const chipsBarcode = '8801019606557';

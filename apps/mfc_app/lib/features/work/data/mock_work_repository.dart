@@ -214,6 +214,29 @@ final class MockWorkRepository implements WorkRepository {
         );
       }
     }
+    // 취소품 복귀(fulfillment RETURN) — 순서 맨 뒤(capacity 공지).
+    for (final st in const ['IN_PROGRESS', 'ASSIGNED']) {
+      for (final id in tasks.taskIds) {
+        final t = tasks.taskJson(id);
+        if (t['taskType'] == 'RETURN' && t['state'] == st) {
+          return NextAssigned(
+            AssignedTask(
+              taskId: id,
+              taskType: 'RETURN',
+              lines: [
+                for (final l
+                    in (t['lines']! as List).cast<Map<String, Object?>>())
+                  AssignedLine(
+                    productName: l['productName'] as String?,
+                    sku: l['sku'] as String?,
+                    qty: l['remainingQty'] as int?,
+                  ),
+              ],
+            ),
+          );
+        }
+      }
+    }
     return const NextUnavailable(WorkProblemCode.noTaskAvailable);
   }
 

@@ -6,42 +6,126 @@ import 'inbound_repository.dart';
 /// 목 입고 예정 2건. 도착 등록 → RECEIVING, 수령 → 접수(202) 뒤 조회 [applyPolls] 번째에 반영(TIN_POSTED).
 /// 상품명·바코드는 계약에 없어 목만 준다(BR-53).
 final class MockInboundRepository implements InboundRepository {
-  MockInboundRepository({this.latency = const Duration(milliseconds: 300)}) {
-    _add('TRF-MOCK-001', const [
-      InboundLine(
-        sku: 'E-00000001',
-        lotId: 'LOT-M-1110',
-        productName: '서울우유 1L',
-        barcode: '8801115114154',
-        expectedQty: 24,
-      ),
-      InboundLine(
-        sku: 'E-00000002',
-        lotId: 'LOT-Y-1110',
-        productName: '그릭요거트 플레인 400g',
-        barcode: '8801115220015',
-        expectedQty: 12,
-      ),
-      InboundLine(
-        sku: 'E-00000005',
-        lotId: 'LOT-C-1101',
-        productName: '감자칩 오리지널 110g',
-        barcode: '8801019606557',
-        expectedQty: 30,
-      ),
-    ]);
-    _add('TRF-MOCK-002', const [
-      InboundLine(
-        sku: 'E-00000005',
-        lotId: 'LOT-C-1102',
-        productName: '감자칩 오리지널 110g',
-        barcode: '8801019606557',
-        expectedQty: 20,
-      ),
-    ]);
+  /// 목 입고 예정 = 오전 차량 2대(MFC 업무 문서 §6 "매일 오전 차량 2대 이상", TMS §22 예시).
+  /// - TRF-MOCK-001: 냉장 차량, 롤테이너 6개·120박스(TMS §22 부산진구 하차분과 같은 규모).
+  /// - TRF-MOCK-002: 상온 차량, 롤테이너 4개·80박스.
+  /// 합계 200박스 — MFC 기준안 하루 134박스·낙관 293박스 사이. 수량은 판매 단위(박스 × 입수).
+  /// 상품명·바코드·박스·롤테이너 수는 계약에 없어 목만 준다(BR-53).
+  /// [withBoxes] = false 면 박스 목록 없이(계약 그대로) — 상품별 계수 화면.
+  MockInboundRepository({
+    this.latency = const Duration(milliseconds: 300),
+    this.withBoxes = true,
+  }) {
+    _add(
+      'TRF-MOCK-001',
+      const [
+        InboundLine(
+          sku: 'E-00000001',
+          lotId: 'LOT-M-1110',
+          productName: '서울우유 1L',
+          barcode: '8801115114154',
+          unitsPerBox: 12,
+          boxCount: 30,
+          expectedQty: 360,
+        ),
+        InboundLine(
+          sku: 'E-00000002',
+          lotId: 'LOT-Y-1110',
+          productName: '그릭요거트 플레인 400g',
+          barcode: '8801115220015',
+          unitsPerBox: 12,
+          boxCount: 20,
+          expectedQty: 240,
+        ),
+        InboundLine(
+          sku: 'E-00000011',
+          lotId: 'LOT-T-1109',
+          productName: '국산콩 두부 300g',
+          barcode: '8801007001101',
+          unitsPerBox: 16,
+          boxCount: 15,
+          expectedQty: 240,
+        ),
+        InboundLine(
+          sku: 'E-00000012',
+          lotId: 'LOT-G-1109',
+          productName: '무항생제 계란 10구',
+          barcode: '8809001002112',
+          unitsPerBox: 10,
+          boxCount: 15,
+          expectedQty: 150,
+        ),
+        InboundLine(
+          sku: 'E-00000013',
+          lotId: 'LOT-Z-1105',
+          productName: '슬라이스 치즈 180g',
+          barcode: '8801115330013',
+          unitsPerBox: 20,
+          boxCount: 10,
+          expectedQty: 200,
+        ),
+        InboundLine(
+          sku: 'E-00000014',
+          lotId: 'LOT-J-1108',
+          productName: '오렌지주스 1L',
+          barcode: '8801056004014',
+          unitsPerBox: 12,
+          boxCount: 15,
+          expectedQty: 180,
+        ),
+        InboundLine(
+          sku: 'E-00000015',
+          lotId: 'LOT-S-1110',
+          productName: '닭가슴살 샐러드',
+          barcode: '8809002003115',
+          unitsPerBox: 8,
+          boxCount: 15,
+          expectedQty: 120,
+        ),
+      ],
+      rollContainers: 6,
+      zone: 'CHILLED',
+      arrival: DateTime.utc(2026, 11, 9, 21), // 06:00 KST
+    );
+    _add(
+      'TRF-MOCK-002',
+      const [
+        InboundLine(
+          sku: 'E-00000005',
+          lotId: 'LOT-C-1102',
+          productName: '감자칩 오리지널 110g',
+          barcode: '8801019606557',
+          unitsPerBox: 20,
+          boxCount: 30,
+          expectedQty: 600,
+        ),
+        InboundLine(
+          sku: 'E-00000021',
+          lotId: 'LOT-W-1101',
+          productName: '생수 2L',
+          barcode: '8801056021021',
+          unitsPerBox: 6,
+          boxCount: 25,
+          expectedQty: 150,
+        ),
+        InboundLine(
+          sku: 'E-00000022',
+          lotId: 'LOT-R-1020',
+          productName: '컵라면 소컵 65g',
+          barcode: '8801043022022',
+          unitsPerBox: 24,
+          boxCount: 25,
+          expectedQty: 600,
+        ),
+      ],
+      rollContainers: 4,
+      zone: 'AMBIENT',
+      arrival: DateTime.utc(2026, 11, 9, 22), // 07:00 KST
+    );
   }
 
   final Duration latency;
+  final bool withBoxes;
 
   /// 수령 뒤 몇 번째 조회에서 반영되는지.
   int applyPolls = 1;
@@ -53,6 +137,7 @@ final class MockInboundRepository implements InboundRepository {
   bool rejectApply = false;
 
   final _promises = <String, InboundPromiseView>{};
+  int _boxSeq = 0;
   final _receiptKeys = <String, String>{};
   final _receipts = <String, (String trfId, int polls, ReceiptView view)>{};
   final _arrivalKeys = <String>{};
@@ -63,14 +148,33 @@ final class MockInboundRepository implements InboundRepository {
   Iterable<String> get trfIds => _promises.keys;
   InboundPromiseView peek(String trfId) => _promises[trfId]!;
 
-  void _add(String id, List<InboundLine> lines) =>
-      _promises[id] = InboundPromiseView(
-        trfId: id,
-        version: 1,
-        state: PromiseState.expected,
-        plannedArrivalAt: DateTime.utc(2026, 11, 10, 6),
-        lines: lines,
-      );
+  void _add(
+    String id,
+    List<InboundLine> lines, {
+    required int rollContainers,
+    required String zone,
+    required DateTime arrival,
+  }) => _promises[id] = InboundPromiseView(
+    trfId: id,
+    version: 1,
+    state: PromiseState.expected,
+    plannedArrivalAt: arrival,
+    lines: lines,
+    rollContainers: rollContainers,
+    boxes: lines.fold(0, (s, l) => s! + (l.boxCount ?? 0)),
+    temperatureZone: zone,
+    boxList: [
+      if (withBoxes)
+        for (final l in lines)
+          for (var i = 0; i < (l.boxCount ?? 0); i++)
+            InboundBox(
+              // CDC 발급 대역(00000001~49999999, 채번 지침 G-05).
+              boxId: 'BOX-${(++_boxSeq).toString().padLeft(8, '0')}',
+              lineKey: l.key,
+              unitsPerBox: l.unitsPerBox ?? 1,
+            ),
+    ],
+  );
 
   Future<void> _wait() => Future<void>.delayed(latency);
 
@@ -89,6 +193,10 @@ final class MockInboundRepository implements InboundRepository {
     arrivedAt: arrivedAt ?? p.arrivedAt,
     lines: lines ?? p.lines,
     receipts: receipts ?? p.receipts,
+    rollContainers: p.rollContainers,
+    boxes: p.boxes,
+    temperatureZone: p.temperatureZone,
+    boxList: p.boxList,
   );
 
   @override
@@ -165,6 +273,8 @@ final class MockInboundRepository implements InboundRepository {
               lotId: l.lotId,
               productName: l.productName,
               barcode: l.barcode,
+              unitsPerBox: l.unitsPerBox,
+              boxCount: l.boxCount,
               expectedQty: l.expectedQty,
               receivedQty: c.total,
               quarantinedQty: c.quarantined,

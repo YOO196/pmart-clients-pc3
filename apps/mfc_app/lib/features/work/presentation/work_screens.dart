@@ -51,14 +51,14 @@ String assignedTypeText(AppLocalizations l10n, String type) => switch (type) {
   _ => type,
 };
 
-/// 작업을 끝내고 근무 화면으로 돌아간다. 근무 화면이 그 자리에서 다음 작업을 다시 받는다.
-/// (같은 경로로 `go` 하면 근무 화면을 재사용해 다시 받지 않는다.)
+/// 작업을 끝내고 근무 화면으로 돌아간다. 근무 상태를 새로 만들어 서버에 다음 작업을 다시 받는다.
+/// (작업 화면 사이에 교체(pushReplacement)가 있으면 근무 화면의 push 완료를 믿을 수 없어서.)
 void backToSession(BuildContext context, WorkArea area) {
-  if (context.canPop()) {
-    context.pop();
-  } else {
-    context.go('/work/${area.name}');
-  }
+  ProviderScope.containerOf(
+    context,
+    listen: false,
+  ).invalidate(workSessionProvider(area));
+  context.go('/work/${area.name}');
 }
 
 /// 권한이 없을 때 띄운다.

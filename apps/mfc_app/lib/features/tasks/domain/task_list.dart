@@ -82,6 +82,7 @@ class PickInstruction {
     this.unallocatedQty,
     this.status,
     this.notice,
+    this.suggestedToLocations = const [],
   });
 
   final String? lotId;
@@ -100,6 +101,9 @@ class PickInstruction {
 
   /// 서버가 준 짧은 안내. 화면에 그대로 보인다.
   final String? notice;
+
+  /// RETURN(취소품 복귀)만 — 돌려놓을 추천 선반(그 상품이 있던 칸 먼저).
+  final List<String> suggestedToLocations;
 }
 
 @immutable

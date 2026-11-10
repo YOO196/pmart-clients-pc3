@@ -138,9 +138,9 @@ void main() {
       MoveState.completed,
     );
 
-    // 다음 작업 — 남은 이동·적치 없음.
+    // 다음 작업 — 남은 이동·적치가 없어 취소품 복귀.
     await tapKey(t, 'result-action');
-    expect(find.text('지금 할 작업이 없어요. 잠시 뒤 다시 받아 주세요'), findsOneWidget);
+    expect(find.byKey(const ValueKey('assigned-shp-9-RETURN')), findsOneWidget);
   });
 
   testWidgets('적치: 품질검사가 만든 적치 작업 → 선반 스캔 → 나눠 놓기 → 다 놓으면 끝', (t) async {
@@ -246,5 +246,77 @@ void main() {
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('assigned-task-mock-2')), findsOneWidget);
+  });
+
+  testWidgets('취소품 복귀: 시작 → 포장 위치 확인 → 추천 선반 스캔 → 실적(큐·같은 키) → 확정 → 끝', (
+    t,
+  ) async {
+    final tasks = MockTaskRepository(latency: Duration.zero);
+    await t.runAsync(() async {
+      // 재고 이동 앞 순서(보충)를 끝내 둔다.
+      await stockMove.pickUp(
+        'MV-mock-1',
+        cartLocation: 'CRT-C-01',
+        qty: 6,
+        key: IdempotencyKey('u'),
+      );
+      await stockMove.drop(
+        'MV-mock-1',
+        toLocation: 'C-S1-02-2-05',
+        qty: 6,
+        key: IdempotencyKey('d'),
+      );
+    });
+    t.view
+      ..physicalSize = const Size(412, 915)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [
+          envProvider.overrideWithValue(PmartEnv.mock),
+          taskRepositoryProvider.overrideWithValue(tasks),
+          packingRepositoryProvider.overrideWithValue(
+            MockPackingRepository(latency: Duration.zero),
+          ),
+          inboundRepositoryProvider.overrideWithValue(
+            MockInboundRepository(latency: Duration.zero),
+          ),
+          qualityRepositoryProvider.overrideWithValue(quality),
+          stockMoveRepositoryProvider.overrideWithValue(stockMove),
+          stockCountRepositoryProvider.overrideWithValue(count),
+          secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+        ],
+        child: const MfcApp(),
+      ),
+    );
+    await t.pumpAndSettle();
+    await tapKey(t, 'area-stockMove');
+    await tapKey(t, 'guide-ok');
+    expect(find.byKey(const ValueKey('assigned-shp-9-RETURN')), findsOneWidget);
+    await tapKey(t, 'run-task');
+    await tapKey(t, 'start');
+
+    // 복귀 화면.
+    expect(find.text('돌려놓을 수량 2개'), findsOneWidget);
+    expect(find.text('추천 칸: C-S1-01-1-01'), findsOneWidget);
+    await scan(t, 'return-scan', 'C-S1-01-1-01'); // 포장 위치 확인 전
+    expect(find.byKey(const ValueKey('return-scan-error')), findsOneWidget);
+    await scan(t, 'return-scan', 'PAK-C-03');
+    await scan(t, 'return-scan', 'C-S1-01-1-01');
+    expect(t.takeException(), isNull);
+    await tapKey(t, 'return-submit');
+
+    // 큐에 넣고 같은 키로 보냄 → 확정 조회로 반영 확인 → 끝.
+    expect(find.byKey(const ValueKey('return-done')), findsOneWidget);
+    expect(tasks.taskJson('shp-9-RETURN')['state'], 'COMPLETED');
+    final lines = (tasks.taskJson('shp-9-RETURN')['lines']! as List)
+        .cast<Map<String, Object?>>();
+    expect(lines.single['completedQty'], 2);
+
+    // 다음 작업 → 근무 화면이 다시 받는다(남은 재고 이동 없음).
+    await tapKey(t, 'result-action');
+    expect(find.text('지금 할 작업이 없어요. 잠시 뒤 다시 받아 주세요'), findsOneWidget);
   });
 }
