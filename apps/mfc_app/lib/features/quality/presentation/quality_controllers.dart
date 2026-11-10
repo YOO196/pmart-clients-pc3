@@ -13,105 +13,185 @@ import '../../tasks/presentation/task_controllers.dart';
 import '../domain/quality.dart';
 
 // ───────────────────────── 입고 품질검사 ─────────────────────────
+// 역할(2026-11-10 사용자 결정): 입고는 박스·수량·겉보기 파손, 품질검사는 상품 대조·소비기한·제조일·
+// 기준 판정(정상/격리)·사유·사진. 같은 물건을 두 번 판정하지 않는다. 수량은 입고 결과(작업 잔량)를 그대로.
 
-/// 결과 한 줄 입력값(화면).
+/// 격리 사유(화면). 계약 검사 결과에는 사유 필드가 없다 — BR-52 R18.
+enum QuarantineReason { expiry, manufacture, damaged, temperature, other }
+
+/// 결과 한 줄 입력값. 판정은 기본값이 없다(null = 아직 안 고름).
 @immutable
 class InspectRow {
   const InspectRow({
     this.id = 0,
-    this.quarantined = false,
     this.qty = 0,
-    this.lotRef = '',
-    this.noLot = false,
     this.expiry = '',
     this.manufacture = '',
+    this.quarantined,
+    this.reason,
+    this.evidence,
+    this.lotRef = '',
+    this.noLot = false,
   });
 
   /// 화면 입력칸 식별(줄을 지워도 다른 줄 입력이 섞이지 않게).
   final int id;
-  final bool quarantined;
   final int qty;
 
-  /// 제조사 LOT 원문 — 포장에 찍힌 값을 스캔으로 읽는다. LOT 번호(lotId)는 시스템이 정한다.
-  final String lotRef;
-
-  /// 포장에 LOT 표기가 없다고 작업자가 확인했다.
-  final bool noLot;
+  /// 소비기한·제조일(yyyy-MM-dd, 달력으로만 고른다).
   final String expiry;
   final String manufacture;
 
+  /// 격리 판정. null = 아직 안 고름.
+  final bool? quarantined;
+  final QuarantineReason? reason;
+
+  /// 증빙 사진 참조(격리 줄 필수).
+  final String? evidence;
+
+  /// 포장에 찍힌 제조사 LOT 원문(스캔) — LOT 번호는 시스템이 정한다(채번 지침 G-06).
+  final String lotRef;
+  final bool noLot;
+
   InspectRow copyWith({
-    bool? quarantined,
     int? qty,
-    String? lotRef,
-    bool? noLot,
     String? expiry,
     String? manufacture,
+    bool? Function()? quarantined,
+    QuarantineReason? Function()? reason,
+    String? Function()? evidence,
+    String? lotRef,
+    bool? noLot,
   }) => InspectRow(
     id: id,
-    quarantined: quarantined ?? this.quarantined,
     qty: qty ?? this.qty,
-    lotRef: lotRef ?? this.lotRef,
-    noLot: noLot ?? this.noLot,
     expiry: expiry ?? this.expiry,
     manufacture: manufacture ?? this.manufacture,
+    quarantined: quarantined != null ? quarantined() : this.quarantined,
+    reason: reason != null ? reason() : this.reason,
+    evidence: evidence != null ? evidence() : this.evidence,
+    lotRef: lotRef ?? this.lotRef,
+    noLot: noLot ?? this.noLot,
   );
 }
 
-/// 입력 오류(화면 문구는 화면이 정한다). 최종 판정은 서버(400·409).
+/// 판정 기준(상품 정보). minRemainingDays 가 null 이면 기준 정보 없음 — 정상 판정을 막는다.
+@immutable
+class InspectCriteria {
+  const InspectCriteria({
+    this.minRemainingDays,
+    this.maxDaysSinceManufacture,
+    this.zone,
+  });
+
+  factory InspectCriteria.of(InboundTaskView t) => InspectCriteria(
+    minRemainingDays: t.minRemainingDays,
+    maxDaysSinceManufacture: t.maxDaysSinceManufacture,
+    zone: t.zone,
+  );
+
+  final int? minRemainingDays;
+  final int? maxDaysSinceManufacture;
+  final TempZone? zone;
+
+  bool get known => minRemainingDays != null;
+  bool get needsManufacture => maxDaysSinceManufacture != null;
+  bool get needsTemperature =>
+      zone == TempZone.chilled || zone == TempZone.frozen;
+}
+
 enum InspectIssue {
-  /// 수량이 0 인 줄.
   zeroQty,
-
-  /// 합계가 잔량보다 많다.
-  overRemaining,
-
-  /// 정상 판정인데 소비기한이 없다 — LOT 를 나누는 기준이라 필수로 둔다(가정).
   needExpiry,
+  needManufacture,
 
-  /// 날짜 형식(yyyy-MM-dd)이 틀렸다.
-  badDate,
-
-  /// 제조일이 오늘 이후거나 소비기한 이후다.
+  /// 제조일이 오늘 이후거나 소비기한 이후.
   badManufacture,
+  needVerdict,
+  needReason,
+  needEvidence,
 
-  /// 같은 판정·같은 LOT 표기·같은 소비기한 줄이 둘 이상 — 같은 배치라 한 줄로 합친다.
-  duplicateExpiry,
-
-  /// 정상 판정인데 LOT 표기를 스캔하지도, "표기 없음"을 누르지도 않았다(지침 G-06 — 동일 배치 판정에 쓴다).
+  /// 정상 줄 — LOT 표기 스캔 또는 "표기 없음".
   needLot,
+
+  /// 합계가 검사할 수량과 다르다.
+  totalMismatch,
+
+  /// 같은 판정·LOT 표기·소비기한 줄이 둘 이상.
+  duplicate,
+
+  /// 냉장·냉동 — 온도 확인을 안 했다.
+  needTemperature,
 }
 
 final _datePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+DateTime? _date(String s) =>
+    _datePattern.hasMatch(s) ? DateTime.tryParse(s) : null;
+DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
-bool _isDate(String s) =>
-    _datePattern.hasMatch(s) && DateTime.tryParse(s) != null;
-
-String _ymd(DateTime d) =>
-    '${d.year.toString().padLeft(4, '0')}-'
-    '${d.month.toString().padLeft(2, '0')}-'
-    '${d.day.toString().padLeft(2, '0')}';
+/// 기준으로 정해지는 강제 격리 사유(정상을 고를 수 없다). 없으면 null.
+QuarantineReason? forcedReason(
+  InspectRow r,
+  InspectCriteria c,
+  DateTime today, {
+  required bool temperatureBad,
+}) {
+  if (temperatureBad) return QuarantineReason.temperature;
+  final exp = _date(r.expiry);
+  final min = c.minRemainingDays;
+  if (exp != null && min != null && exp.difference(_day(today)).inDays < min) {
+    return QuarantineReason.expiry;
+  }
+  final mfg = _date(r.manufacture);
+  final max = c.maxDaysSinceManufacture;
+  if (mfg != null && max != null && _day(today).difference(mfg).inDays > max) {
+    return QuarantineReason.manufacture;
+  }
+  return null;
+}
 
 /// 줄마다의 문제(없으면 빈 집합).
-Set<InspectIssue> inspectRowIssues(InspectRow r, DateTime today) {
+Set<InspectIssue> inspectRowIssues(
+  InspectRow r,
+  InspectCriteria c,
+  DateTime today,
+) {
   final out = <InspectIssue>{};
   if (r.qty < 1) out.add(InspectIssue.zeroQty);
-  if (!r.quarantined && r.expiry.isEmpty) out.add(InspectIssue.needExpiry);
-  if (!r.quarantined && r.lotRef.isEmpty && !r.noLot) {
-    out.add(InspectIssue.needLot);
+  if (r.expiry.isEmpty) out.add(InspectIssue.needExpiry);
+  if (c.needsManufacture && r.manufacture.isEmpty) {
+    out.add(InspectIssue.needManufacture);
   }
-  if ((r.expiry.isNotEmpty && !_isDate(r.expiry)) ||
-      (r.manufacture.isNotEmpty && !_isDate(r.manufacture))) {
-    out.add(InspectIssue.badDate);
-  } else if (r.manufacture.isNotEmpty &&
-      (r.manufacture.compareTo(_ymd(today)) > 0 ||
-          (r.expiry.isNotEmpty && r.manufacture.compareTo(r.expiry) > 0))) {
+  final exp = _date(r.expiry);
+  final mfg = _date(r.manufacture);
+  if (mfg != null &&
+      (mfg.isAfter(_day(today)) || (exp != null && mfg.isAfter(exp)))) {
     out.add(InspectIssue.badManufacture);
+  }
+  switch (r.quarantined) {
+    case null:
+      out.add(InspectIssue.needVerdict);
+    case true:
+      if (r.reason == null) out.add(InspectIssue.needReason);
+      if (r.evidence == null) out.add(InspectIssue.needEvidence);
+    case false:
+      if (r.lotRef.isEmpty && !r.noLot) out.add(InspectIssue.needLot);
   }
   return out;
 }
 
-enum InspectPhase { loading, editing, applied, notFound, loadError }
+/// 단계: 위치 확인 → 상품 대조 → 판정.
+enum InspectPhase {
+  loading,
+  locate,
+  product,
+  judge,
+  applied,
+  notFound,
+  loadError,
+}
+
+enum InspectScan { ok, wrong }
 
 @immutable
 class InspectState {
@@ -119,45 +199,56 @@ class InspectState {
     this.phase = InspectPhase.loading,
     this.task,
     this.rows = const [],
+    this.temperatureOk,
     this.busy = false,
     this.unknown = false,
     this.code,
     this.result,
+    this.lastScan,
   });
 
   final InspectPhase phase;
   final InboundTaskView? task;
   final List<InspectRow> rows;
+
+  /// 냉장·냉동 온도 확인. null = 아직, false = 이탈(전부 격리).
+  final bool? temperatureOk;
   final bool busy;
   final bool unknown;
   final String? code;
   final InboundTaskExecutionView? result;
+  final InspectScan? lastScan;
 
   int get total => rows.fold(0, (s, r) => s + r.qty);
+  InspectCriteria get criteria =>
+      task == null ? const InspectCriteria() : InspectCriteria.of(task!);
 
   InspectState copyWith({
     InspectPhase? phase,
     InboundTaskView? task,
     List<InspectRow>? rows,
+    bool? Function()? temperatureOk,
     bool? busy,
     bool? unknown,
     String? Function()? code,
     InboundTaskExecutionView? result,
+    InspectScan? Function()? lastScan,
   }) => InspectState(
     phase: phase ?? this.phase,
     task: task ?? this.task,
     rows: rows ?? this.rows,
+    temperatureOk: temperatureOk != null ? temperatureOk() : this.temperatureOk,
     busy: busy ?? this.busy,
     unknown: unknown ?? this.unknown,
     code: code != null ? code() : this.code,
     result: result ?? this.result,
+    lastScan: lastScan != null ? lastScan() : this.lastScan,
   );
 }
 
 final inspectFlowProvider = NotifierProvider.autoDispose
     .family<InspectController, InspectState, String>(InspectController.new);
 
-/// 입고 품질검사 1건(입고 작업 INSPECT). 서버가 준 작업 → 결과 줄 입력 → 등록 → 반영(APPLIED)이면 끝.
 class InspectController extends Notifier<InspectState> {
   InspectController(this.taskId);
 
@@ -173,17 +264,22 @@ class InspectController extends Notifier<InspectState> {
 
   DateTime get today => ref.read(mfcClockProvider)();
 
+  /// 화면의 테스트 동작이 현재 상태를 읽는다.
+  InspectState get current => state;
+
   Future<void> load() async {
     final repo = ref.read(qualityRepositoryProvider);
     final mfc = ref.read(currentMfcIdProvider);
     try {
-      // 단건 조회가 계약에 없어 목록에서 찾는다.
+      // 단건 조회가 계약에 없어 목록에서 찾는다(BR-53 R8).
       final open = await repo.inboundTasks(mfc, kind: InboundTaskKind.inspect);
       final t = open.where((t) => t.taskId == taskId).firstOrNull;
       if (!ref.mounted) return;
       if (t != null) {
         state = state.copyWith(
-          phase: InspectPhase.editing,
+          phase: state.phase == InspectPhase.loading
+              ? InspectPhase.locate
+              : state.phase,
           task: t,
           rows: state.rows.isEmpty
               ? [InspectRow(id: ++_rowSeq, qty: t.remainingQty)]
@@ -206,10 +302,68 @@ class InspectController extends Notifier<InspectState> {
     }
   }
 
+  /// 1단계: 검사 위치 스캔.
+  InspectScan scanLocation(String code) {
+    final ok = code.trim() == state.task?.locationCode;
+    state = state.copyWith(
+      lastScan: () => ok ? InspectScan.ok : InspectScan.wrong,
+      phase: ok ? InspectPhase.product : state.phase,
+    );
+    return ok ? InspectScan.ok : InspectScan.wrong;
+  }
+
+  /// 2단계: 상품 바코드 대조. 바코드 정보가 없으면(계약 공백) [confirmProductWithoutBarcode].
+  InspectScan scanProduct(String code) {
+    final ok = code.trim() == state.task?.barcode;
+    state = state.copyWith(
+      lastScan: () => ok ? InspectScan.ok : InspectScan.wrong,
+      phase: ok ? InspectPhase.judge : state.phase,
+    );
+    return ok ? InspectScan.ok : InspectScan.wrong;
+  }
+
+  void confirmProductWithoutBarcode() {
+    if (state.task?.barcode != null) return;
+    state = state.copyWith(phase: InspectPhase.judge, lastScan: () => null);
+  }
+
+  void setTemperature({required bool ok}) {
+    if (state.unknown) return;
+    state = state.copyWith(temperatureOk: () => ok);
+    _applyForced();
+  }
+
   void setRow(int i, InspectRow r) {
     if (state.unknown) return; // 결과를 모르는 동안은 보낸 내용을 바꾸지 않는다.
     state = state.copyWith(rows: [...state.rows]..[i] = r);
+    _applyForced();
   }
+
+  /// 기준 미달·온도 이탈 줄은 격리로 고정하고 사유를 채운다.
+  void _applyForced() {
+    final c = state.criteria;
+    final bad = state.temperatureOk == false;
+    state = state.copyWith(
+      rows: [
+        for (final r in state.rows)
+          switch (forcedReason(r, c, today, temperatureBad: bad)) {
+            final f? => r.copyWith(quarantined: () => true, reason: () => f),
+            null => r,
+          },
+      ],
+    );
+  }
+
+  /// 이 줄에서 정상을 고를 수 있는지(기준 정보 있음·강제 격리 아님).
+  bool canBeNormal(InspectRow r) =>
+      state.criteria.known &&
+      forcedReason(
+            r,
+            state.criteria,
+            today,
+            temperatureBad: state.temperatureOk == false,
+          ) ==
+          null;
 
   void addRow() {
     if (state.unknown) return;
@@ -218,7 +372,7 @@ class InspectController extends Notifier<InspectState> {
     state = state.copyWith(
       rows: [
         ...state.rows,
-        InspectRow(qty: left > 0 ? left : 0),
+        InspectRow(id: ++_rowSeq, qty: left > 0 ? left : 0),
       ],
     );
   }
@@ -228,20 +382,22 @@ class InspectController extends Notifier<InspectState> {
     state = state.copyWith(rows: [...state.rows]..removeAt(i));
   }
 
-  /// 보낼 수 있는지와 전체 문제.
   Set<InspectIssue> issues() {
     final t = state.task;
     final out = <InspectIssue>{
-      for (final r in state.rows) ...inspectRowIssues(r, today),
+      for (final r in state.rows) ...inspectRowIssues(r, state.criteria, today),
     };
-    if (t != null && state.total > t.remainingQty) {
-      out.add(InspectIssue.overRemaining);
+    if (t != null && state.total != t.remainingQty) {
+      out.add(InspectIssue.totalMismatch);
+    }
+    if (state.criteria.needsTemperature && state.temperatureOk == null) {
+      out.add(InspectIssue.needTemperature);
     }
     final seen = <String>{};
     for (final r in state.rows) {
-      if (r.expiry.isEmpty) continue;
+      if (r.expiry.isEmpty || r.quarantined == null) continue;
       if (!seen.add('${r.quarantined}|${r.lotRef}|${r.expiry}')) {
-        out.add(InspectIssue.duplicateExpiry);
+        out.add(InspectIssue.duplicate);
       }
     }
     return out;
@@ -256,8 +412,8 @@ class InspectController extends Notifier<InspectState> {
       for (final r in state.rows)
         InspectionResult(
           qty: r.qty,
-          quarantined: r.quarantined,
-          // LOT 번호(lotId)는 시스템이 정한다. 보내는 것은 포장에 찍힌 제조사 LOT 원문뿐(지침 G-06).
+          quarantined: r.quarantined ?? true,
+          // LOT 번호(lotId)는 시스템이 정한다. 보내는 것은 포장에 찍힌 제조사 LOT 원문뿐.
           sourceLotRef: r.lotRef.isEmpty ? null : r.lotRef,
           expiryDate: r.expiry.isEmpty ? null : r.expiry,
           manufactureDate: r.manufacture.isEmpty ? null : r.manufacture,
@@ -283,74 +439,74 @@ class InspectController extends Notifier<InspectState> {
   }
 }
 
-// ───────────────────────── 회수품 검수 ─────────────────────────
+// ───────────────────────── 회수품(반품) 검수 ─────────────────────────
+// 온도대·신선 여부는 상품 정보 값(작업자가 고르지 않는다). 작업자는 개봉·파손·기한 지남과 사진만.
+// 판정은 자동: 상온·신선 아님·미개봉·파손 없음·기한 지남 아님이면 재판매, 아니면 폐기(사유 자동).
 
-/// 회수품 한 줄 판정 입력값.
+TempZone? _zone(String? w) => switch (w) {
+  'AMBIENT' => TempZone.ambient,
+  'CHILLED' => TempZone.chilled,
+  'FROZEN' => TempZone.frozen,
+  _ => null,
+};
+
 @immutable
 class ReturnDecision {
   const ReturnDecision({
     this.zone,
-    this.fresh = false,
+    this.fresh,
     this.opened = false,
-    this.verdict,
-    this.disposeReason,
+    this.damaged = false,
+    this.expired = false,
+    this.evidence,
   });
 
-  /// 온도대 — 반입 조회에 없어 작업자가 고른다(BR-52 R12).
+  factory ReturnDecision.of(ReturnedLine l) =>
+      ReturnDecision(zone: _zone(l.zone), fresh: l.fresh);
+
+  /// 상품 정보 값. null 이면 정보 없음 — 판정할 수 없다(관리자 확인).
   final TempZone? zone;
-  final bool fresh;
+  final bool? fresh;
+
+  /// 작업자 확인.
   final bool opened;
-  final ReturnVerdict? verdict;
-  final DisposeReason? disposeReason;
+  final bool damaged;
+  final bool expired;
+  final String? evidence;
 
-  /// 재판매는 상온·신선 아님·미개봉일 때만(화면 안내 — 최종은 서버 422).
-  bool get resaleAllowed => zone == TempZone.ambient && !fresh && !opened;
+  bool get known => zone != null && fresh != null;
 
-  /// 폐기 사유 기본값: 조건에서 바로 나오는 것.
-  DisposeReason? get suggestedReason => switch (this) {
+  /// 폐기 사유(재판매면 null). 조건에서 자동.
+  DisposeReason? get disposeReason => switch (this) {
     ReturnDecision(zone: TempZone.chilled || TempZone.frozen) =>
       DisposeReason.temperatureZone,
     ReturnDecision(fresh: true) => DisposeReason.fresh,
     ReturnDecision(opened: true) => DisposeReason.opened,
+    ReturnDecision(damaged: true) => DisposeReason.damaged,
+    ReturnDecision(expired: true) => DisposeReason.expired,
     _ => null,
   };
 
+  ReturnVerdict get verdict =>
+      disposeReason == null ? ReturnVerdict.resale : ReturnVerdict.dispose;
+
+  /// 정보가 있고, 폐기면 사진이 있어야 한다.
   bool get complete =>
-      zone != null &&
-      switch (verdict) {
-        ReturnVerdict.resale => resaleAllowed,
-        ReturnVerdict.dispose => disposeReason != null,
-        null => false,
-      };
+      known && (verdict == ReturnVerdict.resale || evidence != null);
 
   ReturnDecision copyWith({
-    TempZone? zone,
-    bool? fresh,
     bool? opened,
-    ReturnVerdict? Function()? verdict,
-    DisposeReason? Function()? disposeReason,
-  }) {
-    var next = ReturnDecision(
-      zone: zone ?? this.zone,
-      fresh: fresh ?? this.fresh,
-      opened: opened ?? this.opened,
-      verdict: verdict != null ? verdict() : this.verdict,
-      disposeReason: disposeReason != null
-          ? disposeReason()
-          : this.disposeReason,
-    );
-    // 조건이 바뀌어 재판매가 안 되면 판정을 폐기로 돌리고 사유를 채운다.
-    if (next.verdict == ReturnVerdict.resale && !next.resaleAllowed) {
-      next = ReturnDecision(
-        zone: next.zone,
-        fresh: next.fresh,
-        opened: next.opened,
-        verdict: ReturnVerdict.dispose,
-        disposeReason: next.suggestedReason,
-      );
-    }
-    return next;
-  }
+    bool? damaged,
+    bool? expired,
+    String? Function()? evidence,
+  }) => ReturnDecision(
+    zone: zone,
+    fresh: fresh,
+    opened: opened ?? this.opened,
+    damaged: damaged ?? this.damaged,
+    expired: expired ?? this.expired,
+    evidence: evidence != null ? evidence() : this.evidence,
+  );
 }
 
 enum ReturnPhase {
@@ -411,7 +567,6 @@ final returnInspectFlowProvider = NotifierProvider.autoDispose
       ReturnInspectController.new,
     );
 
-/// 회수품 검수 1건(반입 ID). 반입 조회 → 줄별 판정 → 등록(202) → 재고 반영 확인.
 class ReturnInspectController extends Notifier<ReturnInspectState> {
   ReturnInspectController(this.returnReceiptId);
 
@@ -435,7 +590,7 @@ class ReturnInspectController extends Notifier<ReturnInspectState> {
         receipt: r,
         decisions: state.decisions.length == r.lines.length
             ? state.decisions
-            : [for (final _ in r.lines) const ReturnDecision()],
+            : [for (final l in r.lines) ReturnDecision.of(l)],
       );
     } on PmartFailure {
       if (ref.mounted) state = state.copyWith(phase: ReturnPhase.loadError);
@@ -472,14 +627,12 @@ class ReturnInspectController extends Notifier<ReturnInspectState> {
                 orderLineId: l.orderLineId,
                 lotId: l.lotId,
                 qty: l.qty,
-                verdict: state.decisions[i].verdict!,
+                verdict: state.decisions[i].verdict,
                 zone: state.decisions[i].zone!,
-                fresh: state.decisions[i].fresh,
+                fresh: state.decisions[i].fresh!,
                 opened: state.decisions[i].opened,
-                disposeReason:
-                    state.decisions[i].verdict == ReturnVerdict.dispose
-                    ? state.decisions[i].disposeReason
-                    : null,
+                disposeReason: state.decisions[i].disposeReason,
+                evidenceRef: state.decisions[i].evidence,
               ),
           ],
           key: key,

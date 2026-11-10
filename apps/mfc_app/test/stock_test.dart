@@ -119,10 +119,23 @@ void main() {
     await scan(t, 'move-scan', 'C-S1-01-1-01');
     expect(find.text('지시한 칸이 아니에요. 화면의 칸으로 가 주세요'), findsWidgets);
     await scan(t, 'move-scan', 'hello');
-    expect(find.text('칸 바코드가 아니에요'), findsWidgets);
+    expect(find.text('출발 칸 바코드를 먼저 스캔해요'), findsWidgets);
+    // 칸보다 상품을 먼저 찍으면 안내.
+    await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
+    expect(find.text('출발 칸 바코드를 먼저 스캔해요'), findsWidgets);
     await scan(t, 'move-scan', 'C-R1-01-1-01');
-    expect(enabled(t, 'move-submit'), isFalse); // 카트 아직
+    // 수량은 0부터 — 상품을 스캔해 센다. 다른 상품은 세지 않는다.
+    expect(find.text('스캔해 센 수량 0'), findsOneWidget);
+    await scan(t, 'move-scan', MockTaskRepository.yogurtBarcode);
+    expect(find.text('지시한 상품이 아니에요 — 세지 않았어요'), findsWidgets);
     await scan(t, 'move-scan', 'CRT-C-01');
+    expect(enabled(t, 'move-submit'), isFalse); // 상품 아직
+    for (var i = 0; i < 6; i++) {
+      await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
+    }
+    expect(find.text('스캔해 센 수량 6'), findsOneWidget);
+    await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
+    expect(find.text('옮길 양을 넘었어요'), findsWidgets);
     expect(enabled(t, 'move-submit'), isTrue);
     expect(t.takeException(), isNull);
     await tapKey(t, 'move-submit');
@@ -141,6 +154,17 @@ void main() {
     // 다음 작업 — 남은 이동·적치가 없어 취소품 복귀.
     await tapKey(t, 'result-action');
     expect(find.byKey(const ValueKey('assigned-shp-9-RETURN')), findsOneWidget);
+  });
+
+  testWidgets('재고 이동: 출발 칸에 없으면 문제 보고 → 이 지시는 관리자에게', (t) async {
+    await open(t, 'stockMove');
+    await tapKey(t, 'run-task');
+    await scan(t, 'move-scan', 'C-R1-01-1-01');
+    await tapKey(t, 'move-issue');
+    expect(find.text('출발 칸에 물건이 없어요'), findsOneWidget);
+    await tapKey(t, 'move-issue-sourceEmpty');
+    expect(find.byKey(const ValueKey('move-reported')), findsOneWidget);
+    expect(find.text('문제를 보고했어요. 관리자가 처리해요'), findsOneWidget);
   });
 
   testWidgets('적치: 품질검사가 만든 적치 작업 → 선반 스캔 → 나눠 놓기 → 다 놓으면 끝', (t) async {
@@ -175,62 +199,124 @@ void main() {
     );
     await tapKey(t, 'run-task');
     expect(find.text('놓을 수량 10개'), findsOneWidget);
+    expect(find.text('추천 칸: C-S1-01-1-01, C-S1-01-1-02'), findsOneWidget);
 
+    // 출발 위치(입고 구역)부터.
     await scan(t, 'putaway-scan', 'nope');
     expect(find.byKey(const ValueKey('putaway-scan-error')), findsOneWidget);
-    await scan(t, 'putaway-scan', 'C-S1-03-2-04');
-    await setQty(t, 'putaway-qty', 6);
+    await scan(t, 'putaway-scan', 'RCV-C-01');
+    for (var i = 0; i < 6; i++) {
+      await scan(t, 'putaway-scan', MockTaskRepository.yogurtBarcode);
+    }
+    await scan(t, 'putaway-scan', 'C-S1-01-1-01');
     await tapKey(t, 'putaway-submit');
-    // 남은 4개 — 다른 칸으로.
+    // 남은 4개 — 다른 칸으로(추천 밖이면 안내만).
     expect(find.text('놓을 수량 4개'), findsOneWidget);
-    expect(enabled(t, 'putaway-submit'), isFalse); // 칸을 다시 찍어야
+    expect(enabled(t, 'putaway-submit'), isFalse); // 상품·칸을 다시
+    for (var i = 0; i < 4; i++) {
+      await scan(t, 'putaway-scan', MockTaskRepository.yogurtBarcode);
+    }
     await scan(t, 'putaway-scan', 'C-S1-03-2-05');
+    expect(find.textContaining('추천 칸이 아니에요'), findsOneWidget);
     await tapKey(t, 'putaway-submit');
     expect(find.byKey(const ValueKey('putaway-done')), findsOneWidget);
     expect(quality.task('TSK-PUT-mock-1')!.completed, isTrue);
   });
 
-  testWidgets('재고 실사: 칸 확인 → 장부 없이 계수 → 확인 → 제출 → 다르면 다른 작업자 재계수', (t) async {
+  testWidgets(
+    '재고 실사: 칸 확인 → 상품 스캔으로 세기(장부 없음) · 소비기한 묶음 · 계수표 밖 상품 → 제출 → 다르면 다른 작업자 재계수',
+    (t) async {
+      await open(t, 'stockCount');
+      expect(find.byKey(const ValueKey('assigned-CNT-mock-1')), findsOneWidget);
+      await tapKey(t, 'run-task');
+      const milk = MockTaskRepository.milkBarcode;
+      const chips = MockTaskRepository.chipsBarcode;
+      const water = '8801056021021'; // 생수 — 계수표에 없다
+
+      // 1번 칸.
+      await scan(t, 'count-loc-scan', 'C-S1-02-2-05');
+      expect(find.byKey(const ValueKey('count-wrong-place')), findsOneWidget);
+      await scan(t, 'count-loc-scan', 'A-S3-01-1-10');
+      const a1 = 'A-S3-01-1-10|E-00000001|LOT-M-1022';
+      const a2 = 'A-S3-01-1-10|E-00000005|LOT-C-0901';
+      expect(
+        t
+            .widget<FilledButton>(find.byKey(const ValueKey('count-next')))
+            .onPressed,
+        isNull,
+      ); // 다 세야
+      // ＋ 버튼 없음 — 스캔이 +1. 많으면 하나 찍은 뒤 숫자를 눌러 넣는다.
+      expect(
+        t
+            .widget<IconButton>(find.byKey(const ValueKey('count-$a1-plus')))
+            .onPressed,
+        isNull,
+      );
+      await scan(t, 'count-item-scan', milk);
+      expect(find.text('서울우유 1L'), findsOneWidget);
+      await setQty(t, 'count-$a1', 8);
+      await scan(t, 'count-item-scan', chips);
+      await setQty(t, 'count-$a2', 12);
+      // 계수표에 없는 상품 — 따로 센다.
+      await scan(t, 'count-item-scan', water);
+      await scan(t, 'count-item-scan', water);
+      expect(find.byKey(const ValueKey('count-extra-found')), findsOneWidget);
+      expect(find.text('생수 2L'), findsOneWidget);
+      expect(t.takeException(), isNull);
+      await tapKey(t, 'count-next');
+
+      // 2번 칸: 우유 두 묶음(소비기한 11-12 · 11-16), 과자 없음.
+      await scan(t, 'count-loc-scan', 'C-S1-02-2-05');
+      const b1 = 'C-S1-02-2-05|E-00000001|LOT-M-1022';
+      const b2 = 'C-S1-02-2-05|E-00000001|LOT-M-1029';
+      await scan(t, 'count-item-scan', milk);
+      // 어느 묶음인지 골라야 센다.
+      expect(find.byKey(const ValueKey('count-choose-lot')), findsOneWidget);
+      await tapKey(t, 'lot-choice-$b2');
+      await scan(t, 'count-item-scan', milk);
+      await scan(t, 'count-item-scan', milk);
+      expect(
+        t
+            .widget<Text>(
+              find.descendant(
+                of: find.byKey(const ValueKey('count-$b2-value')),
+                matching: find.byType(Text),
+              ),
+            )
+            .data,
+        '3',
+      );
+      await tapKey(t, 'lot-choice-$b1');
+      await scan(t, 'count-item-scan', milk);
+      await setQty(t, 'count-$b1', 7); // 장부 8 과 다름
+      await tapKey(t, 'count-zero-C-S1-02-2-05|E-00000005|LOT-C-0901');
+      await tapKey(t, 'count-next');
+
+      expect(find.text('센 수량을 확인해 주세요'), findsOneWidget);
+      expect(find.byKey(const ValueKey('review-extra-$water')), findsOneWidget);
+      await tapKey(t, 'count-submit');
+      expect(
+        find.byKey(const ValueKey('count-result-recountRequired')),
+        findsOneWidget,
+      );
+      final s = await t.runAsync(() => count.session('M', 'CNT-mock-1'));
+      expect(s!.state, CountState.recountRequired);
+      expect(s.firstCounter, MockTaskRepository.workerId);
+      expect(count.lastExtras.single.sku, 'E-00000021');
+      expect(count.lastExtras.single.qty, 2);
+
+      // 같은 사람에게는 재계수를 주지 않는다.
+      await tapKey(t, 'result-action');
+      expect(find.text('지금 할 작업이 없어요. 잠시 뒤 다시 받아 주세요'), findsOneWidget);
+    },
+  );
+
+  testWidgets('재고 실사: 칸에 갈 수 없으면 문제 보고', (t) async {
     await open(t, 'stockCount');
-    expect(find.byKey(const ValueKey('assigned-CNT-mock-1')), findsOneWidget);
     await tapKey(t, 'run-task');
-
-    // 1번 칸.
-    await scan(t, 'count-loc-scan', 'C-S1-02-2-05');
-    expect(find.byKey(const ValueKey('count-wrong-place')), findsOneWidget);
-    await scan(t, 'count-loc-scan', 'A-S3-01-1-10');
-    const a1 = 'A-S3-01-1-10|E-00000001|LOT-M-1022';
-    const a2 = 'A-S3-01-1-10|E-00000005|LOT-C-0901';
-    expect(
-      t
-          .widget<FilledButton>(find.byKey(const ValueKey('count-next')))
-          .onPressed,
-      isNull,
-    ); // 다 세야
-    await setQty(t, 'count-$a1', 8);
-    await setQty(t, 'count-$a2', 12);
-    expect(t.takeException(), isNull);
-    await tapKey(t, 'count-next');
-
-    // 2번 칸: 우유 7(장부 8과 다름), 과자 없음.
-    await scan(t, 'count-loc-scan', 'C-S1-02-2-05');
-    await setQty(t, 'count-C-S1-02-2-05|E-00000001|LOT-M-1022', 7);
-    await tapKey(t, 'count-zero-C-S1-02-2-05|E-00000005|LOT-C-0901');
-    await tapKey(t, 'count-next');
-
-    expect(find.text('센 수량을 확인해 주세요'), findsOneWidget);
-    await tapKey(t, 'count-submit');
-    expect(
-      find.byKey(const ValueKey('count-result-recountRequired')),
-      findsOneWidget,
-    );
-    final s = await t.runAsync(() => count.session('M', 'CNT-mock-1'));
-    expect(s!.state, CountState.recountRequired);
-    expect(s.firstCounter, MockTaskRepository.workerId);
-
-    // 같은 사람에게는 재계수를 주지 않는다.
-    await tapKey(t, 'result-action');
-    expect(find.text('지금 할 작업이 없어요. 잠시 뒤 다시 받아 주세요'), findsOneWidget);
+    await tapKey(t, 'count-issue');
+    await tapKey(t, 'count-issue-locationBlocked');
+    expect(find.byKey(const ValueKey('count-reported')), findsOneWidget);
   });
 
   testWidgets('피패킹: 폰 화면에서 서버가 준 패킹 → 이어서 패킹, 피킹 시작 → 피킹 화면(넘침 없음)', (t) async {
@@ -239,7 +325,7 @@ void main() {
     await tapKey(t, 'run-task');
     await tapKey(t, 'continue-picking');
     expect(find.text('패킹'), findsOneWidget);
-    expect(find.byKey(const ValueKey('pack-minutes')), findsOneWidget);
+    expect(find.byKey(const ValueKey('pack-min-5')), findsOneWidget);
     expect(t.takeException(), isNull);
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
@@ -304,7 +390,15 @@ void main() {
     await scan(t, 'return-scan', 'C-S1-01-1-01'); // 포장 위치 확인 전
     expect(find.byKey(const ValueKey('return-scan-error')), findsOneWidget);
     await scan(t, 'return-scan', 'PAK-C-03');
+    await scan(t, 'return-scan', MockTaskRepository.yogurtBarcode);
+    await scan(t, 'return-scan', MockTaskRepository.yogurtBarcode);
+    expect(find.text('스캔해 센 수량 2'), findsOneWidget);
     await scan(t, 'return-scan', 'C-S1-01-1-01');
+    // 요거트는 냉장 — 차갑게 보관됐는지 답해야 복귀할 수 있다.
+    expect(enabled(t, 'return-submit'), isFalse);
+    await tapKey(t, 'return-cold');
+    await t.tap(find.text('예, 차가워요'));
+    await t.pumpAndSettle();
     expect(t.takeException(), isNull);
     await tapKey(t, 'return-submit');
 

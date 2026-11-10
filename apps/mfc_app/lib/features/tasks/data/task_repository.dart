@@ -217,15 +217,19 @@ Map<String, Object?> pickPayload({
   required TaskLineView line,
   required int pickedQty,
   ({int qty, ShortageReason reason, String? note})? shortage,
+
+  /// 실제로 집은 칸(스캔한 값)·LOT 조각. 없으면 줄의 첫 지시 사본.
+  String? fromLocation,
+  String? lotId,
 }) => {
   'workerId': workerId,
   'assignmentVersion': ?assignmentVersion,
-  'fromLocation': ?line.locationId,
+  'fromLocation': ?(fromLocation ?? line.locationId),
   'lines': [
     {
       'orderLineId': line.orderLineId,
       'sku': line.sku,
-      'lotId': ?line.lotId,
+      'lotId': ?(lotId ?? line.lotId),
       'pickedQty': pickedQty,
       if (shortage case final s?)
         'shortage': {

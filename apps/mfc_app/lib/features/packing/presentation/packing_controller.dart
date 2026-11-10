@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 
+import '../../../shared/product_hints.dart';
 import '../../../shared/providers.dart';
 import '../../tasks/data/task_repository.dart' show packPayload;
 import '../../tasks/domain/task_list.dart';
@@ -25,7 +26,8 @@ final shipmentProvider = FutureProvider.autoDispose
       (ref, id) => ref.watch(packingRepositoryProvider).shipment(id),
     );
 
-enum PackScan { matched, wrongItem, overExpected }
+/// otherZone = 지금 봉투와 다른 온도대 상품(WK-07 온도별 포장).
+enum PackScan { matched, wrongItem, overExpected, otherZone }
 
 @immutable
 class PackingState {
@@ -111,6 +113,25 @@ class PackingController extends Notifier<PackingState> {
   PackingRepository get _repo => ref.read(packingRepositoryProvider);
 
   /// 담을 수 있는 남은 수량 = 지시(피킹 확정) − 이미 밀봉 − 지금 봉투. 안내용이고 최종은 서버(CONTENT_MISMATCH).
+  /// 상품 보관 온도대(상품 정보). 모르면 null(BR-52 R19 2).
+  StorageZone? zoneOf(TaskLineView line) =>
+      ref.read(productHintsProvider).bySku(line.sku)?.zone;
+
+  /// 모든 줄의 온도대를 알면 봉투 온도대를 작업자가 고르지 않는다.
+  bool zonesKnown(TaskDetailView task) =>
+      task.lines.every((l) => zoneOf(l) != null);
+
+  /// 지금 봉투의 온도대(담은 상품으로 정해짐). 비었으면 null.
+  StorageZone? bagZone(TaskDetailView task) {
+    for (final l in task.lines) {
+      if (state.inBag(l.orderLineId) > 0) {
+        final z = zoneOf(l);
+        if (z != null) return z;
+      }
+    }
+    return null;
+  }
+
   int room(TaskLineView line, ShipmentView s) =>
       line.plannedQty -
       (s.packedByLine[line.orderLineId] ?? 0) -
@@ -123,8 +144,13 @@ class PackingController extends Notifier<PackingState> {
       result = PackScan.wrongItem;
     } else if (room(line, s) <= 0) {
       result = PackScan.overExpected;
+    } else if (zoneOf(line) case final z?
+        when bagZone(task) != null && bagZone(task) != z) {
+      result = PackScan.otherZone;
     } else {
+      final z = zoneOf(line);
       state = state.copyWith(
+        zone: z == null ? null : TemperatureZone.values.byName(z.name),
         bag: {
           ...state.bag,
           line.orderLineId: state.inBag(line.orderLineId) + 1,

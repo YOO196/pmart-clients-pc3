@@ -55,6 +55,12 @@ const _listBody = {
   'asOf': {'asOf': '2026-10-24T06:05:00Z', 'freshness': 'CURRENT'},
 };
 
+Future<void> scanTo(WidgetTester t, String id, String code) async {
+  await t.enterText(find.byKey(ValueKey(id)), code);
+  await t.testTextInput.receiveAction(TextInputAction.done);
+  await t.pumpAndSettle();
+}
+
 void main() {
   setUpAll(initPmartFormatting);
 
@@ -273,12 +279,78 @@ void main() {
       c
         ..listen(p, (_, _) {})
         ..listen(taskQueueProvider('task-mock-1'), (_, _) {});
-      return c.read(p.notifier);
+      final ctl = c.read(p.notifier);
+      ctl.scanCart('CRT-C-01');
+      return ctl;
     }
 
-    test('다른 상품·잔량 초과 스캔은 실적에 넣지 않는다', () async {
+    /// 지금 칸(요거트 C-S1-01-1-01)을 확인한 피킹.
+    Future<(PickingController, TaskDetailView)> atStop() async {
       final pick = await startedPicking();
       final task = await detail('task-mock-1');
+      expect(pick.scanLocation(task, 'C-S1-01-1-01'), PickLocScan.ok);
+      return (pick, task);
+    }
+
+    test('칸을 먼저 — 칸 확인 전 상품 스캔·다른 칸은 받지 않는다', () async {
+      final pick = await startedPicking();
+      final task = await detail('task-mock-1');
+      expect(
+        pick.scan(task, MockTaskRepository.yogurtBarcode),
+        ScanResult.needLocation,
+      );
+      expect(
+        pick.scanLocation(task, 'C-S1-02-2-05'),
+        PickLocScan.wrongPlace,
+        reason: '우유 칸 — 지금은 요거트 칸',
+      );
+      expect(pick.scanLocation(task, 'hello'), PickLocScan.notLocation);
+      expect(pick.scanLocation(task, 'C-S1-01-1-01'), PickLocScan.ok);
+    });
+
+    test('칸 몫을 다 담으면 바로 보낸다 — 실행 본문은 스캔한 칸·지시 LOT, 다음 칸으로', () async {
+      final (pick, task) = await atStop();
+      pick.scan(task, MockTaskRepository.yogurtBarcode);
+      await pick.submitIfFull(task);
+      await pick.sync();
+
+      final sent = repo.sentPayloads.single;
+      expect(sent['fromLocation'], 'C-S1-01-1-01');
+      expect((sent['lines']! as List).single['lotId'], 'LOT-Y-1024');
+
+      // 다음은 우유 — 배정 칸 C-S1-02-2-05 에서 1개, 같은 LOT 다른 칸 안내.
+      final next = nextPickStop(await detail('task-mock-1'))!;
+      expect(next.line.orderLineId, 'ol-2');
+      expect(next.location, 'C-S1-02-2-05');
+      expect(next.qty, 1);
+      expect(next.otherLocations, ['C-S2-04-1-10']);
+      expect(c.read(pickingProvider('task-mock-1')).at, isNull);
+    });
+
+    test('우유: 배정 칸 1개를 집으면 남은 1개는 같은 LOT 의 다른 칸으로 지시가 바뀐다', () async {
+      final pick = await startedPicking();
+      var task = await detail('task-mock-1');
+      pick.scanLocation(task, 'C-S1-01-1-01');
+      pick.scan(task, MockTaskRepository.yogurtBarcode);
+      await pick.submitIfFull(task);
+      await pick.sync();
+      task = await detail('task-mock-1');
+      pick.scanLocation(task, 'C-S1-02-2-05');
+      pick.scan(task, MockTaskRepository.milkBarcode);
+      expect(
+        pick.scan(task, MockTaskRepository.milkBarcode),
+        ScanResult.overRemaining,
+        reason: '이 칸 몫은 1개',
+      );
+      await pick.submitIfFull(task);
+      await pick.sync();
+      final next = nextPickStop(await detail('task-mock-1'))!;
+      expect(next.line.orderLineId, 'ol-2');
+      expect(next.location, 'C-S2-04-1-10');
+    });
+
+    test('다른 상품·잔량 초과 스캔은 실적에 넣지 않는다', () async {
+      final (pick, task) = await atStop();
 
       expect(
         pick.scan(task, MockTaskRepository.milkBarcode),
@@ -298,11 +370,10 @@ void main() {
 
     test('보낸 실적은 확정 대기 → 재고 반영 확정 뒤에만 완료 수량이 된다', () async {
       repo.confirmPolls = 2;
-      final pick = await startedPicking();
-      final task = await detail('task-mock-1');
+      final (pick, task) = await atStop();
       pick.scan(task, MockTaskRepository.yogurtBarcode);
 
-      await pick.submitLine(task, task.lines.first);
+      await pick.submitStop(task);
 
       var items = await c.read(fieldQueueProvider).items();
       expect(items.single.state, QueueItemState.awaitingConfirm);
@@ -321,10 +392,9 @@ void main() {
 
     test('오프라인 실적은 저장됐다가 연결되면 같은 키로 보낸다(앱을 다시 켜도 남는다)', () async {
       repo.offline = true;
-      final pick = await startedPicking();
-      final task = await detail('task-mock-1');
+      final (pick, task) = await atStop();
       pick.scan(task, MockTaskRepository.yogurtBarcode);
-      await pick.submitLine(task, task.lines.first);
+      await pick.submitStop(task);
 
       final saved = await FieldQueue(store, name: 'mfc').items();
       expect(saved.single.state, QueueItemState.queued);
@@ -341,10 +411,9 @@ void main() {
 
     test('실행 결과를 모르면 확인 중이고, 같은 키 재전송으로 한 번만 반영된다', () async {
       repo.loseNextExecutionResponse = true;
-      final pick = await startedPicking();
-      final task = await detail('task-mock-1');
+      final (pick, task) = await atStop();
       pick.scan(task, MockTaskRepository.yogurtBarcode);
-      await pick.submitLine(task, task.lines.first);
+      await pick.submitStop(task);
 
       expect(
         (await c.read(fieldQueueProvider).items()).single.state,
@@ -360,14 +429,13 @@ void main() {
     });
 
     test('재배정 뒤 옛 배정 버전의 실적은 거절된다', () async {
-      final pick = await startedPicking();
-      final task = await detail('task-mock-1');
+      final (pick, task) = await atStop();
       pick.scan(task, MockTaskRepository.yogurtBarcode);
       (repo.taskJson('task-mock-1')['assignment']!
               as Map)['assignmentVersion'] =
           3;
 
-      await pick.submitLine(task, task.lines.first);
+      await pick.submitStop(task);
 
       final item = (await c.read(fieldQueueProvider).items()).single;
       expect(item.state, QueueItemState.rejected);
@@ -378,9 +446,8 @@ void main() {
       final pick = await startedPicking();
       final task = await detail('task-mock-1');
 
-      await pick.submitLine(
+      await pick.submitStop(
         task,
-        task.lines.first,
         shortage: (qty: 1, reason: ShortageReason.short, note: null),
       );
       await pick.sync();
@@ -403,6 +470,10 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.text('피킹'), findsOneWidget);
+    await scanTo(t, 'cart-scan', 'CRT-C-01');
+    await scanTo(t, 'pick-loc-scan', 'C-S1-02-2-05');
+    expect(find.byKey(const ValueKey('pick-loc-error')), findsOneWidget);
+    await scanTo(t, 'pick-loc-scan', 'C-S1-01-1-01');
     await t.enterText(
       find.byKey(const ValueKey('scan-field')),
       MockTaskRepository.milkBarcode,
@@ -416,12 +487,10 @@ void main() {
       MockTaskRepository.yogurtBarcode,
     );
     await t.testTextInput.receiveAction(TextInputAction.done);
-    await t.pump();
-    expect(find.textContaining('이번 스캔 1'), findsOneWidget);
-
-    await t.tap(find.byKey(const ValueKey('line-done')));
+    // 칸 몫(1개)을 채우면 버튼 없이 바로 보낸다.
     await t.pumpAndSettle();
     expect(find.text('확정 대기'), findsOneWidget);
+    expect(find.text('C-S1-02-2-05'), findsOneWidget, reason: '다음 칸 지시');
 
     await t.tap(find.byKey(const ValueKey('sync')));
     await t.pumpAndSettle();
@@ -441,13 +510,13 @@ void main() {
     await openRoute(t, '/tasks/task-mock-1');
     await t.tap(find.byKey(const ValueKey('start')));
     await t.pumpAndSettle();
+    await scanTo(t, 'cart-scan', 'CRT-C-01');
+    await scanTo(t, 'pick-loc-scan', 'C-S1-01-1-01');
     await t.enterText(
       find.byKey(const ValueKey('scan-field')),
       MockTaskRepository.yogurtBarcode,
     );
     await t.testTextInput.receiveAction(TextInputAction.done);
-    await t.pump();
-    await t.tap(find.byKey(const ValueKey('line-done')));
     await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('do-not-redo')), findsOneWidget);

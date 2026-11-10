@@ -30,10 +30,10 @@ base class MockTaskRepository implements TaskRepository {
           'workerId': workerId,
           'startedAt': '2026-10-24T06:20:00Z',
         },
-        'lineCount': 2,
-        'plannedQty': 3,
-        'headline': {'productName': '그릭요거트 플레인 400g', 'otherLineCount': 1},
-        'remainingQty': 3,
+        'lineCount': 3,
+        'plannedQty': 4,
+        'headline': {'productName': '그릭요거트 플레인 400g', 'otherLineCount': 2},
+        'remainingQty': 4,
         'lines': [
           {
             'taskLineId': 'task-mock-2-l1',
@@ -57,6 +57,19 @@ base class MockTaskRepository implements TaskRepository {
             'completedQty': 0,
             'cancelledQty': 0,
             'remainingQty': 2,
+            'pendingQty': 0,
+          },
+          // 냉동 — 냉장과 같은 봉투에 담을 수 없다(온도별 포장).
+          {
+            'taskLineId': 'task-mock-2-l3',
+            'orderLineId': 'ol-4',
+            'sku': 'E-00000031',
+            'productName': '냉동 왕만두 1kg',
+            'barcode': dumplingBarcode,
+            'plannedQty': 1,
+            'completedQty': 0,
+            'cancelledQty': 0,
+            'remainingQty': 1,
             'pendingQty': 0,
           },
         ],
@@ -93,6 +106,7 @@ base class MockTaskRepository implements TaskRepository {
         'orderLineId': 'ol-91',
         'sku': 'E-00000002',
         'productName': '그릭요거트 플레인 400g',
+        'barcode': yogurtBarcode,
         'lotId': 'LOT-Y-1024',
         'plannedQty': 2,
         'completedQty': 0,
@@ -115,6 +129,7 @@ base class MockTaskRepository implements TaskRepository {
   static const milkBarcode = '8801115114154';
   static const yogurtBarcode = '8801115220015';
   static const chipsBarcode = '8801019606557';
+  static const dumplingBarcode = '8801007310014';
 
   final _tasks = <String, Map<String, Object?>>{};
   final _startsByKey = <String, Map<String, Object?>>{};
@@ -142,6 +157,9 @@ base class MockTaskRepository implements TaskRepository {
   int confirmPolls = 1;
 
   final sentExecutionKeys = <String>[];
+
+  /// 처음 보낸 실행 본문(같은 키 재전송은 한 번만).
+  final sentPayloads = <Map<String, Object?>>[];
 
   Future<void> _wait() => Future<void>.delayed(latency);
 
@@ -361,6 +379,7 @@ base class MockTaskRepository implements TaskRepository {
   @override
   Future<SendResult> sendExecution(QueueItem item) async {
     await _wait();
+    if (!sentExecutionKeys.contains(item.id)) sentPayloads.add(item.payload);
     sentExecutionKeys.add(item.id);
     if (offline) {
       return executionFailureToSend(
@@ -428,6 +447,7 @@ base class MockTaskRepository implements TaskRepository {
           ..['completedQty'] = (line['completedQty']! as int) + qty
           ..['remainingQty'] = (line['remainingQty']! as int) - qty - shortage;
         if (shortage > 0) t['state'] = 'BLOCKED';
+        _consumePick(line, l, payload['fromLocation'] as String?, qty);
       }
     }
     final allDone = lines.every(
@@ -437,6 +457,28 @@ base class MockTaskRepository implements TaskRepository {
       t['state'] = 'COMPLETED';
     }
     t['version'] = (t['version']! as int) + 1;
+  }
+
+  /// 반영된 집품만큼 LOT 조각·칸 잔량을 줄인다(다음 칸 지시가 바뀐다).
+  void _consumePick(
+    Map<String, Object?> line,
+    Map<String, Object?> exe,
+    String? from,
+    int qty,
+  ) {
+    if (qty <= 0) return;
+    final picks = (line['picks'] as List?)?.cast<Map<String, Object?>>();
+    final p = picks?.where((p) => p['lotId'] == exe['lotId']).firstOrNull;
+    if (p == null) return;
+    final left = (p['remainingQty'] as int? ?? 0) - qty;
+    p['remainingQty'] = left < 0 ? 0 : left;
+    if (left <= 0) p['pickStatus'] = 'DONE';
+    final locs = (p['locations'] as List?)?.cast<Map<String, Object?>>();
+    final c = locs?.where((c) => c['locationCode'] == from).firstOrNull;
+    if (c == null) return;
+    c['qty'] = (c['qty'] as int? ?? 0) - qty;
+    final a = (c['allocatedQty'] as int? ?? 0) - qty;
+    c['allocatedQty'] = a < 0 ? 0 : a;
   }
 
   @override

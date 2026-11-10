@@ -97,29 +97,34 @@ void main() {
     await t.tap(find.byKey(const ValueKey('start')));
     await t.pumpAndSettle();
 
-    // 첫 줄: 1번째 방문, 배정 칸.
+    Future<void> scanTo(String id, String code) async {
+      await t.enterText(find.byKey(ValueKey(id)), code);
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await t.pumpAndSettle();
+    }
+
+    // 장바구니 → 첫 칸: 1번째 방문, 배정 칸에서 1개.
+    await scanTo('cart-scan', 'CRT-C-01');
     expect(
       t.widget<Text>(find.byKey(const ValueKey('pick-location'))).data,
       'C-S1-01-1-01',
     );
     expect(find.textContaining('1번째'), findsOneWidget);
-    expect(find.text('C-S1-01-1-01 에서 1개'), findsOneWidget);
+    expect(find.text('이 칸에서 1개 · 담음 0'), findsOneWidget);
     expect(find.byKey(const ValueKey('pick-status-warning')), findsNothing);
 
-    // 요거트를 담고 줄을 끝내면 우유(2번째, 일부만 칸 정해짐).
-    await t.enterText(
-      find.byKey(const ValueKey('scan-field')),
-      MockTaskRepository.yogurtBarcode,
-    );
-    await t.testTextInput.receiveAction(TextInputAction.done);
-    await t.pump();
-    await t.tap(find.byKey(const ValueKey('line-done')));
-    await t.pumpAndSettle();
+    // 칸 → 요거트를 담으면 바로 보내고 우유(2번째, 일부만 칸 정해짐).
+    await scanTo('pick-loc-scan', 'C-S1-01-1-01');
+    await scanTo('scan-field', MockTaskRepository.yogurtBarcode);
 
     expect(find.textContaining('2번째'), findsOneWidget);
     expect(find.text('일부만 칸이 정해졌어요'), findsOneWidget);
     expect(find.text('1개는 칸을 못 정했어요 — 다른 칸 확인'), findsOneWidget);
-    expect(find.text('C-S1-02-2-05 에서 1개'), findsOneWidget);
-    expect(find.text('다른 칸 C-S2-04-1-10 (선반 3개)'), findsOneWidget);
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('pick-location'))).data,
+      'C-S1-02-2-05',
+    );
+    expect(find.text('이 칸에서 1개 · 담음 0'), findsOneWidget);
+    expect(find.text('같은 LOT 다른 칸: C-S2-04-1-10'), findsOneWidget);
   });
 }

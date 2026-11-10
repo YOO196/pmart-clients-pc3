@@ -17,10 +17,27 @@ class InboundTaskView {
     required this.completed,
     required this.version,
     this.parentTaskId,
+    this.productName,
+    this.barcode,
+    this.minRemainingDays,
+    this.maxDaysSinceManufacture,
+    this.zone,
+    this.suggestedLocations = const [],
   });
 
   final String taskId;
+
+  /// 적치 추천 칸 — 계약에 없다(BR-52 R19 4). 목만.
+  final List<String> suggestedLocations;
   final InboundTaskKind kind;
+
+  /// 상품명·바코드·판정 기준·보관 온도대 — 입고 작업 계약에 없다(BR-52 R18). 목만.
+  /// 기준은 상품 정보(product-service `minRemainingDays`·`maxDaysSinceManufacture`)의 값.
+  final String? productName;
+  final String? barcode;
+  final int? minRemainingDays;
+  final int? maxDaysSinceManufacture;
+  final TempZone? zone;
   final String receiptId;
   final String? parentTaskId;
   final String sku;
@@ -114,6 +131,7 @@ class ReturnInspectionLine {
     this.lotId,
     this.fresh = false,
     this.disposeReason,
+    this.evidenceRef,
   });
 
   final String sku;
@@ -125,6 +143,9 @@ class ReturnInspectionLine {
   final bool fresh;
   final bool opened;
   final DisposeReason? disposeReason;
+
+  /// 증빙 사진 참조(폐기 줄 필수 — 앱 규칙).
+  final String? evidenceRef;
 
   /// 화면 안내용 — 최종 판정은 서버.
   bool get resaleAllowed => zone == TempZone.ambient && !fresh && !opened;

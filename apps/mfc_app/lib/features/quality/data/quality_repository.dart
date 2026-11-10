@@ -207,6 +207,7 @@ final class ApiQualityRepository implements QualityRepository {
                           .values
                           .firstWhere((e) => e.value == r.wire),
                   },
+                  evidenceRef: l.evidenceRef,
                 ),
             ],
           ),

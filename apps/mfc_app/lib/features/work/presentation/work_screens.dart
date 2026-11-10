@@ -592,7 +592,6 @@ class _AssignedView extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final shown = task.lines.take(3).toList();
     return Column(
       key: ValueKey('assigned-${task.taskId}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -625,25 +624,31 @@ class _AssignedView extends StatelessWidget {
             style: TextStyle(color: theme.colorScheme.error),
           ),
         const SizedBox(height: 12),
-        for (final l in shown)
-          Card(
-            child: ListTile(
-              title: Text(l.productName ?? l.sku ?? '-'),
-              subtitle: Text(
-                [
-                  if (l.boxes case final b?) l10n.boxesUnit(b),
-                  if (l.qty case final q?) l10n.qtyUnit(q),
-                  ?l.fromLocation,
-                  if (l.toLocation case final t?) '→ $t',
-                  ?l.notice,
-                ].join(' · '),
-              ),
-            ),
+        // 받은 작업의 상품을 전부 보인다("외 N개" 없이).
+        Expanded(
+          child: ListView(
+            key: const ValueKey('assigned-lines'),
+            children: [
+              for (final l in task.lines)
+                Card(
+                  child: ListTile(
+                    title: Text(l.productName ?? l.sku ?? '-'),
+                    subtitle: Text(
+                      [
+                        if (l.boxes case final b?) l10n.boxesUnit(b),
+                        if (l.qty case final q?) l10n.qtyUnit(q),
+                        ?l.fromLocation,
+                        if (l.toLocation case final t?) '→ $t',
+                        ?l.notice,
+                      ].join(' · '),
+                    ),
+                  ),
+                ),
+            ],
           ),
-        if (task.lines.length > shown.length)
-          Text(l10n.moreLines(task.lines.length - shown.length)),
+        ),
         if (!task.detailAvailable) Text(l10n.detailUnavailable),
-        const Spacer(),
+        const SizedBox(height: 8),
         if (task.runnable)
           CommandButton(
             key: const ValueKey('run-task'),

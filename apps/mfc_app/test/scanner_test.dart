@@ -8,6 +8,7 @@ import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:mfc_app/app.dart';
+import 'package:mfc_app/l10n/gen/app_localizations.dart';
 import 'package:mfc_app/features/handover/data/mock_handover_repository.dart';
 import 'package:mfc_app/features/handover/domain/handover.dart';
 import 'package:mfc_app/features/handover/presentation/handover_controller.dart';
@@ -17,6 +18,7 @@ import 'package:mfc_app/features/tasks/data/mock_task_repository.dart';
 import 'package:mfc_app/features/tasks/presentation/task_controllers.dart';
 import 'package:mfc_app/router.dart';
 import 'package:mfc_app/shared/providers.dart';
+import 'package:mfc_app/shared/scanner/scan_input.dart';
 import 'package:mfc_app/shared/scanner/scanner.dart';
 
 import 'support.dart';
@@ -144,6 +146,14 @@ void main() {
     await openRoute(t, '/tasks/task-mock-1');
     await t.tap(find.byKey(const ValueKey('start')));
     await t.pumpAndSettle();
+    for (final (id, code) in [
+      ('cart-scan', 'CRT-C-01'),
+      ('pick-loc-scan', 'C-S1-01-1-01'),
+    ]) {
+      await t.enterText(find.byKey(ValueKey(id)), code);
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await t.pumpAndSettle();
+    }
 
     await t.tap(find.byKey(const ValueKey('scan-field-camera')));
     await t.pumpAndSettle();
@@ -151,11 +161,11 @@ void main() {
     expect(camera.continuous, isTrue);
     expect(camera.feedback.map((f) => f.ok), [false, true]);
     expect(camera.feedback.first.message, isNotNull);
-    // 맞는 상품이 담겨 실적 보내기가 열린다.
-    final done = t.widget<FilledButton>(
-      find.byKey(const ValueKey('line-done')),
+    // 맞는 상품이 담겨 칸 몫(1개)이 차면 바로 보낸다 — 다음 칸 지시.
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('pick-location'))).data,
+      'C-S1-02-2-05',
     );
-    expect(done.onPressed, isNotNull);
   });
 
   testWidgets('인계 확인: 포장 QR 카메라 스캔 → 그 포장 인계 상태, 옛 라벨 경고', (t) async {
@@ -195,5 +205,39 @@ void main() {
     expect(find.text('포장 인계 상태'), findsOneWidget);
     expect(find.text('놓인 위치: PAK-C-01'), findsOneWidget);
     expect(find.byKey(const ValueKey('stale-label')), findsNothing);
+  });
+
+  testWidgets('테스트 값 드롭다운은 목 모드에서만 — 고르면 실제 스캔과 같은 처리', (t) async {
+    final got = <String>[];
+    Widget app(PmartEnv env) => ProviderScope(
+      overrides: [envProvider.overrideWithValue(env)],
+      child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('ko'),
+        home: Scaffold(
+          body: ScanInput(
+            id: 'x',
+            label: 'scan',
+            cameraTitle: 'scan',
+            autofocus: false,
+            testValues: const [TestScan('다음', 'BOX-00000001')],
+            onScan: (c) {
+              got.add(c);
+              return const ScanFeedback.ok();
+            },
+          ),
+        ),
+      ),
+    );
+    await t.pumpWidget(app(PmartEnv.local));
+    expect(find.byKey(const ValueKey('x-test')), findsNothing);
+    await t.pumpWidget(app(PmartEnv.mock));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('x-test')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('x-test-BOX-00000001')));
+    await t.pumpAndSettle();
+    expect(got, ['BOX-00000001']);
   });
 }

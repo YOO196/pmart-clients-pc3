@@ -137,6 +137,8 @@ class QtyStepper extends StatelessWidget {
     required this.onChanged,
     this.max,
     this.enabled = true,
+    this.plusEnabled = true,
+    this.typeEnabled = true,
   });
 
   final String id;
@@ -144,6 +146,12 @@ class QtyStepper extends StatelessWidget {
   final int value;
   final int? max;
   final bool enabled;
+
+  /// ＋ 버튼. 스캔으로 세는 칸에서는 끈다(스캔이 +1).
+  final bool plusEnabled;
+
+  /// 숫자를 눌러 직접 넣기.
+  final bool typeEnabled;
   final ValueChanged<int> onChanged;
 
   void _set(int v) {
@@ -164,7 +172,7 @@ class QtyStepper extends StatelessWidget {
         ),
         InkWell(
           key: ValueKey('$id-value'),
-          onTap: enabled
+          onTap: enabled && typeEnabled
               ? () async {
                   final v = await showDialog<int>(
                     context: context,
@@ -184,7 +192,7 @@ class QtyStepper extends StatelessWidget {
         ),
         IconButton.filledTonal(
           key: ValueKey('$id-plus'),
-          onPressed: enabled && (max == null || value < max!)
+          onPressed: enabled && plusEnabled && (max == null || value < max!)
               ? () => _set(value + 1)
               : null,
           icon: const Icon(Icons.add),

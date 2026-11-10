@@ -21,81 +21,107 @@ import 'package:mfc_app/shared/providers.dart';
 void main() {
   setUpAll(initPmartFormatting);
 
-  group('입력 규칙', () {
+  group('판정 규칙', () {
     final today = DateTime(2026, 11, 10);
+    const yogurt = InspectCriteria(minRemainingDays: 5, zone: TempZone.chilled);
+    const tofu = InspectCriteria(
+      minRemainingDays: 3,
+      maxDaysSinceManufacture: 3,
+      zone: TempZone.chilled,
+    );
 
-    test('품질검사 줄: 정상은 LOT 표기 스캔 또는 표기 없음 확인', () {
+    test('기준 미달은 격리로 고정 — 기한 부족·제조일 초과·온도 이탈', () {
       expect(
-        inspectRowIssues(const InspectRow(qty: 1, expiry: '2026-11-30'), today),
+        forcedReason(
+          const InspectRow(expiry: '2026-11-12'),
+          yogurt,
+          today,
+          temperatureBad: false,
+        ),
+        QuarantineReason.expiry,
+      ); // 2일 남음 < 5
+      expect(
+        forcedReason(
+          const InspectRow(expiry: '2026-11-30'),
+          yogurt,
+          today,
+          temperatureBad: false,
+        ),
+        isNull,
+      );
+      expect(
+        forcedReason(
+          const InspectRow(expiry: '2026-11-20', manufacture: '2026-11-05'),
+          tofu,
+          today,
+          temperatureBad: false,
+        ),
+        QuarantineReason.manufacture,
+      ); // 제조 5일 > 3
+      expect(
+        forcedReason(
+          const InspectRow(expiry: '2026-11-30'),
+          yogurt,
+          today,
+          temperatureBad: true,
+        ),
+        QuarantineReason.temperature,
+      );
+    });
+
+    test('판정 기본값 없음, 격리는 사유·사진, 정상은 LOT 표기, 기준이 요구하면 제조일', () {
+      expect(
+        inspectRowIssues(
+          const InspectRow(qty: 1, expiry: '2026-11-30'),
+          yogurt,
+          today,
+        ),
+        {InspectIssue.needVerdict},
+      );
+      expect(
+        inspectRowIssues(
+          const InspectRow(qty: 1, expiry: '2026-11-30', quarantined: true),
+          yogurt,
+          today,
+        ),
+        {InspectIssue.needReason, InspectIssue.needEvidence},
+      );
+      expect(
+        inspectRowIssues(
+          const InspectRow(qty: 1, expiry: '2026-11-30', quarantined: false),
+          yogurt,
+          today,
+        ),
         {InspectIssue.needLot},
       );
       expect(
         inspectRowIssues(
-          const InspectRow(qty: 1, noLot: true, expiry: '2026-11-30'),
+          const InspectRow(
+            qty: 1,
+            expiry: '2026-11-30',
+            quarantined: false,
+            noLot: true,
+          ),
+          tofu,
           today,
         ),
-        isEmpty,
+        {InspectIssue.needManufacture},
       );
     });
 
-    test('품질검사 줄: 수량·정상 소비기한·날짜 형식·제조일', () {
+    test('반품: 온도대·신선은 상품 정보, 판정은 자동, 폐기는 사진', () {
+      const ambient = ReturnDecision(zone: TempZone.ambient, fresh: false);
+      expect(ambient.verdict, ReturnVerdict.resale);
+      expect(ambient.complete, isTrue);
       expect(
-        inspectRowIssues(const InspectRow(qty: 0), today),
-        containsAll([InspectIssue.zeroQty, InspectIssue.needExpiry]),
+        ambient.copyWith(opened: true).disposeReason,
+        DisposeReason.opened,
       );
-      expect(
-        inspectRowIssues(const InspectRow(qty: 2, quarantined: true), today),
-        isEmpty,
-      ); // 격리는 소비기한 없이도
-      expect(
-        inspectRowIssues(
-          const InspectRow(qty: 1, lotRef: 'A1', expiry: '2026/11/30'),
-          today,
-        ),
-        {InspectIssue.badDate},
-      );
-      expect(
-        inspectRowIssues(
-          const InspectRow(
-            qty: 1,
-            lotRef: 'A1',
-            expiry: '2026-11-30',
-            manufacture: '2026-11-11',
-          ),
-          today,
-        ),
-        {InspectIssue.badManufacture},
-      ); // 오늘 이후 제조일
-      expect(
-        inspectRowIssues(
-          const InspectRow(
-            qty: 1,
-            lotRef: 'A1',
-            expiry: '2026-11-30',
-            manufacture: '2026-11-01',
-          ),
-          today,
-        ),
-        isEmpty,
-      );
-    });
-
-    test('반품 판정: 재판매는 상온·신선 아님·미개봉, 조건이 바뀌면 폐기로 돌리고 사유를 채운다', () {
-      var d = const ReturnDecision(zone: TempZone.ambient);
-      expect(d.resaleAllowed, isTrue);
-      d = d.copyWith(verdict: () => ReturnVerdict.resale);
-      expect(d.complete, isTrue);
-      d = d.copyWith(opened: true);
-      expect(d.verdict, ReturnVerdict.dispose);
-      expect(d.disposeReason, DisposeReason.opened);
-      expect(
-        const ReturnDecision(zone: TempZone.frozen).suggestedReason,
-        DisposeReason.temperatureZone,
-      );
-      expect(
-        const ReturnDecision(verdict: ReturnVerdict.dispose).complete,
-        isFalse,
-      ); // 온도대를 골라야
+      const chilled = ReturnDecision(zone: TempZone.chilled, fresh: false);
+      expect(chilled.disposeReason, DisposeReason.temperatureZone);
+      expect(chilled.complete, isFalse); // 사진 필요
+      expect(chilled.copyWith(evidence: () => 'EVD-1').complete, isTrue);
+      expect(const ReturnDecision().complete, isFalse); // 상품 정보 없음
     });
   });
 
@@ -147,19 +173,30 @@ void main() {
     await t.pumpAndSettle();
   }
 
-  Future<void> type(WidgetTester t, String key, String text) async {
-    await t.ensureVisible(find.byKey(ValueKey(key)));
-    await t.enterText(find.byKey(ValueKey(key)), text);
-    await t.pump();
+  Future<void> testScan(WidgetTester t, String id, String value) async {
+    await tapKey(t, '$id-test');
+    await t.tap(find.byKey(ValueKey('$id-test-$value')));
+    await t.pumpAndSettle();
   }
 
-  Future<void> openInspection(WidgetTester t) async {
-    await pumpApp(t);
-    await tapKey(t, 'area-inspection');
-    await tapKey(t, 'guide-ok');
+  Future<void> pickDay(WidgetTester t, String key, String day) async {
+    await tapKey(t, key);
+    await t.tap(find.text(day));
+    await t.tap(find.text('확인'));
+    await t.pumpAndSettle();
   }
 
-  bool submitEnabled(WidgetTester t, String key) =>
+  Future<void> verdict(WidgetTester t, int i, String label) async {
+    final f = find.descendant(
+      of: find.byKey(ValueKey('verdict-$i')),
+      matching: find.text(label),
+    );
+    await t.ensureVisible(f);
+    await t.tap(f);
+    await t.pumpAndSettle();
+  }
+
+  bool enabled(WidgetTester t, String key) =>
       t
           .widget<FilledButton>(
             find.descendant(
@@ -170,135 +207,115 @@ void main() {
           .onPressed !=
       null;
 
+  Future<void> open(WidgetTester t, String taskId) async {
+    await pumpApp(t);
+    await tapKey(t, 'area-inspection');
+    await tapKey(t, 'guide-ok');
+    expect(find.byKey(ValueKey('assigned-$taskId')), findsOneWidget);
+    await tapKey(t, 'run-task');
+  }
+
   testWidgets(
-    '품질검사: 서버가 준 입고 검사 → 정상 10(소비기한) + 격리 2 → 등록 → 적치 작업 생성 → 다음은 반품 검사',
+    '입고 품질검사: 위치 스캔 → 상품 대조 → 기준 표시 → 정상 10(LOT) + 기한 부족 2(자동 격리·사진) → 등록 → 다음 검사',
     (t) async {
-      await openInspection(t);
-      expect(
-        find.byKey(const ValueKey('assigned-TSK-INS-mock-1')),
-        findsOneWidget,
-      );
-      await tapKey(t, 'run-task');
+      await open(t, 'TSK-INS-mock-1');
 
-      // 기본은 정상 한 줄 = 잔량 12. 소비기한이 없으면 등록할 수 없다.
-      expect(find.text('합계 12 / 검사할 수량 12'), findsOneWidget);
-      expect(submitEnabled(t, 'inspect-submit'), isFalse);
-      expect(find.text('정상 판정은 소비기한을 넣어 주세요'), findsOneWidget);
+      // 1단계 위치: 틀린 위치는 거절.
+      await testScan(t, 'inspect-loc-scan', 'RCV-C-09');
+      expect(find.byKey(const ValueKey('inspect-scan-error')), findsOneWidget);
+      await testScan(t, 'inspect-loc-scan', 'RCV-C-01');
 
-      await type(t, 'qty-0', '10');
-      // 포장의 LOT 표기를 스캔(입력칸 = 하드웨어 스캐너 입력).
-      expect(find.text("LOT 표기를 스캔하거나 '표기 없음'을 눌러 주세요"), findsOneWidget);
-      await type(t, 'lot-scan-0', 'L2611A');
-      await t.testTextInput.receiveAction(TextInputAction.done);
+      // 2단계 상품: 다른 상품은 거절.
+      await testScan(t, 'inspect-product-scan', '8801115114154');
+      expect(find.text('지시한 상품이 아니에요'), findsWidgets);
+      await testScan(t, 'inspect-product-scan', '8801115220015');
+
+      // 3단계 판정: 기준이 보이고, 판정 기본값이 없다.
+      expect(find.text('소비기한 5일 이상 남아야 정상'), findsOneWidget);
+      expect(enabled(t, 'inspect-submit'), isFalse);
+      await t.tap(find.text('온도 정상'));
       await t.pumpAndSettle();
-      expect(find.byKey(const ValueKey('lot-value-0')), findsOneWidget);
-      expect(find.text('LOT 표기 L2611A'), findsOneWidget);
-      // 소비기한은 달력에서 고른다(오늘 2026-11-10 → 30일).
-      await tapKey(t, 'exp-0');
-      expect(find.byType(DatePickerDialog), findsOneWidget);
-      await t.tap(find.text('30'));
-      await t.tap(find.text('확인'));
-      await t.pumpAndSettle();
-      expect(find.text('2026-11-30'), findsOneWidget);
-      // 제조일 달력은 오늘 이후를 고를 수 없다.
-      await tapKey(t, 'mfg-0');
-      expect(
-        t.widget<DatePickerDialog>(find.byType(DatePickerDialog)).lastDate,
-        DateTime(2026, 11, 10),
-      );
-      await t.tap(find.text('1'));
-      await t.tap(find.text('확인'));
-      await t.pumpAndSettle();
-      expect(find.text('2026-11-01'), findsOneWidget);
-      await tapKey(t, 'inspect-add-row');
-      // 새 줄은 남은 2개, 격리로.
-      await t.tap(
-        find.descendant(
-          of: find.byKey(const ValueKey('verdict-1')),
-          matching: find.text('격리'),
-        ),
-      );
-      await t.pumpAndSettle();
-      expect(find.text('합계 12 / 검사할 수량 12'), findsOneWidget);
+
+      await t.enterText(find.byKey(const ValueKey('qty-0')), '10');
+      await t.pump();
+      await pickDay(t, 'exp-0', '30');
+      await verdict(t, 0, '정상');
+      await testScan(t, 'lot-scan-0', 'L2611A');
+
+      await tapKey(t, 'inspect-add-row'); // 남은 2개
+      await pickDay(t, 'exp-1', '12'); // 2일 남음 → 기한 부족, 격리 고정
+      expect(find.byKey(const ValueKey('forced-1')), findsOneWidget);
+      expect(enabled(t, 'inspect-submit'), isFalse); // 사진 필요
+      await tapKey(t, 'evidence-1');
       expect(t.takeException(), isNull);
-      expect(submitEnabled(t, 'inspect-submit'), isTrue);
+      expect(enabled(t, 'inspect-submit'), isTrue);
 
       await tapKey(t, 'inspect-submit');
       expect(find.byKey(const ValueKey('inspect-applied')), findsOneWidget);
-      expect(find.textContaining('적치 작업 1개'), findsOneWidget);
       expect(quality.task('TSK-INS-mock-1')!.completed, isTrue);
 
-      await tapKey(t, 'quality-message-action'); // 다음 작업
-      expect(find.byKey(const ValueKey('assigned-RRC-mock-1')), findsOneWidget);
+      await tapKey(t, 'result-action'); // 다음 작업
+      expect(
+        find.byKey(const ValueKey('assigned-TSK-INS-mock-2')),
+        findsOneWidget,
+      );
     },
   );
 
-  testWidgets('반품 검사: 상온 미개봉은 재판매, 냉장은 재판매 불가 → 폐기(사유 자동) → 등록 → 반영', (
-    t,
-  ) async {
-    // 입고 검사 작업을 먼저 끝낸 상태로.
+  testWidgets('두부: 제조일 필수, 온도 이탈이면 전부 격리(사진) — 응답을 잃어도 같은 키로 한 번', (t) async {
     await t.runAsync(
       () => quality.inspect('TSK-INS-mock-1', const [
         InspectionResult(qty: 12, quarantined: true),
       ], key: IdempotencyKey('pre')),
     );
-    await openInspection(t);
-    expect(find.byKey(const ValueKey('assigned-RRC-mock-1')), findsOneWidget);
-    await tapKey(t, 'run-task');
+    quality.loseNextResponse = true;
+    await open(t, 'TSK-INS-mock-2');
+    await testScan(t, 'inspect-loc-scan', 'RCV-C-02');
+    await testScan(t, 'inspect-product-scan', '8801007001101');
+    expect(find.text('제조 3일 이내만 정상 — 제조일 필수'), findsOneWidget);
 
-    expect(find.text('감자칩 오리지널 110g'), findsOneWidget);
-    expect(submitEnabled(t, 'return-submit'), isFalse);
+    await t.tap(find.text('온도 이탈'));
+    await t.pumpAndSettle();
+    await pickDay(t, 'exp-0', '20');
+    expect(find.text('이 상품은 제조일이 필요해요'), findsOneWidget);
+    await pickDay(t, 'mfg-0', '9');
+    expect(find.byKey(const ValueKey('forced-0')), findsOneWidget); // 온도 이탈
+    await tapKey(t, 'evidence-0');
+    await tapKey(t, 'inspect-submit');
+    expect(find.byKey(const ValueKey('inspect-unknown')), findsOneWidget);
+    await tapKey(t, 'inspect-submit'); // 다시 확인
+    expect(find.byKey(const ValueKey('inspect-applied')), findsOneWidget);
+    expect(quality.inspectCalls, 3); // pre 1 + 2
+    expect(quality.task('TSK-INS-mock-2')!.doneQty, 16);
+  });
 
-    await tapKey(t, 'zone-0-ambient');
-    await tapKey(t, 'resale-0');
+  testWidgets('반품 검사: 상품 정보로 자동 판정 — 상온은 재판매, 냉장은 폐기(사진 필수)', (t) async {
+    await t.runAsync(() async {
+      for (final (id, qty) in [
+        ('TSK-INS-mock-1', 12),
+        ('TSK-INS-mock-2', 16),
+      ]) {
+        await quality.inspect(id, [
+          InspectionResult(qty: qty, quarantined: true),
+        ], key: IdempotencyKey('pre-$id'));
+      }
+    });
+    await open(t, 'RRC-mock-1');
 
-    await tapKey(t, 'zone-1-chilled');
-    expect(
-      t
-          .widget<OutlinedButton>(find.byKey(const ValueKey('resale-1')))
-          .onPressed,
-      isNull,
-    );
-    await tapKey(t, 'dispose-1');
-    expect(
-      t
-          .widget<ChoiceChip>(
-            find.byKey(const ValueKey('reason-1-temperatureZone')),
-          )
-          .selected,
-      isTrue,
-    );
+    expect(find.text('상품 정보: 상온 · 신선 아님'), findsOneWidget);
+    expect(find.text('상품 정보: 냉장 · 신선 아님'), findsOneWidget);
+    expect(find.text('재판매'), findsOneWidget);
+    expect(find.text('폐기 — 냉장·냉동'), findsOneWidget);
+    expect(enabled(t, 'return-submit'), isFalse); // 폐기 사진 필요
+
+    await tapKey(t, 'evidence-1');
     expect(t.takeException(), isNull);
-
     await tapKey(t, 'return-submit');
     expect(find.byKey(const ValueKey('return-applied')), findsOneWidget);
     final sent = quality.inspectedReturns['RRC-mock-1']!;
     expect(sent[0].verdict, ReturnVerdict.resale);
     expect(sent[1].verdict, ReturnVerdict.dispose);
     expect(sent[1].disposeReason, DisposeReason.temperatureZone);
-
-    await tapKey(t, 'quality-message-action');
-    expect(find.text('지금 할 작업이 없어요. 잠시 뒤 다시 받아 주세요'), findsOneWidget);
-  });
-
-  testWidgets('검사 응답을 잃으면 확인 중 — 다시 확인은 같은 키(한 번만 반영)', (t) async {
-    quality.loseNextResponse = true;
-    await openInspection(t);
-    await tapKey(t, 'run-task');
-    await t.tap(
-      find.descendant(
-        of: find.byKey(const ValueKey('verdict-0')),
-        matching: find.text('격리'),
-      ),
-    );
-    await t.pumpAndSettle();
-    await tapKey(t, 'inspect-submit');
-    expect(find.byKey(const ValueKey('inspect-unknown')), findsOneWidget);
-    expect(find.byKey(const ValueKey('inspect-applied')), findsNothing);
-
-    await tapKey(t, 'inspect-submit'); // 다시 확인
-    expect(find.byKey(const ValueKey('inspect-applied')), findsOneWidget);
-    expect(quality.inspectCalls, 2);
-    expect(quality.task('TSK-INS-mock-1')!.doneQty, 12);
+    expect(sent[1].evidenceRef, isNotNull);
   });
 }

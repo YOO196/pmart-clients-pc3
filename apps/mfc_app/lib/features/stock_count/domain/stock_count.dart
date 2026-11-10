@@ -82,6 +82,26 @@ class CountSessionView {
   };
 }
 
+/// 칸에서 찾은 계수표 밖 상품(잘못 놓인 재고). 보낼 곳이 계약에 없다(BR-52 R19 6) — 목만 받는다.
+@immutable
+class ExtraFind {
+  const ExtraFind({
+    required this.locationCode,
+    required this.barcode,
+    required this.qty,
+    this.sku,
+    this.productName,
+  });
+
+  final String locationCode;
+  final String barcode;
+  final String? sku;
+  final String? productName;
+  final int qty;
+
+  String get key => '$locationCode|$barcode';
+}
+
 /// 센 수량 한 줄. 계수표에 있는데 안 보내면 0 으로 센 것.
 @immutable
 class CountedLine {

@@ -17,9 +17,22 @@ import 'package:mfc_app/features/packing/presentation/packing_controller.dart';
 import 'package:mfc_app/features/tasks/data/mock_task_repository.dart';
 import 'package:mfc_app/features/tasks/domain/task_list.dart';
 import 'package:mfc_app/features/tasks/presentation/task_controllers.dart';
+import 'package:mfc_app/shared/product_hints.dart';
 import 'package:mfc_app/shared/providers.dart';
 
 import 'support.dart';
+
+Future<void> closeLabel(WidgetTester t) async {
+  await t.tap(
+    find
+        .descendant(
+          of: find.byKey(const ValueKey('label-preview')),
+          matching: find.byType(TextButton),
+        )
+        .last,
+  );
+  await t.pumpAndSettle();
+}
 
 void main() {
   setUpAll(initPmartFormatting);
@@ -73,6 +86,38 @@ void main() {
       expect(c.read(packingProvider('task-mock-2')).inBag('ol-1'), 1);
     });
 
+    test('봉투 온도대는 담은 상품으로 정해지고, 다른 온도대는 같은 봉투에 담지 않는다', () async {
+      final s = await shipment();
+      expect(ctl.zonesKnown(task), isTrue);
+      expect(ctl.bagZone(task), isNull);
+      ctl.scan(task, s, MockTaskRepository.yogurtBarcode);
+      expect(ctl.bagZone(task), StorageZone.chilled);
+      expect(
+        c.read(packingProvider('task-mock-2')).zone,
+        TemperatureZone.chilled,
+      );
+      expect(
+        ctl.scan(task, s, MockTaskRepository.dumplingBarcode),
+        PackScan.otherZone,
+      );
+      expect(c.read(packingProvider('task-mock-2')).inBag('ol-4'), 0);
+
+      await ctl.seal(task, s);
+      expect(
+        ctl.scan(task, await shipment(), MockTaskRepository.dumplingBarcode),
+        PackScan.matched,
+      );
+      expect(
+        c.read(packingProvider('task-mock-2')).zone,
+        TemperatureZone.frozen,
+      );
+      await ctl.seal(task, await shipment());
+      final zones = [
+        for (final p in (await shipment()).packages) p.temperatureZone,
+      ];
+      expect(zones, ['CHILLED', 'FROZEN']);
+    });
+
     test('밀봉하면 QR 포장이 생기고, 모든 수량이 밀봉돼야 출하 준비가 된다', () async {
       var s = await shipment();
       ctl
@@ -86,9 +131,14 @@ void main() {
 
       ctl.scan(task, s, MockTaskRepository.milkBarcode);
       await ctl.seal(task, s);
+      s = await shipment();
+      expect(s.state, ShipmentState.preparing, reason: '냉동이 아직');
+
+      ctl.scan(task, s, MockTaskRepository.dumplingBarcode);
+      await ctl.seal(task, s);
 
       s = await shipment();
-      expect(s.packages, hasLength(2));
+      expect(s.packages, hasLength(3));
       expect(s.state, ShipmentState.ready);
     });
 
@@ -158,6 +208,8 @@ void main() {
         ..scan(task, s, MockTaskRepository.milkBarcode)
         ..scan(task, s, MockTaskRepository.milkBarcode);
       await ctl.seal(task, s);
+      ctl.scan(task, await shipment(), MockTaskRepository.dumplingBarcode);
+      await ctl.seal(task, await shipment());
       s = await shipment();
       await ctl.finish(task, s);
 
@@ -323,10 +375,12 @@ void main() {
           .onPressed,
       isNull,
     );
-    await t.enterText(find.byKey(const ValueKey('pack-minutes')), '0');
-    await t.pump();
-    expect(find.text('1~180분으로 넣어 주세요'), findsOneWidget);
-    await t.enterText(find.byKey(const ValueKey('pack-minutes')), '8');
+    expect(
+      find.byKey(const ValueKey('pack-minutes')),
+      findsNothing,
+      reason: 'PDA 는 키보드 입력 대신 버튼',
+    );
+    await t.tap(find.byKey(const ValueKey('pack-min-10')));
     await t.pump();
     await t.tap(find.byKey(const ValueKey('request-dispatch')));
     await t.pumpAndSettle();
@@ -339,13 +393,31 @@ void main() {
       await t.pump();
     }
 
+    expect(
+      find.byKey(const ValueKey('zone-select')),
+      findsNothing,
+      reason: '온도대는 상품 정보로 — 작업자가 고르지 않는다',
+    );
+    expect(find.text('봉투 온도대는 처음 담는 상품으로 정해져요'), findsOneWidget);
     await scan(MockTaskRepository.yogurtBarcode);
+    expect(find.text('지금 봉투: 냉장'), findsOneWidget);
+    await scan(MockTaskRepository.dumplingBarcode);
+    expect(find.byKey(const ValueKey('pack-scan-error')), findsOneWidget);
     await scan(MockTaskRepository.milkBarcode);
     await scan(MockTaskRepository.milkBarcode);
     await t.tap(find.byKey(const ValueKey('seal')));
     await t.pumpAndSettle();
+    // 밀봉하면 라벨이 바로 나온다(프린터 없음 = 미리보기).
+    expect(find.byKey(const ValueKey('label-preview')), findsOneWidget);
+    await closeLabel(t);
 
-    expect(find.textContaining('PKG:pkg-'), findsOneWidget);
+    await scan(MockTaskRepository.dumplingBarcode);
+    expect(find.text('지금 봉투: 냉동'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('seal')));
+    await t.pumpAndSettle();
+    await closeLabel(t);
+
+    expect(find.textContaining('PKG:pkg-'), findsNWidgets(2));
     expect(find.text('모든 상품을 담았어요(출하 준비)'), findsOneWidget);
 
     await t.tap(find.byKey(const ValueKey('finish-packing')));
@@ -374,22 +446,28 @@ void main() {
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('dispatch-missing')), findsNothing);
 
-    for (final code in [
-      MockTaskRepository.yogurtBarcode,
-      MockTaskRepository.milkBarcode,
-      MockTaskRepository.milkBarcode,
+    for (final bag in [
+      [
+        MockTaskRepository.yogurtBarcode,
+        MockTaskRepository.milkBarcode,
+        MockTaskRepository.milkBarcode,
+      ],
+      [MockTaskRepository.dumplingBarcode],
     ]) {
-      await t.enterText(find.byKey(const ValueKey('pack-scan')), code);
-      await t.testTextInput.receiveAction(TextInputAction.done);
-      await t.pump();
+      for (final code in bag) {
+        await t.enterText(find.byKey(const ValueKey('pack-scan')), code);
+        await t.testTextInput.receiveAction(TextInputAction.done);
+        await t.pump();
+      }
+      await t.tap(find.byKey(const ValueKey('seal')));
+      await t.pumpAndSettle();
+      await closeLabel(t);
     }
-    await t.tap(find.byKey(const ValueKey('seal')));
-    await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('dispatch-missing')), findsOneWidget);
     expect(find.byKey(const ValueKey('dispatch-requested')), findsNothing);
 
-    await t.enterText(find.byKey(const ValueKey('pack-minutes')), '5');
+    await t.tap(find.byKey(const ValueKey('pack-min-5')));
     await t.pump();
     await t.tap(find.byKey(const ValueKey('request-dispatch')));
     await t.pumpAndSettle();

@@ -22,16 +22,30 @@ final class MockStockCountRepository implements StockCountRepository {
           locationCode: loc,
           sku: 'E-00000001',
           lotId: 'LOT-M-1022',
+          expiryDate: '2026-11-12',
         ),
+        // 같은 우유의 다른 LOT(소비기한이 다름) — 작업자가 소비기한으로 나눠 센다.
+        if (loc.startsWith('C-'))
+          CountSheetLine(
+            locationCode: loc,
+            sku: 'E-00000001',
+            lotId: 'LOT-M-1029',
+            expiryDate: '2026-11-16',
+          ),
         CountSheetLine(
           locationCode: loc,
           sku: 'E-00000005',
           lotId: 'LOT-C-0901',
+          expiryDate: '2027-03-01',
         ),
       ],
     ];
     for (final l in sheet) {
-      _book[l.key] = l.sku == 'E-00000001' ? 8 : 12;
+      _book[l.key] = l.lotId == 'LOT-M-1029'
+          ? 3
+          : l.sku == 'E-00000001'
+          ? 8
+          : 12;
     }
     final s = CountSessionView(
       sessionId: 'CNT-mock-${++_seq}',
@@ -96,6 +110,9 @@ final class MockStockCountRepository implements StockCountRepository {
     return _keys[key.value] = FieldDone(s);
   }
 
+  /// 마지막 제출의 계수표 밖 상품(목만 받는다).
+  List<ExtraFind> lastExtras = const [];
+
   @override
   Future<CountSessionView> session(String mfcId, String sessionId) async {
     await _wait();
@@ -108,9 +125,11 @@ final class MockStockCountRepository implements StockCountRepository {
     String sessionId,
     List<CountedLine> lines, {
     required IdempotencyKey key,
+    List<ExtraFind> extras = const [],
   }) async {
     await _wait();
     if (_keys[key.value] case final o?) return o;
+    lastExtras = extras;
     final s = _sessions[sessionId]!;
     if (s.state == CountState.recountRequired && s.firstCounter == counter) {
       return const FieldRejected(CountProblemCode.sameCounter);

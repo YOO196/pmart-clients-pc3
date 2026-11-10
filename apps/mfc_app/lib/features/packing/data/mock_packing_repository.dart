@@ -5,7 +5,7 @@ import 'package:pmart_core/pmart_core.dart';
 import '../domain/packing.dart';
 import 'packing_repository.dart';
 
-/// 목 구현. 출하 shp-2(task-mock-2 패킹): 그릭요거트 1 + 서울우유 2 를 담는다.
+/// 목 구현. 출하 shp-2(task-mock-2 패킹): 그릭요거트 1 + 서울우유 2(냉장) + 냉동 왕만두 1(냉동)을 담는다.
 /// 모든 수량이 밀봉되면 출하가 READY 가 된다. 담을 수량을 넘으면 CONTENT_MISMATCH.
 /// 배차는 직원 요청만 쓴다(2026-11-10 사용자 결정) — READY 가 돼도 자동 요청을 만들지 않는다.
 base class MockPackingRepository implements PackingRepository {
@@ -18,7 +18,7 @@ base class MockPackingRepository implements PackingRepository {
   final DateTime Function() _now;
 
   /// 출하 shp-2 가 담아야 할 수량(피킹 확정분).
-  static const expected = {'ol-1': 1, 'ol-2': 2};
+  static const expected = {'ol-1': 1, 'ol-2': 2, 'ol-4': 1};
 
   final _shipment = <String, Object?>{
     'shipmentId': 'shp-2',

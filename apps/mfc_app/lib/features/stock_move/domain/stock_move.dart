@@ -90,6 +90,8 @@ class ReturnedLine {
     this.lotId,
     this.conditionNote,
     this.productName,
+    this.zone,
+    this.fresh,
   });
 
   final String sku;
@@ -100,6 +102,11 @@ class ReturnedLine {
 
   /// 표시용 — 계약에 없다(목만).
   final String? productName;
+
+  /// 보관 온도대(AMBIENT·CHILLED·FROZEN)·신선 여부 — 상품 정보 값. 반입 조회에 없다(BR-52 R12). 목만.
+  /// 작업자가 고르지 않는다.
+  final String? zone;
+  final bool? fresh;
 }
 
 @immutable

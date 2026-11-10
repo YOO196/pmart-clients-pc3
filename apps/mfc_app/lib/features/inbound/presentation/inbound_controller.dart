@@ -293,6 +293,9 @@ class InboundFlowController extends Notifier<InboundState> {
     }
   }
 
+  /// 화면의 테스트 일괄 동작이 현재 상태를 읽는다.
+  InboundState get current => state;
+
   // ───── 박스 검수 ─────
 
   /// 박스 바코드(박스 번호). 이 송장 박스면 확인.

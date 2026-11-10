@@ -58,7 +58,7 @@
 | BR-48 | 중간 | 백오피스 | 카테고리 추가(`/category-tree-additions`·`-uploads`)에 이미 있는 카테고리만 올리면 계약의 422 `NOTHING_TO_ADD` 대신 500 `INTERNAL_ERROR` | **RESOLVED**(2026-11-04 회신 `../pmart-backend/docs/handoff/2026-11-04-clients-reply-br44-br48.md`): 원인은 큰 zip 업로드 메모리 부족(OOM), 스트림으로 수정. 이미 있는 카테고리만이면 422 `NOTHING_TO_ADD`. 클라이언트 변경 없음 |
 | BR-49 | 중간 | 고객 | 홈·탭·섹션 진열(`storefront`)이 `mfcId` 를 줘도 미취급을 거르지 않음(`carried` 늘 null, 없는 센터도 10건) — 검색처럼 빼 달라, 빈 섹션 규칙, 숨김 정책 확인 | OPEN(요청 `docs/handoff/2026-11-05-backend-storefront-not-carried.md`). 고객앱은 서버 항목 그대로 |
 | BR-51 | 높음 | MFC | 배차 자동 요청(AUTO_ON_READY) 제거 — 사용자 결정(2026-11-10): 배차는 무조건 점원 요청. 계약 0.4.5 D-5 는 READY 시 자동 요청 | OPEN(요청 `docs/handoff/2026-11-10-backend-dispatch-manual-only.md`). PDA 는 직원 요청만, 서버가 AUTO_ON_READY 를 보내면 숨기지 않고 관리자 알림 문구 |
-| BR-52 | 높음 | MFC | PDA 업무 선택(입고/품질검사/재고 이동/재고 실사/피패킹) 기반 배정 — 다음 작업 받기에 고른 업무 필터, 입고·품질검사·적치 배정 포함, 회수품 반입·회수품 검사·실사 작업 유형 추가, 작업자 본인 조회 허용, 메뉴 권한 기준, 작업 가능 신호, 품질검사 LOT 은 시스템 배정(R15) | OPEN(요청 `docs/handoff/2026-11-10-backend-pda-work-areas.md`). PDA 는 목으로 업무 필터·권한 표시 |
+| BR-52 | 높음 | MFC | PDA 업무 선택(입고/품질검사/재고 이동/재고 실사/피패킹) 기반 배정 — 다음 작업 받기에 고른 업무 필터, 입고·품질검사·적치 배정 포함, 회수품 반입·회수품 검사·실사 작업 유형 추가, 작업자 본인 조회 허용, 메뉴 권한 기준, 작업 가능 신호, 품질검사 LOT 은 시스템 배정(R15), 품질검사 판정 기준·격리 사유·증빙 사진 업로드·반입 줄 온도대(R18), 이동·실사·피패킹 상품 바코드·패킹 온도대·장바구니·적치 추천·격리 이동·실사 목록 밖 상품·예외 보고(R19) | OPEN(요청 `docs/handoff/2026-11-10-backend-pda-work-areas.md`). PDA 는 목으로 업무 필터·권한 표시 |
 | BR-53 | 중간 | MFC | 입고 수령 화면에 필요한 값 — 입고 예정 행의 상품명·바코드(스캔 대조), RECEIVE 배정의 taskId ↔ trfId 연결, 송장(TRF) 바코드 원문 형식, 행당 차이 사유 1개의 우선순위(수량 차이 vs 격리 사유) | OPEN(요청 `docs/handoff/2026-11-10-backend-pda-work-areas.md` R8~R11). PDA 는 목만 상품명·바코드, 실서버는 SKU 만 표시 |
 
 ---

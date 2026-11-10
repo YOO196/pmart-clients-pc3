@@ -473,6 +473,12 @@ class _PackageQrScan extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return ScanInput(
       id: 'package-qr-scan',
+      testValues: [
+        TestScan(l10n.tsPackageQr, 'PKG:pkg-chk-1:1'),
+        TestScan(l10n.tsPackageQr, 'PKG:pkg-chk-2:1'),
+        TestScan(l10n.tsOldLabel, 'PKG:pkg-chk-1:2'),
+        TestScan(l10n.tsWrong, '8801115114154'),
+      ],
       label: l10n.packageQrHint,
       cameraTitle: l10n.packageQrCameraTitle,
       continuous: false,

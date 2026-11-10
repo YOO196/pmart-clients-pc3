@@ -7,6 +7,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../work/domain/work.dart';
 import '../../work/presentation/work_screens.dart' show backToSession;
 import '../../../shared/printer/label.dart';
+import '../../../shared/product_hints.dart';
 import '../../../shared/printer/printer_ui.dart';
 import '../../../shared/scanner/scan_input.dart';
 import '../../../shared/scanner/scanner.dart';
@@ -15,6 +16,22 @@ import '../../tasks/domain/task_list.dart';
 import '../../tasks/presentation/task_controllers.dart';
 import '../domain/packing.dart';
 import 'packing_controller.dart';
+
+String zoneText(AppLocalizations l10n, TemperatureZone z) => switch (z) {
+  TemperatureZone.chilled => l10n.zoneChilled,
+  TemperatureZone.frozen => l10n.zoneFrozen,
+  TemperatureZone.ambient => l10n.zoneAmbient,
+};
+
+String storageZoneText(AppLocalizations l10n, StorageZone z) =>
+    zoneText(l10n, TemperatureZone.values.byName(z.name));
+
+String packScanText(AppLocalizations l10n, PackScan r) => switch (r) {
+  PackScan.matched => '',
+  PackScan.wrongItem => l10n.packWrongItem,
+  PackScan.overExpected => l10n.packOver,
+  PackScan.otherZone => l10n.packOtherZone,
+};
 
 String packageStateText(AppLocalizations l10n, PackageState s) => switch (s) {
   PackageState.open => l10n.pkgOpen,
@@ -75,6 +92,19 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
     final taskValue = ref.watch(taskDetailProvider(widget.taskId));
     final packing = ref.watch(packingProvider(widget.taskId));
     final ctl = ref.read(packingProvider(widget.taskId).notifier);
+    // 밀봉되면 라벨을 바로 출력한다(같은 포장 ID·QR). 다시 출력은 포장 목록의 버튼.
+    ref.listen(packingProvider(widget.taskId).select((s) => s.lastSealed), (
+      prev,
+      next,
+    ) async {
+      final id = taskValue.value?.shipmentId;
+      if (next == null || next.packageId == prev?.packageId || id == null) {
+        return;
+      }
+      final s = await ref.read(shipmentProvider(id).future);
+      if (!mounted || next.qrCode == null) return;
+      await printPackageLabel(this.context, ref, PackageLabel.of(s, next));
+    });
     return Scaffold(
       appBar: AppBar(title: Text(l10n.packingTitle)),
       body: UiStateView<TaskDetailView>(
@@ -105,7 +135,13 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                       key: ValueKey('pack-line-${l.orderLineId}'),
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      title: Text(l.productName ?? l.sku),
+                      title: Text(
+                        [
+                          l.productName ?? l.sku,
+                          if (ctl.zoneOf(l) case final z?)
+                            storageZoneText(l10n, z),
+                        ].join(' · '),
+                      ),
                       subtitle: Text(
                         l10n.packCounts(
                           l.plannedQty,
@@ -115,44 +151,54 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                       ),
                     ),
                   if (!ready) ...[
-                    SegmentedButton<TemperatureZone>(
-                      segments: [
-                        ButtonSegment(
-                          value: TemperatureZone.chilled,
-                          label: Text(l10n.zoneChilled),
-                        ),
-                        ButtonSegment(
-                          value: TemperatureZone.frozen,
-                          label: Text(l10n.zoneFrozen),
-                        ),
-                        ButtonSegment(
-                          value: TemperatureZone.ambient,
-                          label: Text(l10n.zoneAmbient),
-                        ),
-                      ],
-                      selected: {packing.zone},
-                      onSelectionChanged: (v) => ctl.setZone(v.first),
-                    ),
+                    // 봉투 온도대는 담은 상품으로 정해진다. 상품 정보가 없을 때만 작업자가 고른다.
+                    if (ctl.zonesKnown(task))
+                      Text(
+                        switch (ctl.bagZone(task)) {
+                          final z? => l10n.bagZone(storageZoneText(l10n, z)),
+                          null => l10n.bagZoneEmpty,
+                        },
+                        key: const ValueKey('bag-zone'),
+                        style: theme.textTheme.titleMedium,
+                      )
+                    else ...[
+                      Text(
+                        l10n.zoneUnknownPick,
+                        key: const ValueKey('zone-unknown'),
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                      SegmentedButton<TemperatureZone>(
+                        key: const ValueKey('zone-select'),
+                        segments: [
+                          for (final z in TemperatureZone.values)
+                            ButtonSegment(
+                              value: z,
+                              label: Text(zoneText(l10n, z)),
+                            ),
+                        ],
+                        selected: {packing.zone},
+                        onSelectionChanged: (v) => ctl.setZone(v.first),
+                      ),
+                    ],
                     ScanInput(
                       id: 'pack-scan',
+                      testValues: [
+                        for (final l in task.lines)
+                          if (l.barcode case final bc?)
+                            TestScan(l.productName ?? l.sku, bc),
+                        TestScan(l10n.tsWrong, '0000000000000'),
+                      ],
                       label: l10n.scanHint,
                       cameraTitle: l10n.packCameraTitle,
                       onScan: (code) => switch (ctl.scan(task, s, code)) {
                         PackScan.matched => const ScanFeedback.ok(),
-                        PackScan.wrongItem => ScanFeedback.error(
-                          l10n.packWrongItem,
-                        ),
-                        PackScan.overExpected => ScanFeedback.error(
-                          l10n.packOver,
-                        ),
+                        final r => ScanFeedback.error(packScanText(l10n, r)),
                       },
                     ),
                     if (packing.lastScan case final r?
                         when r != PackScan.matched)
                       Text(
-                        r == PackScan.wrongItem
-                            ? l10n.packWrongItem
-                            : l10n.packOver,
+                        packScanText(l10n, r),
                         key: const ValueKey('pack-scan-error'),
                         style: TextStyle(color: theme.colorScheme.error),
                       ),
@@ -257,6 +303,9 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
   }
 }
 
+/// 예상 포장 시간 선택지(분). 계약 범위 1~180.
+const packMinuteChoices = [5, 10, 15, 20, 30];
+
 /// 배차 요청 — 직원 요청만 쓴다(자동 요청 없음, 2026-11-10). 서버에 요청이 있으면 그것만 보이고,
 /// 없으면 예상 포장 시간을 받아 요청한다. 서버가 자동 요청(AUTO_ON_READY)을 보내면 숨기지 않고 알린다.
 class DispatchSection extends ConsumerStatefulWidget {
@@ -274,13 +323,7 @@ class DispatchSection extends ConsumerStatefulWidget {
 }
 
 class _DispatchSectionState extends ConsumerState<DispatchSection> {
-  final _minutes = TextEditingController();
-
-  @override
-  void dispose() {
-    _minutes.dispose();
-    super.dispose();
-  }
+  int? _minutes;
 
   @override
   Widget build(BuildContext context) {
@@ -310,8 +353,7 @@ class _DispatchSectionState extends ConsumerState<DispatchSection> {
       );
     }
 
-    final minutes = int.tryParse(_minutes.text.trim());
-    final valid = minutes != null && minutes >= 1 && minutes <= 180;
+    final minutes = _minutes;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
@@ -327,20 +369,23 @@ class _DispatchSectionState extends ConsumerState<DispatchSection> {
                 color: theme.colorScheme.error,
               ),
             ),
-          if (!packing.dispatchUnknown)
-            TextField(
-              key: const ValueKey('pack-minutes'),
-              controller: _minutes,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                labelText: l10n.packMinutesLabel,
-                helperText: l10n.packMinutesHelp,
-                errorText: _minutes.text.isNotEmpty && !valid
-                    ? l10n.packMinutesInvalid
-                    : null,
-              ),
+          // PDA 에서는 키보드 대신 버튼으로 고른다.
+          if (!packing.dispatchUnknown) ...[
+            Text(l10n.packMinutesLabel, style: theme.textTheme.labelLarge),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final m in packMinuteChoices)
+                  ChoiceChip(
+                    key: ValueKey('pack-min-$m'),
+                    label: Text(l10n.minutesN(m)),
+                    selected: _minutes == m,
+                    onSelected: (_) => setState(() => _minutes = m),
+                  ),
+              ],
             ),
+            Text(l10n.packMinutesHelp, style: theme.textTheme.bodySmall),
+          ],
           if (packing.dispatchUnknown)
             Text(l10n.dispatchUnknown, key: const ValueKey('dispatch-unknown')),
           if (packing.dispatchRejectCode case final c?)
@@ -360,7 +405,7 @@ class _DispatchSectionState extends ConsumerState<DispatchSection> {
                 : l10n.requestDispatch,
             onPressed: packing.dispatchUnknown
                 ? () => ctl.recheckDispatch(shipmentId)
-                : valid
+                : minutes != null
                 ? () => ctl.requestDispatch(shipmentId, minutes)
                 : null,
           ),

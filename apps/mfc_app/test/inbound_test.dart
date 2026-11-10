@@ -207,6 +207,18 @@ void main() {
     await tapKey(t, 'area-inbound');
     await tapKey(t, 'guide-ok');
     expect(find.byKey(const ValueKey('assigned-TRF-MOCK-001')), findsOneWidget);
+    // 입고 예정 상품을 전부 보인다("외 N개" 없이).
+    expect(find.textContaining('외 '), findsNothing);
+    final first = inbound.peek('TRF-MOCK-001').lines;
+    for (final l in first) {
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('assigned-lines')),
+          matching: find.text(l.productName!),
+        ),
+        findsOneWidget,
+      );
+    }
     await tapKey(t, 'run-task');
   }
 
@@ -353,9 +365,6 @@ void main() {
     (t) async {
       inbound = MockInboundRepository(latency: Duration.zero);
       await openInbound(t);
-      InboundFlowController ctl() =>
-          ProviderScope.containerOf(t.element(find.byType(Scaffold).first))
-              .read(inboundFlowProvider('TRF-MOCK-001').notifier);
 
       await tapKey(t, 'inbound-arrive');
 
@@ -379,18 +388,16 @@ void main() {
       expect(find.text('이미 확인한 박스예요'), findsWidgets);
       await scanBox('BOX-00000002');
       await tapKey(t, 'box-damaged'); // 우유 2번 박스 — 박스째 파손
-      // 바코드가 안 읽히면 상품을 눌러 박스 번호를 골라 확인.
-      await tapKey(t, 'box-line-E-00000002|LOT-Y-1110');
-      await tapKey(t, 'box-chip-BOX-00000031');
+      // 웹·목 모드에선 스캐너 대신 '테스트 값' 드롭다운(실제 스캔과 같은 처리).
+      await tapKey(t, 'box-scan-test');
+      await tapKey(t, 'box-scan-test-BOX-00000003');
       expect(
         find.textContaining('박스 확인 3 / 120', findRichText: true),
         findsOneWidget,
       );
-      // 나머지는 한꺼번에(목). 샐러드 마지막 박스 BOX-00000120 은 오지 않았다.
-      for (var i = 3; i <= 119; i++) {
-        if (i == 31) continue;
-        ctl().scanBox('BOX-${i.toString().padLeft(8, '0')}');
-      }
+      // 테스트 일괄 동작: 1박스만 빼고 전부 스캔 — 샐러드 마지막 BOX-00000120 이 미도착.
+      await tapKey(t, 'box-scan-test');
+      await tapKey(t, 'box-scan-action-all-but-one');
       await t.pumpAndSettle();
       expect(
         find.textContaining('박스 확인 119 / 120', findRichText: true),
@@ -413,19 +420,27 @@ void main() {
         find.byKey(const ValueKey('box-open-BOX-00000001')),
         findsOneWidget,
       );
-      await setQty(t, 'box-normal', 11);
-      await setQty(t, 'box-quarantined', 1);
+      // 낱개는 0부터 — 상품 스캔 1번 = 정상 +1, 겉보기 파손은 따로(품질검사에서 판정).
       expect(
         t
             .widget<FilledButton>(find.byKey(const ValueKey('box-save')))
             .onPressed,
         isNull,
-      ); // 격리 사유를 골라야
-      await tapKey(t, 'box-reason-damaged');
+      ); // 아직 안 셈
+      await tapKey(t, 'box-item-scan-test');
+      await t.tap(
+        find.byKey(const ValueKey('box-item-scan-test-8801115114154')),
+      );
+      await t.pumpAndSettle();
+      expect(find.text('합계 1 / 예정 12'), findsOneWidget);
+      await setQty(t, 'box-normal', 11);
+      await setQty(t, 'box-damaged-units', 1);
       await tapKey(t, 'box-save');
-      // 목록에서 눌러 열고 "입수대로 정상".
+      // 목록에서 눌러 열고, 테스트 동작 "입수대로 셈".
       await tapKey(t, 'box-BOX-00000003');
-      await tapKey(t, 'box-all-normal');
+      await tapKey(t, 'box-item-scan-test');
+      await t.tap(find.byKey(const ValueKey('box-item-scan-action-fill')));
+      await t.pumpAndSettle();
       await tapKey(t, 'box-save');
       expect(find.text('박스 열어 검수 2 / 118'), findsOneWidget);
       expect(
@@ -434,13 +449,9 @@ void main() {
             .onPressed,
         isNull,
       ); // 전부 열어야
-      for (final b in ctl().state.openable) {
-        if (ctl().state.boxCounts.containsKey(b.boxId)) continue;
-        ctl()
-          ..openBox(b.boxId)
-          ..setBoxCount(b.boxId, ReceiptCount(normal: b.unitsPerBox))
-          ..saveBox();
-      }
+      // 테스트 일괄 동작: 남은 박스 전부 입수대로 정상.
+      await tapKey(t, 'box-open-scan-test');
+      await tapKey(t, 'box-open-scan-action-all-normal');
       await t.pumpAndSettle();
       expect(t.takeException(), isNull);
       await tapKey(t, 'box-to-review');
@@ -448,7 +459,7 @@ void main() {
       // 4단계: 상품별 합계 — 우유 = 11 + (파손 12 격리) + 28×12, 샐러드 1박스 미도착.
       expect(find.byKey(const ValueKey('inbound-step-3')), findsOneWidget);
       expect(
-        find.textContaining('예정 360 · 정상 347 · 격리 13 · 미판정 0'),
+        find.textContaining('예정 360 · 정상 347 · 격리 12 · 미판정 1'),
         findsOneWidget,
       );
       expect(
@@ -459,7 +470,8 @@ void main() {
       expect(find.byKey(const ValueKey('inbound-applied')), findsOneWidget);
       final lines = inbound.peek('TRF-MOCK-001').lines;
       expect(lines[0].receivedQty, 360);
-      expect(lines[0].quarantinedQty, 13);
+      expect(lines[0].quarantinedQty, 12);
+      expect(lines[0].pendingQty, 1);
       expect(lines[6].receivedQty, 112);
     },
   );

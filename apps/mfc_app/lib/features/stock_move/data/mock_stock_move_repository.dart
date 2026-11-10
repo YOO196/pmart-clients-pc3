@@ -43,6 +43,8 @@ final class MockStockMoveRepository implements StockMoveRepository {
           lotId: 'RET-clm-seed-1',
           conditionNote: '고객 단순 변심, 미개봉',
           productName: '감자칩 오리지널 110g',
+          zone: 'AMBIENT',
+          fresh: false,
         ),
         ReturnedLine(
           sku: 'E-00000001',
@@ -51,6 +53,8 @@ final class MockStockMoveRepository implements StockMoveRepository {
           lotId: 'RET-clm-seed-1',
           conditionNote: '용기 찌그러짐',
           productName: '서울우유 1L',
+          zone: 'CHILLED',
+          fresh: false,
         ),
       ],
     ),

@@ -26,6 +26,9 @@ abstract interface class StockCountRepository {
     String sessionId,
     List<CountedLine> lines, {
     required IdempotencyKey key,
+
+    /// 계수표 밖 상품 — 계약에 받을 곳이 없어(BR-52 R19 6) 실서버에는 보내지 않는다.
+    List<ExtraFind> extras = const [],
   });
 }
 
@@ -82,6 +85,7 @@ final class ApiStockCountRepository implements StockCountRepository {
     String sessionId,
     List<CountedLine> lines, {
     required IdempotencyKey key,
+    List<ExtraFind> extras = const [],
   }) => _cmd(
     () => _api.submitCount(
       mfcId: mfcId,

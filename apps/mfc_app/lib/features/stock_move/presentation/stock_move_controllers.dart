@@ -5,16 +5,18 @@ import 'package:pmart_core/pmart_core.dart';
 import '../../../shared/codes.dart';
 import '../../../shared/field_outcome.dart';
 import '../../../shared/field_repositories.dart';
+import '../../../shared/product_hints.dart';
 import '../../quality/domain/quality.dart';
 import '../../tasks/presentation/task_controllers.dart';
 import '../domain/stock_move.dart';
 
-/// 위치 스캔 결과.
-enum LocScan { ok, wrongPlace, notLocation }
+/// 스캔 결과. 칸·카트·상품을 한 입력칸에서 받는다.
+/// needFrom = 출발 칸을 먼저, wrongItem = 지시 상품이 아님, over = 옮길 양을 넘음.
+enum LocScan { ok, wrongPlace, notLocation, needFrom, wrongItem, over }
 
 // ───────────────────────── 이동·보충 지시 ─────────────────────────
 
-enum MovePhase { loading, pickUp, drop, done, cancelled, loadError }
+enum MovePhase { loading, pickUp, drop, done, cancelled, reported, loadError }
 
 @immutable
 class MoveFlowState {
@@ -83,6 +85,8 @@ class MoveController extends Notifier<MoveFlowState> {
   final String moveId;
   IdempotencyKey? _key;
 
+  MoveFlowState get current => state;
+
   @override
   MoveFlowState build() {
     Future.microtask(load);
@@ -105,7 +109,12 @@ class MoveController extends Notifier<MoveFlowState> {
       );
     }
     if (m.toPick > 0) {
-      return s.copyWith(phase: MovePhase.pickUp, move: m, qty: m.toPick);
+      // 수량은 상품을 스캔해 센다(0부터). 상품 바코드를 모르면 직접 넣는다.
+      return s.copyWith(
+        phase: MovePhase.pickUp,
+        move: m,
+        qty: s.phase == MovePhase.pickUp ? s.qty : 0,
+      );
     }
     return s.copyWith(phase: MovePhase.done, move: m);
   }
@@ -119,14 +128,38 @@ class MoveController extends Notifier<MoveFlowState> {
     }
   }
 
-  /// 위치 스캔. 집기 단계는 출발 칸, 내려놓기 단계는 도착 칸이어야 한다.
-  /// 카트 코드면 카트로 받는다.
+  /// 지시 상품 바코드(상품 정보). 모르면 null — 상품 확인 없이 수량을 직접 넣는다.
+  String? get productBarcode {
+    final m = state.move;
+    return m == null
+        ? null
+        : ref.read(productHintsProvider).bySku(m.sku)?.barcode;
+  }
+
+  String? get productName {
+    final m = state.move;
+    return m == null ? null : ref.read(productHintsProvider).bySku(m.sku)?.name;
+  }
+
+  /// 스캔. 집기 단계는 출발 칸 → 상품(1개씩) → 카트, 내려놓기 단계는 도착 칸.
   LocScan scan(String code) {
     final m = state.move;
     final c = code.trim();
     if (m == null || state.unknown) return LocScan.notLocation;
+    final bc = productBarcode;
     final LocScan r;
-    if (state.phase == MovePhase.pickUp && isCartLocation(c)) {
+    if (state.phase == MovePhase.pickUp && bc != null && !isMfcLocation(c)) {
+      if (!state.atFrom) {
+        r = LocScan.needFrom;
+      } else if (c != bc) {
+        r = LocScan.wrongItem;
+      } else if (state.qty >= m.toPick) {
+        r = LocScan.over;
+      } else {
+        state = state.copyWith(qty: state.qty + 1);
+        r = LocScan.ok;
+      }
+    } else if (state.phase == MovePhase.pickUp && isCartLocation(c)) {
       state = state.copyWith(cart: () => c);
       r = LocScan.ok;
     } else if (!isMfcLocation(c)) {
@@ -150,6 +183,9 @@ class MoveController extends Notifier<MoveFlowState> {
 
   bool get canPickUp =>
       state.atFrom && state.cart != null && state.qty > 0 || state.unknown;
+
+  /// 문제를 보고했다 — 이 지시는 관리자가 처리한다(서버 처리 방식은 R19 7 회신 대기).
+  void reported() => state = state.copyWith(phase: MovePhase.reported);
 
   bool get canDrop => state.atTo && state.qty > 0 || state.unknown;
 
@@ -199,7 +235,7 @@ class MoveController extends Notifier<MoveFlowState> {
 
 // ───────────────────────── 적치 ─────────────────────────
 
-enum PutawayPhase { loading, editing, done, notFound, loadError }
+enum PutawayPhase { loading, editing, done, reported, notFound, loadError }
 
 @immutable
 class PutawayState {
@@ -207,6 +243,7 @@ class PutawayState {
     this.phase = PutawayPhase.loading,
     this.task,
     this.to,
+    this.atFrom = false,
     this.qty = 0,
     this.busy = false,
     this.unknown = false,
@@ -216,6 +253,9 @@ class PutawayState {
 
   final PutawayPhase phase;
   final InboundTaskView? task;
+
+  /// 출발 위치(입고 구역)를 찍었다.
+  final bool atFrom;
 
   /// 찍은 도착 선반.
   final String? to;
@@ -229,6 +269,7 @@ class PutawayState {
     PutawayPhase? phase,
     InboundTaskView? task,
     String? Function()? to,
+    bool? atFrom,
     int? qty,
     bool? busy,
     bool? unknown,
@@ -238,6 +279,7 @@ class PutawayState {
     phase: phase ?? this.phase,
     task: task ?? this.task,
     to: to != null ? to() : this.to,
+    atFrom: atFrom ?? this.atFrom,
     qty: qty ?? this.qty,
     busy: busy ?? this.busy,
     unknown: unknown ?? this.unknown,
@@ -257,6 +299,8 @@ class PutawayController extends Notifier<PutawayState> {
   final String taskId;
   IdempotencyKey? _key;
 
+  PutawayState get current => state;
+
   @override
   PutawayState build() {
     Future.microtask(load);
@@ -275,26 +319,52 @@ class PutawayController extends Notifier<PutawayState> {
       final t = list.where((t) => t.taskId == taskId).firstOrNull;
       state = t == null
           ? state.copyWith(phase: PutawayPhase.notFound)
-          : state.copyWith(
-              phase: PutawayPhase.editing,
-              task: t,
-              qty: t.remainingQty,
-            );
+          : state.copyWith(phase: PutawayPhase.editing, task: t, qty: 0);
     } on PmartFailure {
       if (ref.mounted) state = state.copyWith(phase: PutawayPhase.loadError);
     }
   }
 
+  String? get productBarcode {
+    final t = state.task;
+    if (t == null) return null;
+    return t.barcode ?? ref.read(productHintsProvider).bySku(t.sku)?.barcode;
+  }
+
+  /// 출발 위치 → 상품(1개씩) → 도착 칸. 추천 칸이 아니어도 받는다(진열 판정은 서버).
   LocScan scan(String code) {
+    final t = state.task;
     final c = code.trim();
-    if (state.unknown) return LocScan.notLocation;
-    final r = isMfcLocation(c) ? LocScan.ok : LocScan.notLocation;
-    state = state.copyWith(
-      to: r == LocScan.ok ? () => c : null,
-      lastScan: () => r,
-    );
+    if (state.unknown || t == null) return LocScan.notLocation;
+    final bc = productBarcode;
+    final LocScan r;
+    if (!state.atFrom) {
+      r = c == t.locationCode
+          ? LocScan.ok
+          : isMfcLocation(c)
+          ? LocScan.wrongPlace
+          : LocScan.needFrom;
+      if (r == LocScan.ok) state = state.copyWith(atFrom: true);
+    } else if (bc != null && !isMfcLocation(c)) {
+      if (c != bc) {
+        r = LocScan.wrongItem;
+      } else if (state.qty >= t.remainingQty) {
+        r = LocScan.over;
+      } else {
+        state = state.copyWith(qty: state.qty + 1);
+        r = LocScan.ok;
+      }
+    } else if (isMfcLocation(c) && !isCartLocation(c) && c != t.locationCode) {
+      state = state.copyWith(to: () => c);
+      r = LocScan.ok;
+    } else {
+      r = LocScan.notLocation;
+    }
+    state = state.copyWith(lastScan: () => r);
     return r;
   }
+
+  void reported() => state = state.copyWith(phase: PutawayPhase.reported);
 
   void setQty(int q) {
     if (!state.unknown) state = state.copyWith(qty: q);
@@ -322,7 +392,7 @@ class PutawayController extends Notifier<PutawayState> {
               )
             : state.copyWith(
                 task: next,
-                qty: next.remainingQty,
+                qty: 0,
                 to: () => null,
                 busy: false,
                 unknown: false,

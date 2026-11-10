@@ -11,6 +11,8 @@ final class MockQualityRepository implements QualityRepository {
     this.latency = const Duration(milliseconds: 300),
     this.returns,
   }) {
+    // 입고 수령 결과(정상+미판정)가 품질검사 대상 — 요거트 12(냉장, 소비기한 5일 이상),
+    // 두부 16(냉장, 제조 3일 이내·소비기한 3일 이상 — 제조일 필수).
     _tasks['TSK-INS-mock-1'] = const InboundTaskView(
       taskId: 'TSK-INS-mock-1',
       kind: InboundTaskKind.inspect,
@@ -22,6 +24,27 @@ final class MockQualityRepository implements QualityRepository {
       doneQty: 0,
       completed: false,
       version: 1,
+      productName: '그릭요거트 플레인 400g',
+      barcode: '8801115220015',
+      minRemainingDays: 5,
+      zone: TempZone.chilled,
+    );
+    _tasks['TSK-INS-mock-2'] = const InboundTaskView(
+      taskId: 'TSK-INS-mock-2',
+      kind: InboundTaskKind.inspect,
+      receiptId: 'rcp-seed-1',
+      sku: 'E-00000011',
+      lotId: 'LOT-T-1109',
+      locationCode: 'RCV-C-02',
+      plannedQty: 16,
+      doneQty: 0,
+      completed: false,
+      version: 1,
+      productName: '국산콩 두부 300g',
+      barcode: '8801007001101',
+      minRemainingDays: 3,
+      maxDaysSinceManufacture: 3,
+      zone: TempZone.chilled,
     );
   }
 
@@ -68,7 +91,19 @@ final class MockQualityRepository implements QualityRepository {
     doneQty: t.doneQty + qty,
     completed: t.doneQty + qty >= t.plannedQty,
     version: t.version + 1,
+    productName: t.productName,
+    barcode: t.barcode,
+    minRemainingDays: t.minRemainingDays,
+    maxDaysSinceManufacture: t.maxDaysSinceManufacture,
+    zone: t.zone,
+    suggestedLocations: t.suggestedLocations,
   );
+
+  /// 적치 추천 칸(목) — 그 상품이 있던 선반.
+  static const _shelfOf = {
+    'E-00000002': ['C-S1-01-1-01', 'C-S1-01-1-02'],
+    'E-00000011': ['C-S1-04-1-02'],
+  };
 
   @override
   Future<FieldOutcome<InboundTaskExecutionView>> inspect(
@@ -101,6 +136,10 @@ final class MockQualityRepository implements QualityRepository {
         doneQty: 0,
         completed: false,
         version: 1,
+        productName: t.productName,
+        barcode: t.barcode,
+        zone: t.zone,
+        suggestedLocations: _shelfOf[t.sku] ?? const [],
       );
     }
     final next = _advance(t, sum);

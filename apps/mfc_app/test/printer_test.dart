@@ -204,7 +204,19 @@ void main() {
     await t.pump();
     await t.tap(find.byKey(const ValueKey('seal')));
     await t.pumpAndSettle();
+    // 밀봉하면 바로 출력 — 프린터가 없으면 미리보기.
+    expect(find.byKey(const ValueKey('label-preview')), findsOneWidget);
+    await t.tap(
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('label-preview')),
+            matching: find.byType(TextButton),
+          )
+          .last,
+    );
+    await t.pumpAndSettle();
 
+    // 다시 출력 = 같은 포장 ID·같은 QR.
     await t.tap(find.byKey(const ValueKey('print-pkg-1')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('label-preview')), findsOneWidget);

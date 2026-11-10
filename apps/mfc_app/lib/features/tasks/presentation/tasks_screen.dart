@@ -7,6 +7,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../work/domain/work.dart';
 import '../../work/presentation/work_screens.dart' show backToSession;
+import '../../../shared/field_widgets.dart';
 import '../../../shared/scanner/scan_input.dart';
 import '../../../shared/scanner/scanner.dart';
 import '../../../shared/ui_state_of.dart';
@@ -167,7 +168,8 @@ String queueStateText(AppLocalizations l10n, QueueItemState s) => switch (s) {
   QueueItemState.checking => l10n.qChecking,
 };
 
-/// 피킹. 스캔 수량은 "이번 스캔"이고, 서버 확정분만 완료로 보인다.
+/// 피킹: 장바구니 → [칸 스캔 → 상품 스캔 × 수량] 을 칸마다. 한 칸 몫을 다 집으면 바로 보낸다.
+/// 스캔 수량은 "이번 칸"이고, 서버 확정분만 완료로 보인다.
 class PickingScreen extends ConsumerStatefulWidget {
   const PickingScreen({super.key, required this.taskId});
 
@@ -177,27 +179,41 @@ class PickingScreen extends ConsumerStatefulWidget {
   ConsumerState<PickingScreen> createState() => _PickingScreenState();
 }
 
+String pickScanText(AppLocalizations l10n, ScanResult r) => switch (r) {
+  ScanResult.matched => '',
+  ScanResult.wrongItem => l10n.scanWrongItem,
+  ScanResult.overRemaining => l10n.scanOver,
+  ScanResult.noTarget => l10n.scanNoTarget,
+  ScanResult.needLocation => l10n.pickNeedLocation,
+};
+
+String pickLocText(AppLocalizations l10n, PickLocScan r) => switch (r) {
+  PickLocScan.ok => '',
+  PickLocScan.wrongPlace => l10n.moveWrongPlace,
+  PickLocScan.notLocation => l10n.moveNotLocation,
+};
+
 class _PickingScreenState extends ConsumerState<PickingScreen> {
+  PickingController get _ctl =>
+      ref.read(pickingProvider(widget.taskId).notifier);
+
   ScanFeedback _onScan(TaskDetailView task, String code) {
     final l10n = AppLocalizations.of(context);
-    final r = ref
-        .read(pickingProvider(widget.taskId).notifier)
-        .scan(task, code);
-    return switch (r) {
-      ScanResult.matched => const ScanFeedback.ok(),
-      ScanResult.wrongItem => ScanFeedback.error(l10n.scanWrongItem),
-      ScanResult.overRemaining => ScanFeedback.error(l10n.scanOver),
-      ScanResult.noTarget => ScanFeedback.error(l10n.scanNoTarget),
-    };
+    final r = _ctl.scan(task, code);
+    if (r == ScanResult.matched) {
+      _ctl.submitIfFull(task);
+      return const ScanFeedback.ok();
+    }
+    return ScanFeedback.error(pickScanText(l10n, r));
   }
 
-  Future<void> _shortage(TaskDetailView task, TaskLineView line) async {
+  Future<void> _shortage(TaskDetailView task, PickStop stop) async {
     final l10n = AppLocalizations.of(context);
     final picking = ref.read(pickingProvider(widget.taskId));
     final missing =
-        line.remainingQty -
-        line.pendingQty -
-        picking.capturedFor(line.orderLineId);
+        stop.line.remainingQty -
+        stop.line.pendingQty -
+        picking.capturedFor(stop.line.orderLineId);
     if (missing <= 0) return;
     final reason = await showDialog<ShortageReason>(
       context: context,
@@ -218,13 +234,10 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
       ),
     );
     if (reason == null || !mounted) return;
-    await ref
-        .read(pickingProvider(widget.taskId).notifier)
-        .submitLine(
-          task,
-          line,
-          shortage: (qty: missing, reason: reason, note: null),
-        );
+    await _ctl.submitStop(
+      task,
+      shortage: (qty: missing, reason: reason, note: null),
+    );
   }
 
   @override
@@ -234,7 +247,6 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
     final detail = ref.watch(taskDetailProvider(widget.taskId));
     final picking = ref.watch(pickingProvider(widget.taskId));
     final queue = ref.watch(taskQueueProvider(widget.taskId)).value ?? const [];
-    final ctl = ref.read(pickingProvider(widget.taskId).notifier);
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.pickingTitle),
@@ -242,7 +254,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
           IconButton(
             key: const ValueKey('sync'),
             tooltip: l10n.sync,
-            onPressed: picking.syncing ? null : ctl.sync,
+            onPressed: picking.syncing ? null : _ctl.sync,
             icon: const Icon(Icons.sync),
           ),
         ],
@@ -251,11 +263,26 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
         state: uiStateOf(detail),
         onRetry: () => ref.invalidate(taskDetailProvider(widget.taskId)),
         ready: (context, task) {
-          final current = PickingController.currentLine(task, picking);
+          final stop = nextPickStop(task);
           final checking = queue.any((q) => q.state == QueueItemState.checking);
+          final step = picking.cart == null
+              ? 0
+              : picking.at == null
+              ? 1
+              : 2;
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              if (stop != null)
+                StepHeader(
+                  names: [
+                    l10n.pickStepCart,
+                    l10n.pickStepLocation,
+                    l10n.pickStepItem,
+                  ],
+                  current: step,
+                ),
+              const SizedBox(height: 8),
               Text(
                 l10n.taskProgress(task.totalCompleted, task.totalPlanned),
                 key: const ValueKey('pick-progress'),
@@ -270,80 +297,147 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                     title: Text(l10n.doNotRedo),
                   ),
                 ),
-              if (current != null) ...[
+              if (stop != null && picking.cart == null) ...[
+                // 1. 장바구니 — 주문과 장바구니를 잇는다(업무 문서 §7-6).
+                TargetLine(
+                  key: const ValueKey('target-cart'),
+                  label: l10n.moveCart,
+                  code: l10n.moveCartScan,
+                  confirmed: false,
+                ),
+                ScanInput(
+                  id: 'cart-scan',
+                  testValues: [
+                    TestScan(l10n.tsCart, 'CRT-C-01'),
+                    TestScan(l10n.tsWrong, 'C-S1-01-1-01'),
+                  ],
+                  label: l10n.moveCartScan,
+                  cameraTitle: l10n.pickCameraTitle,
+                  continuous: false,
+                  autofocus: false,
+                  onScan: (code) => _ctl.scanCart(code)
+                      ? const ScanFeedback.ok()
+                      : ScanFeedback.error(l10n.pickNotCart),
+                ),
+              ] else if (stop != null) ...[
+                if (picking.cart case final cart?)
+                  TargetLine(label: l10n.moveCart, code: cart, confirmed: true),
                 Card(
-                  key: ValueKey('current-${current.orderLineId}'),
+                  key: ValueKey('current-${stop.line.orderLineId}'),
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          firstPickLocation(current) ?? '-',
+                          picking.at ?? stop.location,
                           key: const ValueKey('pick-location'),
                           style: theme.textTheme.headlineSmall,
                         ),
                         Text(
-                          current.productName ?? current.sku,
+                          stop.line.productName ?? stop.line.sku,
                           style: theme.textTheme.titleMedium,
                         ),
-                        if (current.picks.isEmpty) ...[
-                          if (current.expiresOn case final e?)
-                            Text(l10n.expiresOn(e)),
-                          if (current.lotId case final lot?)
-                            Text(l10n.lot(lot)),
-                        ] else
-                          for (final p in current.picks)
-                            if (p.status != PickStatus.done)
-                              PickInstructionTile(pick: p),
                         Text(
-                          l10n.pickCounts(
-                            current.remainingQty,
-                            current.pendingQty,
-                            picking.capturedFor(current.orderLineId),
+                          [
+                            if (stop.pick?.visitSeq case final n?)
+                              l10n.pickVisit(n),
+                            if (stop.lotId case final lot?) l10n.lot(lot),
+                            if (stop.expiresOn case final e?) l10n.expiresOn(e),
+                          ].join(' · '),
+                        ),
+                        Text(
+                          l10n.pickStopQty(
+                            stop.qty,
+                            picking.capturedFor(stop.line.orderLineId),
                           ),
                           key: const ValueKey('pick-counts'),
+                          style: theme.textTheme.titleLarge,
                         ),
+                        if (stop.pick case final p?) ...[
+                          if (switch (p.status) {
+                                PickStatus.partial => l10n.pickStatusPartial,
+                                PickStatus.notFound => l10n.pickStatusNotFound,
+                                _ => null,
+                              }
+                              case final w?)
+                            Text(
+                              w,
+                              key: const ValueKey('pick-status-warning'),
+                              style: TextStyle(color: theme.colorScheme.error),
+                            ),
+                          if (p.notice case final n?)
+                            Text(n, key: const ValueKey('pick-notice')),
+                        ],
+                        if (stop.otherLocations.isNotEmpty)
+                          Text(
+                            l10n.pickOtherLocations(
+                              stop.otherLocations.join(', '),
+                            ),
+                            key: const ValueKey('pick-other-locations'),
+                            style: theme.textTheme.bodySmall,
+                          ),
                       ],
                     ),
                   ),
                 ),
-                ScanInput(
-                  id: 'scan-field',
-                  label: l10n.scanHint,
-                  cameraTitle: l10n.pickCameraTitle,
-                  onScan: (code) => _onScan(task, code),
-                ),
-                if (picking.lastScan case final s? when s != ScanResult.matched)
-                  Text(
-                    switch (s) {
-                      ScanResult.wrongItem => l10n.scanWrongItem,
-                      ScanResult.overRemaining => l10n.scanOver,
-                      _ => l10n.scanNoTarget,
+                if (picking.at == null) ...[
+                  // 2. 칸 — 같은 상품이 여러 칸·LOT 에 있어도 지시 LOT 을 집게(IV-07 오로트 차단).
+                  ScanInput(
+                    id: 'pick-loc-scan',
+                    testValues: [
+                      TestScan(l10n.tsLocation, stop.location),
+                      for (final o in stop.otherLocations)
+                        TestScan(l10n.tsOtherLocation, o),
+                      TestScan(l10n.tsWrong, 'A-S9-09-9-99'),
+                    ],
+                    label: l10n.pickScanLocation,
+                    cameraTitle: l10n.pickCameraTitle,
+                    continuous: false,
+                    autofocus: false,
+                    onScan: (code) => switch (_ctl.scanLocation(task, code)) {
+                      PickLocScan.ok => const ScanFeedback.ok(),
+                      final r => ScanFeedback.error(pickLocText(l10n, r)),
                     },
-                    key: const ValueKey('scan-error'),
-                    style: TextStyle(color: theme.colorScheme.error),
                   ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton(
-                        key: const ValueKey('line-done'),
-                        onPressed: picking.capturedFor(current.orderLineId) > 0
-                            ? () => ctl.submitLine(task, current)
-                            : null,
-                        child: Text(l10n.lineSubmit),
-                      ),
+                  if (picking.lastLocScan case final r?
+                      when r != PickLocScan.ok)
+                    Text(
+                      pickLocText(l10n, r),
+                      key: const ValueKey('pick-loc-error'),
+                      style: TextStyle(color: theme.colorScheme.error),
                     ),
-                    const SizedBox(width: 8),
-                    OutlinedButton(
-                      key: const ValueKey('report-shortage'),
-                      onPressed: () => _shortage(task, current),
-                      child: Text(l10n.reportShortage),
+                ] else ...[
+                  // 3. 상품 — 한 번에 하나씩. 다 차면 바로 보낸다.
+                  ScanInput(
+                    id: 'scan-field',
+                    testValues: [
+                      for (final l in task.lines)
+                        if (l.barcode case final bc?)
+                          TestScan(l.productName ?? l.sku, bc),
+                      TestScan(l10n.tsWrong, '0000000000000'),
+                    ],
+                    label: l10n.scanHint,
+                    cameraTitle: l10n.pickCameraTitle,
+                    onScan: (code) => _onScan(task, code),
+                  ),
+                  if (picking.lastScan case final s?
+                      when s != ScanResult.matched)
+                    Text(
+                      pickScanText(l10n, s),
+                      key: const ValueKey('scan-error'),
+                      style: TextStyle(color: theme.colorScheme.error),
                     ),
-                  ],
-                ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    key: const ValueKey('report-shortage'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    onPressed: () => _shortage(task, stop),
+                    child: Text(l10n.reportShortage),
+                  ),
+                ],
               ] else ...[
                 Text(
                   task.lines.every((l) => l.done)

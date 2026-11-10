@@ -233,6 +233,10 @@ class _ArrivalStep extends ConsumerWidget {
         const SizedBox(height: 8),
         ScanInput(
           id: 'trf-scan',
+          testValues: [
+            TestScan(l10n.tsNext, trfId),
+            TestScan(l10n.tsOtherTruck, 'TRF-OTHER-999'),
+          ],
           label: l10n.inboundTrfScanHint,
           cameraTitle: l10n.inboundTrfScanHint,
           continuous: false,
@@ -258,7 +262,34 @@ class _ArrivalStep extends ConsumerWidget {
             l10n.inboundArrivalUnknown,
             key: const ValueKey('inbound-unknown'),
           ),
-        const Spacer(),
+        const SizedBox(height: 8),
+        // 입고 예정 상품 전부(박스 수·입수·수량).
+        Expanded(
+          child: ListView(
+            key: const ValueKey('arrival-lines'),
+            children: [
+              for (final l in p.lines)
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(l.productName ?? l.sku),
+                  subtitle: Text(
+                    [
+                      l.sku,
+                      if (l.unitsPerBox case final per?) l10n.boxPer(per),
+                    ].join(' · '),
+                  ),
+                  trailing: Text(
+                    [
+                      if (l.boxCount case final b?) l10n.boxesUnit(b),
+                      l10n.qtyUnit(l.expectedQty),
+                    ].join(' · '),
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ),
+            ],
+          ),
+        ),
         CommandButton(
           key: const ValueKey('inbound-arrive'),
           busy: s.busy,
@@ -355,6 +386,12 @@ class _CountStep extends ConsumerWidget {
         const SizedBox(height: 8),
         ScanInput(
           id: 'inbound-scan',
+          testValues: [
+            for (final x in p.lines)
+              if (x.barcode case final bc?)
+                TestScan(x.productName ?? x.sku, bc),
+            TestScan(l10n.tsWrong, '0000000000000'),
+          ],
           label: l10n.inboundScanHint,
           cameraTitle: l10n.inboundCameraTitle,
           autofocus: false,
@@ -662,6 +699,33 @@ class _BoxCheckStep extends ConsumerWidget {
         const SizedBox(height: 8),
         ScanInput(
           id: 'box-scan',
+          testActions: [
+            TestAction(
+              'all',
+              l10n.testScanAllBoxes(total - s.arrived.length),
+              () {
+                for (final b in p.boxList) {
+                  if (!s.arrived.contains(b.boxId)) ctl.scanBox(b.boxId);
+                }
+              },
+            ),
+            TestAction('all-but-one', l10n.testScanAllButOne, () {
+              final left = [
+                for (final b in p.boxList)
+                  if (!ctl.current.arrived.contains(b.boxId)) b,
+              ];
+              for (final b in left.take(left.length - 1)) {
+                ctl.scanBox(b.boxId);
+              }
+            }),
+          ],
+          testValues: [
+            for (final b
+                in p.boxList.where((b) => !s.arrived.contains(b.boxId)).take(5))
+              TestScan(l10n.tsNext, b.boxId),
+            if (s.arrived.isNotEmpty) TestScan(l10n.tsAlready, s.arrived.first),
+            TestScan(l10n.tsOtherTruck, 'BOX-99999999'),
+          ],
           label: l10n.boxScanHint,
           cameraTitle: l10n.boxScanHint,
           autofocus: false,
@@ -670,12 +734,20 @@ class _BoxCheckStep extends ConsumerWidget {
             final r => ScanFeedback.error(boxScanText(l10n, r)),
           },
         ),
-        if (s.lastBoxScan case final r? when r != BoxScan.ok)
-          Text(
-            boxScanText(l10n, r),
-            key: const ValueKey('box-scan-error'),
-            style: TextStyle(color: theme.colorScheme.error),
-          ),
+        // 안내 줄 자리는 늘 잡아 둔다 — 오류가 나타나도 아래 목록이 밀리지 않게.
+        SizedBox(
+          height: 20,
+          child: switch (s.lastBoxScan) {
+            final r? when r != BoxScan.ok => Text(
+              boxScanText(l10n, r),
+              key: const ValueKey('box-scan-error'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
+            _ => null,
+          },
+        ),
         // 자리를 늘 잡아 둔다 — 박스를 확인할 때 아래 목록이 밀려 잘못 누르지 않게.
         if (last != null && s.arrived.contains(last.boxId))
           Card(
@@ -767,9 +839,8 @@ class _BoxCheckStep extends ConsumerWidget {
                                   key: ValueKey('box-chip-${b.boxId}'),
                                   label: Text(b.boxId.substring(4)),
                                   selected: s.arrived.contains(b.boxId),
-                                  onSelected: s.arrived.contains(b.boxId)
-                                      ? null
-                                      : (_) => ctl.scanBox(b.boxId),
+                                  // 보기 전용 — 확인은 스캔으로만(안드로이드).
+                                  onSelected: null,
                                 ),
                             ],
                           ),
@@ -811,9 +882,10 @@ class _BoxInspectStep extends ConsumerWidget {
     final s = ref.watch(inboundFlowProvider(trfId));
     final ctl = ref.read(inboundFlowProvider(trfId).notifier);
     final p = s.promise!;
+    InboundLine? lineOf(InboundBox b) =>
+        p.lines.where((l) => l.key == b.lineKey).firstOrNull;
     String nameOf(InboundBox b) =>
-        p.lines.where((l) => l.key == b.lineKey).firstOrNull?.productName ??
-        b.lineKey.split('|').first;
+        lineOf(b)?.productName ?? b.lineKey.split('|').first;
 
     if (s.selectedBox case final id?) {
       final b = s.boxById(id)!;
@@ -824,16 +896,36 @@ class _BoxInspectStep extends ConsumerWidget {
         children: [
           Text(id, style: theme.textTheme.titleLarge),
           Text(l10n.boxOf(nameOf(b), b.unitsPerBox)),
+          Text(l10n.boxCountHelp, style: theme.textTheme.bodySmall),
           const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: OutlinedButton.icon(
-              key: const ValueKey('box-all-normal'),
-              onPressed: () =>
-                  ctl.setBoxCount(id, ReceiptCount(normal: b.unitsPerBox)),
-              icon: const Icon(Icons.done_all),
-              label: Text(l10n.boxAllNormal(b.unitsPerBox)),
-            ),
+          // 낱개는 0부터 — 상품 바코드 1번 = 정상 +1(입고는 수량·겉보기 파손만, 품질 판정은 품질검사).
+          ScanInput(
+            id: 'box-item-scan',
+            testValues: [
+              if (lineOf(b)?.barcode case final bc?) TestScan(nameOf(b), bc),
+              TestScan(l10n.tsWrong, '0000000000000'),
+            ],
+            testActions: [
+              TestAction(
+                'fill',
+                l10n.testFillBox(b.unitsPerBox),
+                () => ctl.setBoxCount(
+                  id,
+                  c.copyWith(normal: b.unitsPerBox - c.pending),
+                ),
+              ),
+            ],
+            label: l10n.boxItemScan,
+            cameraTitle: l10n.boxItemScan,
+            autofocus: false,
+            onScan: (code) {
+              if (code.trim() != lineOf(b)?.barcode) {
+                return ScanFeedback.error(l10n.inboundOtherLine);
+              }
+              final now = ctl.boxCountOf(id);
+              ctl.setBoxCount(id, now.copyWith(normal: now.normal + 1));
+              return const ScanFeedback.ok();
+            },
           ),
           QtyStepper(
             id: 'box-normal',
@@ -842,14 +934,8 @@ class _BoxInspectStep extends ConsumerWidget {
             onChanged: (v) => ctl.setBoxCount(id, c.copyWith(normal: v)),
           ),
           QtyStepper(
-            id: 'box-quarantined',
-            label: l10n.qtyQuarantined,
-            value: c.quarantined,
-            onChanged: (v) => ctl.setBoxCount(id, c.copyWith(quarantined: v)),
-          ),
-          QtyStepper(
-            id: 'box-pending',
-            label: l10n.qtyPending,
+            id: 'box-damaged-units',
+            label: l10n.boxLooksDamaged,
             value: c.pending,
             onChanged: (v) => ctl.setBoxCount(id, c.copyWith(pending: v)),
           ),
@@ -860,25 +946,8 @@ class _BoxInspectStep extends ConsumerWidget {
               color: c.total == b.unitsPerBox ? null : theme.colorScheme.error,
             ),
           ),
-          if (c.quarantined > 0)
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final r in [
-                  DiscrepancyReason.damaged,
-                  DiscrepancyReason.temperature,
-                ])
-                  ChoiceChip(
-                    key: ValueKey('box-reason-${r.name}'),
-                    label: Text(reasonText(l10n, r)),
-                    selected: c.quarantineReason == r,
-                    onSelected: (_) => ctl.setBoxCount(
-                      id,
-                      c.copyWith(quarantineReason: () => r),
-                    ),
-                  ),
-              ],
-            ),
+          if (c.total != b.unitsPerBox && c.total > 0)
+            Text(l10n.boxCountDiff, style: theme.textTheme.bodySmall),
           const Spacer(),
           Row(
             children: [
@@ -896,7 +965,7 @@ class _BoxInspectStep extends ConsumerWidget {
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(56),
                   ),
-                  onPressed: c.complete && c.total > 0 ? ctl.saveBox : null,
+                  onPressed: c.total > 0 ? ctl.saveBox : null,
                   child: Text(l10n.boxSave),
                 ),
               ),
@@ -921,6 +990,25 @@ class _BoxInspectStep extends ConsumerWidget {
         const SizedBox(height: 8),
         ScanInput(
           id: 'box-open-scan',
+          testActions: [
+            TestAction('all-normal', l10n.testOpenAllNormal, () {
+              for (final b in ctl.current.openable) {
+                if (ctl.current.boxCounts.containsKey(b.boxId)) continue;
+                ctl
+                  ..openBox(b.boxId)
+                  ..setBoxCount(b.boxId, ReceiptCount(normal: b.unitsPerBox))
+                  ..saveBox();
+              }
+            }),
+          ],
+          testValues: [
+            for (final b
+                in s.openable
+                    .where((b) => !s.boxCounts.containsKey(b.boxId))
+                    .take(5))
+              TestScan(l10n.tsNext, b.boxId),
+            TestScan(l10n.tsOtherTruck, 'BOX-99999999'),
+          ],
           label: l10n.boxOpenScan,
           cameraTitle: l10n.boxOpenScan,
           continuous: false,

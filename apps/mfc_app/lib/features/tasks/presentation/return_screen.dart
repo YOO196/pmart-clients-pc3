@@ -6,6 +6,8 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/codes.dart';
 import '../../../shared/field_widgets.dart';
+import '../../../shared/issue_report.dart';
+import '../../../shared/product_hints.dart';
 import '../../../shared/scanner/scan_input.dart';
 import '../../../shared/scanner/scanner.dart';
 import '../../../shared/ui_state_of.dart';
@@ -64,7 +66,9 @@ class ReturnFlowState {
   const ReturnFlowState({
     this.atFrom = false,
     this.to,
-    this.qty,
+    this.qty = 0,
+    this.coldOk,
+    this.reported = false,
     this.lastScan,
     this.syncing = false,
   });
@@ -72,21 +76,32 @@ class ReturnFlowState {
   final bool atFrom;
   final String? to;
 
-  /// 옮길 수량. null 이면 남은 양 전부.
-  final int? qty;
+  /// 옮길 수량 — 상품을 스캔해 센다(0부터). 바코드를 모르면 직접 넣는다.
+  final int qty;
+
+  /// 냉장·냉동 취소품이 포장대에서 온도를 지켰는지(작업자 답). 상온이면 묻지 않는다.
+  /// 기준은 업무 문서에 없다(BR-52 R19 8).
+  final bool? coldOk;
+
+  /// 문제를 보고했다(복귀하지 않음).
+  final bool reported;
   final LocScan? lastScan;
   final bool syncing;
 
   ReturnFlowState copyWith({
     bool? atFrom,
     String? Function()? to,
-    int? Function()? qty,
+    int? qty,
+    bool? Function()? coldOk,
+    bool? reported,
     LocScan? Function()? lastScan,
     bool? syncing,
   }) => ReturnFlowState(
     atFrom: atFrom ?? this.atFrom,
     to: to != null ? to() : this.to,
-    qty: qty != null ? qty() : this.qty,
+    qty: qty ?? this.qty,
+    coldOk: coldOk != null ? coldOk() : this.coldOk,
+    reported: reported ?? this.reported,
     lastScan: lastScan != null ? lastScan() : this.lastScan,
     syncing: syncing ?? this.syncing,
   );
@@ -106,11 +121,40 @@ class ReturnFlowController extends Notifier<ReturnFlowState> {
   @override
   ReturnFlowState build() => const ReturnFlowState();
 
-  /// 포장 위치면 출발 확인, 선반 칸이면 도착.
+  ReturnFlowState get current => state;
+
+  /// 줄 상품 바코드(작업 줄 → 상품 정보). 모르면 null.
+  String? barcodeOf(TaskLineView l) =>
+      l.barcode ?? ref.read(productHintsProvider).bySku(l.sku)?.barcode;
+
+  /// 냉장·냉동이면 온도 확인을 묻는다(상품 정보 온도대). 모르면 묻지 않는다.
+  bool needsCold(TaskLineView l) =>
+      switch (ref.read(productHintsProvider).bySku(l.sku)?.zone) {
+        StorageZone.chilled || StorageZone.frozen => true,
+        _ => false,
+      };
+
+  void setCold(bool ok) => state = state.copyWith(coldOk: () => ok);
+
+  void reported() => state = state.copyWith(reported: true);
+
+  /// 포장 위치 → 상품(1개씩) → 선반 칸.
   LocScan scan(ReturnPiece p, String code) {
     final c = code.trim();
+    final bc = barcodeOf(p.line);
     final LocScan r;
-    if (!isMfcLocation(c)) {
+    if (bc != null && !isMfcLocation(c)) {
+      if (!state.atFrom) {
+        r = LocScan.needFrom;
+      } else if (c != bc) {
+        r = LocScan.wrongItem;
+      } else if (state.qty >= p.left) {
+        r = LocScan.over;
+      } else {
+        state = state.copyWith(qty: state.qty + 1);
+        r = LocScan.ok;
+      }
+    } else if (!isMfcLocation(c)) {
       r = LocScan.notLocation;
     } else if (c == p.from) {
       state = state.copyWith(atFrom: true);
@@ -126,12 +170,19 @@ class ReturnFlowController extends Notifier<ReturnFlowState> {
     return r;
   }
 
-  void setQty(int q) => state = state.copyWith(qty: () => q);
+  void setQty(int q) => state = state.copyWith(qty: q);
+
+  /// 복귀할 수 있는지 — 칸·수량, 냉장·냉동이면 온도 확인 "예".
+  bool canSubmit(ReturnPiece p) =>
+      state.atFrom &&
+      state.to != null &&
+      state.qty > 0 &&
+      (!needsCold(p.line) || state.coldOk == true);
 
   Future<void> submit(TaskDetailView t, ReturnPiece p) async {
     final to = state.to;
-    final qty = state.qty ?? p.left;
-    if (!state.atFrom || to == null || qty < 1) return;
+    final qty = state.qty;
+    if (!canSubmit(p) || to == null) return;
     await ref
         .read(fieldQueueProvider)
         .enqueue(
@@ -211,6 +262,16 @@ class ReturnShelfScreen extends ConsumerWidget {
             ready: (context, t) {
               final p = nextReturnPiece(t);
               final allDone = t.lines.every((l) => l.done);
+              if (s.reported) {
+                return ResultView(
+                  key: const ValueKey('return-reported'),
+                  icon: Icons.report_problem_outlined,
+                  text: l10n.issueReported,
+                  action: l10n.nextTask,
+                  onAction: () async =>
+                      backToSession(context, WorkArea.stockMove),
+                );
+              }
               if (p == null) {
                 return allDone
                     ? ResultView(
@@ -232,7 +293,9 @@ class ReturnShelfScreen extends ConsumerWidget {
                         onAction: ctl.sync,
                       );
               }
-              final qty = s.qty ?? p.left;
+              final qty = s.qty;
+              final bc = ctl.barcodeOf(p.line);
+              final cold = ctl.needsCold(p.line);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -288,8 +351,22 @@ class ReturnShelfScreen extends ConsumerWidget {
                   const SizedBox(height: 8),
                   ScanInput(
                     id: 'return-scan',
+                    testValues: [
+                      TestScan(l10n.tsFrom, p.from),
+                      if (bc != null) TestScan(l10n.tsProduct, bc),
+                      TestScan(l10n.tsWrongProduct, '0000000000000'),
+                      for (final x in p.suggested) TestScan(l10n.tsShelf, x),
+                      TestScan(l10n.tsWrong, 'A-S9-09-9-99'),
+                    ],
+                    testActions: [
+                      if (bc != null)
+                        TestAction('fill', l10n.testFillMove, () {
+                          while (ctl.current.qty < p.left &&
+                              ctl.scan(p, bc) == LocScan.ok) {}
+                        }),
+                    ],
                     label: s.atFrom
-                        ? l10n.returnShelfScanShelf
+                        ? l10n.returnShelfScanItemOrShelf
                         : l10n.returnShelfScanFrom,
                     cameraTitle: l10n.typeReturn,
                     autofocus: false,
@@ -304,14 +381,67 @@ class ReturnShelfScreen extends ConsumerWidget {
                       key: const ValueKey('return-scan-error'),
                       style: TextStyle(color: theme.colorScheme.error),
                     ),
+                  Text(
+                    bc != null ? l10n.moveScanned(qty) : l10n.moveNoBarcode,
+                    key: const ValueKey('product-check'),
+                  ),
                   QtyStepper(
                     id: 'return-qty',
                     label: l10n.moveQtyDrop,
                     value: qty,
-                    max: p.left,
+                    max: bc != null ? qty : p.left,
+                    enabled: s.atFrom,
                     onChanged: ctl.setQty,
                   ),
+                  if (cold) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      l10n.returnColdQuestion,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    SegmentedButton<bool>(
+                      key: const ValueKey('return-cold'),
+                      emptySelectionAllowed: true,
+                      segments: [
+                        ButtonSegment(
+                          value: true,
+                          label: Text(l10n.returnColdYes),
+                        ),
+                        ButtonSegment(
+                          value: false,
+                          label: Text(l10n.returnColdNo),
+                        ),
+                      ],
+                      selected: {?s.coldOk},
+                      onSelectionChanged: (v) {
+                        if (v.isNotEmpty) ctl.setCold(v.first);
+                      },
+                    ),
+                    if (s.coldOk == false)
+                      Text(
+                        l10n.returnColdNoHelp,
+                        key: const ValueKey('return-cold-no'),
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                  ],
                   const Spacer(),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: IssueButton(
+                      id: 'return-issue',
+                      area: 'return',
+                      targetId: taskId,
+                      location: p.from,
+                      qty: p.left,
+                      issues: const [
+                        FieldIssue.temperature,
+                        FieldIssue.damaged,
+                        FieldIssue.sourceEmpty,
+                        FieldIssue.targetUnusable,
+                      ],
+                      onReported: (_) => ctl.reported(),
+                    ),
+                  ),
                   if (waiting.isNotEmpty)
                     Text(
                       l10n.returnShelfPending(waiting.length),
@@ -322,9 +452,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                     key: const ValueKey('return-submit'),
                     busy: s.syncing,
                     label: l10n.returnShelfSubmit,
-                    onPressed: s.atFrom && s.to != null && qty > 0
-                        ? () => ctl.submit(t, p)
-                        : null,
+                    onPressed: ctl.canSubmit(p) ? () => ctl.submit(t, p) : null,
                   ),
                 ],
               );
