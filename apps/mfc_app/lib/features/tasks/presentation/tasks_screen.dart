@@ -5,7 +5,8 @@ import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
-import '../../../shared/providers.dart';
+import '../../work/domain/work.dart';
+import '../../work/presentation/work_screens.dart' show backToSession;
 import '../../../shared/scanner/scan_input.dart';
 import '../../../shared/scanner/scanner.dart';
 import '../../../shared/ui_state_of.dart';
@@ -31,105 +32,6 @@ String taskStateText(AppLocalizations l10n, TaskState s) => switch (s) {
   TaskState.closedPartial => l10n.tsClosedPartial,
   TaskState.unknown => l10n.tsUnknown,
 };
-
-/// 내 작업. 막힌 작업은 기본 조회에 없어서 따로 본다.
-class TasksScreen extends ConsumerStatefulWidget {
-  const TasksScreen({super.key});
-
-  @override
-  ConsumerState<TasksScreen> createState() => _TasksScreenState();
-}
-
-class _TasksScreenState extends ConsumerState<TasksScreen> {
-  bool _blocked = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final mock = ref.watch(envProvider) == PmartEnv.mock;
-    final provider = _blocked ? blockedTasksProvider : myTasksProvider;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.tasksTitle),
-        actions: [
-          IconButton(
-            key: const ValueKey('open-handover-checks'),
-            tooltip: l10n.handoverChecksMenu,
-            icon: const Icon(Icons.assignment_turned_in_outlined),
-            onPressed: () => context.push('/handover-checks'),
-          ),
-          IconButton(
-            key: const ValueKey('open-printer-settings'),
-            tooltip: l10n.printerSettingsTitle,
-            icon: const Icon(Icons.print_outlined),
-            onPressed: () => context.push('/settings/printer'),
-          ),
-          if (mock)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Chip(label: Text(l10n.mockModeBadge)),
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: SegmentedButton<bool>(
-              segments: [
-                ButtonSegment(value: false, label: Text(l10n.tabMyTasks)),
-                ButtonSegment(value: true, label: Text(l10n.tabBlockedTasks)),
-              ],
-              selected: {_blocked},
-              onSelectionChanged: (v) => setState(() => _blocked = v.first),
-            ),
-          ),
-          Expanded(
-            child: UiStateView<TaskList>(
-              state: uiStateOf(
-                ref.watch(provider),
-                isEmpty: (l) => l.tasks.isEmpty,
-              ),
-              onRetry: () => ref.invalidate(provider),
-              empty: (_) => Center(child: Text(l10n.tasksEmpty)),
-              ready: (context, list) => RefreshIndicator(
-                onRefresh: () => ref.refresh(provider.future),
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (!list.assignmentFresh)
-                      ListTile(
-                        key: const ValueKey('assignment-stale'),
-                        leading: const Icon(Icons.info_outline),
-                        title: Text(l10n.assignmentStale),
-                      ),
-                    for (final task in list.tasks)
-                      Card(
-                        key: ValueKey('task-${task.taskId}'),
-                        child: ListTile(
-                          title: Text(taskKindText(l10n, task.kind)),
-                          subtitle: Text(
-                            [
-                              switch (task.remainingQty) {
-                                final int q => l10n.taskRemaining(q),
-                                null => l10n.taskRemainingUnknown,
-                              },
-                              taskStateText(l10n, task.state),
-                            ].join('\n'),
-                          ),
-                          onTap: () => context.push('/tasks/${task.taskId}'),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 String startRejectText(AppLocalizations l10n, String? code) => switch (code) {
   TaskProblemCode.alreadyStarted => l10n.startAlreadyStarted,
@@ -377,16 +279,23 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          current.locationId ?? '-',
+                          firstPickLocation(current) ?? '-',
+                          key: const ValueKey('pick-location'),
                           style: theme.textTheme.headlineSmall,
                         ),
                         Text(
                           current.productName ?? current.sku,
                           style: theme.textTheme.titleMedium,
                         ),
-                        if (current.expiresOn case final e?)
-                          Text(l10n.expiresOn(e)),
-                        if (current.lotId case final lot?) Text(l10n.lot(lot)),
+                        if (current.picks.isEmpty) ...[
+                          if (current.expiresOn case final e?)
+                            Text(l10n.expiresOn(e)),
+                          if (current.lotId case final lot?)
+                            Text(l10n.lot(lot)),
+                        ] else
+                          for (final p in current.picks)
+                            if (p.status != PickStatus.done)
+                              PickInstructionTile(pick: p),
                         Text(
                           l10n.pickCounts(
                             current.remainingQty,
@@ -435,13 +344,24 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                     ),
                   ],
                 ),
-              ] else
+              ] else ...[
                 Text(
                   task.lines.every((l) => l.done)
                       ? l10n.pickAllConfirmed
                       : l10n.pickWaitingConfirm,
                   key: const ValueKey('pick-finished'),
                 ),
+                const SizedBox(height: 8),
+                // 다음 작업은 서버가 정한다 — 근무 화면으로 돌아가 다시 받는다.
+                FilledButton(
+                  key: const ValueKey('next-task'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                  ),
+                  onPressed: () => backToSession(context, WorkArea.pickPack),
+                  child: Text(l10n.nextTask),
+                ),
+              ],
               const Divider(height: 32),
               Text(l10n.queueTitle, style: theme.textTheme.titleMedium),
               for (final q in queue)
@@ -469,6 +389,73 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// 지금 갈 칸: 남은 첫 지시의 배정 칸(없으면 첫 칸), 지시가 없으면 줄의 지시 로케이션.
+String? firstPickLocation(TaskLineView l) {
+  for (final p in l.picks) {
+    if (p.status == PickStatus.done) continue;
+    final allocated = p.locations
+        .where((c) => (c.allocatedQty ?? 0) > 0)
+        .firstOrNull;
+    final c = allocated ?? p.locations.firstOrNull;
+    if (c != null) return c.code;
+  }
+  return l.locationId;
+}
+
+/// LOT 조각 하나의 피킹 지시. 칸 상태·안내는 서버 값 그대로 보인다.
+class PickInstructionTile extends StatelessWidget {
+  const PickInstructionTile({super.key, required this.pick});
+
+  final PickInstruction pick;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final warn = switch (pick.status) {
+      PickStatus.partial => l10n.pickStatusPartial,
+      PickStatus.notFound => l10n.pickStatusNotFound,
+      PickStatus.unknown => l10n.tsUnknown,
+      _ => null,
+    };
+    return Padding(
+      key: ValueKey('pick-${pick.lotId ?? pick.visitSeq}'),
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            [
+              if (pick.visitSeq case final n?) l10n.pickVisit(n),
+              if (pick.lotId case final lot?) l10n.lot(lot),
+              if (pick.expiresOn case final e?) l10n.expiresOn(e),
+              if (pick.remainingQty case final q?) l10n.pickLotRemaining(q),
+            ].join(' · '),
+            style: theme.textTheme.bodyLarge,
+          ),
+          if (warn != null)
+            Text(
+              warn,
+              key: const ValueKey('pick-status-warning'),
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
+          if (pick.notice case final n?)
+            Text(n, key: const ValueKey('pick-notice')),
+          for (final c in pick.locations)
+            Text(
+              (c.allocatedQty ?? 0) > 0
+                  ? l10n.pickLocationAllocated(c.code, c.allocatedQty!)
+                  : l10n.pickLocationOther(c.code, c.qty ?? 0),
+              style: (c.allocatedQty ?? 0) > 0
+                  ? theme.textTheme.titleMedium
+                  : theme.textTheme.bodyMedium,
+            ),
+        ],
       ),
     );
   }

@@ -20,12 +20,6 @@ final packingRepositoryProvider = Provider<PackingRepository>(
 /// 지금 시각(패킹 소요시간 계산용). 테스트에서 바꾼다.
 final mfcClockProvider = Provider<DateTime Function()>((_) => DateTime.now);
 
-/// 배차 결과 조회 간격·횟수.
-final dispatchPollPolicyProvider =
-    Provider<({Duration interval, int attempts})>(
-      (_) => (interval: const Duration(seconds: 3), attempts: 5),
-    );
-
 final shipmentProvider = FutureProvider.autoDispose
     .family<ShipmentView, String>(
       (ref, id) => ref.watch(packingRepositoryProvider).shipment(id),
@@ -44,8 +38,9 @@ class PackingState {
     this.rejectCode,
     this.lastSealed,
     this.packingFinished = false,
-    this.dispatch,
-    this.dispatchRequestId,
+    this.dispatchBusy = false,
+    this.dispatchUnknown = false,
+    this.dispatchRejectCode,
   });
 
   /// 지금 담고 있는 포장의 수량(밀봉 전). orderLineId → 수량.
@@ -59,8 +54,11 @@ class PackingState {
   final String? rejectCode;
   final PackageView? lastSealed;
   final bool packingFinished;
-  final DispatchView? dispatch;
-  final String? dispatchRequestId;
+  final bool dispatchBusy;
+
+  /// 배차 요청이 됐는지 모른다. "다시 확인"은 같은 키·같은 분으로만 보낸다.
+  final bool dispatchUnknown;
+  final String? dispatchRejectCode;
 
   int inBag(String orderLineId) => bag[orderLineId] ?? 0;
 
@@ -73,8 +71,9 @@ class PackingState {
     String? Function()? rejectCode,
     PackageView? lastSealed,
     bool? packingFinished,
-    DispatchView? dispatch,
-    String? dispatchRequestId,
+    bool? dispatchBusy,
+    bool? dispatchUnknown,
+    String? Function()? dispatchRejectCode,
   }) => PackingState(
     bag: bag ?? this.bag,
     zone: zone ?? this.zone,
@@ -84,8 +83,11 @@ class PackingState {
     rejectCode: rejectCode != null ? rejectCode() : this.rejectCode,
     lastSealed: lastSealed ?? this.lastSealed,
     packingFinished: packingFinished ?? this.packingFinished,
-    dispatch: dispatch ?? this.dispatch,
-    dispatchRequestId: dispatchRequestId ?? this.dispatchRequestId,
+    dispatchBusy: dispatchBusy ?? this.dispatchBusy,
+    dispatchUnknown: dispatchUnknown ?? this.dispatchUnknown,
+    dispatchRejectCode: dispatchRejectCode != null
+        ? dispatchRejectCode()
+        : this.dispatchRejectCode,
   );
 }
 
@@ -98,6 +100,9 @@ class PackingController extends Notifier<PackingState> {
 
   final String taskId;
   IdempotencyKey? _sealKey;
+
+  /// 결과를 모르는 배차 요청의 키·분. 확인될 때까지 이 값으로만 다시 보낸다.
+  ({IdempotencyKey key, int minutes})? _pendingDispatch;
   late final DateTime _startedAt = ref.read(mfcClockProvider)();
 
   @override
@@ -230,59 +235,43 @@ class PackingController extends Notifier<PackingState> {
       ..invalidate(taskDetailProvider(taskId));
   }
 
-  /// 배차 요청 → 결과 조회. 배차 요청 ≠ 배정(라이더 수락은 dispatch 판정).
-  Future<void> requestDispatch(ShipmentView s) async {
-    final deliveryId = s.deliveryId;
-    if (deliveryId == null || state.busy) return;
-    state = state.copyWith(busy: true, rejectCode: () => null);
-    final key = IdempotencyKey.generate();
-    String? requestId;
-    try {
-      requestId = await _repo.requestDispatch(
-        deliveryId: deliveryId,
-        mfcId: ref.read(currentMfcIdProvider),
-        packagingMinutes:
-            (ref.read(mfcClockProvider)().difference(_startedAt).inSeconds / 60)
-                .ceil(),
-        bagCount: s.packages
-            .where((p) => p.state == PackageState.sealed)
-            .length,
-        coldChain: s.packages.any((p) => p.temperatureZone != 'AMBIENT'),
-        packageIds: [
-          for (final p in s.packages)
-            if (p.state == PackageState.sealed) p.packageId,
-        ],
-        key: key,
-      );
-    } on UnknownResultFailure {
-      // 같은 배송의 진행 중 시도는 서버가 기존 것을 돌려준다. 결과는 조회로 확인한다.
-      requestId = key.value;
-    } on ProblemFailure catch (f) {
-      if (ref.mounted) {
-        state = state.copyWith(busy: false, rejectCode: () => f.problem.code);
-      }
-      return;
-    }
-    final policy = ref.read(dispatchPollPolicyProvider);
-    DispatchView? last;
-    for (var i = 0; i < policy.attempts; i++) {
-      if (i > 0) await Future<void>.delayed(policy.interval);
-      if (!ref.mounted) return;
-      try {
-        last = await _repo.dispatch(requestId!);
-      } on PmartFailure {
-        continue;
-      }
-      if (last.state == DispatchState.assigned ||
-          last.state == DispatchState.failed) {
-        break;
-      }
-    }
-    if (!ref.mounted) return;
-    state = state.copyWith(
-      busy: false,
-      dispatch: last,
-      dispatchRequestId: requestId,
+  /// 배차 요청(D-5) — 예상 포장 시간(분)과 함께. 요청 ≠ 배정.
+  /// 결과를 모르면 같은 키·같은 분으로만 다시 보낸다(출고당 한 번이라 서버가 그 요청을 돌려준다).
+  Future<void> requestDispatch(String shipmentId, int minutes) async {
+    if (state.dispatchBusy) return;
+    final pending = _pendingDispatch ??= (
+      key: IdempotencyKey.generate(),
+      minutes: minutes,
     );
+    state = state.copyWith(dispatchBusy: true, dispatchRejectCode: () => null);
+    final outcome = await _repo.requestDispatch(
+      shipmentId,
+      estimatedPackMinutes: pending.minutes,
+      key: pending.key,
+    );
+    if (!ref.mounted) return;
+    switch (outcome) {
+      case DispatchDone():
+        _pendingDispatch = null;
+        state = state.copyWith(dispatchBusy: false, dispatchUnknown: false);
+        ref.invalidate(shipmentProvider(shipmentId));
+      case DispatchRejected(:final code):
+        _pendingDispatch = null;
+        state = state.copyWith(
+          dispatchBusy: false,
+          dispatchUnknown: false,
+          dispatchRejectCode: () => code,
+        );
+        ref.invalidate(shipmentProvider(shipmentId));
+      case DispatchUnknown():
+        state = state.copyWith(dispatchBusy: false, dispatchUnknown: true);
+    }
+  }
+
+  /// 결과를 모르는 요청을 다시 확인한다(같은 키·같은 분).
+  Future<void> recheckDispatch(String shipmentId) async {
+    final p = _pendingDispatch;
+    if (p == null) return;
+    await requestDispatch(shipmentId, p.minutes);
   }
 }

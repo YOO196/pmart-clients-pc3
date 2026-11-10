@@ -31,6 +31,7 @@ base class MockTaskRepository implements TaskRepository {
         },
         'lineCount': 2,
         'plannedQty': 3,
+        'headline': {'productName': '그릭요거트 플레인 400g', 'otherLineCount': 1},
         'remainingQty': 3,
         'lines': [
           {
@@ -71,7 +72,7 @@ base class MockTaskRepository implements TaskRepository {
   }
 
   final Duration latency;
-  static const workerId = 'worker-mock-1';
+  static const workerId = 'OP-mock-1';
   static const milkBarcode = '8801115114154';
   static const yogurtBarcode = '8801115220015';
   static const chipsBarcode = '8801019606557';
@@ -116,6 +117,7 @@ base class MockTaskRepository implements TaskRepository {
     'assignment': {'workerId': workerId, 'assignmentVersion': 2},
     'lineCount': 3,
     'plannedQty': 4,
+    'headline': {'productName': '그릭요거트 플레인 400g', 'otherLineCount': 2},
     'completedQty': 0,
     'remainingQty': 4,
     'promisedReadyAt': '2026-10-24T06:20:00Z',
@@ -127,9 +129,21 @@ base class MockTaskRepository implements TaskRepository {
         'sku': 'E-00000002',
         'productName': '그릭요거트 플레인 400g',
         'barcode': yogurtBarcode,
-        'locationId': 'C01-01-101',
+        'locationId': 'C-S1-01-1-01',
         'lotId': 'LOT-Y-1024',
         'expiresOn': '2026-11-05',
+        'picks': [
+          {
+            'lotId': 'LOT-Y-1024',
+            'expiresOn': '2026-11-05',
+            'remainingQty': 1,
+            'visitSeq': 1,
+            'pickStatus': 'OK',
+            'locations': [
+              {'locationCode': 'C-S1-01-1-01', 'qty': 6, 'allocatedQty': 1},
+            ],
+          },
+        ],
         'plannedQty': 1,
         'completedQty': 0,
         'cancelledQty': 0,
@@ -142,9 +156,24 @@ base class MockTaskRepository implements TaskRepository {
         'sku': 'E-00000001',
         'productName': '서울우유 1L',
         'barcode': milkBarcode,
-        'locationId': 'C01-02-205',
+        'locationId': 'C-S1-02-2-05',
         'lotId': 'LOT-M-1022',
         'expiresOn': '2026-10-30',
+        'picks': [
+          {
+            'lotId': 'LOT-M-1022',
+            'expiresOn': '2026-10-30',
+            'remainingQty': 2,
+            'visitSeq': 2,
+            'pickStatus': 'PARTIAL',
+            'unallocatedQty': 1,
+            'notice': '1개는 칸을 못 정했어요 — 다른 칸 확인',
+            'locations': [
+              {'locationCode': 'C-S1-02-2-05', 'qty': 1, 'allocatedQty': 1},
+              {'locationCode': 'C-S2-04-1-10', 'qty': 3, 'allocatedQty': 0},
+            ],
+          },
+        ],
         'plannedQty': 2,
         'completedQty': 0,
         'cancelledQty': 0,
@@ -157,7 +186,18 @@ base class MockTaskRepository implements TaskRepository {
         'sku': 'E-00000005',
         'productName': '감자칩 오리지널 110g',
         'barcode': chipsBarcode,
-        'locationId': 'A03-01-110',
+        'locationId': 'A-S3-01-1-10',
+        'picks': [
+          {
+            'lotId': 'LOT-C-0901',
+            'remainingQty': 1,
+            'visitSeq': 3,
+            'pickStatus': 'OK',
+            'locations': [
+              {'locationCode': 'A-S3-01-1-10', 'qty': 12, 'allocatedQty': 1},
+            ],
+          },
+        ],
         'plannedQty': 1,
         'completedQty': 0,
         'cancelledQty': 0,
@@ -192,6 +232,9 @@ base class MockTaskRepository implements TaskRepository {
 
   /// 목 작업 JSON(테스트에서 상태를 바꿀 때 쓴다).
   Map<String, Object?> taskJson(String taskId) => _tasks[taskId]!;
+
+  /// 목 작업 ID(다음 작업 받기 목이 고른다).
+  Iterable<String> get taskIds => _tasks.keys;
 
   @override
   Future<TaskDetailView> task(String taskId) async {

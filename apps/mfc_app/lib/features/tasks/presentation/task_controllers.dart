@@ -30,19 +30,6 @@ final fieldQueueProvider = Provider<FieldQueue>(
 /// 시작 결과 불명일 때 같은 키로 자동 재전송하는 횟수.
 final startResendAttemptsProvider = Provider<int>((_) => 2);
 
-final myTasksProvider = FutureProvider.autoDispose<TaskList>(
-  (ref) => ref
-      .watch(taskRepositoryProvider)
-      .myTasks(ref.watch(currentMfcIdProvider)),
-);
-
-/// 막힌 작업은 기본 조회에 없어서 따로 조회한다(BR-05 회신).
-final blockedTasksProvider = FutureProvider.autoDispose<TaskList>(
-  (ref) => ref
-      .watch(taskRepositoryProvider)
-      .myTasks(ref.watch(currentMfcIdProvider), blocked: true),
-);
-
 final taskDetailProvider = FutureProvider.autoDispose
     .family<TaskDetailView, String>(
       (ref, taskId) => ref.watch(taskRepositoryProvider).task(taskId),

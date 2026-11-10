@@ -3,6 +3,55 @@
 점원앱·PDA앱·패킹앱을 **역할별 메뉴로 한 앱에** 둔다 `[확정 2026-10-24, ADR-0001]`. 설정·배정·예외 해결은 관리자 웹(backoffice), PDA는 **실행만** (M 784, 1183).
 근거: `../pmart-backend/docs/business/MFC-business-logic.md`(M, v2.0), `Delivery-business-logic.md`(D), 계약 `mfc-fulfillment`, `mfc-capacity`, `mfc-inbound`, `mfc-location`, `mfc-quality`, `mfc-inventory`, `delivery-dispatch`, `product-service`(바코드).
 
+
+## 0. 메인·작업 흐름 (2026-11-10 사용자 결정 — 이 문서의 다른 절보다 우선)
+- 크루는 **작업 목록을 볼 수 없다**(목록 화면 삭제). 메인(모든 작업자 공통): 업무 5개, 메뉴(인계 확인·프린터 설정·휴게). "작업 준비 완료" 버튼 없음 — 업무를 누르면 바로 작업 순서 안내(2026-11-10).
+- 업무 묶음(사용자 2026-11-10 "지금은 이렇게 묶을 거야"):
+  | 업무 | 하는 일 | 작업 유형 |
+  |---|---|---|
+  | 입고 | 입고 등록·하차 → 수령(계수, 정상/격리/미판정 수량) | RECEIVE |
+  | 품질검사 | 정상/격리 판정, LOT 분리(제조 LOT·소비기한), 환불·불량으로 들어온 회수품 검사 | INSPECT, (임시) RETURN_INSPECT |
+  | 재고 이동 | 입고 → 보관 라인(적치), 회수품(반품) 반입, 보충·지시 이동·취소품 복귀 — 재고가 움직이는 모든 흐름 | PUTAWAY·REPLENISH·MOVE·RETURN, (임시) RETURN_RECEIPT |
+  | 재고 실사 | 실사 입력 → 차이 승인 | (임시) CYCLE_COUNT |
+  | 피패킹 | 피킹·패킹(사용자 목록에 없어 기존 유지 — 가정) | PICK·PACK |
+  - (임시) 값은 계약 TaskType 에 없다 — BR-52 R2·R4.
+- 권한: 작업자 본인 조회(capacity `getWorker`)의 `effectiveTaskTypes`. 업무는 묶음 중 하나라도 있으면, 메뉴는 요구 자격이 있으면 쓸 수 있다. 없으면 누를 때 "○○ 권한이 없어요" 대화상자(잠금 아이콘 표시).
+  - 가정(BR-52 R5): 인계 확인·프린터 설정 = PACK 자격. 휴게 = 누구나.
+- 흐름: 업무 누름 → 작업 순서 안내 한 장(스크롤 없음, 4단계마다 픽토그램(Material 아이콘) + 한 줄, 공통 안내). 휴게 중이면 안내 대신 "휴게 끝내기" 창 → 확인 = 다음 작업 받기(capacity `pullNextTask`) → 받은 작업 하나(유형·약속 시각·상품 3줄) → 작업 시작(피킹·패킹 화면) → 끝나면 "다음 작업" → 다시 받기(끝나지 않았으면 같은 작업).
+  - 지금 할 작업이 없으면 "지금 할 작업이 없어요" + 다시 받기. 휴게 중·근무 밖·근무 등록 없음은 코드별 안내. 응답을 못 받으면 같은 키로 다시 확인.
+  - 실행 화면이 있는 작업은 피킹·패킹만. 나머지 업무의 작업은 "이 작업 화면은 아직 없어요".
+  - 고른 업무 필터는 계약에 없다(BR-52 R1) — 실서버는 업무와 다른 작업이 올 수 있어 "고른 업무와 다른 작업이 배정됐어요" 표시.
+- 웹 미리보기는 412×915dp(안드로이드 폰) 틀 안에 그린다.
+- 목 테스트 계정(worker-mock-1)은 모든 업무 권한(2026-11-10 "앱에 모든 권한 허용한 상태로"). 권한 없음 안내는 테스트에서 권한을 줄여 확인.
+
+### 0-0. 백엔드 연결 현황 (2026-11-10, 실서버 검증 없음 — 목으로만 확인)
+| 업무 | 연결(계약 API) | 화면 |
+|---|---|---|
+| 배정·휴게 | capacity `pullNextTask`·`getWorker`·breaks | 있음 |
+| 입고 | inbound `inbound-promises` 조회·arrivals·receipts·receipt 조회 | 있음 |
+| 품질검사 | inbound `inbound-tasks` 목록·inspections, quality `return-inspections` 등록·조회, inbound `return-receipts` 조회 | 있음(§0-2) |
+| 재고 이동 | inbound `move-orders` 조회·pickups·drops, `inbound-tasks` putaways, `return-receipts` 등록·조회 | 없음(연결 계층·목만) |
+| 재고 실사 | inventory `count-sessions` 시작·조회·counts(차이 승인은 관리자라 제외) | 없음(연결 계층·목만) |
+| 피패킹 | fulfillment tasks·starts·executions·shipments·packages·repack·dispatch-requests | 있음 |
+| 인계 확인 | fulfillment packages checkRequired·handover-resolution·handover-checks, tracking ETA | 있음 |
+- `PMART_ENV=mock` 은 목, `local` 은 계약 API(게이트웨이). 현장 명령 결과는 `FieldOutcome`(확정/거절/불명) — APPLIED(또는 접수 + 결과 ID)만 확정, CAPTURED·UNKNOWN_RESULT·503 은 같은 키로 다시.
+- 연결 중 나온 계약 공백: BR-52 R12~R14(회수품 검수 대기 목록, 회수 라벨 형식, 실사 배정), R16(표시 문서 번호).
+- 식별자 규칙(채번 지침 요약): `docs/architecture/identifiers.md`. 목 데이터 위치 코드·ID 를 지침 형식으로 맞춤(2026-11-10).
+
+### 0-2. 품질검사 실행 (2026-11-10)
+서버가 준 작업 하나 — 입고 품질검사(INSPECT, taskId = 입고 작업 ID) 또는 회수품 검수(RETURN_INSPECT, taskId = 반입 ID — 가정, BR-52 R2·R12).
+- **입고 품질검사**: 작업(SKU·위치·검사할 수량) → 결과 줄(정상/격리 · 수량 · 소비기한 · 제조일(선택)). **LOT 번호는 시스템이 정한다.** 작업자는 정상 줄마다 포장의 **LOT 표기를 스캔**(카메라·스캐너 → `sourceLotRef`)하거나 "LOT 표기 없음"을 누른다(채번 지침 G-06 동일 배치 판정, 사용자 2026-11-10 "(가)", BR-52 R15). "줄 추가"로 LOT 표기·소비기한·격리를 나눈다. 같은 판정·LOT 표기·소비기한 줄이 둘이면 합치라고 막는다. 합계 ≤ 잔량. 정상 판정은 소비기한 필수(가정). 날짜는 **달력에서 고른다**(손 입력 없음) — 제조일 달력은 오늘·소비기한 이후를 고를 수 없다(최종 판정 서버 400). 등록 → APPLIED 면 "적치 작업 N개" 안내. CAPTURED·불명은 같은 키로 다시 확인(그동안 입력 잠금). 단건 조회가 없어 목록에서 찾는다.
+- **회수품 검수**: 반입 조회(반품 번호·줄) → 줄마다 온도대(필수 — 반입 조회에 없어 작업자가 고름)·신선·개봉 → 재판매/폐기. 재판매는 상온·신선 아님·미개봉일 때만 눌린다. 조건이 바뀌어 재판매가 안 되면 폐기로 돌리고 사유를 채운다(냉장·냉동 → 냉장·냉동, 신선 → 신선, 개봉 → 개봉, 그 밖은 파손·기한 지남·기타 중 선택). 등록(202) → 검수 조회의 재고 반영 APPLIED 여야 끝. 422 RESALE_NOT_ALLOWED 는 안내.
+- 끝나면 "다음 작업" → 근무 화면이 다시 받는다(목: 입고 검사 → 반품 검사 → 없음).
+
+### 0-1. 입고(받기) 실행 (2026-11-10)
+서버가 준 RECEIVE 작업 하나(taskId = trfId 가정, BR-53 R9) → 4단계(도착 → 수령 → 확인 → 반영):
+1. **도착**: 송장 정보(예정 시각·상품 종류·예정 수량). 송장 스캔(값 = trfId 가정) 또는 "도착 등록(하차 시작)" → `POST /inbound-promises/{trfId}/arrivals`(예상 버전) → 예정을 다시 읽어 RECEIVING 이어야 다음. 불명이면 같은 키로 다시 확인.
+2. **수령**: 행(SKU·LOT)마다 한 화면. 정상·격리·미판정 수량(−/＋, 숫자 눌러 직접 입력), 상품 스캔 1번 = 정상 +1(바코드는 계약에 없음 — 목만, BR-53 R8). 합계 ≠ 예정이면 부족·초과·미도착 표시. 격리가 있으면 격리 사유(파손·온도 이상)를 골라야 다음.
+3. **확인**: 행별 예정·정상·격리·미판정·사유 → "수령 등록" `POST …/receipts`(예상 버전, 행 차이 사유는 수량 차이 우선 — BR-53 R11). 불명이면 같은 키로만 다시 확인. VERSION_CONFLICT·INVALID_STATE 는 다시 읽기.
+4. **반영**: 202 접수 ≠ 반영. `GET …/receipts/{receiptId}` 로 APPLIED/REJECTED 를 확인(5번, 1초 간격) — 안 끝나면 "재고 반영을 기다리고 있어요" + 다시 확인. 반영되면 "다음 작업" → 근무 화면이 다음 작업을 받는다.
+- 계수는 화면에만 있다(앱을 끄면 다시 센다) — 현장 큐 내구 저장은 아직.
+
 ## 1. 메뉴와 API
 
 | 메뉴 | API | 비고 |
@@ -12,7 +61,7 @@
 | 작업 시작 | `POST /tasks/{taskId}/starts`, `GET …/starts/{requestId}` | BR-05. 처리는 §3-1 |
 | 피킹 | `POST /tasks/{taskId}/executions`, `GET …/executions/{executionId}`, `GET /barcodes/{barcode}` | 지시 행은 `GET /tasks/{taskId}` 의 `lines[]` |
 | 패킹 | `GET /shipments/{id}`, `POST /shipments/{id}/packages`(밀봉 → 포장 QR), `GET /packages/{id}`, `POST /packages/{id}/repackings` | |
-| 배차 요청 | `POST /dispatch-requests`, `GET /dispatch-requests/{requestId}`, `GET /deliveries/{id}/dispatch` | 패킹 소요시간 입력 |
+| 배차 요청 | `POST /shipments/{id}/dispatch-requests`(fulfillment 0.4.5, D-5), 결과는 `GET /shipments/{id}` 의 `dispatchRequest` | 포장 시작 때 예상 포장 시간(분, 1~180) 입력. 출고당 한 번, 안 하면 READY 때 자동(AUTO_ON_READY). 점원 앱은 delivery-dispatch 를 직접 부르지 않는다 |
 | 인계 확인 | `GET /packages?mfcId=&checkRequired=true`, `GET /packages/{id}/handover-resolution`, `POST /packages/{id}/handover-checks`, `GET /deliveries/{id}/eta`(pickupEta) | 라이더 스캔 결과 반영. 허가 만료 뒤 점원 확인(D-1, fulfillment 0.4.4·0.4.9). §6-1 |
 | 입고 | `GET /inbound-promises`, `GET /inbound-promises/{trfId}`, `POST …/arrivals`, `POST …/receipts` (+짝 조회) | 2단계(공급 루프)에 본격 사용. 1차는 초기 보유·회수 반입 |
 | 회수품 반입 | `POST /return-receipts`, `GET /return-receipts/{id}` | 반입 즉시 격리 |
@@ -60,6 +109,7 @@
 - 유효 포장 구성 합계 = 확정 피킹량. 누락·혼입·초과는 준비 완료 차단.
 - 라벨 재출력은 같은 PKG ID, 실제 재포장만 새 PKG. 인계된 포장은 재포장 불가.
 - 패킹 시작·패킹 완료·배차 요청은 각각 기록.
+- 배차 요청(D-5, 2026-11-10 반영): 패킹 화면 위쪽에서 예상 포장 시간(분)을 넣고 요청. 서버에 요청이 있으면 입력 대신 "요청했어요/자동으로 요청됐어요 · 포장 완료 예정 HH:mm" 만 보인다. 응답을 못 받으면 "확인 중" — 같은 키·같은 분으로만 다시 보낸다. 요청 ≠ 배정(라이더 찾기는 delivery-dispatch).
 
 ## 6. 인계 (M 1885-1987)
 - 라이더가 포장 QR을 스캔 → fence `HANDOVER_IN_PROGRESS` → 커밋 → 재고 H/E/R 차감 → `HANDED_OVER`.

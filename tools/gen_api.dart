@@ -42,6 +42,10 @@ const services = <String, List<String>>{
   'delivery-execution-service': ['rider'],
   'rider-service': ['rider'],
   'mfc-fulfillment-service': ['mfc'],
+  'mfc-capacity-service': ['mfc'],
+  'mfc-inbound-service': ['mfc'],
+  'mfc-quality-service': ['mfc'],
+  'mfc-inventory-service': ['mfc'],
 };
 
 const excludedPathPrefixes = ['/internal', '/webhooks', '/actuator'];

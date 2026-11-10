@@ -73,6 +73,7 @@ class ShipmentView {
     this.orderId,
     this.deliveryId,
     this.holdReason,
+    this.dispatchRequest,
   });
 
   final String shipmentId;
@@ -84,6 +85,9 @@ class ShipmentView {
   final ShipmentState state;
   final String? holdReason;
   final List<PackageView> packages;
+
+  /// 서버에 남은 배차 요청(없으면 null). 점원 요청이든 자동 요청이든 출고당 하나다.
+  final DispatchRequestView? dispatchRequest;
 
   /// 유효 포장(밀봉·인계)에 담긴 orderLine 별 수량.
   Map<String, int> get packedByLine {
@@ -126,22 +130,49 @@ final class PackUnknown extends PackOutcome {
 
 enum RepackReason { damagedBag, contentChange, labelUnreadable, shortageAdjust }
 
-/// 배차 시도 상태.
-enum DispatchState { searching, offering, assigned, failed, cancelled, unknown }
+/// 배차 요청이 어떻게 생겼나. 점원 요청(MANUAL) 또는 출하 준비 시 자동(AUTO_ON_READY).
+enum DispatchTrigger { manual, autoOnReady, unknown }
 
+/// 배차 요청(D-5). 요청 ≠ 배정 — 라이더를 찾는 일은 delivery-dispatch 가 한다.
 @immutable
-class DispatchView {
-  const DispatchView({
-    required this.state,
-    this.failureReason,
-    this.splitCount,
+class DispatchRequestView {
+  const DispatchRequestView({
+    required this.trigger,
+    required this.estimatedReadyAt,
+    required this.requestedAt,
+    this.estimatedPackMinutes,
   });
 
-  final DispatchState state;
-  final String? failureReason;
+  final DispatchTrigger trigger;
+  final int? estimatedPackMinutes;
 
-  /// 규격 초과로 추가 라이더가 필요한 수.
-  final int? splitCount;
+  /// 서버가 정한 예상 포장 완료 시각(UTC).
+  final DateTime estimatedReadyAt;
+  final DateTime requestedAt;
+}
+
+/// 배차 요청 결과.
+@immutable
+sealed class DispatchOutcome {
+  const DispatchOutcome();
+}
+
+/// 요청됨(새로 요청했거나 이미 요청돼 있던 것).
+final class DispatchDone extends DispatchOutcome {
+  const DispatchDone(this.request);
+
+  final DispatchRequestView request;
+}
+
+final class DispatchRejected extends DispatchOutcome {
+  const DispatchRejected(this.code);
+
+  final String code;
+}
+
+/// 요청됐는지 모른다. 같은 키로 다시 보내면 서버가 그 요청을 돌려준다(출고당 한 번).
+final class DispatchUnknown extends DispatchOutcome {
+  const DispatchUnknown();
 }
 
 abstract final class PackProblemCode {

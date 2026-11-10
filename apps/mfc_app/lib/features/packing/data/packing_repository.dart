@@ -1,6 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:pmart_api_delivery_dispatch/pmart_api_delivery_dispatch.dart'
-    as dsp;
 import 'package:pmart_api_mfc_fulfillment/pmart_api_mfc_fulfillment.dart'
     as api;
 import 'package:pmart_core/pmart_core.dart';
@@ -29,29 +27,19 @@ abstract interface class PackingRepository {
     required IdempotencyKey key,
   });
 
-  /// `POST /dispatch-requests`(202). 같은 배송의 진행 중 시도가 있으면 그 시도를 돌려준다.
-  Future<String?> requestDispatch({
-    required String deliveryId,
-    required String mfcId,
-    required int packagingMinutes,
-    required int bagCount,
-    required bool coldChain,
-    required List<String> packageIds,
-    bool containsAlcohol = false,
+  /// `POST /shipments/{id}/dispatch-requests`(D-5). 출고당 한 번 — 이미 요청됐으면 그 요청(200).
+  Future<DispatchOutcome> requestDispatch(
+    String shipmentId, {
+    required int estimatedPackMinutes,
     required IdempotencyKey key,
   });
-
-  Future<DispatchView> dispatch(String requestId);
 }
 
 final class ApiPackingRepository implements PackingRepository {
   ApiPackingRepository(Dio dio)
-    : _shipments = api.PmartApiMfcFulfillment(dio: dio).getShipmentsApi(),
-      _dispatch = dsp.PmartApiDeliveryDispatch(dio: dio)
-          .getDispatchRequestsApi();
+    : _shipments = api.PmartApiMfcFulfillment(dio: dio).getShipmentsApi();
 
   final api.ShipmentsApi _shipments;
-  final dsp.DispatchRequestsApi _dispatch;
 
   @override
   Future<ShipmentView> shipment(String shipmentId) async {
@@ -135,47 +123,37 @@ final class ApiPackingRepository implements PackingRepository {
   }
 
   @override
-  Future<String?> requestDispatch({
-    required String deliveryId,
-    required String mfcId,
-    required int packagingMinutes,
-    required int bagCount,
-    required bool coldChain,
-    required List<String> packageIds,
-    bool containsAlcohol = false,
+  Future<DispatchOutcome> requestDispatch(
+    String shipmentId, {
+    required int estimatedPackMinutes,
     required IdempotencyKey key,
   }) async {
-    await pmartGuard(
-      () => _dispatch.createDispatchRequest(
-        idempotencyKey: key.value,
-        xSourceSystem: sourceSystem,
-        dispatchRequest: dsp.DispatchRequest(
-          deliveryId: deliveryId,
-          mfcId: mfcId,
-          packageSpec: dsp.PackageSpec(
-            packagingMinutes: packagingMinutes,
-            bagCount: bagCount,
-            coldChain: coldChain,
-            containsAlcohol: containsAlcohol,
-            packageIds: packageIds,
+    try {
+      final res = await pmartGuard(
+        () => _shipments.requestDispatch(
+          shipmentId: shipmentId,
+          idempotencyKey: key.value,
+          xSourceSystem: sourceSystem,
+          requestDispatchRequest: api.RequestDispatchRequest(
+            estimatedPackMinutes: estimatedPackMinutes,
           ),
+          extra: commandOptions(key).extra,
         ),
-        extra: commandOptions(key).extra,
-      ),
-    );
-    // 결과 조회 경로의 requestId 는 Idempotency-Key 다.
-    return key.value;
-  }
-
-  @override
-  Future<DispatchView> dispatch(String requestId) async {
-    final res = await pmartGuard(
-      () => _dispatch.getDispatchRequest(requestId: requestId),
-    );
-    return dispatchFromContract(
-      res.data ??
-          (throw const ContractViolationFailure('DispatchAttempt 본문 없음')),
-    );
+      );
+      final d = res.data;
+      if (d == null) return const DispatchUnknown();
+      return DispatchDone(dispatchRequestFromContract(d));
+    } on PmartFailure catch (f) {
+      return switch (f) {
+        UnknownResultFailure() => const DispatchUnknown(),
+        ProblemFailure(:final problem)
+            when problem.code == ProblemCode.idempotencyConflict &&
+                problem.retryable =>
+          const DispatchUnknown(),
+        ProblemFailure(:final problem) => DispatchRejected(problem.code),
+        _ => throw f,
+      };
+    }
   }
 }
 
@@ -249,17 +227,20 @@ ShipmentView shipmentFromContract(api.Shipment s) => ShipmentView(
   packages: [
     for (final p in s.packages ?? const <api.Package>[]) packageFromContract(p),
   ],
+  dispatchRequest: switch (s.dispatchRequest) {
+    final d? => dispatchRequestFromContract(d),
+    null => null,
+  },
 );
 
-DispatchView dispatchFromContract(dsp.DispatchAttempt a) => DispatchView(
-  state: switch (a.state?.value) {
-    'SEARCHING' => DispatchState.searching,
-    'OFFERING' => DispatchState.offering,
-    'ASSIGNED' => DispatchState.assigned,
-    'FAILED' => DispatchState.failed,
-    'CANCELLED' => DispatchState.cancelled,
-    _ => DispatchState.unknown,
-  },
-  failureReason: a.failureReason?.value,
-  splitCount: a.splitCount,
-);
+DispatchRequestView dispatchRequestFromContract(api.DispatchRequest d) =>
+    DispatchRequestView(
+      trigger: switch (d.trigger.value) {
+        'MANUAL' => DispatchTrigger.manual,
+        'AUTO_ON_READY' => DispatchTrigger.autoOnReady,
+        _ => DispatchTrigger.unknown,
+      },
+      estimatedPackMinutes: d.estimatedPackMinutes,
+      estimatedReadyAt: d.estimatedReadyAt,
+      requestedAt: d.requestedAt,
+    );

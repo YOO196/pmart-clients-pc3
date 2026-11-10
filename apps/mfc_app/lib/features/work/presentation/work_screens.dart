@@ -1,0 +1,719 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pmart_core/pmart_core.dart';
+import 'package:pmart_ui/pmart_ui.dart';
+
+import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/providers.dart';
+import '../../../shared/ui_state_of.dart';
+import '../domain/work.dart';
+import 'work_controller.dart';
+
+String workAreaText(AppLocalizations l10n, WorkArea a) => switch (a) {
+  WorkArea.inbound => l10n.areaInbound,
+  WorkArea.inspection => l10n.areaInspection,
+  WorkArea.stockMove => l10n.areaStockMove,
+  WorkArea.stockCount => l10n.areaStockCount,
+  WorkArea.pickPack => l10n.areaPickPack,
+};
+
+String workAreaHint(AppLocalizations l10n, WorkArea a) => switch (a) {
+  WorkArea.inbound => l10n.areaInboundHint,
+  WorkArea.inspection => l10n.areaInspectionHint,
+  WorkArea.stockMove => l10n.areaStockMoveHint,
+  WorkArea.stockCount => l10n.areaStockCountHint,
+  WorkArea.pickPack => l10n.areaPickPackHint,
+};
+
+IconData workAreaIcon(WorkArea a) => switch (a) {
+  WorkArea.inbound => Icons.local_shipping_outlined,
+  WorkArea.inspection => Icons.fact_check_outlined,
+  WorkArea.stockMove => Icons.swap_horiz,
+  WorkArea.stockCount => Icons.inventory_outlined,
+  WorkArea.pickPack => Icons.shopping_basket_outlined,
+};
+
+String assignedTypeText(AppLocalizations l10n, String type) => switch (type) {
+  'PICK' => l10n.typePick,
+  'PACK' => l10n.typePack,
+  'RETURN' => l10n.typeReturn,
+  'REPLENISH' => l10n.typeReplenish,
+  'MOVE' => l10n.typeMove,
+  'RECEIVE' => l10n.typeReceive,
+  'PUTAWAY' => l10n.typePutaway,
+  'INSPECT' => l10n.typeInspect,
+  'RETURN_INSPECT' => l10n.typeReturnInspect,
+  'RETURN_RECEIPT' => l10n.typeReturnReceipt,
+  'CYCLE_COUNT' => l10n.typeCycleCount,
+  _ => type,
+};
+
+/// 작업을 끝내고 근무 화면으로 돌아간다. 근무 화면이 그 자리에서 다음 작업을 다시 받는다.
+/// (같은 경로로 `go` 하면 근무 화면을 재사용해 다시 받지 않는다.)
+void backToSession(BuildContext context, WorkArea area) {
+  if (context.canPop()) {
+    context.pop();
+  } else {
+    context.go('/work/${area.name}');
+  }
+}
+
+/// 권한이 없을 때 띄운다.
+Future<void> showNoPermission(BuildContext context, String what) {
+  final l10n = AppLocalizations.of(context);
+  return showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      key: const ValueKey('no-permission'),
+      icon: const Icon(Icons.lock_outline),
+      title: Text(l10n.noPermissionTitle),
+      content: Text(l10n.noPermissionBody(what)),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.confirmOk),
+        ),
+      ],
+    ),
+  );
+}
+
+/// 메인(모든 작업자 공통). 작업 목록은 없다 — 업무를 고르고 준비 완료를 누르면 서버가 작업을 준다.
+class HomeScreen extends ConsumerStatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  bool _breakBusy = false;
+
+  Future<void> _toggleBreak(WorkerProfile me) async {
+    final l10n = AppLocalizations.of(context);
+    setState(() => _breakBusy = true);
+    try {
+      await setOnBreak(ref, on: !me.onBreak);
+    } on PmartFailure {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(l10n.breakFailed)));
+      }
+    } finally {
+      if (mounted) setState(() => _breakBusy = false);
+    }
+  }
+
+  /// 휴게 중에 업무를 누르면: 안내 + 바로 휴게 끝내기.
+  Future<void> _onBreakDialog(WorkerProfile me) async {
+    final l10n = AppLocalizations.of(context);
+    final end = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const ValueKey('on-break-dialog'),
+        icon: const Icon(Icons.coffee_outlined),
+        content: Text(l10n.readyBlockedByBreak),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            key: const ValueKey('end-break'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.breakEnd),
+          ),
+        ],
+      ),
+    );
+    if (end ?? false) await _toggleBreak(me);
+  }
+
+  void _menu(WorkerProfile me, PdaMenu m, String label, VoidCallback go) {
+    if (!me.canUse(m)) {
+      unawaited(showNoPermission(context, label));
+      return;
+    }
+    go();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final mock = ref.watch(envProvider) == PmartEnv.mock;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.homeTitle),
+        actions: [
+          if (mock)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: Chip(label: Text(l10n.mockModeBadge)),
+            ),
+        ],
+      ),
+      body: UiStateView<WorkerProfile>(
+        state: uiStateOf(ref.watch(meProvider)),
+        onRetry: () => ref.invalidate(meProvider),
+        ready: (context, me) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l10n.homeHello(me.displayName ?? me.workerId),
+                  style: theme.textTheme.titleLarge,
+                ),
+                Text(
+                  me.onBreak ? l10n.statusOnBreak : l10n.statusReady,
+                  key: const ValueKey('worker-status'),
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: me.onBreak
+                        ? theme.colorScheme.error
+                        : theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(l10n.chooseArea, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                for (final a in WorkArea.values)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: _AreaTile(
+                        area: a,
+                        allowed: me.can(a),
+                        onTap: () {
+                          if (!me.can(a)) {
+                            unawaited(
+                              showNoPermission(context, workAreaText(l10n, a)),
+                            );
+                            return;
+                          }
+                          if (me.onBreak) {
+                            unawaited(_onBreakDialog(me));
+                            return;
+                          }
+                          // 고르면 바로 그 업무의 작업 순서 안내로.
+                          context.push('/work/${a.name}/guide');
+                        },
+                      ),
+                    ),
+                  ),
+                Row(
+                  children: [
+                    _MenuButton(
+                      key: const ValueKey('menu-handover'),
+                      icon: Icons.inventory_2_outlined,
+                      label: l10n.handoverChecksMenu,
+                      allowed: me.canUse(PdaMenu.handoverCheck),
+                      onTap: () => _menu(
+                        me,
+                        PdaMenu.handoverCheck,
+                        l10n.handoverChecksMenu,
+                        () => context.push('/handover-checks'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _MenuButton(
+                      key: const ValueKey('menu-printer'),
+                      icon: Icons.print_outlined,
+                      label: l10n.printerSettingsTitle,
+                      allowed: me.canUse(PdaMenu.printerSettings),
+                      onTap: () => _menu(
+                        me,
+                        PdaMenu.printerSettings,
+                        l10n.printerSettingsTitle,
+                        () => context.push('/settings/printer'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _MenuButton(
+                      key: const ValueKey('menu-break'),
+                      icon: me.onBreak
+                          ? Icons.play_circle_outline
+                          : Icons.coffee_outlined,
+                      label: me.onBreak ? l10n.breakEnd : l10n.breakStart,
+                      allowed: me.canUse(PdaMenu.rest),
+                      onTap: _breakBusy ? null : () => _toggleBreak(me),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AreaTile extends StatelessWidget {
+  const _AreaTile({
+    required this.area,
+    required this.allowed,
+    required this.onTap,
+  });
+
+  final WorkArea area;
+  final bool allowed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final fg = allowed ? scheme.onSurface : scheme.onSurface.withAlpha(97);
+    return Material(
+      key: ValueKey('area-${area.name}'),
+      color: scheme.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        // 작은 화면에서는 칸이 낮아 설명 줄을 숨긴다.
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final roomy = c.maxHeight >= 72;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Icon(workAreaIcon(area), size: roomy ? 36 : 24, color: fg),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          workAreaText(l10n, area),
+                          maxLines: 1,
+                          style:
+                              (roomy
+                                      ? theme.textTheme.headlineSmall
+                                      : theme.textTheme.titleMedium)
+                                  ?.copyWith(color: fg),
+                        ),
+                        if (roomy)
+                          Text(
+                            workAreaHint(l10n, area),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: fg,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    allowed ? Icons.chevron_right : Icons.lock_outline,
+                    color: fg,
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuButton extends StatelessWidget {
+  const _MenuButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.allowed,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool allowed;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: OutlinedButton(
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(64),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+      ),
+      onPressed: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(allowed ? icon : Icons.lock_outline),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ],
+      ),
+    ),
+  );
+}
+
+/// 업무 설명 한 장(스크롤 없음). 확인을 누르면 작업을 받을 수 있다고 서버에 알린다(다음 작업 받기).
+class WorkGuideScreen extends StatelessWidget {
+  const WorkGuideScreen({super.key, required this.area});
+
+  final WorkArea area;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    // 단계마다 픽토그램(아이콘)과 한 줄 안내.
+    final steps = switch (area) {
+      WorkArea.inbound => [
+        (Icons.local_shipping, l10n.guideInbound1),
+        (Icons.qr_code_scanner, l10n.guideInbound2),
+        (Icons.format_list_numbered, l10n.guideInbound3),
+        (Icons.report_problem_outlined, l10n.guideInbound4),
+      ],
+      WorkArea.inspection => [
+        (Icons.qr_code_scanner, l10n.guideInspection1),
+        (Icons.event_available, l10n.guideInspection2),
+        (Icons.health_and_safety_outlined, l10n.guideInspection3),
+        (Icons.recycling, l10n.guideInspection4),
+      ],
+      WorkArea.stockMove => [
+        (Icons.shelves, l10n.guideStockMove1),
+        (Icons.move_down, l10n.guideStockMove2),
+        (Icons.sync_alt, l10n.guideStockMove3),
+        (Icons.report_problem_outlined, l10n.guideStockMove4),
+      ],
+      WorkArea.stockCount => [
+        (Icons.place_outlined, l10n.guideStockCount1),
+        (Icons.numbers, l10n.guideStockCount2),
+        (Icons.visibility_outlined, l10n.guideStockCount3),
+        (Icons.verified_user_outlined, l10n.guideStockCount4),
+      ],
+      WorkArea.pickPack => [
+        (Icons.shelves, l10n.guidePickPack1),
+        (Icons.shopping_cart_checkout, l10n.guidePickPack2),
+        (Icons.report_problem_outlined, l10n.guidePickPack3),
+        (Icons.inventory_2_outlined, l10n.guidePickPack4),
+      ],
+    };
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.guideTitle(workAreaText(l10n, area)))),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            key: const ValueKey('guide'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.guideLead,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: Column(
+                  children: [
+                    for (final (i, (icon, text)) in steps.indexed) ...[
+                      if (i > 0)
+                        Icon(
+                          Icons.arrow_downward,
+                          size: 20,
+                          color: theme.colorScheme.outline,
+                        ),
+                      Expanded(
+                        child: _GuideStep(n: i + 1, icon: icon, text: text),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Card(
+                margin: EdgeInsets.zero,
+                color: theme.colorScheme.secondaryContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(l10n.guideCommon),
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                key: const ValueKey('guide-ok'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(64),
+                  textStyle: theme.textTheme.titleLarge,
+                ),
+                onPressed: () => context.pushReplacement('/work/${area.name}'),
+                child: Text(l10n.guideOk),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 근무 중 화면. 서버가 준 작업 하나를 보이고, 끝내고 돌아오면 다음 작업을 다시 받는다.
+class WorkSessionScreen extends ConsumerWidget {
+  const WorkSessionScreen({super.key, required this.area});
+
+  final WorkArea area;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final s = ref.watch(workSessionProvider(area));
+    final ctl = ref.read(workSessionProvider(area).notifier);
+
+    Widget center(List<Widget> children) => Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    );
+
+    final body = switch (s.phase) {
+      SessionPhase.pulling => center([
+        const Center(child: CircularProgressIndicator()),
+        const SizedBox(height: 16),
+        Text(
+          l10n.sessionPulling,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.titleMedium,
+        ),
+      ]),
+      SessionPhase.unknown => center([
+        Text(
+          l10n.sessionUnknown,
+          key: const ValueKey('session-unknown'),
+          textAlign: TextAlign.center,
+          style: theme.textTheme.titleMedium,
+        ),
+        const SizedBox(height: 16),
+        FilledButton(
+          key: const ValueKey('session-retry'),
+          onPressed: ctl.pull,
+          child: Text(l10n.checkAgain),
+        ),
+      ]),
+      SessionPhase.unavailable => center([
+        Icon(
+          s.code == WorkProblemCode.noTaskAvailable
+              ? Icons.hourglass_empty
+              : Icons.block,
+          size: 56,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          switch (s.code) {
+            WorkProblemCode.noTaskAvailable => l10n.nextNoTask,
+            WorkProblemCode.onBreak => l10n.nextOnBreak,
+            WorkProblemCode.offShift => l10n.nextOffShift,
+            WorkProblemCode.dailyNotEnrolled => l10n.nextNotEnrolled,
+            _ => l10n.nextNotAllowed,
+          },
+          key: const ValueKey('session-unavailable'),
+          textAlign: TextAlign.center,
+          style: theme.textTheme.titleMedium,
+        ),
+        const SizedBox(height: 16),
+        FilledButton(
+          key: const ValueKey('session-retry'),
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+          onPressed: ctl.pull,
+          child: Text(l10n.nextRetry),
+        ),
+      ]),
+      SessionPhase.assigned => _AssignedView(
+        area: area,
+        task: s.task!,
+        onRun: () async {
+          await context.push(s.task!.route!);
+          // 작업 화면에서 돌아오면 서버에 다음 작업을 다시 받는다(끝나지 않았으면 같은 작업).
+          await ctl.pull();
+        },
+        onRetry: ctl.pull,
+      ),
+    };
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(workAreaText(l10n, area)),
+        automaticallyImplyLeading: false,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: body),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                key: const ValueKey('session-end'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
+                onPressed: () => context.go('/'),
+                child: Text(l10n.sessionEnd),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssignedView extends StatelessWidget {
+  const _AssignedView({
+    required this.area,
+    required this.task,
+    required this.onRun,
+    required this.onRetry,
+  });
+
+  final WorkArea area;
+  final AssignedTask task;
+  final Future<void> Function() onRun;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final shown = task.lines.take(3).toList();
+    return Column(
+      key: ValueKey('assigned-${task.taskId}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(l10n.sessionNow, style: theme.textTheme.titleMedium),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Text(
+              assignedTypeText(l10n, task.taskType),
+              key: const ValueKey('assigned-type'),
+              style: theme.textTheme.headlineMedium,
+            ),
+            if (task.urgent) ...[
+              const SizedBox(width: 8),
+              Chip(label: Text(l10n.urgent)),
+            ],
+          ],
+        ),
+        if (task.promisedReadyAt case final t?)
+          Text(l10n.promisedReadyAt(formatSeoulTime(t))),
+        if (!area.taskTypes.contains(task.taskType))
+          Text(
+            l10n.areaMismatch,
+            key: const ValueKey('area-mismatch'),
+            style: TextStyle(color: theme.colorScheme.error),
+          ),
+        const SizedBox(height: 12),
+        for (final l in shown)
+          Card(
+            child: ListTile(
+              title: Text(l.productName ?? l.sku ?? '-'),
+              subtitle: Text(
+                [
+                  if (l.qty case final q?) l10n.qtyUnit(q),
+                  ?l.fromLocation,
+                  if (l.toLocation case final t?) '→ $t',
+                  ?l.notice,
+                ].join(' · '),
+              ),
+            ),
+          ),
+        if (task.lines.length > shown.length)
+          Text(l10n.moreLines(task.lines.length - shown.length)),
+        if (!task.detailAvailable) Text(l10n.detailUnavailable),
+        const Spacer(),
+        if (task.runnable)
+          CommandButton(
+            key: const ValueKey('run-task'),
+            label: l10n.runTask,
+            onPressed: onRun,
+          )
+        else ...[
+          Text(
+            l10n.taskScreenNotYet,
+            key: const ValueKey('task-not-runnable'),
+            style: TextStyle(color: theme.colorScheme.error),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton(onPressed: onRetry, child: Text(l10n.checkAgain)),
+        ],
+      ],
+    );
+  }
+}
+
+/// 안내 한 단계: 번호 + 픽토그램 + 한 줄.
+class _GuideStep extends StatelessWidget {
+  const _GuideStep({required this.n, required this.icon, required this.text});
+
+  final int n;
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      key: ValueKey('guide-step-$n'),
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: Row(
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(icon, size: 40, color: scheme.onPrimaryContainer),
+                ),
+                Positioned(
+                  left: -6,
+                  top: -6,
+                  child: CircleAvatar(
+                    radius: 12,
+                    backgroundColor: scheme.primary,
+                    foregroundColor: scheme.onPrimary,
+                    child: Text('$n', style: theme.textTheme.labelLarge),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

@@ -264,6 +264,8 @@ TaskList taskListFromContract(api.ListTasks200Response body) {
           remainingQty: t.remainingQty,
           lineCount: t.lineCount,
           promisedReadyAt: t.promisedReadyAt,
+          headlineProduct: t.headline?.productName,
+          otherLineCount: t.headline?.otherLineCount,
         ),
     ],
   );
@@ -300,6 +302,36 @@ TaskDetailView taskDetailFromContract(api.TaskDetail d) => TaskDetailView(
         cancelledQty: l.cancelledQty,
         remainingQty: l.remainingQty,
         pendingQty: l.pendingQty ?? 0,
+        picks: [
+          for (final p in l.picks ?? const <api.TaskLinePicksInner>[])
+            PickInstruction(
+              lotId: p.lotId,
+              expiresOn: p.expiresOn,
+              remainingQty: p.remainingQty,
+              visitSeq: p.visitSeq,
+              unallocatedQty: p.unallocatedQty,
+              status: switch (p.pickStatus?.value) {
+                null => null,
+                'OK' => PickStatus.ok,
+                'PARTIAL' => PickStatus.partial,
+                'NOT_FOUND' => PickStatus.notFound,
+                'DONE' => PickStatus.done,
+                _ => PickStatus.unknown,
+              },
+              notice: p.notice,
+              locations: [
+                for (final c
+                    in p.locations ??
+                        const <api.TaskLinePicksInnerLocationsInner>[])
+                  if (c.locationCode case final code?)
+                    PickLocation(
+                      code: code,
+                      qty: c.qty,
+                      allocatedQty: c.allocatedQty,
+                    ),
+              ],
+            ),
+        ],
       ),
   ],
 );

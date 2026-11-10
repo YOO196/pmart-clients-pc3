@@ -1,5 +1,3 @@
-import 'package:pmart_api_delivery_dispatch/pmart_api_delivery_dispatch.dart'
-    as dsp;
 import 'package:pmart_api_mfc_fulfillment/pmart_api_mfc_fulfillment.dart'
     as api;
 import 'package:pmart_core/pmart_core.dart';
@@ -9,10 +7,15 @@ import 'packing_repository.dart';
 
 /// 목 구현. 출하 shp-2(task-mock-2 패킹): 그릭요거트 1 + 서울우유 2 를 담는다.
 /// 모든 수량이 밀봉되면 출하가 READY 가 된다. 담을 수량을 넘으면 CONTENT_MISMATCH.
+/// 배차는 직원 요청만 쓴다(2026-11-10 사용자 결정) — READY 가 돼도 자동 요청을 만들지 않는다.
 base class MockPackingRepository implements PackingRepository {
-  MockPackingRepository({this.latency = const Duration(milliseconds: 300)});
+  MockPackingRepository({
+    this.latency = const Duration(milliseconds: 300),
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
 
   final Duration latency;
+  final DateTime Function() _now;
 
   /// 출하 shp-2 가 담아야 할 수량(피킹 확정분).
   static const expected = {'ol-1': 1, 'ol-2': 2};
@@ -27,14 +30,19 @@ base class MockPackingRepository implements PackingRepository {
     'packages': <Map<String, Object?>>[],
   };
   final _byKey = <String, String>{};
-  final _dispatches = <String, int>{};
+
+  /// 받은 배차 요청 횟수(같은 키 재전송 포함).
+  int dispatchCalls = 0;
   int _seq = 0;
 
   /// 다음 밀봉 응답을 1회 잃는다(서버는 밀봉함).
   bool loseNextSealResponse = false;
 
-  /// 다음 배차 요청을 주문 취소로 거절한다.
-  bool orderCancelled = false;
+  /// 출고가 취소된 것처럼 배차 요청을 409 INVALID_STATE 로 거절한다.
+  bool shipmentCancelled = false;
+
+  /// 다음 배차 요청 응답을 1회 잃는다(서버는 요청을 남김).
+  bool loseNextDispatchResponse = false;
 
   Future<void> _wait() => Future<void>.delayed(latency);
 
@@ -149,6 +157,18 @@ base class MockPackingRepository implements PackingRepository {
       ..['version'] = (_shipment['version']! as int) + 1;
   }
 
+  Map<String, Object?> _dispatchJson(int minutes) {
+    final now = _now().toUtc();
+    return {
+      'shipmentId': _shipment['shipmentId'],
+      'trigger': 'MANUAL',
+      'estimatedPackMinutes': minutes,
+      'estimatedReadyAt': now.add(Duration(minutes: minutes)).toIso8601String(),
+      'requestedAt': now.toIso8601String(),
+      'requestedBy': 'OP-mock-1',
+    };
+  }
+
   @override
   Future<PackOutcome> repack(
     String packageId,
@@ -189,53 +209,28 @@ base class MockPackingRepository implements PackingRepository {
   }
 
   @override
-  Future<String?> requestDispatch({
-    required String deliveryId,
-    required String mfcId,
-    required int packagingMinutes,
-    required int bagCount,
-    required bool coldChain,
-    required List<String> packageIds,
-    bool containsAlcohol = false,
+  Future<DispatchOutcome> requestDispatch(
+    String shipmentId, {
+    required int estimatedPackMinutes,
     required IdempotencyKey key,
   }) async {
     await _wait();
-    if (orderCancelled) {
-      throw const ProblemFailure(
-        Problem(status: 422, code: PackProblemCode.orderCancelled),
-      );
+    dispatchCalls++;
+    if (shipmentCancelled) {
+      return const DispatchRejected(PackProblemCode.invalidState);
     }
-    // 같은 배송에 진행 중 시도가 있으면 그 시도를 돌려준다.
-    final existing = _dispatches.keys.firstOrNull;
-    if (existing != null) return existing;
-    _dispatches[key.value] = 0;
-    return key.value;
-  }
-
-  @override
-  Future<DispatchView> dispatch(String requestId) async {
-    await _wait();
-    final n = _dispatches[requestId];
-    if (n == null) {
-      throw const ProblemFailure(
-        Problem(status: 404, code: ProblemCode.notFound),
-      );
+    // 출고당 한 번 — 이미 있으면 그 요청을 돌려준다.
+    final d = _shipment['dispatchRequest'] ??= _dispatchJson(
+      estimatedPackMinutes,
+    );
+    if (loseNextDispatchResponse) {
+      loseNextDispatchResponse = false;
+      return const DispatchUnknown();
     }
-    _dispatches[requestId] = n + 1;
-    final state = switch (n) {
-      0 => 'SEARCHING',
-      1 => 'OFFERING',
-      _ => 'ASSIGNED',
-    };
-    return dispatchFromContract(
-      dsp.DispatchAttempt.fromJson({
-        'attemptId': 'att-1',
-        'requestId': requestId,
-        'deliveryId': 'dlv-2',
-        'trigger': 'STORE_STAFF',
-        'state': state,
-        'retryCount': 0,
-      }),
+    return DispatchDone(
+      dispatchRequestFromContract(
+        api.DispatchRequest.fromJson((d as Map).cast<String, Object?>()),
+      ),
     );
   }
 }

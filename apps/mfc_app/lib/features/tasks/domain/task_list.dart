@@ -51,6 +51,8 @@ class TaskItem {
     required this.remainingQty,
     this.lineCount,
     this.promisedReadyAt,
+    this.headlineProduct,
+    this.otherLineCount,
   });
 
   final String taskId;
@@ -59,6 +61,58 @@ class TaskItem {
   final int? remainingQty;
   final int? lineCount;
   final DateTime? promisedReadyAt;
+
+  /// 목록 표시용 첫 줄 상품명과 나머지 줄 수("상품명 외 N건", fulfillment 0.4.9).
+  final String? headlineProduct;
+  final int? otherLineCount;
+}
+
+/// 피킹 칸 상태(0.4.9, 화면 표시용 — 서버 값 그대로).
+enum PickStatus { ok, partial, notFound, done, unknown }
+
+/// 한 줄의 LOT 조각별 피킹 지시(0.2.0~0.4.10). 줄·조각은 서버가 방문 순서로 준다.
+@immutable
+class PickInstruction {
+  const PickInstruction({
+    required this.locations,
+    this.lotId,
+    this.expiresOn,
+    this.remainingQty,
+    this.visitSeq,
+    this.unallocatedQty,
+    this.status,
+    this.notice,
+  });
+
+  final String? lotId;
+  final String? expiresOn;
+
+  /// 이 LOT 조각에서 더 집을 양.
+  final int? remainingQty;
+
+  /// 방문 순서(1부터). 냉장 → 냉동 → 상온, 칸 사이 최단 거리(서버 계산).
+  final int? visitSeq;
+  final List<PickLocation> locations;
+
+  /// 칸을 못 정한 양.
+  final int? unallocatedQty;
+  final PickStatus? status;
+
+  /// 서버가 준 짧은 안내. 화면에 그대로 보인다.
+  final String? notice;
+}
+
+@immutable
+class PickLocation {
+  const PickLocation({required this.code, this.qty, this.allocatedQty});
+
+  final String code;
+
+  /// 그 칸의 LOT 선반 잔량(이 주문 몫만이 아님).
+  final int? qty;
+
+  /// 그 칸에서 이 주문 몫으로 배정된 남은 양.
+  final int? allocatedQty;
 }
 
 /// 작업 지시 행. 수량은 서버 확정값(계획 = 확정 + 승인취소 + 잔량)이다.
@@ -78,6 +132,7 @@ class TaskLineView {
     this.locationId,
     this.lotId,
     this.expiresOn,
+    this.picks = const [],
   });
 
   final String taskLineId;
@@ -97,6 +152,9 @@ class TaskLineView {
 
   /// 접수됐지만 재고 확정 대기인 수량("확정 대기"로 따로 보인다).
   final int pendingQty;
+
+  /// LOT 조각별 지시. 재고 조회가 안 되면 빈 목록일 수 있다(그때는 locationId 만).
+  final List<PickInstruction> picks;
 
   bool get done => remainingQty == 0 && pendingQty == 0;
 }

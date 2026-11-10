@@ -23,8 +23,14 @@ dependencies:
     path: ../../packages/pmart_ui
   pmart_api_mfc_fulfillment:
     path: ../../packages/pmart_api/gen/mfc-fulfillment
-  pmart_api_delivery_dispatch:
-    path: ../../packages/pmart_api/gen/delivery-dispatch
+  pmart_api_mfc_inbound:
+    path: ../../packages/pmart_api/gen/mfc-inbound
+  pmart_api_mfc_quality:
+    path: ../../packages/pmart_api/gen/mfc-quality
+  pmart_api_mfc_inventory:
+    path: ../../packages/pmart_api/gen/mfc-inventory
+  pmart_api_mfc_capacity:
+    path: ../../packages/pmart_api/gen/mfc-capacity
   pmart_api_delivery_tracking:
     path: ../../packages/pmart_api/gen/delivery-tracking
   mobile_scanner: ^7.5.0

@@ -17,6 +17,8 @@ import 'package:mfc_app/shared/printer/label.dart';
 import 'package:mfc_app/shared/printer/label_printer.dart';
 import 'package:mfc_app/shared/providers.dart';
 
+import 'support.dart';
+
 void main() {
   setUpAll(initPmartFormatting);
 
@@ -190,8 +192,7 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('task-task-mock-2')));
-    await t.pumpAndSettle();
+    await openRoute(t, '/tasks/task-mock-2');
     await t.tap(find.byKey(const ValueKey('continue-picking')));
     await t.pumpAndSettle();
 
@@ -224,7 +225,7 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('open-printer-settings')));
+    await t.tap(find.byKey(const ValueKey('menu-printer')));
     await t.pumpAndSettle();
     await t.tap(find.text('네트워크 프린터'));
     await t.pumpAndSettle();

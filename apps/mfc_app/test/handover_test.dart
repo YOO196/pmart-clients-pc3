@@ -59,7 +59,7 @@ void main() {
       final list = await c.read(handoverChecksProvider.future);
       expect(list.items.map((h) => h.packageId), ['pkg-chk-1', 'pkg-chk-2']);
       expect(list.items.first.checkRequired, isTrue);
-      expect(list.items.first.packingLocation, '포장대 A-3');
+      expect(list.items.first.packingLocation, 'PAK-C-03');
     });
 
     test('포장대에 있음 → 허가 해제, 확인 필요에서 빠짐', () async {
@@ -154,7 +154,7 @@ void main() {
                 },
                 'inventoryApplyStatus': 'NOT_REQUESTED',
                 'checkRequired': true,
-                'packingLocation': 'A-3',
+                'packingLocation': 'PAK-C-03',
                 'riderId': 'r-1',
               },
             ],
@@ -248,9 +248,9 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('open-handover-checks')));
+    await t.tap(find.byKey(const ValueKey('menu-handover')));
     await t.pumpAndSettle();
-    expect(find.text('놓인 위치: 포장대 A-3'), findsOneWidget);
+    expect(find.text('놓인 위치: PAK-C-03'), findsOneWidget);
 
     // 취소하면 보내지 않는다.
     await t.tap(find.byKey(const ValueKey('check-taken-pkg-chk-1')));

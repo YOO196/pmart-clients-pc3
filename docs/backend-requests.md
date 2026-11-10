@@ -57,6 +57,9 @@
 | BR-47 | 높음 | 고객 | 상품 검색 `mfcId` 지정 시 LAN 센터의 전 상품이 미취급(carried=false)으로 빠짐 — `total` 은 뺀 상품 포함("1개"인데 빈 목록), 빈 페이지에 `nextCursor`, 미취급 숨김/구분 정책 확인 | **RESOLVED**(2026-11-04 회신 `../pmart-backend/docs/handoff/2026-11-04-clients-reply-br44-br48.md`): MFC-SEED-01 은 데이터 문제(275 SKU 취급 ON), `total` 의미 계약 명시, 빈 페이지는 서버가 채움(그래도 `nextCursor` 있으면 계속). 정책: 업무 문서는 구분 표시이나 사용자 결정은 미취급 숨김(2026-11-05, BR-49 와 같은 판단) — 고객앱은 기본값(false) 유지 |
 | BR-48 | 중간 | 백오피스 | 카테고리 추가(`/category-tree-additions`·`-uploads`)에 이미 있는 카테고리만 올리면 계약의 422 `NOTHING_TO_ADD` 대신 500 `INTERNAL_ERROR` | **RESOLVED**(2026-11-04 회신 `../pmart-backend/docs/handoff/2026-11-04-clients-reply-br44-br48.md`): 원인은 큰 zip 업로드 메모리 부족(OOM), 스트림으로 수정. 이미 있는 카테고리만이면 422 `NOTHING_TO_ADD`. 클라이언트 변경 없음 |
 | BR-49 | 중간 | 고객 | 홈·탭·섹션 진열(`storefront`)이 `mfcId` 를 줘도 미취급을 거르지 않음(`carried` 늘 null, 없는 센터도 10건) — 검색처럼 빼 달라, 빈 섹션 규칙, 숨김 정책 확인 | OPEN(요청 `docs/handoff/2026-11-05-backend-storefront-not-carried.md`). 고객앱은 서버 항목 그대로 |
+| BR-51 | 높음 | MFC | 배차 자동 요청(AUTO_ON_READY) 제거 — 사용자 결정(2026-11-10): 배차는 무조건 점원 요청. 계약 0.4.5 D-5 는 READY 시 자동 요청 | OPEN(요청 `docs/handoff/2026-11-10-backend-dispatch-manual-only.md`). PDA 는 직원 요청만, 서버가 AUTO_ON_READY 를 보내면 숨기지 않고 관리자 알림 문구 |
+| BR-52 | 높음 | MFC | PDA 업무 선택(입고/품질검사/재고 이동/재고 실사/피패킹) 기반 배정 — 다음 작업 받기에 고른 업무 필터, 입고·품질검사·적치 배정 포함, 회수품 반입·회수품 검사·실사 작업 유형 추가, 작업자 본인 조회 허용, 메뉴 권한 기준, 작업 가능 신호, 품질검사 LOT 은 시스템 배정(R15) | OPEN(요청 `docs/handoff/2026-11-10-backend-pda-work-areas.md`). PDA 는 목으로 업무 필터·권한 표시 |
+| BR-53 | 중간 | MFC | 입고 수령 화면에 필요한 값 — 입고 예정 행의 상품명·바코드(스캔 대조), RECEIVE 배정의 taskId ↔ trfId 연결, 송장(TRF) 바코드 원문 형식, 행당 차이 사유 1개의 우선순위(수량 차이 vs 격리 사유) | OPEN(요청 `docs/handoff/2026-11-10-backend-pda-work-areas.md` R8~R11). PDA 는 목만 상품명·바코드, 실서버는 SKU 만 표시 |
 
 ---
 
@@ -321,3 +324,14 @@
 - 사용자 결정: 연결된 MFC 가 취급하지 않는 상품은 안 보인다(검색·진열 모두).
 - 요청: ① mfcId 지정 시 진열에서 미취급 제외(검색과 같은 판정) ② 빈 섹션·페이지 규칙 ③ `carried` 채우기 또는 계약 명시 ④ 업무 문서("구분 표시")와 다른 정책 반영 판단.
 - 고객앱: 서버 항목 그대로 그림. null 을 판정하지 않음.
+
+## BR-51 배차 자동 요청(AUTO_ON_READY) 제거 (MFC)
+- 사용자 결정(2026-11-10): "배차에 자동요청 기능은 빼 무조건 직원 요청으로."
+- 계약 mfc-fulfillment 0.4.5 `POST /shipments/{id}/dispatch-requests` 설명(D-5)은 요청 없이 READY 가 되면 자동 요청(`AUTO_ON_READY`)한다.
+- 요청: 자동 요청을 없애고 `DispatchRequest.trigger` 를 MANUAL 만 남길지, 또는 끌 수 있는 설정으로 둘지 회신. `Delivery-business-logic.md` §3.1 의 D-5 문구 갱신 필요.
+- PDA: 직원 요청만 쓴다. 출하 준비인데 요청이 없으면 "아직 배차를 요청하지 않았어요" 경고. 서버가 AUTO_ON_READY 를 주면 "직원 요청 없이 서버가 배차를 요청했어요. 관리자에게 알려 주세요".
+
+## BR-52 PDA 업무 선택 기반 배정 (MFC)
+- 사용자 결정(2026-11-10): 크루는 작업 목록을 못 본다. 메인(모든 작업자 공통)에서 업무(입고 / 품질검사 / 재고 이동 / 재고 실사 / 피패킹)를 고르고 "작업 준비 완료" → 업무 설명 한 장 → 확인 → 작업 가능 신호 → 서비스가 최우선 작업을 하나씩·단계별로 지시. 권한 없는 업무·메뉴는 "권한이 없어요".
+- 상세 요청: `docs/handoff/2026-11-10-backend-pda-work-areas.md`
+

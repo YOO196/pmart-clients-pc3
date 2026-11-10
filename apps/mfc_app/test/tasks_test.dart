@@ -16,6 +16,8 @@ import 'package:mfc_app/features/tasks/domain/task_list.dart';
 import 'package:mfc_app/features/tasks/presentation/task_controllers.dart';
 import 'package:mfc_app/shared/providers.dart';
 
+import 'support.dart';
+
 List<Override> _base(MockTaskRepository repo, SecureKeyValueStore store) => [
   envProvider.overrideWithValue(PmartEnv.mock),
   taskRepositoryProvider.overrideWithValue(repo),
@@ -387,7 +389,7 @@ void main() {
     });
   });
 
-  testWidgets('작업 목록 → 시작 확정 → 피킹 스캔 → 실적 전송 상태', (t) async {
+  testWidgets('작업 상세 → 시작 확정 → 피킹 스캔 → 실적 전송 상태', (t) async {
     t.view
       ..physicalSize = const Size(800, 2000)
       ..devicePixelRatio = 1;
@@ -396,21 +398,7 @@ void main() {
     await t.pumpWidget(_app(repo, MemoryKeyValueStore()));
     await t.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('task-task-mock-1')), findsOneWidget);
-    expect(find.byKey(const ValueKey('task-task-mock-3')), findsNothing);
-    await t.tap(find.text('막힌 작업'));
-    await t.pumpAndSettle();
-    expect(find.byKey(const ValueKey('task-task-mock-3')), findsOneWidget);
-    await t.tap(
-      find.descendant(
-        of: find.byType(SegmentedButton<bool>),
-        matching: find.text('내 작업'),
-      ),
-    );
-    await t.pumpAndSettle();
-
-    await t.tap(find.byKey(const ValueKey('task-task-mock-1')));
-    await t.pumpAndSettle();
+    await openRoute(t, '/tasks/task-mock-1');
     await t.tap(find.byKey(const ValueKey('start')));
     await t.pumpAndSettle();
 
@@ -450,8 +438,7 @@ void main() {
       ..loseNextExecutionResponse = true;
     await t.pumpWidget(_app(repo, MemoryKeyValueStore()));
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('task-task-mock-1')));
-    await t.pumpAndSettle();
+    await openRoute(t, '/tasks/task-mock-1');
     await t.tap(find.byKey(const ValueKey('start')));
     await t.pumpAndSettle();
     await t.enterText(

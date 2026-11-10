@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../work/domain/work.dart';
+import '../../work/presentation/work_screens.dart' show backToSession;
 import '../../../shared/printer/label.dart';
 import '../../../shared/printer/printer_ui.dart';
 import '../../../shared/scanner/scan_input.dart';
@@ -21,15 +23,6 @@ String packageStateText(AppLocalizations l10n, PackageState s) => switch (s) {
   PackageState.invalidated => l10n.pkgInvalidated,
   PackageState.voided => l10n.pkgVoided,
   PackageState.unknown => l10n.tsUnknown,
-};
-
-String dispatchStateText(AppLocalizations l10n, DispatchState s) => switch (s) {
-  DispatchState.searching => l10n.dspSearching,
-  DispatchState.offering => l10n.dspOffering,
-  DispatchState.assigned => l10n.dspAssigned,
-  DispatchState.failed => l10n.dspFailed,
-  DispatchState.cancelled => l10n.dspCancelled,
-  DispatchState.unknown => l10n.tsUnknown,
 };
 
 /// 패킹(WK-07). 유효 포장 합계 = 확정 피킹량이어야 준비 완료다(서버 판정).
@@ -104,6 +97,9 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                     key: const ValueKey('shipment-state'),
                     style: theme.textTheme.titleLarge,
                   ),
+                  // D-5: 포장을 시작하면 예상 포장 시간과 함께 배차를 요청한다.
+                  if (s.state != ShipmentState.cancelled)
+                    DispatchSection(taskId: widget.taskId, shipment: s),
                   for (final l in task.lines)
                     ListTile(
                       key: ValueKey('pack-line-${l.orderLineId}'),
@@ -234,39 +230,141 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                         onPressed: () => ctl.finish(task, s),
                         child: Text(l10n.finishPacking),
                       )
-                    else
+                    else ...[
                       Text(
                         l10n.packingFinished,
                         key: const ValueKey('packing-finished'),
                       ),
-                    const SizedBox(height: 8),
-                    CommandButton(
-                      key: const ValueKey('request-dispatch'),
-                      busy: packing.busy,
-                      label: l10n.requestDispatch,
-                      onPressed:
-                          (s.deliveryId != null &&
-                              packing.dispatch?.state != DispatchState.assigned)
-                          ? () => ctl.requestDispatch(s)
-                          : null,
-                    ),
-                    if (s.deliveryId == null) Text(l10n.noDeliveryYet),
-                    if (packing.dispatch case final d?)
-                      Text(
-                        dispatchStateText(l10n, d.state),
-                        key: const ValueKey('dispatch-state'),
+                      const SizedBox(height: 8),
+                      FilledButton(
+                        key: const ValueKey('next-task'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                        ),
+                        onPressed: () =>
+                            backToSession(context, WorkArea.pickPack),
+                        child: Text(l10n.nextTask),
                       ),
-                    if (packing.rejectCode == PackProblemCode.orderCancelled)
-                      Text(
-                        l10n.dispatchOrderCancelled,
-                        key: const ValueKey('dispatch-cancelled'),
-                      ),
+                    ],
                   ],
                 ],
               );
             },
           );
         },
+      ),
+    );
+  }
+}
+
+/// 배차 요청 — 직원 요청만 쓴다(자동 요청 없음, 2026-11-10). 서버에 요청이 있으면 그것만 보이고,
+/// 없으면 예상 포장 시간을 받아 요청한다. 서버가 자동 요청(AUTO_ON_READY)을 보내면 숨기지 않고 알린다.
+class DispatchSection extends ConsumerStatefulWidget {
+  const DispatchSection({
+    super.key,
+    required this.taskId,
+    required this.shipment,
+  });
+
+  final String taskId;
+  final ShipmentView shipment;
+
+  @override
+  ConsumerState<DispatchSection> createState() => _DispatchSectionState();
+}
+
+class _DispatchSectionState extends ConsumerState<DispatchSection> {
+  final _minutes = TextEditingController();
+
+  @override
+  void dispose() {
+    _minutes.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final packing = ref.watch(packingProvider(widget.taskId));
+    final ctl = ref.read(packingProvider(widget.taskId).notifier);
+    final shipmentId = widget.shipment.shipmentId;
+
+    if (widget.shipment.dispatchRequest case final d?) {
+      return Card(
+        key: const ValueKey('dispatch-requested'),
+        color: d.trigger == DispatchTrigger.manual
+            ? null
+            : theme.colorScheme.errorContainer,
+        child: ListTile(
+          leading: const Icon(Icons.delivery_dining),
+          title: Text(
+            d.trigger == DispatchTrigger.manual
+                ? l10n.dispatchRequested
+                : l10n.dispatchRequestedAuto,
+          ),
+          subtitle: Text(
+            l10n.dispatchReadyAt(formatSeoulTime(d.estimatedReadyAt)),
+          ),
+        ),
+      );
+    }
+
+    final minutes = int.tryParse(_minutes.text.trim());
+    final valid = minutes != null && minutes >= 1 && minutes <= 180;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 자동 요청이 없어 직원이 잊으면 배차가 시작되지 않는다.
+          if (widget.shipment.state == ShipmentState.ready &&
+              !packing.dispatchUnknown)
+            Text(
+              l10n.dispatchMissing,
+              key: const ValueKey('dispatch-missing'),
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          if (!packing.dispatchUnknown)
+            TextField(
+              key: const ValueKey('pack-minutes'),
+              controller: _minutes,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: l10n.packMinutesLabel,
+                helperText: l10n.packMinutesHelp,
+                errorText: _minutes.text.isNotEmpty && !valid
+                    ? l10n.packMinutesInvalid
+                    : null,
+              ),
+            ),
+          if (packing.dispatchUnknown)
+            Text(l10n.dispatchUnknown, key: const ValueKey('dispatch-unknown')),
+          if (packing.dispatchRejectCode case final c?)
+            Text(
+              c == PackProblemCode.invalidState
+                  ? l10n.dispatchInvalidState
+                  : l10n.dispatchRejected,
+              key: const ValueKey('dispatch-rejected'),
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
+          const SizedBox(height: 8),
+          CommandButton(
+            key: const ValueKey('request-dispatch'),
+            busy: packing.dispatchBusy,
+            label: packing.dispatchUnknown
+                ? l10n.checkAgain
+                : l10n.requestDispatch,
+            onPressed: packing.dispatchUnknown
+                ? () => ctl.recheckDispatch(shipmentId)
+                : valid
+                ? () => ctl.requestDispatch(shipmentId, minutes)
+                : null,
+          ),
+        ],
       ),
     );
   }

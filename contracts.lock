@@ -1,11 +1,12 @@
 {
   "dart": {
-    "backendCommit": "c891da33512740069f367c15fc468dd1144fac7e",
+    "backendCommit": "497a8aca55ca1fcbcedccc097fbcd0b36afb7708",
     "backendContractsDirty": false,
-    "generatedAt": "2026-11-10T00:21:38.983079Z",
+    "generatedAt": "2026-11-10T05:56:49.860155Z",
     "generator": "openapi-generator-cli 7.26.0 (dart-dio, json_serializable)",
     "regenerated": [
-      "mfc-fulfillment-service"
+      "mfc-quality-service",
+      "mfc-inventory-service"
     ],
     "services": {
       "auth-service": [
@@ -59,7 +60,8 @@
       ],
       "delivery-tracking-service": [
         "customer",
-        "rider"
+        "rider",
+        "mfc"
       ],
       "delivery-dispatch-service": [
         "rider"
@@ -71,6 +73,18 @@
         "rider"
       ],
       "mfc-fulfillment-service": [
+        "mfc"
+      ],
+      "mfc-capacity-service": [
+        "mfc"
+      ],
+      "mfc-inbound-service": [
+        "mfc"
+      ],
+      "mfc-quality-service": [
+        "mfc"
+      ],
+      "mfc-inventory-service": [
         "mfc"
       ]
     }

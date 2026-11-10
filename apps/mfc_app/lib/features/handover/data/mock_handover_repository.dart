@@ -71,14 +71,14 @@ base class MockHandoverRepository implements HandoverRepository {
     _expired(
       id: 'pkg-chk-1',
       rider: 'rider-mock-2',
-      location: '포장대 A-3',
+      location: 'PAK-C-03',
       expiresAt: '2026-11-10T02:48:00Z',
       order: 'order-seed-7',
     ),
     _expired(
       id: 'pkg-chk-2',
       rider: 'rider-mock-3',
-      location: '포장대 B-1',
+      location: 'PAK-C-01',
       expiresAt: '2026-11-10T02:57:00Z',
       order: 'order-seed-8',
     ),
@@ -214,7 +214,7 @@ base class MockHandoverRepository implements HandoverRepository {
         HandoverCheck.atStation => 'AT_STATION',
         HandoverCheck.takenByRider => 'TAKEN_BY_RIDER',
       },
-      'checkedBy': 'worker-mock-1',
+      'checkedBy': 'OP-mock-1',
       'checkedAt': '2026-11-10T03:01:00Z',
     };
     switch (result) {

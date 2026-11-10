@@ -19,6 +19,8 @@ import 'package:mfc_app/router.dart';
 import 'package:mfc_app/shared/providers.dart';
 import 'package:mfc_app/shared/scanner/scanner.dart';
 
+import 'support.dart';
+
 /// 카메라 대신 정해 둔 코드를 차례로 넘긴다.
 final class FakeCameraScanner implements CameraScanner {
   FakeCameraScanner(this.codes);
@@ -139,8 +141,7 @@ void main() {
       MockTaskRepository.yogurtBarcode,
     ]);
     await pumpApp(t);
-    await t.tap(find.byKey(const ValueKey('task-task-mock-1')));
-    await t.pumpAndSettle();
+    await openRoute(t, '/tasks/task-mock-1');
     await t.tap(find.byKey(const ValueKey('start')));
     await t.pumpAndSettle();
 
@@ -160,7 +161,7 @@ void main() {
   testWidgets('인계 확인: 포장 QR 카메라 스캔 → 그 포장 인계 상태, 옛 라벨 경고', (t) async {
     camera = FakeCameraScanner(['hello', 'PKG:pkg-chk-1:2']);
     await pumpApp(t);
-    await t.tap(find.byKey(const ValueKey('open-handover-checks')));
+    await t.tap(find.byKey(const ValueKey('menu-handover')));
     await t.pumpAndSettle();
 
     await t.tap(find.byKey(const ValueKey('package-qr-scan-camera')));
@@ -192,7 +193,7 @@ void main() {
     await t.testTextInput.receiveAction(TextInputAction.done);
     await t.pumpAndSettle();
     expect(find.text('포장 인계 상태'), findsOneWidget);
-    expect(find.text('놓인 위치: 포장대 B-1'), findsOneWidget);
+    expect(find.text('놓인 위치: PAK-C-01'), findsOneWidget);
     expect(find.byKey(const ValueKey('stale-label')), findsNothing);
   });
 }
