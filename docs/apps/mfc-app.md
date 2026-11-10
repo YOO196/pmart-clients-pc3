@@ -30,13 +30,22 @@
 | 배정·휴게 | capacity `pullNextTask`·`getWorker`·breaks | 있음 |
 | 입고 | inbound `inbound-promises` 조회·arrivals·receipts·receipt 조회 | 있음 |
 | 품질검사 | inbound `inbound-tasks` 목록·inspections, quality `return-inspections` 등록·조회, inbound `return-receipts` 조회 | 있음(§0-2) |
-| 재고 이동 | inbound `move-orders` 조회·pickups·drops, `inbound-tasks` putaways, `return-receipts` 등록·조회 | 없음(연결 계층·목만) |
-| 재고 실사 | inventory `count-sessions` 시작·조회·counts(차이 승인은 관리자라 제외) | 없음(연결 계층·목만) |
+| 재고 이동 | inbound `move-orders` 조회·pickups·drops, `inbound-tasks` putaways, `return-receipts` 등록·조회 | 이동·보충·적치 있음(§0-3). 회수품 반입·취소품 복귀는 아직 |
+| 재고 실사 | inventory `count-sessions` 시작·조회·counts(차이 승인은 관리자라 제외) | 있음(§0-4) |
 | 피패킹 | fulfillment tasks·starts·executions·shipments·packages·repack·dispatch-requests | 있음 |
 | 인계 확인 | fulfillment packages checkRequired·handover-resolution·handover-checks, tracking ETA | 있음 |
 - `PMART_ENV=mock` 은 목, `local` 은 계약 API(게이트웨이). 현장 명령 결과는 `FieldOutcome`(확정/거절/불명) — APPLIED(또는 접수 + 결과 ID)만 확정, CAPTURED·UNKNOWN_RESULT·503 은 같은 키로 다시.
 - 연결 중 나온 계약 공백: BR-52 R12~R14(회수품 검수 대기 목록, 회수 라벨 형식, 실사 배정), R16(표시 문서 번호).
 - 식별자 규칙(채번 지침 요약): `docs/architecture/identifiers.md`. 목 데이터 위치 코드·ID 를 지침 형식으로 맞춤(2026-11-10).
+
+### 0-3. 재고 이동 실행 (2026-11-10)
+- **이동·보충**(MOVE·REPLENISH, taskId = moveId): ① 집기 — 출발 칸 바코드(지시 칸이어야) + 카트 바코드(`CRT-…`) + 집을 수량(≤ 남은 양) → "카트에 실었어요" `POST /move-orders/{id}/pickups` ② 내려놓기 — 도착 칸 바코드(취소 뒤에는 출발 칸으로 되돌리기) + 수량(≤ 카트) → `POST …/drops`. 다 내려놓으면 끝, 남으면 다시 집기. 칸 바코드는 채번 지침 위치 형식으로 먼저 걸러 "칸 바코드가 아니에요"/"지시한 칸이 아니에요".
+- **적치**(PUTAWAY, taskId = 입고 작업 ID): 놓을 선반 칸 스캔(위치 형식) + 수량 → `POST /inbound-tasks/{id}/putaways`. 한 칸에 다 안 들어가면 놓은 만큼만, 남은 양은 다른 칸으로 다시(목적지 적격은 서버 판정).
+- 목 다음 작업 순서: 카트에 실린 지시 → 긴급 → 이동·보충 → 적치(품질검사가 만든 것).
+- 아직: 회수품 반입(라벨·반입 예정 조회가 계약에 없음 — R13), 취소품 복귀(fulfillment RETURN 실적 — 피킹 실적 큐에 RETURN 유형 추가 필요).
+
+### 0-4. 재고 실사 실행 (2026-11-10)
+- 실사 세션(CYCLE_COUNT, taskId = sessionId — 가정, R14)을 받으면 칸마다: 칸 바코드 확인 → 줄(SKU·LOT·소비기한)별 센 수량. **장부 수량은 보이지 않는다**(계수표에 수량 없음). 0 도 "없음(0개)"으로 직접 넣어야 다음 칸. 다 세면 확인 → `POST …/count-sessions/{id}/counts` → 서버 판정: 일치 / 다르면 다른 작업자 재계수 / 재계수도 다르면 관리자 승인 대기. 재계수는 첫 계수자에게 주지 않는다(목 배정·서버 409 SAME_COUNTER).
 
 ### 0-2. 품질검사 실행 (2026-11-10)
 서버가 준 작업 하나 — 입고 품질검사(INSPECT, taskId = 입고 작업 ID) 또는 회수품 검수(RETURN_INSPECT, taskId = 반입 ID — 가정, BR-52 R2·R12).

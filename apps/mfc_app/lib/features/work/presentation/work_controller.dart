@@ -6,6 +6,7 @@ import '../../../shared/providers.dart';
 import '../../inbound/data/mock_inbound_repository.dart';
 import '../../inbound/presentation/inbound_controller.dart';
 import '../../quality/data/mock_quality_repository.dart';
+import '../../stock_count/data/mock_stock_count_repository.dart';
 import '../../stock_move/data/mock_stock_move_repository.dart';
 import '../../../shared/field_repositories.dart';
 import '../../tasks/data/mock_task_repository.dart';
@@ -31,6 +32,10 @@ final workRepositoryProvider = Provider<WorkRepository>(
       },
       stockMove: switch (ref.watch(stockMoveRepositoryProvider)) {
         final MockStockMoveRepository m => m,
+        _ => null,
+      },
+      stockCount: switch (ref.watch(stockCountRepositoryProvider)) {
+        final MockStockCountRepository m => m,
         _ => null,
       },
     ),

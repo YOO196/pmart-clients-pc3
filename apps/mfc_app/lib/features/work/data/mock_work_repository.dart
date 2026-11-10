@@ -4,7 +4,9 @@ import '../../inbound/data/mock_inbound_repository.dart';
 import '../../inbound/domain/inbound.dart';
 import '../../quality/data/mock_quality_repository.dart';
 import '../../quality/domain/quality.dart';
+import '../../stock_count/data/mock_stock_count_repository.dart';
 import '../../stock_move/data/mock_stock_move_repository.dart';
+import '../../stock_move/domain/stock_move.dart';
 import '../../tasks/data/mock_task_repository.dart';
 import '../domain/work.dart';
 import 'work_repository.dart';
@@ -19,6 +21,7 @@ final class MockWorkRepository implements WorkRepository {
     this.inbound,
     this.quality,
     this.stockMove,
+    this.stockCount,
     this.latency = const Duration(milliseconds: 300),
     Set<String>? allowed,
   }) : allowed = allowed ?? defaultAllowed;
@@ -42,6 +45,7 @@ final class MockWorkRepository implements WorkRepository {
   final MockInboundRepository? inbound;
   final MockQualityRepository? quality;
   final MockStockMoveRepository? stockMove;
+  final MockStockCountRepository? stockCount;
   final Duration latency;
   final Set<String> allowed;
   bool onBreak = false;
@@ -75,6 +79,8 @@ final class MockWorkRepository implements WorkRepository {
     if (onBreak) return const NextUnavailable(WorkProblemCode.onBreak);
     if (area == WorkArea.inbound) return _nextInbound();
     if (area == WorkArea.inspection) return _nextInspection(mfcId);
+    if (area == WorkArea.stockMove) return _nextStockMove(mfcId);
+    if (area == WorkArea.stockCount) return _nextCount(workerId);
     Map<String, Object?>? pick(String state) {
       for (final id in tasks.taskIds) {
         final t = tasks.taskJson(id);
@@ -162,6 +168,69 @@ final class MockWorkRepository implements WorkRepository {
       }
     }
     return const NextUnavailable(WorkProblemCode.noTaskAvailable);
+  }
+
+  /// 재고 이동: 카트에 실린 것(들고 있는 일) → 긴급 → 이동·보충 → 적치.
+  Future<NextTaskOutcome> _nextStockMove(String mfcId) async {
+    final sm = stockMove;
+    if (sm != null) {
+      int rank(MoveOrderView m) => m.onCartQty > 0 ? 0 : (m.urgent ? 1 : 2);
+      final moves = sm.activeMoves.toList()
+        ..sort((a, b) => rank(a).compareTo(rank(b)));
+      if (moves.firstOrNull case final m?) {
+        return NextAssigned(
+          AssignedTask(
+            taskId: m.moveId,
+            taskType: m.kind == MoveKind.move ? 'MOVE' : 'REPLENISH',
+            urgent: m.urgent,
+            lines: [
+              AssignedLine(
+                sku: m.sku,
+                qty: m.qty - m.droppedQty,
+                fromLocation: m.fromLocation,
+                toLocation: m.toLocation,
+              ),
+            ],
+          ),
+        );
+      }
+    }
+    final q = quality;
+    if (q != null) {
+      final open = await q.inboundTasks(mfcId, kind: InboundTaskKind.putaway);
+      if (open.firstOrNull case final t?) {
+        return NextAssigned(
+          AssignedTask(
+            taskId: t.taskId,
+            taskType: 'PUTAWAY',
+            lines: [
+              AssignedLine(
+                sku: t.sku,
+                qty: t.remainingQty,
+                fromLocation: t.locationCode,
+              ),
+            ],
+          ),
+        );
+      }
+    }
+    return const NextUnavailable(WorkProblemCode.noTaskAvailable);
+  }
+
+  NextTaskOutcome _nextCount(String workerId) {
+    final c = stockCount?.openFor(workerId).firstOrNull;
+    if (c == null) {
+      return const NextUnavailable(WorkProblemCode.noTaskAvailable);
+    }
+    return NextAssigned(
+      AssignedTask(
+        taskId: c.sessionId,
+        taskType: 'CYCLE_COUNT',
+        lines: [
+          for (final loc in c.locationCodes) AssignedLine(fromLocation: loc),
+        ],
+      ),
+    );
   }
 
   NextTaskOutcome _nextInbound() {

@@ -56,6 +56,11 @@ final class MockStockMoveRepository implements StockMoveRepository {
     ),
   };
 
+  /// 진행 중 이동·보충 지시(다음 작업 받기 목이 고른다).
+  Iterable<MoveOrderView> get activeMoves => _moves.values.where(
+    (m) => m.state == MoveState.active || m.state == MoveState.cancelPending,
+  );
+
   /// 검수 대기 반입 ID(다음 작업 받기 목이 고른다 — 계약에는 목록 없음, BR-52 R12).
   Iterable<String> get pendingReturnIds =>
       _received.values.where((r) => !r.inspected).map((r) => r.returnReceiptId);

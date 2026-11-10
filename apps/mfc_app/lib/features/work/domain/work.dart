@@ -120,6 +120,11 @@ class AssignedTask {
     // INSPECT taskId = 입고 작업 ID, RETURN_INSPECT taskId = 반입 ID(가정 — BR-52 R2·R12).
     'INSPECT' => '/quality/inspect/$taskId',
     'RETURN_INSPECT' => '/quality/return/$taskId',
+    // MOVE·REPLENISH taskId = moveId(capacity 공지 2026-11-08), PUTAWAY = 입고 작업 ID,
+    // CYCLE_COUNT = 실사 세션 ID(가정 — BR-52 R14).
+    'MOVE' || 'REPLENISH' => '/stock/move/$taskId',
+    'PUTAWAY' => '/stock/putaway/$taskId',
+    'CYCLE_COUNT' => '/stock/count/$taskId',
     _ => null,
   };
 

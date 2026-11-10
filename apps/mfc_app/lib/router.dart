@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'features/handover/presentation/handover_screens.dart';
 import 'features/inbound/presentation/inbound_screen.dart';
 import 'features/quality/presentation/quality_screens.dart';
+import 'features/stock_count/presentation/stock_count_screen.dart';
+import 'features/stock_move/presentation/stock_move_screens.dart';
 import 'features/packing/presentation/packing_screen.dart';
 import 'features/tasks/presentation/tasks_screen.dart';
 import 'features/work/domain/work.dart';
@@ -46,6 +48,18 @@ final routerProvider = Provider<GoRouter>(
         path: '/quality/return/:id',
         builder: (_, s) =>
             ReturnInspectScreen(returnReceiptId: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/stock/move/:id',
+        builder: (_, s) => MoveScreen(moveId: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/stock/putaway/:id',
+        builder: (_, s) => PutawayScreen(taskId: s.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/stock/count/:id',
+        builder: (_, s) => CountScreen(sessionId: s.pathParameters['id']!),
       ),
       GoRoute(
         path: '/settings/printer',
