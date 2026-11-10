@@ -1,0 +1,198 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:flutter_test/flutter_test.dart';
+import 'package:pmart_core/pmart_core.dart';
+import 'package:pmart_ui/pmart_ui.dart';
+
+import 'package:mfc_app/app.dart';
+import 'package:mfc_app/features/handover/data/mock_handover_repository.dart';
+import 'package:mfc_app/features/handover/domain/handover.dart';
+import 'package:mfc_app/features/handover/presentation/handover_controller.dart';
+import 'package:mfc_app/features/packing/data/mock_packing_repository.dart';
+import 'package:mfc_app/features/packing/presentation/packing_controller.dart';
+import 'package:mfc_app/features/tasks/data/mock_task_repository.dart';
+import 'package:mfc_app/features/tasks/presentation/task_controllers.dart';
+import 'package:mfc_app/router.dart';
+import 'package:mfc_app/shared/providers.dart';
+import 'package:mfc_app/shared/scanner/scanner.dart';
+
+/// 카메라 대신 정해 둔 코드를 차례로 넘긴다.
+final class FakeCameraScanner implements CameraScanner {
+  FakeCameraScanner(this.codes);
+
+  final List<String> codes;
+  final feedback = <ScanFeedback>[];
+  String? title;
+  bool? continuous;
+
+  @override
+  Future<void> open(
+    BuildContext context, {
+    required ScanHandler onScan,
+    required String title,
+    bool continuous = true,
+  }) async {
+    this.title = title;
+    this.continuous = continuous;
+    for (final c in codes) {
+      final f = onScan(c);
+      feedback.add(f);
+      if (f.ok && !continuous) break;
+    }
+  }
+}
+
+void main() {
+  setUpAll(initPmartFormatting);
+
+  group('ScanDedup', () {
+    final t0 = DateTime.utc(2026, 11, 10);
+    Duration ms(int n) => Duration(milliseconds: n);
+
+    test('다른 코드는 바로 받는다', () {
+      final d = ScanDedup();
+      expect(d.accept('A', t0), isTrue);
+      expect(d.accept('B', t0.add(ms(10))), isTrue);
+      expect(d.accept('A', t0.add(ms(20))), isTrue);
+    });
+
+    test('계속 비추고 있는 같은 코드는 창이 지나도 다시 받지 않는다', () {
+      final d = ScanDedup(window: ms(1500));
+      expect(d.accept('A', t0), isTrue);
+      for (var i = 1; i <= 10; i++) {
+        expect(d.accept('A', t0.add(ms(500 * i))), isFalse);
+      }
+    });
+
+    test('같은 코드도 창만큼 안 보였다가 다시 보이면 받는다(두 번째 상품)', () {
+      final d = ScanDedup(window: ms(1500));
+      expect(d.accept('A', t0), isTrue);
+      expect(d.accept('A', t0.add(ms(1500))), isTrue);
+    });
+
+    test('빈 코드는 받지 않는다', () {
+      expect(ScanDedup().accept('  ', t0), isFalse);
+    });
+  });
+
+  group('parsePackageQr', () {
+    test('PKG:<id>:<버전>', () {
+      expect(parsePackageQr('PKG:pkg-1:2'), (packageId: 'pkg-1', version: 2));
+      expect(parsePackageQr(' PKG:a:b:3 '), (packageId: 'a:b', version: 3));
+    });
+
+    test('형식이 아니면 null', () {
+      for (final s in [
+        '',
+        '8801115114154',
+        'PKG:',
+        'PKG::1',
+        'PKG:pkg-1',
+        'PKG:pkg-1:v1',
+        'PKG:pkg-1:0',
+        'PMART-PKG:pkg-1:v1',
+      ]) {
+        expect(parsePackageQr(s), isNull, reason: s);
+      }
+    });
+  });
+
+  late FakeCameraScanner camera;
+  late MockHandoverRepository handovers;
+
+  List<Override> overrides() => [
+    envProvider.overrideWithValue(PmartEnv.mock),
+    taskRepositoryProvider.overrideWithValue(
+      MockTaskRepository(latency: Duration.zero),
+    ),
+    packingRepositoryProvider.overrideWithValue(
+      MockPackingRepository(latency: Duration.zero),
+    ),
+    handoverRepositoryProvider.overrideWithValue(handovers),
+    secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+    cameraScannerProvider.overrideWith((_) => camera),
+  ];
+
+  setUp(() => handovers = MockHandoverRepository(latency: Duration.zero));
+
+  Future<void> pumpApp(WidgetTester t) async {
+    t.view
+      ..physicalSize = const Size(800, 2400)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: overrides(),
+        child: const MfcApp(),
+      ),
+    );
+    await t.pumpAndSettle();
+  }
+
+  testWidgets('피킹: 카메라 스캔도 같은 대조 — 다른 상품은 거절 안내, 맞는 상품은 담김', (t) async {
+    camera = FakeCameraScanner([
+      MockTaskRepository.milkBarcode,
+      MockTaskRepository.yogurtBarcode,
+    ]);
+    await pumpApp(t);
+    await t.tap(find.byKey(const ValueKey('task-task-mock-1')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('start')));
+    await t.pumpAndSettle();
+
+    await t.tap(find.byKey(const ValueKey('scan-field-camera')));
+    await t.pumpAndSettle();
+    expect(camera.title, '피킹 상품 스캔');
+    expect(camera.continuous, isTrue);
+    expect(camera.feedback.map((f) => f.ok), [false, true]);
+    expect(camera.feedback.first.message, isNotNull);
+    // 맞는 상품이 담겨 실적 보내기가 열린다.
+    final done = t.widget<FilledButton>(
+      find.byKey(const ValueKey('line-done')),
+    );
+    expect(done.onPressed, isNotNull);
+  });
+
+  testWidgets('인계 확인: 포장 QR 카메라 스캔 → 그 포장 인계 상태, 옛 라벨 경고', (t) async {
+    camera = FakeCameraScanner(['hello', 'PKG:pkg-chk-1:2']);
+    await pumpApp(t);
+    await t.tap(find.byKey(const ValueKey('open-handover-checks')));
+    await t.pumpAndSettle();
+
+    await t.tap(find.byKey(const ValueKey('package-qr-scan-camera')));
+    await t.pumpAndSettle();
+    expect(camera.continuous, isFalse);
+    expect(camera.feedback.map((f) => f.ok), [false, true]);
+    expect(camera.feedback.first.message, '포장 QR이 아니에요');
+
+    expect(find.text('포장 인계 상태'), findsOneWidget);
+    expect(find.byKey(const ValueKey('check-required')), findsOneWidget);
+    // 찍은 라벨 v2, 지금 포장 v1.
+    expect(find.byKey(const ValueKey('stale-label')), findsOneWidget);
+  });
+
+  testWidgets('인계 확인: 키보드 웨지로 포장 QR 입력 → 같은 버전이면 경고 없음', (t) async {
+    camera = FakeCameraScanner(const []);
+    await pumpApp(t);
+    unawaited(
+      ProviderScope.containerOf(t.element(find.byType(Scaffold).first))
+          .read(routerProvider)
+          .push<void>('/handover-checks'),
+    );
+    await t.pumpAndSettle();
+
+    await t.enterText(
+      find.byKey(const ValueKey('package-qr-scan')),
+      'PKG:pkg-chk-2:1',
+    );
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pumpAndSettle();
+    expect(find.text('포장 인계 상태'), findsOneWidget);
+    expect(find.text('놓인 위치: 포장대 B-1'), findsOneWidget);
+    expect(find.byKey(const ValueKey('stale-label')), findsNothing);
+  });
+}

@@ -6,6 +6,8 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/providers.dart';
+import '../../../shared/scanner/scan_input.dart';
+import '../../../shared/scanner/scanner.dart';
 import '../../../shared/ui_state_of.dart';
 import '../domain/task_list.dart';
 import 'task_controllers.dart';
@@ -55,6 +57,12 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
             tooltip: l10n.handoverChecksMenu,
             icon: const Icon(Icons.assignment_turned_in_outlined),
             onPressed: () => context.push('/handover-checks'),
+          ),
+          IconButton(
+            key: const ValueKey('open-printer-settings'),
+            tooltip: l10n.printerSettingsTitle,
+            icon: const Icon(Icons.print_outlined),
+            onPressed: () => context.push('/settings/printer'),
           ),
           if (mock)
             Padding(
@@ -268,22 +276,17 @@ class PickingScreen extends ConsumerStatefulWidget {
 }
 
 class _PickingScreenState extends ConsumerState<PickingScreen> {
-  final _scan = TextEditingController();
-  final _focus = FocusNode();
-
-  @override
-  void dispose() {
-    _scan.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
-  void _onScan(TaskDetailView task, String code) {
-    if (code.trim().isEmpty) return;
-    ref.read(pickingProvider(widget.taskId).notifier).scan(task, code);
-    _scan.clear();
-    // 하드웨어 스캐너(키보드 웨지)가 다음 입력을 계속 받게 한다.
-    _focus.requestFocus();
+  ScanFeedback _onScan(TaskDetailView task, String code) {
+    final l10n = AppLocalizations.of(context);
+    final r = ref
+        .read(pickingProvider(widget.taskId).notifier)
+        .scan(task, code);
+    return switch (r) {
+      ScanResult.matched => const ScanFeedback.ok(),
+      ScanResult.wrongItem => ScanFeedback.error(l10n.scanWrongItem),
+      ScanResult.overRemaining => ScanFeedback.error(l10n.scanOver),
+      ScanResult.noTarget => ScanFeedback.error(l10n.scanNoTarget),
+    };
   }
 
   Future<void> _shortage(TaskDetailView task, TaskLineView line) async {
@@ -396,13 +399,11 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                     ),
                   ),
                 ),
-                TextField(
-                  key: const ValueKey('scan-field'),
-                  controller: _scan,
-                  focusNode: _focus,
-                  autofocus: true,
-                  decoration: InputDecoration(labelText: l10n.scanHint),
-                  onSubmitted: (v) => _onScan(task, v),
+                ScanInput(
+                  id: 'scan-field',
+                  label: l10n.scanHint,
+                  cameraTitle: l10n.pickCameraTitle,
+                  onScan: (code) => _onScan(task, code),
                 ),
                 if (picking.lastScan case final s? when s != ScanResult.matched)
                   Text(

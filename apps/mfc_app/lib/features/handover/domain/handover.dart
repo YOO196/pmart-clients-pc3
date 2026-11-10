@@ -105,6 +105,19 @@ final class CheckUnknown extends CheckOutcome {
   const CheckUnknown();
 }
 
+/// 포장 QR 원문(`PKG:<packageId>:<packageVersion>`, fulfillment authorizePackageHandover 설명 0.4.0)을 해석한다.
+/// 형식이 아니면 null — 서버에 보내지 않고 "포장 QR 이 아니에요"로 안내한다.
+({String packageId, int version})? parsePackageQr(String raw) {
+  final s = raw.trim();
+  if (!s.startsWith('PKG:')) return null;
+  final cut = s.lastIndexOf(':');
+  if (cut <= 4) return null;
+  final id = s.substring(4, cut);
+  final version = int.tryParse(s.substring(cut + 1));
+  if (id.isEmpty || version == null || version < 1) return null;
+  return (packageId: id, version: version);
+}
+
 abstract final class HandoverProblemCode {
   static const fenceActive = 'FENCE_ACTIVE';
   static const invalidState = 'INVALID_STATE';

@@ -4,6 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/printer/label.dart';
+import '../../../shared/printer/printer_ui.dart';
+import '../../../shared/scanner/scan_input.dart';
+import '../../../shared/scanner/scanner.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../tasks/domain/task_list.dart';
 import '../../tasks/presentation/task_controllers.dart';
@@ -39,16 +43,6 @@ class PackingScreen extends ConsumerStatefulWidget {
 }
 
 class _PackingScreenState extends ConsumerState<PackingScreen> {
-  final _scan = TextEditingController();
-  final _focus = FocusNode();
-
-  @override
-  void dispose() {
-    _scan.dispose();
-    _focus.dispose();
-    super.dispose();
-  }
-
   Future<void> _repack(ShipmentView s, PackageView p) async {
     final l10n = AppLocalizations.of(context);
     final reason = await showDialog<RepackReason>(
@@ -143,17 +137,18 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                       selected: {packing.zone},
                       onSelectionChanged: (v) => ctl.setZone(v.first),
                     ),
-                    TextField(
-                      key: const ValueKey('pack-scan'),
-                      controller: _scan,
-                      focusNode: _focus,
-                      autofocus: true,
-                      decoration: InputDecoration(labelText: l10n.scanHint),
-                      onSubmitted: (v) {
-                        if (v.trim().isEmpty) return;
-                        ctl.scan(task, s, v);
-                        _scan.clear();
-                        _focus.requestFocus();
+                    ScanInput(
+                      id: 'pack-scan',
+                      label: l10n.scanHint,
+                      cameraTitle: l10n.packCameraTitle,
+                      onScan: (code) => switch (ctl.scan(task, s, code)) {
+                        PackScan.matched => const ScanFeedback.ok(),
+                        PackScan.wrongItem => ScanFeedback.error(
+                          l10n.packWrongItem,
+                        ),
+                        PackScan.overExpected => ScanFeedback.error(
+                          l10n.packOver,
+                        ),
                       },
                     ),
                     if (packing.lastScan case final r?
@@ -207,13 +202,29 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                               '/packages/${p.packageId}/handover',
                             )
                           : null,
-                      trailing: p.canRepack
-                          ? TextButton(
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 라벨 재출력은 같은 포장 ID·같은 QR(서버 값). 밀봉된 포장만.
+                          if (p.state == PackageState.sealed &&
+                              p.qrCode != null)
+                            TextButton(
+                              key: ValueKey('print-${p.packageId}'),
+                              onPressed: () => printPackageLabel(
+                                context,
+                                ref,
+                                PackageLabel.of(s, p),
+                              ),
+                              child: Text(l10n.printLabel),
+                            ),
+                          if (p.canRepack)
+                            TextButton(
                               key: ValueKey('repack-${p.packageId}'),
                               onPressed: () => _repack(s, p),
                               child: Text(l10n.repack),
-                            )
-                          : null,
+                            ),
+                        ],
+                      ),
                     ),
                   if (ready) ...[
                     const SizedBox(height: 16),

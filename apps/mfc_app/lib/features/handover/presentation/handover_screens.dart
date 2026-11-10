@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/scanner/scan_input.dart';
+import '../../../shared/scanner/scanner.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../packing/domain/packing.dart';
 import '../../packing/presentation/packing_controller.dart'
@@ -235,7 +237,9 @@ class HandoverChecksScreen extends ConsumerWidget {
         empty: (_) => RefreshIndicator(
           onRefresh: () => ref.refresh(handoverChecksProvider.future),
           child: ListView(
+            padding: const EdgeInsets.all(16),
             children: [
+              const _PackageQrScan(),
               Padding(
                 padding: const EdgeInsets.all(32),
                 child: Center(
@@ -251,6 +255,8 @@ class HandoverChecksScreen extends ConsumerWidget {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              const _PackageQrScan(),
+              const SizedBox(height: 12),
               Text(l10n.handoverChecksIntro),
               if (!list.fresh)
                 ListTile(
@@ -314,9 +320,16 @@ class HandoverChecksScreen extends ConsumerWidget {
 
 /// 포장 한 건의 인계 판정(`GET /packages/{id}/handover-resolution`) + 라이더 픽업 ETA.
 class PackageHandoverScreen extends ConsumerWidget {
-  const PackageHandoverScreen({super.key, required this.packageId});
+  const PackageHandoverScreen({
+    super.key,
+    required this.packageId,
+    this.scannedVersion,
+  });
 
   final String packageId;
+
+  /// 포장 QR 을 찍고 들어왔으면 그 QR 의 포장 버전.
+  final int? scannedVersion;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -348,6 +361,16 @@ class PackageHandoverScreen extends ConsumerWidget {
                     key: const ValueKey('handover-stale'),
                     leading: const Icon(Icons.info_outline),
                     title: Text(l10n.viewStale),
+                  ),
+                if (scannedVersion case final v?
+                    when h.packageVersion != null && v != h.packageVersion)
+                  Text(
+                    l10n.staleLabel(v, h.packageVersion!),
+                    key: const ValueKey('stale-label'),
+                    style: TextStyle(
+                      color: theme.colorScheme.error,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 const SizedBox(height: 8),
                 Text(l10n.hoPackage(h.packageId, '${h.packageVersion ?? '-'}')),
@@ -438,5 +461,31 @@ class _PickupEta extends ConsumerWidget {
       EtaStatus.pending || EtaStatus.unknown => l10n.etaPending,
       EtaStatus.finalized => l10n.etaFinal,
     };
+  }
+}
+
+/// 포장 라벨 QR 을 찍어 그 포장의 인계 상태로 간다.
+class _PackageQrScan extends StatelessWidget {
+  const _PackageQrScan();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return ScanInput(
+      id: 'package-qr-scan',
+      label: l10n.packageQrHint,
+      cameraTitle: l10n.packageQrCameraTitle,
+      continuous: false,
+      autofocus: false,
+      onScan: (code) {
+        final qr = parsePackageQr(code);
+        if (qr == null) return ScanFeedback.error(l10n.notPackageQr);
+        context.push(
+          '/packages/${Uri.encodeComponent(qr.packageId)}/handover'
+          '?scanned=${qr.version}',
+        );
+        return const ScanFeedback.ok();
+      },
+    );
   }
 }

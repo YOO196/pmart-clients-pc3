@@ -27,6 +27,7 @@ dependencies:
     path: ../../packages/pmart_api/gen/delivery-dispatch
   pmart_api_delivery_tracking:
     path: ../../packages/pmart_api/gen/delivery-tracking
+  mobile_scanner: ^7.5.0
 
 dev_dependencies:
   flutter_test:

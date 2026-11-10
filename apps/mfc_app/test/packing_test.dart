@@ -284,7 +284,7 @@ void main() {
     await t.tap(find.byKey(const ValueKey('seal')));
     await t.pumpAndSettle();
 
-    expect(find.textContaining('PMART-PKG:'), findsOneWidget);
+    expect(find.textContaining('PKG:pkg-'), findsOneWidget);
     expect(find.text('모든 상품을 담았어요(출하 준비)'), findsOneWidget);
 
     await t.tap(find.byKey(const ValueKey('finish-packing')));

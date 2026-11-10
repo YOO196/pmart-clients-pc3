@@ -113,7 +113,7 @@ base class MockPackingRepository implements PackingRepository {
       'orderId': _shipment['orderId'],
       'version': 1,
       'state': 'SEALED',
-      'qrCode': 'PMART-PKG:$id:v1',
+      'qrCode': 'PKG:$id:1',
       'contents': [
         for (final c in contents)
           {
@@ -179,7 +179,7 @@ base class MockPackingRepository implements PackingRepository {
       'packageId': id,
       'packageVersion': version,
       'state': 'SEALED',
-      'qrCode': 'PMART-PKG:$id:v$version',
+      'qrCode': 'PKG:$id:$version',
       'invalidatedReason': null,
     };
     _packages.add(p);

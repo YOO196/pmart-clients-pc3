@@ -339,5 +339,70 @@
   "etaFinal": "픽업 단계가 끝났어요",
   "etaUnassigned": "라이더 배정 전",
   "etaNoDelivery": "배송번호가 아직 없어 도착 예정을 볼 수 없어요",
-  "viewHandover": "인계 상태"
+  "viewHandover": "인계 상태",
+  "scanWithCamera": "카메라로 스캔",
+  "scanAim": "바코드나 QR을 네모 안에 비춰 주세요",
+  "scanAccepted": "인식했어요",
+  "scanRejected": "받을 수 없는 코드예요",
+  "scanCount": "이번에 {count}개 인식",
+  "@scanCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "scanClose": "다 했어요",
+  "scanTorch": "손전등",
+  "cameraPermissionDenied": "카메라 권한이 없어요. 설정에서 카메라를 허용하거나, 닫고 직접 입력해 주세요.",
+  "cameraUnavailable": "카메라를 쓸 수 없어요. 닫고 직접 입력해 주세요.",
+  "pickCameraTitle": "피킹 상품 스캔",
+  "packCameraTitle": "패킹 상품 스캔",
+  "packageQrHint": "포장 QR 스캔",
+  "packageQrCameraTitle": "포장 라벨 QR 스캔",
+  "notPackageQr": "포장 QR이 아니에요",
+  "staleLabel": "찍은 라벨은 v{scanned}인데 지금 포장은 v{current}이에요. 이 라벨은 무효예요.",
+  "@staleLabel": {
+    "placeholders": {
+      "scanned": {
+        "type": "int"
+      },
+      "current": {
+        "type": "int"
+      }
+    }
+  },
+  "printLabel": "라벨 출력",
+  "printSent": "프린터로 보냈어요. 라벨이 나왔는지 확인해 주세요.",
+  "printNotConfigured": "프린터 주소가 없어요. 프린터 설정에서 입력해 주세요.",
+  "printUnreachable": "프린터에 연결하지 못했어요. 전원·네트워크·주소를 확인해 주세요.",
+  "labelPreviewTitle": "라벨 미리보기",
+  "labelPreviewNote": "프린터 없이 보는 화면이에요. 프린터 설정에서 네트워크 프린터를 고르면 출력돼요.",
+  "labelDelivery": "배송 {deliveryId}",
+  "@labelDelivery": {
+    "placeholders": {
+      "deliveryId": {
+        "type": "String"
+      }
+    }
+  },
+  "labelBags": "봉투 {count}개",
+  "@labelBags": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "printerSettingsTitle": "프린터 설정",
+  "printerModePreview": "화면 미리보기",
+  "printerModeNetwork": "네트워크 프린터",
+  "printerPreviewHelp": "프린터가 없을 때 라벨을 화면에 보여 줘요.",
+  "printerNetworkHelp": "포장대 라벨 프린터(ZPL, RAW 9100 포트)에 같은 Wi-Fi로 보내요. 프린터의 IP 주소를 입력해 주세요.",
+  "printerHost": "프린터 IP 주소",
+  "printerPort": "포트",
+  "printerSave": "저장",
+  "printerSaved": "저장했어요",
+  "printerInvalid": "IP 주소와 포트(1~65535)를 확인해 주세요",
+  "printerTestPrint": "시험 라벨 출력"
 }
