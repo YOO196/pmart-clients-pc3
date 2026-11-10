@@ -442,10 +442,10 @@
   "readyBlockedByBreak": "휴게 중에는 작업을 받을 수 없어요",
   "guideTitle": "{area} 안내",
   "@guideTitle": { "placeholders": { "area": { "type": "String" } } },
-  "guideInbound1": "도착한 입고 건을 등록하고 하차해요",
-  "guideInbound2": "입고 송장(TRF) 바코드를 스캔해요",
-  "guideInbound3": "상품별로 수량을 세어 정상·격리·미판정으로 나눠 입력해요",
-  "guideInbound4": "예정과 다르면 그대로 입력해요 — 맞추려고 고치지 않아요",
+  "guideInbound1": "트럭이 오면 송장(TRF)을 확인하고 도착 등록 — 하차해요",
+  "guideInbound2": "이 트럭에 올 상품·박스 수를 보고 박스 바코드를 하나씩 찍어요. 박스째 파손은 표시해요",
+  "guideInbound3": "확인한 박스를 전부 하나씩 열어 낱개를 정상·격리·미판정으로 세요",
+  "guideInbound4": "예정과 다르면 그대로 입력해요. 소비기한은 품질검사에서 봐요",
   "guideInspection1": "검사할 상품을 스캔해요(입고품·반품·불량 회수품)",
   "guideInspection2": "포장의 LOT 표기를 스캔하고(없으면 표기 없음), 소비기한이 다르면 줄을 나눠요",
   "guideInspection3": "정상 또는 격리로 판정해요. 파손·변질·온도 이상은 격리",
@@ -701,5 +701,11 @@
   "boxSave": "이 박스 검수 끝",
   "boxInspected": "정상 {normal} · 이상 {bad}",
   "@boxInspected": { "placeholders": { "normal": { "type": "int" }, "bad": { "type": "int" } } },
-  "boxNotInspected": "아직"
+  "boxNotInspected": "아직",
+  "boxCheckHelp": "박스 바코드를 찍거나, 바코드가 안 읽히면 상품을 눌러 박스 번호를 골라요",
+  "boxPer": "{per}입",
+  "@boxPer": { "placeholders": { "per": { "type": "int" } } },
+  "boxesUnit": "{count}박스",
+  "@boxesUnit": { "placeholders": { "count": { "type": "int" } } },
+  "boxLastPlaceholder": "확인한 박스가 여기 보여요"
 }

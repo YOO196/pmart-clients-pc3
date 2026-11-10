@@ -641,16 +641,24 @@ class _BoxCheckStep extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          l10n.boxCheckProgress(s.arrived.length, total),
+        // 한 줄에 함께 — 파손 표시로 줄이 늘어 아래 목록이 밀리지 않게.
+        Text.rich(
+          TextSpan(
+            text: l10n.boxCheckProgress(s.arrived.length, total),
+            children: [
+              if (s.damaged.isNotEmpty)
+                TextSpan(
+                  text: '  ${l10n.boxDamagedCount(s.damaged.length)}',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+            ],
+          ),
           key: const ValueKey('box-progress'),
           style: theme.textTheme.titleLarge,
         ),
-        if (s.damaged.isNotEmpty)
-          Text(
-            l10n.boxDamagedCount(s.damaged.length),
-            style: TextStyle(color: theme.colorScheme.error),
-          ),
+        Text(l10n.boxCheckHelp, style: theme.textTheme.bodySmall),
         const SizedBox(height: 8),
         ScanInput(
           id: 'box-scan',
@@ -668,6 +676,7 @@ class _BoxCheckStep extends ConsumerWidget {
             key: const ValueKey('box-scan-error'),
             style: TextStyle(color: theme.colorScheme.error),
           ),
+        // 자리를 늘 잡아 둔다 — 박스를 확인할 때 아래 목록이 밀려 잘못 누르지 않게.
         if (last != null && s.arrived.contains(last.boxId))
           Card(
             key: const ValueKey('last-box'),
@@ -690,6 +699,13 @@ class _BoxCheckStep extends ConsumerWidget {
                 onSelected: (_) => ctl.toggleDamaged(last.boxId),
               ),
             ),
+          )
+        else
+          Card(
+            child: ListTile(
+              title: Text(l10n.boxLastPlaceholder),
+              subtitle: const Text(' '),
+            ),
           ),
         Expanded(
           child: ListView(
@@ -705,22 +721,59 @@ class _BoxCheckStep extends ConsumerWidget {
                         .where((b) => s.damaged.contains(b.boxId))
                         .length;
                     final done = got == boxes.length;
-                    return ListTile(
-                      key: ValueKey('box-line-${l.key}'),
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        done ? Icons.check_circle : Icons.inventory_2_outlined,
-                        color: done ? theme.colorScheme.primary : null,
-                      ),
-                      title: Text(l.productName ?? l.sku),
-                      subtitle: bad > 0
-                          ? Text(l10n.boxDamagedCount(bad))
-                          : null,
-                      trailing: Text(
-                        l10n.boxLineProgress(got, boxes.length),
-                        style: theme.textTheme.titleMedium,
-                      ),
+                    final open = s.expandedLine == l.key;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ListTile(
+                          key: ValueKey('box-line-${l.key}'),
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          onTap: () => ctl.toggleLine(l.key),
+                          leading: Icon(
+                            done
+                                ? Icons.check_circle
+                                : Icons.inventory_2_outlined,
+                            color: done ? theme.colorScheme.primary : null,
+                          ),
+                          title: Text(l.productName ?? l.sku),
+                          subtitle: Text(
+                            [
+                              if (l.unitsPerBox case final per?)
+                                l10n.boxPer(per),
+                              if (bad > 0) l10n.boxDamagedCount(bad),
+                            ].join(' · '),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                l10n.boxLineProgress(got, boxes.length),
+                                style: theme.textTheme.titleMedium,
+                              ),
+                              Icon(
+                                open ? Icons.expand_less : Icons.expand_more,
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (open)
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              for (final b in boxes)
+                                FilterChip(
+                                  key: ValueKey('box-chip-${b.boxId}'),
+                                  label: Text(b.boxId.substring(4)),
+                                  selected: s.arrived.contains(b.boxId),
+                                  onSelected: s.arrived.contains(b.boxId)
+                                      ? null
+                                      : (_) => ctl.scanBox(b.boxId),
+                                ),
+                            ],
+                          ),
+                      ],
                     );
                   },
                 ),

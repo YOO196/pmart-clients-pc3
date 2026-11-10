@@ -361,7 +361,10 @@ void main() {
 
       // 2단계: 박스 검수 — 이 트럭에 어떤 상품이 몇 박스.
       expect(find.byKey(const ValueKey('inbound-step-1')), findsOneWidget);
-      expect(find.text('박스 확인 0 / 120'), findsOneWidget);
+      expect(
+        find.textContaining('박스 확인 0 / 120', findRichText: true),
+        findsOneWidget,
+      );
       expect(find.text('0/30박스'), findsOneWidget); // 우유 30박스
       Future<void> scanBox(String id) async {
         await t.enterText(find.byKey(const ValueKey('box-scan')), id);
@@ -376,12 +379,23 @@ void main() {
       expect(find.text('이미 확인한 박스예요'), findsWidgets);
       await scanBox('BOX-00000002');
       await tapKey(t, 'box-damaged'); // 우유 2번 박스 — 박스째 파손
+      // 바코드가 안 읽히면 상품을 눌러 박스 번호를 골라 확인.
+      await tapKey(t, 'box-line-E-00000002|LOT-Y-1110');
+      await tapKey(t, 'box-chip-BOX-00000031');
+      expect(
+        find.textContaining('박스 확인 3 / 120', findRichText: true),
+        findsOneWidget,
+      );
       // 나머지는 한꺼번에(목). 샐러드 마지막 박스 BOX-00000120 은 오지 않았다.
       for (var i = 3; i <= 119; i++) {
+        if (i == 31) continue;
         ctl().scanBox('BOX-${i.toString().padLeft(8, '0')}');
       }
       await t.pumpAndSettle();
-      expect(find.text('박스 확인 119 / 120'), findsOneWidget);
+      expect(
+        find.textContaining('박스 확인 119 / 120', findRichText: true),
+        findsOneWidget,
+      );
       expect(find.byKey(const ValueKey('box-missing')), findsOneWidget);
       expect(t.takeException(), isNull);
       await tapKey(t, 'box-check-done');

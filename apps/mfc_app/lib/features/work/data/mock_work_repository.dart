@@ -281,6 +281,7 @@ final class MockWorkRepository implements WorkRepository {
               productName: l.productName,
               sku: l.sku,
               qty: l.expectedQty,
+              boxes: l.boxCount,
             ),
         ],
       ),

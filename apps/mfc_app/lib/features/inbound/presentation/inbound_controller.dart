@@ -76,7 +76,11 @@ class InboundState {
     this.selectedBox,
     this.lastBox,
     this.lastBoxScan,
+    this.expandedLine,
   });
+
+  /// 박스 검수에서 박스 번호를 펼친 상품(행 key).
+  final String? expandedLine;
 
   /// 박스 검수: 확인한 박스 ID.
   final Set<String> arrived;
@@ -135,6 +139,7 @@ class InboundState {
     String? Function()? selectedBox,
     String? Function()? lastBox,
     BoxScan? Function()? lastBoxScan,
+    String? Function()? expandedLine,
   }) => InboundState(
     phase: phase ?? this.phase,
     promise: promise ?? this.promise,
@@ -151,6 +156,7 @@ class InboundState {
     selectedBox: selectedBox != null ? selectedBox() : this.selectedBox,
     lastBox: lastBox != null ? lastBox() : this.lastBox,
     lastBoxScan: lastBoxScan != null ? lastBoxScan() : this.lastBoxScan,
+    expandedLine: expandedLine != null ? expandedLine() : this.expandedLine,
   );
 
   bool get usesBoxes => promise?.boxList.isNotEmpty ?? false;
@@ -308,6 +314,11 @@ class InboundFlowController extends Notifier<InboundState> {
     );
     return r;
   }
+
+  /// 상품 줄을 눌러 박스 번호를 펼치거나 접는다.
+  void toggleLine(String lineKey) => state = state.copyWith(
+    expandedLine: () => state.expandedLine == lineKey ? null : lineKey,
+  );
 
   /// 박스째 파손 표시/해제(확인한 박스만).
   void toggleDamaged(String boxId) {

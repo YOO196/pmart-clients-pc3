@@ -613,7 +613,11 @@ class _AssignedView extends StatelessWidget {
           ],
         ),
         if (task.promisedReadyAt case final t?)
-          Text(l10n.promisedReadyAt(formatSeoulTime(t))),
+          Text(
+            task.taskType == 'RECEIVE'
+                ? l10n.inboundPlannedAt(formatSeoulTime(t))
+                : l10n.promisedReadyAt(formatSeoulTime(t)),
+          ),
         if (!area.taskTypes.contains(task.taskType))
           Text(
             l10n.areaMismatch,
@@ -627,6 +631,7 @@ class _AssignedView extends StatelessWidget {
               title: Text(l.productName ?? l.sku ?? '-'),
               subtitle: Text(
                 [
+                  if (l.boxes case final b?) l10n.boxesUnit(b),
                   if (l.qty case final q?) l10n.qtyUnit(q),
                   ?l.fromLocation,
                   if (l.toLocation case final t?) '→ $t',

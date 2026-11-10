@@ -79,8 +79,11 @@ class AssignedLine {
     this.fromLocation,
     this.toLocation,
     this.notice,
+    this.boxes,
   });
 
+  /// 입고: 예정 박스 수(목만 — BR-53 R17).
+  final int? boxes;
   final String? productName;
   final String? sku;
   final int? qty;
