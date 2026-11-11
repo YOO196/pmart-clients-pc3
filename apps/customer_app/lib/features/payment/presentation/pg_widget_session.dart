@@ -58,6 +58,9 @@ final class TossPgWidgetSession implements PgWidgetSession {
   Widget build(BuildContext context, {required int amount}) =>
       _TossWidgets(session: this, amount: amount);
 
+  /// 첫 그리기 중(토스 위젯은 다 그려지기 전까지 높이가 거의 0 이라 빈칸으로 보인다).
+  final ValueNotifier<bool> _loading = ValueNotifier(true);
+
   Future<void> _render(int amount) async {
     if (_rendering || _disposed) return;
     _rendering = true;
@@ -76,6 +79,7 @@ final class TossPgWidgetSession implements PgWidgetSession {
       if (!_disposed) _ready.value = false;
     } finally {
       _rendering = false;
+      if (!_disposed) _loading.value = false;
     }
   }
 
@@ -126,6 +130,7 @@ final class TossPgWidgetSession implements PgWidgetSession {
   void dispose() {
     _disposed = true;
     _ready.dispose();
+    _loading.dispose();
   }
 }
 
@@ -155,6 +160,23 @@ class _TossWidgetsState extends State<_TossWidgets> {
   @override
   Widget build(BuildContext context) => Column(
     children: [
+      ValueListenableBuilder<bool>(
+        valueListenable: widget.session._loading,
+        builder: (context, loading, _) => loading
+            ? Row(
+                key: const ValueKey('pg-widget-loading'),
+                children: [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(AppLocalizations.of(context).payMethodsLoading),
+                ],
+              )
+            : const SizedBox.shrink(),
+      ),
       PaymentMethodWidget(
         paymentWidget: widget.session._widget,
         selector: TossPgWidgetSession._methods,

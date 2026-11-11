@@ -444,122 +444,130 @@ class _SheetState extends ConsumerState<_Sheet> {
     final body = Column(
       children: [
         Expanded(
-          child: ListView(
+          // ListView 는 화면 밖 항목을 늦게 만든다 — 맨 아래 결제수단(토스 위젯)이 스크롤이 닿을 때에야
+          // 로딩을 시작해 늦게 떴다. 주문서는 길지 않아 한 번에 만든다.
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            children: [
-              ...banners,
-              if (expiry != null && draft.awaitingCheckout)
-                Text(
-                  expiry.isAfter(now)
-                      ? l10n.payWithin(_left(expiry.difference(now)))
-                      : l10n.holdExpired,
-                  key: const ValueKey('pay-within'),
-                  style: theme.textTheme.titleMedium,
-                ),
-              _Section(
-                title: l10n.checkoutItems,
-                children: [
-                  for (final l in req.lines)
-                    Text(
-                      '${orderSheetLineTitle(draft, cart, l)} · ${l10n.cartLineQuantity(l.quantity)}',
-                    ),
-                ],
-              ),
-              _Section(
-                title: l10n.checkoutDelivery,
-                trailing: TextButton(
-                  key: const ValueKey('change-delivery'),
-                  onPressed: () => context.pop(),
-                  child: Text(l10n.checkoutChange),
-                ),
-                children: [
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ...banners,
+                if (expiry != null && draft.awaitingCheckout)
                   Text(
-                    [
-                      modeLabel(l10n, req.mode),
-                      if (req.window case final w?) windowText(w),
-                    ].join(' · '),
+                    expiry.isAfter(now)
+                        ? l10n.payWithin(_left(expiry.difference(now)))
+                        : l10n.holdExpired,
+                    key: const ValueKey('pay-within'),
+                    style: theme.textTheme.titleMedium,
                   ),
-                  if ((quote?.plannedShipments ?? 1) > 1)
-                    Text(l10n.splitShipment(quote!.plannedShipments!)),
-                ],
-              ),
-              _Section(
-                title: l10n.checkoutAddress,
-                children: [
-                  // 초안에 고정된 배송지 사본(BR-37). 사본이 없는 옛 초안만 초안을 만든 현재 쇼핑 주소를 보인다.
-                  if (draft.shippingAddress case final a?)
-                    ShippingAddressView(address: a)
-                  else if (address != null) ...[
-                    Text(address.label ?? address.roadAddress),
-                    Text('${address.roadAddress} ${address.detailAddress}'),
+                _Section(
+                  title: l10n.checkoutItems,
+                  children: [
+                    for (final l in req.lines)
+                      Text(
+                        '${orderSheetLineTitle(draft, cart, l)} · ${l10n.cartLineQuantity(l.quantity)}',
+                      ),
                   ],
-                ],
-              ),
-              _Section(
-                title: l10n.checkoutOptions,
-                children: [
-                  Text(switch (req.outOfStock) {
-                    OutOfStockPreference.cancelOutOfStockOnly => l10n.oosOnly,
-                    OutOfStockPreference.cancelAll => l10n.oosAll,
-                  }),
-                  if (req.deliveryNote case final n?) Text(n),
-                ],
-              ),
-              _Section(
-                title: l10n.checkoutAmounts,
-                children: [
-                  _AmountRow(l10n.amountItems, _money(l10n, quote?.itemAmount)),
-                  _AmountRow(
-                    '${l10n.amountTip} (${tipReasonText(l10n, quote?.tipReason ?? TipReason.unknown)})',
-                    _money(l10n, quote?.deliveryTip),
+                ),
+                _Section(
+                  title: l10n.checkoutDelivery,
+                  trailing: TextButton(
+                    key: const ValueKey('change-delivery'),
+                    onPressed: () => context.pop(),
+                    child: Text(l10n.checkoutChange),
                   ),
-                  if (quote?.firstPurchase case final f
-                      when f == FirstPurchaseBenefit.expected ||
-                          f == FirstPurchaseBenefit.checkingOtherOrder)
+                  children: [
                     Text(
-                      f == FirstPurchaseBenefit.expected
-                          ? l10n.firstPurchaseExpected
-                          : l10n.firstPurchaseChecking,
-                      key: const ValueKey('first-purchase'),
-                      style: theme.textTheme.bodySmall,
+                      [
+                        modeLabel(l10n, req.mode),
+                        if (req.window case final w?) windowText(w),
+                      ].join(' · '),
                     ),
-                  _AmountRow(l10n.amountBag, _money(l10n, quote?.bagFee)),
-                  const Divider(),
-                  _AmountRow(
-                    l10n.amountTotal,
-                    _money(l10n, quote?.totalAmount),
-                    key: const ValueKey('amount-total'),
-                    strong: true,
-                  ),
-                  if (quote?.expiresAt case final e?)
-                    Text(
-                      e.isAfter(now)
-                          ? l10n.priceHoldLeft(_left(e.difference(now)))
-                          : l10n.holdExpired,
-                      key: const ValueKey('price-hold'),
-                      style: theme.textTheme.bodySmall,
+                    if ((quote?.plannedShipments ?? 1) > 1)
+                      Text(l10n.splitShipment(quote!.plannedShipments!)),
+                  ],
+                ),
+                _Section(
+                  title: l10n.checkoutAddress,
+                  children: [
+                    // 초안에 고정된 배송지 사본(BR-37). 사본이 없는 옛 초안만 초안을 만든 현재 쇼핑 주소를 보인다.
+                    if (draft.shippingAddress case final a?)
+                      ShippingAddressView(address: a)
+                    else if (address != null) ...[
+                      Text(address.label ?? address.roadAddress),
+                      Text('${address.roadAddress} ${address.detailAddress}'),
+                    ],
+                  ],
+                ),
+                _Section(
+                  title: l10n.checkoutOptions,
+                  children: [
+                    Text(switch (req.outOfStock) {
+                      OutOfStockPreference.cancelOutOfStockOnly => l10n.oosOnly,
+                      OutOfStockPreference.cancelAll => l10n.oosAll,
+                    }),
+                    if (req.deliveryNote case final n?) Text(n),
+                  ],
+                ),
+                _Section(
+                  title: l10n.checkoutAmounts,
+                  children: [
+                    _AmountRow(
+                      l10n.amountItems,
+                      _money(l10n, quote?.itemAmount),
                     ),
-                  if (draft.resources?.reservationExpiresAt case final e?)
-                    Text(
-                      e.isAfter(now)
-                          ? l10n.stockHoldLeft(_left(e.difference(now)))
-                          : l10n.holdExpired,
-                      key: const ValueKey('stock-hold'),
-                      style: theme.textTheme.bodySmall,
+                    _AmountRow(
+                      '${l10n.amountTip} (${tipReasonText(l10n, quote?.tipReason ?? TipReason.unknown)})',
+                      _money(l10n, quote?.deliveryTip),
                     ),
-                ],
-              ),
-              _Section(
-                title: l10n.payMethods,
-                children: [
-                  _PaymentWidgetArea(
-                    config: config,
-                    session: session,
-                    amount: quote?.totalAmount,
-                  ),
-                ],
-              ),
-            ],
+                    if (quote?.firstPurchase case final f
+                        when f == FirstPurchaseBenefit.expected ||
+                            f == FirstPurchaseBenefit.checkingOtherOrder)
+                      Text(
+                        f == FirstPurchaseBenefit.expected
+                            ? l10n.firstPurchaseExpected
+                            : l10n.firstPurchaseChecking,
+                        key: const ValueKey('first-purchase'),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    _AmountRow(l10n.amountBag, _money(l10n, quote?.bagFee)),
+                    const Divider(),
+                    _AmountRow(
+                      l10n.amountTotal,
+                      _money(l10n, quote?.totalAmount),
+                      key: const ValueKey('amount-total'),
+                      strong: true,
+                    ),
+                    if (quote?.expiresAt case final e?)
+                      Text(
+                        e.isAfter(now)
+                            ? l10n.priceHoldLeft(_left(e.difference(now)))
+                            : l10n.holdExpired,
+                        key: const ValueKey('price-hold'),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    if (draft.resources?.reservationExpiresAt case final e?)
+                      Text(
+                        e.isAfter(now)
+                            ? l10n.stockHoldLeft(_left(e.difference(now)))
+                            : l10n.holdExpired,
+                        key: const ValueKey('stock-hold'),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                  ],
+                ),
+                _Section(
+                  title: l10n.payMethods,
+                  children: [
+                    _PaymentWidgetArea(
+                      config: config,
+                      session: session,
+                      amount: quote?.totalAmount,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
         SafeArea(

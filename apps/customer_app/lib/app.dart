@@ -45,6 +45,16 @@ class CustomerApp extends ConsumerWidget {
               onPressed: () => ref.read(routerProvider).push('/login'),
             ),
           ),
+          SessionNotice.unreachable => SnackBar(
+            key: const ValueKey('session-unreachable'),
+            content: Text(l10n.sessionUnreachableNotice),
+            duration: const Duration(seconds: 8),
+            action: SnackBarAction(
+              label: l10n.sessionRetry,
+              onPressed: () =>
+                  ref.read(sessionProvider.notifier).retryRestore(),
+            ),
+          ),
         },
       );
     });
@@ -67,12 +77,45 @@ class CustomerApp extends ConsumerWidget {
     ],
     routerConfig: ref.watch(routerProvider),
     // 목 모드는 화면 모서리에 띠를 둔다(실서버와 헷갈리지 않게: 목 로그인은 Google 창 없이 항상 성공한다).
-    builder: (context, child) => ref.watch(envProvider) == PmartEnv.mock
-        ? Banner(
-            message: AppLocalizations.of(context).mockBanner,
-            location: BannerLocation.topStart,
-            child: child ?? const SizedBox.shrink(),
-          )
-        : child ?? const SizedBox.shrink(),
+    builder: (context, child) => _RestoreOnResume(
+      child: ref.watch(envProvider) == PmartEnv.mock
+          ? Banner(
+              message: AppLocalizations.of(context).mockBanner,
+              location: BannerLocation.topStart,
+              child: child ?? const SizedBox.shrink(),
+            )
+          : child ?? const SizedBox.shrink(),
+    ),
   );
+}
+
+/// 저장된 세션을 확인하지 못한 채라면(연결 안 됨) 앱이 다시 앞으로 올 때 다시 확인한다.
+class _RestoreOnResume extends ConsumerStatefulWidget {
+  const _RestoreOnResume({required this.child});
+
+  final Widget child;
+
+  @override
+  ConsumerState<_RestoreOnResume> createState() => _RestoreOnResumeState();
+}
+
+class _RestoreOnResumeState extends ConsumerState<_RestoreOnResume> {
+  AppLifecycleListener? _listener;
+
+  @override
+  void initState() {
+    super.initState();
+    _listener = AppLifecycleListener(
+      onResume: () => ref.read(sessionProvider.notifier).retryRestore(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _listener?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

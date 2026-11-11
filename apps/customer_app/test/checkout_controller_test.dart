@@ -84,6 +84,49 @@ void main() {
     expect(state().canPay, isFalse);
   });
 
+  group('최소 주문 미달 뒤 장바구니를 채우면 넘어간다(같은 주문 의도 재사용 금지)', () {
+    test('장바구니로 돌아가 채우고 다시 "주문하기"', () async {
+      expect(await draft().prepare(), CheckoutGate.minOrderUnmet);
+      final first = c.read(checkoutSetupProvider).purchaseIntentId;
+
+      await fillCartTo(5);
+      c.read(checkoutSetupProvider.notifier).begin(); // 장바구니 "주문하기"
+
+      expect(c.read(checkoutSetupProvider).purchaseIntentId, isNot(first));
+      expect(await draft().prepare(), CheckoutGate.proceed);
+      expect(state().draft.quote!.minOrderSatisfied, isTrue);
+    });
+
+    test('"주문하기"를 다시 누르지 않고 장바구니만 바뀌어도 새 초안을 받는다', () async {
+      expect(await draft().prepare(), CheckoutGate.minOrderUnmet);
+      final firstDraft = state().draft.draftId;
+
+      await fillCartTo(5);
+
+      expect(await draft().prepare(), CheckoutGate.proceed);
+      expect(state().draft.draftId, isNot(firstDraft));
+    });
+
+    test('조건·장바구니가 그대로면 같은 초안을 다시 조회한다(새로 만들지 않는다)', () async {
+      await fillCartTo(5);
+      await draft().prepare();
+      final firstDraft = state().draft.draftId;
+      final intent = c.read(checkoutSetupProvider).purchaseIntentId;
+
+      final calls = checkout.getDraftCalls;
+      await draft().enter(); // 배송 선택 → 주문서
+
+      expect(state().draft.draftId, firstDraft);
+      expect(c.read(checkoutSetupProvider).purchaseIntentId, intent);
+      // 방금 "다음"에서 확인한 초안이라 주문서 진입에서 다시 조회하지 않는다(결제수단이 늦게 뜨던 원인 중 하나)
+      expect(checkout.getDraftCalls, calls);
+
+      // 그 뒤 다시 들어오면(주문서에 다녀옴) 다시 조회한다
+      await draft().enter();
+      expect(checkout.getDraftCalls, calls + 1);
+    });
+  });
+
   test('확인을 기다렸다가 결제 진입 전 초안(DRAFT·REVIEW)이면 결제를 연다(금액은 서버 값)', () async {
     await fillCartTo(5); // 2,980×5 + 1,980 = 16,880
 

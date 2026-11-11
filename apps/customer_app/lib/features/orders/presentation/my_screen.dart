@@ -99,13 +99,26 @@ class MyScreen extends ConsumerWidget {
               // 로그아웃 API(`POST /auth/logouts`)는 아직 붙이지 않았다. 기기의 토큰만 지운다.
               onTap: () => ref.read(sessionProvider.notifier).signOut(),
             )
-          else
+          else ...[
+            // 저장된 로그인을 서버에 확인하지 못했다(연결 안 됨). 로그아웃된 게 아니다.
+            if (ref.watch(sessionUnverifiedProvider))
+              ListTile(
+                key: const ValueKey('my-session-unverified'),
+                leading: const Icon(Icons.cloud_off_outlined),
+                title: Text(l10n.sessionUnreachableNotice),
+                trailing: TextButton(
+                  onPressed: () =>
+                      ref.read(sessionProvider.notifier).retryRestore(),
+                  child: Text(l10n.sessionRetry),
+                ),
+              ),
             ListTile(
               key: const ValueKey('my-login'),
               leading: const Icon(Icons.login),
               title: Text(l10n.loginTitle),
               onTap: () => context.push('/login'),
             ),
+          ],
         ],
       ),
     );

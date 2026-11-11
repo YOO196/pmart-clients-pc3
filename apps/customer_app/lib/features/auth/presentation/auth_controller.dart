@@ -60,6 +60,23 @@ enum SessionNotice {
 
   /// 세션이 끝났고 조용한 재로그인도 안 됐다 → "다시 로그인해 주세요".
   expired,
+
+  /// 저장된 세션을 서버에 확인하지 못했다(연결 안 됨). 로그인은 그대로 두고 "다시 시도"를 준다.
+  unreachable,
+}
+
+/// 저장된 세션이 있는데 서버에 닿지 못해 아직 확인하지 못했다. 회원으로 확정해 보이지 않고,
+/// 비회원으로 바꾸지도 않는다(토큰을 지우지 않는다). 확인되면 false.
+final sessionUnverifiedProvider =
+    NotifierProvider<SessionUnverifiedController, bool>(
+      SessionUnverifiedController.new,
+    );
+
+class SessionUnverifiedController extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool value) => state = value;
 }
 
 final sessionNoticeProvider =
@@ -132,6 +149,7 @@ class SessionController extends Notifier<Session> {
     String? accountLabel,
   }) async {
     await ref.read(tokenStoreProvider).save(member.tokens);
+    ref.read(sessionUnverifiedProvider.notifier).set(false);
     state = MemberSession(
       member.accountId,
       provider: provider,
@@ -141,12 +159,35 @@ class SessionController extends Notifier<Session> {
 
   /// 저장된 refresh token 이 있을 때만 서버에 세션을 묻는다(`GET /auth/sessions/current`).
   /// 서버가 확인한 계정만 회원으로 보인다. 그 사이 직접 로그인했으면 덮지 않는다.
+  /// 서버에 닿지 못하면 토큰을 두고 "확인 못 함"으로 남긴다 — 다시 시도·앱 복귀 때 다시 묻는다.
+  /// (예전에는 연결 실패도 "세션 없음"으로 보고 비회원으로 시작해, 다른 망에서 로그인이 풀린 것처럼 보였다.)
   Future<void> restore() async {
     final tokens = ref.read(tokenStoreProvider);
     if (await tokens.readRefreshToken() == null) return;
-    final accountId = await ref.read(authRepositoryProvider).currentAccountId();
-    if (!ref.mounted || accountId == null || state is MemberSession) return;
+    if (!ref.mounted || state is MemberSession) return;
+    final String? accountId;
+    try {
+      accountId = await ref.read(authRepositoryProvider).currentAccountId();
+    } on PmartFailure {
+      if (!ref.mounted || state is MemberSession) return;
+      final wasUnverified = ref.read(sessionUnverifiedProvider);
+      ref.read(sessionUnverifiedProvider.notifier).set(true);
+      // 처음 한 번만 알린다(앱 복귀 때마다 다시 띄우지 않는다)
+      if (!wasUnverified) {
+        ref.read(sessionNoticeProvider.notifier).set(SessionNotice.unreachable);
+      }
+      return;
+    }
+    if (!ref.mounted) return;
+    ref.read(sessionUnverifiedProvider.notifier).set(false);
+    if (accountId == null || state is MemberSession) return;
     state = MemberSession(accountId);
+  }
+
+  /// 확인하지 못한 저장 세션을 다시 확인한다(다시 시도·앱 복귀).
+  Future<void> retryRestore() async {
+    if (!ref.read(sessionUnverifiedProvider)) return;
+    await restore();
   }
 
   Future<void> signOut() async {

@@ -35,7 +35,8 @@ abstract interface class AuthRepository {
   Future<LoginOutcome> lookup(String authRequestId);
 
   /// 저장된 세션의 계정(`GET /auth/sessions/current`. 401 이면 인터셉터가 refresh 회전 후 다시 보낸다).
-  /// 세션이 끝났으면 null(토큰은 인터셉터가 지운다). 네트워크 오류도 null — 토큰은 두고 비회원으로 시작한다.
+  /// 세션이 끝났거나 고객 세션이 아니면 null(토큰은 인터셉터가 지운다).
+  /// 서버에 닿지 못했으면(연결 오류·타임아웃·결과 불명·5xx) [PmartFailure] 를 던진다 — 세션이 끝난 게 아니다.
   Future<String?> currentAccountId();
 
   /// 필수 동의 반영 후 인증 완료.
@@ -109,7 +110,11 @@ final class ApiAuthRepository implements AuthRepository {
       return session?.principalType == auth.SessionPrincipalTypeEnum.CUSTOMER
           ? session?.principalId
           : null;
-    } on PmartFailure {
+    } on SessionExpiredFailure {
+      return null;
+    } on ProblemFailure catch (f) {
+      // 서버가 답했다: 4xx 는 세션 없음, 5xx·429 는 지금 확인할 수 없음
+      if (f.problem.status >= 500 || f.problem.status == 429) rethrow;
       return null;
     }
   }

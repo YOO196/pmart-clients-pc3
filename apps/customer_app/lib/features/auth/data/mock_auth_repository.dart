@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart' show DioExceptionType;
 import 'package:pmart_api_auth/pmart_api_auth.dart' as auth;
 import 'package:pmart_core/pmart_core.dart';
 
@@ -61,9 +62,15 @@ base class MockAuthRepository implements AuthRepository {
   /// 앱 시작 때 복원될 계정(null 이면 저장된 세션 없음).
   final String? restoredAccountId;
 
+  /// 세션 확인이 서버에 닿지 못한다(다른 망 등). 시험용.
+  bool unreachable = false;
+
   @override
   Future<String?> currentAccountId() async {
     await _wait();
+    if (unreachable) {
+      throw const NetworkFailure(DioExceptionType.connectionError);
+    }
     return restoredAccountId;
   }
 

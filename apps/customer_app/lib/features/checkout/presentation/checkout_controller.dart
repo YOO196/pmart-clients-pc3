@@ -75,11 +75,11 @@ class CheckoutSetupController extends Notifier<CheckoutSetup> {
   @override
   CheckoutSetup build() => const CheckoutSetup();
 
-  /// 장바구니 "주문하기". 새 주문 의도를 연다(이전 선택은 유지한다).
-  void begin() {
-    if (state.purchaseIntentId != null) return;
-    state = state.copyWith(purchaseIntentId: IdempotencyKey.generate().value);
-  }
+  /// 장바구니 "주문하기". 누를 때마다 새 주문 의도를 연다(이전 선택은 유지한다).
+  /// 같은 의도로 다시 보내면 서버는 견적 만료 전까지 예전 초안을 그대로 돌려준다 — 장바구니를 바꾼 뒤에도
+  /// 최소 주문 미달 초안이 돌아와 넘어가지 못했다(백엔드 안내 2026-10-31 주문서 §3: 진입 1회마다 새 값).
+  void begin() =>
+      state = state.copyWith(purchaseIntentId: IdempotencyKey.generate().value);
 
   /// 만료된 초안을 다시 만들 때 새 주문 의도를 연다(같은 의도로 보내면 만료 초안이 돌아온다).
   void renewIntent() =>
@@ -237,6 +237,9 @@ class DraftController extends AsyncNotifier<DraftState?> {
 
   DraftState? get _current => state.value;
 
+  /// 배송 선택 "다음"이 방금 초안을 만들고 확인했다. 바로 이어지는 주문서 진입은 다시 조회하지 않는다.
+  bool _justPrepared = false;
+
   void _set(DraftState next) {
     if (ref.mounted) state = AsyncData(next);
   }
@@ -279,6 +282,8 @@ class DraftController extends AsyncNotifier<DraftState?> {
   /// 주문서 진입. 조건·장바구니가 그대로면 기존 초안을 다시 조회하고(타이머를 새로 시작하지 않는다),
   /// 바뀌었으면 새 초안을 만든다.
   Future<void> enter() async {
+    final justPrepared = _justPrepared;
+    _justPrepared = false;
     final setup = ref.read(checkoutSetupProvider);
     final cartVersion =
         ref.read(cartControllerProvider).value?.cart.version ?? -1;
@@ -287,18 +292,24 @@ class DraftController extends AsyncNotifier<DraftState?> {
         current.setupRevision == setup.revision &&
         current.cartVersion == cartVersion &&
         !current.draft.expired) {
-      await refresh();
+      // 배송 선택 "다음"(prepare)이 방금 만들고 확인한 초안이면 주문서 진입에서 다시 조회하지 않는다.
+      if (!justPrepared) await refresh();
       return;
     }
+    // 이미 초안이 있는데 조건·장바구니가 바뀌었다. 같은 의도면 서버가 예전 초안을 돌려주므로 새 의도로 만든다.
+    if (current != null) {
+      ref.read(checkoutSetupProvider.notifier).renewIntent();
+    }
+    final setupNow = ref.read(checkoutSetupProvider);
     state = const AsyncLoading();
     try {
-      final request = _request(setup);
+      final request = _request(setupNow);
       final draft = await _createWithResend(request);
       _set(
         DraftState(
           draft: draft,
           request: request,
-          setupRevision: setup.revision,
+          setupRevision: setupNow.revision,
           cartVersion: cartVersion,
           agreedQuote: draft.quote,
         ),
@@ -315,6 +326,7 @@ class DraftController extends AsyncNotifier<DraftState?> {
   /// 판정 전(견적 없음)이면 막지 않는다 — 주문서가 서버 값으로 다시 막는다(결제 버튼).
   Future<CheckoutGate> prepare() async {
     await enter();
+    _justPrepared = state.value != null;
     return switch (state) {
       // 예전 계약(422 거절)도 같은 뜻으로 받는다.
       AsyncError(error: ProblemFailure(:final problem))

@@ -11,6 +11,8 @@ import '../../address/presentation/address_controller.dart';
 import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../domain/checkout.dart';
 import 'checkout_controller.dart';
+import '../../payment/presentation/payment_controller.dart'
+    show paymentWidgetConfigProvider;
 import 'order_sheet_screen.dart' show draftRejection;
 
 String modeLabel(AppLocalizations l10n, DeliveryMode m) => switch (m) {
@@ -131,6 +133,9 @@ class _DeliveryBodyState extends ConsumerState<_DeliveryBody> {
   /// 서버가 최소 주문 미달이라고 하면 주문서로 넘어가지 않고 장바구니로 안내한다.
   Future<void> _next() async {
     setState(() => _preparing = true);
+    // 결제창 설정을 초안과 동시에 받아 둔다(주문서에 들어간 뒤 차례로 받으면 결제수단이 늦게 뜬다).
+    // 실패는 주문서가 결제수단 자리에 "다시 시도"로 보인다.
+    ref.read(paymentWidgetConfigProvider.future).ignore();
     final gate = await ref.read(draftControllerProvider.notifier).prepare();
     if (!mounted) return;
     setState(() => _preparing = false);

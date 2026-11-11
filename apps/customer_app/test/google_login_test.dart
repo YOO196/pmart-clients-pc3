@@ -206,5 +206,40 @@ void main() {
       await c.read(sessionRestoreProvider.future);
       expect(c.read(sessionProvider), isA<GuestSession>());
     });
+
+    test('서버에 닿지 못하면(다른 망) 토큰을 지우지 않고 "확인 못 함"으로 두며, 다시 시도하면 회원이 된다', () async {
+      final tokens = TokenStore(MemoryKeyValueStore());
+      await tokens.save(const AuthTokens(accessToken: 'a', refreshToken: 'r'));
+      final auth = MockAuthRepository(
+        latency: Duration.zero,
+        restoredAccountId: 'acct-9',
+      )..unreachable = true;
+      final c = make(auth, tokens);
+
+      await c.read(sessionRestoreProvider.future);
+      expect(c.read(sessionProvider), isA<GuestSession>());
+      expect(c.read(sessionUnverifiedProvider), isTrue);
+      expect(c.read(sessionNoticeProvider), SessionNotice.unreachable);
+      expect(await tokens.readRefreshToken(), 'r');
+
+      // 아직 연결 안 됨: 다시 알리지 않는다
+      c.read(sessionNoticeProvider.notifier).clear();
+      await c.read(sessionProvider.notifier).retryRestore();
+      expect(c.read(sessionUnverifiedProvider), isTrue);
+      expect(c.read(sessionNoticeProvider), isNull);
+
+      auth.unreachable = false; // Wi-Fi 로 돌아옴
+      await c.read(sessionProvider.notifier).retryRestore();
+      expect(c.read(sessionProvider), isA<MemberSession>());
+      expect(c.read(sessionUnverifiedProvider), isFalse);
+    });
+
+    test('확인 못 함이 아니면 다시 시도해도 서버에 묻지 않는다', () async {
+      final auth = _CountingAuth();
+      final c = make(auth, TokenStore(MemoryKeyValueStore()));
+      await c.read(sessionRestoreProvider.future);
+      await c.read(sessionProvider.notifier).retryRestore();
+      expect(auth.asked, 0);
+    });
   });
 }

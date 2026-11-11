@@ -79,6 +79,9 @@ base class MockCheckoutRepository
   bool loseNextDraftResponse = false;
 
   final drafts = <String, MockDraft>{};
+
+  /// 초안 조회 횟수(시험용: 중복 조회가 없는지).
+  int getDraftCalls = 0;
   final _byKey = <String, String>{};
   final checkoutKeys = <String>[];
   int _seq = 0;
@@ -241,6 +244,21 @@ base class MockCheckoutRepository
     await _wait();
     final existing = _byKey[key.value];
     if (existing != null) return _out(drafts[existing]!);
+    // 서버처럼 같은 주문 의도에 견적이 아직 유효한 초안이 있으면, 요청 내용이 달라도 그 초안을 그대로 돌려준다
+    // (order-service DraftService.create — 백엔드 안내 2026-10-31 주문서 §3).
+    for (final d in drafts.values) {
+      final quote = d.json['quote'] as Map<String, Object?>?;
+      final expires = switch (quote?['quoteExpiresAt']) {
+        final String s => DateTime.parse(s),
+        _ => null,
+      };
+      if (d.json['purchaseIntentId'] == request.purchaseIntentId &&
+          expires != null &&
+          now().isBefore(expires)) {
+        _byKey[key.value] = d.json['draftId']! as String;
+        return _out(d);
+      }
+    }
     if (rejectNextDraft case final code?) {
       rejectNextDraft = null;
       throw ProblemFailure(
@@ -333,6 +351,7 @@ base class MockCheckoutRepository
   @override
   Future<OrderDraft> getDraft(String draftId) async {
     await _wait();
+    getDraftCalls++;
     final d = drafts[draftId];
     if (d == null) {
       throw const ProblemFailure(
