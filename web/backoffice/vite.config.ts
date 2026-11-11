@@ -2,27 +2,41 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-// mode: `mock`(MSW, 기본 개발) / `local`(게이트웨이 프록시, 로컬 백엔드 필요) / `lan`(.env.lan 의 게이트웨이 주소로 직접, CORS).
-export default defineConfig(({ mode }) => ({
-  plugins: [react(), tailwindcss()],
-  define: {
-    // mock·test 모드만 MSW. 그 외(local, production 빌드)는 실제 API 경로를 쓴다(배포 환경은 [결정 필요]).
-    'import.meta.env.VITE_PMART_ENV': JSON.stringify(mode === 'mock' || mode === 'test' ? 'mock' : 'local'),
-    // lan: 게이트웨이가 다른 출처(PC4). 브라우저는 http://192.168.0.40 으로 연다(CORS 허용 출처: 192.168.0.40·d603-16).
-    // 이름(d603-16)은 다른 PC 에서 IPv6 링크 로컬로 먼저 풀려 응답이 없어 IP 를 쓴다(2026-11-06 백엔드 요청).
-    // 비밀값이 아니라 주소라 여기 둔다. pc4 IP(백엔드 deploy/lan/placement.conf)가 바뀌면
-    // pmart-config api-gateway-lan.yml 의 pmart.gateway.cors.allowed-origins 와 함께 고친다.
-    ...(mode === 'lan' ? { 'import.meta.env.VITE_PMART_API_BASE': JSON.stringify('http://192.168.0.40:8080/api/v1') } : {}),
-  },
-  server: {
-    port: 5173,
-    // local 모드에서만 게이트웨이로 넘긴다. 쿠키·CORS 방식은 BR-03·BR-04 결정 대기.
-    proxy: mode === 'local' ? { '/api': 'http://localhost:8080' } : undefined,
-  },
-  test: {
-    environment: 'jsdom',
-    globals: true,
-    setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
-  },
-}));
+// mode: `mock`(MSW, 기본 개발) / `local`(게이트웨이 프록시, 로컬 백엔드 필요) / `lan`(.env.lan 의 게이트웨이 주소로 직접, CORS)
+//       / `lan-keycloak`(lan + 운영자 로그인을 Keycloak 으로).
+// 로그인 방식(ADR-0054 결정 D): 옮기는 동안 auth-service 와 Keycloak 을 빌드 모드로 고른다. 백엔드가 auth-service 의
+// OPERATOR 발급을 끄면(handoff 2026-11-11 §5-3) lan 도 keycloak 으로 바꾸고 auth-service 로그인 코드를 지운다.
+// Keycloak 주소·클라이언트 ID 는 비밀값이 아니다(공개 클라이언트, client secret 없음). PC5 IP 가 바뀌면 백엔드
+// deploy/lan/keycloak/pmart-staff-realm.json 의 redirect·웹 출처와 함께 고친다.
+const KEYCLOAK_ISSUER = 'http://192.168.0.101:8180/realms/pmart-staff';
+const KEYCLOAK_CLIENT_ID = 'pmart-backoffice';
+
+export default defineConfig(({ mode }) => {
+  const lan = mode === 'lan' || mode === 'lan-keycloak';
+  return {
+    plugins: [react(), tailwindcss()],
+    define: {
+      // mock·test 모드만 MSW. 그 외(local, production 빌드)는 실제 API 경로를 쓴다(배포 환경은 [결정 필요]).
+      'import.meta.env.VITE_PMART_ENV': JSON.stringify(mode === 'mock' || mode === 'test' ? 'mock' : 'local'),
+      // lan: 게이트웨이가 다른 출처(PC4). 브라우저는 http://192.168.0.40 으로 연다(CORS 허용 출처: 192.168.0.40·d603-16).
+      // 이름(d603-16)은 다른 PC 에서 IPv6 링크 로컬로 먼저 풀려 응답이 없어 IP 를 쓴다(2026-11-06 백엔드 요청).
+      // 비밀값이 아니라 주소라 여기 둔다. pc4 IP(백엔드 deploy/lan/placement.conf)가 바뀌면
+      // pmart-config api-gateway-lan.yml 의 pmart.gateway.cors.allowed-origins 와 함께 고친다.
+      ...(lan ? { 'import.meta.env.VITE_PMART_API_BASE': JSON.stringify('http://192.168.0.40:8080/api/v1') } : {}),
+      'import.meta.env.VITE_PMART_LOGIN': JSON.stringify(mode === 'lan-keycloak' ? 'keycloak' : 'auth-service'),
+      'import.meta.env.VITE_PMART_KEYCLOAK_ISSUER': JSON.stringify(KEYCLOAK_ISSUER),
+      'import.meta.env.VITE_PMART_KEYCLOAK_CLIENT_ID': JSON.stringify(KEYCLOAK_CLIENT_ID),
+    },
+    server: {
+      port: 5173,
+      // local 모드에서만 게이트웨이로 넘긴다. 쿠키·CORS 방식은 BR-03·BR-04 결정 대기.
+      proxy: mode === 'local' ? { '/api': 'http://localhost:8080' } : undefined,
+    },
+    test: {
+      environment: 'jsdom',
+      globals: true,
+      setupFiles: ['./src/test/setup.ts'],
+      include: ['src/**/*.test.{ts,tsx}'],
+    },
+  };
+});

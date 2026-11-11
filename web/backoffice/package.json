@@ -13,7 +13,9 @@
     "gen:api": "npm --prefix ../../tools/web-tools run gen:api",
     "lint": "node ../../tools/web-tools/node_modules/eslint/bin/eslint.js --config ../../tools/web-tools/eslint.config.js src",
     "dev:lan": "vite --mode lan",
-    "build:lan": "tsc --noEmit -p tsconfig.app.json && vite build --mode lan"
+    "build:lan": "tsc --noEmit -p tsconfig.app.json && vite build --mode lan",
+    "dev:lan-keycloak": "vite --mode lan-keycloak",
+    "build:lan-keycloak": "tsc --noEmit -p tsconfig.app.json && vite build --mode lan-keycloak"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.5",

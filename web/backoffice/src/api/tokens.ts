@@ -9,6 +9,8 @@ export interface TokenPairLike {
   readonly accessToken: string;
   readonly refreshToken: string;
   readonly accessTokenExpiresAt?: string;
+  /** Keycloak ID 토큰(표시 이름·로그아웃 힌트). auth-service 로그인에는 없다 */
+  readonly idToken?: string;
 }
 
 type Listener = (accessToken: string | null) => void;
@@ -16,6 +18,7 @@ type Listener = (accessToken: string | null) => void;
 export class TokenStore {
   private access: string | null = null;
   private refresh: string | null = null;
+  private id: string | null = null;
   private listeners = new Set<Listener>();
   private device: string = randomUuid();
 
@@ -37,7 +40,10 @@ export class TokenStore {
   /** 테스트·목 세션용. refresh 없이 access 만 둔다. */
   set accessToken(value: string | null) {
     this.access = value;
-    if (value === null) this.refresh = null;
+    if (value === null) {
+      this.refresh = null;
+      this.id = null;
+    }
     this.emit();
   }
 
@@ -45,16 +51,23 @@ export class TokenStore {
     return this.refresh;
   }
 
+  /** Keycloak ID 토큰(메모리만. 새로고침 뒤에는 갱신 응답으로 다시 받는다) */
+  get idToken(): string | null {
+    return this.id;
+  }
+
   setPair(pair: TokenPairLike): void {
     this.access = pair.accessToken;
     this.refresh = pair.refreshToken;
+    this.id = pair.idToken ?? null;
     this.emit();
   }
 
   clear(): void {
-    if (this.access === null && this.refresh === null) return;
+    if (this.access === null && this.refresh === null && this.id === null) return;
     this.access = null;
     this.refresh = null;
+    this.id = null;
     this.emit();
   }
 

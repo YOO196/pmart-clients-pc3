@@ -20,7 +20,7 @@ import { NewProductDraftPage, ProductDraftPage } from '../features/products/Prod
 import { NewProductImportPage, ProductImportPage } from '../features/products/ProductImportPage';
 import { ProductListPage } from '../features/products/ProductListPage';
 import { OperatorAccountsPage } from '../features/operators/OperatorAccountsPage';
-import { LoginPage } from '../features/session/LoginPage';
+import { KeycloakCallbackPage, LoginPage } from '../features/session/LoginPage';
 import { SessionPage } from '../features/session/SessionPage';
 import { messages as m } from '../shared/messages';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
@@ -50,7 +50,7 @@ const defaultAssistantPort = (): AssistantPort =>
   import.meta.env.VITE_PMART_ENV === 'mock' ? createDraftAssistantMock({ delayMs: 400 }) : notConnectedAssistant;
 
 function Layout() {
-  const { session, operator } = useSession();
+  const { session, displayName } = useSession();
   return (
     <div className="flex min-h-screen bg-base-200">
       <aside className="w-52 shrink-0 bg-base-100 shadow-sm">
@@ -63,7 +63,7 @@ function Layout() {
         <ul className="menu w-full">
           <li>
             <NavLink to={session ? '/session' : '/login'}>
-              {session ? `${m.nav.session}: ${operator?.displayName ?? session.subject}` : m.nav.login}
+              {session ? `${m.nav.session}: ${displayName ?? session.subject}` : m.nav.login}
             </NavLink>
           </li>
           {nav.map(([to, label]) => (
@@ -86,6 +86,8 @@ const guarded = (element: ReactNode) => <RequireSession>{element}</RequireSessio
 
 const routes = [
   { path: '/login', element: <LoginPage /> },
+  // Keycloak redirect_uri(handoff 2026-11-11 §1 — Keycloak 에 등록된 출처 아래 경로)
+  { path: '/login/callback', element: <KeycloakCallbackPage /> },
   {
     path: '/',
     element: <Layout />,

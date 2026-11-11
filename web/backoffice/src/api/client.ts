@@ -11,6 +11,7 @@ import type { paths as PricingPaths } from './generated/pricing';
 import type { paths as ProductPaths } from './generated/product';
 import type { paths as ContentPaths } from './generated/product-content';
 import { SOURCE_SYSTEM } from './command';
+import { LOGIN_MODE, refreshKeycloakTokens } from './keycloak';
 import { createPmartFetch, type PmartFetch } from './pmartFetch';
 import { TokenStore } from './tokens';
 
@@ -49,6 +50,11 @@ export const api: Api = createApi(
     sourceSystem: SOURCE_SYSTEM,
     tokens,
     // ADR-0018: 401 이면 refresh token 회전으로 한 번 갱신(single-flight). 세션이 끝나면 tokens 가 비워진다.
-    refresh: () => refreshOperatorTokens(api, tokens),
+    refresh: () => refreshTokens(api, tokens),
   }),
 );
+
+/** 로그인 방식에 맞는 갱신(auth-service `POST /auth/tokens` 또는 Keycloak 토큰 주소). 새로고침 복원도 이것을 쓴다. */
+export function refreshTokens(target: Api, store: TokenStore): Promise<string | null> {
+  return LOGIN_MODE === 'keycloak' ? refreshKeycloakTokens(store) : refreshOperatorTokens(target, store);
+}

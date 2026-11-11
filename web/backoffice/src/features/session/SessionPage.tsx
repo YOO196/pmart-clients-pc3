@@ -1,9 +1,12 @@
 // 내 세션: 토큰 클레임·서버 세션(GET /auth/sessions/current)·비밀번호 변경·로그아웃.
+// Keycloak 로그인이면(handoff 2026-11-11 §4) /auth/sessions/current 는 401 이라 부르지 않고 토큰 값만 보인다.
+// 비밀번호 변경도 auth-service API 라 Keycloak 계정 화면으로 안내한다.
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
+import { KEYCLOAK } from '../../api/keycloak';
 import { request, requestNoContent } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
@@ -83,10 +86,11 @@ export function SessionPage() {
   const api = useApi();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { session, operator, logout } = useSession();
+  const { session, operator, displayName, authTimeSeconds, loginMode, logout } = useSession();
+  const keycloak = loginMode === 'keycloak';
   const current = useQuery({
     queryKey: ['auth', 'session', session?.subject],
-    enabled: session !== null,
+    enabled: session !== null && !keycloak,
     queryFn: () => request('GET', api.auth.GET('/auth/sessions/current', {})),
   });
   const required = params.get('password') === 'required' || operator?.passwordChangeRequired === true;
@@ -100,27 +104,48 @@ export function SessionPage() {
             <div className="card-body">
               <dl className="grid grid-cols-[8rem_1fr] gap-1 text-sm">
                 <dt>{m.session.subject}</dt>
-                <dd>{operator ? `${operator.displayName} (${operator.loginId})` : session.subject || m.none}</dd>
+                <dd>
+                  {operator
+                    ? `${operator.displayName} (${operator.loginId})`
+                    : displayName
+                      ? `${displayName} (${session.subject || m.none})`
+                      : session.subject || m.none}
+                </dd>
                 <dt>{m.session.roles}</dt>
                 <dd>{session.roles.join(', ') || m.none}</dd>
                 <dt>{m.session.centers}</dt>
                 <dd>{session.centers.join(', ') || m.none}</dd>
               </dl>
-              <h2 className="mt-2 text-sm font-semibold">{m.session.current}</h2>
-              <QueryState state={toUiState(current)} onRetry={() => void current.refetch()}>
-                {(s) => (
-                  <dl className="grid grid-cols-[8rem_1fr] gap-1 text-sm">
-                    <dt>{m.session.sessionId}</dt>
-                    <dd>{s.sessionId ?? m.none}</dd>
-                    <dt>{m.session.roles}</dt>
-                    <dd>{(s.roles ?? []).join(', ') || m.none}</dd>
-                    <dt>{m.session.centers}</dt>
-                    <dd>{(s.centerScope ?? []).join(', ') || m.none}</dd>
-                    <dt>{m.session.expiresAt}</dt>
-                    <dd>{s.expiresAt ? formatSeoul(s.expiresAt) : m.none}</dd>
-                  </dl>
-                )}
-              </QueryState>
+              {keycloak ? (
+                <dl className="grid grid-cols-[8rem_1fr] gap-1 text-sm">
+                  {authTimeSeconds !== null && (
+                    <>
+                      <dt>{m.keycloak.authTime}</dt>
+                      <dd>{formatSeoul(new Date(authTimeSeconds * 1000).toISOString())}</dd>
+                    </>
+                  )}
+                  <dt>{m.keycloak.tokenExpiresAt}</dt>
+                  <dd>{session.expiresAtSeconds ? formatSeoul(new Date(session.expiresAtSeconds * 1000).toISOString()) : m.none}</dd>
+                </dl>
+              ) : (
+                <>
+                  <h2 className="mt-2 text-sm font-semibold">{m.session.current}</h2>
+                  <QueryState state={toUiState(current)} onRetry={() => void current.refetch()}>
+                    {(s) => (
+                      <dl className="grid grid-cols-[8rem_1fr] gap-1 text-sm">
+                        <dt>{m.session.sessionId}</dt>
+                        <dd>{s.sessionId ?? m.none}</dd>
+                        <dt>{m.session.roles}</dt>
+                        <dd>{(s.roles ?? []).join(', ') || m.none}</dd>
+                        <dt>{m.session.centers}</dt>
+                        <dd>{(s.centerScope ?? []).join(', ') || m.none}</dd>
+                        <dt>{m.session.expiresAt}</dt>
+                        <dd>{s.expiresAt ? formatSeoul(s.expiresAt) : m.none}</dd>
+                      </dl>
+                    )}
+                  </QueryState>
+                </>
+              )}
               <button
                 type="button"
                 className="btn btn-sm w-fit"
@@ -130,7 +155,16 @@ export function SessionPage() {
               </button>
             </div>
           </div>
-          <PasswordChange required={required} />
+          {keycloak ? (
+            <p className="rounded-box bg-base-100 p-4 text-sm">
+              {m.keycloak.passwordNote}{' '}
+              <a className="link" href={`${KEYCLOAK.issuer}/account`} target="_blank" rel="noreferrer">
+                {m.keycloak.accountConsole}
+              </a>
+            </p>
+          ) : (
+            <PasswordChange required={required} />
+          )}
         </>
       )}
     </section>

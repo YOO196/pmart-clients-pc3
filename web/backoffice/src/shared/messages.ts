@@ -75,6 +75,26 @@ export const messages = {
     unknownBody: '로그인 결과를 받지 못했어요. 잠시 뒤 다시 로그인해 주세요.',
   },
 
+  keycloak: {
+    start: 'Keycloak 으로 로그인',
+    note: '로그인은 직원 계정(Keycloak) 화면에서 해요. 백오피스는 비밀번호를 받지 않아요. 로그인은 로그인한 때부터 12시간 유지돼요.',
+    starting: 'Keycloak 로그인 화면으로 이동하는 중…',
+    completing: '로그인 정보를 받는 중…',
+    retry: '다시 로그인',
+    errors: {
+      DISCOVERY_FAILED: 'Keycloak 에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+      NO_PENDING: '이 탭에서 시작한 로그인이 아니에요(오래된 주소이거나 다른 탭). 다시 로그인해 주세요.',
+      STATE_MISMATCH: '로그인 확인 값이 맞지 않아요. 다시 로그인해 주세요.',
+      PROVIDER_ERROR: 'Keycloak 이 로그인을 마치지 않았어요. 다시 로그인해 주세요.',
+      TOKEN_REJECTED: '로그인을 마치지 못했어요(시간이 지났을 수 있어요). 다시 로그인해 주세요.',
+      NETWORK: '로그인 결과를 받지 못했어요. 다시 로그인해 주세요.',
+    },
+    authTime: '로그인 시각',
+    tokenExpiresAt: '토큰 만료',
+    passwordNote: '비밀번호는 Keycloak 계정 화면에서 바꿔요.',
+    accountConsole: 'Keycloak 계정 화면',
+  },
+
   password: {
     title: '비밀번호 변경',
     current: '현재 비밀번호',
