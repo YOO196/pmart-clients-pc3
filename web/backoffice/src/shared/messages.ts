@@ -91,7 +91,12 @@ export const messages = {
     adminOnly: 'OPERATOR_ADMIN 역할만 쓸 수 있어요.',
     loginId: '아이디',
     displayName: '표시 이름',
-    roles: '역할(쉼표 구분)',
+    roles: '역할',
+    rolesPick: '역할을 고르세요(여러 개 가능)',
+    rolesSelected: (n: number) => `역할 ${n}개 선택`,
+    roleLabel: (r: string) =>
+      `${r}${({ PRODUCT_APPROVER: ' · 상품 승인', DISPLAY_APPROVER: ' · 전시 승인', PRICE_APPROVER: ' · 가격 승인', OPERATOR_ADMIN: ' · 운영자 계정 관리' } as Record<string, string>)[r] ?? ''}`,
+    rolesUnknown: (r: string) => `${r} (목록에 없음)`,
     centers: '센터',
     centersPick: '센터를 고르세요(여러 개 가능)',
     centersSelected: (n: number) => `센터 ${n}개 선택`,
@@ -109,7 +114,6 @@ export const messages = {
     reset: '비밀번호 초기화',
     temporaryPassword: '임시 비밀번호',
     resetDone: '초기화했어요. 잠금이 풀리고 열린 세션은 끊겨요.',
-    knownRoles: '알려진 역할: MD, PRODUCT_APPROVER, DISPLAY_APPROVER, PRICE_APPROVER, OPERATOR_ADMIN',
     stateName: { ACTIVE: '사용', DISABLED: '비활성' } as const,
   },
 

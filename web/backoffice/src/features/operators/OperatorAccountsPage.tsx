@@ -17,13 +17,47 @@ import { QueryState } from '../../shared/QueryState';
 import { toUiState } from '../../shared/toUiState';
 import { useCommand } from '../../shared/useCommand';
 
-const list = (s: string) =>
-  s
-    .split(',')
-    .map((x) => x.trim())
-    .filter(Boolean);
-
 const KEY = ['auth', 'operators'];
+
+/**
+ * 고를 수 있는 역할. 계약 `RoleName` 은 enum 이 아니고 역할 목록 API 도 없어, 계약 설명에 적힌 5개를 쓴다.
+ * 계정이 이미 가진 다른 역할은 "(목록에 없음)"으로 남겨 저장 때 지워지지 않게 한다.
+ */
+const KNOWN_ROLES = ['MD', 'PRODUCT_APPROVER', 'DISPLAY_APPROVER', 'PRICE_APPROVER', 'OPERATOR_ADMIN'] as const;
+
+/** 역할 선택(여러 개, 사용자 요청 2026-11-07: 쉼표 입력은 오타 위험 → 드롭다운) */
+function RolePicker({ value, onChange }: { readonly value: readonly string[]; readonly onChange: (next: string[]) => void }) {
+  const known = new Set<string>(KNOWN_ROLES);
+  const label = (r: string) => (known.has(r) ? m.operators.roleLabel(r) : m.operators.rolesUnknown(r));
+  const options = [
+    ...value.filter((r) => !known.has(r)).map((r) => ({ value: r, label: m.operators.rolesUnknown(r) })),
+    ...KNOWN_ROLES.map((r) => ({ value: r, label: m.operators.roleLabel(r) })),
+  ];
+  return (
+    <div className="flex w-72 flex-col gap-1 text-sm">
+      <MultiSelectDropdown
+        label={m.operators.roles}
+        options={options}
+        value={value}
+        onChange={onChange}
+        placeholder={m.operators.rolesPick}
+        selectedText={m.operators.rolesSelected}
+      />
+      {value.length > 0 && (
+        <ul className="flex flex-wrap gap-1" aria-label={m.operators.roles}>
+          {value.map((r) => (
+            <li key={r} className="badge badge-outline gap-1">
+              {label(r)}
+              <button type="button" aria-label={`${label(r)} 빼기`} onClick={() => onChange(value.filter((x) => x !== r))}>
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 /**
  * 센터 선택(여러 개). 목록은 center-master `GET /centers`. 목록 조회에 실패해도 계정 화면은 쓸 수 있게
@@ -80,14 +114,14 @@ function CenterPicker({ value, onChange }: { readonly value: readonly string[]; 
 function CreateAccount() {
   const api = useApi();
   const queryClient = useQueryClient();
-  const [v, setV] = useState({ loginId: '', displayName: '', initialPassword: '', roles: '', centers: [] as string[] });
+  const [v, setV] = useState({ loginId: '', displayName: '', initialPassword: '', roles: [] as string[], centers: [] as string[] });
   const cmd = useCommand(async (body: { loginId: string; displayName: string; initialPassword: string; roles: string[]; centers: string[] }, key) => {
     const a = await request('POST', api.auth.POST('/operator-accounts', { ...commandParams(key), body }));
-    setV({ loginId: '', displayName: '', initialPassword: '', roles: '', centers: [] });
+    setV({ loginId: '', displayName: '', initialPassword: '', roles: [], centers: [] });
     await queryClient.invalidateQueries({ queryKey: KEY });
     return a;
   });
-  const field = (k: 'loginId' | 'displayName' | 'initialPassword' | 'roles', label: string, type = 'text') => (
+  const field = (k: 'loginId' | 'displayName' | 'initialPassword', label: string, type = 'text') => (
     <label className="flex flex-col gap-1 text-sm">
       {label}
       <input
@@ -111,7 +145,7 @@ function CreateAccount() {
             loginId: v.loginId,
             displayName: v.displayName.trim(),
             initialPassword: v.initialPassword,
-            roles: list(v.roles),
+            roles: v.roles,
             centers: v.centers,
           });
       }}
@@ -121,10 +155,10 @@ function CreateAccount() {
         {field('loginId', m.operators.loginId)}
         {field('displayName', m.operators.displayName)}
         {field('initialPassword', m.operators.initialPassword, 'password')}
-        {field('roles', m.operators.roles)}
+        <RolePicker value={v.roles} onChange={(roles) => setV({ ...v, roles })} />
         <CenterPicker value={v.centers} onChange={(centers) => setV({ ...v, centers })} />
       </div>
-      <p className="text-xs opacity-70">{`${m.operators.knownRoles} · ${m.password.rule}`}</p>
+      <p className="text-xs opacity-70">{m.password.rule}</p>
       <button type="submit" className="btn btn-primary btn-sm" disabled={!ok || cmd.busy}>
         {m.operators.create}
       </button>
@@ -145,7 +179,7 @@ function AccountRow({ account }: { readonly account: OperatorAccount }) {
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState({
     displayName: account.displayName,
-    roles: account.roles.join(', '),
+    roles: [...account.roles],
     centers: [...account.centers],
     state: account.state,
   });
@@ -200,10 +234,7 @@ function AccountRow({ account }: { readonly account: OperatorAccount }) {
                 {m.operators.displayName}
                 <input className="input input-sm" value={v.displayName} onChange={(e) => setV({ ...v, displayName: e.target.value })} />
               </label>
-              <label className="flex flex-col text-sm">
-                {m.operators.roles}
-                <input className="input input-sm w-72" value={v.roles} onChange={(e) => setV({ ...v, roles: e.target.value })} />
-              </label>
+              <RolePicker value={v.roles} onChange={(roles) => setV({ ...v, roles })} />
               <CenterPicker value={v.centers} onChange={(centers) => setV({ ...v, centers })} />
               <label className="flex flex-col text-sm">
                 {m.operators.state}
@@ -220,7 +251,7 @@ function AccountRow({ account }: { readonly account: OperatorAccount }) {
                 type="button"
                 className="btn btn-primary btn-sm"
                 disabled={save.busy || !v.displayName.trim()}
-                onClick={() => void save.run({ displayName: v.displayName.trim(), roles: list(v.roles), centers: v.centers, state: v.state })}
+                onClick={() => void save.run({ displayName: v.displayName.trim(), roles: v.roles, centers: v.centers, state: v.state })}
               >
                 {m.operators.save}
               </button>

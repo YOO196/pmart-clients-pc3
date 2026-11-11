@@ -14,6 +14,7 @@ import { db } from '../../mocks/db';
 import { mockAccounts, mockTokenFor, MOCK_PASSWORD } from '../../mocks/operators';
 import { as, renderAt } from '../../test/render';
 import { server } from '../../test/server';
+import { messages as m } from '../../shared/messages';
 
 const ACCESS = mockAuthPolicy.accessSeconds;
 afterEach(() => {
@@ -219,7 +220,13 @@ describe('운영자 계정 관리', () => {
     await user.type(screen.getAllByLabelText('아이디')[0]!, 'md2');
     await user.type(screen.getByLabelText('표시 이름'), 'MD 최');
     await user.type(screen.getByLabelText('초기 비밀번호'), 'initial-pass-1');
-    await user.type(screen.getAllByLabelText('역할(쉼표 구분)')[0]!, 'MD');
+    // 역할도 목록에서 고른다(쉼표 입력은 오타 위험).
+    const roles = screen.getAllByRole('button', { name: '역할' })[0]!;
+    expect(roles).toHaveTextContent('역할을 고르세요');
+    await user.click(roles);
+    await user.click(await screen.findByRole('checkbox', { name: 'MD' }));
+    expect(roles).toHaveTextContent('역할 1개 선택');
+    await user.keyboard('{Escape}');
     // 센터는 center-master 목록에서 고른다(쉼표 입력 아님).
     // 닫힌 드롭다운을 열고 체크박스로 여러 개 고른다.
     const centers = screen.getAllByRole('button', { name: '센터' })[0]!;
@@ -237,7 +244,9 @@ describe('운영자 계정 관리', () => {
     expect(await screen.findByRole('cell', { name: 'md2' })).toBeInTheDocument();
     const post = view.mutations('/operator-accounts')[0]!;
     expect(post.headers.get('Idempotency-Key')).toBeTruthy();
-    expect(((await post.json()) as { centers: string[] }).centers).toEqual(['CDC01', 'MFC-BSN-01']);
+    const body = (await post.json()) as { roles: string[]; centers: string[] };
+    expect(body.roles).toEqual(['MD']);
+    expect(body.centers).toEqual(['CDC01', 'MFC-BSN-01']);
     expect([...db.accounts.values()].find((a) => a.account.loginId === 'md2')?.account.passwordChangeRequired).toBe(true);
     view.stop();
   });
@@ -258,6 +267,27 @@ describe('운영자 계정 관리', () => {
 
     expect(await screen.findByRole('alert')).toHaveAttribute('data-code', 'VERSION_CONFLICT');
     expect(view.mutations('/operator-accounts/op-md-1')[0]?.headers.get('X-Expected-Version')).toBe('0');
+    view.stop();
+  });
+
+  it('수정: 목록에 없는 역할은 "(목록에 없음)"으로 남아 저장 때 지워지지 않고, 드롭다운으로 역할을 더한다', async () => {
+    const md = db.accounts.get('op-md-1')!;
+    md.account = { ...md.account, roles: ['MD', 'LEGACY_ROLE'] };
+    const user = userEvent.setup();
+    const view = renderAt('/operators', as.admin);
+    const row = (await screen.findByRole('cell', { name: 'md' })).closest('tr')!;
+    await user.click(row.querySelector('button')!);
+    expect(screen.getByText('LEGACY_ROLE (목록에 없음)')).toBeInTheDocument();
+    const roles = screen.getAllByRole('button', { name: '역할' }).at(-1)!;
+    expect(roles).toHaveTextContent('역할 2개 선택');
+    await user.click(roles);
+    await user.click(await screen.findByRole('checkbox', { name: 'PRICE_APPROVER · 가격 승인' }));
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(await screen.findByText(m.operators.saved)).toBeInTheDocument();
+    const put = view.mutations('/operator-accounts/op-md-1')[0]!;
+    expect([...((await put.json()) as { roles: string[] }).roles].sort()).toEqual(['LEGACY_ROLE', 'MD', 'PRICE_APPROVER']);
     view.stop();
   });
 });
