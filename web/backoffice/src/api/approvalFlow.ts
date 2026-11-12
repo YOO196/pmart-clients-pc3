@@ -2,10 +2,10 @@
 // 백엔드 handoff 2026-10-30 §3 ③④. 승인 결정과 정본 반영은 다른 사람·다른 시점의 일이라 여기서 기다리지 않는다.
 import type { Api } from './client';
 import { commandParams, IdempotencyKey } from './command';
-import { CommandRejectedFailure, UnknownResultFailure } from './failure';
+import { CommandRejectedFailure, UnknownResultFailure } from '@pmart/web-core';
 import type { ApprovalRequestBody } from './models';
-import { request } from './pmartFetch';
-import { pollUntil } from './poll';
+import { request } from '@pmart/web-core';
+import { pollUntil } from '@pmart/web-core';
 
 export interface ApprovalRequested {
   readonly changeRequestId: string;

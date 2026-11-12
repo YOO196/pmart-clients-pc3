@@ -1,6 +1,6 @@
 // 콘텐츠 신규 / 기존 게시 갱신 표시(BR-44, 백엔드 회신 2026-11-04). 서버 값(registration·지금 게시본)만 보인다.
 // 심사 전 초안(DRAFT·SUBMITTED)만 서버가 채우고, 게시·반려된 초안은 null → "-". 화면이 게시 여부를 추정하지 않는다.
-import { formatSeoul } from '../../shared/format';
+import { formatSeoul } from '@pmart/web-ui';
 import { messages as m } from '../../shared/messages';
 
 export interface ContentRegistrationValue {

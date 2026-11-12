@@ -6,7 +6,7 @@ import type { ApprovalRequestBody } from '../../api/models';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback } from '../../shared/Feedback';
 import { messages as m } from '../../shared/messages';
-import { useCommand } from '../../shared/useCommand';
+import { useCommand } from '@pmart/web-ui';
 
 export function RequestApproval({
   body,

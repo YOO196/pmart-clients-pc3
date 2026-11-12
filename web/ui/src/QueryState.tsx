@@ -7,8 +7,8 @@ import {
   ProblemFailure,
   SessionExpiredFailure,
   UnknownResultFailure,
-} from '../api/failure';
-import { messages as m } from './messages';
+} from '@pmart/web-core';
+import { uiMessages as m } from './messages';
 
 export type UiState<T> =
   | { readonly kind: 'loading' }

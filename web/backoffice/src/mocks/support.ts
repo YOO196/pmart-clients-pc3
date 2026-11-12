@@ -1,7 +1,7 @@
 // 목 핸들러 공통: Problem 응답, 토큰 클레임, 멱등 재생, 기대 버전.
 import { HttpResponse } from 'msw';
 
-import { parseOperatorToken, type OperatorSession } from '../api/session';
+import { parseOperatorToken, type OperatorSession } from '@pmart/web-core';
 import { db } from './db';
 
 export function problem(

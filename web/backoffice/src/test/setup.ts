@@ -3,7 +3,7 @@ import { cleanup } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 
 import { resetDb } from '../mocks/db';
-import { pollConfig } from '../api/poll';
+import { pollConfig } from '@pmart/web-core';
 import { server } from './server';
 
 // 폴링은 테스트에서 기다리지 않는다.

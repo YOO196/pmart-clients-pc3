@@ -9,7 +9,7 @@ import { useSession } from '../../app/SessionContext';
 import { mockAccounts } from '../../mocks/operators';
 import { CommandFeedback } from '../../shared/Feedback';
 import { messages as m } from '../../shared/messages';
-import { useCommand } from '../../shared/useCommand';
+import { useCommand } from '@pmart/web-ui';
 
 const isMock = import.meta.env.VITE_PMART_ENV !== 'local';
 

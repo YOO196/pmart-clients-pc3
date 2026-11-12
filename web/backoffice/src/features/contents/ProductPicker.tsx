@@ -3,9 +3,9 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useId, useMemo } from 'react';
 
-import { PmartFailure } from '../../api/failure';
+import { PmartFailure } from '@pmart/web-core';
 import type { ProductSummary } from '../../api/models';
-import { request } from '../../api/pmartFetch';
+import { request } from '@pmart/web-core';
 import { useApi } from '../../app/ApiContext';
 import { FailureAlert } from '../../shared/Feedback';
 import { messages as m } from '../../shared/messages';

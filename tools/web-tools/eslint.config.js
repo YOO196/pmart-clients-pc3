@@ -1,5 +1,5 @@
-// web/backoffice 린트. TS 7 에는 typescript-eslint 가 쓰는 컴파일러 JS API 가 없어서
-// 이 패키지(TS 5.9)의 eslint 로 실행한다(web/backoffice 에서 `npm run lint`). typescript-eslint 가 TS 7 을 지원하면 web/backoffice 로 옮긴다.
+// web/* (backoffice·hr-backoffice·core·ui) 린트. TS 7 에는 typescript-eslint 가 쓰는 컴파일러 JS API 가 없어서
+// 이 패키지(TS 5.9)의 eslint 로 실행한다(각 패키지에서 `npm run lint`). typescript-eslint 가 TS 7 을 지원하면 web/backoffice 로 옮긴다.
 import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
@@ -7,7 +7,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tseslint from 'typescript-eslint';
 
-const backoffice = resolve(dirname(fileURLToPath(import.meta.url)), '../../web/backoffice');
+const web = resolve(dirname(fileURLToPath(import.meta.url)), '../../web');
 
 export default tseslint.config(
   { ignores: ['**/generated/**', '**/dist/**', '**/public/**'] },
@@ -18,8 +18,13 @@ export default tseslint.config(
     languageOptions: {
       globals: globals.browser,
       parserOptions: {
-        project: [resolve(backoffice, 'tsconfig.app.json')],
-        tsconfigRootDir: backoffice,
+        project: [
+          resolve(web, 'backoffice/tsconfig.app.json'),
+          resolve(web, 'hr-backoffice/tsconfig.app.json'),
+          resolve(web, 'core/tsconfig.json'),
+          resolve(web, 'ui/tsconfig.json'),
+        ],
+        tsconfigRootDir: web,
       },
     },
     plugins: { 'react-hooks': reactHooks },

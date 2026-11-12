@@ -164,6 +164,41 @@ export function createDb(): MockDb {
     receipts: [],
   });
 
+  // 직원 권한 요청(GRANT): 인사팀 백오피스의 직원 등록이 계정 발급 뒤 자동으로 올린다(백엔드 handoff 2026-11-13).
+  approvals.set('apv-seed-grant-1', {
+    approvalId: 'apv-seed-grant-1',
+    changeRequestId: 'cr-seed-grant-1',
+    type: 'GRANT',
+    targetService: 'employee-auth-service',
+    targetRef: 'OP-seed-new-1',
+    summary: '직원 권한 요청 P2026-00014 hong@pmart.com (hr-service GR-seed-1)',
+    requesterId: 'OP-seed-hr-1',
+    requestState: 'SUBMITTED',
+    reviewState: 'REVIEW_PENDING',
+    executionState: 'NOT_REQUESTED',
+    deliveryState: 'PENDING',
+    caseId: null,
+    submittedAt: '2026-11-13T01:00:00Z',
+    expiresAt: null,
+    version: 0,
+    approvalVersion: 1,
+    allowedActions: [],
+    lines: [
+      {
+        lineKey: 'MD',
+        attributes: {
+          role: 'MD',
+          centers: [],
+          validFrom: '2026-11-13',
+          reason: '상품팀 배치',
+          employee: { operatorId: 'OP-seed-new-1', employeeNo: 'P2026-00014', mailAddress: 'hong@pmart.com', affiliation: { type: 'HQ_DEPARTMENT', code: 'HQ' } },
+        },
+      },
+    ],
+    decisions: [],
+    receipts: [],
+  });
+
   const accounts = new Map<string, MockAccount>(
     mockAccounts.map((a) => [
       a.operatorId,

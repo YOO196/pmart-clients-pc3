@@ -3,8 +3,7 @@
 // - Problem·REJECTED 는 거절로 확정, 타임아웃·5xx·UNKNOWN_RESULT 는 불명(실패로 확정하지 않음).
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
-import { IdempotencyKey } from '../api/command';
-import { NetworkFailure, PmartFailure, UnknownResultFailure } from '../api/failure';
+import { IdempotencyKey, NetworkFailure, PmartFailure, UnknownResultFailure } from '@pmart/web-core';
 
 export type CommandPhase<T> =
   | { readonly kind: 'idle' }

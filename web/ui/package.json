@@ -1,0 +1,31 @@
+{
+  "name": "@pmart/web-ui",
+  "private": true,
+  "version": "0.1.0",
+  "description": "웹 앱 공통 화면 부품(UiState 표시·명령 결과·공통 문구). 빌드 없이 소스(src/index.ts)를 앱이 직접 묶는다. Tailwind 클래스는 앱의 index.css 가 @source 로 읽는다.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "node ../../tools/web-tools/node_modules/eslint/bin/eslint.js --config ../../tools/web-tools/eslint.config.js src"
+  },
+  "dependencies": {
+    "@pmart/web-core": "*"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "^5.104.5",
+    "react": "^19.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "jsdom": "^30.1.3",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,6 +1,6 @@
 // 계약(생성 타입, ai-assistant-service 1.1.0) 응답 → 화면 모델. 목과 실서버 어댑터가 같이 쓴다.
 // 계약 필수 값이 없거나 enum 밖이면 빈 값으로 메우지 않고 계약 위반으로 던진다(화면은 오류로 보인다).
-import { ContractViolationFailure } from '../../api/failure';
+import { ContractViolationFailure } from '@pmart/web-core';
 import type { components } from '../../api/generated/ai-assistant';
 import {
   ANSWER_MODES,

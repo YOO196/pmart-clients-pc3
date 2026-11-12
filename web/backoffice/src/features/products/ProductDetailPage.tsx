@@ -5,15 +5,15 @@ import { Link, useParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
 import { SALE_STATES, type ChangeRequestBody, type ProductDetail, type SaleState } from '../../api/models';
-import { request } from '../../api/pmartFetch';
-import { settleCommand } from '../../api/settle';
+import { request } from '@pmart/web-core';
+import { settleCommand } from '@pmart/web-core';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback } from '../../shared/Feedback';
-import { formatSeoul } from '../../shared/format';
+import { formatSeoul } from '@pmart/web-ui';
 import { messages as m } from '../../shared/messages';
-import { QueryState } from '../../shared/QueryState';
-import { toUiState } from '../../shared/toUiState';
-import { useCommand } from '../../shared/useCommand';
+import { QueryState } from '@pmart/web-ui';
+import { toUiState } from '@pmart/web-ui';
+import { useCommand } from '@pmart/web-ui';
 import { RequestApproval } from '../approvals/RequestApproval';
 
 /** handoff 2026-10-30 §4.3 판매중지 변경 요청 본문 */

@@ -15,11 +15,11 @@ import {
   logoutEmployee,
   refreshEmployeeTokens,
 } from '../../api/employeeAuth';
-import { PmartFailure } from '../../api/failure';
-import { createPmartFetch } from '../../api/pmartFetch';
-import { mockOperatorToken } from '../../api/session';
-import { sha256Fallback } from '../../api/sha256';
-import { TokenStore } from '../../api/tokens';
+import { PmartFailure } from '@pmart/web-core';
+import { createPmartFetch } from '@pmart/web-core';
+import { mockOperatorToken } from '@pmart/web-core';
+import { sha256Fallback } from '@pmart/web-core';
+import { TokenStore } from '@pmart/web-core';
 import { App } from '../../app/App';
 import { problem } from '../../mocks/support';
 import { server } from '../../test/server';

@@ -124,3 +124,21 @@ describe('승인 상세 (목 모드, MSW)', () => {
     expect(screen.queryByText(/새 상품/)).not.toBeInTheDocument();
   });
 });
+
+describe('직원 권한 요청(GRANT) 승인 상세 — 백엔드 회신 2026-11-13 Q6', () => {
+  it('행에 역할·센터·기간·근거와 대상 직원(사번·메일·소속)을 읽기 쉽게 보인다. 없는 값은 "-"', async () => {
+    render(<App memory initialPath="/approvals/apv-seed-grant-1" initialToken={as.admin} />);
+    const line = await screen.findByTestId('grant-line');
+    expect(line).toHaveTextContent('역할MD');
+    expect(line).toHaveTextContent('센터-'); // 센터 없음을 "전체"로 바꾸지 않는다
+    expect(line).toHaveTextContent('기간2026-11-13 ~ -'); // 종료일 없음을 "무기한"으로 바꾸지 않는다
+    expect(line).toHaveTextContent('근거상품팀 배치');
+    expect(line).toHaveTextContent('대상 직원P2026-00014 · hong@pmart.com · 본사 부서 HQ');
+    expect(screen.getByRole('button', { name: '승인' })).toBeInTheDocument();
+  });
+
+  it('승인 목록의 유형 필터에 GRANT 가 있다', async () => {
+    render(<App memory initialPath="/approvals" initialToken={as.admin} />);
+    expect(await screen.findByRole('option', { name: 'GRANT' })).toBeInTheDocument();
+  });
+});

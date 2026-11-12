@@ -1,0 +1,281 @@
+// 직원 로그인 employee-auth-service — ADR-0056, 백엔드 handoff 2026-11-12 clients-request-backoffice-employee-auth-login,
+// 계약 employee-auth-service.yaml 0.1.0.
+// 직원용 웹 앱(백오피스·인사팀 백오피스)은 OAuth 클라이언트가 아니다: Keycloak 주소·client_id 를 모른다. 게이트웨이의 로그인 시작 주소로 브라우저를
+// 이동시키고(302 → Keycloak 로그인 화면 → 복귀 주소 ?ticket=), 티켓을 PMart 직원 토큰으로 바꾼다.
+// - 티켓은 60초·1회용이고 로그인을 시작한 deviceId + code_verifier 로만 바뀐다. 실패하면 다시 로그인(같은 티켓을 다시 보내지 않는다).
+// - refresh token 은 한 번만 쓴다. 갱신은 pmartFetch 의 single-flight 한 곳에서만 부른다.
+// - 티켓·verifier·토큰을 로그·오류 문구에 남기지 않는다.
+import type { Client } from 'openapi-fetch';
+
+import { IdempotencyKey } from './command';
+import { ProblemFailure } from './failure';
+import type { components, paths } from './generated/employee-auth';
+import { PUBLIC_HEADER, request } from './pmartFetch';
+import { sha256 } from './sha256';
+import type { TokenStore } from './tokens';
+
+/** employee-auth-service 계약 경로 타입 — 앱이 `createClient<EmployeeAuthPaths>` 로 클라이언트를 만든다 */
+export type EmployeeAuthPaths = paths;
+export type EmployeeSession = components['schemas']['EmployeeSession'];
+
+/** 이 모듈이 쓰는 API 클라이언트(앱의 Api 중 employeeAuth 만) */
+export interface EmployeeAuthApi {
+  readonly employeeAuth: Client<paths>;
+}
+
+export interface EmployeeAuthConfig {
+  /** employee-auth 설정의 앱 이름(pmart.employee-auth.apps.<app>) — backoffice, hr-backoffice */
+  readonly app: string;
+  /** `X-Source-System` */
+  readonly sourceSystem: string;
+  /** 로그인 시작 기록(verifier·기기 ID)을 두는 sessionStorage 키 */
+  readonly pendingKey: string;
+}
+
+/** 브라우저 이동(로그인 시작·Keycloak 로그아웃). 시험에서 바꿔 끼울 수 있게 한 곳에 둔다 */
+export const browser = {
+  assign(url: string): void {
+    globalThis.location.assign(url);
+  },
+};
+
+/** 복귀 주소 경로 — 백엔드 허용 목록(return-uris)에 `<출처>/auth/callback` 으로 들어 있다 */
+export const CALLBACK_PATH = '/auth/callback';
+
+/** 복귀 주소 `?error=` 로 오는 코드(계약 completeEmployeeLogin) */
+const RETURN_ERRORS = ['IDP_ERROR', 'IDP_REJECTED', 'IDP_UNAVAILABLE', 'EMPLOYEE_NOT_REGISTERED', 'ACCOUNT_NOT_AVAILABLE'] as const;
+type ReturnError = (typeof RETURN_ERRORS)[number];
+
+export type EmployeeLoginErrorCode =
+  | ReturnError
+  /** 돌아왔는데 이 탭에서 시작한 로그인 기록이 없다(다른 탭·오래된 주소·새로고침) */
+  | 'NO_PENDING'
+  /** 티켓이 없거나 서버가 거절(60초 넘김·이미 씀·다른 기기·verifier 불일치) */
+  | 'TICKET_INVALID'
+  /** 티켓 교환 결과를 모른다(네트워크·5xx). 티켓은 1회용이라 다시 로그인해야 한다 */
+  | 'NETWORK'
+  /** 계약에 없는 error 값 */
+  | 'UNKNOWN';
+
+export class EmployeeLoginError extends Error {
+  constructor(readonly code: EmployeeLoginErrorCode) {
+    super(code);
+    this.name = 'EmployeeLoginError';
+  }
+}
+
+interface Pending {
+  readonly verifier: string;
+  /** 로그인을 시작한 기기 ID — 티켓 교환·갱신에 같은 값을 보낸다 */
+  readonly deviceId: string;
+  /** 로그인 뒤 돌아갈 앱 안 경로 */
+  readonly from: string;
+}
+
+export interface EmployeeLoginDeps {
+  readonly storage?: Storage | null;
+  readonly origin?: string;
+}
+
+function sessionStorageOrNull(): Storage | null {
+  try {
+    return typeof sessionStorage === 'undefined' ? null : sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+const deps = (d: EmployeeLoginDeps = {}) => ({
+  storage: d.storage === undefined ? sessionStorageOrNull() : d.storage,
+  origin: d.origin ?? globalThis.location.origin,
+});
+
+export function base64Url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+/** RFC 7636 S256: BASE64URL(SHA256(ASCII(verifier))). LAN 은 http 라 crypto.subtle 이 없어 sha256.ts 를 쓴다 */
+export async function codeChallenge(verifier: string): Promise<string> {
+  return base64Url(await sha256(new TextEncoder().encode(verifier)));
+}
+
+function readPending(storage: Storage | null, pendingKey: string): Pending | null {
+  const raw = storage?.getItem(pendingKey);
+  if (!raw) return null;
+  try {
+    const p = JSON.parse(raw) as Partial<Pending>;
+    return typeof p.verifier === 'string' && typeof p.deviceId === 'string' && typeof p.from === 'string' ? (p as Pending) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 세션을 끝내야 하는 갱신 거절 코드 */
+const SESSION_ENDING = new Set(['TOKEN_INVALID', 'TOKEN_REUSED', 'SESSION_EXPIRED', 'ACCOUNT_NOT_AVAILABLE']);
+
+export interface EmployeeLogoutOutcome {
+  /**
+   * Keycloak 로그아웃 주소(SSO — handoff 2026-11-12 clients-request-backoffice-sso-logout). 브라우저를 이 주소로 이동시켜야
+   * Keycloak 세션까지 끝난다(끝나면 <출처>/login 으로 돌아온다). 토큰 값이 들어 있으니 로그·오류 문구에 남기지 않는다.
+   */
+  readonly idpLogoutUri?: string;
+  /** 서버가 로그아웃을 확인해 주지 않았다(실패·결과 불명) — Keycloak 세션이 남아 다음 로그인이 비밀번호 없이 될 수 있다 */
+  readonly idpSessionMayRemain: boolean;
+}
+
+/** http(s) 주소만 이동 대상으로 받는다(javascript: 등 다른 scheme 은 버린다) */
+function httpUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export interface EmployeeAuth {
+  /**
+   * 로그인 시작: code_verifier 와 기기 ID 를 이 탭의 sessionStorage 에 두고 게이트웨이의 로그인 시작 주소를 돌려준다.
+   * 호출한 쪽이 그 주소로 이동한다(`browser.assign`).
+   */
+  readonly beginEmployeeLogin: (apiBase: string, from: string, store: TokenStore, d?: EmployeeLoginDeps) => Promise<string>;
+  /** 복귀 주소로 돌아온 뒤: 티켓을 직원 토큰으로 바꿔 store 에 넣고, 돌아갈 앱 경로를 돌려준다. 실패는 EmployeeLoginError */
+  readonly completeEmployeeLogin: (api: EmployeeAuthApi, params: URLSearchParams, store: TokenStore, d?: EmployeeLoginDeps) => Promise<string>;
+  /** pmartFetch 의 refresh 훅. 새 access token, 세션이 끝났으면 null */
+  readonly refreshEmployeeTokens: (api: EmployeeAuthApi, store: TokenStore) => Promise<string | null>;
+  /** 서버 세션을 끝내고 이 탭의 토큰을 지운다. idpLogoutUri 로 이동하는 것은 호출한 쪽이 한다 */
+  readonly logoutEmployee: (api: EmployeeAuthApi, store: TokenStore) => Promise<EmployeeLogoutOutcome>;
+}
+
+/** 앱마다 한 번 만든다(앱 이름·출처·보관 키가 다르다). */
+export function createEmployeeAuth({ app, sourceSystem, pendingKey }: EmployeeAuthConfig): EmployeeAuth {
+  /**
+   * 로그인 시작: code_verifier 와 기기 ID 를 이 탭의 sessionStorage 에 두고 게이트웨이의 로그인 시작 주소를 돌려준다.
+   * 호출한 쪽이 그 주소로 이동한다(fetch 가 아니라 브라우저 이동 — 302 를 따라 Keycloak 화면으로 간다).
+   */
+  async function beginEmployeeLogin(apiBase: string, from: string, store: TokenStore, d?: EmployeeLoginDeps): Promise<string> {
+    const { storage, origin } = deps(d);
+    const pending: Pending = {
+      verifier: base64Url(crypto.getRandomValues(new Uint8Array(32))), // 43자(계약 43~128)
+      deviceId: store.deviceId,
+      from,
+    };
+    storage?.setItem(pendingKey, JSON.stringify(pending));
+    const query = new URLSearchParams({
+      app,
+      deviceId: pending.deviceId,
+      codeChallenge: await codeChallenge(pending.verifier),
+      codeChallengeMethod: 'S256',
+      returnUri: `${origin}${CALLBACK_PATH}`,
+    });
+    return `${apiBase}/employee-auth/logins?${query.toString()}`;
+  }
+
+  const inflight = new Map<string, Promise<string>>();
+
+  /**
+   * 복귀 주소로 돌아온 뒤: 티켓을 직원 토큰으로 바꿔 store 에 넣는다. 돌아갈 앱 경로를 돌려준다.
+   * 같은 티켓으로 두 번 부르면(StrictMode 이중 실행) 첫 요청을 같이 기다린다(티켓은 한 번만 쓸 수 있다).
+   */
+  function completeEmployeeLogin(api: EmployeeAuthApi, params: URLSearchParams, store: TokenStore, d?: EmployeeLoginDeps): Promise<string> {
+    const key = params.get('ticket') ?? params.get('error') ?? '';
+    let p = inflight.get(key);
+    if (!p) {
+      p = exchange(api, params, store, d).finally(() => setTimeout(() => inflight.delete(key), 0));
+      inflight.set(key, p);
+    }
+    return p;
+  }
+
+  async function exchange(api: EmployeeAuthApi, params: URLSearchParams, store: TokenStore, d?: EmployeeLoginDeps): Promise<string> {
+    const { storage } = deps(d);
+    const pending = readPending(storage, pendingKey);
+    storage?.removeItem(pendingKey); // verifier 는 한 번만 쓴다
+    const error = params.get('error');
+    if (error) throw new EmployeeLoginError((RETURN_ERRORS as readonly string[]).includes(error) ? (error as ReturnError) : 'UNKNOWN');
+    if (!pending) throw new EmployeeLoginError('NO_PENDING');
+    const ticket = params.get('ticket');
+    if (!ticket) throw new EmployeeLoginError('TICKET_INVALID');
+
+    store.clear();
+    // 페이지가 다시 열렸으므로 기기 ID 를 로그인 시작 때 값으로 되돌린다(티켓·갱신이 이 값에 묶인다).
+    store.useDevice(pending.deviceId);
+    try {
+      const result = await request(
+        'POST',
+        api.employeeAuth.POST('/employee-auth/tokens', {
+          params: {
+            header: { 'Idempotency-Key': IdempotencyKey.generate().value, 'X-Source-System': sourceSystem, 'X-Device-Id': pending.deviceId },
+          },
+          headers: { [PUBLIC_HEADER]: '1' },
+          body: { ticket, codeVerifier: pending.verifier },
+        }),
+      );
+      store.setPair(result.tokens);
+      return pending.from;
+    } catch (e) {
+      if (e instanceof ProblemFailure) {
+        if (e.problem.code === 'ACCOUNT_NOT_AVAILABLE') throw new EmployeeLoginError('ACCOUNT_NOT_AVAILABLE');
+        if (e.problem.status === 401) throw new EmployeeLoginError('TICKET_INVALID');
+      }
+      throw new EmployeeLoginError('NETWORK');
+    }
+  }
+
+  /**
+   * pmartFetch 의 refresh 훅. 새 access token 을 돌려주고, 세션이 끝났으면 null.
+   * 응답을 잃으면(결과 불명) 같은 refresh token 을 다시 보내지 않는다 — 서버가 재사용으로 보고 세션을 끊는다(TOKEN_REUSED).
+   */
+  async function refreshEmployeeTokens(api: EmployeeAuthApi, store: TokenStore): Promise<string | null> {
+    const refreshToken = store.refreshToken;
+    if (!refreshToken) return null;
+    try {
+      const pair = await request(
+        'POST',
+        api.employeeAuth.POST('/employee-auth/tokens/refresh', {
+          params: {
+            header: { 'Idempotency-Key': IdempotencyKey.generate().value, 'X-Source-System': sourceSystem, 'X-Device-Id': store.deviceId },
+          },
+          headers: { [PUBLIC_HEADER]: '1' },
+          body: { refreshToken },
+        }),
+      );
+      store.setPair(pair);
+      return pair.accessToken;
+    } catch (e) {
+      if (e instanceof ProblemFailure && SESSION_ENDING.has(e.problem.code)) return null;
+      throw e;
+    }
+  }
+
+  /**
+   * 서버 세션을 끝낸다. 결과와 관계없이 이 탭의 토큰은 지운다(로그아웃은 멱등).
+   * 백오피스는 SSO 라 Keycloak 세션이 남아 있다 — 응답의 idpLogoutUri 로 브라우저를 이동시키는 것은 호출한 쪽이 한다(토큰을 지운 뒤).
+   * 이미 끝난 세션이면 idpLogoutUri 없이 200(Keycloak 세션도 이미 끝난 것으로 본다).
+   */
+  async function logoutEmployee(api: EmployeeAuthApi, store: TokenStore): Promise<EmployeeLogoutOutcome> {
+    try {
+      if (!store.accessToken) return { idpSessionMayRemain: false };
+      const result = await request(
+        'POST',
+        api.employeeAuth.POST('/employee-auth/logouts', {
+          params: { header: { 'Idempotency-Key': IdempotencyKey.generate().value, 'X-Source-System': sourceSystem } },
+          body: { allDevices: false },
+        }),
+      );
+      const idpLogoutUri = httpUrl(result.idpLogoutUri);
+      return { ...(idpLogoutUri ? { idpLogoutUri } : {}), idpSessionMayRemain: false };
+    } catch {
+      // 서버 세션 종료를 확인하지 못해도 이 탭은 로그아웃한다(access 는 최대 15분, 세션은 최대 12시간으로 끝난다).
+      return { idpSessionMayRemain: true };
+    } finally {
+      store.clear();
+    }
+  }
+
+  return { beginEmployeeLogin, completeEmployeeLogin, refreshEmployeeTokens, logoutEmployee };
+}

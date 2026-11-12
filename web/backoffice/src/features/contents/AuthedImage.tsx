@@ -2,7 +2,7 @@
 // 같은 imageId 의 본문은 바뀌지 않아(내용 주소) blob URL 을 캐시에 두고 다시 쓴다(탭을 닫으면 해제된다).
 import { useQuery } from '@tanstack/react-query';
 
-import { request } from '../../api/pmartFetch';
+import { request } from '@pmart/web-core';
 import { useApi } from '../../app/ApiContext';
 import { messages as m } from '../../shared/messages';
 

@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 @plugin "daisyui";
+/* 공유 패키지(@pmart/web-ui)의 컴포넌트가 쓰는 클래스도 읽는다 */
+@source "../../ui/src";
 
 /* 임시 테마. 색은 daisyUI 테마 변수로만 정의한다(컴포넌트에 색 하드코딩 금지). */
 @plugin "daisyui/theme" {

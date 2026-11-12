@@ -1,0 +1,120 @@
+// 직원 로그인(employee-auth-service, app=hr-backoffice). 버튼 → 게이트웨이 로그인 시작 → Keycloak 화면 → /auth/callback 으로 돌아온다.
+// 이 앱은 비밀번호를 받지 않는다. 목 모드에는 Keycloak 이 없어 목 계정 버튼으로 복귀 주소를 바로 연다(티켓 교환부터는 같은 코드).
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
+
+import { EmployeeLoginError, type EmployeeLoginErrorCode } from '../../api/employeeAuth';
+import { useSession } from '../../app/SessionContext';
+import { env } from '../../env';
+import { mockLogins } from '../../mocks/db';
+import { messages as m } from '../../shared/messages';
+
+/** 열린 리디렉트 방지: 앱 안 경로만 */
+const safeFrom = (from: string | null) => (from && from.startsWith('/') && !from.startsWith('//') ? from : '/employees');
+
+export function LoginPage() {
+  const { session, startLogin, startMockLogin, signOutUnconfirmed } = useSession();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const from = safeFrom(params.get('from'));
+  const [phase, setPhase] = useState<'idle' | 'starting' | 'failed'>('idle');
+
+  if (session) return <Navigate to={from} replace />;
+
+  return (
+    <section className="mx-auto max-w-sm space-y-4 pt-10">
+      <h1 className="text-xl font-bold">{m.login.title}</h1>
+      <div className="space-y-3 rounded-box bg-base-100 p-6 shadow-sm">
+        {env.isMock ? (
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">{m.login.mockAccounts}</p>
+            {mockLogins.map((a) => (
+              <button
+                key={a.operatorId}
+                type="button"
+                className="btn btn-primary btn-sm w-full"
+                disabled={phase === 'starting'}
+                onClick={() => {
+                  setPhase('starting');
+                  startMockLogin(from, a.operatorId)
+                    .then((callback) => navigate(callback, { replace: true }))
+                    .catch(() => setPhase('failed'));
+                }}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="btn btn-primary w-full"
+            disabled={phase === 'starting'}
+            onClick={() => {
+              setPhase('starting');
+              startLogin(from).catch(() => setPhase('failed'));
+            }}
+          >
+            {phase === 'starting' ? m.employeeLogin.starting : m.employeeLogin.start}
+          </button>
+        )}
+        {phase === 'failed' && (
+          <p role="alert" className="alert alert-error text-sm">
+            {m.employeeLogin.startFailed}
+          </p>
+        )}
+        {signOutUnconfirmed && (
+          <p role="alert" className="alert alert-warning text-sm">
+            {m.employeeLogin.signOutUnconfirmed}
+          </p>
+        )}
+        <p className="text-xs opacity-70">{m.employeeLogin.note}</p>
+      </div>
+    </section>
+  );
+}
+
+/** 로그인 뒤 돌아오는 곳(복귀 주소 ?ticket= 또는 ?error=). 티켓을 토큰으로 바꾸고 원래 가려던 화면으로 */
+export function LoginCallbackPage() {
+  const { completeLogin } = useSession();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const [error, setError] = useState<EmployeeLoginErrorCode | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    completeLogin(params)
+      .then((from) => {
+        // 주소창에서 ticket 을 지운다(replace)
+        if (live) void navigate(safeFrom(from), { replace: true });
+      })
+      .catch((e: unknown) => {
+        if (live) setError(e instanceof EmployeeLoginError ? e.code : 'NETWORK');
+      });
+    return () => {
+      live = false;
+    };
+  }, [completeLogin, navigate, params]);
+
+  return (
+    <section className="mx-auto max-w-sm space-y-4 pt-10">
+      <h1 className="text-xl font-bold">{m.login.title}</h1>
+      <div className="space-y-3 rounded-box bg-base-100 p-6 shadow-sm">
+        {error === null ? (
+          <p role="status" className="text-sm opacity-70">
+            {m.employeeLogin.completing}
+          </p>
+        ) : (
+          <>
+            <p role="alert" className="alert alert-error text-sm">
+              {m.employeeLogin.errors[error]}
+            </p>
+            <Link to="/login" replace className="btn btn-primary w-full">
+              {m.employeeLogin.retry}
+            </Link>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}

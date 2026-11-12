@@ -1,0 +1,50 @@
+// 웹 앱 공통 문구(1차 한국어). 상태 표시(QueryState)·명령 결과(Feedback)·직원 로그인 화면이 쓴다.
+// 앱 고유 문구와 Problem code → 문구 표는 앱의 shared/messages.ts 에 둔다(표는 UiTextProvider 로 넘긴다).
+export const uiMessages = {
+  loading: '불러오는 중이에요',
+  empty: '표시할 내용이 없어요',
+  errorTitle: '정보를 불러오지 못했어요',
+  errorBody: '잠시 후 다시 시도해 주세요. 지금 보이는 내용은 최신이 아닐 수 있어요.',
+  forbiddenTitle: '이용할 수 없는 화면이에요',
+  forbiddenBody: '권한이 없거나 담당 범위가 아니에요.',
+  unknownTitle: '처리 결과를 확인하고 있어요',
+  unknownBody: '요청이 처리됐는지 아직 확인되지 않았어요. 확인될 때까지 같은 요청을 다시 하지 마세요.',
+  sessionExpired: '다시 로그인해 주세요',
+  configRequired: '운영 설정을 기다리고 있어요',
+  retry: '다시 시도',
+  checkAgain: '다시 확인',
+  requestId: (id: string) => `문의 번호 ${id}`,
+  unavailableSources: '조회하지 못한 원천',
+  none: '-',
+  running: '처리 중이에요',
+  rejectedTitle: '요청이 거절됐어요',
+  resend: '같은 요청으로 결과 확인',
+} as const;
+
+/** 직원 로그인(employee-auth-service) 화면 문구 — 백오피스·인사팀 백오피스 공통 */
+export const employeeLoginMessages = {
+  start: '직원 계정으로 로그인',
+  note: '로그인은 직원 계정(Keycloak) 화면에서 해요. 백오피스는 비밀번호를 받지 않아요. 로그인은 최대 12시간 유지돼요. 같은 브라우저에서는 로그아웃하기 전까지 비밀번호를 다시 묻지 않을 수 있어요.',
+  starting: '로그인 화면으로 이동하는 중…',
+  startFailed: '로그인 화면으로 이동하지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+  completing: '로그인 정보를 받는 중…',
+  retry: '다시 로그인',
+  errors: {
+    IDP_ERROR: '로그인을 마치지 않았어요(취소했거나 오류가 났어요). 다시 로그인해 주세요.',
+    IDP_REJECTED: '로그인 결과를 확인하지 못했어요. 다시 로그인하고, 계속되면 관리자에게 알려 주세요.',
+    IDP_UNAVAILABLE: '로그인 서버가 응답하지 않아요. 잠시 뒤 다시 시도해 주세요.',
+    EMPLOYEE_NOT_REGISTERED: '계정은 있지만 PMart 직원으로 등록되지 않았어요. 관리자에게 문의해 주세요.',
+    ACCOUNT_NOT_AVAILABLE: '정지되었거나 퇴사 처리된 계정이에요. 관리자에게 문의해 주세요.',
+    NO_PENDING: '이 탭에서 시작한 로그인이 아니에요(오래된 주소이거나 다른 탭). 다시 로그인해 주세요.',
+    TICKET_INVALID: '로그인을 마치지 못했어요(시간이 지났을 수 있어요). 다시 로그인해 주세요.',
+    NETWORK: '로그인 결과를 받지 못했어요. 다시 로그인해 주세요.',
+    UNKNOWN: '로그인을 마치지 못했어요. 다시 로그인해 주세요.',
+  },
+  app: '앱',
+  issuedAt: '로그인 시각',
+  tokenExpiresAt: '토큰 만료',
+  noRoles: '아직 권한이 없어요(권한 승인 대기). 업무 화면은 승인 뒤에 쓸 수 있어요.',
+  signOutUnconfirmed: '이 탭은 로그아웃했지만 서버에서 로그아웃을 확인하지 못했어요. 다음 로그인이 비밀번호 없이 될 수 있으니, 공용 PC 라면 브라우저를 닫아 주세요.',
+  sharedPcNote: '공용 PC 에서는 자리를 뜰 때 꼭 로그아웃해 주세요. 로그아웃해야 다음 사람에게 비밀번호를 물어요.',
+  passwordNote: '비밀번호는 직원 계정(Keycloak)에서 관리해요. 백오피스에서는 바꿀 수 없어요.',
+} as const;

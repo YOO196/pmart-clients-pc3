@@ -5,18 +5,18 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
-import { ProblemFailure } from '../../api/failure';
+import { ProblemFailure } from '@pmart/web-core';
 import type { ChangeRequestBody } from '../../api/models';
-import { request } from '../../api/pmartFetch';
-import { settleCommand } from '../../api/settle';
-import { randomUuid } from '../../api/uuid';
+import { request } from '@pmart/web-core';
+import { settleCommand } from '@pmart/web-core';
+import { randomUuid } from '@pmart/web-core';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback } from '../../shared/Feedback';
-import { formatKrw, formatSeoul } from '../../shared/format';
+import { formatKrw, formatSeoul } from '@pmart/web-ui';
 import { messages as m } from '../../shared/messages';
-import { QueryState } from '../../shared/QueryState';
-import { toUiState } from '../../shared/toUiState';
-import { useCommand } from '../../shared/useCommand';
+import { QueryState } from '@pmart/web-ui';
+import { toUiState } from '@pmart/web-ui';
+import { useCommand } from '@pmart/web-ui';
 import { RequestApproval } from '../approvals/RequestApproval';
 
 const SKU_PATTERN = /^[EB]-\d{8}$/;

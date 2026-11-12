@@ -6,15 +6,15 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
-import { request, requestNoContent } from '../../api/pmartFetch';
+import { request, requestNoContent } from '@pmart/web-core';
 import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
 import { CommandFeedback } from '../../shared/Feedback';
-import { formatSeoul } from '../../shared/format';
+import { formatSeoul } from '@pmart/web-ui';
 import { messages as m } from '../../shared/messages';
-import { QueryState } from '../../shared/QueryState';
-import { toUiState } from '../../shared/toUiState';
-import { useCommand } from '../../shared/useCommand';
+import { QueryState } from '@pmart/web-ui';
+import { toUiState } from '@pmart/web-ui';
+import { useCommand } from '@pmart/web-ui';
 
 function PasswordChange({ required }: { readonly required: boolean }) {
   const api = useApi();

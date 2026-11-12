@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { UiTextProvider } from '@pmart/web-ui';
 import { useState, type ReactNode } from 'react';
 import { createBrowserRouter, createMemoryRouter, Link, Navigate, NavLink, Outlet, RouterProvider } from 'react-router';
 
@@ -161,11 +162,13 @@ export function App({
   const [port] = useState(() => assistantPort ?? defaultAssistantPort());
   return (
     <QueryClientProvider client={queryClient}>
-      <SessionProvider {...(initialToken ? { initialToken } : {})}>
-        <AssistantProvider port={port}>
-          <RouterProvider router={router} />
-        </AssistantProvider>
-      </SessionProvider>
+      <UiTextProvider problem={m.problem} reason={m.reason}>
+        <SessionProvider {...(initialToken ? { initialToken } : {})}>
+          <AssistantProvider port={port}>
+            <RouterProvider router={router} />
+          </AssistantProvider>
+        </SessionProvider>
+      </UiTextProvider>
     </QueryClientProvider>
   );
 }

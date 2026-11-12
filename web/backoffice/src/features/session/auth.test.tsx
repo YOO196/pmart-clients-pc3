@@ -4,10 +4,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { loginOperator, refreshOperatorTokens } from '../../api/auth';
 import { createApi, SOURCE_SYSTEM, tokens } from '../../api/client';
-import { request } from '../../api/pmartFetch';
-import { createPmartFetch } from '../../api/pmartFetch';
+import { request } from '@pmart/web-core';
+import { createPmartFetch } from '@pmart/web-core';
 import { SESSION_STORAGE_KEY } from '../../api/sessionPersistence';
-import { TokenStore } from '../../api/tokens';
+import { TokenStore } from '@pmart/web-core';
 import { App } from '../../app/App';
 import { mockAuthPolicy } from '../../mocks/authHandlers';
 import { db } from '../../mocks/db';

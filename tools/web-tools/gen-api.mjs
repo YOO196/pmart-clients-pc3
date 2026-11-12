@@ -1,7 +1,8 @@
 // 계약(../pmart-backend/contracts/openapi) → web/backoffice TS 타입(openapi-typescript).
 //
 // 실행: npm run gen:api -w web/backoffice  (또는 tools/web-tools 에서 npm run gen:api)
-// 결과: web/backoffice/src/api/generated/<service>.ts (.gitignore 대상), contracts.lock 의 "web" 항목
+// 결과: web/backoffice/src/api/generated/<service>.ts (.gitignore 대상), contracts.lock 의 "web" 항목.
+//       다른 웹 패키지가 쓰는 계약(copies)은 그 패키지의 generated/ 에도 같은 파일을 둔다.
 //
 // Dart 생성(tools/gen_api.dart)과 같은 규칙으로 /internal, /webhooks, /actuator 경로를 걸러낸다.
 import { execFileSync } from 'node:child_process';
@@ -16,6 +17,11 @@ const backend = resolve(repo, '../pmart-backend');
 const contracts = join(backend, 'contracts/openapi');
 const cache = join(here, '.cache/specs');
 const out = join(repo, 'web/backoffice/src/api/generated');
+/** 다른 웹 패키지가 쓰는 계약만 그 패키지의 generated/ 에 복사한다(@pmart/web-core = 직원 로그인, 인사팀 백오피스 = hr·센터 목록). */
+const copies = [
+  { label: 'web/core', dir: join(repo, 'web/core/src/generated'), services: ['employee-auth'] },
+  { label: 'web/hr-backoffice', dir: join(repo, 'web/hr-backoffice/src/api/generated'), services: ['hr', 'center-master'] },
+];
 const excluded = ['/internal', '/webhooks', '/actuator'];
 
 // 백오피스가 직접 부르지 않는 플랫폼 계약.
@@ -72,6 +78,13 @@ async function main() {
       `// 생성물. 직접 고치지 않는다(tools/web-tools/gen-api.mjs, pmart-backend ${sha}).\n${astToString(ast)}`,
     );
     console.log(`== ${name}`);
+  }
+
+  for (const { label, dir, services: names } of copies) {
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    for (const name of names) copyFileSync(join(out, `${name}.ts`), join(dir, `${name}.ts`));
+    console.log(`${label}: ${names.join(', ')}`);
   }
 
   const lockPath = join(repo, 'contracts.lock');

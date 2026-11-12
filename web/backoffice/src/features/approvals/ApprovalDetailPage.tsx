@@ -5,18 +5,18 @@ import { useState } from 'react';
 import { useParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
-import { CommandRejectedFailure, UnknownResultFailure } from '../../api/failure';
+import { CommandRejectedFailure, UnknownResultFailure } from '@pmart/web-core';
 import type { ApprovalDetail, ApprovalLine, ExecutionState, ReviewState, SupportedDecision } from '../../api/models';
-import { request } from '../../api/pmartFetch';
-import { pollConfig, pollUntil } from '../../api/poll';
+import { request } from '@pmart/web-core';
+import { pollConfig, pollUntil } from '@pmart/web-core';
 import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
 import { CommandFeedback } from '../../shared/Feedback';
-import { formatKrw, formatSeoul } from '../../shared/format';
+import { formatKrw, formatSeoul } from '@pmart/web-ui';
 import { messages as m } from '../../shared/messages';
-import { QueryState } from '../../shared/QueryState';
-import { toUiState } from '../../shared/toUiState';
-import { useCommand } from '../../shared/useCommand';
+import { QueryState } from '@pmart/web-ui';
+import { toUiState } from '@pmart/web-ui';
+import { useCommand } from '@pmart/web-ui';
 import { ContentRegistration } from '../contents/ContentRegistration';
 
 const OPEN_REVIEW: readonly ReviewState[] = ['REVIEW_PENDING', 'EVIDENCE_REQUIRED'];
@@ -55,6 +55,40 @@ function PriceLineAttributes({ attributes }: { readonly attributes: Record<strin
     <p className="text-sm" data-testid="price-line">
       {`${name} · ${amount(attributes['previousPrice'])} → ${amount(attributes['basePrice'])}${changeName ? ` · ${changeName}` : ''}`}
     </p>
+  );
+}
+
+/**
+ * 직원 권한 요청(GRANT) 행 attributes {role, centers, validFrom, validTo, reason, employee{operatorId, employeeNo, mailAddress, affiliation{type, code}}}
+ * — 백엔드 handoff 2026-11-13 reply-hr-backoffice-questions Q6. 이름은 오지 않는다. 없는 값은 "-"(무기한·전체로 바꾸지 않는다).
+ */
+function GrantLineAttributes({ attributes }: { readonly attributes: Record<string, unknown> | undefined }) {
+  if (!attributes || typeof attributes['role'] !== 'string') return null;
+  const text = (v: unknown) => (typeof v === 'string' && v ? v : m.none);
+  const centers = Array.isArray(attributes['centers']) ? (attributes['centers'] as unknown[]).filter((c) => typeof c === 'string').join(', ') : '';
+  const emp = typeof attributes['employee'] === 'object' && attributes['employee'] !== null ? (attributes['employee'] as Record<string, unknown>) : null;
+  const aff = emp && typeof emp['affiliation'] === 'object' && emp['affiliation'] !== null ? (emp['affiliation'] as Record<string, unknown>) : null;
+  const g = m.approvals.grant;
+  return (
+    <dl className="grid grid-cols-[5rem_1fr] gap-x-2 text-sm" data-testid="grant-line">
+      <dt>{g.role}</dt>
+      <dd>{attributes['role']}</dd>
+      <dt>{g.centers}</dt>
+      <dd>{centers || m.none}</dd>
+      <dt>{g.period}</dt>
+      <dd>{`${text(attributes['validFrom'])} ~ ${text(attributes['validTo'])}`}</dd>
+      <dt>{g.reason}</dt>
+      <dd>{text(attributes['reason'])}</dd>
+      {emp && (
+        <>
+          <dt>{g.employee}</dt>
+          <dd>
+            {`${text(emp['employeeNo'])} · ${text(emp['mailAddress'])}`}
+            {aff && ` · ${g.affiliationType[text(aff['type'])] ?? text(aff['type'])} ${text(aff['code'])}`}
+          </dd>
+        </>
+      )}
+    </dl>
   );
 }
 
@@ -192,6 +226,7 @@ export function ApprovalDetailPage() {
                       <td>
                         {/* 가격 일괄 등록 행(백엔드 안내 2026-11-03 §1-5): 승인자가 이전 → 새 가격·구분·상품명을 바로 본다 */}
                         <PriceLineAttributes attributes={l.attributes} />
+                        {a.type === 'GRANT' && <GrantLineAttributes attributes={l.attributes} />}
                         {/* 상품 등록 행(BR-39 회신): 재업로드면 "기존 상품 갱신"을 먼저 보인다 */}
                         {/* 콘텐츠 게시 행(BR-44 회신): 이미 게시된 콘텐츠를 바꾸는 건이면 "기존 게시 갱신" + 지금 게시본 버전 */}
                         {a.targetService === 'product-content-service' ? (

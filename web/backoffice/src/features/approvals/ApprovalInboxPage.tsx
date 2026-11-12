@@ -2,10 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 
 import { useApi } from '../../app/ApiContext';
-import { request } from '../../api/pmartFetch';
-import { formatSeoul } from '../../shared/format';
+import { request } from '@pmart/web-core';
+import { formatSeoul } from '@pmart/web-ui';
 import { messages as m } from '../../shared/messages';
-import { QueryState, uiStateFromError, type UiState } from '../../shared/QueryState';
+import { QueryState, uiStateFromError, type UiState } from '@pmart/web-ui';
 import { SourceStamps } from '../../shared/SourceStamps';
 import type { ApprovalInboxView } from '../../api/views';
 

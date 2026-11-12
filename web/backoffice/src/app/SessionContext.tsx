@@ -9,7 +9,7 @@ import { Navigate, useLocation } from 'react-router';
 import { loginOperator, logoutOperator, type OperatorAccount } from '../api/auth';
 import { API_BASE, refreshTokens, tokens } from '../api/client';
 import { beginEmployeeLogin, browser, completeEmployeeLogin, LOGIN_MODE, logoutEmployee, type LoginMode } from '../api/employeeAuth';
-import { parseOperatorToken, type OperatorSession } from '../api/session';
+import { parseOperatorToken, type OperatorSession } from '@pmart/web-core';
 import { clearSavedSession, loadSavedSession, syncSavedSession } from '../api/sessionPersistence';
 import { messages as m } from '../shared/messages';
 import { useApi } from './ApiContext';

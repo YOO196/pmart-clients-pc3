@@ -3,12 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
 
 import { APPROVAL_TYPES, REVIEW_STATES, type ApprovalType, type ReviewState } from '../../api/models';
-import { request } from '../../api/pmartFetch';
+import { request } from '@pmart/web-core';
 import { useApi } from '../../app/ApiContext';
-import { formatSeoul } from '../../shared/format';
+import { formatSeoul } from '@pmart/web-ui';
 import { messages as m } from '../../shared/messages';
-import { QueryState } from '../../shared/QueryState';
-import { toUiState } from '../../shared/toUiState';
+import { QueryState } from '@pmart/web-ui';
+import { toUiState } from '@pmart/web-ui';
 
 const pick = <T extends string>(value: string | null, allowed: readonly T[]): T | undefined =>
   allowed.find((a) => a === value);

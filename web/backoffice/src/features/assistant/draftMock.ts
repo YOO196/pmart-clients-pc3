@@ -5,8 +5,8 @@
 // - 질문 원문은 서버가 기본 저장하지 않는다(ADR-0036) → 목도 목록의 question 을 null 로 둔다.
 import { tokens } from '../../api/client';
 import type { IdempotencyKey } from '../../api/command';
-import { type Problem, ProblemFailure, UnknownResultFailure } from '../../api/failure';
-import { parseOperatorToken } from '../../api/session';
+import { type Problem, ProblemFailure, UnknownResultFailure } from '@pmart/web-core';
+import { parseOperatorToken } from '@pmart/web-core';
 import type { AssistantPort } from './port';
 import { answerFromWire, historyFromWire, type AnswerWire, type HistoryWire } from './wire';
 

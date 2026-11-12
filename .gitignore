@@ -16,6 +16,8 @@ coverage/
 packages/pmart_api/gen/
 tools/.cache/
 web/backoffice/src/api/generated/
+web/core/src/generated/
+web/hr-backoffice/src/api/generated/
 
 # Node
 node_modules/

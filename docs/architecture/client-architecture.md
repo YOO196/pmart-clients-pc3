@@ -45,7 +45,10 @@ pmart-clients/
 │   ├── pmart_core/              # 아래 §5 공통 연동 계층
 │   └── pmart_ui/                # 테마·공통 위젯·UiState 표시·금액/시각 포맷
 ├── web/
-│   └── backoffice/              # Vite + React + TS
+│   ├── core/                    # @pmart/web-core — 웹 앱 공통 연동 계층(§5). 빌드 없이 소스를 앱이 직접 묶는다 (ADR-0003)
+│   ├── ui/                      # @pmart/web-ui — 웹 앱 공통 화면 부품(UiState 표시·명령 결과·공통 문구)
+│   ├── backoffice/              # Vite + React + TS
+│   └── hr-backoffice/           # 인사팀 백오피스(ADR-0003) — 스택은 backoffice 와 같다
 ├── tools/
 │   ├── web-tools/               # TS 5 웹 도구(openapi-typescript·ESLint). npm workspace 밖. C0 확정
 │   ├── gen_api.dart             # 계약 → Dart 생성
@@ -95,9 +98,11 @@ lib/
 | 지도 | 카카오 지도 JavaScript API(`dapi.kakao.com` SDK 스크립트 로드, 실시간 배송 관제 #6). 근거: 백엔드 `Delivery-business-logic.md` L103 "React 화면 + 카카오 지도 API". React 래퍼 라이브러리는 쓰지 않고 `src/shared/map` 어댑터로 감싼다(래퍼 추가는 별도 결정). JavaScript 키는 `VITE_KAKAO_MAP_KEY` 환경변수로 주입하고 저장소에 넣지 않는다. 앱 키 발급·허용 도메인 등록 `[결정 필요]` |
 | 테스트 | Vitest + Testing Library, E2E Playwright |
 
-## 5. 공통 연동 계층 (`pmart_core` / `web/backoffice/src/api`)
+## 5. 공통 연동 계층 (`pmart_core` / `web/core`)
 
 백엔드 공통 규약(`contracts/README.md` §1, `_common.yaml`)을 한 곳에서 구현하고 화면 코드는 이것만 쓴다.
+
+웹은 `web/core`(`@pmart/web-core`, 사용자 결정 2026-11-13 — 인사팀 백오피스가 같은 코드를 쓴다): 실패 분류·`pmartFetch`·멱등키·폴링·토큰 보관·직원 로그인(employee-auth). 앱마다 다른 값(`X-Source-System`, employee-auth 앱 이름, sessionStorage 키)은 앱의 `src/api/command.ts`·`employeeAuth.ts`·`sessionPersistence.ts` 가 넘긴다 — `web/core` 에 앱 이름을 넣지 않는다. 앱 전용(생성 타입으로 만든 클라이언트 `client.ts`, 화면 모델, auth-service 로그인)은 앱의 `src/api` 에 둔다.
 
 ### 5.1 요청 헤더
 | 헤더 | 규칙 |

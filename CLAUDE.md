@@ -1,9 +1,9 @@
 # CLAUDE.md — PMart Clients
 
-PMart(퀵 커머스: 도심 MFC 기반 즉시·예약 배달)의 **클라이언트 앱** 저장소. Flutter 모바일 앱 3개 + React SPA 1개.
+PMart(퀵 커머스: 도심 MFC 기반 즉시·예약 배달)의 **클라이언트 앱** 저장소. Flutter 모바일 앱 3개 + React SPA 2개.
 백엔드(`../pmart-backend`, Spring Boot MSA)는 **다른 계정의 Claude Code가 담당**한다. 이 저장소에서는 백엔드를 읽기만 한다.
 
-## 앱 구성 `[확정 2026-10-24, ADR-0001]`
+## 앱 구성 `[확정 2026-10-24, ADR-0001 · 인사팀 백오피스 추가 2026-11-13, ADR-0003]`
 Flutter 앱은 **Android 만** 개발한다. iOS 는 중단(`ios/` 는 두되 손대지 않음) — ADR-0002 (2026-10-30).
 
 | 앱 | 기술 | 사용자 | 1차 범위 | 문서 |
@@ -12,6 +12,7 @@ Flutter 앱은 **Android 만** 개발한다. iOS 는 중단(`ios/` 는 두되 �
 | `apps/rider_app` | Flutter (Android) | 라이더 | 1단계 | `docs/apps/rider-app.md` |
 | `apps/mfc_app` | Flutter (Android PDA 우선) | MFC 점원(피킹·패킹·인계·입고·실사) | 1단계 | `docs/apps/mfc-app.md` |
 | `web/backoffice` | React SPA (Vite + TS) | 본사·센터 운영자 | 1단계 | `docs/apps/backoffice-web.md` |
+| `web/hr-backoffice` | React SPA (Vite + TS) | 인사팀(`HR_ADMIN`) — 직원 등록·계정 발급·정지/퇴사 | 목 서버 구현(백엔드 배포 대기) | `docs/apps/hr-backoffice-web.md` |
 | (예약) `apps/driver_app` | Flutter | 간선기사(TMS) | 2단계 | `docs/apps/driver-app.md` |
 
 ## 구조
@@ -21,7 +22,10 @@ packages/             # Dart 공유 패키지 (pub workspace)
   pmart_api/          #   contracts/openapi → 생성 클라이언트 (생성물은 커밋하지 않음)
   pmart_core/         #   HTTP·인증·멱등키·Problem·CommandResponse·결과 조회 폴링·기기 ID
   pmart_ui/           #   디자인 시스템·공통 위젯·상태 표시(UI_* 7종)
+web/core/             # 웹 공유 패키지 @pmart/web-core (HTTP 규약·실패 분류·멱등키·토큰·직원 로그인)
+web/ui/               # 웹 공유 패키지 @pmart/web-ui (UiState 표시·명령 결과·공통 문구)
 web/backoffice/       # React SPA (npm workspace)
+web/hr-backoffice/    # React SPA — 인사팀 백오피스 (npm workspace)
 tools/                # 계약 동기화·코드 생성 스크립트
 docs/                 # 설계 정본 (아래 문서 지도)
 ```
@@ -74,6 +78,7 @@ npm run dev -w web/backoffice                     # 목 모드(MSW). 실서버�
 npm run typecheck -w web/backoffice               # TS 7
 npm run lint -w web/backoffice                    # ESLint (tools/web-tools 의 TS 5)
 npm run test -w web/backoffice                    # Vitest + MSW
+# 다른 웹 패키지도 같은 스크립트: -w web/hr-backoffice (dev 는 포트 5174), -w web/core, -w web/ui (typecheck·lint·test)
 ```
 실행 전 경로와 스크립트 존재를 확인한다. 검증은 목 모드만 쓴다(백엔드 도커 사용 안 함).
 

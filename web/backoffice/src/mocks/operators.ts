@@ -1,6 +1,6 @@
 // 목 모드 운영자 계정. 역할 이름은 백엔드 handoff 2026-10-30 §2(설정값이라 바뀔 수 있음).
 // 비밀번호는 목 전용 값이다(실서버 비밀번호가 아님). 로컬 백엔드 첫 관리자도 admin / pmart-local (ADR-0018 §5).
-import { mockOperatorToken } from '../api/session';
+import { mockOperatorToken } from '@pmart/web-core';
 
 export const MOCK_PASSWORD = 'pmart-local';
 

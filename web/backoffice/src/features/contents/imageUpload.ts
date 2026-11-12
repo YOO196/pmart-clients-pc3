@@ -2,9 +2,9 @@
 // sortOrder: MAIN 은 0(다시 올리면 바꾼다), 그 밖은 이미 올라간 같은 역할 뒤에 이어 붙인다.
 import type { Api } from '../../api/client';
 import { commandParams, IdempotencyKey } from '../../api/command';
-import { PmartFailure } from '../../api/failure';
+import { PmartFailure } from '@pmart/web-core';
 import type { ContentImage } from '../../api/models';
-import { request } from '../../api/pmartFetch';
+import { request } from '@pmart/web-core';
 import { multipart } from '../products/ProductImportPage';
 import type { PendingImage } from './ImagePicker';
 

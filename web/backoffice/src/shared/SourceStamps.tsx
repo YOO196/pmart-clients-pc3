@@ -1,6 +1,6 @@
 // ComposedView 의 원천·기준시각·신선도·확인 등급·미제공 원천을 숨기지 않고 보여 준다.
 import type { components } from '../api/generated/backoffice-bff';
-import { formatSeoul } from './format';
+import { formatSeoul } from '@pmart/web-ui';
 import { messages as m } from './messages';
 
 type SourceStamp = components['schemas']['SourceStamp'];

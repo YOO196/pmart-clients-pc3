@@ -3,13 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
-import { request } from '../../api/pmartFetch';
+import { request } from '@pmart/web-core';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback } from '../../shared/Feedback';
 import { messages as m } from '../../shared/messages';
-import { QueryState } from '../../shared/QueryState';
-import { toUiState } from '../../shared/toUiState';
-import { useCommand } from '../../shared/useCommand';
+import { QueryState } from '@pmart/web-ui';
+import { toUiState } from '@pmart/web-ui';
+import { useCommand } from '@pmart/web-ui';
 import { BatchApprovals, multipart, ZipUpload } from '../products/ProductImportPage';
 import { ContentRegistration } from './ContentRegistration';
 import { type ImportItem, rowStatus, type RowStatus, rowSummary } from './importRowStatus';

@@ -5,10 +5,10 @@
 // - 비밀번호·토큰은 로그·오류 문구에 남기지 않는다.
 import type { Api } from './client';
 import { IdempotencyKey, SOURCE_SYSTEM } from './command';
-import { ProblemFailure } from './failure';
+import { ProblemFailure } from '@pmart/web-core';
 import type { components } from './generated/auth';
-import { NO_IDEMPOTENCY_HEADER, PUBLIC_HEADER, request, requestNoContent } from './pmartFetch';
-import type { TokenStore } from './tokens';
+import { NO_IDEMPOTENCY_HEADER, PUBLIC_HEADER, request, requestNoContent } from '@pmart/web-core';
+import type { TokenStore } from '@pmart/web-core';
 
 export type OperatorAccount = components['schemas']['OperatorAccount'];
 export type CurrentSession = components['schemas']['Session'];

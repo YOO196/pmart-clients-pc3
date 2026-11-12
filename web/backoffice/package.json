@@ -16,6 +16,8 @@
     "build:lan": "tsc --noEmit -p tsconfig.app.json && vite build --mode lan"
   },
   "dependencies": {
+    "@pmart/web-core": "*",
+    "@pmart/web-ui": "*",
     "@tanstack/react-query": "^5.104.5",
     "openapi-fetch": "^0.17.0",
     "react": "^19.3.1",

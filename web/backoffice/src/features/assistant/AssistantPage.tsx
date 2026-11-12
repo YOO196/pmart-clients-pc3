@@ -6,13 +6,13 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 
-import { UnknownResultFailure } from '../../api/failure';
-import { formatSeoul } from '../../shared/format';
+import { UnknownResultFailure } from '@pmart/web-core';
+import { formatSeoul } from '@pmart/web-ui';
 import { messages as m } from '../../shared/messages';
-import { QueryState, uiStateFromError } from '../../shared/QueryState';
+import { QueryState, uiStateFromError } from '@pmart/web-ui';
 import { CommandFeedback } from '../../shared/Feedback';
-import { toUiState } from '../../shared/toUiState';
-import { useCommand } from '../../shared/useCommand';
+import { toUiState } from '@pmart/web-ui';
+import { useCommand } from '@pmart/web-ui';
 import { assistantQueryKey, useAssistant } from './AssistantContext';
 import { AnswerView } from './AnswerView';
 import type { AssistantAnswer, HistoryItem } from './model';

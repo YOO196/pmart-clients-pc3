@@ -2,7 +2,7 @@
 // 인용의 지위(authority)·생애(lifecycleStatus)·구현 기록은 서로 다른 축이라 각각 보인다(계약 1.1.0).
 import { Link } from 'react-router';
 
-import { formatSeoul } from '../../shared/format';
+import { formatSeoul } from '@pmart/web-ui';
 import { messages as m } from '../../shared/messages';
 import { type AnswerState, type AssistantAnswer, type Authority, type Citation, isBaseline, isDisplayablePath } from './model';
 

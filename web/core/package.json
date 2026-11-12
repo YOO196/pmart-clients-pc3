@@ -1,0 +1,22 @@
+{
+  "name": "@pmart/web-core",
+  "private": true,
+  "version": "0.1.0",
+  "description": "웹 앱 공통 연동 계층(HTTP 규약·실패 분류·멱등키·토큰·직원 로그인). 빌드 없이 소스(src/index.ts)를 앱이 직접 묶는다.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "node ../../tools/web-tools/node_modules/eslint/bin/eslint.js --config ../../tools/web-tools/eslint.config.js src"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.17.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

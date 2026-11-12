@@ -2,7 +2,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
-import { mockOperatorToken } from '../api/session';
+import { mockOperatorToken } from '@pmart/web-core';
 import { db, nextId, timestamp, type MockAccount, type MockSession } from './db';
 import { idempotent, operator, problem, unauthorized } from './support';
 

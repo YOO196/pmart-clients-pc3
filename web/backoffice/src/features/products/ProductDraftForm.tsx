@@ -3,13 +3,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 
-import { PmartFailure } from '../../api/failure';
+import { PmartFailure } from '@pmart/web-core';
 import { STORAGE_TYPES, type CategoryNode, type ProductDraftInput, type SaleUnitType, type StorageType } from '../../api/models';
-import { request } from '../../api/pmartFetch';
+import { request } from '@pmart/web-core';
 import { useApi } from '../../app/ApiContext';
 import { FailureAlert } from '../../shared/Feedback';
 import { messages as m } from '../../shared/messages';
-import { MultiSelectDropdown } from '../../shared/MultiSelectDropdown';
+import { MultiSelectDropdown } from '@pmart/web-ui';
 import { parseProductJson, ProductJsonError, type SkuJson } from './productJson';
 
 interface SkuRow {

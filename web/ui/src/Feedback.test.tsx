@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { UnknownResultFailure } from '../api/failure';
+import { UnknownResultFailure } from '@pmart/web-core';
 import { CommandFeedback } from './Feedback';
 import type { Command } from './useCommand';
 
