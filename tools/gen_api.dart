@@ -23,6 +23,8 @@ const genDir = 'packages/pmart_api/gen';
 /// 앱이 쓰는 서비스. 새 서비스가 필요하면 여기에 추가한다(사유는 worklog).
 const services = <String, List<String>>{
   'auth-service': ['customer', 'rider', 'mfc'],
+  // 직원 로그인(ADR-0056 6단계, 백엔드 handoff 2026-11-13 mfc-app-employee-login)
+  'employee-auth-service': ['mfc'],
   'customer-service': ['customer'],
   'cart-service': ['customer'],
   'product-service': ['customer', 'mfc'],

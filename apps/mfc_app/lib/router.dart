@@ -1,6 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/auth/domain/employee_auth.dart';
+import 'features/auth/presentation/auth_controller.dart';
+import 'features/auth/presentation/login_screen.dart';
 import 'features/handover/presentation/handover_screens.dart';
 import 'features/inbound/presentation/inbound_screen.dart';
 import 'features/quality/presentation/quality_screens.dart';
@@ -11,12 +15,29 @@ import 'features/work/domain/work.dart';
 import 'features/work/presentation/work_screens.dart';
 import 'shared/printer/printer_ui.dart';
 
-/// 라우트. 점원 로그인(BR-02) 리다이렉트는 계약 반영 뒤 붙인다.
+/// 라우트. 로그인 전·세션 종료 뒤에는 로그인 화면으로 보낸다(직원 로그인 — 백엔드 handoff 2026-11-13).
+/// 화면을 막는 것은 편의일 뿐이고, 권한 판정은 서버가 한다.
 /// 크루는 작업 목록을 보지 않는다(2026-11-10) — 메인 → 업무 안내 → 서버가 준 작업 하나.
-final routerProvider = Provider<GoRouter>(
-  (ref) => GoRouter(
+final routerProvider = Provider<GoRouter>((ref) {
+  // 세션 상태가 바뀌면 리다이렉트를 다시 계산한다.
+  final auth = ValueNotifier<AuthState>(ref.read(authControllerProvider));
+  ref
+    ..listen(authControllerProvider, (_, next) => auth.value = next)
+    ..onDispose(auth.dispose);
+  return GoRouter(
     initialLocation: '/',
+    refreshListenable: auth,
+    redirect: (_, s) {
+      final at = s.matchedLocation;
+      return switch (auth.value) {
+        AuthRestoring() => at == '/starting' ? null : '/starting',
+        AuthSignedOut() => at == '/login' ? null : '/login',
+        AuthSignedIn() => at == '/login' || at == '/starting' ? '/' : null,
+      };
+    },
     routes: [
+      GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
+      GoRoute(path: '/starting', builder: (_, _) => const StartingScreen()),
       GoRoute(path: '/', builder: (_, _) => const HomeScreen()),
       GoRoute(
         path: '/work/:area',
@@ -80,5 +101,5 @@ final routerProvider = Provider<GoRouter>(
         builder: (_, s) => TaskRunScreen(taskId: s.pathParameters['taskId']!),
       ),
     ],
-  ),
-);
+  );
+});

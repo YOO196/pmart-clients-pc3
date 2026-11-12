@@ -9,7 +9,7 @@
 | ID | 우선 | 앱 | 요약 | 상태 |
 |---|---|---|---|---|
 | BR-01 | 높음 | 고객 | 토스 결제창 진입 정보·결제 인증 결과 전달 경로가 고객용 API에 없음 | **RESOLVED**(계약, ADR-0020): `POST /payment-confirmations` 등. 결제 진입 정보는 초안 `nextAction=PAY`·`payment`. 고객앱 반영(2026-10-31, 토스 결제위젯 SDK 연결. customerKey 는 D6 미정이라 anonymous) |
-| BR-02 | 높음 | 라이더·MFC·관리자·기사 | 고객 외 주체(라이더·점원·운영자·간선기사) 로그인·전화 본인확인 API 없음 | 일부 DONE — 운영자 로그인 `f6ed21b`(ADR-0018). 라이더·점원·간선기사·본인확인 OPEN |
+| BR-02 | 높음 | 라이더·MFC·관리자·기사 | 고객 외 주체(라이더·점원·운영자·간선기사) 로그인·전화 본인확인 API 없음 | 일부 DONE — 운영자 로그인 `f6ed21b`(ADR-0018), 점원(mfc_app) 로그인은 employee-auth-service `app=mfc`(백엔드 ADR-0056 6단계, 2026-11-13 구현). 라이더·간선기사·본인확인 OPEN |
 | BR-03 | 높음 | 전체(특히 웹) | 사용자 토큰 보관 방식(쿠키/CSRF vs Bearer) 미정, 게이트웨이가 `Cookie` 제거 | OPEN |
 | BR-04 | 중간 | 관리자 웹 | 게이트웨이 CORS 설정 없음 — 웹 배포 출처 결정 필요 | DONE (`f6ed21b`·`1b0f84b`, 허용 출처 localhost:5173·3000, LAN `http://d603-16`) |
 | BR-05 | 높음 | MFC | PDA 작업 목록·작업 상세(피킹 지시 행) 조회 API 없음 | AGREED (`e817184`, check 통과 `3916354`) |

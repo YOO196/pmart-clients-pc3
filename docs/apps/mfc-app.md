@@ -106,7 +106,7 @@
 
 | 메뉴 | API | 비고 |
 |---|---|---|
-| 로그인(직원 ID) | 없음 | BR-02 |
+| 로그인(직원 계정) | employee-auth-service `app=mfc`(Custom Tab → `pmart-mfc://login` → 티켓 교환, 무활동 30분·SSO 없음) | 구현(2026-11-13, `lib/features/auth`) — 실기기 확인 전. `docs/handoff/2026-11-13-backend-mfc-app-employee-login-reply.md` |
 | 내 작업 | `GET /tasks?mfcId=&assignee=me&type=&state=`, `GET /tasks/{taskId}` | BR-05 AGREED(`e817184`). 기본 state에 BLOCKED 없음 → 막힌 작업은 `state=BLOCKED` 로 따로 조회 |
 | 작업 시작 | `POST /tasks/{taskId}/starts`, `GET …/starts/{requestId}` | BR-05. 처리는 §3-1 |
 | 피킹 | `POST /tasks/{taskId}/executions`, `GET …/executions/{executionId}`, `GET /barcodes/{barcode}` | 지시 행은 `GET /tasks/{taskId}` 의 `lines[]` |

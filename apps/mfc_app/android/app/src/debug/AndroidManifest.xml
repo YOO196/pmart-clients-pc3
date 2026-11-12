@@ -4,4 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 디버그 빌드만: 게이트웨이(http://192.168.0.40:8080, PMART_ENV=local)를 평문 HTTP 로 부른다(customer_app 과 같다).
+         release 매니페스트에는 없다(출시 빌드는 HTTPS 만). 로그인 화면(Keycloak)은 Custom Tab 이 HTTPS 로 연다. -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>

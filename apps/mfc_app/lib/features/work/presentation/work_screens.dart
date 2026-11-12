@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
+import '../../auth/presentation/auth_controller.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/providers.dart';
 import '../../../shared/ui_state_of.dart';
@@ -133,6 +134,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (end ?? false) await _toggleBreak(me);
   }
 
+  /// 교대·자리 비움. 확인한 뒤 서버 세션을 끝내고 로그인 화면으로 간다(라우터가 보낸다).
+  Future<void> _logout() async {
+    final l10n = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const ValueKey('logout-dialog'),
+        content: Text(l10n.logoutConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.cancel),
+          ),
+          FilledButton(
+            key: const ValueKey('logout-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.logout),
+          ),
+        ],
+      ),
+    );
+    if (ok ?? false) await ref.read(authControllerProvider.notifier).logout();
+  }
+
   void _menu(WorkerProfile me, PdaMenu m, String label, VoidCallback go) {
     if (!me.canUse(m)) {
       unawaited(showNoPermission(context, label));
@@ -155,8 +180,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               padding: const EdgeInsets.only(right: 12),
               child: Chip(label: Text(l10n.mockModeBadge)),
             ),
+          IconButton(
+            key: const ValueKey('logout'),
+            tooltip: l10n.logout,
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+          ),
         ],
       ),
+      // 역할이 아직 없으면(권한 승인 대기) 업무 API 가 403 이다 — 조회 오류 대신 이유를 먼저 알린다.
+      bottomNavigationBar: (ref.watch(employeeSessionProvider)?.awaitingGrant ?? false)
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  l10n.awaitingGrant,
+                  key: const ValueKey('awaiting-grant'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: theme.colorScheme.error),
+                ),
+              ),
+            )
+          : null,
       body: UiStateView<WorkerProfile>(
         state: uiStateOf(ref.watch(meProvider)),
         onRetry: () => ref.invalidate(meProvider),
