@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pmart_ui/pmart_ui.dart';
 
 import 'features/address/presentation/address_screens.dart';
 import 'features/auth/domain/auth.dart';
@@ -235,23 +236,23 @@ class _TabShell extends StatelessWidget {
             shell.goBranch(i, initialLocation: i == shell.currentIndex),
         destinations: [
           NavigationDestination(
-            icon: const Icon(Icons.home_outlined),
+            icon: const PmartLineIcon(PmartLineIcons.home),
             label: l10n.navHome,
           ),
           NavigationDestination(
-            icon: const Icon(Icons.category_outlined),
+            icon: const PmartLineIcon(PmartLineIcons.grid),
             label: l10n.navCategory,
           ),
           NavigationDestination(
-            icon: const Icon(Icons.search),
+            icon: const PmartLineIcon(PmartLineIcons.search),
             label: l10n.navSearch,
           ),
           NavigationDestination(
-            icon: const Icon(Icons.shopping_cart_outlined),
+            icon: const PmartLineIcon(PmartLineIcons.cart),
             label: l10n.navCart,
           ),
           NavigationDestination(
-            icon: const Icon(Icons.person_outline),
+            icon: const PmartLineIcon(PmartLineIcons.user),
             label: l10n.navMy,
           ),
         ],

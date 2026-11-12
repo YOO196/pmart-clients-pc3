@@ -26,8 +26,14 @@ class CartScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final value = ref.watch(cartControllerProvider);
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.cartTitle)),
+      backgroundColor: scheme.surfaceContainer,
+      appBar: AppBar(
+        title: Text(l10n.cartTitle),
+        centerTitle: true,
+        backgroundColor: scheme.surface,
+      ),
       body: UiStateView<CartState>(
         state: uiStateOf(value),
         onRetry: () => ref.invalidate(cartControllerProvider),
@@ -93,22 +99,34 @@ class _CartBody extends ConsumerWidget {
               : RefreshIndicator(
                   onRefresh: controller.refresh,
                   child: ListView(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
                     children: [
-                      _CartHeader(state: state),
-                      for (final line in cart.lines)
-                        _CartLineTile(
-                          line: line,
-                          enabled: state.canChange,
-                          unknown: state.sync == CartSync.unknown,
-                          busy:
-                              state.busyItemId == line.cartItemId &&
-                              state.sync != CartSync.stable,
-                          mfcKnown: cart.mfcId != null,
-                          stockUnavailable: cart.inventoryUnavailable,
+                      Material(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _CartHeader(state: state),
+                            for (final line in cart.lines) ...[
+                              const Divider(),
+                              _CartLineTile(
+                                line: line,
+                                enabled: state.canChange,
+                                unknown: state.sync == CartSync.unknown,
+                                busy:
+                                    state.busyItemId == line.cartItemId &&
+                                    state.sync != CartSync.stable,
+                                mfcKnown: cart.mfcId != null,
+                                stockUnavailable: cart.inventoryUnavailable,
+                              ),
+                            ],
+                            const Divider(),
+                            const _AddMoreButton(),
+                          ],
                         ),
-                      const SizedBox(height: 4),
-                      const Center(child: _AddMoreButton()),
+                      ),
                     ],
                   ),
                 ),
@@ -131,7 +149,7 @@ class _CartHeader extends ConsumerWidget {
     final theme = Theme.of(context);
     final selected = state.cart.lines.where((l) => l.selected).length;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
       child: Row(
         children: [
           if (state.cart.expiresAt case final at?)
@@ -144,13 +162,23 @@ class _CartHeader extends ConsumerWidget {
             )
           else
             const Spacer(),
-          TextButton.icon(
+          TextButton(
             key: const ValueKey('cart-remove-selected'),
-            icon: const Icon(Icons.delete_outline, size: 18),
-            label: Text(l10n.cartRemoveSelected),
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.onSurface,
+              side: BorderSide(color: theme.colorScheme.outlineVariant),
+              minimumSize: const Size(0, 28),
+              padding: const EdgeInsets.symmetric(horizontal: 9),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              textStyle: theme.textTheme.labelMedium,
+            ),
             onPressed: (state.canChange && selected > 0)
                 ? () => _confirmRemoveSelected(context, ref, selected)
                 : null,
+            child: Text(l10n.cartRemoveSelected),
           ),
         ],
       ),
@@ -199,8 +227,14 @@ class _AddMoreButton extends StatelessWidget {
   const _AddMoreButton();
 
   @override
-  Widget build(BuildContext context) => OutlinedButton.icon(
+  Widget build(BuildContext context) => TextButton.icon(
     key: const ValueKey('cart-add-more'),
+    style: TextButton.styleFrom(
+      minimumSize: const Size.fromHeight(52),
+      foregroundColor: Theme.of(context).colorScheme.onSurface,
+      textStyle: Theme.of(context).textTheme.titleSmall,
+      shape: const RoundedRectangleBorder(),
+    ),
     icon: const Icon(Icons.add),
     label: Text(AppLocalizations.of(context).cartAddMore),
     onPressed: () => context.go('/'),
@@ -341,101 +375,160 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
     };
     final id = line.cartItemId;
     final shown = _pending ?? line.quantity;
-    return Card(
+    final scheme = theme.colorScheme;
+    final pendingLook = _pending != null || busy;
+    return Padding(
       key: ValueKey('cart-line-$id'),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              key: ValueKey('cart-select-$id'),
-              value: line.selected,
-              // 구매 불가 품목은 새로 고르는 것만 막는다. 이미 선택된 채 품절·미취급이 됐으면
-              // 해제는 할 수 있어야 한다(선택 합계에서 빼려면). 삭제는 언제나 가능.
-              onChanged: (enabled && (line.purchasable || line.selected))
-                  ? (v) => controller.submit(
-                      SetSelected(cartItemId: id, selected: v ?? false),
-                    )
-                  : null,
-            ),
-            ProductImage(url: line.imageUrl, size: 56),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(line.name ?? line.sku, style: theme.textTheme.bodyLarge),
-                  if (line.optionLabel case final String label)
-                    Text(label, style: theme.textTheme.bodySmall),
-                  // 담은 수량만큼의 금액(단가 × 수량). 서버 합계(selectedItemAmount)와 같은 식이며 표시용이다.
-                  // 주문 금액은 견적·주문서의 서버 값으로만 확정한다(사용자 요청 2026-11-03: "개당" 대신 수량 금액).
-                  Text(switch (line.unitPrice) {
-                    final int p => l10n.cartLineAmount(
-                      formatKrw(p * line.quantity),
-                    ),
-                    null => l10n.priceUnavailable,
-                  }, key: ValueKey('cart-amount-$id')),
-                  if (reason != null)
-                    Text(
-                      reason,
-                      key: ValueKey('cart-reason-$id'),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
-                  Row(
+      padding: const EdgeInsets.fromLTRB(4, 4, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1줄: 선택 + 상품 이름
+          Row(
+            children: [
+              Checkbox(
+                key: ValueKey('cart-select-$id'),
+                value: line.selected,
+                // 구매 불가 품목은 새로 고르는 것만 막는다. 이미 선택된 채 품절·미취급이 됐으면
+                // 해제는 할 수 있어야 한다(선택 합계에서 빼려면). 삭제는 언제나 가능.
+                onChanged: (enabled && (line.purchasable || line.selected))
+                    ? (v) => controller.submit(
+                        SetSelected(cartItemId: id, selected: v ?? false),
+                      )
+                    : null,
+              ),
+              Expanded(
+                child: Text(
+                  line.name ?? line.sku,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+          // 2줄: 사진 + 옵션·금액
+          Padding(
+            padding: const EdgeInsets.only(left: 48),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ProductImage(url: line.imageUrl, size: 58, radius: 6),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 1개에서는 - 대신 휴지통(누르면 같은 삭제 확인).
-                      IconButton(
-                        key: ValueKey('cart-dec-$id'),
-                        tooltip: shown <= 1
-                            ? l10n.cartRemove
-                            : l10n.cartDecrease,
-                        icon: Icon(
-                          shown <= 1 ? Icons.delete_outline : Icons.remove,
-                        ),
-                        onPressed: widget.unknown ? null : () => _bump(-1),
-                      ),
-                      // 모아 보내는 중·서버 반영 중에는 목표 수량을 흐리게 + 진행 표시. 확정되면 보통 글씨.
-                      Text(
-                        l10n.cartLineQuantity(_pending ?? line.quantity),
-                        key: ValueKey('cart-qty-$id'),
-                        style: (_pending != null || busy)
-                            ? TextStyle(color: theme.colorScheme.outline)
-                            : null,
-                      ),
-                      if (_pending != null || busy)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 6),
-                          child: SizedBox.square(
-                            dimension: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                      if (line.optionLabel case final String label)
+                        Text(label, style: theme.textTheme.bodySmall),
+                      if (reason != null)
+                        Text(
+                          reason,
+                          key: ValueKey('cart-reason-$id'),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: scheme.error,
                           ),
                         ),
-                      IconButton(
-                        key: ValueKey('cart-inc-$id'),
-                        tooltip: l10n.cartIncrease,
-                        icon: const Icon(Icons.add),
-                        onPressed: (!widget.unknown && line.purchasable)
-                            ? () => _bump(1)
-                            : null,
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        key: ValueKey('cart-remove-$id'),
-                        onPressed: enabled
-                            ? () => _confirmRemove(context, ref)
-                            : null,
-                        child: Text(l10n.cartRemove),
+                      const SizedBox(height: 2),
+                      // 담은 수량만큼의 금액(단가 × 수량). 서버 합계(selectedItemAmount)와 같은 식이며 표시용이다.
+                      // 주문 금액은 견적·주문서의 서버 값으로만 확정한다(사용자 요청 2026-11-03: "개당" 대신 수량 금액).
+                      Text(
+                        switch (line.unitPrice) {
+                          final int p => l10n.cartLineAmount(
+                            formatKrw(p * line.quantity),
+                          ),
+                          null => l10n.priceUnavailable,
+                        },
+                        key: ValueKey('cart-amount-$id'),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontSize: 15,
+                        ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          // 3줄: 삭제 + 수량 상자(오른쪽)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                key: ValueKey('cart-remove-$id'),
+                style: TextButton.styleFrom(
+                  foregroundColor: scheme.onSurfaceVariant,
+                ),
+                onPressed: enabled ? () => _confirmRemove(context, ref) : null,
+                child: Text(l10n.cartRemove),
+              ),
+              const SizedBox(width: 4),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: scheme.outlineVariant),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 1개에서는 - 대신 휴지통(누르면 같은 삭제 확인).
+                    IconButton(
+                      key: ValueKey('cart-dec-$id'),
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 32,
+                        height: 30,
+                      ),
+                      padding: EdgeInsets.zero,
+                      iconSize: 17,
+                      tooltip: shown <= 1 ? l10n.cartRemove : l10n.cartDecrease,
+                      icon: Icon(
+                        shown <= 1 ? Icons.delete_outline : Icons.remove,
+                      ),
+                      onPressed: widget.unknown ? null : () => _bump(-1),
+                    ),
+                    // 모아 보내는 중·서버 반영 중에는 목표 수량을 흐리게 + 진행 표시. 확정되면 보통 글씨.
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 26),
+                      child: Center(
+                        child: DefaultTextStyle.merge(
+                          style: theme.textTheme.labelLarge,
+                          child: Text(
+                            l10n.cartLineQuantity(_pending ?? line.quantity),
+                            key: ValueKey('cart-qty-$id'),
+                            style: pendingLook
+                                ? TextStyle(color: scheme.outline)
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (pendingLook)
+                      const SizedBox.square(
+                        dimension: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    IconButton(
+                      key: ValueKey('cart-inc-$id'),
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 32,
+                        height: 30,
+                      ),
+                      padding: EdgeInsets.zero,
+                      iconSize: 17,
+                      tooltip: l10n.cartIncrease,
+                      icon: const Icon(Icons.add),
+                      onPressed: (!widget.unknown && line.purchasable)
+                          ? () => _bump(1)
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -455,18 +548,26 @@ class _CartSummaryBar extends ConsumerWidget {
         .where((l) => l.selected && l.purchasable)
         .length;
     return Material(
-      elevation: 8,
+      color: theme.colorScheme.surface,
+      elevation: 12,
+      shadowColor: Colors.black26,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
-                  Text(l10n.cartSelectedTotal),
+                  Text(
+                    l10n.cartSelectedTotal,
+                    style: theme.textTheme.titleSmall,
+                  ),
                   const Spacer(),
                   Text(
                     // 서버 합계만 보인다. 변경 확정 뒤 다시 읽는 동안은 "확인 중", 없으면 0원이 아니라 "확인할 수 없어요".
@@ -503,6 +604,13 @@ class _CartSummaryBar extends ConsumerWidget {
               const SizedBox(height: 4),
               FilledButton(
                 key: const ValueKey('cart-order'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  textStyle: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 // "주문하기"는 PG 진입이 아니다. 배송 방식 선택 → 주문서로 간다.
                 onPressed: (state.canChange && cart.hasSelectedPurchasable)
                     ? () => _order(context, ref)
@@ -615,12 +723,14 @@ class _AddToCartBarState extends ConsumerState<AddToCartBar> {
         widget.enabled &&
         cartState != null &&
         cartState.canChange;
+    final theme = Theme.of(context);
     return Material(
-      elevation: 8,
+      color: theme.colorScheme.surface,
+      shape: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -628,9 +738,15 @@ class _AddToCartBarState extends ConsumerState<AddToCartBar> {
               if (value.hasError && cartState == null)
                 Text(l10n.cartUnavailableForAdd),
               if (inCart != null)
-                Text(
-                  l10n.cartInCart(inCart.quantity),
-                  key: const ValueKey('in-cart'),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    l10n.cartInCart(inCart.quantity),
+                    key: const ValueKey('in-cart'),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
                 ),
               Row(
                 children: [

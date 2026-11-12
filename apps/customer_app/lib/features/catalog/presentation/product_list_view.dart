@@ -64,7 +64,7 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.fromLTRB(16, 4, 8, 0),
           child: Row(
             children: [
               Expanded(
@@ -75,6 +75,8 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
               ),
               DropdownButton<SortKey>(
                 key: const ValueKey('sort'),
+                underline: const SizedBox.shrink(),
+                style: Theme.of(context).textTheme.labelLarge,
                 value: _sort,
                 onChanged: (s) => setState(() => _sort = s ?? _sort),
                 items: [
@@ -101,26 +103,55 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
             state: uiStateOf(value, isEmpty: (s) => s.items.isEmpty),
             onRetry: () => ref.invalidate(provider),
             empty: (_) => Center(child: Text(l10n.searchNoResult)),
-            ready: (context, list) => ListView.builder(
+            ready: (context, list) => ProductGrid(
               key: const PageStorageKey('product-list'),
-              padding: const EdgeInsets.all(12),
-              itemCount: list.items.length + (list.hasMore ? 1 : 0),
-              itemBuilder: (context, i) {
-                if (i == list.items.length) {
-                  return LoadMoreFooter(
-                    list: list,
-                    onLoadMore: () => ref.read(provider.notifier).loadMore(),
-                  );
-                }
-                final tile = list.items[i];
-                return ProductTileCard(
-                  tile: tile,
-                  onTap: () => context.push('/products/${tile.productId}'),
-                );
-              },
+              list: list,
+              onLoadMore: () => ref.read(provider.notifier).loadMore(),
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// 상품 2칸 격자 + 목록 끝의 "더 보기". 검색·카테고리·전체보기가 같이 쓴다.
+class ProductGrid extends StatelessWidget {
+  const ProductGrid({super.key, required this.list, required this.onLoadMore});
+
+  final ProductListState list;
+  final VoidCallback onLoadMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = ProductTileCard.gridWidthOf(context);
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          sliver: SliverGrid.builder(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 16,
+              mainAxisExtent: ProductTileCard.heightFor(context, width),
+            ),
+            itemCount: list.items.length,
+            itemBuilder: (context, i) {
+              final tile = list.items[i];
+              return ProductTileCard(
+                rail: true,
+                tile: tile,
+                onTap: () => context.push('/products/${tile.productId}'),
+              );
+            },
+          ),
+        ),
+        if (list.hasMore)
+          SliverToBoxAdapter(
+            child: LoadMoreFooter(list: list, onLoadMore: onLoadMore),
+          ),
+        const SliverToBoxAdapter(child: SizedBox(height: 16)),
       ],
     );
   }

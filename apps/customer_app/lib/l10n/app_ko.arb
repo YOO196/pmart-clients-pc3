@@ -890,6 +890,7 @@
   "noticeReferenceNote": "기기 알림 권한과 마케팅 동의는 이 화면에서 바꾸지 않아요. 서버에 저장된 값을 보여 드려요.",
   "homeDeliveryFailed": "배송 정보를 불러오지 못했어요",
   "homeNightNotice": "지금은 예약배달만 받을 수 있어요",
+  "homeDeliveryHeadline": "지금 주문하면 이렇게 받아요",
   "homeOrderFailed": "주문 정보를 불러오지 못했어요",
   "sectionViewAll": "전체보기",
   "quickAddTooltip": "장바구니에 담기",

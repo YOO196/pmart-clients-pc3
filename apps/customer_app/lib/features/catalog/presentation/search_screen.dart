@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../domain/catalog.dart';
@@ -72,26 +73,52 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final submitted = _submitted;
     return Scaffold(
       appBar: AppBar(
-        title: TextField(
-          key: const ValueKey('search-field'),
-          controller: _controller,
-          textInputAction: TextInputAction.search,
-          maxLength: 100,
-          decoration: InputDecoration(
-            hintText: l10n.searchHint,
-            counterText: '',
-            border: InputBorder.none,
+        toolbarHeight: 56,
+        titleSpacing: 14,
+        title: SizedBox(
+          height: 40,
+          child: TextField(
+            key: const ValueKey('search-field'),
+            controller: _controller,
+            textInputAction: TextInputAction.search,
+            maxLength: 100,
+            style: Theme.of(context).textTheme.bodyLarge
+                ?.copyWith(fontSize: 14),
+            decoration: InputDecoration(
+              hintText: l10n.searchHint,
+              counterText: '',
+              isDense: true,
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainer,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 10,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(20),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: _onChanged,
+            onSubmitted: _submit,
           ),
-          onChanged: _onChanged,
-          onSubmitted: _submit,
         ),
         actions: [
           IconButton(
             key: const ValueKey('search-submit'),
             tooltip: l10n.searchSubmit,
-            icon: const Icon(Icons.search),
+            icon: const PmartLineIcon(PmartLineIcons.search, size: 23),
             onPressed: () => _submit(_controller.text),
           ),
+          const SizedBox(width: 6),
         ],
       ),
       body: Stack(

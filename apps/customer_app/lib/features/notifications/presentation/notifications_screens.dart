@@ -20,12 +20,13 @@ class NotificationCenterScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final value = ref.watch(inboxProvider);
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
       appBar: AppBar(
         title: Text(l10n.noticeTitle),
         actions: [
           IconButton(
             key: const ValueKey('notice-settings'),
-            icon: const Icon(Icons.settings_outlined),
+            icon: const Icon(Icons.settings_outlined, size: 23),
             tooltip: l10n.noticeSettingsTitle,
             onPressed: () => context.push('/notifications/settings'),
           ),
@@ -147,7 +148,10 @@ class _NoticeCard extends ConsumerWidget {
     final n = notice;
     return Card(
       key: ValueKey('notice-${n.notificationId}'),
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+      elevation: 1,
+      shadowColor: Colors.black26,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       child: InkWell(
         onTap: () {
           // 읽음 처리는 이동을 막지 않는다. 결과는 목록에 서버 상태로 반영된다.
@@ -157,15 +161,16 @@ class _NoticeCard extends ConsumerWidget {
           );
         },
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(18, 18, 16, 18),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
+                radius: 22,
                 backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                child: Icon(_categoryIcon(n.category)),
+                child: Icon(_categoryIcon(n.category), size: 21),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,6 +178,7 @@ class _NoticeCard extends ConsumerWidget {
                     Text(
                       n.title,
                       style: theme.textTheme.titleMedium?.copyWith(
+                        fontSize: 14.5,
                         fontWeight: n.read
                             ? FontWeight.normal
                             : FontWeight.bold,
@@ -185,15 +191,21 @@ class _NoticeCard extends ConsumerWidget {
                           b,
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 12.5,
+                          ),
                         ),
                       ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Text(
                       [
                         noticeCategoryText(l10n, n.category),
                         formatSeoulDateTime(n.createdAt),
                       ].join(' · '),
-                      style: theme.textTheme.bodySmall,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        color: theme.colorScheme.outline,
+                      ),
                     ),
                     if (checking)
                       Text(
@@ -211,10 +223,10 @@ class _NoticeCard extends ConsumerWidget {
                     label: l10n.noticeUnread,
                     child: Container(
                       key: ValueKey('notice-unread-${n.notificationId}'),
-                      width: 10,
-                      height: 10,
+                      width: 8,
+                      height: 8,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary,
+                        color: theme.colorScheme.tertiary,
                         shape: BoxShape.circle,
                       ),
                     ),

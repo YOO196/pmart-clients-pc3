@@ -10,6 +10,7 @@ import 'package:customer_app/features/cart/presentation/cart_screen.dart'
     show AddToCartBar;
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/domain/catalog.dart';
+import 'package:customer_app/features/catalog/presentation/widgets/product_tile_card.dart';
 
 import 'support/app_harness.dart';
 
@@ -94,7 +95,19 @@ void main() {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();
 
+      // 첫 진열 영역은 배송 카드·배너·검색창·카테고리 아래에 있다.
+      await t.scrollUntilVisible(
+        find.text('지금 많이 사는 상품'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.pumpAndSettle();
       expect(find.text('지금 많이 사는 상품'), findsOneWidget);
+      await t.scrollUntilVisible(
+        find.byKey(const ValueKey('tile-P-0001')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.byKey(const ValueKey('tile-P-0001')), findsWidgets);
       final weekly = find.byKey(const ValueKey('section-unavailable-S-WEEKLY'));
       await t.scrollUntilVisible(
@@ -104,6 +117,8 @@ void main() {
       );
       expect(find.text('이 영역을 불러오지 못했어요'), findsOneWidget);
 
+      await t.ensureVisible(find.text('이 영역 다시 불러오기'));
+      await t.pumpAndSettle();
       await t.tap(find.text('이 영역 다시 불러오기'));
       await t.pumpAndSettle();
 
@@ -207,12 +222,20 @@ void main() {
       await t.tap(find.text('과일·채소 전체'));
       await t.pumpAndSettle();
 
-      expect(find.byType(Card), findsNWidgets(2));
+      expect(find.byType(ProductTileCard), findsNWidgets(2));
+      // 격자 아래의 "더 보기"는 스크롤해야 만들어진다.
+      await t.scrollUntilVisible(
+        find.byKey(const ValueKey('load-more')),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await t.ensureVisible(find.byKey(const ValueKey('load-more')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('load-more')));
       await t.pumpAndSettle();
 
       expect(find.text('다음 상품을 불러오지 못했어요'), findsOneWidget);
-      expect(find.byType(Card), findsNWidgets(2));
+      expect(find.byType(ProductTileCard), findsNWidgets(2));
     });
   });
 

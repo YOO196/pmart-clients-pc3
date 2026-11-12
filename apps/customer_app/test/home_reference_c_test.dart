@@ -156,10 +156,28 @@ void main() {
       await t.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('home-delivery-card')), findsOneWidget);
+      // 예상시간(굵게)과 기본 배달팁(주 색)을 두 줄로 보인다. 값은 서버 값 그대로.
+      for (final text in ['약 30~60분', '기본 배달팁 4,000원']) {
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('home-delivery-single')),
+            matching: find.text(text),
+          ),
+          findsOneWidget,
+        );
+      }
+      // 나머지 방식은 화살표로 펼친다.
+      expect(find.byKey(const ValueKey('home-delivery-bundled')), findsNothing);
+      await t.tap(find.byKey(const ValueKey('home-delivery-toggle')));
+      await t.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('home-delivery-bundled')),
+        findsOneWidget,
+      );
       expect(
         find.descendant(
-          of: find.byKey(const ValueKey('home-delivery-single')),
-          matching: find.text('약 30~60분 · 기본 배달팁 4,000원'),
+          of: find.byKey(const ValueKey('home-delivery-scheduled')),
+          matching: find.textContaining('가장 빠른 시간'),
         ),
         findsOneWidget,
       );
@@ -265,6 +283,16 @@ void main() {
       await t.pumpWidget(testApp(const []));
       await t.pumpAndSettle();
 
+      await t.scrollUntilVisible(
+        find.byKey(const ValueKey('section-view-all-S-RANK')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.pumpAndSettle();
+      await t.ensureVisible(
+        find.byKey(const ValueKey('section-view-all-S-RANK')),
+      );
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('section-view-all-S-RANK')));
       await t.pumpAndSettle();
       expect(find.text('지금 많이 사는 상품'), findsOneWidget); // 화면 제목
@@ -276,6 +304,8 @@ void main() {
         200,
         scrollable: find.byType(Scrollable).last,
       );
+      await t.ensureVisible(more);
+      await t.pumpAndSettle();
       await t.tap(more);
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('tile-P-0006')), findsOneWidget);
@@ -485,6 +515,13 @@ void main() {
     catalog.gate.complete();
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('home-skeleton')), findsNothing);
+    // 첫 진열 영역은 배송 카드·배너·검색창·카테고리 아래에 있다.
+    await t.scrollUntilVisible(
+      find.text('지금 많이 사는 상품'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await t.pumpAndSettle();
     expect(find.text('지금 많이 사는 상품'), findsOneWidget);
   });
 }

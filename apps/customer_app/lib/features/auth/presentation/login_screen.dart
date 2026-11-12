@@ -129,26 +129,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.loginTitle)),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(52, 96, 52, 24),
         children: [
+          Text(
+            l10n.appTitle,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontSize: 40,
+              fontWeight: FontWeight.w900,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 18),
           Text(
             widget.purpose == LoginPurpose.checkout
                 ? l10n.loginForCheckout
                 : l10n.loginBody,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
           if (ref.watch(envProvider) == PmartEnv.mock) ...[
             const SizedBox(height: 8),
             Text(
               l10n.loginMockNotice,
               key: const ValueKey('login-mock-notice'),
+              textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 56),
           if (message != null) ...[
             Text(
               message,
               key: const ValueKey('login-message'),
+              textAlign: TextAlign.center,
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
             const SizedBox(height: 12),
@@ -162,9 +176,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           else
             for (final p in ref.watch(loginProvidersProvider))
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: FilledButton.tonal(
                   key: ValueKey('login-${p.name}'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                    shape: const StadiumBorder(),
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainer,
+                    foregroundColor: Theme.of(context).colorScheme.onSurface,
+                    textStyle: Theme.of(context).textTheme.bodyMedium,
+                  ),
                   // 제한 중에는 다시 누를 수 없다(남은 시간은 서버 값).
                   onPressed: (busy || outcome is LoginRestricted)
                       ? null

@@ -236,6 +236,9 @@ void main() {
     await t.pumpWidget(testApp(const [], cart: cart));
     await _openCartTab(t);
 
+    // 둘째 줄의 버튼은 낮은 시험 화면(600)에서 합계 영역에 가릴 수 있어 먼저 보이게 한다.
+    await t.ensureVisible(find.byKey(const ValueKey('cart-dec-ci-2')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('cart-dec-ci-2')));
     await t.pumpAndSettle();
     expect(find.text('상품을 뺄까요?'), findsOneWidget);
@@ -339,6 +342,8 @@ void main() {
       expect(iconOf('cart-dec-ci-2').icon, Icons.delete_outline);
       expect(iconOf('cart-dec-ci-1').icon, Icons.remove);
 
+      await t.ensureVisible(find.byKey(const ValueKey('cart-dec-ci-2')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('cart-dec-ci-2')));
       await t.pumpAndSettle();
       expect(find.text('상품을 뺄까요?'), findsOneWidget);
@@ -401,6 +406,9 @@ void main() {
       await t.pumpWidget(testApp(const [], cart: cart));
       await _openCartTab(t);
       for (final id in ['ci-1', 'ci-2']) {
+        // 둘째 줄은 낮은 시험 화면에서 합계 영역에 가릴 수 있어 먼저 보이게 한다.
+        await t.ensureVisible(find.byKey(ValueKey('cart-select-$id')));
+        await t.pumpAndSettle();
         await t.tap(find.byKey(ValueKey('cart-select-$id')));
         await t.pumpAndSettle();
       }

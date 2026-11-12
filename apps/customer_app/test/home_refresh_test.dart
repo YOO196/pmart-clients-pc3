@@ -96,6 +96,11 @@ void main() {
           w.key is ValueKey<String> &&
           (w.key! as ValueKey<String>).value.startsWith('tile-'),
     );
+    // 상품 진열은 배송 카드·배너·검색창·카테고리 아래에 있다.
+    await t.drag(find.byType(Scrollable).first, const Offset(0, -400));
+    await t.pumpAndSettle();
+    await t.ensureVisible(tile.first);
+    await t.pumpAndSettle();
     await t.tap(tile.first);
     await t.pumpAndSettle();
     expect(find.byType(HomeScreen).hitTestable(), findsNothing);

@@ -42,9 +42,9 @@ void main() {
           builder: (context) => Scaffold(
             body: Center(
               child: SizedBox(
-                width: 280,
-                height: ProductTileCard.railHeight(context),
-                child: const ProductTileCard(tile: tile),
+                width: 148,
+                height: ProductTileCard.heightFor(context, 148),
+                child: const ProductTileCard(tile: tile, rail: true),
               ),
             ),
           ),

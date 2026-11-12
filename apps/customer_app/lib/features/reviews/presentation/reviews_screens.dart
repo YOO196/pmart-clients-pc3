@@ -196,46 +196,70 @@ class _WritableCard extends ConsumerWidget {
     return Card(
       key: ValueKey('review-writable-${e.orderLineId}'),
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ProductName(
-              productId: e.productId,
-              style: theme.textTheme.titleMedium,
-            ),
-            Text(
-              [
-                if (e.deliveredAt case final t?)
-                  l10n.reviewDeliveredAt(formatSeoulDateTime(t)),
-                // 기한은 서버 eligibleUntil 을 그대로 보인다(남은 일수를 앱이 세지 않는다).
-                if (e.eligibleUntil case final t?)
-                  l10n.reviewDeadline(formatSeoulDateTime(t)),
-              ].join(' · '),
-              key: ValueKey('review-deadline-${e.orderLineId}'),
-              style: theme.textTheme.bodySmall,
-            ),
-            const SizedBox(height: 8),
-            Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 4, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (var i = 1; i <= reviewRatingMax; i++)
-                  IconButton(
-                    key: ValueKey('review-quick-star-${e.orderLineId}-$i'),
-                    tooltip: l10n.reviewStar(i),
-                    icon: const Icon(Icons.star_border),
-                    onPressed: () => open(i),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _ProductName(
+                        productId: e.productId,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        [
+                          if (e.deliveredAt case final t?)
+                            l10n.reviewDeliveredAt(formatSeoulDateTime(t)),
+                          // 기한은 서버 eligibleUntil 을 그대로 보인다(남은 일수를 앱이 세지 않는다).
+                          if (e.eligibleUntil case final t?)
+                            l10n.reviewDeadline(formatSeoulDateTime(t)),
+                        ].join(' · '),
+                        key: ValueKey('review-deadline-${e.orderLineId}'),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                const Spacer(),
+                ),
                 TextButton(
                   key: ValueKey('review-write-${e.orderLineId}'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
                   onPressed: () => open(),
                   child: Text(l10n.reviewWrite),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (var i = 1; i <= reviewRatingMax; i++)
+                  IconButton(
+                    key: ValueKey('review-quick-star-${e.orderLineId}-$i'),
+                    tooltip: l10n.reviewStar(i),
+                    iconSize: 32,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    icon: const Icon(Icons.star_rounded),
+                    onPressed: () => open(i),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

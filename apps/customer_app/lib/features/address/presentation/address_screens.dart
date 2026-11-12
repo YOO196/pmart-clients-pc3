@@ -133,12 +133,26 @@ class _AddressListState extends ConsumerState<_AddressList> {
               key: ValueKey('address-${a.addressId}'),
               value: a.addressId,
               enabled: !_busy,
-              title: Text(a.label ?? a.roadAddress),
-              subtitle: Text(
-                [
-                  '${a.roadAddress} ${a.detailAddress}',
-                  serviceabilityText(l10n, a.serviceability),
-                ].join('\n'),
+              // 레퍼런스: 왼쪽 위치 표시, 오른쪽 선택 표시.
+              controlAffinity: ListTileControlAffinity.trailing,
+              secondary: const Icon(Icons.place, size: 22),
+              title: Text(
+                a.label ?? a.roadAddress,
+                style: Theme.of(context).textTheme.titleSmall
+                    ?.copyWith(fontSize: 15.5, fontWeight: FontWeight.w600),
+              ),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  [
+                    '${a.roadAddress} ${a.detailAddress}',
+                    serviceabilityText(l10n, a.serviceability),
+                  ].join('\n'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
               isThreeLine: true,
             ),

@@ -29,34 +29,31 @@ class CustomerApp extends ConsumerWidget {
       if (messenger == null || ctx == null) return;
       final l10n = AppLocalizations.of(ctx);
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        switch (notice) {
-          SessionNotice.renewed => SnackBar(
-            key: const ValueKey('session-renewed'),
-            content: Text(l10n.sessionRenewed),
+      messenger.showSnackBar(switch (notice) {
+        SessionNotice.renewed => SnackBar(
+          key: const ValueKey('session-renewed'),
+          content: Text(l10n.sessionRenewed),
+        ),
+        SessionNotice.expired => SnackBar(
+          key: const ValueKey('session-expired'),
+          content: Text(l10n.sessionExpiredNotice),
+          duration: const Duration(seconds: 8),
+          action: SnackBarAction(
+            label: l10n.sessionExpiredLogin,
+            // 로그인은 현재 화면 위에 열리고, 끝나면 그 화면으로 돌아온다(입력값 유지).
+            onPressed: () => ref.read(routerProvider).push('/login'),
           ),
-          SessionNotice.expired => SnackBar(
-            key: const ValueKey('session-expired'),
-            content: Text(l10n.sessionExpiredNotice),
-            duration: const Duration(seconds: 8),
-            action: SnackBarAction(
-              label: l10n.sessionExpiredLogin,
-              // 로그인은 현재 화면 위에 열리고, 끝나면 그 화면으로 돌아온다(입력값 유지).
-              onPressed: () => ref.read(routerProvider).push('/login'),
-            ),
+        ),
+        SessionNotice.unreachable => SnackBar(
+          key: const ValueKey('session-unreachable'),
+          content: Text(l10n.sessionUnreachableNotice),
+          duration: const Duration(seconds: 8),
+          action: SnackBarAction(
+            label: l10n.sessionRetry,
+            onPressed: () => ref.read(sessionProvider.notifier).retryRestore(),
           ),
-          SessionNotice.unreachable => SnackBar(
-            key: const ValueKey('session-unreachable'),
-            content: Text(l10n.sessionUnreachableNotice),
-            duration: const Duration(seconds: 8),
-            action: SnackBarAction(
-              label: l10n.sessionRetry,
-              onPressed: () =>
-                  ref.read(sessionProvider.notifier).retryRestore(),
-            ),
-          ),
-        },
-      );
+        ),
+      });
     });
     return _app(ref);
   }
@@ -64,8 +61,8 @@ class CustomerApp extends ConsumerWidget {
   Widget _app(WidgetRef ref) => MaterialApp.router(
     scaffoldMessengerKey: rootScaffoldMessengerKey,
     onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-    theme: PmartTheme.light(),
-    darkTheme: PmartTheme.dark(),
+    theme: PmartCustomerTheme.light(fontFamily: 'Pretendard'),
+    darkTheme: PmartCustomerTheme.dark(fontFamily: 'Pretendard'),
     locale: const Locale('ko'),
     supportedLocales: AppLocalizations.supportedLocales,
     localizationsDelegates: const [

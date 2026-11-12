@@ -21,6 +21,7 @@ import '../../payment/presentation/payment_controller.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
 import 'home_providers.dart';
+import 'widgets/category_art.dart';
 import 'widgets/product_tile_card.dart';
 
 /// SCR-HOME-001. 영역별 부분 실패는 그 영역만 다시 불러온다.
@@ -110,20 +111,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.watch(homeProvider),
       isEmpty: (h) => h.sections.isEmpty && h.banners.isEmpty,
     );
+    final gray = Theme.of(context).colorScheme.surfaceContainer;
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: gray,
+        toolbarHeight: 46,
         title: const _AddressChip(),
         actions: [
           IconButton(
             key: const ValueKey('home-notifications'),
-            icon: const Icon(Icons.notifications_none),
+            visualDensity: VisualDensity.compact,
+            icon: const PmartLineIcon(PmartLineIcons.bell, size: 23),
             tooltip: l10n.noticeTitle,
             onPressed: () => context.push('/notifications'),
           ),
+          IconButton(
+            key: const ValueKey('home-top-search'),
+            visualDensity: VisualDensity.compact,
+            icon: const PmartLineIcon(PmartLineIcons.search, size: 23),
+            tooltip: l10n.searchTitle,
+            onPressed: () => context.go('/search'),
+          ),
+          IconButton(
+            key: const ValueKey('home-top-cart'),
+            visualDensity: VisualDensity.compact,
+            icon: const PmartLineIcon(PmartLineIcons.cart, size: 23),
+            tooltip: l10n.cartTitle,
+            onPressed: () => context.go('/cart'),
+          ),
+          const SizedBox(width: 4),
           if (mock)
             Padding(
               padding: const EdgeInsets.only(right: 12),
-              child: Chip(label: Text(l10n.mockModeBadge)),
+              child: Center(child: PmartTag(l10n.mockModeBadge)),
             ),
         ],
       ),
@@ -138,11 +158,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 return RefreshIndicator(
                   onRefresh: _refresh,
                   child: ListView(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.only(bottom: 24),
                     children: [
-                      const _PendingPaymentBanner(),
-                      const _InProgressOrderCard(),
-                      const _DeliverySummaryCard(),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              gray,
+                              gray,
+                              Theme.of(context).colorScheme.surface,
+                            ],
+                            stops: const [0, 0.7, 1],
+                          ),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SizedBox(height: 4),
+                            _PendingPaymentBanner(),
+                            _InProgressOrderCard(),
+                            _DeliverySummaryCard(),
+                          ],
+                        ),
+                      ),
                       if (home.tabs.length > 1)
                         _HomeTabs(
                           tabs: home.tabs,
@@ -150,7 +190,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           onSelected: (t) => setState(() => _tab = t),
                         ),
                       if (tab == HomeTab.home) ...[
-                        for (final b in home.banners) _BannerCard(b),
+                        if (home.banners.isNotEmpty)
+                          _BannerPager(banners: home.banners),
+                        const _HomeSearchBar(),
+                        const _CategoryShortcuts(),
+                        const SizedBox(height: 14),
+                        const PmartSectionGap(height: 10),
                         for (final s in home.sections)
                           _SectionView(
                             key: ValueKey('section-${s.sectionId}'),
@@ -192,19 +237,47 @@ class _HomeTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      child: Wrap(
-        spacing: 8,
-        children: [
-          for (final t in tabs)
-            ChoiceChip(
-              key: ValueKey('home-tab-${t.name}'),
-              label: Text(homeTabLabel(l10n, t)),
-              selected: t == selected,
-              onSelected: (_) => onSelected(t),
-            ),
-        ],
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          children: [
+            for (final t in tabs)
+              InkWell(
+                key: ValueKey('home-tab-${t.name}'),
+                onTap: () => onSelected(t),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        width: 2.5,
+                        color: t == selected
+                            ? scheme.onSurface
+                            : Colors.transparent,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    homeTabLabel(l10n, t),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontSize: 16,
+                      fontWeight: t == selected
+                          ? FontWeight.w800
+                          : FontWeight.w400,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -248,25 +321,262 @@ class _TabBody extends ConsumerWidget {
   }
 }
 
-class _BannerCard extends StatelessWidget {
+/// 넘겨 보는 배너. 오른쪽 아래에 `1 / N`.
+class _BannerPager extends StatefulWidget {
+  const _BannerPager({required this.banners});
+
+  final List<HomeBanner> banners;
+
+  @override
+  State<_BannerPager> createState() => _BannerPagerState();
+}
+
+class _BannerPagerState extends State<_BannerPager> {
+  int _page = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final banners = widget.banners;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 2),
+      child: SizedBox(
+        height: 112,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            children: [
+              PageView.builder(
+                itemCount: banners.length,
+                onPageChanged: (i) => setState(() => _page = i),
+                itemBuilder: (context, i) => _BannerCard(banners[i]),
+              ),
+              if (banners.length > 1)
+                Positioned(
+                  right: 12,
+                  bottom: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${_page + 1} / ${banners.length}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BannerCard extends ConsumerWidget {
   const _BannerCard(this.banner);
 
   final HomeBanner banner;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-    child: Card(
-      color: Theme.of(context).colorScheme.secondaryContainer,
-      child: SizedBox(
-        height: 96,
-        child: Center(
-          child: Text(
-            banner.altText ?? '',
-            style: Theme.of(context).textTheme.titleMedium,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    // 서버가 배너 그림을 주면 그 그림을 쓴다. 없거나 받지 못하면 색 바탕 + 대체 문구.
+    final image = resolveImageUrl(
+      banner.imageUrl,
+      ref.watch(imageOriginProvider),
+    );
+    final fallback = _fallback(theme, scheme);
+    if (image == null) return fallback;
+    return Image.network(
+      image,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      semanticLabel: banner.altText,
+      errorBuilder: (_, _, _) => fallback,
+    );
+  }
+
+  Widget _fallback(ThemeData theme, ColorScheme scheme) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            scheme.primaryContainer,
+            Color.lerp(scheme.primaryContainer, scheme.primary, 0.32)!,
+          ],
+        ),
+      ),
+      child: Stack(
+        children: [
+          // 장식(그림 자산 없이): 오른쪽에 옅은 원 두 개
+          Positioned(
+            right: -24,
+            bottom: -40,
+            child: _Bubble(size: 150, color: scheme.surface, alpha: 0.35),
+          ),
+          Positioned(
+            right: 76,
+            top: -30,
+            child: _Bubble(size: 80, color: scheme.surface, alpha: 0.25),
+          ),
+          const Positioned(
+            right: 10,
+            top: 6,
+            bottom: 2,
+            width: 130,
+            child: BannerArt(),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 22, right: 136),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                banner.altText ?? '',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                  color: scheme.onSurface,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 홈의 검색창(누르면 검색 탭으로).
+class _HomeSearchBar extends StatelessWidget {
+  const _HomeSearchBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 2),
+      child: InkWell(
+        key: const ValueKey('home-search'),
+        borderRadius: BorderRadius.circular(22),
+        onTap: () => context.go('/search'),
+        child: Container(
+          height: 44,
+          padding: const EdgeInsets.only(left: 18, right: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: scheme.onSurface, width: 1.1),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.searchHint,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 13,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const PmartLineIcon(PmartLineIcons.search, size: 20),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 상위 카테고리 바로가기(동그란 칸 + 이름, 가로로 넘긴다). 카테고리 그림이 계약에 없어 첫 글자를 넣는다.
+/// 조회 중·실패면 그리지 않는다(카테고리 탭이 상태를 직접 보인다).
+class _CategoryShortcuts extends ConsumerWidget {
+  const _CategoryShortcuts();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final roots = (ref.watch(categoriesProvider).value ?? const [])
+        .where((n) => n.depth == 1)
+        .toList();
+    if (roots.isEmpty) return const SizedBox.shrink();
+    final labelHeight = MediaQuery.textScalerOf(context).scale(16);
+    final cell = 48 + 5 + labelHeight + 10; // 원 + 간격 + 이름 + 줄 사이
+    final twoRows = roots.length > 5;
+    return SizedBox(
+      height: (twoRows ? cell * 2 : cell) + 14,
+      child: GridView.builder(
+        key: const ValueKey('home-categories'),
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(12, 14, 12, 0),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: twoRows ? 2 : 1,
+          mainAxisExtent: 66,
+          mainAxisSpacing: 0,
+        ),
+        itemCount: roots.length,
+        itemBuilder: (context, i) {
+          final c = roots[i];
+          return InkWell(
+            key: ValueKey('home-category-${c.categoryId}'),
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => context.push(
+              Uri(
+                path: '/products',
+                queryParameters: {'categoryId': c.categoryId, 'title': c.name},
+              ).toString(),
+            ),
+            child: Column(
+              children: [
+                CategoryArt(name: c.name, size: 48, radius: 16),
+                const SizedBox(height: 5),
+                Text(
+                  c.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w400,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _Bubble extends StatelessWidget {
+  const _Bubble({required this.size, required this.color, required this.alpha});
+
+  final double size;
+  final Color color;
+  final double alpha;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(
+      shape: BoxShape.circle,
+      color: color.withValues(alpha: alpha),
     ),
   );
 }
@@ -302,28 +612,42 @@ class _SectionView extends ConsumerWidget {
             )
           : vertical
           ? Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 16,
                 children: [
                   for (final tile in shown.items)
-                    ProductTileCard(
-                      tile: tile,
-                      onTap: () => context.push('/products/${tile.productId}'),
+                    SizedBox(
+                      width: ProductTileCard.gridWidthOf(context),
+                      height: ProductTileCard.heightFor(
+                        context,
+                        ProductTileCard.gridWidthOf(context),
+                      ),
+                      child: ProductTileCard(
+                        rail: true,
+                        tile: tile,
+                        onTap: () =>
+                            context.push('/products/${tile.productId}'),
+                      ),
                     ),
                 ],
               ),
             )
           : SizedBox(
-              height: ProductTileCard.railHeight(context),
+              height: ProductTileCard.heightFor(
+                context,
+                ProductTileCard.railWidthOf(context),
+              ),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 itemCount: shown.items.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 4),
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (context, i) => SizedBox(
-                  width: 280,
+                  width: ProductTileCard.railWidthOf(context),
                   child: ProductTileCard(
+                    rail: true,
                     tile: shown.items[i],
                     onTap: () =>
                         context.push('/products/${shown.items[i].productId}'),
@@ -358,36 +682,39 @@ class _SectionView extends ConsumerWidget {
         ),
       );
     }
-    final theme = Theme.of(context);
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.only(top: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(section.title, style: theme.textTheme.titleLarge),
-                ),
-                if (shown.hasViewAll)
-                  TextButton(
+          PmartSectionHeader(
+            title: section.title,
+            subtitle: section.subtitle,
+            trailing: shown.hasViewAll
+                ? TextButton(
                     key: ValueKey('section-view-all-${section.sectionId}'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: scheme.onSurface,
+                      textStyle: Theme.of(context).textTheme.bodyMedium,
+                    ),
                     onPressed: () => context.push(
                       '/sections/${shown.sectionId}',
                       extra: SectionRef(shown, layoutVersion),
                     ),
-                    child: Text(l10n.sectionViewAll),
-                  ),
-              ],
-            ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(l10n.sectionViewAll),
+                        const PmartLineIcon(
+                          PmartLineIcons.chevronRight,
+                          size: 15,
+                        ),
+                      ],
+                    ),
+                  )
+                : null,
           ),
-          if (section.subtitle case final sub? when sub.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-              child: Text(sub, style: theme.textTheme.bodySmall),
-            ),
           body,
         ],
       ),
@@ -499,15 +826,24 @@ class _DeliverySummaryCard extends ConsumerWidget {
   }
 }
 
-class _DeliverySummary extends StatelessWidget {
+class _DeliverySummary extends StatefulWidget {
   const _DeliverySummary({required this.options});
 
   final List<DeliveryOption> options;
 
   @override
+  State<_DeliverySummary> createState() => _DeliverySummaryState();
+}
+
+class _DeliverySummaryState extends State<_DeliverySummary> {
+  bool _open = false;
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final options = widget.options;
     final night = options.any(
       (o) => !o.available && o.reason == UnavailableReason.nightTime,
     );
@@ -515,84 +851,178 @@ class _DeliverySummary extends StatelessWidget {
         .where((o) => o.mode == DeliveryMode.scheduled)
         .firstOrNull
         ?.earliestSlot;
+    // 심야로 막힌 방식은 머리 띠 안내가 대신한다.
+    final rows = [
+      for (final o in options)
+        if (!(night && o.reason == UnavailableReason.nightTime)) o,
+    ];
+    // 접힌 상태에서는 첫 줄(가능한 방식 우선)만 보인다.
+    final first =
+        rows.where((o) => o.available).firstOrNull ?? rows.firstOrNull;
+    final shown = _open ? rows : [?first];
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Card(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
+      child: Container(
         key: const ValueKey('home-delivery-card'),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (night)
-                Padding(
-                  key: const ValueKey('home-night-notice'),
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.nightlight_outlined, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.homeNightNotice,
-                              style: theme.textTheme.titleSmall,
-                            ),
-                            if (earliest != null)
-                              Text(
-                                l10n.optionEarliestSlot(windowText(earliest)),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              for (final o in options)
-                // 심야로 막힌 방식은 위 안내가 대신한다.
-                if (!(night && o.reason == UnavailableReason.nightTime))
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 머리 띠(주 색)
+            Container(
+              key: night ? const ValueKey('home-night-notice') : null,
+              color: PmartBrand.violet,
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Padding(
-                    key: ValueKey('home-delivery-${o.mode.name}'),
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Icon(
+                      night ? Icons.nightlight_round : Icons.bolt_rounded,
+                      size: 13,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          width: 88,
-                          child: Text(
-                            modeLabel(l10n, o.mode),
-                            style: theme.textTheme.labelLarge,
+                        Text(
+                          night
+                              ? l10n.homeNightNotice
+                              : l10n.homeDeliveryHeadline,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
-                        Expanded(child: Text(_optionSummary(l10n, o))),
+                        if (night && earliest != null)
+                          Text(
+                            l10n.optionEarliestSlot(windowText(earliest)),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.88),
+                            ),
+                          ),
                       ],
                     ),
                   ),
-            ],
-          ),
+                ],
+              ),
+            ),
+            InkWell(
+              key: const ValueKey('home-delivery-toggle'),
+              onTap: rows.length > 1
+                  ? () => setState(() => _open = !_open)
+                  : null,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 16, 20, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children: [
+                          for (final (i, o) in shown.indexed)
+                            Padding(
+                              key: ValueKey('home-delivery-${o.mode.name}'),
+                              padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
+                              child: _DeliveryRow(option: o),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (rows.length > 1)
+                      PmartLineIcon(
+                        _open
+                            ? PmartLineIcons.chevronUp
+                            : PmartLineIcons.chevronDown,
+                        size: 20,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// 방식 한 줄 요약. 불가면 사유, 가능하면 예상시간·기본 배달팁·가장 빠른 시간(서버 값만).
+/// 방식 한 줄: 이름 | 예상시간(굵게) / 기본 배달팁(주 색). 불가면 사유. 값은 서버 값만.
 /// 상품액 없이 물었으므로 팁은 기본값만 있다 — 무료 여부는 장바구니·주문서에서 서버가 판정한다.
-String _optionSummary(AppLocalizations l10n, DeliveryOption o) {
-  if (!o.available) return optionSubtitle(l10n, o);
-  final eta = o.eta;
-  return [
-    if (eta != null && !eta.notSet)
-      switch ((eta.minMinutes, eta.maxMinutes)) {
-        (final int a, final int b) => l10n.optionEta(a, b),
-        _ => null,
-      },
-    if (o.tip?.base case final int base) l10n.homeTipBase(formatKrw(base)),
-    if (o.earliestSlot case final w?) l10n.optionEarliestSlot(windowText(w)),
-  ].nonNulls.join(' · ');
+class _DeliveryRow extends StatelessWidget {
+  const _DeliveryRow({required this.option});
+
+  final DeliveryOption option;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final o = option;
+    final eta = o.eta;
+    final etaText = (eta != null && !eta.notSet)
+        ? switch ((eta.minMinutes, eta.maxMinutes)) {
+            (final int a, final int b) => l10n.optionEta(a, b),
+            _ => null,
+          }
+        : null;
+    final slotText = switch (o.earliestSlot) {
+      final w? => l10n.optionEarliestSlot(windowText(w)),
+      null => null,
+    };
+    final tipText = switch (o.tip?.base) {
+      final int base => l10n.homeTipBase(formatKrw(base)),
+      null => null,
+    };
+    final strong = theme.textTheme.titleSmall?.copyWith(fontSize: 13.5);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 70,
+          child: Text(
+            modeLabel(l10n, o.mode),
+            style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13.5),
+          ),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: o.available
+                ? [
+                    if ((etaText ?? slotText) case final String t)
+                      Text(t, style: strong),
+                    if (etaText != null && slotText != null)
+                      Text(slotText, style: theme.textTheme.bodySmall),
+                    if (tipText != null)
+                      Text(
+                        tipText,
+                        style: strong?.copyWith(color: scheme.primary),
+                      ),
+                  ]
+                : [
+                    Text(
+                      optionSubtitle(l10n, o),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// 홈 첫 로딩 자리 표시. 회색 블록만 그린다(새 패키지 없이).
@@ -646,8 +1076,8 @@ class _Block extends StatelessWidget {
       height: height,
       width: width,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(12),
       ),
     ),
   );
@@ -673,10 +1103,21 @@ class _AddressChip extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.place_outlined, size: 20),
-          const SizedBox(width: 4),
-          Flexible(child: Text(text, overflow: TextOverflow.ellipsis)),
-          const Icon(Icons.expand_more),
+          Icon(
+            Icons.place_rounded,
+            size: 17,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 3),
+          Flexible(
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          const SizedBox(width: 2),
+          const PmartLineIcon(PmartLineIcons.chevronDown, size: 17),
         ],
       ),
     );

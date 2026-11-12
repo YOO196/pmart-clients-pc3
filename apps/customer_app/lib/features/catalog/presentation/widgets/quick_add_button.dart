@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
+import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/shopping_context.dart';
@@ -91,20 +92,26 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     return SizedBox.square(
-      dimension: 36,
+      dimension: 32,
       child: IconButton.filledTonal(
         key: ValueKey('quick-add-${widget.tile.productId}'),
         tooltip: l10n.quickAddTooltip,
         padding: EdgeInsets.zero,
         iconSize: 20,
-        style: IconButton.styleFrom(backgroundColor: scheme.surface),
+        style: IconButton.styleFrom(
+          backgroundColor: scheme.surface,
+          elevation: 2,
+          shadowColor: Colors.black38,
+          minimumSize: const Size.square(32),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
         onPressed: _busy ? null : _onPressed,
         icon: _busy
             ? const SizedBox.square(
                 dimension: 16,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : const Icon(Icons.add),
+            : const PmartLineIcon(PmartLineIcons.plus, size: 18),
       ),
     );
   }

@@ -181,8 +181,14 @@ class _OrderSheetScreenState extends ConsumerState<OrderSheetScreen> {
       AsyncError(:final error) => draftRejection(l10n, error),
       _ => null,
     };
+    final surfaces = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.checkoutTitle)),
+      backgroundColor: surfaces.surfaceContainer,
+      appBar: AppBar(
+        title: Text(l10n.checkoutTitle),
+        centerTitle: true,
+        backgroundColor: surfaces.surfaceContainer,
+      ),
       body: blocked != null
           ? Center(child: Text(blockedText(l10n, blocked)))
           : rejection != null
@@ -447,18 +453,33 @@ class _SheetState extends ConsumerState<_Sheet> {
           // ListView 는 화면 밖 항목을 늦게 만든다 — 맨 아래 결제수단(토스 위젯)이 스크롤이 닿을 때에야
           // 로딩을 시작해 늦게 떴다. 주문서는 길지 않아 한 번에 만든다.
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 ...banners,
                 if (expiry != null && draft.awaitingCheckout)
-                  Text(
-                    expiry.isAfter(now)
-                        ? l10n.payWithin(_left(expiry.difference(now)))
-                        : l10n.holdExpired,
-                    key: const ValueKey('pay-within'),
-                    style: theme.textTheme.titleMedium,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(6, 10, 6, 2),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.schedule,
+                          size: 18,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            expiry.isAfter(now)
+                                ? l10n.payWithin(_left(expiry.difference(now)))
+                                : l10n.holdExpired,
+                            key: const ValueKey('pay-within'),
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 _Section(
                   title: l10n.checkoutItems,
@@ -570,30 +591,39 @@ class _SheetState extends ConsumerState<_Sheet> {
             ),
           ),
         ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ValueListenableBuilder<bool>(
-                valueListenable: session?.ready ?? _neverReady,
-                builder: (context, widgetReady, _) => CommandButton(
-                  key: const ValueKey('pay'),
-                  busy: state.paying || _working(flow),
-                  // 막는 사유가 있으면 주버튼에 첫 사유를 쓴다(DraftBlocker 설명의 순서).
-                  label: switch ((
-                    draft.blockers.firstOrNull,
-                    quote?.totalAmount,
-                  )) {
-                    (final DraftBlocker b, _) => blockerText(l10n, b),
-                    (null, final int t) => l10n.payButton(formatKrw(t)),
-                    (null, null) => l10n.payButtonNoAmount,
-                  },
-                  // 결제위젯이 그려져야 연다(설정 실패·비회원이면 열지 않는다).
-                  onPressed: state.canPay && widgetReady
-                      ? () => _pay(context, l10n)
-                      : null,
+        Material(
+          color: theme.colorScheme.surface,
+          elevation: 12,
+          shadowColor: Colors.black26,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              child: SizedBox(
+                width: double.infinity,
+                height: 58,
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: session?.ready ?? _neverReady,
+                  builder: (context, widgetReady, _) => CommandButton(
+                    key: const ValueKey('pay'),
+                    busy: state.paying || _working(flow),
+                    // 막는 사유가 있으면 주버튼에 첫 사유를 쓴다(DraftBlocker 설명의 순서).
+                    label: switch ((
+                      draft.blockers.firstOrNull,
+                      quote?.totalAmount,
+                    )) {
+                      (final DraftBlocker b, _) => blockerText(l10n, b),
+                      (null, final int t) => l10n.payButton(formatKrw(t)),
+                      (null, null) => l10n.payButtonNoAmount,
+                    },
+                    // 결제위젯이 그려져야 연다(설정 실패·비회원이면 열지 않는다).
+                    onPressed: state.canPay && widgetReady
+                        ? () => _pay(context, l10n)
+                        : null,
+                  ),
                 ),
               ),
             ),
@@ -739,9 +769,19 @@ class _Banner extends StatelessWidget {
   final Widget? action;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: ListTile(leading: Icon(icon), title: Text(text), trailing: action),
-  );
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(top: 8),
+      color: scheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ListTile(
+        leading: Icon(icon, color: scheme.primary),
+        title: Text(text),
+        trailing: action,
+      ),
+    );
+  }
 }
 
 class _Section extends StatelessWidget {
@@ -752,22 +792,32 @@ class _Section extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 16),
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(top: 10),
+    padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+    ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium,
+        ConstrainedBox(
+          // 오른쪽 동작(변경 등)이 있어도 없어도 제목 줄 높이가 같게
+          constraints: const BoxConstraints(minHeight: 32),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
               ),
-            ),
-            ?trailing,
-          ],
+              ?trailing,
+            ],
+          ),
         ),
+        const SizedBox(height: 6),
         ...children,
       ],
     ),
@@ -783,13 +833,31 @@ class _AmountRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = strong ? Theme.of(context).textTheme.titleLarge : null;
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: EdgeInsets.symmetric(vertical: strong ? 8 : 3),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: style)),
-          Text(value, style: style),
+          Expanded(
+            child: Text(
+              label,
+              style: strong
+                  ? theme.textTheme.titleMedium
+                  : theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+            ),
+          ),
+          Text(
+            value,
+            style: strong
+                ? theme.textTheme.headlineSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  )
+                : theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+          ),
         ],
       ),
     );

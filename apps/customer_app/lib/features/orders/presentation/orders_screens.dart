@@ -53,10 +53,10 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     final provider = orderListProvider(_status);
     final value = ref.watch(provider);
     final filters = SizedBox(
-      height: 48,
+      height: 50,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         children: [
           for (final s in <OrderStatus?>[null, ...orderListFilters])
             Padding(
@@ -93,10 +93,81 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         _ => Column(
           children: [
             filters,
-            Expanded(child: _list(l10n, provider, value)),
+            Expanded(
+              child: ColoredBox(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                child: _list(l10n, provider, value),
+              ),
+            ),
           ],
         ),
       },
+    );
+  }
+
+  /// 주문 카드 한 장: 상태 · "주문 상세" 알약 / 주문 시각(크게) / 상품 수 · 금액.
+  Widget _orderCard(
+    BuildContext context,
+    AppLocalizations l10n,
+    OrderListItem o,
+  ) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                orderStatusText(l10n, o.status),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                l10n.orderDetailTitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 11.5,
+                  color: scheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (o.orderedAt case final t?) ...[
+          const SizedBox(height: 10),
+          Text(
+            formatSeoulDateTime(t),
+            style: theme.textTheme.titleLarge?.copyWith(fontSize: 19),
+          ),
+        ],
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            if (o.itemCount case final n?)
+              Expanded(
+                child: Text(
+                  l10n.ordersItemCount(n),
+                  style: theme.textTheme.bodyMedium,
+                ),
+              )
+            else
+              const Spacer(),
+            Text(
+              _money(l10n, o.totalAmount),
+              style: theme.textTheme.titleSmall,
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -117,23 +188,28 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     ready: (context, page) => RefreshIndicator(
       onRefresh: () => ref.refresh(provider.future),
       child: ListView(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
         children: [
           for (final o in page!.items)
-            ListTile(
-              key: ValueKey('order-${o.orderId}'),
-              title: Text(orderStatusText(l10n, o.status)),
-              subtitle: Text(
-                [
-                  if (o.orderedAt case final t?) formatSeoulDateTime(t),
-                  if (o.itemCount case final n?) l10n.ordersItemCount(n),
-                ].join(' · '),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                key: ValueKey('order-${o.orderId}'),
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () async {
+                    await context.push('/orders/${o.orderId}');
+                    // 상세에서 취소·변경을 했을 수 있다. 돌아오면 목록을 다시 읽는다.
+                    if (context.mounted) ref.invalidate(orderListProvider);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+                    child: _orderCard(context, l10n, o),
+                  ),
+                ),
               ),
-              trailing: Text(_money(l10n, o.totalAmount)),
-              onTap: () async {
-                await context.push('/orders/${o.orderId}');
-                // 상세에서 취소·변경을 했을 수 있다. 돌아오면 목록을 다시 읽는다.
-                if (context.mounted) ref.invalidate(orderListProvider);
-              },
             ),
         ],
       ),
@@ -189,13 +265,25 @@ class _OrderBody extends ConsumerWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          orderStatusText(l10n, o.status),
-          key: const ValueKey('order-status'),
-          style: theme.textTheme.headlineSmall,
+        _DetailBox(
+          children: [
+            Text(
+              orderStatusText(l10n, o.status),
+              key: const ValueKey('order-status'),
+              style: theme.textTheme.titleLarge,
+            ),
+            if (o.window case final w?)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(windowText(w), style: theme.textTheme.titleSmall),
+              ),
+            const SizedBox(height: 6),
+            Text(
+              l10n.payOrderNumber(o.orderId),
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
         ),
-        Text(l10n.payOrderNumber(o.orderId), style: theme.textTheme.bodySmall),
-        if (o.window case final w?) Text(windowText(w)),
         for (final s in o.staleSources)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -217,9 +305,13 @@ class _OrderBody extends ConsumerWidget {
         for (final (i, s) in o.shipments.indexed)
           Card(
             key: ValueKey('shipment-${s.shipmentId}'),
-            margin: const EdgeInsets.only(top: 12),
+            margin: const EdgeInsets.only(top: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: theme.colorScheme.outlineVariant),
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(14, 6, 6, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -257,39 +349,59 @@ class _OrderBody extends ConsumerWidget {
           ),
         const SizedBox(height: 16),
         // 주문 당시 배송지 사본(BR-37). 주소록을 다시 부르지 않는다.
-        Text(l10n.checkoutAddress, style: theme.textTheme.titleMedium),
-        ShippingAddressView(address: o.shippingAddress),
+        _DetailTitle(l10n.checkoutAddress),
+        _DetailBox(children: [ShippingAddressView(address: o.shippingAddress)]),
         // 배달 정보: 주문에 남은 요청사항·품절 시 처리(계약 `deliveryNote`·`outOfStockPreference`). 없으면 줄을 두지 않는다.
         if (o.deliveryNote != null || o.outOfStock != null) ...[
           const SizedBox(height: 16),
-          Text(l10n.orderDeliveryInfo, style: theme.textTheme.titleMedium),
-          if (o.deliveryNote case final n?)
-            _Row(l10n.orderDeliveryNote, n, key: const ValueKey('order-note')),
-          if (o.outOfStock case final p?)
-            _Row(l10n.orderOutOfStock, switch (p) {
-              OutOfStockPreference.cancelOutOfStockOnly => l10n.oosOnly,
-              OutOfStockPreference.cancelAll => l10n.oosAll,
-            }, key: const ValueKey('order-oos')),
+          _DetailTitle(l10n.orderDeliveryInfo),
+          _DetailBox(
+            children: [
+              if (o.deliveryNote case final n?)
+                _Row(
+                  l10n.orderDeliveryNote,
+                  n,
+                  key: const ValueKey('order-note'),
+                ),
+              if (o.outOfStock case final p?)
+                _Row(l10n.orderOutOfStock, switch (p) {
+                  OutOfStockPreference.cancelOutOfStockOnly => l10n.oosOnly,
+                  OutOfStockPreference.cancelAll => l10n.oosAll,
+                }, key: const ValueKey('order-oos')),
+            ],
+          ),
         ],
         const SizedBox(height: 16),
         _OrderLinesSection(order: o),
         const SizedBox(height: 16),
-        Text(l10n.checkoutAmounts, style: theme.textTheme.titleMedium),
-        _Row(l10n.amountItems, _money(l10n, o.quote?.itemAmount)),
-        if (o.quote case final q?)
-          _Row(
-            '${l10n.amountTip} (${tipReasonText(l10n, q.tipReason)})',
-            _money(l10n, q.deliveryTip),
-          ),
-        _Row(l10n.amountBag, _money(l10n, o.quote?.bagFee)),
-        _Row(l10n.amountTotal, _money(l10n, o.quote?.totalAmount)),
-        _PaymentMethodRow(paymentAttemptId: o.paymentAttemptId),
-        if ((o.refundedAmount ?? 0) > 0)
-          _Row(
-            l10n.refundedAmount,
-            formatKrw(o.refundedAmount!),
-            key: const ValueKey('refunded'),
-          ),
+        _DetailTitle(l10n.checkoutAmounts),
+        _DetailBox(
+          children: [
+            _Row(l10n.amountItems, _money(l10n, o.quote?.itemAmount)),
+            if (o.quote case final q?)
+              _Row(
+                '${l10n.amountTip} (${tipReasonText(l10n, q.tipReason)})',
+                _money(l10n, q.deliveryTip),
+              ),
+            _Row(l10n.amountBag, _money(l10n, o.quote?.bagFee)),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Divider(),
+            ),
+            _Row(
+              l10n.amountTotal,
+              _money(l10n, o.quote?.totalAmount),
+              strong: true,
+            ),
+            _PaymentMethodRow(paymentAttemptId: o.paymentAttemptId),
+            if ((o.refundedAmount ?? 0) > 0)
+              _Row(
+                l10n.refundedAmount,
+                formatKrw(o.refundedAmount!),
+                key: const ValueKey('refunded'),
+              ),
+          ],
+        ),
         _ClaimsSection(order: o, onVisit: visit),
         // 배송 완료된 배송이 있는 주문만 리뷰 자격을 묻는다(작성 가능 여부는 서버 자격 값으로만 판단).
         if (o.shipments.any((s) => s.state == ShipmentState.delivered))
@@ -314,6 +426,43 @@ class _OrderBody extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// 주문 상세의 구획 제목(카드 밖).
+class _DetailTitle extends StatelessWidget {
+  const _DetailTitle(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+    child: Text(
+      text,
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 14.5),
+    ),
+  );
+}
+
+/// 주문 상세의 테두리 카드.
+class _DetailBox extends StatelessWidget {
+  const _DetailBox({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    ),
+  );
 }
 
 /// 주문의 처리 내역(취소·반품·교환). 서버는 주문 상세의 `claims` 를 아직 비워 보내므로 `GET /claims?orderId=` 로 받고,
@@ -681,21 +830,30 @@ class _LineTile extends StatelessWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row(this.label, this.value, {super.key});
+  const _Row(this.label, this.value, {super.key, this.strong = false});
 
   final String label;
   final String value;
 
+  /// 합계 줄처럼 굵고 크게.
+  final bool strong;
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 2),
-    child: Row(
-      children: [
-        Expanded(child: Text(label)),
-        Text(value),
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final style = strong
+        ? text.titleMedium?.copyWith(fontSize: 16)
+        : text.bodyMedium;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: style)),
+          Text(value, style: style),
+        ],
+      ),
+    );
+  }
 }
 
 /// SCR-TRACK-001. 위치 조회 실패는 배송 실패가 아니다. 라이더 좌표·다른 고객 정보는 받지도 보이지도 않는다.

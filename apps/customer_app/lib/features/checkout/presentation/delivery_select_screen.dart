@@ -114,7 +114,7 @@ class DeliverySelectScreen extends ConsumerWidget {
       ),
     };
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.deliveryTitle)),
+      appBar: AppBar(title: Text(l10n.deliveryTitle), centerTitle: true),
       body: body,
     );
   }
@@ -233,12 +233,31 @@ class _DeliveryBodyState extends ConsumerState<_DeliveryBody> {
                   child: Column(
                     children: [
                       for (final o in list)
-                        RadioListTile<DeliveryMode>(
-                          key: ValueKey('mode-${o.mode.name}'),
-                          value: o.mode,
-                          enabled: o.available,
-                          title: Text(modeLabel(l10n, o.mode)),
-                          subtitle: Text(optionSubtitle(l10n, o)),
+                        _ChoiceFrame(
+                          selected: o.mode == setup.mode,
+                          child: RadioListTile<DeliveryMode>(
+                            key: ValueKey('mode-${o.mode.name}'),
+                            value: o.mode,
+                            enabled: o.available,
+                            contentPadding: const EdgeInsets.only(
+                              left: 4,
+                              right: 16,
+                            ),
+                            visualDensity: VisualDensity.compact,
+                            title: Text(
+                              modeLabel(l10n, o.mode),
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontSize: 15),
+                            ),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Text(
+                                optionSubtitle(l10n, o),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(fontSize: 12.5),
+                              ),
+                            ),
+                          ),
                         ),
                     ],
                   ),
@@ -311,6 +330,34 @@ class _DeliveryBodyState extends ConsumerState<_DeliveryBody> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// 고르는 항목 하나의 테두리. 고른 항목은 주 색 테두리 + 옅은 바탕.
+class _ChoiceFrame extends StatelessWidget {
+  const _ChoiceFrame({required this.selected, required this.child});
+
+  final bool selected;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        clipBehavior: Clip.antiAlias,
+        color: selected ? scheme.surfaceContainer : scheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: selected ? scheme.primary : scheme.outlineVariant,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: child,
+      ),
     );
   }
 }
