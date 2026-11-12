@@ -23,7 +23,7 @@ export function LoginPage() {
 
 /** employee-auth: 버튼 → 게이트웨이 로그인 시작(→ Keycloak 로그인 화면). 돌아오면 /auth/callback 이 티켓을 토큰으로 바꾼다 */
 function EmployeeLoginPage() {
-  const { session, startEmployeeLogin } = useSession();
+  const { session, startEmployeeLogin, signOutUnconfirmed } = useSession();
   const [params] = useSearchParams();
   const from = safeFrom(params.get('from'));
   const [phase, setPhase] = useState<'idle' | 'starting' | 'failed'>('idle');
@@ -48,6 +48,11 @@ function EmployeeLoginPage() {
         {phase === 'failed' && (
           <p role="alert" className="alert alert-error text-sm">
             {m.employeeLogin.startFailed}
+          </p>
+        )}
+        {signOutUnconfirmed && (
+          <p role="alert" className="alert alert-warning text-sm">
+            {m.employeeLogin.signOutUnconfirmed}
           </p>
         )}
         <p className="text-xs opacity-70">{m.employeeLogin.note}</p>

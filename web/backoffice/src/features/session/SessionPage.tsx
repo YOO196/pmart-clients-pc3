@@ -165,14 +165,22 @@ export function SessionPage() {
               <button
                 type="button"
                 className="btn btn-sm w-fit"
-                onClick={() => void logout().finally(() => void navigate('/login', { replace: true }))}
+                onClick={() =>
+                  void logout().then((result) => {
+                    // 'redirecting' 이면 브라우저가 Keycloak 로그아웃 주소로 떠난다(→ /login 으로 돌아온다).
+                    if (result !== 'redirecting') void navigate('/login', { replace: true });
+                  })
+                }
               >
                 {m.session.signOut}
               </button>
             </div>
           </div>
           {employee ? (
-            <p className="rounded-box bg-base-100 p-4 text-sm">{m.employeeLogin.passwordNote}</p>
+            <div className="space-y-1 rounded-box bg-base-100 p-4 text-sm">
+              <p>{m.employeeLogin.passwordNote}</p>
+              <p>{m.employeeLogin.sharedPcNote}</p>
+            </div>
           ) : (
             <PasswordChange required={required} />
           )}

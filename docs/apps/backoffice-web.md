@@ -60,7 +60,7 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 승인 뒤 정본 반영은 비동기라 승인 상세에서 1초 간격·최대 30회 폴링하고, 끝나지 않으면 "아직 확인되지 않음 + 다시 확인"으로 둔다.
 토큰(ADR-0018): access·refresh 모두 탭 메모리(새로고침 = 재로그인, localStorage 금지). 401 → pmartFetch single-flight 로 `POST /auth/tokens` 한 번(회전된 refresh 로 즉시 교체) → 원 요청 재전송. `TOKEN_INVALID`·`TOKEN_REUSED`·`SESSION_EXPIRED` 면 토큰을 지우고 로그인 화면(`/login?from=`). 갱신 결과 불명이면 같은 refresh 를 다시 보내지 않는다(재사용으로 세션이 끊김). `X-Device-Id` 는 탭마다 UUID(refresh 도 탭 메모리라 충분).
 
-직원 로그인(ADR-0056, 2026-11-12): `lan` 빌드는 employee-auth-service — `/login` 버튼 → 게이트웨이 `GET /employee-auth/logins`(브라우저 이동, Keycloak 화면) → `/auth/callback?ticket=` → `POST /employee-auth/tokens`. 갱신 `POST /employee-auth/tokens/refresh`, 로그아웃 `POST /employee-auth/logouts`. 백오피스는 Keycloak 주소를 갖지 않는다. `mock`·`local` 빌드는 auth-service 아이디·비밀번호 그대로(`src/api/employeeAuth.ts`, `vite.config.ts`).
+직원 로그인(ADR-0056, 2026-11-12): `lan` 빌드는 employee-auth-service — `/login` 버튼 → 게이트웨이 `GET /employee-auth/logins`(브라우저 이동, Keycloak 화면) → `/auth/callback?ticket=` → `POST /employee-auth/tokens`. 갱신 `POST /employee-auth/tokens/refresh`, 로그아웃 `POST /employee-auth/logouts` → 200 `idpLogoutUri` 로 브라우저 이동(SSO — Keycloak 세션까지 끝내고 `/login` 으로 돌아옴, 2026-11-13). 백오피스는 Keycloak 주소를 갖지 않는다. `mock`·`local` 빌드는 auth-service 아이디·비밀번호 그대로(`src/api/employeeAuth.ts`, `vite.config.ts`).
 실행 모드: `dev`(목) / `dev:local`(Vite 프록시 → localhost:8080, 첫 관리자 admin / pmart-local) / `dev:lan`·`build:lan`(게이트웨이 `http://192.168.0.40:8080/api/v1` 직접, 브라우저는 `http://192.168.0.40` 으로 연다. 이름 `d603-16` 은 다른 PC 에서 IPv6 링크 로컬로 풀려 안 열림 — 2026-11-06).
 막힌 것: 이미지 인증(BR-25), 초안 목록(BR-26), 센터 목록(center-master 다음 작업 → 센터 ID 입력).
 

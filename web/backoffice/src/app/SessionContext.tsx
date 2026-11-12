@@ -8,7 +8,7 @@ import { Navigate, useLocation } from 'react-router';
 
 import { loginOperator, logoutOperator, type OperatorAccount } from '../api/auth';
 import { API_BASE, refreshTokens, tokens } from '../api/client';
-import { beginEmployeeLogin, completeEmployeeLogin, LOGIN_MODE, logoutEmployee, type LoginMode } from '../api/employeeAuth';
+import { beginEmployeeLogin, browser, completeEmployeeLogin, LOGIN_MODE, logoutEmployee, type LoginMode } from '../api/employeeAuth';
 import { parseOperatorToken, type OperatorSession } from '../api/session';
 import { clearSavedSession, loadSavedSession, syncSavedSession } from '../api/sessionPersistence';
 import { messages as m } from '../shared/messages';
@@ -28,7 +28,13 @@ interface SessionValue {
   /** 복귀 주소의 쿼리(ticket 또는 error)로 토큰을 받는다. 돌아갈 앱 경로 */
   readonly completeEmployeeLogin: (params: URLSearchParams) => Promise<string>;
   readonly login: (credentials: { loginId: string; password: string }) => Promise<OperatorAccount>;
-  readonly logout: () => Promise<void>;
+  /**
+   * 로그아웃. employee-auth(SSO)면 토큰을 지운 뒤 Keycloak 로그아웃 주소로 브라우저를 옮긴다(→ /login 으로 돌아온다).
+   * 'idp-session-may-remain' = 서버 확인을 못 받아 Keycloak 세션이 남았을 수 있다(signOutUnconfirmed 로 로그인 화면에서 안내).
+   */
+  readonly logout: () => Promise<'done' | 'redirecting' | 'idp-session-may-remain'>;
+  /** 마지막 로그아웃을 서버가 확인해 주지 않았다 — 로그인 화면이 "브라우저를 닫아 주세요"를 안내한다. 다음 로그인 시작 때 꺼진다 */
+  readonly signOutUnconfirmed: boolean;
   /** 비밀번호를 바꾼 뒤 안내를 끈다 */
   readonly passwordChanged: () => void;
 }
@@ -48,6 +54,7 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
   const [saved] = useState(() => (!initialToken && tokens.accessToken === null ? loadSavedSession() : null));
   const [restoring, setRestoring] = useState(saved !== null);
   const restoreStarted = useRef(false);
+  const [signOutUnconfirmed, setSignOutUnconfirmed] = useState(false);
 
   // 토큰이 바뀌면(갱신·만료) 세션 표시를 따라가고, refresh 보관을 맞춘다(없으면 지운다).
   useEffect(
@@ -87,11 +94,22 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
   );
 
   const logout = useCallback(async () => {
-    return LOGIN_MODE === 'employee-auth' ? logoutEmployee(api, tokens) : logoutOperator(api, tokens);
+    if (LOGIN_MODE !== 'employee-auth') {
+      await logoutOperator(api, tokens);
+      return 'done' as const;
+    }
+    const outcome = await logoutEmployee(api, tokens);
+    if (outcome.idpLogoutUri) {
+      browser.assign(outcome.idpLogoutUri);
+      return 'redirecting' as const;
+    }
+    setSignOutUnconfirmed(outcome.idpSessionMayRemain);
+    return outcome.idpSessionMayRemain ? ('idp-session-may-remain' as const) : ('done' as const);
   }, [api]);
   const passwordChanged = useCallback(() => setOperator((o) => (o ? { ...o, passwordChangeRequired: false } : o)), []);
   const startEmployeeLogin = useCallback(async (from: string) => {
-    globalThis.location.assign(await beginEmployeeLogin(API_BASE, from, tokens));
+    setSignOutUnconfirmed(false);
+    browser.assign(await beginEmployeeLogin(API_BASE, from, tokens));
   }, []);
   const completeEmployee = useCallback((params: URLSearchParams) => completeEmployeeLogin(api, params, tokens), [api]);
 
@@ -107,9 +125,10 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
       completeEmployeeLogin: completeEmployee,
       login,
       logout,
+      signOutUnconfirmed,
       passwordChanged,
     }),
-    [session, restoring, operator, displayName, startEmployeeLogin, completeEmployee, login, logout, passwordChanged],
+    [session, restoring, operator, displayName, startEmployeeLogin, completeEmployee, login, logout, signOutUnconfirmed, passwordChanged],
   );
   return <SessionContext value={value}>{children}</SessionContext>;
 }

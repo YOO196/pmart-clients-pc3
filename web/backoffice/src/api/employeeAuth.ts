@@ -9,7 +9,7 @@ import type { Api } from './client';
 import { IdempotencyKey, SOURCE_SYSTEM } from './command';
 import { ProblemFailure } from './failure';
 import type { components } from './generated/employee-auth';
-import { PUBLIC_HEADER, request, requestNoContent } from './pmartFetch';
+import { PUBLIC_HEADER, request } from './pmartFetch';
 import { sha256 } from './sha256';
 import type { TokenStore } from './tokens';
 
@@ -19,6 +19,13 @@ export type LoginMode = 'auth-service' | 'employee-auth';
 export const LOGIN_MODE: LoginMode = import.meta.env.VITE_PMART_LOGIN === 'employee-auth' ? 'employee-auth' : 'auth-service';
 
 export type EmployeeSession = components['schemas']['EmployeeSession'];
+
+/** 브라우저 이동(로그인 시작·Keycloak 로그아웃). 시험에서 바꿔 끼울 수 있게 한 곳에 둔다 */
+export const browser = {
+  assign(url: string): void {
+    globalThis.location.assign(url);
+  },
+};
 
 /** employee-auth 설정의 앱 이름(pmart.employee-auth.apps.backoffice) */
 export const EMPLOYEE_APP = 'backoffice';
@@ -199,20 +206,47 @@ export async function refreshEmployeeTokens(api: Api, store: TokenStore): Promis
   }
 }
 
-/** 서버 세션을 끝낸다. 결과와 관계없이 이 탭의 토큰은 지운다(로그아웃은 멱등). Keycloak 세션은 로그인 때 이미 끝났다. */
-export async function logoutEmployee(api: Api, store: TokenStore): Promise<void> {
+export interface EmployeeLogoutOutcome {
+  /**
+   * Keycloak 로그아웃 주소(SSO — handoff 2026-11-12 clients-request-backoffice-sso-logout). 브라우저를 이 주소로 이동시켜야
+   * Keycloak 세션까지 끝난다(끝나면 <출처>/login 으로 돌아온다). 토큰 값이 들어 있으니 로그·오류 문구에 남기지 않는다.
+   */
+  readonly idpLogoutUri?: string;
+  /** 서버가 로그아웃을 확인해 주지 않았다(실패·결과 불명) — Keycloak 세션이 남아 다음 로그인이 비밀번호 없이 될 수 있다 */
+  readonly idpSessionMayRemain: boolean;
+}
+
+/** http(s) 주소만 이동 대상으로 받는다(javascript: 등 다른 scheme 은 버린다) */
+function httpUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
   try {
-    if (store.accessToken) {
-      await requestNoContent(
-        'POST',
-        api.employeeAuth.POST('/employee-auth/logouts', {
-          params: { header: { 'Idempotency-Key': IdempotencyKey.generate().value, 'X-Source-System': SOURCE_SYSTEM } },
-          body: { allDevices: false },
-        }),
-      );
-    }
+    const u = new URL(value);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 서버 세션을 끝낸다. 결과와 관계없이 이 탭의 토큰은 지운다(로그아웃은 멱등).
+ * 백오피스는 SSO 라 Keycloak 세션이 남아 있다 — 응답의 idpLogoutUri 로 브라우저를 이동시키는 것은 호출한 쪽이 한다(토큰을 지운 뒤).
+ * 이미 끝난 세션이면 idpLogoutUri 없이 200(Keycloak 세션도 이미 끝난 것으로 본다).
+ */
+export async function logoutEmployee(api: Api, store: TokenStore): Promise<EmployeeLogoutOutcome> {
+  try {
+    if (!store.accessToken) return { idpSessionMayRemain: false };
+    const result = await request(
+      'POST',
+      api.employeeAuth.POST('/employee-auth/logouts', {
+        params: { header: { 'Idempotency-Key': IdempotencyKey.generate().value, 'X-Source-System': SOURCE_SYSTEM } },
+        body: { allDevices: false },
+      }),
+    );
+    const idpLogoutUri = httpUrl(result.idpLogoutUri);
+    return { ...(idpLogoutUri ? { idpLogoutUri } : {}), idpSessionMayRemain: false };
   } catch {
     // 서버 세션 종료를 확인하지 못해도 이 탭은 로그아웃한다(access 는 최대 15분, 세션은 최대 12시간으로 끝난다).
+    return { idpSessionMayRemain: true };
   } finally {
     store.clear();
   }

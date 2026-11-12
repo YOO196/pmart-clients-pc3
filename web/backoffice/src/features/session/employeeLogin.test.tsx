@@ -1,11 +1,13 @@
 // 직원 로그인 employee-auth(LOGIN_MODE=employee-auth, 빌드 모드 lan) — 백엔드 handoff 2026-11-12, 계약 employee-auth-service.yaml.
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { API_BASE, createApi, SOURCE_SYSTEM } from '../../api/client';
 import {
   beginEmployeeLogin,
+  browser,
   codeChallenge,
   completeEmployeeLogin,
   EmployeeLoginError,
@@ -28,6 +30,7 @@ vi.mock('../../api/employeeAuth', async (importOriginal) => ({
 }));
 
 const ORIGIN = 'http://192.168.0.40';
+const IDP_LOGOUT = 'https://192.168.0.40:8443/iam/realms/pmart-staff/protocol/openid-connect/logout?id_token_hint=HINT&post_logout_redirect_uri=http%3A%2F%2F192.168.0.40%2Flogin';
 const access = (roles: readonly string[] = ['PRICE_APPROVER']) =>
   mockOperatorToken({ sub: 'OP-ea-1', roles, centers: ['MFC-GANGNAM'], sid: 'SES-ea-1', exp: 1_800_000_000 });
 const pair = (accessToken = access(), refreshToken = 'ea-refresh-1') => ({
@@ -214,26 +217,46 @@ describe('갱신·로그아웃', () => {
     expect(store.refreshToken).toBe('ea-refresh-1');
   });
 
-  it('로그아웃: 직원 토큰으로 POST /employee-auth/logouts(allDevices=false) 뒤 토큰 삭제 — 서버가 실패해도 이 탭은 지운다', async () => {
+  function logoutHandler(reply: () => Response) {
     const sent: Sent[] = [];
-    let status = 204;
     server.use(
       http.post('*/api/v1/employee-auth/logouts', async ({ request }) => {
         sent.push({ headers: request.headers, body: (await request.json()) as Record<string, unknown> });
-        return new HttpResponse(null, { status });
+        return reply();
       }),
     );
-    for (const s of [204, 500]) {
-      status = s;
-      const { api, store } = client();
-      store.setPair(pair());
-      await logoutEmployee(api, store);
-      expect(store.accessToken).toBeNull();
-      expect(store.refreshToken).toBeNull();
-    }
+    return sent;
+  }
+
+  it('로그아웃(SSO): 직원 토큰으로 POST /employee-auth/logouts → 200 idpLogoutUri 를 돌려주고 토큰을 지운다', async () => {
+    const sent = logoutHandler(() => HttpResponse.json({ idpLogoutUri: IDP_LOGOUT }));
+    const { api, store } = client();
+    store.setPair(pair());
+    expect(await logoutEmployee(api, store)).toEqual({ idpLogoutUri: IDP_LOGOUT, idpSessionMayRemain: false });
+    expect(store.accessToken).toBeNull();
+    expect(store.refreshToken).toBeNull();
     expect(sent[0]!.headers.get('Authorization')).toBe(`Bearer ${access()}`);
     expect(sent[0]!.headers.get('Idempotency-Key')).toBeTruthy();
     expect(sent[0]!.body).toEqual({ allDevices: false });
+  });
+
+  it('로그아웃: 이미 끝난 세션(200, 주소 없음)은 그대로 끝, http(s) 가 아닌 주소는 버린다', async () => {
+    for (const body of [{}, { idpLogoutUri: 'javascript:alert(1)' }, { idpLogoutUri: 'not a url' }]) {
+      logoutHandler(() => HttpResponse.json(body));
+      const { api, store } = client();
+      store.setPair(pair());
+      expect(await logoutEmployee(api, store)).toEqual({ idpSessionMayRemain: false });
+      expect(store.accessToken).toBeNull();
+    }
+  });
+
+  it('로그아웃: 서버가 실패해도 이 탭의 토큰은 지우고, Keycloak 세션이 남았을 수 있다고 알린다', async () => {
+    logoutHandler(() => new HttpResponse(null, { status: 500 }));
+    const { api, store } = client();
+    store.setPair(pair());
+    expect(await logoutEmployee(api, store)).toEqual({ idpSessionMayRemain: true });
+    expect(store.accessToken).toBeNull();
+    expect(store.refreshToken).toBeNull();
   });
 });
 
@@ -305,5 +328,46 @@ describe('운영자 계정 화면(employee-auth 로그인에서는 내림)', () 
     expect(screen.getByRole('link', { name: '승인함' })).toBeInTheDocument();
     server.events.removeListener('request:start', listener);
     expect(paths.some((p) => p.includes('/operator-accounts'))).toBe(false);
+  });
+});
+
+describe('로그아웃 화면(SSO)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function signedIn(logoutReply: () => Response) {
+    const assign = vi.spyOn(browser, 'assign').mockImplementation(() => undefined);
+    server.use(
+      http.get('*/api/v1/employee-auth/sessions/current', () =>
+        HttpResponse.json({ sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z' }),
+      ),
+      http.post('*/api/v1/employee-auth/logouts', () => logoutReply()),
+    );
+    render(<App memory initialPath="/session" initialToken={access()} />);
+    return assign;
+  }
+
+  it('로그인 시작 버튼은 게이트웨이 로그인 시작 주소로 브라우저를 옮긴다', async () => {
+    const assign = vi.spyOn(browser, 'assign').mockImplementation(() => undefined);
+    render(<App memory initialPath="/login" />);
+    await userEvent.click(screen.getByRole('button', { name: '직원 계정으로 로그인' }));
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    expect(assign.mock.calls[0]![0]).toContain('/api/v1/employee-auth/logins?app=backoffice');
+  });
+
+  it('로그아웃하면 토큰을 지운 뒤 Keycloak 로그아웃 주소로 브라우저를 옮긴다', async () => {
+    const assign = signedIn(() => HttpResponse.json({ idpLogoutUri: IDP_LOGOUT }));
+    expect(screen.getByText(/공용 PC 에서는 자리를 뜰 때 꼭 로그아웃/)).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: '로그아웃' }));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith(IDP_LOGOUT));
+    expect(sessionStorage.getItem('pmart.backoffice.session')).toBeNull();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('서버가 로그아웃을 확인해 주지 못하면 이동하지 않고, 로그인 화면에서 브라우저를 닫으라고 안내한다', async () => {
+    const assign = signedIn(() => new HttpResponse(null, { status: 503 }));
+    await userEvent.click(await screen.findByRole('button', { name: '로그아웃' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('브라우저를 닫아 주세요');
+    expect(screen.getByRole('button', { name: '직원 계정으로 로그인' })).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
   });
 });
