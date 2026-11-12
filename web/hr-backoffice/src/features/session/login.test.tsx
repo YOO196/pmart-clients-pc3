@@ -53,6 +53,7 @@ describe('목 로그인(티켓 교환부터는 실제와 같은 코드)', () => 
     await userEvent.click(screen.getByRole('button', { name: /인사 담당/ }));
     expect(await screen.findByRole('heading', { name: '직원 목록' })).toBeInTheDocument();
     expect(await screen.findByText('한인사')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: '내 세션: 한인사' })).toBeInTheDocument(); // 메뉴에는 운영자 ID 대신 이름
 
     const exchange = view.mutations('/employee-auth/tokens')[0]!;
     expect(exchange.headers.get('Authorization')).toBeNull();

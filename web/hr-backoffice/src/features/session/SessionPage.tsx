@@ -3,12 +3,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 
-import { ProblemCode, ProblemFailure, request } from '@pmart/web-core';
+import { request } from '@pmart/web-core';
 import { formatSeoul, QueryState, toUiState } from '@pmart/web-ui';
 import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
 import { messages as m } from '../../shared/messages';
 import { affiliationText } from '../employees/labels';
+import { useMe } from './useMe';
 
 export function SessionPage() {
   const api = useApi();
@@ -19,19 +20,7 @@ export function SessionPage() {
     enabled: session !== null,
     queryFn: () => request('GET', api.employeeAuth.GET('/employee-auth/sessions/current', {})),
   });
-  // 인사 기록이 없는 계정은 404 — 오류가 아니라 "기록 없음"으로 보인다(null).
-  const me = useQuery({
-    queryKey: ['hr', 'me', session?.subject],
-    enabled: session !== null,
-    queryFn: async () => {
-      try {
-        return await request('GET', api.hr.GET('/hr/employees/me', {}));
-      } catch (e) {
-        if (e instanceof ProblemFailure && e.problem.code === ProblemCode.notFound) return null;
-        throw e;
-      }
-    },
-  });
+  const me = useMe();
 
   if (!session) return null;
   return (

@@ -9,6 +9,7 @@ import { EmployeeListPage } from '../features/employees/EmployeeListPage';
 import { EmployeeRegisterPage } from '../features/employees/EmployeeRegisterPage';
 import { LoginCallbackPage, LoginPage } from '../features/session/LoginPage';
 import { SessionPage } from '../features/session/SessionPage';
+import { useMe } from '../features/session/useMe';
 import { messages as m } from '../shared/messages';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
 
@@ -19,6 +20,9 @@ const nav: ReadonlyArray<readonly [string, string]> = [
 
 function Layout() {
   const { session } = useSession();
+  // 메뉴에는 이름을 보인다(운영자 ID 는 길다). 이름을 아직 못 받았거나 인사 기록이 없으면 "내 세션"만.
+  const me = useMe();
+  const myName = me.data?.name;
   return (
     <div className="flex min-h-screen bg-base-200">
       <aside className="w-52 shrink-0 bg-base-100 shadow-sm">
@@ -30,7 +34,7 @@ function Layout() {
         </div>
         <ul className="menu w-full">
           <li>
-            <NavLink to={session ? '/session' : '/login'}>{session ? `${m.nav.session}: ${session.subject}` : m.nav.login}</NavLink>
+            <NavLink to={session ? '/session' : '/login'}>{session ? (myName ? `${m.nav.session}: ${myName}` : m.nav.session) : m.nav.login}</NavLink>
           </li>
           {nav.map(([to, label]) => (
             <li key={to}>
