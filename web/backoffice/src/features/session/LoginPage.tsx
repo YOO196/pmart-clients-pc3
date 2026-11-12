@@ -1,10 +1,10 @@
-// 운영자 로그인. LOGIN_MODE 가 keycloak 이면 Keycloak 로그인 화면으로 보낸다(ADR-0054, handoff 2026-11-11).
+// 직원 로그인. LOGIN_MODE 가 employee-auth 면 게이트웨이 로그인 시작 주소로 보낸다(ADR-0056, handoff 2026-11-12) — Keycloak 화면에서 로그인하고 /auth/callback 으로 돌아온다.
 // auth-service(아이디·비밀번호 → JWT, ADR-0018). 실패 사유는 code 로만 고른다(LOGIN_FAILED·ACCOUNT_LOCKED).
 // 비밀번호는 상태에만 두고 로그·오류 문구에 남기지 않는다. 로그인 뒤 원래 가려던 화면으로 돌아간다.
 import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 
-import { KeycloakLoginError, type KeycloakErrorCode } from '../../api/keycloak';
+import { EmployeeLoginError, type EmployeeLoginErrorCode } from '../../api/employeeAuth';
 import { useSession } from '../../app/SessionContext';
 import { mockAccounts } from '../../mocks/operators';
 import { CommandFeedback } from '../../shared/Feedback';
@@ -18,12 +18,12 @@ const safeFrom = (from: string | null) => (from && from.startsWith('/') && !from
 
 export function LoginPage() {
   const { loginMode } = useSession();
-  return loginMode === 'keycloak' ? <KeycloakLoginPage /> : <PasswordLoginPage />;
+  return loginMode === 'employee-auth' ? <EmployeeLoginPage /> : <PasswordLoginPage />;
 }
 
-/** Keycloak: 버튼 → Keycloak 로그인 화면(PKCE). 돌아오면 /login/callback 이 토큰을 받는다 */
-function KeycloakLoginPage() {
-  const { session, startKeycloakLogin } = useSession();
+/** employee-auth: 버튼 → 게이트웨이 로그인 시작(→ Keycloak 로그인 화면). 돌아오면 /auth/callback 이 티켓을 토큰으로 바꾼다 */
+function EmployeeLoginPage() {
+  const { session, startEmployeeLogin } = useSession();
   const [params] = useSearchParams();
   const from = safeFrom(params.get('from'));
   const [phase, setPhase] = useState<'idle' | 'starting' | 'failed'>('idle');
@@ -40,43 +40,43 @@ function KeycloakLoginPage() {
           disabled={phase === 'starting'}
           onClick={() => {
             setPhase('starting');
-            startKeycloakLogin(from).catch(() => setPhase('failed'));
+            startEmployeeLogin(from).catch(() => setPhase('failed'));
           }}
         >
-          {phase === 'starting' ? m.keycloak.starting : m.keycloak.start}
+          {phase === 'starting' ? m.employeeLogin.starting : m.employeeLogin.start}
         </button>
         {phase === 'failed' && (
           <p role="alert" className="alert alert-error text-sm">
-            {m.keycloak.errors.DISCOVERY_FAILED}
+            {m.employeeLogin.startFailed}
           </p>
         )}
-        <p className="text-xs opacity-70">{m.keycloak.note}</p>
+        <p className="text-xs opacity-70">{m.employeeLogin.note}</p>
       </div>
     </section>
   );
 }
 
-/** Keycloak 에서 돌아오는 곳(redirect_uri). code 를 토큰으로 바꾸고 원래 가려던 화면으로 */
-export function KeycloakCallbackPage() {
-  const { completeKeycloakLogin } = useSession();
+/** 로그인 뒤 돌아오는 곳(복귀 주소 ?ticket= 또는 ?error=). 티켓을 토큰으로 바꾸고 원래 가려던 화면으로 */
+export function LoginCallbackPage() {
+  const { completeEmployeeLogin } = useSession();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [error, setError] = useState<KeycloakErrorCode | null>(null);
+  const [error, setError] = useState<EmployeeLoginErrorCode | null>(null);
 
   useEffect(() => {
     let live = true;
-    completeKeycloakLogin(params)
+    completeEmployeeLogin(params)
       .then((from) => {
-        // 주소창에서 code·state 를 지운다(replace)
+        // 주소창에서 ticket 을 지운다(replace)
         if (live) void navigate(safeFrom(from), { replace: true });
       })
       .catch((e: unknown) => {
-        if (live) setError(e instanceof KeycloakLoginError ? e.code : 'NETWORK');
+        if (live) setError(e instanceof EmployeeLoginError ? e.code : 'NETWORK');
       });
     return () => {
       live = false;
     };
-  }, [completeKeycloakLogin, navigate, params]);
+  }, [completeEmployeeLogin, navigate, params]);
 
   return (
     <section className="mx-auto max-w-sm space-y-4 pt-10">
@@ -84,15 +84,15 @@ export function KeycloakCallbackPage() {
       <div className="space-y-3 rounded-box bg-base-100 p-6 shadow-sm">
         {error === null ? (
           <p role="status" className="text-sm opacity-70">
-            {m.keycloak.completing}
+            {m.employeeLogin.completing}
           </p>
         ) : (
           <>
             <p role="alert" className="alert alert-error text-sm">
-              {m.keycloak.errors[error]}
+              {m.employeeLogin.errors[error]}
             </p>
             <Link to="/login" replace className="btn btn-primary w-full">
-              {m.keycloak.retry}
+              {m.employeeLogin.retry}
             </Link>
           </>
         )}
@@ -101,7 +101,7 @@ export function KeycloakCallbackPage() {
   );
 }
 
-/** auth-service: 아이디·비밀번호(옮기는 동안 유지, 결정 D) */
+/** auth-service: 아이디·비밀번호(mock·local 빌드) */
 function PasswordLoginPage() {
   const { session, login } = useSession();
   const navigate = useNavigate();

@@ -75,24 +75,29 @@ export const messages = {
     unknownBody: '로그인 결과를 받지 못했어요. 잠시 뒤 다시 로그인해 주세요.',
   },
 
-  keycloak: {
-    start: 'Keycloak 으로 로그인',
-    note: '로그인은 직원 계정(Keycloak) 화면에서 해요. 백오피스는 비밀번호를 받지 않아요. 로그인은 로그인한 때부터 12시간 유지돼요.',
-    starting: 'Keycloak 로그인 화면으로 이동하는 중…',
+  employeeLogin: {
+    start: '직원 계정으로 로그인',
+    note: '로그인은 직원 계정(Keycloak) 화면에서 해요. 백오피스는 비밀번호를 받지 않아요. 로그인은 최대 12시간 유지돼요.',
+    starting: '로그인 화면으로 이동하는 중…',
+    startFailed: '로그인 화면으로 이동하지 못했어요. 잠시 뒤 다시 시도해 주세요.',
     completing: '로그인 정보를 받는 중…',
     retry: '다시 로그인',
     errors: {
-      DISCOVERY_FAILED: 'Keycloak 에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+      IDP_ERROR: '로그인을 마치지 않았어요(취소했거나 오류가 났어요). 다시 로그인해 주세요.',
+      IDP_REJECTED: '로그인 결과를 확인하지 못했어요. 다시 로그인하고, 계속되면 관리자에게 알려 주세요.',
+      IDP_UNAVAILABLE: '로그인 서버가 응답하지 않아요. 잠시 뒤 다시 시도해 주세요.',
+      EMPLOYEE_NOT_REGISTERED: '계정은 있지만 PMart 직원으로 등록되지 않았어요. 관리자에게 문의해 주세요.',
+      ACCOUNT_NOT_AVAILABLE: '정지되었거나 퇴사 처리된 계정이에요. 관리자에게 문의해 주세요.',
       NO_PENDING: '이 탭에서 시작한 로그인이 아니에요(오래된 주소이거나 다른 탭). 다시 로그인해 주세요.',
-      STATE_MISMATCH: '로그인 확인 값이 맞지 않아요. 다시 로그인해 주세요.',
-      PROVIDER_ERROR: 'Keycloak 이 로그인을 마치지 않았어요. 다시 로그인해 주세요.',
-      TOKEN_REJECTED: '로그인을 마치지 못했어요(시간이 지났을 수 있어요). 다시 로그인해 주세요.',
+      TICKET_INVALID: '로그인을 마치지 못했어요(시간이 지났을 수 있어요). 다시 로그인해 주세요.',
       NETWORK: '로그인 결과를 받지 못했어요. 다시 로그인해 주세요.',
+      UNKNOWN: '로그인을 마치지 못했어요. 다시 로그인해 주세요.',
     },
-    authTime: '로그인 시각',
+    app: '앱',
+    issuedAt: '로그인 시각',
     tokenExpiresAt: '토큰 만료',
-    passwordNote: '비밀번호는 Keycloak 계정 화면에서 바꿔요.',
-    accountConsole: 'Keycloak 계정 화면',
+    noRoles: '아직 권한이 없어요(권한 승인 대기). 업무 화면은 승인 뒤에 쓸 수 있어요.',
+    passwordNote: '비밀번호는 직원 계정(Keycloak)에서 관리해요. 백오피스에서는 바꿀 수 없어요.',
   },
 
   password: {
@@ -108,6 +113,7 @@ export const messages = {
 
   operators: {
     title: '운영자 계정',
+    movedNotice: '직원 계정과 권한은 이 화면에서 관리하지 않아요. 인사팀 화면이 준비되면 그곳에서 등록·관리해요.',
     adminOnly: 'OPERATOR_ADMIN 역할만 쓸 수 있어요.',
     loginId: '아이디',
     displayName: '표시 이름',

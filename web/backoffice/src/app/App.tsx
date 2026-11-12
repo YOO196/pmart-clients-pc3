@@ -20,7 +20,7 @@ import { NewProductDraftPage, ProductDraftPage } from '../features/products/Prod
 import { NewProductImportPage, ProductImportPage } from '../features/products/ProductImportPage';
 import { ProductListPage } from '../features/products/ProductListPage';
 import { OperatorAccountsPage } from '../features/operators/OperatorAccountsPage';
-import { KeycloakCallbackPage, LoginPage } from '../features/session/LoginPage';
+import { LoginCallbackPage, LoginPage } from '../features/session/LoginPage';
 import { SessionPage } from '../features/session/SessionPage';
 import { messages as m } from '../shared/messages';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
@@ -49,8 +49,26 @@ const nav: ReadonlyArray<readonly [string, string]> = [
 const defaultAssistantPort = (): AssistantPort =>
   import.meta.env.VITE_PMART_ENV === 'mock' ? createDraftAssistantMock({ delayMs: 400 }) : notConnectedAssistant;
 
+/**
+ * 운영자 계정 화면(auth-service 계정 API). employee-auth 로그인(lan)에서는 내린다 — 직원 역할·센터의 정본이
+ * employee-auth-service 이고 직원 등록은 인사팀 화면(hr-service, ADR-0056 5단계)으로 간다(handoff 2026-11-12 §4, 사용자 결정 2026-11-12).
+ */
+function OperatorsRoute() {
+  const { loginMode } = useSession();
+  if (loginMode !== 'employee-auth') return <OperatorAccountsPage />;
+  return (
+    <section className="max-w-2xl space-y-4">
+      <h1 className="text-xl font-bold">{m.operators.title}</h1>
+      <p role="note" className="alert alert-info text-sm">
+        {m.operators.movedNotice}
+      </p>
+    </section>
+  );
+}
+
 function Layout() {
-  const { session, displayName } = useSession();
+  const { session, displayName, loginMode } = useSession();
+  const items = loginMode === 'employee-auth' ? nav.filter(([to]) => to !== '/operators') : nav;
   return (
     <div className="flex min-h-screen bg-base-200">
       <aside className="w-52 shrink-0 bg-base-100 shadow-sm">
@@ -66,7 +84,7 @@ function Layout() {
               {session ? `${m.nav.session}: ${displayName ?? session.subject}` : m.nav.login}
             </NavLink>
           </li>
-          {nav.map(([to, label]) => (
+          {items.map(([to, label]) => (
             <li key={to}>
               <NavLink to={to} end>
                 {label}
@@ -86,15 +104,15 @@ const guarded = (element: ReactNode) => <RequireSession>{element}</RequireSessio
 
 const routes = [
   { path: '/login', element: <LoginPage /> },
-  // Keycloak redirect_uri(handoff 2026-11-11 §1 — Keycloak 에 등록된 출처 아래 경로)
-  { path: '/login/callback', element: <KeycloakCallbackPage /> },
+  // employee-auth 복귀 주소(handoff 2026-11-12 §3 — 백엔드 허용 목록의 <출처>/auth/callback)
+  { path: '/auth/callback', element: <LoginCallbackPage /> },
   {
     path: '/',
     element: <Layout />,
     children: [
       { index: true, element: <Navigate to="/approvals" replace /> },
       { path: 'session', element: guarded(<SessionPage />) },
-      { path: 'operators', element: guarded(<OperatorAccountsPage />) },
+      { path: 'operators', element: guarded(<OperatorsRoute />) },
       { path: 'approvals', element: guarded(<ApprovalListPage />) },
       { path: 'approvals/:approvalId', element: guarded(<ApprovalDetailPage />) },
       { path: 'views/approval-inbox', element: guarded(<ApprovalInboxPage />) },

@@ -2,14 +2,14 @@
 // 로그인 → 토큰 쌍, 401 → refresh 회전(pmartFetch), 갱신 거절 → 세션 종료.
 // 새로고침하면 보관한 refresh 로 한 번 갱신해 세션을 되살린다(그동안은 로그인 화면으로 보내지 않는다).
 // 화면에 보이는 역할·센터는 access token 클레임에서 읽는다(안내용. 판정은 서버).
-// 로그인 방식(LOGIN_MODE): auth-service(아이디·비밀번호) 또는 Keycloak(로그인 화면으로 이동, PKCE — handoff 2026-11-11).
+// 로그인 방식(LOGIN_MODE): auth-service(아이디·비밀번호, mock·local) 또는 employee-auth(게이트웨이 로그인 시작 → 티켓 교환, lan — handoff 2026-11-12).
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 
 import { loginOperator, logoutOperator, type OperatorAccount } from '../api/auth';
-import { refreshTokens, tokens } from '../api/client';
-import { beginKeycloakLogin, completeKeycloakLogin, keycloakLogoutUrl, LOGIN_MODE, type LoginMode } from '../api/keycloak';
-import { parseIdToken, parseOperatorToken, type OperatorSession } from '../api/session';
+import { API_BASE, refreshTokens, tokens } from '../api/client';
+import { beginEmployeeLogin, completeEmployeeLogin, LOGIN_MODE, logoutEmployee, type LoginMode } from '../api/employeeAuth';
+import { parseOperatorToken, type OperatorSession } from '../api/session';
 import { clearSavedSession, loadSavedSession, syncSavedSession } from '../api/sessionPersistence';
 import { messages as m } from '../shared/messages';
 import { useApi } from './ApiContext';
@@ -20,15 +20,13 @@ interface SessionValue {
   readonly restoring: boolean;
   /** 로그인 응답의 계정(표시 이름·비밀번호 변경 필요). 새로고침·테스트 토큰이면 null */
   readonly operator: OperatorAccount | null;
-  /** 표시 이름(auth-service 로그인 응답 또는 Keycloak ID 토큰 name). 모르면 null */
+  /** 표시 이름(auth-service 로그인 응답). employee-auth 는 이름을 주지 않아 null */
   readonly displayName: string | null;
-  /** Keycloak ID 토큰의 auth_time(초). 없으면 표시하지 않는다 */
-  readonly authTimeSeconds: number | null;
   readonly loginMode: LoginMode;
-  /** Keycloak 로그인 화면으로 이동한다(돌아올 앱 경로). .well-known 을 못 읽으면 던진다 */
-  readonly startKeycloakLogin: (from: string) => Promise<void>;
-  /** Keycloak 에서 돌아온 쿼리로 토큰을 받는다. 돌아갈 앱 경로 */
-  readonly completeKeycloakLogin: (params: URLSearchParams) => Promise<string>;
+  /** employee-auth 로그인 시작 주소로 이동한다(돌아올 앱 경로) */
+  readonly startEmployeeLogin: (from: string) => Promise<void>;
+  /** 복귀 주소의 쿼리(ticket 또는 error)로 토큰을 받는다. 돌아갈 앱 경로 */
+  readonly completeEmployeeLogin: (params: URLSearchParams) => Promise<string>;
   readonly login: (credentials: { loginId: string; password: string }) => Promise<OperatorAccount>;
   readonly logout: () => Promise<void>;
   /** 비밀번호를 바꾼 뒤 안내를 끈다 */
@@ -46,7 +44,6 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
     return fromToken(tokens.accessToken);
   });
   const [operator, setOperator] = useState<OperatorAccount | null>(null);
-  const [idInfo, setIdInfo] = useState(() => parseIdToken(tokens.idToken));
   // 새로고침 복원 대상(보관한 refresh). 첫 렌더에서 한 번 읽는다.
   const [saved] = useState(() => (!initialToken && tokens.accessToken === null ? loadSavedSession() : null));
   const [restoring, setRestoring] = useState(saved !== null);
@@ -57,7 +54,6 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
     () =>
       tokens.subscribe((access) => {
         setSession(fromToken(access));
-        setIdInfo(parseIdToken(tokens.idToken));
         if (access === null) setOperator(null);
         syncSavedSession(tokens);
       }),
@@ -91,34 +87,29 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
   );
 
   const logout = useCallback(async () => {
-    if (LOGIN_MODE !== 'keycloak') return logoutOperator(api, tokens);
-    // 탭의 토큰을 지우고 Keycloak 세션도 끝낸다(로그아웃 주소로 이동 → post_logout_redirect_uri /login 으로 돌아온다).
-    const url = await keycloakLogoutUrl(tokens);
-    if (url) globalThis.location.assign(url);
+    return LOGIN_MODE === 'employee-auth' ? logoutEmployee(api, tokens) : logoutOperator(api, tokens);
   }, [api]);
   const passwordChanged = useCallback(() => setOperator((o) => (o ? { ...o, passwordChangeRequired: false } : o)), []);
-  const startKeycloakLogin = useCallback(async (from: string) => {
-    globalThis.location.assign(await beginKeycloakLogin(from));
+  const startEmployeeLogin = useCallback(async (from: string) => {
+    globalThis.location.assign(await beginEmployeeLogin(API_BASE, from, tokens));
   }, []);
-  const completeKeycloak = useCallback((params: URLSearchParams) => completeKeycloakLogin(params, tokens), []);
+  const completeEmployee = useCallback((params: URLSearchParams) => completeEmployeeLogin(api, params, tokens), [api]);
 
-  const displayName = operator?.displayName ?? idInfo.name ?? null;
-  const authTimeSeconds = idInfo.authTimeSeconds ?? null;
+  const displayName = operator?.displayName ?? null;
   const value = useMemo(
     () => ({
       session,
       restoring,
       operator,
       displayName,
-      authTimeSeconds,
       loginMode: LOGIN_MODE,
-      startKeycloakLogin,
-      completeKeycloakLogin: completeKeycloak,
+      startEmployeeLogin,
+      completeEmployeeLogin: completeEmployee,
       login,
       logout,
       passwordChanged,
     }),
-    [session, restoring, operator, displayName, authTimeSeconds, startKeycloakLogin, completeKeycloak, login, logout, passwordChanged],
+    [session, restoring, operator, displayName, startEmployeeLogin, completeEmployee, login, logout, passwordChanged],
   );
   return <SessionContext value={value}>{children}</SessionContext>;
 }

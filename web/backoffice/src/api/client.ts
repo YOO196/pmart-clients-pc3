@@ -6,12 +6,13 @@ import type { paths as AuthPaths } from './generated/auth';
 import type { paths as BffPaths } from './generated/backoffice-bff';
 import type { paths as CdcInventoryPaths } from './generated/cdc-inventory';
 import type { paths as CenterPaths } from './generated/center-master';
+import type { paths as EmployeeAuthPaths } from './generated/employee-auth';
 import type { paths as MfcInventoryPaths } from './generated/mfc-inventory';
 import type { paths as PricingPaths } from './generated/pricing';
 import type { paths as ProductPaths } from './generated/product';
 import type { paths as ContentPaths } from './generated/product-content';
 import { SOURCE_SYSTEM } from './command';
-import { LOGIN_MODE, refreshKeycloakTokens } from './keycloak';
+import { LOGIN_MODE, refreshEmployeeTokens } from './employeeAuth';
 import { createPmartFetch, type PmartFetch } from './pmartFetch';
 import { TokenStore } from './tokens';
 
@@ -33,6 +34,7 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
   return {
     bff: createClient<BffPaths>({ ...options, baseUrl: `${baseUrl}/backoffice` }),
     auth: createClient<AuthPaths>(options),
+    employeeAuth: createClient<EmployeeAuthPaths>(options),
     approval: createClient<ApprovalPaths>(options),
     product: createClient<ProductPaths>(options),
     content: createClient<ContentPaths>(options),
@@ -54,7 +56,7 @@ export const api: Api = createApi(
   }),
 );
 
-/** 로그인 방식에 맞는 갱신(auth-service `POST /auth/tokens` 또는 Keycloak 토큰 주소). 새로고침 복원도 이것을 쓴다. */
+/** 로그인 방식에 맞는 갱신(auth-service `POST /auth/tokens` 또는 employee-auth `POST /employee-auth/tokens/refresh`). 새로고침 복원도 이것을 쓴다. */
 export function refreshTokens(target: Api, store: TokenStore): Promise<string | null> {
-  return LOGIN_MODE === 'keycloak' ? refreshKeycloakTokens(store) : refreshOperatorTokens(target, store);
+  return LOGIN_MODE === 'employee-auth' ? refreshEmployeeTokens(target, store) : refreshOperatorTokens(target, store);
 }

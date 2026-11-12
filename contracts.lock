@@ -90,9 +90,9 @@
     }
   },
   "web": {
-    "backendCommit": "6a955de1d71097ec15a2a8eab3a6aac831cda58b",
+    "backendCommit": "4942d1828c860947142d076803b243a2716ea98e",
     "backendContractsDirty": false,
-    "generatedAt": "2026-11-06T02:39:29.358Z",
+    "generatedAt": "2026-11-12T13:37:23.505Z",
     "generator": "openapi-typescript 7.13.0 (TS 5.9)",
     "services": [
       "_internal-dead-letters",
@@ -111,6 +111,7 @@
       "center-master-service",
       "claim-service",
       "cold-chain-service",
+      "customer-assistant-service",
       "customer-service",
       "delivery-capacity-service",
       "delivery-dispatch-service",
@@ -118,6 +119,7 @@
       "delivery-serviceability-service",
       "delivery-tracking-service",
       "demand-planning-service",
+      "employee-auth-service",
       "fleet-service",
       "fulfillment-routing-service",
       "mfc-capacity-service",
@@ -137,6 +139,7 @@
       "promotion-service",
       "replenishment-service",
       "review-service",
+      "rider-auth-service",
       "rider-service",
       "search-service",
       "storefront-service",

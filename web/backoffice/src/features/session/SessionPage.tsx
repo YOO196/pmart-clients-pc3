@@ -1,12 +1,11 @@
 // 내 세션: 토큰 클레임·서버 세션(GET /auth/sessions/current)·비밀번호 변경·로그아웃.
-// Keycloak 로그인이면(handoff 2026-11-11 §4) /auth/sessions/current 는 401 이라 부르지 않고 토큰 값만 보인다.
-// 비밀번호 변경도 auth-service API 라 Keycloak 계정 화면으로 안내한다.
+// employee-auth 로그인이면(handoff 2026-11-12 §3) 서버 세션은 GET /employee-auth/sessions/current 로 읽는다.
+// 비밀번호는 Keycloak 이 관리해 백오피스에서 바꾸지 않는다(백오피스는 Keycloak 주소를 갖지 않아 링크도 두지 않는다).
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
-import { KEYCLOAK } from '../../api/keycloak';
 import { request, requestNoContent } from '../../api/pmartFetch';
 import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
@@ -86,12 +85,17 @@ export function SessionPage() {
   const api = useApi();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const { session, operator, displayName, authTimeSeconds, loginMode, logout } = useSession();
-  const keycloak = loginMode === 'keycloak';
+  const { session, operator, displayName, loginMode, logout } = useSession();
+  const employee = loginMode === 'employee-auth';
   const current = useQuery({
     queryKey: ['auth', 'session', session?.subject],
-    enabled: session !== null && !keycloak,
+    enabled: session !== null && !employee,
     queryFn: () => request('GET', api.auth.GET('/auth/sessions/current', {})),
+  });
+  const employeeSession = useQuery({
+    queryKey: ['employee-auth', 'session', session?.subject],
+    enabled: session !== null && employee,
+    queryFn: () => request('GET', api.employeeAuth.GET('/employee-auth/sessions/current', {})),
   });
   const required = params.get('password') === 'required' || operator?.passwordChangeRequired === true;
 
@@ -116,17 +120,29 @@ export function SessionPage() {
                 <dt>{m.session.centers}</dt>
                 <dd>{session.centers.join(', ') || m.none}</dd>
               </dl>
-              {keycloak ? (
-                <dl className="grid grid-cols-[8rem_1fr] gap-1 text-sm">
-                  {authTimeSeconds !== null && (
-                    <>
-                      <dt>{m.keycloak.authTime}</dt>
-                      <dd>{formatSeoul(new Date(authTimeSeconds * 1000).toISOString())}</dd>
-                    </>
-                  )}
-                  <dt>{m.keycloak.tokenExpiresAt}</dt>
-                  <dd>{session.expiresAtSeconds ? formatSeoul(new Date(session.expiresAtSeconds * 1000).toISOString()) : m.none}</dd>
-                </dl>
+              {employee && session.roles.length === 0 && (
+                <p role="alert" className="alert alert-warning text-sm">
+                  {m.employeeLogin.noRoles}
+                </p>
+              )}
+              {employee ? (
+                <>
+                  <h2 className="mt-2 text-sm font-semibold">{m.session.current}</h2>
+                  <QueryState state={toUiState(employeeSession)} onRetry={() => void employeeSession.refetch()}>
+                    {(s) => (
+                      <dl className="grid grid-cols-[8rem_1fr] gap-1 text-sm">
+                        <dt>{m.session.sessionId}</dt>
+                        <dd>{s.sessionId}</dd>
+                        <dt>{m.employeeLogin.app}</dt>
+                        <dd>{s.app}</dd>
+                        <dt>{m.employeeLogin.issuedAt}</dt>
+                        <dd>{formatSeoul(s.issuedAt)}</dd>
+                        <dt>{m.employeeLogin.tokenExpiresAt}</dt>
+                        <dd>{formatSeoul(s.expiresAt)}</dd>
+                      </dl>
+                    )}
+                  </QueryState>
+                </>
               ) : (
                 <>
                   <h2 className="mt-2 text-sm font-semibold">{m.session.current}</h2>
@@ -155,13 +171,8 @@ export function SessionPage() {
               </button>
             </div>
           </div>
-          {keycloak ? (
-            <p className="rounded-box bg-base-100 p-4 text-sm">
-              {m.keycloak.passwordNote}{' '}
-              <a className="link" href={`${KEYCLOAK.issuer}/account`} target="_blank" rel="noreferrer">
-                {m.keycloak.accountConsole}
-              </a>
-            </p>
+          {employee ? (
+            <p className="rounded-box bg-base-100 p-4 text-sm">{m.employeeLogin.passwordNote}</p>
           ) : (
             <PasswordChange required={required} />
           )}

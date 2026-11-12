@@ -9,8 +9,6 @@ export interface TokenPairLike {
   readonly accessToken: string;
   readonly refreshToken: string;
   readonly accessTokenExpiresAt?: string;
-  /** Keycloak ID 토큰(표시 이름·로그아웃 힌트). auth-service 로그인에는 없다 */
-  readonly idToken?: string;
 }
 
 type Listener = (accessToken: string | null) => void;
@@ -18,7 +16,6 @@ type Listener = (accessToken: string | null) => void;
 export class TokenStore {
   private access: string | null = null;
   private refresh: string | null = null;
-  private id: string | null = null;
   private listeners = new Set<Listener>();
   private device: string = randomUuid();
 
@@ -33,6 +30,11 @@ export class TokenStore {
     this.device = deviceId;
   }
 
+  /** 로그인 복귀(employee-auth): 로그인을 시작할 때의 기기 ID 로 되돌린다(티켓 교환·갱신이 그 값에 묶인다). */
+  useDevice(deviceId: string): void {
+    this.device = deviceId;
+  }
+
   get accessToken(): string | null {
     return this.access;
   }
@@ -40,10 +42,7 @@ export class TokenStore {
   /** 테스트·목 세션용. refresh 없이 access 만 둔다. */
   set accessToken(value: string | null) {
     this.access = value;
-    if (value === null) {
-      this.refresh = null;
-      this.id = null;
-    }
+    if (value === null) this.refresh = null;
     this.emit();
   }
 
@@ -51,23 +50,16 @@ export class TokenStore {
     return this.refresh;
   }
 
-  /** Keycloak ID 토큰(메모리만. 새로고침 뒤에는 갱신 응답으로 다시 받는다) */
-  get idToken(): string | null {
-    return this.id;
-  }
-
   setPair(pair: TokenPairLike): void {
     this.access = pair.accessToken;
     this.refresh = pair.refreshToken;
-    this.id = pair.idToken ?? null;
     this.emit();
   }
 
   clear(): void {
-    if (this.access === null && this.refresh === null && this.id === null) return;
+    if (this.access === null && this.refresh === null) return;
     this.access = null;
     this.refresh = null;
-    this.id = null;
     this.emit();
   }
 

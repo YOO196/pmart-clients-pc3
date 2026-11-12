@@ -3,16 +3,11 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
 // mode: `mock`(MSW, 기본 개발) / `local`(게이트웨이 프록시, 로컬 백엔드 필요) / `lan`(.env.lan 의 게이트웨이 주소로 직접, CORS)
-//       / `lan-keycloak`(lan + 운영자 로그인을 Keycloak 으로).
-// 로그인 방식(ADR-0054 결정 D): 옮기는 동안 auth-service 와 Keycloak 을 빌드 모드로 고른다. 백엔드가 auth-service 의
-// OPERATOR 발급을 끄면(handoff 2026-11-11 §5-3) lan 도 keycloak 으로 바꾸고 auth-service 로그인 코드를 지운다.
-// Keycloak 주소·클라이언트 ID 는 비밀값이 아니다(공개 클라이언트, client secret 없음). PC5 IP 가 바뀌면 백엔드
-// deploy/lan/keycloak/pmart-staff-realm.json 의 redirect·웹 출처와 함께 고친다.
-const KEYCLOAK_ISSUER = 'http://192.168.0.101:8180/realms/pmart-staff';
-const KEYCLOAK_CLIENT_ID = 'pmart-backoffice';
+// 로그인 방식(ADR-0056, 백엔드 handoff 2026-11-12): lan 은 employee-auth-service(게이트웨이 로그인 시작 → Keycloak 화면 → 티켓 교환).
+// 백오피스는 Keycloak 주소·client_id 를 갖지 않는다(게이트웨이 주소만). mock·local 은 auth-service 아이디·비밀번호(목 계정으로 개발·시험).
 
 export default defineConfig(({ mode }) => {
-  const lan = mode === 'lan' || mode === 'lan-keycloak';
+  const lan = mode === 'lan';
   return {
     plugins: [react(), tailwindcss()],
     define: {
@@ -23,9 +18,7 @@ export default defineConfig(({ mode }) => {
       // 비밀값이 아니라 주소라 여기 둔다. pc4 IP(백엔드 deploy/lan/placement.conf)가 바뀌면
       // pmart-config api-gateway-lan.yml 의 pmart.gateway.cors.allowed-origins 와 함께 고친다.
       ...(lan ? { 'import.meta.env.VITE_PMART_API_BASE': JSON.stringify('http://192.168.0.40:8080/api/v1') } : {}),
-      'import.meta.env.VITE_PMART_LOGIN': JSON.stringify(mode === 'lan-keycloak' ? 'keycloak' : 'auth-service'),
-      'import.meta.env.VITE_PMART_KEYCLOAK_ISSUER': JSON.stringify(KEYCLOAK_ISSUER),
-      'import.meta.env.VITE_PMART_KEYCLOAK_CLIENT_ID': JSON.stringify(KEYCLOAK_CLIENT_ID),
+      'import.meta.env.VITE_PMART_LOGIN': JSON.stringify(lan ? 'employee-auth' : 'auth-service'),
     },
     server: {
       port: 5173,
