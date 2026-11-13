@@ -18,7 +18,7 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 
 | # | 동선 | BO | API | 1차 |
 |---|---|---|---|---|
-| 1 | 로그인·내 할 일 | BO-28 | 로그인 없음(BR-02), `GET /auth/sessions/current`, bff `/views/metrics`, `/views/case-inbox`, `/views/approval-inbox` | ✔ |
+| 1 | 로그인·내 할 일 | BO-28 | 로그인 employee-auth-service(ADR-0056), `GET /employee-auth/sessions/current`, bff `/views/metrics`, `/views/case-inbox`, `/views/approval-inbox` | ✔ |
 | 2 | 통합 조회·CS 접수 | BO-11 | bff `/views/unified-lookup`(q, kind), case `POST /cs-intakes` | ✔ |
 | 3 | 통합 승인함·상세·결정 | BO-10 | bff `/views/approval-inbox`, approval `/approvals/{id}`, `/decisions`(APPROVE/PARTIALLY_APPROVE/REJECT/REQUEST_EVIDENCE), `/re-reviews`, `/receipts` | ✔ |
 | 4 | 변경 요청 작성(상품·가격·전시·권역·센터) | BO-03~07 | approval `POST /change-requests`, `/submissions`, `/withdrawals`; 원천 조회 product/pricing/product-content/center-master | ✔ |
@@ -43,9 +43,8 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 
 | 메뉴 | 경로 | API |
 |---|---|---|
-| 로그인 | `/login` | auth `POST /auth/operator-logins`(Idempotency-Key 없음, `X-Device-Id`). 실패 `LOGIN_FAILED`·`ACCOUNT_LOCKED` |
-| 내 세션 | `/session` | `GET /auth/sessions/current`, `POST /auth/password-changes`(204), `POST /auth/logouts` |
-| 운영자 계정 | `/operators` | `GET`·`POST /operator-accounts`, `PUT …/{id}`(X-Expected-Version), `POST …/{id}/password-resets` — OPERATOR_ADMIN. 센터는 center-master `GET /centers` 목록에서 다중 선택(`CenterPicker`), 목록에 없는 기존 ID 는 "(목록에 없음)"으로 유지 |
+| 로그인 | `/login`, `/auth/callback` | employee-auth-service — 게이트웨이 `GET /employee-auth/logins`(브라우저 이동, Keycloak 화면) → 복귀 `?ticket=` → `POST /employee-auth/tokens`(`X-Device-Id`). 이 앱은 비밀번호를 받지 않는다. 목 모드는 목 계정 버튼(목 티켓). auth-service 운영자 로그인은 2026-11-13 없어짐 |
+| 내 세션 | `/session` | `GET /employee-auth/sessions/current`, `POST /employee-auth/logouts`(SSO). 비밀번호 변경 없음(Keycloak 이 관리) |
 | 승인함·상세 | `/approvals`, `/approvals/:id` | approval `GET /approvals`, `GET /approvals/{id}`, `POST …/decisions`(APPROVE·REJECT 만) |
 | 카테고리 트리 | `/categories` | product `GET /categories/tree`, `…/filters`, `POST /category-tree-versions`. 카테고리 추가는 `categories.json`(`POST /category-tree-additions`) 또는 seed-v1 zip(`POST /category-tree-addition-uploads`, multipart) — 결과·승인 흐름 동일(2026-11-03 회신) |
 | 상품 등록 | `/products/drafts/new`, `/products/drafts/:id` | `/product-drafts*` → 제출 준비 → 승인 요청. 대표 카테고리는 노출 목록에 자동 포함(화면은 "대표" 배지로 맨 앞, 전송은 `primaryCategoryId` + 나머지 `categoryIds` — 서버가 대표를 맨 앞에 합친다) |
@@ -58,10 +57,10 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 
 공통 흐름: 정본 "제출 준비" 응답의 `approvalRequest` → approval `POST /change-requests` → `…/submissions`(approvalId). 두 요청 키는 사용자 행위 키 하나에서 만든다(`{key}:cr`, `{key}:submit`). 판매중지·가격은 화면이 변경 요청 본문을 직접 만든다(handoff §4.3·§4.5).
 승인 뒤 정본 반영은 비동기라 승인 상세에서 1초 간격·최대 30회 폴링하고, 끝나지 않으면 "아직 확인되지 않음 + 다시 확인"으로 둔다.
-토큰(ADR-0018): access·refresh 모두 탭 메모리(새로고침 = 재로그인, localStorage 금지). 401 → pmartFetch single-flight 로 `POST /auth/tokens` 한 번(회전된 refresh 로 즉시 교체) → 원 요청 재전송. `TOKEN_INVALID`·`TOKEN_REUSED`·`SESSION_EXPIRED` 면 토큰을 지우고 로그인 화면(`/login?from=`). 갱신 결과 불명이면 같은 refresh 를 다시 보내지 않는다(재사용으로 세션이 끊김). `X-Device-Id` 는 탭마다 UUID(refresh 도 탭 메모리라 충분).
+토큰: access 는 탭 메모리, refresh 는 이 탭의 sessionStorage(새로고침 복원용 — BR-03 전 임시, localStorage 금지). 401 → pmartFetch single-flight 로 `POST /employee-auth/tokens/refresh` 한 번(회전된 refresh 로 즉시 교체) → 원 요청 재전송. 갱신이 거절되면(`TOKEN_INVALID`·`TOKEN_REUSED` 등) 토큰을 지우고 로그인 화면(`/login?from=`). 갱신 결과 불명이면 같은 refresh 를 다시 보내지 않는다(재사용으로 세션이 끊김). `X-Device-Id` 는 탭마다 UUID(로그인 시작·티켓 교환·갱신이 같은 값).
 
-직원 로그인(ADR-0056, 2026-11-12): `lan` 빌드는 employee-auth-service — `/login` 버튼 → 게이트웨이 `GET /employee-auth/logins`(브라우저 이동, Keycloak 화면) → `/auth/callback?ticket=` → `POST /employee-auth/tokens`. 갱신 `POST /employee-auth/tokens/refresh`, 로그아웃 `POST /employee-auth/logouts` → 200 `idpLogoutUri` 로 브라우저 이동(SSO — Keycloak 세션까지 끝내고 `/login` 으로 돌아옴, 2026-11-13). 백오피스는 Keycloak 주소를 갖지 않는다. `mock`·`local` 빌드는 auth-service 아이디·비밀번호 그대로(`src/api/employeeAuth.ts`, `vite.config.ts`).
-실행 모드: `dev`(목) / `dev:local`(Vite 프록시 → localhost:8080, 첫 관리자 admin / pmart-local) / `dev:lan`·`build:lan`(게이트웨이 `http://192.168.0.40:8080/api/v1` 직접, 브라우저는 `http://192.168.0.40` 으로 연다. 이름 `d603-16` 은 다른 PC 에서 IPv6 링크 로컬로 풀려 안 열림 — 2026-11-06).
+직원 로그인(ADR-0056, 2026-11-12 · 2026-11-13 모든 모드로): employee-auth-service 하나 — `/login` 버튼 → 게이트웨이 `GET /employee-auth/logins`(브라우저 이동, Keycloak 화면) → `/auth/callback?ticket=` → `POST /employee-auth/tokens`. 갱신 `POST /employee-auth/tokens/refresh`, 로그아웃 `POST /employee-auth/logouts` → 200 `idpLogoutUri` 로 브라우저 이동(SSO — Keycloak 세션까지 끝내고 `/login` 으로 돌아옴). 백오피스는 Keycloak 주소를 갖지 않는다. 목 모드에는 Keycloak 이 없어 로그인 화면의 목 계정 버튼이 `mock.<운영자 ID>` 티켓으로 복귀 주소를 연다(티켓 교환부터는 같은 코드 — 인사팀 백오피스와 같은 방식, `src/mocks/authHandlers.ts`). auth-service 의 운영자 로그인·비밀번호 변경·운영자 계정 API 는 백엔드가 2026-11-13 없앴고(`clients-notice-auth-operator-login-removed`), 이 앱의 그 코드(아이디·비밀번호 로그인, 운영자 계정 화면)도 같은 날 지웠다 — 직원 등록·권한은 인사팀 백오피스.
+실행 모드: `dev`(목) / `dev:local`(Vite 프록시 → localhost:8080 — 로컬에는 Keycloak 이 없어 화면 로그인은 안 된다, 직원 토큰은 백엔드 `dev-on-other-pcs.md` §1 의 dev-tokens) / `dev:lan`·`build:lan`(게이트웨이 `https://192.168.0.40:8443/api/v1` 직접, 브라우저는 `https://192.168.0.40` 으로 연다 — HTTP 80 은 2026-11-13 닫혀 HTTPS 로 넘어간다. 이름 `d603-16` 은 다른 PC 에서 IPv6 링크 로컬로 풀려 안 열림 — 2026-11-06). 빌드는 PC 4 에 직접 올리지 않고 백엔드가 `lan.sh publish-backoffice` 로 올린다.
 막힌 것: 이미지 인증(BR-25), 초안 목록(BR-26), 센터 목록(center-master 다음 작업 → 센터 ID 입력).
 
 ## 2-2. 업무 도우미 (정책·업무 절차 질의응답, 2026-11-04, BR-46 / 계약 1.1.0 반영 2026-11-06)

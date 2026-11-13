@@ -1,5 +1,6 @@
-// 직원 로그인 employee-auth-service(공통: @pmart/web-core employeeAuth) — 백오피스의 앱 이름·보관 키·로그인 방식.
+// 직원 로그인 employee-auth-service(공통: @pmart/web-core employeeAuth) — 백오피스의 앱 이름·보관 키.
 // ADR-0056, 백엔드 handoff 2026-11-12 clients-request-backoffice-employee-auth-login.
+// 로그인은 모든 모드에서 이것 하나다(auth-service 운영자 로그인은 2026-11-13 백엔드에서 없어졌다 — clients-notice-auth-operator-login-removed).
 import { createEmployeeAuth } from '@pmart/web-core';
 
 import { SOURCE_SYSTEM } from './command';
@@ -15,11 +16,6 @@ export {
   type EmployeeLogoutOutcome,
   type EmployeeSession,
 } from '@pmart/web-core';
-
-export type LoginMode = 'auth-service' | 'employee-auth';
-
-/** 빌드 때 고른 로그인 방식(vite.config.ts). lan = employee-auth, mock·local = auth-service(아이디·비밀번호). */
-export const LOGIN_MODE: LoginMode = import.meta.env.VITE_PMART_LOGIN === 'employee-auth' ? 'employee-auth' : 'auth-service';
 
 /** employee-auth 설정의 앱 이름(pmart.employee-auth.apps.backoffice) */
 export const EMPLOYEE_APP = 'backoffice';

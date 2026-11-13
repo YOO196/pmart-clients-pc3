@@ -66,6 +66,7 @@ export const messages = {
     FAILED: '실패',
     COMPENSATED: '실패(만든 것을 되돌림)',
   } satisfies Record<ProvisioningStep, string>,
+  grantNoEnd: '기한 없음',
   grantSubmission: {
     PENDING: '발급 전(아직 요청 안 함)',
     SUBMITTED: '승인 대기',

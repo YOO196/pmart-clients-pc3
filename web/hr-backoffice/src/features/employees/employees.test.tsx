@@ -284,6 +284,15 @@ describe('백엔드 회신 2026-11-13 반영', () => {
     expect(grant.getByText('AP-seed-3')).toBeInTheDocument();
   });
 
+  it('요청 권한 기간: 종료일이 없으면(정규직) "기한 없음", 있으면 그 날짜', async () => {
+    const regular = renderAt('/employees/OP-hr-1');
+    expect(await screen.findByText('2026-03-02 ~ 기한 없음')).toBeInTheDocument();
+    regular.unmount();
+    renderAt('/employees/OP-picker-1');
+    expect(await screen.findByText('2026-09-01 ~ 2027-02-28')).toBeInTheDocument();
+    expect(screen.queryByText(/기한 없음/)).not.toBeInTheDocument();
+  });
+
   it('퇴사도 그 사이 다른 변경이 있으면 409 VERSION_CONFLICT — 퇴사 처리되지 않는다', async () => {
     renderAt('/employees/OP-picker-1');
     await screen.findByRole('heading', { name: /이피킹/ });

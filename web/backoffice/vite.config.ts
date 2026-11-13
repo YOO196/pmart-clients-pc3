@@ -3,8 +3,8 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
 // mode: `mock`(MSW, 기본 개발) / `local`(게이트웨이 프록시, 로컬 백엔드 필요) / `lan`(.env.lan 의 게이트웨이 주소로 직접, CORS)
-// 로그인 방식(ADR-0056, 백엔드 handoff 2026-11-12): lan 은 employee-auth-service(게이트웨이 로그인 시작 → Keycloak 화면 → 티켓 교환).
-// 백오피스는 Keycloak 주소·client_id 를 갖지 않는다(게이트웨이 주소만). mock·local 은 auth-service 아이디·비밀번호(목 계정으로 개발·시험).
+// 로그인(ADR-0056, 백엔드 handoff 2026-11-12): 모든 모드에서 employee-auth-service(게이트웨이 로그인 시작 → Keycloak 화면 → 티켓 교환).
+// 백오피스는 Keycloak 주소·client_id 를 갖지 않는다(게이트웨이 주소만). mock 은 Keycloak 이 없어 로그인 화면의 목 계정 버튼이 목 티켓으로 복귀 주소를 연다.
 
 export default defineConfig(({ mode }) => {
   const lan = mode === 'lan';
@@ -19,7 +19,6 @@ export default defineConfig(({ mode }) => {
       // 비밀값이 아니라 주소라 여기 둔다. pc4 IP(백엔드 deploy/lan/placement.conf)가 바뀌면
       // pmart-config api-gateway-lan.yml 의 pmart.gateway.cors.allowed-origins 와 함께 고친다.
       ...(lan ? { 'import.meta.env.VITE_PMART_API_BASE': JSON.stringify('https://192.168.0.40:8443/api/v1') } : {}),
-      'import.meta.env.VITE_PMART_LOGIN': JSON.stringify(lan ? 'employee-auth' : 'auth-service'),
     },
     server: {
       port: 5173,

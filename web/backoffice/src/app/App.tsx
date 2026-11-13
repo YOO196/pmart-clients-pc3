@@ -20,13 +20,11 @@ import { ProductDetailPage } from '../features/products/ProductDetailPage';
 import { NewProductDraftPage, ProductDraftPage } from '../features/products/ProductDraftPage';
 import { NewProductImportPage, ProductImportPage } from '../features/products/ProductImportPage';
 import { ProductListPage } from '../features/products/ProductListPage';
-import { OperatorAccountsPage } from '../features/operators/OperatorAccountsPage';
 import { LoginCallbackPage, LoginPage } from '../features/session/LoginPage';
 import { SessionPage } from '../features/session/SessionPage';
+import { env } from '../env';
 import { messages as m } from '../shared/messages';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
-
-const isMock = import.meta.env.VITE_PMART_ENV !== 'local';
 
 // 백엔드 handoff 2026-10-30 §5 메뉴 순서
 const nav: ReadonlyArray<readonly [string, string]> = [
@@ -41,7 +39,6 @@ const nav: ReadonlyArray<readonly [string, string]> = [
   ['/prices/import', m.nav.priceImport],
   ['/handlings', m.nav.handlings],
   ['/views/approval-inbox', m.nav.bffInbox],
-  ['/operators', m.nav.operators],
   // 메뉴는 모두에게 보인다. 업무 도우미 권한은 서버가 판정한다(403·FORBIDDEN_SCOPE).
   ['/assistant', m.nav.assistant],
 ];
@@ -50,26 +47,8 @@ const nav: ReadonlyArray<readonly [string, string]> = [
 const defaultAssistantPort = (): AssistantPort =>
   import.meta.env.VITE_PMART_ENV === 'mock' ? createDraftAssistantMock({ delayMs: 400 }) : notConnectedAssistant;
 
-/**
- * 운영자 계정 화면(auth-service 계정 API). employee-auth 로그인(lan)에서는 내린다 — 직원 역할·센터의 정본이
- * employee-auth-service 이고 직원 등록은 인사팀 화면(hr-service, ADR-0056 5단계)으로 간다(handoff 2026-11-12 §4, 사용자 결정 2026-11-12).
- */
-function OperatorsRoute() {
-  const { loginMode } = useSession();
-  if (loginMode !== 'employee-auth') return <OperatorAccountsPage />;
-  return (
-    <section className="max-w-2xl space-y-4">
-      <h1 className="text-xl font-bold">{m.operators.title}</h1>
-      <p role="note" className="alert alert-info text-sm">
-        {m.operators.movedNotice}
-      </p>
-    </section>
-  );
-}
-
 function Layout() {
-  const { session, displayName, loginMode } = useSession();
-  const items = loginMode === 'employee-auth' ? nav.filter(([to]) => to !== '/operators') : nav;
+  const { session } = useSession();
   return (
     <div className="flex min-h-screen bg-base-200">
       <aside className="w-52 shrink-0 bg-base-100 shadow-sm">
@@ -77,15 +56,15 @@ function Layout() {
           <Link to="/" className="text-lg font-bold" aria-label={m.goHome}>
             {m.appTitle}
           </Link>
-          {isMock && <span className="badge badge-outline ml-2">{m.mockBadge}</span>}
+          {env.isMock && <span className="badge badge-outline ml-2">{m.mockBadge}</span>}
         </div>
         <ul className="menu w-full">
           <li>
             <NavLink to={session ? '/session' : '/login'}>
-              {session ? `${m.nav.session}: ${displayName ?? session.subject}` : m.nav.login}
+              {session ? `${m.nav.session}: ${session.subject}` : m.nav.login}
             </NavLink>
           </li>
-          {items.map(([to, label]) => (
+          {nav.map(([to, label]) => (
             <li key={to}>
               <NavLink to={to} end>
                 {label}
@@ -105,7 +84,7 @@ const guarded = (element: ReactNode) => <RequireSession>{element}</RequireSessio
 
 const routes = [
   { path: '/login', element: <LoginPage /> },
-  // employee-auth 복귀 주소(handoff 2026-11-12 §3 — 백엔드 허용 목록의 <출처>/auth/callback)
+  // 직원 로그인 복귀 주소(handoff 2026-11-12 §3 — 백엔드 허용 목록의 <출처>/auth/callback)
   { path: '/auth/callback', element: <LoginCallbackPage /> },
   {
     path: '/',
@@ -113,7 +92,6 @@ const routes = [
     children: [
       { index: true, element: <Navigate to="/approvals" replace /> },
       { path: 'session', element: guarded(<SessionPage />) },
-      { path: 'operators', element: guarded(<OperatorsRoute />) },
       { path: 'approvals', element: guarded(<ApprovalListPage />) },
       { path: 'approvals/:approvalId', element: guarded(<ApprovalDetailPage />) },
       { path: 'views/approval-inbox', element: guarded(<ApprovalInboxPage />) },

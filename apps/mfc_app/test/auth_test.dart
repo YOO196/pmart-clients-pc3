@@ -238,7 +238,7 @@ void main() {
       expect(req.headers['Idempotency-Key'], isNotEmpty);
     });
 
-    test('401 이면 세션 종료(null) — 정지·퇴사는 이유를 따로 남긴다. 네트워크 오류는 세션 종료가 아니다', () async {
+    test('401 이면 세션 종료(null) — 갱신 거절은 "만료"로 남긴다(정지·퇴사도 TOKEN_INVALID 로 온다). 네트워크 오류는 세션 종료가 아니다', () async {
       Future<(AuthTokens?, SessionEnd?)> run(FakeReply reply) async {
         final ended = SessionEndRecorder();
         final refresh = employeeAuthRefresher(
@@ -253,8 +253,81 @@ void main() {
 
       expect(await run(const FakeReply.problem(401, {'code': 'SESSION_EXPIRED', 'status': 401})), (null, SessionEnd.expired));
       expect(await run(const FakeReply.problem(401, {'code': 'TOKEN_REUSED', 'status': 401})), (null, SessionEnd.expired));
+      expect(await run(const FakeReply.problem(401, {'code': 'TOKEN_INVALID', 'status': 401})), (null, SessionEnd.expired));
+      // 지금 백엔드는 갱신에 이 code 를 주지 않는다(바꾸면 그대로 "이용할 수 없는 계정").
       expect(await run(const FakeReply.problem(401, {'code': 'ACCOUNT_NOT_AVAILABLE', 'status': 401})), (null, SessionEnd.accountBlocked));
       await expectLater(run(const FakeReply.transport(DioExceptionType.connectionTimeout)), throwsA(isA<PmartFailure>()));
+    });
+
+    test('정지·퇴사: 업무 요청 401 SUBJECT_BLOCKED → 갱신은 TOKEN_INVALID 로 거절 → 이유는 "이용할 수 없는 계정"', () async {
+      final ended = SessionEndRecorder();
+      final store = MemoryKeyValueStore();
+      final tokens = TokenStore(store);
+      await tokens.save(AuthTokens(accessToken: _access, refreshToken: 'rt-1'));
+      final adapter = FakeAdapter((o, _) async => o.path.endsWith('/employee-auth/tokens/refresh')
+          ? const FakeReply.problem(401, {'code': 'TOKEN_INVALID', 'status': 401})
+          : const FakeReply.problem(401, {'code': 'SUBJECT_BLOCKED', 'status': 401}));
+      SessionEnd? told;
+      final dio = watchSubjectBlocked(
+        createPmartDio(
+          baseUrl: _base,
+          sourceSystem: sourceSystem,
+          tokens: tokens,
+          deviceId: DeviceIdProvider(store),
+          refresher: employeeAuthRefresher(
+            baseUrl: _base,
+            sourceSystem: sourceSystem,
+            deviceId: DeviceIdProvider(store),
+            ended: ended,
+            adapter: adapter,
+          ),
+          // 세션 종료 알림을 받는 순간의 이유(컨트롤러가 이때 읽는다)
+          onSessionExpired: () => told = ended.take(),
+          adapter: adapter,
+          delay: (_) async {},
+        ),
+        ended,
+      );
+
+      await expectLater(dio.get<dynamic>('/work'), throwsA(isA<DioException>()));
+
+      expect(told, SessionEnd.accountBlocked);
+      expect(tokens.accessToken, isNull);
+      expect(await tokens.readRefreshToken(), isNull);
+    });
+
+    test('무활동 만료: 업무 요청 401(다른 code) → 갱신 거절 → 이유는 "만료"', () async {
+      final ended = SessionEndRecorder();
+      final store = MemoryKeyValueStore();
+      final tokens = TokenStore(store);
+      await tokens.save(AuthTokens(accessToken: _access, refreshToken: 'rt-1'));
+      final adapter = FakeAdapter((o, _) async => o.path.endsWith('/employee-auth/tokens/refresh')
+          ? const FakeReply.problem(401, {'code': 'TOKEN_INVALID', 'status': 401})
+          : const FakeReply.problem(401, {'code': 'TOKEN_EXPIRED', 'status': 401}));
+      SessionEnd? told;
+      final dio = watchSubjectBlocked(
+        createPmartDio(
+          baseUrl: _base,
+          sourceSystem: sourceSystem,
+          tokens: tokens,
+          deviceId: DeviceIdProvider(store),
+          refresher: employeeAuthRefresher(
+            baseUrl: _base,
+            sourceSystem: sourceSystem,
+            deviceId: DeviceIdProvider(store),
+            ended: ended,
+            adapter: adapter,
+          ),
+          onSessionExpired: () => told = ended.take(),
+          adapter: adapter,
+          delay: (_) async {},
+        ),
+        ended,
+      );
+
+      await expectLater(dio.get<dynamic>('/work'), throwsA(isA<DioException>()));
+
+      expect(told, SessionEnd.expired);
     });
 
     test('업무 요청 401 → 갱신 거절 → 토큰 삭제·세션 종료 알림(동시 요청도 갱신은 한 번)', () async {

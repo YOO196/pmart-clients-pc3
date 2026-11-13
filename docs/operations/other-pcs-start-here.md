@@ -21,15 +21,15 @@ PC 1 이 아닌 PC(사람·Claude)가 이 저장소(`pmart-clients`)를 다룰 �
 
 ## 2. PC 별로 더
 
-클라이언트 쪽에서 확정된 담당은 **PC 1 = customer-app 위주**, **PC 2 = backoffice(로그인 마무리 뒤 시작)** 둘이다(`pc-split.md` §1). PC 3·4·5 는 클라이언트 앱 영역을 맡는다고 정해진 것이 없다 — 아래는 그 PC 의 백엔드 영역과 **맞닿는 클라이언트 문서**(화면 쪽 사정을 알아야 할 때 읽는다).
+클라이언트 담당(사용자 확정 2026-11-13, `pc-split.md` §1): **PC 1 = customer-app 위주**, **PC 2 = backoffice(로그인 마무리 뒤 시작)**, **PC 3 = mfc-app**, **PC 5 = rider-app**. PC 4(rag)는 클라이언트 앱 영역이 없다.
 
 | PC(백엔드 영역) | 클라이언트 앱 영역 | 파일 |
 |---|---|---|
-| **PC 1**(platform) | customer-app 위주 + 다른 PC 가 맡기 전의 전부 | `pmart-clients/docs/apps/customer-app.md`, 레퍼런스 캡처 `pmart-clients/docs/customer-app-design/`(git 제외 — PC 1 에만 있다), 메모 대신 이 문서들 |
+| **PC 1**(platform) | customer-app 위주 + PC 2 가 시작하기 전의 backoffice·hr-backoffice·web-common | `pmart-clients/docs/apps/customer-app.md`, 레퍼런스 캡처 `pmart-clients/docs/customer-app-design/`(git 제외 — PC 1 에만 있다) |
 | **PC 2**(backoffice, 로그인 마무리 뒤) | backoffice·hr-backoffice·web-common(web-common 을 옮길지는 시작할 때 정한다) | `pmart-clients/docs/apps/backoffice-web.md`, `pmart-clients/docs/apps/hr-backoffice-web.md`, `pmart-clients/docs/adr/0003-hr-backoffice-and-web-shared-packages.md`(웹 공통 패키지 구조), `pmart-clients/.claude/rules/react-web.md`. 인수인계 문서는 아직 없다 — 영역을 나눌 때 `pmart-clients/docs/operations/backoffice-handover.md` 를 만든다(백엔드는 `docs/backoffice/HANDOVER.md`) |
-| **PC 3**(mfc) | 미정(관련: mfc-app) | `pmart-clients/docs/apps/mfc-app.md`, `pmart-clients/.claude/rules/flutter.md` |
-| **PC 4**(rag, 시작 전) | 미정(관련: 백오피스 질문 화면, 고객 앱 채팅 — 화면 아직 없음) | `pmart-clients/docs/apps/backoffice-web.md`, `pmart-clients/docs/apps/customer-app.md` |
-| **PC 5**(delivery) | 미정(관련: rider-app) | `pmart-clients/docs/apps/rider-app.md`, `pmart-clients/.claude/rules/flutter.md` |
+| **PC 3**(mfc) | **mfc-app** | `pmart-clients/docs/apps/mfc-app.md`, `pmart-clients/.claude/rules/flutter.md`·`api-integration.md`, 지난 일지 `pmart-clients/docs/worklog/2026-11-13.md` 의 "mfc_app 직원 로그인" 절, 아래 §2-2 mfc-app 줄의 handoff. 이어받을 일: 정지 안내를 `SUBJECT_BLOCKED` 기준으로, 실기기 로그인 확인 |
+| **PC 4**(rag, 시작 전) | 없음(관련: 백오피스 질문 화면, 고객 앱 채팅 — 화면 아직 없음) | 화면 사정을 알아야 할 때만 `pmart-clients/docs/apps/backoffice-web.md`, `pmart-clients/docs/apps/customer-app.md` |
+| **PC 5**(delivery) | **rider-app** | `pmart-clients/docs/apps/rider-app.md`, `pmart-clients/.claude/rules/flutter.md`·`api-integration.md`, 아래 §2-2 rider-app 줄의 handoff |
 
 ### 2-1. 지난 작업 일지
 

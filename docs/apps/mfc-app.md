@@ -106,7 +106,7 @@
 
 | 메뉴 | API | 비고 |
 |---|---|---|
-| 로그인(직원 계정) | employee-auth-service `app=mfc`(Custom Tab → `pmart-mfc://login` → 티켓 교환, 무활동 30분·SSO 없음) | 구현(2026-11-13, `lib/features/auth`) — 실기기 확인 전. `docs/handoff/2026-11-13-backend-mfc-app-employee-login-reply.md` |
+| 로그인(직원 계정) | employee-auth-service `app=mfc`(Custom Tab → `pmart-mfc://login` → 티켓 교환, 무활동 30분·SSO 없음) | 구현(2026-11-13, `lib/features/auth`) — 실기기 확인 전. 정지·퇴사 안내("이용할 수 없는 계정")는 업무 요청의 401 `SUBJECT_BLOCKED` 로 고른다(갱신은 `TOKEN_INVALID` 로 와서 구별되지 않는다 — 백엔드 회신 `clients-reply-mfc-app-login-and-https-build` §1-2). `docs/handoff/2026-11-13-backend-mfc-app-employee-login-reply.md` |
 | 내 작업 | `GET /tasks?mfcId=&assignee=me&type=&state=`, `GET /tasks/{taskId}` | BR-05 AGREED(`e817184`). 기본 state에 BLOCKED 없음 → 막힌 작업은 `state=BLOCKED` 로 따로 조회 |
 | 작업 시작 | `POST /tasks/{taskId}/starts`, `GET …/starts/{requestId}` | BR-05. 처리는 §3-1 |
 | 피킹 | `POST /tasks/{taskId}/executions`, `GET …/executions/{executionId}`, `GET /barcodes/{barcode}` | 지시 행은 `GET /tasks/{taskId}` 의 `lines[]` |
@@ -131,7 +131,7 @@
 - 재고 반영 상태: `CAPTURED → SUBMITTED → PROCESSING → APPLIED | REJECTED | UNKNOWN_RESULT`. 확정 전엔 "확정 대기". `UNKNOWN_RESULT` 일 때 **물리 작업을 다시 하지 말라**고 안내.
 
 ### 3-1. 작업 시작 처리 (`POST /tasks/{taskId}/starts`, 계약 `c609a4d`)
-근거: `../pmart-backend/docs/handoff/2026-10-24-clients-reply-br05-start-503.md`. 판정 순서는 담당 조회 → 판정 기록 → 응답이다.
+근거: `../pmart-backend/docs/handoff/clients/archive/2026-10-24-clients-reply-br05-start-503.md`. 판정 순서는 담당 조회 → 판정 기록 → 응답이다.
 
 | 상황 | 의미 | 앱 동작 |
 |---|---|---|

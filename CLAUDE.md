@@ -12,7 +12,7 @@ Flutter 앱은 **Android 만** 개발한다. iOS 는 중단(`ios/` 는 두되 �
 | `apps/rider_app` | Flutter (Android) | 라이더 | 1단계 | `docs/apps/rider-app.md` |
 | `apps/mfc_app` | Flutter (Android PDA 우선) | MFC 점원(피킹·패킹·인계·입고·실사) | 1단계 | `docs/apps/mfc-app.md` |
 | `web/backoffice` | React SPA (Vite + TS) | 본사·센터 운영자 | 1단계 | `docs/apps/backoffice-web.md` |
-| `web/hr-backoffice` | React SPA (Vite + TS) | 인사팀(`HR_ADMIN`) — 직원 등록·계정 발급·정지/퇴사 | 목 서버 구현(백엔드 배포 대기) | `docs/apps/hr-backoffice-web.md` |
+| `web/hr-backoffice` | React SPA (Vite + TS) | 인사팀(`HR_ADMIN`) — 직원 등록·계정 발급·정지/퇴사 | 구현·LAN 배포(`https://192.168.0.40:8444`, 2026-11-13) | `docs/apps/hr-backoffice-web.md` |
 | (예약) `apps/driver_app` | Flutter | 간선기사(TMS) | 2단계 | `docs/apps/driver-app.md` |
 
 ## 구조

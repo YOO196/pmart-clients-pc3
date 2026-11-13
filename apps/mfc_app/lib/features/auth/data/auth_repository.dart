@@ -30,11 +30,16 @@ const employeeApp = 'mfc';
 const loginCallbackScheme = 'pmart-mfc';
 const loginReturnUri = '$loginCallbackScheme://login';
 
-/// 갱신이 거절된 이유를 로그인 화면이 안내할 수 있게 잠깐 들고 있는다.
+/// 세션이 끝난 이유를 로그인 화면이 안내할 수 있게 잠깐 들고 있는다.
 final class SessionEndRecorder {
   SessionEnd? _last;
 
-  void record(SessionEnd end) => _last = end;
+  /// 정지·퇴사([SessionEnd.accountBlocked])는 뒤에 오는 "만료"로 덮지 않는다 —
+  /// 업무 요청이 `SUBJECT_BLOCKED` 로 막힌 뒤 갱신은 `TOKEN_INVALID`(만료와 같은 code)로 거절되기 때문이다.
+  void record(SessionEnd end) {
+    if (_last == SessionEnd.accountBlocked) return;
+    _last = end;
+  }
 
   /// 읽으면 비운다.
   SessionEnd? take() {
@@ -49,11 +54,42 @@ String? _problemCode(DioException e) {
   return data is Map && data['code'] is String ? data['code'] as String : null;
 }
 
+/// 업무 요청이 401 `SUBJECT_BLOCKED` 로 막히면 "이용할 수 없는 계정"으로 기록한다.
+///
+/// 백엔드 회신 2026-11-13(mfc-app-login-and-https-build §1-2): 정지·퇴사된 직원의 access token 은 게이트웨이가
+/// 바로 401 `SUBJECT_BLOCKED` 로 막고, 그 뒤 갱신은 401 `TOKEN_INVALID`(만료와 같은 code)로 거절된다 —
+/// 그래서 갱신 응답이 아니라 **막힌 업무 요청**에서 이유를 읽는다.
+/// 같은 code 가 로그아웃한 세션의 토큰에도 나오지만, 앱은 로그아웃할 때 토큰을 지워 그 뒤로 요청하지 않는다.
+///
+/// 인증 인터셉터(갱신 → 세션 종료 알림)보다 **먼저** 돌아야 한다 → [watchSubjectBlocked] 가 맨 앞에 넣는다.
+final class SubjectBlockedInterceptor extends Interceptor {
+  SubjectBlockedInterceptor(this.ended);
+
+  final SessionEndRecorder ended;
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (err.response?.statusCode == 401 &&
+        _problemCode(err) == 'SUBJECT_BLOCKED') {
+      ended.record(SessionEnd.accountBlocked);
+    }
+    handler.next(err);
+  }
+}
+
+/// 업무용 Dio 의 인터셉터 맨 앞에 [SubjectBlockedInterceptor] 를 넣는다.
+Dio watchSubjectBlocked(Dio dio, SessionEndRecorder ended) {
+  dio.interceptors.insert(0, SubjectBlockedInterceptor(ended));
+  return dio;
+}
+
 /// `POST /employee-auth/tokens/refresh` 로 토큰을 회전한다(refresh token 은 한 번만 쓴다).
 ///
 /// 인증 인터셉터를 거치지 않는 별도 Dio 를 쓴다(갱신 요청이 다시 갱신을 부르지 않게).
 /// 동시 갱신은 [PmartAuthInterceptor] 가 한 번으로 모은다.
 /// 401 이면 세션이 끝난 것이므로 null — 무활동 30분·최대 12시간·재사용 감지·정지/퇴사.
+/// 정지·퇴사도 여기서는 `TOKEN_INVALID` 로 온다(세션이 이미 끝났다) — 그 구별은 [SubjectBlockedInterceptor] 가 한다.
+/// `ACCOUNT_NOT_AVAILABLE` 분기는 백엔드가 갱신 응답을 그렇게 바꿀 때를 위해 둔다(지금은 오지 않는다).
 TokenRefresher employeeAuthRefresher({
   required String baseUrl,
   required String sourceSystem,

@@ -55,15 +55,19 @@ final tokenRefresherProvider = Provider<TokenRefresher>(
 ///
 /// 401 이면 인터셉터가 한 번 갱신한다(동시 요청도 한 번으로). 갱신이 거절되면(무활동 30분·최대 12시간·정지/퇴사)
 /// 토큰을 지우고 세션 컨트롤러에 알린다 → 로그인 화면.
+/// 그 401 이 `SUBJECT_BLOCKED`(정지·퇴사 즉시 차단)였으면 "이용할 수 없는 계정"으로 안내한다.
 final dioProvider = Provider<Dio>(
-  (ref) => createPmartDio(
-    baseUrl: ref.watch(apiBaseUrlProvider),
-    sourceSystem: sourceSystem,
-    tokens: ref.watch(tokenStoreProvider),
-    deviceId: ref.watch(deviceIdProvider),
-    refresher: ref.watch(tokenRefresherProvider),
-    onSessionExpired: () =>
-        ref.read(authControllerProvider.notifier).sessionExpired(),
-    log: kDebugMode ? debugPrint : null,
+  (ref) => watchSubjectBlocked(
+    createPmartDio(
+      baseUrl: ref.watch(apiBaseUrlProvider),
+      sourceSystem: sourceSystem,
+      tokens: ref.watch(tokenStoreProvider),
+      deviceId: ref.watch(deviceIdProvider),
+      refresher: ref.watch(tokenRefresherProvider),
+      onSessionExpired: () =>
+          ref.read(authControllerProvider.notifier).sessionExpired(),
+      log: kDebugMode ? debugPrint : null,
+    ),
+    ref.watch(sessionEndRecorderProvider),
   ),
 );

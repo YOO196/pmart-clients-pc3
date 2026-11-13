@@ -2,7 +2,7 @@
 
 근거: 백엔드 handoff `2026-11-13-clients-request-hr-backoffice.md`(사용자 결정 2026-11-13 — 별도 앱·SSO), 백엔드 ADR-0056(결정 5·7·8·10), 계약 `hr-service.yaml` 0.1.0·`employee-auth-service.yaml`·`center-master-service.yaml`(`GET /centers`), 흐름 `docs/business/flows/employee-account-provisioning.md`(백엔드). 클라이언트 결정은 ADR-0003.
 
-상태(2026-11-13): 목 서버로 구현·검증 → **LAN 배포(`http://192.168.0.40:8081`)·실서버 확인 23/23**(`docs/handoff/2026-11-13-backend-hr-backoffice-lan-deployed.md`). 사람 손 확인은 아직.
+상태(2026-11-13): 목 서버로 구현·검증 → LAN 배포·실서버 확인 23/23(`docs/handoff/2026-11-13-backend-hr-backoffice-lan-deployed.md`) → **HTTPS 로 옮김(`https://192.168.0.40:8444`, 옛 `http://…:8081` 은 HTTPS 로 넘어간다)**. HTTPS 주소에서의 브라우저 확인과 사람 손 확인은 아직. 요청 권한 기간은 종료일이 없으면 "기한 없음"(정규직 — 백엔드 회신 `clients-reply-hr-backoffice-deployed`).
 
 ## 1. 원칙
 - 사용자는 인사팀(`HR_ADMIN`). 역할이 없으면 서버가 403 → "이용할 수 없는 화면". 화면은 토큰 클레임으로 "인사 권한이 없습니다" 안내만 하고 막지 않는다(판정은 서버). 본인 조회(`/hr/employees/me`)만 모든 직원.
@@ -15,7 +15,7 @@
 |---|---|
 | 로그인 | employee-auth-service, 백오피스와 같은 흐름·같은 코드(`@pmart/web-core` `createEmployeeAuth`). 앱 이름 `hr-backoffice` |
 | SSO | 백오피스에 로그인돼 있으면 비밀번호 없이 들어온다. 로그아웃(`idpLogoutUri`)은 두 앱의 Keycloak 세션을 같이 끝낸다 |
-| 주소 | 개발 `http://localhost:5174`, LAN `http://192.168.0.40:8081`(복귀 `…/auth/callback`) |
+| 주소 | 개발 `http://localhost:5174`, LAN `https://192.168.0.40:8444`(복귀 `…/auth/callback`, API `https://192.168.0.40:8443/api/v1`). 빌드는 백엔드가 `lan.sh publish-hr-backoffice` 로 올린다 |
 | `X-Source-System` | `hr-backoffice-web` |
 | 보관 | access token 메모리, refresh token·기기 ID 는 탭 sessionStorage(`pmart.hr-backoffice.session`) |
 | 빌드 모드 | `mock`(MSW, 목 계정 버튼 — Keycloak 없음, 티켓 교환부터는 실제 코드) / `local`(게이트웨이 프록시) / `lan` |

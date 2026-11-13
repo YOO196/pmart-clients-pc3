@@ -15,7 +15,6 @@ import type {
   ProductDraft,
   SkuHandling,
 } from '../api/models';
-import type { OperatorAccount } from '../api/auth';
 import { mockAccounts } from './operators';
 
 export interface StoredImage {
@@ -23,10 +22,10 @@ export interface StoredImage {
   readonly contentType: string;
 }
 
-export interface MockAccount {
-  account: OperatorAccount;
-  password: string;
-  failures: number;
+/** 직원 권한의 효력은 employee-auth-service 가 정본이다 — 목 로그인이 토큰에 싣는 값 */
+export interface MockGrant {
+  readonly roles: readonly string[];
+  readonly centers: readonly string[];
 }
 
 export interface MockSession {
@@ -39,12 +38,11 @@ export interface MockSession {
   readonly used: Set<string>;
   revoked: boolean;
   readonly issuedAt: string;
-  readonly expiresAt: string;
 }
 
 export interface MockDb {
   seq: number;
-  accounts: Map<string, MockAccount>;
+  grants: Map<string, MockGrant>;
   sessions: Map<string, MockSession>;
   tree: { version: number; effectiveFrom: string; nodes: CategoryNode[]; filters: Record<string, FilterGroup[]> } | null;
   treeVersions: Map<number, CategoryTreeVersion & { nodes: CategoryNode[] }>;
@@ -199,33 +197,9 @@ export function createDb(): MockDb {
     receipts: [],
   });
 
-  const accounts = new Map<string, MockAccount>(
-    mockAccounts.map((a) => [
-      a.operatorId,
-      {
-        password: a.password,
-        failures: 0,
-        account: {
-          operatorId: a.operatorId,
-          loginId: a.loginId,
-          displayName: a.displayName,
-          roles: [...a.roles],
-          centers: [...a.centers],
-          state: 'ACTIVE',
-          locked: false,
-          lockedUntil: null,
-          passwordChangeRequired: false,
-          lastLoginAt: null,
-          version: 0,
-          createdAt: '2026-10-30T00:00:00Z',
-        },
-      },
-    ]),
-  );
-
   return {
     seq: 100,
-    accounts,
+    grants: new Map<string, MockGrant>(mockAccounts.map((a) => [a.operatorId, { roles: [...a.roles], centers: [...a.centers] }])),
     sessions: new Map(),
     tree: {
       version: 1,

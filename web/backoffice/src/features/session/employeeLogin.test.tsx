@@ -1,8 +1,9 @@
-// 직원 로그인 employee-auth(LOGIN_MODE=employee-auth, 빌드 모드 lan) — 백엔드 handoff 2026-11-12, 계약 employee-auth-service.yaml.
+// 직원 로그인 employee-auth(실서버 모드 — 게이트웨이 로그인 시작·티켓 교환·갱신·SSO 로그아웃) — 백엔드 handoff 2026-11-12, 계약 employee-auth-service.yaml.
+// 목 계정 버튼 로그인은 mockLogin.test.tsx.
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { API_BASE, createApi, SOURCE_SYSTEM } from '../../api/client';
 import {
@@ -21,13 +22,17 @@ import { mockOperatorToken } from '@pmart/web-core';
 import { sha256Fallback } from '@pmart/web-core';
 import { TokenStore } from '@pmart/web-core';
 import { App } from '../../app/App';
+import { env } from '../../env';
 import { problem } from '../../mocks/support';
 import { server } from '../../test/server';
 
-vi.mock('../../api/employeeAuth', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../api/employeeAuth')>()),
-  LOGIN_MODE: 'employee-auth',
-}));
+// 이 파일은 실서버 모드의 로그인 화면(목 계정 버튼 없음)을 본다.
+beforeEach(() => {
+  env.isMock = false;
+});
+afterEach(() => {
+  env.isMock = true;
+});
 
 const ORIGIN = 'http://192.168.0.40';
 const IDP_LOGOUT = 'https://192.168.0.40:8443/iam/realms/pmart-staff/protocol/openid-connect/logout?id_token_hint=HINT&post_logout_redirect_uri=http%3A%2F%2F192.168.0.40%2Flogin';
@@ -296,7 +301,6 @@ describe('화면', () => {
 
     expect(exchanged).toHaveLength(1);
     expect(exchanged[0]!.body['ticket']).toBe('TICKET-UI');
-    expect(paths.some((p) => p.endsWith('/auth/sessions/current') && !p.includes('employee-auth'))).toBe(false);
   });
 
   it('역할이 비어 있으면 권한 승인 대기 안내', async () => {
@@ -317,17 +321,16 @@ describe('화면', () => {
   });
 });
 
-describe('운영자 계정 화면(employee-auth 로그인에서는 내림)', () => {
-  it('메뉴에 없고, 주소로 들어가도 안내만 — 계정 API 를 부르지 않는다', async () => {
+describe('운영자 계정 화면(없앰 — 직원 등록·권한은 인사팀 백오피스)', () => {
+  it('메뉴에 없고, 계정 API 를 부르지 않는다', async () => {
     const paths: string[] = [];
     const listener = ({ request }: { request: Request }) => void paths.push(new URL(request.url).pathname);
     server.events.on('request:start', listener);
-    render(<App memory initialPath="/operators" initialToken={access(['OPERATOR_ADMIN'])} />);
-    expect(await screen.findByRole('note')).toHaveTextContent('이 화면에서 관리하지 않아요');
+    render(<App memory initialPath="/approvals" initialToken={access(['OPERATOR_ADMIN'])} />);
+    expect(await screen.findByRole('link', { name: '승인함' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '운영자 계정' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '승인함' })).toBeInTheDocument();
     server.events.removeListener('request:start', listener);
-    expect(paths.some((p) => p.includes('/operator-accounts'))).toBe(false);
+    expect(paths.some((p) => p.includes('/operator-accounts') || p.includes('/auth/operator-logins'))).toBe(false);
   });
 });
 
