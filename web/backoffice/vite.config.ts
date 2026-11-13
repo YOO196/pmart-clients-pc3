@@ -13,11 +13,12 @@ export default defineConfig(({ mode }) => {
     define: {
       // mock·test 모드만 MSW. 그 외(local, production 빌드)는 실제 API 경로를 쓴다(배포 환경은 [결정 필요]).
       'import.meta.env.VITE_PMART_ENV': JSON.stringify(mode === 'mock' || mode === 'test' ? 'mock' : 'local'),
-      // lan: 게이트웨이가 다른 출처(PC4). 브라우저는 http://192.168.0.40 으로 연다(CORS 허용 출처: 192.168.0.40·d603-16).
+      // lan: 게이트웨이가 다른 출처(PC4). 브라우저는 https://192.168.0.40 으로 연다(백엔드 handoff 2026-11-13 backoffice-https-csp-logout).
+      // 화면이 HTTPS 라 API 도 HTTPS 게이트웨이(8443)여야 한다 — http://…:8080 은 혼합 콘텐츠로 막힌다.
       // 이름(d603-16)은 다른 PC 에서 IPv6 링크 로컬로 먼저 풀려 응답이 없어 IP 를 쓴다(2026-11-06 백엔드 요청).
       // 비밀값이 아니라 주소라 여기 둔다. pc4 IP(백엔드 deploy/lan/placement.conf)가 바뀌면
       // pmart-config api-gateway-lan.yml 의 pmart.gateway.cors.allowed-origins 와 함께 고친다.
-      ...(lan ? { 'import.meta.env.VITE_PMART_API_BASE': JSON.stringify('http://192.168.0.40:8080/api/v1') } : {}),
+      ...(lan ? { 'import.meta.env.VITE_PMART_API_BASE': JSON.stringify('https://192.168.0.40:8443/api/v1') } : {}),
       'import.meta.env.VITE_PMART_LOGIN': JSON.stringify(lan ? 'employee-auth' : 'auth-service'),
     },
     server: {
