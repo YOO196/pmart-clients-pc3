@@ -45,16 +45,16 @@ PC 1 이 아닌 PC(사람·Claude)가 이 저장소(`pmart-clients`)를 다룰 �
 ### 2-2. handoff — 앱 영역별 관련 파일
 
 - 백엔드가 보낸 것: `pmart-backend/docs/handoff/clients/`(남은 것만 — 처리 끝난 것은 그 아래 `archive/`, 기준·목록 `archive/README.md`). 2026-11-14 부터는 파일 이름의 `<받는 앱 영역>` 으로 고른다(`*-<자기 앱 영역>-*`, `*-all-*`).
-- 클라이언트가 보낸 것: `pmart-clients/docs/handoff/`, 상태표 `pmart-clients/docs/backend-requests.md`(BR 번호).
+- 클라이언트가 보낸 것: `pmart-clients/docs/handoff/<앱 영역>/`·`all/`(열린 것), `archive/`(끝난 것 — 2026-11-13 까지의 문서 35개). 규칙·열린 문서 목록 `pmart-clients/docs/handoff/README.md`. 상태표 `pmart-clients/docs/backend-requests.md`(BR 번호). 아래 표의 클라이언트 칸 파일은 따로 적지 않았으면 `archive/` 에 있다.
 
 | 앱 영역 | 백엔드가 보낸 것(`pmart-backend/docs/handoff/clients/`) | 클라이언트가 보낸 것(`pmart-clients/docs/handoff/`) |
 |---|---|---|
 | backoffice | `2026-11-13-clients-notice-auth-operator-login-removed.md`(옛 운영자 로그인 코드 삭제 — **아직 안 함**), `2026-11-13-clients-notice-backoffice-https-csp-logout.md`(HTTPS 주소·CSP 규칙·로그아웃 즉시 차단), `2026-11-13-all-reply-https-builds-published-http-closed.md`(HTTPS 빌드 올림 — 브라우저 확인 **아직 안 함**), `2026-11-12-clients-request-backoffice-employee-auth-login.md`, `2026-11-12-clients-request-backoffice-sso-logout.md`, `2026-11-09-clients-request-backoffice-role-menus.md`, `2026-11-09-clients-request-customer-inquiry-page.md` | `2026-11-12-backend-backoffice-employee-auth-login-reply.md`, `2026-11-13-backend-backoffice-sso-logout-deployed.md`, `2026-11-13-backend-web-https-lan-builds.md` |
 | hr-backoffice | `2026-11-13-clients-request-hr-backoffice.md`, `2026-11-13-clients-reply-hr-backoffice-questions.md`, `2026-11-13-clients-reply-hr-backoffice-deployed.md`(권한 기간 "기한 없음" 표시 — **아직 안 함**), `2026-11-13-hr-backoffice-notice-webmail-separate.md` | `2026-11-13-backend-hr-backoffice-contract-questions.md`, `2026-11-13-backend-hr-backoffice-lan-deployed.md` |
-| mfc-app | `2026-11-13-clients-request-mfc-app-employee-login.md`, `2026-11-13-clients-reply-mfc-app-login-and-https-build.md`(정지 안내는 `SUBJECT_BLOCKED` 기준 — **아직 안 함**, PDA 용 CA 위치, 실기기 확인 대기), 2026-11-07~09 의 `…-mfc-…`·`…-shelf-life-…`·`…-pda-…`·`…-plan-…` 파일들 | `2026-11-13-backend-mfc-app-employee-login-reply.md`, `2026-11-10-backend-dispatch-manual-only.md`, `2026-11-10-backend-pda-work-areas.md` |
+| mfc-app | `2026-11-13-clients-request-mfc-app-employee-login.md`, `2026-11-13-clients-reply-mfc-app-login-and-https-build.md`(정지 안내는 `SUBJECT_BLOCKED` 기준 — **아직 안 함**, PDA 용 CA 위치, 실기기 확인 대기), 2026-11-07~09 의 `…-mfc-…`·`…-shelf-life-…`·`…-pda-…`·`…-plan-…` 파일들 | `2026-11-13-backend-mfc-app-employee-login-reply.md`, `2026-11-10-backend-dispatch-manual-only.md`(BR-51 — 회신 `2026-11-13-mfc-app-reply-dispatch-manual-only.md`), **`mfc-app/2026-11-10-backend-pda-work-areas.md`(열림 — BR-52·53)** |
 | rider-app | `2026-11-10-clients-notice-rider-google-login.md` | 아직 없음 |
 | customer-app | `2026-10-31-clients-notice-delivery-and-order-draft.md`, `2026-11-09-clients-request-customer-chat-assistant.md`(채팅 — 화면 아직 없음) | `docs/backend-requests.md` 의 고객앱 BR 항목 |
-| 전체(all) | `2026-11-13-clients-notice-dev-on-other-pcs.md`, `2026-11-13-all-notice-area-split.md`, `2026-11-13-all-notice-area-plan-rag-backoffice.md`, `2026-11-13-all-notice-area-pcs-decided.md`(backoffice = PC 2, rag = PC 4), `2026-11-13-all-notice-handoff-archive.md` | `2026-11-13-backend-area-split-reply.md` |
+| 전체(all) | `2026-11-13-clients-notice-dev-on-other-pcs.md`, `2026-11-13-all-notice-area-split.md`, `2026-11-13-all-notice-area-plan-rag-backoffice.md`, `2026-11-13-all-notice-area-pcs-decided.md`(backoffice = PC 2, rag = PC 4), `2026-11-13-all-notice-handoff-archive.md` | `2026-11-13-backend-area-split-reply.md`, `2026-11-13-backend-client-area-pcs-decided.md`, **`all/2026-11-13-backend-client-todo-done.md`(열림 — 새 웹 빌드)**, **`all/2026-11-13-backend-handoff-folders.md`(열림 — 폴더 구조 제안)** |
 
 "아직 안 함" 은 2026-11-13 기준이다. 지금 상태는 `pmart-backend/docs/operations/other-pcs-todo.md` 의 클라이언트 절과 최근 일지에서 확인한다.
 
@@ -63,7 +63,7 @@ PC 1 이 아닌 PC(사람·Claude)가 이 저장소(`pmart-clients`)를 다룰 �
 | 파일·폴더 | 언제 |
 |---|---|
 | `pmart-clients/docs/backend-requests.md` | 계약에 없는 API·필드가 필요할 때(추측해 만들지 않는다) — BR 상태표. 다른 PC 는 직접 고치지 않고 일지·PR 설명에 적는다(`pc-split.md` §6) |
-| `pmart-clients/docs/handoff/` | 백엔드에 요청·질문·회신을 보낼 때 — `YYYY-MM-DD-<앱 영역>-backend-<주제>.md`, 첫머리 `보낸 앱`·`받는 백엔드 영역`(`pc-split.md` §5) |
+| `pmart-clients/docs/handoff/<앱 영역>/`(여러 앱이면 `all/`) | 백엔드에 요청·질문·회신을 보낼 때 — `YYYY-MM-DD-backend-<주제>.md`, 첫머리 `보낸 앱`·`받는 백엔드 영역`. 끝나면 `archive/` 로(`docs/handoff/README.md`, `pc-split.md` §5) |
 | `pmart-backend/contracts/openapi/*.yaml`, `_common.yaml` | REST 계약 정본 — 모델·경로를 확인할 때(읽기만) |
 | `pmart-backend/contracts/states/*.md` | 상태표(주문·배송 등 상태 이름과 전이) |
 | `pmart-backend/platform-services/api-gateway/src/main/resources/application.yml` | 게이트웨이 라우팅·공개 경로 |

@@ -106,7 +106,7 @@
 
 | 메뉴 | API | 비고 |
 |---|---|---|
-| 로그인(직원 계정) | employee-auth-service `app=mfc`(Custom Tab → `pmart-mfc://login` → 티켓 교환, 무활동 30분·SSO 없음) | 구현(2026-11-13, `lib/features/auth`) — 실기기 확인 전. 정지·퇴사 안내("이용할 수 없는 계정")는 업무 요청의 401 `SUBJECT_BLOCKED` 로 고른다(갱신은 `TOKEN_INVALID` 로 와서 구별되지 않는다 — 백엔드 회신 `clients-reply-mfc-app-login-and-https-build` §1-2). `docs/handoff/2026-11-13-backend-mfc-app-employee-login-reply.md` |
+| 로그인(직원 계정) | employee-auth-service `app=mfc`(Custom Tab → `pmart-mfc://login` → 티켓 교환, 무활동 30분·SSO 없음) | 구현(2026-11-13, `lib/features/auth`) — 실기기 확인 전. 정지·퇴사 안내("이용할 수 없는 계정")는 업무 요청의 401 `SUBJECT_BLOCKED` 로 고른다(갱신은 `TOKEN_INVALID` 로 와서 구별되지 않는다 — 백엔드 회신 `clients-reply-mfc-app-login-and-https-build` §1-2). `docs/handoff/archive/2026-11-13-backend-mfc-app-employee-login-reply.md` |
 | 내 작업 | `GET /tasks?mfcId=&assignee=me&type=&state=`, `GET /tasks/{taskId}` | BR-05 AGREED(`e817184`). 기본 state에 BLOCKED 없음 → 막힌 작업은 `state=BLOCKED` 로 따로 조회 |
 | 작업 시작 | `POST /tasks/{taskId}/starts`, `GET …/starts/{requestId}` | BR-05. 처리는 §3-1 |
 | 피킹 | `POST /tasks/{taskId}/executions`, `GET …/executions/{executionId}`, `GET /barcodes/{barcode}` | 지시 행은 `GET /tasks/{taskId}` 의 `lines[]` |

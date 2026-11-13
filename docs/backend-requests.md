@@ -22,10 +22,10 @@
 | BR-12 | 낮음 | 고객 | 고객 노출 문구용 상태 코드(FUL_*, CXL_* 등) 와 계약 enum 대응 확정 | OPEN |
 | BR-13 | 중간 | 고객 | 배송 방식별 현재 가능 여부·불가 사유·예상시간·배달팁 조회 없음 | **RESOLVED**(2026-10-30, 백엔드 1203209): `GET /delivery-options`. 고객앱 배송 선택에 반영(LAN 배포 확인 전) |
 | BR-14 | 중간 | 고객 | 견적에 최소주문 부족액·첫 구매 무료 4가지 상태 없음 | **RESOLVED**(2026-10-30, 1203209): Quote `minOrderShortfall`·`firstPurchaseBenefit`, 최소주문 미달은 초안 `blockers`. 고객앱 반영 |
-| BR-15 | 중간 | 고객 | 반품·교환 자격(품목별 가능 여부·기한·사유) 조회와 사유별 증빙 요건 없음 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
-| BR-16 | 중간 | 고객 | 고객 배송 문의 접수(지연·오배송·파손·누락·미수령) 경로 없음 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
-| BR-17 | 낮음 | 고객 | 현금영수증 신청·발급 가능 여부·발급 결과 조회 없음 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
-| BR-18 | 낮음 | 고객 | 주문서 이탈 시 초안 처리(명시적 취소 경로 여부) 확인 | SENT 준비(`docs/handoff/2026-10-24-backend-customer-gaps.md`) |
+| BR-15 | 중간 | 고객 | 반품·교환 자격(품목별 가능 여부·기한·사유) 조회와 사유별 증빙 요건 없음 | SENT 준비(`docs/handoff/archive/2026-10-24-backend-customer-gaps.md`) |
+| BR-16 | 중간 | 고객 | 고객 배송 문의 접수(지연·오배송·파손·누락·미수령) 경로 없음 | SENT 준비(`docs/handoff/archive/2026-10-24-backend-customer-gaps.md`) |
+| BR-17 | 낮음 | 고객 | 현금영수증 신청·발급 가능 여부·발급 결과 조회 없음 | SENT 준비(`docs/handoff/archive/2026-10-24-backend-customer-gaps.md`) |
+| BR-18 | 낮음 | 고객 | 주문서 이탈 시 초안 처리(명시적 취소 경로 여부) 확인 | SENT 준비(`docs/handoff/archive/2026-10-24-backend-customer-gaps.md`) |
 | BR-19 | 낮음 | 고객 | 상품 카드·상세의 100g/100mL당 가격 표시 값 없음 | OPEN |
 | BR-20 | 중간 | 고객 | 필수 동의 대기(AUTH_CONSENT)에서 토큰 없이 동의 변경을 호출할 경로·`requiredConsents` 형식 불명 | OPEN |
 | BR-21 | 낮음 | 고객 | `OrderDraft` 응답에 품목·배송 방식·도착 구간·주소 반영 내용이 없음, 품절 처리 "다음에도 적용" 저장 경로 없음 | **부분 해소**(2026-10-30, 1203209): 초안 `lines`·`delivery`·`blockers`. 품절 처리 "다음에도 적용" 저장 경로는 아직 없음 |
@@ -34,16 +34,16 @@
 | BR-24 | 높음 | 라이더 | 라이더가 볼 전달지(주소·상세·출입 안내·요청사항·연락)를 주는 계약 경로가 없음 | OPEN |
 | BR-25 | 중간 | 관리자 웹 | 인증이 필요한 상품 이미지(`GET /content-images/{imageId}`)를 `<img>` 로 표시할 방식 미정 | OPEN(백엔드 인지, handoff 2026-10-30 §0-3) |
 | BR-26 | 낮음 | 관리자 웹 | 상품·콘텐츠 초안 목록 조회 API 없음(ID 를 알아야만 다시 열 수 있음) | OPEN |
-| BR-27 | 낮음 | 고객 | 이용 불가 계정 오류: 계약 422 `ACCOUNT_NOT_PURCHASABLE` vs 안내 403 `ACCOUNT_NOT_AVAILABLE` | SENT 준비(`docs/handoff/2026-10-30-backend-customer-google-login.md`) |
+| BR-27 | 낮음 | 고객 | 이용 불가 계정 오류: 계약 422 `ACCOUNT_NOT_PURCHASABLE` vs 안내 403 `ACCOUNT_NOT_AVAILABLE` | SENT 준비(`docs/handoff/archive/2026-10-30-backend-customer-google-login.md`) |
 | BR-28 | 높음 | 고객 | 비회원 둘러보기: `/categories/tree`·`/product-contents/**`·`/prices/**` 가 공개 경로가 아니고 비회원 장바구니 식별 방법 없음 | **RESOLVED**(2026-10-30): 둘러보기 공개(백엔드 `clients-notice-public-browse-and-test-data`), 비회원 장바구니 = 게스트 토큰(ADR-0022, `clients-notice-cart-and-guest-token`). 고객앱 비회원 토큰 반영됨 |
 | BR-29 | 높음 | 고객 | 주소 좌표(`AddressInput.geo`)의 출처: 앱에 주소 검색(좌표 제공)이 없어 회원 주소 판정이 늘 UNKNOWN | **RESOLVED**(2026-10-31): 우편번호 검색 + 서버 좌표 변환(BR-30) + 카카오 지도 핀. 판정은 서버가 도로명으로(핀은 배달 위치 참고) |
 | BR-30 | 높음 | 고객 | 주소 → 좌표 변환 API(카카오 로컬, REST 키는 서버). 지도 핀 조정 전 시작 좌표 | **RESOLVED**(2026-10-31, 백엔드 회신 `clients-reply-address-geocoding`, ADR-0023). 고객앱 주소 검색·지도 핀 반영 |
 | BR-31 | 중간 | 백오피스 | 상품 목록 `GET /products` 에 검색어(상품명·ID) 파라미터가 없음. 콘텐츠 등록의 상품 고르기가 불러온 쪽 안에서만 찾는다 | OPEN |
-| BR-32 | 높음 | 고객 | 휴대폰 번호 저장(`POST /me/profile-changes`)이 501. 배송지 받는 분·연락처 자동 채움에 쓸 본인 연락처(가리지 않은 값)·기본 수령정보가 없음 | OPEN(요청 `docs/handoff/2026-10-31-backend-customer-profile-and-refunds.md`) |
+| BR-32 | 높음 | 고객 | 휴대폰 번호 저장(`POST /me/profile-changes`)이 501. 배송지 받는 분·연락처 자동 채움에 쓸 본인 연락처(가리지 않은 값)·기본 수령정보가 없음 | OPEN(요청 `docs/handoff/archive/2026-10-31-backend-customer-profile-and-refunds.md`) |
 | BR-33 | 중간 | 고객 | 내 취소·반품·환불 목록 경로가 없음(클레임 단건 환불 조회만) | OPEN(같은 요청서 §3) |
 | BR-34 | 높음 | 고객 | 주문서형 결제위젯: 결제 진입 전에 토스 clientKey(·customerKey)를 받을 경로가 없음(지금은 PAY 이후에만) | **RESOLVED**(2026-11-02, 백엔드 회신 `clients-reply-br34-payment-widget-config`·`clients-notice-toss-customer-key`): `GET /payment-widget-config` → {provider, clientKey, customerKey=accountId}. 고객앱 주문서형 결제위젯 반영 |
 | BR-35 | 높음 | 고객 | 주문·초안 품목 `productName`(주문 당시 사본)이 비어 와서 주문 내역에 SKU 가 보임 | **RESOLVED**(회신 `../pmart-backend/docs/handoff/clients/archive/2026-11-02-clients-reply-br35-product-name-snapshot.md`, 초안·주문 `productName`·`optionLabel` 사본). 고객앱 반영 2026-11-02(주문 상세·취소 화면 품목 제목, 이름 없으면 sku) |
-| BR-36 | 중간 | 고객 | 상품 상세 `SaleOption.price` 가 항상 null(계약은 "pricing 사본"). 상세에 가격이 안 보임 | OPEN(요청 `docs/handoff/2026-11-02-backend-product-detail-price.md`). 앱은 `GET /prices?skus=` 로 채워 표시 중 |
+| BR-36 | 중간 | 고객 | 상품 상세 `SaleOption.price` 가 항상 null(계약은 "pricing 사본"). 상세에 가격이 안 보임 | OPEN(요청 `docs/handoff/archive/2026-11-02-backend-product-detail-price.md`). 앱은 `GET /prices?skus=` 로 채워 표시 중 |
 | BR-37 | 중간 | 고객 | 주문이 참조하는 고객 데이터(주소·수령인·연락처)의 주문 시점 불변성 보장 방식과 "주문 당시 배송지" 고객용 조회 경로 | **RESOLVED**(2026-11-02, 백엔드 회신 `clients-reply-br37-order-shipping-snapshot`): 초안 생성 때 사본 고정 → `DraftDelivery.shippingAddress`·`Order.shippingAddress`. `contact.phoneRef` deprecated. 결제 진입 때 계정 재확인(422 `ACCOUNT_NOT_PURCHASABLE`). 고객앱 반영 |
 | BR-38 | 중간 | 백오피스 | 상품 일괄 등록 배치의 `validCount`·`invalidCount` 가 업로드 때 값으로 고정돼 행을 고친 뒤(`PUT /product-drafts/{id}`) 맞지 않음. 유효 0 → 화면이 제출 버튼을 잠갔음 | **RESOLVED**(2026-11-03 회신 `clients-reply-br39-category-zip` §4): 서버가 조회 때 행 기준으로 셈(수정 18:54, LAN 배포 대기). 백오피스 행 기준 집계는 그대로 둠 |
 | BR-39 | 중간 | 백오피스 | 이미 등록(APPLIED)된 seed 상품 ID 를 다시 올리면 새 초안이 생겨 바코드 없는 상품은 중복 등록될 수 있음. 업로드 검증에 "이미 상품 X 로 등록됨" 검사 요청 | **RESOLVED**(2026-11-03 회신 §1·2): 승인해도 중복 등록 아님(기존 상품의 새 버전, SKU 유지). 초안 `registration` NEW/UPDATE·`existingProductId`·`existingSkus` 추가 → 백오피스 구분 열·안내·승인 상세 반영(19:20) |
@@ -56,11 +56,11 @@
 | BR-46 | 중간 | 백오피스 | 업무 도우미(정책 RAG): ai-assistant-service 계약이 3단계 초안 — 절·문서 버전·확정/제안/미결정 구분·문서 열람·GET 출처·질문 목록·응답 유실 복구·진행 상태·장애/권한 구분·게이트웨이 라우트 없음 | **대부분 해소**(계약 1.1.0, 회신 `../pmart-backend/docs/handoff/clients/archive/2026-11-04-clients-reply-br44-br48.md` §BR-46): 질문 목록 `GET /assistant/question-history` 추가, 원문 열람 API 없음(`citations[].excerpt` 전문), 상태 확인은 응답 코드(503·422)로. 남음: **LAN 배포 보류**(사용자 결정, ADR-0036). 백오피스는 계약 1.1.0 에 맞춘 목 화면(2026-11-06), 실서버는 배포 뒤 연결 |
 | BR-47 | 높음 | 고객 | 상품 검색 `mfcId` 지정 시 LAN 센터의 전 상품이 미취급(carried=false)으로 빠짐 — `total` 은 뺀 상품 포함("1개"인데 빈 목록), 빈 페이지에 `nextCursor`, 미취급 숨김/구분 정책 확인 | **RESOLVED**(2026-11-04 회신 `../pmart-backend/docs/handoff/clients/archive/2026-11-04-clients-reply-br44-br48.md`): MFC-SEED-01 은 데이터 문제(275 SKU 취급 ON), `total` 의미 계약 명시, 빈 페이지는 서버가 채움(그래도 `nextCursor` 있으면 계속). 정책: 업무 문서는 구분 표시이나 사용자 결정은 미취급 숨김(2026-11-05, BR-49 와 같은 판단) — 고객앱은 기본값(false) 유지 |
 | BR-48 | 중간 | 백오피스 | 카테고리 추가(`/category-tree-additions`·`-uploads`)에 이미 있는 카테고리만 올리면 계약의 422 `NOTHING_TO_ADD` 대신 500 `INTERNAL_ERROR` | **RESOLVED**(2026-11-04 회신 `../pmart-backend/docs/handoff/clients/archive/2026-11-04-clients-reply-br44-br48.md`): 원인은 큰 zip 업로드 메모리 부족(OOM), 스트림으로 수정. 이미 있는 카테고리만이면 422 `NOTHING_TO_ADD`. 클라이언트 변경 없음 |
-| BR-49 | 중간 | 고객 | 홈·탭·섹션 진열(`storefront`)이 `mfcId` 를 줘도 미취급을 거르지 않음(`carried` 늘 null, 없는 센터도 10건) — 검색처럼 빼 달라, 빈 섹션 규칙, 숨김 정책 확인 | OPEN(요청 `docs/handoff/2026-11-05-backend-storefront-not-carried.md`). 고객앱은 서버 항목 그대로 |
+| BR-49 | 중간 | 고객 | 홈·탭·섹션 진열(`storefront`)이 `mfcId` 를 줘도 미취급을 거르지 않음(`carried` 늘 null, 없는 센터도 10건) — 검색처럼 빼 달라, 빈 섹션 규칙, 숨김 정책 확인 | OPEN(요청 `docs/handoff/archive/2026-11-05-backend-storefront-not-carried.md`). 고객앱은 서버 항목 그대로 |
 | BR-50 | 중간 | 고객 | 주문서 로그인 뒤 비회원→회원 장바구니 병합(`POST /carts/{id}/merges`) 앞 확인 — `CART_MERGE_CONFIRM` 이 실제로 오는 조건, 비회원 토큰 만료 시 처리, 센터(mfcId)가 다를 때, LAN 구현 상태 | OPEN(2026-11-07). 고객앱은 병합 미구현 — 로그인 뒤 빈 회원 장바구니가 보임(사용자 실기기 보고) |
-| BR-51 | 높음 | MFC | 배차 자동 요청(AUTO_ON_READY) 제거 — 사용자 결정(2026-11-10): 배차는 무조건 점원 요청. 계약 0.4.5 D-5 는 READY 시 자동 요청 | OPEN(요청 `docs/handoff/2026-11-10-backend-dispatch-manual-only.md`). PDA 는 직원 요청만, 서버가 AUTO_ON_READY 를 보내면 숨기지 않고 관리자 알림 문구 |
-| BR-52 | 높음 | MFC | PDA 업무 선택(입고/품질검사/재고 이동/재고 실사/피패킹) 기반 배정 — 다음 작업 받기에 고른 업무 필터, 입고·품질검사·적치 배정 포함, 회수품 반입·회수품 검사·실사 작업 유형 추가, 작업자 본인 조회 허용, 메뉴 권한 기준, 작업 가능 신호, 품질검사 LOT 은 시스템 배정(R15), 품질검사 판정 기준·격리 사유·증빙 사진 업로드·반입 줄 온도대(R18), 이동·실사·피패킹 상품 바코드·패킹 온도대·장바구니·적치 추천·격리 이동·실사 목록 밖 상품·예외 보고(R19), 피킹한 사람에게 같은 주문 패킹 배정·출하대기 랙 위치(R20) | OPEN(요청 `docs/handoff/2026-11-10-backend-pda-work-areas.md`). PDA 는 목으로 업무 필터·권한 표시 |
-| BR-53 | 중간 | MFC | 입고 수령 화면에 필요한 값 — 입고 예정 행의 상품명·바코드(스캔 대조), RECEIVE 배정의 taskId ↔ trfId 연결, 송장(TRF) 바코드 원문 형식, 행당 차이 사유 1개의 우선순위(수량 차이 vs 격리 사유) | OPEN(요청 `docs/handoff/2026-11-10-backend-pda-work-areas.md` R8~R11). PDA 는 목만 상품명·바코드, 실서버는 SKU 만 표시 |
+| BR-51 | 높음 | MFC | 배차 자동 요청(AUTO_ON_READY) 제거 — 사용자 결정(2026-11-10): 배차는 무조건 점원 요청. 계약 0.4.5 D-5 는 READY 시 자동 요청 | OPEN(요청 `docs/handoff/archive/2026-11-10-backend-dispatch-manual-only.md`). PDA 는 직원 요청만, 서버가 AUTO_ON_READY 를 보내면 숨기지 않고 관리자 알림 문구 |
+| BR-52 | 높음 | MFC | PDA 업무 선택(입고/품질검사/재고 이동/재고 실사/피패킹) 기반 배정 — 다음 작업 받기에 고른 업무 필터, 입고·품질검사·적치 배정 포함, 회수품 반입·회수품 검사·실사 작업 유형 추가, 작업자 본인 조회 허용, 메뉴 권한 기준, 작업 가능 신호, 품질검사 LOT 은 시스템 배정(R15), 품질검사 판정 기준·격리 사유·증빙 사진 업로드·반입 줄 온도대(R18), 이동·실사·피패킹 상품 바코드·패킹 온도대·장바구니·적치 추천·격리 이동·실사 목록 밖 상품·예외 보고(R19), 피킹한 사람에게 같은 주문 패킹 배정·출하대기 랙 위치(R20) | OPEN(요청 `docs/handoff/mfc-app/2026-11-10-backend-pda-work-areas.md`). PDA 는 목으로 업무 필터·권한 표시 |
+| BR-53 | 중간 | MFC | 입고 수령 화면에 필요한 값 — 입고 예정 행의 상품명·바코드(스캔 대조), RECEIVE 배정의 taskId ↔ trfId 연결, 송장(TRF) 바코드 원문 형식, 행당 차이 사유 1개의 우선순위(수량 차이 vs 격리 사유) | OPEN(요청 `docs/handoff/mfc-app/2026-11-10-backend-pda-work-areas.md` R8~R11). PDA 는 목만 상품명·바코드, 실서버는 SKU 만 표시 |
 
 ---
 
@@ -93,7 +93,7 @@
   - `GET /tasks/{taskId}`: `lines[].pendingQty`, `pendingExecutions`, `activeStart`.
   - `POST /tasks/{taskId}/starts` 와 짝 조회 `GET …/starts/{requestId}`.
   - 서비스 빌드는 미검증이고 서버 구현 전까지 501이므로 목으로만 쓴다. `assignee=me` 는 BR-02, 실제 배정은 mfc-capacity 수동 배정 계약에 의존한다.
-- 추가 질문: 시작 503의 의미, 짝 조회 여부, 같은 키 재전송 → `docs/handoff/2026-10-24-backend-br05-start-503.md`
+- 추가 질문: 시작 503의 의미, 짝 조회 여부, 같은 키 재전송 → `docs/handoff/archive/2026-10-24-backend-br05-start-503.md`
 - 추가 회신(`../pmart-backend/docs/handoff/clients/archive/2026-10-24-clients-reply-br05-start-503.md`, 계약 `c609a4d`):
   - 503은 항상 `DEPENDENCY_UNAVAILABLE` 이고, 시작 안 됨이 확정이다. 판정이 기록되지 않으므로 같은 키로 보내면 다시 판정한다.
   - 짝 조회 404는 확정이 아니다.
@@ -107,7 +107,7 @@
   - 수용: `GET /offers?state=` 는 본인 제안만 준다. state를 생략하면 SENT이면서 만료 전인 것만 나온다. 응답에 `serverTime` 이 있고, 각 제안에 `remainingSec` 이 있다. 경로는 게이트웨이 라우팅 때문에 `/riders/me/offers` 가 아니라 `/offers` 로 정해졌다.
   - 보류: 푸시·SSE 전달 채널(notification 결정 대기)과 일반배차모드 대기 목록(업무 문서 공백). 푸시 토큰은 BR-09에서 따로 회신한다.
   - 클라이언트 반영: `docs/apps/rider-app.md` "제안 수신과 남은 시간".
-- 추가 질문: 폴링 간격 → `docs/handoff/2026-10-24-backend-br06-offer-polling.md`
+- 추가 질문: 폴링 간격 → `docs/handoff/archive/2026-10-24-backend-br06-offer-polling.md`
   - 회신(`../pmart-backend/docs/handoff/2026-10-24-clients-reply-br06-offer-polling.md`, `f4dd171`, lint만 통과, 빌드 미검증): 수용. 응답에 `pollAfterSec` 이 추가됐다(잠정 5초). 받을 수 없는 상태면 null이다. 처리율 제한은 JWT subject 단위 단일 버킷이다. 백그라운드에서 놓쳐도 되는지는 업무 결정 대기다(푸시·BR-09와 함께). 클라이언트 반영: `rider-app.md`.
 
 ## BR-07 파일 업로드
@@ -240,7 +240,7 @@
 - 2026-10-31 결정(사용자): 다음 우편번호 검색(무료·키 없음)으로 도로명을 고른다 → 서버가 카카오 로컬 API 로 좌표로 바꾼다(BR-30) → 앱이 카카오 지도(네이티브 앱 키)에서 핀을 맞춘다 → 최종 좌표를 `geo` 로 보낸다. 주소 계약은 그대로다.
 
 ## BR-30 주소 → 좌표 변환 API (고객앱)
-- 요청: `docs/handoff/2026-10-31-backend-address-geocoding.md`. 도로명주소 → 좌표 후보(필수), 좌표 → 주소(선택).
+- 요청: `docs/handoff/archive/2026-10-31-backend-address-geocoding.md`. 도로명주소 → 좌표 후보(필수), 좌표 → 주소(선택).
 - 이유: 카카오 로컬 API 는 REST API 키(비밀)가 필요하므로 앱이 직접 부르지 않는다. 키는 사용자가 백엔드 `deploy/lan/.secrets/backend.env` 에 넣어 두었다.
 - 클라이언트 원칙: 결과 0건과 조회 실패(카카오 장애·사용량 소진)를 구분해 표시한다. 주소 원문을 로그에 남기지 않는다.
 
@@ -253,11 +253,11 @@
 - 현황(LAN 2026-11-02): `GET /product-contents/{id}?mfcId=MFC-SEED-01` 의 `options[].price` 가 `null`. 같은 상품이 홈 카드(storefront)에는 `basePrice` 가 있고 `GET /prices/{sku}` 도 200 이다. product-content-service `ContentQueries` 주석 "가격은 pricing 의 것이라 넣지 않는다" — 의도적으로 안 채운다. 그러나 계약 `product-content-service.yaml` 의 `SaleOption.price` 설명은 "pricing 사본"이라 계약 설명과 구현이 다르다.
 - 영향: 고객앱 상세가 "가격 확인 중"으로만 보였다.
 - 앱 처리(2026-11-02): 상세 응답의 옵션 가격이 비면 `GET /prices?skus=` 로 표시 가격을 따로 읽어 합친다(`ApiCatalogRepository._pricesFor`). `notSet` 은 "판매 불가"·담기 비활성. 가격 조회 실패는 "가격 확인 중" 유지(0원·판매 불가로 확정하지 않음). 상세에 가격이 오면 가격 API 를 부르지 않으므로 백엔드가 채우기 시작해도 앱 변경은 없다.
-- 요청: (a) 상세에 pricing 사본을 채우든지, (b) 계약 설명을 "채우지 않는다. 표시 가격은 `/prices` 로 읽는다"로 고치든지 정해 달라. 요청서 `docs/handoff/2026-11-02-backend-product-detail-price.md`.
+- 요청: (a) 상세에 pricing 사본을 채우든지, (b) 계약 설명을 "채우지 않는다. 표시 가격은 `/prices` 로 읽는다"로 고치든지 정해 달라. 요청서 `docs/handoff/archive/2026-11-02-backend-product-detail-price.md`.
 
 ## BR-37 주문이 참조하는 고객 데이터의 불변성 (고객앱)
 - 배경: 주문(`customer_order`)은 `account_id`·`shopping_address_id` 만 저장하고 주소 원문·수령인·연락처는 없다(ADR-0009 참조 ID 원칙). customer-service 주소는 제자리 수정·물리 삭제로 보이며 이력이 없다. 그런데 계약 `PATCH /me/addresses/{id}` 는 "확정 주문의 주소는 변경되지 않음"이라고 적혀 있다.
-- 질문: 그 보장이 어디서 이루어지는지, 확정 주문이 참조한 주소의 삭제를 막는지, 수령인·연락처를 주문 시점으로 고정하는지, 구매 가능 검증을 결제 진입에서 다시 하는지. 질문서 `docs/handoff/2026-11-02-backend-order-customer-reference.md`.
+- 질문: 그 보장이 어디서 이루어지는지, 확정 주문이 참조한 주소의 삭제를 막는지, 수령인·연락처를 주문 시점으로 고정하는지, 구매 가능 검증을 결제 진입에서 다시 하는지. 질문서 `docs/handoff/archive/2026-11-02-backend-order-customer-reference.md`.
 - 고객앱 처리(회신 전): 주문 상세에 배송지를 보이지 않는다. 주소 ID 로 현재 주소를 조회해 "주문 당시 배송지"처럼 보이지 않는다.
 - 회신(2026-11-02, `../pmart-backend/docs/handoff/clients/archive/2026-11-02-clients-reply-br37-order-shipping-snapshot.md`): (1) 지금까지 미보장이었음 → 초안 생성 때 주소록을 복사해 고정, 확정 때 주문으로 옮김. 고객용은 `GET /orders/{id}`·초안 `delivery.shippingAddress`(가리지 않음, 배포 전 것은 null). (2) 주소 삭제는 지금 규칙 유지(주문은 사본). (3) 수령인·연락처 = 배송지 값으로 고정, `contact.phoneRef` 는 쓰지 않음(deprecated). (4) 결제 진입 때 계정 재확인 → 422 `ACCOUNT_NOT_PURCHASABLE`.
 - 고객앱 반영(2026-11-02): 주문서·주문 상세 "받는 곳" = `shippingAddress`(null 이면 "배송지 정보 없음"), 결제 진입 거절 문구, 백엔드 `312a51b` 계약 재생성.
@@ -344,5 +344,5 @@
 
 ## BR-52 PDA 업무 선택 기반 배정 (MFC)
 - 사용자 결정(2026-11-10): 크루는 작업 목록을 못 본다. 메인(모든 작업자 공통)에서 업무(입고 / 품질검사 / 재고 이동 / 재고 실사 / 피패킹)를 고르고 "작업 준비 완료" → 업무 설명 한 장 → 확인 → 작업 가능 신호 → 서비스가 최우선 작업을 하나씩·단계별로 지시. 권한 없는 업무·메뉴는 "권한이 없어요".
-- 상세 요청: `docs/handoff/2026-11-10-backend-pda-work-areas.md`
+- 상세 요청: `docs/handoff/mfc-app/2026-11-10-backend-pda-work-areas.md`
 

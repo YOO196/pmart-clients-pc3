@@ -5,7 +5,7 @@
 - 백엔드의 같은 규칙(정본): `../pmart-backend/docs/operations/pc-split.md`, 루트 `../pmart-backend/CLAUDE.md` "PC 나눠 작업하기".
 - 다른 PC 에서 개발하는 법(포크·PR·시험 계정·토큰): `../pmart-backend/docs/operations/dev-on-other-pcs.md`. PC 별 할 일 체크리스트: `../pmart-backend/docs/operations/other-pcs-todo.md`(클라이언트 절 있음).
 - 다른 PC 가 읽을 문서 지도(순서·PC 별·필요할 때·시작할 때 보낼 말): `docs/operations/other-pcs-start-here.md`.
-- 적용: 일지·handoff 의 새 이름·폴더는 **2026-11-14 부터.** 2026-11-13 까지의 파일은 이름·위치를 그대로 둔다.
+- 적용: 일지의 영역별 폴더는 **2026-11-14 부터**(2026-11-13 까지의 일지는 그대로 둔다). handoff 는 **2026-11-13 에 폴더를 나눴다** — 그때까지의 문서는 `docs/handoff/archive/`(열린 것 둘만 영역 폴더).
 
 ## 1. PC 별 역할 (2026-11-13 기준)
 
@@ -73,7 +73,7 @@ docs/
   apps/<앱>.md                         # 앱별 화면·규칙 — 그 앱 영역이 고친다
   worklog/<앱 영역>/YYYY-MM-DD.md       # 작업 일지 — 자기 영역 폴더에만(§4)
   worklog/YYYY-MM-DD.md                # 2026-11-13 까지의 일지(그대로 둔다)
-  handoff/YYYY-MM-DD-<앱 영역>-backend-<주제>.md   # 백엔드로 보내는 문서(§5)
+  handoff/<앱 영역|all>/YYYY-MM-DD-backend-<주제>.md   # 백엔드로 보내는 문서(§5) — 끝나면 handoff/archive/
   operations/pc-split.md               # 이 문서
   architecture/ · adr/ · roadmap.md · backend-requests.md   # 공통 문서(§6)
 contracts.lock · CLAUDE.md · .claude/rules/   # 공통(§6)
@@ -112,13 +112,14 @@ contracts.lock · CLAUDE.md · .claude/rules/   # 공통(§6)
 - 다른 영역에 영향을 준 일은 자기 일지에 `영향: backoffice` 처럼 적는다(남의 일지에 쓰지 않는다).
 - 형식과 나머지 규칙은 `docs/worklog/README.md` 그대로.
 
-## 5. handoff — 파일 이름에 앱 영역
+## 5. handoff — 앱 영역별 폴더
 
-- 클라이언트 → 백엔드: **`docs/handoff/YYYY-MM-DD-<앱 영역>-backend-<주제>.md`**. 여러 앱에 걸치면 앱 영역 자리에 `all`.
+- 클라이언트 → 백엔드: **`docs/handoff/<앱 영역>/YYYY-MM-DD-backend-<주제>.md`**(사용자 결정 2026-11-13 — 파일 이름이 아니라 폴더로 나눈다). 여러 앱에 걸치면 `docs/handoff/all/`. 자기 영역 폴더에만 쓴다. 폴더·규칙·열린 문서 목록은 `docs/handoff/README.md`.
+  - 처리가 끝난 문서는 `docs/handoff/archive/` 로 옮긴다(`git mv`, 이름 그대로 — 그 영역 담당이). 이 저장소 문서가 그 경로를 가리키면 같은 커밋에서 고친다.
   - 첫머리에 **`보낸 앱: <앱 영역>`** 과 **`받는 백엔드 영역: platform|mfc|delivery`** 를 적는다. 회신이면 원 문서 경로도 적는다.
   - 받는 영역 고르기: 인증·로그인·HR·승인·게이트웨이·배포·공통 계약과 아래 둘 밖의 모든 서비스는 platform(PC 1), MFC 업무 API(mfc-*-service)는 mfc(PC 3), 배송·라이더(delivery-*·rider-service·rider-auth-service)는 delivery(PC 5).
-  - 예: `2026-11-14-mfc-app-backend-picking-scan.md`(받는 백엔드 영역 mfc).
-- 백엔드 → 클라이언트: `../pmart-backend/docs/handoff/clients/YYYY-MM-DD-<받는 앱 영역>-<종류>-<주제>.md`(종류 request·reply·notice, 첫머리 `보낸 영역:`). 각 앱 담당은 **`*-<자기 앱 영역>-*` 와 `*-all-*`** 만 읽으면 된다. 2026-11-13 까지의 파일은 `…-clients-…`.
+  - 예: `docs/handoff/mfc-app/2026-11-14-backend-picking-scan.md`(받는 백엔드 영역 mfc).
+- 백엔드 → 클라이언트(지금 — 백엔드에 같은 폴더 구조를 제안했다, `docs/handoff/all/2026-11-13-backend-handoff-folders.md`): `../pmart-backend/docs/handoff/clients/YYYY-MM-DD-<받는 앱 영역>-<종류>-<주제>.md`(종류 request·reply·notice, 첫머리 `보낸 영역:`). 각 앱 담당은 **`*-<자기 앱 영역>-*` 와 `*-all-*`** 만 읽으면 된다. 2026-11-13 까지의 파일은 `…-clients-…`.
 - 한 주제는 한 앱 영역이 보낸다(같은 주제를 두 PC 가 따로 보내지 않는다).
 - 백엔드는 다른 PC 의 handoff 를 **원본 main 에 들어온 뒤** 읽는다(PC 1 의 것만 작업 폴더에서 바로 읽는다). 다른 PC 는 handoff 를 PR 에 넣어 보낸다.
 

@@ -2,7 +2,7 @@
 
 근거: 백엔드 handoff `2026-11-13-clients-request-hr-backoffice.md`(사용자 결정 2026-11-13 — 별도 앱·SSO), 백엔드 ADR-0056(결정 5·7·8·10), 계약 `hr-service.yaml` 0.1.0·`employee-auth-service.yaml`·`center-master-service.yaml`(`GET /centers`), 흐름 `docs/business/flows/employee-account-provisioning.md`(백엔드). 클라이언트 결정은 ADR-0003.
 
-상태(2026-11-13): 목 서버로 구현·검증 → LAN 배포·실서버 확인 23/23(`docs/handoff/2026-11-13-backend-hr-backoffice-lan-deployed.md`) → **HTTPS 로 옮김(`https://192.168.0.40:8444`, 옛 `http://…:8081` 은 HTTPS 로 넘어간다)**. HTTPS 주소에서의 브라우저 확인과 사람 손 확인은 아직. 요청 권한 기간은 종료일이 없으면 "기한 없음"(정규직 — 백엔드 회신 `clients-reply-hr-backoffice-deployed`).
+상태(2026-11-13): 목 서버로 구현·검증 → LAN 배포·실서버 확인 23/23(`docs/handoff/archive/2026-11-13-backend-hr-backoffice-lan-deployed.md`) → **HTTPS 로 옮김(`https://192.168.0.40:8444`, 옛 `http://…:8081` 은 HTTPS 로 넘어간다)**. HTTPS 주소에서의 브라우저 확인과 사람 손 확인은 아직. 요청 권한 기간은 종료일이 없으면 "기한 없음"(정규직 — 백엔드 회신 `clients-reply-hr-backoffice-deployed`).
 
 ## 1. 원칙
 - 사용자는 인사팀(`HR_ADMIN`). 역할이 없으면 서버가 403 → "이용할 수 없는 화면". 화면은 토큰 클레임으로 "인사 권한이 없습니다" 안내만 하고 막지 않는다(판정은 서버). 본인 조회(`/hr/employees/me`)만 모든 직원.
