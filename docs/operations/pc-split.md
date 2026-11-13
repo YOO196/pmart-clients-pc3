@@ -4,7 +4,7 @@
 
 - 백엔드의 같은 규칙(정본): `../pmart-backend/docs/operations/pc-split.md`, 루트 `../pmart-backend/CLAUDE.md` "PC 나눠 작업하기".
 - 다른 PC 에서 개발하는 법(포크·PR·시험 계정·토큰): `../pmart-backend/docs/operations/dev-on-other-pcs.md`. PC 별 할 일 체크리스트: `../pmart-backend/docs/operations/other-pcs-todo.md`(클라이언트 절 있음).
-- 다른 PC 가 처음 읽을 문서 목록(경로·파일 이름): `docs/operations/other-pcs-start-here.md`.
+- 다른 PC 가 읽을 문서 지도(순서·PC 별·필요할 때·시작할 때 보낼 말): `docs/operations/other-pcs-start-here.md`.
 - 적용: 일지·handoff 의 새 이름·폴더는 **2026-11-14 부터.** 2026-11-13 까지의 파일은 이름·위치를 그대로 둔다.
 
 ## 1. PC 별 역할 (2026-11-13 기준)
@@ -14,12 +14,12 @@
 | PC | IP | 백엔드 영역(개발) | 클라이언트(이 저장소) | LAN 에서 돌리는 것 |
 |---|---|---|---|---|
 | **PC 1** | 192.168.0.32 | **platform** — 인증·HR·승인·게이트웨이·라이브러리·배포, 다른 영역 밖의 모든 서비스. **배포·병합 유일 지점** | **customer-app 위주**(사용자 2026-11-13). 지금까지의 mfc-app·backoffice·hr-backoffice·web-common 작업도 이 PC 가 했고, 다른 PC 가 맡기 전까지 이어서 맡는다. **원본 main 에 넣는 유일한 PC** | 없음(빌드·Claude Code 전용, Docker 미기동) |
-| **PC 2** | 192.168.0.34 | 없음. 예정 **rag**(추천, 미확정) | 미정 | 커머스 서비스(상품·고객·장바구니·검색·가격·주문·결제 등), Kafka 1 |
+| **PC 2** | 192.168.0.34 | 없음. 예정 **backoffice**(사용자 확정 2026-11-13, 로그인 마무리 뒤 시작) — 백엔드 `backoffice-bff` + 클라이언트 웹 | **backoffice 영역이 시작되면** `web/backoffice`·`web/hr-backoffice`(+ `web/core`·`web/ui` — §3 web-common 참고)를 백엔드와 함께 맡는다. 그 전까지는 없음(PC 1 이 맡는다) | 커머스 서비스(상품·고객·장바구니·검색·가격·주문·결제 등), Kafka 1 |
 | **PC 3** | 192.168.0.222 | **mfc** — mfc-*-service, MFC 시뮬레이터 연결 | 미정 | MFC 서비스 6개, CDC 재고, 검색 색인(ES) |
-| **PC 4** | 192.168.0.40 | 없음. 예정 **backoffice**(추천, 로그인 마무리 뒤 — 미확정) | 미정. backoffice 영역이 생기면 `web/backoffice`·`web/hr-backoffice`·`web/core`·`web/ui` 를 백엔드 `backoffice-bff` 와 함께 한 PC 가 맡는 안(§2 web-common 참고) | **API 게이트웨이**(`https://192.168.0.40:8443`, 앱용 `http://…:8080`), **백오피스 화면**(`https://192.168.0.40`), **인사팀 백오피스 화면**(`https://192.168.0.40:8444`), auth-service·승인·bff·설정 서버·Eureka·모니터링 |
+| **PC 4** | 192.168.0.40 | 없음. 예정 **rag**(사용자 확정 2026-11-13, 시작 전) — 백엔드만 | 미정(rag 는 클라이언트 영향 거의 없음) | **API 게이트웨이**(`https://192.168.0.40:8443`, 앱용 `http://…:8080`), **백오피스 화면**(`https://192.168.0.40`), **인사팀 백오피스 화면**(`https://192.168.0.40:8444`), auth-service·승인·bff·설정 서버·Eureka·모니터링. 화면 서빙은 backoffice 영역이 PC 2 로 가도 계속 PC 4, 배포는 PC 1 |
 | **PC 5** | 192.168.0.101 | **delivery** — delivery-*·rider-service·rider-auth-service | 미정 | 배송 서비스, **Keycloak**(직원 로그인 화면), employee-auth-service, hr-service, 사내 메일·웹메일(`https://192.168.0.101:8190`), RAG 실행(ollama) |
 
-- **클라이언트 쪽에서 확정된 것은 PC 1 = customer-app 위주 하나뿐이다.** 다른 PC 가 어느 앱 영역을 맡는지는 사용자가 정한다 — 정해지면 이 표를 고친다.
+- **클라이언트 쪽에서 확정된 것은 둘이다: PC 1 = customer-app 위주, PC 2 = backoffice(로그인 마무리 뒤).** 그 밖의 PC 가 어느 앱 영역을 맡는지는 사용자가 정한다 — 정해지면 이 표를 고친다.
 - 두 백오피스의 HTTP 주소(80·8081)는 2026-11-13 에 닫혔다(HTTPS 로 301). LAN 빌드의 API 주소는 `https://192.168.0.40:8443/api/v1`.
 - Flutter 앱(mfc_app·customer_app)은 게이트웨이 `http://192.168.0.40:8080/api/v1` 을 그대로 쓴다(디버그 빌드).
 - 웹 빌드 배포: **PC 4 에 직접 복사하지 않는다.** `npm run build:lan -w web/<앱>` 뒤 dist 폴더와 진입 파일 이름을 handoff 로 알리면 PC 1 의 백엔드가 `lan.sh publish-backoffice`·`publish-hr-backoffice` 로 올린다(직접 복사한 빌드는 다음 배포 때 덮인다 — 2026-11-13 겪음).
@@ -101,7 +101,7 @@ contracts.lock · CLAUDE.md · .claude/rules/   # 공통(§6)
 | **web-common** | `web/core`·`web/ui`·`tools/web-tools` (두 웹앱 공통 — 한 주인) |
 
 - 영역 이름은 백엔드 제안과 같다(백엔드가 handoff 파일 이름에 그대로 쓴다).
-- **web-common**: 백엔드 계획(§1 PC 4)대로 backoffice 영역이 생기면 backoffice·hr-backoffice·web-common 을 한 PC 가 맡는다. 그때 web-common 을 backoffice 에 합칠지 정한다(미정 — 지금은 따로 둔다). 그 전까지 `web/core` 의 직원 로그인 코드와 두 웹앱의 로그인 부분은 PC 1 이 맡는다(백엔드 "로그인 마무리 기준": 남은 것은 CSRF 시기 결정·mfc_app 실기기 확인).
+- **web-common**: backoffice 영역이 PC 2 에서 시작되면(§1) backoffice·hr-backoffice 와 함께 web-common 주인도 PC 2 로 옮길지 그때 정한다(백엔드 부탁 `2026-11-13-all-notice-area-pcs-decided.md` — 미정, 지금은 따로 두고 PC 1 이 맡는다). 그 전까지 `web/core` 의 직원 로그인 코드와 두 웹앱의 로그인 부분은 PC 1 이 맡는다(백엔드 "로그인 마무리 기준": 남은 것은 CSRF 시기 결정·mfc_app 실기기 확인).
 - 위 표에 없는 공통 폴더(`packages/pmart_*`, `tools/gen_api.dart`)는 따로 영역을 두지 않았다. 고칠 때는 고친 앱 영역의 일지에 적고 `영향: <다른 앱 영역>` 을 단다. 담당을 정해야 하면 사용자가 정한다(미정).
 - 남의 영역 폴더를 고쳐야 하면 직접 고치지 말고 사용자에게 먼저 알린다(그 영역 담당과 겹치지 않게).
 
@@ -131,6 +131,6 @@ Claude 메모는 PC 마다 따로라 서로 모른다. 다른 PC 도 알아야 �
 
 ## 8. 아직 정하지 않은 것 (사용자 결정)
 
-- PC 2~5 가 맡을 클라이언트 앱 영역(mfc-app·rider-app·backoffice·hr-backoffice·web-common 담당).
-- backoffice 영역을 언제·어느 PC 에 만들지, web-common 을 거기에 합칠지.
+- PC 3·4·5 가 맡을 클라이언트 앱 영역(mfc-app·rider-app 담당).
+- backoffice 영역(PC 2)을 시작할 때의 경계 — hr-backoffice·web-common 을 함께 옮길지.
 - 공통 폴더(`packages/pmart_*`·`tools/gen_api.dart`)의 담당.
