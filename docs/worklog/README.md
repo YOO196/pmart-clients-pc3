@@ -1,6 +1,11 @@
 # 작업 일지 (worklog)
 
-Claude Code가 이 저장소에서 수행한 작업의 "무엇을·왜·어떻게 검증했는지" 기록. 날짜별 1파일(`YYYY-MM-DD.md`), 항목은 시간순. 형식은 백엔드 `docs/worklog/README.md` 와 같다.
+Claude Code가 이 저장소에서 수행한 작업의 "무엇을·왜·어떻게 검증했는지" 기록. 항목은 시간순. 형식은 백엔드 `docs/worklog/README.md` 와 같다.
+
+## 위치 — 앱 영역별 폴더 (2026-11-14 부터)
+- **`docs/worklog/<앱 영역>/YYYY-MM-DD.md`** — 앱 영역은 customer-app·mfc-app·rider-app·backoffice·hr-backoffice·web-common (`docs/operations/pc-split.md`). 여러 PC 가 같은 날 한 파일에 쓰면 합칠 때 충돌하므로 자기 영역 파일에만 쓴다.
+- 다른 영역에 영향을 준 일은 자기 일지에 `영향: <앱 영역>` 으로 적는다(남의 일지에 쓰지 않는다).
+- 2026-11-13 까지의 일지는 `docs/worklog/YYYY-MM-DD.md`(이 폴더 바로 아래, 그대로 둔다).
 
 ## 규칙
 1. 커밋할 때 같은 커밋에 일지 항목을 포함한다(SHA는 다음 항목에 추기).
@@ -17,5 +22,6 @@ Claude Code가 이 저장소에서 수행한 작업의 "무엇을·왜·어떻�
 - 결정: 선택과 근거
 - 검증: 실행한 명령과 결과
 - 미결: 남은 것, 가정, 확인 필요
+- 영향: 다른 앱 영역에 영향이 있을 때만
 - 커밋: SHA
 ```

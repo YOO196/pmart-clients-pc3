@@ -35,10 +35,11 @@ docs/                 # 설계 정본 (아래 문서 지도)
 - 클라이언트 아키텍처·스택·API 연동 패턴: `docs/architecture/client-architecture.md`
 - 앱별 화면·규칙: `docs/apps/*.md`
 - **백엔드에 요청할 계약 공백**: `docs/backend-requests.md` — 계약에 없는 API가 필요하면 추측해서 만들지 말고 여기에 적는다
-- **백엔드와 주고받는 문서(handoff)**: 요청·추가 질문은 `docs/handoff/<날짜>-backend-<주제>.md` 에 새 파일로 쓴다. 백엔드 회신은 `../pmart-backend/docs/handoff/<날짜>-clients-<주제>.md` 에서 읽는다(읽기 전용).
+- **PC 나눠 작업하기(앱 영역·일지·handoff 규칙)**: `docs/operations/pc-split.md` — 여러 PC 가 이 저장소를 함께 고친다. 앱 영역은 customer-app·mfc-app·rider-app·backoffice·hr-backoffice·web-common. 여럿이 고치는 문서(`backend-requests.md`·`contracts.lock` 등)는 한 곳이 몰아서 고친다.
+- **백엔드와 주고받는 문서(handoff)**: 요청·추가 질문은 `docs/handoff/<날짜>-<앱 영역>-backend-<주제>.md` 에 새 파일로 쓰고, 첫머리에 `보낸 앱:` 과 `받는 백엔드 영역:`(platform·mfc·delivery)을 적는다. 백엔드 회신은 `../pmart-backend/docs/handoff/clients/<날짜>-<받는 앱 영역|all>-<종류>-<주제>.md` 에서 읽는다(읽기 전용, 2026-11-13 까지는 `…-clients-…`).
 - 단계 계획: `docs/roadmap.md`
 - 결정 기록: `docs/adr/`
-- 작업 일지: `docs/worklog/` (형식은 `docs/worklog/README.md`)
+- 작업 일지: `docs/worklog/<앱 영역>/<날짜>.md` (2026-11-14 부터 앱 영역별 폴더, 형식은 `docs/worklog/README.md`)
 
 ## 백엔드 정본 (읽기 전용 참조)
 - REST 계약: `../pmart-backend/contracts/openapi/*.yaml` (+ `_common.yaml`). **클라이언트 모델·경로의 정본.**
