@@ -4,6 +4,7 @@
 
 - 백엔드의 같은 규칙(정본): `../pmart-backend/docs/operations/pc-split.md`, 루트 `../pmart-backend/CLAUDE.md` "PC 나눠 작업하기".
 - 다른 PC 에서 개발하는 법(포크·PR·시험 계정·토큰): `../pmart-backend/docs/operations/dev-on-other-pcs.md`. PC 별 할 일 체크리스트: `../pmart-backend/docs/operations/other-pcs-todo.md`(클라이언트 절 있음).
+- 다른 PC 가 처음 읽을 문서 목록(경로·파일 이름): `docs/operations/other-pcs-start-here.md`.
 - 적용: 일지·handoff 의 새 이름·폴더는 **2026-11-14 부터.** 2026-11-13 까지의 파일은 이름·위치를 그대로 둔다.
 
 ## 1. PC 별 역할 (2026-11-13 기준)
