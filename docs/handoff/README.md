@@ -24,4 +24,5 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 |---|---|
 | `all/2026-11-13-backend-client-todo-done.md` | 새 웹 빌드 두 개를 백엔드가 올리는 것 |
 | `all/2026-11-13-backend-handoff-folders.md` | 백엔드 쪽 handoff 폴더를 같은 구조로 나눌지 |
-| `mfc-app/2026-11-10-backend-pda-work-areas.md` | BR-52·BR-53 회신 |
+| `mfc-app/2026-11-10-backend-pda-work-areas.md` | BR-52·BR-53 회신(R1·R3·R4, R8~R11 은 받음 — 나머지) |
+| `mfc-app/2026-11-14-backend-br52-next-priority.md` | BR-52 R2·R19-1 을 먼저 해 줄지, LAN 기존 상품의 상품명·바코드 재발행 상태 |
