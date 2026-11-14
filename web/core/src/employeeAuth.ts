@@ -9,6 +9,8 @@
 //   서버가 BODY 로 답하면(목·시험) 예전처럼 본문 refresh token 으로 갱신한다.
 // - 조용한 로그인 확인(silent — handoff 2026-11-13 web-common-request-silent-login): 토큰 없이 열렸을 때 로그인 버튼을 보이기 전에 한 번,
 //   화면 없이 Keycloak 세션만 확인한다. 세션이 없으면 ?error=LOGIN_REQUIRED 로 돌아온다(오류가 아니라 로그인 버튼).
+// - 로그아웃 전파(ADR-0061, handoff 2026-11-14 web-common-request-logout-propagation): 같은 브라우저의 다른 앱에서 로그아웃하면 서버가 이 앱
+//   세션도 끝낸다. 출처가 달라 탭끼리 알릴 수 없으므로, 탭이 다시 보일 때 세션을 한 번 확인한다(watchEmployeeSessionOnVisible).
 // - 티켓·verifier·토큰을 로그·오류 문구에 남기지 않는다.
 import type { Client } from 'openapi-fetch';
 
@@ -381,4 +383,34 @@ export function createEmployeeAuth({ app, sourceSystem, pendingKey, silentKey }:
   }
 
   return { beginEmployeeLogin, canTrySilentLogin, beginSilentEmployeeLogin, completeEmployeeLogin, refreshEmployeeTokens, logoutEmployee };
+}
+
+export interface SessionWatchDeps {
+  readonly doc?: Pick<Document, 'visibilityState' | 'addEventListener' | 'removeEventListener'>;
+  readonly now?: () => number;
+  /** 마지막 확인 뒤 이 시간 안이면 건너뛴다(탭을 빨리 오갈 때). 기본 30초 */
+  readonly minIntervalMs?: number;
+}
+
+/**
+ * 탭이 다시 보일 때(visibilitychange → visible) 세션이 있으면 `GET /employee-auth/sessions/current` 를 한 번 부른다(Bearer, 쿠키 없음).
+ * 200 이면 아무것도 하지 않는다. 401 이면 pmartFetch 의 401 처리 그대로다 — 갱신 한 번, 거절되면 store 가 비워져 앱이 로그인 화면
+ * (조용한 로그인 확인 → 버튼)으로 간다. 네트워크 오류·5xx 는 버린다(다음 호출 때 다시 드러난다).
+ * 돌려준 함수를 부르면 그만 본다.
+ */
+export function watchEmployeeSessionOnVisible(api: EmployeeAuthApi, store: TokenStore, d: SessionWatchDeps = {}): () => void {
+  const doc = d.doc ?? (typeof document === 'undefined' ? null : document);
+  if (!doc) return () => undefined;
+  const now = d.now ?? Date.now;
+  const minIntervalMs = d.minIntervalMs ?? 30_000;
+  let last: number | null = null;
+  const onChange = () => {
+    if (doc.visibilityState !== 'visible' || store.accessToken === null) return;
+    const at = now();
+    if (last !== null && at - last < minIntervalMs) return;
+    last = at;
+    void api.employeeAuth.GET('/employee-auth/sessions/current', {}).catch(() => undefined);
+  };
+  doc.addEventListener('visibilitychange', onChange);
+  return () => doc.removeEventListener('visibilitychange', onChange);
 }

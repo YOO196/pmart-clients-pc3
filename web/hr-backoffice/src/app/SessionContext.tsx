@@ -5,7 +5,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 
-import { parseOperatorToken, type OperatorSession } from '@pmart/web-core';
+import { parseOperatorToken, watchEmployeeSessionOnVisible, type OperatorSession } from '@pmart/web-core';
 import { API_BASE, tokens } from '../api/client';
 import {
   beginEmployeeLogin,
@@ -95,6 +95,9 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
     setSignOutUnconfirmed(false);
     browser.assign(await beginEmployeeLogin(API_BASE, from, tokens));
   }, []);
+
+  // 로그아웃 전파(ADR-0061): 다른 앱에서 로그아웃했을 수 있다 — 탭이 다시 보일 때 세션을 한 번 확인한다(30초 안에는 다시 안 한다).
+  useEffect(() => watchEmployeeSessionOnVisible(api, tokens), [api]);
 
   const startSilentLogin = useCallback(async (from: string) => {
     const url = await beginSilentEmployeeLogin(API_BASE, from, tokens);

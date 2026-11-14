@@ -142,3 +142,29 @@ describe('내 세션·로그아웃', () => {
     expect(assign).not.toHaveBeenCalled();
   });
 });
+
+describe('로그아웃 전파 — 탭이 다시 보일 때 세션 확인(ADR-0061)', () => {
+  it('탭이 다시 보이면 세션을 한 번 확인하고, 살아 있으면 화면은 그대로다(30초 안에는 다시 부르지 않는다)', async () => {
+    const view = renderAt('/session');
+    await screen.findByRole('button', { name: '로그아웃' });
+    await waitFor(() => expect(view.gets('/employee-auth/sessions/current')).toHaveLength(1)); // 화면이 부른 한 번
+    document.dispatchEvent(new Event('visibilitychange'));
+    await waitFor(() => expect(view.gets('/employee-auth/sessions/current')).toHaveLength(2));
+    document.dispatchEvent(new Event('visibilitychange'));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(view.gets('/employee-auth/sessions/current')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument();
+  });
+
+  it('다른 앱에서 로그아웃돼 세션이 끝나 있으면(401, 갱신 거절) 로그인 화면으로 간다', async () => {
+    renderAt('/session');
+    await screen.findByRole('button', { name: '로그아웃' });
+    server.use(
+      http.get(`${API_BASE}/employee-auth/sessions/current`, () =>
+        HttpResponse.json({ type: 'about:blank', title: 'blocked', status: 401, code: 'SUBJECT_BLOCKED' }, { status: 401, headers: { 'content-type': 'application/problem+json' } }),
+      ),
+    );
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(await screen.findByRole('button', { name: /인사 담당/ })).toBeInTheDocument(); // 목 모드의 로그인 화면
+  });
+});

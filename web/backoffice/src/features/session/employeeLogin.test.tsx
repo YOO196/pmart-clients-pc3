@@ -24,7 +24,7 @@ import { PmartFailure } from '@pmart/web-core';
 import { createPmartFetch } from '@pmart/web-core';
 import { mockOperatorToken } from '@pmart/web-core';
 import { sha256Fallback } from '@pmart/web-core';
-import { TokenStore } from '@pmart/web-core';
+import { TokenStore, watchEmployeeSessionOnVisible } from '@pmart/web-core';
 import { App } from '../../app/App';
 import { env } from '../../env';
 import { problem } from '../../mocks/support';
@@ -635,5 +635,120 @@ describe('로그아웃 화면(SSO)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('브라우저를 닫아 주세요');
     expect(screen.getByRole('button', { name: '직원 계정으로 로그인' })).toBeInTheDocument();
     expect(assign).not.toHaveBeenCalled();
+  });
+});
+
+describe('로그아웃 전파 — 탭이 다시 보일 때 세션 확인(ADR-0061)', () => {
+  /** 가짜 document: visibilityState 를 바꾸고 visibilitychange 를 낸다 */
+  function fakeDoc() {
+    const target = new EventTarget();
+    const doc = {
+      visibilityState: 'visible' as DocumentVisibilityState,
+      addEventListener: target.addEventListener.bind(target),
+      removeEventListener: target.removeEventListener.bind(target),
+    };
+    const show = (state: DocumentVisibilityState = 'visible') => {
+      doc.visibilityState = state;
+      target.dispatchEvent(new Event('visibilitychange'));
+    };
+    return { doc: doc as unknown as Document, show };
+  }
+  const SESSION = { sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z' };
+  /** sessions/current 호출을 모은다(Authorization 값) */
+  function currentHandler(reply: () => Response | Promise<Response>) {
+    const calls: Array<string | null> = [];
+    server.use(
+      http.get('*/api/v1/employee-auth/sessions/current', ({ request }) => {
+        calls.push(request.headers.get('Authorization'));
+        return reply();
+      }),
+    );
+    return calls;
+  }
+  const settle = () => new Promise((r) => setTimeout(r, 30));
+
+  it('보이게 될 때 세션이 있으면 한 번 확인한다(Bearer, 쿠키 없음). 200 이면 그대로', async () => {
+    const calls = currentHandler(() => HttpResponse.json(SESSION));
+    const { api, store, credentialsOf } = client();
+    store.setPair(pair());
+    const { doc, show } = fakeDoc();
+    watchEmployeeSessionOnVisible(api, store, { doc });
+    show('hidden');
+    await settle();
+    expect(calls).toHaveLength(0); // 가려질 때는 부르지 않는다
+    show();
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toBe(`Bearer ${access()}`);
+    expect(credentialsOf('/employee-auth/sessions/current')).toEqual(['same-origin']);
+    expect(store.accessToken).toBe(access());
+  });
+
+  it('세션이 없으면 부르지 않는다. 그만 보면(해제) 부르지 않는다', async () => {
+    const calls = currentHandler(() => HttpResponse.json(SESSION));
+    const { api, store } = client();
+    const { doc, show } = fakeDoc();
+    const stop = watchEmployeeSessionOnVisible(api, store, { doc });
+    show();
+    await settle();
+    expect(calls).toHaveLength(0);
+    store.setPair(pair());
+    stop();
+    show();
+    await settle();
+    expect(calls).toHaveLength(0);
+  });
+
+  it('마지막 확인 뒤 30초 안이면 건너뛴다', async () => {
+    const calls = currentHandler(() => HttpResponse.json(SESSION));
+    const { api, store } = client();
+    store.setPair(pair());
+    const { doc, show } = fakeDoc();
+    let at = 1_000_000;
+    watchEmployeeSessionOnVisible(api, store, { doc, now: () => at });
+    show();
+    await waitFor(() => expect(calls).toHaveLength(1));
+    at += 29_999;
+    show();
+    await settle();
+    expect(calls).toHaveLength(1);
+    at += 1;
+    show();
+    await waitFor(() => expect(calls).toHaveLength(2));
+  });
+
+  it('401 이고 갱신도 거절되면(다른 앱에서 로그아웃) 이 탭의 세션을 지운다', async () => {
+    currentHandler(() => problem(401, 'SUBJECT_BLOCKED'));
+    server.use(http.post('*/api/v1/employee-auth/tokens/refresh', () => problem(401, 'TOKEN_INVALID')));
+    const { api, store } = client();
+    store.setPair(pair());
+    const { doc, show } = fakeDoc();
+    watchEmployeeSessionOnVisible(api, store, { doc });
+    show();
+    await waitFor(() => expect(store.accessToken).toBeNull());
+    expect(store.refreshToken).toBeNull();
+  });
+
+  it('네트워크 오류·5xx 는 아무것도 하지 않는다(세션 그대로)', async () => {
+    const { api, store } = client();
+    store.setPair(pair());
+    const { doc, show } = fakeDoc();
+    let at = 0;
+    watchEmployeeSessionOnVisible(api, store, { doc, now: () => (at += 60_000) });
+    for (const reply of [() => HttpResponse.error(), () => new HttpResponse(null, { status: 503 })]) {
+      const calls = currentHandler(reply);
+      show();
+      await waitFor(() => expect(calls.length).toBeGreaterThan(0));
+      await settle();
+      expect(store.accessToken).toBe(access());
+    }
+  });
+
+  it('앱: 탭으로 돌아왔을 때 세션이 끝나 있으면 로그인 화면으로 간다', async () => {
+    currentHandler(() => problem(401, 'SUBJECT_BLOCKED'));
+    server.use(http.post('*/api/v1/employee-auth/tokens/refresh', () => problem(401, 'TOKEN_INVALID')));
+    render(<App memory initialPath="/session" initialToken={access()} />);
+    await screen.findByRole('button', { name: '로그아웃' });
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(await screen.findByRole('button', { name: '직원 계정으로 로그인' })).toBeInTheDocument();
   });
 });
