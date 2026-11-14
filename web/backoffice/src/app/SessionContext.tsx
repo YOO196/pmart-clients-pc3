@@ -1,4 +1,4 @@
-// 직원 세션(employee-auth-service, app=backoffice). access token 은 메모리, refresh token 은 이 탭의 sessionStorage(새로고침 복원용, BR-03 전 임시).
+// 직원 세션(employee-auth-service, app=backoffice). access token 은 메모리, refresh token 은 HttpOnly 쿠키(ADR-0059 — 이 탭의 sessionStorage 에는 세션 ID 만. 목·시험은 본문 refresh token).
 // 로그인: 게이트웨이 로그인 시작 → Keycloak 화면 → /auth/callback?ticket= → 티켓 교환. 401 → refresh 회전(pmartFetch), 갱신 거절 → 세션 종료.
 // 새로고침하면 보관한 refresh 로 한 번 갱신해 세션을 되살린다(그동안은 로그인 화면으로 보내지 않는다).
 // 화면에 보이는 역할·센터는 access token 클레임에서 읽는다(안내용. 판정은 서버).
@@ -8,7 +8,16 @@ import { Navigate, useLocation } from 'react-router';
 
 import { parseOperatorToken, type OperatorSession } from '@pmart/web-core';
 import { API_BASE, tokens } from '../api/client';
-import { beginEmployeeLogin, browser, CALLBACK_PATH, completeEmployeeLogin, logoutEmployee, refreshEmployeeTokens } from '../api/employeeAuth';
+import {
+  beginEmployeeLogin,
+  beginSilentEmployeeLogin,
+  browser,
+  CALLBACK_PATH,
+  canTrySilentLogin,
+  completeEmployeeLogin,
+  logoutEmployee,
+  refreshEmployeeTokens,
+} from '../api/employeeAuth';
 import { clearSavedSession, loadSavedSession, syncSavedSession } from '../api/sessionPersistence';
 import { messages as m } from '../shared/messages';
 import { useApi } from './ApiContext';
@@ -19,6 +28,13 @@ interface SessionValue {
   readonly restoring: boolean;
   /** 게이트웨이 로그인 시작 주소로 브라우저를 옮긴다(돌아올 앱 경로) */
   readonly startEmployeeLogin: (from: string) => Promise<void>;
+  /** 이 탭에서 조용한 로그인 확인(silent)을 아직 하지 않았다 — 로그인 버튼을 보이기 전에 한 번 한다 */
+  readonly canTrySilentLogin: () => boolean;
+  /**
+   * 조용한 로그인 확인: 화면 없이 Keycloak 세션만 확인하러 브라우저를 옮긴다(→ /auth/callback?ticket= 또는 ?error=LOGIN_REQUIRED).
+   * 옮겼으면 true, 이미 한 번 했으면 false(로그인 버튼을 보인다).
+   */
+  readonly startSilentLogin: (from: string) => Promise<boolean>;
   /**
    * 목 모드 전용: Keycloak 화면 대신 목 티켓으로 복귀 주소(앱 안 경로)를 돌려준다 — 호출한 쪽이 그 경로로 이동한다.
    * 티켓 교환부터는 실제와 같은 코드가 돈다.
@@ -66,7 +82,7 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
   useEffect(() => {
     if (!restoring || restoreStarted.current || !saved) return;
     restoreStarted.current = true;
-    tokens.restore(saved.refreshToken, saved.deviceId);
+    tokens.restore(saved);
     void refreshEmployeeTokens(api, tokens)
       .then((access) => {
         if (access === null) {
@@ -81,6 +97,13 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
   const startEmployeeLogin = useCallback(async (from: string) => {
     setSignOutUnconfirmed(false);
     browser.assign(await beginEmployeeLogin(API_BASE, from, tokens));
+  }, []);
+
+  const startSilentLogin = useCallback(async (from: string) => {
+    const url = await beginSilentEmployeeLogin(API_BASE, from, tokens);
+    if (url === null) return false;
+    browser.assign(url);
+    return true;
   }, []);
 
   const startMockLogin = useCallback(async (from: string, operatorId: string) => {
@@ -102,8 +125,8 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
   }, [api]);
 
   const value = useMemo(
-    () => ({ session, restoring, startEmployeeLogin, startMockLogin, completeEmployeeLogin: completeEmployee, logout, signOutUnconfirmed }),
-    [session, restoring, startEmployeeLogin, startMockLogin, completeEmployee, logout, signOutUnconfirmed],
+    () => ({ session, restoring, startEmployeeLogin, canTrySilentLogin, startSilentLogin, startMockLogin, completeEmployeeLogin: completeEmployee, logout, signOutUnconfirmed }),
+    [session, restoring, startEmployeeLogin, startSilentLogin, startMockLogin, completeEmployee, logout, signOutUnconfirmed],
   );
   return <SessionContext value={value}>{children}</SessionContext>;
 }

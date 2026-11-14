@@ -9,9 +9,12 @@ export { browser, CALLBACK_PATH, EmployeeLoginError, type EmployeeLoginErrorCode
 /** employee-auth 설정의 앱 이름(pmart.employee-auth.apps.hr-backoffice) */
 export const EMPLOYEE_APP = 'hr-backoffice';
 export const LOGIN_PENDING_KEY = 'pmart.hr-backoffice.login.pending';
+/** 이 탭에서 조용한 로그인 확인(silent)을 이미 했다는 표시 */
+export const LOGIN_SILENT_KEY = 'pmart.hr-backoffice.login.silent';
 
-export const { beginEmployeeLogin, completeEmployeeLogin, refreshEmployeeTokens, logoutEmployee } = createEmployeeAuth({
+export const { beginEmployeeLogin, canTrySilentLogin, beginSilentEmployeeLogin, completeEmployeeLogin, refreshEmployeeTokens, logoutEmployee } = createEmployeeAuth({
   app: EMPLOYEE_APP,
   sourceSystem: SOURCE_SYSTEM,
   pendingKey: LOGIN_PENDING_KEY,
+  silentKey: LOGIN_SILENT_KEY,
 });

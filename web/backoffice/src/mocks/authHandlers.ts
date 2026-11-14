@@ -21,6 +21,8 @@ function issue(s: MockSession) {
   return {
     accessToken: mockOperatorToken({ sub: s.operatorId, roles: grant.roles, centers: grant.centers, sid: s.sessionId, exp }),
     refreshToken: s.refreshToken,
+    // 목은 본문 방식(BODY)이다 — 서비스 워커는 HttpOnly 쿠키를 심지 못한다. 쿠키 방식(COOKIE)은 시험에서 따로 본다.
+    refreshTransport: 'BODY' as const,
     accessTokenExpiresAt: new Date(exp * 1000).toISOString(),
     refreshTokenExpiresAt: new Date(new Date(s.issuedAt).getTime() + mockAuthPolicy.sessionHours * 3600_000).toISOString(),
     sessionId: s.sessionId,

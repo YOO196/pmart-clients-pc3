@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { TokenStore } from '@pmart/web-core';
 import { API_BASE } from '../../api/client';
-import { beginEmployeeLogin, browser, LOGIN_PENDING_KEY } from '../../api/employeeAuth';
+import { beginEmployeeLogin, beginSilentEmployeeLogin, browser, LOGIN_PENDING_KEY, LOGIN_SILENT_KEY } from '../../api/employeeAuth';
 import { SESSION_STORAGE_KEY } from '../../api/sessionPersistence';
 import { env } from '../../env';
 import { as, renderAt } from '../../test/render';
@@ -33,12 +33,35 @@ describe('로그인 시작', () => {
 
   it('실서버 모드: 버튼은 게이트웨이 로그인 시작 주소로 브라우저를 옮긴다(목 계정 버튼 없음)', async () => {
     env.isMock = false;
+    sessionStorage.setItem(LOGIN_SILENT_KEY, '1'); // 조용한 로그인 확인은 이미 했다
     const assign = vi.spyOn(browser, 'assign').mockImplementation(() => undefined);
     renderAt('/login', null);
     expect(screen.queryByRole('button', { name: /인사 담당/ })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '직원 계정으로 로그인' }));
     await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
     expect(assign.mock.calls[0]![0]).toContain('/api/v1/employee-auth/logins?app=hr-backoffice');
+  });
+
+  it('실서버 모드: 토큰 없이 열리면 버튼보다 먼저 한 번 조용히 로그인 확인(silent=true)하러 간다', async () => {
+    env.isMock = false;
+    const assign = vi.spyOn(browser, 'assign').mockImplementation(() => undefined);
+    renderAt('/employees', null);
+    expect(await screen.findByRole('status')).toHaveTextContent('로그인 확인 중');
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    const url = new URL(assign.mock.calls[0]![0]);
+    expect(url.searchParams.get('app')).toBe('hr-backoffice');
+    expect(url.searchParams.get('silent')).toBe('true');
+    expect(sessionStorage.getItem(LOGIN_SILENT_KEY)).toBe('1');
+  });
+
+  it('실서버 모드: ?error=LOGIN_REQUIRED 로 돌아오면 오류 문구 없이 로그인 버튼', async () => {
+    env.isMock = false;
+    const assign = vi.spyOn(browser, 'assign').mockImplementation(() => undefined);
+    await beginSilentEmployeeLogin(API_BASE, '/employees', new TokenStore());
+    renderAt('/auth/callback?error=LOGIN_REQUIRED', null);
+    expect(await screen.findByRole('button', { name: '직원 계정으로 로그인' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it('로그인 전에는 업무 화면 대신 로그인으로 보낸다', async () => {

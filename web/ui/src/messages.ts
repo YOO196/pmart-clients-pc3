@@ -28,9 +28,11 @@ export const employeeLoginMessages = {
   starting: '로그인 화면으로 이동하는 중…',
   startFailed: '로그인 화면으로 이동하지 못했어요. 잠시 뒤 다시 시도해 주세요.',
   completing: '로그인 정보를 받는 중…',
+  checking: '로그인 확인 중…',
   retry: '다시 로그인',
   errors: {
     IDP_ERROR: '로그인을 마치지 않았어요(취소했거나 오류가 났어요). 다시 로그인해 주세요.',
+    LOGIN_REQUIRED: '로그인이 필요해요. 로그인해 주세요.',
     IDP_REJECTED: '로그인 결과를 확인하지 못했어요. 다시 로그인하고, 계속되면 관리자에게 알려 주세요.',
     IDP_UNAVAILABLE: '로그인 서버가 응답하지 않아요. 잠시 뒤 다시 시도해 주세요.',
     EMPLOYEE_NOT_REGISTERED: '계정은 있지만 PMart 직원으로 등록되지 않았어요. 관리자에게 문의해 주세요.',

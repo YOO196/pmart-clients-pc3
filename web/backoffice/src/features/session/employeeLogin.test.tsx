@@ -5,14 +5,18 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { API_BASE, createApi, SOURCE_SYSTEM } from '../../api/client';
+import { API_BASE, createApi, SOURCE_SYSTEM, tokens } from '../../api/client';
+import { SESSION_STORAGE_KEY } from '../../api/sessionPersistence';
 import {
   beginEmployeeLogin,
+  beginSilentEmployeeLogin,
   browser,
+  canTrySilentLogin,
   codeChallenge,
   completeEmployeeLogin,
   EmployeeLoginError,
   LOGIN_PENDING_KEY,
+  LOGIN_SILENT_KEY,
   logoutEmployee,
   refreshEmployeeTokens,
 } from '../../api/employeeAuth';
@@ -27,11 +31,14 @@ import { problem } from '../../mocks/support';
 import { server } from '../../test/server';
 
 // 이 파일은 실서버 모드의 로그인 화면(목 계정 버튼 없음)을 본다.
+// 조용한 로그인 확인(silent)은 이미 한 것으로 둔다 — 그 흐름은 아래 '조용한 로그인 확인' 에서 따로 본다.
 beforeEach(() => {
   env.isMock = false;
+  sessionStorage.setItem(LOGIN_SILENT_KEY, '1');
 });
 afterEach(() => {
   env.isMock = true;
+  vi.restoreAllMocks();
 });
 
 const ORIGIN = 'http://192.168.0.40';
@@ -41,18 +48,33 @@ const access = (roles: readonly string[] = ['PRICE_APPROVER']) =>
 const pair = (accessToken = access(), refreshToken = 'ea-refresh-1') => ({
   accessToken,
   refreshToken,
+  refreshTransport: 'BODY' as const,
   accessTokenExpiresAt: '2026-11-12T10:15:00Z',
   refreshTokenExpiresAt: '2026-11-12T22:00:00Z',
   sessionId: 'SES-ea-1',
 });
 
-/** 앱과 같은 구성의 독립 클라이언트 */
+/**
+ * 앱과 같은 구성의 독립 클라이언트. credentialsOf 는 실제로 fetch 에 넘어간 Request 의 credentials 를 경로 끝으로 찾는다
+ * (MSW 핸들러의 request 는 credentials 를 옮겨 주지 않아 늘 same-origin 으로 보인다 — fetch 바로 앞에서 본다).
+ */
 function client() {
   const store = new TokenStore();
+  const fetched: Request[] = [];
   const api: ReturnType<typeof createApi> = createApi(
-    createPmartFetch({ sourceSystem: SOURCE_SYSTEM, tokens: store, refresh: () => refreshEmployeeTokens(api, store), sleep: () => Promise.resolve() }),
+    createPmartFetch({
+      sourceSystem: SOURCE_SYSTEM,
+      tokens: store,
+      refresh: () => refreshEmployeeTokens(api, store),
+      sleep: () => Promise.resolve(),
+      fetchImpl: (r) => {
+        fetched.push(r);
+        return fetch(r);
+      },
+    }),
   );
-  return { api, store };
+  const credentialsOf = (pathEnd: string) => fetched.filter((r) => new URL(r.url).pathname.endsWith(pathEnd)).map((r) => r.credentials);
+  return { api, store, credentialsOf };
 }
 
 interface Sent {
@@ -318,6 +340,247 @@ describe('화면', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('정지되었거나 퇴사 처리된 계정이에요');
     expect(screen.getByRole('link', { name: '다시 로그인' })).toBeInTheDocument();
     expect(exchanged).toHaveLength(0);
+  });
+});
+
+describe('refresh 쿠키(ADR-0059, handoff 2026-11-13 web-common-request-refresh-cookie)', () => {
+  const CSRF = 'CSRF-VALUE-1';
+  const cookiePair = (accessToken = access()) => ({
+    accessToken,
+    refreshToken: null,
+    refreshTransport: 'COOKIE' as const,
+    accessTokenExpiresAt: '2026-11-12T10:15:00Z',
+    refreshTokenExpiresAt: '2026-11-12T22:00:00Z',
+    sessionId: 'SES-ea-1',
+  });
+  const withCsrfCookie = (value: string | null = CSRF) =>
+    vi.spyOn(browser, 'cookies').mockReturnValue(value === null ? 'other=1' : `other=1; __Secure-pmart_ea_csrf_SES-ea-1=${value}; __Secure-pmart_ea_csrf_SES-other=NOPE`);
+
+  interface SentRefresh {
+    readonly url: URL;
+    readonly headers: Headers;
+    readonly body: string;
+  }
+  function cookieRefreshHandler(reply: () => Response) {
+    const sent: SentRefresh[] = [];
+    server.use(
+      http.post('*/api/v1/employee-auth/tokens/refresh/:sessionId', async ({ request }) => {
+        sent.push({ url: new URL(request.url), headers: request.headers, body: await request.text() });
+        return reply();
+      }),
+    );
+    return sent;
+  }
+  /** 쿠키 방식으로 로그인한 상태 */
+  function cookieClient() {
+    const c = client();
+    c.store.setPair(cookiePair());
+    return c;
+  }
+
+  it('티켓 교환은 credentials: include, 응답이 COOKIE 면 refresh token 없이 세션 ID 만 둔다', async () => {
+    server.use(
+      http.post('*/api/v1/employee-auth/tokens', () =>
+        HttpResponse.json({ operatorId: 'OP-ea-1', roles: ['PRICE_APPROVER'], centers: ['MFC-GANGNAM'], tokens: cookiePair() }),
+      ),
+    );
+    const { api, store, credentialsOf } = client();
+    await beginEmployeeLogin(API_BASE, '/prices', store, { origin: ORIGIN });
+    await completeEmployeeLogin(api, new URLSearchParams({ ticket: 'TICKET-C' }), store);
+    expect(credentialsOf('/employee-auth/tokens')).toEqual(['include']);
+    expect(store.accessToken).toBe(access());
+    expect(store.refreshToken).toBeNull();
+    expect(store.cookieSessionId).toBe('SES-ea-1');
+  });
+
+  it('갱신: POST /tokens/refresh/{sessionId} — 그 세션의 CSRF 쿠키 값을 X-CSRF-Token 으로, credentials: include, 본문 없음', async () => {
+    const next = access(['PRICE_APPROVER', 'MD']);
+    const sent = cookieRefreshHandler(() => HttpResponse.json(cookiePair(next)));
+    withCsrfCookie();
+    const { api, store, credentialsOf } = cookieClient();
+    expect(await refreshEmployeeTokens(api, store)).toBe(next);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.url.pathname).toBe('/api/v1/employee-auth/tokens/refresh/SES-ea-1');
+    expect(sent[0]!.headers.get('X-CSRF-Token')).toBe(CSRF);
+    expect(sent[0]!.headers.get('X-Device-Id')).toBe(store.deviceId);
+    expect(sent[0]!.headers.get('X-Source-System')).toBe(SOURCE_SYSTEM);
+    expect(sent[0]!.headers.get('Idempotency-Key')).toBeTruthy();
+    expect(sent[0]!.headers.has('Authorization')).toBe(false);
+    expect(credentialsOf('/employee-auth/tokens/refresh/SES-ea-1')).toEqual(['include']);
+    expect(sent[0]!.body).toBe('');
+    expect(store.accessToken).toBe(next);
+    expect(store.cookieSessionId).toBe('SES-ea-1');
+  });
+
+  it('CSRF 쿠키가 없으면 요청하지 않고 이 탭의 세션을 끝낸다(null)', async () => {
+    const sent = cookieRefreshHandler(() => HttpResponse.json(cookiePair()));
+    withCsrfCookie(null);
+    const { api, store } = cookieClient();
+    expect(await refreshEmployeeTokens(api, store)).toBeNull();
+    expect(sent).toHaveLength(0);
+  });
+
+  it('403 CSRF_INVALID·401 TOKEN_INVALID·TOKEN_REUSED 는 세션 끝(null)', async () => {
+    withCsrfCookie();
+    for (const [status, code] of [
+      [403, 'CSRF_INVALID'],
+      [401, 'TOKEN_INVALID'],
+      [401, 'TOKEN_REUSED'],
+    ] as const) {
+      cookieRefreshHandler(() => problem(status, code));
+      const { api, store } = cookieClient();
+      expect(await refreshEmployeeTokens(api, store)).toBeNull();
+    }
+  });
+
+  it('결과를 모르는 갱신(연결 끊김·본문 없는 5xx)은 다시 보내지 않고 세션 끝으로 본다(null) — 옛 쿠키 재사용 방지', async () => {
+    withCsrfCookie();
+    for (const reply of [() => HttpResponse.error(), () => new HttpResponse(null, { status: 502 })]) {
+      const sent = cookieRefreshHandler(reply);
+      const { api, store } = cookieClient();
+      expect(await refreshEmployeeTokens(api, store)).toBeNull();
+      expect(sent).toHaveLength(1);
+    }
+  });
+
+  it('401 → 쿠키 갱신 한 번 → 원 요청을 새 토큰으로 다시 보낸다. 갱신이 거절되면 토큰·세션 ID 를 비운다', async () => {
+    const next = access(['PRICE_APPROVER', 'MD']);
+    const sent = cookieRefreshHandler(() => HttpResponse.json(cookiePair(next)));
+    withCsrfCookie();
+    const seen: Array<string | null> = [];
+    server.use(
+      http.get('*/api/v1/employee-auth/sessions/current', ({ request }) => {
+        seen.push(request.headers.get('Authorization'));
+        return request.headers.get('Authorization') === `Bearer ${next}`
+          ? HttpResponse.json({ sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z' })
+          : problem(401, 'TOKEN_EXPIRED');
+      }),
+    );
+    const { api, store, credentialsOf } = cookieClient();
+    const [a, b] = await Promise.all([api.employeeAuth.GET('/employee-auth/sessions/current', {}), api.employeeAuth.GET('/employee-auth/sessions/current', {})]);
+    expect(a.response.status).toBe(200);
+    expect(b.response.status).toBe(200);
+    expect(sent).toHaveLength(1); // single-flight
+    expect(new Set(credentialsOf('/employee-auth/sessions/current'))).toEqual(new Set(['same-origin'])); // 다른 API 는 쿠키 없이 Bearer 만
+    expect(seen.filter((h) => h === `Bearer ${next}`)).toHaveLength(2);
+
+    cookieRefreshHandler(() => problem(401, 'TOKEN_REUSED'));
+    store.setPair(cookiePair());
+    await expect(api.employeeAuth.GET('/employee-auth/sessions/current', {})).rejects.toBeInstanceOf(PmartFailure);
+    expect(store.accessToken).toBeNull();
+    expect(store.cookieSessionId).toBeNull();
+  });
+
+  it('로그아웃은 credentials: include(쿠키 삭제), 서버가 실패해도 세션 ID 를 지운다', async () => {
+    server.use(http.post('*/api/v1/employee-auth/logouts', () => new HttpResponse(null, { status: 500 })));
+    const { api, store, credentialsOf } = cookieClient();
+    expect(await logoutEmployee(api, store)).toEqual({ idpSessionMayRemain: true });
+    expect(credentialsOf('/employee-auth/logouts')).toEqual(['include']);
+    expect(store.cookieSessionId).toBeNull();
+  });
+
+  it('화면: 쿠키 로그인 뒤 sessionStorage 에는 세션 ID·기기 ID 만 — 새로고침하면 쿠키 갱신으로 세션을 되살린다', async () => {
+    server.use(
+      http.post('*/api/v1/employee-auth/tokens', () =>
+        HttpResponse.json({ operatorId: 'OP-ea-1', roles: ['PRICE_APPROVER'], centers: ['MFC-GANGNAM'], tokens: cookiePair() }),
+      ),
+      http.get('*/api/v1/employee-auth/sessions/current', () =>
+        HttpResponse.json({ sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z' }),
+      ),
+    );
+    const sent = cookieRefreshHandler(() => HttpResponse.json(cookiePair()));
+    withCsrfCookie();
+    await beginEmployeeLogin(API_BASE, '/session', new TokenStore(), { origin: ORIGIN });
+    const first = render(<App memory initialPath="/auth/callback?ticket=TICKET-COOKIE" />);
+    expect(await screen.findByRole('heading', { name: '내 세션' })).toBeInTheDocument();
+    const saved = sessionStorage.getItem(SESSION_STORAGE_KEY)!;
+    expect(Object.keys(JSON.parse(saved) as Record<string, unknown>).sort()).toEqual(['deviceId', 'sessionId']);
+    expect(saved).not.toContain('refresh');
+
+    // 새로고침: 메모리 토큰은 사라지고 sessionStorage 만 남는다.
+    first.unmount();
+    tokens.accessToken = null;
+    sessionStorage.setItem(SESSION_STORAGE_KEY, saved);
+    render(<App memory initialPath="/session" />);
+    expect(await screen.findByRole('heading', { name: '내 세션' })).toBeInTheDocument();
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.headers.get('X-CSRF-Token')).toBe(CSRF);
+  });
+
+  it('화면: 새로고침했는데 쿠키 갱신이 거절되면 보관을 지우고 조용한 로그인 확인으로 넘어간다', async () => {
+    cookieRefreshHandler(() => problem(403, 'CSRF_INVALID'));
+    withCsrfCookie();
+    const assign = vi.spyOn(browser, 'assign').mockImplementation(() => undefined);
+    sessionStorage.removeItem(LOGIN_SILENT_KEY);
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ sessionId: 'SES-ea-1', deviceId: 'dev-1' }));
+    render(<App memory initialPath="/prices" />);
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    const url = new URL(assign.mock.calls[0]![0]);
+    expect(url.searchParams.get('silent')).toBe('true');
+    expect(sessionStorage.getItem(SESSION_STORAGE_KEY)).toBeNull();
+    expect(pending().from).toBe('/prices');
+  });
+});
+
+describe('조용한 로그인 확인(silent — handoff 2026-11-13 web-common-request-silent-login)', () => {
+  beforeEach(() => sessionStorage.removeItem(LOGIN_SILENT_KEY));
+
+  it('시작 주소에 silent=true, 이 탭에서 한 번만 — 두 번째는 null', async () => {
+    const store = new TokenStore();
+    expect(canTrySilentLogin()).toBe(true);
+    const url = new URL((await beginSilentEmployeeLogin(API_BASE, '/prices', store, { origin: ORIGIN }))!);
+    expect(url.pathname).toBe('/api/v1/employee-auth/logins');
+    expect(url.searchParams.get('silent')).toBe('true');
+    expect(url.searchParams.get('app')).toBe('backoffice');
+    expect(url.searchParams.get('codeChallenge')).toBe(await codeChallenge(pending().verifier));
+    expect(url.searchParams.get('returnUri')).toBe('http://192.168.0.40/auth/callback');
+    expect(canTrySilentLogin()).toBe(false);
+    expect(await beginSilentEmployeeLogin(API_BASE, '/prices', store, { origin: ORIGIN })).toBeNull();
+    // 버튼 로그인 주소에는 silent 가 없다
+    expect(new URL(await beginEmployeeLogin(API_BASE, '/prices', store, { origin: ORIGIN })).searchParams.has('silent')).toBe(false);
+  });
+
+  it('?error=LOGIN_REQUIRED 는 가려던 경로와 함께 알리고 토큰을 요청하지 않는다 — 다시 확인하지 않는다', async () => {
+    const sent = exchangeHandler();
+    const { api, store } = client();
+    await beginSilentEmployeeLogin(API_BASE, '/prices?x=1', store, { origin: ORIGIN });
+    await expect(completeEmployeeLogin(api, new URLSearchParams({ error: 'LOGIN_REQUIRED' }), store)).rejects.toMatchObject({ code: 'LOGIN_REQUIRED', from: '/prices?x=1' });
+    expect(sent).toHaveLength(0);
+    expect(canTrySilentLogin()).toBe(false);
+  });
+
+  it('티켓으로 돌아와 세션이 생기면 표시를 지운다(그 세션이 끝난 뒤 한 번 더 확인할 수 있다). 로그아웃하면 다시 표시한다', async () => {
+    exchangeHandler();
+    server.use(http.post('*/api/v1/employee-auth/logouts', () => HttpResponse.json({})));
+    const { api, store } = client();
+    await beginSilentEmployeeLogin(API_BASE, '/prices', store, { origin: ORIGIN });
+    expect(await completeEmployeeLogin(api, new URLSearchParams({ ticket: 'TICKET-S' }), store)).toBe('/prices');
+    expect(canTrySilentLogin()).toBe(true);
+    await logoutEmployee(api, store);
+    expect(canTrySilentLogin()).toBe(false);
+  });
+
+  it('화면: 토큰 없이 열리면 버튼을 보이기 전에 한 번 확인하러 간다(가려던 경로 보존)', async () => {
+    const assign = vi.spyOn(browser, 'assign').mockImplementation(() => undefined);
+    render(<App memory initialPath="/prices?state=ACTIVE" />);
+    expect(await screen.findByRole('status')).toHaveTextContent('로그인 확인 중');
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    expect(new URL(assign.mock.calls[0]![0]).searchParams.get('silent')).toBe('true');
+    expect(screen.queryByRole('button', { name: '직원 계정으로 로그인' })).not.toBeInTheDocument();
+    expect(pending().from).toBe('/prices?state=ACTIVE');
+  });
+
+  it('화면: ?error=LOGIN_REQUIRED 로 돌아오면 오류 문구 없이 로그인 버튼 — 버튼은 가려던 경로로 로그인을 시작한다', async () => {
+    const assign = vi.spyOn(browser, 'assign').mockImplementation(() => undefined);
+    await beginSilentEmployeeLogin(API_BASE, '/prices', new TokenStore(), { origin: ORIGIN });
+    render(<App memory initialPath="/auth/callback?error=LOGIN_REQUIRED" />);
+    const button = await screen.findByRole('button', { name: '직원 계정으로 로그인' });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled(); // 다시 확인하러 가지 않는다
+    await userEvent.click(button);
+    await waitFor(() => expect(assign).toHaveBeenCalledTimes(1));
+    expect(new URL(assign.mock.calls[0]![0]).searchParams.has('silent')).toBe(false);
+    expect(pending().from).toBe('/prices');
   });
 });
 
