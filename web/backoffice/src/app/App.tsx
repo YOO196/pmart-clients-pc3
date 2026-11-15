@@ -17,6 +17,7 @@ import { ContentImportPage, NewContentImportPage } from '../features/contents/Co
 import { SkuHandlingPage } from '../features/handlings/SkuHandlingPage';
 import { ClaimDetailPage, ClaimListPage } from '../features/claims/ClaimPages';
 import { PendingPage } from '../features/pending/PendingPage';
+import { CaseDetailPage, CaseListPage, NewMisdeliveryPage } from '../features/cases/CasePages';
 import { DeliveryDetailPage, DeliveryOpenPage } from '../features/deliveries/DeliveryPages';
 import { HelpRequestQueuePage } from '../features/deliveries/HelpRequestQueuePage';
 import { InquiryDetailPage, InquiryListPage } from '../features/inquiries/InquiryPages';
@@ -139,7 +140,10 @@ const routes = [
       // 고객센터·라이더 운영(백엔드 요청 2026-11-15 cs-rider-menus)
       { path: 'orders', element: guarded(<OrderLookupPage />) },
       { path: 'orders/:orderId', element: guarded(<OrderDetailPage />) },
-      { path: 'pending/fulfillment-issues', element: guarded(<PendingPage />) },
+      { path: 'pending', element: guarded(<PendingPage />) },
+      { path: 'cases', element: guarded(<CaseListPage />) },
+      { path: 'cases/new-misdelivery', element: guarded(<NewMisdeliveryPage />) },
+      { path: 'cases/:caseId', element: guarded(<CaseDetailPage />) },
       { path: 'rider-complaints', element: guarded(<RiderComplaintListPage />) },
       { path: 'rider-complaints/new', element: guarded(<NewRiderComplaintPage />) },
       { path: 'rider-complaints/:complaintId', element: guarded(<RiderComplaintDetailPage />) },

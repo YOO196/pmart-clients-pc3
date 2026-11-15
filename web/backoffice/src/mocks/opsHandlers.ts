@@ -4,7 +4,7 @@
 // 응답 모양은 생성 타입을 따른다. 계약에 없는 필드는 넣지 않는다.
 import { http, HttpResponse } from 'msw';
 
-import { API_BASE } from '../api/client';
+import { API_BASE, BFF_BASE } from '../api/client';
 import type { components as CaseC } from '../api/generated/case';
 import type { components as ClaimC } from '../api/generated/claim';
 import type { components as DispatchC } from '../api/generated/delivery-dispatch';
@@ -148,6 +148,10 @@ interface OpsState {
   cancellations: Map<string, { deliveryId: string; outcome: 'CANCELLED_BEFORE_PICKUP' | 'REJECTED_PICKED_UP'; polled: boolean }>;
   /** order 0.6.0 이행 확인 필요(처리 대기 메뉴) */
   issues: Issue[];
+  /** orchestration 0.2.0 멈춘 사가(bff pending-work 의 STUCK_SAGA) — resolved 면 목록에서 빠진다 */
+  sagas: Array<{ sagaId: string; orderId: string; sagaType: string; state: string; step: string; reasonCode: string; reasonMessage: string; since: string; requeryable: boolean; resolved: boolean }>;
+  /** bff 명령 결과(짝 조회) */
+  bffResults: Map<string, { requestId: string; status: 'APPLIED'; occurredAt: string }>;
 }
 
 function seed(): OpsState {
@@ -155,6 +159,11 @@ function seed(): OpsState {
   failed.failure = { reason: 'CUSTOMER_UNREACHABLE', detail: '[목] 세 번 전화했지만 받지 않았어요.', goodsLocation: 'WITH_RIDER', contactAttempts: 3, reportedAt: ago(1) };
   return {
     seq: 100,
+    sagas: [
+      { sagaId: 'SAGA-MOCK-1', orderId: 'ORD-MOCK-1001', sagaType: 'S1_CHECKOUT', state: 'ESCALATED', step: 'PAYMENT_CONFIRM', reasonCode: 'PAYMENT_UNKNOWN', reasonMessage: '[목] PG 승인 결과를 모름 — 결제 결과 다시 확인 필요', since: ago(2), requeryable: true, resolved: false },
+      { sagaId: 'SAGA-MOCK-2', orderId: 'ORD-MOCK-1003', sagaType: 'S2_FULFILLMENT', state: 'ESCALATED', step: 'MFC_RESERVE', reasonCode: 'RESERVATION_REJECTED', reasonMessage: '[목] MFC 예약 거절 — 밖에서 처리한 뒤 완료 표시', since: ago(6), requeryable: false, resolved: false },
+    ],
+    bffResults: new Map(),
     issues: [
       { issueId: 'FI-MOCK-1', orderId: 'ORD-MOCK-1003', mfcId: 'MFC-BSN-01', sku: 'E-00000001', lotId: 'LOT-MOCK-7', blockedQty: 1, reason: 'QUALITY_HOLD', state: 'OPEN', blockedAt: ago(3), reservationId: 'RSV-MOCK-1', note: null, acknowledgedBy: null, acknowledgedAt: null, resolvedAt: null },
       { issueId: 'FI-MOCK-2', orderId: 'ORD-MOCK-1001', mfcId: 'MFC-SEL-01', sku: 'E-00000002', lotId: null, blockedQty: 2, reason: 'COUNT_LOSS', state: 'OPEN', blockedAt: ago(5), reservationId: 'RSV-MOCK-2', note: null, acknowledgedBy: null, acknowledgedAt: null, resolvedAt: null },
@@ -391,6 +400,74 @@ export const opsHandlers = [
       if (issue.state === 'OPEN') Object.assign(issue, { state: 'ACKNOWLEDGED', note, acknowledgedBy: who.subject, acknowledgedAt: new Date().toISOString() });
       return { status: 200, body: issue };
     });
+  }),
+
+  // ---- bff 0.2.0 처리 대기(BO-12) — OPERATOR_ADMIN. 멈춘 사가 + 열린 이행 확인 필요를 한 목록으로 ----
+  http.get(`${BFF_BASE}/views/pending-work`, ({ request }) => {
+    const { denied } = allow(request, ...ADMIN);
+    if (denied) return denied;
+    const now = new Date().toISOString();
+    const stamp = (system: string) => ({ system, confidence: 'DIRECT' as const, asOf: { asOf: now, freshness: 'CURRENT' as const } });
+    const items = [
+      ...ops.sagas
+        .filter((s) => !s.resolved)
+        .map((s) => ({
+          kind: 'STUCK_SAGA' as const,
+          refId: s.sagaId,
+          orderId: s.orderId,
+          sagaType: s.sagaType,
+          state: s.state,
+          step: s.step,
+          reasonCode: s.reasonCode,
+          reasonMessage: s.reasonMessage,
+          since: s.since,
+          allowedActions: s.requeryable ? ['REQUERY_RESULT', 'MARK_RESOLVED'] : ['MARK_RESOLVED'],
+          source: stamp('order-orchestration-service'),
+        })),
+      ...ops.issues
+        .filter((i) => i.state === 'OPEN')
+        .map((i) => ({
+          kind: 'FULFILLMENT_ISSUE' as const,
+          refId: i.issueId ?? '',
+          orderId: i.orderId ?? '',
+          mfcId: i.mfcId ?? null,
+          state: i.state ?? 'OPEN',
+          reasonCode: i.reason ?? null,
+          reasonMessage: `${i.sku ?? ''} × ${i.blockedQty ?? 0}`,
+          since: i.blockedAt ?? now,
+          allowedActions: ['ACKNOWLEDGE'],
+          source: stamp('order-service'),
+        })),
+    ].sort((a, b) => a.since.localeCompare(b.since));
+    return HttpResponse.json({ composedAt: now, sources: [stamp('order-orchestration-service'), stamp('order-service')], unavailableSources: [], items });
+  }),
+
+  // bff 명령 프록시: order-orchestration-service saga-requery·saga-resolve(승인 없음, OPERATOR_ADMIN). 이미 바뀐 사가는 422.
+  http.post(`${BFF_BASE}/commands/:targetService/:command`, async ({ request, params }) => {
+    const { denied } = allow(request, ...ADMIN);
+    if (denied) return denied;
+    if (params['targetService'] !== 'order-orchestration-service') return problem(404, 'NOT_FOUND');
+    const body = (await request.clone().json()) as { targetRef?: string; reason?: string };
+    return idempotent(request, () => {
+      const saga = ops.sagas.find((s) => s.sagaId === body.targetRef);
+      if (!saga) return problem(404, 'NOT_FOUND');
+      if (params['command'] === 'saga-requery') {
+        if (!saga.requeryable || saga.resolved) return problem(422, 'NOT_REQUERYABLE');
+        saga.requeryable = false; // 목: 다시 확인하면 PG 결과가 와서 사가가 이어진다 → 목록에서 빠진다
+        saga.resolved = true;
+      } else if (params['command'] === 'saga-resolve') {
+        if (!(body.reason ?? '').trim()) return problem(400, 'VALIDATION_FAILED', [{ field: 'reason', reason: 'REQUIRED' }]);
+        if (saga.resolved) return problem(422, 'NOT_RESOLVABLE');
+        saga.resolved = true;
+      } else return problem(404, 'NOT_FOUND');
+      const result = { requestId: keyOf(request), status: 'APPLIED' as const, occurredAt: new Date().toISOString() };
+      ops.bffResults.set(keyOf(request), result);
+      return { status: 202, body: result };
+    });
+  }),
+  http.get(`${BFF_BASE}/commands/:targetService/:command/:requestId`, ({ params }) => {
+    const r = ops.bffResults.get(String(params['requestId']));
+    return r ? HttpResponse.json(r) : problem(404, 'NOT_FOUND');
   }),
 
   // ---- case 0.3.0 rider-complaints ----

@@ -76,11 +76,21 @@ export const navGroups: readonly NavGroup[] = [
     ],
   },
   {
+    id: 'support',
+    label: m.nav.group.support,
+    // 지원센터 = RIDER_OPS(사용자 2026-11-16). OPERATOR_ADMIN 모두, CS_AGENT 는 보기 + 오배송 열기만(서버 판정).
+    visibleTo: oneOf('RIDER_OPS', 'OPERATOR_ADMIN', 'CS_AGENT'),
+    items: [
+      { to: '/cases', label: m.nav.cases },
+      { to: '/cases/new-misdelivery', label: m.nav.misdelivery },
+    ],
+  },
+  {
     id: 'pending',
     label: m.nav.group.pending,
     // 본사 관리자(OPERATOR_ADMIN)만 — 모든 센터를 본다(사용자 2026-11-15). 센터 관리자는 MFC 백오피스.
     visibleTo: oneOf('OPERATOR_ADMIN'),
-    items: [{ to: '/pending/fulfillment-issues', label: m.nav.fulfillmentIssues }],
+    items: [{ to: '/pending', label: m.nav.pendingWork }],
   },
   {
     id: 'assistant',
