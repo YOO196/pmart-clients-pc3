@@ -32,6 +32,7 @@ final class MockInquiriesRepository implements InquiriesRepository {
 
   /// 마지막으로 접수한 문의가 들어온 곳(시험용).
   InquiryOrigin? lastOrigin;
+  String? lastOrderId;
 
   /// 다음 접수 한 번에 던질 실패(응답 유실 등 시험용). 유실이면 서버에는 접수된 것으로 둔다.
   PmartFailure? failNextCreate;
@@ -126,6 +127,7 @@ final class MockInquiriesRepository implements InquiriesRepository {
     _seq += 1;
     created += 1;
     lastOrigin = draft.origin;
+    lastOrderId = draft.orderId;
     final made = InquiryDetail(
       summary: InquirySummary(
         inquiryId: 'inq-mock-$_seq',

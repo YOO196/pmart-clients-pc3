@@ -162,6 +162,30 @@ void main() {
       expect(find.text('아직 답변 전이에요. 상담원이 확인하고 있어요.'), findsOneWidget);
     });
 
+    testWidgets('주문 고르기: 내 주문 목록에서 고르면 그 주문으로 접수된다(종류는 "주문"이 기본)', (t) async {
+      await openSupport(t);
+      await t.tap(find.byKey(const ValueKey('support-new-inquiry')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('inq-order')), findsNothing);
+      await t.tap(find.byKey(const ValueKey('inq-pick-order')));
+      await t.pumpAndSettle();
+      expect(find.text('어떤 주문에 대한 문의인가요?'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('inq-pick-order-seed-1')));
+      await t.pumpAndSettle();
+      expect(find.text('주문 order-seed-1'), findsOneWidget);
+      expect(
+        t
+            .widget<ChoiceChip>(find.byKey(const ValueKey('inq-cat-order')))
+            .selected,
+        isTrue,
+      );
+      await t.enterText(find.byKey(const ValueKey('inq-body')), '포장이 찢어졌어요');
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('inq-submit')));
+      await t.pumpAndSettle();
+      expect(repo.lastOrderId, 'order-seed-1');
+    });
+
     testWidgets('결과 불명: 본문을 잠그고 "다시 확인"만 — 눌러도 문의는 하나', (t) async {
       await openSupport(t);
       await t.tap(find.byKey(const ValueKey('support-new-inquiry')));

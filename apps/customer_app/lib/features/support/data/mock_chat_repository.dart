@@ -49,10 +49,11 @@ final class MockChatRepository implements ChatRepository {
     return MockChatScenario.answered;
   }
 
-  static const _orders = [
+  static final _orders = [
     ChatOrder(
       orderId: 'order-seed-4',
       statusLabel: '상품 준비 중',
+      orderedAt: DateTime.utc(2026, 11, 15, 4, 10),
       itemCount: 3,
       totalAmount: 18900,
       arrivalDate: '2026-11-15',
@@ -62,6 +63,7 @@ final class MockChatRepository implements ChatRepository {
     ChatOrder(
       orderId: 'order-seed-1',
       statusLabel: '배송 완료',
+      orderedAt: DateTime.utc(2026, 11, 14, 9, 30),
       itemCount: 2,
       totalAmount: 9800,
     ),
@@ -83,6 +85,24 @@ final class MockChatRepository implements ChatRepository {
 
   Future<void> _wait() =>
       latency == Duration.zero ? Future.value() : Future.delayed(latency);
+
+  /// 시험용: 다음 최근 주문 조회를 한 번 실패시킨다.
+  bool failNextRecentOrders = false;
+
+  /// 시험용: 최근 주문이 없는 고객.
+  bool noRecentOrders = false;
+
+  @override
+  Future<List<ChatOrder>> recentOrders({int size = 5}) async {
+    await _wait();
+    if (failNextRecentOrders) {
+      failNextRecentOrders = false;
+      throw const ProblemFailure(
+        Problem(status: 503, code: 'DEPENDENCY_UNAVAILABLE'),
+      );
+    }
+    return noRecentOrders ? const [] : _orders.take(size).toList();
+  }
 
   @override
   Future<ChatAnswer> ask(

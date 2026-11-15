@@ -176,6 +176,7 @@ void main() {
     await shot('inquiries');
     await go('/support/inquiries/inq-seed-1');
     await shot('inquiry-detail');
+    // 상담 종류 고르기(레퍼런스 고객센터 2-1) → 주문 건 문의의 최근 주문(2-4)
     await go('/support/chat');
     await shot('chat');
     Future<void> ask(String q) async {
@@ -184,6 +185,18 @@ void main() {
       await t.tap(find.byKey(const ValueKey('chat-send')));
       await t.pumpAndSettle();
     }
+
+    await t.tap(find.byKey(const ValueKey('chat-topic-order')));
+    await t.pumpAndSettle();
+    await shot('chat-pick-order');
+    await t.tap(find.byKey(const ValueKey('chat-recent-order-seed-4')));
+    await t.pumpAndSettle();
+    await ask('언제 도착해요?');
+    await shot('chat-order-topic');
+    await t.tap(find.byKey(const ValueKey('chat-topic-change')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('chat-topic-general')));
+    await t.pumpAndSettle();
 
     await ask('상품 준비 중인 주문도 취소할 수 있나요?');
     await t.tap(find.byKey(const ValueKey('chat-citations')));

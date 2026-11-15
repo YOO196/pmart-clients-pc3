@@ -178,6 +178,7 @@ void main() {
       MockChatRepository repo, {
       MockInquiriesRepository? inquiries,
       bool login = true,
+      bool general = true,
     }) async {
       t.view
         ..physicalSize = const Size(400, 1600)
@@ -207,6 +208,10 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('support-chat')));
       await t.pumpAndSettle();
+      if (login && general) {
+        await t.tap(find.byKey(const ValueKey('chat-topic-general')));
+        await t.pumpAndSettle();
+      }
     }
 
     Future<void> ask(WidgetTester t, String q) async {
@@ -281,6 +286,79 @@ void main() {
       expect(find.byKey(const ValueKey('chat-rejected')), findsOneWidget);
       expect(find.textContaining('질문이 너무 빨라요'), findsOneWidget);
       expect(find.byKey(const ValueKey('chat-handoff')), findsOneWidget);
+    });
+
+    testWidgets('상담 종류를 고르기 전에는 입력할 수 없다(레퍼런스 2-1)', (t) async {
+      await open(t, mock(), general: false);
+      expect(find.byKey(const ValueKey('chat-topic-general')), findsOneWidget);
+      expect(find.byKey(const ValueKey('chat-topic-order')), findsOneWidget);
+      expect(
+        t.widget<TextField>(find.byKey(const ValueKey('chat-input'))).enabled,
+        isFalse,
+      );
+      await t.tap(find.byKey(const ValueKey('chat-topic-general')));
+      await t.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('chat-topic-general-chosen')),
+        findsOneWidget,
+      );
+      expect(
+        t.widget<TextField>(find.byKey(const ValueKey('chat-input'))).enabled,
+        isTrue,
+      );
+    });
+
+    testWidgets('주문 건 문의: 최근 주문을 고르면 그 뒤 질문마다 orderId 를 붙인다(레퍼런스 2-4)', (
+      t,
+    ) async {
+      final repo = mock();
+      await open(t, repo, general: false);
+      await t.tap(find.byKey(const ValueKey('chat-topic-order')));
+      await t.pumpAndSettle();
+      expect(find.text('최근 주문이에요. 어떤 주문에 대해 문의하시나요?'), findsOneWidget);
+      expect(
+        t.widget<TextField>(find.byKey(const ValueKey('chat-input'))).enabled,
+        isFalse,
+      );
+      await t.tap(find.byKey(const ValueKey('chat-recent-order-seed-1')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('chat-topic-bar')), findsOneWidget);
+      await ask(t, '언제 와요?');
+      await ask(t, '포장은요?');
+      expect(repo.sentOrderIds, ['order-seed-1', 'order-seed-1']);
+      expect(repo.sentKeys.toSet(), hasLength(2));
+
+      // 종류 바꾸기 → 처음 선택지로
+      await t.tap(find.byKey(const ValueKey('chat-topic-change')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('chat-topic-order')), findsOneWidget);
+    });
+
+    testWidgets('최근 주문 조회 실패는 "주문 없음"이 아니라 오류 — 다시 시도', (t) async {
+      final repo = mock()..failNextRecentOrders = true;
+      await open(t, repo, general: false);
+      await t.tap(find.byKey(const ValueKey('chat-topic-order')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('chat-recent-error')), findsOneWidget);
+      expect(find.byKey(const ValueKey('chat-recent-empty')), findsNothing);
+      await t.tap(find.byKey(const ValueKey('chat-recent-retry')));
+      await t.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('chat-recent-order-seed-4')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('최근 주문이 없으면 안내하고 일반 문의로 이어 간다', (t) async {
+      final repo = mock()..noRecentOrders = true;
+      await open(t, repo, general: false);
+      await t.tap(find.byKey(const ValueKey('chat-topic-order')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('chat-recent-empty')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('chat-topic-general-instead')));
+      await t.pumpAndSettle();
+      await ask(t, '포인트는요?');
+      expect(repo.sentOrderIds, [null]);
     });
 
     testWidgets('응답 유실: "다시 확인"으로 같은 질문의 답을 받는다', (t) async {

@@ -8,6 +8,8 @@ import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../orders/presentation/orders_providers.dart'
+    show orderListProvider, orderStatusText;
 import '../domain/inquiry.dart';
 import 'inquiry_controller.dart';
 
@@ -358,6 +360,93 @@ class InquiryDetailScreen extends ConsumerWidget {
   }
 }
 
+/// 문의에 붙일 주문 고르기 — 본인 주문 목록 첫 쪽(최근 순). 실패는 오류로(빈 목록 아님).
+class _OrderPickerSheet extends ConsumerWidget {
+  const _OrderPickerSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final page = ref.watch(orderListProvider(null));
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.7,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                l10n.inqPickOrderTitle,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Flexible(
+              child: switch (page) {
+                AsyncData(:final value)
+                    when (value?.items ?? const []).isEmpty =>
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                      l10n.inqPickOrderEmpty,
+                      key: const ValueKey('inq-pick-empty'),
+                    ),
+                  ),
+                AsyncData(:final value) => ListView(
+                  shrinkWrap: true,
+                  children: [
+                    for (final o in value!.items)
+                      ListTile(
+                        key: ValueKey('inq-pick-${o.orderId}'),
+                        title: Text(
+                          o.orderedAt == null
+                              ? o.orderId
+                              : formatSeoulDateTime(o.orderedAt!),
+                        ),
+                        subtitle: Text(
+                          '${orderStatusText(l10n, o.status)} · ${o.orderId}',
+                        ),
+                        onTap: () => Navigator.of(context).pop(o.orderId),
+                      ),
+                  ],
+                ),
+                AsyncError() => Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.inqPickOrderFailed,
+                        key: const ValueKey('inq-pick-error'),
+                      ),
+                      TextButton(
+                        onPressed: () =>
+                            ref.invalidate(orderListProvider(null)),
+                        child: Text(l10n.chatRetry),
+                      ),
+                    ],
+                  ),
+                ),
+                _ => const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// 문의 남기기. 접수일 뿐 취소·환불을 실행하지 않는다. 사진 첨부·답변 알림은 없다(1차).
 class InquiryFormScreen extends ConsumerStatefulWidget {
   const InquiryFormScreen({super.key, this.args = const InquiryFormArgs()});
@@ -403,6 +492,20 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
 
   bool get _canSend =>
       !_busy && _category != null && _body.text.trim().isNotEmpty;
+
+  Future<void> _pickOrder() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _OrderPickerSheet(),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _orderId = picked;
+      _category ??= InquiryCategory.order;
+    });
+  }
 
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context);
@@ -485,16 +588,33 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
                       ),
                   ],
                 ),
-                if (_orderId != null) ...[
-                  const SizedBox(height: 12),
-                  InputChip(
-                    key: const ValueKey('inq-order'),
-                    label: Text(l10n.inqOrderAttached),
-                    onDeleted: locked
-                        ? null
-                        : () => setState(() => _orderId = null),
+                const SizedBox(height: 12),
+                if (_orderId case final orderId?)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: InputChip(
+                      key: const ValueKey('inq-order'),
+                      label: Text(l10n.inqOrderChosen(orderId)),
+                      onDeleted: locked
+                          ? null
+                          : () => setState(() => _orderId = null),
+                    ),
+                  )
+                else
+                  // 주문은 선택. 본인 주문 목록(`GET /orders`)에서 고른다 — 서버가 본인 주문인지 다시 확인한다(422 ORDER_NOT_FOUND).
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      key: const ValueKey('inq-pick-order'),
+                      onPressed: locked ? null : _pickOrder,
+                      icon: const PmartLineIcon(
+                        PmartLineIcons.chevronRight,
+                        size: 14,
+                      ),
+                      iconAlignment: IconAlignment.end,
+                      label: Text(l10n.inqPickOrder),
+                    ),
                   ),
-                ],
                 const SizedBox(height: 16),
                 TextField(
                   key: const ValueKey('inq-title'),

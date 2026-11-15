@@ -111,3 +111,29 @@ class ChatController extends Notifier<List<ChatTurn>> {
 final chatProvider = NotifierProvider<ChatController, List<ChatTurn>>(
   ChatController.new,
 );
+
+/// 상담 종류. null = 아직 고르지 않음(입력 칸을 막고 두 버튼을 보인다). 계정이 바뀌면 처음으로.
+class ChatTopicController extends Notifier<ChatTopic?> {
+  @override
+  ChatTopic? build() {
+    ref.watch(sessionProvider);
+    return null;
+  }
+
+  void chooseGeneral() => state = const ChatTopicGeneral();
+
+  void chooseOrder() => state = const ChatTopicPickingOrder();
+
+  void pickOrder(ChatOrder order) => state = ChatTopicOrder(order);
+
+  void reset() => state = null;
+}
+
+final chatTopicProvider = NotifierProvider<ChatTopicController, ChatTopic?>(
+  ChatTopicController.new,
+);
+
+/// "주문 건에 대한 문의"에서 고를 최근 주문. 실패는 오류로 남는다(빈 목록으로 바꾸지 않는다).
+final chatRecentOrdersProvider = FutureProvider.autoDispose<List<ChatOrder>>(
+  (ref) => ref.watch(chatRepositoryProvider).recentOrders(),
+);

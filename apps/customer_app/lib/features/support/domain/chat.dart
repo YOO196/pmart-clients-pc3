@@ -104,6 +104,29 @@ class ChatAnswer {
   final bool extractive;
 }
 
+/// 상담 종류(레퍼런스 "채팅 상담 선택 — 일반 문의 / 주문 건에 대한 문의").
+/// 화면 안 구분일 뿐 서버에 보내지 않는다 — 주문 건이면 질문마다 `orderId` 를 붙인다.
+sealed class ChatTopic {
+  const ChatTopic();
+}
+
+/// 일반 문의(주문 없이 묻는다).
+final class ChatTopicGeneral extends ChatTopic {
+  const ChatTopicGeneral();
+}
+
+/// 주문 건에 대한 문의 — 아직 주문을 고르는 중.
+final class ChatTopicPickingOrder extends ChatTopic {
+  const ChatTopicPickingOrder();
+}
+
+/// 주문 건에 대한 문의 — 고른 주문으로 묻는다.
+final class ChatTopicOrder extends ChatTopic {
+  const ChatTopicOrder(this.order);
+
+  final ChatOrder order;
+}
+
 abstract final class ChatProblemCode {
   static const rateLimited = 'RATE_LIMITED';
   static const orderNotFound = 'ORDER_NOT_FOUND';

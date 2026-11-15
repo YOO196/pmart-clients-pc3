@@ -17,6 +17,10 @@ abstract interface class ChatRepository {
     String? orderId,
     required IdempotencyKey key,
   });
+
+  /// `GET /customer-assistant/recent-orders` — "주문 건에 대한 문의"에서 고를 본인 최근 주문(최근 확정 순, 최대 10).
+  /// 요청 제한에 세지 않는다. 403(비회원), 503(주문 조회 장애).
+  Future<List<ChatOrder>> recentOrders({int size = 5});
 }
 
 final class ApiChatRepository implements ChatRepository {
@@ -45,6 +49,15 @@ final class ApiChatRepository implements ChatRepository {
     return chatAnswerFromContract(
       res.data ?? (throw UnknownResultFailure(requestId: key.value)),
     );
+  }
+
+  @override
+  Future<List<ChatOrder>> recentOrders({int size = 5}) async {
+    final res = await pmartGuard(
+      () => _api.listRecentOrdersForChat(size: size),
+    );
+    final data = res.data ?? (throw const ContractViolationFailure('본문 없음'));
+    return [for (final o in data.items) chatOrderFromContract(o)];
   }
 }
 

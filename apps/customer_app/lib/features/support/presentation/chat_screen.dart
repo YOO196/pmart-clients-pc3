@@ -53,7 +53,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final q = _input.text.trim();
     if (q.isEmpty) return;
     _input.clear();
-    await ref.read(chatProvider.notifier).ask(q);
+    // 주문 건 문의면 질문마다 고른 주문을 붙인다.
+    final orderId = switch (ref.read(chatTopicProvider)) {
+      ChatTopicOrder(:final order) => order.orderId,
+      _ => null,
+    };
+    await ref.read(chatProvider.notifier).ask(q, orderId: orderId);
   }
 
   @override
@@ -64,7 +69,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final turns = ref.watch(chatProvider);
     final busy = turns.any((t) => t.status == ChatTurnStatus.sending);
     final mock = ref.watch(envProvider) == PmartEnv.mock;
+    final topic = ref.watch(chatTopicProvider);
+    // 종류를 고르기 전(또는 주문을 고르는 중)에는 입력을 막는다.
+    final canType = topic is ChatTopicGeneral || topic is ChatTopicOrder;
     ref.listen(chatProvider, (_, _) => _toEnd());
+    ref.listen(chatTopicProvider, (_, _) => _toEnd());
     return Scaffold(
       appBar: AppBar(title: Text(l10n.supportChat)),
       body: !member
@@ -92,10 +101,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           ),
                         ),
                       const SizedBox(height: 12),
+                      _TopicSection(topic: topic),
                       for (final t in turns) _Turn(turn: t),
                     ],
                   ),
                 ),
+                if (topic case ChatTopicOrder(:final order))
+                  Container(
+                    key: const ValueKey('chat-topic-bar'),
+                    width: double.infinity,
+                    color: theme.colorScheme.surfaceContainer,
+                    padding: const EdgeInsets.only(left: 16, right: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.chatOrderTopicBar(order.orderId),
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                        TextButton(
+                          key: const ValueKey('chat-topic-change'),
+                          onPressed: busy
+                              ? null
+                              : ref.read(chatTopicProvider.notifier).reset,
+                          child: Text(l10n.chatTopicChange),
+                        ),
+                      ],
+                    ),
+                  ),
                 SafeArea(
                   top: false,
                   child: Padding(
@@ -107,12 +141,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           child: TextField(
                             key: const ValueKey('chat-input'),
                             controller: _input,
-                            enabled: !busy,
+                            enabled: !busy && canType,
                             maxLength: chatQuestionMax,
                             minLines: 1,
                             maxLines: 4,
                             decoration: InputDecoration(
-                              hintText: l10n.chatHint,
+                              hintText: canType
+                                  ? l10n.chatHint
+                                  : l10n.chatChooseTopicHint,
                             ),
                           ),
                         ),
@@ -121,7 +157,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           padding: const EdgeInsets.only(bottom: 22),
                           child: FilledButton(
                             key: const ValueKey('chat-send'),
-                            onPressed: busy || _input.text.trim().isEmpty
+                            onPressed:
+                                busy || !canType || _input.text.trim().isEmpty
                                 ? null
                                 : _send,
                             child: Text(l10n.chatSend),
@@ -221,6 +258,189 @@ class _Turn extends ConsumerWidget {
   }
 }
 
+/// 상담 종류 고르기(레퍼런스 2-1·2-4): 처음엔 오른쪽에 "일반 문의"·"주문 건에 대한 문의" 버튼,
+/// 고르면 내 말풍선으로 남는다. 주문 건이면 최근 주문(`GET /customer-assistant/recent-orders`)을 버튼으로 보인다.
+class _TopicSection extends ConsumerWidget {
+  const _TopicSection({required this.topic});
+
+  final ChatTopic? topic;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final notifier = ref.read(chatTopicProvider.notifier);
+    Widget mine(String text, Key key) => Align(
+      alignment: Alignment.centerRight,
+      child: _Bubble(
+        key: key,
+        color: scheme.primaryContainer,
+        child: Text(text),
+      ),
+    );
+    return switch (topic) {
+      null => Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _ChoiceButton(
+            key: const ValueKey('chat-topic-general'),
+            label: l10n.chatTopicGeneral,
+            onTap: notifier.chooseGeneral,
+          ),
+          _ChoiceButton(
+            key: const ValueKey('chat-topic-order'),
+            label: l10n.chatTopicOrder,
+            onTap: notifier.chooseOrder,
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+      ChatTopicGeneral() => mine(
+        l10n.chatTopicGeneral,
+        const ValueKey('chat-topic-general-chosen'),
+      ),
+      ChatTopicPickingOrder() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          mine(l10n.chatTopicOrder, const ValueKey('chat-topic-order-chosen')),
+          const _RecentOrderPicker(),
+        ],
+      ),
+      ChatTopicOrder(:final order) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          mine(l10n.chatTopicOrder, const ValueKey('chat-topic-order-chosen')),
+          mine(
+            _orderPickLabel(l10n, order),
+            const ValueKey('chat-topic-order-picked'),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    };
+  }
+}
+
+String _orderPickLabel(AppLocalizations l10n, ChatOrder o) =>
+    switch (o.orderedAt) {
+      final DateTime t => l10n.chatOrderPick(formatSeoulDateTime(t), o.orderId),
+      null => o.orderId,
+    };
+
+class _RecentOrderPicker extends ConsumerWidget {
+  const _RecentOrderPicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final notifier = ref.read(chatTopicProvider.notifier);
+    final orders = ref.watch(chatRecentOrdersProvider);
+    final prompt = Align(
+      alignment: Alignment.centerLeft,
+      child: _Bubble(
+        color: theme.colorScheme.surfaceContainer,
+        child: Text(l10n.chatPickOrderPrompt),
+      ),
+    );
+    return switch (orders) {
+      AsyncData(:final value) when value.isEmpty => Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _Bubble(
+              key: const ValueKey('chat-recent-empty'),
+              color: theme.colorScheme.surfaceContainer,
+              child: Text(l10n.chatNoRecentOrders),
+            ),
+          ),
+          _ChoiceButton(
+            key: const ValueKey('chat-topic-general-instead'),
+            label: l10n.chatAskGeneralInstead,
+            onTap: notifier.chooseGeneral,
+          ),
+        ],
+      ),
+      AsyncData(:final value) => Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          prompt,
+          for (final o in value)
+            _ChoiceButton(
+              key: ValueKey('chat-recent-${o.orderId}'),
+              label: _orderPickLabel(l10n, o),
+              onTap: () => notifier.pickOrder(o),
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
+      // 조회 실패는 "주문 없음"으로 보이지 않는다.
+      AsyncError() => Align(
+        alignment: Alignment.centerLeft,
+        child: _Bubble(
+          key: const ValueKey('chat-recent-error'),
+          color: theme.colorScheme.errorContainer,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(l10n.chatRecentOrdersFailed),
+              TextButton(
+                key: const ValueKey('chat-recent-retry'),
+                onPressed: () => ref.invalidate(chatRecentOrdersProvider),
+                child: Text(l10n.chatRetry),
+              ),
+            ],
+          ),
+        ),
+      ),
+      _ => const Padding(
+        padding: EdgeInsets.all(8),
+        child: Center(
+          child: SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+    };
+  }
+}
+
+/// 오른쪽 정렬 테두리 버튼(레퍼런스의 선택지 모양).
+class _ChoiceButton extends StatelessWidget {
+  const _ChoiceButton({super.key, required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width * 0.75,
+      ),
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          side: BorderSide(color: Theme.of(context).colorScheme.onSurface),
+          // 레퍼런스(2-1·2-4): 얇은 테두리, 모서리 4dp, 보통 굵기, 높이 약 38dp.
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          minimumSize: const Size(0, 38),
+          alignment: Alignment.centerLeft,
+          textStyle: Theme.of(context).textTheme.bodyLarge
+              ?.copyWith(fontWeight: FontWeight.w400),
+        ),
+        child: Text(label, textAlign: TextAlign.start),
+      ),
+    ),
+  );
+}
+
 String _rejectText(AppLocalizations l10n, ChatTurn t) => switch (t.rejectCode) {
   // 서버 안내 문장이 있으면 그대로(1분 5개·하루 50개를 서버가 구분해 준다).
   ChatProblemCode.rateLimited => switch (t.serverDetail?.trim()) {
@@ -285,10 +505,13 @@ class _Answer extends ConsumerWidget {
               for (final o in answer.recentOrders)
                 _OrderCard(
                   order: o,
-                  // 같은 질문을 주문과 함께 새 키로 다시 보낸다.
-                  onTap: () => ref
-                      .read(chatProvider.notifier)
-                      .ask(turn.question, orderId: o.orderId),
+                  // 같은 질문을 주문과 함께 새 키로 다시 보낸다. 다음 질문도 이 주문으로 묻는다.
+                  onTap: () {
+                    ref.read(chatTopicProvider.notifier).pickOrder(o);
+                    ref
+                        .read(chatProvider.notifier)
+                        .ask(turn.question, orderId: o.orderId);
+                  },
                 ),
           ],
           if (answer.citations.isNotEmpty)
