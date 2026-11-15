@@ -65,7 +65,7 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 
 ## 2-2. 업무 도우미 (정책·업무 절차 질의응답, 2026-11-04, BR-46 / 계약 1.1.0 반영 2026-11-06)
 - 경로 `/assistant`(질문·답변·내 질문 목록), `/assistant/answers/:answerId`(답변 다시 보기). 코드 `src/features/assistant/`.
-- 읽기 전용. 주문·재고·환불·승인 변경 버튼, AI 자동 실행 없음. 메뉴는 숨기지 않고 권한은 서버 판정(403·404).
+- 읽기 전용. 주문·재고·환불·승인 변경 버튼, AI 자동 실행 없음. 메뉴는 모든 직원에게 보이고 권한은 서버 판정(403·404).
 - 계약 `ai-assistant-service.yaml` 1.1.0(ADR-0036). 화면은 `AssistantPort` 뒤에 둔다. 목 모드는 `draftMock`(계약 모양, "목 답변" 표시), local·LAN 빌드는 `httpAssistant`(생성 타입 + pmartFetch)로 게이트웨이 `/api/v1/assistant/**` 를 부른다(2026-11-15 — 서비스는 2026-11-09 LAN 배포, 생성 답변). 실서버 확인은 아직 안 함. `GET ?requestId=` 는 쓰지 않는다 — 결과 불명·202 는 같은 키·같은 질문 POST 로 다시 확인한다(계약상 같은 답, 409 `INVALID_STATE` 때 하라는 것도 같은 POST). 생성 답변(`GENERATIVE`)에는 "근거 문서를 꼭 확인" 안내를 붙인다(백엔드 공지: 다른 주제를 근거로 답한 경우가 있었다).
 - 질의 `POST /assistant/policy-questions`: 새 전송 = 새 Idempotency-Key. 결과 불명(타임아웃·503 `DEPENDENCY_UNAVAILABLE`·응답 유실)과 202 `PROCESSING` 은 같은 키·같은 질문으로만 재확인(계약: 같은 키 = 같은 답). 답을 받은 질문을 그대로 다시 보내지 않는다(질문을 고치거나 "새 질문"). 403·409·422 `CONFIG_REQUIRED` 는 거절로 확정.
 - 표시: 답변·근거 본문은 일반 텍스트(HTML·마크다운 해석 없음). 기준선(`BASELINE_EXTRACTIVE`·`BASELINE_HASH`)이면 "품질 미검증" 안내. 인용은 지위(authority 6종)·생애(ACTIVE 외만 표시, 대체 문서·대체 제안)·구현 기록(날짜 기준, 현재 구현 보장 아님)을 따로, 저장소 상대 경로·절·문서 버전·기준일·색인 시점(스냅샷·revision·커밋 안 된 변경)·근거 본문(접기). 상대 경로가 아니면 가린다. 링크 없음(1차에 문서 열람 API 없음).
@@ -75,13 +75,25 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 - 계정 전환·로그아웃: 이전 계정의 `['assistant', owner]` 캐시 삭제, 화면 상태 새로 시작.
 
 ## 2-3. 고객센터 문의 답변 (2026-11-15, case-service 0.2.0)
-- 경로 `/inquiries`(목록), `/inquiries/:inquiryId`(상세·답변). 코드 `src/features/inquiries/`. 역할 `CS_AGENT` 만(서버 403 — 메뉴는 숨기지 않는다).
+- 경로 `/inquiries`(목록), `/inquiries/:inquiryId`(상세·답변). 코드 `src/features/inquiries/`. 역할 `CS_AGENT` 만(서버 403). 2026-11-15 부터 고객센터 묶음 안 "문의 답변"(§2-4). 문의 상세에서 "이 문의로 라이더 컴플레인 기록"(문의 ID·주문 ID 채움).
 - 목록 `GET /inquiries?status=&cursor=`: 최근 접수 순, 상태 필터(전체·접수·답변 완료·종료)는 URL 쿼리, 커서 "더 보기". 조회 실패는 빈 목록이 아니라 오류로.
 - 상세 `GET /inquiries/{inquiryId}`: 상태·종류·고객 ID·주문·들어온 곳(문의 페이지 / AI 상담에서 넘어옴)·사건 번호, 본문, 답변들. 본문·답변은 일반 텍스트.
 - 답변 `POST /inquiries/{inquiryId}/replies`(본문 1~4000자, `X-Expected-Version` = 문의 `version`). 반영되면 `ANSWERED`. 결과 불명은 같은 키로만 재확인, 409 `VERSION_CONFLICT`·`INQUIRY_CLOSED` 는 안내 + 다시 읽기. 종료(CLOSED) 문의에는 답변 칸이 없다.
 - 답변은 응대일 뿐 주문·환불을 바꾸지 않는다. 고객 알림은 없다(고객은 앱 "내 문의"에서 본다).
 - 실서버 확인은 아직 안 함(목: `mocks/inquiryHandlers.ts`, 목 계정 "상담원 최").
 
+## 2-4. 메뉴 묶음 · 고객센터 · 라이더 운영 (2026-11-15, 백엔드 요청 `backoffice/2026-11-15-clients-request-backoffice-cs-rider-menus.md`)
+- **메뉴 묶음**(`src/app/nav.ts`): 상품 관리(`MD`) / 승인(`*_APPROVER`·`OPERATOR_ADMIN`) / 고객센터(`CS_AGENT`·`OPERATOR_ADMIN`) / 라이더 운영(`RIDER_OPS`·`OPERATOR_ADMIN`) / 업무 도우미(모든 직원). 토큰 클레임 역할의 합집합, 하위 메뉴가 없으면 묶음도 숨김. 접고 펴는 `<details>` — 지금 화면의 묶음만 펼친 채 시작. 같은 화면(주문 조회·라이더 컴플레인·배송)은 두 묶음에 있다. 메뉴 숨김은 편의 — 주소로 열면 서버 403 이 오류로 보인다. 첫 화면은 보이는 첫 메뉴(없으면 내 세션). MFC 메뉴는 넣지 않는다(MFC 백오피스는 따로 앱, 2026-11-15 사용자 결정).
+- **주문 조회** `/orders`, `/orders/:orderId` — order 0.3.0 `GET /orders/lookups`(조건은 URL 쿼리, 기본 기간 오늘까지 7일, 주문 ID·고객 ID 없으면 기간 31일 이하 — 보내기 전 안내, 연락처는 숫자만 완전 일치 9~11자리, `page`·`hasNext` 쪽 이동). 목록 연락처는 서버가 가린 값. 상세: 금액 구성·결제 번호·주문 상품·이행 확인 필요 기록·이 주문의 클레임(`GET /claims?orderId=`), 배송지(수령인·연락처·주소·출입 메모)는 **기본 가림 + "보기"**. 취소 버튼 없음(ADR-0060). 배송 번호는 주문 조회에 없다(BR-56).
+- **라이더 컴플레인** `/rider-complaints`(목록 — 라이더·배송·종류·기간 필터, 커서), `/rider-complaints/new`(기록 — 배송 번호·종류 필수, 주문·문의·메모 선택, 쿼리로 미리 채움), `/rider-complaints/:id`(상세·메모). case 0.3.0. 라이더는 서버가 채운다(422 `RIDER_NOT_ASSIGNED`·`DELIVERY_NOT_FOUND`·`INQUIRY_NOT_FOUND` 안내). 결과 불명은 같은 키로 확인.
+- **클레임 조회** `/claims`, `/claims/:id` — claim 0.1.0 목록·상세·환불(`/refunds`). 결정 버튼 없음(서버 501). 환불은 서버 상태 그대로(PG 성공 전 "완료" 아님).
+- **배송 확인** `/deliveries`(배송 번호 입력), `/deliveries/:id` — 배송 수행(execution `GET /deliveries/{id}`)과 배차(dispatch `GET …/dispatch`)를 따로 읽고 따로 보인다(한쪽 403 이어도 다른 쪽은 보인다). `FAILURE_REPORTED` 면 전달 실패 확정·반려(`X-Expected-Version` = 수행 version, `APPLIED`/`ACCEPTED` 문구 구분), 배차 `ASSIGNED` 면 픽업 전 배차 취소(사유 4가지 — 운영자 판단은 승인 번호 필수, 다시 배차 기본 켬, 202 접수 → 짝 조회 `GET …/assignment-cancellations/{requestId}` 로 확정까지, 422 `PICKED_UP_CASE_REQUIRED` 안내). "이 배송으로 라이더 컴플레인 기록" 링크.
+- **라이더 찾기·계정 제한** `/riders`, `/riders/:riderId` — 찾기·기본 정보는 계약 전(BR-54): 목 모드만 목, 실서버 모드는 "서버 API 준비 전" 안내(부르지 않음). 라이더 ID 로 바로 열기. 계정 제한 현재·이력·걸기/바꾸기/풀기(rider 0.3.0, 사유 필수·기한·증빙·승인 번호, `X-Expected-Version` = 최근 이력의 version), 이 라이더의 열린 제한 검토·컴플레인.
+- **제한 검토** `/riders/restriction-reviews` — 열림·제한함·기각 탭, 묶인 컴플레인, 열린 검토는 행마다 "제한함으로 닫기"·"기각"(메모), 닫으면 그 자리에서 결과 표시.
+- **전달 실패·도움요청 대기** `/delivery-help-requests` — 계약 전(BR-55): 목 모드만, 오래된 것 먼저, 행 → 배송 화면.
+- 권한(서버 판정, 지금 계약): 배차 조회는 `CS_AGENT`·`RIDER_OPS` 가, 계정 제한·제한 검토·배차 취소·실패 결정은 `RIDER_OPS` 가 PC 5 반영 뒤에 열린다 — 그 전에는 403 이 오류로 보인다(목도 같게 흉내).
+- 개인정보: 목록은 서버가 가린 값, 상세 원문은 `Masked`(기본 가림, "보기"). 원문 열람 사유 입력은 계약이 없어 두지 않았다(§4 Q20). 검색 조건·연락처·주소·메모를 로그에 남기지 않는다.
+- 목: `mocks/opsHandlers.ts`(주문 3·배송 4·클레임 2·컴플레인 2·라이더 2·검토 1), 목 계정 "라이더 운영 정"(`RIDER_OPS`)·"상담·라이더운영 한"(`CS_AGENT`+`RIDER_OPS`, LAN `test-cs-rider` 와 같은 역할). 실서버 확인은 아직 안 함.
 ## 3. 기술 메모
 - 개발: Vite 프록시 `/api → http://localhost:8080` (CORS 없음, BR-04). 목은 MSW.
 - 모든 목록은 커서 페이지(`size`, `cursor`). 표·필터 상태는 URL 쿼리에 둔다(공유·새로고침 복원).

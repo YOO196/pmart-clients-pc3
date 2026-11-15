@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { UiTextProvider } from '@pmart/web-ui';
 import { useState, type ReactNode } from 'react';
-import { createBrowserRouter, createMemoryRouter, Link, Navigate, NavLink, Outlet, RouterProvider } from 'react-router';
+import { createBrowserRouter, createMemoryRouter, Link, Navigate, NavLink, Outlet, RouterProvider, useLocation } from 'react-router';
 
 import { ApprovalDetailPage } from '../features/approvals/ApprovalDetailPage';
 import { ApprovalInboxPage } from '../features/approvals/ApprovalInboxPage';
@@ -15,7 +15,14 @@ import { CategoryTreePage } from '../features/categories/CategoryTreePage';
 import { ContentDraftPage, NewContentDraftPage } from '../features/contents/ContentDraftPage';
 import { ContentImportPage, NewContentImportPage } from '../features/contents/ContentImportPage';
 import { SkuHandlingPage } from '../features/handlings/SkuHandlingPage';
+import { ClaimDetailPage, ClaimListPage } from '../features/claims/ClaimPages';
+import { DeliveryDetailPage, DeliveryOpenPage } from '../features/deliveries/DeliveryPages';
+import { HelpRequestQueuePage } from '../features/deliveries/HelpRequestQueuePage';
 import { InquiryDetailPage, InquiryListPage } from '../features/inquiries/InquiryPages';
+import { OrderDetailPage, OrderLookupPage } from '../features/orders/OrderLookupPages';
+import { NewRiderComplaintPage, RiderComplaintDetailPage, RiderComplaintListPage } from '../features/riderComplaints/RiderComplaintPages';
+import { RestrictionReviewPage } from '../features/riders/RestrictionReviewPage';
+import { RiderDetailPage, RiderSearchPage } from '../features/riders/RiderPages';
 import { NewPriceImportPage, PriceImportPage } from '../features/prices/PriceImportPage';
 import { PricePage } from '../features/prices/PricePage';
 import { ProductDetailPage } from '../features/products/ProductDetailPage';
@@ -28,57 +35,60 @@ import type { Api } from '../api/client';
 import { env } from '../env';
 import { messages as m } from '../shared/messages';
 import { useApi } from './ApiContext';
+import { covers, homePath, visibleGroups, type NavGroup } from './nav';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
 
-// 백엔드 handoff 2026-10-30 §5 메뉴 순서
-const nav: ReadonlyArray<readonly [string, string]> = [
-  ['/approvals', m.nav.approvals],
-  ['/categories', m.nav.categories],
-  ['/products/drafts/new', m.nav.productNew],
-  ['/products/import', m.nav.productImport],
-  ['/products', m.nav.products],
-  ['/contents/drafts/new', m.nav.contentNew],
-  ['/contents/import', m.nav.contentImport],
-  ['/prices', m.nav.prices],
-  ['/prices/import', m.nav.priceImport],
-  ['/handlings', m.nav.handlings],
-  ['/views/approval-inbox', m.nav.bffInbox],
-  // 고객센터 문의(상담원 CS_AGENT). 메뉴는 모두에게 보이고 권한은 서버가 판정한다(403).
-  ['/inquiries', m.nav.inquiries],
-  // 메뉴는 모두에게 보인다. 업무 도우미 권한은 서버가 판정한다(403·FORBIDDEN_SCOPE).
-  ['/assistant', m.nav.assistant],
-];
-
-/** 업무 도우미: 목 모드만 계약 확정 전 목(BR-46), 실서버 모드는 연결하지 않는다. */
-// 목 모드는 draftMock(계약 모양), 실서버 모드(local·lan)는 게이트웨이의 ai-assistant-service(2026-11-09 LAN 배포).
+/** 업무 도우미: 목 모드는 draftMock(계약 모양), 실서버 모드(local·lan)는 게이트웨이의 ai-assistant-service(2026-11-09 LAN 배포). */
 const defaultAssistantPort = (api: Api): AssistantPort =>
   import.meta.env.VITE_PMART_ENV === 'mock' ? createDraftAssistantMock({ delayMs: 400 }) : createHttpAssistant(api);
 
+/** 접고 펴는 메뉴 묶음. 지금 화면이 든 묶음은 펼친 채로 시작한다(사용자가 접으면 그대로 둔다). */
+function NavGroupMenu({ group, pathname }: { readonly group: NavGroup; readonly pathname: string }) {
+  const active = group.items.some((i) => covers(i, pathname));
+  const [manual, setManual] = useState<boolean | null>(null);
+  const open = manual ?? active;
+  return (
+    <li>
+      <details open={open} onToggle={(e) => setManual(e.currentTarget.open)} data-testid={`nav-group-${group.id}`}>
+        <summary className="font-bold">{group.label}</summary>
+        <ul>
+          {group.items.map((item) => (
+            <li key={item.to}>
+              <NavLink to={item.to} end>
+                {item.label}
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </li>
+  );
+}
+
 function Layout() {
   const { session } = useSession();
+  const { pathname } = useLocation();
+  const groups = session ? visibleGroups(session.roles) : [];
   return (
     <div className="flex min-h-screen bg-base-200">
-      <aside className="w-52 shrink-0 bg-base-100 shadow-sm">
+      <aside className="w-56 shrink-0 bg-base-100 shadow-sm">
         <div className="p-4">
           <Link to="/" className="text-lg font-bold" aria-label={m.goHome}>
             {m.appTitle}
           </Link>
           {env.isMock && <span className="badge badge-outline ml-2">{m.mockBadge}</span>}
         </div>
-        <ul className="menu w-full">
+        <ul className="menu w-full" aria-label="메뉴">
           <li>
             <NavLink to={session ? '/session' : '/login'}>
               {session ? `${m.nav.session}: ${session.subject}` : m.nav.login}
             </NavLink>
           </li>
-          {nav.map(([to, label]) => (
-            <li key={to}>
-              <NavLink to={to} end>
-                {label}
-              </NavLink>
-            </li>
+          {groups.map((g) => (
+            <NavGroupMenu key={g.id} group={g} pathname={pathname} />
           ))}
         </ul>
+        {session && groups.every((g) => g.id === 'assistant') && <p className="px-4 text-xs opacity-60">{m.nav.noMenu}</p>}
       </aside>
       <main className="min-w-0 flex-1 p-6">
         <Outlet />
@@ -89,6 +99,12 @@ function Layout() {
 
 const guarded = (element: ReactNode) => <RequireSession>{element}</RequireSession>;
 
+/** 첫 화면: 역할로 보이는 첫 메뉴(없으면 내 세션). */
+function Home() {
+  const { session } = useSession();
+  return <Navigate to={homePath(session?.roles ?? [])} replace />;
+}
+
 const routes = [
   { path: '/login', element: <LoginPage /> },
   // 직원 로그인 복귀 주소(handoff 2026-11-12 §3 — 백엔드 허용 목록의 <출처>/auth/callback)
@@ -97,7 +113,7 @@ const routes = [
     path: '/',
     element: <Layout />,
     children: [
-      { index: true, element: <Navigate to="/approvals" replace /> },
+      { index: true, element: guarded(<Home />) },
       { path: 'session', element: guarded(<SessionPage />) },
       { path: 'approvals', element: guarded(<ApprovalListPage />) },
       { path: 'approvals/:approvalId', element: guarded(<ApprovalDetailPage />) },
@@ -119,6 +135,20 @@ const routes = [
       { path: 'handlings', element: guarded(<SkuHandlingPage />) },
       { path: 'inquiries', element: guarded(<InquiryListPage />) },
       { path: 'inquiries/:inquiryId', element: guarded(<InquiryDetailPage />) },
+      // 고객센터·라이더 운영(백엔드 요청 2026-11-15 cs-rider-menus)
+      { path: 'orders', element: guarded(<OrderLookupPage />) },
+      { path: 'orders/:orderId', element: guarded(<OrderDetailPage />) },
+      { path: 'rider-complaints', element: guarded(<RiderComplaintListPage />) },
+      { path: 'rider-complaints/new', element: guarded(<NewRiderComplaintPage />) },
+      { path: 'rider-complaints/:complaintId', element: guarded(<RiderComplaintDetailPage />) },
+      { path: 'claims', element: guarded(<ClaimListPage />) },
+      { path: 'claims/:claimId', element: guarded(<ClaimDetailPage />) },
+      { path: 'deliveries', element: guarded(<DeliveryOpenPage />) },
+      { path: 'deliveries/:deliveryId', element: guarded(<DeliveryDetailPage />) },
+      { path: 'riders', element: guarded(<RiderSearchPage />) },
+      { path: 'riders/restriction-reviews', element: guarded(<RestrictionReviewPage />) },
+      { path: 'riders/:riderId', element: guarded(<RiderDetailPage />) },
+      { path: 'delivery-help-requests', element: guarded(<HelpRequestQueuePage />) },
       { path: 'assistant', element: guarded(<AssistantPage />) },
       { path: 'assistant/answers/:answerId', element: guarded(<AssistantAnswerPage />) },
     ],

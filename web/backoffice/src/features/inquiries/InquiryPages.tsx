@@ -234,6 +234,13 @@ export function InquiryDetailPage() {
             )}
 
             <ReplyForm key={q.inquiryId} inquiry={q} />
+            {/* 라이더 때문에 생긴 문의면 컴플레인을 기록한다(문의 ID 로 사건 연결 — case 0.3.0). 배송 번호는 상담원이 넣는다(문의에 없음). */}
+            <Link
+              className="btn btn-sm"
+              to={`/rider-complaints/new?${new URLSearchParams({ inquiryId: q.inquiryId, ...(q.orderId ? { orderId: q.orderId } : {}) }).toString()}`}
+            >
+              {m.inquiries.recordComplaint}
+            </Link>
           </>
         )}
       </QueryState>

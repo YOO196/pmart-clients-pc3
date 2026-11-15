@@ -31,9 +31,10 @@ describe('고객센터 문의 목록', () => {
     expect(screen.queryByTestId('inquiry-row')).not.toBeInTheDocument();
   });
 
-  it('메뉴는 권한과 관계없이 보인다(권한은 서버 판정)', async () => {
+  it('메뉴는 역할로 숨기지만(편의) 화면은 열 수 있고 권한은 서버가 판정한다(403 은 오류로)', async () => {
     renderAt('/inquiries', as.md);
-    expect(await screen.findByRole('link', { name: '고객센터 문의' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '문의 답변' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '이용할 수 없는 화면이에요' })).toBeInTheDocument();
   });
 });
 

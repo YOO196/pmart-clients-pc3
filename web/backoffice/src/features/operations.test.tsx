@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { cleanup, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
@@ -68,9 +68,14 @@ describe('센터 취급', () => {
 
 
 describe('이동', () => {
-  it('상단 PMart 로고를 누르면 홈(승인함)으로 간다', async () => {
+  it('상단 PMart 로고를 누르면 홈(역할로 보이는 첫 메뉴)으로 간다 — MD 는 상품 조회, 승인자는 승인함', async () => {
     const user = userEvent.setup();
     renderAt('/prices');
+    await user.click(screen.getByRole('link', { name: 'PMart 백오피스 홈으로' }));
+    expect(await screen.findByRole('heading', { name: '상품 조회' })).toBeInTheDocument();
+    cleanup();
+
+    renderAt('/prices', as.approver);
     await user.click(screen.getByRole('link', { name: 'PMart 백오피스 홈으로' }));
     expect(await screen.findByRole('heading', { name: '승인함' })).toBeInTheDocument();
   });

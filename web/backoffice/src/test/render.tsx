@@ -10,6 +10,8 @@ export const as = {
   approver: mockTokenFor(mockOperators[2]),
   center: mockTokenFor(mockOperators[3]),
   cs: mockTokenFor(mockOperators[4]),
+  riderOps: mockTokenFor(mockOperators[5]),
+  csRider: mockTokenFor(mockOperators[6]),
 };
 
 /** 화면 + 보낸 요청 기록(헤더 확인용) */

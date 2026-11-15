@@ -23,6 +23,8 @@
 - 409 `VERSION_CONFLICT`·`INQUIRY_CLOSED` 는 안내하고 문의를 다시 읽는다.
 
 ## 2. 새 웹 빌드 — 올려 달라
+> 2026-11-15 덧붙임: 이 빌드 대신 `2026-11-15-backend-cs-rider-menus-done.md` §6 의 새 빌드(`index-Dyq2y9wh.js`)를 올려 달라(이 문서의 기능 포함).
+
 | 앱 | dist 폴더 (PC 1) | 진입 파일 | 주소 |
 |---|---|---|---|
 | 백오피스 | `C:\development\pmart-project\pmart-clients\web\backoffice\dist` | `assets/index-Bxl0nrwE.js`, `assets/index-CvVsfcBO.css` | `https://192.168.0.40` |

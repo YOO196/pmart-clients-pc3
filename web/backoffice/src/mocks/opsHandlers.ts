@@ -1,0 +1,512 @@
+// ⚠ 화면 개발·시험용 목 — 고객센터·라이더 운영(백엔드 요청 2026-11-15 cs-rider-menus). 실제 서버 동작이 아니다.
+// 계약: order 0.3.0 lookups, case 0.3.0 rider-complaints, claim 0.1.0, rider 0.3.0 restrictions·reviews, dispatch 0.3.1, execution 0.3.2.
+// 역할은 지금 계약 설명 그대로 흉내 낸다 — PC 5 반영 전이라 RIDER_OPS 는 계정 제한·검토·배차 조회/취소·실패 결정이 403, CS_AGENT 는 배차 조회가 403.
+// 응답 모양은 생성 타입을 따른다. 계약에 없는 필드는 넣지 않는다.
+import { http, HttpResponse } from 'msw';
+
+import { API_BASE } from '../api/client';
+import type { components as CaseC } from '../api/generated/case';
+import type { components as ClaimC } from '../api/generated/claim';
+import type { components as DispatchC } from '../api/generated/delivery-dispatch';
+import type { components as ExecutionC } from '../api/generated/delivery-execution';
+import type { components as OrderC } from '../api/generated/order';
+import type { components as RiderC } from '../api/generated/rider';
+import { expectedVersion, idempotent, operator, problem, unauthorized } from './support';
+
+type StaffOrder = OrderC['schemas']['StaffOrderDetail'];
+type Complaint = CaseC['schemas']['RiderComplaint'];
+type Claim = ClaimC['schemas']['Claim'];
+type Refund = ClaimC['schemas']['Refund'];
+type DispatchView = DispatchC['schemas']['Delivery'];
+type Execution = ExecutionC['schemas']['DeliveryExecution'];
+type RestrictionRecord = RiderC['schemas']['RiderRestrictionRecord'];
+type Restriction = RiderC['schemas']['AccountRestriction'];
+type Review = RiderC['schemas']['RestrictionReview'];
+
+const HOUR = 3_600_000;
+const ago = (hours: number) => new Date(Date.now() - hours * HOUR).toISOString();
+
+function order(orderId: string, status: StaffOrder['status'], confirmedAt: string, phone: string): StaffOrder {
+  return {
+    orderId,
+    status,
+    confirmedAt,
+    customerId: `CUS-${orderId.slice(-4)}`,
+    mfcId: 'MFC-BSN-01',
+    deliveryMode: 'SINGLE',
+    arrivalWindow: { date: confirmedAt.slice(0, 10), start: '14:00', end: '15:00' },
+    plannedShipments: 1,
+    outOfStockPreference: 'CANCEL_OOS_ONLY',
+    version: 3,
+    weightG: 1800,
+    deliveryNote: '[목] 문 앞에 두세요',
+    amounts: {
+      itemAmount: 12000,
+      deliveryTip: 3000,
+      deliveryTipBase: 3000,
+      deliveryTipReason: 'STANDARD',
+      firstPurchaseApplied: false,
+      bagFee: 100,
+      totalAmount: 15100,
+      approvedAmount: 15100,
+    },
+    payment: { paymentAttemptId: `PAY-${orderId}`, pgTransactionId: `PG-${orderId}` },
+    lines: [
+      { orderLineId: `${orderId}-L1`, sku: 'E-00000001', productName: '사과 1.5kg', originalQty: 1, cancelledBeforeShipQty: 0, handedOverQty: 1, deliveredQty: 0, returnedQty: 0, unitPrice: 12000, lineAmount: 12000 },
+    ],
+    fulfillmentIssues: [],
+    shippingAddress: {
+      receiverName: '[목] 김고객',
+      receiverPhone: phone,
+      roadAddress: '[목] 부산 수영구 광안로 1',
+      detailAddress: '101동 1001호',
+      postalCode: '48300',
+      entranceMethod: 'PASSWORD',
+      entranceNote: '[목] #1234',
+      capturedAt: confirmedAt,
+    },
+  };
+}
+
+const maskPhone = (p: string | undefined) => (p && p.length >= 8 ? `${p.slice(0, 3)}-****-${p.slice(-4)}` : null);
+
+function execution(deliveryId: string, orderId: string, state: ExecutionC['schemas']['ExecutionState'], riderId: string | undefined): Execution {
+  return {
+    deliveryId,
+    orderId,
+    mfcId: 'MFC-BSN-01',
+    type: 'FORWARD',
+    state,
+    ...(riderId ? { riderId, assignedAt: ago(2) } : {}),
+    version: 4,
+    history: [{ state: 'ASSIGNED', actor: 'SYSTEM_EVENT', occurredAt: ago(2) }],
+    incidents: [],
+  };
+}
+
+function dispatch(deliveryId: string, orderId: string, state: DispatchC['schemas']['DispatchState'], riderId: string | undefined): DispatchView {
+  return {
+    deliveryId,
+    orderId,
+    mfcId: 'MFC-BSN-01',
+    type: 'FORWARD',
+    state,
+    version: 2,
+    ...(riderId
+      ? { assignment: { riderId, assignedAt: ago(2), state: state === 'PICKED_UP' ? 'PICKED_UP' : 'ASSIGNED', ...(state === 'PICKED_UP' ? { pickedUpAt: ago(1) } : {}) } }
+      : {}),
+    attempts: [{ attemptId: `ATT-${deliveryId}`, state: riderId ? 'ASSIGNED' : 'SEARCHING', trigger: 'STORE_STAFF', startedAt: ago(2) }],
+  };
+}
+
+interface OpsState {
+  seq: number;
+  orders: StaffOrder[];
+  executions: Map<string, Execution>;
+  dispatches: Map<string, DispatchView>;
+  complaints: Complaint[];
+  claims: Claim[];
+  refunds: Map<string, Refund[]>;
+  riders: Map<string, { version: number; current: Restriction; history: RestrictionRecord[] }>;
+  reviews: Review[];
+  /** 배차 취소 짝 조회: requestId → 처리 결과(다음 조회부터 확정으로 보인다) */
+  cancellations: Map<string, { deliveryId: string; outcome: 'CANCELLED_BEFORE_PICKUP' | 'REJECTED_PICKED_UP'; polled: boolean }>;
+}
+
+function seed(): OpsState {
+  const failed = execution('DLV-MOCK-2', 'ORD-MOCK-1002', 'FAILURE_REPORTED', 'RID-MOCK-2');
+  failed.failure = { reason: 'CUSTOMER_UNREACHABLE', detail: '[목] 세 번 전화했지만 받지 않았어요.', goodsLocation: 'WITH_RIDER', contactAttempts: 3, reportedAt: ago(1) };
+  return {
+    seq: 100,
+    orders: [
+      order('ORD-MOCK-1001', 'IN_DELIVERY', ago(1), '01012345678'),
+      order('ORD-MOCK-1002', 'IN_DELIVERY', ago(26), '01055556666'),
+      order('ORD-MOCK-1003', 'PREPARING', ago(72), '01012345678'),
+    ],
+    executions: new Map([
+      ['DLV-MOCK-1', execution('DLV-MOCK-1', 'ORD-MOCK-1001', 'PICKED_UP', 'RID-MOCK-1')],
+      ['DLV-MOCK-2', failed],
+      ['DLV-MOCK-3', execution('DLV-MOCK-3', 'ORD-MOCK-1003', 'ASSIGNED', 'RID-MOCK-1')],
+      ['DLV-MOCK-4', execution('DLV-MOCK-4', 'ORD-MOCK-1003', 'UNASSIGNED', undefined)],
+    ]),
+    dispatches: new Map([
+      ['DLV-MOCK-1', dispatch('DLV-MOCK-1', 'ORD-MOCK-1001', 'PICKED_UP', 'RID-MOCK-1')],
+      ['DLV-MOCK-2', dispatch('DLV-MOCK-2', 'ORD-MOCK-1002', 'PICKED_UP', 'RID-MOCK-2')],
+      ['DLV-MOCK-3', dispatch('DLV-MOCK-3', 'ORD-MOCK-1003', 'ASSIGNED', 'RID-MOCK-1')],
+      ['DLV-MOCK-4', dispatch('DLV-MOCK-4', 'ORD-MOCK-1003', 'DISPATCHING', undefined)],
+    ]),
+    complaints: [
+      { complaintId: 'RCP-MOCK-2', complaintType: 'MISDELIVERY', deliveryId: 'DLV-MOCK-21', riderId: 'RID-MOCK-2', recordedAt: ago(20), recordedBy: 'op-cs-1', source: 'CS_AGENT', note: '[목] 옆집에 두고 감' },
+      { complaintId: 'RCP-MOCK-1', complaintType: 'MISDELIVERY', deliveryId: 'DLV-MOCK-20', riderId: 'RID-MOCK-2', recordedAt: ago(48), recordedBy: 'op-cs-1', source: 'CS_AGENT', note: null },
+    ],
+    claims: [
+      {
+        claimId: 'CLM-MOCK-1',
+        orderId: 'ORD-MOCK-1002',
+        type: 'CANCEL',
+        state: 'CLOSED',
+        reason: 'CHANGE_OF_MIND',
+        openedAt: ago(25),
+        decidedAt: ago(25),
+        closedAt: ago(24),
+        version: 4,
+        lines: [{ claimLineId: 'CL-1', sku: 'E-00000001', requestedQty: 1, approvedQty: 1, decision: 'APPROVED', refundAmount: 15100 }],
+      },
+      {
+        claimId: 'CLM-MOCK-2',
+        orderId: 'ORD-MOCK-1003',
+        type: 'CANCEL',
+        state: 'STOP_PENDING',
+        openedAt: ago(2),
+        version: 1,
+        lines: [{ claimLineId: 'CL-2', sku: 'E-00000001', requestedQty: 1, decision: 'PENDING' }],
+      },
+    ],
+    refunds: new Map([
+      ['CLM-MOCK-1', [{ refundIntentId: 'RF-MOCK-1', claimId: 'CLM-MOCK-1', amount: 15100, state: 'COMPLETED', pgResult: 'SUCCESS', requestedAt: ago(25), completedAt: ago(24) }]],
+      ['CLM-MOCK-2', [{ refundIntentId: 'RF-MOCK-2', claimId: 'CLM-MOCK-2', amount: 15100, state: 'PENDING_EXECUTION', requestedAt: ago(2) }]],
+    ]),
+    riders: new Map([
+      ['RID-MOCK-1', { version: 1, current: 'NORMAL', history: [] }],
+      [
+        'RID-MOCK-2',
+        {
+          version: 3,
+          current: 'NORMAL',
+          history: [
+            { riderId: 'RID-MOCK-2', previous: 'DISPATCH_RESTRICTED', restriction: 'NORMAL', reason: '[목] 소명 확인 — 제한 풀기', changedAt: ago(240), changedBy: 'op-admin-1', version: 3 },
+            { riderId: 'RID-MOCK-2', previous: 'NORMAL', restriction: 'DISPATCH_RESTRICTED', reason: '[목] 오배송 반복', changedAt: ago(300), changedBy: 'op-admin-1', version: 2 },
+          ],
+        },
+      ],
+    ]),
+    reviews: [
+      {
+        reviewId: 'REV-MOCK-1',
+        riderId: 'RID-MOCK-2',
+        complaintType: 'MISDELIVERY',
+        state: 'OPEN',
+        openedAt: ago(20),
+        complaints: [
+          { complaintId: 'RCP-MOCK-0', deliveryId: 'DLV-MOCK-19', recordedAt: ago(100) },
+          { complaintId: 'RCP-MOCK-1', deliveryId: 'DLV-MOCK-20', recordedAt: ago(48) },
+          { complaintId: 'RCP-MOCK-2', deliveryId: 'DLV-MOCK-21', recordedAt: ago(20) },
+        ],
+      },
+    ],
+    cancellations: new Map(),
+  };
+}
+
+let ops = seed();
+
+/** 시험 사이에 목 상태를 처음으로 돌린다. */
+export function resetMockOps(): void {
+  ops = seed();
+}
+
+/** 역할 검사: 토큰 없음 401, 역할 없음 403. */
+const allow = (request: Request, ...roles: string[]) => {
+  const who = operator(request);
+  if (!who) return { denied: unauthorized(), who: null };
+  return who.roles.some((r) => roles.includes(r)) ? { denied: null, who } : { denied: problem(403, 'FORBIDDEN'), who };
+};
+
+const PAGE = 20;
+const cursorPage = <T,>(all: T[], url: URL) => {
+  const start = Number(url.searchParams.get('cursor') ?? '0');
+  const size = Number(url.searchParams.get('size') ?? PAGE) || PAGE;
+  return { items: all.slice(start, start + size), page: { nextCursor: start + size < all.length ? String(start + size) : null, size } };
+};
+const inRange = (iso: string, from: string | null, to: string | null) => (!from || iso >= new Date(from).toISOString()) && (!to || iso < new Date(to).toISOString());
+const complaintSummary = (c: Complaint) => ({
+  complaintId: c.complaintId,
+  complaintType: c.complaintType,
+  deliveryId: c.deliveryId,
+  riderId: c.riderId,
+  recordedAt: c.recordedAt,
+  recordedBy: c.recordedBy,
+  source: c.source,
+  ...(c.orderId ? { orderId: c.orderId } : {}),
+  ...(c.inquiryId ? { inquiryId: c.inquiryId } : {}),
+  ...(c.caseId ? { caseId: c.caseId } : {}),
+});
+
+const CS = ['CS_AGENT', 'OPERATOR_ADMIN'];
+const LOOKUP = ['CS_AGENT', 'OPERATOR_ADMIN', 'RIDER_OPS'];
+const ADMIN = ['OPERATOR_ADMIN'];
+const MAX_DAYS = 31;
+
+export const opsHandlers = [
+  // ---- order 0.3.0 ----
+  http.get(`${API_BASE}/orders/lookups`, ({ request }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const q = new URL(request.url).searchParams;
+    const orderId = q.get('orderId');
+    const customerId = q.get('customerId');
+    const from = q.get('createdFrom');
+    const to = q.get('createdTo');
+    if (!orderId && !customerId) {
+      if (!from || !to) return problem(400, 'VALIDATION_FAILED', [{ field: 'createdFrom', reason: 'REQUIRED' }]);
+      const span = Date.parse(to) - Date.parse(from);
+      if (span <= 0 || span > MAX_DAYS * 24 * HOUR) return problem(400, 'VALIDATION_FAILED', [{ field: 'createdTo', reason: 'RANGE' }]);
+    }
+    const phone = q.get('receiverPhone')?.replace(/\D/g, '');
+    if (phone !== undefined && phone !== '' && (phone.length < 9 || phone.length > 11)) return problem(400, 'VALIDATION_FAILED', [{ field: 'receiverPhone' }]);
+    const all = ops.orders
+      .filter(
+        (o) =>
+          (!orderId || o.orderId === orderId) &&
+          (!customerId || o.customerId === customerId) &&
+          (!q.get('status') || o.status === q.get('status')) &&
+          (!q.get('mfcId') || o.mfcId === q.get('mfcId')) &&
+          (!phone || o.shippingAddress?.receiverPhone === phone) &&
+          inRange(o.confirmedAt, from, to),
+      )
+      .toSorted((a, b) => b.confirmedAt.localeCompare(a.confirmedAt));
+    const page = Number(q.get('page') ?? '0');
+    const size = Number(q.get('size') ?? '20');
+    const slice = all.slice(page * size, page * size + size);
+    return HttpResponse.json({
+      items: slice.map((o) => ({
+        orderId: o.orderId,
+        status: o.status,
+        confirmedAt: o.confirmedAt,
+        customerId: o.customerId,
+        mfcId: o.mfcId,
+        deliveryMode: o.deliveryMode,
+        ...(o.arrivalWindow ? { arrivalWindow: o.arrivalWindow } : {}),
+        itemCount: o.lines.reduce((n, l) => n + (l.originalQty ?? 0), 0),
+        lineCount: o.lines.length,
+        openFulfillmentIssues: o.fulfillmentIssues.filter((f) => f.state === 'OPEN').length,
+        plannedShipments: o.plannedShipments ?? 1,
+        receiverPhoneMasked: maskPhone(o.shippingAddress?.receiverPhone),
+        totalAmount: o.amounts.totalAmount,
+        approvedAmount: o.amounts.approvedAmount,
+        version: o.version,
+      })),
+      page: { page, size, hasNext: (page + 1) * size < all.length },
+    });
+  }),
+  http.get(`${API_BASE}/orders/lookups/:orderId`, ({ request, params }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const found = ops.orders.find((o) => o.orderId === params['orderId']);
+    return found ? HttpResponse.json(found) : problem(404, 'NOT_FOUND');
+  }),
+
+  // ---- case 0.3.0 rider-complaints ----
+  http.post(`${API_BASE}/rider-complaints`, async ({ request }) => {
+    const { denied, who } = allow(request, ...CS);
+    if (denied) return denied;
+    const body = (await request.clone().json()) as { deliveryId?: string; complaintType?: Complaint['complaintType']; orderId?: string; note?: string; inquiryId?: string };
+    return idempotent(request, () => {
+      if (!body.deliveryId || !body.complaintType) return problem(400, 'VALIDATION_FAILED');
+      const d = ops.dispatches.get(body.deliveryId);
+      if (!d) return problem(422, 'DELIVERY_NOT_FOUND');
+      const riderId = d.assignment?.riderId;
+      if (!riderId) return problem(422, 'RIDER_NOT_ASSIGNED');
+      if (body.inquiryId && !body.inquiryId.startsWith('INQ-MOCK-')) return problem(422, 'INQUIRY_NOT_FOUND');
+      const saved: Complaint = {
+        complaintId: `RCP-MOCK-${++ops.seq}`,
+        complaintType: body.complaintType,
+        deliveryId: body.deliveryId,
+        riderId,
+        recordedAt: new Date().toISOString(),
+        recordedBy: who?.subject ?? '',
+        source: 'CS_AGENT',
+        note: body.note ?? null,
+        ...(body.orderId ? { orderId: body.orderId } : {}),
+        ...(body.inquiryId ? { inquiryId: body.inquiryId, caseId: `CASE-${body.inquiryId}` } : {}),
+      };
+      ops.complaints.unshift(saved);
+      return { status: 201, body: saved };
+    });
+  }),
+  http.get(`${API_BASE}/rider-complaints`, ({ request }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const url = new URL(request.url);
+    const q = url.searchParams;
+    const all = ops.complaints.filter(
+      (c) =>
+        (!q.get('riderId') || c.riderId === q.get('riderId')) &&
+        (!q.get('deliveryId') || c.deliveryId === q.get('deliveryId')) &&
+        (!q.get('complaintType') || c.complaintType === q.get('complaintType')) &&
+        inRange(c.recordedAt, q.get('from'), q.get('to')),
+    );
+    const page = cursorPage(all, url);
+    return HttpResponse.json({ items: page.items.map(complaintSummary), page: page.page });
+  }),
+  http.get(`${API_BASE}/rider-complaints/:complaintId`, ({ request, params }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const found = ops.complaints.find((c) => c.complaintId === params['complaintId']);
+    return found ? HttpResponse.json(found) : problem(404, 'NOT_FOUND');
+  }),
+
+  // ---- claim 0.1.0 (조회만) ----
+  http.get(`${API_BASE}/claims`, ({ request }) => {
+    const { denied } = allow(request, ...CS);
+    if (denied) return denied;
+    const url = new URL(request.url);
+    const q = url.searchParams;
+    const all = ops.claims.filter((c) => (!q.get('orderId') || c.orderId === q.get('orderId')) && (!q.get('type') || c.type === q.get('type')) && (!q.get('state') || c.state === q.get('state')));
+    const page = cursorPage(all, url);
+    return HttpResponse.json({
+      items: page.items.map((c) => ({ claimId: c.claimId, orderId: c.orderId, type: c.type, state: c.state, openedAt: c.openedAt })),
+      page: page.page,
+    });
+  }),
+  http.get(`${API_BASE}/claims/:claimId`, ({ request, params }) => {
+    const { denied } = allow(request, ...CS);
+    if (denied) return denied;
+    const found = ops.claims.find((c) => c.claimId === params['claimId']);
+    return found ? HttpResponse.json(found) : problem(404, 'NOT_FOUND');
+  }),
+  http.get(`${API_BASE}/claims/:claimId/refunds`, ({ request, params }) => {
+    const { denied } = allow(request, ...CS);
+    if (denied) return denied;
+    const id = String(params['claimId']);
+    if (!ops.claims.some((c) => c.claimId === id)) return problem(404, 'NOT_FOUND');
+    return HttpResponse.json({ claimId: id, items: ops.refunds.get(id) ?? [], asOf: { asOf: new Date().toISOString(), freshness: 'CURRENT' } });
+  }),
+
+  // ---- delivery-execution 0.3.2 ----
+  http.get(`${API_BASE}/deliveries/:deliveryId`, ({ request, params }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const found = ops.executions.get(String(params['deliveryId']));
+    return found ? HttpResponse.json(found) : problem(404, 'NOT_FOUND');
+  }),
+  http.post(`${API_BASE}/deliveries/:deliveryId/failure-decisions`, async ({ request, params }) => {
+    const { denied, who } = allow(request, ...CS);
+    if (denied) return denied;
+    const body = (await request.clone().json()) as { decision?: 'CONFIRM' | 'REJECT'; custody?: 'RIDER' | 'STORE'; note?: string };
+    return idempotent(request, () => {
+      const id = String(params['deliveryId']);
+      const d = ops.executions.get(id);
+      if (!d) return problem(404, 'NOT_FOUND');
+      if (d.state !== 'FAILURE_REPORTED') return problem(409, 'INVALID_STATE');
+      const v = expectedVersion(request);
+      if (v !== undefined && v !== d.version) return problem(409, 'VERSION_CONFLICT');
+      if (!body.decision) return problem(400, 'VALIDATION_FAILED');
+      const at = new Date().toISOString();
+      const next: Execution = {
+        ...d,
+        state: body.decision === 'CONFIRM' ? 'FAILED' : 'ARRIVED_AT_CUSTOMER',
+        version: (d.version ?? 0) + 1,
+        failure: { ...d.failure, decision: body.decision, decidedAt: at, decidedBy: who?.subject ?? '', ...(body.custody ? { custody: body.custody } : {}) },
+        history: [...(d.history ?? []), { state: body.decision === 'CONFIRM' ? 'FAILED' : 'ARRIVED_AT_CUSTOMER', actor: 'OPERATOR', occurredAt: at }],
+      };
+      ops.executions.set(id, next);
+      return { status: 200, body: { status: 'APPLIED', requestId: request.headers.get('Idempotency-Key') ?? '', resultId: id, version: next.version, occurredAt: at } };
+    });
+  }),
+
+  // ---- delivery-dispatch 0.3.1 ----
+  http.get(`${API_BASE}/deliveries/:deliveryId/dispatch`, ({ request, params }) => {
+    // 지금 계약: 그 센터 직원·OPERATOR_ADMIN(CS_AGENT·RIDER_OPS 는 PC 5 반영 뒤)
+    const { denied } = allow(request, ...ADMIN);
+    if (denied) return denied;
+    const found = ops.dispatches.get(String(params['deliveryId']));
+    return found ? HttpResponse.json(found) : problem(404, 'NOT_FOUND');
+  }),
+  http.post(`${API_BASE}/deliveries/:deliveryId/assignment-cancellations`, async ({ request, params }) => {
+    const { denied } = allow(request, ...ADMIN);
+    if (denied) return denied;
+    const body = (await request.clone().json()) as { requestedBy?: string; reason?: string; reassign?: boolean; approvalRef?: string };
+    return idempotent(request, () => {
+      const id = String(params['deliveryId']);
+      const d = ops.dispatches.get(id);
+      if (!d) return problem(404, 'NOT_FOUND');
+      if (d.state === 'PICKED_UP') return problem(422, 'PICKED_UP_CASE_REQUIRED');
+      if (d.state !== 'ASSIGNED') return problem(409, 'INVALID_STATE');
+      const v = expectedVersion(request);
+      if (v !== undefined && v !== d.version) return problem(409, 'VERSION_CONFLICT');
+      if (body.reason === 'OPERATOR' && !body.approvalRef) return problem(422, 'APPROVAL_REQUIRED');
+      const requestId = request.headers.get('Idempotency-Key') ?? '';
+      // 접수만 하고(202), 반영은 짝 조회 두 번째부터 보인다(비동기 흉내).
+      ops.cancellations.set(requestId, { deliveryId: id, outcome: 'CANCELLED_BEFORE_PICKUP', polled: false });
+      const reassign = body.reassign ?? true;
+      const next: DispatchView = { ...d, state: reassign ? 'DISPATCHING' : 'CANCELLED_BEFORE_PICKUP', version: (d.version ?? 0) + 1 };
+      delete next.assignment; // 배정 해제
+      ops.dispatches.set(id, next);
+      return { status: 202, body: { status: 'ACCEPTED', requestId, occurredAt: new Date().toISOString() } };
+    });
+  }),
+  http.get(`${API_BASE}/deliveries/:deliveryId/assignment-cancellations/:requestId`, ({ request, params }) => {
+    const { denied } = allow(request, ...ADMIN);
+    if (denied) return denied;
+    const requestId = String(params['requestId']);
+    const found = ops.cancellations.get(requestId);
+    if (!found || found.deliveryId !== params['deliveryId']) return problem(404, 'NOT_FOUND');
+    if (!found.polled) {
+      found.polled = true;
+      return HttpResponse.json({ requestId, state: 'PENDING' });
+    }
+    return HttpResponse.json({ requestId, state: found.outcome });
+  }),
+
+  // ---- rider 0.3.0 (지금 OPERATOR_ADMIN 만) ----
+  http.get(`${API_BASE}/riders/restriction-reviews`, ({ request }) => {
+    const { denied } = allow(request, ...ADMIN);
+    if (denied) return denied;
+    const q = new URL(request.url).searchParams;
+    const state = q.get('state') ?? 'OPEN';
+    return HttpResponse.json({ items: ops.reviews.filter((r) => r.state === state && (!q.get('riderId') || r.riderId === q.get('riderId'))) });
+  }),
+  http.post(`${API_BASE}/riders/restriction-reviews/:reviewId/decisions`, async ({ request, params }) => {
+    const { denied, who } = allow(request, ...ADMIN);
+    if (denied) return denied;
+    const body = (await request.clone().json()) as { decision?: 'RESTRICTED' | 'DISMISSED'; note?: string };
+    return idempotent(request, () => {
+      const index = ops.reviews.findIndex((r) => r.reviewId === params['reviewId']);
+      const found = ops.reviews[index];
+      if (!found) return problem(404, 'NOT_FOUND');
+      if (found.state !== 'OPEN') return problem(409, 'INVALID_STATE');
+      if (!body.decision) return problem(400, 'VALIDATION_FAILED');
+      // 목 가정: "먼저 계정 제한을 건 뒤 RESTRICTED"(계약 요약) — 제한이 없으면 거절로 흉내 낸다.
+      if (body.decision === 'RESTRICTED' && ops.riders.get(found.riderId ?? '')?.current === 'NORMAL') return problem(409, 'INVALID_STATE');
+      const closed: Review = { ...found, state: body.decision, decidedAt: new Date().toISOString(), decidedBy: who?.subject ?? '', ...(body.note ? { note: body.note } : {}) };
+      ops.reviews[index] = closed;
+      return { status: 200, body: closed };
+    });
+  }),
+  http.get(`${API_BASE}/riders/:riderId/restrictions`, ({ request, params }) => {
+    const { denied } = allow(request, ...ADMIN);
+    if (denied) return denied;
+    const r = ops.riders.get(String(params['riderId']));
+    return r ? HttpResponse.json({ current: r.current, items: r.history }) : problem(404, 'NOT_FOUND');
+  }),
+  http.post(`${API_BASE}/riders/:riderId/restrictions`, async ({ request, params }) => {
+    const { denied, who } = allow(request, ...ADMIN);
+    if (denied) return denied;
+    const body = (await request.clone().json()) as { restriction?: Restriction; reason?: string; until?: string; evidenceRefs?: string[]; approvalRef?: string };
+    return idempotent(request, () => {
+      const riderId = String(params['riderId']);
+      const r = ops.riders.get(riderId);
+      if (!r) return problem(404, 'NOT_FOUND');
+      if (!body.restriction || !body.reason) return problem(400, 'VALIDATION_FAILED');
+      const v = expectedVersion(request);
+      if (v !== undefined && v !== r.version) return problem(409, 'VERSION_CONFLICT');
+      r.version += 1;
+      const record: RestrictionRecord = {
+        riderId,
+        previous: r.current,
+        restriction: body.restriction,
+        reason: body.reason,
+        changedAt: new Date().toISOString(),
+        changedBy: who?.subject ?? '',
+        version: r.version,
+        ...(body.until ? { until: body.until } : {}),
+        ...(body.evidenceRefs ? { evidenceRefs: body.evidenceRefs } : {}),
+        ...(body.approvalRef ? { approvalRef: body.approvalRef } : {}),
+      };
+      r.current = body.restriction;
+      r.history = [record, ...r.history];
+      return { status: 200, body: record };
+    });
+  }),
+];

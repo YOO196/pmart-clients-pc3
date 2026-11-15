@@ -6,7 +6,12 @@ import type { paths as BffPaths } from './generated/backoffice-bff';
 import type { paths as CasePaths } from './generated/case';
 import type { paths as CdcInventoryPaths } from './generated/cdc-inventory';
 import type { paths as CenterPaths } from './generated/center-master';
+import type { paths as ClaimPaths } from './generated/claim';
+import type { paths as DispatchPaths } from './generated/delivery-dispatch';
+import type { paths as ExecutionPaths } from './generated/delivery-execution';
 import type { paths as MfcInventoryPaths } from './generated/mfc-inventory';
+import type { paths as OrderPaths } from './generated/order';
+import type { paths as RiderPaths } from './generated/rider';
 import type { paths as PricingPaths } from './generated/pricing';
 import type { paths as ProductPaths } from './generated/product';
 import type { paths as ContentPaths } from './generated/product-content';
@@ -41,6 +46,12 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     center: createClient<CenterPaths>(options),
     assistant: createClient<AssistantPaths>(options),
     cases: createClient<CasePaths>(options),
+    // 고객센터·라이더 운영(백엔드 요청 2026-11-15 cs-rider-menus)
+    orders: createClient<OrderPaths>(options),
+    claims: createClient<ClaimPaths>(options),
+    riders: createClient<RiderPaths>(options),
+    dispatch: createClient<DispatchPaths>(options),
+    execution: createClient<ExecutionPaths>(options),
   };
 }
 
