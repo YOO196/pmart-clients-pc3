@@ -4,6 +4,8 @@ import type { ReactNode } from 'react';
 import { createBrowserRouter, createMemoryRouter, Link, Navigate, NavLink, Outlet, RouterProvider } from 'react-router';
 
 import { env } from '../env';
+import { DepartmentsPage } from '../features/departments/departments';
+import { PermissionDetailPage, PermissionsPage } from '../features/permissions/PermissionsPage';
 import { EmployeeDetailPage } from '../features/employees/EmployeeDetailPage';
 import { EmployeeListPage } from '../features/employees/EmployeeListPage';
 import { EmployeeRegisterPage } from '../features/employees/EmployeeRegisterPage';
@@ -16,6 +18,8 @@ import { RequireSession, SessionProvider, useSession } from './SessionContext';
 const nav: ReadonlyArray<readonly [string, string]> = [
   ['/employees', m.nav.employees],
   ['/employees/new', m.nav.register],
+  ['/departments', m.nav.departments],
+  ['/permissions', m.nav.permissions],
 ];
 
 function Layout() {
@@ -73,6 +77,9 @@ const routes = [
       { path: 'employees', element: guarded(<EmployeeListPage />) },
       { path: 'employees/new', element: guarded(<EmployeeRegisterPage />) },
       { path: 'employees/:operatorId', element: guarded(<EmployeeDetailPage />) },
+      { path: 'departments', element: guarded(<DepartmentsPage />) },
+      { path: 'permissions', element: guarded(<PermissionsPage />) },
+      { path: 'permissions/:operatorId', element: guarded(<PermissionDetailPage />) },
     ],
   },
 ];

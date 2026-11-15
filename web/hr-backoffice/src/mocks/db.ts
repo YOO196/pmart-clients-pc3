@@ -1,4 +1,5 @@
 // 목 서버 상태(메모리). 계약 hr-service.yaml 0.1.0 의 모양만 쓴다. 테스트마다 resetDb() 로 되돌린다.
+import type { EmployeeGrant } from '@pmart/web-core';
 import type { Employee, ProvisioningStep } from '../api/models';
 
 export interface MockSession {
@@ -148,6 +149,10 @@ export const db = {
   grants: new Map<string, MockGrant>(),
   sessions: new Map<string, MockSession>(),
   idempotent: new Map<string, { status: number; body: unknown }>(),
+  /** 본사 부서 표시 이름(hr 0.3.0 PUT /hr/departments/{code}). 목록은 이것 ∪ 직원 소속(HQ_DEPARTMENT) 코드 */
+  departments: new Map<string, { name?: string }>(),
+  /** employee-auth 의 승인된 권한(0.7.0 grants, 0.8.0 회수) — 목: 발급이 끝난 직원의 APPROVED 요청에서 만든다 */
+  accountGrants: new Map<string, EmployeeGrant[]>(),
   seq: 100,
 };
 
@@ -156,7 +161,29 @@ export function resetDb(): void {
   db.grants = new Map(seedGrants());
   db.sessions = new Map();
   db.idempotent = new Map();
+  db.departments = new Map([['HR', { name: '인사팀' }], ['MD', {}], ['CS', { name: '고객센터' }]]);
+  db.accountGrants = new Map(seedAccountGrants(db.employees));
   db.seq = 100;
+}
+
+function seedAccountGrants(employees: Map<string, MockEmployee>): Array<[string, EmployeeGrant[]]> {
+  return [...employees.values()]
+    .filter((m) => m.employee.provisioning.step === 'DONE')
+    .map((m, i) => [
+      m.employee.operatorId,
+      (m.employee.requestedGrants ?? [])
+        .filter((g) => g.submission === 'APPROVED')
+        .map((g, j) => ({
+          grantId: `${g.approvalRef ?? `AP-seed-${i}`}:L${j + 1}`,
+          approvalId: g.approvalRef ?? `AP-seed-${i}`,
+          approverId: g.role === 'MFC_WORKER' ? 'RULE:center-worker@v1' : 'OP-admin-1',
+          role: g.role,
+          centers: [...g.centers],
+          validFrom: `${g.validFrom ?? m.employee.startDate}T00:00:00+09:00`,
+          validUntil: g.validTo ? `${g.validTo}T00:00:00+09:00` : null,
+          appliedAt: m.employee.createdAt,
+        })),
+    ]);
 }
 
 resetDb();

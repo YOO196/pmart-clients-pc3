@@ -7,7 +7,7 @@ import { mockOperatorToken } from '@pmart/web-core';
 import { API_BASE } from '../api/client';
 import { EMPLOYEE_APP } from '../api/employeeAuth';
 import { db, nextSeq, timestamp, type MockSession } from './db';
-import { operator, problem, unauthorized } from './support';
+import { idempotent, operator, problem, unauthorized } from './support';
 
 /** 목 수치(실서버는 보안 설정값): access 15분, 세션 12시간 */
 export const mockAuthPolicy = { accessSeconds: 15 * 60, sessionHours: 12 };
@@ -47,7 +47,62 @@ export const mockRoles = [
   ['SERVICEABILITY_APPROVER', '배송 권역 승인자'],
 ].map(([code, name], i) => ({ code: code!, name: name!, centerScoped: code === 'MFC_SUPERVISOR' || code === 'MFC_WORKER', order: i + 1 }));
 
+/** 목 employee-auth 계정(0.7.0): 발급이 끝난 직원만 있다(그 전 404 EMPLOYEE_NOT_FOUND). effective = 지금 유효한 grants */
+function account(operatorId: string) {
+  const m = db.employees.get(operatorId);
+  if (!m || m.employee.provisioning.step !== 'DONE') return null;
+  const grants = db.accountGrants.get(operatorId) ?? [];
+  const now = Date.now();
+  const live = grants.filter((g) => !g.revokedAt && Date.parse(g.validFrom) <= now && (!g.validUntil || Date.parse(g.validUntil) > now));
+  return {
+    operatorId,
+    state: m.employee.status === 'ACTIVE' ? ('ACTIVE' as const) : m.employee.status === 'LEFT' ? ('LEFT' as const) : ('DISABLED' as const),
+    roles: [] as string[],
+    centers: [] as string[],
+    effectiveRoles: [...new Set(live.map((g) => g.role))],
+    effectiveCenters: [...new Set(live.flatMap((g) => g.centers))],
+    grants,
+    keycloakLinked: true,
+    lastLoginAt: '2026-11-15T09:00:00Z',
+    updatedAt: m.employee.updatedAt,
+    version: m.employee.version,
+  };
+}
+
+const ADMIN_ROLES = ['OPERATOR_ADMIN', 'HR_ADMIN'];
+
 export const authHandlers = [
+  http.get(`${API_BASE}/employee-auth/employees/:operatorId`, ({ request, params }) => {
+    const who = operator(request);
+    if (!who) return unauthorized();
+    if (!who.roles.some((r) => ADMIN_ROLES.includes(r))) return problem(403, 'FORBIDDEN');
+    const a = account(String(params['operatorId']));
+    return a ? HttpResponse.json(a) : problem(404, 'EMPLOYEE_NOT_FOUND');
+  }),
+
+  // 0.8.0 회수 — 승인 없이 즉시, 사유 필수. 자기 권한·HR_ADMIN 이 관리자 역할 회수 403, 없는 grant 404, 기한 끝남 409, 이미 회수면 200.
+  http.post(`${API_BASE}/employee-auth/employees/:operatorId/grant-revocations`, async ({ request, params }) => {
+    const who = operator(request);
+    if (!who) return unauthorized();
+    if (!who.roles.some((r) => ADMIN_ROLES.includes(r))) return problem(403, 'FORBIDDEN');
+    const operatorId = String(params['operatorId']);
+    const body = (await request.clone().json()) as { grantId?: string; reason?: string };
+    return idempotent(request, () => {
+      if (!body.grantId || !(body.reason ?? '').trim()) return problem(400, 'VALIDATION_FAILED', [{ field: 'reason', reason: 'REQUIRED' }]);
+      if (operatorId === who.subject) return problem(403, 'FORBIDDEN');
+      const g = (db.accountGrants.get(operatorId) ?? []).find((x) => x.grantId === body.grantId);
+      if (!g) return problem(404, 'GRANT_NOT_FOUND');
+      if (ADMIN_ROLES.includes(g.role) && !who.roles.includes('OPERATOR_ADMIN')) return problem(403, 'FORBIDDEN');
+      if (!g.revokedAt) {
+        if (g.validUntil && Date.parse(g.validUntil) <= Date.now()) return problem(409, 'INVALID_STATE');
+        const now = timestamp();
+        Object.assign(g, { revokedAt: now, revokedBy: who.subject, revokeReason: (body.reason ?? '').trim(), validUntil: now });
+        for (const s of db.sessions.values()) if (s.operatorId === operatorId) s.revoked = true; // 그 직원 세션을 끊는다
+      }
+      return { status: 200, body: account(operatorId) };
+    });
+  }),
+
   http.get(`${API_BASE}/employee-auth/roles`, ({ request }) => {
     if (!operator(request)) return unauthorized();
     return HttpResponse.json({ items: mockRoles });

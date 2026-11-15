@@ -1,7 +1,8 @@
 // 소속 입력(본사 부서 / 센터 + 코드) — 등록·소속 변경이 같이 쓴다.
-// 본사 부서 코드 목록을 주는 API 가 없어 직접 입력받는다(회신 Q1). 센터는 목록에서 고른다(못 불러오면 직접 입력).
+// 본사 부서는 `GET /hr/departments`(hr 0.3.0) 목록에서 고르거나 새 코드를 친다. 센터는 목록에서 고른다(둘 다 못 불러오면 직접 입력).
 import { AFFILIATION_TYPES, CODE_PATTERN, type Affiliation, type AffiliationType } from '../../api/models';
 import { messages as m } from '../../shared/messages';
+import { DepartmentInput } from '../departments/departments';
 import { CenterSelect, type useCenters } from './centers';
 
 export interface AffiliationDraft {
@@ -44,15 +45,7 @@ export function AffiliationFields({
       {value.type === 'CENTER' ? (
         <CenterSelect centers={centers} label={m.fields.center} value={value.code} onChange={(code) => onChange({ ...value, code })} />
       ) : (
-        <label className="flex flex-col gap-1 text-sm">
-          {m.fields.departmentCode}
-          <input
-            className="input input-sm w-full max-w-xs"
-            maxLength={64}
-            value={value.code}
-            onChange={(e) => onChange({ ...value, code: e.target.value.trim() })}
-          />
-        </label>
+        <DepartmentInput value={value.code} onChange={(code) => onChange({ ...value, code })} />
       )}
       {value.code !== '' && !CODE_PATTERN.test(value.code) && <p className="text-error text-xs">{m.register.codeInvalid}</p>}
     </div>

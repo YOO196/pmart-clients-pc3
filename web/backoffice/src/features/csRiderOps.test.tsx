@@ -19,7 +19,7 @@ describe('메뉴 묶음 — 역할로 보이고(합집합) 접고 편다', () =>
       [as.cs, ['고객센터', '업무 도우미']],
       [as.riderOps, ['라이더 운영', '업무 도우미']],
       [as.csRider, ['고객센터', '라이더 운영', '업무 도우미']],
-      [as.admin, ['상품 관리', '승인', '고객센터', '라이더 운영', '업무 도우미']], // 상품 관리는 2026-11-15 부터 OPERATOR_ADMIN 도
+      [as.admin, ['상품 관리', '승인', '고객센터', '라이더 운영', '처리 대기', '업무 도우미']], // 상품 관리는 2026-11-15 부터 OPERATOR_ADMIN 도
       [as.center, ['업무 도우미']],
     ];
     for (const [token, expected] of cases) {
@@ -93,15 +93,63 @@ describe('주문 조회', () => {
     view.stop();
   });
 
-  it('상세: 배송지·연락처·출입 메모는 기본으로 가리고 "보기"로 연다. 이 주문의 클레임이 보인다. 취소 버튼 없음', async () => {
-    const user = userEvent.setup();
+  it('상세: 배송지는 서버가 가린 값 그대로(0.4.0) — 이 주문의 클레임이 보인다. 취소 버튼 없음', async () => {
     renderAt('/orders/ORD-MOCK-1002', as.cs);
     const phone = await screen.findByTestId('order-receiver-phone');
-    expect(phone).not.toHaveTextContent('01055556666');
-    await user.click(within(phone).getByRole('button', { name: '보기' }));
-    expect(phone).toHaveTextContent('01055556666');
+    expect(phone).toHaveTextContent('010-****-6666');
+    expect(screen.getByTestId('order-detail-address')).toHaveTextContent('***');
+    expect(screen.getByTestId('order-entrance-note')).toHaveTextContent('가림');
+    expect(screen.getByTestId('order-delivery-note')).toHaveTextContent('가림');
+    expect(screen.queryByText('01055556666')).not.toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'CLM-MOCK-1' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /취소/ })).not.toBeInTheDocument();
+  });
+
+  it('원문 열람: 사유 2자 이상 + 고른 항목만 pii-reveals 로(키·출처 헤더) → 그 항목만 원문, 다시 가리기', async () => {
+    const user = userEvent.setup();
+    const view = renderAt('/orders/ORD-MOCK-1002', as.cs);
+    await screen.findByTestId('order-receiver-phone');
+    const form = screen.getByRole('form', { name: '원문 열람' });
+    expect(within(form).getByRole('button', { name: '열람' })).toBeDisabled(); // 사유 없음
+    for (const f of ['수령인 이름', '상세 주소·핀', '출입 메모·배송 요청사항']) await user.click(within(form).getByLabelText(f)); // 연락처만 남김
+    await user.type(within(form).getByLabelText('열람 사유'), '고객 문의 — 연락처 확인');
+    await user.click(within(form).getByRole('button', { name: '열람' }));
+
+    expect(await screen.findByTestId('order-receiver-phone')).toHaveTextContent('01055556666');
+    await waitFor(() => expect(screen.getByTestId('order-receiver-phone')).toHaveTextContent('01055556666'));
+    expect(screen.getByTestId('order-detail-address')).toHaveTextContent('***'); // 열지 않은 항목은 그대로 가림
+    expect(screen.getByText(/열람 기록 PAL-MOCK-/)).toBeInTheDocument();
+    const sent = view.mutations('/pii-reveals');
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.headers.get('Idempotency-Key')).toBeTruthy();
+    expect(sent[0]!.headers.get('X-Source-System')).toBe('backoffice-web');
+    expect(await sent[0]!.json()).toEqual({ reason: '고객 문의 — 연락처 확인', fields: ['PHONE'] });
+
+    await user.click(screen.getByRole('button', { name: '다시 가리기' }));
+    expect(screen.getByTestId('order-receiver-phone')).toHaveTextContent('010-****-6666');
+  });
+
+  it('열람 기록을 못 남기면(503) 원문 없이 결과 확인 — 같은 키로 다시 보내 원문을 받는다', async () => {
+    const user = userEvent.setup();
+    let fail = true;
+    server.use(
+      http.post(`${API_BASE}/orders/lookups/:orderId/pii-reveals`, () =>
+        fail ? HttpResponse.json({ type: 'about:blank', title: 't', status: 503, code: 'UNKNOWN_RESULT', traceId: 't' }, { status: 503, headers: { 'content-type': 'application/problem+json' } }) : undefined,
+      ),
+    );
+    const view = renderAt('/orders/ORD-MOCK-1002', as.cs);
+    await screen.findByTestId('order-receiver-phone');
+    const form = screen.getByRole('form', { name: '원문 열람' });
+    await user.type(within(form).getByLabelText('열람 사유'), '배송지 확인');
+    await user.click(within(form).getByRole('button', { name: '열람' }));
+    expect(await screen.findByRole('button', { name: '같은 요청으로 결과 확인' })).toBeInTheDocument();
+    expect(screen.getByTestId('order-receiver-phone')).toHaveTextContent('010-****-6666');
+    fail = false;
+    await user.click(screen.getByRole('button', { name: '같은 요청으로 결과 확인' }));
+    await waitFor(() => expect(screen.getByTestId('order-receiver-phone')).toHaveTextContent('01055556666'));
+    const keys = view.mutations('/pii-reveals').map((r) => r.headers.get('Idempotency-Key'));
+    expect(keys.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(keys).size).toBe(1);
   });
 
   it('권한 밖(MD)은 403 — 빈 목록이 아니라 오류로 보인다', async () => {

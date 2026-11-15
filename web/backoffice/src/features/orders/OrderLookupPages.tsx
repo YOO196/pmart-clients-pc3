@@ -1,21 +1,24 @@
 // 주문 조회(고객센터·라이더 운영) — order-service 0.3.0 `GET /orders/lookups`, `GET /orders/lookups/{orderId}`(2026-11-15 LAN 배포).
 // 조건은 URL 쿼리에 둔다. orderId·customerId 가 없으면 기간 두 값이 필요하고 31일 이하(서버 400 — 화면은 보내기 전에 안내만).
-// 연락처는 숫자만 완전 일치(부분 검색 없음). 목록 연락처는 서버가 가린 값, 상세 배송지는 원문이라 화면에서 기본으로 가린다.
+// 연락처는 숫자만 완전 일치(부분 검색 없음). 목록 연락처·상세 배송지는 서버가 가린 값(0.4.0·0.5.0) — 원문은 사유를 적고 pii-reveals(열람 기록).
 // 검색 조건·배송지·연락처를 로그에 남기지 않는다. 고객센터는 주문을 취소하지 않는다(ADR-0060) — 취소 버튼 없음.
 import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
-import { QueryState, toUiState } from '@pmart/web-ui';
+import { CommandFeedback, QueryState, toUiState, useCommand } from '@pmart/web-ui';
+import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/order';
 import { useApi } from '../../app/ApiContext';
 import { messages as m } from '../../shared/messages';
-import { addSeoulDays, Facts, isSeoulDate, label, Masked, seoulDayEnd, seoulDayStart, seoulToday, spanDays, text, when, won } from '../../shared/ops';
+import { addSeoulDays, Facts, isSeoulDate, label, seoulDayEnd, seoulDayStart, seoulToday, spanDays, text, when, won } from '../../shared/ops';
 import { ClaimsOfOrder } from '../claims/ClaimPages';
 
 type OrderStatus = components['schemas']['OrderStatus'];
 type Detail = components['schemas']['StaffOrderDetail'];
+type PiiField = components['schemas']['StaffPiiField'];
+type Reveal = components['schemas']['StaffPiiReveal'];
 
 const STATUSES = Object.keys(m.orders.statusName) as OrderStatus[];
 const MAX_DAYS = 31;
@@ -212,26 +215,104 @@ export function OrderLookupPage() {
   );
 }
 
+const PII_FIELDS: readonly PiiField[] = ['NAME', 'PHONE', 'ADDRESS', 'ENTRANCE'];
+
+/**
+ * 배송지(order 0.4.0·0.5.0): 상세는 서버가 가린 값 그대로 보인다(이름 첫·끝 글자, 010-****-1234, 상세주소 ***, 출입 메모·핀·요청사항 없음).
+ * 원문은 사유를 적고 `POST /orders/lookups/{orderId}/pii-reveals` — 서버가 열람 기록(audit)을 남긴 뒤 고른 항목만 준다.
+ * 받은 원문은 이 컴포넌트 상태(메모리)에만 둔다. 저장·로그·주소에 넣지 않고, 화면을 떠나거나 "다시 가리기"를 누르면 사라진다.
+ * 503(기록 못 남김)·결과 불명은 원문이 없다 — 같은 키로 다시 보내면 같은 기록으로 이어진다(useCommand 의 "같은 요청으로 결과 확인").
+ */
 function Address({ order }: { readonly order: Detail }) {
+  const api = useApi();
+  const [fields, setFields] = useState<readonly PiiField[]>(PII_FIELDS);
+  const [reason, setReason] = useState('');
+  const reveal = useCommand(async (v: { reason: string; fields: readonly PiiField[] }, key) =>
+    request(
+      'POST',
+      api.orders.POST('/orders/lookups/{orderId}/pii-reveals', {
+        ...commandParams(key, { path: { orderId: order.orderId } }),
+        body: { reason: v.reason, fields: [...v.fields] },
+      }),
+    ),
+  );
   const a = order.shippingAddress;
   if (!a) return <p className="text-sm opacity-70">{m.orders.noAddress}</p>;
+
+  const opened: Reveal | null = reveal.phase.kind === 'done' ? reveal.phase.result : null;
+  const isOpen = (f: PiiField) => opened?.fields.includes(f) ?? false;
+  const raw = opened?.shippingAddress ?? null;
+  const shown = (f: PiiField, masked: string | null | undefined, original: string | null | undefined, testId?: string) => (
+    <span data-testid={testId} data-masked={!isOpen(f)}>
+      {isOpen(f) ? text(original) : masked ? masked : m.orders.pii.maskedValue}
+    </span>
+  );
+  const reasonOk = reason.trim().length >= 2 && reason.trim().length <= 200;
+
   return (
     <>
-      <p className="text-xs opacity-60">{m.masked.note}</p>
+      {order.shippingAddressMasked && <p className="text-xs opacity-60">{m.orders.pii.maskedNote}</p>}
       <Facts
         testId="order-address"
         rows={[
-          [m.orders.receiverName, <Masked key="n" value={a.receiverName} testId="order-receiver-name" />],
-          [m.orders.phone, <Masked key="p" value={a.receiverPhone} testId="order-receiver-phone" />],
-          [m.orders.roadAddress, <Masked key="r" value={a.roadAddress} />],
-          [m.orders.detailAddress, <Masked key="d" value={a.detailAddress} />],
+          [m.orders.receiverName, shown('NAME', a.receiverName, raw?.receiverName, 'order-receiver-name')],
+          [m.orders.phone, shown('PHONE', a.receiverPhone, raw?.receiverPhone, 'order-receiver-phone')],
+          [m.orders.roadAddress, text(a.roadAddress)],
+          [m.orders.detailAddress, shown('ADDRESS', a.detailAddress, raw?.detailAddress, 'order-detail-address')],
           [m.orders.postalCode, text(a.postalCode)],
           [m.orders.entrance, label(m.orders.entranceMethod, a.entranceMethod)],
-          // 출입 비밀번호일 수 있다 — 기본 가림
-          [m.orders.entranceNote, <Masked key="e" value={a.entranceNote} />],
-          [m.orders.deliveryNote, text(order.deliveryNote)],
+          // 출입 비밀번호일 수 있다 — 서버가 가린다(null)
+          [m.orders.entranceNote, shown('ENTRANCE', a.entranceNote, raw?.entranceNote, 'order-entrance-note')],
+          [
+            m.orders.deliveryNote,
+            order.deliveryNoteMasked ? shown('ENTRANCE', null, opened?.deliveryNote, 'order-delivery-note') : text(order.deliveryNote),
+          ],
         ]}
       />
+      {opened ? (
+        <div role="status" className="flex flex-wrap items-center gap-2 text-xs">
+          <span>{m.orders.pii.opened(opened.piiAccessLogId, when(opened.recordedAt))}</span>
+          <button type="button" className="btn btn-xs" onClick={() => reveal.reset()}>
+            {m.orders.pii.hide}
+          </button>
+        </div>
+      ) : (
+        <form
+          className="space-y-2 rounded-box bg-base-100 p-3 text-sm"
+          aria-label={m.orders.pii.title}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!reasonOk || fields.length === 0) return;
+            if (reveal.phase.kind === 'rejected') reveal.reset();
+            void reveal.run({ reason: reason.trim(), fields });
+          }}
+        >
+          <h3 className="font-semibold">{m.orders.pii.title}</h3>
+          <fieldset className="flex flex-wrap gap-3">
+            <legend className="text-xs opacity-70">{m.orders.pii.fields}</legend>
+            {PII_FIELDS.map((f) => (
+              <label key={f} className="flex items-center gap-1">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-xs"
+                  checked={fields.includes(f)}
+                  onChange={(e) => setFields((cur) => (e.target.checked ? PII_FIELDS.filter((x) => x === f || cur.includes(x)) : cur.filter((x) => x !== f)))}
+                />
+                {m.orders.pii.fieldName[f]}
+              </label>
+            ))}
+          </fieldset>
+          <label className="flex flex-col gap-1">
+            {m.orders.pii.reason}
+            <input className="input input-sm w-full max-w-md" maxLength={200} autoComplete="off" placeholder={m.orders.pii.reasonHint} value={reason} onChange={(e) => setReason(e.target.value)} />
+          </label>
+          {fields.length === 0 && <p className="text-xs text-warning">{m.orders.pii.noFields}</p>}
+          <button type="submit" className="btn btn-sm" disabled={!reasonOk || fields.length === 0 || reveal.busy}>
+            {m.orders.pii.open}
+          </button>
+          <CommandFeedback command={reveal} />
+        </form>
+      )}
     </>
   );
 }

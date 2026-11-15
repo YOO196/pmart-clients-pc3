@@ -11,9 +11,10 @@ import type { components as DispatchC } from '../api/generated/delivery-dispatch
 import type { components as ExecutionC } from '../api/generated/delivery-execution';
 import type { components as OrderC } from '../api/generated/order';
 import type { components as RiderC } from '../api/generated/rider';
-import { expectedVersion, idempotent, operator, problem, unauthorized } from './support';
+import { expectedVersion, idempotent, keyOf, operator, problem, unauthorized } from './support';
 
 type StaffOrder = OrderC['schemas']['StaffOrderDetail'];
+type Issue = OrderC['schemas']['FulfillmentIssue'];
 type Complaint = CaseC['schemas']['RiderComplaint'];
 type Claim = ClaimC['schemas']['Claim'];
 type Refund = ClaimC['schemas']['Refund'];
@@ -55,7 +56,7 @@ function order(orderId: string, status: StaffOrder['status'], confirmedAt: strin
       { orderLineId: `${orderId}-L1`, sku: 'E-00000001', productName: '사과 1.5kg', originalQty: 1, cancelledBeforeShipQty: 0, handedOverQty: 1, deliveredQty: 0, returnedQty: 0, unitPrice: 12000, lineAmount: 12000 },
     ],
     fulfillmentIssues: [],
-    // order 0.4.0 부터 서버는 늘 가려서(true) 준다. 이 목은 아직 0.4.0 전 동작(원문) — 가림·열람(pii-reveals)은 따로 반영한다.
+    // 목 원장은 원문을 둔다 — 상세 응답은 maskedDetail() 로 가리고(0.4.0·0.5.0), 원문은 POST …/pii-reveals 로만 준다.
     shippingAddressMasked: false,
     shippingAddress: {
       receiverName: '[목] 김고객',
@@ -71,6 +72,38 @@ function order(orderId: string, status: StaffOrder['status'], confirmedAt: strin
 }
 
 const maskPhone = (p: string | undefined) => (p && p.length >= 8 ? `${p.slice(0, 3)}-****-${p.slice(-4)}` : null);
+/** 이름 첫·끝 글자만(홍*동) */
+const maskName = (n: string | undefined) => (n === undefined ? undefined : n.length <= 1 ? '*' : `${n[0]}${'*'.repeat(Math.max(1, n.length - 2))}${n.length > 2 ? n[n.length - 1] : ''}`);
+
+type PiiField = OrderC['schemas']['StaffPiiField'];
+const PII_FIELDS: readonly PiiField[] = ['NAME', 'PHONE', 'ADDRESS', 'ENTRANCE'];
+
+/** order 0.4.0·0.5.0 직원 상세: 이름·연락처·상세주소·출입 메모·핀·배송 요청사항을 가린다. `open` 에 든 항목만 원문 */
+function maskedAddress(o: StaffOrder, open: readonly PiiField[] = []): OrderC['schemas']['ShippingAddress'] {
+  const a = o.shippingAddress;
+  if (!a) return null;
+  const has = (f: PiiField) => open.includes(f);
+  const name = has('NAME') ? a.receiverName : maskName(a.receiverName);
+  const phone = has('PHONE') ? a.receiverPhone : maskPhone(a.receiverPhone);
+  return {
+    ...a,
+    ...(name !== undefined ? { receiverName: name } : {}),
+    ...(phone ? { receiverPhone: phone } : {}),
+    detailAddress: has('ADDRESS') ? (a.detailAddress ?? '') : '***',
+    geo: has('ADDRESS') ? (a.geo ?? null) : null,
+    entranceNote: has('ENTRANCE') ? (a.entranceNote ?? null) : null,
+  };
+}
+
+function maskedDetail(o: StaffOrder): StaffOrder {
+  return {
+    ...o,
+    shippingAddress: maskedAddress(o),
+    shippingAddressMasked: true,
+    deliveryNote: null,
+    ...(o.deliveryNote ? { deliveryNoteMasked: true } : {}),
+  };
+}
 
 function execution(deliveryId: string, orderId: string, state: ExecutionC['schemas']['ExecutionState'], riderId: string | undefined): Execution {
   return {
@@ -113,6 +146,8 @@ interface OpsState {
   reviews: Review[];
   /** 배차 취소 짝 조회: requestId → 처리 결과(다음 조회부터 확정으로 보인다) */
   cancellations: Map<string, { deliveryId: string; outcome: 'CANCELLED_BEFORE_PICKUP' | 'REJECTED_PICKED_UP'; polled: boolean }>;
+  /** order 0.6.0 이행 확인 필요(처리 대기 메뉴) */
+  issues: Issue[];
 }
 
 function seed(): OpsState {
@@ -120,6 +155,11 @@ function seed(): OpsState {
   failed.failure = { reason: 'CUSTOMER_UNREACHABLE', detail: '[목] 세 번 전화했지만 받지 않았어요.', goodsLocation: 'WITH_RIDER', contactAttempts: 3, reportedAt: ago(1) };
   return {
     seq: 100,
+    issues: [
+      { issueId: 'FI-MOCK-1', orderId: 'ORD-MOCK-1003', mfcId: 'MFC-BSN-01', sku: 'E-00000001', lotId: 'LOT-MOCK-7', blockedQty: 1, reason: 'QUALITY_HOLD', state: 'OPEN', blockedAt: ago(3), reservationId: 'RSV-MOCK-1', note: null, acknowledgedBy: null, acknowledgedAt: null, resolvedAt: null },
+      { issueId: 'FI-MOCK-2', orderId: 'ORD-MOCK-1001', mfcId: 'MFC-SEL-01', sku: 'E-00000002', lotId: null, blockedQty: 2, reason: 'COUNT_LOSS', state: 'OPEN', blockedAt: ago(5), reservationId: 'RSV-MOCK-2', note: null, acknowledgedBy: null, acknowledgedAt: null, resolvedAt: null },
+      { issueId: 'FI-MOCK-3', orderId: 'ORD-MOCK-1002', mfcId: 'MFC-BSN-01', sku: 'E-00000003', lotId: 'LOT-MOCK-8', blockedQty: 1, reason: 'SHORT', state: 'ACKNOWLEDGED', blockedAt: ago(30), reservationId: 'RSV-MOCK-3', note: '[목] 고객센터 연락 완료', acknowledgedBy: 'OP-admin-1', acknowledgedAt: ago(28), resolvedAt: null },
+    ],
     orders: [
       order('ORD-MOCK-1001', 'IN_DELIVERY', ago(1), '01012345678'),
       order('ORD-MOCK-1002', 'IN_DELIVERY', ago(26), '01055556666'),
@@ -295,7 +335,62 @@ export const opsHandlers = [
     const { denied } = allow(request, ...LOOKUP);
     if (denied) return denied;
     const found = ops.orders.find((o) => o.orderId === params['orderId']);
-    return found ? HttpResponse.json(found) : problem(404, 'NOT_FOUND');
+    return found ? HttpResponse.json(maskedDetail(found)) : problem(404, 'ORDER_NOT_FOUND');
+  }),
+
+  // order 0.4.0·0.5.0 원문 열람 — 사유 2~200자, 열람 기록(목 ID)을 남긴 뒤 고른 항목만 원문. 같은 키면 같은 기록.
+  http.post(`${API_BASE}/orders/lookups/:orderId/pii-reveals`, async ({ request, params }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const body = (await request.clone().json()) as { reason?: string; fields?: PiiField[] };
+    return idempotent(request, () => {
+      const reason = (body.reason ?? '').trim();
+      if (reason.length < 2 || reason.length > 200) return problem(400, 'VALIDATION_FAILED', [{ field: 'reason', reason: 'INVALID_FORMAT' }]);
+      const found = ops.orders.find((o) => o.orderId === params['orderId']);
+      if (!found) return problem(404, 'ORDER_NOT_FOUND');
+      if (!found.shippingAddress) return problem(404, 'SHIPPING_COPY_NOT_FOUND');
+      const fields = body.fields && body.fields.length > 0 ? PII_FIELDS.filter((f) => body.fields!.includes(f)) : [...PII_FIELDS];
+      return {
+        status: 200,
+        body: {
+          orderId: found.orderId,
+          piiAccessLogId: `PAL-MOCK-${keyOf(request).slice(0, 8)}`,
+          recordedAt: new Date().toISOString(),
+          fields,
+          shippingAddress: maskedAddress(found, fields),
+          deliveryNote: fields.includes('ENTRANCE') ? (found.deliveryNote ?? null) : null,
+        },
+      };
+    });
+  }),
+
+  // ---- order 0.6.0 이행 확인 필요(처리 대기) — OPERATOR_ADMIN 은 mfcId 를 비우면 모든 센터, 센터 운영자는 mfcId 필수(그 센터만) ----
+  http.get(`${API_BASE}/fulfillment-issues`, ({ request }) => {
+    const who = operator(request);
+    if (!who) return unauthorized();
+    const q = new URL(request.url).searchParams;
+    const mfcId = q.get('mfcId');
+    const state = q.get('state') ?? 'OPEN';
+    const admin = who.roles.includes('OPERATOR_ADMIN');
+    if (!admin && (!mfcId || !who.centers.includes(mfcId))) return problem(403, 'FORBIDDEN');
+    const items = ops.issues
+      .filter((i) => i.state === state && (!mfcId || i.mfcId === mfcId))
+      .sort((a, b) => (b.blockedAt ?? '').localeCompare(a.blockedAt ?? ''));
+    return HttpResponse.json({ items });
+  }),
+  http.post(`${API_BASE}/fulfillment-issues/:issueId/acknowledgements`, async ({ request, params }) => {
+    const who = operator(request);
+    if (!who) return unauthorized();
+    const body = (await request.clone().json()) as { note?: string };
+    return idempotent(request, () => {
+      const issue = ops.issues.find((i) => i.issueId === params['issueId']);
+      if (!issue) return problem(404, 'NOT_FOUND');
+      if (!who.roles.includes('OPERATOR_ADMIN') && !who.centers.includes(issue.mfcId ?? '')) return problem(403, 'FORBIDDEN');
+      const note = (body.note ?? '').trim();
+      if (note.length < 1 || note.length > 500) return problem(400, 'VALIDATION_FAILED', [{ field: 'note', reason: 'INVALID_FORMAT' }]);
+      if (issue.state === 'OPEN') Object.assign(issue, { state: 'ACKNOWLEDGED', note, acknowledgedBy: who.subject, acknowledgedAt: new Date().toISOString() });
+      return { status: 200, body: issue };
+    });
   }),
 
   // ---- case 0.3.0 rider-complaints ----

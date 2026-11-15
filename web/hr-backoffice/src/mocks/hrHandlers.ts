@@ -51,12 +51,24 @@ function advance(m: MockEmployee): void {
     const own = e.affiliation.type === 'CENTER' ? e.affiliation.code : null;
     m.employee = {
       ...e,
-      requestedGrants: (e.requestedGrants ?? []).map(
-        (g): GrantRequestState =>
-          g.submission === 'SUBMITTED' && g.role === 'MFC_WORKER' && own !== null && g.centers.length === 1 && g.centers[0] === own
-            ? { ...g, submission: 'APPROVED', approvalRef: `AP-mock-${nextSeq()}` }
-            : g,
-      ),
+      requestedGrants: (e.requestedGrants ?? []).map((g): GrantRequestState => {
+        if (!(g.submission === 'SUBMITTED' && g.role === 'MFC_WORKER' && own !== null && g.centers.length === 1 && g.centers[0] === own)) return g;
+        const approvalRef = `AP-mock-${nextSeq()}`;
+        // 승인되면 employee-auth 가 권한을 적용한다(목: 계정 grants 에 더한다)
+        const list = db.accountGrants.get(e.operatorId) ?? [];
+        list.push({
+          grantId: `${approvalRef}:L1`,
+          approvalId: approvalRef,
+          approverId: 'RULE:center-worker@v1',
+          role: g.role,
+          centers: [...g.centers],
+          validFrom: `${g.validFrom ?? e.startDate}T00:00:00+09:00`,
+          validUntil: g.validTo ? `${g.validTo}T00:00:00+09:00` : null,
+          appliedAt: timestamp(),
+        });
+        db.accountGrants.set(e.operatorId, list);
+        return { ...g, submission: 'APPROVED', approvalRef };
+      }),
     };
   }
 }
@@ -94,6 +106,64 @@ function reasonCommand(
 }
 
 export const hrHandlers = [
+  // hr 0.3.0 권한 추가·변경 요청(BO-01): 재직 중·발급 끝난 직원만(409 INVALID_STATE), 결정 안 된 요청이 있으면 409 GRANT_REQUEST_PENDING, 자기 권한 403.
+  // 목 규칙: SUBMITTED 로 붙고, 다음 직원 조회에서 소속 센터 MFC_WORKER 만 자동 승인(등록 때와 같은 advance 규칙).
+  http.post(`${API_BASE}/hr/employees/:operatorId/grant-requests`, async ({ request, params }) => {
+    const found = find(request, params['operatorId']);
+    if (found instanceof Response) return found;
+    const who = operator(request);
+    const body = (await request.clone().json()) as { grants?: Array<{ role: string; centers?: string[]; validFrom?: string; validTo?: string; reason?: string }>; reason?: string };
+    return idempotent(request, () => {
+      if (!body.grants || body.grants.length === 0 || !(body.reason ?? '').trim()) return problem(400, 'VALIDATION_FAILED');
+      if (who?.subject === found.employee.operatorId) return problem(403, 'FORBIDDEN');
+      if (stale(request, found)) return problem(409, 'VERSION_CONFLICT');
+      if (found.employee.status !== 'ACTIVE' || found.employee.provisioning.step !== 'DONE') return problem(409, 'INVALID_STATE');
+      if ((found.employee.requestedGrants ?? []).some((g) => g.submission === 'PENDING' || g.submission === 'SUBMITTED')) return problem(409, 'GRANT_REQUEST_PENDING');
+      const added: GrantRequestState[] = body.grants.map((g) => ({
+        role: g.role,
+        centers: g.centers ?? [],
+        ...(g.validFrom ? { validFrom: g.validFrom } : {}),
+        ...(g.validTo ? { validTo: g.validTo } : {}),
+        reason: g.reason ?? (body.reason ?? '').trim(),
+        submission: 'SUBMITTED',
+      }));
+      return { status: 200, body: touch(found, { requestedGrants: [...(found.employee.requestedGrants ?? []), ...added] }) };
+    });
+  }),
+
+  // hr 0.3.0 본사 부서: 목록 = 이름을 정한 부서 ∪ 직원 소속(HQ_DEPARTMENT) 코드, 코드 오름차순. employeeCount = 퇴사 아닌 소속 직원 수.
+  http.get(`${API_BASE}/hr/departments`, ({ request }) => {
+    const denied = requireHr(request);
+    if (denied) return denied;
+    const codes = new Set(db.departments.keys());
+    for (const m of db.employees.values()) if (m.employee.affiliation.type === 'HQ_DEPARTMENT') codes.add(m.employee.affiliation.code);
+    const items = [...codes].sort().map((code) => {
+      const name = db.departments.get(code)?.name;
+      const employeeCount = [...db.employees.values()].filter(
+        (m) => m.employee.affiliation.type === 'HQ_DEPARTMENT' && m.employee.affiliation.code === code && m.employee.status !== 'LEFT',
+      ).length;
+      return { code, employeeCount, ...(name ? { name } : {}) };
+    });
+    return HttpResponse.json({ items });
+  }),
+
+  http.put(`${API_BASE}/hr/departments/:code`, async ({ request, params }) => {
+    const denied = requireHr(request);
+    if (denied) return denied;
+    const body = (await request.clone().json()) as { name?: string };
+    return idempotent(request, () => {
+      const code = String(params['code']);
+      if (!/^[A-Za-z0-9_.-]{1,64}$/.test(code)) return problem(400, 'VALIDATION_FAILED', [{ field: 'code', reason: 'INVALID_FORMAT' }]);
+      const name = (body.name ?? '').trim();
+      if (name.length > 60) return problem(400, 'VALIDATION_FAILED', [{ field: 'name', reason: 'INVALID_FORMAT' }]);
+      db.departments.set(code, name ? { name } : {});
+      const employeeCount = [...db.employees.values()].filter(
+        (m) => m.employee.affiliation.type === 'HQ_DEPARTMENT' && m.employee.affiliation.code === code && m.employee.status !== 'LEFT',
+      ).length;
+      return { status: 200, body: { code, employeeCount, ...(name ? { name } : {}) } };
+    });
+  }),
+
   http.get(`${API_BASE}/hr/employees`, ({ request }) => {
     const denied = requireHr(request);
     if (denied) return denied;

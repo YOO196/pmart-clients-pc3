@@ -26,6 +26,10 @@ export type EmployeeAuthPaths = paths;
 export type EmployeeSession = components['schemas']['EmployeeSession'];
 /** 직원 역할 목록 항목(`GET /employee-auth/roles`, 0.5.0 — BR-57) */
 export type EmployeeRole = components['schemas']['EmployeeRole'];
+/** 직원 로그인 계정(`GET /employee-auth/employees/{operatorId}`, 0.7.0 — effectiveRoles·grants) */
+export type EmployeeAccount = components['schemas']['Employee'];
+/** 승인된 권한 한 줄(0.7.0, 회수 0.8.0) */
+export type EmployeeGrant = components['schemas']['EmployeeGrant'];
 
 /** 이 모듈이 쓰는 API 클라이언트(앱의 Api 중 employeeAuth 만) */
 export interface EmployeeAuthApi {
