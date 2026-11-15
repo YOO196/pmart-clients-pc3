@@ -45,12 +45,12 @@ describe('로그인', () => {
 });
 
 describe('센터', () => {
-  it('센터가 하나면 고르지 않고 그 센터로 — 이름은 GET /centers 에서', async () => {
+  it('센터가 하나면 고르지 않고 그 센터로 — 이름은 세션 응답 centerDetails(0.9.0)에서, GET /centers 는 부르지 않는다', async () => {
     const view = renderAt('/');
     expect(await screen.findByRole('heading', { name: '작업자' })).toBeInTheDocument();
     expect(await screen.findByText('부산진구 MFC (MFC-BSN-01)')).toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(new URL(view.gets('/centers')[0]!.url).searchParams.get('type')).toBe('MFC');
+    expect(view.gets('/centers')).toHaveLength(0);
   });
 
   it('센터가 둘 이상이면 위에서 고른다 — 세션 centers 만(전체 목록의 다른 센터는 없다), 바꾸면 같은 메뉴', async () => {
@@ -63,11 +63,28 @@ describe('센터', () => {
     expect(screen.getByRole('link', { name: '품질' })).toHaveAttribute('href', '/c/MFC-SEL-01/quality');
   });
 
-  it('센터 이름을 못 불러와도 센터는 코드로 보인다(빈 목록 아님)', async () => {
-    server.use(http.get(`${API_BASE}/centers`, () => HttpResponse.json({ code: 'INTERNAL_ERROR' }, { status: 500 })));
+  it('서버가 센터 이름을 못 읽으면(name: null) 그 센터는 코드로 보인다(빈 목록 아님)', async () => {
+    server.use(
+      http.get(`${API_BASE}/employee-auth/sessions/current`, () =>
+        HttpResponse.json({
+          sessionId: 'SES-1',
+          operatorId: 'OP-sup-2',
+          app: 'mfc-backoffice',
+          issuedAt: '2026-11-16T00:00:00Z',
+          expiresAt: '2026-11-16T00:15:00Z',
+          roles: ['MFC_SUPERVISOR'],
+          centers: ['MFC-BSN-01', 'MFC-SEL-01'],
+          centerDetails: [
+            { centerId: 'MFC-BSN-01', name: '부산진구 MFC' },
+            { centerId: 'MFC-SEL-01', name: null },
+          ],
+        }),
+      ),
+    );
     renderAt('/c/MFC-BSN-01/workers', as.sup2);
-    expect(await screen.findByText('센터 이름을 불러오지 못해 센터 코드로만 보여요.')).toBeInTheDocument();
-    expect(within(screen.getByRole('combobox')).getAllByRole('option').map((o) => o.textContent)).toEqual(['MFC-BSN-01', 'MFC-SEL-01']);
+    const select = await screen.findByRole('combobox');
+    await waitFor(() => expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['부산진구 MFC (MFC-BSN-01)', 'MFC-SEL-01']));
+    expect(screen.getByText('센터 이름을 불러오지 못해 센터 코드로만 보여요.')).toBeInTheDocument();
   });
 
   it('맡지 않은 센터 주소는 "이 센터 권한이 없습니다" + 맡은 센터로 가는 링크', async () => {

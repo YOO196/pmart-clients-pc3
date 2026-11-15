@@ -9,10 +9,21 @@ export interface OperatorSession {
   readonly type: string;
   readonly roles: readonly string[];
   readonly centers: readonly string[];
+  /**
+   * 센터 표시 이름(sessions/current 0.9.0 `centerDetails` — 서버가 이름을 읽은 것만). 표시용이다 — 판단·API 호출은 centers 코드로.
+   * 없거나 이름이 빠진 센터는 코드를 그대로 보인다(centerDisplayName).
+   */
+  readonly centerNames?: ReadonlyMap<string, string>;
   /** sid 클레임(서버 세션) */
   readonly sessionId?: string;
   /** exp 클레임(초). 화면은 만료 판정에 쓰지 않는다(서버 401 → 갱신) */
   readonly expiresAtSeconds?: number;
+}
+
+/** 센터 표시: 이름이 있으면 "이름 (코드)", 없으면 코드 */
+export function centerDisplayName(session: Pick<OperatorSession, 'centerNames'> | null | undefined, centerId: string): string {
+  const name = session?.centerNames?.get(centerId);
+  return name ? `${name} (${centerId})` : centerId;
 }
 
 function decodeSegment(segment: string): unknown {

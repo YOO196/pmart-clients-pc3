@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw';
+import { http } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { authHandlers } from './authHandlers';
@@ -14,14 +14,5 @@ const gateway = http.all(`${API_BASE}/*`, ({ request }) => {
   return operator(request) ? undefined : unauthorized();
 });
 
-/** center-master `GET /centers`(계약 Center 의 일부 필드) — 전체 센터를 준다. 화면은 토큰 centers 와 겹치는 것만 쓴다 */
-export const centerList = {
-  items: [
-    { centerId: 'MFC-BSN-01', type: 'MFC', name: '부산진구 MFC', state: 'ACTIVE' },
-    { centerId: 'MFC-SEL-01', type: 'MFC', name: '송파 MFC', state: 'PLANNED' },
-    { centerId: 'MFC-SEL-02', type: 'MFC', name: '강남 MFC', state: 'ACTIVE' },
-  ],
-  page: { nextCursor: null, size: 200 },
-};
-
-export const handlers = [gateway, http.get(`${API_BASE}/centers`, () => HttpResponse.json(centerList)), ...authHandlers];
+// 센터 이름은 sessions/current 의 centerDetails(0.9.0)로 온다 — GET /centers 목은 두지 않는다(authHandlers 의 mockCenterNames).
+export const handlers = [gateway, ...authHandlers];

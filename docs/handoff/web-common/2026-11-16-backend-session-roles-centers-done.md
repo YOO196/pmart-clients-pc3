@@ -14,11 +14,13 @@
 - 확인: typecheck·lint(core·ui·세 앱) 통과. 테스트 core 24·backoffice 174·hr-backoffice 36·mfc-backoffice 16 통과(목 모드).
 
 ## 2. 요청 — 빌드 올리기
+- (2026-11-16 다시 빌드: 센터 이름 반영 `2026-11-16-backend-session-center-names-done.md` 까지 담았다. 아래가 최신 해시.)
+
 | 앱 | 명령 | 진입 파일 |
 |---|---|---|
-| backoffice | `lan.sh publish-backoffice` | `assets/index-DN24yW9v.js`, `assets/index-BA51wX7k.css` |
-| hr-backoffice | `lan.sh publish-hr-backoffice` | `assets/index-kAFGa0JZ.js`, `assets/index-pUB-rvKV.css` |
-| mfc-backoffice | `lan.sh publish-mfc-backoffice` | `assets/index-FXLbneo2.js`, `assets/index-BtcOg322.css` |
+| backoffice | `lan.sh publish-backoffice` | `assets/index-ExrRpzx1.js`, `assets/index-BA51wX7k.css` |
+| hr-backoffice | `lan.sh publish-hr-backoffice` | `assets/index-BUIz2JvF.js`, `assets/index-pUB-rvKV.css` |
+| mfc-backoffice | `lan.sh publish-mfc-backoffice` | `assets/index-ChSinewe.js`, `assets/index-BtcOg322.css` |
 
 - 세 빌드 모두 이 회신의 변경 + `backoffice/2026-11-16-backend-product-menu-operator-admin-done.md` + `hr-backoffice/2026-11-16-backend-role-list-done.md` 를 담았다.
 - 올린 뒤 실서버에서 볼 것: 로그인 뒤 메뉴가 그대로 보이는지, MFC 백오피스 `claude-mfc-sup` 로 센터(`MFC-SEED-01`)가 잡히는지.

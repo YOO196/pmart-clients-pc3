@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { EmployeeAuthPaths } from './employeeAuth';
 import { createOperatorSessionSource } from './operatorSession';
+import { centerDisplayName } from './session';
 import { TokenStore } from './tokens';
 
 const session = (roles: string[], centers: string[]) => ({
@@ -43,6 +44,20 @@ describe('createOperatorSessionSource — sessions/current 응답이 화면 세�
     await settle();
     const s = source.getState();
     expect(s.status === 'ready' && s.session).toMatchObject({ subject: 'OP-1', roles: ['MFC_SUPERVISOR'], centers: ['MFC-A', 'MFC-B'], sessionId: 'SES-1' });
+    stop();
+  });
+
+  it('centerDetails(0.9.0) 이름은 표시용으로 — 이름이 null 이면 코드', async () => {
+    const body = { ...session(['MFC_SUPERVISOR'], ['MFC-A', 'MFC-B']), centerDetails: [{ centerId: 'MFC-A', name: '가 센터' }, { centerId: 'MFC-B', name: null }] };
+    const { store, source } = setup([() => json(body)]);
+    store.accessToken = 'a';
+    const stop = source.start();
+    await settle();
+    const s = source.getState();
+    const ready = s.status === 'ready' ? s.session : null;
+    expect(ready && centerDisplayName(ready, 'MFC-A')).toBe('가 센터 (MFC-A)');
+    expect(ready && centerDisplayName(ready, 'MFC-B')).toBe('MFC-B');
+    expect(ready?.centers).toEqual(['MFC-A', 'MFC-B']);
     stop();
   });
 

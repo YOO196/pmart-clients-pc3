@@ -1,59 +1,42 @@
 // 센터 고르기(handoff §1·§2-1): 고를 수 있는 센터는 세션 응답(`GET /employee-auth/sessions/current`, 0.6.0)의 `centers` 다(토큰을 풀지 않는다 — 백엔드 요청 2026-11-15 session-roles-centers).
-// 이름은 center-master `GET /centers` 에서 붙인다. 전체 센터를 주므로 세션 centers 와 겹치는 것만 쓴다.
-// 이름을 못 불러와도 센터 목록은 비지 않는다(코드로만 보이고 안내).
-import { useQuery } from '@tanstack/react-query';
+// 이름은 같은 응답의 `centerDetails`(0.9.0, 백엔드 알림 web-common/2026-11-16-notice-session-center-names) — 서버가 이름을 못 읽은 센터는 코드로 보이고 안내한다.
+// 이름은 표시용이다. 주소·API 호출은 코드(centers)로.
 import { useNavigate } from 'react-router';
 
-import { request } from '@pmart/web-core';
-import { useApi } from '../../app/ApiContext';
+import { centerDisplayName } from '@pmart/web-core';
+import { useSession } from '../../app/SessionContext';
 import { messages as m } from '../../shared/messages';
 
-const PAGE_SIZE = 200; // 계약 PageSize 최댓값
-
-export function useCenterNames() {
-  const api = useApi();
-  return useQuery({
-    queryKey: ['centers', 'names'],
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const page = await request('GET', api.center.GET('/centers', { params: { query: { type: 'MFC', size: PAGE_SIZE } } }));
-      return new Map((page.items ?? []).flatMap((c) => (c.centerId && c.name ? [[c.centerId, c.name] as const] : [])));
-    },
-  });
-}
-
-export const centerLabel = (id: string, names: ReadonlyMap<string, string> | undefined) => {
-  const name = names?.get(id);
-  return name ? `${name} (${id})` : id;
-};
-
-/** 센터가 둘 이상일 때만 보인다. 바꾸면 같은 메뉴의 다른 센터로 간다. */
+/** 센터가 둘 이상일 때만 고르기가 보인다. 바꾸면 같은 메뉴의 다른 센터로 간다. */
 export function CenterSwitcher({ centers, current, segment }: { readonly centers: readonly string[]; readonly current: string; readonly segment: string }) {
-  const names = useCenterNames();
+  const { session } = useSession();
   const navigate = useNavigate();
+  const missingNames = centers.some((c) => !session?.centerNames?.has(c));
   if (centers.length < 2) {
     return (
       <div className="text-sm">
-        <span className="opacity-70">{m.center.label}</span> <strong>{centerLabel(current, names.data)}</strong>
-        {names.isError && <p className="text-warning text-xs">{m.center.namesFailed}</p>}
+        <span className="opacity-70">{m.center.label}</span> <strong>{centerDisplayName(session, current)}</strong>
+        {missingNames && <p className="text-warning text-xs">{m.center.namesFailed}</p>}
       </div>
     );
   }
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <span className="opacity-70">{m.center.choose}</span>
-      <select
-        className="select select-sm w-auto"
-        value={current}
-        onChange={(e) => void navigate(`/c/${encodeURIComponent(e.target.value)}/${segment}`)}
-      >
-        {centers.map((c) => (
-          <option key={c} value={c}>
-            {centerLabel(c, names.data)}
-          </option>
-        ))}
-      </select>
-      {names.isError && <span className="text-warning text-xs">{m.center.namesFailed}</span>}
-    </label>
+    <div className="flex items-center gap-2 text-sm">
+      <label className="flex items-center gap-2">
+        <span className="opacity-70">{m.center.choose}</span>
+        <select
+          className="select select-sm w-auto"
+          value={current}
+          onChange={(e) => void navigate(`/c/${encodeURIComponent(e.target.value)}/${segment}`)}
+        >
+          {centers.map((c) => (
+            <option key={c} value={c}>
+              {centerDisplayName(session, c)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {missingNames && <span className="text-warning text-xs">{m.center.namesFailed}</span>}
+    </div>
   );
 }

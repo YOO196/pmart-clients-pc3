@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 
-import { request } from '@pmart/web-core';
+import { centerDisplayName, request } from '@pmart/web-core';
 import { formatSeoul, QueryState, toUiState } from '@pmart/web-ui';
 import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
@@ -32,7 +32,7 @@ export function SessionPage() {
                 <dt>{m.session.roles}</dt>
                 <dd>{session.roles.join(', ') || m.none}</dd>
                 <dt>{m.session.centers}</dt>
-                <dd>{session.centers.join(', ') || m.none}</dd>
+                <dd>{session.centers.map((c) => centerDisplayName(session, c)).join(', ') || m.none}</dd>
               </dl>
               {session.roles.length === 0 && (
                 <p role="alert" className="alert alert-warning text-sm">

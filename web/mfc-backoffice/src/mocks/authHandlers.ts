@@ -28,7 +28,14 @@ function issue(s: MockSession) {
   };
 }
 
-const available = (operatorId: string) => db.grants.has(operatorId) && !db.suspended.has(operatorId);
+/** 목 센터 이름(서버는 center-master 이름을 10분 캐시) — 없는 센터는 name: null(서버가 못 읽은 경우와 같다) */
+export const mockCenterNames: ReadonlyMap<string, string> = new Map([
+  ['MFC-BSN-01', '부산진구 MFC'],
+  ['MFC-SEL-01', '송파 MFC'],
+  ['MFC-SEL-02', '강남 MFC'],
+]);
+
+const available =(operatorId: string) => db.grants.has(operatorId) && !db.suspended.has(operatorId);
 
 export const authHandlers = [
   http.post(`${API_BASE}/employee-auth/tokens`, async ({ request }) => {
@@ -89,6 +96,7 @@ export const authHandlers = [
       operatorId: who.subject,
       roles: [...grant.roles],
       centers: [...grant.centers],
+      centerDetails: grant.centers.map((centerId) => ({ centerId, name: mockCenterNames.get(centerId) ?? null })),
       app: EMPLOYEE_APP,
       issuedAt: s?.issuedAt ?? timestamp(),
       expiresAt: new Date((who.expiresAtSeconds ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),

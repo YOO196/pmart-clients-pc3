@@ -38,6 +38,8 @@ export function toOperatorSession(s: EmployeeSession): OperatorSession {
     type: 'OPERATOR',
     roles: [...s.roles],
     centers: [...s.centers],
+    // 0.9.0 centerDetails — 이름이 null(서버가 못 읽음)인 센터는 넣지 않는다(코드로 보인다)
+    centerNames: new Map((s.centerDetails ?? []).flatMap((c) => (c.name ? [[c.centerId, c.name] as const] : []))),
     sessionId: s.sessionId,
     ...(Number.isNaN(exp) ? {} : { expiresAtSeconds: Math.floor(exp / 1000) }),
   };
