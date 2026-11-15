@@ -55,6 +55,7 @@ gh pr create --repo code-and-pick/pmart-clients --base main --head <내 계정>:
 
 - PR 설명에 바꾼 것·실행한 시험·영향 앱 영역·공통 문서(§5) 갱신 필요를 적는다.
 - 받기는 늘 `git pull origin main`. PC 1 의 작업은 원본 main 에 바로 들어가므로 작업 시작·PR 전에 받아서 rebase 한다.
+- PR 을 앞 PR 위에 쌓지 않는다(원본은 squash 로 합쳐 뒤 PR 이 매번 충돌한다). 쌓아야 하면 앞 PR 이 합쳐진 뒤 `rebase --onto` 로 옮긴다 — 내역·방법: `stacked-pr-squash-conflicts.md`.
 
 ## 2. 폴더 구조
 
