@@ -21,6 +21,11 @@ const out = join(repo, 'web/backoffice/src/api/generated');
 const copies = [
   { label: 'web/core', dir: join(repo, 'web/core/src/generated'), services: ['employee-auth'] },
   { label: 'web/hr-backoffice', dir: join(repo, 'web/hr-backoffice/src/api/generated'), services: ['hr', 'center-master'] },
+  {
+    label: 'web/mfc-backoffice',
+    dir: join(repo, 'web/mfc-backoffice/src/api/generated'),
+    services: ['center-master', 'mfc-capacity', 'mfc-fulfillment', 'mfc-inbound', 'mfc-inventory', 'mfc-location', 'mfc-quality'],
+  },
 ];
 const excluded = ['/internal', '/webhooks', '/actuator'];
 

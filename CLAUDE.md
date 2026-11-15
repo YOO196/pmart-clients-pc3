@@ -13,6 +13,7 @@ Flutter 앱은 **Android 만** 개발한다. iOS 는 중단(`ios/` 는 두되 �
 | `apps/mfc_app` | Flutter (Android PDA 우선) | MFC 점원(피킹·패킹·인계·입고·실사) | 1단계 | `docs/apps/mfc-app.md` |
 | `web/backoffice` | React SPA (Vite + TS) | 본사·센터 운영자 | 1단계 | `docs/apps/backoffice-web.md` |
 | `web/hr-backoffice` | React SPA (Vite + TS) | 인사팀(`HR_ADMIN`) — 직원 등록·계정 발급·정지/퇴사 | 구현·LAN 배포(`https://192.168.0.40:8444`, 2026-11-13) | `docs/apps/hr-backoffice-web.md` |
+| `web/mfc-backoffice` | React SPA (Vite + TS) | 센터 관리자(`MFC_SUPERVISOR`) — 작업자·배정·작업·입고·재고·품질·위치·운영 제한 | 기반만(2026-11-15, 메뉴 화면은 준비 중) — LAN `https://192.168.0.40:8445` | `docs/apps/mfc-backoffice-web.md` |
 | (예약) `apps/driver_app` | Flutter | 간선기사(TMS) | 2단계 | `docs/apps/driver-app.md` |
 
 ## 구조
@@ -26,6 +27,7 @@ web/core/             # 웹 공유 패키지 @pmart/web-core (HTTP 규약·실�
 web/ui/               # 웹 공유 패키지 @pmart/web-ui (UiState 표시·명령 결과·공통 문구)
 web/backoffice/       # React SPA (npm workspace)
 web/hr-backoffice/    # React SPA — 인사팀 백오피스 (npm workspace)
+web/mfc-backoffice/   # React SPA — MFC 백오피스(센터 관리자) (npm workspace)
 tools/                # 계약 동기화·코드 생성 스크립트
 docs/                 # 설계 정본 (아래 문서 지도)
 ```
@@ -80,7 +82,7 @@ npm run dev -w web/backoffice                     # 목 모드(MSW). 실서버�
 npm run typecheck -w web/backoffice               # TS 7
 npm run lint -w web/backoffice                    # ESLint (tools/web-tools 의 TS 5)
 npm run test -w web/backoffice                    # Vitest + MSW
-# 다른 웹 패키지도 같은 스크립트: -w web/hr-backoffice (dev 는 포트 5174), -w web/core, -w web/ui (typecheck·lint·test)
+# 다른 웹 패키지도 같은 스크립트: -w web/hr-backoffice (dev 는 포트 5174), -w web/mfc-backoffice (5175), -w web/core, -w web/ui (typecheck·lint·test)
 ```
 실행 전 경로와 스크립트 존재를 확인한다. 검증은 목 모드만 쓴다(백엔드 도커 사용 안 함).
 
