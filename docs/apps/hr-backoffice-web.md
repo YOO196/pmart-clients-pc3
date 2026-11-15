@@ -45,7 +45,7 @@
 | Q5 | 409 = `MAIL_ID_TAKEN`·`VERSION_CONFLICT`·`INVALID_STATE`·`KEYCLOAK_<상태>`·`MAILBOX_<상태>`. 퇴사도 버전이 다르면 409. 이미 그 상태인 복귀·퇴사는 200 | 앞의 셋은 전용 문구, 나머지는 일반 문구 + code |
 | Q6 | `GRANT` 승인 행 `attributes.employee{operatorId, employeeNo, mailAddress, affiliation}` — 이름은 없음 | 백오피스 승인 상세가 역할·센터·기간·근거·대상 직원을 표시 |
 | — | 복귀: 파트타임·일일크루는 기존 계약 종료일이 지났으면 새 종료일 필요(400 `VALIDATION_FAILED` `endDate`) | 복귀 화면에 안내, 서버 거절을 그대로 보임 |
-| — | 역할 목록 API 없음 — 12개 고정 | `src/api/models.ts` `GRANT_ROLES` |
+| — | 역할 목록 API 없음 — 13개 고정(2026-11-15 `RIDER_OPS` 추가, API 요청 BR-57) | `src/api/models.ts` `GRANT_ROLES` |
 
 ## 5. 하지 않은 것
 - 개인정보 마스킹: 인사 화면은 이름·메일을 그대로 보인다(계약에 사유 입력 열람 API 없음, 주민번호·연락처 등은 계약에 없다).
