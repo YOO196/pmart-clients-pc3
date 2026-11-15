@@ -22,10 +22,10 @@
 | BR-12 | 낮음 | 고객 | 고객 노출 문구용 상태 코드(FUL_*, CXL_* 등) 와 계약 enum 대응 확정 | OPEN |
 | BR-13 | 중간 | 고객 | 배송 방식별 현재 가능 여부·불가 사유·예상시간·배달팁 조회 없음 | **RESOLVED**(2026-10-30, 백엔드 1203209): `GET /delivery-options`. 고객앱 배송 선택에 반영(LAN 배포 확인 전) |
 | BR-14 | 중간 | 고객 | 견적에 최소주문 부족액·첫 구매 무료 4가지 상태 없음 | **RESOLVED**(2026-10-30, 1203209): Quote `minOrderShortfall`·`firstPurchaseBenefit`, 최소주문 미달은 초안 `blockers`. 고객앱 반영 |
-| BR-15 | 중간 | 고객 | 반품·교환 자격(품목별 가능 여부·기한·사유) 조회와 사유별 증빙 요건 없음 | SENT 준비(`docs/handoff/archive/2026-10-24-backend-customer-gaps.md`) |
-| BR-16 | 중간 | 고객 | 고객 배송 문의 접수(지연·오배송·파손·누락·미수령) 경로 없음 | SENT 준비(`docs/handoff/archive/2026-10-24-backend-customer-gaps.md`) |
-| BR-17 | 낮음 | 고객 | 현금영수증 신청·발급 가능 여부·발급 결과 조회 없음 | SENT 준비(`docs/handoff/archive/2026-10-24-backend-customer-gaps.md`) |
-| BR-18 | 낮음 | 고객 | 주문서 이탈 시 초안 처리(명시적 취소 경로 여부) 확인 | SENT 준비(`docs/handoff/archive/2026-10-24-backend-customer-gaps.md`) |
+| BR-15 | 중간 | 고객 | 반품·교환 자격(품목별 가능 여부·기한·사유) 조회와 사유별 증빙 요건 없음 | 일부 해소 — 고객 문의 접수·조회는 case-service 0.2.0 `inquiries` 로 생김(고객앱 반영 2026-11-15, 종류 7가지·주문 연결). 전달 사진 조회·사진 첨부·상담 채널 운영 시간은 그대로 없음. 원 요청 `docs/handoff/archive/2026-10-24-backend-customer-gaps.md` |
+| BR-16 | 중간 | 고객 | 고객 배송 문의 접수(지연·오배송·파손·누락·미수령) 경로 없음 | 일부 해소 — 고객 문의 접수·조회는 case-service 0.2.0 `inquiries` 로 생김(고객앱 반영 2026-11-15, 종류 7가지·주문 연결). 전달 사진 조회·사진 첨부·상담 채널 운영 시간은 그대로 없음. 원 요청 `docs/handoff/archive/2026-10-24-backend-customer-gaps.md` |
+| BR-17 | 낮음 | 고객 | 현금영수증 신청·발급 가능 여부·발급 결과 조회 없음 | 일부 해소 — 고객 문의 접수·조회는 case-service 0.2.0 `inquiries` 로 생김(고객앱 반영 2026-11-15, 종류 7가지·주문 연결). 전달 사진 조회·사진 첨부·상담 채널 운영 시간은 그대로 없음. 원 요청 `docs/handoff/archive/2026-10-24-backend-customer-gaps.md` |
+| BR-18 | 낮음 | 고객 | 주문서 이탈 시 초안 처리(명시적 취소 경로 여부) 확인 | 일부 해소 — 고객 문의 접수·조회는 case-service 0.2.0 `inquiries` 로 생김(고객앱 반영 2026-11-15, 종류 7가지·주문 연결). 전달 사진 조회·사진 첨부·상담 채널 운영 시간은 그대로 없음. 원 요청 `docs/handoff/archive/2026-10-24-backend-customer-gaps.md` |
 | BR-19 | 낮음 | 고객 | 상품 카드·상세의 100g/100mL당 가격 표시 값 없음 | OPEN |
 | BR-20 | 중간 | 고객 | 필수 동의 대기(AUTH_CONSENT)에서 토큰 없이 동의 변경을 호출할 경로·`requiredConsents` 형식 불명 | OPEN |
 | BR-21 | 낮음 | 고객 | `OrderDraft` 응답에 품목·배송 방식·도착 구간·주소 반영 내용이 없음, 품절 처리 "다음에도 적용" 저장 경로 없음 | **부분 해소**(2026-10-30, 1203209): 초안 `lines`·`delivery`·`blockers`. 품절 처리 "다음에도 적용" 저장 경로는 아직 없음 |
@@ -307,7 +307,7 @@
 - 현황: `ai-assistant-service.yaml` 은 x-stage 3 "자리 표시용 초안". 게이트웨이 라우트 없음. 출처는 `docRef`·`policyVersion`·`asOf` 뿐, GET 에는 출처 없음, 질의는 동기 200 만.
 - 영향: 절·문서 버전·확정/제안/미결정 구분·문서 열람·질문 목록·응답 유실 뒤 복구(키 기반 짝 조회)·진행 상태·장애 구분을 계약으로 보일 수 없다.
 - 요청: 요청서 §1 표 14항목(필드·경로·required·라우트·본문 형식).
-- 백오피스: `/assistant` 화면 + `AssistantPort`(목 모드만 `draftMock`, BR-46 확장 필드는 목에서만). local·LAN 은 호출하지 않고 "연결 전" 안내.
+- 백오피스: `/assistant` 화면 + `AssistantPort`. 목 모드는 `draftMock`, local·LAN 은 `httpAssistant` 로 실서버를 부른다(2026-11-15 — 계약 1.1.0, 서비스 2026-11-09 LAN 배포). 실서버 확인은 안 함.
 
 ## BR-47 상품 검색 — 센터 지정 시 전 상품 미취급·total 불일치·빈 페이지 (고객앱)
 - 현황(LAN 2026-11-04): `GET /search/products?mfcId=MFC-BSN-01`(또는 MFC-SEED-01) → 검색어 없이 total 162·items 0·nextCursor 있음. `q=탄산수` → total 1·items 0. `includeNotCarried=true` 면 `carried: false` 로 나옴.

@@ -1,4 +1,4 @@
-// ⚠ 화면 개발·시험용 목. 실제 ai-assistant-service 동작이 아니다(서비스 LAN 미배포, BR-46 #13).
+// ⚠ 화면 개발·시험용 목. 실제 ai-assistant-service 동작이 아니다(실서버 모드는 httpAssistant).
 // - 계약 1.1.0 의 경로 의미(질의 200/202, answerId 다시 보기, 내 질문 목록)와 공통 규칙
 //   (같은 Idempotency-Key·같은 본문 = 같은 결과, 같은 키·다른 본문 = 409 IDEMPOTENCY_CONFLICT, 403·404·422·503)만 흉내 낸다.
 // - 응답 본문은 생성 타입(AnswerWire)으로 만들고 wire.ts 로 바꾼다 — 실서버 어댑터와 같은 길.

@@ -9,6 +9,7 @@ export const as = {
   md: mockTokenFor(mockOperators[1]),
   approver: mockTokenFor(mockOperators[2]),
   center: mockTokenFor(mockOperators[3]),
+  cs: mockTokenFor(mockOperators[4]),
 };
 
 /** 화면 + 보낸 요청 기록(헤더 확인용) */

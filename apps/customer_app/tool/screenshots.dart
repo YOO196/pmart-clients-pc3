@@ -167,6 +167,33 @@ void main() {
     await shot('notifications');
     await go('/addresses');
     await shot('addresses');
+    // 고객센터(레퍼런스 9-2 "3-1. 문의하기" 모양) · 문의 남기기 · 내 문의 · AI 상담
+    await go('/support');
+    await shot('support');
+    await go('/support/inquiries/new');
+    await shot('inquiry-new');
+    await go('/support/inquiries');
+    await shot('inquiries');
+    await go('/support/inquiries/inq-seed-1');
+    await shot('inquiry-detail');
+    await go('/support/chat');
+    await shot('chat');
+    Future<void> ask(String q) async {
+      await t.enterText(find.byKey(const ValueKey('chat-input')), q);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('chat-send')));
+      await t.pumpAndSettle();
+    }
+
+    await ask('상품 준비 중인 주문도 취소할 수 있나요?');
+    await t.tap(find.byKey(const ValueKey('chat-citations')));
+    await shot('chat-answer');
+    await ask('내 주문 어디쯤이에요? #주문');
+    await shot('chat-orders');
+    await t.tap(find.byKey(const ValueKey('chat-order-order-seed-4')).last);
+    await shot('chat-order-status');
+    await ask('포인트는 언제 생기나요? #근거없음');
+    await shot('chat-handoff');
     debugDisableShadows = true;
   });
 }

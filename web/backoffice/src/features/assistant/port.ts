@@ -1,8 +1,6 @@
 // 업무 도우미 연동 포트. 화면은 이 인터페이스만 안다.
-// - 지금: 목 모드는 draftMock(계약 1.1.0 모양), 실서버 모드(local·lan)는 notConnected(호출하지 않음).
-//   서비스가 LAN 에 배포되지 않았다(BR-46 #13, 사용자 결정으로 보류 — 게이트웨이 경로는 있으나 부르면 503).
-// - 배포 안내 뒤: 생성 타입(api/generated/ai-assistant) + pmartFetch(인증·Idempotency-Key·X-Source-System)로
-//   어댑터를 만들어 여기에 끼운다. 화면·테스트는 그대로 둔다.
+// - 목 모드는 draftMock(계약 1.1.0 모양), 실서버 모드(local·lan)는 httpAssistant(생성 타입 + pmartFetch — 서비스 2026-11-09 LAN 배포).
+// - notConnected 는 서버를 부르면 안 되는 구성용으로 남겨 둔다(기본 구성에서는 쓰지 않는다).
 import type { IdempotencyKey } from '../../api/command';
 import type { AssistantAnswer, HistoryPage } from './model';
 
@@ -28,11 +26,11 @@ export interface AssistantPort {
 
 export class AssistantNotConnectedError extends Error {
   constructor() {
-    super('ai-assistant-service 가 LAN 에 배포되기 전(BR-46) — 호출하지 않는다');
+    super('업무 도우미가 연결되지 않은 구성 — 호출하지 않는다');
   }
 }
 
-/** 실서버 모드 기본값. 서비스가 배포되지 않아 부르지 않는다. */
+/** 서버를 부르지 않는 포트. 화면은 "연결 전" 안내만 보인다. */
 export const notConnectedAssistant: AssistantPort = {
   connected: false,
   mock: false,

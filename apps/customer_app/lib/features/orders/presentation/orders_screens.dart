@@ -423,6 +423,12 @@ class _OrderBody extends ConsumerWidget {
             onPressed: () => visit('/orders/${o.orderId}/cancel'),
             child: Text(l10n.cancelTitle),
           ),
+        // 고객센터 문의(주문을 고른 상태로). 접수일 뿐 주문을 바꾸지 않는다.
+        OutlinedButton(
+          key: const ValueKey('order-inquiry'),
+          onPressed: () => visit('/support/inquiries/new?orderId=${o.orderId}'),
+          child: Text(l10n.orderInquiry),
+        ),
       ],
     );
   }

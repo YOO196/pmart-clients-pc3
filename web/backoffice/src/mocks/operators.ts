@@ -7,6 +7,8 @@ export const mockAccounts = [
   { operatorId: 'op-md-1', label: 'MD 김', roles: ['MD'], centers: [] },
   { operatorId: 'op-approver-1', label: '승인자 이', roles: ['PRODUCT_APPROVER', 'DISPLAY_APPROVER', 'PRICE_APPROVER'], centers: [] },
   { operatorId: 'op-center-1', label: '센터 박', roles: [], centers: ['MFC-BSN-01', 'CDC01'] },
+  // 고객센터 상담원(백엔드 요청 2026-11-09 customer-inquiry-page §2)
+  { operatorId: 'op-cs-1', label: '상담원 최', roles: ['CS_AGENT'], centers: [] },
 ] as const;
 
 /** 테스트용: 로그인 없이 바로 세션을 여는 목 access token */

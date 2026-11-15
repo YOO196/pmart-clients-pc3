@@ -55,14 +55,14 @@ const wireCitation = (path: string): AnswerWire['citations'][number] => ({
   excerpt: '본문',
 });
 
-describe('업무 도우미 (계약 1.1.0 목, 서버 LAN 배포 전)', () => {
+describe('업무 도우미 (계약 1.1.0 목)', () => {
   it('정상 답변: 답변·근거 경로·절·버전·지위·생애·구현 기록·색인 시점을 보이고, 기준선·목 표시를 붙인다', async () => {
     const { port } = setup();
     render(<App memory initialPath="/assistant" initialToken={as.md} assistantPort={port} />);
     await ask('반품 기한은?');
 
     expect(await screen.findByTestId('answer-text')).toHaveTextContent('[목 답변]');
-    expect(screen.getByText('목 데이터 · 서버 LAN 배포 전(BR-46)')).toBeInTheDocument();
+    expect(screen.getByText('목 답변(실제 서버 답이 아님)')).toBeInTheDocument();
     expect(screen.getByTestId('baseline')).toBeInTheDocument();
     expect(screen.getByText('Q. 반품 기한은?')).toBeInTheDocument();
     const cites = screen.getAllByTestId('citation');
@@ -271,7 +271,7 @@ describe('업무 도우미 (계약 1.1.0 목, 서버 LAN 배포 전)', () => {
     expect(await screen.findByTestId('answer-text')).toBeInTheDocument();
   });
 
-  it('실서버 모드(서버 배포 전): 호출하지 않고 "아직 연결되지 않았어요"만 보인다', async () => {
+  it('연결하지 않은 구성(notConnected): 호출하지 않고 "아직 연결되지 않았어요"만 보인다', async () => {
     render(<App memory initialPath="/assistant" initialToken={as.md} assistantPort={notConnectedAssistant} />);
     expect(await screen.findByText('업무 도우미는 아직 서버에 연결되지 않았어요')).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: '질문' })).not.toBeInTheDocument();

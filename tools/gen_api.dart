@@ -38,6 +38,9 @@ const services = <String, List<String>>{
   'payment-service': ['customer'],
   'claim-service': ['customer'],
   'review-service': ['customer'],
+  // 고객센터 문의(case 0.2.0 inquiries)·AI 상담(customer-assistant 0.1.0) — 백엔드 handoff 2026-11-09
+  'case-service': ['customer'],
+  'customer-assistant-service': ['customer'],
   'notification-service': ['customer', 'rider'],
   'delivery-tracking-service': ['customer', 'rider', 'mfc'],
   'delivery-dispatch-service': ['rider'],

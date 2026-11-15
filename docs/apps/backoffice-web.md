@@ -66,13 +66,21 @@ BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO �
 ## 2-2. 업무 도우미 (정책·업무 절차 질의응답, 2026-11-04, BR-46 / 계약 1.1.0 반영 2026-11-06)
 - 경로 `/assistant`(질문·답변·내 질문 목록), `/assistant/answers/:answerId`(답변 다시 보기). 코드 `src/features/assistant/`.
 - 읽기 전용. 주문·재고·환불·승인 변경 버튼, AI 자동 실행 없음. 메뉴는 숨기지 않고 권한은 서버 판정(403·404).
-- 계약 `ai-assistant-service.yaml` 1.1.0(ADR-0036). 화면은 `AssistantPort` 뒤에 둔다. 서비스가 LAN 에 배포되지 않아(BR-46 #13 보류) 목 모드만 `draftMock`(계약 모양, "서버 LAN 배포 전" 표시), local·LAN 빌드는 호출하지 않고 "연결 전" 안내. 배포 안내가 오면 생성 타입 + pmartFetch 어댑터를 끼운다.
+- 계약 `ai-assistant-service.yaml` 1.1.0(ADR-0036). 화면은 `AssistantPort` 뒤에 둔다. 목 모드는 `draftMock`(계약 모양, "목 답변" 표시), local·LAN 빌드는 `httpAssistant`(생성 타입 + pmartFetch)로 게이트웨이 `/api/v1/assistant/**` 를 부른다(2026-11-15 — 서비스는 2026-11-09 LAN 배포, 생성 답변). 실서버 확인은 아직 안 함. `GET ?requestId=` 는 쓰지 않는다 — 결과 불명·202 는 같은 키·같은 질문 POST 로 다시 확인한다(계약상 같은 답, 409 `INVALID_STATE` 때 하라는 것도 같은 POST). 생성 답변(`GENERATIVE`)에는 "근거 문서를 꼭 확인" 안내를 붙인다(백엔드 공지: 다른 주제를 근거로 답한 경우가 있었다).
 - 질의 `POST /assistant/policy-questions`: 새 전송 = 새 Idempotency-Key. 결과 불명(타임아웃·503 `DEPENDENCY_UNAVAILABLE`·응답 유실)과 202 `PROCESSING` 은 같은 키·같은 질문으로만 재확인(계약: 같은 키 = 같은 답). 답을 받은 질문을 그대로 다시 보내지 않는다(질문을 고치거나 "새 질문"). 403·409·422 `CONFIG_REQUIRED` 는 거절로 확정.
 - 표시: 답변·근거 본문은 일반 텍스트(HTML·마크다운 해석 없음). 기준선(`BASELINE_EXTRACTIVE`·`BASELINE_HASH`)이면 "품질 미검증" 안내. 인용은 지위(authority 6종)·생애(ACTIVE 외만 표시, 대체 문서·대체 제안)·구현 기록(날짜 기준, 현재 구현 보장 아님)을 따로, 저장소 상대 경로·절·문서 버전·기준일·색인 시점(스냅샷·revision·커밋 안 된 변경)·근거 본문(접기). 상대 경로가 아니면 가린다. 링크 없음(1차에 문서 열람 API 없음).
 - 상태: `NO_GROUNDING`·`REALTIME_DATA_REQUIRED`·`OUT_OF_SCOPE`·`FORBIDDEN_SCOPE` 는 각자 안내(서버 안내 문장 함께) ≠ 오류. 상태 확인(health) 경로는 게이트웨이에 없어 응답 코드로만 구분.
 - 내 질문 목록 `GET /assistant/question-history`(최근 순, 커서 "더 보기"). 질문 원문은 서버가 저장하지 않아 `answerPreview` 로 구분. 조회 실패는 오류로(빈 목록 아님). 질의 뒤 목록 다시 조회.
 - 답변 다시 보기 `GET /assistant/policy-questions/{answerId}`: 202 처리 중이면 "다시 확인", 404·409 는 오류로.
 - 계정 전환·로그아웃: 이전 계정의 `['assistant', owner]` 캐시 삭제, 화면 상태 새로 시작.
+
+## 2-3. 고객센터 문의 답변 (2026-11-15, case-service 0.2.0)
+- 경로 `/inquiries`(목록), `/inquiries/:inquiryId`(상세·답변). 코드 `src/features/inquiries/`. 역할 `CS_AGENT` 만(서버 403 — 메뉴는 숨기지 않는다).
+- 목록 `GET /inquiries?status=&cursor=`: 최근 접수 순, 상태 필터(전체·접수·답변 완료·종료)는 URL 쿼리, 커서 "더 보기". 조회 실패는 빈 목록이 아니라 오류로.
+- 상세 `GET /inquiries/{inquiryId}`: 상태·종류·고객 ID·주문·들어온 곳(문의 페이지 / AI 상담에서 넘어옴)·사건 번호, 본문, 답변들. 본문·답변은 일반 텍스트.
+- 답변 `POST /inquiries/{inquiryId}/replies`(본문 1~4000자, `X-Expected-Version` = 문의 `version`). 반영되면 `ANSWERED`. 결과 불명은 같은 키로만 재확인, 409 `VERSION_CONFLICT`·`INQUIRY_CLOSED` 는 안내 + 다시 읽기. 종료(CLOSED) 문의에는 답변 칸이 없다.
+- 답변은 응대일 뿐 주문·환불을 바꾸지 않는다. 고객 알림은 없다(고객은 앱 "내 문의"에서 본다).
+- 실서버 확인은 아직 안 함(목: `mocks/inquiryHandlers.ts`, 목 계정 "상담원 최").
 
 ## 3. 기술 메모
 - 개발: Vite 프록시 `/api → http://localhost:8080` (CORS 없음, BR-04). 목은 MSW.

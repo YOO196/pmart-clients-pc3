@@ -142,6 +142,11 @@ export function AnswerView({
           {m.assistant.baseline}
         </p>
       )}
+      {answer.answerMode === 'GENERATIVE' && (
+        <p role="note" data-testid="generative" className="alert alert-info text-xs">
+          {m.assistant.generative}
+        </p>
+      )}
       <p className="whitespace-pre-wrap break-words" data-testid="answer-text">
         {answer.answer}
       </p>

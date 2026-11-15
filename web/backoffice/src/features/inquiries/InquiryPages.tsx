@@ -1,0 +1,245 @@
+// 고객센터 문의(상담원 CS_AGENT) — case-service 0.2.0 inquiries, 백엔드 요청 2026-11-09 customer-inquiry-page §2.
+// 목록(GET /inquiries?status=) · 상세(GET /inquiries/{id}) · 답변(POST /inquiries/{id}/replies, X-Expected-Version = 문의 version).
+// 권한은 서버 판정(상담원이 아니면 403) — 메뉴를 숨겨 대신하지 않는다. 답변은 접수 응대일 뿐 주문·환불을 바꾸지 않는다.
+// 문의·답변 본문은 고객이 쓴 신뢰할 수 없는 텍스트 — 일반 텍스트로만 그린다. 로그에 남기지 않는다.
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router';
+
+import { request } from '@pmart/web-core';
+import { formatSeoul, QueryState, toUiState, uiStateFromError, useCommand } from '@pmart/web-ui';
+import { commandParams } from '../../api/command';
+import type { components } from '../../api/generated/case';
+import { useApi } from '../../app/ApiContext';
+import { CommandFeedback } from '../../shared/Feedback';
+import { messages as m } from '../../shared/messages';
+
+type Inquiry = components['schemas']['Inquiry'];
+type InquirySummary = components['schemas']['InquirySummary'];
+type InquiryStatus = components['schemas']['InquiryStatus'];
+
+const STATUSES: readonly InquiryStatus[] = ['RECEIVED', 'ANSWERED', 'CLOSED'];
+const MAX_REPLY = 4000; // 계약 replyInquiry body maxLength
+
+const isStatus = (v: string | null): v is InquiryStatus => v !== null && (STATUSES as readonly string[]).includes(v);
+/** 계약 밖 값은 지어내지 않고 원문 그대로 보인다. */
+const label = (map: Readonly<Record<string, string>>, v: string | null | undefined) => (v ? (map[v] ?? v) : m.none);
+
+/** 문의 목록(최근 접수 순). 상태 필터는 URL 쿼리(`?status=`)에 둔다 — 서버에 그대로 묻는다(화면에서 거르지 않는다). */
+export function InquiryListPage() {
+  const api = useApi();
+  const [search, setSearch] = useSearchParams();
+  const raw = search.get('status');
+  const status = isStatus(raw) ? raw : undefined;
+
+  const query = useInfiniteQuery({
+    queryKey: ['inquiries', 'list', status ?? 'ALL'],
+    queryFn: ({ pageParam }) =>
+      request(
+        'GET',
+        api.cases.GET('/inquiries', { params: { query: { ...(status ? { status } : {}), ...(pageParam ? { cursor: pageParam } : {}) } } }),
+      ),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.page?.nextCursor ?? undefined,
+  });
+  const items: InquirySummary[] = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
+
+  return (
+    <section className="space-y-4">
+      <h1 className="text-xl font-bold">{m.inquiries.title}</h1>
+      <p className="text-sm opacity-70">{m.inquiries.intro}</p>
+      <div role="group" aria-label={m.inquiries.statusFilter} className="join">
+        {([undefined, ...STATUSES] as const).map((s) => (
+          <button
+            key={s ?? 'ALL'}
+            type="button"
+            aria-pressed={status === s}
+            className={`btn join-item btn-sm ${status === s ? 'btn-active' : ''}`}
+            onClick={() => setSearch(s ? { status: s } : {})}
+          >
+            {s ? m.inquiries.status[s] : m.inquiries.all}
+          </button>
+        ))}
+      </div>
+
+      {query.isPending ? (
+        <QueryState state={{ kind: 'loading' }}>{() => null}</QueryState>
+      ) : query.isError && items.length === 0 ? (
+        // 조회 실패(403 포함)는 "문의 없음"이 아니라 오류로 보인다.
+        <QueryState state={uiStateFromError(query.error)} onRetry={() => void query.refetch()}>
+          {() => null}
+        </QueryState>
+      ) : items.length === 0 ? (
+        <p className="text-sm opacity-70">{m.inquiries.empty}</p>
+      ) : (
+        <>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>{m.inquiries.id}</th>
+                <th>{m.inquiries.category}</th>
+                <th>{m.inquiries.subject}</th>
+                <th>{m.inquiries.statusLabel}</th>
+                <th>{m.inquiries.createdAt}</th>
+                <th>{m.inquiries.answeredAt}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((i) => (
+                <tr key={i.inquiryId} data-testid="inquiry-row">
+                  <td>
+                    <Link className="link" to={`/inquiries/${encodeURIComponent(i.inquiryId)}`}>
+                      {i.inquiryId}
+                    </Link>
+                  </td>
+                  <td>{label(m.inquiries.categoryName, i.category)}</td>
+                  <td className="max-w-xs truncate">
+                    {i.title ?? m.none}
+                    {i.origin === 'ASSISTANT_HANDOFF' && <span className="badge badge-ghost badge-sm ml-1">{m.inquiries.fromAssistant}</span>}
+                  </td>
+                  <td>{label(m.inquiries.status, i.status)}</td>
+                  <td>{formatSeoul(i.createdAt)}</td>
+                  <td>{i.answeredAt ? formatSeoul(i.answeredAt) : m.none}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {query.isFetchNextPageError && <p className="text-sm text-error">{m.inquiries.moreFailed}</p>}
+          {query.hasNextPage && (
+            <button type="button" className="btn btn-sm" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>
+              {m.inquiries.more}
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function ReplyForm({ inquiry }: { readonly inquiry: Inquiry }) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const [body, setBody] = useState('');
+
+  const reply = useCommand(async ({ text, version }: { text: string; version: number }, key) => {
+    try {
+      const updated = await request(
+        'POST',
+        api.cases.POST('/inquiries/{inquiryId}/replies', {
+          ...commandParams(key, { path: { inquiryId: inquiry.inquiryId }, version }),
+          body: { body: text },
+        }),
+      );
+      queryClient.setQueryData(['inquiries', 'detail', inquiry.inquiryId], updated);
+      setBody('');
+      return updated;
+    } finally {
+      // 거절(버전 충돌·닫힘)이어도 문의가 바뀌었을 수 있다 — 새로 읽는다.
+      void queryClient.invalidateQueries({ queryKey: ['inquiries'] });
+    }
+  });
+
+  const trimmed = body.trim();
+  const locked = reply.busy; // 진행 중·결과 불명이면 본문을 바꾸지 않는다(같은 키 재확인만)
+  if (inquiry.status === 'CLOSED') return <p className="text-sm opacity-70">{m.inquiries.closedNote}</p>;
+
+  return (
+    <form
+      className="space-y-2 rounded-box bg-base-100 p-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (trimmed && !locked) void reply.run({ text: trimmed, version: inquiry.version });
+      }}
+    >
+      <label className="block">
+        <span className="text-sm font-bold">{m.inquiries.replyLabel}</span>
+        <textarea
+          className="textarea mt-1 w-full"
+          rows={4}
+          maxLength={MAX_REPLY}
+          value={body}
+          disabled={locked}
+          onChange={(e) => setBody(e.target.value)}
+        />
+      </label>
+      <p className="text-xs opacity-60">{m.inquiries.replyNote}</p>
+      <div className="flex items-center gap-2">
+        <button type="submit" className="btn btn-primary btn-sm" disabled={!trimmed || locked}>
+          {m.inquiries.replySend}
+        </button>
+        <span className="ml-auto text-xs opacity-60">{`${body.length} / ${MAX_REPLY}`}</span>
+      </div>
+      <CommandFeedback command={reply} unknown={{ body: m.inquiries.replyUnknown }}>
+        {() => (
+          <p role="status" className="text-sm text-success">
+            {m.inquiries.replySent}
+          </p>
+        )}
+      </CommandFeedback>
+    </form>
+  );
+}
+
+/** 문의 상세 + 답변. */
+export function InquiryDetailPage() {
+  const { inquiryId = '' } = useParams();
+  const api = useApi();
+  const query = useQuery({
+    queryKey: ['inquiries', 'detail', inquiryId],
+    queryFn: () => request('GET', api.cases.GET('/inquiries/{inquiryId}', { params: { path: { inquiryId } } })),
+  });
+
+  return (
+    <section className="max-w-3xl space-y-4">
+      <h1 className="text-xl font-bold">{`${m.inquiries.detailTitle} ${inquiryId}`}</h1>
+      <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
+        {(q) => (
+          <>
+            <dl className="grid grid-cols-[8rem_1fr] gap-1 rounded-box bg-base-100 p-4 text-sm">
+              <dt>{m.inquiries.statusLabel}</dt>
+              <dd data-testid="inquiry-status">{label(m.inquiries.status, q.status)}</dd>
+              <dt>{m.inquiries.category}</dt>
+              <dd>{label(m.inquiries.categoryName, q.category)}</dd>
+              <dt>{m.inquiries.customer}</dt>
+              <dd>{q.customerId ?? m.none}</dd>
+              <dt>{m.inquiries.order}</dt>
+              <dd>{q.orderId ?? m.none}</dd>
+              <dt>{m.inquiries.origin}</dt>
+              <dd>{q.origin === 'ASSISTANT_HANDOFF' ? m.inquiries.fromAssistant : q.origin === 'INQUIRY_PAGE' ? m.inquiries.fromPage : (q.origin ?? m.none)}</dd>
+              <dt>{m.inquiries.createdAt}</dt>
+              <dd>{formatSeoul(q.createdAt)}</dd>
+              <dt>{m.inquiries.caseId}</dt>
+              <dd>{q.caseId}</dd>
+            </dl>
+
+            <article className="rounded-box bg-base-100 p-4">
+              {q.title && <h2 className="mb-2 font-bold">{q.title}</h2>}
+              <p className="whitespace-pre-wrap break-words" data-testid="inquiry-body">
+                {q.body}
+              </p>
+            </article>
+
+            <h2 className="font-bold">{m.inquiries.replies}</h2>
+            {q.replies.length === 0 ? (
+              <p className="text-sm opacity-70">{m.inquiries.noReplies}</p>
+            ) : (
+              <ul className="space-y-2">
+                {q.replies.map((r, i) => (
+                  <li key={r.replyId ?? `reply-${i}`} className="rounded-box bg-base-200 p-3 text-sm" data-testid="inquiry-reply">
+                    <p className="whitespace-pre-wrap break-words">{r.body ?? ''}</p>
+                    <p className="mt-1 text-xs opacity-60">{r.createdAt ? formatSeoul(r.createdAt) : m.none}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <ReplyForm key={q.inquiryId} inquiry={q} />
+          </>
+        )}
+      </QueryState>
+      <Link className="link text-sm" to="/inquiries">
+        {m.inquiries.back}
+      </Link>
+    </section>
+  );
+}

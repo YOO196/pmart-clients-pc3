@@ -1,7 +1,9 @@
 import createClient from 'openapi-fetch';
 
+import type { paths as AssistantPaths } from './generated/ai-assistant';
 import type { paths as ApprovalPaths } from './generated/approval';
 import type { paths as BffPaths } from './generated/backoffice-bff';
+import type { paths as CasePaths } from './generated/case';
 import type { paths as CdcInventoryPaths } from './generated/cdc-inventory';
 import type { paths as CenterPaths } from './generated/center-master';
 import type { paths as MfcInventoryPaths } from './generated/mfc-inventory';
@@ -37,6 +39,8 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     mfcInventory: createClient<MfcInventoryPaths>(options),
     cdcInventory: createClient<CdcInventoryPaths>(options),
     center: createClient<CenterPaths>(options),
+    assistant: createClient<AssistantPaths>(options),
+    cases: createClient<CasePaths>(options),
   };
 }
 

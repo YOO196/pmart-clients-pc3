@@ -1,13 +1,12 @@
 {
   "dart": {
-    "backendCommit": "55e1bb71b81dd3b5b555a510d92daff2c0f0519b",
+    "backendCommit": "7b6fe95991b1568f22e948ed4522ac6c1440f3de",
     "backendContractsDirty": false,
-    "generatedAt": "2026-11-14T10:27:46.524751Z",
+    "generatedAt": "2026-11-15T01:19:00.327081Z",
     "generator": "openapi-generator-cli 7.26.0 (dart-dio, json_serializable)",
     "regenerated": [
-      "mfc-capacity-service",
-      "mfc-inbound-service",
-      "mfc-inventory-service"
+      "case-service",
+      "customer-assistant-service"
     ],
     "services": {
       "auth-service": [
@@ -56,6 +55,12 @@
         "customer"
       ],
       "review-service": [
+        "customer"
+      ],
+      "case-service": [
+        "customer"
+      ],
+      "customer-assistant-service": [
         "customer"
       ],
       "notification-service": [

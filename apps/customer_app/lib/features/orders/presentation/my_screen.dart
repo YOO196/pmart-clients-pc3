@@ -86,6 +86,12 @@ class MyScreen extends ConsumerWidget {
             onTap: () => context.push('/notifications/settings'),
           ),
           ListTile(
+            key: const ValueKey('my-support'),
+            leading: const Icon(Icons.headset_mic_outlined),
+            title: Text(l10n.supportTitle),
+            onTap: () => context.push('/support'),
+          ),
+          ListTile(
             leading: const Icon(Icons.place_outlined),
             title: Text(l10n.addressTitle),
             onTap: () => context.push('/addresses'),

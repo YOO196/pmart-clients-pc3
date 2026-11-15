@@ -9,11 +9,13 @@ import { ApprovalListPage } from '../features/approvals/ApprovalListPage';
 import { AssistantProvider } from '../features/assistant/AssistantContext';
 import { AssistantAnswerPage, AssistantPage } from '../features/assistant/AssistantPage';
 import { createDraftAssistantMock } from '../features/assistant/draftMock';
-import { notConnectedAssistant, type AssistantPort } from '../features/assistant/port';
+import { createHttpAssistant } from '../features/assistant/httpAssistant';
+import type { AssistantPort } from '../features/assistant/port';
 import { CategoryTreePage } from '../features/categories/CategoryTreePage';
 import { ContentDraftPage, NewContentDraftPage } from '../features/contents/ContentDraftPage';
 import { ContentImportPage, NewContentImportPage } from '../features/contents/ContentImportPage';
 import { SkuHandlingPage } from '../features/handlings/SkuHandlingPage';
+import { InquiryDetailPage, InquiryListPage } from '../features/inquiries/InquiryPages';
 import { NewPriceImportPage, PriceImportPage } from '../features/prices/PriceImportPage';
 import { PricePage } from '../features/prices/PricePage';
 import { ProductDetailPage } from '../features/products/ProductDetailPage';
@@ -22,8 +24,10 @@ import { NewProductImportPage, ProductImportPage } from '../features/products/Pr
 import { ProductListPage } from '../features/products/ProductListPage';
 import { LoginCallbackPage, LoginPage } from '../features/session/LoginPage';
 import { SessionPage } from '../features/session/SessionPage';
+import type { Api } from '../api/client';
 import { env } from '../env';
 import { messages as m } from '../shared/messages';
+import { useApi } from './ApiContext';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
 
 // 백엔드 handoff 2026-10-30 §5 메뉴 순서
@@ -39,13 +43,16 @@ const nav: ReadonlyArray<readonly [string, string]> = [
   ['/prices/import', m.nav.priceImport],
   ['/handlings', m.nav.handlings],
   ['/views/approval-inbox', m.nav.bffInbox],
+  // 고객센터 문의(상담원 CS_AGENT). 메뉴는 모두에게 보이고 권한은 서버가 판정한다(403).
+  ['/inquiries', m.nav.inquiries],
   // 메뉴는 모두에게 보인다. 업무 도우미 권한은 서버가 판정한다(403·FORBIDDEN_SCOPE).
   ['/assistant', m.nav.assistant],
 ];
 
 /** 업무 도우미: 목 모드만 계약 확정 전 목(BR-46), 실서버 모드는 연결하지 않는다. */
-const defaultAssistantPort = (): AssistantPort =>
-  import.meta.env.VITE_PMART_ENV === 'mock' ? createDraftAssistantMock({ delayMs: 400 }) : notConnectedAssistant;
+// 목 모드는 draftMock(계약 모양), 실서버 모드(local·lan)는 게이트웨이의 ai-assistant-service(2026-11-09 LAN 배포).
+const defaultAssistantPort = (api: Api): AssistantPort =>
+  import.meta.env.VITE_PMART_ENV === 'mock' ? createDraftAssistantMock({ delayMs: 400 }) : createHttpAssistant(api);
 
 function Layout() {
   const { session } = useSession();
@@ -110,6 +117,8 @@ const routes = [
       { path: 'prices/import', element: guarded(<NewPriceImportPage />) },
       { path: 'prices/import/:batchId', element: guarded(<PriceImportPage />) },
       { path: 'handlings', element: guarded(<SkuHandlingPage />) },
+      { path: 'inquiries', element: guarded(<InquiryListPage />) },
+      { path: 'inquiries/:inquiryId', element: guarded(<InquiryDetailPage />) },
       { path: 'assistant', element: guarded(<AssistantPage />) },
       { path: 'assistant/answers/:answerId', element: guarded(<AssistantAnswerPage />) },
     ],
@@ -137,7 +146,8 @@ export function App({
   readonly assistantPort?: AssistantPort;
 }) {
   const router = memory ? createMemoryRouter(routes, { initialEntries: [initialPath] }) : createBrowserRouter(routes);
-  const [port] = useState(() => assistantPort ?? defaultAssistantPort());
+  const api = useApi();
+  const [port] = useState(() => assistantPort ?? defaultAssistantPort(api));
   return (
     <QueryClientProvider client={queryClient}>
       <UiTextProvider problem={m.problem} reason={m.reason}>

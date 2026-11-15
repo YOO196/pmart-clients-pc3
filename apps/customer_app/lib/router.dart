@@ -16,6 +16,8 @@ import 'features/payment/presentation/payment_screen.dart';
 import 'features/profile/presentation/my_info_screen.dart';
 import 'features/reviews/domain/reviews.dart' show ReviewTarget;
 import 'features/reviews/presentation/reviews_screens.dart';
+import 'features/support/presentation/chat_screen.dart';
+import 'features/support/presentation/inquiry_screens.dart';
 import 'features/orders/presentation/my_screen.dart';
 import 'features/orders/presentation/orders_screens.dart';
 import 'features/catalog/presentation/home_providers.dart' show SectionRef;
@@ -197,6 +199,45 @@ final routerProvider = Provider<GoRouter>(
             builder: (_, state) => ProductReviewsScreen(
               productId: state.pathParameters['productId']!,
             ),
+          ),
+        ],
+      ),
+      // 고객센터: 메인 → 문의 남기기·내 문의(case-service inquiries). 문의 남기기는 주문·AI 상담에서 값을 넘겨 받을 수 있다.
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/support',
+        builder: (_, _) => const SupportScreen(),
+        routes: [
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'chat',
+            builder: (_, _) => const ChatScreen(),
+          ),
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'inquiries',
+            builder: (_, _) => const InquiryListScreen(),
+            routes: [
+              GoRoute(
+                parentNavigatorKey: rootNavigatorKey,
+                path: 'new',
+                builder: (_, state) => InquiryFormScreen(
+                  args: switch (state.extra) {
+                    final InquiryFormArgs a => a,
+                    _ => InquiryFormArgs(
+                      orderId: state.uri.queryParameters['orderId'],
+                    ),
+                  },
+                ),
+              ),
+              GoRoute(
+                parentNavigatorKey: rootNavigatorKey,
+                path: ':inquiryId',
+                builder: (_, state) => InquiryDetailScreen(
+                  inquiryId: state.pathParameters['inquiryId']!,
+                ),
+              ),
+            ],
           ),
         ],
       ),
