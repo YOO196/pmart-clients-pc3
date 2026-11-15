@@ -14,12 +14,12 @@
 | PC | IP | 백엔드 영역(개발) | 클라이언트(이 저장소) | LAN 에서 돌리는 것 |
 |---|---|---|---|---|
 | **PC 1** | 192.168.0.32 | **platform** — 인증·HR·승인·게이트웨이·라이브러리·배포, 다른 영역 밖의 모든 서비스. **배포·병합 유일 지점** | **customer-app 위주**(사용자 2026-11-13). backoffice·hr-backoffice·web-common 은 PC 2 가 시작하기 전까지 이 PC 가 맡는다. **mfc-backoffice 기반**(앱 뼈대·로그인·센터 고르기·메뉴 자리)도 이 PC(사용자 2026-11-15) — 메뉴 화면을 누가 채울지는 미정. **원본 main 에 넣는 유일한 PC** | 없음(빌드·Claude Code 전용, Docker 미기동) |
-| **PC 2** | 192.168.0.34 | 없음. 예정 **backoffice**(사용자 확정 2026-11-13, 로그인 마무리 뒤 시작) — 백엔드 `backoffice-bff` + 클라이언트 웹 | **backoffice 영역이 시작되면** `web/backoffice`·`web/hr-backoffice`(+ `web/core`·`web/ui` — §3 web-common 참고)를 백엔드와 함께 맡는다. 그 전까지는 없음(PC 1 이 맡는다) | 커머스 서비스(상품·고객·장바구니·검색·가격·주문·결제 등), Kafka 1 |
+| **PC 2** | 192.168.0.34 | **backoffice**(2026-11-16 PC 1 에서 넘김) — 백엔드 `backoffice-bff`·`case-service` + 클라이언트 웹 | **`web/backoffice`·`web/hr-backoffice`·`web/core`·`web/ui`(로그인·세션·토큰 부분 제외)** — 2026-11-16 넘김. 지금까지 백엔드가 보낸 화면 요청은 PC 1 이 끝까지 하고 PC 2 는 그 뒤부터. 인계서 `docs/operations/backoffice-handover.md` | 커머스 서비스(상품·고객·장바구니·검색·가격·주문·결제 등), Kafka 1 |
 | **PC 3** | 192.168.0.222 | **mfc** — mfc-*-service, MFC 시뮬레이터 연결 | **mfc-app**(사용자 확정 2026-11-13) — `apps/mfc_app` | MFC 서비스 6개, CDC 재고, 검색 색인(ES) |
 | **PC 4** | 192.168.0.40 | 없음. 예정 **rag**(사용자 확정 2026-11-13, 시작 전) — 백엔드만 | 미정(rag 는 클라이언트 영향 거의 없음) | **API 게이트웨이**(`https://192.168.0.40:8443`, 앱용 `http://…:8080`), **백오피스 화면**(`https://192.168.0.40`), **인사팀 백오피스 화면**(`https://192.168.0.40:8444`), auth-service·승인·bff·설정 서버·Eureka·모니터링. 화면 서빙은 backoffice 영역이 PC 2 로 가도 계속 PC 4, 배포는 PC 1 |
 | **PC 5** | 192.168.0.101 | **delivery** — delivery-*·rider-service·rider-auth-service | **rider-app**(사용자 확정 2026-11-13) — `apps/rider_app` | 배송 서비스, **Keycloak**(직원 로그인 화면), employee-auth-service, hr-service, 사내 메일·웹메일(`https://192.168.0.101:8190`), RAG 실행(ollama) |
 
-- **클라이언트 담당(사용자 확정 2026-11-13): PC 1 = customer-app 위주, PC 2 = backoffice(로그인 마무리 뒤), PC 3 = mfc-app, PC 5 = rider-app.** PC 4(rag)는 클라이언트 앱 영역이 없다. 바뀌면 이 표를 고친다.
+- **클라이언트 담당(사용자 확정 2026-11-13, PC 2 넘김 2026-11-16): PC 1 = customer-app 위주 + 로그인 코드, PC 2 = backoffice·hr-backoffice·web-common(로그인 제외), PC 3 = mfc-app, PC 5 = rider-app.** PC 4(rag)는 클라이언트 앱 영역이 없다. mfc-backoffice 메뉴 화면 담당(PC 3 또는 PC 2)은 미정. 바뀌면 이 표를 고친다.
 - mfc-app 은 2026-11-13 까지 PC 1 이 고쳤다(직원 로그인 — 일지 `docs/worklog/2026-11-13.md`). 남은 일(정지 안내를 `SUBJECT_BLOCKED` 기준으로, 실기기 로그인 확인)은 PC 3 이 이어받는다 — `../pmart-backend/docs/operations/other-pcs-todo.md` 클라이언트 절.
 - 두 백오피스의 HTTP 주소(80·8081)는 2026-11-13 에 닫혔다(HTTPS 로 301). LAN 빌드의 API 주소는 `https://192.168.0.40:8443/api/v1`.
 - Flutter 앱(mfc_app·customer_app)은 게이트웨이 `http://192.168.0.40:8080/api/v1` 을 그대로 쓴다(디버그 빌드).
@@ -120,7 +120,7 @@ contracts.lock · CLAUDE.md · .claude/rules/   # 공통(§6)
 | **web-common** | `web/core`·`web/ui`·`tools/web-tools` (웹앱 공통 — 한 주인) |
 
 - 영역 이름은 백엔드 제안과 같다(백엔드가 handoff 파일 이름에 그대로 쓴다).
-- **web-common**: backoffice 영역이 PC 2 에서 시작되면(§1) backoffice·hr-backoffice 와 함께 web-common 주인도 PC 2 로 옮길지 그때 정한다(백엔드 부탁 `2026-11-13-all-notice-area-pcs-decided.md` — 미정, 지금은 따로 두고 PC 1 이 맡는다). 그 전까지 `web/core` 의 직원 로그인 코드와 두 웹앱의 로그인 부분은 PC 1 이 맡는다(백엔드 "로그인 마무리 기준": 남은 것은 CSRF 시기 결정·mfc_app 실기기 확인).
+- **web-common**: 2026-11-16 backoffice·hr-backoffice 와 함께 PC 2 로 넘겼다(백엔드 인계서 `pmart-backend/docs/backoffice/HANDOVER.md` §0). 단 `web/core` 의 직원 로그인·세션·토큰 코드와 웹 앱의 로그인 부분은 PC 1 이 맡는다(§1 표). `tools/web-tools` 담당은 정하지 않았다.
 - 위 표에 없는 공통 폴더(`packages/pmart_*`, `tools/gen_api.dart`)는 따로 영역을 두지 않았다. 고칠 때는 고친 앱 영역의 일지에 적고 `영향: <다른 앱 영역>` 을 단다. 담당을 정해야 하면 사용자가 정한다(미정).
 - 남의 영역 폴더를 고쳐야 하면 직접 고치지 말고 사용자에게 먼저 알린다(그 영역 담당과 겹치지 않게).
 
@@ -151,6 +151,5 @@ Claude 메모는 PC 마다 따로라 서로 모른다. 다른 PC 도 알아야 �
 
 ## 8. 아직 정하지 않은 것 (사용자 결정)
 
-- hr-backoffice·web-common 을 backoffice 와 함께 PC 2 로 옮길지(위 줄과 같은 결정).
-- backoffice 영역(PC 2)을 시작할 때의 경계 — hr-backoffice·web-common 을 함께 옮길지.
+- mfc-backoffice 메뉴 화면 담당(PC 3 또는 PC 2). `tools/web-tools` 담당.
 - 공통 폴더(`packages/pmart_*`·`tools/gen_api.dart`)의 담당.
