@@ -17,4 +17,4 @@
 
 ## 3. 확인·빌드
 - typecheck·lint 통과, 테스트 46개 통과(목 모드). 실서버 확인은 아직.
-- 빌드: `web-common/2026-11-16-backend-session-roles-centers-done.md` §2 표의 hr-backoffice 해시를 바꿨다(`index-CIy9U2nd.js`·`index-CU0EfKq_.css`).
+- 빌드: `web-common/2026-11-16-backend-session-roles-centers-done.md` §2 표의 hr-backoffice 해시를 바꿨다(`index-Bo9fKM9V.js`·`index-CU0EfKq_.css`).
