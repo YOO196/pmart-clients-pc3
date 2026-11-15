@@ -147,12 +147,13 @@ describe('로그아웃 전파 — 탭이 다시 보일 때 세션 확인(ADR-006
   it('탭이 다시 보이면 세션을 한 번 확인하고, 살아 있으면 화면은 그대로다(30초 안에는 다시 부르지 않는다)', async () => {
     const view = renderAt('/session');
     await screen.findByRole('button', { name: '로그아웃' });
-    await waitFor(() => expect(view.gets('/employee-auth/sessions/current')).toHaveLength(1)); // 화면이 부른 한 번
-    document.dispatchEvent(new Event('visibilitychange'));
+    // 세션 응답(역할·센터) 한 번 + 내 세션 화면이 부른 한 번
     await waitFor(() => expect(view.gets('/employee-auth/sessions/current')).toHaveLength(2));
     document.dispatchEvent(new Event('visibilitychange'));
+    await waitFor(() => expect(view.gets('/employee-auth/sessions/current')).toHaveLength(3));
+    document.dispatchEvent(new Event('visibilitychange'));
     await new Promise((r) => setTimeout(r, 30));
-    expect(view.gets('/employee-auth/sessions/current')).toHaveLength(2);
+    expect(view.gets('/employee-auth/sessions/current')).toHaveLength(3);
     expect(screen.getByRole('button', { name: '로그아웃' })).toBeInTheDocument();
   });
 

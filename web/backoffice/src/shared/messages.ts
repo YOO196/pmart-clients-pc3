@@ -603,6 +603,8 @@ export const messages = {
     publishedAt: '게시 시각',
     skus: 'SKU',
     changeSaleState: '판매 상태 변경',
+    /** 판매 상태 변경은 MD 만(서버 설정 sale-state-change-role) — OPERATOR_ADMIN 은 상품 관리 묶음을 보지만 이 버튼은 없다 */
+    saleStateMdOnly: '판매 상태는 MD 만 바꿀 수 있습니다.',
     stopNeedsApproval: '판매중지는 PRODUCT 승인이 먼저 있어야 해요. 승인 요청을 올리고, 승인되면 승인 번호와 함께 변경해요.',
     approvalIdLabel: '승인 번호(판매중지)',
     applyChange: '변경 요청',

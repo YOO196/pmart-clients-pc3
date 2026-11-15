@@ -31,6 +31,13 @@ describe('판매 상태', () => {
     expect(view.mutations('/sale-state-changes')[0]?.headers.get('X-Expected-Version')).toBe('1');
     view.stop();
   });
+
+  it('OPERATOR_ADMIN 은 상품을 보지만 판매 상태 변경은 없다 — "MD 만 바꿀 수 있습니다"', async () => {
+    renderAt('/products/P-00000001', as.admin);
+    await screen.findByTestId('sale-state');
+    expect(screen.getByText('판매 상태는 MD 만 바꿀 수 있습니다.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '변경 요청' })).not.toBeInTheDocument();
+  });
 });
 
 describe('가격', () => {

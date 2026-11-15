@@ -24,6 +24,8 @@ import type { TokenStore } from './tokens';
 /** employee-auth-service 계약 경로 타입 — 앱이 `createClient<EmployeeAuthPaths>` 로 클라이언트를 만든다 */
 export type EmployeeAuthPaths = paths;
 export type EmployeeSession = components['schemas']['EmployeeSession'];
+/** 직원 역할 목록 항목(`GET /employee-auth/roles`, 0.5.0 — BR-57) */
+export type EmployeeRole = components['schemas']['EmployeeRole'];
 
 /** 이 모듈이 쓰는 API 클라이언트(앱의 Api 중 employeeAuth 만) */
 export interface EmployeeAuthApi {
@@ -390,6 +392,8 @@ export interface SessionWatchDeps {
   readonly now?: () => number;
   /** 마지막 확인 뒤 이 시간 안이면 건너뛴다(탭을 빨리 오갈 때). 기본 30초 */
   readonly minIntervalMs?: number;
+  /** 확인할 때 부를 것. 기본은 `GET /employee-auth/sessions/current` 를 부르고 결과는 버린다(operatorSession.ts 는 응답을 세션 상태로 쓴다) */
+  readonly check?: () => Promise<unknown>;
 }
 
 /**
@@ -403,13 +407,14 @@ export function watchEmployeeSessionOnVisible(api: EmployeeAuthApi, store: Token
   if (!doc) return () => undefined;
   const now = d.now ?? Date.now;
   const minIntervalMs = d.minIntervalMs ?? 30_000;
+  const check = d.check ?? (() => api.employeeAuth.GET('/employee-auth/sessions/current', {}));
   let last: number | null = null;
   const onChange = () => {
     if (doc.visibilityState !== 'visible' || store.accessToken === null) return;
     const at = now();
     if (last !== null && at - last < minIntervalMs) return;
     last = at;
-    void api.employeeAuth.GET('/employee-auth/sessions/current', {}).catch(() => undefined);
+    void check().catch(() => undefined);
   };
   doc.addEventListener('visibilitychange', onChange);
   return () => doc.removeEventListener('visibilitychange', onChange);

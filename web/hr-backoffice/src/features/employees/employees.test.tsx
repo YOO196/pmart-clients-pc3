@@ -173,6 +173,24 @@ describe('직원 등록', () => {
     await userEvent.type(screen.getByRole('textbox', { name: '센터' }), 'MFC-BSN-01');
     expect(screen.getByRole('textbox', { name: '센터' })).toHaveValue('MFC-BSN-01');
   });
+
+  it('요청 권한 역할은 GET /employee-auth/roles 순서·이름 그대로(BR-57), 센터가 필요한 역할은 안내', async () => {
+    renderAt('/employees/new');
+    await userEvent.click(await screen.findByRole('button', { name: '권한 추가' }));
+    const options = within(screen.getByLabelText('역할')).getAllByRole('option').map((o) => o.textContent);
+    expect(options).toHaveLength(14); // 고르기 + 13개
+    expect(options[1]).toBe('운영 관리자 (OPERATOR_ADMIN)');
+    expect(options).toContain('라이더 운영 (RIDER_OPS)');
+    await userEvent.selectOptions(screen.getByLabelText('역할'), 'MFC_SUPERVISOR');
+    expect(screen.getByText('이 역할은 권한 센터를 함께 골라야 해요.')).toBeInTheDocument();
+  });
+
+  it('역할 목록을 못 불러오면 빈 목록이 아니라 오류 — 권한을 추가할 수 없다', async () => {
+    server.use(http.get(`${API_BASE}/employee-auth/roles`, () => problem(503, 'DEPENDENCY_UNAVAILABLE')));
+    renderAt('/employees/new');
+    expect(await screen.findByText('정보를 불러오지 못했어요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '권한 추가' })).toBeDisabled();
+  });
 });
 
 describe('직원 상세', () => {

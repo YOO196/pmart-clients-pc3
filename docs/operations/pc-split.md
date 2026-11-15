@@ -25,6 +25,21 @@
 - Flutter 앱(mfc_app·customer_app)은 게이트웨이 `http://192.168.0.40:8080/api/v1` 을 그대로 쓴다(디버그 빌드).
 - 웹 빌드 배포: **PC 4 에 직접 복사하지 않는다.** `npm run build:lan -w web/<앱>` 뒤 dist 폴더와 진입 파일 이름을 handoff 로 알리면 PC 1 의 백엔드가 `lan.sh publish-backoffice`·`publish-hr-backoffice`·`publish-mfc-backoffice` 로 올린다(직접 복사한 빌드는 다음 배포 때 덮인다 — 2026-11-13 겪음).
 
+### 로그인·세션·토큰 코드는 PC 1 만 고친다 (사용자 2026-11-15)
+"백오피스, mfc 로그인, 소셜 로그인같은 작업은 pc1에서 하는걸로 정해서 다른쪽에서 코드가 오염되는걸 막고싶어" — 백엔드 알림 `../pmart-backend/docs/handoff/clients/all/2026-11-15-notice-login-code-pc1-only.md`, 백엔드 정본 `pmart-backend/docs/operations/pc-split.md` §1-3.
+
+| 앱·패키지 | PC 1 만 고치는 경로 |
+|---|---|
+| `web/core` | `src/employeeAuth.ts`·`session.ts`·`sessionPersistence.ts`·`tokens.ts`, `pmartFetch.ts` 의 토큰 갱신 부분 |
+| 웹 앱(backoffice·hr-backoffice·mfc-backoffice) | `src/features/session`, 그리고 그것을 받치는 `src/api/employeeAuth.ts`·`src/api/sessionPersistence.ts`·`src/app/SessionContext.tsx` |
+| `apps/customer_app` | `lib/features/auth`(Google 로그인) |
+| `apps/mfc_app` | `lib/features/auth`(직원 로그인) |
+| `packages/pmart_core` | `lib/src/auth_tokens.dart`·`lib/src/interceptors.dart` |
+
+- **예외: `apps/rider_app` 로그인은 rider-app 담당(PC 5)이 만든다**(사용자 2026-11-15). 공용 `pmart_core` 토큰 코드는 위 표대로 PC 1.
+- 업무 화면이 토큰을 **쓰는** 코드(요청에 붙이기, 401·403 화면, 역할로 메뉴 가리기)는 각 앱 담당이 그대로 쓴다 — 위 경로를 **바꾸는** 것만 PC 1. 바꿀 일이 생기면 handoff 나 사용자를 통해 PC 1 에 요청한다.
+- 새 앱(예 mfc-backoffice)은 로그인·세션 부분을 PC 1 이 먼저 만들고, 메뉴·업무 화면은 담당 PC 가 만든다.
+
 ### 다른 PC 가 원본에 넣는 방법 — 포크 → PR → PC 1 병합
 
 PC 마다 GitHub 계정이 다르고, PC 1 이 아닌 계정은 원본(`code-and-pick/pmart-clients`)에 push 할 수 없다(triage 권한 — 사용자가 만든 구조, 포크는 허용). 절차는 백엔드 `dev-on-other-pcs.md` §0 과 같다(저장소 이름만 다르다).

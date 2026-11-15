@@ -12,7 +12,7 @@ import { messages as m } from '../shared/messages';
 import { allMenus, centerPath, isWorkerOnly, navGroups, type MenuItem } from './nav';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
 
-/** 주소의 센터(`/c/:mfcId/…`). 토큰 centers 에 있을 때만 그 센터 */
+/** 주소의 센터(`/c/:mfcId/…`). 세션 centers(sessions/current)에 있을 때만 그 센터 */
 function useCenter(): { readonly mfcId: string; readonly mine: boolean } | null {
   const { mfcId } = useParams();
   const { session } = useSession();

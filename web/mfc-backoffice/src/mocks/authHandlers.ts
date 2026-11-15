@@ -77,13 +77,18 @@ export const authHandlers = [
     return HttpResponse.json({});
   }),
 
+  // 0.6.0: 지금 기준 역할·센터(목 계정이면 db.grants, 시험용 토큰만 있는 계정이면 토큰 값). 정지 계정은 401 SESSION_EXPIRED.
   http.get(`${API_BASE}/employee-auth/sessions/current`, ({ request }) => {
     const who = operator(request);
     if (!who) return unauthorized();
+    if (db.suspended.has(who.subject)) return problem(401, 'SESSION_EXPIRED');
     const s = who.sessionId ? db.sessions.get(who.sessionId) : undefined;
+    const grant = db.grants.get(who.subject) ?? { roles: who.roles, centers: who.centers };
     return HttpResponse.json({
       sessionId: who.sessionId ?? '',
       operatorId: who.subject,
+      roles: [...grant.roles],
+      centers: [...grant.centers],
       app: EMPLOYEE_APP,
       issuedAt: s?.issuedAt ?? timestamp(),
       expiresAt: new Date((who.expiresAtSeconds ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),

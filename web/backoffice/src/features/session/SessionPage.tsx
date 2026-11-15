@@ -1,4 +1,4 @@
-// 내 세션: 토큰 클레임·서버 세션(GET /employee-auth/sessions/current, handoff 2026-11-12 §3)·로그아웃.
+// 내 세션: 역할·센터(sessions/current 0.6.0 응답)·서버 세션(GET /employee-auth/sessions/current, handoff 2026-11-12 §3)·로그아웃.
 // 비밀번호는 Keycloak 이 관리해 백오피스에서 바꾸지 않는다(백오피스는 Keycloak 주소를 갖지 않아 링크도 두지 않는다).
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';

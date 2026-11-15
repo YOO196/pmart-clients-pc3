@@ -1,4 +1,4 @@
-// 센터 SKU 취급 ON/OFF(MFC·CDC). 기본 OFF(레코드 없음 = OFF, version 0). 자기 센터만(토큰 centers) — 판정은 서버.
+// 센터 SKU 취급 ON/OFF(MFC·CDC). 기본 OFF(레코드 없음 = OFF, version 0). 자기 센터만(세션 centers — 서버는 토큰 centers 로 판정) — 판정은 서버.
 // 센터 목록 API(center-master)가 아직 없어 센터 ID 를 입력한다. 필터·센터·커서는 URL 쿼리.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';

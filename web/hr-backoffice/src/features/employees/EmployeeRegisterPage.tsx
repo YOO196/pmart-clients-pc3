@@ -5,11 +5,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { request } from '@pmart/web-core';
-import { CommandFeedback, useCommand } from '@pmart/web-ui';
+import { CommandFeedback, QueryState, toUiState, useCommand } from '@pmart/web-ui';
 import { commandParams } from '../../api/command';
 import {
   EMPLOYMENT_TYPES,
-  GRANT_ROLES,
   MAIL_ID_PATTERN,
   type EmployeeRegistration,
   type EmploymentType,
@@ -19,6 +18,7 @@ import { useApi } from '../../app/ApiContext';
 import { messages as m } from '../../shared/messages';
 import { AffiliationFields, toAffiliation, type AffiliationDraft } from './AffiliationFields';
 import { CenterMultiSelect, useCenters } from './centers';
+import { roleLabel, useEmployeeRoles } from './roles';
 
 interface GrantDraft {
   readonly id: number;
@@ -45,6 +45,7 @@ export function EmployeeRegisterPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const centers = useCenters();
+  const roles = useEmployeeRoles();
   const [name, setName] = useState('');
   const [mailId, setMailId] = useState('');
   const [employmentType, setEmploymentType] = useState<EmploymentType>('REGULAR');
@@ -146,19 +147,28 @@ export function EmployeeRegisterPage() {
         <div className="space-y-3 rounded-box bg-base-100 p-4">
           <h2 className="font-bold">{m.register.grants}</h2>
           <p className="text-xs opacity-70">{m.register.grantsNote}</p>
-          {grants.map((g, i) => (
+          {/* 역할 목록을 못 받으면 고를 수 없다 — 빈 목록이 아니라 오류 + 다시 시도(권한 추가 버튼도 막는다) */}
+          {!roles.isSuccess && (
+            <QueryState state={toUiState(roles)} onRetry={() => void roles.refetch()}>
+              {() => null}
+            </QueryState>
+          )}
+          {roles.isSuccess && grants.map((g, i) => (
             <fieldset key={g.id} className="grid gap-3 rounded-box border border-base-300 p-3 sm:grid-cols-2">
               <legend className="px-1 text-sm">{`${m.register.grants} ${i + 1}`}</legend>
               <label className="flex flex-col gap-1 text-sm">
                 {m.register.grantRole}
                 <select className="select select-sm w-full" value={g.role} onChange={(e) => patchGrant(g.id, { role: e.target.value })}>
                   <option value="">{m.register.chooseRole}</option>
-                  {GRANT_ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
+                  {roles.data.map((r) => (
+                    <option key={r.code} value={r.code}>
+                      {roleLabel(r)}
                     </option>
                   ))}
                 </select>
+                {roles.data.find((r) => r.code === g.role)?.centerScoped && g.centers.length === 0 && (
+                  <span className="text-xs text-warning">{m.register.roleNeedsCenter}</span>
+                )}
               </label>
               <CenterMultiSelect centers={centers} label={m.register.grantCenters} value={g.centers} onChange={(next) => patchGrant(g.id, { centers: next })} />
               <label className="flex flex-col gap-1 text-sm">
@@ -184,7 +194,7 @@ export function EmployeeRegisterPage() {
           <button
             type="button"
             className="btn btn-sm"
-            disabled={grants.length >= 20} // 계약 maxItems
+            disabled={grants.length >= 20 || !roles.isSuccess} // 계약 maxItems, 역할 목록을 받은 뒤에만
             onClick={() => {
               setGrants((gs) => [...gs, { id: nextId, role: '', centers: [], validFrom: '', validTo: '', reason: '' }]);
               setNextId((n) => n + 1);

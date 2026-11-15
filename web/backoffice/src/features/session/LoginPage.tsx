@@ -13,7 +13,7 @@ import { messages as m } from '../../shared/messages';
 const safeFrom = (from: string | null) => (from && from.startsWith('/') && !from.startsWith('//') ? from : '/approvals');
 
 export function LoginPage() {
-  const { session, restoring, startEmployeeLogin, canTrySilentLogin, startSilentLogin, startMockLogin, signOutUnconfirmed } = useSession();
+  const { signedIn, restoring, startEmployeeLogin, canTrySilentLogin, startSilentLogin, startMockLogin, signOutUnconfirmed } = useSession();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const from = safeFrom(params.get('from'));
@@ -24,16 +24,16 @@ export function LoginPage() {
   const silentStarted = useRef(false);
   useEffect(() => {
     // 새로고침 복원(쿠키 갱신)이 먼저다 — 끝나고도 세션이 없을 때만 확인한다.
-    if (!checking || session || restoring || silentStarted.current) return;
+    if (!checking || signedIn || restoring || silentStarted.current) return;
     silentStarted.current = true;
     startSilentLogin(from)
       .then((moved) => {
         if (!moved) setChecking(false);
       })
       .catch(() => setChecking(false));
-  }, [checking, session, restoring, startSilentLogin, from]);
+  }, [checking, signedIn, restoring, startSilentLogin, from]);
 
-  if (session) return <Navigate to={from} replace />;
+  if (signedIn) return <Navigate to={from} replace />;
   if (checking || restoring) {
     return (
       <p role="status" className="p-6 text-sm opacity-70">

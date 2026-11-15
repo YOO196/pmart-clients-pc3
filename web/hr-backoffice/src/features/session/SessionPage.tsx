@@ -1,4 +1,4 @@
-// 내 세션: 토큰 클레임, 서버 세션(GET /employee-auth/sessions/current), 내 인사 정보(GET /hr/employees/me — 모든 직원), 로그아웃.
+// 내 세션: 역할·센터(sessions/current 0.6.0 응답), 서버 세션(GET /employee-auth/sessions/current), 내 인사 정보(GET /hr/employees/me — 모든 직원), 로그아웃.
 // 비밀번호는 Keycloak 이 관리해 이 앱에서 바꾸지 않는다.
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';

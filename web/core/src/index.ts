@@ -3,6 +3,7 @@
 export * from './command';
 export * from './employeeAuth';
 export * from './failure';
+export * from './operatorSession';
 export * from './pmartFetch';
 export * from './poll';
 export * from './session';

@@ -34,9 +34,9 @@ export const messages = {
   center: {
     label: '센터',
     choose: '센터 고르기',
-    /** 토큰 centers 가 비었다 — 서버가 센터 API 를 모두 403 으로 막는다 */
+    /** 세션 centers 가 비었다 — 서버가 센터 API 를 모두 403 으로 막는다 */
     none: '맡은 센터가 없어요. 센터 관리자(MFC_SUPERVISOR) 권한을 센터와 함께 받아야 이 화면을 쓸 수 있어요.',
-    /** 주소의 센터가 토큰 centers 에 없다 */
+    /** 주소의 센터가 세션 centers 에 없다 */
     notMine: '이 센터 권한이 없습니다. 맡은 센터를 골라 주세요.',
     namesFailed: '센터 이름을 불러오지 못해 센터 코드로만 보여요.',
   },

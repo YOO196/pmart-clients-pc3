@@ -1,6 +1,6 @@
-// 운영자 세션. 토큰 클레임(typ·roles·centers, docs/handoff 백엔드 2026-10-30 §1·§2)을 화면 편의용으로만 읽는다.
-// 서명 검증·권한 판정은 서버가 한다. 버튼을 숨기거나 막는 데 쓰지 않고 안내에만 쓴다.
-// 직원 토큰(employee-auth-service, ADR-0056)은 예전 auth-service 운영자 토큰과 모양이 같다(typ=OPERATOR, sub=OP-…, roles, centers, sid).
+// 운영자 세션 모양. 화면은 이 값을 `GET /employee-auth/sessions/current` 응답에서 만든다(operatorSession.ts — employee-auth 0.6.0,
+// 백엔드 요청 2026-11-15 web-common-request-session-roles-centers). 판정은 서버가 한다.
+// parseOperatorToken·mockOperatorToken 은 **목(MSW)·시험 전용**이다 — 목 서버가 목 토큰을 읽는 데 쓴다. 화면 판단(메뉴·센터)에 토큰을 풀어 쓰지 않는다.
 
 export interface OperatorSession {
   /** 운영자 ID(OP-…, sub) */

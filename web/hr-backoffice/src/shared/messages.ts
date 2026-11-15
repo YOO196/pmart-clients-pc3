@@ -22,7 +22,7 @@ export const messages = {
     register: '직원 등록',
   },
 
-  /** 역할이 없으면 서버가 403 을 준다 — 토큰 클레임으로 미리 안내만 한다(판정은 서버) */
+  /** 역할이 없으면 서버가 403 을 준다 — 세션 응답(sessions/current)으로 미리 안내만 한다(판정은 서버) */
   noHrRole: '인사 권한이 없습니다. 인사 화면은 HR_ADMIN 역할이 있어야 볼 수 있어요. 내 정보는 "내 세션"에서 볼 수 있어요.',
 
   login: {
@@ -132,6 +132,8 @@ export const messages = {
     grantPeriodHint: '비우면 근무 기간',
     grantReason: '근거',
     chooseRole: '역할 고르기',
+    /** 역할 목록(GET /employee-auth/roles)의 centerScoped — 안내만(판정은 서버) */
+    roleNeedsCenter: '이 역할은 권한 센터를 함께 골라야 해요.',
     submit: '등록',
     after: '등록하면 사서함 → 로그인 계정 → 비밀번호 설정 메일 순서로 계정이 발급돼요(몇 초~수 분).',
   },

@@ -16,11 +16,11 @@
 | 생성 타입 | `src/api/generated/`(커밋 안 함): center-master, mfc-capacity·fulfillment·inbound·inventory·location·quality — `npm run gen:api -w web/mfc-backoffice`(백오피스 생성물에서 복사) |
 
 ## 2. 센터
-- 고를 수 있는 센터 = access token 클레임 `centers`(로그인 응답과 토큰에만 있다 — `sessions/current` 에는 없다).
+- 고를 수 있는 센터 = `GET /employee-auth/sessions/current` 응답의 `centers`(employee-auth 0.6.0, 2026-11-16 — 토큰을 풀지 않는다. 승인·회수 직후 토큰과 다르면 응답을 따른다).
 - 주소에 센터를 넣는다: `/c/<mfcId>/<메뉴>`. 첫 화면은 맡은 첫 센터의 첫 메뉴(작업자).
 - 센터가 하나면 고르지 않고 이름만 보인다. 둘 이상이면 위에서 고르고, 바꾸면 같은 메뉴의 다른 센터로 간다.
-- 이름은 center-master `GET /centers?type=MFC` 에서 붙인다(전체 센터 — 토큰 centers 와 겹치는 것만). 못 불러오면 센터 코드로만 보이고 안내한다(센터 목록은 비지 않는다).
-- 주소의 센터가 토큰 centers 에 없으면 "이 센터 권한이 없습니다" + 맡은 센터 링크. 맡은 센터가 없으면(예: 센터 없는 `OPERATOR_ADMIN`) 안내만, 메뉴 없음.
+- 이름은 center-master `GET /centers?type=MFC` 에서 붙인다(전체 센터 — 세션 centers 와 겹치는 것만). 못 불러오면 센터 코드로만 보이고 안내한다(센터 목록은 비지 않는다).
+- 주소의 센터가 세션 centers 에 없으면 "이 센터 권한이 없습니다" + 맡은 센터 링크. 맡은 센터가 없으면(예: 센터 없는 `OPERATOR_ADMIN`) 안내만, 메뉴 없음.
 
 ## 3. 역할
 - `MFC_WORKER` 만 있는 계정: "센터 관리자만 쓰는 화면입니다"(메뉴 없음).

@@ -8,6 +8,7 @@ import { SALE_STATES, type ChangeRequestBody, type ProductDetail, type SaleState
 import { request } from '@pmart/web-core';
 import { settleCommand } from '@pmart/web-core';
 import { useApi } from '../../app/ApiContext';
+import { useSession } from '../../app/SessionContext';
 import { CommandFeedback } from '../../shared/Feedback';
 import { formatSeoul } from '@pmart/web-ui';
 import { messages as m } from '../../shared/messages';
@@ -133,6 +134,8 @@ function SaleStateChange({ product }: { readonly product: ProductDetail }) {
 export function ProductDetailPage() {
   const { productId = '' } = useParams();
   const api = useApi();
+  // 판매 상태 변경은 MD 만(백엔드 알림 2026-11-15 product-menu-operator-admin) — 그 밖 역할(OPERATOR_ADMIN)에는 버튼을 숨긴다. 판정은 서버(403).
+  const canChangeSaleState = useSession().session?.roles.includes('MD') ?? false;
   const query = useQuery({
     queryKey: ['product', 'detail', productId],
     queryFn: () => request('GET', api.product.GET('/products/{productId}', { params: { path: { productId } } })),
@@ -203,7 +206,11 @@ export function ProductDetailPage() {
                 ))}
               </tbody>
             </table>
-            <SaleStateChange key={p.productId} product={p} />
+            {canChangeSaleState ? (
+              <SaleStateChange key={p.productId} product={p} />
+            ) : (
+              <p className="rounded-box bg-base-100 p-4 text-sm opacity-70">{m.products.saleStateMdOnly}</p>
+            )}
           </>
         )}
       </QueryState>

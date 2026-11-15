@@ -288,10 +288,11 @@ describe('갱신·로그아웃', () => {
 });
 
 describe('화면', () => {
-  function sessionHandler() {
+  /** 0.6.0: 화면의 역할·센터는 이 응답에서 읽는다 */
+  function sessionHandler(roles: readonly string[] = ['PRICE_APPROVER'], centers: readonly string[] = []) {
     server.use(
       http.get('*/api/v1/employee-auth/sessions/current', () =>
-        HttpResponse.json({ sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z' }),
+        HttpResponse.json({ sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z', roles, centers }),
       ),
     );
   }
@@ -327,7 +328,7 @@ describe('화면', () => {
 
   it('역할이 비어 있으면 권한 승인 대기 안내', async () => {
     exchangeHandler(() => HttpResponse.json({ operatorId: 'OP-ea-1', roles: [], centers: [], tokens: pair(access([])) }));
-    sessionHandler();
+    sessionHandler([]);
     await beginEmployeeLogin(API_BASE, '/session', new TokenStore(), { origin: ORIGIN });
     render(<App memory initialPath="/auth/callback?ticket=TICKET-NOROLE" />);
     expect(await screen.findByText(/권한 승인 대기/)).toBeInTheDocument();
@@ -452,7 +453,7 @@ describe('refresh 쿠키(ADR-0059, handoff 2026-11-13 web-common-request-refresh
       http.get('*/api/v1/employee-auth/sessions/current', ({ request }) => {
         seen.push(request.headers.get('Authorization'));
         return request.headers.get('Authorization') === `Bearer ${next}`
-          ? HttpResponse.json({ sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z' })
+          ? HttpResponse.json({ sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z', roles: ['PRICE_APPROVER'], centers: [] })
           : problem(401, 'TOKEN_EXPIRED');
       }),
     );
@@ -485,7 +486,7 @@ describe('refresh 쿠키(ADR-0059, handoff 2026-11-13 web-common-request-refresh
         HttpResponse.json({ operatorId: 'OP-ea-1', roles: ['PRICE_APPROVER'], centers: ['MFC-GANGNAM'], tokens: cookiePair() }),
       ),
       http.get('*/api/v1/employee-auth/sessions/current', () =>
-        HttpResponse.json({ sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z' }),
+        HttpResponse.json({ sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z', roles: ['PRICE_APPROVER'], centers: ['MFC-GANGNAM'] }),
       ),
     );
     const sent = cookieRefreshHandler(() => HttpResponse.json(cookiePair()));
@@ -604,7 +605,7 @@ describe('로그아웃 화면(SSO)', () => {
     const assign = vi.spyOn(browser, 'assign').mockImplementation(() => undefined);
     server.use(
       http.get('*/api/v1/employee-auth/sessions/current', () =>
-        HttpResponse.json({ sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z' }),
+        HttpResponse.json({ sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z', roles: ['PRICE_APPROVER'], centers: [] }),
       ),
       http.post('*/api/v1/employee-auth/logouts', () => logoutReply()),
     );
@@ -653,7 +654,7 @@ describe('로그아웃 전파 — 탭이 다시 보일 때 세션 확인(ADR-006
     };
     return { doc: doc as unknown as Document, show };
   }
-  const SESSION = { sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z' };
+  const SESSION = { sessionId: 'SES-ea-1', operatorId: 'OP-ea-1', app: 'backoffice', issuedAt: '2026-11-12T01:00:00Z', expiresAt: '2026-11-12T01:15:00Z', roles: ['PRICE_APPROVER'], centers: [] };
   /** sessions/current 호출을 모은다(Authorization 값) */
   function currentHandler(reply: () => Response | Promise<Response>) {
     const calls: Array<string | null> = [];

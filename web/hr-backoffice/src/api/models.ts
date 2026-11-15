@@ -26,25 +26,8 @@ export const PROVISIONING_IN_PROGRESS: readonly ProvisioningStep[] = ['REQUESTED
 /** 발급 다시 시도 버튼을 보이는 단계(계약 retryProvisioning — 그 밖은 409 INVALID_STATE) */
 export const PROVISIONING_RETRYABLE: readonly ProvisioningStep[] = ['FAILED', 'COMPENSATED'];
 
-/**
- * 요청 권한으로 고를 수 있는 역할(handoff 2026-11-13 §3 — 목록을 주는 API 가 없어 고정, BR-57).
- * 역할이 늘면 백엔드가 알려 주기로 했다. RIDER_OPS: 백엔드 알림 2026-11-15 `hr-backoffice/2026-11-15-notice-role-rider-ops.md`.
- */
-export const GRANT_ROLES = [
-  'OPERATOR_ADMIN',
-  'HR_ADMIN',
-  'CENTER_MASTER_APPROVER',
-  'CS_AGENT',
-  'DISPLAY_APPROVER',
-  'INVENTORY_APPROVER',
-  'MD',
-  'MFC_SUPERVISOR',
-  'MFC_WORKER',
-  'PRICE_APPROVER',
-  'PRODUCT_APPROVER',
-  'RIDER_OPS',
-  'SERVICEABILITY_APPROVER',
-] as const;
+// 요청 권한으로 고를 수 있는 역할은 고정 목록 대신 `GET /employee-auth/roles`(employee-auth 0.5.0, BR-57 — 백엔드 알림
+// hr-backoffice/2026-11-15-notice-role-list-and-departments §1)에서 받는다: features/employees/roles.ts.
 
 /** 계약 EmployeeRegistration.mailId pattern(입력 도움용 — 판정은 서버) */
 export const MAIL_ID_PATTERN = /^[a-z0-9][a-z0-9._-]{1,30}[a-z0-9]$/;

@@ -55,6 +55,8 @@ function order(orderId: string, status: StaffOrder['status'], confirmedAt: strin
       { orderLineId: `${orderId}-L1`, sku: 'E-00000001', productName: '사과 1.5kg', originalQty: 1, cancelledBeforeShipQty: 0, handedOverQty: 1, deliveredQty: 0, returnedQty: 0, unitPrice: 12000, lineAmount: 12000 },
     ],
     fulfillmentIssues: [],
+    // order 0.4.0 부터 서버는 늘 가려서(true) 준다. 이 목은 아직 0.4.0 전 동작(원문) — 가림·열람(pii-reveals)은 따로 반영한다.
+    shippingAddressMasked: false,
     shippingAddress: {
       receiverName: '[목] 김고객',
       receiverPhone: phone,

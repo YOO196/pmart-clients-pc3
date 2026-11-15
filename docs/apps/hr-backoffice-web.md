@@ -5,7 +5,7 @@
 상태(2026-11-13): 목 서버로 구현·검증 → LAN 배포·실서버 확인 23/23(`docs/handoff/archive/2026-11-13-backend-hr-backoffice-lan-deployed.md`) → **HTTPS 로 옮김(`https://192.168.0.40:8444`, 옛 `http://…:8081` 은 HTTPS 로 넘어간다)**. HTTPS 주소에서의 브라우저 확인과 사람 손 확인은 아직. 요청 권한 기간은 종료일이 없으면 "기한 없음"(정규직 — 백엔드 회신 `clients-reply-hr-backoffice-deployed`).
 
 ## 1. 원칙
-- 사용자는 인사팀(`HR_ADMIN`). 역할이 없으면 서버가 403 → "이용할 수 없는 화면". 화면은 토큰 클레임으로 "인사 권한이 없습니다" 안내만 하고 막지 않는다(판정은 서버). 본인 조회(`/hr/employees/me`)만 모든 직원.
+- 사용자는 인사팀(`HR_ADMIN`). 역할이 없으면 서버가 403 → "이용할 수 없는 화면". 화면은 세션 응답(`sessions/current` 0.6.0 의 `roles`)으로 "인사 권한이 없습니다" 안내만 하고 막지 않는다(판정은 서버). 본인 조회(`/hr/employees/me`)만 모든 직원.
 - hr-service 가 정본인 것(직원 신원·고용 정보·계정 발급 단계)만 보여 주고 바꾼다. **권한의 효력은 다루지 않는다** — 요청 권한은 상태만 보이고 승인 버튼이 없다(승인은 지금 백오피스 승인함, 인사와 권한 분리).
 - 비밀번호를 받지 않는다. 로그인 비밀번호는 본인이 Keycloak 메일 링크로 정한다. 사서함 초기 비밀번호는 응답을 **한 번만** 보여 주고 저장·로그·클립보드 자동 복사를 하지 않는다.
 - 상태 변경은 사유 + `X-Expected-Version`(직원 `version`). 서버 응답이 온 것만 화면에 반영한다. 계정 발급 단계는 서버 값만 보인다(등록 201 ≠ 발급 완료).
@@ -45,7 +45,7 @@
 | Q5 | 409 = `MAIL_ID_TAKEN`·`VERSION_CONFLICT`·`INVALID_STATE`·`KEYCLOAK_<상태>`·`MAILBOX_<상태>`. 퇴사도 버전이 다르면 409. 이미 그 상태인 복귀·퇴사는 200 | 앞의 셋은 전용 문구, 나머지는 일반 문구 + code |
 | Q6 | `GRANT` 승인 행 `attributes.employee{operatorId, employeeNo, mailAddress, affiliation}` — 이름은 없음 | 백오피스 승인 상세가 역할·센터·기간·근거·대상 직원을 표시 |
 | — | 복귀: 파트타임·일일크루는 기존 계약 종료일이 지났으면 새 종료일 필요(400 `VALIDATION_FAILED` `endDate`) | 복귀 화면에 안내, 서버 거절을 그대로 보임 |
-| — | 역할 목록 API 없음 — 13개 고정(2026-11-15 `RIDER_OPS` 추가, API 요청 BR-57) | `src/api/models.ts` `GRANT_ROLES` |
+| — | 요청 권한 역할 = `GET /employee-auth/roles`(0.5.0, BR-57 끝남 2026-11-16) — "이름 (코드)", 순서 그대로, `centerScoped` 면 센터를 고르라고 안내. 못 불러오면 오류 + 권한 추가 막음 | `src/features/employees/roles.ts` |
 
 ## 5. 하지 않은 것
 - 개인정보 마스킹: 인사 화면은 이름·메일을 그대로 보인다(계약에 사유 입력 열람 API 없음, 주민번호·연락처 등은 계약에 없다).

@@ -1,5 +1,5 @@
-// 센터 고르기(handoff §1·§2-1): 고를 수 있는 센터는 토큰의 `centers` 다(로그인 응답·access token 클레임에만 있다 — sessions/current 에는 없다).
-// 이름은 center-master `GET /centers` 에서 붙인다. 전체 센터를 주므로 토큰 centers 와 겹치는 것만 쓴다.
+// 센터 고르기(handoff §1·§2-1): 고를 수 있는 센터는 세션 응답(`GET /employee-auth/sessions/current`, 0.6.0)의 `centers` 다(토큰을 풀지 않는다 — 백엔드 요청 2026-11-15 session-roles-centers).
+// 이름은 center-master `GET /centers` 에서 붙인다. 전체 센터를 주므로 세션 centers 와 겹치는 것만 쓴다.
 // 이름을 못 불러와도 센터 목록은 비지 않는다(코드로만 보이고 안내).
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';

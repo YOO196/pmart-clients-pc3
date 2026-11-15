@@ -1,11 +1,12 @@
 // 직원 세션(employee-auth-service, app=mfc-backoffice). access token 은 메모리, refresh token 은 HttpOnly 쿠키(ADR-0059 — 이 탭의 sessionStorage 에는 세션 ID 만. 목·시험은 본문 refresh token).
 // 로그인: 게이트웨이 로그인 시작 → Keycloak 화면 → /auth/callback?ticket= → 티켓 교환. 401 → refresh 회전(pmartFetch), 갱신 거절 → 세션 종료.
-// 화면에 보이는 역할·센터는 access token 클레임에서 읽는다(안내용. 판정은 서버).
+// 화면에 보이는 역할·센터는 `GET /employee-auth/sessions/current` 응답에서 읽는다(employee-auth 0.6.0, @pmart/web-core operatorSession — 토큰을 풀지 않는다. 판정은 서버).
 // 로그인·갱신·로그아웃 로직은 @pmart/web-core(createEmployeeAuth) — 백오피스와 같은 코드다.
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 
-import { parseOperatorToken, watchEmployeeSessionOnVisible, type OperatorSession } from '@pmart/web-core';
+import { createOperatorSessionSource, parseOperatorToken, type OperatorSession } from '@pmart/web-core';
+import { QueryState, uiStateFromError } from '@pmart/web-ui';
 import { API_BASE, tokens } from '../api/client';
 import {
   beginEmployeeLogin,
@@ -22,7 +23,15 @@ import { messages as m } from '../shared/messages';
 import { useApi } from './ApiContext';
 
 interface SessionValue {
+  /** 서버가 준 지금 세션(역할·센터). 받기 전·실패면 null — 로그인 여부는 signedIn 으로 본다 */
   readonly session: OperatorSession | null;
+  /** 이 탭에 토큰이 있다(세션 응답을 받기 전에도 참) */
+  readonly signedIn: boolean;
+  /** 세션 응답 받기: 'loading'(처음 받는 중)·'failed'(처음 받기 실패 — failure)·'ready'·'signed-out' */
+  readonly sessionStatus: 'signed-out' | 'loading' | 'ready' | 'failed';
+  readonly sessionFailure: unknown;
+  /** 세션 응답을 다시 받는다(실패 뒤 "다시 시도") */
+  readonly reloadSession: () => void;
   /** 새로고침 뒤 보관한 refresh 로 세션을 되살리는 중. 끝날 때까지 로그인으로 보내지 않는다. */
   readonly restoring: boolean;
   /** 게이트웨이 로그인 시작 주소로 브라우저를 옮긴다(돌아올 앱 경로) */
@@ -51,28 +60,24 @@ interface SessionValue {
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-const fromToken = (access: string | null) => (access ? parseOperatorToken(access) : null);
-
 export function SessionProvider({ initialToken, children }: { readonly initialToken?: string; readonly children: ReactNode }) {
   const api = useApi();
-  const [session, setSession] = useState<OperatorSession | null>(() => {
+  const [source] = useState(() => {
     tokens.accessToken = initialToken ?? null;
-    return fromToken(tokens.accessToken);
+    // initialToken 은 시험 전용(목 토큰) — 첫 화면을 그 클레임으로 채우고 곧 sessions/current 응답으로 바꾼다. 실제 로그인은 토큰을 풀지 않는다.
+    return createOperatorSessionSource(api, tokens, initialToken ? parseOperatorToken(initialToken) : null);
   });
+  const state = useSyncExternalStore(source.subscribe, source.getState);
   const [saved] = useState(() => (!initialToken && tokens.accessToken === null ? loadSavedSession() : null));
   const [restoring, setRestoring] = useState(saved !== null);
   const restoreStarted = useRef(false);
   const [signOutUnconfirmed, setSignOutUnconfirmed] = useState(false);
 
-  // 토큰이 바뀌면(갱신·만료) 세션 표시를 따라가고, refresh 보관을 맞춘다(없으면 지운다).
-  useEffect(
-    () =>
-      tokens.subscribe((access) => {
-        setSession(fromToken(access));
-        syncSavedSession(tokens);
-      }),
-    [],
-  );
+  // 토큰이 바뀌면 refresh 보관을 맞춘다(없으면 지운다).
+  useEffect(() => tokens.subscribe(() => syncSavedSession(tokens)), []);
+
+  // 세션 응답 받기: 토큰이 생기거나 바뀔 때(로그인·복원·갱신)와 탭이 다시 보일 때(로그아웃 전파 ADR-0061 확인 — 30초 안에는 다시 안 한다).
+  useEffect(() => source.start(), [source]);
 
   // 새로고침 복원: 보관한 refresh 로 한 번 갱신한다. 세션이 끝났으면(거절) 보관을 지우고 로그인으로.
   // 네트워크 등으로 결과를 모르면 보관은 두고 이번에는 로그인으로 보낸다(다음 로드에서 다시 시도).
@@ -95,9 +100,6 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
     setSignOutUnconfirmed(false);
     browser.assign(await beginEmployeeLogin(API_BASE, from, tokens));
   }, []);
-
-  // 로그아웃 전파(ADR-0061): 다른 앱에서 로그아웃했을 수 있다 — 탭이 다시 보일 때 세션을 한 번 확인한다(30초 안에는 다시 안 한다).
-  useEffect(() => watchEmployeeSessionOnVisible(api, tokens), [api]);
 
   const startSilentLogin = useCallback(async (from: string) => {
     const url = await beginSilentEmployeeLogin(API_BASE, from, tokens);
@@ -124,9 +126,25 @@ export function SessionProvider({ initialToken, children }: { readonly initialTo
     return outcome.idpSessionMayRemain ? ('idp-session-may-remain' as const) : ('done' as const);
   }, [api]);
 
+  const reloadSession = useCallback(() => void source.reload(), [source]);
+
   const value = useMemo(
-    () => ({ session, restoring, startLogin, canTrySilentLogin, startSilentLogin, startMockLogin, completeLogin, logout, signOutUnconfirmed }),
-    [session, restoring, startLogin, startSilentLogin, startMockLogin, completeLogin, logout, signOutUnconfirmed],
+    () => ({
+      session: state.status === 'ready' ? state.session : null,
+      signedIn: state.status !== 'signed-out',
+      sessionStatus: state.status,
+      sessionFailure: state.status === 'failed' ? state.failure : null,
+      reloadSession,
+      restoring,
+      startLogin,
+      canTrySilentLogin,
+      startSilentLogin,
+      startMockLogin,
+      completeLogin,
+      logout,
+      signOutUnconfirmed,
+    }),
+    [state, reloadSession, restoring, startLogin, startSilentLogin, startMockLogin, completeLogin, logout, signOutUnconfirmed],
   );
   return <SessionContext value={value}>{children}</SessionContext>;
 }
@@ -137,12 +155,16 @@ export function useSession(): SessionValue {
   return v;
 }
 
-/** 세션이 없으면 로그인 화면으로 보낸다(돌아올 경로를 쿼리에). 권한 판정은 서버. */
+/**
+ * 세션이 없으면 로그인 화면으로 보낸다(돌아올 경로를 쿼리에). 토큰은 있는데 세션 응답을 아직 못 받았으면 기다리고,
+ * 처음 받기가 실패하면 실패로 보인다(빈 역할로 메뉴를 그리지 않는다). 권한 판정은 서버.
+ */
 export function RequireSession({ children }: { readonly children: ReactNode }) {
-  const { session, restoring } = useSession();
+  const { session, sessionStatus, sessionFailure, reloadSession, restoring } = useSession();
   const location = useLocation();
   if (session) return <>{children}</>;
-  if (restoring) {
+  if (sessionStatus === 'failed') return <QueryState state={uiStateFromError(sessionFailure)} onRetry={reloadSession}>{() => null}</QueryState>;
+  if (sessionStatus === 'loading' || restoring) {
     return (
       <p role="status" className="p-6 text-sm opacity-70">
         {m.loading}

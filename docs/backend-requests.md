@@ -64,7 +64,7 @@
 | BR-54 | 중간 | 백오피스 | 직원용 라이더 찾기·상세(`GET /riders`, `GET /riders/{riderId}` — PC 5 BOD-3) | OPEN(2026-11-15). 화면은 만듦 — 목 모드만 메모리 목, 실서버 모드는 안내만(부르지 않음) |
 | BR-55 | 중간 | 백오피스 | 전달 실패·도움요청 대기 목록(`GET /delivery-help-requests` 제안 — PC 5 BOD-4), "처리함" 닫기 API 여부 | OPEN(2026-11-15). 화면은 만듦 — 목 모드만, 처리는 배송 화면(계약 API) |
 | BR-56 | 중간 | 백오피스 | 직원 주문 조회·문의에서 배송 번호(deliveryId)로 잇기 — 컴플레인 기록·배송 확인에 필요 | OPEN(2026-11-15). 지금은 상담원이 배송 번호를 직접 넣는다 |
-| BR-57 | 낮음 | 인사팀 백오피스 | 요청 권한으로 고를 수 있는 역할 목록 API(employee-auth) — 역할이 늘 때마다 화면 고정 목록을 맞추지 않게 | OPEN(2026-11-15). 지금은 화면에 13개 고정(`RIDER_OPS` 추가) |
+| BR-57 | 낮음 | 인사팀 백오피스 | 요청 권한으로 고를 수 있는 역할 목록 API(employee-auth) — 역할이 늘 때마다 화면 고정 목록을 맞추지 않게 | **DONE(2026-11-16)** — `GET /employee-auth/roles`(employee-auth 0.5.0, 백엔드 알림 `hr-backoffice/2026-11-15-notice-role-list-and-departments.md` §1). 직원 등록의 요청 권한 역할이 이 응답(이름·순서·센터 필요 여부)을 쓴다 |
 
 ---
 
@@ -369,3 +369,4 @@
 - 직원 등록 화면의 "요청 권한 역할" 고르기 목록을 주는 API 가 없어 `web/hr-backoffice/src/api/models.ts` `GRANT_ROLES` 에 고정해 두었다(handoff 2026-11-13 §3). 2026-11-15 `RIDER_OPS` 알림(`hr-backoffice/2026-11-15-notice-role-rider-ops.md`)으로 13개가 됐다.
 - 역할이 늘 때마다 화면 목록이 서버 목록과 어긋날 수 있다(서버만 늘면 화면에서 못 고르고, 화면만 늘면 `UNKNOWN_ROLE` 행 거절).
 - 요청: employee-auth-service 에 HR_ADMIN 이 부를 수 있는 역할 목록 조회(역할 코드, 표시 이름, 센터를 골라야 하는 역할인지)를 계약에 넣어 줄지 회신. 생기면 고정 목록 대신 그 응답을 쓴다.
+- **끝남(2026-11-16)**: 백엔드가 `GET /employee-auth/roles`(0.5.0, 직원 토큰이면 누구나)를 만들었다. `GRANT_ROLES` 를 지우고 `src/features/employees/roles.ts` 가 이 응답을 쓴다(못 불러오면 오류 — 빈 목록 아님).

@@ -30,7 +30,29 @@ function issue(s: MockSession) {
 
 const available = (operatorId: string) => db.employees.get(operatorId)?.employee.status === 'ACTIVE';
 
+/** `GET /employee-auth/roles` 목(0.5.0) — 이름은 백엔드 설정 role-info 와 같게(2026-11-15). 순서 = order */
+export const mockRoles = [
+  ['OPERATOR_ADMIN', '운영 관리자'],
+  ['HR_ADMIN', '인사 관리자'],
+  ['CENTER_MASTER_APPROVER', '센터 기준정보 승인자'],
+  ['CS_AGENT', '고객센터 상담원'],
+  ['DISPLAY_APPROVER', '전시 승인자'],
+  ['INVENTORY_APPROVER', '재고 승인자'],
+  ['MD', 'MD(상품 담당)'],
+  ['MFC_SUPERVISOR', '센터 관리자'],
+  ['MFC_WORKER', '센터 작업자'],
+  ['PRICE_APPROVER', '가격 승인자'],
+  ['PRODUCT_APPROVER', '상품 승인자'],
+  ['RIDER_OPS', '라이더 운영'],
+  ['SERVICEABILITY_APPROVER', '배송 권역 승인자'],
+].map(([code, name], i) => ({ code: code!, name: name!, centerScoped: code === 'MFC_SUPERVISOR' || code === 'MFC_WORKER', order: i + 1 }));
+
 export const authHandlers = [
+  http.get(`${API_BASE}/employee-auth/roles`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    return HttpResponse.json({ items: mockRoles });
+  }),
+
   http.post(`${API_BASE}/employee-auth/tokens`, async ({ request }) => {
     const body = (await request.json()) as { ticket?: string; codeVerifier?: string };
     const deviceId = request.headers.get('X-Device-Id');
@@ -81,9 +103,13 @@ export const authHandlers = [
     const who = operator(request);
     if (!who) return unauthorized();
     const s = who.sessionId ? db.sessions.get(who.sessionId) : undefined;
+    // 0.6.0: 지금 기준 역할·센터(목 계정이면 db.grants, 시험용 토큰만 있는 계정이면 토큰 값)
+    const grant = db.grants.get(who.subject) ?? { roles: who.roles, centers: who.centers };
     return HttpResponse.json({
       sessionId: who.sessionId ?? '',
       operatorId: who.subject,
+      roles: [...grant.roles],
+      centers: [...grant.centers],
       app: EMPLOYEE_APP,
       issuedAt: s?.issuedAt ?? timestamp(),
       expiresAt: new Date((who.expiresAtSeconds ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),

@@ -53,7 +53,7 @@ describe('센터', () => {
     expect(new URL(view.gets('/centers')[0]!.url).searchParams.get('type')).toBe('MFC');
   });
 
-  it('센터가 둘 이상이면 위에서 고른다 — 토큰 centers 만(전체 목록의 다른 센터는 없다), 바꾸면 같은 메뉴', async () => {
+  it('센터가 둘 이상이면 위에서 고른다 — 세션 centers 만(전체 목록의 다른 센터는 없다), 바꾸면 같은 메뉴', async () => {
     renderAt('/c/MFC-BSN-01/inventory', as.sup2);
     const select = await screen.findByRole('combobox', { name: '센터 고르기' });
     await waitFor(() => expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['부산진구 MFC (MFC-BSN-01)', '송파 MFC (MFC-SEL-01)']));
@@ -75,6 +75,44 @@ describe('센터', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('이 센터 권한이 없습니다');
     expect(screen.getByRole('link', { name: 'MFC-BSN-01' })).toHaveAttribute('href', '/c/MFC-BSN-01/workers');
     expect(screen.queryByRole('heading', { name: '작업자' })).not.toBeInTheDocument();
+  });
+});
+
+describe('세션 응답(sessions/current 0.6.0) — 토큰을 풀지 않는다', () => {
+  it('응답의 역할·센터가 토큰과 다르면 응답을 따른다(승인 직후 등)', async () => {
+    // 토큰은 센터 1곳인데 서버는 지금 2곳이라고 답한다 → 센터 고르기가 보인다.
+    server.use(
+      http.get(`${API_BASE}/employee-auth/sessions/current`, () =>
+        HttpResponse.json({
+          sessionId: 'SES-1',
+          operatorId: 'OP-sup-1',
+          app: 'mfc-backoffice',
+          issuedAt: '2026-11-15T00:00:00Z',
+          expiresAt: '2026-11-15T00:15:00Z',
+          roles: ['MFC_SUPERVISOR'],
+          centers: ['MFC-BSN-01', 'MFC-SEL-01'],
+        }),
+      ),
+    );
+    renderAt('/c/MFC-BSN-01/workers', as.sup);
+    const select = await screen.findByRole('combobox', { name: '센터 고르기' });
+    expect(within(select).getAllByRole('option')).toHaveLength(2);
+  });
+
+  it('처음 받기가 실패하면 메뉴를 그리지 않고 오류 + 다시 시도', async () => {
+    let fail = true;
+    server.use(
+      http.get(`${API_BASE}/employee-auth/sessions/current`, () =>
+        fail ? HttpResponse.json({ code: 'INTERNAL_ERROR', status: 500, title: 'x', traceId: 't' }, { status: 500 }) : undefined,
+      ),
+    );
+    renderAt('/', null);
+    await userEvent.click(await screen.findByRole('button', { name: '센터 관리자(MFC 1곳)' }));
+    expect(await screen.findByText('정보를 불러오지 못했어요')).toBeInTheDocument();
+    expect(screen.queryByText('인력')).not.toBeInTheDocument();
+    fail = false;
+    await userEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    expect(await screen.findByRole('heading', { name: '작업자' })).toBeInTheDocument();
   });
 });
 
