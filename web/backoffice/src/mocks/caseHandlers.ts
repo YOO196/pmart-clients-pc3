@@ -36,7 +36,7 @@ function seed(): Case[] {
       summary: '[목] 라이더 도움요청 — 건물 출입 불가',
       subjectType: 'DELIVERY',
       subjectRef: 'DLV-MOCK-1',
-      refs: [{ refType: 'deliveryId', refId: 'DLV-MOCK-1' }, { refType: 'orderId', refId: 'ORD-MOCK-1001' }, { refType: 'riderId', refId: 'RID-MOCK-1' }],
+      refs: [{ refType: 'deliveryId', refId: 'DLV-MOCK-1' }, { refType: 'orderId', refId: 'ORD-MOCK-1001' }, { refType: 'riderId', refId: 'RID-MOCK-1' }, { refType: 'incidentId', refId: 'DLV-MOCK-1:HLP-MOCK-1' }],
       slaDueAt: at(-0.5),
       overdue: true,
     }),

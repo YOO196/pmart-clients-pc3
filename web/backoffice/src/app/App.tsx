@@ -19,7 +19,6 @@ import { ClaimDetailPage, ClaimListPage } from '../features/claims/ClaimPages';
 import { PendingPage } from '../features/pending/PendingPage';
 import { CaseDetailPage, CaseListPage, NewMisdeliveryPage } from '../features/cases/CasePages';
 import { DeliveryDetailPage, DeliveryOpenPage } from '../features/deliveries/DeliveryPages';
-import { HelpRequestQueuePage } from '../features/deliveries/HelpRequestQueuePage';
 import { InquiryDetailPage, InquiryListPage } from '../features/inquiries/InquiryPages';
 import { OrderDetailPage, OrderLookupPage } from '../features/orders/OrderLookupPages';
 import { NewRiderComplaintPage, RiderComplaintDetailPage, RiderComplaintListPage } from '../features/riderComplaints/RiderComplaintPages';
@@ -154,7 +153,7 @@ const routes = [
       { path: 'riders', element: guarded(<RiderSearchPage />) },
       { path: 'riders/restriction-reviews', element: guarded(<RestrictionReviewPage />) },
       { path: 'riders/:riderId', element: guarded(<RiderDetailPage />) },
-      { path: 'delivery-help-requests', element: guarded(<HelpRequestQueuePage />) },
+      { path: 'delivery-help-requests', element: <Navigate to="/cases?kind=RIDER_HELP" replace /> }, // 도움요청 대기는 사건함으로(백엔드 알림 2026-11-16 §3)
       { path: 'assistant', element: guarded(<AssistantPage />) },
       { path: 'assistant/answers/:answerId', element: guarded(<AssistantAnswerPage />) },
     ],

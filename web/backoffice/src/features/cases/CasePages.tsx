@@ -23,6 +23,9 @@ type Case = components['schemas']['Case'];
 type Summary = components['schemas']['CaseSummary'];
 type Resolution = keyof typeof m.cases.resolutionName;
 const RESOLUTIONS = Object.keys(m.cases.resolutionName) as Resolution[];
+type Kind = components['schemas']['CaseKind'];
+/** 사건함이 보이는 종류(0.4.0 — 배송 쪽 넷) */
+const KINDS: readonly Kind[] = ['RIDER_HELP', 'DELIVERY_INCIDENT', 'RIDER_LOCATION_STALE', 'MISDELIVERY'];
 type Tab = keyof typeof m.cases.tabs;
 const TABS = Object.keys(m.cases.tabs) as Tab[];
 const isTab = (v: string | null): v is Tab => TABS.some((t) => t === v);
@@ -73,8 +76,13 @@ export function CaseListPage() {
   const [params, setParams] = useSearchParams();
   const tabParam = params.get('tab');
   const tab: Tab = isTab(tabParam) ? tabParam : 'unassigned';
+  const kind = KINDS.find((k) => k === params.get('kind'));
+  const setQuery = (next: { tab?: Tab; kind?: Kind | '' }) => {
+    const k = next.kind === undefined ? kind : next.kind || undefined;
+    setParams({ tab: next.tab ?? tab, ...(k ? { kind: k } : {}) });
+  };
   const query = useQuery({
-    queryKey: ['cases', tab, me],
+    queryKey: ['cases', tab, me, kind ?? ''],
     queryFn: () =>
       request(
         'GET',
@@ -82,6 +90,7 @@ export function CaseListPage() {
           params: {
             query: {
               size: 100,
+              ...(kind ? { kind } : {}),
               ...(tab === 'unassigned' ? { unassigned: true } : {}),
               ...(tab === 'mine' ? { assigneeId: me } : {}),
               ...(tab === 'overdue' ? { overdue: true } : {}),
@@ -97,11 +106,22 @@ export function CaseListPage() {
       <p className="text-sm opacity-70">{m.cases.intro}</p>
       <div role="tablist" className="tabs tabs-box w-fit">
         {TABS.map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={t === tab} className={`tab ${t === tab ? 'tab-active' : ''}`} onClick={() => setParams({ tab: t })}>
+          <button key={t} type="button" role="tab" aria-selected={t === tab} className={`tab ${t === tab ? 'tab-active' : ''}`} onClick={() => setQuery({ tab: t })}>
             {m.cases.tabs[t]}
           </button>
         ))}
       </div>
+      <label className="flex w-fit items-center gap-2 text-sm">
+        {m.cases.kind}
+        <select className="select select-sm" value={kind ?? ''} onChange={(e) => setQuery({ kind: KINDS.find((k) => k === e.target.value) ?? '' })}>
+          <option value="">{m.cases.anyKind}</option>
+          {KINDS.map((k) => (
+            <option key={k} value={k}>
+              {label(m.cases.kindName, k)}
+            </option>
+          ))}
+        </select>
+      </label>
       <QueryState state={toUiState(query, (r) => (r.items ?? []).length === 0)} onRetry={() => void query.refetch()} emptyText={m.cases.empty}>
         {(r) => (
           <table className="table table-sm rounded-box bg-base-100">
@@ -241,6 +261,47 @@ function CloseForm({ c, onDone }: { readonly c: Case; readonly onDone: (c: Case)
   );
 }
 
+/**
+ * 라이더 도움요청·전달 실패 사건: refs 의 incidentId(= `<deliveryId>:<requestId>`)로 execution `GET /deliveries/{id}/help-requests/{requestId}`
+ * (라이더가 쓴 내용·사진 참조). 사건 처리는 사건 집기·닫기로(백엔드 알림 2026-11-16 rider-delivery-staff-apis §3).
+ */
+function HelpRequestOfCase({ c }: { readonly c: Case }) {
+  const api = useApi();
+  const incident = (c.refs ?? []).find((r) => r.refType === 'incidentId')?.refId ?? '';
+  const sep = incident.lastIndexOf(':');
+  const deliveryId = sep > 0 ? incident.slice(0, sep) : '';
+  const requestId = sep > 0 ? incident.slice(sep + 1) : '';
+  const query = useQuery({
+    queryKey: ['help-request', deliveryId, requestId],
+    enabled: deliveryId !== '' && requestId !== '',
+    queryFn: () => request('GET', api.execution.GET('/deliveries/{deliveryId}/help-requests/{requestId}', { params: { path: { deliveryId, requestId } } })),
+  });
+  if (!deliveryId || !requestId) return null;
+  return (
+    <>
+      <h2 className="font-bold">{m.cases.helpRequest}</h2>
+      <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
+        {(h) => (
+          <dl className="grid grid-cols-[8rem_1fr] gap-1 rounded-box bg-base-100 p-4 text-sm" data-testid="case-help-request">
+            <dt>{m.helpQueue.category}</dt>
+            <dd>{label(m.helpQueue.categoryName, h.category)}</dd>
+            <dt>{m.helpQueue.stage}</dt>
+            <dd>{label(m.deliveries.executionState, h.stage)}</dd>
+            <dt>{m.cases.helpDetail}</dt>
+            <dd className="whitespace-pre-wrap">{text(h.detail)}</dd>
+            <dt>{m.helpQueue.photos}</dt>
+            <dd>{(h.evidenceRefs ?? []).join(', ') || m.none}</dd>
+            <dt>{m.cases.state}</dt>
+            <dd>{label(m.helpQueue.state, h.state)}</dd>
+            <dt>{m.helpQueue.createdAt}</dt>
+            <dd>{when(h.createdAt)}</dd>
+          </dl>
+        )}
+      </QueryState>
+    </>
+  );
+}
+
 export function CaseDetailPage() {
   const { caseId = '' } = useParams();
   const api = useApi();
@@ -283,6 +344,8 @@ export function CaseDetailPage() {
                 <dt>{m.cases.openedAt}</dt>
                 <dd>{when(c.openedAt)}</dd>
               </dl>
+
+              {(c.kind === 'RIDER_HELP' || c.kind === 'DELIVERY_INCIDENT') && <HelpRequestOfCase c={c} />}
 
               {!admin && !team && <p className="text-sm opacity-70">{m.cases.viewOnly}</p>}
               {!closed && <AssignForm c={c} onDone={onDone} />}

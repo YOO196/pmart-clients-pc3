@@ -69,7 +69,6 @@ export const navGroups: readonly NavGroup[] = [
     items: [
       { to: '/riders', label: m.nav.riders },
       { to: '/riders/restriction-reviews', label: m.nav.restrictionReviews },
-      { to: '/delivery-help-requests', label: m.nav.helpQueue },
       { to: '/deliveries', label: m.nav.deliveriesRiderOps },
       { to: '/rider-complaints', label: m.nav.riderComplaints },
       { to: '/orders', label: m.nav.orders },

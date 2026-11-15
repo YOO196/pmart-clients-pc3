@@ -1,6 +1,6 @@
 // ⚠ 화면 개발·시험용 목 — 고객센터·라이더 운영(백엔드 요청 2026-11-15 cs-rider-menus). 실제 서버 동작이 아니다.
 // 계약: order 0.3.0 lookups, case 0.3.0 rider-complaints, claim 0.1.0, rider 0.3.0 restrictions·reviews, dispatch 0.3.1, execution 0.3.2.
-// 역할은 지금 계약 설명 그대로 흉내 낸다 — PC 5 반영 전이라 RIDER_OPS 는 계정 제한·검토·배차 조회/취소·실패 결정이 403, CS_AGENT 는 배차 조회가 403.
+// 역할은 지금 계약 설명 그대로 흉내 낸다(PC 5 PR #17 — BOD-1~6 반영): RIDER_OPS 는 계정 제한·검토·배차 조회/취소·실패 결정, CS_AGENT 는 배차 조회·실패 결정(취소는 403).
 // 응답 모양은 생성 타입을 따른다. 계약에 없는 필드는 넣지 않는다.
 import { http, HttpResponse } from 'msw';
 
@@ -286,8 +286,32 @@ const complaintSummary = (c: Complaint) => ({
 const CS = ['CS_AGENT', 'OPERATOR_ADMIN'];
 const LOOKUP = ['CS_AGENT', 'OPERATOR_ADMIN', 'RIDER_OPS'];
 const ADMIN = ['OPERATOR_ADMIN'];
+/** rider 0.4.0·dispatch 0.3.2·execution 0.4.0(BOD-1): 라이더 운영 역할도 계정 제한·검토·배차 취소·실패 결정 */
+const RIDER_OPS_ROLES = ['OPERATOR_ADMIN', 'RIDER_OPS'];
 const MAX_DAYS = 31;
 
+/** rider 0.4.0 목 라이더(직원 찾기·상세·원문 열람). 계정 제한 상태·version 은 ops.riders 와 같은 값 */
+const RIDER_PROFILES = [
+  { riderId: 'RID-MOCK-1', name: '[목] 김라이더', phone: '01011112222', vehicleType: 'MOTORCYCLE' as const, operatingStatus: 'ON_DUTY' as const, newDispatchEnabled: true, operatingMfcId: 'MFC-BSN-01', joinedAt: '2026-10-01T00:00:00Z', lastHeartbeatAt: '2026-11-15T01:00:00Z' },
+  { riderId: 'RID-MOCK-2', name: '[목] 이라이더', phone: '01033334444', vehicleType: 'BICYCLE' as const, operatingStatus: 'OFF_DUTY' as const, newDispatchEnabled: false, operatingMfcId: null, joinedAt: '2026-10-10T00:00:00Z', lastHeartbeatAt: null },
+];
+
+function riderSummary(r: (typeof RIDER_PROFILES)[number]) {
+  const state = ops.riders.get(r.riderId);
+  return {
+    riderId: r.riderId,
+    version: state?.version ?? 1,
+    nameMasked: maskName(r.name) ?? null,
+    phoneMasked: `${r.phone.slice(0, 3)}****${r.phone.slice(-4)}`,
+    vehicleType: r.vehicleType,
+    operatingStatus: r.operatingStatus,
+    newDispatchEnabled: r.newDispatchEnabled,
+    operatingMfcId: r.operatingMfcId,
+    restriction: state?.current ?? ('NORMAL' as const),
+    joinedAt: r.joinedAt,
+    stateChangedAt: r.joinedAt,
+  };
+}
 export const opsHandlers = [
   // ---- order 0.3.0 ----
   http.get(`${API_BASE}/orders/lookups`, ({ request }) => {
@@ -555,7 +579,7 @@ export const opsHandlers = [
     return found ? HttpResponse.json(found) : problem(404, 'NOT_FOUND');
   }),
   http.post(`${API_BASE}/deliveries/:deliveryId/failure-decisions`, async ({ request, params }) => {
-    const { denied, who } = allow(request, ...CS);
+    const { denied, who } = allow(request, ...LOOKUP);
     if (denied) return denied;
     const body = (await request.clone().json()) as { decision?: 'CONFIRM' | 'REJECT'; custody?: 'RIDER' | 'STORE'; note?: string };
     return idempotent(request, () => {
@@ -581,14 +605,14 @@ export const opsHandlers = [
 
   // ---- delivery-dispatch 0.3.1 ----
   http.get(`${API_BASE}/deliveries/:deliveryId/dispatch`, ({ request, params }) => {
-    // 지금 계약: 그 센터 직원·OPERATOR_ADMIN(CS_AGENT·RIDER_OPS 는 PC 5 반영 뒤)
-    const { denied } = allow(request, ...ADMIN);
+    // 0.3.2(BOD-1·2): 그 센터 직원·OPERATOR_ADMIN·RIDER_OPS·CS_AGENT(상담원은 조회만)
+    const { denied } = allow(request, ...LOOKUP);
     if (denied) return denied;
     const found = ops.dispatches.get(String(params['deliveryId']));
     return found ? HttpResponse.json(found) : problem(404, 'NOT_FOUND');
   }),
   http.post(`${API_BASE}/deliveries/:deliveryId/assignment-cancellations`, async ({ request, params }) => {
-    const { denied } = allow(request, ...ADMIN);
+    const { denied } = allow(request, ...RIDER_OPS_ROLES);
     if (denied) return denied;
     const body = (await request.clone().json()) as { requestedBy?: string; reason?: string; reassign?: boolean; approvalRef?: string };
     return idempotent(request, () => {
@@ -611,7 +635,7 @@ export const opsHandlers = [
     });
   }),
   http.get(`${API_BASE}/deliveries/:deliveryId/assignment-cancellations/:requestId`, ({ request, params }) => {
-    const { denied } = allow(request, ...ADMIN);
+    const { denied } = allow(request, ...RIDER_OPS_ROLES);
     if (denied) return denied;
     const requestId = String(params['requestId']);
     const found = ops.cancellations.get(requestId);
@@ -625,14 +649,14 @@ export const opsHandlers = [
 
   // ---- rider 0.3.0 (지금 OPERATOR_ADMIN 만) ----
   http.get(`${API_BASE}/riders/restriction-reviews`, ({ request }) => {
-    const { denied } = allow(request, ...ADMIN);
+    const { denied } = allow(request, ...RIDER_OPS_ROLES);
     if (denied) return denied;
     const q = new URL(request.url).searchParams;
     const state = q.get('state') ?? 'OPEN';
     return HttpResponse.json({ items: ops.reviews.filter((r) => r.state === state && (!q.get('riderId') || r.riderId === q.get('riderId'))) });
   }),
   http.post(`${API_BASE}/riders/restriction-reviews/:reviewId/decisions`, async ({ request, params }) => {
-    const { denied, who } = allow(request, ...ADMIN);
+    const { denied, who } = allow(request, ...RIDER_OPS_ROLES);
     if (denied) return denied;
     const body = (await request.clone().json()) as { decision?: 'RESTRICTED' | 'DISMISSED'; note?: string };
     return idempotent(request, () => {
@@ -649,13 +673,13 @@ export const opsHandlers = [
     });
   }),
   http.get(`${API_BASE}/riders/:riderId/restrictions`, ({ request, params }) => {
-    const { denied } = allow(request, ...ADMIN);
+    const { denied } = allow(request, ...RIDER_OPS_ROLES);
     if (denied) return denied;
     const r = ops.riders.get(String(params['riderId']));
     return r ? HttpResponse.json({ current: r.current, items: r.history }) : problem(404, 'NOT_FOUND');
   }),
   http.post(`${API_BASE}/riders/:riderId/restrictions`, async ({ request, params }) => {
-    const { denied, who } = allow(request, ...ADMIN);
+    const { denied, who } = allow(request, ...RIDER_OPS_ROLES);
     if (denied) return denied;
     const body = (await request.clone().json()) as { restriction?: Restriction; reason?: string; until?: string; evidenceRefs?: string[]; approvalRef?: string };
     return idempotent(request, () => {
@@ -681,6 +705,113 @@ export const opsHandlers = [
       r.current = body.restriction;
       r.history = [record, ...r.history];
       return { status: 200, body: record };
+    });
+  }),
+  // ---- rider 0.4.0 직원용 찾기·상세·원문 열람(BOD-3) — OPERATOR_ADMIN·RIDER_OPS·CS_AGENT. 이름·전화는 가린 값, 원문은 사유 + pii-reveals ----
+  // (경로 순서: 위의 /riders/restriction-reviews 가 먼저 맞도록 여기 둔다)
+  http.get(`${API_BASE}/riders`, ({ request }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const q = new URL(request.url).searchParams;
+    const phone = q.get('phone')?.replace(/\D/g, '');
+    if (phone !== undefined && phone !== '' && (phone.length < 10 || phone.length > 11)) return problem(400, 'VALIDATION_FAILED', [{ field: 'phone', reason: 'INVALID_FORMAT' }]);
+    const items = RIDER_PROFILES.filter(
+      (r) =>
+        (!q.get('riderId') || r.riderId === q.get('riderId')) &&
+        (!phone || r.phone === phone) &&
+        (!q.get('restriction') || (ops.riders.get(r.riderId)?.current ?? 'NORMAL') === q.get('restriction')) &&
+        (!q.get('operatingStatus') || r.operatingStatus === q.get('operatingStatus')) &&
+        (!q.get('vehicleType') || r.vehicleType === q.get('vehicleType')),
+    ).map((r) => riderSummary(r));
+    return HttpResponse.json({ items, page: Number(q.get('page') ?? 0), size: items.length, hasNext: false });
+  }),
+  http.get(`${API_BASE}/riders/:riderId`, ({ request, params }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const r = RIDER_PROFILES.find((x) => x.riderId === params['riderId']);
+    if (!r) return problem(404, 'NOT_FOUND');
+    const s = riderSummary(r);
+    return HttpResponse.json({
+      riderId: r.riderId,
+      version: s.version,
+      nameMasked: s.nameMasked,
+      phoneMasked: s.phoneMasked,
+      vehicleType: r.vehicleType,
+      joinedAt: r.joinedAt,
+      lastHeartbeatAt: r.lastHeartbeatAt,
+      deliveryAreas: r.operatingMfcId ? [{ mfcId: r.operatingMfcId, zoneId: 'ZONE-MOCK-1' }] : [],
+      operating: { status: r.operatingStatus, newDispatchEnabled: r.newDispatchEnabled, activeDeliveryCount: r.operatingStatus === 'ON_DUTY' ? 1 : 0, ...(r.operatingMfcId ? { mfcId: r.operatingMfcId } : {}) },
+      settings: { dispatchMode: 'AI_RECOMMENDED', oneAtATime: false },
+      restriction: { state: s.restriction, until: null, reason: null },
+    });
+  }),
+  http.post(`${API_BASE}/riders/:riderId/pii-reveals`, async ({ request, params }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const body = (await request.clone().json()) as { reason?: string; fields?: Array<'NAME' | 'PHONE'> };
+    return idempotent(request, () => {
+      const reason = (body.reason ?? '').trim();
+      if (reason.length < 2 || reason.length > 200) return problem(400, 'VALIDATION_FAILED', [{ field: 'reason', reason: 'INVALID_FORMAT' }]);
+      const r = RIDER_PROFILES.find((x) => x.riderId === params['riderId']);
+      if (!r) return problem(404, 'NOT_FOUND');
+      const fields = body.fields && body.fields.length > 0 ? body.fields : (['NAME', 'PHONE'] as const);
+      return {
+        status: 200,
+        body: {
+          riderId: r.riderId,
+          piiAccessLogId: `PAL-MOCK-R-${keyOf(request).slice(0, 8)}`,
+          recordedAt: new Date().toISOString(),
+          fields,
+          name: fields.includes('NAME') ? r.name : null,
+          phone: fields.includes('PHONE') ? r.phone : null,
+        },
+      };
+    });
+  }),
+
+  // ---- execution 0.4.0 직원용 배송 찾기(BOD-5) — 개인정보 없이 ID·상태·시각만 ----
+  http.get(`${API_BASE}/deliveries`, ({ request }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const q = new URL(request.url).searchParams;
+    const items = [...ops.executions.values()]
+      .filter(
+        (e) =>
+          (!q.get('orderId') || e.orderId === q.get('orderId')) &&
+          (!q.get('riderId') || e.riderId === q.get('riderId')) &&
+          (!q.get('state') || e.state === q.get('state')) &&
+          (!q.get('mfcId') || e.mfcId === q.get('mfcId')),
+      )
+      .map((e, i) => ({
+        deliveryId: e.deliveryId,
+        orderId: e.orderId ?? null,
+        mfcId: e.mfcId ?? null,
+        riderId: e.riderId ?? null,
+        state: e.state,
+        type: e.type,
+        createdAt: ago(10 - i),
+        assignedAt: e.assignedAt ?? null,
+        version: e.version,
+      }))
+      .sort((a, b) => (q.get('sort') === 'OLDEST' ? a.createdAt.localeCompare(b.createdAt) : b.createdAt.localeCompare(a.createdAt)));
+    return HttpResponse.json({ items, page: { nextCursor: null, size: items.length } });
+  }),
+  // execution 0.4.0 도움요청 단건(라이더가 쓴 내용·사진 참조) — 사건함의 RIDER_HELP 가 refs.incidentId 로 연다
+  http.get(`${API_BASE}/deliveries/:deliveryId/help-requests/:requestId`, ({ request, params }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    if (params['deliveryId'] !== 'DLV-MOCK-1' || params['requestId'] !== 'HLP-MOCK-1') return problem(404, 'NOT_FOUND');
+    return HttpResponse.json({
+      requestId: 'HLP-MOCK-1',
+      deliveryId: 'DLV-MOCK-1',
+      incidentId: 'DLV-MOCK-1:HLP-MOCK-1',
+      category: 'ADDRESS',
+      stage: 'PICKED_UP',
+      state: 'OPEN',
+      detail: '[목] 공동현관이 잠겨 있고 호출해도 응답이 없어요.',
+      evidenceRefs: ['PHOTO-MOCK-1'],
+      createdAt: ago(1),
+      caseId: 'CASE-MOCK-1',
     });
   }),
 ];
