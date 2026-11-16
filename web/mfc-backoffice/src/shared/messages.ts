@@ -14,7 +14,7 @@ export const messages = {
 
   /** 메뉴 묶음·하위 메뉴(handoff 2026-11-15 §2 — 이름·순서는 클라이언트가 정해도 된다) */
   groups: {
-    people: '인력',
+    people: '작업자 관리', // '인력' 에서 바꿈(사용자 2026-11-16)
     work: '작업',
     stock: '재고·품질',
     center: '센터',
@@ -125,6 +125,34 @@ export const messages = {
     body: '이 메뉴의 화면은 아직 만들지 않았어요.',
     apiMissing: '서버 API 가 아직 없는 기능(백엔드가 만들면 알려 주기로 했어요)',
     apiReady: '서버 API 가 있는 기능(다음 차례에 화면을 만들어요)',
+  },
+
+  /** 운영 제한 — mfc-capacity-service 0.14.0 operation-restrictions */
+  restrictions: {
+    intro: '센터의 주문 접수를 멈추거나(접수 중지) 시간대별 수용량을 줄여요(수용 축소). 시간이 지나도 자동으로 풀리지 않아요 — 해제해야 풀려요.',
+    activeOnly: '활성만(기본)',
+    all: '해제된 것까지',
+    filter: '보기',
+    empty: '조건에 맞는 운영 제한이 없어요.',
+    type: { INTAKE_STOP: '접수 중지', CAPACITY_REDUCE: '수용 축소' } as Readonly<Record<string, string>>,
+    state: { ACTIVE: '활성', LIFTED: '해제됨' } as Readonly<Record<string, string>>,
+    cols: { type: '종류', state: '상태', period: '적용 기간', units: '축소 후 수용 단위', reason: '사유', approval: '승인 근거', affected: '영향 주문' },
+    noEnd: '끝 없음',
+    period: (from: string, to: string) => `${from} ~ ${to}`,
+    create: '운영 제한 등록',
+    typeLabel: '종류',
+    effectiveFrom: '시작(한국)',
+    effectiveTo: '끝(한국, 비우면 끝 없음)',
+    units: '축소 후 수용 단위',
+    reason: '사유',
+    approvalRef: '승인 근거(승인 번호)',
+    approvalRefHint: '승인 번호를 직접 넣어요(승인 서비스가 없어 서버는 기록만 해요).',
+    createHint: '접수 중지: 기간 안의 새 주문 슬롯 잡기를 막아요(이미 잡힌 주문은 그대로). 수용 축소: 기간 안의 수용 단위를 줄여요 — 이미 받은 주문은 지우지 않고 영향 주문으로 알려요.',
+    created: '운영 제한을 등록했어요.',
+    lift: '해제',
+    liftRef: (type: string) => `${type} 해제 승인 근거`,
+    lifted: '운영 제한을 해제했어요.',
+    endBeforeStart: '끝은 시작보다 뒤여야 해요.',
   },
 
   /** 품질 — mfc-quality-service 0.2.0 */
