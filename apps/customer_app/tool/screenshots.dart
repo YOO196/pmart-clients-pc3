@@ -249,6 +249,7 @@ void main() {
     await shot('chat-pick-order');
     await t.tap(find.byKey(const ValueKey('chat-recent-order-seed-4')));
     await t.pumpAndSettle();
+    await shot('chat-order-picked');
     await ask('언제 도착해요?');
     await shot('chat-order-topic');
     await t.tap(find.byKey(const ValueKey('chat-topic-change')));
@@ -257,8 +258,12 @@ void main() {
     await t.pumpAndSettle();
 
     await ask('상품 준비 중인 주문도 취소할 수 있나요?');
-    await t.tap(find.byKey(const ValueKey('chat-citations')));
     await shot('chat-answer');
+    // 취소 같은 실행 요청 → 최근 주문 카드(주문을 고르기 전, 일반 문의에서).
+    await ask('주문 취소해 주세요 #취소');
+    await t.drag(find.byType(Scrollable).first, const Offset(0, -900));
+    await t.pumpAndSettle();
+    await shot('chat-cancel-orders');
     await ask('내 주문 어디쯤이에요? #주문');
     await shot('chat-orders');
     await t.tap(find.byKey(const ValueKey('chat-order-order-seed-4')).last);

@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kakao_map_sdk/kakao_map_sdk.dart';
+import 'package:pmart_core/pmart_core.dart' show trustPmartLanRootCa;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'app.dart';
@@ -12,6 +14,8 @@ import 'shared/providers.dart' show onSessionExpiredProvider;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initPmartFormatting();
+  // LAN HTTPS 게이트웨이(사설 CA, ADR-0057)를 믿는다 — 운영(release) 빌드에는 넣지 않는다(T6).
+  if (!kReleaseMode) trustPmartLanRootCa();
   // 카카오 지도는 키가 있을 때만 켠다(빌드 때 --dart-define-from-file=.secrets/customer.env). 키는 로그에 남기지 않는다.
   if (kakaoNativeAppKey.isNotEmpty) {
     await KakaoMapSdk.instance.initialize(kakaoNativeAppKey);

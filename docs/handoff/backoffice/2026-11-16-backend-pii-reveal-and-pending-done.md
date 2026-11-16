@@ -17,5 +17,5 @@
 
 ## 3. 확인·빌드
 - typecheck·lint 통과, 테스트 181개 통과(목 모드 — 열람 항목·헤더·503 같은 키, 처리 대기 목록·센터·확인·실패). 실서버 확인은 아직.
-- 빌드: `web-common/2026-11-16-backend-session-roles-centers-done.md` §2 표의 backoffice 해시를 이 변경까지 담은 것으로 바꿨다(`index-BEI3dP9H.js`·`index-CfStOUC1.css`).
+- 빌드: `archive/2026-11-16-backend-session-roles-centers-done.md` §2 표의 backoffice 해시를 이 변경까지 담은 것으로 바꿨다(`index-BEI3dP9H.js`·`index-CfStOUC1.css`).
 - 아직 안 한 것: 개인정보 열람 기록 조회 메뉴(`backoffice/2026-11-16-notice-pii-access-log-api.md`).

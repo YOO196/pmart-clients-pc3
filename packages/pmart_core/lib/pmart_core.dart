@@ -10,6 +10,7 @@ export 'src/field_queue.dart';
 export 'src/http_client.dart';
 export 'src/idempotency.dart';
 export 'src/interceptors.dart';
+export 'src/lan_trust.dart';
 export 'src/logging.dart';
 export 'src/problem.dart';
 export 'src/request_options.dart';

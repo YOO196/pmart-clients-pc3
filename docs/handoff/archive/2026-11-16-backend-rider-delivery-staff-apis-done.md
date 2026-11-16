@@ -24,4 +24,4 @@
 
 ## 4. 확인·빌드
 - typecheck·lint 통과, 테스트 194개(목 모드 — 라이더 찾기·전화 검사·원문 열람·이 라이더의 배송·실패 대기·주문의 배송·도움요청 사건, 권한 변경 반영). 실서버 확인은 아직.
-- 빌드: `web-common/2026-11-16-backend-session-roles-centers-done.md` §2 표의 backoffice 해시를 `index-BGISi3dQ.js`·`index-axp6BaGl.css` 로 바꿨다(오늘 백오피스 변경 전부).
+- 빌드: `archive/2026-11-16-backend-session-roles-centers-done.md` §2 표의 backoffice 해시를 `index-BGISi3dQ.js`·`index-axp6BaGl.css` 로 바꿨다(오늘 백오피스 변경 전부).

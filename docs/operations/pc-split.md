@@ -105,7 +105,7 @@ contracts.lock · CLAUDE.md · .claude/rules/   # 공통(§6)
 | 웹 빌드(`web/*/dist`) | `npm run build:lan -w web/<앱>` — 올리는 것은 PC 1(§1) |
 | 고객앱 레퍼런스 캡처 `docs/customer-app-design/` | git 제외 — **PC 1 에만 있다.** 고객앱 화면 작업은 이 폴더가 있어야 한다(다른 PC 가 맡으면 사용자가 복사) |
 | LAN 시험 계정 비밀번호 | 백엔드 `deploy/lan/.secrets/` 에 필요한 파일만(사용자가 복사). 저장소 루트에 두지 않고, 이 저장소에는 절대 넣지 않는다. `keycloak-admin-password` 는 PC 1 밖으로 옮기지 않는다 |
-| LAN 루트 CA | PC 2~5 Windows 에는 설치돼 있다. PDA·폰은 `../pmart-backend/deploy/lan/tls/pmart-lan-root-ca.crt` 를 기기에 설치해야 직원 로그인 화면이 열린다 |
+| LAN 루트 CA | PC 2~5 Windows 에는 설치돼 있다. PDA·폰은 `../pmart-backend/deploy/lan/tls/pmart-lan-root-ca.crt` 를 기기에 설치해야 직원 로그인 화면(브라우저)이 열린다. **Flutter 앱의 API 호출(Dio·`Image.network`)은 기기에 설치한 CA·안드로이드 `network_security_config` 를 쓰지 않는다** — `https://192.168.0.40:8443` 을 쓰려면 앱 `main` 에서 `if (!kReleaseMode) trustPmartLanRootCa();`(`pmart_core`, 2026-11-16, ADR-0057 T6 — 운영 빌드 제외)를 부른다. 고객앱은 넣었다. **mfc_app(PC 3)·rider_app(PC 5)은 아직 `http://…:8080` — HTTPS 로 옮길 때 이 한 줄을 넣는다** |
 
 ## 3. 앱 영역
 
@@ -137,7 +137,7 @@ contracts.lock · CLAUDE.md · .claude/rules/   # 공통(§6)
   - 첫머리에 **`보낸 앱: <앱 영역>`** 과 **`받는 백엔드 영역: platform|mfc|delivery`** 를 적는다. 회신이면 원 문서 경로도 적는다.
   - 받는 영역 고르기: 인증·로그인·HR·승인·게이트웨이·배포·공통 계약과 아래 둘 밖의 모든 서비스는 platform(PC 1), MFC 업무 API(mfc-*-service)는 mfc(PC 3), 배송·라이더(delivery-*·rider-service·rider-auth-service)는 delivery(PC 5).
   - 예: `docs/handoff/mfc-app/2026-11-14-backend-picking-scan.md`(받는 백엔드 영역 mfc).
-- 백엔드 → 클라이언트(지금 — 백엔드에 같은 폴더 구조를 제안했다, `docs/handoff/all/2026-11-13-backend-handoff-folders.md`): `../pmart-backend/docs/handoff/clients/YYYY-MM-DD-<받는 앱 영역>-<종류>-<주제>.md`(종류 request·reply·notice, 첫머리 `보낸 영역:`). 각 앱 담당은 **`*-<자기 앱 영역>-*` 와 `*-all-*`** 만 읽으면 된다. 2026-11-13 까지의 파일은 `…-clients-…`.
+- 백엔드 → 클라이언트: `../pmart-backend/docs/handoff/clients/<받는 앱 영역|all>/YYYY-MM-DD-<종류>-<주제>.md`(종류 request·reply·notice, 첫머리 `보낸 영역:` — 같은 폴더 구조, 제안 `docs/handoff/archive/2026-11-13-backend-handoff-folders.md`). 각 앱 담당은 **자기 앱 영역 폴더와 `all/`** 만 읽으면 된다. 2026-11-13 까지의 파일은 `clients/` 바로 아래 `…-clients-…`.
 - 한 주제는 한 앱 영역이 보낸다(같은 주제를 두 PC 가 따로 보내지 않는다).
 - 백엔드는 다른 PC 의 handoff 를 **원본 main 에 들어온 뒤** 읽는다(PC 1 의 것만 작업 폴더에서 바로 읽는다). 다른 PC 는 handoff 를 PR 에 넣어 보낸다.
 

@@ -5,6 +5,8 @@ import 'package:pmart_api_customer_assistant/pmart_api_customer_assistant.dart'
     as api;
 import 'package:pmart_ui/pmart_ui.dart';
 
+import 'package:customer_app/features/orders/presentation/orders_screens.dart'
+    show OrderDetailScreen;
 import 'package:customer_app/features/support/data/chat_repository.dart';
 import 'package:customer_app/features/support/data/mock_chat_repository.dart';
 import 'package:customer_app/features/support/data/mock_inquiries_repository.dart';
@@ -227,7 +229,7 @@ void main() {
       expect(find.byKey(const ValueKey('chat-input')), findsNothing);
     });
 
-    testWidgets('답변과 근거 보기', (t) async {
+    testWidgets('답변만 보이고 근거는 보이지 않는다(서버가 근거를 줘도)', (t) async {
       await open(t, mock());
       await ask(t, '준비 중인 주문도 취소돼요?');
       expect(
@@ -235,10 +237,9 @@ void main() {
         findsOneWidget,
       );
       expect(find.textContaining('[목 답변]'), findsOneWidget);
-      expect(find.textContaining('[목 근거]'), findsNothing); // 접혀 있다
-      await t.tap(find.byKey(const ValueKey('chat-citations')));
-      await t.pumpAndSettle();
-      expect(find.textContaining('[목 근거]'), findsOneWidget);
+      expect(find.byKey(const ValueKey('chat-citations')), findsNothing);
+      expect(find.textContaining('[목 근거]'), findsNothing);
+      expect(find.textContaining('근거 보기'), findsNothing);
       expect(find.byKey(const ValueKey('chat-handoff')), findsNothing);
     });
 
@@ -278,6 +279,44 @@ void main() {
         findsOneWidget,
       );
       expect(repo.sentOrderIds, [null, 'order-seed-4']);
+    });
+
+    testWidgets('취소 같은 실행 요청: 최근 주문 카드 → 누르면 그 주문 상세(AI 는 취소하지 않는다)', (t) async {
+      final repo = mock(MockChatScenario.outOfScope);
+      await open(t, repo);
+      await ask(t, '주문 취소해 주세요');
+      expect(
+        find.byKey(const ValueKey('chat-answer-outOfScope')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('chat-action-orders')), findsOneWidget);
+      expect(
+        find.text('최근 주문이에요. 주문을 누르면 주문 상세에서 취소·반품을 신청할 수 있는지 볼 수 있어요.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('chat-handoff')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('chat-order-order-seed-4')).last);
+      await t.pumpAndSettle();
+      expect(find.byType(OrderDetailScreen), findsOneWidget);
+      expect(repo.sentOrderIds, [null], reason: '카드를 눌러도 질문을 다시 보내지 않는다');
+    });
+
+    testWidgets('실행 요청의 최근 주문 조회 실패는 오류 + 다시 시도', (t) async {
+      final repo = mock(MockChatScenario.outOfScope)
+        ..failNextRecentOrders = true;
+      await open(t, repo);
+      await ask(t, '환불해 주세요');
+      expect(
+        find.byKey(const ValueKey('chat-action-orders-error')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('chat-action-orders-empty')),
+        findsNothing,
+      );
+      await t.tap(find.text('다시 시도').last);
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('chat-action-orders')), findsOneWidget);
     });
 
     testWidgets('요청 제한: 서버 안내 문장 + 문의 남기기 버튼', (t) async {
@@ -323,6 +362,14 @@ void main() {
       await t.tap(find.byKey(const ValueKey('chat-recent-order-seed-1')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('chat-topic-bar')), findsOneWidget);
+      // 고르면 바로 응답: 고른 주문 카드 + 안내 + 주문 상세(질문은 대신 보내지 않는다)
+      expect(
+        find.byKey(const ValueKey('chat-topic-order-ack')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('chat-order-order-seed-1')), findsOne);
+      expect(find.text('주문 상세 보기'), findsOneWidget);
+      expect(repo.sentKeys, isEmpty);
       await ask(t, '언제 와요?');
       await ask(t, '포장은요?');
       expect(repo.sentOrderIds, ['order-seed-1', 'order-seed-1']);
@@ -332,6 +379,17 @@ void main() {
       await t.tap(find.byKey(const ValueKey('chat-topic-change')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('chat-topic-order')), findsOneWidget);
+    });
+
+    testWidgets('주문을 고른 뒤 "주문 상세 보기" → 그 주문 상세', (t) async {
+      await open(t, mock(), general: false);
+      await t.tap(find.byKey(const ValueKey('chat-topic-order')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('chat-recent-order-seed-4')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('chat-topic-order-detail')));
+      await t.pumpAndSettle();
+      expect(find.byType(OrderDetailScreen), findsOneWidget);
     });
 
     testWidgets('최근 주문 조회 실패는 "주문 없음"이 아니라 오류 — 다시 시도', (t) async {

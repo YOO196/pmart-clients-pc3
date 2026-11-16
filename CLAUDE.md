@@ -39,7 +39,7 @@ docs/                 # 설계 정본 (아래 문서 지도)
 - **백엔드에 요청할 계약 공백**: `docs/backend-requests.md` — 계약에 없는 API가 필요하면 추측해서 만들지 말고 여기에 적는다
 - **PC 나눠 작업하기(PC 별 역할·폴더 구조·앱 영역·일지·handoff 규칙)**: `docs/operations/pc-split.md` — 여러 PC 가 이 저장소를 함께 고친다. 앱 영역은 customer-app·mfc-app·rider-app·backoffice·hr-backoffice·web-common. 클라이언트 담당: PC 1 = customer-app·로그인/세션/토큰 코드, **PC 2 = backoffice·hr-backoffice·mfc-backoffice·web-common(2026-11-16 부터, 인계서 `docs/operations/backoffice-handover.md`)**, PC 3 = mfc-app, PC 5 = rider-app. PC 1(192.168.0.32)만 원본 main 에 넣고 다른 PC 는 포크 → PR. 여럿이 고치는 문서(`backend-requests.md`·`contracts.lock` 등)는 PC 1 이 합칠 때 몰아서 고친다. 저장소는 `pmart-backend`·`pmart-clients`·`pmart-mfc-simulation` 을 같은 부모 폴더의 형제로 둔다.
 - **다른 PC 가 읽을 문서 지도**(읽는 순서·PC 별 문서·필요할 때 볼 것·시작할 때 보낼 말): `docs/operations/other-pcs-start-here.md`
-- **백엔드와 주고받는 문서(handoff)**: 요청·추가 질문은 `docs/handoff/<앱 영역>/<날짜>-backend-<주제>.md`(여러 앱이면 `docs/handoff/all/`)에 새 파일로 쓰고, 첫머리에 `보낸 앱:` 과 `받는 백엔드 영역:`(platform·mfc·delivery)을 적는다. 끝난 문서는 `docs/handoff/archive/` 로 옮긴다(규칙·열린 문서 목록 `docs/handoff/README.md`). 백엔드 회신은 `../pmart-backend/docs/handoff/clients/<날짜>-<받는 앱 영역|all>-<종류>-<주제>.md` 에서 읽는다(읽기 전용, 2026-11-13 까지는 `…-clients-…`, 끝난 것은 그 아래 `archive/`).
+- **백엔드와 주고받는 문서(handoff)**: 요청·추가 질문은 `docs/handoff/<앱 영역>/<날짜>-backend-<주제>.md`(여러 앱이면 `docs/handoff/all/`)에 새 파일로 쓰고, 첫머리에 `보낸 앱:` 과 `받는 백엔드 영역:`(platform·mfc·delivery)을 적는다. 끝난 문서는 `docs/handoff/archive/` 로 옮긴다(규칙·열린 문서 목록 `docs/handoff/README.md`). 백엔드 회신은 `../pmart-backend/docs/handoff/clients/<받는 앱 영역|all>/<날짜>-<종류>-<주제>.md` 에서 읽는다(읽기 전용, 2026-11-13 까지는 `clients/` 바로 아래 `…-clients-…`, 끝난 것은 그 아래 `archive/`).
 - 단계 계획: `docs/roadmap.md`
 - 결정 기록: `docs/adr/`
 - 작업 일지: `docs/worklog/<앱 영역>/<날짜>.md` (2026-11-14 부터 앱 영역별 폴더, 형식은 `docs/worklog/README.md`)
@@ -72,6 +72,8 @@ dart tools/gen_api.dart                           # 계약 → packages/pmart_ap
 dart tools/gen_api.dart --only=cart,order         # 일부 서비스만
 flutter pub get                                   # 루트 workspace
 cd apps/customer_app && flutter run --dart-define=PMART_ENV=mock   # 에뮬레이터면 --dart-define=PMART_ANDROID_EMULATOR=true
+# 고객앱 LAN APK(HTTPS 게이트웨이, 사설 CA 는 debug 빌드가 앱에 넣어 믿는다 — pmart_core trustPmartLanRootCa, ADR-0057 T6):
+#   flutter build apk --debug --dart-define=PMART_ENV=local --dart-define=PMART_API_BASE_URL=https://192.168.0.40:8443/api/v1 --dart-define-from-file=.secrets/customer.env
 flutter analyze && flutter test                   # 앱/패키지 디렉터리에서 (packages/pmart_core·pmart_ui, apps/*)
 
 # React (Node 24 / npm 11 확인됨)

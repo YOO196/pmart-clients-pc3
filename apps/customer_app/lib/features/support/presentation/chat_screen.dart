@@ -15,7 +15,7 @@ import '../domain/inquiry.dart' show InquiryOrigin;
 import 'chat_controller.dart';
 import 'inquiry_screens.dart' show InquiryFormArgs;
 
-/// 고객센터 AI 상담. 답변·근거·주문 상태는 서버가 준 문장 그대로 보인다(일반 텍스트).
+/// 고객센터 AI 상담. 답변·주문 상태는 서버가 준 문장 그대로 보인다(일반 텍스트).
 /// AI 상담은 취소·환불을 하지 않는다 — 답하지 못하면 "고객센터에 문의 남기기"로 잇는다.
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -314,6 +314,29 @@ class _TopicSection extends ConsumerWidget {
             _orderPickLabel(l10n, order),
             const ValueKey('chat-topic-order-picked'),
           ),
+          // 고른 뒤 바로 응답한다(사용자 2026-11-16 "주문 고른 뒤 연결이 안 된다") — 고른 주문(서버 값) +
+          // 무엇을 물으면 되는지 + 주문 상세(취소·반품 신청은 거기서, 서버 판정). 질문을 대신 보내지는 않는다.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _Bubble(
+              key: const ValueKey('chat-topic-order-ack'),
+              color: scheme.surfaceContainer,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _OrderCard(order: order),
+                  Text(l10n.chatOrderPickedPrompt),
+                  TextButton(
+                    key: const ValueKey('chat-topic-order-detail'),
+                    onPressed: () => context.push(
+                      '/orders/${Uri.encodeComponent(order.orderId)}',
+                    ),
+                    child: Text(l10n.chatOrderDetail),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
         ],
       ),
@@ -514,8 +537,17 @@ class _Answer extends ConsumerWidget {
                   },
                 ),
           ],
-          if (answer.citations.isNotEmpty)
-            _Citations(citations: answer.citations),
+          // 취소·환불 같은 실행 요청: 답 바로 아래에 최근 주문(누르면 주문 상세) + 주문 내역.
+          if (answer.state == ChatAnswerState.outOfScope) ...[
+            const SizedBox(height: 8),
+            const _ActionOrders(),
+            TextButton(
+              key: const ValueKey('chat-go-orders'),
+              onPressed: () => context.push('/orders'),
+              child: Text(l10n.ordersTitle),
+            ),
+          ],
+          // 근거(citations)는 받더라도 고객에게 보이지 않는다(사용자 2026-11-16 — 개발 단계에서도).
           if (handoff != null) ...[
             const SizedBox(height: 4),
             Text(handoff.message, style: theme.textTheme.bodySmall),
@@ -528,15 +560,59 @@ class _Answer extends ConsumerWidget {
               orderId: handoff.orderId ?? turn.orderId,
             ),
           ],
-          if (answer.state == ChatAnswerState.outOfScope)
-            TextButton(
-              key: const ValueKey('chat-go-orders'),
-              onPressed: () => context.push('/orders'),
-              child: Text(l10n.ordersTitle),
-            ),
         ],
       ),
     );
+  }
+}
+
+/// 취소·환불 같은 실행 요청(`OUT_OF_SCOPE`)의 답 아래: 최근 주문(`GET /customer-assistant/recent-orders`, 최대 5개).
+/// 누르면 그 주문 상세로 간다 — 취소는 거기서(가능 여부는 서버 판정). AI 가 취소하지 않는다(사용자 2026-11-16).
+/// 조회 실패는 실패 + 다시 시도(빈 목록으로 바꾸지 않는다).
+class _ActionOrders extends ConsumerWidget {
+  const _ActionOrders();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return switch (ref.watch(chatRecentOrdersProvider)) {
+      AsyncData(value: final orders) when orders.isEmpty => Text(
+        l10n.chatNoRecentOrders,
+        key: const ValueKey('chat-action-orders-empty'),
+        style: theme.textTheme.bodySmall,
+      ),
+      AsyncData(value: final orders) => Column(
+        key: const ValueKey('chat-action-orders'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(l10n.chatActionOrdersHint, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 6),
+          for (final o in orders)
+            _OrderCard(
+              order: o,
+              onTap: () =>
+                  context.push('/orders/${Uri.encodeComponent(o.orderId)}'),
+            ),
+        ],
+      ),
+      AsyncError() => Row(
+        key: const ValueKey('chat-action-orders-error'),
+        children: [
+          Expanded(
+            child: Text(
+              l10n.chatRecentOrdersFailed,
+              style: TextStyle(color: theme.colorScheme.error),
+            ),
+          ),
+          TextButton(
+            onPressed: () => ref.invalidate(chatRecentOrdersProvider),
+            child: Text(l10n.chatRetry),
+          ),
+        ],
+      ),
+      _ => const LinearProgressIndicator(),
+    };
   }
 }
 
@@ -616,57 +692,6 @@ class _OrderCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// "근거 보기" — 눌러서 펼친다. (말풍선 배경 위라 ExpansionTile 을 쓰지 않는다.)
-class _Citations extends StatefulWidget {
-  const _Citations({required this.citations});
-
-  final List<ChatCitation> citations;
-
-  @override
-  State<_Citations> createState() => _CitationsState();
-}
-
-class _CitationsState extends State<_Citations> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TextButton.icon(
-          key: const ValueKey('chat-citations'),
-          onPressed: () => setState(() => _open = !_open),
-          icon: PmartLineIcon(
-            _open ? PmartLineIcons.chevronUp : PmartLineIcons.chevronDown,
-            size: 14,
-          ),
-          label: Text(l10n.chatCitations),
-        ),
-        if (_open)
-          for (final c in widget.citations)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    c.section == null ? c.title : '${c.title} · ${c.section}',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(c.excerpt, style: theme.textTheme.bodySmall),
-                ],
-              ),
-            ),
-      ],
     );
   }
 }

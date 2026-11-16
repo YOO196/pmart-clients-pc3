@@ -69,10 +69,9 @@ backoffice 194, hr-backoffice 46, web/core 25, web/ui 2, mfc-backoffice 16 — �
 | `backoffice/2026-11-15-backend-cs-rider-menus-done.md` | BR-54~56(끝남)·역할·version 질문 회신 확인 | PC 2 |
 | `backoffice/2026-11-16-backend-pii-reveal-and-pending-done.md` | 반영 확인 | PC 2 |
 | `backoffice/2026-11-16-backend-case-inbox-and-pending-work-done.md` | 질문 3개 — 백엔드 회신 옴(`reply-case-inbox-questions`), 4-1 반영 뒤 닫기 | PC 1 반영 → PC 2 닫기 |
-| `backoffice/2026-11-16-backend-rider-delivery-staff-apis-done.md` | incidentId 질문 — 회신 옴(`reply-rider-delivery-staff-apis`), 빌드 올라감. 닫아도 됨 | PC 2 |
 | `backoffice/2026-11-16-backend-product-menu-operator-admin-done.md` | 반영 확인 | PC 2 |
 | `hr-backoffice/2026-11-16-backend-departments-and-permissions-done.md`, `…-role-list-done.md` | 반영 확인 | PC 2 |
-| `web-common/2026-11-16-backend-session-roles-centers-done.md`, `…-session-center-names-done.md` | 빌드 올리기(§2 표가 최신 해시) | 세션 코드라 PC 1 |
+| (끝남 — 2026-11-16 `archive/`) `2026-11-16-backend-rider-delivery-staff-apis-done.md`, `…-session-roles-centers-done.md`, `…-session-center-names-done.md` | 회신·빌드 올림 확인 | — |
 | `web-common/2026-11-14-backend-logout-propagation.md`, `…-refresh-cookie-silent-login.md` | 로그인 관련 | PC 1 |
 
 ## 6. 규칙·도구

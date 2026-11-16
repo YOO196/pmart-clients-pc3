@@ -22,5 +22,5 @@
 
 ## 3. 확인·빌드·질문
 - typecheck·lint 통과, 테스트 189개(처리 대기 6·사건함 7 새로). 목 모드만 — 실서버 확인은 아직.
-- 빌드: `web-common/2026-11-16-backend-session-roles-centers-done.md` §2 표의 backoffice 해시를 `index-Bw-245hF.js`·`index-axp6BaGl.css` 로 바꿨다(오늘 백오피스 변경 전부).
+- 빌드: `archive/2026-11-16-backend-session-roles-centers-done.md` §2 표의 backoffice 해시를 `index-Bw-245hF.js`·`index-axp6BaGl.css` 로 바꿨다(오늘 백오피스 변경 전부).
 - 질문: (1) 사건 목록 `summary` 가 없을 때 무엇을 보이면 되나(지금 caseId). (2) 오배송 `evidence.system` 에 `backoffice-web` 을 넣었는데 사진 보관 서비스 이름이 따로 있으면 알려 달라. (3) 사가 `reasonCode`(예 `PAYMENT_UNKNOWN`·`RESERVATION_REJECTED`)는 코드 그대로 보이고 있다 — 한국어 이름 표가 있으면 알려 달라.
