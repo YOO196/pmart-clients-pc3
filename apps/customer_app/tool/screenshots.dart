@@ -182,6 +182,11 @@ void main() {
     await t.tap(find.byKey(const ValueKey('delivery-next')));
     await t.pumpAndSettle();
     await shot('cart-stock-shortage');
+    // 테스트 시계는 저절로 흐르지 않아 알림이 다음 캡처까지 남는다 — 지운다.
+    ScaffoldMessenger.of(
+      t.element(find.byType(Scaffold).first),
+    ).clearSnackBars();
+    await t.pumpAndSettle();
     unawaited(router().push('/checkout'));
     await t.pumpAndSettle();
     await shot('order-sheet');

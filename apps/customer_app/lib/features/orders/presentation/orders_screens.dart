@@ -279,7 +279,8 @@ class _OrderBody extends ConsumerWidget {
               ),
             const SizedBox(height: 6),
             Text(
-              l10n.payOrderNumber(o.orderId),
+              l10n.payOrderNumber(o.displayNumber),
+              key: const ValueKey('order-number'),
               style: theme.textTheme.bodySmall,
             ),
           ],
