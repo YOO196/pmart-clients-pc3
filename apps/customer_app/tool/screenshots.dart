@@ -254,6 +254,8 @@ void main() {
     await shot('chat-order-topic');
     await t.tap(find.byKey(const ValueKey('chat-topic-change')));
     await t.pumpAndSettle();
+    // 종류 바꾸기 → 앞 대화는 그대로, 새 선택지는 맨 아래(한 줄 시간순)
+    await shot('chat-topic-change');
     await t.tap(find.byKey(const ValueKey('chat-topic-general')));
     await t.pumpAndSettle();
 

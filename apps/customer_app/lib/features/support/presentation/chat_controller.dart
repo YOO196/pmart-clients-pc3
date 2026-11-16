@@ -120,14 +120,42 @@ class ChatTopicController extends Notifier<ChatTopic?> {
     return null;
   }
 
-  void chooseGeneral() => state = const ChatTopicGeneral();
+  void chooseGeneral() => _settle(const ChatTopicGeneral());
 
   void chooseOrder() => state = const ChatTopicPickingOrder();
 
-  void pickOrder(ChatOrder order) => state = ChatTopicOrder(order);
+  void pickOrder(ChatOrder order) => _settle(ChatTopicOrder(order));
 
   void reset() => state = null;
+
+  /// 정해진 종류는 대화 기록에도 남긴다 — 그때까지의 질문 수 자리에(한 줄 시간순으로 그린다).
+  /// [ChatLoggedTopic.fromChooser] = "주문 건에 대한 문의"를 눌러 고른 주문(답 안의 주문 카드로 고른 것과 구분).
+  void _settle(ChatTopic topic) {
+    ref.read(chatTopicLogProvider.notifier).add((
+      topic: topic,
+      at: ref.read(chatProvider).length,
+      fromChooser: topic is ChatTopicGeneral || state is ChatTopicPickingOrder,
+    ));
+    state = topic;
+  }
 }
+
+/// 대화 중 고른 상담 종류·주문(시간순). [at] = 고를 때까지 있던 질문 수 — 그 질문들 뒤에 그린다.
+/// 지금 고르는 중인 선택지는 기록이 아니라 대화 맨 끝에 그린다. 계정이 바뀌면 비운다.
+typedef ChatLoggedTopic = ({ChatTopic topic, int at, bool fromChooser});
+
+class ChatTopicLog extends Notifier<List<ChatLoggedTopic>> {
+  @override
+  List<ChatLoggedTopic> build() {
+    ref.watch(sessionProvider);
+    return const [];
+  }
+
+  void add(ChatLoggedTopic entry) => state = [...state, entry];
+}
+
+final chatTopicLogProvider =
+    NotifierProvider<ChatTopicLog, List<ChatLoggedTopic>>(ChatTopicLog.new);
 
 final chatTopicProvider = NotifierProvider<ChatTopicController, ChatTopic?>(
   ChatTopicController.new,

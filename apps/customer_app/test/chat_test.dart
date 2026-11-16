@@ -281,7 +281,9 @@ void main() {
       expect(repo.sentOrderIds, [null, 'order-seed-4']);
     });
 
-    testWidgets('취소 같은 실행 요청: 최근 주문 카드 → 누르면 그 주문 상세(AI 는 취소하지 않는다)', (t) async {
+    testWidgets('취소 같은 실행 요청: 최근 주문 카드 → 누르면 그 주문 상세(AI 는 취소하지 않는다)', (
+      t,
+    ) async {
       final repo = mock(MockChatScenario.outOfScope);
       await open(t, repo);
       await ask(t, '주문 취소해 주세요');
@@ -379,6 +381,47 @@ void main() {
       await t.tap(find.byKey(const ValueKey('chat-topic-change')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('chat-topic-order')), findsOneWidget);
+    });
+
+    testWidgets('대화는 한 줄 시간순: 주문 1 → 질문·답 → 종류 바꾸기 → 주문 2 는 앞 대화 아래에 쌓인다', (
+      t,
+    ) async {
+      await open(t, mock(), general: false);
+      double y(Finder f) => t.getTopLeft(f).dy;
+      await t.tap(find.byKey(const ValueKey('chat-topic-order')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('chat-recent-order-seed-4')));
+      await t.pumpAndSettle();
+      await ask(t, '첫 주문 언제 와요?');
+      final firstQuestion = find.text('첫 주문 언제 와요?');
+
+      await t.tap(find.byKey(const ValueKey('chat-topic-change')));
+      await t.pumpAndSettle();
+      // 다시 고르는 버튼은 앞 대화 아래(맨 끝)에 나온다.
+      expect(
+        y(find.byKey(const ValueKey('chat-topic-order')).last),
+        greaterThan(y(firstQuestion)),
+      );
+      await t.tap(find.byKey(const ValueKey('chat-topic-order')).last);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('chat-recent-order-seed-1')).last);
+      await t.pumpAndSettle();
+      await ask(t, '두 번째 주문은요?');
+
+      // 앞에서 고른 주문 1 은 지워지지 않고 그 자리에 남는다.
+      final picks = find.byKey(const ValueKey('chat-topic-order-picked'));
+      expect(picks, findsNWidgets(2));
+      expect(
+        find.descendant(
+          of: picks.first,
+          matching: find.textContaining('order-seed-4'),
+        ),
+        findsOneWidget,
+      );
+      // 순서: 주문 1 고름 < 첫 질문 < 주문 2 고름 < 두 번째 질문
+      expect(y(picks.first), lessThan(y(firstQuestion)));
+      expect(y(firstQuestion), lessThan(y(picks.last)));
+      expect(y(picks.last), lessThan(y(find.text('두 번째 주문은요?'))));
     });
 
     testWidgets('주문을 고른 뒤 "주문 상세 보기" → 그 주문 상세', (t) async {

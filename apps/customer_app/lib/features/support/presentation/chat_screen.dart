@@ -70,6 +70,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final busy = turns.any((t) => t.status == ChatTurnStatus.sending);
     final mock = ref.watch(envProvider) == PmartEnv.mock;
     final topic = ref.watch(chatTopicProvider);
+    final log = ref.watch(chatTopicLogProvider);
     // 종류를 고르기 전(또는 주문을 고르는 중)에는 입력을 막는다.
     final canType = topic is ChatTopicGeneral || topic is ChatTopicOrder;
     ref.listen(chatProvider, (_, _) => _toEnd());
@@ -101,8 +102,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           ),
                         ),
                       const SizedBox(height: 12),
-                      _TopicSection(topic: topic),
-                      for (final t in turns) _Turn(turn: t),
+                      // 한 줄 시간순(사용자 2026-11-16): 고른 종류·주문은 고른 자리에 남고, 질문·답은 그 뒤에,
+                      // 지금 고르는 선택지는 맨 끝에. (전에는 선택 칸이 맨 위 한 자리라 새 선택이 앞 대화보다 위에 나왔다.)
+                      for (var i = 0; i <= turns.length; i++) ...[
+                        for (final e in log)
+                          if (e.at == i)
+                            _TopicSection(
+                              topic: e.topic,
+                              fromChooser: e.fromChooser,
+                            ),
+                        if (i < turns.length) _Turn(turn: turns[i]),
+                      ],
+                      if (topic == null || topic is ChatTopicPickingOrder)
+                        _TopicSection(topic: topic),
                     ],
                   ),
                 ),
@@ -261,9 +273,12 @@ class _Turn extends ConsumerWidget {
 /// 상담 종류 고르기(레퍼런스 2-1·2-4): 처음엔 오른쪽에 "일반 문의"·"주문 건에 대한 문의" 버튼,
 /// 고르면 내 말풍선으로 남는다. 주문 건이면 최근 주문(`GET /customer-assistant/recent-orders`)을 버튼으로 보인다.
 class _TopicSection extends ConsumerWidget {
-  const _TopicSection({required this.topic});
+  const _TopicSection({required this.topic, this.fromChooser = true});
 
   final ChatTopic? topic;
+
+  /// 주문을 "주문 건에 대한 문의"로 골랐는지(아니면 답 안의 주문 카드로 고른 것 — 그 말풍선은 없다).
+  final bool fromChooser;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -309,7 +324,11 @@ class _TopicSection extends ConsumerWidget {
       ChatTopicOrder(:final order) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          mine(l10n.chatTopicOrder, const ValueKey('chat-topic-order-chosen')),
+          if (fromChooser)
+            mine(
+              l10n.chatTopicOrder,
+              const ValueKey('chat-topic-order-chosen'),
+            ),
           mine(
             _orderPickLabel(l10n, order),
             const ValueKey('chat-topic-order-picked'),
