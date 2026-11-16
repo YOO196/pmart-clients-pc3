@@ -1,5 +1,7 @@
 # 인사팀 백오피스 (web/hr-backoffice, React SPA)
 
+담당: **PC 2**(backoffice 영역, 2026-11-16 PC 1 에서 넘김 — 인계서 `docs/operations/backoffice-handover.md`). 로그인·세션·토큰 코드는 PC 1 만 고친다(`docs/operations/pc-split.md` §1).
+
 근거: 백엔드 handoff `2026-11-13-clients-request-hr-backoffice.md`(사용자 결정 2026-11-13 — 별도 앱·SSO), 백엔드 ADR-0056(결정 5·7·8·10), 계약 `hr-service.yaml` 0.1.0·`employee-auth-service.yaml`·`center-master-service.yaml`(`GET /centers`), 흐름 `docs/business/flows/employee-account-provisioning.md`(백엔드). 클라이언트 결정은 ADR-0003.
 
 상태(2026-11-13): 목 서버로 구현·검증 → LAN 배포·실서버 확인 23/23(`docs/handoff/archive/2026-11-13-backend-hr-backoffice-lan-deployed.md`) → **HTTPS 로 옮김(`https://192.168.0.40:8444`, 옛 `http://…:8081` 은 HTTPS 로 넘어간다)**. HTTPS 주소에서의 브라우저 확인과 사람 손 확인은 아직. 요청 권한 기간은 종료일이 없으면 "기한 없음"(정규직 — 백엔드 회신 `clients-reply-hr-backoffice-deployed`).

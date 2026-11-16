@@ -1,5 +1,7 @@
 # 관리자 웹 (web/backoffice, React SPA)
 
+담당: **PC 2**(backoffice 영역, 2026-11-16 PC 1 에서 넘김 — 인계서 `docs/operations/backoffice-handover.md`). 로그인·세션·토큰 코드는 PC 1 만 고친다(`docs/operations/pc-split.md` §1).
+
 근거: `../pmart-backend/docs/business/BackOffice-business-logic.md`(BO, v2.0 **제안**, BO-01~BO-28), ADR-0004, 계약 `backoffice-bff`(base `/api/v1/backoffice`), `approval-service`, `case-service`, `center-master-service`, `audit-service`, `auth-service`.
 BO §7(≈L1492-1510)의 화면은 "업무 동선 제안"이다. 화면을 BO 번호마다 하나씩 만들지 않고 동선별로 묶는다.
 

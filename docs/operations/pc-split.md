@@ -13,7 +13,7 @@
 
 | PC | IP | 백엔드 영역(개발) | 클라이언트(이 저장소) | LAN 에서 돌리는 것 |
 |---|---|---|---|---|
-| **PC 1** | 192.168.0.32 | **platform** — 인증·HR·승인·게이트웨이·라이브러리·배포, 다른 영역 밖의 모든 서비스. **배포·병합 유일 지점** | **customer-app 위주**(사용자 2026-11-13). backoffice·hr-backoffice·web-common 은 PC 2 가 시작하기 전까지 이 PC 가 맡는다. **mfc-backoffice 기반**(앱 뼈대·로그인·센터 고르기·메뉴 자리)도 이 PC(사용자 2026-11-15) — 메뉴 화면을 누가 채울지는 미정. **원본 main 에 넣는 유일한 PC** | 없음(빌드·Claude Code 전용, Docker 미기동) |
+| **PC 1** | 192.168.0.32 | **platform** — 인증·HR·승인·게이트웨이·라이브러리·배포, 다른 영역 밖의 모든 서비스. **배포·병합 유일 지점** | **customer-app 위주**(사용자 2026-11-13) + **로그인·세션·토큰 코드**(모든 앱). backoffice·hr-backoffice·web-common 은 **2026-11-16 PC 2 로 넘겼다**(PC 2 작업 중) — PC 1 은 그 전에 받은 화면 요청 중 남은 것만(`backoffice-handover.md` §4-1). **mfc-backoffice 기반**(앱 뼈대·로그인·센터 고르기·메뉴 자리)도 이 PC(사용자 2026-11-15) — 메뉴 화면을 누가 채울지는 미정. **원본 main 에 넣는 유일한 PC** | 없음(빌드·Claude Code 전용, Docker 미기동) |
 | **PC 2** | 192.168.0.34 | **backoffice**(2026-11-16 PC 1 에서 넘김) — 백엔드 `backoffice-bff`·`case-service` + 클라이언트 웹 | **`web/backoffice`·`web/hr-backoffice`·`web/core`·`web/ui`(로그인·세션·토큰 부분 제외)** — 2026-11-16 넘김. 지금까지 백엔드가 보낸 화면 요청은 PC 1 이 끝까지 하고 PC 2 는 그 뒤부터. 인계서 `docs/operations/backoffice-handover.md` | 커머스 서비스(상품·고객·장바구니·검색·가격·주문·결제 등), Kafka 1 |
 | **PC 3** | 192.168.0.222 | **mfc** — mfc-*-service, MFC 시뮬레이터 연결 | **mfc-app**(사용자 확정 2026-11-13) — `apps/mfc_app` | MFC 서비스 6개, CDC 재고, 검색 색인(ES) |
 | **PC 4** | 192.168.0.40 | 없음. 예정 **rag**(사용자 확정 2026-11-13, 시작 전) — 백엔드만 | 미정(rag 는 클라이언트 영향 거의 없음) | **API 게이트웨이**(`https://192.168.0.40:8443`, 앱용 `http://…:8080`), **백오피스 화면**(`https://192.168.0.40`), **인사팀 백오피스 화면**(`https://192.168.0.40:8444`), auth-service·승인·bff·설정 서버·Eureka·모니터링. 화면 서빙은 backoffice 영역이 PC 2 로 가도 계속 PC 4, 배포는 PC 1 |
