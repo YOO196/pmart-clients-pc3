@@ -524,6 +524,7 @@
   "draftMfcChanged": "주소의 담당 센터가 바뀌었어요. 장바구니와 배송 방식을 다시 확인해 주세요",
   "draftSkuNotSaleable": "지금 살 수 없는 상품이 있어요. 장바구니를 확인해 주세요",
   "draftQuantityLimit": "구매 한도를 넘는 상품이 있어요. 수량을 줄여 주세요",
+  "draftInsufficientStock": "재고가 부족한 상품이 있어요. 장바구니에서 수량을 줄이거나 빼 주세요",
   "draftPriceNotSet": "가격이 정해지지 않은 상품이 있어요. 장바구니를 확인해 주세요",
   "draftWeightUnsplittable": "한 번에 배송할 수 없는 무거운 상품이 있어요",
   "draftConfigRequired": "아직 주문 설정이 끝나지 않았어요. 잠시 후 다시 시도해 주세요",

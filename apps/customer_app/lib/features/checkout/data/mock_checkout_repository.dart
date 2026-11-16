@@ -72,6 +72,10 @@ base class MockCheckoutRepository
   /// 다음 초안 생성을 이 코드로 거절한다(422, MFC_CHANGED 는 409).
   String? rejectNextDraft;
 
+  /// [rejectNextDraft] 에 실을 `details[]`(예: INSUFFICIENT_STOCK — field = sku,
+  /// reason = `requestedQty=2;availableQty=1` 또는 `NOT_HANDLED`, order 0.8.0).
+  List<ProblemDetail> rejectNextDraftDetails = const [];
+
   /// 다음 결제 진입을 이 코드로 거절한다(422, 사가 시작 없음. 예: ACCOUNT_NOT_PURCHASABLE).
   String? rejectNextCheckout;
 
@@ -261,10 +265,13 @@ base class MockCheckoutRepository
     }
     if (rejectNextDraft case final code?) {
       rejectNextDraft = null;
+      final details = rejectNextDraftDetails;
+      rejectNextDraftDetails = const [];
       throw ProblemFailure(
         Problem(
           status: code == CheckoutProblemCode.mfcChanged ? 409 : 422,
           code: code,
+          details: details,
         ),
       );
     }

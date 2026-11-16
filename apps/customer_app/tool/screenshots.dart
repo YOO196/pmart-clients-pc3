@@ -19,7 +19,10 @@ import 'package:customer_app/features/checkout/presentation/checkout_controller.
 import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
 import 'package:customer_app/features/reviews/domain/reviews.dart';
 import 'package:customer_app/features/reviews/presentation/reviews_controller.dart';
-import 'package:pmart_core/pmart_core.dart' show UnknownResultFailure;
+import 'package:customer_app/features/checkout/domain/checkout.dart'
+    show CheckoutProblemCode;
+import 'package:pmart_core/pmart_core.dart'
+    show ProblemDetail, UnknownResultFailure;
 
 import '../test/support/app_harness.dart';
 
@@ -166,6 +169,19 @@ void main() {
     await t.tap(find.byKey(const ValueKey('mode-single')));
     await t.pump();
     await shot('delivery-select-picked');
+    // 주문하기가 재고 부족(422 INSUFFICIENT_STOCK, order 0.8.0)으로 막혀 장바구니로 돌아온 모습.
+    checkout
+      ..rejectNextDraft = CheckoutProblemCode.insufficientStock
+      ..rejectNextDraftDetails = const [
+        ProblemDetail(
+          field: 'E-00000001',
+          reason: 'requestedQty=2;availableQty=1',
+        ),
+        ProblemDetail(field: 'E-00000005', reason: 'NOT_HANDLED'),
+      ];
+    await t.tap(find.byKey(const ValueKey('delivery-next')));
+    await t.pumpAndSettle();
+    await shot('cart-stock-shortage');
     unawaited(router().push('/checkout'));
     await t.pumpAndSettle();
     await shot('order-sheet');
