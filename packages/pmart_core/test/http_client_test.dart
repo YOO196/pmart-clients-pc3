@@ -126,6 +126,34 @@ void main() {
       );
     });
 
+    test('multipart(FormData) 도 같은 키로 다시 보낸다(한 번 쓴 FormData 는 복사본으로)', () async {
+      final adapter = FakeAdapter(
+        (_, i) async => i == 0
+            ? FakeReply.problem(
+                429,
+                problemBody('RATE_LIMITED', status: 429, retryable: true),
+                headers: {'retry-after': '1'},
+              )
+            : const FakeReply(201, body: {'photoId': 'p-1'}),
+      );
+      final key = IdempotencyKey.generate();
+
+      final res = await build(adapter).post<dynamic>(
+        '/review-photos',
+        data: FormData.fromMap({
+          'file': MultipartFile.fromBytes([1, 2, 3], filename: 'a.jpg'),
+        }),
+        options: commandOptions(key),
+      );
+
+      expect(res.statusCode, 201);
+      expect(adapter.requests, hasLength(2));
+      expect(
+        adapter.requests.map((r) => r.headers['Idempotency-Key']).toSet(),
+        {key.value},
+      );
+    });
+
     test('Retry-After 가 상한(30초)보다 길면 기다리지 않고 오류로 넘긴다', () async {
       final adapter = FakeAdapter(
         (_, _) async => FakeReply.problem(

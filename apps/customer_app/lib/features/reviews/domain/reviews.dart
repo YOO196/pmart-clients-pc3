@@ -34,6 +34,7 @@ class ReviewEligibility {
     required this.state,
     this.sku,
     this.productId,
+    this.productName,
     this.deliveredAt,
     this.eligibleUntil,
     this.reviewId,
@@ -43,6 +44,9 @@ class ReviewEligibility {
   final String orderLineId;
   final String? sku;
   final String? productId;
+
+  /// 주문 당시 상품명 사본(review 0.2.0, 없을 수 있다). 없으면 상품 정보를 조회해 보인다.
+  final String? productName;
   final DateTime? deliveredAt;
   final DateTime? eligibleUntil;
   final ReviewState state;
@@ -133,7 +137,7 @@ class ReviewTarget {
         orderId: e.orderId,
         orderLineId: e.orderLineId,
         productId: e.productId,
-        title: title,
+        title: title ?? e.productName,
         eligibleUntil: e.eligibleUntil,
         initialRating: initialRating,
       );
@@ -148,10 +152,41 @@ class ReviewTarget {
   final int? initialRating;
 }
 
-/// 계약 `POST /reviews` 422 코드.
+/// 계약 `POST /reviews`·`POST /review-photos` 422 코드.
 abstract final class ReviewProblemCode {
   static const notEligible = 'NOT_ELIGIBLE';
   static const eligibilityExpired = 'ELIGIBILITY_EXPIRED';
   static const alreadyReviewed = 'ALREADY_REVIEWED';
   static const rewriteAfterDeleteForbidden = 'REWRITE_AFTER_DELETE_FORBIDDEN';
+
+  /// 내가 올린 사진이 아니거나 다른 리뷰에 쓰인 사진(24시간 지나 지워진 사진 포함).
+  static const photoNotFound = 'PHOTO_NOT_FOUND';
+
+  /// 사진 형식(JPEG·PNG·WEBP)·크기(10MB) 거절 — 서버가 파일 내용으로 판정한다.
+  static const photoInvalid = 'PHOTO_INVALID';
+}
+
+/// 계약 사진 한도(review 0.2.0, 사용자 결정): 리뷰당 5장, 장당 10MB. 서버가 다시 검사한다.
+const reviewPhotoMax = 5;
+const reviewPhotoMaxBytes = 10 * 1024 * 1024;
+
+/// 올릴 사진 한 장(기기에 있는 원본). 미리보기는 이 바이트로 그린다(올린 사진은 공개 전에는 서버에서 열리지 않는다).
+@immutable
+class ReviewPhotoFile {
+  const ReviewPhotoFile({required this.name, required this.bytes});
+
+  final String name;
+  final Uint8List bytes;
+
+  @override
+  String toString() => 'ReviewPhotoFile($name, ${bytes.length}B)';
+}
+
+/// 서버에 올라간 사진(`POST /review-photos` 201).
+@immutable
+class UploadedReviewPhoto {
+  const UploadedReviewPhoto({required this.photoId, this.url});
+
+  final String photoId;
+  final String? url;
 }

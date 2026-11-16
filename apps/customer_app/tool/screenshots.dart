@@ -4,6 +4,7 @@
 // 상품 사진은 테스트에서 네트워크를 쓰지 않아 자리표시로 나온다.
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,6 +15,10 @@ import 'package:pmart_ui/pmart_ui.dart';
 import 'package:customer_app/app.dart';
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
+import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
+import 'package:customer_app/features/reviews/domain/reviews.dart';
+import 'package:customer_app/features/reviews/presentation/reviews_controller.dart';
+import 'package:pmart_core/pmart_core.dart' show UnknownResultFailure;
 
 import '../test/support/app_harness.dart';
 
@@ -69,8 +74,35 @@ void main() {
       latency: Duration.zero,
       now: () => now,
     );
+    final reviews = MockReviewsRepository(latency: Duration.zero);
+    // 고른 사진 대신 색 칸 PNG(캡처 전용).
+    final samplePhotos = <ReviewPhotoFile>[];
+    await t.runAsync(() async {
+      for (final (i, c) in const [
+        Color(0xFFB9A7E8),
+        Color(0xFFF2C77B),
+        Color(0xFF9BD3B5),
+      ].indexed) {
+        final rec = ui.PictureRecorder();
+        Canvas(rec)
+          ..drawRect(const Rect.fromLTWH(0, 0, 240, 240), Paint()..color = c)
+          ..drawCircle(
+            const Offset(120, 130),
+            60,
+            Paint()..color = Colors.white.withValues(alpha: 0.7),
+          );
+        final img = await rec.endRecording().toImage(240, 240);
+        final png = await img.toByteData(format: ui.ImageByteFormat.png);
+        samplePhotos.add(
+          ReviewPhotoFile(name: 'p$i.png', bytes: png!.buffer.asUint8List()),
+        );
+      }
+    });
     await t.pumpWidget(
-      testApp(checkout: checkout, [
+      testApp(checkout: checkout, reviews: reviews, [
+        reviewPhotoPickerProvider.overrideWithValue(
+          (_, max) async => samplePhotos.take(max).toList(),
+        ),
         clockProvider.overrideWithValue(() => now),
         draftPollPolicyProvider.overrideWithValue((
           interval: Duration.zero,
@@ -159,6 +191,32 @@ void main() {
     await shot('order-detail-2');
     await go('/reviews');
     await shot('reviews');
+    // 리뷰 쓰기 + 사진(review 0.2.0). 첫 사진은 결과 불명 → 다시 올리기.
+    reviews.uploadFailures.add(const UnknownResultFailure(httpStatus: 503));
+    await t.tap(find.byKey(const ValueKey('review-quick-star-ol-1-5')));
+    await t.pumpAndSettle();
+    await shot('review-write');
+    await t.tap(find.byKey(const ValueKey('review-photo-add')));
+    await t.pumpAndSettle();
+    await shot('review-photo-sheet');
+    await t.tap(find.byKey(const ValueKey('review-photo-gallery')));
+    await t.pumpAndSettle();
+    await t.runAsync(() => Future<void>.delayed(Duration.zero));
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const ValueKey('review-photo-add')));
+    // 사진 미리보기(Image.memory) 디코딩은 실제 시간이 걸린다.
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    await t.pumpAndSettle();
+    await shot('review-write-photos');
+    await t.tap(find.byKey(const ValueKey('review-photo-retry-0')));
+    await t.pumpAndSettle();
+    await t.runAsync(() => Future<void>.delayed(Duration.zero));
+    await t.pumpAndSettle();
+    await shot('review-write-photos-ok');
+    await t.tap(find.byKey(const ValueKey('review-close')));
+    await t.pumpAndSettle();
     await go('/addresses/new');
     await shot('address-new');
     await go('/notifications/settings');

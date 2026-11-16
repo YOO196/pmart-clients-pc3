@@ -6,7 +6,7 @@ import 'package:pmart_core/pmart_core.dart';
 import '../domain/reviews.dart';
 import 'reviews_repository.dart';
 
-/// 목 리뷰(review-service 미구현 동안 목 모드 전용). 데이터는 계약 JSON(`Eligibility`·`Review`)으로 두고
+/// 목 리뷰(목 모드 전용). 데이터는 계약 JSON(`Eligibility`·`Review`·`ReviewPhoto`)으로 두고
 /// 생성 모델로 읽는다. 주문·상품 참조는 주문 목(`order-seed-*`)·상품 목(`P-000*`)에 맞춘다.
 final class MockReviewsRepository implements ReviewsRepository {
   MockReviewsRepository({
@@ -39,8 +39,24 @@ final class MockReviewsRepository implements ReviewsRepository {
   /// 다음 상품 리뷰 조회에서 던질 실패.
   final productFailures = Queue<PmartFailure>();
 
+  /// 다음 사진 올리기에서 던질 실패(앞에서부터 하나씩).
+  final uploadFailures = Queue<PmartFailure>();
+
   final createKeys = <String>[];
-  final createBodies = <({String orderLineId, int rating, String? text})>[];
+  final createBodies =
+      <
+        ({
+          String orderLineId,
+          int rating,
+          String? text,
+          List<String> photoIds,
+        })
+      >[];
+  final uploadKeys = <String>[];
+
+  /// 올린 사진 photoId → 붙은 리뷰(아직 안 붙었으면 null).
+  final uploadedPhotos = <String, String?>{};
+  final _photoByKey = <String, String>{};
   final eligibilityQueries = <({String? orderId, ReviewState? state})>[];
   final productCursors = <String?>[];
   int calls = 0;
@@ -56,6 +72,7 @@ final class MockReviewsRepository implements ReviewsRepository {
       'orderLineId': 'ol-1',
       'sku': 'E-00000001',
       'productId': 'P-0001',
+      'productName': '서울우유 1L',
       'deliveredAt': '2026-10-24T02:30:00Z',
       'eligibleUntil': '2026-11-07T02:30:00Z',
       'state': 'REV_ELIGIBLE',
@@ -137,18 +154,56 @@ final class MockReviewsRepository implements ReviewsRepository {
     required String orderLineId,
     required int rating,
     String? text,
+    List<String> photoIds = const [],
     required IdempotencyKey key,
   }) async {
     calls++;
     await _wait();
     createKeys.add(key.value);
-    createBodies.add((orderLineId: orderLineId, rating: rating, text: text));
+    createBodies.add((
+      orderLineId: orderLineId,
+      rating: rating,
+      text: text,
+      photoIds: photoIds,
+    ));
     if (createFailures.isNotEmpty) {
       final f = createFailures.removeFirst();
-      if (createFailureApplies) _apply(orderLineId, rating, text, key);
+      if (createFailureApplies) {
+        _apply(orderLineId, rating, text, photoIds, key);
+      }
       throw f;
     }
-    return _apply(orderLineId, rating, text, key);
+    return _apply(orderLineId, rating, text, photoIds, key);
+  }
+
+  @override
+  Future<UploadedReviewPhoto> uploadPhoto(
+    ReviewPhotoFile photo, {
+    required IdempotencyKey key,
+  }) async {
+    calls++;
+    await _wait();
+    uploadKeys.add(key.value);
+    if (uploadFailures.isNotEmpty) throw uploadFailures.removeFirst();
+    if (_photoByKey[key.value] case final id?) {
+      return UploadedReviewPhoto(photoId: id, url: '/api/v1/review-photos/$id');
+    }
+    if (photo.bytes.isEmpty || photo.bytes.length > reviewPhotoMaxBytes) {
+      throw const ProblemFailure(
+        Problem(status: 422, code: ReviewProblemCode.photoInvalid),
+      );
+    }
+    final id = 'rph-${++_seq}';
+    _photoByKey[key.value] = id;
+    uploadedPhotos[id] = null;
+    final body = api.ReviewPhoto.fromJson({
+      'photoId': id,
+      'url': '/api/v1/review-photos/$id',
+      'contentType': 'image/jpeg',
+      'sizeBytes': photo.bytes.length,
+      'uploadedAt': '2026-11-16T03:00:00Z',
+    });
+    return UploadedReviewPhoto(photoId: body.photoId, url: body.url);
   }
 
   /// 서버 판정을 흉내 낸다. 같은 키 재전송은 처음 만든 리뷰를 그대로 준다.
@@ -156,9 +211,18 @@ final class MockReviewsRepository implements ReviewsRepository {
     String orderLineId,
     int rating,
     String? text,
+    List<String> photoIds,
     IdempotencyKey key,
   ) {
     if (_byKey[key.value] case final id?) return _view(id);
+    // 내가 올렸고 아직 어느 리뷰에도 안 붙은 사진만(계약 PHOTO_NOT_FOUND).
+    if (photoIds.any(
+      (p) => !uploadedPhotos.containsKey(p) || uploadedPhotos[p] != null,
+    )) {
+      throw const ProblemFailure(
+        Problem(status: 422, code: ReviewProblemCode.photoNotFound),
+      );
+    }
     final e = eligibilityJson
         .where((e) => e['orderLineId'] == orderLineId)
         .firstOrNull;
@@ -194,6 +258,10 @@ final class MockReviewsRepository implements ReviewsRepository {
       'authorMasked': '김**',
       'rating': rating,
       'text': ?text,
+      'photos': [
+        for (final p in photoIds)
+          {'photoId': p, 'url': '/api/v1/review-photos/$p'},
+      ],
       'state': 'PUBLISHED',
       'version': 1,
       'createdAt': '2026-11-04T03:00:00Z',
@@ -201,6 +269,9 @@ final class MockReviewsRepository implements ReviewsRepository {
     });
     e['state'] = 'PUBLISHED';
     e['reviewId'] = id;
+    for (final p in photoIds) {
+      uploadedPhotos[p] = id;
+    }
     _byKey[key.value] = id;
     return _view(id);
   }

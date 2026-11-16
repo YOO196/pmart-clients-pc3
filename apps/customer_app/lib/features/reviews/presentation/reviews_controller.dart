@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart';
@@ -14,10 +15,136 @@ import '../domain/reviews.dart';
 final reviewsRepositoryProvider = Provider<ReviewsRepository>(
   (ref) => switch (ref.watch(envProvider)) {
     PmartEnv.mock => MockReviewsRepository(),
-    // review-service 는 아직 백엔드에 구현·게이트웨이 경로가 없다(2026-11-04). 호출은 실패하고 화면은 실패 상태를 보인다.
+    // review-service 0.2.0 — 2026-11-16 LAN 배포.
     PmartEnv.local => ApiReviewsRepository(ref.watch(dioProvider)),
   },
 );
+
+/// 사진 고르는 곳. [ReviewPhotoSource.camera] 는 한 장, 사진첩은 [max] 장까지. 고르지 않으면 빈 목록.
+typedef ReviewPhotoPicker =
+    Future<List<ReviewPhotoFile>> Function(ReviewPhotoSource source, int max);
+
+enum ReviewPhotoSource { gallery, camera }
+
+/// 기기 사진첩·카메라(image_picker). 시험은 이 provider 를 바꿔 끼운다.
+final reviewPhotoPickerProvider = Provider<ReviewPhotoPicker>(
+  (_) => (source, max) async {
+    final picker = ImagePicker();
+    // 긴 변 2,048px·품질 85 로 줄여 계약 한도(장당 10MB) 안에 들게 한다. 한도 판정은 서버가 다시 한다.
+    final files = switch (source) {
+      ReviewPhotoSource.camera => [
+        ?await picker.pickImage(
+          source: ImageSource.camera,
+          maxWidth: 2048,
+          maxHeight: 2048,
+          imageQuality: 85,
+        ),
+      ],
+      ReviewPhotoSource.gallery =>
+        max <= 1
+            ? [
+                ?await picker.pickImage(
+                  source: ImageSource.gallery,
+                  maxWidth: 2048,
+                  maxHeight: 2048,
+                  imageQuality: 85,
+                ),
+              ]
+            : await picker.pickMultiImage(
+                limit: max,
+                maxWidth: 2048,
+                maxHeight: 2048,
+                imageQuality: 85,
+              ),
+    };
+    return [
+      for (final f in files.take(max))
+        ReviewPhotoFile(name: f.name, bytes: await f.readAsBytes()),
+    ];
+  },
+);
+
+/// 작성 화면의 사진 한 칸. 고르면 바로 올린다(칸마다 자기 멱등 키).
+enum ReviewPhotoStatus {
+  /// 올리는 중.
+  uploading,
+
+  /// 서버가 photoId 를 줬다.
+  uploaded,
+
+  /// 결과를 모른다(시간 초과·연결 끊김 등) — "다시 올리기"는 같은 키로(같은 photoId).
+  unknown,
+
+  /// 서버가 거절했다(형식·크기 등) — 빼야 한다.
+  rejected,
+}
+
+@immutable
+class ReviewPhotoSlot {
+  const ReviewPhotoSlot({
+    required this.file,
+    required this.key,
+    required this.status,
+    this.photoId,
+    this.code,
+  });
+
+  ReviewPhotoSlot.picked(ReviewPhotoFile file)
+    : this(
+        file: file,
+        key: IdempotencyKey.generate(),
+        status: ReviewPhotoStatus.uploading,
+      );
+
+  final ReviewPhotoFile file;
+  final IdempotencyKey key;
+  final ReviewPhotoStatus status;
+  final String? photoId;
+
+  /// 거절 코드(Problem code).
+  final String? code;
+
+  ReviewPhotoSlot copyWith({
+    required ReviewPhotoStatus status,
+    String? photoId,
+    String? code,
+  }) => ReviewPhotoSlot(
+    file: file,
+    key: key,
+    status: status,
+    photoId: photoId,
+    code: code,
+  );
+}
+
+/// 사진 한 칸을 올린다. 결과는 칸 상태로만 돌려준다(던지지 않는다).
+/// 장당 한도를 넘는 파일은 보내지 않고 거절로 둔다(서버도 같은 한도로 다시 검사한다).
+Future<ReviewPhotoSlot> uploadReviewPhoto(
+  ReviewsRepository repo,
+  ReviewPhotoSlot slot,
+) async {
+  if (slot.file.bytes.length > reviewPhotoMaxBytes) {
+    return slot.copyWith(
+      status: ReviewPhotoStatus.rejected,
+      code: ReviewProblemCode.photoInvalid,
+    );
+  }
+  try {
+    final p = await repo.uploadPhoto(slot.file, key: slot.key);
+    return slot.copyWith(status: ReviewPhotoStatus.uploaded, photoId: p.photoId);
+  } on ProblemFailure catch (f) {
+    // 5xx Problem 은 결과 불명(같은 키로 다시), 4xx 는 거절.
+    if (f.problem.status >= 500 || f.problem.retryable) {
+      return slot.copyWith(status: ReviewPhotoStatus.unknown);
+    }
+    return slot.copyWith(
+      status: ReviewPhotoStatus.rejected,
+      code: f.problem.code,
+    );
+  } on PmartFailure {
+    return slot.copyWith(status: ReviewPhotoStatus.unknown);
+  }
+}
 
 /// 누적 페이지. 다음 묶음 실패는 받은 목록을 지우지 않고 [loadMoreFailure] 로만 보인다.
 @immutable
@@ -220,7 +347,7 @@ class ReviewSubmitter {
   final ReviewTarget target;
 
   IdempotencyKey? _key;
-  ({int rating, String? text})? _body;
+  ({int rating, String? text, List<String> photoIds})? _body;
 
   /// 결과를 모르는 채 보관 중인 요청이 있다(입력을 바꾸면 안 된다).
   bool get pending => _key != null;
@@ -228,14 +355,16 @@ class ReviewSubmitter {
   Future<CommandOutcome<ReviewView>> submit({
     required int rating,
     String? text,
+    List<String> photoIds = const [],
   }) async {
-    final body = _body ??= (rating: rating, text: text);
+    final body = _body ??= (rating: rating, text: text, photoIds: photoIds);
     final key = _key ??= IdempotencyKey.generate();
     try {
       final review = await _repo.create(
         orderLineId: target.orderLineId,
         rating: body.rating,
         text: body.text,
+        photoIds: body.photoIds,
         key: key,
       );
       _clear();

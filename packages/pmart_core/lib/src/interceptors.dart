@@ -142,7 +142,7 @@ final class PmartAuthInterceptor extends Interceptor {
 
     options.extra[PmartExtra.retriedAfterRefresh] = true;
     try {
-      handler.resolve(await dio.fetch<dynamic>(options));
+      handler.resolve(await dio.fetch<dynamic>(resendable(options)));
     } on DioException catch (e) {
       handler.next(e);
     }
@@ -218,7 +218,7 @@ final class PmartRetryInterceptor extends Interceptor {
     await _delay(wait);
     options.extra[PmartExtra.attempt] = attempt + 1;
     try {
-      handler.resolve(await dio.fetch<dynamic>(options));
+      handler.resolve(await dio.fetch<dynamic>(resendable(options)));
     } on DioException catch (e) {
       handler.next(e);
     }
@@ -253,6 +253,14 @@ final class PmartRetryInterceptor extends Interceptor {
   }
 
   Duration _backoff(int attempt) => baseBackoff * (1 << attempt);
+}
+
+/// 같은 요청을 다시 보낼 수 있게 한다. multipart(`FormData`)는 한 번 보내면 다시 쓸 수 없어 복사본을 싣는다
+/// (리뷰 사진 올리기 — 토큰 갱신 뒤·429 재전송, 같은 멱등 키).
+RequestOptions resendable(RequestOptions options) {
+  final data = options.data;
+  if (data is FormData) options.data = data.clone();
+  return options;
 }
 
 /// `Retry-After`: 초(delta-seconds) 또는 HTTP-date.

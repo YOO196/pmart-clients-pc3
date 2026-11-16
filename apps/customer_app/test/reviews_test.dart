@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart' show DioExceptionType;
 import 'package:flutter/material.dart';
@@ -110,6 +111,89 @@ void main() {
       expect(adapter.requests[1].uri.queryParameters['cursor'], 'c2');
     });
 
+    test('사진 올리기는 POST /review-photos multipart(file)·멱등 키, 작성에 photoIds', () async {
+      final key = IdempotencyKey.generate();
+      final api = repo(
+        (i) => i == 0
+            ? const FakeReply(
+                201,
+                body: {
+                  'photoId': 'rph-1',
+                  'url': '/api/v1/review-photos/rph-1',
+                  'contentType': 'image/jpeg',
+                  'sizeBytes': 3,
+                  'uploadedAt': '2026-11-16T03:00:00Z',
+                },
+              )
+            : const FakeReply(
+                201,
+                body: {
+                  'reviewId': 'rv-1',
+                  'productId': 'P-0001',
+                  'rating': 5,
+                  'state': 'PUBLISHED',
+                  'createdAt': '2026-11-16T03:00:00Z',
+                  'photos': [
+                    {'photoId': 'rph-1', 'url': '/api/v1/review-photos/rph-1'},
+                  ],
+                },
+              ),
+      );
+      final photo = await api.uploadPhoto(
+        ReviewPhotoFile(name: 'a.jpg', bytes: Uint8List.fromList([1, 2, 3])),
+        key: key,
+      );
+      expect(photo.photoId, 'rph-1');
+      final up = adapter.requests[0];
+      expect(up.method, 'POST');
+      expect(up.uri.path, '/api/v1/review-photos');
+      expect(up.headers['Idempotency-Key'], key.value);
+      expect(up.headers['X-Source-System'], sourceSystem);
+      expect(up.headers['content-type'], contains('multipart/form-data'));
+
+      final r = await api.create(
+        orderLineId: 'ol-1',
+        rating: 5,
+        photoIds: const ['rph-1'],
+        key: IdempotencyKey.generate(),
+      );
+      expect(jsonDecode(adapter.requests[1].data as String), {
+        'orderLineId': 'ol-1',
+        'rating': 5,
+        'photoIds': ['rph-1'],
+      });
+      expect(r.photoUrls, ['/api/v1/review-photos/rph-1']);
+    });
+
+    test('자격의 productName 을 쓴다(빈 값은 없음으로)', () async {
+      final api = repo(
+        (_) => const FakeReply(
+          200,
+          body: {
+            'items': [
+              {
+                'orderId': 'o-1',
+                'orderLineId': 'ol-1',
+                'productName': '서울우유 1L',
+                'state': 'REV_ELIGIBLE',
+              },
+              {
+                'orderId': 'o-1',
+                'orderLineId': 'ol-2',
+                'productName': ' ',
+                'state': 'REV_ELIGIBLE',
+              },
+            ],
+            'page': {'nextCursor': null},
+          },
+        ),
+      );
+      final items = (await api.eligibilities()).items;
+      expect(items[0].productName, '서울우유 1L');
+      expect(ReviewTarget.of(items[0]).title, '서울우유 1L');
+      expect(items[1].productName, isNull);
+    });
+
     test('경로가 없으면(게이트웨이 404) 빈 목록이 아니라 실패로 던진다', () async {
       final api = repo((_) => const FakeReply(404, body: {'error': 'x'}));
       await expectLater(
@@ -170,6 +254,53 @@ void main() {
     });
   });
 
+  group('사진 한 칸 올리기(uploadReviewPhoto)', () {
+    final file = ReviewPhotoFile(
+      name: 'a.jpg',
+      bytes: Uint8List.fromList([1, 2, 3]),
+    );
+
+    test('올라가면 photoId, 결과 불명은 같은 키로 다시 → 같은 photoId', () async {
+      final repo = MockReviewsRepository(latency: Duration.zero)
+        ..uploadFailures.add(unknown);
+      final slot = ReviewPhotoSlot.picked(file);
+      final first = await uploadReviewPhoto(repo, slot);
+      expect(first.status, ReviewPhotoStatus.unknown);
+      final again = await uploadReviewPhoto(
+        repo,
+        first.copyWith(status: ReviewPhotoStatus.uploading),
+      );
+      expect(again.status, ReviewPhotoStatus.uploaded);
+      expect(again.photoId, isNotNull);
+      expect(repo.uploadKeys, [slot.key.value, slot.key.value]);
+      final third = await uploadReviewPhoto(repo, again);
+      expect(third.photoId, again.photoId, reason: '같은 키 = 같은 사진');
+    });
+
+    test('서버 거절(PHOTO_INVALID)은 거절 — 다시 올리지 않고 빼야 한다', () async {
+      final repo = MockReviewsRepository(latency: Duration.zero)
+        ..uploadFailures.add(
+          const ProblemFailure(
+            Problem(status: 422, code: ReviewProblemCode.photoInvalid),
+          ),
+        );
+      final r = await uploadReviewPhoto(repo, ReviewPhotoSlot.picked(file));
+      expect(r.status, ReviewPhotoStatus.rejected);
+      expect(r.code, ReviewProblemCode.photoInvalid);
+    });
+
+    test('10MB 넘는 파일은 보내지 않고 거절로 둔다', () async {
+      final repo = MockReviewsRepository(latency: Duration.zero);
+      final big = ReviewPhotoFile(
+        name: 'big.jpg',
+        bytes: Uint8List(reviewPhotoMaxBytes + 1),
+      );
+      final r = await uploadReviewPhoto(repo, ReviewPhotoSlot.picked(big));
+      expect(r.status, ReviewPhotoStatus.rejected);
+      expect(repo.uploadKeys, isEmpty);
+    });
+  });
+
   group('화면', () {
     Future<void> bigScreen(WidgetTester t) async {
       t.view
@@ -223,7 +354,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('review-writable-ol-3')), findsNothing);
-      expect(find.text('서울우유 1L'), findsOneWidget); // 상품 정보 조회로 이름
+      expect(find.text('서울우유 1L'), findsOneWidget); // 자격의 productName(0.2.0)
       final deadline = t.widget<Text>(
         find.byKey(const ValueKey('review-deadline-ol-1')),
       );
@@ -236,18 +367,16 @@ void main() {
       await openManage(t, repo);
       await t.tap(find.byKey(const ValueKey('review-quick-star-ol-1-4')));
       await t.pumpAndSettle();
-      // 별 4개가 미리 골라져 있다. 사진 첨부는 없다(BR-07).
+      // 별 4개가 미리 골라져 있다. 사진 칸은 "사진 0/5".
       expect(find.byIcon(Icons.star), findsNWidgets(4));
-      expect(find.byIcon(Icons.photo_camera), findsNothing);
+      expect(find.text('사진 0/5'), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('review-text')), '신선해요');
       await t.tap(find.byKey(const ValueKey('review-submit')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('review-result-done')), findsOneWidget);
-      expect(repo.createBodies.single, (
-        orderLineId: 'ol-1',
-        rating: 4,
-        text: '신선해요',
-      ));
+      final body = repo.createBodies.single;
+      expect((body.orderLineId, body.rating, body.text), ('ol-1', 4, '신선해요'));
+      expect(body.photoIds, isEmpty);
 
       await t.tap(find.byKey(const ValueKey('review-result-ok')));
       await t.pumpAndSettle();
@@ -259,6 +388,99 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('신선해요'), findsOneWidget);
       expect(find.text('꾸덕하고 맛있어요. 다음에도 살게요.'), findsOneWidget);
+    });
+
+    testWidgets('사진: 못 올린 사진이 있으면 등록을 막고 다시 올리기·빼기를 묻는다 → 다 올라가면 photoIds 로 등록', (
+      t,
+    ) async {
+      final repo = MockReviewsRepository(latency: Duration.zero)
+        ..uploadFailures.addAll([
+          unknown,
+          const ProblemFailure(
+            Problem(status: 422, code: ReviewProblemCode.photoInvalid),
+          ),
+        ]);
+      final picks = <(ReviewPhotoSource, int)>[];
+      await bigScreen(t);
+      await t.pumpWidget(
+        testApp([
+          reviewPhotoPickerProvider.overrideWithValue((source, max) async {
+            picks.add((source, max));
+            return [
+              for (var i = 0; i < 3; i++)
+                ReviewPhotoFile(
+                  name: 'p$i.jpg',
+                  bytes: Uint8List.fromList([i, 1, 2]),
+                ),
+            ];
+          }),
+        ], reviews: repo),
+      );
+      await t.pumpAndSettle();
+      await t.tap(find.text('마이페이지').last);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('my-login')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('login-kakao')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('my-reviews')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('review-quick-star-ol-1-5')));
+      await t.pumpAndSettle();
+
+      await t.tap(find.byKey(const ValueKey('review-photo-add')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('review-photo-gallery')));
+      await t.pumpAndSettle();
+      expect(picks.single, (ReviewPhotoSource.gallery, 5));
+      expect(find.text('사진 3/5'), findsOneWidget);
+      // 0번 결과 불명(다시 올리기), 1번 거절(빼기만), 2번 올라감.
+      expect(find.byKey(const ValueKey('review-photo-retry-0')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('review-photo-rejected-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('review-photo-needs-action')),
+        findsOneWidget,
+      );
+      FilledButton submit() =>
+          t.widget<FilledButton>(find.byKey(const ValueKey('review-submit')));
+      expect(submit().onPressed, isNull, reason: '올라간 사진만 몰래 보내지 않는다');
+
+      await t.tap(find.byKey(const ValueKey('review-photo-retry-0')));
+      await t.pumpAndSettle();
+      expect(repo.uploadKeys[0], repo.uploadKeys[3], reason: '다시 올리기는 같은 키');
+      expect(submit().onPressed, isNull);
+
+      await t.tap(find.byKey(const ValueKey('review-photo-remove-1')));
+      await t.pumpAndSettle();
+      expect(find.text('사진 2/5'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('review-photo-needs-action')),
+        findsNothing,
+      );
+      expect(submit().onPressed, isNotNull);
+
+      await t.tap(find.byKey(const ValueKey('review-submit')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('review-result-done')), findsOneWidget);
+      expect(repo.createBodies.single.photoIds, hasLength(2));
+      expect(
+        repo.createBodies.single.photoIds.toSet(),
+        {
+          for (final MapEntry(:key, :value) in repo.uploadedPhotos.entries)
+            if (value != null) key,
+        },
+      );
+
+      // 내가 쓴 리뷰에 사진 칸이 보인다(목은 상대 경로라 자리표시).
+      await t.tap(find.byKey(const ValueKey('review-result-ok')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('review-tab-mine')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('review-photo-rv-new-3-0')), findsOne);
+      expect(find.byKey(const ValueKey('review-photo-rv-new-3-1')), findsOne);
     });
 
     testWidgets('결과 불명: 확인 중 + 입력 잠금, 다시 확인은 같은 키', (t) async {

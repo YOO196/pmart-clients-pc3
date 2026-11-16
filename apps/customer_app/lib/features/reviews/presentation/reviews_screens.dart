@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/providers.dart' show imageOriginProvider, resolveImageUrl;
 import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../auth/domain/auth.dart';
@@ -210,6 +213,7 @@ class _WritableCard extends ConsumerWidget {
                     children: [
                       _ProductName(
                         productId: e.productId,
+                        title: e.productName,
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w600,
@@ -325,6 +329,7 @@ class _MyReviewCard extends ConsumerWidget {
           children: [
             _ProductName(
               productId: eligibility.productId,
+              title: eligibility.productName,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
@@ -351,6 +356,7 @@ class _MyReviewCard extends ConsumerWidget {
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(t),
                     ),
+                  _ReviewPhotos(review: r),
                 ],
               ),
               AsyncError() => Row(
@@ -377,7 +383,9 @@ class _MyReviewCard extends ConsumerWidget {
   }
 }
 
-/// SCR-REVIEW-EDIT-001(작성). 별점 → 본문(계약 최대 1,000자). 사진은 업로드 API 가 없어(BR-07) 받지 않는다.
+/// SCR-REVIEW-EDIT-001(작성). 별점 → 본문(계약 최대 1,000자) → 사진(리뷰당 5장, review 0.2.0).
+/// 사진은 고르면 바로 한 장씩 올린다(칸마다 자기 키). 못 올린 사진이 있으면 등록을 막고 다시 올리기·빼기를 묻는다
+/// — 올라간 사진만 몰래 보내지 않는다(백엔드 알림 2026-11-16 review-service §3). 사진 실패와 리뷰 등록 실패는 따로 보인다.
 /// 등록 결과는 서버 응답으로만 보인다: 등록됨 / 거절(코드별 안내) / 확인 중(같은 키로만 다시 확인).
 class ReviewWriteScreen extends ConsumerStatefulWidget {
   const ReviewWriteScreen({super.key, required this.target});
@@ -397,6 +405,8 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen> {
   late int? _rating = widget.target.initialRating;
   bool _busy = false;
   CommandOutcome<ReviewView>? _outcome;
+  List<ReviewPhotoSlot> _photos = const [];
+  bool _pickFailed = false;
 
   @override
   void dispose() {
@@ -404,14 +414,91 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen> {
     super.dispose();
   }
 
+  bool get _photosReady =>
+      _photos.every((p) => p.status == ReviewPhotoStatus.uploaded);
+
+  Future<void> _addPhotos() async {
+    final l10n = AppLocalizations.of(context);
+    final source = await showModalBottomSheet<ReviewPhotoSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              key: const ValueKey('review-photo-gallery'),
+              title: Text(l10n.reviewPhotoFromGallery),
+              onTap: () => Navigator.pop(context, ReviewPhotoSource.gallery),
+            ),
+            ListTile(
+              key: const ValueKey('review-photo-camera'),
+              title: Text(l10n.reviewPhotoFromCamera),
+              onTap: () => Navigator.pop(context, ReviewPhotoSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+    final room = reviewPhotoMax - _photos.length;
+    if (room <= 0) return;
+    final List<ReviewPhotoFile> files;
+    try {
+      files = await ref.read(reviewPhotoPickerProvider)(source, room);
+    } on Object {
+      // 권한 거절 등. 파일 내용·경로는 남기지 않는다.
+      if (mounted) setState(() => _pickFailed = true);
+      return;
+    }
+    if (!mounted || files.isEmpty) return;
+    final added = [for (final f in files.take(room)) ReviewPhotoSlot.picked(f)];
+    setState(() {
+      _pickFailed = false;
+      _photos = [..._photos, ...added];
+    });
+    for (final slot in added) {
+      unawaited(_upload(slot));
+    }
+  }
+
+  Future<void> _upload(ReviewPhotoSlot slot) async {
+    final result = await uploadReviewPhoto(
+      ref.read(reviewsRepositoryProvider),
+      slot,
+    );
+    if (!mounted) return;
+    setState(() {
+      _photos = [
+        for (final p in _photos) identical(p, slot) ? result : p,
+      ];
+    });
+  }
+
+  /// 결과를 모르는 사진은 같은 키로 다시 올린다(서버가 같은 photoId 를 준다).
+  void _retryPhoto(ReviewPhotoSlot slot) {
+    final again = slot.copyWith(status: ReviewPhotoStatus.uploading);
+    setState(() {
+      _photos = [for (final p in _photos) identical(p, slot) ? again : p];
+    });
+    unawaited(_upload(again));
+  }
+
+  void _removePhoto(ReviewPhotoSlot slot) => setState(() {
+    _photos = [
+      for (final p in _photos)
+        if (!identical(p, slot)) p,
+    ];
+  });
+
   Future<void> _submit() async {
     final rating = _rating;
-    if (rating == null || _busy) return;
+    if (rating == null || _busy || !_photosReady) return;
     setState(() => _busy = true);
     final text = _text.text.trim();
     final outcome = await _submitter.submit(
       rating: rating,
       text: text.isEmpty ? null : text,
+      photoIds: [for (final p in _photos) ?p.photoId],
     );
     if (!mounted) return;
     if (outcome is CommandDone<ReviewView>) {
@@ -428,6 +515,7 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen> {
     ReviewProblemCode.eligibilityExpired => l10n.reviewRejectedExpired,
     ReviewProblemCode.alreadyReviewed => l10n.reviewRejectedAlready,
     ReviewProblemCode.rewriteAfterDeleteForbidden => l10n.reviewRejectedDeleted,
+    ReviewProblemCode.photoNotFound => l10n.reviewRejectedPhotoNotFound,
     _ => l10n.reviewRejected,
   };
 
@@ -530,7 +618,45 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen> {
               border: const OutlineInputBorder(),
             ),
           ),
-          Text(l10n.reviewPhotoNotReady, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 4),
+          _PhotoRow(
+            photos: _photos,
+            locked: locked,
+            onAdd: _addPhotos,
+            onRetry: _retryPhoto,
+            onRemove: _removePhoto,
+          ),
+          if (_pickFailed)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                l10n.reviewPhotoPickFailed,
+                key: const ValueKey('review-photo-pick-failed'),
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+            ),
+          if (_photos.any(
+            (p) =>
+                p.status == ReviewPhotoStatus.unknown ||
+                p.status == ReviewPhotoStatus.rejected,
+          ))
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                l10n.reviewPhotoNeedsAction,
+                key: const ValueKey('review-photo-needs-action'),
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+            )
+          else if (_photos.any((p) => p.status == ReviewPhotoStatus.uploading))
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                l10n.reviewPhotoUploading,
+                key: const ValueKey('review-photo-uploading'),
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
           const SizedBox(height: 16),
           // 정책 문구: Commerce 업무 문서 15장 [확정 정책](품목당 1건, 배송완료 후 14일, 최초 등록 후 3일 수정, 삭제 후 재작성 불가).
           ExpansionTile(
@@ -589,13 +715,275 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen> {
                 child: FilledButton(
                   key: const ValueKey('review-submit'),
                   // 확인 중에는 새 등록을 막는다("다시 확인"만 같은 키로 보낸다).
-                  onPressed: locked || _rating == null ? null : _submit,
+                  // 사진이 다 올라가기 전에는 등록하지 않는다.
+                  onPressed: locked || _rating == null || !_photosReady
+                      ? null
+                      : _submit,
                   child: Text(l10n.reviewSubmit),
                 ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 사진 칸 줄: [사진 n/5] 칸(레퍼런스 "리뷰 쓰기" 의 사진 칸 — 225px ÷ 3 ≈ 75dp, 모서리 16) + 고른 사진들.
+class _PhotoRow extends StatelessWidget {
+  const _PhotoRow({
+    required this.photos,
+    required this.locked,
+    required this.onAdd,
+    required this.onRetry,
+    required this.onRemove,
+  });
+
+  static const double tile = 75;
+
+  final List<ReviewPhotoSlot> photos;
+  final bool locked;
+  final VoidCallback onAdd;
+  final void Function(ReviewPhotoSlot) onRetry;
+  final void Function(ReviewPhotoSlot) onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final radius = BorderRadius.circular(16);
+    final full = photos.length >= reviewPhotoMax;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        Semantics(
+          button: true,
+          label: l10n.reviewPhotoAdd(photos.length, reviewPhotoMax),
+          child: InkWell(
+            key: const ValueKey('review-photo-add'),
+            borderRadius: radius,
+            onTap: locked || full ? null : onAdd,
+            child: Container(
+              width: tile,
+              height: tile,
+              decoration: BoxDecoration(
+                borderRadius: radius,
+                border: Border.all(color: theme.colorScheme.outlineVariant),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  PmartLineIcon(
+                    PmartLineIcons.camera,
+                    size: 24,
+                    color: locked || full
+                        ? theme.colorScheme.outline
+                        : theme.colorScheme.onSurface,
+                  ),
+                  const SizedBox(height: 4),
+                  ExcludeSemantics(
+                    child: Text(
+                      l10n.reviewPhotoAdd(photos.length, reviewPhotoMax),
+                      style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        for (final (i, p) in photos.indexed)
+          _PhotoTile(
+            key: ValueKey('review-photo-$i'),
+            slot: p,
+            index: i,
+            locked: locked,
+            onRetry: () => onRetry(p),
+            onRemove: () => onRemove(p),
+          ),
+      ],
+    );
+  }
+}
+
+class _PhotoTile extends StatelessWidget {
+  const _PhotoTile({
+    super.key,
+    required this.slot,
+    required this.index,
+    required this.locked,
+    required this.onRetry,
+    required this.onRemove,
+  });
+
+  final ReviewPhotoSlot slot;
+  final int index;
+  final bool locked;
+  final VoidCallback onRetry;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final radius = BorderRadius.circular(16);
+    final bad =
+        slot.status == ReviewPhotoStatus.unknown ||
+        slot.status == ReviewPhotoStatus.rejected;
+    return SizedBox.square(
+      dimension: _PhotoRow.tile,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: ClipRRect(
+              borderRadius: radius,
+              // 미리보기는 기기 원본으로(올린 사진은 공개 리뷰에 붙기 전에는 서버에서 열리지 않는다).
+              child: Image.memory(
+                slot.file.bytes,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) =>
+                    ColoredBox(color: theme.colorScheme.surfaceContainerHighest),
+              ),
+            ),
+          ),
+          if (slot.status != ReviewPhotoStatus.uploaded)
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: radius,
+                  color: Colors.black.withValues(alpha: 0.45),
+                  border: bad
+                      ? Border.all(color: theme.colorScheme.error, width: 2)
+                      : null,
+                ),
+                child: Center(
+                  child: switch (slot.status) {
+                    ReviewPhotoStatus.uploading => SizedBox.square(
+                      key: ValueKey('review-photo-uploading-$index'),
+                      dimension: 22,
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                    ReviewPhotoStatus.unknown => TextButton(
+                      key: ValueKey('review-photo-retry-$index'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        // 테마 글꼴(Pretendard)을 유지한 채 크기만 줄인다.
+                        textStyle: theme.textTheme.labelSmall?.copyWith(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      onPressed: locked ? null : onRetry,
+                      child: Text(l10n.reviewPhotoRetry),
+                    ),
+                    ReviewPhotoStatus.rejected => Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Text(
+                        slot.code == ReviewProblemCode.photoInvalid
+                            ? l10n.reviewPhotoRejectedInvalid
+                            : l10n.reviewPhotoRejected,
+                        key: ValueKey('review-photo-rejected-$index'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10.5,
+                        ),
+                      ),
+                    ),
+                    ReviewPhotoStatus.uploaded => const SizedBox.shrink(),
+                  },
+                ),
+              ),
+            ),
+          if (slot.status != ReviewPhotoStatus.uploading)
+            Positioned(
+              top: 2,
+              right: 2,
+              child: Semantics(
+                button: true,
+                label: l10n.reviewPhotoRemove,
+                child: InkWell(
+                  key: ValueKey('review-photo-remove-$index'),
+                  customBorder: const CircleBorder(),
+                  onTap: locked ? null : onRemove,
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: const BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.close, size: 14, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 공개 리뷰에 붙은 사진(서버 `photos[].url` — 게이트웨이 상대 경로 `/api/v1/review-photos/{id}`, 토큰 없이 연다).
+/// 주소를 그릴 수 없으면(목 모드 상대 경로 등) 자리표시만 보인다.
+class _ReviewPhotos extends ConsumerWidget {
+  const _ReviewPhotos({required this.review});
+
+  final ReviewView review;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (review.photoUrls.isEmpty) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final origin = ref.watch(imageOriginProvider);
+    Widget placeholder() => ColoredBox(
+      color: theme.colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: PmartLineIcon(
+          PmartLineIcons.camera,
+          size: 20,
+          color: theme.colorScheme.outline,
+        ),
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: SizedBox(
+        height: 72,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: review.photoUrls.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 6),
+          itemBuilder: (context, i) {
+            final url = resolveImageUrl(review.photoUrls[i], origin);
+            return Semantics(
+              image: true,
+              label: l10n.reviewPhotoLabel(i + 1),
+              child: ClipRRect(
+                key: ValueKey('review-photo-${review.reviewId}-$i'),
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox.square(
+                  dimension: 72,
+                  child: url == null
+                      ? placeholder()
+                      : Image.network(
+                          url,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => placeholder(),
+                        ),
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -623,6 +1011,7 @@ Widget _reviewItem(BuildContext context, AppLocalizations l10n, ReviewView r) {
           ],
         ),
         if (r.text case final t? when t.isNotEmpty) Text(t),
+        _ReviewPhotos(review: r),
       ],
     ),
   );
@@ -787,7 +1176,7 @@ class OrderReviewsSection extends ConsumerWidget {
             contentPadding: EdgeInsets.zero,
             title: _ProductName(
               productId: e.productId,
-              title: lineTitles[e.orderLineId],
+              title: lineTitles[e.orderLineId] ?? e.productName,
             ),
             subtitle: e.writable && e.eligibleUntil != null
                 ? Text(

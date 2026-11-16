@@ -24,6 +24,9 @@ enum NoticeDestinationType {
   refund,
   dispatchOffer,
   caseFile,
+
+  /// 고객센터 문의(notification 0.2.0, ref = inquiryId).
+  inquiry,
   notice,
   none,
 }
@@ -80,6 +83,7 @@ class NoticePage {
 ///
 /// - REFUND: `ref` 는 claimId 다(notification-service 0.1.1 `Destination.ref`). 환불은 클레임 아래에서 보므로
 ///   클레임 처리 내역으로 간다.
+/// - INQUIRY: `ref` 는 inquiryId 다(notification 0.2.0 — 고객센터 답변 알림). 내 문의 상세로 간다.
 /// - DISPATCH_OFFER·CASE: 라이더·운영자용 목적지다.
 String? noticeRoute(NoticeDestination? d) {
   final ref = d?.ref;
@@ -90,6 +94,7 @@ String? noticeRoute(NoticeDestination? d) {
     NoticeDestinationType.delivery => '/deliveries/$id',
     NoticeDestinationType.claim ||
     NoticeDestinationType.refund => '/claims/$id',
+    NoticeDestinationType.inquiry => '/support/inquiries/$id',
     _ => null,
   };
 }

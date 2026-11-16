@@ -1,14 +1,12 @@
 {
   "dart": {
-    "backendCommit": "082f3d1321563eedb0b209116919561195a70bb6",
+    "backendCommit": "4852052e785fc416b36e7ea724420847c0036c35",
     "backendContractsDirty": false,
-    "generatedAt": "2026-11-15T22:36:55.043500Z",
+    "generatedAt": "2026-11-16T00:07:29.457853Z",
     "generator": "openapi-generator-cli 7.26.0 (dart-dio, json_serializable)",
     "regenerated": [
-      "product-service",
-      "mfc-capacity-service",
-      "mfc-inbound-service",
-      "mfc-inventory-service"
+      "review-service",
+      "notification-service"
     ],
     "services": {
       "auth-service": [

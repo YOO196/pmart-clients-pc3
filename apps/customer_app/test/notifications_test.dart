@@ -61,7 +61,7 @@ void main() {
   }
 
   group('목적지 → 앱 경로', () {
-    test('주문·배송·클레임·환불만 이동하고 나머지는 상세에 머문다', () {
+    test('주문·배송·클레임·환불·문의만 이동하고 나머지는 상세에 머문다', () {
       String? r(NoticeDestinationType? type, [String? ref = 'x-1']) =>
           noticeRoute(NoticeDestination(type: type, ref: ref));
       expect(r(NoticeDestinationType.order), '/orders/x-1');
@@ -69,6 +69,8 @@ void main() {
       expect(r(NoticeDestinationType.claim), '/claims/x-1');
       // REFUND 의 ref 는 claimId — 클레임 처리 내역으로 간다(백엔드 회신 2026-11-05 §1)
       expect(r(NoticeDestinationType.refund), '/claims/x-1');
+      // INQUIRY 의 ref 는 inquiryId — 고객센터 답변 알림(notification 0.2.0)
+      expect(r(NoticeDestinationType.inquiry), '/support/inquiries/x-1');
       for (final t in [
         NoticeDestinationType.dispatchOffer,
         NoticeDestinationType.caseFile,
@@ -412,6 +414,31 @@ void main() {
         NoticeDestinationType.delivery,
       );
       expect(page.items.single.read, isFalse);
+    });
+
+    test('고객센터 답변 알림(INQUIRY, 0.2.0)은 내 문의 상세로 간다', () async {
+      final adapter = FakeAdapter(
+        (o, _) async => FakeReply(
+          200,
+          body: {
+            'items': [
+              {
+                ...notice,
+                'notificationId': 'ntf-inq',
+                'category': 'CASE',
+                'title': '문의에 답변이 등록되었어요',
+                'destination': {'type': 'INQUIRY', 'ref': 'inq-1'},
+              },
+            ],
+            'unreadCount': 1,
+            'page': {'nextCursor': null, 'size': 50},
+          },
+        ),
+      );
+      final page = await ApiNotificationsRepository(dioWith(adapter)).list();
+      final d = page.items.single.destination;
+      expect(d?.type, NoticeDestinationType.inquiry);
+      expect(noticeRoute(d), '/support/inquiries/inq-1');
     });
 
     test('읽음 처리는 Idempotency-Key·X-Source-System 을 붙인다', () async {

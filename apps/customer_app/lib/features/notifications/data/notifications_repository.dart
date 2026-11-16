@@ -181,6 +181,7 @@ InboxNotice noticeFromContract(api.Notification n) => InboxNotice(
         api.DestinationTypeEnum.DISPATCH_OFFER =>
           NoticeDestinationType.dispatchOffer,
         api.DestinationTypeEnum.CASE => NoticeDestinationType.caseFile,
+        api.DestinationTypeEnum.INQUIRY => NoticeDestinationType.inquiry,
         api.DestinationTypeEnum.NOTICE => NoticeDestinationType.notice,
         api.DestinationTypeEnum.NONE => NoticeDestinationType.none,
         null => null,

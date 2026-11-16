@@ -11,12 +11,36 @@ import '../domain/notifications.dart';
 import 'notifications_controller.dart';
 
 /// SCR-NOTICE-001. 알림함(본인만). 알림 문구는 발송 당시 사실이고, 누르면 서버가 준 최신 목적지로 간다.
-/// 푸시 수신은 없다(푸시 토큰 등록 경로 없음, BR-09).
-class NotificationCenterScreen extends ConsumerWidget {
+/// 푸시 수신은 없다(푸시 토큰 등록 경로 없음, BR-09 — notification 0.2.0 도 앱 알림함만). 그래서 화면을 열 때와
+/// 앱이 다시 앞으로 올 때 목록을 다시 읽는다(백엔드 알림 2026-11-16 notification-inbox §3).
+class NotificationCenterScreen extends ConsumerStatefulWidget {
   const NotificationCenterScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationCenterScreen> createState() =>
+      _NotificationCenterScreenState();
+}
+
+class _NotificationCenterScreenState
+    extends ConsumerState<NotificationCenterScreen> {
+  AppLifecycleListener? _listener;
+
+  @override
+  void initState() {
+    super.initState();
+    _listener = AppLifecycleListener(
+      onResume: () => ref.invalidate(inboxProvider),
+    );
+  }
+
+  @override
+  void dispose() {
+    _listener?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final value = ref.watch(inboxProvider);
     return Scaffold(

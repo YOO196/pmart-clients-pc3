@@ -15,6 +15,9 @@ enum PmartLineIcons {
   back,
   plus,
   minus,
+
+  /// 사진 올리기(고객앱 리뷰 쓰기).
+  camera,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -194,6 +197,37 @@ class _LinePainter extends CustomPainter {
         canvas.drawLine(const Offset(5, 12), const Offset(19, 12), line);
       case PmartLineIcons.minus:
         canvas.drawLine(const Offset(5, 12), const Offset(19, 12), line);
+      case PmartLineIcons.camera:
+        canvas.drawPath(
+          Path()
+            ..moveTo(3.4, 8.6)
+            ..arcToPoint(
+              const Offset(5.4, 6.6),
+              radius: const Radius.circular(2),
+            )
+            ..lineTo(8, 6.6)
+            ..lineTo(9.6, 4.4)
+            ..lineTo(14.4, 4.4)
+            ..lineTo(16, 6.6)
+            ..lineTo(18.6, 6.6)
+            ..arcToPoint(
+              const Offset(20.6, 8.6),
+              radius: const Radius.circular(2),
+            )
+            ..lineTo(20.6, 17.6)
+            ..arcToPoint(
+              const Offset(18.6, 19.6),
+              radius: const Radius.circular(2),
+            )
+            ..lineTo(5.4, 19.6)
+            ..arcToPoint(
+              const Offset(3.4, 17.6),
+              radius: const Radius.circular(2),
+            )
+            ..close(),
+          line,
+        );
+        canvas.drawCircle(const Offset(12, 12.8), 3.6, line);
     }
   }
 

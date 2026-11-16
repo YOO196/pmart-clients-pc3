@@ -7,8 +7,7 @@ import '../domain/reviews.dart';
 
 /// 리뷰 자격·작성·조회(`review-service` 계약). 실패는 [PmartFailure] 로 던진다(빈 목록으로 바꾸지 않는다).
 ///
-/// 2026-11-04 기준 백엔드에 review-service 구현·게이트웨이 경로가 없다. 실서버 모드에서는 호출이 실패하고
-/// 화면은 실패 상태를 보인다(목 모드에서만 동작).
+/// review-service 0.2.0(2026-11-16 LAN 배포). 자격은 배송 완료(라이더 전달 완료 사진) 뒤에 생긴다.
 abstract interface class ReviewsRepository {
   /// `GET /me/review-eligibilities`. [orderId]·[state] 로 좁힌다.
   Future<EligibilityPage> eligibilities({
@@ -18,11 +17,18 @@ abstract interface class ReviewsRepository {
   });
 
   /// `POST /reviews`. 같은 키·같은 본문 재전송은 같은 리뷰를 돌려줘야 한다(멱등).
-  /// 사진 업로드 API 가 없어(BR-07) `photoIds` 는 보내지 않는다.
+  /// [photoIds] 는 [uploadPhoto] 가 돌려준 사진(리뷰당 5장).
   Future<ReviewView> create({
     required String orderLineId,
     required int rating,
     String? text,
+    List<String> photoIds = const [],
+    required IdempotencyKey key,
+  });
+
+  /// `POST /review-photos`(multipart `file`). 한 장씩. 같은 키 재전송은 같은 photoId.
+  Future<UploadedReviewPhoto> uploadPhoto(
+    ReviewPhotoFile photo, {
     required IdempotencyKey key,
   });
 
@@ -36,10 +42,12 @@ abstract interface class ReviewsRepository {
 final class ApiReviewsRepository implements ReviewsRepository {
   ApiReviewsRepository(Dio dio)
     : _eligibilities = api.PmartApiReview(dio: dio).getEligibilitiesApi(),
-      _reviews = api.PmartApiReview(dio: dio).getReviewsApi();
+      _reviews = api.PmartApiReview(dio: dio).getReviewsApi(),
+      _photos = api.PmartApiReview(dio: dio).getPhotosApi();
 
   final api.EligibilitiesApi _eligibilities;
   final api.ReviewsApi _reviews;
+  final api.PhotosApi _photos;
 
   @override
   Future<EligibilityPage> eligibilities({
@@ -74,6 +82,7 @@ final class ApiReviewsRepository implements ReviewsRepository {
     required String orderLineId,
     required int rating,
     String? text,
+    List<String> photoIds = const [],
     required IdempotencyKey key,
   }) async {
     final res = await pmartGuard(
@@ -84,6 +93,7 @@ final class ApiReviewsRepository implements ReviewsRepository {
           orderLineId: orderLineId,
           rating: rating,
           text: text,
+          photoIds: photoIds.isEmpty ? null : photoIds,
         ),
         extra: commandOptions(key).extra,
       ),
@@ -91,6 +101,23 @@ final class ApiReviewsRepository implements ReviewsRepository {
     return reviewFromContract(
       res.data ?? (throw UnknownResultFailure(requestId: key.value)),
     );
+  }
+
+  @override
+  Future<UploadedReviewPhoto> uploadPhoto(
+    ReviewPhotoFile photo, {
+    required IdempotencyKey key,
+  }) async {
+    final res = await pmartGuard(
+      () => _photos.uploadReviewPhoto(
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        file: MultipartFile.fromBytes(photo.bytes, filename: photo.name),
+        extra: commandOptions(key).extra,
+      ),
+    );
+    final body = res.data ?? (throw UnknownResultFailure(requestId: key.value));
+    return UploadedReviewPhoto(photoId: body.photoId, url: body.url);
   }
 
   @override
@@ -127,6 +154,10 @@ EligibilityPage eligibilityPageFromContract(
           orderLineId: l,
           sku: e.sku,
           productId: e.productId,
+          productName: switch (e.productName) {
+            final n? when n.trim().isNotEmpty => n,
+            _ => null,
+          },
           deliveredAt: e.deliveredAt,
           eligibleUntil: e.eligibleUntil,
           state: reviewStateFromWire(e.state?.value),
