@@ -13,7 +13,7 @@ Flutter 앱은 **Android 만** 개발한다. iOS 는 중단(`ios/` 는 두되 �
 | `apps/mfc_app` | Flutter (Android PDA 우선) | MFC 점원(피킹·패킹·인계·입고·실사) | 1단계 | `docs/apps/mfc-app.md` |
 | `web/backoffice` | React SPA (Vite + TS) | 본사·센터 운영자 | 1단계 | `docs/apps/backoffice-web.md` |
 | `web/hr-backoffice` | React SPA (Vite + TS) | 인사팀(`HR_ADMIN`) — 직원 등록·계정 발급·정지/퇴사 | 구현·LAN 배포(`https://192.168.0.40:8444`, 2026-11-13) | `docs/apps/hr-backoffice-web.md` |
-| `web/mfc-backoffice` | React SPA (Vite + TS) | 센터 관리자(`MFC_SUPERVISOR`) — 작업자·배정·작업·입고·재고·품질·위치·운영 제한 | 기반만(2026-11-15, 메뉴 화면은 준비 중) — LAN `https://192.168.0.40:8445` | `docs/apps/mfc-backoffice-web.md` |
+| `web/mfc-backoffice` | React SPA (Vite + TS) | 센터 관리자(`MFC_SUPERVISOR`) — 작업자·배정·작업·입고·재고·품질·위치·운영 제한 | 기반만(2026-11-15, 메뉴 화면은 PC 2 — 2026-11-16) — LAN `https://192.168.0.40:8445` | `docs/apps/mfc-backoffice-web.md` |
 | (예약) `apps/driver_app` | Flutter | 간선기사(TMS) | 2단계 | `docs/apps/driver-app.md` |
 
 ## 구조
@@ -37,7 +37,7 @@ docs/                 # 설계 정본 (아래 문서 지도)
 - 클라이언트 아키텍처·스택·API 연동 패턴: `docs/architecture/client-architecture.md`
 - 앱별 화면·규칙: `docs/apps/*.md`
 - **백엔드에 요청할 계약 공백**: `docs/backend-requests.md` — 계약에 없는 API가 필요하면 추측해서 만들지 말고 여기에 적는다
-- **PC 나눠 작업하기(PC 별 역할·폴더 구조·앱 영역·일지·handoff 규칙)**: `docs/operations/pc-split.md` — 여러 PC 가 이 저장소를 함께 고친다. 앱 영역은 customer-app·mfc-app·rider-app·backoffice·hr-backoffice·web-common. 클라이언트 담당: PC 1 = customer-app·로그인/세션/토큰 코드, **PC 2 = backoffice·hr-backoffice·web-common(2026-11-16 부터, 인계서 `docs/operations/backoffice-handover.md`)**, PC 3 = mfc-app, PC 5 = rider-app. PC 1(192.168.0.32)만 원본 main 에 넣고 다른 PC 는 포크 → PR. 여럿이 고치는 문서(`backend-requests.md`·`contracts.lock` 등)는 PC 1 이 합칠 때 몰아서 고친다. 저장소는 `pmart-backend`·`pmart-clients`·`pmart-mfc-simulation` 을 같은 부모 폴더의 형제로 둔다.
+- **PC 나눠 작업하기(PC 별 역할·폴더 구조·앱 영역·일지·handoff 규칙)**: `docs/operations/pc-split.md` — 여러 PC 가 이 저장소를 함께 고친다. 앱 영역은 customer-app·mfc-app·rider-app·backoffice·hr-backoffice·web-common. 클라이언트 담당: PC 1 = customer-app·로그인/세션/토큰 코드, **PC 2 = backoffice·hr-backoffice·mfc-backoffice·web-common(2026-11-16 부터, 인계서 `docs/operations/backoffice-handover.md`)**, PC 3 = mfc-app, PC 5 = rider-app. PC 1(192.168.0.32)만 원본 main 에 넣고 다른 PC 는 포크 → PR. 여럿이 고치는 문서(`backend-requests.md`·`contracts.lock` 등)는 PC 1 이 합칠 때 몰아서 고친다. 저장소는 `pmart-backend`·`pmart-clients`·`pmart-mfc-simulation` 을 같은 부모 폴더의 형제로 둔다.
 - **다른 PC 가 읽을 문서 지도**(읽는 순서·PC 별 문서·필요할 때 볼 것·시작할 때 보낼 말): `docs/operations/other-pcs-start-here.md`
 - **백엔드와 주고받는 문서(handoff)**: 요청·추가 질문은 `docs/handoff/<앱 영역>/<날짜>-backend-<주제>.md`(여러 앱이면 `docs/handoff/all/`)에 새 파일로 쓰고, 첫머리에 `보낸 앱:` 과 `받는 백엔드 영역:`(platform·mfc·delivery)을 적는다. 끝난 문서는 `docs/handoff/archive/` 로 옮긴다(규칙·열린 문서 목록 `docs/handoff/README.md`). 백엔드 회신은 `../pmart-backend/docs/handoff/clients/<날짜>-<받는 앱 영역|all>-<종류>-<주제>.md` 에서 읽는다(읽기 전용, 2026-11-13 까지는 `…-clients-…`, 끝난 것은 그 아래 `archive/`).
 - 단계 계획: `docs/roadmap.md`

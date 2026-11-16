@@ -21,12 +21,12 @@ PC 1 이 아닌 PC(사람·Claude)가 이 저장소(`pmart-clients`)를 다룰 �
 
 ## 2. PC 별로 더
 
-클라이언트 담당(사용자 확정 2026-11-13, `pc-split.md` §1): **PC 1 = customer-app 위주**, **PC 2 = backoffice·hr-backoffice·web-common(로그인 제외, 2026-11-16 넘김)**, **PC 3 = mfc-app**, **PC 5 = rider-app**. PC 4(rag)는 클라이언트 앱 영역이 없다.
+클라이언트 담당(사용자 확정 2026-11-13, `pc-split.md` §1): **PC 1 = customer-app 위주**, **PC 2 = backoffice·hr-backoffice·mfc-backoffice·web-common(로그인 제외, 2026-11-16 넘김)**, **PC 3 = mfc-app**, **PC 5 = rider-app**. PC 4(rag)는 클라이언트 앱 영역이 없다.
 
 | PC(백엔드 영역) | 클라이언트 앱 영역 | 파일 |
 |---|---|---|
 | **PC 1**(platform) | customer-app 위주 + 로그인·세션·토큰 코드(모든 앱). 백엔드가 2026-11-16 까지 보낸 백오피스 화면 요청은 끝까지 | `pmart-clients/docs/apps/customer-app.md`, 레퍼런스 캡처 `pmart-clients/docs/customer-app-design/`(git 제외 — PC 1 에만 있다) |
-| **PC 2**(backoffice) | backoffice·hr-backoffice·web-common(로그인·세션·토큰 부분 제외) | **인계서 `pmart-clients/docs/operations/backoffice-handover.md`(먼저)**, `pmart-clients/docs/apps/backoffice-web.md`, `pmart-clients/docs/apps/hr-backoffice-web.md`, `pmart-clients/docs/adr/0003-hr-backoffice-and-web-shared-packages.md`(웹 공통 패키지 구조), `pmart-clients/.claude/rules/react-web.md`. 백엔드 짝 문서 `pmart-backend/docs/backoffice/HANDOVER.md` |
+| **PC 2**(backoffice) | backoffice·hr-backoffice·mfc-backoffice·web-common(로그인·세션·토큰 부분 제외) | **인계서 `pmart-clients/docs/operations/backoffice-handover.md`(먼저)**, `pmart-clients/docs/apps/backoffice-web.md`, `pmart-clients/docs/apps/hr-backoffice-web.md`, `pmart-clients/docs/apps/mfc-backoffice-web.md`, `pmart-clients/docs/adr/0003-hr-backoffice-and-web-shared-packages.md`(웹 공통 패키지 구조), `pmart-clients/.claude/rules/react-web.md`. 백엔드 짝 문서 `pmart-backend/docs/backoffice/HANDOVER.md` |
 | **PC 3**(mfc) | **mfc-app** | `pmart-clients/docs/apps/mfc-app.md`, `pmart-clients/.claude/rules/flutter.md`·`api-integration.md`, 지난 일지 `pmart-clients/docs/worklog/2026-11-13.md` 의 "mfc_app 직원 로그인" 절, 아래 §2-2 mfc-app 줄의 handoff. 이어받을 일: 정지 안내를 `SUBJECT_BLOCKED` 기준으로, 실기기 로그인 확인 |
 | **PC 4**(rag, 시작 전) | 없음(관련: 백오피스 질문 화면, 고객 앱 채팅 — 화면 아직 없음) | 화면 사정을 알아야 할 때만 `pmart-clients/docs/apps/backoffice-web.md`, `pmart-clients/docs/apps/customer-app.md` |
 | **PC 5**(delivery) | **rider-app** | `pmart-clients/docs/apps/rider-app.md`, `pmart-clients/.claude/rules/flutter.md`·`api-integration.md`, 아래 §2-2 rider-app 줄의 handoff |

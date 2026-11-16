@@ -10,7 +10,7 @@
 |---|---|---|
 | 앱 | `web/backoffice`, `web/hr-backoffice`(인사팀 화면 — 사용자 정정으로 PC 2) | `apps/customer_app` 등 나머지 |
 | 웹 공통 | `web/core`·`web/ui` — **로그인·세션·토큰 부분 제외** | 로그인·세션·토큰 코드 전부(`pc-split.md` §1 "로그인·세션·토큰 코드는 PC 1 만" 표의 경로) |
-| 정하지 않음 | `web/mfc-backoffice` 의 메뉴 화면(PC 3 또는 PC 2 — 사용자 결정 예정). 로그인·센터 고르기 뼈대는 PC 1 | |
+| 앱 | `web/mfc-backoffice` 의 메뉴 화면(사용자 2026-11-16 — 백엔드 알림 `all/2026-11-16-notice-mfc-backoffice-owner-pc2.md`). 문서 `docs/apps/mfc-backoffice-web.md`. 화면이 부를 MFC API(MB-1~3)는 백엔드 PC 3, 더 필요하면 백엔드 `docs/architecture/service-requests/mfc-backoffice-staff-apis.md` | 로그인·센터 고르기 뼈대(PC 1 이 만듦) |
 | 정하지 않음 | `tools/web-tools`(TS 5 타입 생성·ESLint) 담당 — 백엔드 인계서에 없다. 바꿀 일이 생기면 사용자에게 | |
 
 - **시점**: 지금까지 백엔드가 클라이언트에 보낸 화면 요청은 **PC 1 이 끝까지 한다**(사용자 2026-11-16 "클라이언트쪽에 보낸 요청까지는 다하기로"). PC 2 는 그 뒤의 일부터 — 받은 화면은 확인만(§4-1).

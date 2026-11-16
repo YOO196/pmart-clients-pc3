@@ -1,5 +1,7 @@
 # MFC 백오피스 웹 (`web/mfc-backoffice`)
 
+담당: **PC 2**(사용자 2026-11-16 — 백엔드 알림 `../pmart-backend/docs/handoff/clients/all/2026-11-16-notice-mfc-backoffice-owner-pc2.md`, 인계서 `docs/operations/backoffice-handover.md`). 로그인·센터 고르기 뼈대와 로그인·세션·토큰 코드는 PC 1. 화면이 부를 MFC API(MB-1~3)는 백엔드 PC 3 — 더 필요하면 백엔드 `docs/architecture/service-requests/mfc-backoffice-staff-apis.md` 로 요청.
+
 - 사용자: 센터 관리자(`MFC_SUPERVISOR`) — 자기 센터(`centers`)만. 현장 작업자(`MFC_WORKER`)는 PDA 앱(`apps/mfc_app`)을 쓴다.
 - 근거: 백엔드 요청 `../pmart-backend/docs/handoff/clients/mfc-backoffice/2026-11-15-request-mfc-backoffice.md`. 메뉴·API 정본은 `pmart-backend/docs/architecture/backoffice-role-menus.md` §3, 계약 `contracts/openapi/mfc-*.yaml`.
 - 기본 백오피스(`web/backoffice`)에는 MFC 메뉴를 넣지 않는다(백엔드 요청 2026-11-15 cs-rider-menus §0).
