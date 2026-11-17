@@ -137,6 +137,9 @@ base class MockTaskRepository implements TaskRepository {
   };
   static const milkBarcode = '8801115114154';
   static const yogurtBarcode = '8801115220015';
+
+  /// 요거트 점포 바코드(299…) — 같은 상품의 두 번째 활성 바코드.
+  static const yogurtStoreBarcode = '2990000000024';
   static const chipsBarcode = '8801019606557';
   static const dumplingBarcode = '8801007310014';
 
@@ -227,6 +230,7 @@ base class MockTaskRepository implements TaskRepository {
         'sku': 'E-00000002',
         'productName': '그릭요거트 플레인 400g',
         'barcode': yogurtBarcode,
+        'barcodes': [yogurtBarcode, yogurtStoreBarcode],
         'locationId': 'C-S1-01-1-01',
         'lotId': 'LOT-Y-1024',
         'expiresOn': '2026-11-05',

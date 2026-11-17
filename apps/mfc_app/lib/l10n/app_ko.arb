@@ -905,6 +905,7 @@
   "pickRejectToLocation": "장바구니 없이 보낸 실적이에요(앱 이전 버전)",
   "pickRejectCartMismatch": "이 주문은 처음 담은 장바구니에만 담을 수 있어요",
   "pickRejectZone": "장바구니가 아닌 곳으로 보냈어요",
+  "pickRejectByServer": "서버(재고)가 거절했어요 — 사유는 서버가 아직 알려 주지 않아요",
   "pickRejectCode": "사유 {code}",
   "@pickRejectCode": {
     "placeholders": {

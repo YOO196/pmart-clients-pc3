@@ -365,7 +365,7 @@ class PickingController extends Notifier<PickingState> {
       result = ScanResult.noTarget;
     } else if (state.at == null) {
       result = ScanResult.needLocation;
-    } else if (stop.line.barcode != code.trim()) {
+    } else if (!stop.line.matchesBarcode(code)) {
       result = ScanResult.wrongItem;
     } else if (state.capturedFor(stop.line.orderLineId) >= stop.qty) {
       result = ScanResult.overRemaining;

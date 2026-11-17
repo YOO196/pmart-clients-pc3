@@ -151,8 +151,10 @@ final class ApiTaskRepository implements TaskRepository {
         api.StartTask201ResponseStatusEnum.APPLIED => SendApplied(
           resultId: res.data!.resultId,
         ),
-        api.StartTask201ResponseStatusEnum.REJECTED => SendRejected(
-          res.data!.nextAction ?? ProblemCode.domainRejected,
+        // 거절 사유는 응답·실행 조회 어디에도 없다(nextAction 은 "QUERY_RESULT" — 사유 아님).
+        // 백엔드 요청 2026-11-17 pick-reject-reason.
+        api.StartTask201ResponseStatusEnum.REJECTED => const SendRejected(
+          ProblemCode.domainRejected,
         ),
         api.StartTask201ResponseStatusEnum.ACCEPTED => SendAccepted(
           resultId: res.data!.resultId,
@@ -378,6 +380,7 @@ TaskDetailView taskDetailFromContract(api.TaskDetail d) => TaskDetailView(
         sku: l.sku,
         productName: l.productName,
         barcode: l.barcode,
+        barcodes: [...?l.barcodes],
         locationId: l.locationId,
         lotId: l.lotId,
         expiresOn: l.expiresOn,

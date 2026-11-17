@@ -153,6 +153,7 @@ class TaskLineView {
     this.pendingQty = 0,
     this.productName,
     this.barcode,
+    this.barcodes = const [],
     this.locationId,
     this.lotId,
     this.expiresOn,
@@ -164,8 +165,17 @@ class TaskLineView {
   final String sku;
   final String? productName;
 
-  /// 필수 스캔 대조값. 다른 바코드는 실적 0 + 원인 안내.
+  /// 대표 바코드(스티커 재출력·시험 스캔에 쓴다).
   final String? barcode;
+
+  /// 그 SKU 의 활성 바코드 전부(제조사 880… + 점포 299… 처럼 여럿 — fulfillment 0.7.0).
+  final List<String> barcodes;
+
+  /// 찍은 값이 이 줄 상품인지. 활성 바코드 중 하나와 같으면 맞다(다른 바코드는 실적 0 + 원인 안내).
+  bool matchesBarcode(String code) {
+    final c = code.trim();
+    return c.isNotEmpty && (c == barcode || barcodes.contains(c));
+  }
   final String? locationId;
   final String? lotId;
   final String? expiresOn;

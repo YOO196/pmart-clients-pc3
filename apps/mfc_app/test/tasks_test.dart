@@ -360,6 +360,15 @@ void main() {
       expect(c.read(pickingProvider('task-mock-1')).at, isNull);
     });
 
+    test('상품 바코드가 여럿이면 어느 것을 찍어도 같은 상품(점포 299…)', () async {
+      final (pick, task) = await atStop();
+      expect(
+        pick.scan(task, MockTaskRepository.yogurtStoreBarcode),
+        ScanResult.matched,
+      );
+      expect(pick.scan(task, '0000000000000'), ScanResult.wrongItem);
+    });
+
     test('장바구니를 안 찍고 보낸 실적은 목도 실서버처럼 거절 — 화면에 사유', () async {
       await startTask('task-mock-1');
       final res = await repo.sendExecution(

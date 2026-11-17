@@ -168,7 +168,7 @@ class PackingController extends Notifier<PackingState> {
       state.inBag(line.orderLineId);
 
   PackScan scan(TaskDetailView task, ShipmentView s, String code) {
-    final line = task.lines.where((l) => l.barcode == code.trim()).firstOrNull;
+    final line = task.lines.where((l) => l.matchesBarcode(code)).firstOrNull;
     final PackScan result;
     if (line == null) {
       result = PackScan.wrongItem;

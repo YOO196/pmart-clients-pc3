@@ -202,6 +202,7 @@ String pickRejectText(AppLocalizations l10n, String code) => switch (code) {
   TaskProblemCode.toLocationRequired => l10n.pickRejectToLocation,
   TaskProblemCode.cartMismatch => l10n.pickRejectCartMismatch,
   TaskProblemCode.locationZoneMismatch => l10n.pickRejectZone,
+  ProblemCode.domainRejected => l10n.pickRejectByServer,
   _ => l10n.pickRejectCode(code),
 };
 
