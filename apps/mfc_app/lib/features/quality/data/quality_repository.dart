@@ -265,4 +265,16 @@ InboundTaskView inboundTaskFromContract(ib.InboundTask t) => InboundTaskView(
     for (final b in t.barcodes ?? const <String>[])
       if (b.trim().isNotEmpty) b.trim(),
   ],
+  // 판정 기준(0.11.0, BR-52 R18) — 서버 값 그대로. null 은 "기준 미설정"(0·무제한 아님).
+  minRemainingDays: t.minRemainingDays,
+  maxDaysSinceManufacture: t.maxDaysSinceManufacture,
+  zone: tempZoneFromWire(t.storageType),
 );
+
+/// 보관 유형(AMBIENT·CHILLED·FROZEN). 모르는 값·null 은 null(온도 확인을 묻지 않는다 — 추정하지 않음).
+TempZone? tempZoneFromWire(String? w) => switch (w) {
+  'AMBIENT' => TempZone.ambient,
+  'CHILLED' => TempZone.chilled,
+  'FROZEN' => TempZone.frozen,
+  _ => null,
+};

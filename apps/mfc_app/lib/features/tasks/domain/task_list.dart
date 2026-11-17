@@ -285,6 +285,27 @@ abstract final class TaskProblemCode {
 
   /// 도착지가 장바구니(CART)·포장(PACKING) 구역이 아니다 — 재고 거절 사유(inventory 0.19.0).
   static const locationZoneMismatch = 'LOCATION_ZONE_MISMATCH';
+
+  // 재고 거절 사유(fulfillment 0.16.0 `TaskExecution.rejectCode`, 회신 2026-11-17 E3). 모르는 코드는 그대로 보인다.
+  static const lotMismatch = 'LOT_MISMATCH';
+  static const pickQtyExceeded = 'PICK_QTY_EXCEEDED';
+  static const insufficientStock = 'INSUFFICIENT_STOCK';
+  static const locationClosed = 'LOCATION_CLOSED';
+  static const locationNotRegistered = 'LOCATION_NOT_REGISTERED';
+  static const locationAllocatedToOther = 'LOCATION_ALLOCATED_TO_OTHER';
+  static const skuAlreadyShelved = 'SKU_ALREADY_SHELVED';
+  static const temperatureZoneMismatch = 'TEMPERATURE_ZONE_MISMATCH';
+  static const configRequired = 'CONFIG_REQUIRED';
+}
+
+/// 거절된 실행의 사유(fulfillment 0.16.0 `TaskExecution.rejectCode`·`rejectReason`, E1).
+/// [reason] 은 재고가 준 한국어 문장 그대로 — 화면에 바로 보여도 된다(회신).
+@immutable
+class ExecutionReject {
+  const ExecutionReject({required this.code, this.reason});
+
+  final String code;
+  final String? reason;
 }
 
 /// 큐에 넣는 실행 명령 종류.

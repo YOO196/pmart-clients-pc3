@@ -9,6 +9,12 @@ import '../data/mock_task_repository.dart';
 import '../data/task_repository.dart';
 import '../domain/task_list.dart';
 
+/// 거절된 실행의 사유(E1) — (작업 ID, 실행 ID). 화면이 거절 줄을 그릴 때만 부른다.
+final executionRejectProvider = FutureProvider.autoDispose
+    .family<ExecutionReject?, (String, String)>(
+      (ref, k) => ref.watch(taskRepositoryProvider).executionReject(k.$1, k.$2),
+    );
+
 final taskRepositoryProvider = Provider<TaskRepository>(
   (ref) => switch (ref.watch(envProvider)) {
     PmartEnv.mock => MockTaskRepository(),

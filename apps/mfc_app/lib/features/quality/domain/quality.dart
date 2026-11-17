@@ -43,8 +43,9 @@ class InboundTaskView {
 
   bool matchesBarcode(String code) => barcodes.contains(code.trim());
 
-  /// 판정 기준·보관 온도대 — 입고 작업 계약에 없다(BR-52 R18). 목만.
-  /// 기준은 상품 정보(product-service `minRemainingDays`·`maxDaysSinceManufacture`)의 값.
+  /// 판정 기준·보관 온도대 — mfc-inbound 0.11.0 `InboundTask`(BR-52 R18 A안, 회신 2026-11-17 qc-criteria).
+  /// `minRemainingDays` = 상품 보장값, 없으면 보관 유형 기본값(예약·출하 가능 판정과 같은 값). 없으면 null —
+  /// 0·무제한으로 바꾸지 않고 "기준 미설정"으로 정상 판정을 막는다. `maxDaysSinceManufacture` 가 있으면 제조일 필수.
   final int? minRemainingDays;
   final int? maxDaysSinceManufacture;
   final TempZone? zone;

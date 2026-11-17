@@ -221,6 +221,78 @@ void main() {
       expect(body['toLocation'], 'CRT-A-01', reason: '집품 도착지 = 장바구니');
     });
 
+    test(
+      '실행 전송: 재고가 거절(REJECTED)하면 실행을 한 번 조회해 거절 코드(E1) — 조회가 안 되면 일반 거절',
+      () async {
+        QueueItem item() => QueueItem(
+          id: 'k-r',
+          kind: FieldCommandKind.pickExecution,
+          targetId: 'task-1',
+          payload: const {'workerId': 'w', 'lines': []},
+          state: QueueItemState.queued,
+          createdAt: DateTime.utc(2026),
+        );
+        const rejected = FakeReply(
+          202,
+          body: {
+            'status': 'REJECTED',
+            'requestId': 'k-r',
+            'resultId': 'exe-r',
+            'nextAction': 'QUERY_RESULT',
+          },
+        );
+        final adapter = FakeAdapter((o, _) async {
+          if (o.method == 'POST') return rejected;
+          return const FakeReply(
+            200,
+            body: {
+              'executionId': 'exe-r',
+              'taskId': 'task-1',
+              'state': 'REJECTED',
+              'rejectCode': 'LOT_MISMATCH',
+              'rejectReason': '지시 LOT 이 아닙니다',
+            },
+          );
+        });
+        expect(
+          await _repoWith(adapter).sendExecution(item()),
+          isA<SendRejected>().having(
+            (r) => r.code,
+            'code',
+            TaskProblemCode.lotMismatch,
+          ),
+        );
+        expect(
+          adapter.requests.last.uri.path,
+          '/api/v1/tasks/task-1/executions/exe-r',
+        );
+
+        final failing = FakeAdapter((o, _) async {
+          if (o.method == 'POST') return rejected;
+          return const FakeReply.transport(DioExceptionType.receiveTimeout);
+        });
+        expect(
+          await _repoWith(failing).sendExecution(item()),
+          isA<SendRejected>().having(
+            (r) => r.code,
+            'code',
+            ProblemCode.domainRejected,
+          ),
+        );
+      },
+    );
+
+    test('거절 칸: 옛 기록(REJECTED)·빈 코드는 일반 거절, 서버 문장은 그대로', () {
+      expect(
+        executionRejectOf('REJECTED', null).code,
+        ProblemCode.domainRejected,
+      );
+      expect(executionRejectOf(' ', ' ').reason, isNull);
+      final r = executionRejectOf('INSUFFICIENT_STOCK', ' 재고 부족 ');
+      expect(r.code, 'INSUFFICIENT_STOCK');
+      expect(r.reason, '재고 부족');
+    });
+
     test('실행 전송: 장바구니 없음 400·다른 장바구니 409 는 거절(코드 그대로)', () async {
       Future<SendResult> send(FakeReply reply) =>
           _repoWith(FakeAdapter((_, _) async => reply)).sendExecution(

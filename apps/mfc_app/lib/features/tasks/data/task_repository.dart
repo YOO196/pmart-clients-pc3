@@ -10,10 +10,6 @@ abstract interface class TaskRepository {
   /// 내 작업. [blocked] 면 막힌 작업만(기본 조회에 BLOCKED 가 없다). 실패는 [PmartFailure].
   Future<TaskList> myTasks(String mfcId, {bool blocked = false});
 
-  /// 내 업무 내역(사용자 2026-11-17) — `assignee=me` 의 완료·부분 종결·진행 중. 날짜 거르기는 계약에 없어
-  /// 화면이 `lastActivityAt` 으로 오늘 것만 고른다. fulfillment 작업(피킹·패킹·출고·복귀)만 나온다.
-  Future<TaskList> myHistory(String mfcId);
-
   /// 센터 작업 목록(센터 관리자 — 사용자 2026-11-16 "작업 현황"). `assignee` 없이 그 센터 전체.
   Future<TaskList> centerTasks(String mfcId, {required List<TaskState> states});
 
@@ -33,6 +29,9 @@ abstract interface class TaskRepository {
 
   /// 실행 결과(재고 반영) 조회.
   Future<ConfirmResult> execution(String taskId, String executionId);
+
+  /// 거절된 실행의 사유(E1). 거절이 아니거나 조회가 안 되면 null.
+  Future<ExecutionReject?> executionReject(String taskId, String executionId);
 }
 
 /// 실서버 구현. `assignee=me`·작업자 ID 는 BR-02(점원 로그인) 전에는 실제로 동작하지 않는다.
@@ -49,24 +48,6 @@ final class ApiTaskRepository implements TaskRepository {
         mfcId: mfcId,
         assignee: 'me',
         state: blocked ? [api.TaskState.BLOCKED] : null,
-      ),
-    );
-    final body = res.data;
-    if (body == null) throw const ContractViolationFailure('listTasks 본문 없음');
-    return taskListFromContract(body);
-  }
-
-  @override
-  Future<TaskList> myHistory(String mfcId) async {
-    final res = await pmartGuard(
-      () => _tasks.listTasks(
-        mfcId: mfcId,
-        assignee: 'me',
-        state: const [
-          api.TaskState.COMPLETED,
-          api.TaskState.CLOSED_PARTIAL,
-          api.TaskState.IN_PROGRESS,
-        ],
       ),
     );
     final body = res.data;
@@ -151,10 +132,11 @@ final class ApiTaskRepository implements TaskRepository {
         api.StartTask201ResponseStatusEnum.APPLIED => SendApplied(
           resultId: res.data!.resultId,
         ),
-        // 거절 사유는 응답·실행 조회 어디에도 없다(nextAction 은 "QUERY_RESULT" — 사유 아님).
-        // 백엔드 요청 2026-11-17 pick-reject-reason.
-        api.StartTask201ResponseStatusEnum.REJECTED => const SendRejected(
-          ProblemCode.domainRejected,
+        // 거절 사유는 응답에 없다(nextAction 은 "QUERY_RESULT" — 사유 아님). resultId = executionId 로
+        // 실행을 한 번 조회해 rejectCode 를 받는다(fulfillment 0.16.0 E1 — E2 는 안 함, 회신 2026-11-17).
+        api.StartTask201ResponseStatusEnum.REJECTED => SendRejected(
+          (await _rejectOf(item.targetId, res.data!.resultId))?.code ??
+              ProblemCode.domainRejected,
         ),
         api.StartTask201ResponseStatusEnum.ACCEPTED => SendAccepted(
           resultId: res.data!.resultId,
@@ -177,7 +159,39 @@ final class ApiTaskRepository implements TaskRepository {
       return ConfirmResult.unknown;
     }
   }
+
+  @override
+  Future<ExecutionReject?> executionReject(String taskId, String executionId) =>
+      _rejectOf(taskId, executionId);
+
+  Future<ExecutionReject?> _rejectOf(String taskId, String? executionId) async {
+    if (executionId == null || executionId.isEmpty) return null;
+    try {
+      final res = await pmartGuard(
+        () => _tasks.getTaskExecution(taskId: taskId, executionId: executionId),
+      );
+      final e = res.data;
+      if (e?.state?.value != 'REJECTED') return null;
+      return executionRejectOf(e!.rejectCode, e.rejectReason);
+    } on PmartFailure {
+      // 사유 조회 실패는 거절을 바꾸지 않는다 — 사유만 모른다.
+      return null;
+    }
+  }
 }
+
+/// 실행 조회의 거절 칸 → 화면 값. 코드가 비면 일반 거절(옛 기록은 서버가 "REJECTED").
+ExecutionReject executionRejectOf(String? code, String? reason) =>
+    ExecutionReject(
+      code: switch (code?.trim()) {
+        final c? when c.isNotEmpty && c != 'REJECTED' => c,
+        _ => ProblemCode.domainRejected,
+      },
+      reason: switch (reason?.trim()) {
+        final r? when r.isNotEmpty => r,
+        _ => null,
+      },
+    );
 
 /// 시작 실패 분류(§3-1). 503 DEPENDENCY_UNAVAILABLE 은 "시작 안 됨" 확정이다.
 StartOutcome startFailureToOutcome(PmartFailure f) => switch (f) {
