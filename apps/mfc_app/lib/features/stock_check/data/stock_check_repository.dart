@@ -57,9 +57,17 @@ class StockLine {
 
 @immutable
 class StockView {
-  const StockView({required this.sku, required this.lots, required this.lines});
+  const StockView({
+    required this.sku,
+    required this.lots,
+    required this.lines,
+    this.productName,
+  });
 
   final String sku;
+
+  /// 상품명(mfc-inventory 0.23.0 `CenterStock.productName` — SKU 사본, 모르면 null, IV-2 Q4).
+  final String? productName;
   final List<StockLot> lots;
   final List<StockLine> lines;
 
@@ -68,6 +76,10 @@ class StockView {
 
 StockView stockFromContract(inv.CenterStock s) => StockView(
   sku: s.sku,
+  productName: switch (s.productName?.trim()) {
+    final n? when n.isNotEmpty => n,
+    _ => null,
+  },
   lots: [
     for (final l in s.lots)
       StockLot(

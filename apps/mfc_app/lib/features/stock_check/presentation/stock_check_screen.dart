@@ -142,7 +142,10 @@ class _StockResult extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final name = ref.watch(productHintsProvider).bySku(view.sku)?.name;
+    // 서버 상품명(0.23.0) 먼저, 없으면 상품 정보 사본.
+    final name =
+        view.productName ??
+        ref.watch(productHintsProvider).bySku(view.sku)?.name;
     String n(int? v) => v == null ? '—' : l10n.qtyUnit(v);
     return ListView(
       key: const ValueKey('stock-check-result'),

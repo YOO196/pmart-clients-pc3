@@ -202,6 +202,17 @@ String pickRejectText(AppLocalizations l10n, String code) => switch (code) {
   TaskProblemCode.toLocationRequired => l10n.pickRejectToLocation,
   TaskProblemCode.cartMismatch => l10n.pickRejectCartMismatch,
   TaskProblemCode.locationZoneMismatch => l10n.pickRejectZone,
+  TaskProblemCode.lotMismatch => l10n.pickRejectLot,
+  TaskProblemCode.pickQtyExceeded => l10n.pickRejectQtyExceeded,
+  TaskProblemCode.insufficientStock => l10n.pickRejectStock,
+  TaskProblemCode.locationClosed => l10n.pickRejectLocationClosed,
+  TaskProblemCode.locationNotRegistered => l10n.pickRejectLocationUnknown,
+  TaskProblemCode.locationAllocatedToOther => l10n.pickRejectLocationOther,
+  TaskProblemCode.skuAlreadyShelved => l10n.pickRejectShelved,
+  TaskProblemCode.temperatureZoneMismatch => l10n.pickRejectTemperature,
+  TaskProblemCode.invalidState => l10n.pickRejectState,
+  TaskProblemCode.versionConflict => l10n.pickRejectVersion,
+  TaskProblemCode.configRequired => l10n.pickRejectConfig,
   ProblemCode.domainRejected => l10n.pickRejectByServer,
   _ => l10n.pickRejectCode(code),
 };
@@ -608,19 +619,12 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                 ),
               ],
               if (queue.any((q) => q.state == QueueItemState.rejected))
-                Text(
-                  [
-                    l10n.pickRejectedSome,
-                    // 거절 사유(서버 코드) — 무엇이 막혔는지 현장에서 알 수 있게.
-                    ...{
-                      for (final q in queue)
-                        if (q.state == QueueItemState.rejected &&
-                            q.rejectCode != null)
-                          pickRejectText(l10n, q.rejectCode!),
-                    },
-                  ].join('\n'),
-                  key: const ValueKey('pick-rejected'),
-                  style: TextStyle(color: theme.colorScheme.error),
+                _RejectedNotice(
+                  taskId: widget.taskId,
+                  items: [
+                    for (final q in queue)
+                      if (q.state == QueueItemState.rejected) q,
+                  ],
                 ),
             ],
           );
@@ -729,6 +733,43 @@ class _TaskInfoSheet extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// 거절된 실적과 사유 — 무엇이 막혔는지 현장에서 알 수 있게(fulfillment 0.16.0 E1).
+/// 보낼 때 받은 코드가 있으면 그 문구, 확정 조회로 거절된 것(코드 없음)은 실행을 조회해 코드·서버 문장.
+class _RejectedNotice extends ConsumerWidget {
+  const _RejectedNotice({required this.taskId, required this.items});
+
+  final String taskId;
+  final List<QueueItem> items;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final lines = <String>{};
+    for (final q in items) {
+      final code = q.rejectCode;
+      if (code != null && code != ProblemCode.domainRejected) {
+        lines.add(pickRejectText(l10n, code));
+        continue;
+      }
+      final id = q.resultId;
+      final r = id == null
+          ? null
+          : ref.watch(executionRejectProvider((taskId, id))).value;
+      lines.add(switch (r) {
+        ExecutionReject(:final code, :final reason?) =>
+          l10n.pickRejectWithReason(pickRejectText(l10n, code), reason),
+        ExecutionReject(:final code) => pickRejectText(l10n, code),
+        null => pickRejectText(l10n, code ?? ProblemCode.domainRejected),
+      });
+    }
+    return Text(
+      [l10n.pickRejectedSome, ...lines].join('\n'),
+      key: const ValueKey('pick-rejected'),
+      style: TextStyle(color: Theme.of(context).colorScheme.error),
     );
   }
 }

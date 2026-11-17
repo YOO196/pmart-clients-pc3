@@ -221,6 +221,78 @@ void main() {
       expect(body['toLocation'], 'CRT-A-01', reason: '집품 도착지 = 장바구니');
     });
 
+    test(
+      '실행 전송: 재고가 거절(REJECTED)하면 실행을 한 번 조회해 거절 코드(E1) — 조회가 안 되면 일반 거절',
+      () async {
+        QueueItem item() => QueueItem(
+          id: 'k-r',
+          kind: FieldCommandKind.pickExecution,
+          targetId: 'task-1',
+          payload: const {'workerId': 'w', 'lines': []},
+          state: QueueItemState.queued,
+          createdAt: DateTime.utc(2026),
+        );
+        const rejected = FakeReply(
+          202,
+          body: {
+            'status': 'REJECTED',
+            'requestId': 'k-r',
+            'resultId': 'exe-r',
+            'nextAction': 'QUERY_RESULT',
+          },
+        );
+        final adapter = FakeAdapter((o, _) async {
+          if (o.method == 'POST') return rejected;
+          return const FakeReply(
+            200,
+            body: {
+              'executionId': 'exe-r',
+              'taskId': 'task-1',
+              'state': 'REJECTED',
+              'rejectCode': 'LOT_MISMATCH',
+              'rejectReason': '지시 LOT 이 아닙니다',
+            },
+          );
+        });
+        expect(
+          await _repoWith(adapter).sendExecution(item()),
+          isA<SendRejected>().having(
+            (r) => r.code,
+            'code',
+            TaskProblemCode.lotMismatch,
+          ),
+        );
+        expect(
+          adapter.requests.last.uri.path,
+          '/api/v1/tasks/task-1/executions/exe-r',
+        );
+
+        final failing = FakeAdapter((o, _) async {
+          if (o.method == 'POST') return rejected;
+          return const FakeReply.transport(DioExceptionType.receiveTimeout);
+        });
+        expect(
+          await _repoWith(failing).sendExecution(item()),
+          isA<SendRejected>().having(
+            (r) => r.code,
+            'code',
+            ProblemCode.domainRejected,
+          ),
+        );
+      },
+    );
+
+    test('거절 칸: 옛 기록(REJECTED)·빈 코드는 일반 거절, 서버 문장은 그대로', () {
+      expect(
+        executionRejectOf('REJECTED', null).code,
+        ProblemCode.domainRejected,
+      );
+      expect(executionRejectOf(' ', ' ').reason, isNull);
+      final r = executionRejectOf('INSUFFICIENT_STOCK', ' 재고 부족 ');
+      expect(r.code, 'INSUFFICIENT_STOCK');
+      expect(r.reason, '재고 부족');
+    });
+
     test('실행 전송: 장바구니 없음 400·다른 장바구니 409 는 거절(코드 그대로)', () async {
       Future<SendResult> send(FakeReply reply) =>
           _repoWith(FakeAdapter((_, _) async => reply)).sendExecution(
@@ -251,6 +323,63 @@ void main() {
       );
     });
   });
+
+  test(
+    '다음 칸은 서버 방문 순서(visitSeq) — 한 줄의 조각 사이에 다른 줄이 끼면 그 줄 먼저(시뮬레이터 바코드 판과 같게)',
+    () {
+      PickInstruction piece(
+        String lot,
+        int seq,
+        String loc, {
+        bool done = false,
+      }) => PickInstruction(
+        lotId: lot,
+        remainingQty: done ? 0 : 1,
+        visitSeq: seq,
+        status: done ? PickStatus.done : PickStatus.ok,
+        locations: [
+          PickLocation(code: loc, qty: 5, allocatedQty: done ? 0 : 1),
+        ],
+      );
+      TaskLineView line(String id, List<PickInstruction> picks) => TaskLineView(
+        taskLineId: 'tl-$id',
+        orderLineId: id,
+        sku: 'E-0000000$id',
+        plannedQty: picks.length,
+        completedQty: 0,
+        cancelledQty: 0,
+        remainingQty: picks.where((p) => p.status != PickStatus.done).length,
+        picks: picks,
+      );
+      TaskDetailView task(List<TaskLineView> lines) => TaskDetailView(
+        taskId: 't',
+        kind: TaskKind.pick,
+        state: TaskState.inProgress,
+        version: 1,
+        lines: lines,
+      );
+      // 줄 1: 1번째·3번째 칸, 줄 2: 2번째 칸.
+      final first = task([
+        line('1', [
+          piece('L1', 1, 'C-B1-01-1-01'),
+          piece('L2', 3, 'C-B3-01-1-01'),
+        ]),
+        line('2', [piece('L3', 2, 'C-B2-06-3-01')]),
+      ]);
+      expect(nextPickStop(first)!.location, 'C-B1-01-1-01');
+      final second = task([
+        line('1', [
+          piece('L1', 1, 'C-B1-01-1-01', done: true),
+          piece('L2', 3, 'C-B3-01-1-01'),
+        ]),
+        line('2', [piece('L3', 2, 'C-B2-06-3-01')]),
+      ]);
+      final s = nextPickStop(second)!;
+      expect(s.location, 'C-B2-06-3-01');
+      expect(s.line.orderLineId, '2');
+      expect(s.lotId, 'L3');
+    },
+  );
 
   group('시작·피킹', () {
     late MockTaskRepository repo;

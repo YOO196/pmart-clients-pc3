@@ -4,37 +4,46 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/product_hints.dart';
 import '../../../shared/ui_state_of.dart';
-import '../../tasks/domain/task_list.dart';
 import '../../tasks/presentation/task_controllers.dart';
-import '../../tasks/presentation/tasks_screen.dart'
-    show taskKindText, taskStateText;
+import '../data/my_work_repository.dart';
 
 /// 내 오늘 업무 내역(사용자 2026-11-17 "작업자마다 본인의 금일 작업내용을 체크").
-/// fulfillment `GET /tasks?assignee=me&state=COMPLETED,CLOSED_PARTIAL,IN_PROGRESS` 에서
-/// 마지막 실적 시각(`lastActivityAt`)이 오늘(서울)인 것만 고른다 — 계약에 날짜 거르기가 없다.
-/// 입고·검사·이동·실사는 이 목록에 없다(서버에 내 내역 조회가 없음 — handoff 2026-11-17 my-work).
-final myTodayWorkProvider = FutureProvider.autoDispose<List<TaskItem>>((
-  ref,
-) async {
-  final list = await ref
-      .watch(taskRepositoryProvider)
-      .myHistory(ref.watch(currentMfcIdProvider));
-  final today = _seoulDate(DateTime.now());
-  final items = [
-    for (final t in list.tasks)
-      if (t.lastActivityAt case final at? when _seoulDate(at) == today) t,
-  ]..sort((a, b) => b.lastActivityAt!.compareTo(a.lastActivityAt!));
-  return items;
-});
+/// mfc-capacity `GET /mfcs/{mfcId}/workers/me/activities`(0.17.0) — 피킹·포장·복귀·입고·품질검사·적치·이동·
+/// 회수품 반입·실사·품질 판정을 서버가 모아 준다. 오늘은 서버가 정한다(Asia/Seoul). 합계는 서버 값.
+final myTodayWorkProvider = FutureProvider.autoDispose<WorkActivities>(
+  (ref) => ref
+      .watch(myWorkRepositoryProvider)
+      .today(ref.watch(currentMfcIdProvider)),
+);
 
-(int, int, int) _seoulDate(DateTime instant) {
-  final s = toSeoulWallClock(instant);
-  return (s.year, s.month, s.day);
-}
+String activityTypeText(AppLocalizations l10n, String type) => switch (type) {
+  'PICK' => l10n.typePick,
+  'PACK' => l10n.typePack,
+  'RETURN' => l10n.typeReturn,
+  'RECEIVE' => l10n.typeReceive,
+  'INSPECT' => l10n.typeInspect,
+  'PUTAWAY' => l10n.typePutaway,
+  'MOVE' => l10n.typeMove,
+  'RETURN_RECEIPT' => l10n.typeReturnReceipt,
+  'COUNT' => l10n.actCount,
+  'RECOUNT' => l10n.actRecount,
+  'QUARANTINE' => l10n.actQuarantine,
+  'RELEASE' => l10n.actRelease,
+  'DISPOSE' => l10n.actDispose,
+  'RETURN_INSPECTION' => l10n.typeReturnInspect,
+  _ => type,
+};
 
-bool _finished(TaskItem t) =>
-    t.state == TaskState.completed || t.state == TaskState.closedPartial;
+String? activityResultText(AppLocalizations l10n, String? r) => switch (r) {
+  null => null,
+  'APPLIED' => l10n.actApplied,
+  'REJECTED' => l10n.actRejected,
+  'RECORDED' || 'INVENTORY_PENDING' => l10n.actPending,
+  'UNKNOWN_RESULT' => l10n.actUnknown,
+  _ => r,
+};
 
 /// 업무 고르기·업무 진행 화면 맨 위의 작은 바 — "업무 내역" 칩을 누르면 오늘 업무 내역.
 /// AppBar `bottom` 에 둔다. 조회 실패는 칩에 건수를 빼고 보일 뿐(내역 화면에서 오류를 보인다).
@@ -47,7 +56,7 @@ class MyWorkBar extends ConsumerWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final done = ref.watch(myTodayWorkProvider).value?.where(_finished).length;
+    final n = ref.watch(myTodayWorkProvider).value?.items.length;
     return SizedBox(
       height: preferredSize.height,
       child: Padding(
@@ -59,7 +68,7 @@ class MyWorkBar extends ConsumerWidget implements PreferredSizeWidget {
               avatar: const Icon(Icons.history, size: 18),
               visualDensity: VisualDensity.compact,
               label: Text(
-                done == null ? l10n.myWorkChip : l10n.myWorkChipCount(done),
+                n == null ? l10n.myWorkChip : l10n.myWorkChipCount(n),
               ),
               onPressed: () => context.push('/my-work'),
             ),
@@ -80,54 +89,76 @@ class MyWorkScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.myWorkTitle)),
       body: SafeArea(
-        child: UiStateView<List<TaskItem>>(
+        child: UiStateView<WorkActivities>(
           state: uiStateOf(ref.watch(myTodayWorkProvider)),
           onRetry: () => ref.invalidate(myTodayWorkProvider),
-          ready: (context, items) => _MyWorkList(items: items),
+          ready: (context, a) => RefreshIndicator(
+            onRefresh: () => ref.refresh(myTodayWorkProvider.future),
+            child: _MyWorkList(a: a),
+          ),
         ),
       ),
     );
   }
 }
 
-class _MyWorkList extends StatelessWidget {
-  const _MyWorkList({required this.items});
+class _MyWorkList extends ConsumerWidget {
+  const _MyWorkList({required this.a});
 
-  final List<TaskItem> items;
+  final WorkActivities a;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final finished = items.where(_finished).toList();
+    final hints = ref.watch(productHintsProvider);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (a.unavailableSources.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              l10n.myWorkPartial(a.unavailableSources.join(', ')),
+              key: const ValueKey('my-work-partial'),
+              style: TextStyle(color: scheme.error),
+            ),
+          ),
         Card(
           key: const ValueKey('my-work-summary'),
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _Stat(
-                    label: l10n.myWorkDone,
-                    value: l10n.myWorkCount(finished.length),
+            child: a.totals.isEmpty
+                ? Text(l10n.myWorkNoTotals)
+                : Wrap(
+                    spacing: 16,
+                    runSpacing: 8,
+                    children: [
+                      for (final t in a.totals)
+                        Column(
+                          key: ValueKey('my-work-total-${t.type}'),
+                          children: [
+                            Text(
+                              activityTypeText(l10n, t.type),
+                              style: theme.textTheme.labelLarge,
+                            ),
+                            Text(
+                              l10n.myWorkCount(t.count),
+                              style: theme.textTheme.headlineSmall,
+                            ),
+                            Text(
+                              l10n.myWorkTotalQty(t.qty),
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                    ],
                   ),
-                ),
-                Expanded(
-                  child: _Stat(
-                    label: l10n.myWorkInProgress,
-                    value: l10n.myWorkCount(items.length - finished.length),
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
         const SizedBox(height: 8),
-        if (items.isEmpty)
+        if (a.items.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 32),
             child: Text(
@@ -137,35 +168,36 @@ class _MyWorkList extends StatelessWidget {
               style: theme.textTheme.titleMedium,
             ),
           ),
-        for (final t in items)
+        for (final i in a.items)
           ListTile(
-            key: ValueKey('my-work-${t.taskId}'),
+            key: ValueKey('my-work-${i.refId}'),
             contentPadding: EdgeInsets.zero,
             title: Text(
-              t.headlineProduct == null
-                  ? taskKindText(l10n, t.kind)
-                  : (t.otherLineCount ?? 0) > 0
-                  ? l10n.myWorkHeadline(t.headlineProduct!, t.otherLineCount!)
-                  : t.headlineProduct!,
+              [
+                activityTypeText(l10n, i.type),
+                if (i.sku case final s?) hints.bySku(s)?.name ?? s,
+              ].join(' · '),
             ),
             subtitle: Text(
               [
-                taskKindText(l10n, t.kind),
-                formatSeoulTime(t.lastActivityAt!),
-                if (t.completedQty != null && t.plannedQty != null)
-                  l10n.myWorkQty(t.completedQty!, t.plannedQty!),
+                formatSeoulTime(i.at),
+                if (i.qty case final q?) l10n.myWorkItemQty(q),
+                ?i.taskId,
               ].join(' · '),
             ),
-            trailing: Text(
-              taskStateText(l10n, t.state),
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: t.state == TaskState.completed
-                    ? scheme.primary
-                    : t.state == TaskState.closedPartial
-                    ? scheme.error
-                    : scheme.onSurfaceVariant,
+            trailing: switch (activityResultText(l10n, i.result)) {
+              final r? => Text(
+                r,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: i.result == 'REJECTED'
+                      ? scheme.error
+                      : i.result == 'APPLIED'
+                      ? scheme.primary
+                      : scheme.onSurfaceVariant,
+                ),
               ),
-            ),
+              null => null,
+            },
           ),
         const SizedBox(height: 16),
         Text(
@@ -174,24 +206,6 @@ class _MyWorkList extends StatelessWidget {
             color: scheme.onSurfaceVariant,
           ),
         ),
-      ],
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      children: [
-        Text(label, style: theme.textTheme.labelLarge),
-        Text(value, style: theme.textTheme.headlineSmall),
       ],
     );
   }

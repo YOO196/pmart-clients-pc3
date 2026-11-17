@@ -3,6 +3,7 @@ import 'package:pmart_api_mfc_inbound/pmart_api_mfc_inbound.dart' as ib;
 
 import 'package:mfc_app/features/inbound/domain/inbound.dart';
 import 'package:mfc_app/features/quality/data/quality_repository.dart';
+import 'package:mfc_app/features/quality/domain/quality.dart';
 
 /// BR-53 R8·R10 (mfc-inbound 0.8.0): 입고 작업의 상품명·바코드, 송장 라벨 형식.
 void main() {
@@ -45,6 +46,25 @@ void main() {
       expect(v.barcode, isNull);
       expect(v.matchesBarcode(''), isFalse);
     }
+  });
+
+  test('입고 작업 판정 기준(0.11.0, BR-52 R18): 최소 잔여일·제조 후 경과일·보관 유형 — 없으면 null(0·무제한 아님)', () {
+    final v = inboundTaskFromContract(
+      task({
+        'storageType': 'CHILLED',
+        'minRemainingDays': 2,
+        'maxDaysSinceManufacture': 7,
+      }),
+    );
+    expect(v.minRemainingDays, 2);
+    expect(v.maxDaysSinceManufacture, 7);
+    expect(v.zone, TempZone.chilled);
+    final none = inboundTaskFromContract(task({}));
+    expect(none.minRemainingDays, isNull);
+    expect(none.maxDaysSinceManufacture, isNull);
+    expect(none.zone, isNull);
+    expect(tempZoneFromWire('FROZEN'), TempZone.frozen);
+    expect(tempZoneFromWire('SOMETHING'), isNull);
   });
 
   test('송장 라벨 TRF:{trfId}:{version} — trfId 만 꺼낸다, 형식이 아니면 null', () {

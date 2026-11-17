@@ -95,6 +95,7 @@ void main() {
       inv.CenterStock.fromJson({
         'mfcId': 'MFC-1',
         'sku': 'E-1',
+        'productName': '서울우유 1L',
         'lots': [
           {
             'lotId': 'L-1',
@@ -119,5 +120,6 @@ void main() {
     expect(v.lots.single.expiryDate, '2026-12-01');
     expect(v.lines.single.qualityState, 'QUARANTINED');
     expect(v.lines.single.qty, 2);
+    expect(v.productName, '서울우유 1L', reason: '서버 상품명(0.23.0)');
   });
 }
