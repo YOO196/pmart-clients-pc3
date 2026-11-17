@@ -252,6 +252,63 @@ void main() {
     });
   });
 
+  test(
+    '다음 칸은 서버 방문 순서(visitSeq) — 한 줄의 조각 사이에 다른 줄이 끼면 그 줄 먼저(시뮬레이터 바코드 판과 같게)',
+    () {
+      PickInstruction piece(
+        String lot,
+        int seq,
+        String loc, {
+        bool done = false,
+      }) => PickInstruction(
+        lotId: lot,
+        remainingQty: done ? 0 : 1,
+        visitSeq: seq,
+        status: done ? PickStatus.done : PickStatus.ok,
+        locations: [
+          PickLocation(code: loc, qty: 5, allocatedQty: done ? 0 : 1),
+        ],
+      );
+      TaskLineView line(String id, List<PickInstruction> picks) => TaskLineView(
+        taskLineId: 'tl-$id',
+        orderLineId: id,
+        sku: 'E-0000000$id',
+        plannedQty: picks.length,
+        completedQty: 0,
+        cancelledQty: 0,
+        remainingQty: picks.where((p) => p.status != PickStatus.done).length,
+        picks: picks,
+      );
+      TaskDetailView task(List<TaskLineView> lines) => TaskDetailView(
+        taskId: 't',
+        kind: TaskKind.pick,
+        state: TaskState.inProgress,
+        version: 1,
+        lines: lines,
+      );
+      // 줄 1: 1번째·3번째 칸, 줄 2: 2번째 칸.
+      final first = task([
+        line('1', [
+          piece('L1', 1, 'C-B1-01-1-01'),
+          piece('L2', 3, 'C-B3-01-1-01'),
+        ]),
+        line('2', [piece('L3', 2, 'C-B2-06-3-01')]),
+      ]);
+      expect(nextPickStop(first)!.location, 'C-B1-01-1-01');
+      final second = task([
+        line('1', [
+          piece('L1', 1, 'C-B1-01-1-01', done: true),
+          piece('L2', 3, 'C-B3-01-1-01'),
+        ]),
+        line('2', [piece('L3', 2, 'C-B2-06-3-01')]),
+      ]);
+      final s = nextPickStop(second)!;
+      expect(s.location, 'C-B2-06-3-01');
+      expect(s.line.orderLineId, '2');
+      expect(s.lotId, 'L3');
+    },
+  );
+
   group('시작·피킹', () {
     late MockTaskRepository repo;
     late MemoryKeyValueStore store;

@@ -219,8 +219,12 @@ class PickStop {
   final List<String> otherLocations;
 }
 
-/// 서버 순서대로 첫 남은 칸. 접수만 된(확정 대기) 양은 앞 조각에서 뺀다.
+/// 지금 갈 칸: 남은 조각 중 서버 방문 순서(`visitSeq`, 냉장 → 냉동 → 상온, 걷는 거리 최단)가 가장 앞인 것.
+/// 한 줄의 조각이 다른 줄 조각 사이에 끼어 있어도 서버 순서를 따른다(시뮬레이터 바코드 판과 같은 칸).
+/// 방문 순서가 없으면 서버가 준 줄·조각 순서. 접수만 된(확정 대기) 양은 그 줄의 앞 조각에서 뺀다.
 PickStop? nextPickStop(TaskDetailView task) {
+  PickStop? best;
+  int? bestSeq;
   for (final l in task.lines) {
     if (l.remainingQty - l.pendingQty <= 0) continue;
     var sent = l.pendingQty;
@@ -242,7 +246,7 @@ PickStop? nextPickStop(TaskDetailView task) {
           : (c.qty ?? 0) > 0
           ? c.qty!
           : r;
-      return PickStop(
+      final stop = PickStop(
         line: l,
         location: c.code,
         qty: here < r ? here : r,
@@ -254,9 +258,19 @@ PickStop? nextPickStop(TaskDetailView task) {
             if (o.code != c.code) o.code,
         ],
       );
+      final seq = p.visitSeq;
+      if (best == null) {
+        best = stop;
+        bestSeq = seq;
+      } else if (seq != null && (bestSeq == null || seq < bestSeq)) {
+        best = stop;
+        bestSeq = seq;
+      }
+      // 방문 순서가 없으면 줄 안에서는 첫 남은 조각만(예전과 같게).
+      if (seq == null) break;
     }
     // 재고 조회가 안 돼 지시가 비었으면 줄의 지시 칸.
-    if (l.picks.isEmpty && l.locationId != null) {
+    if (best == null && l.picks.isEmpty && l.locationId != null) {
       return PickStop(
         line: l,
         location: l.locationId!,
@@ -266,7 +280,7 @@ PickStop? nextPickStop(TaskDetailView task) {
       );
     }
   }
-  return null;
+  return best;
 }
 
 @immutable
