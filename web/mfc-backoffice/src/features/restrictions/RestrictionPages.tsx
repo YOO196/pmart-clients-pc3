@@ -126,7 +126,7 @@ function RestrictionCard({ mfcId, restriction: r, onDone }: { readonly mfcId: st
             {m.lift}
           </button>
           <div className="w-full">
-            <ApprovalAwareFeedback command={lift} />
+            <ApprovalAwareFeedback command={lift} onApprovalId={setApprovalRef} />
           </div>
         </form>
       )}
