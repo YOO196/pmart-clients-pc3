@@ -148,10 +148,25 @@ void main() {
     expect(enabled(t, 'move-submit'), isFalse); // 상품 아직
     await scan(t, 'move-scan', MockTaskRepository.yogurtBarcode);
     expect(find.text('지시한 상품이 아니에요 — 세지 않았어요'), findsWidgets);
-    for (var i = 0; i < 6; i++) {
-      await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
-    }
-    expect(find.text('스캔해 센 수량 6'), findsOneWidget);
+    // 첫 개를 스캔하면 수량 칸(피킹과 같게) — 스캔·+·수기, 1 ~ 옮길 양.
+    expect(find.byKey(const ValueKey('move-qty')), findsNothing);
+    await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
+    expect(find.text('스캔해 센 수량 0'), findsNothing);
+    String qty() => t.widget<TextField>(find.byKey(const ValueKey('move-qty'))).controller!.text;
+    expect(qty(), '1');
+    await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
+    expect(qty(), '2');
+    await tapKey(t, 'move-qty-add');
+    expect(qty(), '3');
+    await t.enterText(find.byKey(const ValueKey('move-qty')), '0');
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pumpAndSettle();
+    expect(qty(), '1'); // 1 아래로 내려가지 않는다
+    await t.enterText(find.byKey(const ValueKey('move-qty')), '99');
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pumpAndSettle();
+    expect(qty(), '6'); // 옮길 양까지
+    expect(t.widget<ButtonStyleButton>(find.byKey(const ValueKey('move-qty-add'))).onPressed, isNull);
     await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
     expect(find.text('옮길 양을 넘었어요'), findsWidgets);
     expect(enabled(t, 'move-submit'), isTrue);
@@ -484,8 +499,8 @@ void main() {
     // ② 상품 싣기: 상품을 세고 "실었어요". 그 전에는 선반을 받지 않는다.
     expect(find.byKey(const ValueKey('step-1')), findsOneWidget);
     await scan(t, 'return-scan', MockTaskRepository.yogurtBarcode);
-    await scan(t, 'return-scan', MockTaskRepository.yogurtBarcode);
-    expect(find.text('스캔해 센 수량 2'), findsOneWidget);
+    await tapKey(t, 'return-qty-add');
+    expect(t.widget<TextField>(find.byKey(const ValueKey('return-qty'))).controller!.text, '2');
     await scan(t, 'return-scan', 'C-S1-01-1-01');
     expect(find.text("상품을 다 세었으면 '실었어요'를 먼저 눌러 주세요"), findsWidgets);
     await tapKey(t, 'return-load');

@@ -443,6 +443,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                       _ => l10n.moveScanDrop,
                     },
                     cameraTitle: l10n.typeReturn,
+                    continuous: false,
                     autofocus: false,
                     onScan: (code) => switch (ctl.scan(p, code)) {
                       LocScan.ok => const ScanFeedback.ok(),
@@ -462,17 +463,30 @@ class ReturnShelfScreen extends ConsumerWidget {
                       style: theme.textTheme.bodyMedium,
                     )
                   else if (step == 1) ...[
-                    Text(
-                      bc != null ? l10n.moveScanned(qty) : l10n.moveNoBarcode,
-                      key: const ValueKey('product-check'),
-                    ),
-                    QtyStepper(
-                      id: 'return-qty',
-                      label: l10n.moveQtyDrop,
-                      value: qty,
-                      max: bc != null ? qty : p.left,
-                      onChanged: ctl.setQty,
-                    ),
+                    if (bc == null || qty == 0)
+                      Text(
+                        bc != null ? l10n.moveScanned(qty) : l10n.moveNoBarcode,
+                        key: const ValueKey('product-check'),
+                      ),
+                    if (bc == null)
+                      QtyStepper(
+                        id: 'return-qty',
+                        label: l10n.moveQtyDrop,
+                        value: qty,
+                        max: p.left,
+                        onChanged: ctl.setQty,
+                      )
+                    else if (qty > 0)
+                      CountQtyField(
+                        id: 'return-qty',
+                        label: l10n.moveQtyDrop,
+                        help: l10n.countQtyHelp(p.left),
+                        addLabel: l10n.pickQtyAdd,
+                        value: qty,
+                        max: p.left,
+                        onAdd: () => ctl.scan(p, bc),
+                        onSet: (n) => ctl.setQty(n.clamp(1, p.left)),
+                      ),
                   ] else
                     Row(
                       children: [

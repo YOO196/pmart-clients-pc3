@@ -915,6 +915,8 @@
     }
   },
   "pickQtyAdd": "한 개 더",
+  "countQtyHelp": "더 찍거나 +로 올리거나 숫자를 고쳐요(최대 {max}개)",
+  "@countQtyHelp": {"placeholders": {"max": {"type": "int"}}},
   "pickRejectByServer": "서버(재고)가 거절했어요 — 사유는 서버가 아직 알려 주지 않아요",
   "pickRejectCode": "사유 {code}",
   "@pickRejectCode": {
