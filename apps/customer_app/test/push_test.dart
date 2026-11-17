@@ -15,7 +15,10 @@ import 'package:customer_app/features/auth/presentation/auth_controller.dart';
 import 'package:customer_app/features/notifications/presentation/notifications_screens.dart';
 import 'package:customer_app/features/push/data/push_source.dart';
 import 'package:customer_app/features/push/data/push_tokens_repository.dart';
+import 'package:customer_app/features/push/domain/push_route.dart';
 import 'package:customer_app/features/push/presentation/push_controller.dart';
+import 'package:customer_app/features/orders/presentation/orders_screens.dart'
+    show OrderDetailScreen;
 import 'package:customer_app/shared/providers.dart';
 
 import 'support/app_harness.dart';
@@ -30,7 +33,7 @@ final class FakePushSource implements PushSource {
   int permissionAsks = 0;
   int deletes = 0;
   final refreshes = StreamController<String>.broadcast();
-  final opens = StreamController<void>.broadcast();
+  final opens = StreamController<Map<String, String>>.broadcast();
   final receives = StreamController<void>.broadcast();
 
   @override
@@ -54,7 +57,7 @@ final class FakePushSource implements PushSource {
   }
 
   @override
-  Stream<void> get opened => opens.stream;
+  Stream<Map<String, String>> get opened => opens.stream;
 
   @override
   Stream<void> get received => receives.stream;
@@ -64,17 +67,25 @@ final class FakePushSource implements PushSource {
 void main() {
   setUpAll(initPmartFormatting);
 
-  List<Override> pushOverrides(FakePushSource source, MockPushTokensRepository repo) => [
+  List<Override> pushOverrides(
+    FakePushSource source,
+    MockPushTokensRepository repo,
+  ) => [
     pushSourceProvider.overrideWithValue(source),
     pushTokensRepositoryProvider.overrideWithValue(repo),
     // 앱(main.dart)과 같게: 로그아웃 직전 서버에서 이 단말을 지운다
     beforeSignOutProvider.overrideWith(
       (ref) =>
-          () => ref.read(pushRegistrationProvider.notifier).unregisterBeforeSignOut(),
+          () => ref
+              .read(pushRegistrationProvider.notifier)
+              .unregisterBeforeSignOut(),
     ),
   ];
 
-  Future<ProviderContainer> loginAsMember(WidgetTester t, List<Override> overrides) async {
+  Future<ProviderContainer> loginAsMember(
+    WidgetTester t,
+    List<Override> overrides,
+  ) async {
     await t.pumpWidget(testApp(overrides));
     await t.pumpAndSettle();
     await t.tap(find.text('마이페이지').last);
@@ -83,7 +94,9 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('login-kakao')));
     await t.pumpAndSettle();
-    final container = ProviderScope.containerOf(t.element(find.byType(CustomerApp)));
+    final container = ProviderScope.containerOf(
+      t.element(find.byType(CustomerApp)),
+    );
     expect(container.read(sessionProvider), isA<MemberSession>());
     return container;
   }
@@ -168,15 +181,80 @@ void main() {
     expect(container.read(pushRegistrationProvider), PushStatus.off);
   });
 
-  testWidgets('푸시를 누르면 알림함이 열린다', (t) async {
+  testWidgets('푸시를 누르면 목적지 화면(주문 상세)이 열린다', (t) async {
     final source = FakePushSource();
     final repo = MockPushTokensRepository();
     await loginAsMember(t, pushOverrides(source, repo));
 
-    source.opens.add(null);
+    source.opens.add({
+      'notificationId': 'ntf-1',
+      'templateKey': 'ORDER_CANCELLED',
+      'destinationType': 'ORDER',
+      'destinationRef': 'order-seed-1',
+    });
+    await t.pumpAndSettle();
+
+    final detail = t.widget<OrderDetailScreen>(find.byType(OrderDetailScreen));
+    expect(detail.orderId, 'order-seed-1');
+  });
+
+  testWidgets('목적지를 모르는 푸시는 알림함이 열린다', (t) async {
+    final source = FakePushSource();
+    final repo = MockPushTokensRepository();
+    await loginAsMember(t, pushOverrides(source, repo));
+
+    source.opens.add(const {'destinationType': 'SOMETHING_NEW'});
     await t.pumpAndSettle();
 
     expect(find.byType(NotificationCenterScreen), findsOneWidget);
+  });
+
+  group('푸시 data → 경로(알림함 목적지와 같게)', () {
+    test('주문·배송·환불(클레임)·문의', () {
+      expect(
+        pushRoute(const {'destinationType': 'ORDER', 'destinationRef': 'o 1'}),
+        '/orders/o%201',
+      );
+      expect(
+        pushRoute(const {
+          'destinationType': 'DELIVERY',
+          'destinationRef': 'd1',
+        }),
+        '/deliveries/d1',
+      );
+      expect(
+        pushRoute(const {'destinationType': 'REFUND', 'destinationRef': 'c1'}),
+        '/claims/c1',
+      );
+      expect(
+        pushRoute(const {'destinationType': 'CLAIM', 'destinationRef': 'c1'}),
+        '/claims/c1',
+      );
+      expect(
+        pushRoute(const {'destinationType': 'INQUIRY', 'destinationRef': 'q1'}),
+        '/support/inquiries/q1',
+      );
+    });
+
+    test('목적지 없음·화면 없는 목적지·참조 없음 → 그 알림 상세, 알림 ID 도 없으면 알림함', () {
+      expect(
+        pushRoute(const {'notificationId': 'n1', 'destinationType': 'NONE'}),
+        '/notifications/n1',
+      );
+      expect(
+        pushRoute(const {
+          'notificationId': 'n1',
+          'destinationType': 'NOTICE',
+          'destinationRef': 'x',
+        }),
+        '/notifications/n1',
+      );
+      expect(
+        pushRoute(const {'notificationId': 'n1', 'destinationType': 'ORDER'}),
+        '/notifications/n1',
+      );
+      expect(pushRoute(const {}), '/notifications');
+    });
   });
 
   group('API 연동', () {
@@ -189,36 +267,44 @@ void main() {
       delay: (_) async {},
     );
 
-    test('등록: PUT /me/push-tokens/{기기 ID}, 본문 token·platform ANDROID, 멱등 키·출처 헤더', () async {
-      final adapter = FakeAdapter(
-        (o, _) async => FakeReply(
-          200,
-          body: {
-            'deviceId': 'dev-1',
-            'platform': 'ANDROID',
-            'registeredAt': '2026-11-17T10:00:00Z',
-            'updatedAt': '2026-11-17T10:00:00Z',
-          },
-        ),
-      );
-      final deviceId = DeviceIdProvider(MemoryKeyValueStore());
-      final key = IdempotencyKey.generate();
-      await ApiPushTokensRepository(dioWith(adapter), deviceId).register('tok-1', key: key);
+    test(
+      '등록: PUT /me/push-tokens/{기기 ID}, 본문 token·platform ANDROID, 멱등 키·출처 헤더',
+      () async {
+        final adapter = FakeAdapter(
+          (o, _) async => FakeReply(
+            200,
+            body: {
+              'deviceId': 'dev-1',
+              'platform': 'ANDROID',
+              'registeredAt': '2026-11-17T10:00:00Z',
+              'updatedAt': '2026-11-17T10:00:00Z',
+            },
+          ),
+        );
+        final deviceId = DeviceIdProvider(MemoryKeyValueStore());
+        final key = IdempotencyKey.generate();
+        await ApiPushTokensRepository(
+          dioWith(adapter),
+          deviceId,
+        ).register('tok-1', key: key);
 
-      final sent = adapter.requests.single;
-      expect(sent.method, 'PUT');
-      expect(sent.path, endsWith('/me/push-tokens/${await deviceId.get()}'));
-      expect(sent.headers['Idempotency-Key'], key.value);
-      expect(sent.headers['X-Source-System'], sourceSystem);
-      expect(sent.data, contains('"token":"tok-1"'));
-      expect(sent.data, contains('"platform":"ANDROID"'));
-    });
+        final sent = adapter.requests.single;
+        expect(sent.method, 'PUT');
+        expect(sent.path, endsWith('/me/push-tokens/${await deviceId.get()}'));
+        expect(sent.headers['Idempotency-Key'], key.value);
+        expect(sent.headers['X-Source-System'], sourceSystem);
+        expect(sent.data, contains('"token":"tok-1"'));
+        expect(sent.data, contains('"platform":"ANDROID"'));
+      },
+    );
 
     test('해제: DELETE /me/push-tokens/{기기 ID}, 204', () async {
       final adapter = FakeAdapter((o, _) async => const FakeReply(204));
       final deviceId = DeviceIdProvider(MemoryKeyValueStore());
-      await ApiPushTokensRepository(dioWith(adapter), deviceId)
-          .unregister(key: IdempotencyKey.generate());
+      await ApiPushTokensRepository(
+        dioWith(adapter),
+        deviceId,
+      ).unregister(key: IdempotencyKey.generate());
 
       final sent = adapter.requests.single;
       expect(sent.method, 'DELETE');
@@ -230,12 +316,19 @@ void main() {
       final adapter = FakeAdapter(
         (o, _) async => const FakeReply(
           422,
-          body: {'type': 'about:blank', 'title': 'x', 'status': 422, 'code': 'CONFIG_REQUIRED'},
+          body: {
+            'type': 'about:blank',
+            'title': 'x',
+            'status': 422,
+            'code': 'CONFIG_REQUIRED',
+          },
         ),
       );
       await expectLater(
-        ApiPushTokensRepository(dioWith(adapter), DeviceIdProvider(MemoryKeyValueStore()))
-            .register('tok-1', key: IdempotencyKey.generate()),
+        ApiPushTokensRepository(
+          dioWith(adapter),
+          DeviceIdProvider(MemoryKeyValueStore()),
+        ).register('tok-1', key: IdempotencyKey.generate()),
         throwsA(isA<ProblemFailure>()),
       );
     });

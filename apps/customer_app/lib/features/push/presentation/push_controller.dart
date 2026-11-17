@@ -11,6 +11,7 @@ import '../../notifications/presentation/notifications_controller.dart'
     show inboxProvider;
 import '../data/push_source.dart';
 import '../data/push_tokens_repository.dart';
+import '../domain/push_route.dart';
 
 final pushSourceProvider = Provider<PushSource>(
   (ref) => switch (ref.watch(envProvider)) {
@@ -109,10 +110,13 @@ class PushRegistrationController extends Notifier<PushStatus> {
           if (_member && token.isNotEmpty) unawaited(_register(token));
         }, onError: (Object _) {}),
       )
-      // 푸시를 누르면 알림함으로. 푸시 data 로 갈 화면을 고르는 것은 계약이 정해진 뒤(백엔드 질문 2026-11-17 Q4).
+      // 푸시를 누르면 알림함에서 누른 것과 같은 화면으로(data 의 목적지 — 없으면 그 알림, 그것도 없으면 알림함).
+      // 새 알림이 있으니 알림함(안 읽음 수)도 다시 읽는다.
       ..add(
-        _source.opened.listen((_) {
-          if (ref.mounted) ref.read(routerProvider).push('/notifications');
+        _source.opened.listen((data) {
+          if (!ref.mounted) return;
+          if (_member) ref.invalidate(inboxProvider);
+          ref.read(routerProvider).push(pushRoute(data));
         }, onError: (Object _) {}),
       )
       // 앱을 보고 있을 때 온 푸시는 알림을 띄우지 않으니 알림함(안 읽음 수)을 다시 읽는다.

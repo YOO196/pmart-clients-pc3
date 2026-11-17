@@ -1,7 +1,7 @@
 # 고객앱 해야 할 일 (PC 1)
 
 - 만든 날: 2026-11-17 (사용자 "해야 할 일 md 파일을 작성해줘")
-- 고친 날: 2026-11-17
+- 고친 날: 2026-11-18
 - 끝난 항목은 지우지 말고 `~~취소선~~` + 커밋을 적는다. 새 항목은 맨 아래 절에 더한다.
 - 계약·회신 경로: 백엔드 회신은 `../pmart-backend/docs/handoff/clients/<customer-app|all>/`, 우리 요청은 `docs/handoff/customer-app/`.
 
@@ -46,7 +46,9 @@
 | 18 | 화면용 주문번호 8자리(주문 상세·결제 완료) | `53fb6c9` |
 | 19 | 오배송 다시 배송비 9,000원 결제·환불 고르기 — LAN 에 고객 잘못 오배송 건이 있어야 함(백오피스 접수부터) | `e9115ca` |
 | 20 | 예약 시간 변경 거절 사유·오늘·내일 슬롯 | `aba8b12` |
-| 21 | 알림함(쌓이는지, 푸시는 BR-09 전이라 없음) | 2026-11-16 |
+| 21 | 알림함(쌓이는지) — 휴대폰 푸시는 27 | 2026-11-16 |
+| 27 | **휴대폰 푸시(폰 연결 필요)**: Firebase 콘솔 테스트 메시지 수신 → 로그인 뒤 `GET /me/push-tokens` 에 단말 → 주문 취소·배송 출발 때 푸시가 오고 누르면 그 화면, 주문 확정은 알림함에만 → **Google 로그인 그대로**(빌드 값 `googleServerClientId` 꼭 넣어 빌드). 결과는 `docs/handoff/customer-app/2026-11-18-backend-customer-push-fcm-reply.md` §2 에 덧붙임 | `7cbe1f2`, 2026-11-18 푸시 누르면 목적지 |
+| 28 | Firebase 프로젝트 합치기(2026-11-18 예정): 사용자가 `pmart-123` 에 `com.pmart.customer_app` 을 등록해 받은 `google-services.json` 으로 `apps/customer_app/android/app/google-services.json`(git 제외)만 바꾼 뒤 27 다시 | 코드 변경 없음 |
 
 ## 5. 다른 PC 일 중 PC 1 이 챙길 것
 

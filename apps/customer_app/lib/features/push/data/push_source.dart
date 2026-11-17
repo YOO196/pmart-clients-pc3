@@ -21,8 +21,8 @@ abstract interface class PushSource {
   /// 이 단말의 토큰을 버린다(로그아웃·세션 종료) — 서버에 남은 옛 토큰으로는 더 오지 않게.
   Future<void> deleteToken();
 
-  /// 푸시를 눌러 앱이 열렸다(꺼져 있다가 열린 경우 포함).
-  Stream<void> get opened;
+  /// 푸시를 눌러 앱이 열렸다(꺼져 있다가 열린 경우 포함). 값은 그 푸시의 `data`(문자열만).
+  Stream<Map<String, String>> get opened;
 
   /// 앱을 보고 있는 동안 푸시를 받았다(Android 는 이때 알림을 띄우지 않는다).
   Stream<void> get received;
@@ -48,7 +48,7 @@ final class NoPushSource implements PushSource {
   Future<void> deleteToken() async {}
 
   @override
-  Stream<void> get opened => const Stream.empty();
+  Stream<Map<String, String>> get opened => const Stream.empty();
 
   @override
   Stream<void> get received => const Stream.empty();
@@ -88,19 +88,26 @@ final class FirebasePushSource implements PushSource {
   Future<String?> token() => FirebaseMessaging.instance.getToken();
 
   @override
-  // ignore: deprecated_member_use
-  Stream<String> get tokenRefreshes => FirebaseMessaging.instance.onTokenRefresh;
+  Stream<String> get tokenRefreshes =>
+      // ignore: deprecated_member_use
+      FirebaseMessaging.instance.onTokenRefresh;
 
   @override
   // ignore: deprecated_member_use
   Future<void> deleteToken() => FirebaseMessaging.instance.deleteToken();
 
   @override
-  Stream<void> get opened async* {
+  Stream<Map<String, String>> get opened async* {
     final initial = await FirebaseMessaging.instance.getInitialMessage();
-    if (initial != null) yield null;
-    yield* FirebaseMessaging.onMessageOpenedApp.map<void>((_) {});
+    if (initial != null) yield _data(initial);
+    yield* FirebaseMessaging.onMessageOpenedApp.map(_data);
   }
+
+  /// FCM data 는 문자열 값만 온다 — 다른 값은 버린다.
+  static Map<String, String> _data(RemoteMessage m) => {
+    for (final e in m.data.entries)
+      if (e.value case final String v) e.key: v,
+  };
 
   @override
   Stream<void> get received => FirebaseMessaging.onMessage.map<void>((_) {});
