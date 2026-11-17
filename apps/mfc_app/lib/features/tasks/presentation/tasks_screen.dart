@@ -210,6 +210,7 @@ String pickLocText(AppLocalizations l10n, PickLocScan r) => switch (r) {
   PickLocScan.ok => '',
   PickLocScan.wrongPlace => l10n.moveWrongPlace,
   PickLocScan.notLocation => l10n.moveNotLocation,
+  PickLocScan.overScan => l10n.scanOver,
 };
 
 class _PickingScreenState extends ConsumerState<PickingScreen> {
@@ -523,6 +524,9 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                     ],
                     label: l10n.scanHint,
                     cameraTitle: l10n.pickCameraTitle,
+                    // 한 번 인식하면 카메라를 내린다(사용자 2026-11-17) — 열린 채 연속 인식하면
+                    // 칸 몫을 채운 뒤의 인식이 다음 단계로 넘어가 버렸다.
+                    continuous: false,
                     onScan: (code) => _onScan(task, code),
                   ),
                   if (picking.lastScan case final s?
