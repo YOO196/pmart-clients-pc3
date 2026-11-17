@@ -27,14 +27,14 @@ enum MockApproval { approve, decline, unknown, mismatch, approveThenCancel }
 
 /// 목 배송지 사본(계약 `ShippingAddress`). 목 주소록(`mock_address_repository.dart`)의 쇼핑 주소와 같다.
 const mockShippingAddressJson = <String, Object?>{
-  'roadAddress': '서울 송파구 올림픽로 300',
-  'detailAddress': '101동 1001호',
-  'postalCode': '05551',
+  'roadAddress': '부산 부산진구 전포대로 210',
+  'detailAddress': '전포 한빛아파트 103동 1203호',
   'receiverName': '김피마',
   'receiverPhone': '010-0000-0000',
   'entranceMethod': 'PASSWORD',
   'entranceNote': '#1234',
-  'geo': {'lat': 37.5133, 'lng': 127.1028},
+  // 라이더앱 목 배송 dlv-1 의 전달지 좌표와 같다(우편번호는 그쪽에 없어 넣지 않는다 — 계약상 선택).
+  'geo': {'lat': 35.1565, 'lng': 129.0665},
 };
 
 /// 주문 결제가 아닌 결제 시도(예: 오배송 다시 배송비)를 흉내 내는 목. 목 결제 서비스([MockCheckoutRepository])가

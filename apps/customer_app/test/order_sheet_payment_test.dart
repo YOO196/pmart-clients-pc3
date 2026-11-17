@@ -176,7 +176,7 @@ void main() {
     await toOrderSheet(t, checkout);
 
     expect(find.byKey(const ValueKey('shipping-address')), findsOneWidget);
-    expect(find.textContaining('올림픽로 300'), findsOneWidget);
+    expect(find.textContaining('전포대로 210'), findsOneWidget);
     expect(find.text('김피마 · 010-0000-0000'), findsOneWidget);
     expect(find.textContaining('비밀번호 필요'), findsOneWidget);
     // 결제수단·약관 영역이 주문서 안에 있다(목은 안내 문구).

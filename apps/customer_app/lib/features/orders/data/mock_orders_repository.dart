@@ -53,10 +53,11 @@ base class MockOrdersRepository implements OrdersRepository {
   Map<String, Map<String, Object?>> _seeded() => {
     'order-seed-4': {
       'orderId': 'order-seed-4',
-      'orderNumber': '61842093',
+      // 라이더앱 목 배송 dlv-1 과 같은 주문(번호·배송 ID·지점 — PC 5 요청, 목 전용).
+      'orderNumber': '48213075',
       'version': 2,
       'status': 'CONFIRMED',
-      'mfcId': 'MFC-MOCK-01',
+      'mfcId': 'MFC-BSJ-01',
       'deliveryMode': 'SCHEDULED',
       'arrivalWindow': {'date': '2026-10-24', 'start': '18:00', 'end': '19:00'},
       'shippingAddress': {
@@ -88,7 +89,7 @@ base class MockOrdersRepository implements OrdersRepository {
       'shipments': [
         {
           'shipmentId': 'sh-5',
-          'deliveryId': 'dlv-s5',
+          'deliveryId': 'dlv-1',
           'lines': [
             {'orderLineId': 'ol-5', 'qty': 3},
           ],
@@ -115,7 +116,7 @@ base class MockOrdersRepository implements OrdersRepository {
       'orderNumber': '48213907',
       'version': 7,
       'status': 'PARTIALLY_DELIVERED',
-      'mfcId': 'MFC-MOCK-01',
+      'mfcId': 'MFC-BSJ-01',
       'deliveryMode': 'SINGLE',
       'quote': _quoteSeed,
       'lines': [

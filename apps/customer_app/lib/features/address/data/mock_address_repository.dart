@@ -9,15 +9,16 @@ base class MockAddressRepository implements AddressRepository {
   MockAddressRepository({this.latency = const Duration(milliseconds: 300)});
 
   final Duration latency;
-  static const homeMfcId = 'MFC-MOCK-01';
+  // 라이더앱 목과 같은 지점·배송지(PC 5 요청 rider-app/2026-11-16-pc1-request-shared-mock-order — 목 전용).
+  static const homeMfcId = 'MFC-BSJ-01';
 
   final _addresses = <Map<String, Object?>>[
     {
       'addressId': 'addr-1',
       'version': 1,
       'label': '집',
-      'roadAddress': '서울 송파구 올림픽로 300',
-      'detailAddress': '101동 1001호',
+      'roadAddress': '부산 부산진구 전포대로 210',
+      'detailAddress': '전포 한빛아파트 103동 1203호',
       'receiverName': '김피마',
       'receiverPhone': '010-0000-0000',
       'entranceMethod': 'PASSWORD',
@@ -82,7 +83,7 @@ base class MockAddressRepository implements AddressRepository {
           ? {'state': 'OUT_OF_SERVICE_AREA'}
           : road.contains('확인')
           ? {'state': 'UNKNOWN'}
-          : {'state': 'SERVICEABLE', 'mfcId': 'MFC-MOCK-02'},
+          : {'state': 'SERVICEABLE', 'mfcId': 'MFC-BHU-01'},
     };
     _addresses.add(json);
     _addedByKey[key.value] = json;

@@ -153,7 +153,8 @@ base class MockCatalogRepository implements CatalogRepository {
   final Set<String> unavailableSectionIds;
   final int pageSize;
 
-  static const mfcId = 'MFC-MOCK-01';
+  /// 라이더앱 목과 같은 부산진구지점(목 전용).
+  static const mfcId = 'MFC-BSJ-01';
 
   Future<void> _wait() => Future<void>.delayed(latency);
 

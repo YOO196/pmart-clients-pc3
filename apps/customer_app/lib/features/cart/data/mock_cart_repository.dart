@@ -74,7 +74,7 @@ base class MockCartRepository implements CartRepository {
   String? _openedMfcId;
 
   bool _notCarried(String sku) =>
-      notCarriedAt[_openedMfcId ?? 'MFC-MOCK-01']?.contains(sku) ?? false;
+      notCarriedAt[_openedMfcId ?? 'MFC-BSJ-01']?.contains(sku) ?? false;
 
   /// 받은 변경 명령(재전송 포함) 순서대로. 테스트가 "몇 번 보냈는지"를 본다.
   final changes = <CartChange>[];
@@ -163,7 +163,7 @@ base class MockCartRepository implements CartRepository {
       'cartVersion': version,
       'ownerType': 'GUEST',
       'accountId': null,
-      'mfcId': noMfc ? null : 'MFC-MOCK-01',
+      'mfcId': noMfc ? null : 'MFC-BSJ-01',
       'items': items,
       'selectedItemAmount': amount,
       'lastChangedAt': '2026-10-24T06:00:00Z',

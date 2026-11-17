@@ -368,7 +368,7 @@ void main() {
         t,
         orders,
         orderId: 'order-seed-4',
-        deliveryId: 'dlv-s5',
+        deliveryId: 'dlv-1',
       );
       expect(key('track-reserved'), findsOneWidget);
       // 서버 도착 구간(18:00~19:00, 서울 시각)을 그대로 보인다.

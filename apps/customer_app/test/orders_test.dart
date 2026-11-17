@@ -107,7 +107,7 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('shipping-address')), findsOneWidget);
-    expect(find.textContaining('올림픽로 300'), findsOneWidget);
+    expect(find.textContaining('전포대로 210'), findsOneWidget);
     expect(find.text('김피마 · 010-0000-0000'), findsOneWidget);
   });
 

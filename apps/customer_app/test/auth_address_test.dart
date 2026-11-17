@@ -228,7 +228,7 @@ void main() {
       final outcome = await c.read(addressBookProvider.notifier).select(id);
 
       expect(outcome, isA<ShoppingAddressChanged>());
-      expect(c.read(currentMfcIdProvider), 'MFC-MOCK-02');
+      expect(c.read(currentMfcIdProvider), 'MFC-BHU-01');
     });
 
     test('선택 응답을 잃으면 쇼핑 컨텍스트 조회로 반영을 확인한다', () async {
