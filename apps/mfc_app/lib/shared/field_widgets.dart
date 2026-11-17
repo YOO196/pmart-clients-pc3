@@ -476,3 +476,99 @@ class _QtyDialogState extends State<QtyDialog> {
 /// 현장 명령 거절 문구. 담당 아님(409 `NOT_ASSIGNEE` — 이동 지시, 입고 작업 mfc-inbound 0.9.0)은 따로 알린다.
 String fieldRejectedText(AppLocalizations l10n, String code) =>
     code == 'NOT_ASSIGNEE' ? l10n.startNotAssignee : l10n.inspectRejected(code);
+
+/// 스캔해 센 수량 — 첫 개를 스캔한 뒤 보인다(사용자 2026-11-17, 피킹·이동·적치·복귀 같게).
+/// 스캔마다 +1(화면 밖), + 버튼, 숫자 수기(완료 키·바깥 누르면 반영). 범위 판단은 [onSet] 쪽.
+class CountQtyField extends StatefulWidget {
+  const CountQtyField({
+    super.key,
+    required this.id,
+    required this.label,
+    required this.help,
+    required this.addLabel,
+    required this.value,
+    required this.max,
+    required this.onAdd,
+    required this.onSet,
+  });
+
+  /// 입력칸 키 `id`, + 버튼 키 `id-add`.
+  final String id;
+  final String label;
+  final String help;
+  final String addLabel;
+  final int value;
+  final int max;
+  final VoidCallback onAdd;
+  final ValueChanged<int> onSet;
+
+  @override
+  State<CountQtyField> createState() => _CountQtyFieldState();
+}
+
+class _CountQtyFieldState extends State<CountQtyField> {
+  late final _text = TextEditingController(text: '${widget.value}');
+
+  @override
+  void didUpdateWidget(CountQtyField old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value) _text.text = '${widget.value}';
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  void _apply() {
+    final n = int.tryParse(_text.text.trim());
+    if (n == null) {
+      _text.text = '${widget.value}';
+      return;
+    }
+    widget.onSet(n);
+    // 범위 밖이라 값이 그대로면 칸을 원래 값으로 돌린다.
+    if (mounted) _text.text = '${widget.value}';
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 8),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: TextField(
+            key: ValueKey(widget.id),
+            controller: _text,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            style: Theme.of(context).textTheme.headlineSmall,
+            decoration: InputDecoration(
+              labelText: widget.label,
+              helperText: widget.help,
+              helperMaxLines: 2,
+              border: const OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => _apply(),
+            onTapOutside: (_) {
+              FocusManager.instance.primaryFocus?.unfocus();
+              _apply();
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          height: 64,
+          child: FilledButton.tonalIcon(
+            key: ValueKey('${widget.id}-add'),
+            onPressed: widget.value < widget.max ? widget.onAdd : null,
+            icon: const Icon(Icons.add),
+            label: Text(widget.addLabel),
+          ),
+        ),
+      ],
+    ),
+  );
+}

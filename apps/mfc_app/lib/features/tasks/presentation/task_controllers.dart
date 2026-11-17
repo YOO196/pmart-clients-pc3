@@ -186,7 +186,14 @@ class StartController extends Notifier<StartFlow> {
 enum ScanResult { matched, wrongItem, overRemaining, noTarget, needLocation }
 
 /// 칸 스캔 결과.
-enum PickLocScan { ok, wrongPlace, notLocation }
+enum PickLocScan {
+  ok,
+  wrongPlace,
+  notLocation,
+
+  /// 방금 다 집은 상품을 한 번 더 찍었다 — 지시 수량 초과(실적에 넣지 않음, 단계 그대로).
+  overScan,
+}
 
 /// 지금 갈 칸 하나: 줄·LOT 조각·칸·이 칸에서 집을 양.
 @immutable
@@ -271,6 +278,7 @@ class PickingState {
     this.lastScan,
     this.lastLocScan,
     this.syncing = false,
+    this.lastDoneLine,
   });
 
   /// 장바구니(`CRT-…`). 실행의 toLocation(집품 도착지 — fulfillment 0.8.0).
@@ -285,6 +293,9 @@ class PickingState {
   final PickLocScan? lastLocScan;
   final bool syncing;
 
+  /// 방금 칸 몫을 다 채워 보낸 줄(orderLineId). 그 상품을 또 찍으면 "칸 먼저"가 아니라 "수량 초과"로 알린다.
+  final String? lastDoneLine;
+
   int capturedFor(String orderLineId) => captured[orderLineId] ?? 0;
 
   PickingState copyWith({
@@ -294,6 +305,7 @@ class PickingState {
     ScanResult? Function()? lastScan,
     PickLocScan? Function()? lastLocScan,
     bool? syncing,
+    String? Function()? lastDoneLine,
   }) => PickingState(
     cart: cart != null ? cart() : this.cart,
     at: at != null ? at() : this.at,
@@ -301,6 +313,7 @@ class PickingState {
     lastScan: lastScan != null ? lastScan() : this.lastScan,
     lastLocScan: lastLocScan != null ? lastLocScan() : this.lastLocScan,
     syncing: syncing ?? this.syncing,
+    lastDoneLine: lastDoneLine != null ? lastDoneLine() : this.lastDoneLine,
   );
 }
 
@@ -345,11 +358,13 @@ class PickingController extends Notifier<PickingState> {
     final stop = nextPickStop(task);
     final c = code.trim();
     final PickLocScan r;
-    if (stop == null || !isMfcLocation(c) || isCartLocation(c)) {
+    if (_isJustDone(task, c)) {
+      r = PickLocScan.overScan;
+    } else if (stop == null || !isMfcLocation(c) || isCartLocation(c)) {
       r = PickLocScan.notLocation;
     } else if (c == stop.location || stop.otherLocations.contains(c)) {
       r = PickLocScan.ok;
-      state = state.copyWith(at: () => c);
+      state = state.copyWith(at: () => c, lastDoneLine: () => null);
     } else {
       r = PickLocScan.wrongPlace;
     }
@@ -357,11 +372,21 @@ class PickingController extends Notifier<PickingState> {
     return r;
   }
 
+  /// 방금 다 채워 보낸 줄의 상품 바코드인가(칸 확인 전 연타·카메라 중복 인식).
+  bool _isJustDone(TaskDetailView task, String code) {
+    final id = state.lastDoneLine;
+    if (id == null) return false;
+    final line = task.lines.where((l) => l.orderLineId == id).firstOrNull;
+    return line != null && line.matchesBarcode(code);
+  }
+
   /// 상품 바코드 스캔. 칸 확인 전·다른 상품·이 칸 몫 초과는 수량 0 + 원인 안내.
   ScanResult scan(TaskDetailView task, String code) {
     final stop = nextPickStop(task);
     final ScanResult result;
-    if (stop == null) {
+    if (state.at == null && _isJustDone(task, code)) {
+      result = ScanResult.overRemaining;
+    } else if (stop == null) {
       result = ScanResult.noTarget;
     } else if (state.at == null) {
       result = ScanResult.needLocation;
@@ -381,6 +406,28 @@ class PickingController extends Notifier<PickingState> {
     }
     state = state.copyWith(lastScan: () => result);
     return result;
+  }
+
+  /// 담은 수량을 직접 고친다(사용자 2026-11-17 — 첫 개는 스캔, 그다음은 스캔·+·수기).
+  /// 첫 스캔 전에는 고칠 수 없고, 1 ~ 이 칸 지시 수량으로 맞춘다. 지시 수량에 닿으면 바로 보낸다.
+  Future<void> setCount(TaskDetailView task, int n) async {
+    final stop = nextPickStop(task);
+    if (stop == null || state.at == null) return;
+    final id = stop.line.orderLineId;
+    if (state.capturedFor(id) < 1) return;
+    final v = n.clamp(1, stop.qty);
+    state = state.copyWith(
+      captured: {...state.captured, id: v},
+      lastScan: () => null,
+    );
+    await submitIfFull(task);
+  }
+
+  /// + 버튼 — 한 개 더.
+  Future<void> addOne(TaskDetailView task) {
+    final stop = nextPickStop(task);
+    if (stop == null) return Future.value();
+    return setCount(task, state.capturedFor(stop.line.orderLineId) + 1);
   }
 
   /// 이 칸 몫을 다 집었으면 바로 보낸다(버튼 없음).
@@ -424,6 +471,7 @@ class PickingController extends Notifier<PickingState> {
       captured: {...state.captured}..remove(line.orderLineId),
       lastScan: () => null,
       lastLocScan: () => null,
+      lastDoneLine: () => shortage == null ? line.orderLineId : null,
     );
     await sync();
   }

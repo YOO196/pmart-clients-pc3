@@ -176,6 +176,7 @@ class TaskLineView {
     final c = code.trim();
     return c.isNotEmpty && (c == barcode || barcodes.contains(c));
   }
+
   final String? locationId;
   final String? lotId;
   final String? expiresOn;
