@@ -97,13 +97,20 @@
 - API 클라이언트: `api.bff`(`/api/v1/backoffice`)·`api.cases`. 계약 타입은 `gen:api` 의 mfc-backoffice 복사 목록에 backoffice-bff·case 를 더해 만든다(`tools/web-tools/gen-api.mjs`).
 - 목 `mocks/centerDeliveryHandlers.ts`(우리 센터 진행 중 2·끝난 1·다른 센터 1, 사건 열린 1·닫힌 1·다른 센터 1 — 상태 SUSPENDED 로 거르면 배차·사건 원천 실패). 시험 `features/delivery/centerDelivery.test.tsx`(7).
 
+### 4-4b. 포장 인계 현황 — bff 0.11.0 `packing-handover` (`features/delivery/PackingHandoverPage.tsx`, 2026-11-17 PC 3)
+- 백엔드 요청 `clients/all/2026-11-17-request-packing-handover.md`(배송 원문 §10.1·§3.1·§3.4·§3.7). 묶음 "배송"의 첫 메뉴 `packing-handover`. **보기만**.
+- bff `GET /backoffice/views/packing-handover?mfcId=<주소의 센터>&state=&size=50&cursor=` — 센터 관리자는 자기 센터 고정(다른 센터 403). 상태(ShipmentState)를 비우면 끝나지 않은 출고(PREPARING·READY·PARTIALLY_HANDED_OVER), 오래된 것부터, `page.nextCursor` 로 다음 쪽. 모니터에 띄워 두는 화면이라 30초마다 다시 읽기.
+- 열: 주문번호(`orderNumber`, 없으면 주문 ID · 재발송 표시) · 단계(서버 `stage` — 출고요청·피킹중·패킹중·출고대기·일부 인계·인계 완료, null 이면 추정하지 않고 "단계 없음 — 출고 <원천 상태>") · 피킹/패킹 작업 상태 · 포장(밀봉/전체 · 인계 · 남음, 포장마다 상태·인계 허가·인계 시각·라이더) · 출고대기 시각 · 배차 요청 시각 · 배송 상태·배정 라이더.
+- 배송 원천 실패(`delivery.state` null)는 "모름(조회 실패)" + 못 읽은 원천 경고, 배송 없음(`delivery` null)은 "배송 없음" — 섞지 않는다. 개인정보·QR 없음.
+- 목 `mocks/packingHandoverHandlers.ts`(우리 센터 진행 중 4·취소 1·다른 센터 1 — 상태 CANCELLED 로 거르면 배송 원천 실패). 시험 `features/delivery/packingHandover.test.tsx`(2).
+
 ### 4-5. 작업 현황 — mfc-fulfillment-service 0.4.11 (`features/tasks/TaskPages.tsx`)
 | 화면·동작 | API | 규칙 |
 |---|---|---|
 | 목록 `tasks` | `GET /tasks?mfcId=&type=&state=` | state 를 비우면 서버 기본(ASSIGNED·IN_PROGRESS). 유형·상태 거르기는 URL 쿼리(상태는 하나씩). 커서 더 보기. 담당은 capacity 배정의 투영 — 응답 asOf 를 "담당 기준"으로. 늦음·멈춤은 서버 표시값(자동으로 빼앗지 않음) |
 | 상세 `tasks/<taskId>` | `GET /tasks/{id}` | 줄(계획·완료·취소·남음·확정 대기), 막힌 이유, 포장 위치, 방문 순서 방법. 재고 확정 대기 실적이 있으면 안내 |
 | 작업 내놓기 | `POST /tasks/{id}/releases` {workerId = 지금 담당, reason?} | ASSIGNED·IN_PROGRESS 이고 담당이 있을 때만 단추. 409 `EXECUTION_IN_FLIGHT` 문구, 503 은 결과 불명(같은 키로 확인). 응답 상태가 READY 일 때만 "내놓음" |
-| 출하·포장 | `GET /shipments/{id}`, `GET /packages/{id}/handover-resolution`(누를 때만) | 포장 상태·인계 허가(만료 시각)·라이더. 판정과 "점원 확인 필요" 표시 |
+| 출하·포장 | `GET /shipments/{id}`, `GET /packages/{id}/handover-resolution`(누를 때만) | 화면용 주문번호(`orderNumber`, 0.13.0 F-5 — 없으면 안 보임), 포장 인계 숫자(`handoverCode`, F-8), 포장 상태·인계 허가(만료 시각)·라이더. 판정과 "점원 확인 필요" 표시 |
 - 확인 필요 포장 목록·확인(`GET /packages?checkRequired=true`, `handover-checks`)은 지금 MFC_WORKER 만(MB-3 결정 대기) — 목록 위에 안내만, 부르지 않는다.
 - 시작·실적·포장·배차 요청은 현장 일 — 넣지 않는다.
 

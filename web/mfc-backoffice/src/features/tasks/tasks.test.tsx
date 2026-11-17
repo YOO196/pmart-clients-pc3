@@ -61,6 +61,9 @@ describe('작업 상세', () => {
     expect(screen.getByText('최단 경로')).toBeInTheDocument();
     const pkg = (await screen.findAllByTestId('package-row'))[0]!;
     expect(within(pkg).getByText('밀봉')).toBeInTheDocument();
+    // 화면용 주문번호·라벨 인계 숫자(fulfillment 0.13.0 F-5·F-8)
+    expect(screen.getByTestId('order-number')).toHaveTextContent('주문번호 20000001');
+    expect(within(pkg).getByTestId('handover-code')).toHaveTextContent('482913');
     expect(view.gets('/handover-resolution')).toHaveLength(0);
     await userEvent.click(within(pkg).getByRole('button', { name: '인계 판정 보기' }));
     const r = await screen.findByTestId('resolution');
