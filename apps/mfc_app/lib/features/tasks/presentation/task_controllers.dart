@@ -408,6 +408,28 @@ class PickingController extends Notifier<PickingState> {
     return result;
   }
 
+  /// 담은 수량을 직접 고친다(사용자 2026-11-17 — 첫 개는 스캔, 그다음은 스캔·+·수기).
+  /// 첫 스캔 전에는 고칠 수 없고, 1 ~ 이 칸 지시 수량으로 맞춘다. 지시 수량에 닿으면 바로 보낸다.
+  Future<void> setCount(TaskDetailView task, int n) async {
+    final stop = nextPickStop(task);
+    if (stop == null || state.at == null) return;
+    final id = stop.line.orderLineId;
+    if (state.capturedFor(id) < 1) return;
+    final v = n.clamp(1, stop.qty);
+    state = state.copyWith(
+      captured: {...state.captured, id: v},
+      lastScan: () => null,
+    );
+    await submitIfFull(task);
+  }
+
+  /// + 버튼 — 한 개 더.
+  Future<void> addOne(TaskDetailView task) {
+    final stop = nextPickStop(task);
+    if (stop == null) return Future.value();
+    return setCount(task, state.capturedFor(stop.line.orderLineId) + 1);
+  }
+
   /// 이 칸 몫을 다 집었으면 바로 보낸다(버튼 없음).
   Future<void> submitIfFull(TaskDetailView task) async {
     final stop = nextPickStop(task);

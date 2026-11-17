@@ -529,6 +529,14 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                     continuous: false,
                     onScan: (code) => _onScan(task, code),
                   ),
+                  // 첫 개를 스캔하면 수량 칸 — 스캔마다 +1, + 버튼, 수기(사용자 2026-11-17).
+                  if (picking.capturedFor(stop.line.orderLineId) > 0)
+                    _PickQty(
+                      value: picking.capturedFor(stop.line.orderLineId),
+                      max: stop.qty,
+                      onAdd: () => _ctl.addOne(task),
+                      onSet: (n) => _ctl.setCount(task, n),
+                    ),
                   if (picking.lastScan case final s?
                       when s != ScanResult.matched)
                     Text(
@@ -715,6 +723,92 @@ class _TaskInfoSheet extends StatelessWidget {
               subtitle: Text(firstPickLocation(l) ?? '-'),
               trailing: Text(l10n.taskInfoLine(l.completedQty, l.plannedQty)),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 담은 수량 — 숫자 칸(수기, 완료 키로 반영)과 + 버튼.
+class _PickQty extends StatefulWidget {
+  const _PickQty({
+    required this.value,
+    required this.max,
+    required this.onAdd,
+    required this.onSet,
+  });
+
+  final int value;
+  final int max;
+  final VoidCallback onAdd;
+  final ValueChanged<int> onSet;
+
+  @override
+  State<_PickQty> createState() => _PickQtyState();
+}
+
+class _PickQtyState extends State<_PickQty> {
+  late final _text = TextEditingController(text: '${widget.value}');
+
+  @override
+  void didUpdateWidget(_PickQty old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value) _text.text = '${widget.value}';
+  }
+
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
+
+  void _apply() {
+    final n = int.tryParse(_text.text.trim());
+    if (n == null) {
+      _text.text = '${widget.value}';
+      return;
+    }
+    widget.onSet(n);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: TextField(
+              key: const ValueKey('pick-qty'),
+              controller: _text,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              style: Theme.of(context).textTheme.headlineSmall,
+              decoration: InputDecoration(
+                labelText: l10n.pickQtyLabel,
+                helperText: l10n.pickQtyHelp(widget.max),
+                helperMaxLines: 2,
+                border: const OutlineInputBorder(),
+              ),
+              onSubmitted: (_) => _apply(),
+              onTapOutside: (_) {
+                FocusManager.instance.primaryFocus?.unfocus();
+                _apply();
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            height: 64,
+            child: FilledButton.tonalIcon(
+              key: const ValueKey('pick-qty-add'),
+              onPressed: widget.value < widget.max ? widget.onAdd : null,
+              icon: const Icon(Icons.add),
+              label: Text(l10n.pickQtyAdd),
+            ),
+          ),
         ],
       ),
     );

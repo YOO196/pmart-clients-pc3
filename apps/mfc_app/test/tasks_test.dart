@@ -360,6 +360,44 @@ void main() {
       expect(c.read(pickingProvider('task-mock-1')).at, isNull);
     });
 
+    test('수량: 첫 개는 스캔, 그다음 스캔·+·수기 — 지시 수량에 닿으면 보낸다', () async {
+      // 요거트 줄을 3개로(이 시험만).
+      final line =
+          ((repo.taskJson('task-mock-1')['lines']! as List).first
+              as Map<String, Object?>);
+      line['plannedQty'] = 3;
+      line['remainingQty'] = 3;
+      final pickJson = (line['picks']! as List).first as Map<String, Object?>;
+      pickJson['remainingQty'] = 3;
+      ((pickJson['locations']! as List).first
+              as Map<String, Object?>)['allocatedQty'] =
+          3;
+      final (pick, task) = await atStop();
+      final state = pickingProvider('task-mock-1');
+      expect(nextPickStop(task)!.qty, 3);
+
+      await pick.setCount(task, 2);
+      expect(c.read(state).capturedFor('ol-1'), 0, reason: '첫 개는 스캔해야');
+
+      expect(
+        pick.scan(task, MockTaskRepository.yogurtBarcode),
+        ScanResult.matched,
+      );
+      expect(c.read(state).capturedFor('ol-1'), 1);
+      await pick.addOne(task);
+      expect(c.read(state).capturedFor('ol-1'), 2);
+      await pick.setCount(task, 0);
+      expect(c.read(state).capturedFor('ol-1'), 1, reason: '1 아래로는 안 간다');
+      expect(repo.sentPayloads, isEmpty);
+
+      await pick.setCount(task, 99); // 최대 3으로 맞춰지고 다 찼으니 보낸다
+      await pick.sync();
+      expect(
+        (repo.sentPayloads.single['lines']! as List).single['pickedQty'],
+        3,
+      );
+    });
+
     test('칸 몫을 채운 뒤 같은 상품을 또 찍으면 수량 초과 안내만 — 칸 단계로 튕기지 않는다', () async {
       final (pick, task) = await atStop();
       expect(
