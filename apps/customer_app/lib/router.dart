@@ -12,9 +12,11 @@ import 'features/checkout/presentation/order_sheet_screen.dart';
 import 'features/claims/presentation/claims_screens.dart';
 import 'features/catalog/presentation/category_screen.dart';
 import 'features/notifications/presentation/notifications_screens.dart';
+import 'features/redelivery/presentation/redelivery_screens.dart';
 import 'features/payment/presentation/payment_screen.dart';
 import 'features/profile/presentation/my_info_screen.dart';
-import 'features/reviews/domain/reviews.dart' show ReviewEligibility, ReviewTarget;
+import 'features/reviews/domain/reviews.dart'
+    show ReviewEligibility, ReviewTarget;
 import 'features/reviews/presentation/reviews_screens.dart';
 import 'features/support/presentation/chat_screen.dart';
 import 'features/support/presentation/inquiry_screens.dart';
@@ -93,6 +95,16 @@ final routerProvider = Provider<GoRouter>(
             builder: (_, state) =>
                 OrderDetailScreen(orderId: state.pathParameters['orderId']!),
             routes: [
+              // 오배송 다시 배송비 결제(ADR-0065, order-orchestration 0.3.0).
+              GoRoute(
+                parentNavigatorKey: rootNavigatorKey,
+                path: 'redelivery-payments/:redeliveryPaymentId',
+                builder: (_, state) => RedeliveryPaymentScreen(
+                  orderId: state.pathParameters['orderId']!,
+                  redeliveryPaymentId:
+                      state.pathParameters['redeliveryPaymentId']!,
+                ),
+              ),
               GoRoute(
                 parentNavigatorKey: rootNavigatorKey,
                 path: 'cancel',

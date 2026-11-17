@@ -1,13 +1,11 @@
 {
   "dart": {
-    "backendCommit": "4d99b94be06a13d66527c081e1ed17f6b5e6a2ba",
-    "backendContractsDirty": false,
-    "generatedAt": "2026-11-16T23:10:39.678351Z",
+    "backendCommit": "98efc1e7cc29b37bde8c1b06f296195b9663c901",
+    "backendContractsDirty": true,
+    "generatedAt": "2026-11-16T23:48:54.276448Z",
     "generator": "openapi-generator-cli 7.26.0 (dart-dio, json_serializable)",
     "regenerated": [
-      "cart-service",
-      "order-service",
-      "payment-service"
+      "order-orchestration-service"
     ],
     "services": {
       "auth-service": [
@@ -47,6 +45,9 @@
         "customer"
       ],
       "order-service": [
+        "customer"
+      ],
+      "order-orchestration-service": [
         "customer"
       ],
       "payment-service": [

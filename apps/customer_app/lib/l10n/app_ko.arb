@@ -1091,5 +1091,55 @@
     "placeholders": {
       "orderId": { "type": "String" }
     }
-  }
+  },
+  "rdpCardTitle": "다시 배송비 결제가 필요해요",
+  "rdpCardBody": "입력한 주소와 다른 곳에 배달돼, 실제 주소로 다시 보내려면 {amount}을 결제해야 해요",
+  "@rdpCardBody": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "rdpDeadline": "{time}까지 결제 · {minutes}분 남음",
+  "@rdpDeadline": {
+    "placeholders": {
+      "time": { "type": "String" },
+      "minutes": { "type": "int" }
+    }
+  },
+  "rdpDeadlineOver": "결제 기한이 지났어요. 곧 회수 후 환불로 바뀌어요",
+  "rdpRefundNote": "결제하지 않으면 상품을 회수하고 상품값에서 {amount}을 뺀 금액을 환불해 드려요",
+  "@rdpRefundNote": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "rdpOpen": "결제하거나 환불 고르기",
+  "rdpPaid": "다시 배송비를 결제했어요. 실제 주소로 다시 보내 드려요",
+  "rdpDeclined": "회수 후 환불을 골랐어요. 상품을 회수한 뒤 환불해 드려요",
+  "rdpTimedOut": "결제 기한이 지나 상품을 회수한 뒤 환불해 드려요",
+  "rdpLoadFailed": "다시 배송비 결제 정보를 불러오지 못했어요",
+  "rdpTitle": "다시 배송비 결제",
+  "rdpPay": "{amount} 결제하기",
+  "@rdpPay": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "rdpPayAgain": "다시 결제하기",
+  "rdpDecline": "결제하지 않고 환불받기",
+  "rdpDeclineConfirmTitle": "결제하지 않고 환불받을까요?",
+  "rdpDeclineConfirmBody": "상품을 회수하고 상품값에서 {amount}을 뺀 금액을 환불해 드려요. 고른 뒤에는 결제할 수 없어요",
+  "@rdpDeclineConfirmBody": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "rdpDeclineConfirmOk": "환불받기",
+  "rdpPreparing": "결제를 준비하고 있어요",
+  "rdpFailed": "결제가 끝나지 않았어요. 기한 안에 다시 결제할 수 있어요",
+  "rdpCancelled": "결제를 취소했어요. 기한 안에 다시 결제할 수 있어요",
+  "rdpDeclining": "환불 고르기를 보내고 있어요",
+  "rdpAlreadyPaid": "이미 결제돼 환불로 바꿀 수 없어요",
+  "rdpDeclineFailed": "환불 고르기가 반영되지 않았어요. 다시 시도해 주세요",
+  "rdpMissing": "결제할 건을 찾지 못했어요"
 }
