@@ -1,11 +1,11 @@
 // 운영 제한 목: mfc-capacity-service 0.14.0 `/operation-restrictions*`.
-// 서버 규칙 중 화면이 보여 줄 것만: 그 센터 권한, 등록·해제 = MFC_SUPERVISOR, approvalRef 필수(422 APPROVAL_REQUIRED),
+// 서버 규칙 중 화면이 보여 줄 것만: 그 센터 권한, 등록·해제 = MFC_SUPERVISOR, 등록은 approvalRef 필수(422 APPROVAL_REQUIRED), 해제는 늘 본사 승인(AP-1 — 번호 없으면 422 + 승인 요청 본문),
 // 수용 축소는 reducedCapacityUnits 필수, 기본 목록은 활성만(activeOnly=true), 해제는 ACTIVE 만·버전(이미 LIFTED 면 202 지금 상태).
 import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { db, nextSeq, type MockRestriction } from './db';
-import { expectedVersion, idempotent, operator, problem, unauthorized } from './support';
+import { approvalProblem, expectedVersion, idempotent, operator, problem, unauthorized } from './support';
 
 const canAccess = (request: Request, mfcId: string) => operator(request)?.centers.includes(mfcId) ?? false;
 const isSupervisor = (request: Request) => operator(request)?.roles.includes('MFC_SUPERVISOR') ?? false;
@@ -75,7 +75,8 @@ export const restrictionHandlers = [
     const approvalRef = new URL(request.url).searchParams.get('approvalRef') ?? '';
     return idempotent(request, () => {
       if (r.state === 'LIFTED') return { status: 202, body: { status: 'APPLIED', requestId: keyOf(request), resultId: r.restrictionId, version: r.version } };
-      if (!approvalRef.trim()) return problem(422, 'APPROVAL_REQUIRED');
+      const need = approvalProblem(`${r.mfcId}:RESTRICTION_LIFT:${r.restrictionId}`, '운영 제한 해제는 늘 본사 승인', approvalRef);
+      if (need) return need;
       if (expectedVersion(request) !== undefined && expectedVersion(request) !== r.version) return problem(409, 'VERSION_CONFLICT');
       const next: MockRestriction = { ...r, state: 'LIFTED', liftApprovalRef: approvalRef, version: r.version + 1 };
       db.restrictions.set(next.restrictionId, next);

@@ -1,6 +1,6 @@
 // 품질 목: mfc-quality-service 0.2.0 — 격리·해제 판정(+해제 승인), 폐기(요청·승인·실행), 회수품 검수.
 // 서버 규칙 중 화면이 보여 줄 것만: 그 센터 권한, QUARANTINE 은 바로 반영(APPLIED), RELEASE 는 요청만(ACCEPTED·REQUESTED) → 다른 관리자 승인,
-// 요청자·판정자 본인 승인 불가(422 SELF_APPROVAL), 폐기 승인은 approvalRef 필수(422 APPROVAL_REQUIRED)·버전, 실행은 잔량 이하(422 QTY_EXCEEDS_APPROVED),
+// 요청자·판정자 본인 승인 불가(422 SELF_APPROVAL), 폐기 승인의 본사 승인 번호는 선택(AP-1)·버전, 실행은 잔량 이하(422 QTY_EXCEEDS_APPROVED),
 // 회수품 검수는 관리자·반입한 사람 아님, RESALE 은 상온·미개봉·신선 아님만(422 RESALE_NOT_ALLOWED), 줄 합계 = 반입 수량.
 import { http, HttpResponse } from 'msw';
 
@@ -108,7 +108,6 @@ export const qualityHandlers = [
       if (expectedVersion(request) !== undefined && expectedVersion(request) !== d.version) return problem(409, 'VERSION_CONFLICT');
       if (d.state !== 'REQUESTED') return problem(409, 'INVALID_STATE');
       if (d.requesterId === actor(request)) return problem(422, 'SELF_APPROVAL');
-      if (body.action === 'APPROVE' && !body.approvalRef?.trim()) return problem(422, 'APPROVAL_REQUIRED');
       const approve = body.action === 'APPROVE';
       const next: MockDisposal = {
         ...d,

@@ -87,12 +87,12 @@ describe('폐기', () => {
     expect(await screen.findByTestId('disposal')).toHaveTextContent('승인 대기');
   });
 
-  it('폐기 승인은 승인 근거를 넣어야 — 지금 버전으로 보낸다', async () => {
+  it('폐기 승인(본사 승인 번호 선택) — 지금 버전으로 보낸다', async () => {
     const view = renderAt('/c/MFC-BSN-01/quality?tab=disposals&disposalId=DSP-1');
     const card = await screen.findByTestId('disposal');
     const approve = within(card).getByRole('button', { name: '폐기 승인' });
-    expect(approve).toBeDisabled();
-    await userEvent.type(within(card).getByRole('textbox', { name: /승인 근거/ }), 'AP-LOSS-9');
+    expect(approve).toBeEnabled(); // 본사 승인 번호는 선택(AP-1)
+    await userEvent.type(within(card).getByRole('textbox', { name: /본사 승인 번호/ }), 'AP-LOSS-9');
     await userEvent.click(approve);
     expect(await screen.findByText('폐기를 승인했어요.')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('disposal')).toHaveTextContent('승인됨'));
@@ -147,5 +147,16 @@ describe('회수품 검수', () => {
     const form = await screen.findByRole('form', { name: '검수 결과 보내기' });
     await userEvent.click(within(form).getByRole('button', { name: '검수 결과 보내기' }));
     expect(await within(form).findByRole('alert')).toHaveTextContent('직접 요청·시작·계수·반입한 사람은 승인할 수 없어요.');
+  });
+});
+
+describe('격리 해제 승인 — 본사 승인 번호(quality 0.3.0 새 칸)', () => {
+  it('넣으면 APPROVE 본문에 approvalRef, 비우면 보내지 않는다', async () => {
+    const view = renderAt('/c/MFC-BSN-01/quality?decisionId=QD-1');
+    const d = await screen.findByTestId('decision');
+    await userEvent.type(within(d).getByRole('textbox', { name: /본사 승인 번호/ }), 'AP-REL-1');
+    await userEvent.click(within(d).getByRole('button', { name: '해제 승인' }));
+    expect(await screen.findByText('해제를 승인했어요. 재고에 반영됐어요.')).toBeInTheDocument();
+    expect(await sentBody(postsTo(view.sent, '/approvals')[0]!)).toMatchObject({ action: 'APPROVE', approvalRef: 'AP-REL-1' });
   });
 });

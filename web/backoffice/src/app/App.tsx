@@ -24,6 +24,7 @@ import { CaseDetailPage, CaseListPage, NewMisdeliveryPage } from '../features/ca
 import { CsFollowUpPage } from '../features/cases/FollowUps';
 import { HandoverPage } from '../features/cases/HandoverPages';
 import { DeliveryDetailPage, DeliveryOpenPage } from '../features/deliveries/DeliveryPages';
+import { CaseMetricsPage } from '../features/cases/CaseMetricsPage';
 import { InquiryDetailPage, InquiryListPage } from '../features/inquiries/InquiryPages';
 import { SatisfactionPage } from '../features/inquiries/SatisfactionPage';
 import { NewCsIntakePage } from '../features/csIntakes/CsIntakePages';
@@ -45,6 +46,7 @@ import { messages as m } from '../shared/messages';
 import { useApi } from './ApiContext';
 import { covers, homePath, visibleGroups, type NavGroup } from './nav';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
+import { CaseNavBadges } from '../features/cases/CaseBadges';
 
 /** 업무 도우미: 목 모드는 draftMock(계약 모양), 실서버 모드(local·lan)는 게이트웨이의 ai-assistant-service(2026-11-09 LAN 배포). */
 const defaultAssistantPort = (api: Api): AssistantPort =>
@@ -64,6 +66,8 @@ function NavGroupMenu({ group, pathname }: { readonly group: NavGroup; readonly 
             <li key={item.to}>
               <NavLink to={item.to} end>
                 {item.label}
+                {/* 접수 건 알림 배지(1분마다 개수 — 지원센터·관리자) */}
+                {item.to === '/cases' && <CaseNavBadges />}
               </NavLink>
             </li>
           ))}
@@ -158,6 +162,7 @@ const routes = [
       { path: 'lookup', element: guarded(<UnifiedLookupPage />) },
       { path: 'live-delivery', element: guarded(<LiveDeliveryPage />) },
       { path: 'cases', element: guarded(<CaseListPage />) },
+      { path: 'case-metrics', element: guarded(<CaseMetricsPage />) },
       { path: 'cases/new-misdelivery', element: guarded(<NewMisdeliveryPage />) },
       { path: 'cases/:caseId', element: guarded(<CaseDetailPage />) },
       { path: 'rider-complaints', element: guarded(<RiderComplaintListPage />) },

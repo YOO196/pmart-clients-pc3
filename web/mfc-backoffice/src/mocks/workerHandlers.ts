@@ -241,6 +241,29 @@ export const workerHandlers = [
     });
   }),
 
+  // 업무 내역(capacity 0.17.0) — 목: OP-wkr-1 의 2026-11-17 만 내역이 있다(날짜 생략 = 2026-11-17). 목 전용 스위치: date=2026-01-01 이면 품질 원장을 못 읽음.
+  http.get(`${base}/:workerId/activities`, ({ request, params }) => {
+    if (!operator(request)) return unauthorized();
+    const w = found(request, params, 'read');
+    if (w instanceof Response) return w;
+    const date = new URL(request.url).searchParams.get('date') ?? '2026-11-17';
+    const has = w.workerId === 'OP-wkr-1' && date === '2026-11-17';
+    const items = has
+      ? [
+          { source: 'mfc-fulfillment', activityType: 'PICK', refId: 'EXE-1', taskId: 'TASK-PICK-1', sku: 'SKU-MILK-1', qty: 2, result: 'APPLIED', at: '2026-11-17T00:10:00.000Z' },
+          { source: 'mfc-fulfillment', activityType: 'PICK', refId: 'EXE-2', taskId: 'TASK-PICK-1', sku: 'SKU-YOG-1', qty: 1, result: 'REJECTED', at: '2026-11-17T00:12:00.000Z' },
+          { source: 'mfc-inbound', activityType: 'PUTAWAY', refId: 'INB-EXE-1', taskId: 'INB-T-1', sku: 'SKU-MILK-1', qty: 12, result: 'APPLIED', at: '2026-11-17T01:00:00.000Z' },
+        ]
+      : [];
+    const totals = has
+      ? [
+          { source: 'mfc-fulfillment', activityType: 'PICK', count: 2, qty: 2 },
+          { source: 'mfc-inbound', activityType: 'PUTAWAY', count: 1, qty: 12 },
+        ]
+      : [];
+    return HttpResponse.json({ mfcId: w.mfcId, workerId: w.workerId, date, items, totals, unavailableSources: date === '2026-01-01' ? ['mfc-quality'] : [] });
+  }),
+
   http.get(`${base}/:workerId/shifts`, ({ request, params }) => {
     if (!operator(request)) return unauthorized();
     const w = found(request, params, 'read');
