@@ -183,6 +183,8 @@ InboxNotice noticeFromContract(api.Notification n) => InboxNotice(
         api.DestinationTypeEnum.CASE => NoticeDestinationType.caseFile,
         api.DestinationTypeEnum.INQUIRY => NoticeDestinationType.inquiry,
         api.DestinationTypeEnum.NOTICE => NoticeDestinationType.notice,
+        // 라이더 도움요청(notification 계약에 추가 — 라이더 알림용). 고객앱에는 갈 화면이 없어 목적지 없음으로.
+        api.DestinationTypeEnum.HELP_REQUEST ||
         api.DestinationTypeEnum.NONE => NoticeDestinationType.none,
         null => null,
       },
