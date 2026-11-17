@@ -2,7 +2,8 @@
 // - 목록 `GET /operation-restrictions?mfcId=&activeOnly=`(기본 활성만 — 서버 기본과 같음). 거르기는 URL 쿼리(`all=1` 이면 activeOnly=false).
 // - 등록 `POST /operation-restrictions`(MFC_SUPERVISOR, approvalRef 필수, CAPACITY_REDUCE 는 reducedCapacityUnits 필수) → 201 CommandResponse.
 // - 해제 `DELETE /operation-restrictions/{id}?approvalRef=` + X-Expected-Version → 202 CommandResponse. 시간이 지나도 자동 해제 없음.
-// 승인 근거(approvalRef)는 화면에서 직접 입력(사용자 2026-11-16 — 승인 서비스가 없어 서버는 기록만). 시각 입력은 한국 시간 + "+09:00".
+// 등록의 승인 근거(approvalRef)는 필수·기록만. 해제는 늘 본사 승인(AP-1, capacity 0.16.0) — 번호는 선택으로 보내고 없으면 422 APPROVAL_REQUIRED(shared/approval.tsx).
+// 시각 입력은 한국 시간 + "+09:00".
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -12,6 +13,7 @@ import { CommandFeedback, formatSeoul, QueryState, toUiState, useCommand } from 
 import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-capacity';
 import { useApi } from '../../app/ApiContext';
+import { ApprovalAwareFeedback, ApprovalRefInput } from '../../shared/approval';
 import { messages } from '../../shared/messages';
 
 const m = messages.restrictions;
@@ -77,7 +79,7 @@ function RestrictionCard({ mfcId, restriction: r, onDone }: { readonly mfcId: st
     onDone(null);
     const { params } = commandParams(key, { path: { restrictionId: id }, version: r.version });
     const res = checkCommand(
-      await request('DELETE', api.capacity.DELETE('/operation-restrictions/{restrictionId}', { params: { ...params, query: { approvalRef: approvalRef.trim() } } })),
+      await request('DELETE', api.capacity.DELETE('/operation-restrictions/{restrictionId}', { params: { ...params, query: approvalRef.trim() ? { approvalRef: approvalRef.trim() } : {} } })),
     );
     // 접수(ACCEPTED)면 목록을 다시 읽어 상태로 보인다 — 완료 문구는 APPLIED 일 때만
     if (res.status === 'APPLIED') onDone(m.lifted);
@@ -115,20 +117,16 @@ function RestrictionCard({ mfcId, restriction: r, onDone }: { readonly mfcId: st
           aria-label={`${m.lift} ${id}`}
           onSubmit={(e) => {
             e.preventDefault();
-            if (!approvalRef.trim()) return;
             if (lift.phase.kind === 'rejected') lift.reset();
             void lift.run(null);
           }}
         >
-          <label className="flex flex-col gap-1">
-            {m.liftRef(typeName)}
-            <input className="input input-sm w-56 font-mono" maxLength={128} value={approvalRef} onChange={(e) => setApprovalRef(e.target.value)} />
-          </label>
-          <button type="submit" className="btn btn-sm btn-warning" disabled={!approvalRef.trim() || lift.busy}>
+          <ApprovalRefInput value={approvalRef} onChange={setApprovalRef} hint={messages.approval.refHintAlways} />
+          <button type="submit" className="btn btn-sm btn-warning" disabled={lift.busy}>
             {m.lift}
           </button>
           <div className="w-full">
-            <CommandFeedback command={lift} />
+            <ApprovalAwareFeedback command={lift} />
           </div>
         </form>
       )}

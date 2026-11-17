@@ -46,3 +46,18 @@ export function idempotent(request: Request, run: () => Reply) {
   db.idempotent.set(id, result);
   return HttpResponse.json(result.body as Record<string, unknown>, { status: result.status });
 }
+
+/**
+ * 본사 승인 필요(AP-1, VERIFY 모드 흉내) — 422 APPROVAL_REQUIRED. details: threshold(걸린 기준 문장), approvalRequest(approval-service 본문 JSON 문자열).
+ * 넣은 번호가 안 되면 field=approvalRef reason. 목 규칙: 승인 번호 'AP-PENDING' = 아직 승인 안 됨(NOT_APPROVED), 'AP-USED' = 이미 씀(ALREADY_USED).
+ */
+export function approvalProblem(targetRef: string, threshold: string, approvalRef?: string | null) {
+  const ref = approvalRef?.trim() ?? '';
+  if (ref === 'AP-PENDING') return problem(422, 'APPROVAL_REQUIRED', [{ field: 'approvalRef', reason: 'NOT_APPROVED' }]);
+  if (ref === 'AP-USED') return problem(422, 'APPROVAL_REQUIRED', [{ field: 'approvalRef', reason: 'ALREADY_USED' }]);
+  if (ref) return null;
+  return problem(422, 'APPROVAL_REQUIRED', [
+    { field: 'threshold', reason: threshold },
+    { field: 'approvalRequest', reason: JSON.stringify({ requestType: 'MFC_EXECUTION', targetRef, summary: threshold }) },
+  ]);
+}

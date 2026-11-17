@@ -6,17 +6,18 @@
 // - 출하 부적격 LOT `GET …/unshippable-lots` → 이동 지시로(이동 메뉴에 값을 채워 연다).
 // - 보충 기준 `GET/PUT/DELETE …/replenishment-policies`(고회전 선반만, min ≤ target).
 // - 상품 취급 `GET/POST …/sku-handlings`(X-Expected-Version = 취급 레코드 version, 없으면 0).
-// 승인 근거(approvalRef)는 화면에서 직접 입력한다(사용자 2026-11-16 — 승인 서비스가 없어 서버는 기록만).
+// 본사 승인 번호(approvalRef)는 선택(AP-1, 0.22.0) — 기준 이상이면 422 APPROVAL_REQUIRED(shared/approval.tsx). 정정은 승인 뒤 같은 Idempotency-Key 로 다시.
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
-import { CommandRejectedFailure, request, requestNoContent, UnknownResultFailure, type CommandResponse } from '@pmart/web-core';
+import { CommandRejectedFailure, type IdempotencyKey, request, requestNoContent, UnknownResultFailure, type CommandResponse } from '@pmart/web-core';
 import { CommandFeedback, formatSeoul, QueryState, toUiState, useCommand } from '@pmart/web-ui';
 import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-inventory';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
+import { ApprovalAwareFeedback, ApprovalRefInput, approvalRequired } from '../../shared/approval';
 import { messages } from '../../shared/messages';
 
 const m = messages.inventory;
@@ -100,16 +101,6 @@ function LookupForm({ label, value, button, onSubmit }: { readonly label: string
         {button}
       </button>
     </form>
-  );
-}
-
-function ApprovalRefInput({ value, onChange }: { readonly value: string; readonly onChange: (v: string) => void }) {
-  return (
-    <label className="flex flex-col gap-1">
-      {m.approvalRef}
-      <input className="input input-sm w-56 font-mono" maxLength={128} value={value} onChange={(e) => onChange(e.target.value)} />
-      <span className="text-xs opacity-70">{m.approvalRefHint}</span>
-    </label>
   );
 }
 
@@ -250,8 +241,12 @@ function CorrectionForm({
   const [approvalRef, setApprovalRef] = useState('');
   const n = Number(qty);
   const changesSomething = !!toLocation.trim() || !!toSourceLotRef.trim() || !!toExpiryDate || !!toManufactureDate;
-  const valid = Number.isInteger(n) && n >= 1 && n <= (unit.qty ?? 0) && !!reason.trim() && !!approvalRef.trim() && changesSomething;
-  const correct = useCommand(async (_: null, key) => {
+  const valid = Number.isInteger(n) && n >= 1 && n <= (unit.qty ?? 0) && !!reason.trim() && changesSomething;
+  // 승인 대상 = 이 요청의 키(targetRef <mfcId>:CORRECTION:<키>) — 422 APPROVAL_REQUIRED 뒤 다시 보낼 때는 같은 키(422 는 기록되지 않음).
+  const approvalKey = useRef<IdempotencyKey | null>(null);
+  const correct = useCommand(async (_: null, fresh) => {
+    const key = approvalKey.current ?? fresh;
+    approvalKey.current = key;
     const r = checkCommand(
       await request(
         'POST',
@@ -259,7 +254,7 @@ function CorrectionForm({
           ...commandParams(key, { path: { mfcId } }),
           body: {
             reason: reason.trim(),
-            approvalRef: approvalRef.trim(),
+            ...(approvalRef.trim() ? { approvalRef: approvalRef.trim() } : {}),
             lines: [
               {
                 sku,
@@ -278,6 +273,7 @@ function CorrectionForm({
         }),
       ),
     );
+    approvalKey.current = null;
     await queryClient.invalidateQueries({ queryKey: ['stock', mfcId, sku] });
     onDone(m.corrected);
     return r;
@@ -289,6 +285,8 @@ function CorrectionForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (!valid) return;
+        // 승인 기다림이 아닌 거절이면 새 요청(새 키)
+        if (correct.phase.kind === 'rejected' && !approvalRequired(correct.phase.failure)) approvalKey.current = null;
         if (correct.phase.kind === 'rejected') correct.reset();
         void correct.run(null);
       }}
@@ -332,7 +330,8 @@ function CorrectionForm({
           {m.cancel}
         </button>
       </div>
-      <CommandFeedback command={correct} />
+      <ApprovalAwareFeedback command={correct} />
+      {correct.phase.kind === 'rejected' && approvalRequired(correct.phase.failure) && <p className="text-xs opacity-70">{messages.approval.sameKeyNote}</p>}
     </form>
   );
 }
@@ -494,7 +493,7 @@ function DecideCount({ mfcId, session, onDecided: setNotice }: { readonly mfcId:
       'POST',
       api.inventory.POST('/mfcs/{mfcId}/count-sessions/{sessionId}/approvals', {
         ...commandParams(key, { path: { mfcId, sessionId } }),
-        body: { action, ...(action === 'APPROVE' ? { approvalRef: approvalRef.trim() } : {}), ...(note.trim() ? { note: note.trim() } : {}) },
+        body: { action, ...(action === 'APPROVE' && approvalRef.trim() ? { approvalRef: approvalRef.trim() } : {}), ...(note.trim() ? { note: note.trim() } : {}) },
       }),
     );
     if (s.state === 'ADJUSTED') setNotice(m.approved);
@@ -517,14 +516,14 @@ function DecideCount({ mfcId, session, onDecided: setNotice }: { readonly mfcId:
         </label>
       </div>
       <div className="flex gap-2">
-        <button type="button" className="btn btn-sm btn-primary" disabled={!approvalRef.trim() || decide.busy} onClick={() => run('APPROVE')}>
+        <button type="button" className="btn btn-sm btn-primary" disabled={decide.busy} onClick={() => run('APPROVE')}>
           {m.approve}
         </button>
         <button type="button" className="btn btn-sm" disabled={decide.busy} onClick={() => run('REJECT')}>
           {m.reject}
         </button>
       </div>
-      <CommandFeedback command={decide} />
+      <ApprovalAwareFeedback command={decide} />
     </div>
   );
 }
