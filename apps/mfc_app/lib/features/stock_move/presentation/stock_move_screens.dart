@@ -233,6 +233,7 @@ class MoveScreen extends ConsumerWidget {
                 ? l10n.moveScanItem
                 : l10n.moveScanDrop,
             cameraTitle: title,
+            continuous: false,
             autofocus: false,
             onScan: (code) => switch (ctl.scan(code)) {
               LocScan.ok => const ScanFeedback.ok(),
@@ -257,16 +258,29 @@ class MoveScreen extends ConsumerWidget {
               style: theme.textTheme.bodyMedium,
             )
           else if (loading) ...[
-            _ProductCheck(barcodeKnown: barcode != null, counted: s.qty),
-            // 바코드를 알면 스캔으로만 늘린다(줄이기만 가능). 모르면 직접 넣는다.
-            QtyStepper(
-              id: 'move-qty',
-              label: l10n.moveQtyPick,
-              value: s.qty,
-              max: barcode != null ? s.qty : m.toPick,
-              enabled: !s.unknown,
-              onChanged: ctl.setQty,
-            ),
+            // 바코드를 알면 첫 개를 스캔한 뒤 수량 칸(스캔·+·수기, 피킹과 같게). 모르면 직접 넣는다.
+            if (barcode == null || s.qty == 0)
+              _ProductCheck(barcodeKnown: barcode != null, counted: s.qty),
+            if (barcode == null)
+              QtyStepper(
+                id: 'move-qty',
+                label: l10n.moveQtyPick,
+                value: s.qty,
+                max: m.toPick,
+                enabled: !s.unknown,
+                onChanged: ctl.setQty,
+              )
+            else if (s.qty > 0)
+              CountQtyField(
+                id: 'move-qty',
+                label: l10n.moveQtyPick,
+                help: l10n.countQtyHelp(m.toPick),
+                addLabel: l10n.pickQtyAdd,
+                value: s.qty,
+                max: m.toPick,
+                onAdd: () => ctl.scan(barcode),
+                onSet: (n) => ctl.setQty(n.clamp(1, m.toPick)),
+              ),
           ] else
             QtyStepper(
               id: 'move-qty',
@@ -508,6 +522,7 @@ class PutawayScreen extends ConsumerWidget {
                 _ => l10n.moveScanDrop,
               },
               cameraTitle: l10n.typePutaway,
+              continuous: false,
               autofocus: false,
               onScan: (code) => switch (ctl.scan(code)) {
                 LocScan.ok => const ScanFeedback.ok(),
@@ -531,15 +546,28 @@ class PutawayScreen extends ConsumerWidget {
                 style: theme.textTheme.bodyMedium,
               )
             else if (step == 1) ...[
-              _ProductCheck(barcodeKnown: barcode != null, counted: s.qty),
-              QtyStepper(
-                id: 'putaway-qty',
-                label: l10n.putawayQty,
-                value: s.qty,
-                max: barcode != null ? s.qty : t.remainingQty,
-                enabled: !s.unknown,
-                onChanged: ctl.setQty,
-              ),
+              if (barcode == null || s.qty == 0)
+                _ProductCheck(barcodeKnown: barcode != null, counted: s.qty),
+              if (barcode == null)
+                QtyStepper(
+                  id: 'putaway-qty',
+                  label: l10n.putawayQty,
+                  value: s.qty,
+                  max: t.remainingQty,
+                  enabled: !s.unknown,
+                  onChanged: ctl.setQty,
+                )
+              else if (s.qty > 0)
+                CountQtyField(
+                  id: 'putaway-qty',
+                  label: l10n.putawayQty,
+                  help: l10n.countQtyHelp(t.remainingQty),
+                  addLabel: l10n.pickQtyAdd,
+                  value: s.qty,
+                  max: t.remainingQty,
+                  onAdd: () => ctl.scan(barcode),
+                  onSet: (n) => ctl.setQty(n.clamp(1, t.remainingQty)),
+                ),
             ] else
               Row(
                 children: [
