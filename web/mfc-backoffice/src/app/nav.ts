@@ -73,6 +73,14 @@ export const navGroups: readonly MenuGroup[] = [
     key: 'delivery',
     items: [
       {
+        // 포장 인계 현황(bff 0.11.0, 2026-11-17 request-packing-handover — 보기만)
+        key: 'packingHandover',
+        segment: 'packing-handover',
+        ready: true,
+        apiReady: ['출고별 단계(출고요청·피킹중·패킹중·출고대기·인계)·포장별 인계·배송(보기만)'],
+        apiMissing: [],
+      },
+      {
         key: 'deliveries',
         segment: 'deliveries',
         ready: true,

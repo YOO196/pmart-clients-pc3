@@ -354,6 +354,11 @@ function ShipmentView({ shipmentId }: { readonly shipmentId: string }) {
         {(s) => (
           <>
             <p>
+              {s.orderNumber && (
+                <span className="mr-2 font-mono font-semibold" data-testid="order-number">
+                  {m.orderNumber(s.orderNumber)}
+                </span>
+              )}
               <span className="font-mono">{s.shipmentId}</span> · {m.shipmentState[s.state ?? ''] ?? s.state}
               {s.holdReason && <span className="ml-1 opacity-70">{s.holdReason}</span>}
             </p>
@@ -364,6 +369,7 @@ function ShipmentView({ shipmentId }: { readonly shipmentId: string }) {
                 <thead>
                   <tr>
                     <th>{p.id}</th>
+                    <th>{p.handoverCode}</th>
                     <th>{p.state}</th>
                     <th>{p.fence}</th>
                     <th>{p.rider}</th>
@@ -376,6 +382,9 @@ function ShipmentView({ shipmentId }: { readonly shipmentId: string }) {
                   {(s.packages ?? []).map((pkg) => (
                     <tr key={pkg.packageId} data-testid="package-row">
                       <td className="font-mono">{pkg.packageId}</td>
+                      <td className="font-mono" data-testid="handover-code">
+                        {pkg.handoverCode ?? messages.none}
+                      </td>
                       <td>{m.packageState[pkg.state ?? ''] ?? pkg.state}</td>
                       <td>
                         {m.fenceState[pkg.fence?.state ?? ''] ?? pkg.fence?.state ?? messages.none}
