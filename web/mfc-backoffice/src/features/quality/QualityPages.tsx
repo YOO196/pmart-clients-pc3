@@ -15,6 +15,7 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-quality';
 import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
+import { ApprovalAwareFeedback, ApprovalRefInput } from '../../shared/approval';
 import { messages } from '../../shared/messages';
 
 const m = messages.quality;
@@ -105,16 +106,6 @@ function LookupForm({ label, value, onSubmit }: { readonly label: string; readon
         {m.open}
       </button>
     </form>
-  );
-}
-
-function ApprovalRefInput({ value, onChange }: { readonly value: string; readonly onChange: (v: string) => void }) {
-  return (
-    <label className="flex flex-col gap-1">
-      {m.approvalRef}
-      <input className="input input-sm w-56 font-mono" maxLength={128} value={value} onChange={(e) => onChange(e.target.value)} />
-      <span className="text-xs opacity-70">{m.approvalRefHint}</span>
-    </label>
   );
 }
 
@@ -318,13 +309,15 @@ function DecideRelease({ decision, onDone }: { readonly decision: Decision; read
   const queryClient = useQueryClient();
   const id = decision.qualityDecisionId ?? '';
   const [note, setNote] = useState('');
+  const [approvalRef, setApprovalRef] = useState('');
   const decide = useCommand(async (action: 'APPROVE' | 'REJECT', key) => {
     onDone(null);
     const d = await request(
       'POST',
       api.quality.POST('/quality-decisions/{qualityDecisionId}/approvals', {
         ...commandParams(key, { path: { qualityDecisionId: id } }),
-        body: { action, ...(note.trim() ? { note: note.trim() } : {}) },
+        // 본사 승인 번호(quality 0.3.0 새 칸) — APPROVE 때만, 비우면 보내지 않는다
+        body: { action, ...(action === 'APPROVE' && approvalRef.trim() ? { approvalRef: approvalRef.trim() } : {}), ...(note.trim() ? { note: note.trim() } : {}) },
       }),
     );
     // 반영 결과는 서버 상태로만: APPLIED = 해제 반영, DECLINED = 반려, 그 밖(UNKNOWN_RESULT 등)은 상태만 보인다
@@ -339,6 +332,7 @@ function DecideRelease({ decision, onDone }: { readonly decision: Decision; read
   return (
     <div className="space-y-2 border-t border-base-200 pt-3">
       <p className="text-xs opacity-70">{m.approveHint}</p>
+      <ApprovalRefInput value={approvalRef} onChange={setApprovalRef} />
       <label className="flex flex-col gap-1">
         {m.note}
         <input className="input input-sm w-64" maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
@@ -351,7 +345,7 @@ function DecideRelease({ decision, onDone }: { readonly decision: Decision; read
           {m.rejectRelease}
         </button>
       </div>
-      <CommandFeedback command={decide} />
+      <ApprovalAwareFeedback command={decide} />
     </div>
   );
 }
@@ -453,7 +447,7 @@ function DisposalView({ mfcId, id }: { readonly mfcId: string; readonly id: stri
               {notice}
             </p>
           )}
-          <p className="opacity-70">{`${m.requester} ${d.requesterId ?? messages.none} · ${m.approver} ${d.approverId ?? messages.none} · ${m.approvalRef} ${d.approvalRef ?? messages.none}`}</p>
+          <p className="opacity-70">{`${m.requester} ${d.requesterId ?? messages.none} · ${m.approver} ${d.approverId ?? messages.none} · ${messages.approval.ref} ${d.approvalRef ?? messages.none}`}</p>
           <table className="table table-xs">
             <thead>
               <tr>
@@ -510,7 +504,7 @@ function DecideDisposal({ mfcId, disposal, onDone }: { readonly mfcId: string; r
         'POST',
         api.quality.POST('/disposal-approvals', {
           ...commandParams(key, { version: disposal.version }),
-          body: { action, mfcId, disposalApprovalId: id, ...(action === 'APPROVE' ? { approvalRef: approvalRef.trim() } : {}) },
+          body: { action, mfcId, disposalApprovalId: id, ...(action === 'APPROVE' && approvalRef.trim() ? { approvalRef: approvalRef.trim() } : {}) },
         }),
       ),
     );
@@ -526,14 +520,14 @@ function DecideDisposal({ mfcId, disposal, onDone }: { readonly mfcId: string; r
     <div className="space-y-2 border-t border-base-200 pt-3">
       <ApprovalRefInput value={approvalRef} onChange={setApprovalRef} />
       <div className="flex gap-2">
-        <button type="button" className="btn btn-sm btn-primary" disabled={!approvalRef.trim() || decide.busy} onClick={() => run('APPROVE')}>
+        <button type="button" className="btn btn-sm btn-primary" disabled={decide.busy} onClick={() => run('APPROVE')}>
           {m.approveDisposal}
         </button>
         <button type="button" className="btn btn-sm" disabled={decide.busy} onClick={() => run('REJECT')}>
           {m.rejectDisposal}
         </button>
       </div>
-      <CommandFeedback command={decide} />
+      <ApprovalAwareFeedback command={decide} />
     </div>
   );
 }

@@ -210,7 +210,7 @@ export const messages = {
     units: '축소 후 수용 단위',
     reason: '사유',
     approvalRef: '승인 근거(승인 번호)',
-    approvalRefHint: '승인 번호를 직접 넣어요(승인 서비스가 없어 서버는 기록만 해요).',
+    approvalRefHint: '등록은 승인 번호가 필수예요(서버는 기록만 해요).',
     createHint: '접수 중지: 기간 안의 새 주문 슬롯 잡기를 막아요(이미 잡힌 주문은 그대로). 수용 축소: 기간 안의 수용 단위를 줄여요 — 이미 받은 주문은 지우지 않고 영향 주문으로 알려요.',
     created: '운영 제한을 등록했어요.',
     lift: '해제',
@@ -273,8 +273,6 @@ export const messages = {
     disposalState: { REQUESTED: '승인 대기', APPROVED: '승인됨', REJECTED: '반려', PARTIALLY_EXECUTED: '일부 실행', COMPLETED: '끝남' } as Readonly<Record<string, string>>,
     dLine: { requested: '요청', approved: '승인', executed: '실행', remaining: '남음' },
     requester: '요청한 사람',
-    approvalRef: '승인 근거(승인 번호)',
-    approvalRefHint: '승인 번호를 직접 넣어요(승인 서비스가 없어 서버는 기록만 해요).',
     approveDisposal: '폐기 승인',
     rejectDisposal: '폐기 반려',
     disposalApproved: '폐기를 승인했어요.',
@@ -330,8 +328,6 @@ export const messages = {
     toManufactureDate: '바로잡은 제조일',
     qty: '수량',
     reason: '사유',
-    approvalRef: '승인 근거(승인 번호)',
-    approvalRefHint: '승인 번호를 직접 넣어요(승인 서비스가 없어 서버는 기록만 해요).',
     submitCorrect: '정정 보내기',
     corrected: '정정했어요.',
     cancel: '닫기',
@@ -943,7 +939,7 @@ export const messages = {
     QTY_EXCEEDS_APPROVED: '승인된 남은 수량보다 많아요.',
     QTY_EXCEEDS_QUARANTINED: '격리된 수량보다 많아요.',
     // 재고(mfc-inventory 0.16.0)
-    APPROVAL_REQUIRED: '승인 근거(승인 번호)를 넣어 주세요.',
+    APPROVAL_REQUIRED: '본사 승인이 필요해요. 승인 번호를 넣고 다시 보내 주세요.',
     INSUFFICIENT_STOCK: '그 위치·LOT 의 재고가 모자라요.',
     INVARIANT_VIOLATION: '예약이 걸린 수량은 옮길 수 없어요.',
     LOCATION_NOT_REGISTERED: '등록되지 않은 칸이에요.',
@@ -981,6 +977,27 @@ export const messages = {
   } as Readonly<Record<string, string>>,
 
   /** 검증 사유 code → 문구(없는 code 는 code 그대로) */
+  /** 본사 승인 번호(AP-1 — inventory 0.22.0·quality 0.3.0·capacity 0.16.0) */
+  approval: {
+    ref: '본사 승인 번호',
+    refHint: '기준(한 건 손실 10만 원 이상 또는 한 상품 20개 이상) 아래면 비워 두세요 — 필요하면 서버가 알려 줘요.',
+    refHintAlways: '운영 제한 해제는 늘 본사 승인이에요. 받은 승인 번호를 넣어 주세요.',
+    required: '본사 승인이 필요해요.',
+    thresholds: '걸린 기준',
+    howTo: '본사(백오피스 승인함)에서 승인을 받은 뒤, 받은 승인 번호를 넣고 같은 내용으로 다시 보내 주세요.',
+    requestPending: '이 화면에서 본사 승인 요청 보내기는 준비 중이에요(승인 서비스 연결 대기).',
+    sameKeyNote: '재고 정정은 승인 대상이 이 요청이에요 — 내용을 바꾸지 말고 승인 번호만 넣어 다시 보내요.',
+    refReason: {
+      NOT_APPROVED: '이 승인 번호는 아직 승인되지 않았어요(심사 중이거나 반려).',
+      ALREADY_USED: '이 승인 번호는 다른 처리에 이미 썼어요. 새 승인을 받아 주세요.',
+      EXPIRED: '이 승인 번호는 기한이 지났어요.',
+      NOT_YET_EFFECTIVE: '이 승인 번호는 아직 효력이 시작되지 않았어요.',
+      SELF_APPROVAL: '승인한 사람과 요청한 사람이 같아요.',
+      TARGET_MISMATCH: '이 승인 번호는 다른 대상의 승인이에요.',
+      OUT_OF_SCOPE: '승인된 수량보다 많아요 — 새 승인을 받아 주세요.',
+    } as Readonly<Record<string, string>>,
+  },
+
   reason: {
     REQUIRED: '필요한 값이 없어요',
     INVALID_FORMAT: '형식이 맞지 않아요',

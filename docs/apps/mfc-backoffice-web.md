@@ -139,14 +139,14 @@
 | 입고 예정(`promises`) | `/inbound-promises*` | 계약만(501, MB-2) — 안내만 |
 
 ### 4-8. 재고 — mfc-inventory-service 0.16.0 (`features/inventory/InventoryPages.tsx`)
-탭은 URL 쿼리 `tab`(상품별 재고 기본 · `counts` · `unshippable` · `policies` · `handlings`). **승인 근거(approvalRef)는 화면에서 직접 입력**(사용자 2026-11-16 "승인 근거 너가 받아도 괜찮아" — 승인 서비스가 없어 서버는 기록만, PDA 실사 승인과 같음).
+탭은 URL 쿼리 `tab`(상품별 재고 기본 · `counts` · `unshippable` · `policies` · `handlings`). **본사 승인 번호(approvalRef)는 선택**(AP-1, inventory 0.22.0·quality 0.3.0·capacity 0.16.0 — 2026-11-17 PC 3). 기준(한 건 손실 10만 원 이상 또는 한 SKU 20개 이상, 운영 제한 해제는 늘)이면 서버가 422 `APPROVAL_REQUIRED` — `shared/approval.tsx` 가 걸린 기준(`details field=threshold`)과 안 되는 번호의 이유(`field=approvalRef` NOT_APPROVED·ALREADY_USED·EXPIRED·NOT_YET_EFFECTIVE·SELF_APPROVAL·TARGET_MISMATCH·OUT_OF_SCOPE)를 보이고, 승인 요청 본문(`field=approvalRequest`, JSON 문자열)은 화면에 쏟지 않는다. **본사 승인 요청 보내기**(approval-service `POST /change-requests` → submissions)는 approval 타입이 생긴 뒤(PC 2 요청 2026-11-17) — 지금은 "백오피스 승인함에서 받은 번호를 넣고 다시" 안내. LAN 은 PC 1 이 `VERIFY` 로 바꾸기 전까지 예전대로(번호 필수·확인 없음).
 
 | 화면·동작 | API | 규칙 |
 |---|---|---|
 | 상품별 재고 | `GET /mfcs/{id}/stock?sku=` | 상품 코드 필수(센터 전체 목록 MB-1 — 안내). LOT 요약(보유·격리·판매 가능·예약·가용)과 위치·품질·업무 상태별 단위 행 — 서버 값만 |
-| 위치·LOT 정정 | `POST /mfcs/{id}/stock-corrections` | 단위 행의 "정정" → 수량(보이는 수량 이하)·목적 위치·바로잡은 LOT 표기/소비기한/제조일 중 하나 이상·사유·승인 근거. 201 CommandResponse(REJECTED·UNKNOWN_RESULT 처리), 반영 뒤 재고 다시 읽기. 422 `INSUFFICIENT_STOCK`·`APPROVAL_REQUIRED`, 409 `INVARIANT_VIOLATION` 문구 |
+| 위치·LOT 정정 | `POST /mfcs/{id}/stock-corrections` | 단위 행의 "정정" → 수량(보이는 수량 이하)·목적 위치·바로잡은 LOT 표기/소비기한/제조일 중 하나 이상·사유·본사 승인 번호(선택). **승인 필요(422) 뒤 다시 보낼 때는 같은 `Idempotency-Key`**(승인 대상 = 요청 키 `targetRef <mfcId>:CORRECTION:<키>`, 422 는 기록되지 않음 — 다른 거절이면 새 키). 201 CommandResponse(REJECTED·UNKNOWN_RESULT 처리), 반영 뒤 재고 다시 읽기. 422 `INSUFFICIENT_STOCK`·`APPROVAL_REQUIRED`, 409 `INVARIANT_VIOLATION` 문구 |
 | 순환 실사 시작(`counts`) | `POST …/count-sessions` {locationCodes(최대 50, 중복 제거), reason?} | 실사 잠금 칸만 — 409 `LOCATION_NOT_LOCKED`(잠금 주체는 BR-52 R14 대기, 화면은 서버 판정만 안내). 시작하면 그 실사를 연다 |
-| 실사 보기·결정 | `GET …/count-sessions/{id}`, `POST …/approvals` | 목록 API 없음(MB-1) — 실사 ID 로 연다. 계수 중에는 차이를 숨긴다(서버가 null). 승인 대기면 승인(승인 근거 필수)·반려(근거 없이). 422 `SELF_APPROVAL`·`APPROVAL_REQUIRED`, 409 `BOOK_CHANGED`. 결정 문구는 실사 화면 위에(결정 영역은 사라진다). 계수·재계수는 PDA |
+| 실사 보기·결정 | `GET …/count-sessions/{id}`, `POST …/approvals` | 목록 API 없음(MB-1) — 실사 ID 로 연다. 계수 중에는 차이를 숨긴다(서버가 null). 승인 대기면 승인(본사 승인 번호 선택)·반려. 422 `SELF_APPROVAL`·`APPROVAL_REQUIRED`, 409 `BOOK_CHANGED`. 결정 문구는 실사 화면 위에(결정 영역은 사라진다). 계수·재계수는 PDA |
 | 출하 부적격 LOT(`unshippable`) | `GET …/unshippable-lots` | 소비기한 빠른 순. 이미 기타 칸이 아니면 "이동 지시" → 이동 화면을 상품·LOT·출발 칸·수량으로 채워 연다(`moves/new?sku=&lotId=&fromLocation=&qty=`) |
 | 보충 기준(`policies`) | `GET/PUT/DELETE …/replenishment-policies` | 칸·상품·최소·목표·단위. 최소 > 목표면 보내지 않음. 고회전 선반이 아니면 422 `REPLENISH_ONLY_HIGH_TURNOVER`. 삭제는 204(`locationCode`·`sku` 쿼리) |
 | 상품 취급(`handlings`) | `GET/POST …/sku-handlings` | ON/OFF 거르기, 커서 더 보기. 켜기·끄기는 `X-Expected-Version` = 취급 레코드 version(없으면 0). `changed=false` 면 "바뀐 것 없음". 422 `SKU_INACTIVE`, 404 `SKU_NOT_FOUND` 문구. 일괄 변경(`sku-handling-batches`)은 아직 안 붙임 |
@@ -159,7 +159,7 @@
 | 판정(격리·해제) | `POST /quality-decisions` → 202 CommandResponse(resultId = 판정 번호) | 판정·사유(7종)·메모·대상 줄(상품·LOT·위치·수량·업무 상태). 격리는 바로 반영, 해제는 요청만(ACCEPTED → "해제 승인 대기"). 보낸 뒤 판정을 다시 읽어 상태로 보인다(접수를 완료로 보이지 않음) |
 | 판정 보기·해제 결정 | `GET /quality-decisions/{id}`, `POST …/{id}/approvals` {APPROVE\|REJECT, note?} | 해제 승인 대기일 때만 단추. 응답 상태가 APPLIED 면 "반영", DECLINED 면 "반려", 그 밖(결과 모름 등)은 상태만 |
 | 폐기 요청 | `POST /disposal-approvals` {action REQUEST, lines, reason?, sourceRef?} | 202 resultId = 폐기 번호 → 그 폐기를 연다 |
-| 폐기 승인·반려 | `POST /disposal-approvals` {APPROVE\|REJECT, disposalApprovalId, approvalRef} + `X-Expected-Version` | 승인 근거는 직접 입력(사용자 2026-11-16), 없으면 단추 꺼짐. 전량 승인(부분 승인은 아직 안 붙임) |
+| 폐기 승인·반려 | `POST /disposal-approvals` {APPROVE\|REJECT, disposalApprovalId, approvalRef} + `X-Expected-Version` | 본사 승인 번호 선택(AP-1). 전량 승인(부분 승인은 아직 안 붙임) |
 | 폐기 실행 | `POST /disposal-approvals/{id}/executions` | 승인·일부 실행일 때만. 줄마다 실행 수량(기본 = 남은 승인량, 넘으면 단추 꺼짐 — 서버도 422 `QTY_EXCEEDS_APPROVED`). 실행 상태 APPLIED·REJECTED(사유)·UNKNOWN_RESULT(같은 키) |
 | 회수품 검수 | inbound `GET /return-receipts/{id}` → `POST /return-inspections` | 반입이 반영되고 검수 대기일 때만. 줄마다 재판매/폐기·보관 온도대·개봉·신선·폐기 사유. 재판매는 상온·미개봉·신선 아님만(화면이 막고 서버도 422 `RESALE_NOT_ALLOWED`). inspectedBy = 로그인한 사람. 결과는 검수 번호로 연다(재판매·폐기 수량, 폐기 승인 요청 번호) |
 | 품질 사고(`incidents`) | `/quality-incidents*` | 계약만(501, MB-2) — 안내만 |
@@ -169,8 +169,8 @@
 | 화면·동작 | API | 규칙 |
 |---|---|---|
 | 목록 | `GET /operation-restrictions?mfcId=&activeOnly=` | 기본 활성만(서버 기본 — 보내지 않음), "해제된 것까지"는 `activeOnly=false`(주소 `all=1`). 종류·상태·적용 기간(끝 없음)·축소 후 수용 단위·사유·승인 근거(등록 / 해제)·영향 주문 |
-| 등록 | `POST /operation-restrictions` → 201 CommandResponse | 접수 중지·수용 축소. 시작 필수, 끝은 선택(끝 ≤ 시작이면 보내지 않음), 수용 축소는 단위 필수. **승인 근거 직접 입력**(사용자 2026-11-16), 없으면 단추 꺼짐. 시각은 한국 시간 +09:00. APPLIED 일 때만 완료 문구 |
-| 해제 | `DELETE /operation-restrictions/{id}?approvalRef=` + `X-Expected-Version` → 202 | 활성일 때만, 해제 승인 근거 직접 입력. APPLIED 면 "해제", 그 밖은 목록을 다시 읽어 상태로 |
+| 등록 | `POST /operation-restrictions` → 201 CommandResponse | 접수 중지·수용 축소. 시작 필수, 끝은 선택(끝 ≤ 시작이면 보내지 않음), 수용 축소는 단위 필수. **승인 근거 직접 입력**(등록은 계약상 필수·기록만 — AP-1 대상 아님), 없으면 단추 꺼짐. 시각은 한국 시간 +09:00. APPLIED 일 때만 완료 문구 |
+| 해제 | `DELETE /operation-restrictions/{id}?approvalRef=` + `X-Expected-Version` → 202 | 활성일 때만. 해제는 늘 본사 승인 — 번호는 선택으로 보내고(비우면 query 없음) 없으면 422 승인 안내. APPLIED 면 "해제", 그 밖은 목록을 다시 읽어 상태로 |
 - 시간이 지나도 자동 해제하지 않는다(서버) — 화면 문구로 알린다. MFC_SUPERVISOR 가 아니면 서버 403.
 
 ## 5. 목 모드

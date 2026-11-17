@@ -68,13 +68,13 @@ describe('운영 제한', () => {
     expect(within(form).getByRole('button', { name: '운영 제한 등록' })).toBeDisabled();
   });
 
-  it('해제: 승인 근거·지금 버전으로 보내고, 활성 목록에서 빠진다', async () => {
+  it('해제: 본사 승인 번호·지금 버전으로 보내고, 활성 목록에서 빠진다', async () => {
     const view = renderAt('/c/MFC-BSN-01/restrictions');
     await waitFor(() => expect(cards()).toHaveLength(1));
     const card = cards()[0]!;
     const lift = within(card).getByRole('button', { name: '해제' });
-    expect(lift).toBeDisabled();
-    await userEvent.type(within(card).getByRole('textbox', { name: /해제 승인 근거/ }), 'AP-OPS-1L');
+    expect(lift).toBeEnabled(); // 번호는 선택으로 보내고, 없으면 서버가 APPROVAL_REQUIRED
+    await userEvent.type(within(card).getByRole('textbox', { name: /본사 승인 번호/ }), 'AP-OPS-1L');
     await userEvent.click(lift);
     expect(await screen.findByText('운영 제한을 해제했어요.')).toBeInTheDocument();
     expect(await screen.findByText('조건에 맞는 운영 제한이 없어요.')).toBeInTheDocument();
@@ -91,5 +91,20 @@ describe('운영 제한', () => {
     await userEvent.type(within(form).getByRole('textbox', { name: /승인 근거/ }), 'AP-OPS-9');
     await userEvent.click(within(form).getByRole('button', { name: '운영 제한 등록' }));
     expect(await within(form).findByText('이 센터 권한이 없습니다.')).toBeInTheDocument();
+  });
+});
+
+describe('운영 제한 해제 — 늘 본사 승인(AP-1)', () => {
+  it('번호 없이 보내면 승인 안내(늘 본사), 이미 쓴 번호는 이유', async () => {
+    renderAt('/c/MFC-BSN-01/restrictions');
+    await waitFor(() => expect(cards()).toHaveLength(1));
+    const card = cards()[0]!;
+    await userEvent.click(within(card).getByRole('button', { name: '해제' }));
+    const notice = await within(card).findByRole('alert');
+    expect(notice).toHaveAttribute('data-state', 'approval-required');
+    expect(notice).toHaveTextContent('운영 제한 해제는 늘 본사 승인');
+    await userEvent.type(within(card).getByRole('textbox', { name: /본사 승인 번호/ }), 'AP-USED');
+    await userEvent.click(within(card).getByRole('button', { name: '해제' }));
+    expect(await within(card).findByTestId('approval-ref-reason')).toHaveTextContent('이미 썼어요');
   });
 });

@@ -1,13 +1,13 @@
 // 재고 목: mfc-inventory-service 0.16.0 — 위치·LOT 정정, 순환 실사(시작·조회·승인), 출하 부적격 LOT, 보충 기준, 상품 취급.
 // 상품별 재고 조회(`/mfcs/{id}/stock`)는 moveHandlers 에 있다(같은 db.stockUnits).
-// 서버 규칙 중 화면이 보여 줄 것만: 그 센터 권한, approvalRef 필수(422 APPROVAL_REQUIRED), 정정 수량 ≤ 출발 단위(422 INSUFFICIENT_STOCK),
+// 서버 규칙 중 화면이 보여 줄 것만: 그 센터 권한, 본사 승인 번호(AP-1 — 정정은 목 기준 한 줄 10개 이상이면 422 APPROVAL_REQUIRED, 실사·그 밖은 번호 선택), 정정 수량 ≤ 출발 단위(422 INSUFFICIENT_STOCK),
 // 실사 시작은 실사 잠금 칸만(409 LOCATION_NOT_LOCKED), 승인은 PENDING_APPROVAL·시작/계수한 사람 아님(422 SELF_APPROVAL),
 // 보충 기준은 고회전 선반만(422 REPLENISH_ONLY_HIGH_TURNOVER)·min ≤ target, 취급 켜기는 ACTIVE 만(422 SKU_INACTIVE)·버전.
 import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { db, nextSeq, timestamp, type MockCountSession } from './db';
-import { expectedVersion, idempotent, operator, problem, unauthorized } from './support';
+import { approvalProblem, expectedVersion, idempotent, operator, problem, unauthorized } from './support';
 
 const canAccess = (request: Request, mfcId: string) => operator(request)?.centers.includes(mfcId) ?? false;
 const isSupervisor = (request: Request) => operator(request)?.roles.includes('MFC_SUPERVISOR') ?? false;
@@ -27,11 +27,14 @@ export const inventoryHandlers = [
     if (mfcId instanceof Response) return mfcId;
     const body = (await request.json()) as {
       reason: string;
-      approvalRef: string;
+      approvalRef?: string;
       lines: Array<{ sku: string; lotId: string; fromLocation: string; qualityState: string; workState: string; qty: number; toLocation?: string; toSourceLotRef?: string }>;
     };
     return idempotent(request, () => {
-      if (!body.approvalRef?.trim()) return problem(422, 'APPROVAL_REQUIRED');
+      // 목 기준: 한 줄 10개 이상(실서버 기준은 한 건 손실 10만 원 이상 또는 한 SKU 20개 이상 — 서버가 정함). 승인 대상 = 이 요청의 키.
+      const big = body.lines.some((l) => l.qty >= 10);
+      const need = big || body.approvalRef ? approvalProblem(`${mfcId}:CORRECTION:${keyOf(request)}`, '한 SKU 20개 이상(목: 10개 이상)', body.approvalRef) : null;
+      if (need) return need;
       for (const l of body.lines) {
         const unit = db.stockUnits.find(
           (u) => u.mfcId === mfcId && u.sku === l.sku && u.lotId === l.lotId && u.locationCode === l.fromLocation && u.qualityState === l.qualityState && u.workState === l.workState,
@@ -100,7 +103,6 @@ export const inventoryHandlers = [
       if (s.state !== 'PENDING_APPROVAL') return problem(409, 'INVALID_STATE');
       const me = actor(request);
       if ([s.createdBy, s.firstCounter, s.recounter].includes(me)) return problem(422, 'SELF_APPROVAL');
-      if (body.action === 'APPROVE' && !body.approvalRef?.trim()) return problem(422, 'APPROVAL_REQUIRED');
       const next: MockCountSession = {
         ...s,
         state: body.action === 'APPROVE' ? 'ADJUSTED' : 'REJECTED',
