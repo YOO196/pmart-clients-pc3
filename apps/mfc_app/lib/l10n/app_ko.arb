@@ -890,6 +890,17 @@
   "pickToPack": "피킹을 다 했어요.\n장바구니를 들고 패킹대로 가요",
   "pickStartPacking": "패킹대 도착 — 패킹 시작",
   "pickRejectedSome": "거절된 실적이 있어요 — 관리자에게 알려 주세요",
+  "pickRejectToLocation": "장바구니 없이 보낸 실적이에요(앱 이전 버전)",
+  "pickRejectCartMismatch": "이 주문은 처음 담은 장바구니에만 담을 수 있어요",
+  "pickRejectZone": "장바구니가 아닌 곳으로 보냈어요",
+  "pickRejectCode": "사유 {code}",
+  "@pickRejectCode": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "packStepStation": "패킹대",
   "packStepCart": "장바구니",
   "packStepDispatch": "배차",

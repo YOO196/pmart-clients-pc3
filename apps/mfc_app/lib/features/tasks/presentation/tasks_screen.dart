@@ -197,6 +197,14 @@ String pickScanText(AppLocalizations l10n, ScanResult r) => switch (r) {
   ScanResult.needLocation => l10n.pickNeedLocation,
 };
 
+/// 피킹 실적 거절 사유. 모르는 코드는 코드 그대로.
+String pickRejectText(AppLocalizations l10n, String code) => switch (code) {
+  TaskProblemCode.toLocationRequired => l10n.pickRejectToLocation,
+  TaskProblemCode.cartMismatch => l10n.pickRejectCartMismatch,
+  TaskProblemCode.locationZoneMismatch => l10n.pickRejectZone,
+  _ => l10n.pickRejectCode(code),
+};
+
 String pickLocText(AppLocalizations l10n, PickLocScan r) => switch (r) {
   PickLocScan.ok => '',
   PickLocScan.wrongPlace => l10n.moveWrongPlace,
@@ -584,7 +592,16 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
               ],
               if (queue.any((q) => q.state == QueueItemState.rejected))
                 Text(
-                  l10n.pickRejectedSome,
+                  [
+                    l10n.pickRejectedSome,
+                    // 거절 사유(서버 코드) — 무엇이 막혔는지 현장에서 알 수 있게.
+                    ...{
+                      for (final q in queue)
+                        if (q.state == QueueItemState.rejected &&
+                            q.rejectCode != null)
+                          pickRejectText(l10n, q.rejectCode!),
+                    },
+                  ].join('\n'),
                   key: const ValueKey('pick-rejected'),
                   style: TextStyle(color: theme.colorScheme.error),
                 ),

@@ -262,10 +262,15 @@ Map<String, Object?> pickPayload({
   /// 실제로 집은 칸(스캔한 값)·LOT 조각. 없으면 줄의 첫 지시 사본.
   String? fromLocation,
   String? lotId,
+
+  /// 찍은 장바구니(`CRT-…`) — 집품 도착지(fulfillment 0.8.0, handoff 2026-11-17 pick-to-cart P1).
+  /// 집은 양이 있으면 서버가 필수로 본다(없으면 400 TO_LOCATION_REQUIRED).
+  String? toLocation,
 }) => {
   'workerId': workerId,
   'assignmentVersion': ?assignmentVersion,
   'fromLocation': ?(fromLocation ?? line.locationId),
+  'toLocation': ?toLocation,
   'lines': [
     {
       'orderLineId': line.orderLineId,

@@ -265,6 +265,15 @@ abstract final class TaskProblemCode {
   static const versionConflict = 'VERSION_CONFLICT';
   static const idempotencyConflict = 'IDEMPOTENCY_CONFLICT';
   static const dependencyUnavailable = 'DEPENDENCY_UNAVAILABLE';
+
+  /// 집은 양이 있는데 도착지(장바구니)가 없다 — 400(fulfillment 0.8.0).
+  static const toLocationRequired = 'TO_LOCATION_REQUIRED';
+
+  /// 같은 출고를 다른 장바구니로 집었다 — 409(fulfillment 0.8.0, 한 출고 = 한 장바구니).
+  static const cartMismatch = 'CART_MISMATCH';
+
+  /// 도착지가 장바구니(CART)·포장(PACKING) 구역이 아니다 — 재고 거절 사유(inventory 0.19.0).
+  static const locationZoneMismatch = 'LOCATION_ZONE_MISMATCH';
 }
 
 /// 큐에 넣는 실행 명령 종류.

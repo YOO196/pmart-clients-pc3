@@ -273,7 +273,7 @@ class PickingState {
     this.syncing = false,
   });
 
-  /// 장바구니(`CRT-…`). 실행 본문에 넣을 곳이 없다(BR-52 R19 3) — 화면에만.
+  /// 장바구니(`CRT-…`). 실행의 toLocation(집품 도착지 — fulfillment 0.8.0).
   final String? cart;
 
   /// 확인한 칸(스캔 값). 실행의 fromLocation.
@@ -305,7 +305,7 @@ class PickingState {
 }
 
 /// 출하 → 피킹에 쓴 장바구니. 패킹대에서 장바구니를 찍어 같은 주문인지 확인한다.
-/// 실행 본문에 넣을 곳이 없어(BR-52 R19 3) 이 기기에만 둔다.
+/// 서버도 집품 도착지로 알지만(작업 상세 packingLocations) 패킹 화면은 이 기기 값으로 바로 비교한다.
 final orderCartProvider = NotifierProvider<OrderCarts, Map<String, String>>(
   OrderCarts.new,
 );
@@ -415,6 +415,7 @@ class PickingController extends Notifier<PickingState> {
             shortage: shortage,
             fromLocation: state.at ?? stop.location,
             lotId: stop.lotId,
+            toLocation: state.cart,
           ),
         );
     if (!ref.mounted) return;
