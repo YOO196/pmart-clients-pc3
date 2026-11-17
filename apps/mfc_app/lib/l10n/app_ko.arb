@@ -479,6 +479,18 @@
   "nextOffShift": "근무 시간이 아니라 작업을 받을 수 없어요",
   "nextNotEnrolled": "오늘 근무 등록이 안 돼 있어요. 센터 관리자에게 알려 주세요",
   "nextNotAllowed": "작업을 받을 수 없어요. 센터 관리자에게 알려 주세요",
+  "nextWorkerNotActive": "작업자 상태가 '활동'이 아니에요(정지·휴직 등). 센터 관리자에게 알려 주세요",
+  "nextWorkerNotRegistered": "이 센터 작업자로 등록돼 있지 않아요. 센터 관리자에게 알려 주세요",
+  "nextConfigRequired": "센터 근무 시간표가 없어 작업을 받을 수 없어요. 센터 관리자에게 알려 주세요",
+  "nextForbidden": "작업을 받을 권한이 없어요(작업자 역할 아님). 센터 관리자에게 알려 주세요",
+  "nextReasonCode": "사유 {code}",
+  "@nextReasonCode": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "nextWorkAreaNotAllowed": "이 업무는 지금 받을 수 있는 작업 권한이 없어요. 다른 업무를 고르거나 센터 관리자에게 요청해 주세요",
   "nextRetry": "다시 받기",
   "typePick": "피킹",
@@ -1087,7 +1099,7 @@
   "startChoose": "메뉴를 누르세요",
   "startLogin": "로그인",
   "startLoginHint": "직원 계정으로 업무 시작",
-  "startSetupHint": "네트워크 · 프린터 · 스캐너",
+  "startSetupHint": "프린터 · 스캐너 · 기기 정보",
   "startStockHint": "상품별 칸 · 수량",
   "startNeedsLogin": "로그인 필요",
   "stockCheckTitle": "재고 확인",

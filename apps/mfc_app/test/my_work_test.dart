@@ -19,7 +19,7 @@ import 'support.dart';
 void main() {
   setUpAll(initPmartFormatting);
 
-  Future<void> pump(WidgetTester t) async {
+  Future<void> pump(WidgetTester t, {String? nextRejectCode}) async {
     t.view
       ..physicalSize = const Size(412, 915)
       ..devicePixelRatio = 1;
@@ -33,7 +33,8 @@ void main() {
           authRepositoryProvider.overrideWithValue(MockAuthRepository()),
           taskRepositoryProvider.overrideWithValue(tasks),
           workRepositoryProvider.overrideWithValue(
-            MockWorkRepository(tasks: tasks, latency: Duration.zero),
+            MockWorkRepository(tasks: tasks, latency: Duration.zero)
+              ..nextRejectCode = nextRejectCode,
           ),
           secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),
         ],
@@ -67,5 +68,12 @@ void main() {
     await t.tap(find.byKey(const ValueKey('my-work-chip')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('my-work-summary')), findsOneWidget);
+  });
+
+  testWidgets('작업을 받을 수 없으면 사유와 서버 코드를 보인다', (t) async {
+    await pump(t, nextRejectCode: 'WORKER_NOT_ACTIVE');
+    await openRoute(t, '/work/pickPack');
+    expect(find.textContaining("작업자 상태가 '활동'이 아니에요"), findsOneWidget);
+    expect(find.text('사유 WORKER_NOT_ACTIVE'), findsOneWidget);
   });
 }
