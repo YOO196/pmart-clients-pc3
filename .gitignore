@@ -19,6 +19,7 @@ web/backoffice/src/api/generated/
 web/core/src/generated/
 web/hr-backoffice/src/api/generated/
 web/mfc-backoffice/src/api/generated/
+web/rider-backoffice/src/api/generated/
 
 # Node
 node_modules/

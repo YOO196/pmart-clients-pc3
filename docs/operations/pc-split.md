@@ -13,17 +13,17 @@
 
 | PC | IP | 백엔드 영역(개발) | 클라이언트(이 저장소) | LAN 에서 돌리는 것 |
 |---|---|---|---|---|
-| **PC 1** | 192.168.0.32 | **platform** — 인증·HR·승인·게이트웨이·라이브러리·배포, 다른 영역 밖의 모든 서비스. **배포·병합 유일 지점** | **customer-app 위주**(사용자 2026-11-13) + **로그인·세션·토큰 코드**(모든 앱). backoffice·hr-backoffice·web-common 은 **2026-11-16 PC 2 로 넘겼다**(PC 2 작업 중) — PC 1 은 그 전에 받은 화면 요청 중 남은 것만(`backoffice-handover.md` §4-1). **mfc-backoffice** 는 로그인·센터 고르기 뼈대만 이 PC(2026-11-15), 메뉴 화면은 PC 2(사용자 2026-11-16). **원본 main 에 넣는 유일한 PC** | 없음(빌드·Claude Code 전용, Docker 미기동) |
-| **PC 2** | 192.168.0.34 | **backoffice**(2026-11-16 PC 1 에서 넘김) — 백엔드 `backoffice-bff`·`case-service` + 클라이언트 웹 | **`web/backoffice`·`web/hr-backoffice`·`web/mfc-backoffice`·`web/core`·`web/ui`(로그인·세션·토큰 부분 제외)** — 2026-11-16 넘김(mfc-backoffice 는 같은 날 사용자 결정, 백엔드 알림 `all/2026-11-16-notice-mfc-backoffice-owner-pc2.md`). 지금까지 백엔드가 보낸 화면 요청은 PC 1 이 끝까지 하고 PC 2 는 그 뒤부터. 인계서 `docs/operations/backoffice-handover.md` | 커머스 서비스(상품·고객·장바구니·검색·가격·주문·결제 등), Kafka 1 |
-| **PC 3** | 192.168.0.222 | **mfc** — mfc-*-service, MFC 시뮬레이터 연결 | **mfc-app**(사용자 확정 2026-11-13) — `apps/mfc_app` | MFC 서비스 6개, CDC 재고, 검색 색인(ES) |
-| **PC 4** | 192.168.0.40 | 없음. 예정 **rag**(사용자 확정 2026-11-13, 시작 전) — 백엔드만 | 미정(rag 는 클라이언트 영향 거의 없음) | **API 게이트웨이**(`https://192.168.0.40:8443`, 앱용 `http://…:8080`), **백오피스 화면**(`https://192.168.0.40`), **인사팀 백오피스 화면**(`https://192.168.0.40:8444`), auth-service·승인·bff·설정 서버·Eureka·모니터링. 화면 서빙은 backoffice 영역이 PC 2 로 가도 계속 PC 4, 배포는 PC 1 |
-| **PC 5** | 192.168.0.101 | **delivery** — delivery-*·rider-service·rider-auth-service | **rider-app**(사용자 확정 2026-11-13) — `apps/rider_app` | 배송 서비스, **Keycloak**(직원 로그인 화면), employee-auth-service, hr-service, 사내 메일·웹메일(`https://192.168.0.101:8190`), RAG 실행(ollama) |
+| **PC 1** | 192.168.0.32 | **platform** — 인증·HR·승인·게이트웨이·라이브러리·배포, 다른 영역 밖의 모든 서비스. **배포·병합 유일 지점** | **customer-app 위주**(사용자 2026-11-13) + **로그인·세션·토큰 코드**(모든 앱). backoffice·hr-backoffice·web-common 은 **2026-11-16 PC 2 로 넘겼다**(PC 2 작업 중) — PC 1 은 그 전에 받은 화면 요청 중 남은 것만(`backoffice-handover.md` §4-1). **mfc-backoffice** 는 로그인·센터 고르기 뼈대만 이 PC(2026-11-15), 메뉴 화면은 PC 3(2026-11-17 PC 2 에서 옮김). **rider-backoffice** 도 뼈대·로그인만 이 PC(2026-11-17), 메뉴 화면은 PC 5. **원본 main 에 넣는 유일한 PC** | 없음(빌드·Claude Code 전용, Docker 미기동) |
+| **PC 2** | 192.168.0.34 | **backoffice**(2026-11-16 PC 1 에서 넘김) — 백엔드 `backoffice-bff`·`case-service` + 클라이언트 웹 | **`web/backoffice`·`web/hr-backoffice`·`web/core`·`web/ui`(로그인·세션·토큰 부분 제외)** — 2026-11-16 넘김. `web/mfc-backoffice` 는 2026-11-16~17 PC 2 가 맡았다가 **2026-11-17 PC 3 으로 옮김**(사용자 "MFC 백오피스를 PC2에서 PC3로"). 지금까지 백엔드가 보낸 화면 요청은 PC 1 이 끝까지 하고 PC 2 는 그 뒤부터. 인계서 `docs/operations/backoffice-handover.md` | 커머스 서비스(상품·고객·장바구니·검색·가격·주문·결제 등), Kafka 1 |
+| **PC 3** | 192.168.0.222 | **mfc** — mfc-*-service, MFC 시뮬레이터 연결 | **mfc-app**(사용자 확정 2026-11-13) — `apps/mfc_app`, **mfc-backoffice**(2026-11-17 PC 2 에서 옮김) — `web/mfc-backoffice` | MFC 서비스 6개, CDC 재고, 검색 색인(ES) |
+| **PC 4** | 192.168.0.40 | 없음. 예정 **rag**(사용자 확정 2026-11-13, 시작 전) — 백엔드만 | 미정(rag 는 클라이언트 영향 거의 없음) | **API 게이트웨이**(`https://192.168.0.40:8443`, 앱용 `http://…:8080`), **백오피스 화면**(`https://192.168.0.40`), **인사팀 백오피스 화면**(`https://192.168.0.40:8444`), **MFC 백오피스 화면**(`:8445`), **라이더 백오피스 화면**(`:8446`, 2026-11-17), auth-service·승인·bff·설정 서버·Eureka·모니터링. 화면 서빙은 backoffice 영역이 PC 2 로 가도 계속 PC 4, 배포는 PC 1 |
+| **PC 5** | 192.168.0.101 | **delivery** — delivery-*·rider-service·rider-auth-service | **rider-app**(사용자 확정 2026-11-13) — `apps/rider_app`, **rider-backoffice**(2026-11-17 새 앱 — 사용자 "라이더 백오피스는 PC5로") — `web/rider-backoffice` | 배송 서비스, **Keycloak**(직원 로그인 화면), employee-auth-service, hr-service, 사내 메일·웹메일(`https://192.168.0.101:8190`), RAG 실행(ollama) |
 
-- **클라이언트 담당(사용자 확정 2026-11-13, PC 2 넘김 2026-11-16): PC 1 = customer-app 위주 + 로그인 코드, PC 2 = backoffice·hr-backoffice·mfc-backoffice·web-common(로그인 제외), PC 3 = mfc-app, PC 5 = rider-app.** PC 4(rag)는 클라이언트 앱 영역이 없다. mfc-backoffice 화면이 부르는 MFC API 는 백엔드 PC 3(mfc 영역)이 만든다. 바뀌면 이 표를 고친다.
+- **클라이언트 담당(사용자 확정 2026-11-13, PC 2 넘김 2026-11-16): PC 1 = customer-app 위주 + 로그인 코드, PC 2 = backoffice·hr-backoffice·web-common(로그인 제외), PC 3 = mfc-app·mfc-backoffice(2026-11-17), PC 5 = rider-app·rider-backoffice(2026-11-17).** PC 4(rag)는 클라이언트 앱 영역이 없다. mfc-backoffice 화면이 부르는 MFC API 는 백엔드 PC 3, rider-backoffice 화면이 부르는 배송·라이더 API 는 백엔드 PC 5 가 만든다 — 화면과 API 가 같은 PC. 웹 공통(`web/core`·`web/ui`)은 PC 2 그대로 — PC 3·5 는 고칠 일이 생기면 PC 2 에 요청한다(같이 쓰는 네 앱 빌드를 한 곳에서 맞춘다). 바뀌면 이 표를 고친다.
 - mfc-app 은 2026-11-13 까지 PC 1 이 고쳤다(직원 로그인 — 일지 `docs/worklog/2026-11-13.md`). 남은 일(정지 안내를 `SUBJECT_BLOCKED` 기준으로, 실기기 로그인 확인)은 PC 3 이 이어받는다 — `../pmart-backend/docs/operations/other-pcs-todo.md` 클라이언트 절.
 - 두 백오피스의 HTTP 주소(80·8081)는 2026-11-13 에 닫혔다(HTTPS 로 301). LAN 빌드의 API 주소는 `https://192.168.0.40:8443/api/v1`.
 - Flutter 앱(mfc_app·customer_app)은 게이트웨이 `http://192.168.0.40:8080/api/v1` 을 그대로 쓴다(디버그 빌드).
-- 웹 빌드 배포: **PC 4 에 직접 복사하지 않는다.** `npm run build:lan -w web/<앱>` 뒤 dist 폴더와 진입 파일 이름을 handoff 로 알리면 PC 1 의 백엔드가 `lan.sh publish-backoffice`·`publish-hr-backoffice`·`publish-mfc-backoffice` 로 올린다(직접 복사한 빌드는 다음 배포 때 덮인다 — 2026-11-13 겪음).
+- 웹 빌드 배포: **PC 4 에 직접 복사하지 않는다.** `npm run build:lan -w web/<앱>` 뒤 dist 폴더와 진입 파일 이름을 handoff 로 알리면 PC 1 의 백엔드가 `lan.sh publish-backoffice`·`publish-hr-backoffice`·`publish-mfc-backoffice`·`publish-rider-backoffice` 로 올린다(직접 복사한 빌드는 다음 배포 때 덮인다 — 2026-11-13 겪음).
 
 ### 로그인·세션·토큰 코드는 PC 1 만 고친다 (사용자 2026-11-15)
 "백오피스, mfc 로그인, 소셜 로그인같은 작업은 pc1에서 하는걸로 정해서 다른쪽에서 코드가 오염되는걸 막고싶어" — 백엔드 알림 `../pmart-backend/docs/handoff/clients/all/2026-11-15-notice-login-code-pc1-only.md`, 백엔드 정본 `pmart-backend/docs/operations/pc-split.md` §1-3.
@@ -31,14 +31,14 @@
 | 앱·패키지 | PC 1 만 고치는 경로 |
 |---|---|
 | `web/core` | `src/employeeAuth.ts`·`session.ts`·`sessionPersistence.ts`·`tokens.ts`, `pmartFetch.ts` 의 토큰 갱신 부분 |
-| 웹 앱(backoffice·hr-backoffice·mfc-backoffice) | `src/features/session`, 그리고 그것을 받치는 `src/api/employeeAuth.ts`·`src/api/sessionPersistence.ts`·`src/app/SessionContext.tsx` |
+| 웹 앱(backoffice·hr-backoffice·mfc-backoffice·rider-backoffice) | `src/features/session`, 그리고 그것을 받치는 `src/api/employeeAuth.ts`·`src/api/sessionPersistence.ts`·`src/app/SessionContext.tsx` |
 | `apps/customer_app` | `lib/features/auth`(Google 로그인) |
 | `apps/mfc_app` | `lib/features/auth`(직원 로그인) |
 | `packages/pmart_core` | `lib/src/auth_tokens.dart`·`lib/src/interceptors.dart` |
 
 - **예외: `apps/rider_app` 로그인은 rider-app 담당(PC 5)이 만든다**(사용자 2026-11-15). 공용 `pmart_core` 토큰 코드는 위 표대로 PC 1.
 - 업무 화면이 토큰을 **쓰는** 코드(요청에 붙이기, 401·403 화면, 역할로 메뉴 가리기)는 각 앱 담당이 그대로 쓴다 — 위 경로를 **바꾸는** 것만 PC 1. 바꿀 일이 생기면 handoff 나 사용자를 통해 PC 1 에 요청한다.
-- 새 앱(예 mfc-backoffice)은 로그인·세션 부분을 PC 1 이 먼저 만들고, 메뉴·업무 화면은 담당 PC 가 만든다.
+- 새 앱(예 mfc-backoffice·rider-backoffice)은 로그인·세션 부분을 PC 1 이 먼저 만들고, 메뉴·업무 화면은 담당 PC 가 만든다.
 
 ### 다른 PC 가 원본에 넣는 방법 — 포크 → PR → PC 1 병합
 
@@ -83,6 +83,7 @@ web/
   backoffice/          # backoffice
   hr-backoffice/       # hr-backoffice
   mfc-backoffice/      # mfc-backoffice
+  rider-backoffice/    # rider-backoffice
   core/  ui/           # web-common (@pmart/web-core · @pmart/web-ui)
 tools/
   gen_api.dart         # Dart 계약 생성 — 공통
@@ -101,7 +102,7 @@ contracts.lock · CLAUDE.md · .claude/rules/   # 공통(§6)
 
 | 것 | 어떻게 |
 |---|---|
-| 생성 클라이언트(`packages/pmart_api/gen/`, `web/*/src/**/generated/`) | `dart tools/gen_api.dart`(약 6분, `flutter pub get` 보다 먼저), `npm run gen:api -w web/backoffice`·`-w web/hr-backoffice`·`-w web/mfc-backoffice` |
+| 생성 클라이언트(`packages/pmart_api/gen/`, `web/*/src/**/generated/`) | `dart tools/gen_api.dart`(약 6분, `flutter pub get` 보다 먼저), `npm run gen:api -w web/backoffice`·`-w web/hr-backoffice`·`-w web/mfc-backoffice`(rider-backoffice 는 화면을 만들 때 복사 대상에 더한다) |
 | `node_modules` | `npm install`(루트), `npm install --prefix tools/web-tools` |
 | 웹 빌드(`web/*/dist`) | `npm run build:lan -w web/<앱>` — 올리는 것은 PC 1(§1) |
 | 고객앱 레퍼런스 캡처 `docs/customer-app-design/` | git 제외 — **PC 1 에만 있다.** 고객앱 화면 작업은 이 폴더가 있어야 한다(다른 PC 가 맡으면 사용자가 복사) |
@@ -117,7 +118,8 @@ contracts.lock · CLAUDE.md · .claude/rules/   # 공통(§6)
 | **rider-app** | `apps/rider_app` |
 | **backoffice** | `web/backoffice` |
 | **hr-backoffice** | `web/hr-backoffice` |
-| **mfc-backoffice** | `web/mfc-backoffice` (센터 관리자 웹, 2026-11-15) |
+| **mfc-backoffice** | `web/mfc-backoffice` (센터 관리자 웹, 2026-11-15 — PC 3, 2026-11-17) |
+| **rider-backoffice** | `web/rider-backoffice` (라이더 운영·관제 웹, 2026-11-17 — PC 5) |
 | **web-common** | `web/core`·`web/ui`·`tools/web-tools` (웹앱 공통 — 한 주인) |
 
 - 영역 이름은 백엔드 제안과 같다(백엔드가 handoff 파일 이름에 그대로 쓴다).
