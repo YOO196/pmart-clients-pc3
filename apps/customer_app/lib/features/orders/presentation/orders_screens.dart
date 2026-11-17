@@ -27,6 +27,7 @@ import '../data/orders_repository.dart' show OrdersRepository;
 import '../domain/orders.dart';
 import '../domain/tracking.dart';
 import 'orders_providers.dart';
+import 'receipt_confirmation.dart';
 import '../../redelivery/presentation/redelivery_screens.dart'
     show RedeliveryPaymentsSection;
 import '../../reviews/presentation/reviews_screens.dart'
@@ -347,6 +348,23 @@ class _OrderBody extends ConsumerWidget {
                   for (final sl in s.lines)
                     Text(
                       '${byLine[sl.orderLineId]?.title ?? sl.orderLineId} · ${l10n.cartLineQuantity(sl.qty)}',
+                    ),
+                  // "받았어요"(수령 확인): 배송 중인 배송만 도착 예상 단계를 묻는다. 누른 뒤에는 결과를 남긴다.
+                  if (s.deliveryId case final id?
+                      when s.state == ShipmentState.handedOver ||
+                          s.state == ShipmentState.inDelivery ||
+                          ref.watch(
+                            receiptConfirmationProvider((
+                              orderId: o.orderId,
+                              deliveryId: id,
+                            )),
+                          ) is! ReceiptIdle)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ReceiptConfirmation(
+                        orderId: o.orderId,
+                        deliveryId: id,
+                      ),
                     ),
                 ],
               ),

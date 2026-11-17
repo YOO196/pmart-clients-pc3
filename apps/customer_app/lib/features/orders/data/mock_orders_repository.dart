@@ -395,7 +395,59 @@ base class MockOrdersRepository implements OrdersRepository {
         Problem(status: 404, code: ProblemCode.notFound),
       );
     }
-    return orderFromContract(api.Order.fromJson(json));
+    return orderFromContract(api.Order.fromJson(_withReceipts(json)));
+  }
+
+  /// 고객이 "받았어요"를 누른 배송(서버가 전달 완료로 바꾼 것).
+  final received = <String>{};
+
+  /// 수령 확인에 보낸 키(배송 ID → 키). 같은 키 재전송은 같은 결과.
+  final receiptKeys = <String, String>{};
+
+  /// 다음 수령 확인 응답(시험용). null 이면 APPLIED.
+  CommandStatus? nextReceiptStatus;
+
+  /// 다음 수령 확인을 이 오류로 실패시킨다(시험용 — 409·결과 불명 등).
+  PmartFailure? failNextReceipt;
+
+  Map<String, Object?> _withReceipts(Map<String, Object?> json) {
+    final shipments = json['shipments'] as List<Object?>?;
+    if (shipments == null || received.isEmpty) return json;
+    return {
+      ...json,
+      'shipments': [
+        for (final sh in shipments.cast<Map<String, Object?>>())
+          received.contains(sh['deliveryId'])
+              ? {...sh, 'state': 'DELIVERED'}
+              : sh,
+      ],
+    };
+  }
+
+  @override
+  Future<CommandStatus> confirmReceipt(
+    String deliveryId, {
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    if (failNextReceipt case final f?) {
+      failNextReceipt = null;
+      throw f;
+    }
+    if (receiptKeys[deliveryId] == key.value) return CommandStatus.applied;
+    if (received.contains(deliveryId)) {
+      throw const ProblemFailure(
+        Problem(status: 409, code: ProblemCode.invalidState),
+      );
+    }
+    final status = nextReceiptStatus ?? CommandStatus.applied;
+    nextReceiptStatus = null;
+    receiptKeys[deliveryId] = key.value;
+    // 접수(ACCEPTED)도 곧 반영된다고 흉내 낸다 — 다시 읽으면 완료.
+    if (status == CommandStatus.applied || status == CommandStatus.accepted) {
+      received.add(deliveryId);
+    }
+    return status;
   }
 
   @override
@@ -406,6 +458,12 @@ base class MockOrdersRepository implements OrdersRepository {
     }
     final current = now().toUtc();
     final json = switch (deliveryId) {
+      final id when received.contains(id) => {
+        'deliveryId': deliveryId,
+        'stage': 'DONE',
+        'dropEta': {'status': 'FINAL'},
+        'asOf': {'asOf': current.toIso8601String(), 'freshness': 'CURRENT'},
+      },
       'dlv-s2' => {
         'deliveryId': deliveryId,
         'stage': 'TO_CUSTOMER',

@@ -21,6 +21,7 @@
 | 10 | 회원 탈퇴·탈퇴 철회, 내 동의 목록, AI 상담 답 다시 찾기·다시 보기 | customer `/me/withdrawals`·`GET /me/consents`, customer-assistant `GET /customer-assistant/questions(/{id})` | 화면 위치는 레퍼런스 캡처 먼저 |
 | 25 | **약관 동의(CU-1) — 급함** (1단계 로그인 흐름 끝 2026-11-17, 남은 것 = 주문 전 재동의·설정 마케팅): 로그인 동의 완료 본문 `providerToken`+`consents`(필수 + 선택 MARKETING, 끈 것도 false), `/me/consent-changes` 먼저 부르기 지움, 재동의 안내(`newAccount=false`), 완료 오류 표, 로그인해 있는 고객의 주문 전 재동의(`GET /me/consents` `requiredConsentOutdated`), 설정의 마케팅 켜고 끄기 | auth 0.2.0·customer 0.3.0, `clients/customer-app/2026-11-17-notice-consents.md`(BR-20 회신 포함) | **최신 계약으로 다시 만들면 고객앱이 컴파일되지 않음**(2026-11-17, `consentChangeRequestId` 없어짐). LAN 스위치 2개는 앱 반영 때까지 꺼짐 — 준비되면 백엔드(PC 1 백엔드)와 함께 켬. `contracts.lock`(dart)은 이것과 함께 올림 |
 | 26 | 주소 검색(카카오 우편번호) 스크립트 도메인 `t1.daumcdn.net` → `t1.kakaocdn.net`, 이름 `daum.Postcode` → `kakao.Postcode` — **2026-11-30 종료**, 옛 주소면 검색 창 위에 개발자 공지가 고객에게 보임 | PC 5 알림 `docs/handoff/rider-app/2026-11-17-pc1-postcode-domain.md`(라이더앱은 #63 에서 바꿈) | 고객앱 `postcode_screen.dart` |
+| 29 | ~~**"받았어요"(고객 수령 확인)** — 주문 상세 배송 카드에 픽업 뒤·전달 전일 때 버튼, 확인 대화 뒤 `POST /deliveries/{id}/receipt-confirmations`~~ 2026-11-18 끝(커밋은 worklog) | execution 0.20.0, `clients/customer-app/2026-11-17-request-receipt-confirmation.md` | 사용자 2026-11-18 "이 요청 문서에 추가하고 바로 만들어". 실서버 확인은 30. 못 받음 신고는 6 |
 
 ## 2. 백엔드에 회신할 것
 
@@ -49,6 +50,7 @@
 | 21 | 알림함(쌓이는지) — 휴대폰 푸시는 27 | 2026-11-16 |
 | 27 | **휴대폰 푸시(폰 연결 필요)**: Firebase 콘솔 테스트 메시지 수신 → 로그인 뒤 `GET /me/push-tokens` 에 단말 → 주문 취소·배송 출발 때 푸시가 오고 누르면 그 화면, 주문 확정은 알림함에만 → **Google 로그인 그대로**(빌드 값 `googleServerClientId` 꼭 넣어 빌드). 결과는 `docs/handoff/customer-app/2026-11-18-backend-customer-push-fcm-reply.md` §2 에 덧붙임 | `7cbe1f2`, 2026-11-18 푸시 누르면 목적지 |
 | 28 | Firebase 프로젝트 합치기(2026-11-18 예정): 사용자가 `pmart-123` 에 `com.pmart.customer_app` 을 등록해 받은 `google-services.json` 으로 `apps/customer_app/android/app/google-services.json`(git 제외)만 바꾼 뒤 27 다시 | 코드 변경 없음 |
+| 30 | "받았어요" 실서버: 배송 중(픽업 뒤) 주문에서 버튼 → 완료로 바뀌고 라이더 앱에도 완료, 도착 예정 + 20분에 알림함 "상품을 받으셨나요?" → 누르면 주문 상세. **백엔드 LAN 배포 먼저 확인**(요청서 작성 때 배포 전) | 2026-11-18 받았어요 |
 
 ## 5. 다른 PC 일 중 PC 1 이 챙길 것
 

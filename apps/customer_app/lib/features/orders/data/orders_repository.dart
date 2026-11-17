@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:pmart_api_delivery_execution/pmart_api_delivery_execution.dart'
+    as ex;
 import 'package:pmart_api_delivery_tracking/pmart_api_delivery_tracking.dart'
     as trk;
 import 'package:pmart_api_order/pmart_api_order.dart' as api;
@@ -43,17 +45,26 @@ abstract interface class OrdersRepository {
 
   /// 시간 변경 결과 조회. 불명이면 [RequestState.unknown]. 거절이면 원인 코드(reason)도.
   Future<TimeChangeResult> timeChange(String orderId, IdempotencyKey key);
+
+  /// "받았어요"(고객 수령 확인) — execution 0.20.0 `POST /deliveries/{id}/receipt-confirmations`(본문 없음).
+  /// 픽업 뒤·전달 전 배송을 전달 완료로. 같은 키 재전송은 같은 결과. 남의 주문 404, 실패 처리 중·이미 끝남 409.
+  Future<CommandStatus> confirmReceipt(
+    String deliveryId, {
+    required IdempotencyKey key,
+  });
 }
 
 final class ApiOrdersRepository implements OrdersRepository {
   ApiOrdersRepository(Dio dio)
     : _dio = dio,
       _orders = api.PmartApiOrder(dio: dio).getOrdersApi(),
-      _eta = trk.PmartApiDeliveryTracking(dio: dio).getEtaApi();
+      _eta = trk.PmartApiDeliveryTracking(dio: dio).getEtaApi(),
+      _execution = ex.PmartApiDeliveryExecution(dio: dio).getExecutionApi();
 
   final Dio _dio;
   final api.OrdersApi _orders;
   final trk.EtaApi _eta;
+  final ex.ExecutionApi _execution;
 
   /// 이벤트 사이 최대 대기. 서버 HEARTBEAT 보다 길게 둔다(그 안에 아무것도 안 오면 끊긴 것으로 본다).
   static const streamIdleTimeout = Duration(seconds: 60);
@@ -208,6 +219,26 @@ final class ApiOrdersRepository implements OrdersRepository {
       }
       rethrow;
     }
+  }
+
+  @override
+  Future<CommandStatus> confirmReceipt(
+    String deliveryId, {
+    required IdempotencyKey key,
+  }) async {
+    final res = await pmartGuard(
+      () => _execution.confirmDeliveryReceipt(
+        deliveryId: deliveryId,
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        extra: commandOptions(key).extra,
+      ),
+    );
+    final status = res.data?.status.value;
+    if (status == null) {
+      throw const ContractViolationFailure('수령 확인 응답 본문 없음');
+    }
+    return CommandStatus.parse(status);
   }
 }
 

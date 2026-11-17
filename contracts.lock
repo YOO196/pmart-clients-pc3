@@ -80,7 +80,8 @@
         "rider"
       ],
       "delivery-execution-service": [
-        "rider"
+        "rider",
+        "customer"
       ],
       "rider-service": [
         "rider"

@@ -47,6 +47,9 @@ dependencies:
     path: ../../packages/pmart_api/gen/delivery-serviceability
   pmart_api_delivery_tracking:
     path: ../../packages/pmart_api/gen/delivery-tracking
+  # "받았어요"(고객 수령 확인) execution 0.20.0 `receipt-confirmations` — 백엔드 요청 2026-11-17 receipt-confirmation
+  pmart_api_delivery_execution:
+    path: ../../packages/pmart_api/gen/delivery-execution
   pmart_api_claim:
     path: ../../packages/pmart_api/gen/claim
   pmart_api_notification:

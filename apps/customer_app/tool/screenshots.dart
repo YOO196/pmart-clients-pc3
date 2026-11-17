@@ -227,6 +227,30 @@ void main() {
     // 오배송 다시 배송비 결제(order-seed-1 에 결제 대기 1건).
     await go('/orders/order-seed-1');
     await shot('order-detail-redelivery');
+    // "받았어요"(고객 수령 확인, execution 0.20.0) — 배송 중인 배송(dlv-s2)에만. 확인 대화 → 완료 안내.
+    Future<void> showShipment() async {
+      await t.ensureVisible(find.byKey(const ValueKey('shipment-sh-2')));
+      await t.pumpAndSettle();
+      final ctx = t.element(find.byKey(const ValueKey('shipment-sh-2')));
+      unawaited(Scrollable.ensureVisible(ctx, alignment: 0.15));
+      await t.pumpAndSettle();
+    }
+
+    await showShipment();
+    await shot('order-detail-receipt');
+    await t.tap(find.byKey(const ValueKey('receipt-dlv-s2')));
+    await t.pumpAndSettle();
+    await shot('order-detail-receipt-dialog');
+    await t.tap(find.byKey(const ValueKey('receipt-confirm')));
+    await t.pumpAndSettle();
+    await showShipment();
+    await shot('order-detail-receipt-done');
+    await go('/orders/order-seed-1');
+    await t.scrollUntilVisible(
+      find.byKey(const ValueKey('rdp-open-rdp-1')),
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
     await t.tap(find.byKey(const ValueKey('rdp-open-rdp-1')));
     await t.pumpAndSettle();
     await shot('redelivery-payment');
