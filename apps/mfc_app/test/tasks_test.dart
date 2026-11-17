@@ -360,6 +360,32 @@ void main() {
       expect(c.read(pickingProvider('task-mock-1')).at, isNull);
     });
 
+    test('칸 몫을 채운 뒤 같은 상품을 또 찍으면 수량 초과 안내만 — 칸 단계로 튕기지 않는다', () async {
+      final (pick, task) = await atStop();
+      expect(
+        pick.scan(task, MockTaskRepository.yogurtBarcode),
+        ScanResult.matched,
+      );
+      await pick.submitIfFull(task);
+      await pick.sync();
+      final after = await detail('task-mock-1');
+
+      // 카메라 중복 인식·스캐너 연타 — 상품 스캔 자리로 와도, 칸 스캔 자리로 와도 "수량 초과".
+      expect(
+        pick.scan(after, MockTaskRepository.yogurtBarcode),
+        ScanResult.overRemaining,
+      );
+      expect(
+        pick.scanLocation(after, MockTaskRepository.yogurtBarcode),
+        PickLocScan.overScan,
+      );
+      expect(repo.sentPayloads, hasLength(1), reason: '실적은 한 번만');
+
+      // 다음 칸을 찍으면 평소대로.
+      expect(pick.scanLocation(after, 'C-S1-02-2-05'), PickLocScan.ok);
+      expect(c.read(pickingProvider('task-mock-1')).lastDoneLine, isNull);
+    });
+
     test('상품 바코드가 여럿이면 어느 것을 찍어도 같은 상품(점포 299…)', () async {
       final (pick, task) = await atStop();
       expect(

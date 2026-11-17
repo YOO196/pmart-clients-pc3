@@ -157,7 +157,8 @@ void main() {
     await t.tap(find.byKey(const ValueKey('scan-field-camera')));
     await t.pumpAndSettle();
     expect(camera.title, '피킹 상품 스캔');
-    expect(camera.continuous, isTrue);
+    // 한 번 맞게 인식하면 카메라를 내린다(사용자 2026-11-17). 틀린 인식은 안내만 하고 창을 둔다.
+    expect(camera.continuous, isFalse);
     expect(camera.feedback.map((f) => f.ok), [false, true]);
     expect(camera.feedback.first.message, isNotNull);
     // 맞는 상품이 담겨 칸 몫(1개)이 차면 바로 보낸다 — 다음 칸 지시.
