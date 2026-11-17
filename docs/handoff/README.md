@@ -28,6 +28,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `mfc-app/2026-11-17-backend-pick-to-cart.md` | P1~P4 모두 수용 회신(`clients/mfc-app/2026-11-17-reply-pick-to-cart.md`, fulfillment 0.8.0·inventory 0.19.0 — 백엔드 브랜치 `mfc/pick-to-cart`, 아직 main·LAN 아님). PDA 반영함 — 배포 뒤 실서버 피킹 → 포장 → 출하대기 확인 |
 | `mfc-app/2026-11-17-backend-pick-reject-reason.md` | 실적 거절 사유(`rejectCode`·`rejectReason`)를 실행 조회·응답에(E1~E3) — 지금은 PDA 가 거절 이유를 못 보인다 |
 | `mfc-app/2026-11-17-backend-lot-label.md` | LOT 라벨(QR·자체 스티커) 형식·발급·재출력·해석(L1~L6) — 피킹에서 LOT 를 찍어 선입선출 확인 |
+| `mfc-app/2026-11-17-backend-shipment-ready-at-npe.md` | **버그(급함)** 출고 조회 `GET /shipments/{id}` 가 READY 전(`ready_at` NULL)이면 500 — `TaskStore.shipmentReadyAt` NPE, 패킹 화면이 안 열림(S1·S2) |
 | `backoffice/2026-11-16-backend-pii-reveal-and-pending-done.md` | 주문 개인정보 열람·처리 대기 — LAN 조회 화면은 확인(2026-11-16 PC 2), 원문 열람은 실서버에서 아직 안 눌러 봄 |
 | `all/2026-11-16-backend-login-code-pc1-only-done.md` | 클라이언트 표(경로 보탬) 확인 |
 | `backoffice/2026-11-16-backend-case-order-exceptions-done.md` | 사건함 사가·결제 이상·배차 실패 화면 반영 확인(PR #13) — case 0.5.0 LAN 배포됨(백엔드 알림, 데이터 0건), 사건이 생기면 실서버 확인 |
