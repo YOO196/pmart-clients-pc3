@@ -123,7 +123,7 @@ contracts.lock · CLAUDE.md · .claude/rules/   # 공통(§6)
 | **web-common** | `web/core`·`web/ui`·`tools/web-tools` (웹앱 공통 — 한 주인) |
 
 - 영역 이름은 백엔드 제안과 같다(백엔드가 handoff 파일 이름에 그대로 쓴다).
-- **web-common**: 2026-11-16 backoffice·hr-backoffice 와 함께 PC 2 로 넘겼다(백엔드 인계서 `pmart-backend/docs/backoffice/HANDOVER.md` §0). 단 `web/core` 의 직원 로그인·세션·토큰 코드와 웹 앱의 로그인 부분은 PC 1 이 맡는다(§1 표). `tools/web-tools` 담당은 정하지 않았다.
+- **web-common**: 2026-11-16 backoffice·hr-backoffice 와 함께 PC 2 로 넘겼다(백엔드 인계서 `pmart-backend/docs/backoffice/HANDOVER.md` §0). 단 `web/core` 의 직원 로그인·세션·토큰 코드와 웹 앱의 로그인 부분은 PC 1 이 맡는다(§1 표). 2026-11-17 에 mfc-backoffice 가 PC 3, rider-backoffice 가 PC 5 로 가도 web-common(`tools/web-tools` 포함)은 **PC 2 그대로**다 — PC 3·5 는 고칠 일이 생기면 PC 2 에 요청한다(백엔드 알림 `all/2026-11-17-notice-backoffice-web-owners-moved.md`, 백엔드 `pc-split.md` 앱 영역 표).
 - 위 표에 없는 공통 폴더(`packages/pmart_*`, `tools/gen_api.dart`)는 따로 영역을 두지 않았다. 고칠 때는 고친 앱 영역의 일지에 적고 `영향: <다른 앱 영역>` 을 단다. 담당을 정해야 하면 사용자가 정한다(미정).
 - 남의 영역 폴더를 고쳐야 하면 직접 고치지 말고 사용자에게 먼저 알린다(그 영역 담당과 겹치지 않게).
 
