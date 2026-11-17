@@ -204,3 +204,41 @@ describe('작업자 상세', () => {
     expect(within(qual).getByTestId('preview-warning')).toHaveTextContent('맡은 일(업무)이지만 배정에서 빠져요: 포장');
   });
 });
+
+describe('작업자 업무 내역(capacity 0.17.0)', () => {
+  it('펼칠 때만 부르고, 시각 순 내역·종류별 합계(거절은 빨강), 날짜를 고르면 그 날로', async () => {
+    const view = renderAt('/c/MFC-BSN-01/workers/OP-wkr-1');
+    await heading();
+    expect(view.gets('/activities')).toHaveLength(0);
+    const box = screen.getByTestId('activities');
+    const details = box.closest('details')!;
+    details.open = true;
+    fireEvent(details, new Event('toggle'));
+    const rows = await within(box).findAllByTestId('activity-row');
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent('피킹');
+    expect(rows[0]).toHaveTextContent('TASK-PICK-1');
+    expect(rows[1]).toHaveTextContent('거절');
+    expect(rows[1]).toHaveClass('text-error');
+    expect(rows[2]).toHaveTextContent('적치');
+    const totals = within(box).getAllByTestId('activity-total');
+    expect(totals.map((t) => t.textContent)).toEqual(['피킹22', '적치112']);
+    expect(new URL(view.gets('/activities')[0]!.url).searchParams.get('date')).toBeNull(); // 비우면 서버의 오늘
+
+    fireEvent.change(within(box).getByLabelText('날짜'), { target: { value: '2026-11-16' } });
+    expect(await within(box).findByText('이 날 처리한 일이 없어요.')).toBeInTheDocument();
+    expect(new URL(view.gets('/activities').at(-1)!.url).searchParams.get('date')).toBe('2026-11-16');
+  });
+
+  it('못 읽은 원장은 빈 내역으로 두지 않고 경고', async () => {
+    renderAt('/c/MFC-BSN-01/workers/OP-wkr-1');
+    await heading();
+    const box = screen.getByTestId('activities');
+    const details = box.closest('details')!;
+    details.open = true;
+    fireEvent(details, new Event('toggle'));
+    await within(box).findAllByTestId('activity-row');
+    fireEvent.change(within(box).getByLabelText('날짜'), { target: { value: '2026-01-01' } });
+    expect(await within(box).findByRole('alert')).toHaveTextContent('mfc-quality');
+  });
+});

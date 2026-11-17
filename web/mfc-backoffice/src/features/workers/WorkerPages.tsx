@@ -336,6 +336,7 @@ function WorkerDetailPage({ mfcId }: { readonly mfcId: string }) {
             <Section title={m.sections.speed}>
               <SpeedChange key={`speed-${w.speedFactor ?? 1}`} mfcId={mfcId} worker={w} notify={notify} />
             </Section>
+            <Activities mfcId={mfcId} workerId={workerId} />
             <Histories worker={w} />
           </>
         )}
@@ -804,6 +805,108 @@ function CancelShift({
       </button>
       <CommandFeedback command={cancel} />
     </form>
+  );
+}
+
+/** 업무 내역 — `GET …/workers/{id}/activities?date=`(capacity 0.17.0). 펼칠 때만 부른다. 날짜를 비우면 서버의 오늘(Asia/Seoul). */
+function Activities({ mfcId, workerId }: { readonly mfcId: string; readonly workerId: string }) {
+  const api = useApi();
+  const a = m.activities;
+  const [open, setOpen] = useState(false);
+  const [date, setDate] = useState('');
+  const query = useQuery({
+    queryKey: ['worker-activities', mfcId, workerId, date],
+    enabled: open,
+    queryFn: () =>
+      request('GET', api.capacity.GET('/mfcs/{mfcId}/workers/{workerId}/activities', { params: { path: { mfcId, workerId }, query: date ? { date } : {} } })),
+  });
+  const name = (map: Readonly<Record<string, string>>, v: string | null | undefined) => (v ? (map[v] ?? v) : messages.none);
+  return (
+    <details className="rounded-box bg-base-100" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary className="cursor-pointer p-3 font-semibold">{m.sections.activities}</summary>
+      <div className="space-y-3 px-4 pb-4 text-sm" data-testid="activities">
+        <p className="opacity-70">{a.intro}</p>
+        <div className="flex items-end gap-2">
+          <label className="flex flex-col gap-1">
+            {a.date}
+            <input type="date" className="input input-sm" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+          {date && (
+            <button type="button" className="btn btn-sm" onClick={() => setDate('')}>
+              {a.today}
+            </button>
+          )}
+        </div>
+        {open && (
+          <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
+            {(r) => (
+              <div className="space-y-3">
+                <p className="opacity-70">{r.date}</p>
+                {r.unavailableSources.length > 0 && (
+                  <p role="alert" className="alert alert-warning text-sm">
+                    {a.unavailable(r.unavailableSources.join(', '))}
+                  </p>
+                )}
+                {r.totals.length > 0 && (
+                  <div>
+                    <h3 className="font-semibold">{a.totals}</h3>
+                    <table className="table table-xs w-fit">
+                      <thead>
+                        <tr>
+                          <th>{a.col.type}</th>
+                          <th>{a.col.count}</th>
+                          <th>{a.col.qty}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {r.totals.map((t) => (
+                          <tr key={`${t.source}-${t.activityType}`} data-testid="activity-total">
+                            <td>{name(a.type, t.activityType)}</td>
+                            <td>{t.count}</td>
+                            <td>{t.qty}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <p className="text-xs opacity-70">{a.rejectedNote}</p>
+                  </div>
+                )}
+                {r.items.length === 0 ? (
+                  <p data-state="empty" className="opacity-70">
+                    {a.empty}
+                  </p>
+                ) : (
+                  <table className="table table-xs">
+                    <thead>
+                      <tr>
+                        <th>{a.col.at}</th>
+                        <th>{a.col.type}</th>
+                        <th>{a.col.ref}</th>
+                        <th>{a.col.sku}</th>
+                        <th>{a.col.qty}</th>
+                        <th>{a.col.result}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.items.map((it, i) => (
+                        <tr key={`${it.source}-${it.refId}-${i}`} data-testid="activity-row" className={it.result === 'REJECTED' ? 'text-error' : ''}>
+                          <td>{formatSeoul(it.at)}</td>
+                          <td>{name(a.type, it.activityType)}</td>
+                          <td className="font-mono">{it.taskId ?? it.refId}</td>
+                          <td className="font-mono">{it.sku ?? messages.none}</td>
+                          <td>{it.qty ?? messages.none}</td>
+                          <td>{name(a.result, it.result)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </QueryState>
+        )}
+      </div>
+    </details>
   );
 }
 
