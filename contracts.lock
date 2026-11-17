@@ -1,12 +1,10 @@
 {
   "dart": {
-    "backendCommit": "18c30ff9b9e2407b390a817540fd794718811cf7",
+    "backendCommit": "f53240667e3316ef950f849bbb28169d4c4ddfef",
     "backendContractsDirty": false,
-    "generatedAt": "2026-11-17T14:27:45.163804Z",
+    "generatedAt": "2026-11-17T14:53:23.339638Z",
     "generator": "openapi-generator-cli 7.26.0 (dart-dio, json_serializable)",
     "regenerated": [
-      "delivery-tracking-service",
-      "delivery-dispatch-service",
       "delivery-execution-service",
       "rider-service"
     ],
@@ -111,9 +109,9 @@
     }
   },
   "web": {
-    "backendCommit": "868d27a25e3e8b7aef6134e53d1200b59e317a03",
+    "backendCommit": "f53240667e3316ef950f849bbb28169d4c4ddfef",
     "backendContractsDirty": false,
-    "generatedAt": "2026-11-17T14:25:47.585Z",
+    "generatedAt": "2026-11-17T14:51:54.486Z",
     "generator": "openapi-typescript 7.13.0 (TS 5.9)",
     "services": [
       "_internal-dead-letters",
