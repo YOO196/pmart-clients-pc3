@@ -1,7 +1,11 @@
 // 백엔드 조치 API 알림(2026-11-17) 대조 뒤 보탠 것 — 문의 사진·완료 증빙·수행료·반납 방식·추가 배달료 거르기. 목(MSW) 기준, 실서버 확인은 아니다.
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { API_BASE } from '../api/client';
+import { server } from '../test/server';
 
 import { as, renderAt } from '../test/render';
 
@@ -51,13 +55,13 @@ describe('추가 배달료 거르기', () => {
     expect(await screen.findAllByTestId('surcharge-row')).toHaveLength(1);
     expect(surchargeQuery(view.sent).at(-1)!.get('state')).toBe('REQUESTED');
 
-    await userEvent.click(screen.getByRole('tab', { name: '승인' }));
+    await userEvent.click(screen.getByRole('radio', { name: '승인' }));
     const decided = await screen.findByTestId('surcharge-decided');
     expect(decided).toHaveTextContent('승인');
     expect(decided).toHaveTextContent('OP-rops-1');
     expect(screen.queryByRole('button', { name: /승인$/ })).toBeNull();
 
-    await userEvent.click(screen.getByRole('tab', { name: '전체' }));
+    await userEvent.click(screen.getByRole('radio', { name: '전체' }));
     expect(await screen.findAllByTestId('surcharge-row')).toHaveLength(2);
     expect(surchargeQuery(view.sent).at(-1)!.has('state')).toBe(false);
 
@@ -65,5 +69,32 @@ describe('추가 배달료 거르기', () => {
     await userEvent.click(screen.getByRole('button', { name: '찾기' }));
     expect(await screen.findAllByTestId('surcharge-row')).toHaveLength(1);
     expect(surchargeQuery(view.sent).at(-1)!.get('riderId')).toBe('RD-8');
+  });
+});
+
+describe('완료 방법(execution 0.22.1 계약 enum — 요청서 #7 회신)', () => {
+  const completed = (method: string) => ({
+    deliveryId: 'DLV-9',
+    orderId: 'ORD-9',
+    type: 'FORWARD',
+    purpose: 'DELIVERY',
+    state: 'COMPLETED',
+    riderId: 'RD-7',
+    mfcId: 'MFC-BSJ-01',
+    completedAt: '2026-11-17T06:00:00.000Z',
+    evidence: { method, photoRefs: [], takenAt: '2026-11-17T06:00:00.000Z' },
+    history: [],
+    version: 3,
+  });
+
+  it.each([
+    ['AUTO_COMPLETED', '자동 완료(픽업 5시간)'],
+    ['CUSTOMER_CONFIRMED', '고객이 "받았어요"'],
+  ])('%s → %s, 사진 없음', async (method, text) => {
+    server.use(http.get(`${API_BASE}/deliveries/DLV-9`, () => HttpResponse.json(completed(method))));
+    renderAt('/deliveries/DLV-9', as.riderOps);
+    const proof = await screen.findByTestId('delivery-proof');
+    expect(await within(proof).findByText(text)).toBeInTheDocument();
+    expect(within(proof).queryByRole('button', { name: /완료 사진/ })).toBeNull();
   });
 });
