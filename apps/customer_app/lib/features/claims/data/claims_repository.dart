@@ -34,6 +34,13 @@ abstract interface class ClaimsRepository {
   });
 
   Future<RequestState> withdrawal(String claimId, IdempotencyKey key);
+
+  /// 반품 회수비 결제가 실패한 뒤 새 결제 시도 — `POST /claims/{id}/fee-payment-attempts`(본문 없음, claim 0.2.0).
+  /// 새 `paymentAttemptId` 가 든 클레임을 준다. 기한 지남·결제 대기 아님 409, 남의 것 404.
+  Future<ClaimView> retryFeePayment(
+    String claimId, {
+    required IdempotencyKey key,
+  });
 }
 
 final class ApiClaimsRepository implements ClaimsRepository {
@@ -156,6 +163,24 @@ final class ApiClaimsRepository implements ClaimsRepository {
       rethrow;
     }
   }
+
+  @override
+  Future<ClaimView> retryFeePayment(
+    String claimId, {
+    required IdempotencyKey key,
+  }) async {
+    final res = await pmartGuard(
+      () => _claims.createReturnFeePaymentAttempt(
+        claimId: claimId,
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        extra: commandOptions(key).extra,
+      ),
+    );
+    return claimFromContract(
+      res.data ?? (throw const ContractViolationFailure('회수비 결제 다시 시도 본문 없음')),
+    );
+  }
 }
 
 RequestState requestStateOf(String? wire) => switch (wire) {
@@ -172,6 +197,33 @@ ClaimView claimFromContract(api.Claim c) => ClaimView(
   type: claimTypeFromWire(c.type?.value),
   state: claimStateFromWire(c.state?.value),
   autoCancelled: c.reason == api.ClaimReason.FULFILLMENT_REJECTED,
+  feePayment: switch (c.feePayment) {
+    null => null,
+    final f => ReturnFeeView(
+      state: switch (f.state) {
+        api.ReturnFeePaymentStateEnum.WAITING => ReturnFeeState.waiting,
+        api.ReturnFeePaymentStateEnum.PAID => ReturnFeeState.paid,
+        api.ReturnFeePaymentStateEnum.UNPAID => ReturnFeeState.unpaid,
+        api.ReturnFeePaymentStateEnum.LATE_CANCEL_PENDING ||
+        api.ReturnFeePaymentStateEnum.LATE_CANCELLED ||
+        api.ReturnFeePaymentStateEnum.LATE_CANCEL_FAILED =>
+          ReturnFeeState.lateCancel,
+        _ => ReturnFeeState.unknown,
+      },
+      amount: f.amount,
+      orderName: switch (f.orderName?.trim()) {
+        final n? when n.isNotEmpty => n,
+        _ => null,
+      },
+      paymentAttemptId: switch (f.paymentAttemptId?.trim()) {
+        final a? when a.isNotEmpty => a,
+        _ => null,
+      },
+      deadlineAt: f.deadlineAt,
+      refunded:
+          f.refundDecision == api.ReturnFeePaymentRefundDecisionEnum.REFUND,
+    ),
+  },
   lines: [
     for (final l in c.lines ?? const <api.ClaimLine>[])
       if (l.orderLineId != null)
@@ -208,6 +260,7 @@ ClaimView claimFromContract(api.Claim c) => ClaimView(
         },
         amount: r.amount,
         completedAt: r.completedAt,
+        returnFee: r.kind == api.RefundKindEnum.RETURN_FEE,
       ),
   ],
 );

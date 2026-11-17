@@ -17,18 +17,26 @@ import '../../orders/domain/orders.dart';
 import '../../orders/presentation/orders_providers.dart';
 import '../domain/claims.dart';
 import 'claims_controller.dart';
+import 'return_fee_section.dart';
 
-String claimStateText(AppLocalizations l10n, ClaimState s) => switch (s) {
-  ClaimState.opened => l10n.clOpened,
-  // 출고 중지 확인(STOP_PENDING)은 내부 단계라 고객에게는 "확인 중"으로만 보인다(2026-11-02 사용자 결정).
-  ClaimState.underReview || ClaimState.stopPending => l10n.clUnderReview,
-  ClaimState.decided => l10n.clDecided,
-  ClaimState.inProgress => l10n.clInProgress,
-  ClaimState.closed => l10n.clClosed,
-  ClaimState.withdrawn => l10n.clWithdrawn,
-  ClaimState.rejected => l10n.clRejected,
-  ClaimState.unknown => l10n.osUnknown,
-};
+/// [type] 이 반품이면 진행 중 문구를 반품용으로(회수·검수·환불 — 취소 문구를 쓰지 않는다).
+String claimStateText(AppLocalizations l10n, ClaimState s, {ClaimType? type}) =>
+    switch (s) {
+      ClaimState.inProgress when type == ClaimType.returnItems =>
+        l10n.clReturnInProgress,
+      ClaimState.opened => l10n.clOpened,
+      // 출고 중지 확인(STOP_PENDING)은 내부 단계라 고객에게는 "확인 중"으로만 보인다(2026-11-02 사용자 결정).
+      ClaimState.underReview || ClaimState.stopPending => l10n.clUnderReview,
+      ClaimState.decided => l10n.clDecided,
+      ClaimState.inProgress => l10n.clInProgress,
+      ClaimState.closed => l10n.clClosed,
+      ClaimState.withdrawn => l10n.clWithdrawn,
+      ClaimState.rejected => l10n.clRejected,
+      ClaimState.feePending => l10n.clFeePending,
+      ClaimState.recoveryFailed => l10n.clRecoveryFailed,
+      ClaimState.cancelled => l10n.clCancelled,
+      ClaimState.unknown => l10n.osUnknown,
+    };
 
 /// 주문 상세의 처리 내역 줄 제목. 모르는 종류는 일반 제목으로.
 String claimTypeText(AppLocalizations l10n, ClaimType t) => switch (t) {
@@ -259,7 +267,7 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               Text(
-                claimStateText(l10n, c.state),
+                claimStateText(l10n, c.state, type: c.type),
                 key: const ValueKey('claim-state'),
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
@@ -278,6 +286,8 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
                 )
               else if (c.state == ClaimState.opened)
                 Text(l10n.claimAcceptedNote),
+              // 반품 회수비(고객 사유 반품 — 고객센터 접수). 결제해야 회수가 시작된다.
+              ReturnFeeSection(claim: c),
               const SizedBox(height: 12),
               for (final l in c.lines)
                 ListTile(
@@ -317,6 +327,8 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
                     r.done ? Icons.check_circle_outline : Icons.hourglass_top,
                   ),
                   title: Text(switch (r) {
+                    _ when r.returnFee && r.done => l10n.refundFeeDone,
+                    _ when r.returnFee => l10n.refundFeeInProgress,
                     _ when r.done => l10n.refundDone,
                     RefundView(state: RefundState.failed) => l10n.refundFailed,
                     RefundView(state: RefundState.unknown) =>

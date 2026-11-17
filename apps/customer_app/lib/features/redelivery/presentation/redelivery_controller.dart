@@ -23,7 +23,7 @@ final redeliveryPaymentsRepositoryProvider =
           // 목 결제 서비스(주문서 목)가 이 결제 시도도 승인하게 잇는다.
           if (ref.watch(checkoutRepositoryProvider)
               case final MockCheckoutRepository c) {
-            c.external = repo;
+            c.externals.add(repo);
           }
           return repo;
         }(),

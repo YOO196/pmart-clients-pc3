@@ -78,7 +78,7 @@ Widget testApp(
     final MockCheckoutRepository c,
     final MockRedeliveryPaymentsRepository r,
   )) {
-    c.external = r;
+    c.externals.add(r);
   }
   return ProviderScope(
     retry: (_, _) => null,

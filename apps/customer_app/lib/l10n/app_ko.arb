@@ -1172,5 +1172,38 @@
   "receiptUnknown": "받음 처리 결과를 아직 확인하지 못했어요",
   "receiptCheck": "다시 확인",
   "receiptAlreadyHandled": "이미 처리된 배송이에요",
-  "receiptFailed": "받음 처리가 되지 않았어요. 다시 시도해 주세요"
+  "receiptFailed": "받음 처리가 되지 않았어요. 다시 시도해 주세요",
+  "clReturnInProgress": "반품을 진행하고 있어요",
+  "clFeePending": "회수비 결제를 기다리고 있어요",
+  "clRecoveryFailed": "상품을 가져오지 못했어요. 고객센터에서 다시 연락드려요",
+  "clCancelled": "반품이 취소됐어요",
+  "retFeeTitle": "반품 회수비 결제가 필요해요",
+  "retFeeBody": "결제하시면 라이더가 상품을 가지러 가요",
+  "retFeeLabel": "반품 회수비",
+  "retFeeAfter": "상품은 매장에서 검수한 뒤 환불해 드려요. 기한 안에 결제하지 않으면 반품이 취소돼요",
+  "retFeeDeadline": "{time}까지 결제 · {hours}시간 {minutes}분 남음",
+  "@retFeeDeadline": {
+    "placeholders": {
+      "time": { "type": "String" },
+      "hours": { "type": "int" },
+      "minutes": { "type": "int" }
+    }
+  },
+  "retFeeDeadlineOver": "결제 기한이 지났어요. 곧 반품이 취소돼요",
+  "retFeeNotWaiting": "지금은 결제할 수 없어요. 반품 상태를 다시 확인해 주세요",
+  "retFeePaid": "반품 회수비 {amount}을 결제했어요",
+  "@retFeePaid": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "retFeeRefunded": "낸 반품 회수비 {amount}을 돌려드려요",
+  "@retFeeRefunded": {
+    "placeholders": {
+      "amount": { "type": "String" }
+    }
+  },
+  "retFeeUnpaid": "기한 안에 회수비를 결제하지 않아 반품이 취소됐어요",
+  "refundFeeDone": "반품 회수비 환불 완료",
+  "refundFeeInProgress": "반품 회수비 환불 진행 중"
 }

@@ -562,7 +562,7 @@ class _ClaimsSection extends ConsumerWidget {
             title: Text(claimTypeText(l10n, c.type)),
             subtitle: Text(
               [
-                claimStateText(l10n, c.state),
+                claimStateText(l10n, c.state, type: c.type),
                 if (c.openedAt case final t?)
                   l10n.claimOpenedAt(formatSeoulDateTime(t)),
               ].join(' · '),

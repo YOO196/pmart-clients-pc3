@@ -10,6 +10,15 @@ enum ClaimState {
   closed,
   withdrawn,
   rejected,
+
+  /// 반품 회수비 결제 대기(claim 0.2.0) — 결제하면 회수를 시작한다.
+  feePending,
+
+  /// 회수가 두 번 실패했다 — 고객센터가 다시 연락한다.
+  recoveryFailed,
+
+  /// 반품이 취소됐다(회수비 기한 지남·반품 기한 지남·상담원 취소).
+  cancelled,
   unknown,
 }
 
@@ -60,12 +69,16 @@ class RefundView {
     required this.pgResult,
     this.amount,
     this.completedAt,
+    this.returnFee = false,
   });
 
   final RefundState state;
   final PgResult pgResult;
   final int? amount;
   final DateTime? completedAt;
+
+  /// 낸 반품 회수비를 돌려주는 환불(`kind: RETURN_FEE`, claim 0.3.0). 상품 환불이 아니다.
+  final bool returnFee;
 
   /// "환불 완료"는 PG 성공일 때만이다.
   bool get done =>
@@ -110,8 +123,55 @@ ClaimState claimStateFromWire(String? wire) => switch (wire) {
   'CLOSED' => ClaimState.closed,
   'WITHDRAWN' => ClaimState.withdrawn,
   'REJECTED' => ClaimState.rejected,
+  'FEE_PENDING' => ClaimState.feePending,
+  'RECOVERY_FAILED' => ClaimState.recoveryFailed,
+  'CANCELLED' => ClaimState.cancelled,
   _ => ClaimState.unknown,
 };
+
+/// 반품 회수비 결제 상태(계약 `ReturnFeePayment.state`).
+enum ReturnFeeState {
+  /// 결제 대기 — 기한 안에 결제하면 회수를 시작한다.
+  waiting,
+  paid,
+
+  /// 기한 안에 결제하지 않았다(반품 취소).
+  unpaid,
+
+  /// 기한 뒤 승인이 와서 서버가 그 결제를 취소하는 중·취소함·취소 실패(서버가 처리).
+  lateCancel,
+  unknown,
+}
+
+/// 고객 사유 반품의 회수비 결제(claim 0.2.0 `Claim.feePayment`). 회사 잘못 반품은 없다(null).
+@immutable
+class ReturnFeeView {
+  const ReturnFeeView({
+    required this.state,
+    this.amount,
+    this.orderName,
+    this.paymentAttemptId,
+    this.deadlineAt,
+    this.refunded = false,
+  });
+
+  final ReturnFeeState state;
+
+  /// 서버 금액(지금 9,000원). 앱이 계산하지 않는다.
+  final int? amount;
+
+  /// 결제위젯 주문명. 없으면 앱 문구.
+  final String? orderName;
+
+  /// 결제위젯 `orderId` 로 그대로 쓴다. 비었으면 결제 시도 준비 중 — 잠시 뒤 다시 읽는다.
+  final String? paymentAttemptId;
+
+  /// 결제 기한(24시간). 지나면 서버가 반품을 취소한다 — 앱은 표시·결제창 열기 판단에만 쓴다.
+  final DateTime? deadlineAt;
+
+  /// 반품 취소 때 낸 회수비를 돌려주기로 했다(`refundDecision` REFUND, claim 0.3.0).
+  final bool refunded;
+}
 
 @immutable
 class ClaimView {
@@ -124,6 +184,7 @@ class ClaimView {
     required this.lines,
     required this.refunds,
     this.autoCancelled = false,
+    this.feePayment,
   });
 
   final String claimId;
@@ -137,6 +198,14 @@ class ClaimView {
   /// MFC 가 작업을 받지 못해 시스템이 자동으로 연 전체 취소(`reason = FULFILLMENT_REJECTED`, 백엔드 공지 2026-11-07).
   /// 고객이 접수한 클레임이 아니므로 "요청하신" 같은 문구를 쓰지 않는다.
   final bool autoCancelled;
+
+  /// 반품 회수비 결제. 회사 잘못 반품·취소·교환은 null.
+  final ReturnFeeView? feePayment;
+
+  /// 회수비를 결제해야 반품이 진행된다.
+  bool get awaitingFee =>
+      state == ClaimState.feePending &&
+      feePayment?.state == ReturnFeeState.waiting;
 
   /// 철회는 심사 전(접수 상태)까지만 고를 수 있다. 최종 판정은 서버.
   bool get canWithdraw => state == ClaimState.opened;
@@ -207,4 +276,5 @@ List<CancelLine>? wholeOrderCancelLines(
 bool isClaimSettled(ClaimState s) =>
     s == ClaimState.closed ||
     s == ClaimState.rejected ||
-    s == ClaimState.withdrawn;
+    s == ClaimState.withdrawn ||
+    s == ClaimState.cancelled;

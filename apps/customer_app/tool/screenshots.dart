@@ -17,6 +17,7 @@ import 'package:customer_app/app.dart';
 import 'package:customer_app/features/auth/data/mock_auth_repository.dart';
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
+import 'package:customer_app/features/claims/data/mock_claims_repository.dart';
 import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
 import 'package:customer_app/features/redelivery/data/mock_redelivery_payments_repository.dart';
 import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
@@ -105,13 +106,26 @@ void main() {
         );
       }
     });
+    final orders = MockOrdersRepository(latency: Duration.zero, now: () => now)
+      ..rejectNextTimeChange = true
+      ..rejectReason = 'LOT_EXPIRY_NOT_MET';
+    // 반품 회수비 결제(고객센터가 접수한 고객 사유 반품 — order-seed-1).
+    final claims = MockClaimsRepository(
+      orders: orders,
+      latency: Duration.zero,
+      now: () => now,
+    );
+    final returnClaimId = claims.seedReturnFee(
+      'order-seed-1',
+      left: const Duration(hours: 23, minutes: 40),
+    );
+    checkout.externals.add(claims);
     await t.pumpWidget(
       testApp(
         checkout: checkout,
         reviews: reviews,
-        orders: MockOrdersRepository(latency: Duration.zero, now: () => now)
-          ..rejectNextTimeChange = true
-          ..rejectReason = 'LOT_EXPIRY_NOT_MET',
+        orders: orders,
+        claims: claims,
         redelivery: MockRedeliveryPaymentsRepository(
           latency: Duration.zero,
           now: () => now,
@@ -254,6 +268,11 @@ void main() {
     await t.tap(find.byKey(const ValueKey('rdp-open-rdp-1')));
     await t.pumpAndSettle();
     await shot('redelivery-payment');
+    await go('/claims/$returnClaimId');
+    await shot('return-fee');
+    await t.tap(find.byKey(const ValueKey('ret-fee-pay')));
+    await t.pumpAndSettle();
+    await shot('return-fee-paid');
     // 예약 시간 변경 — 결과가 거절(LOT_EXPIRY_NOT_MET)이면 원인 + 기존 시간 그대로.
     await go('/orders/order-seed-4/reschedule');
     await t.tap(find.byKey(const ValueKey('rs-slot-20:00')));

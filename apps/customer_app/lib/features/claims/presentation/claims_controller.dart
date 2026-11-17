@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart';
+import '../../checkout/data/mock_checkout_repository.dart';
 import '../../checkout/domain/checkout.dart' show ArrivalWindow;
+import '../../checkout/presentation/checkout_controller.dart';
 import '../../orders/data/mock_orders_repository.dart';
 import '../../orders/domain/orders.dart';
 import '../../orders/presentation/orders_providers.dart';
@@ -13,12 +15,21 @@ import '../domain/claims.dart';
 
 final claimsRepositoryProvider = Provider<ClaimsRepository>(
   (ref) => switch (ref.watch(envProvider)) {
-    PmartEnv.mock => MockClaimsRepository(
-      orders: switch (ref.watch(ordersRepositoryProvider)) {
-        final MockOrdersRepository m => m,
-        _ => null,
-      },
-    ),
+    PmartEnv.mock => () {
+      final repo = MockClaimsRepository(
+        orders: switch (ref.watch(ordersRepositoryProvider)) {
+          final MockOrdersRepository m => m,
+          _ => null,
+        },
+        now: ref.watch(clockProvider),
+      );
+      // 목 결제 서비스(주문서 목)가 반품 회수비 결제 시도도 승인하게 잇는다.
+      if (ref.watch(checkoutRepositoryProvider)
+          case final MockCheckoutRepository c) {
+        c.externals.add(repo);
+      }
+      return repo;
+    }(),
     PmartEnv.local => ApiClaimsRepository(ref.watch(dioProvider)),
   },
 );

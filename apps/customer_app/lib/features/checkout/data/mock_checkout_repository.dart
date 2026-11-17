@@ -77,8 +77,8 @@ base class MockCheckoutRepository
   /// 다음 결제 진입을 가격 변경(RE_QUOTE_REQUIRED)으로 만든다.
   bool priceChangesOnCheckout = false;
 
-  /// 주문 초안이 아닌 결제 시도(다시 배송비 등)를 받는 목.
-  MockExternalPayments? external;
+  /// 주문 초안이 아닌 결제 시도(다시 배송비·반품 회수비 등)를 받는 목들. 자기 것이 아니면 다음 목에 넘긴다.
+  final externals = <MockExternalPayments>{};
 
   /// 다음 초안 생성을 이 코드로 거절한다(422, MFC_CHANGED 는 409).
   String? rejectNextDraft;
@@ -520,7 +520,7 @@ base class MockCheckoutRepository
   }) async {
     await _wait();
     authFailures.add((entry.pgOrderId, errorCode));
-    if (external?.reportAuthFailure(entry.pgOrderId, errorCode) ?? false) {
+    if (externals.any((e) => e.reportAuthFailure(entry.pgOrderId, errorCode))) {
       return;
     }
     final d = _byPgOrder(entry.pgOrderId);
@@ -607,8 +607,10 @@ base class MockCheckoutRepository
     if (previous != null) return previous;
     final d = _byPgOrder(auth.pgOrderId);
     if (d == null) {
-      if (external?.submitAuth(auth) case final r?) {
-        return _authResults[key.value] = r;
+      for (final e in externals) {
+        if (e.submitAuth(auth) case final r?) {
+          return _authResults[key.value] = r;
+        }
       }
     }
     final quote = d?.json['quote'] as Map<String, Object?>?;
