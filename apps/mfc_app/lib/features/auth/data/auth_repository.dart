@@ -114,10 +114,15 @@ TokenRefresher employeeAuthRefresher({
       if (pair == null) {
         throw const ContractViolationFailure('TokenPair 본문 없음');
       }
-      return AuthTokens(
-        accessToken: pair.accessToken,
-        refreshToken: pair.refreshToken,
-      );
+      // PDA 는 본문 전달(BODY)이다. refresh token 이 없으면(COOKIE) 다음 갱신을 할 수 없다 — 세션 끝남이 아니라
+      // 서버 설정·계약 문제로 올린다(값은 로그에 남기지 않는다).
+      final refresh = pair.refreshToken;
+      if (refresh == null || refresh.isEmpty) {
+        throw const ContractViolationFailure(
+          'TokenPair.refreshToken 없음(BODY 아님)',
+        );
+      }
+      return AuthTokens(accessToken: pair.accessToken, refreshToken: refresh);
     } on DioException catch (e) {
       final status = e.response?.statusCode;
       if (status == 401 || status == 403) {
@@ -217,11 +222,14 @@ final class ApiAuthRepository implements AuthRepository {
       throw const LoginFailure(LoginError.network);
     }
 
+    // PDA 는 refresh token 을 본문으로 받는다(BODY). 없으면 갱신할 수 없어 로그인을 끝내지 않는다 —
+    // 티켓은 이미 썼으므로 다시 로그인해야 한다(서버 설정 문제라 일시 오류로 안내).
+    final refresh = result.tokens.refreshToken;
+    if (refresh == null || refresh.isEmpty) {
+      throw const LoginFailure(LoginError.temporary);
+    }
     await tokens.save(
-      AuthTokens(
-        accessToken: result.tokens.accessToken,
-        refreshToken: result.tokens.refreshToken,
-      ),
+      AuthTokens(accessToken: result.tokens.accessToken, refreshToken: refresh),
     );
     return EmployeeSession(
       operatorId: result.operatorId,

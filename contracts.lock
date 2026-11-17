@@ -1,11 +1,11 @@
 {
   "dart": {
-    "backendCommit": "98efc1e7cc29b37bde8c1b06f296195b9663c901",
-    "backendContractsDirty": true,
-    "generatedAt": "2026-11-16T23:48:54.276448Z",
+    "backendCommit": "0f2bd7adade2978ce3f0908b47c016c0de27cfda",
+    "backendContractsDirty": false,
+    "generatedAt": "2026-11-17T01:09:00.807672Z",
     "generator": "openapi-generator-cli 7.26.0 (dart-dio, json_serializable)",
     "regenerated": [
-      "order-orchestration-service"
+      "employee-auth-service"
     ],
     "services": {
       "auth-service": [

@@ -32,9 +32,11 @@ final _access = _jwt({
   'centers': ['MFC-SEED-01'],
 });
 
-Map<String, Object?> _pair({String refresh = 'rt-1'}) => {
+/// PDA 는 본문으로 refresh token 을 받는다(employee-auth 0.3.0 `refreshTransport = BODY`, ADR-0059).
+Map<String, Object?> _pair({String? refresh = 'rt-1'}) => {
   'accessToken': _access,
   'refreshToken': refresh,
+  'refreshTransport': refresh == null ? 'COOKIE' : 'BODY',
   'accessTokenExpiresAt': '2026-11-13T01:15:00Z',
   'refreshTokenExpiresAt': '2026-11-13T13:00:00Z',
   'sessionId': 'SES-1',
@@ -275,6 +277,20 @@ void main() {
       );
       expect(await run(const FakeReply(503)), (LoginError.network, 1));
     });
+
+    test('티켓 교환 응답에 refresh token 이 없으면(COOKIE — PDA 설정 오류) 토큰을 보관하지 않고 일시 오류', () async {
+      final adapter = FakeAdapter(
+        (_, _) async => FakeReply(200, body: {..._loginResult(), 'tokens': _pair(refresh: null)}),
+      );
+      final t = _repo(_FakeBrowser(_ticketBack), adapter);
+      await expectLater(
+        t.repo.login(),
+        throwsA(isA<LoginFailure>().having((f) => f.error, 'error', LoginError.temporary)),
+      );
+      expect(t.tokens.accessToken, isNull);
+      expect(await t.tokens.readRefreshToken(), isNull);
+      expect(adapter.requests, hasLength(1)); // 같은 티켓을 다시 보내지 않는다
+    });
   });
 
   group('토큰 갱신', () {
@@ -305,6 +321,12 @@ void main() {
         expect(req.headers['Idempotency-Key'], isNotEmpty);
       },
     );
+
+    test('갱신 응답에 refresh token 이 없으면(COOKIE) 세션 종료(null)가 아니라 계약 위반으로 올린다', () async {
+      final adapter = FakeAdapter((_, _) async => FakeReply(200, body: _pair(refresh: null)));
+      final refresh = employeeAuthRefresher(baseUrl: _base, sourceSystem: sourceSystem, deviceId: device(), adapter: adapter);
+      await expectLater(refresh('rt-1'), throwsA(isA<ContractViolationFailure>()));
+    });
 
     test('401 이면 세션 종료(null) — 갱신 거절은 "만료"로 남긴다(정지·퇴사도 TOKEN_INVALID 로 온다). 네트워크 오류는 세션 종료가 아니다', () async {
       Future<(AuthTokens?, SessionEnd?)> run(FakeReply reply) async {
