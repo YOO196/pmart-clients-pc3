@@ -24,13 +24,21 @@
 | 29 | ~~**"받았어요"(고객 수령 확인)** — 주문 상세 배송 카드에 픽업 뒤·전달 전일 때 버튼, 확인 대화 뒤 `POST /deliveries/{id}/receipt-confirmations`~~ 2026-11-18 끝(커밋은 worklog) | execution 0.20.0, `clients/customer-app/2026-11-17-request-receipt-confirmation.md` | 사용자 2026-11-18 "이 요청 문서에 추가하고 바로 만들어". 실서버 확인은 30. 못 받음 신고는 6 |
 | 31 | ~~**반품 회수비 결제** — 처리 내역(클레임 상세)에 결제 카드, 토스 결제위젯·승인 결과 확인·실패 뒤 새 시도~~ 2026-11-18 끝(커밋은 worklog) | claim 0.2.0·0.3.0, `clients/all/2026-11-17-request-return-recovery.md` §3 | 사용자 2026-11-17 미뤄 둔 요청 → 2026-11-18 "진행해". 실서버 확인은 32 |
 | 33 | **문의 "상담 종료"** — 고객이 답변 받은 문의를 스스로 끝내기 | `clients/all/2026-11-17-request-inquiry-close.md` | 2026-11-17 미뤄 둔 요청. 2026-11-18 할 일 문서에 올림 |
+| 35 | 리뷰 요청 알림 `REVIEW_REQUESTED`(알림함만, 대상 ORDER) — 누르면 그 주문의 리뷰 쓰기 화면 | notification 0.4.2, `clients/customer-app/2026-11-18-notice-gap-a-built.md` §1 | 알림함 목적지 매핑(`noticeFromContract`)에 종류 하나 |
+| 36 | 주문 내역 카드 — 대표 상품 "<상품명> 외 N개"(`representativeItem`·`itemCount`), 배송 방식(`deliveryMode`), 썸네일은 productId 로 | order 0.12.0, 같은 문서 §2 | 2026-11-02 전 주문은 `productName` null → "상품 N개" |
+| 37 | 주문 내역 기간·상품명 검색(`from`·`to`·`q`) — **조건 없으면 최근 3개월만 옴**(배포 뒤 지금 앱도 3개월 전 주문이 안 보임) | order 0.12.0, 같은 문서 §3 | 다음 쪽은 같은 조건 + cursor. 레퍼런스 캡처의 주문 내역 필터 먼저 |
+| 38 | 주문 내역 삭제(숨기기) `POST /orders/{id}/hides` — 끝난 주문만(409 `ORDER_NOT_FINISHED`), 되돌리기 없음 → 확인 창 | order 0.12.0, 같은 문서 §4 | 멱등 키·출처 헤더 |
+| 39 | 장바구니 최소 주문 금액 진행 바 — `Cart.minOrderAmount`·`minOrderShortfall`(null 이면 바 숨김, 0 으로 바꾸지 않음) | cart 0.2.0, 같은 문서 §5 | 안내용 — 최종은 주문서 견적 |
+| 40 | 품절 처리 "다음에도 적용" — 주문서 체크 때 `PUT /me/order-preferences`, 다음 주문서 기본값은 `GET` | customer 0.4.0, 같은 문서 §6 | **customer 계약 다시 만들기 = 25(CU-1)와 함께**(지금 다시 만들면 컴파일 안 됨) |
+| 41 | 배달 지연 신고 — 배송 현황·진행 중 주문에 "늦어요" → 문의 `deliveryIssue: DELAYED`(진행 중 주문만, 그 밖 422 `ORDER_NOT_IN_PROGRESS`) | case 0.23.0, 같은 문서 §7 | 6(배송 신고)과 같이 |
+| 42 | FAQ 목록·검색 `GET /customer-assistant/faqs(/{id})` — 회원만(비회원 403), `answer` 는 마크다운 | customer-assistant 0.2.0, 같은 문서 §8 | LAN 은 배포·색인 전 422 `CONFIG_REQUIRED`. 마크다운 그리기 라이브러리 추가는 사용자 확인 먼저 |
 | 34 | 고객센터가 대신 취소한 주문의 클레임이 처리 내역에 보이는지(채널 `CS`) — 앱은 보이기만 | claim 0.4.0(2026-11-18), `clients/customer-app/2026-11-18-notice-reference-gap-update.md` §1 | 지금 앱 표시(목 데이터)부터 확인. 계약 다시 만들기는 25(CU-1)와 함께 |
 
 ## 2. 백엔드에 회신할 것
 
 | # | 할 일 | 근거 |
 |---|---|---|
-| 11 | **레퍼런스 대비 빠진 기능 A 목록의 착수 순서 회신**(오늘 순서 5번) + **11-18 갱신 §2(백엔드 없는 것) 중 먼저 필요한 것 고르기** — 리뷰 작성 알림, 주문 내역 카드 상품명·썸네일, 주문 내역 검색·기간·삭제, 교환, 현금영수증, 라이더 통화 요청, 상담원 채팅, FAQ 목록, 단위 가격, 매장 위치, 장바구니 최소 주문 금액 진행 바(cart 응답에 없음) | `clients/customer-app/2026-11-17-notice-reference-gap.md`·`…/2026-11-18-notice-reference-gap-update.md` — 회신은 `docs/handoff/customer-app/` 또는 PR 본문. 고르는 건 사용자 |
+| 11 | **레퍼런스 대비 빠진 기능 A 목록의 착수 순서 회신**(오늘 순서 5번) (11-18 갱신 §2 "백엔드 없는 것"은 백엔드 쪽 사용자 결정 "A해줘"로 8가지를 만들어 35~42 로 옮김. 교환·현금영수증·단위 가격·라이더 통화·실시간 상담·매장 위치는 "나중에" — 백엔드 `pending-user-decisions.md` L-8~L-13) | `clients/customer-app/2026-11-17-notice-reference-gap.md`·`…/2026-11-18-notice-reference-gap-update.md` — 회신은 `docs/handoff/customer-app/` 또는 PR 본문. 고르는 건 사용자 |
 | 12 | 재고 표시 요청 등록 — 목록 카드의 센터 재고 상태(일시품절), 상세·목록의 "N개 남음" 기준·개수 | 2026-11-17 조사(storefront·search 에 재고 필드 없음, product-content·cart 의 LOW 는 "아직 쓰지 않음"). 레퍼런스 대비 C(정책 결정 대기)에 "카드의 남은 수량" — **사용자 결정 뒤** `backend-requests.md` 에 BR 등록 |
 
 ## 3. 사용자 결정 기다림
