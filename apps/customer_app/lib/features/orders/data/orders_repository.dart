@@ -14,7 +14,7 @@ import '../../checkout/domain/checkout.dart'
     show ArrivalWindow, OutOfStockPreference;
 import '../../../shared/providers.dart' show sourceSystem;
 import '../../claims/data/claims_repository.dart' show requestStateOf;
-import '../../claims/domain/claims.dart' show RequestState;
+import '../../claims/domain/claims.dart' show RequestState, TimeChangeResult;
 import '../domain/orders.dart';
 import '../domain/tracking.dart';
 import 'sse_parser.dart';
@@ -41,8 +41,8 @@ abstract interface class OrdersRepository {
     required IdempotencyKey key,
   });
 
-  /// 시간 변경 결과 조회. 불명이면 [RequestState.unknown].
-  Future<RequestState> timeChange(String orderId, IdempotencyKey key);
+  /// 시간 변경 결과 조회. 불명이면 [RequestState.unknown]. 거절이면 원인 코드(reason)도.
+  Future<TimeChangeResult> timeChange(String orderId, IdempotencyKey key);
 }
 
 final class ApiOrdersRepository implements OrdersRepository {
@@ -184,7 +184,10 @@ final class ApiOrdersRepository implements OrdersRepository {
   }
 
   @override
-  Future<RequestState> timeChange(String orderId, IdempotencyKey key) async {
+  Future<TimeChangeResult> timeChange(
+    String orderId,
+    IdempotencyKey key,
+  ) async {
     try {
       final res = await pmartGuard(
         () => _orders.getReservationTimeChange(
@@ -192,9 +195,17 @@ final class ApiOrdersRepository implements OrdersRepository {
           requestId: key.value,
         ),
       );
-      return requestStateOf(res.data?.state?.value);
+      return TimeChangeResult(
+        requestStateOf(res.data?.state?.value),
+        reason: switch (res.data?.reason?.trim()) {
+          final r? when r.isNotEmpty => r,
+          _ => null,
+        },
+      );
     } on ProblemFailure catch (f) {
-      if (f.problem.code == ProblemCode.notFound) return RequestState.unknown;
+      if (f.problem.code == ProblemCode.notFound) {
+        return const TimeChangeResult(RequestState.unknown);
+      }
       rethrow;
     }
   }

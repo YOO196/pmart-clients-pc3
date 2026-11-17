@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pmart_core/pmart_core.dart' show PmartFailure;
+import 'package:pmart_core/pmart_core.dart' show PmartFailure, ProblemCode;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
@@ -376,11 +376,34 @@ class RescheduleScreen extends ConsumerStatefulWidget {
   ConsumerState<RescheduleScreen> createState() => _RescheduleScreenState();
 }
 
+/// 시간 변경에서 고를 슬롯 — 주문의 담당 센터(`Order.mfcId`) 기준(지금 쇼핑 주소의 센터가 아니다).
+final orderSlotsProvider = FutureProvider.autoDispose
+    .family<List<Slot>, ({String mfcId, String date})>(
+      (ref, a) => ref.watch(checkoutRepositoryProvider).slots(a.mfcId, a.date),
+    );
+
+/// 시간 변경 거절 사유(요청 단계 코드 또는 결과의 reason). 모르는 코드는 "다른 시간을 골라 주세요".
+String rescheduleReasonText(AppLocalizations l10n, String? code) =>
+    switch (code) {
+      ProblemCode.invalidState ||
+      TimeChangeCode.preparationStarted => l10n.rescheduleTooLate,
+      TimeChangeCode.notScheduled => l10n.rescheduleNotScheduled,
+      TimeChangeCode.sameSlot => l10n.rescheduleSameSlot,
+      TimeChangeCode.inProgress => l10n.rescheduleInProgress,
+      ProblemCode.versionConflict => l10n.rescheduleVersionConflict,
+      TimeChangeCode.capacityExceeded ||
+      TimeChangeCode.slotNotSelectable => l10n.rescheduleSlotClosed,
+      TimeChangeCode.operationRestricted => l10n.rescheduleCenterLimited,
+      TimeChangeCode.lotExpiryNotMet => l10n.rescheduleLotExpiry,
+      _ => l10n.rescheduleNotAvailable,
+    };
+
 class _RescheduleScreenState extends ConsumerState<RescheduleScreen> {
   ArrivalWindow? _picked;
   ArrivalWindow? _requested;
   RequestState? _state;
   String? _rejectCode;
+  bool _tomorrow = false;
 
   Future<void> _submit(OrderDetail order) async {
     final w = _picked;
@@ -395,7 +418,8 @@ class _RescheduleScreenState extends ConsumerState<RescheduleScreen> {
     setState(() {
       switch (outcome) {
         case CommandDone(:final value):
-          _state = value;
+          _state = value.state;
+          _rejectCode = value.reason;
         case CommandRejected(:final code):
           _state = RequestState.rejected;
           _rejectCode = code;
@@ -403,7 +427,9 @@ class _RescheduleScreenState extends ConsumerState<RescheduleScreen> {
           _state = RequestState.unknown;
       }
     });
-    if (_state == RequestState.confirmed) {
+    // 바뀌었으면 새 시간, 주문이 그사이 바뀌었으면(VERSION_CONFLICT) 최신 주문을 다시 읽는다.
+    if (_state == RequestState.confirmed ||
+        _rejectCode == ProblemCode.versionConflict) {
       ref.invalidate(orderDetailProvider(widget.orderId));
     }
   }
@@ -419,7 +445,20 @@ class _RescheduleScreenState extends ConsumerState<RescheduleScreen> {
         state: uiStateOf(ref.watch(provider)),
         onRetry: () => ref.invalidate(provider),
         ready: (context, order) {
-          final slots = ref.watch(slotsProvider(seoulDate(now)));
+          // 오늘·내일(서울) 중 고른 날의 슬롯. 주문의 센터를 모르면(예전 주문) 지금 주소의 센터로.
+          final date = seoulDate(
+            _tomorrow ? now.add(const Duration(days: 1)) : now,
+          );
+          final slotsArg = switch (order.mfcId) {
+            final m? => (mfcId: m, date: date),
+            null => null,
+          };
+          final slots = slotsArg == null
+              ? ref.watch(slotsProvider(date))
+              : ref.watch(orderSlotsProvider(slotsArg));
+          void retrySlots() => slotsArg == null
+              ? ref.invalidate(slotsProvider(date))
+              : ref.invalidate(orderSlotsProvider(slotsArg));
           final busy = _state == RequestState.pending;
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -432,11 +471,9 @@ class _RescheduleScreenState extends ConsumerState<RescheduleScreen> {
               ),
               if (_requested != null && _state != RequestState.confirmed)
                 Text(switch (_state) {
-                  RequestState.rejected => l10n.rescheduleRejected(
-                    _rejectCode == 'INVALID_STATE'
-                        ? l10n.rescheduleTooLate
-                        : l10n.rescheduleNotAvailable,
-                  ),
+                  // 거절이면 기존 시간 그대로다(서버가 약속을 바꾸지 않았다).
+                  RequestState.rejected =>
+                    '${l10n.rescheduleRejected(rescheduleReasonText(l10n, _rejectCode))}\n${l10n.rescheduleKept}',
                   _ => l10n.rescheduleChecking(windowText(_requested!)),
                 }, key: const ValueKey('reschedule-status')),
               if (_state == RequestState.confirmed)
@@ -445,9 +482,23 @@ class _RescheduleScreenState extends ConsumerState<RescheduleScreen> {
                   key: const ValueKey('reschedule-done'),
                 ),
               const SizedBox(height: 12),
+              SegmentedButton<bool>(
+                segments: [
+                  ButtonSegment(value: false, label: Text(l10n.slotToday)),
+                  ButtonSegment(value: true, label: Text(l10n.slotTomorrow)),
+                ],
+                selected: {_tomorrow},
+                onSelectionChanged: busy
+                    ? null
+                    : (v) => setState(() {
+                        _tomorrow = v.first;
+                        _picked = null;
+                      }),
+              ),
+              const SizedBox(height: 8),
               UiStateView<List<Slot>>(
                 state: uiStateOf(slots),
-                onRetry: () => ref.invalidate(slotsProvider(seoulDate(now))),
+                onRetry: retrySlots,
                 ready: (context, list) => Wrap(
                   spacing: 8,
                   runSpacing: 8,

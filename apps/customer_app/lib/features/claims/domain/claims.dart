@@ -153,6 +153,29 @@ class CancelLine {
 /// 철회·예약시간 변경 같은 비동기 요청의 결과 조회 상태.
 enum RequestState { pending, confirmed, rejected, unknown }
 
+/// 예약 시간 변경 결과(`GET /orders/{id}/reservation-time-changes/{requestId}`, order 0.10.0).
+/// REJECTED 면 기존 시간 그대로이고 [reason] 이 원인 코드(CAPACITY_EXCEEDED·SLOT_NOT_SELECTABLE·
+/// OPERATION_RESTRICTED·LOT_EXPIRY_NOT_MET·PREPARATION_STARTED 등 — 모르는 코드도 올 수 있다).
+@immutable
+class TimeChangeResult {
+  const TimeChangeResult(this.state, {this.reason});
+
+  final RequestState state;
+  final String? reason;
+}
+
+/// 예약 시간 변경의 요청·결과 거절 코드.
+abstract final class TimeChangeCode {
+  static const notScheduled = 'NOT_SCHEDULED';
+  static const sameSlot = 'SAME_SLOT';
+  static const inProgress = 'TIME_CHANGE_IN_PROGRESS';
+  static const capacityExceeded = 'CAPACITY_EXCEEDED';
+  static const slotNotSelectable = 'SLOT_NOT_SELECTABLE';
+  static const operationRestricted = 'OPERATION_RESTRICTED';
+  static const lotExpiryNotMet = 'LOT_EXPIRY_NOT_MET';
+  static const preparationStarted = 'PREPARATION_STARTED';
+}
+
 abstract final class ClaimProblemCode {
   static const orderNotCancellable = 'ORDER_NOT_CANCELLABLE';
   static const quantityExceedsAvailable = 'QUANTITY_EXCEEDS_AVAILABLE';

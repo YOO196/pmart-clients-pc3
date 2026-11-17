@@ -16,6 +16,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import 'package:customer_app/app.dart';
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
+import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
 import 'package:customer_app/features/redelivery/data/mock_redelivery_payments_repository.dart';
 import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
 import 'package:customer_app/features/reviews/domain/reviews.dart';
@@ -107,6 +108,9 @@ void main() {
       testApp(
         checkout: checkout,
         reviews: reviews,
+        orders: MockOrdersRepository(latency: Duration.zero, now: () => now)
+          ..rejectNextTimeChange = true
+          ..rejectReason = 'LOT_EXPIRY_NOT_MET',
         redelivery: MockRedeliveryPaymentsRepository(
           latency: Duration.zero,
           now: () => now,
@@ -225,6 +229,13 @@ void main() {
     await t.tap(find.byKey(const ValueKey('rdp-open-rdp-1')));
     await t.pumpAndSettle();
     await shot('redelivery-payment');
+    // 예약 시간 변경 — 결과가 거절(LOT_EXPIRY_NOT_MET)이면 원인 + 기존 시간 그대로.
+    await go('/orders/order-seed-4/reschedule');
+    await t.tap(find.byKey(const ValueKey('rs-slot-20:00')));
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('reschedule-submit')));
+    await t.pumpAndSettle();
+    await shot('reschedule-rejected');
     await go('/reviews');
     await shot('reviews');
     // 리뷰 쓰기 + 사진(review 0.2.0). 첫 사진은 결과 불명 → 다시 올리기.

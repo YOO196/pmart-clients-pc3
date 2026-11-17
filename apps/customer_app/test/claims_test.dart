@@ -13,6 +13,9 @@ import 'package:customer_app/features/claims/data/claims_repository.dart'
 import 'package:customer_app/features/claims/data/mock_claims_repository.dart';
 import 'package:customer_app/features/claims/domain/claims.dart';
 import 'package:customer_app/features/claims/presentation/claims_controller.dart';
+import 'package:customer_app/features/claims/presentation/claims_screens.dart'
+    show rescheduleReasonText;
+import 'package:customer_app/l10n/gen/app_localizations.dart';
 import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
 
 import 'support/app_harness.dart';
@@ -223,11 +226,14 @@ void main() {
         key: key,
       );
 
-      expect(await orders.timeChange(order.orderId, key), RequestState.pending);
+      expect(
+        (await orders.timeChange(order.orderId, key)).state,
+        RequestState.pending,
+      );
       // 확인 중에는 주문의 시간이 아직 그대로다.
       expect((await orders.get(order.orderId)).window!.start, '18:00');
       expect(
-        await orders.timeChange(order.orderId, key),
+        (await orders.timeChange(order.orderId, key)).state,
         RequestState.confirmed,
       );
       expect((await orders.get(order.orderId)).window, window);
@@ -422,6 +428,89 @@ void main() {
         t.widget<Text>(find.byKey(const ValueKey('reschedule-current'))).data,
         contains('오후 8:00'),
       );
+    });
+
+    testWidgets('결과가 거절(REJECTED + reason)이면 원인과 "기존 시간 그대로"를 보이고 시간은 그대로', (
+      t,
+    ) async {
+      orders
+        ..rejectNextTimeChange = true
+        ..rejectReason = 'LOT_EXPIRY_NOT_MET';
+      await openOrder(t, 'order-seed-4');
+      await t.tap(find.byKey(const ValueKey('reschedule')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('rs-slot-20:00')));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('reschedule-submit')));
+      await t.pumpAndSettle();
+
+      expect(
+        t.widget<Text>(find.byKey(const ValueKey('reschedule-status'))).data,
+        '시간을 바꾸지 못했어요. 신선 상품의 기한 때문에 날짜를 바꿀 수 없어요\n기존 시간이 그대로 유지돼요',
+      );
+      expect(find.byKey(const ValueKey('reschedule-done')), findsNothing);
+      expect(
+        t.widget<Text>(find.byKey(const ValueKey('reschedule-current'))).data,
+        contains('오후 6:00'),
+      );
+    });
+
+    testWidgets('요청 단계 거절(TIME_CHANGE_IN_PROGRESS)은 코드별 안내', (t) async {
+      // 다른 기기에서 넣은 변경이 아직 확인 중이다.
+      // 위젯 시험은 가짜 시계라 목의 지연(타이머)이 저절로 풀리지 않는다 — 진짜 비동기로 넣는다.
+      await t.runAsync(() async {
+        final order = await orders.get('order-seed-4');
+        await orders.requestTimeChange(
+          order.orderId,
+          const ArrivalWindow(date: '2026-10-24', start: '19:00', end: '20:00'),
+          expectedVersion: order.version,
+          key: IdempotencyKey.generate(),
+        );
+      });
+      await openOrder(t, 'order-seed-4');
+      await t.tap(find.byKey(const ValueKey('reschedule')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('rs-slot-20:00')));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('reschedule-submit')));
+      await t.pumpAndSettle();
+
+      expect(
+        t.widget<Text>(find.byKey(const ValueKey('reschedule-status'))).data,
+        startsWith('시간을 바꾸지 못했어요. 이미 시간 변경을 확인하고 있어요'),
+      );
+    });
+
+    testWidgets('시간은 오늘·내일 중 고른다(주문의 센터 슬롯)', (t) async {
+      await openOrder(t, 'order-seed-4');
+      await t.tap(find.byKey(const ValueKey('reschedule')));
+      await t.pumpAndSettle();
+      expect(find.text('오늘'), findsOneWidget);
+      await t.tap(find.text('내일'));
+      await t.pumpAndSettle();
+      // 목 슬롯은 날짜마다 같은 시각 목록 — 내일로 바꾸면 고른 시간이 풀린다.
+      expect(find.byKey(const ValueKey('rs-slot-20:00')), findsOneWidget);
+      final submit = t.widget<CommandButton>(
+        find.byKey(const ValueKey('reschedule-submit')),
+      );
+      expect(submit.onPressed, isNull);
+    });
+
+    test('거절 사유 문구 — 모르는 코드는 "다른 시간을 골라 주세요"', () {
+      final l10n = lookupAppLocalizations(const Locale('ko'));
+      expect(
+        rescheduleReasonText(l10n, 'CAPACITY_EXCEEDED'),
+        '그 시간대가 마감됐어요. 다른 시간을 골라 주세요',
+      );
+      expect(
+        rescheduleReasonText(l10n, 'PREPARATION_STARTED'),
+        '상품 준비가 시작돼 바꿀 수 없어요',
+      );
+      expect(
+        rescheduleReasonText(l10n, 'SAME_SLOT'),
+        '지금과 같은 시간이에요. 다른 시간을 골라 주세요',
+      );
+      expect(rescheduleReasonText(l10n, 'NEW_CODE'), '다른 시간을 골라 주세요');
     });
 
     testWidgets(

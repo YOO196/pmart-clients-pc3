@@ -10,7 +10,8 @@ import '../../checkout/data/mock_checkout_repository.dart';
 import '../../checkout/domain/checkout.dart'
     show ArrivalWindow, OutOfStockPreference;
 import '../../../shared/order_status.dart';
-import '../../claims/domain/claims.dart' show RequestState;
+import '../../claims/domain/claims.dart'
+    show RequestState, TimeChangeCode, TimeChangeResult;
 import '../domain/orders.dart';
 import '../domain/tracking.dart';
 import 'orders_repository.dart';
@@ -497,6 +498,9 @@ base class MockOrdersRepository implements OrdersRepository {
   /// 다음 시간 변경을 서버가 거절하게 한다(정원 소진 등).
   bool rejectNextTimeChange = false;
 
+  /// [rejectNextTimeChange] 때의 원인 코드(계약 `reason`).
+  String rejectReason = TimeChangeCode.capacityExceeded;
+
   @override
   Future<void> requestTimeChange(
     String orderId,
@@ -518,6 +522,26 @@ base class MockOrdersRepository implements OrdersRepository {
         Problem(status: 409, code: ProblemCode.invalidState),
       );
     }
+    // 서버 흉내(order 0.10.0): 예약배달만, 지금과 다른 시간대만, 진행 중인 변경이 없을 때만.
+    if (order['deliveryMode'] != 'SCHEDULED') {
+      throw const ProblemFailure(
+        Problem(status: 422, code: TimeChangeCode.notScheduled),
+      );
+    }
+    final current = order['arrivalWindow'] as Map<String, Object?>?;
+    if (current != null &&
+        current['date'] == window.date &&
+        current['start'] == window.start &&
+        current['end'] == window.end) {
+      throw const ProblemFailure(
+        Problem(status: 422, code: TimeChangeCode.sameSlot),
+      );
+    }
+    if (_timeChanges.values.any((r) => r.orderId == orderId)) {
+      throw const ProblemFailure(
+        Problem(status: 409, code: TimeChangeCode.inProgress),
+      );
+    }
     if (order['version'] != expectedVersion) {
       throw const ProblemFailure(
         Problem(status: 409, code: ProblemCode.versionConflict),
@@ -531,22 +555,31 @@ base class MockOrdersRepository implements OrdersRepository {
   }
 
   @override
-  Future<RequestState> timeChange(String orderId, IdempotencyKey key) async {
+  Future<TimeChangeResult> timeChange(
+    String orderId,
+    IdempotencyKey key,
+  ) async {
     await _wait();
     final r = _timeChanges[key.value];
-    if (r == null) return RequestState.unknown;
+    if (r == null) {
+      return TimeChangeResult(
+        _confirmed.contains(key.value)
+            ? RequestState.confirmed
+            : RequestState.unknown,
+      );
+    }
     if (r.polls == 0) {
       _timeChanges[key.value] = (
         orderId: r.orderId,
         window: r.window,
         polls: 1,
       );
-      return RequestState.pending;
+      return const TimeChangeResult(RequestState.pending);
     }
     if (rejectNextTimeChange) {
       rejectNextTimeChange = false;
       _timeChanges.remove(key.value);
-      return RequestState.rejected;
+      return TimeChangeResult(RequestState.rejected, reason: rejectReason);
     }
     final order = orderJson(orderId)!;
     overrides[orderId] = {
@@ -556,7 +589,7 @@ base class MockOrdersRepository implements OrdersRepository {
     };
     _timeChanges.remove(key.value);
     _confirmed.add(key.value);
-    return RequestState.confirmed;
+    return const TimeChangeResult(RequestState.confirmed);
   }
 
   final _confirmed = <String>{};

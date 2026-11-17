@@ -164,10 +164,15 @@ final withdrawClaimProvider =
           (claim) => withdrawClaim(ref, claim),
     );
 
-/// 예약시간 변경 요청 → 결과 조회. 확정 전에는 옛 시간·새 시간을 동시에 확정으로 보이지 않는다.
+/// 예약시간 변경 요청(202 = 접수) → 결과 조회. 확정 전에는 옛 시간·새 시간을 동시에 확정으로 보이지 않는다.
+/// 요청 단계 거절(NOT_SCHEDULED·SAME_SLOT·TIME_CHANGE_IN_PROGRESS·INVALID_STATE·VERSION_CONFLICT)은 [CommandRejected],
+/// 결과 단계 거절은 [CommandDone] 의 REJECTED + reason(기존 시간 그대로).
 final requestTimeChangeProvider =
     Provider<
-      Future<CommandOutcome<RequestState>> Function(OrderDetail, ArrivalWindow)
+      Future<CommandOutcome<TimeChangeResult>> Function(
+        OrderDetail,
+        ArrivalWindow,
+      )
     >((ref) {
       return (order, window) async {
         final repo = ref.read(ordersRepositoryProvider);
@@ -184,10 +189,20 @@ final requestTimeChangeProvider =
         } on ProblemFailure catch (f) {
           return CommandRejected(f.problem.code);
         }
-        final state = await _poll(
-          ref.read(requestPollPolicyProvider),
-          () => repo.timeChange(order.orderId, key),
-        );
-        return CommandDone(state);
+        final policy = ref.read(requestPollPolicyProvider);
+        var last = const TimeChangeResult(RequestState.unknown);
+        for (var i = 0; i < policy.attempts; i++) {
+          if (i > 0) await Future<void>.delayed(policy.interval);
+          try {
+            last = await repo.timeChange(order.orderId, key);
+          } on PmartFailure {
+            last = const TimeChangeResult(RequestState.unknown);
+          }
+          if (last.state == RequestState.confirmed ||
+              last.state == RequestState.rejected) {
+            break;
+          }
+        }
+        return CommandDone(last);
       };
     });
