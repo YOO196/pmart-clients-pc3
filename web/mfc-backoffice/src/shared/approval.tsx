@@ -28,22 +28,25 @@ export function approvalRequired(failure: PmartFailure): ApprovalRequired | null
 
 export function ApprovalRequiredNotice({ info }: { readonly info: ApprovalRequired }) {
   return (
-    <div role="alert" data-state="approval-required" className="alert alert-warning flex-col items-start text-sm">
-      <span className="font-bold">{a.required}</span>
-      {info.thresholds.length > 0 && (
-        <ul className="list-disc pl-5" aria-label={a.thresholds}>
-          {info.thresholds.map((t) => (
-            <li key={t}>{t}</li>
-          ))}
-        </ul>
-      )}
-      {info.refReasons.map((r) => (
-        <span key={r} className="text-error" data-testid="approval-ref-reason">
-          {a.refReason[r] ?? r}
-        </span>
-      ))}
-      <span>{a.howTo}</span>
-      <span className="text-xs opacity-70">{a.requestPending}</span>
+    // daisyUI alert 는 넓은 화면에서 자식을 가로 칸으로 나눈다 — 내용을 한 덩어리로 묶어 위아래로 쌓는다.
+    <div role="alert" data-state="approval-required" className="alert alert-warning alert-soft text-sm">
+      <div className="w-full space-y-1">
+        <p className="font-bold">{a.required}</p>
+        {info.thresholds.length > 0 && (
+          <ul className="list-disc pl-5" aria-label={a.thresholds}>
+            {info.thresholds.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        )}
+        {info.refReasons.map((r) => (
+          <p key={r} className="font-semibold" data-testid="approval-ref-reason">
+            {a.refReason[r] ?? r}
+          </p>
+        ))}
+        <p>{a.howTo}</p>
+        <p className="text-xs opacity-70">{a.requestPending}</p>
+      </div>
     </div>
   );
 }
