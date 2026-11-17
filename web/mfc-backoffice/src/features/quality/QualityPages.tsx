@@ -345,7 +345,7 @@ function DecideRelease({ decision, onDone }: { readonly decision: Decision; read
           {m.rejectRelease}
         </button>
       </div>
-      <ApprovalAwareFeedback command={decide} />
+      <ApprovalAwareFeedback command={decide} onApprovalId={setApprovalRef} />
     </div>
   );
 }
@@ -527,7 +527,7 @@ function DecideDisposal({ mfcId, disposal, onDone }: { readonly mfcId: string; r
           {m.rejectDisposal}
         </button>
       </div>
-      <ApprovalAwareFeedback command={decide} />
+      <ApprovalAwareFeedback command={decide} onApprovalId={setApprovalRef} />
     </div>
   );
 }

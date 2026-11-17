@@ -234,3 +234,60 @@ describe('본사 승인 번호(AP-1)', () => {
     expect(await sentBody(postsTo(view.sent, '/approvals')[0]!)).toEqual({ action: 'APPROVE' });
   });
 });
+
+describe('본사 승인 요청 보내기(approval-service)', () => {
+  it('승인 필요 → 요청 보내기(초안·제출) → 번호가 칸에 → 상태 확인(심사 중 → 승인) → 같은 키로 다시 보내 정정', async () => {
+    const view = renderAt('/c/MFC-BSN-01/inventory?sku=SKU-MILK-1');
+    const row = (await screen.findAllByTestId('unit-row')).find((r) => r.textContent?.includes('A-P1-01-1-01'))!;
+    await userEvent.click(within(row).getByRole('button', { name: '정정' }));
+    const form = screen.getByRole('form', { name: '정정' });
+    const qty = within(form).getByRole('spinbutton', { name: '수량' });
+    await userEvent.clear(qty);
+    await userEvent.type(qty, '10');
+    await userEvent.type(within(form).getByRole('textbox', { name: /목적 위치/ }), 'c-s1-03-2-04');
+    await userEvent.type(within(form).getByRole('textbox', { name: '사유' }), '대량 위치 정정');
+    const submit = within(form).getByRole('button', { name: '정정 보내기' });
+    await userEvent.click(submit);
+    await userEvent.click(await within(form).findByRole('button', { name: '본사 승인 요청 보내기' }));
+    const requested = await within(form).findByTestId('approval-requested');
+    expect(requested).toHaveTextContent(/승인 번호 APV-\d+/);
+    const ref = within(form).getByRole('textbox', { name: /본사 승인 번호/ });
+    expect((ref as HTMLInputElement).value).toMatch(/^APV-\d+$/); // 받은 번호를 칸에 넣어 둔다
+
+    // 초안 본문 = 422 의 요청 본문 그대로, 제출은 초안 버전으로
+    const cr = postsTo(view.sent, '/change-requests')[0]!;
+    const crBody = await sentBody(cr);
+    expect([crBody.type, crBody.targetService]).toEqual(['MFC_STOCK_ADJUSTMENT', 'mfc-inventory-service']);
+    expect(String(crBody.targetRef)).toMatch(/^MFC-BSN-01:CORRECTION:/);
+    expect(postsTo(view.sent, '/submissions')[0]!.headers.get('X-Expected-Version')).toBe('1');
+
+    await userEvent.click(within(requested).getByRole('button', { name: '승인 상태 확인' }));
+    expect(await within(requested).findByTestId('approval-review-state')).toHaveTextContent('본사 심사 중');
+    await userEvent.click(within(requested).getByRole('button', { name: '승인 상태 확인' }));
+    await waitFor(() => expect(within(requested).getByTestId('approval-review-state')).toHaveTextContent('승인됨'));
+
+    await userEvent.click(submit);
+    expect(await screen.findByText('정정했어요.')).toBeInTheDocument();
+    const keys = postsTo(view.sent, '/stock-corrections').map((r) => r.headers.get('Idempotency-Key'));
+    expect(keys).toHaveLength(2);
+    expect(new Set(keys).size).toBe(1);
+  });
+
+  it('승인 전에 다시 보내면 "아직 승인되지 않았어요"', async () => {
+    renderAt('/c/MFC-BSN-01/inventory?sku=SKU-MILK-1');
+    const row = (await screen.findAllByTestId('unit-row')).find((r) => r.textContent?.includes('A-P1-01-1-01'))!;
+    await userEvent.click(within(row).getByRole('button', { name: '정정' }));
+    const form = screen.getByRole('form', { name: '정정' });
+    const qty = within(form).getByRole('spinbutton', { name: '수량' });
+    await userEvent.clear(qty);
+    await userEvent.type(qty, '11');
+    await userEvent.type(within(form).getByRole('textbox', { name: '사유' }), '정정');
+    await userEvent.type(within(form).getByRole('textbox', { name: /목적 위치/ }), 'c-s1-03-2-04');
+    const submit = within(form).getByRole('button', { name: '정정 보내기' });
+    await userEvent.click(submit);
+    await userEvent.click(await within(form).findByRole('button', { name: '본사 승인 요청 보내기' }));
+    await within(form).findByTestId('approval-requested');
+    await userEvent.click(submit);
+    expect(await within(form).findByTestId('approval-ref-reason')).toHaveTextContent('아직 승인되지 않았어요');
+  });
+});

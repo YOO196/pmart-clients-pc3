@@ -3,6 +3,7 @@ import createClient from 'openapi-fetch';
 import { createPmartFetch, TokenStore, type EmployeeAuthPaths, type PmartFetch } from '@pmart/web-core';
 import { SOURCE_SYSTEM } from './command';
 import { refreshEmployeeTokens } from './employeeAuth';
+import type { paths as ApprovalPaths } from './generated/approval';
 import type { paths as BffPaths } from './generated/backoffice-bff';
 import type { paths as CasePaths } from './generated/case';
 import type { paths as CenterPaths } from './generated/center-master';
@@ -35,6 +36,8 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     // 우리 센터 배송 현황(bff 0.3.1 live-delivery — 계약 servers.url /api/v1/backoffice)·배차 실패 사건(case 0.5.2)
     bff: createClient<BffPaths>({ ...options, baseUrl: `${baseUrl}/backoffice` }),
     cases: createClient<CasePaths>(options),
+    // 본사 승인 요청(AP-1) — 422 APPROVAL_REQUIRED 의 요청 본문으로 변경 요청 만들기·제출, 승인 상태 조회
+    approval: createClient<ApprovalPaths>(options),
   };
 }
 

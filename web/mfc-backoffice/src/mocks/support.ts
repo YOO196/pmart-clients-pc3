@@ -55,9 +55,27 @@ export function approvalProblem(targetRef: string, threshold: string, approvalRe
   const ref = approvalRef?.trim() ?? '';
   if (ref === 'AP-PENDING') return problem(422, 'APPROVAL_REQUIRED', [{ field: 'approvalRef', reason: 'NOT_APPROVED' }]);
   if (ref === 'AP-USED') return problem(422, 'APPROVAL_REQUIRED', [{ field: 'approvalRef', reason: 'ALREADY_USED' }]);
+  // 목 승인 서비스가 발급한 번호: 아직 승인 전(조회 2번 미만)이면 NOT_APPROVED, 다른 대상이면 TARGET_MISMATCH, 이미 썼으면 ALREADY_USED
+  const issued = db.approvals.get(ref);
+  if (issued) {
+    if (issued.targetRef !== targetRef) return problem(422, 'APPROVAL_REQUIRED', [{ field: 'approvalRef', reason: 'TARGET_MISMATCH' }]);
+    if (issued.checks < 2) return problem(422, 'APPROVAL_REQUIRED', [{ field: 'approvalRef', reason: 'NOT_APPROVED' }]);
+    if (issued.used) return problem(422, 'APPROVAL_REQUIRED', [{ field: 'approvalRef', reason: 'ALREADY_USED' }]);
+    issued.used = true;
+    return null;
+  }
   if (ref) return null;
   return problem(422, 'APPROVAL_REQUIRED', [
     { field: 'threshold', reason: threshold },
-    { field: 'approvalRequest', reason: JSON.stringify({ requestType: 'MFC_EXECUTION', targetRef, summary: threshold }) },
+    {
+      field: 'approvalRequest',
+      reason: JSON.stringify({
+        type: targetRef.includes(':RESTRICTION_LIFT:') ? 'MFC_OPERATION_RESTRICTION' : 'MFC_STOCK_ADJUSTMENT',
+        targetService: targetRef.includes(':RESTRICTION_LIFT:') ? 'mfc-capacity-service' : 'mfc-inventory-service',
+        targetRef,
+        allowedActions: ['EXECUTE'],
+        summary: threshold,
+      }),
+    },
   ]);
 }

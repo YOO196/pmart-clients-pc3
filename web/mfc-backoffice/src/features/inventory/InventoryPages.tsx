@@ -330,7 +330,7 @@ function CorrectionForm({
           {m.cancel}
         </button>
       </div>
-      <ApprovalAwareFeedback command={correct} />
+      <ApprovalAwareFeedback command={correct} onApprovalId={setApprovalRef} />
       {correct.phase.kind === 'rejected' && approvalRequired(correct.phase.failure) && <p className="text-xs opacity-70">{messages.approval.sameKeyNote}</p>}
     </form>
   );
@@ -523,7 +523,7 @@ function DecideCount({ mfcId, session, onDecided: setNotice }: { readonly mfcId:
           {m.reject}
         </button>
       </div>
-      <ApprovalAwareFeedback command={decide} />
+      <ApprovalAwareFeedback command={decide} onApprovalId={setApprovalRef} />
     </div>
   );
 }

@@ -640,6 +640,9 @@ export const db = {
   suspended: new Set<string>(),
   sessions: new Map<string, MockSession>(),
   idempotent: new Map<string, { status: number; body: unknown }>(),
+  /** 목 본사 승인(approval-service) — 변경 요청·승인. 승인 상태는 조회 두 번째부터 APPROVED(본사가 승인했다고 흉내). */
+  changeRequests: new Map<string, { changeRequestId: string; version: number; body: Record<string, unknown>; approvalId: string | null }>(),
+  approvals: new Map<string, { approvalId: string; targetRef: string; checks: number; used: boolean }>(),
   seq: 100,
 };
 
@@ -648,6 +651,8 @@ export function resetDb(): void {
   db.suspended = new Set();
   db.sessions = new Map();
   db.idempotent = new Map();
+  db.changeRequests = new Map();
+  db.approvals = new Map();
   db.seq = 100;
   db.locations = new Map(seedLocations());
   db.locationStateChanges = new Map();
