@@ -183,6 +183,7 @@ void main() {
             remainingQty: 2,
           ),
           pickedQty: 2,
+          toLocation: 'CRT-A-01',
         ),
         state: QueueItemState.queued,
         createdAt: DateTime.utc(2026),
@@ -217,6 +218,37 @@ void main() {
       final body = jsonDecode(req.data as String) as Map<String, dynamic>;
       expect(body['assignmentVersion'], 2);
       expect((body['lines'] as List).single['pickedQty'], 2);
+      expect(body['toLocation'], 'CRT-A-01', reason: '집품 도착지 = 장바구니');
+    });
+
+    test('실행 전송: 장바구니 없음 400·다른 장바구니 409 는 거절(코드 그대로)', () async {
+      Future<SendResult> send(FakeReply reply) =>
+          _repoWith(FakeAdapter((_, _) async => reply)).sendExecution(
+            QueueItem(
+              id: 'k-1',
+              kind: FieldCommandKind.pickExecution,
+              targetId: 'task-1',
+              payload: const {'workerId': 'w', 'lines': []},
+              state: QueueItemState.queued,
+              createdAt: DateTime.utc(2026),
+            ),
+          );
+      expect(
+        await send(FakeReply.problem(400, problemBody('TO_LOCATION_REQUIRED'))),
+        isA<SendRejected>().having(
+          (r) => r.code,
+          'code',
+          TaskProblemCode.toLocationRequired,
+        ),
+      );
+      expect(
+        await send(FakeReply.problem(409, problemBody('CART_MISMATCH'))),
+        isA<SendRejected>().having(
+          (r) => r.code,
+          'code',
+          TaskProblemCode.cartMismatch,
+        ),
+      );
     });
   });
 
@@ -316,6 +348,7 @@ void main() {
 
       final sent = repo.sentPayloads.single;
       expect(sent['fromLocation'], 'C-S1-01-1-01');
+      expect(sent['toLocation'], 'CRT-C-01', reason: '집품 도착지 = 찍은 장바구니(0.8.0)');
       expect((sent['lines']! as List).single['lotId'], 'LOT-Y-1024');
 
       // 다음은 우유 — 배정 칸 C-S1-02-2-05 에서 1개, 같은 LOT 다른 칸 안내.
@@ -325,6 +358,44 @@ void main() {
       expect(next.qty, 1);
       expect(next.otherLocations, ['C-S2-04-1-10']);
       expect(c.read(pickingProvider('task-mock-1')).at, isNull);
+    });
+
+    test('상품 바코드가 여럿이면 어느 것을 찍어도 같은 상품(점포 299…)', () async {
+      final (pick, task) = await atStop();
+      expect(
+        pick.scan(task, MockTaskRepository.yogurtStoreBarcode),
+        ScanResult.matched,
+      );
+      expect(pick.scan(task, '0000000000000'), ScanResult.wrongItem);
+    });
+
+    test('장바구니를 안 찍고 보낸 실적은 목도 실서버처럼 거절 — 화면에 사유', () async {
+      await startTask('task-mock-1');
+      final res = await repo.sendExecution(
+        QueueItem(
+          id: 'k-no-cart',
+          kind: FieldCommandKind.pickExecution,
+          targetId: 'task-mock-1',
+          payload: const {
+            'workerId': 'w',
+            'assignmentVersion': 2,
+            'fromLocation': 'C-S1-01-1-01',
+            'lines': [
+              {'orderLineId': 'ol-1', 'sku': 'E-00000002', 'pickedQty': 1},
+            ],
+          },
+          state: QueueItemState.queued,
+          createdAt: DateTime.utc(2026),
+        ),
+      );
+      expect(
+        res,
+        isA<SendRejected>().having(
+          (r) => r.code,
+          'code',
+          TaskProblemCode.toLocationRequired,
+        ),
+      );
     });
 
     test('우유: 배정 칸 1개를 집으면 남은 1개는 같은 LOT 의 다른 칸으로 지시가 바뀐다', () async {

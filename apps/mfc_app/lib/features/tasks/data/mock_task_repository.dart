@@ -3,6 +3,7 @@ import 'package:pmart_api_mfc_fulfillment/pmart_api_mfc_fulfillment.dart'
     as api;
 import 'package:pmart_core/pmart_core.dart';
 
+import '../../../shared/codes.dart';
 import '../domain/task_list.dart';
 import 'task_repository.dart';
 
@@ -136,6 +137,9 @@ base class MockTaskRepository implements TaskRepository {
   };
   static const milkBarcode = '8801115114154';
   static const yogurtBarcode = '8801115220015';
+
+  /// 요거트 점포 바코드(299…) — 같은 상품의 두 번째 활성 바코드.
+  static const yogurtStoreBarcode = '2990000000024';
   static const chipsBarcode = '8801019606557';
   static const dumplingBarcode = '8801007310014';
 
@@ -148,6 +152,9 @@ base class MockTaskRepository implements TaskRepository {
       >{};
   final _executionByKey = <String, String>{};
   int _exeSeq = 0;
+
+  /// 작업 → 집품한 장바구니(한 출고 = 한 장바구니, 409 CART_MISMATCH).
+  final _pickCart = <String, String>{};
 
   /// 다음 시작 n회를 503 DEPENDENCY_UNAVAILABLE(시작 안 됨)로 만든다.
   int startUnavailable = 0;
@@ -223,6 +230,7 @@ base class MockTaskRepository implements TaskRepository {
         'sku': 'E-00000002',
         'productName': '그릭요거트 플레인 400g',
         'barcode': yogurtBarcode,
+        'barcodes': [yogurtBarcode, yogurtStoreBarcode],
         'locationId': 'C-S1-01-1-01',
         'lotId': 'LOT-Y-1024',
         'expiresOn': '2026-11-05',
@@ -570,6 +578,35 @@ base class MockTaskRepository implements TaskRepository {
           Problem(status: 409, code: TaskProblemCode.versionConflict),
         ),
       );
+    }
+    // 집품 도착지 = 장바구니(fulfillment 0.8.0 — 실서버와 같게 판정).
+    if (item.kind == FieldCommandKind.pickExecution &&
+        item.payload['executionType'] != 'RETURN') {
+      final lines = (item.payload['lines']! as List)
+          .cast<Map<String, Object?>>();
+      final picked = lines.any((l) => ((l['pickedQty'] as int?) ?? 0) > 0);
+      final to = item.payload['toLocation'] as String?;
+      if (picked && (to == null || to.isEmpty)) {
+        return executionFailureToSend(
+          const ProblemFailure(
+            Problem(status: 400, code: TaskProblemCode.toLocationRequired),
+          ),
+        );
+      }
+      if (picked && to != null) {
+        if (!isCartLocation(to) && !to.startsWith('PAK-')) {
+          return const SendRejected(TaskProblemCode.locationZoneMismatch);
+        }
+        final used = _pickCart[item.targetId];
+        if (used != null && used != to) {
+          return executionFailureToSend(
+            const ProblemFailure(
+              Problem(status: 409, code: TaskProblemCode.cartMismatch),
+            ),
+          );
+        }
+        _pickCart[item.targetId] = to;
+      }
     }
     final id = 'exe-${++_exeSeq}';
     _executionByKey[item.id] = id;

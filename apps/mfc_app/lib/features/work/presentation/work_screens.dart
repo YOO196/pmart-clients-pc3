@@ -650,12 +650,26 @@ class WorkSessionScreen extends ConsumerWidget {
             WorkProblemCode.offShift => l10n.nextOffShift,
             WorkProblemCode.dailyNotEnrolled => l10n.nextNotEnrolled,
             WorkProblemCode.workAreaNotAllowed => l10n.nextWorkAreaNotAllowed,
+            WorkProblemCode.workerNotActive => l10n.nextWorkerNotActive,
+            WorkProblemCode.workerNotRegistered => l10n.nextWorkerNotRegistered,
+            WorkProblemCode.configRequired => l10n.nextConfigRequired,
+            ProblemCode.forbidden => l10n.nextForbidden,
             _ => l10n.nextNotAllowed,
           },
           key: const ValueKey('session-unavailable'),
           textAlign: TextAlign.center,
           style: theme.textTheme.titleMedium,
         ),
+        // 서버 코드 — 관리자가 원인을 바로 찾게(작업 없음은 빼고).
+        if (s.code case final code?
+            when code != WorkProblemCode.noTaskAvailable) ...[
+          const SizedBox(height: 4),
+          Text(
+            l10n.nextReasonCode(code),
+            key: const ValueKey('session-unavailable-code'),
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
         const SizedBox(height: 16),
         FilledButton(
           key: const ValueKey('session-retry'),

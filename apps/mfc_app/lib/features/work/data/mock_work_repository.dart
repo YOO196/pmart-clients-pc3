@@ -49,6 +49,9 @@ final class MockWorkRepository implements WorkRepository {
   final Duration latency;
   final Set<String> allowed;
   bool onBreak = false;
+
+  /// 시험용: 다음 작업 받기를 이 코드로 거절한다(예 WORKER_NOT_ACTIVE).
+  String? nextRejectCode;
   int nextCalls = 0;
 
   /// 다음 받기 응답을 1회 잃는다(서버는 배정함).
@@ -110,6 +113,7 @@ final class MockWorkRepository implements WorkRepository {
     await _wait();
     nextCalls++;
     if (onBreak) return const NextUnavailable(WorkProblemCode.onBreak);
+    if (nextRejectCode case final c?) return NextUnavailable(c);
     if (area == WorkArea.inbound) return _nextInbound();
     if (area == WorkArea.inspection) return _nextInspection(mfcId);
     if (area == WorkArea.stockMove) return _nextStockMove(mfcId);

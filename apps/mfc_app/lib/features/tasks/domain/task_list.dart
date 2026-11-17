@@ -153,6 +153,7 @@ class TaskLineView {
     this.pendingQty = 0,
     this.productName,
     this.barcode,
+    this.barcodes = const [],
     this.locationId,
     this.lotId,
     this.expiresOn,
@@ -164,8 +165,17 @@ class TaskLineView {
   final String sku;
   final String? productName;
 
-  /// 필수 스캔 대조값. 다른 바코드는 실적 0 + 원인 안내.
+  /// 대표 바코드(스티커 재출력·시험 스캔에 쓴다).
   final String? barcode;
+
+  /// 그 SKU 의 활성 바코드 전부(제조사 880… + 점포 299… 처럼 여럿 — fulfillment 0.7.0).
+  final List<String> barcodes;
+
+  /// 찍은 값이 이 줄 상품인지. 활성 바코드 중 하나와 같으면 맞다(다른 바코드는 실적 0 + 원인 안내).
+  bool matchesBarcode(String code) {
+    final c = code.trim();
+    return c.isNotEmpty && (c == barcode || barcodes.contains(c));
+  }
   final String? locationId;
   final String? lotId;
   final String? expiresOn;
@@ -265,6 +275,15 @@ abstract final class TaskProblemCode {
   static const versionConflict = 'VERSION_CONFLICT';
   static const idempotencyConflict = 'IDEMPOTENCY_CONFLICT';
   static const dependencyUnavailable = 'DEPENDENCY_UNAVAILABLE';
+
+  /// 집은 양이 있는데 도착지(장바구니)가 없다 — 400(fulfillment 0.8.0).
+  static const toLocationRequired = 'TO_LOCATION_REQUIRED';
+
+  /// 같은 출고를 다른 장바구니로 집었다 — 409(fulfillment 0.8.0, 한 출고 = 한 장바구니).
+  static const cartMismatch = 'CART_MISMATCH';
+
+  /// 도착지가 장바구니(CART)·포장(PACKING) 구역이 아니다 — 재고 거절 사유(inventory 0.19.0).
+  static const locationZoneMismatch = 'LOCATION_ZONE_MISMATCH';
 }
 
 /// 큐에 넣는 실행 명령 종류.
