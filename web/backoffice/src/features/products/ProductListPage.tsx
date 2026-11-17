@@ -11,6 +11,7 @@ import { FailureAlert } from '../../shared/Feedback';
 import { messages as m } from '../../shared/messages';
 import { QueryState } from '@pmart/web-ui';
 import { toUiState } from '@pmart/web-ui';
+import { DataTable, PageHeader, SearchRow } from '../../shared/admin';
 
 function Lookup() {
   const api = useApi();
@@ -96,9 +97,13 @@ export function ProductListPage() {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-xl font-bold">{m.products.listTitle}</h1>
-      <Lookup />
-      <div className="flex flex-wrap gap-2">
+      <PageHeader title={m.products.listTitle} />
+      {/* 관리자 형식(2026-11-18): 검색 조건 상자 — 줄마다 왼쪽 항목명 */}
+      <div className="overflow-hidden rounded-box border border-base-300 bg-base-100 divide-y divide-base-300">
+      <SearchRow label={m.products.quickFind}>
+        <Lookup />
+      </SearchRow>
+      <SearchRow label={m.products.saleState}>
         <select
           aria-label={m.products.saleState}
           className="select select-sm w-40"
@@ -112,6 +117,8 @@ export function ProductListPage() {
             </option>
           ))}
         </select>
+      </SearchRow>
+      <SearchRow label={m.products.categoryFilter}>
         <form
           className="flex gap-2"
           onSubmit={(e) => {
@@ -130,11 +137,12 @@ export function ProductListPage() {
             {m.search}
           </button>
         </form>
+      </SearchRow>
       </div>
       <QueryState state={toUiState(query, (d) => (d.items?.length ?? 0) === 0)} onRetry={() => void query.refetch()}>
         {(d) => (
           <>
-            <table className="table table-sm bg-base-100">
+            <DataTable>
               <thead>
                 <tr>
                   <th>{m.products.productId}</th>
@@ -163,7 +171,7 @@ export function ProductListPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </DataTable>
             {d.page?.nextCursor && (
               <button type="button" className="btn btn-sm" onClick={() => setParam('cursor', d.page?.nextCursor ?? '')}>
                 {m.more}
