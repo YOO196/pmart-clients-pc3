@@ -12,9 +12,9 @@
 | 1 | **고객센터 문의에 사진 붙이기** — 한 장씩 `POST /inquiry-photos`(multipart) → 문의 `photoIds`(5장, 장당 10MB), 남긴 뒤 보완 `POST /inquiries/{id}/photos`, 상세 사진 보기 | case 0.14.0, `clients/all/2026-11-17-request-inquiry-photos.md` | 사용자 2026-11-17 "해야 할 일에 기억". 사진 실패해도 문의는 남게(첨부 성공 ≠ 접수 성공). 리뷰 사진 코드(`features/reviews`) 방식 그대로. 백오피스 보기는 #59 로 끝남 |
 | 2 | 문의 만족도 — 답변 받은 문의에 1~5점 + 한 줄(200자), 한 번만 | case 0.15.0, `clients/all/2026-11-17-request-inquiry-satisfaction.md` | 409 `INQUIRY_NOT_ANSWERED`·`ALREADY_RATED` 문구 |
 | 3 | 리뷰 수정·삭제 화면 — "내가 쓴 리뷰"에서 수정(`PATCH`, `X-Expected-Version`, 3일 안 — `editableUntil` 그대로)·삭제(삭제 뒤 재작성 불가 안내) | review 0.2.0, `clients/customer-app/2026-11-16-request-review-edit-delete.md` | 앱에 API 호출 코드는 있음(`updateReview`·`deleteReview`), 화면 없음 |
-| 4 | 실시간 도착 예정·배송 현황 실서버 확인 + 라이더 위치 점(픽업 뒤만) | tracking 0.5.0(`/eta`·`/stream` 구현), 0.6.0 `riderLocation`, `clients/customer-app/2026-11-17-reply-delivery-eta.md`·`…-reply-reference-gap-delivery.md` | 앱 구현은 있음(501 이던 것). 라이더 위치 지도는 새로. 매장 위치는 보이지 않음(결정) |
-| 5 | 전달 완료 사진·놓은 곳 보기(오배송 확인) | execution `GET /deliveries/{id}/delivery-proof`·`evidence-photos/{ref}`(백엔드 PR #80), 같은 회신 | 사진은 앱에 저장하지 않음(`no-store`). **백엔드 main 반영 확인 먼저** |
-| 6 | 배송 신고(지연·미수령·오배송)를 문의로 — `POST /inquiries` 에 배송 ID·신고 종류 | case(백엔드 PR #82), 같은 회신 | **백엔드 main 반영 확인 먼저** |
+| 4 | 실시간 도착 예정·배송 현황 실서버 확인 + 라이더 위치 점(픽업 뒤만) | tracking 0.5.0(`/eta`·`/stream` 구현), 0.6.0 `riderLocation`, `clients/customer-app/2026-11-17-reply-delivery-eta.md`·`…-reply-reference-gap-delivery.md` | 앱 구현은 있음(501 이던 것). 라이더 위치 지도는 새로 — 위치는 픽업 뒤(TO_CUSTOMER·AT_CUSTOMER)만 오고 그 전·끝난 뒤 null(사용자 결정 2026-11-17, `clients/customer-app/2026-11-18-notice-reference-gap-update.md` §1). 매장 위치는 보이지 않음(결정) |
+| 5 | 전달 완료 사진·놓은 곳 보기(오배송 확인) | execution 0.9.0~ `GET /deliveries/{id}/delivery-proof`·`evidence-photos/{ref}` — **백엔드 main 반영 확인함(2026-11-18, 지금 0.22.2)** | 고객은 전달 완료(COMPLETED) 뒤 **전달 완료 증빙 사진만**(실패·회수 사진 안 됨). 사진은 앱에 저장하지 않음(`no-store`) |
+| 6 | 배송 신고(지연·미수령·오배송)를 문의로 — `POST /inquiries` 에 `deliveryIssue`(DELAYED·NOT_RECEIVED·MISDELIVERED)·`deliveryId`(선택) | case 0.16.0, 지연 신고는 0.23.0(2026-11-18) — **백엔드 main 반영 확인함(2026-11-18)** | 11-18 갱신 알림 §2 의 "배달 지연 제보 — 고객용 API 없음"은 계약 0.23.0 보다 먼저 쓰인 것으로 보임(계약이 정본) |
 | 7 | 최근 검색어·인기 키워드 | search 0.2.0 `/me/recent-searches`·`suggestions.popular` | `search_screen.dart` 주석에 "로그인 단계에서 붙인다"만 있음 |
 | 8 | 비회원 장바구니 병합(주문서 로그인 뒤) | cart `POST /carts/{id}/merges`, BR-50(OPEN) | BR-50 질문 회신부터 확인 |
 | 9 | 주소 수정·삭제 | customer `PATCH`·`DELETE /me/addresses/{id}` | 레퍼런스 대비 A 목록에도 있음 |
@@ -23,12 +23,14 @@
 | 26 | 주소 검색(카카오 우편번호) 스크립트 도메인 `t1.daumcdn.net` → `t1.kakaocdn.net`, 이름 `daum.Postcode` → `kakao.Postcode` — **2026-11-30 종료**, 옛 주소면 검색 창 위에 개발자 공지가 고객에게 보임 | PC 5 알림 `docs/handoff/rider-app/2026-11-17-pc1-postcode-domain.md`(라이더앱은 #63 에서 바꿈) | 고객앱 `postcode_screen.dart` |
 | 29 | ~~**"받았어요"(고객 수령 확인)** — 주문 상세 배송 카드에 픽업 뒤·전달 전일 때 버튼, 확인 대화 뒤 `POST /deliveries/{id}/receipt-confirmations`~~ 2026-11-18 끝(커밋은 worklog) | execution 0.20.0, `clients/customer-app/2026-11-17-request-receipt-confirmation.md` | 사용자 2026-11-18 "이 요청 문서에 추가하고 바로 만들어". 실서버 확인은 30. 못 받음 신고는 6 |
 | 31 | ~~**반품 회수비 결제** — 처리 내역(클레임 상세)에 결제 카드, 토스 결제위젯·승인 결과 확인·실패 뒤 새 시도~~ 2026-11-18 끝(커밋은 worklog) | claim 0.2.0·0.3.0, `clients/all/2026-11-17-request-return-recovery.md` §3 | 사용자 2026-11-17 미뤄 둔 요청 → 2026-11-18 "진행해". 실서버 확인은 32 |
+| 33 | **문의 "상담 종료"** — 고객이 답변 받은 문의를 스스로 끝내기 | `clients/all/2026-11-17-request-inquiry-close.md` | 2026-11-17 미뤄 둔 요청. 2026-11-18 할 일 문서에 올림 |
+| 34 | 고객센터가 대신 취소한 주문의 클레임이 처리 내역에 보이는지(채널 `CS`) — 앱은 보이기만 | claim 0.4.0(2026-11-18), `clients/customer-app/2026-11-18-notice-reference-gap-update.md` §1 | 지금 앱 표시(목 데이터)부터 확인. 계약 다시 만들기는 25(CU-1)와 함께 |
 
 ## 2. 백엔드에 회신할 것
 
 | # | 할 일 | 근거 |
 |---|---|---|
-| 11 | **레퍼런스 대비 빠진 기능 A 목록의 착수 순서 회신**(오늘 순서 5번) | `clients/customer-app/2026-11-17-notice-reference-gap.md` — 회신은 `docs/handoff/customer-app/` 또는 PR 본문 |
+| 11 | **레퍼런스 대비 빠진 기능 A 목록의 착수 순서 회신**(오늘 순서 5번) + **11-18 갱신 §2(백엔드 없는 것) 중 먼저 필요한 것 고르기** — 리뷰 작성 알림, 주문 내역 카드 상품명·썸네일, 주문 내역 검색·기간·삭제, 교환, 현금영수증, 라이더 통화 요청, 상담원 채팅, FAQ 목록, 단위 가격, 매장 위치, 장바구니 최소 주문 금액 진행 바(cart 응답에 없음) | `clients/customer-app/2026-11-17-notice-reference-gap.md`·`…/2026-11-18-notice-reference-gap-update.md` — 회신은 `docs/handoff/customer-app/` 또는 PR 본문. 고르는 건 사용자 |
 | 12 | 재고 표시 요청 등록 — 목록 카드의 센터 재고 상태(일시품절), 상세·목록의 "N개 남음" 기준·개수 | 2026-11-17 조사(storefront·search 에 재고 필드 없음, product-content·cart 의 LOW 는 "아직 쓰지 않음"). 레퍼런스 대비 C(정책 결정 대기)에 "카드의 남은 수량" — **사용자 결정 뒤** `backend-requests.md` 에 BR 등록 |
 
 ## 3. 사용자 결정 기다림
@@ -50,7 +52,7 @@
 | 20 | 예약 시간 변경 거절 사유·오늘·내일 슬롯 | `aba8b12` |
 | 21 | 알림함(쌓이는지) — 휴대폰 푸시는 27 | 2026-11-16 |
 | 27 | **휴대폰 푸시(폰 연결 필요)**: Firebase 콘솔 테스트 메시지 수신 → 로그인 뒤 `GET /me/push-tokens` 에 단말 → 주문 취소·배송 출발 때 푸시가 오고 누르면 그 화면, 주문 확정은 알림함에만 → **Google 로그인 그대로**(빌드 값 `googleServerClientId` 꼭 넣어 빌드). 결과는 `docs/handoff/customer-app/2026-11-18-backend-customer-push-fcm-reply.md` §2 에 덧붙임 | `7cbe1f2`, 2026-11-18 푸시 누르면 목적지 |
-| 28 | Firebase 프로젝트 합치기(2026-11-18 예정): 사용자가 `pmart-123` 에 `com.pmart.customer_app` 을 등록해 받은 `google-services.json` 으로 `apps/customer_app/android/app/google-services.json`(git 제외)만 바꾼 뒤 27 다시 | 코드 변경 없음 |
+| 28 | Firebase 프로젝트 합치기(백엔드는 2026-11-18 `pmart-123` 으로 합침 — 회신 `clients/customer-app/2026-11-18-reply-customer-push-q6-q8.md`. 옛 `pmart-42b37` 단말 토큰은 새 키로 못 보내니 로그인하면 앱이 다시 등록): 사용자가 `pmart-123` 에 `com.pmart.customer_app` 을 등록해 받은 `google-services.json` 으로 `apps/customer_app/android/app/google-services.json`(git 제외)만 바꾼 뒤 27 다시 | 코드 변경 없음 |
 | 30 | "받았어요" 실서버: 배송 중(픽업 뒤) 주문에서 버튼 → 완료로 바뀌고 라이더 앱에도 완료, 도착 예정 + 20분에 알림함 "상품을 받으셨나요?" → 누르면 주문 상세. **백엔드 LAN 배포 먼저 확인**(요청서 작성 때 배포 전) | 2026-11-18 받았어요 |
 | 32 | 반품 회수비 실서버: 백오피스(고객센터)에서 고객 사유 반품 접수 → 고객앱 처리 내역에 9,000원 결제 카드 → 토스 결제 → 반품 진행으로. 결제창 닫기 → 다시 결제(새 시도). 회사 잘못 반품은 카드 없음 | 2026-11-18 반품 회수비 |
 

@@ -39,5 +39,5 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-16-backend-review-edit-delete-done.md` | 리뷰 수정·삭제 화면 반영 확인, 빈 글 수정 질문 1개 — 실서버 확인은 배송 완료 뒤 |
 | `rider-backoffice/2026-11-17-backend-rider-backoffice-base-done.md` | 라이더 백오피스 뼈대·로그인 회신 — 들어간 커밋 `756db67` 을 그대로 받음(사용자 2026-11-17), 검토·시험 11개·LAN 빌드 이름 확인. **남은 것: 실서버(8446) 로그인을 브라우저로 눌러 보기** |
 | `rider-backoffice/2026-11-18-backend-rider-ops-gaps.md` | 라이더 백오피스 직원용 API 공백 7건(PC 5) — 7번 `Evidence.method` 값 목록 먼저, 2~6번 1차 포함 여부·서비스·버전 회신 |
-| `customer-app/2026-11-18-backend-customer-push-fcm-reply.md` | 고객앱 휴대폰 푸시 회신 — 앱 반영 끝(토큰 등록 `7cbe1f2`, 누르면 목적지 화면). 남은 질문 Q6(LAN `max-devices`)·Q8(설치 ID). **남은 것: 실기기 확인, 11-18 `pmart-123` 으로 json 교체** |
+| `customer-app/2026-11-18-backend-customer-push-fcm-reply.md` | 고객앱 휴대폰 푸시 회신 — 앱 반영 끝(토큰 등록 `7cbe1f2`, 누르면 목적지 화면). Q6·Q8 은 11-18 답 받음(앱 고칠 것 없음). **남은 것: 실기기 확인, `pmart-123` json 교체 — 결과 덧붙이면 archive** |
 | `customer-app/2026-11-15-backend-support-chat-inquiry.md` | 고객앱 문의·AI 상담 반영 알림 — LAN 고객 토큰으로 실제 확인, 질문 3개 |

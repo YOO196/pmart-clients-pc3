@@ -25,9 +25,14 @@
 - 디버그 APK 빌드 성공(11-17, `google-services.json` 넣고 — 매니페스트에 `POST_NOTIFICATIONS`·FCM 서비스 들어감).
 - **실기기는 아직**(폰 연결 대기): Firebase 콘솔 테스트 메시지 수신 → 로그인 뒤 `GET /me/push-tokens` 에 단말 → 주문 취소·배송 출발 때 푸시, 주문 확정은 알림함에만 → Google 로그인 그대로. 하면 이 문서에 결과를 덧붙인다.
 
-## 3. 남은 질문
+## 3. 남은 질문 — 답 받음(2026-11-18)
 
-| # | 질문 | 왜 |
+백엔드 회신 `../pmart-backend/docs/handoff/clients/customer-app/2026-11-18-reply-customer-push-q6-q8.md`.
+
+| # | 질문 | 답 |
 |---|---|---|
-| Q6 | `pmart.notification.push-token.max-devices` 가 LAN 에 설정돼 있나(요청서는 "5대까지") — 없으면 PUT 이 422 `CONFIG_REQUIRED` | 실기기 확인 때 등록 실패 원인을 가르려고 |
-| Q8 | 서버가 받는 값은 FCM 등록 토큰만인가, Firebase 설치 ID(FID)도 되나 | `firebase_messaging` 17 이 `getToken`·`onTokenRefresh`·`deleteToken` 을 deprecated 로 두고 `register()`·`onRegistered`(값 = FID)를 권한다. 지금은 계약대로 `getToken` 을 쓴다(경고만 끔). 라이더 앱도 같은 패키지 |
+| Q6 | `pmart.notification.push-token.max-devices` 가 LAN 에 설정돼 있나(요청서는 "5대까지") — 없으면 PUT 이 422 `CONFIG_REQUIRED` | **있다 — 5**(공통 설정, LAN 적용). 6번째 단말은 등록 성공, 가장 오래 갱신 안 된 단말을 서버가 지운다. 앱 고칠 것 없음 |
+| Q8 | 서버가 받는 값은 FCM 등록 토큰만인가, Firebase 설치 ID(FID)도 되나 | **지금은 `getToken()`(등록 토큰) 유지.** FID(`register()`)로 옮길 땐 백엔드가 서버를 `fid` 칸으로 먼저 고치고 실기기 확인 뒤 알림 → 고객앱·라이더앱을 같이 옮긴다. 앱 고칠 것 없음 |
+
+- 함께 받은 소식: 2026-11-18 Firebase 를 `pmart-123` 으로 합침 → 고객앱은 새 `google-services.json` 으로 다시 빌드(할 일 28), 옛 프로젝트 단말 토큰은 로그인 뒤 앱이 다시 등록.
+- 이 문서는 실기기 확인(§2) 결과를 덧붙인 뒤 `archive/` 로 옮긴다.
