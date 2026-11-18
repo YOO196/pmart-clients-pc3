@@ -30,6 +30,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `mfc-app/2026-11-17-backend-pick-reject-reason.md` | 실적 거절 사유(`rejectCode`·`rejectReason`)를 실행 조회·응답에(E1~E3) — 지금은 PDA 가 거절 이유를 못 보인다 |
 | `mfc-app/2026-11-17-backend-lot-label.md` | LOT 라벨(QR·자체 스티커) 형식·발급·재출력·해석(L1~L6) — 피킹에서 LOT 를 찍어 선입선출 확인 |
 | `mfc-app/2026-11-17-backend-shipment-ready-at-npe.md` | **버그(급함)** 출고 조회 `GET /shipments/{id}` 가 READY 전(`ready_at` NULL)이면 500 — `TaskStore.shipmentReadyAt` NPE, 패킹 화면이 안 열림(S1·S2) |
+| `mfc-app/2026-11-18-backend-pick-then-pack-same-worker.md` | **급함** 피킹을 끝낸 사람에게 그 주문 PACK 을 먼저(R1~R3) — 지금은 다음 작업이 다른 주문 PICK 이라 한 주문 피패킹을 이어 갈 수 없다 |
 | `mfc-backoffice/2026-11-17-backend-lists-and-roles.md` | MFC 센터 관리자 웹 — 목록 API 전부(MB-1, 품질 대기 → 실사 → 입고 → 센터 재고·지난 추천 순), 품질 사고 구현(MB-2), 권한 결정(MB-3: 확인 필요 포장 관리자 허용, 정정·칸 변경 관리자만, 상품 취급 관리자+MD) |
 | `backoffice/2026-11-16-backend-pii-reveal-and-pending-done.md` | 주문 개인정보 열람·처리 대기 — LAN 조회 화면은 확인(2026-11-16 PC 2), 원문 열람은 실서버에서 아직 안 눌러 봄 |
 | `all/2026-11-16-backend-login-code-pc1-only-done.md` | 클라이언트 표(경로 보탬) 확인 |
