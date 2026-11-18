@@ -10,7 +10,9 @@ import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../orders/presentation/orders_providers.dart'
     show orderListProvider, orderStatusText;
+import '../../orders/domain/orders.dart' show OrderListQuery;
 import '../domain/inquiry.dart';
+import 'faq_screens.dart' show SupportFaqBlock;
 import 'inquiry_controller.dart';
 
 String inquiryCategoryText(AppLocalizations l10n, InquiryCategory? c) =>
@@ -39,6 +41,8 @@ class InquiryFormArgs {
     this.orderId,
     this.bodyDraft,
     this.origin = InquiryOrigin.inquiryPage,
+    this.deliveryIssue,
+    this.deliveryId,
   });
 
   final String? orderId;
@@ -46,7 +50,17 @@ class InquiryFormArgs {
   /// 본문 초안(AI 상담에서 넘어올 때 고객이 한 질문 — 고칠 수 있다).
   final String? bodyDraft;
   final InquiryOrigin origin;
+
+  /// 배송 신고로 왔으면 그 종류(주문 도움말 화면에서). 종류는 배송·주문은 고정.
+  final DeliveryIssue? deliveryIssue;
+  final String? deliveryId;
 }
+
+String deliveryIssueText(AppLocalizations l10n, DeliveryIssue i) => switch (i) {
+  DeliveryIssue.delayed => l10n.inqIssueDelayed,
+  DeliveryIssue.notReceived => l10n.inqIssueNotReceived,
+  DeliveryIssue.misdelivered => l10n.inqIssueMisdelivered,
+};
 
 /// 고객센터 메인. 레퍼런스 "문의하기"(큰 제목 + 화살표 줄) 모양을 따른다.
 /// 상담사 실시간 연결은 없다(2026-11-09 결정) — 문의 남기기로 받는다.
@@ -69,6 +83,8 @@ class SupportScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          // 검색칸 · 자주 묻는 질문 · 분류 칩(회원만 — 레퍼런스 고객센터 메인).
+          const SupportFaqBlock(),
           SupportRow(
             key: const ValueKey('support-chat'),
             label: l10n.supportChat,
@@ -368,7 +384,7 @@ class _OrderPickerSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final page = ref.watch(orderListProvider(null));
+    final page = ref.watch(orderListProvider(const OrderListQuery()));
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -427,8 +443,9 @@ class _OrderPickerSheet extends ConsumerWidget {
                         key: const ValueKey('inq-pick-error'),
                       ),
                       TextButton(
-                        onPressed: () =>
-                            ref.invalidate(orderListProvider(null)),
+                        onPressed: () => ref.invalidate(
+                          orderListProvider(const OrderListQuery()),
+                        ),
                         child: Text(l10n.chatRetry),
                       ),
                     ],
@@ -476,8 +493,12 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
   @override
   void initState() {
     super.initState();
-    // 주문에서 들어오면 종류를 비워 두지 않는다(고객이 바꿀 수 있다).
-    if (_orderId != null) _category = InquiryCategory.order;
+    // 주문에서 들어오면 종류를 비워 두지 않는다(고객이 바꿀 수 있다). 배송 신고는 배송으로 고정한다(계약).
+    if (widget.args.deliveryIssue != null) {
+      _category = InquiryCategory.delivery;
+    } else if (_orderId != null) {
+      _category = InquiryCategory.order;
+    }
     _body.addListener(_changed);
   }
 
@@ -523,6 +544,10 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
         orderId: _orderId,
         title: title.isEmpty ? null : title,
         origin: widget.args.origin,
+        deliveryIssue: widget.args.deliveryIssue,
+        deliveryId: widget.args.deliveryIssue == null
+            ? null
+            : widget.args.deliveryId,
       ),
     );
     if (!mounted) return;
@@ -540,6 +565,7 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
           _unknown = false;
           _message = switch (code) {
             InquiryProblemCode.orderNotFound => l10n.inqOrderNotFound,
+            InquiryProblemCode.orderNotInProgress => l10n.inqOrderNotInProgress,
             _ when status == 403 => l10n.inqLoginNeeded,
             _ => l10n.inqRejected,
           };
@@ -559,6 +585,9 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
     final theme = Theme.of(context);
     final member = ref.watch(sessionProvider) is MemberSession;
     final locked = _busy || _unknown;
+    final issue = widget.args.deliveryIssue;
+    // 배송 신고는 종류(배송)·주문을 바꾸지 않는다 — 서버가 DELIVERY + 주문을 요구한다.
+    final fixed = locked || issue != null;
     return Scaffold(
       appBar: AppBar(title: Text(l10n.supportNewInquiry)),
       body: !member
@@ -566,6 +595,16 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                if (issue != null) ...[
+                  Text(
+                    deliveryIssueText(l10n, issue),
+                    key: const ValueKey('inq-issue'),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 Text(
                   l10n.inqCategoryLabel,
                   style: theme.textTheme.titleSmall?.copyWith(
@@ -582,7 +621,7 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
                         key: ValueKey('inq-cat-${c.name}'),
                         label: Text(inquiryCategoryText(l10n, c)),
                         selected: _category == c,
-                        onSelected: locked
+                        onSelected: fixed
                             ? null
                             : (_) => setState(() => _category = c),
                       ),
@@ -595,7 +634,7 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
                     child: InputChip(
                       key: const ValueKey('inq-order'),
                       label: Text(l10n.inqOrderChosen(orderId)),
-                      onDeleted: locked
+                      onDeleted: fixed
                           ? null
                           : () => setState(() => _orderId = null),
                     ),

@@ -591,6 +591,12 @@ class _CartSummaryBar extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // 최소 주문 금액 안내(cart 0.2.0, 레퍼런스 5-1). 서버 부족액이 있을 때만 — 없으면(null) 바를 숨긴다.
+              // 안내용이라 주문 버튼을 막지 않는다(최종 판정은 주문서 견적).
+              if (cart.hasSelectedPurchasable)
+                if ((cart.minOrderAmount, cart.minOrderShortfall)
+                    case (final int min, final int short) when short > 0)
+                  _MinOrderBar(min: min, shortfall: short),
               Row(
                 children: [
                   Text(
@@ -657,6 +663,55 @@ class _CartSummaryBar extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// "15,000원부터 배달 가능해요 / N원 더 담으면 주문할 수 있어요" + 진행 바(레퍼런스 5-1). 금액은 서버 값 그대로.
+class _MinOrderBar extends StatelessWidget {
+  const _MinOrderBar({required this.min, required this.shortfall});
+
+  final int min;
+  final int shortfall;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Padding(
+      key: const ValueKey('cart-min-order'),
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            l10n.cartMinOrderTitle(formatKrw(min)),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.error,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            l10n.cartMinOrderShortfall(formatKrw(shortfall)),
+            key: const ValueKey('cart-min-order-shortfall'),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              key: const ValueKey('cart-min-order-bar'),
+              value: ((min - shortfall) / min).clamp(0.0, 1.0),
+              minHeight: 5,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }

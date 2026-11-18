@@ -80,6 +80,8 @@ class Cart {
     required this.lines,
     this.mfcId,
     this.selectedItemAmount,
+    this.minOrderAmount,
+    this.minOrderShortfall,
     this.expiresAt,
     this.sources = const [],
   });
@@ -94,6 +96,12 @@ class Cart {
 
   /// 서버가 준 선택 품목 표시 합계(견적 아님). 없으면 null. 앱에서 더하지 않는다.
   final int? selectedItemAmount;
+
+  /// 최소 주문 금액(cart 0.2.0, 안내용 — 최종 판정은 주문서 견적).
+  final int? minOrderAmount;
+
+  /// 최소 주문까지 모자란 금액 = max(0, 최소 − 선택 합계)(서버 값). 가격 모르는 줄이 있으면 null — 바를 숨긴다(0 으로 바꾸지 않는다).
+  final int? minOrderShortfall;
   final DateTime? expiresAt;
 
   /// 표시용 사본의 원천별 신선도(계약 `Cart.sources`). 어느 원천을 못 받았는지 안내에 쓴다.
@@ -130,6 +138,8 @@ class Cart {
       lines: next,
       mfcId: mfcId,
       selectedItemAmount: null,
+      minOrderAmount: minOrderAmount,
+      minOrderShortfall: null,
       expiresAt: expiresAt,
       sources: sources,
     );

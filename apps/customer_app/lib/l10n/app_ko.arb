@@ -594,7 +594,7 @@
   "ordersTitle": "주문 내역",
   "ordersEmpty": "주문 내역이 없어요",
   "ordersLoginNeeded": "주문 내역을 보려면 로그인이 필요해요",
-  "ordersItemCount": "상품 {count}종",
+  "ordersItemCount": "상품 {count}개",
   "@ordersItemCount": {
     "placeholders": {
       "count": {
@@ -854,6 +854,66 @@
   "cartFeeMinOrderNote": "배달팁·봉투값은 최소 주문 금액에 들어가지 않아요. 정확한 금액은 배송 방식을 고른 뒤 주문서에서 확인해요.",
   "ordersFilterAll": "전체",
   "ordersEmptyFiltered": "이 상태의 주문이 없어요",
+  "ordersEmptySearch": "조건에 맞는 주문이 없어요",
+  "consentVersionChanged": "그 사이 약관이 바뀌었어요. 다시 확인해 주세요",
+  "marketingConsentFailed": "마케팅 정보 수신 동의를 바꾸지 못했어요. 다시 시도해 주세요",
+  "marketingConsentLoadFailed": "동의 상태를 불러오지 못했어요",
+  "oosRemember": "다음에도 적용",
+  "oosRememberFailed": "'다음에도 적용'을 저장하지 못했어요. 이번 주문은 고른 대로 진행돼요",
+  "faqTitle": "자주 묻는 질문",
+  "faqSearchHint": "궁금한 점을 검색해 보세요",
+  "faqEmpty": "찾는 질문이 없어요. 다른 말로 검색하거나 문의를 남겨 주세요",
+  "faqLoadFailed": "자주 묻는 질문을 불러오지 못했어요",
+  "faqRetry": "다시 시도",
+  "faqLoginNeeded": "자주 묻는 질문은 로그인하면 볼 수 있어요",
+  "orderHelpTitle": "무엇을 도와드릴까요?",
+  "orderHelpOther": "그 외 문의가 있어요",
+  "inqIssueDelayed": "배달이 늦어지고 있어요",
+  "inqIssueNotReceived": "상품을 받지 못했어요",
+  "inqIssueMisdelivered": "입력한 주소와 다른 곳으로 배달됐어요",
+  "inqOrderNotInProgress": "진행 중인 주문만 지연 신고를 할 수 있어요. 받지 못했다면 '상품을 받지 못했어요'로 남겨 주세요",
+  "cartMinOrderTitle": "{amount}부터 배달 가능해요",
+  "@cartMinOrderTitle": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "cartMinOrderShortfall": "{amount} 더 담으면 주문할 수 있어요",
+  "@cartMinOrderShortfall": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "ordersSearch": "검색",
+  "ordersSearchHint": "상품명으로 검색",
+  "ordersPeriod": "조회 기간",
+  "ordersPeriod3m": "최근 3개월",
+  "ordersPeriod6m": "최근 6개월",
+  "ordersPeriod1y": "최근 1년",
+  "ordersPeriodAll": "전체 기간",
+  "ordersRepresentative": "{name} 외 {count}개",
+  "@ordersRepresentative": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+  "ordersRepresentativeOnly": "{name} {count}개",
+  "@ordersRepresentativeOnly": {
+    "placeholders": {
+      "name": {"type": "String"},
+      "count": {"type": "int"}
+    }
+  },
+  "ordersHide": "삭제",
+  "ordersHideTitle": "주문 내역을 삭제할까요?",
+  "ordersHideBody": "삭제한 주문은 주문 내역에서 보이지 않고 되돌릴 수 없어요. 처리 내역·문의는 그대로 남아요",
+  "ordersHideConfirm": "삭제하기",
+  "ordersHideCancel": "취소",
+  "ordersHideDone": "주문 내역에서 삭제했어요",
+  "ordersHideAccepted": "삭제를 처리하고 있어요. 잠시 뒤 다시 확인해 주세요",
+  "ordersHideNotFinished": "배송이 끝난 주문만 삭제할 수 있어요",
+  "ordersHideFailed": "삭제하지 못했어요. 다시 시도해 주세요",
   "orderPaymentMethod": "결제 수단",
   "orderPaymentMethodNone": "정보 없음",
   "orderPaymentMethodChecking": "확인 중",

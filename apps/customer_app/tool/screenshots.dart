@@ -360,6 +360,20 @@ void main() {
     await shot('inquiries');
     await go('/support/inquiries/inq-seed-1');
     await shot('inquiry-detail');
+    // 주문 문의하기 → 무엇을 도와드릴까요?(레퍼런스 9-2 3-1) → 배송 신고(case deliveryIssue)
+    await go('/orders/order-seed-4/help');
+    await shot('order-help');
+    await t.tap(find.byKey(const ValueKey('order-help-delayed')));
+    await t.pumpAndSettle();
+    await shot('inquiry-delivery-issue');
+    // 자주 묻는 질문(customer-assistant 0.2.0) — 목록 · 답(마크다운)
+    await go('/support/faqs');
+    await shot('faq-list');
+    await go('/support/faqs/faq-cancel-1');
+    await shot('faq-detail');
+    // 로그인해 있는 고객의 재동의(CU-1 §3)
+    await go('/me/consents/reconsent');
+    await shot('reconsent');
     // 상담 종류 고르기(레퍼런스 고객센터 2-1) → 주문 건 문의의 최근 주문(2-4)
     await go('/support/chat');
     await shot('chat');

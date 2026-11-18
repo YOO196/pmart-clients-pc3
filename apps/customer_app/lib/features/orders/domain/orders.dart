@@ -2,7 +2,12 @@ import 'package:flutter/foundation.dart';
 
 import '../../../shared/order_status.dart';
 import '../../checkout/domain/checkout.dart'
-    show ArrivalWindow, OutOfStockPreference, Quote, ShippingAddress;
+    show
+        ArrivalWindow,
+        DeliveryMode,
+        OutOfStockPreference,
+        Quote,
+        ShippingAddress;
 
 @immutable
 class OrderListItem {
@@ -13,6 +18,9 @@ class OrderListItem {
     this.orderedAt,
     this.totalAmount,
     this.itemCount,
+    this.deliveryMode,
+    this.representativeName,
+    this.representativeQty,
   });
 
   final String orderId;
@@ -22,7 +30,78 @@ class OrderListItem {
   final OrderStatus status;
   final DateTime? orderedAt;
   final int? totalAmount;
+
+  /// 주문행 수량 합(계약 `itemCount`).
   final int? itemCount;
+
+  /// 배송 방식(order 0.12.0). 모르는 값·없음은 null — 칸을 숨긴다.
+  final DeliveryMode? deliveryMode;
+
+  /// 대표 상품(첫 주문 행)의 주문 당시 상품명 사본(order 0.12.0). 2026-11-02 전 주문은 null → "상품 N개".
+  final String? representativeName;
+
+  /// 대표 상품의 주문 수량.
+  final int? representativeQty;
+
+  /// "<대표 상품> 외 N개"의 N — 다른 상품 수량 합(`itemCount` − 대표 수량). 둘 중 하나라도 없으면 null.
+  int? get othersQty => switch ((itemCount, representativeQty)) {
+    (final int all, final int rep) when all >= rep => all - rep,
+    _ => null,
+  };
+
+  /// 끝난 주문만 숨길 수 있다(order 0.12.0 — 그 밖 409 `ORDER_NOT_FINISHED`, 최종 판정은 서버).
+  bool get canHide => switch (status) {
+    OrderStatus.completed ||
+    OrderStatus.cancelled ||
+    OrderStatus.expired => true,
+    _ => false,
+  };
+}
+
+/// 주문 내역 조회 기간. 서버 기본(조건 없음)은 최근 3개월이다(order 0.12.0).
+enum OrderPeriod { months3, months6, year1, all }
+
+/// 주문 내역 조회 조건. 다음 쪽도 같은 조건으로 묻는다.
+@immutable
+class OrderListQuery {
+  const OrderListQuery({
+    this.status,
+    this.period = OrderPeriod.months3,
+    this.q,
+  });
+
+  /// null 이면 전체 상태.
+  final OrderStatus? status;
+  final OrderPeriod period;
+
+  /// 상품명 검색어(앞뒤 공백 제거, 비면 null).
+  final String? q;
+
+  @override
+  bool operator ==(Object other) =>
+      other is OrderListQuery &&
+      other.status == status &&
+      other.period == period &&
+      other.q == q;
+
+  @override
+  int get hashCode => Object.hash(status, period, q);
+}
+
+/// 기간 → 서버 `from`(Asia/Seoul 날짜 `yyyy-MM-dd`). 3개월은 서버 기본이라 보내지 않는다(null).
+/// 전체는 서버 안내대로 오래전 날짜를 보낸다(2026-11-18 백엔드 알림 §3).
+String? orderPeriodFrom(OrderPeriod p, DateTime seoulToday) {
+  DateTime monthsAgo(int m) =>
+      DateTime(seoulToday.year, seoulToday.month - m, seoulToday.day);
+  final from = switch (p) {
+    OrderPeriod.months3 => null,
+    OrderPeriod.months6 => monthsAgo(6),
+    OrderPeriod.year1 => monthsAgo(12),
+    OrderPeriod.all => DateTime(2020),
+  };
+  if (from == null) return null;
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${from.year}-${two(from.month)}-${two(from.day)}';
 }
 
 @immutable

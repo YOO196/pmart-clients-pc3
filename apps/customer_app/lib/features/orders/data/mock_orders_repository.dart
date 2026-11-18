@@ -5,6 +5,7 @@ import 'package:pmart_api_delivery_tracking/pmart_api_delivery_tracking.dart'
     as trk;
 import 'package:pmart_api_order/pmart_api_order.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
+import 'package:pmart_ui/pmart_ui.dart' show toSeoulWallClock;
 
 import '../../checkout/data/mock_checkout_repository.dart';
 import '../../checkout/domain/checkout.dart'
@@ -359,31 +360,110 @@ base class MockOrdersRepository implements OrdersRepository {
   /// 현재 주문 JSON(취소 목 등에서 고쳐 쓴다).
   Map<String, Object?>? orderJson(String orderId) => _all()[orderId];
 
+  /// 목록 조회에 쓴 기간·검색 조건(순서대로).
+  final listQueries = <({String? from, String? q})>[];
+
+  /// 숨긴 주문(서버가 목록에서 뺀 것).
+  final hidden = <String>{};
+
+  /// 숨기기에 보낸 키(주문 ID → 키).
+  final hideKeys = <String, String>{};
+
+  /// 다음 목록 조회를 실패시킨다(시험용).
+  bool failNextList = false;
+
   @override
-  Future<OrderPage> list({String? cursor, OrderStatus? status}) async {
+  Future<OrderPage> list({
+    String? cursor,
+    OrderStatus? status,
+    String? from,
+    String? q,
+  }) async {
     await _wait();
     listStatuses.add(status);
+    listQueries.add((from: from, q: q));
+    if (failNextList) {
+      failNextList = false;
+      throw const UnknownResultFailure();
+    }
     final all = _all();
     // 서버 흉내: status 를 주면 그 상태만(계약 `GET /orders?status=`).
     final wire = orderStatusToWire(status)?.value;
+    // 서버 흉내(order 0.12.0): from 이 없으면 최근 3개월(확정 시각, Asia/Seoul 날짜), q 는 상품명 부분 일치.
+    final seoul = toSeoulWallClock(now());
+    final fromDate = switch (from) {
+      final f? => DateTime.parse(f),
+      null => DateTime(seoul.year, seoul.month - 3, seoul.day),
+    };
+    final needle = q?.trim().toLowerCase();
+    bool matches(Map<String, Object?> o) =>
+        needle == null ||
+        needle.isEmpty ||
+        (o['lines']! as List).any(
+          (l) =>
+              ((l as Map)['productName'] as String?)?.toLowerCase().contains(
+                needle,
+              ) ??
+              false,
+        );
+    String orderedAt(String id) =>
+        _orderedAt[id] ?? now().toUtc().toIso8601String();
     return orderPageFromContract(
       api.ListOrders200Response.fromJson({
         'items': [
           for (final e in all.entries)
-            if (wire == null || e.value['status'] == wire)
+            if ((wire == null || e.value['status'] == wire) &&
+                !hidden.contains(e.key) &&
+                !toSeoulWallClock(DateTime.parse(orderedAt(e.key)))
+                    .isBefore(fromDate) &&
+                matches(e.value))
               {
                 'orderId': e.key,
                 'orderNumber': e.value['orderNumber'],
                 'status': e.value['status'],
-                'orderedAt':
-                    _orderedAt[e.key] ?? now().toUtc().toIso8601String(),
+                'orderedAt': orderedAt(e.key),
                 'totalAmount': (e.value['quote']! as Map)['totalAmount'],
-                'itemCount': (e.value['lines']! as List).length,
+                'itemCount': [
+                  for (final l in e.value['lines']! as List)
+                    (l as Map)['originalQty'] as int? ?? 0,
+                ].fold<int>(0, (a, b) => a + b),
+                'deliveryMode': e.value['deliveryMode'],
+                if ((e.value['lines']! as List).firstOrNull
+                    case final Map<String, Object?> first)
+                  'representativeItem': {
+                    'productId': first['productId'],
+                    'sku': first['sku'],
+                    'productName': first['productName'],
+                    'quantity': first['originalQty'],
+                  },
               },
         ],
         'page': {'nextCursor': null, 'size': 50},
       }),
     );
+  }
+
+  @override
+  Future<CommandStatus> hide(
+    String orderId, {
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    final json = _all()[orderId];
+    if (json == null) {
+      throw const ProblemFailure(
+        Problem(status: 404, code: ProblemCode.notFound),
+      );
+    }
+    hideKeys[orderId] = key.value;
+    // 서버 흉내: 끝난 주문(COMPLETED·CANCELLED·EXPIRED)만.
+    if (!const {'COMPLETED', 'CANCELLED', 'EXPIRED'}.contains(json['status'])) {
+      throw const ProblemFailure(
+        Problem(status: 409, code: 'ORDER_NOT_FINISHED'),
+      );
+    }
+    hidden.add(orderId);
+    return CommandStatus.applied;
   }
 
   @override

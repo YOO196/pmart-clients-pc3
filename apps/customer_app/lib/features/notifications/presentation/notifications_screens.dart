@@ -7,6 +7,8 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_screens.dart' show LoginRequired;
+import '../../profile/presentation/consents_screens.dart'
+    show MarketingConsentTile;
 import '../domain/notifications.dart';
 import 'notifications_controller.dart';
 
@@ -363,11 +365,6 @@ class _SettingsBody extends ConsumerWidget {
       OsPermission.denied => l10n.noticeValueDenied,
       OsPermission.unknown || null => l10n.noticeValueUnknown,
     };
-    String consent(MarketingConsent? v) => switch (v) {
-      MarketingConsent.agreed => l10n.noticeValueAgreed,
-      MarketingConsent.withdrawn => l10n.noticeValueWithdrawn,
-      MarketingConsent.unknown || null => l10n.noticeValueUnknown,
-    };
     return ListView(
       children: [
         if (byCategory.isEmpty)
@@ -397,11 +394,8 @@ class _SettingsBody extends ConsumerWidget {
           title: Text(l10n.noticeOsPermission),
           trailing: Text(os(settings.osPermission)),
         ),
-        ListTile(
-          key: const ValueKey('settings-marketing-consent'),
-          title: Text(l10n.noticeMarketingConsent),
-          trailing: Text(consent(settings.marketingConsent)),
-        ),
+        // 마케팅 동의는 customer 의 내 동의(MARKETING)로 켜고 끈다 — notification 의 값은 아직 UNKNOWN(CU-1 §3).
+        const MarketingConsentTile(),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           child: Text(

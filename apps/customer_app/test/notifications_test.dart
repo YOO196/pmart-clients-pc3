@@ -295,7 +295,15 @@ void main() {
       expect(t.widget<Switch>(sw('order-appPush')).onChanged, isNull);
       expect(on(t, 'order-appPush'), isTrue);
       expect(t.widget<Switch>(sw('marketing-appPush')).onChanged, isNotNull);
-      expect(find.text('동의 안 함'), findsOneWidget);
+      // 마케팅 동의는 customer 내 동의(MARKETING)의 스위치다(CU-1 §3) — 목 기본값은 꺼짐.
+      expect(
+        t
+            .widget<SwitchListTile>(
+              find.byKey(const ValueKey('settings-marketing-consent')),
+            )
+            .value,
+        isFalse,
+      );
       expect(find.text('알 수 없음'), findsOneWidget);
     });
 

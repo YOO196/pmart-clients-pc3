@@ -73,6 +73,8 @@ dependencies:
   # Android 만, 설정은 android/app/google-services.json(git 제외)에서 읽는다(FlutterFire CLI 안 씀).
   firebase_core: ^5.2.0
   firebase_messaging: ^17.1.0
+  # FAQ 답(customer-assistant 0.2.0 `answer` 마크다운) 그리기 — flutter_markdown(지원 종료)의 후속. 사용자 결정 2026-11-18.
+  flutter_markdown_plus: ^1.0.12
 
 dev_dependencies:
   flutter_test:

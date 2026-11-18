@@ -46,11 +46,16 @@ base class _OrdersDown extends MockOrdersRepository {
   final Set<OrderStatus>? down;
 
   @override
-  Future<OrderPage> list({String? cursor, OrderStatus? status}) {
+  Future<OrderPage> list({
+    String? cursor,
+    OrderStatus? status,
+    String? from,
+    String? q,
+  }) {
     if (down == null || down!.contains(status)) {
       throw const NetworkFailure(DioExceptionType.connectionError);
     }
-    return super.list(cursor: cursor, status: status);
+    return super.list(cursor: cursor, status: status, from: from, q: q);
   }
 }
 

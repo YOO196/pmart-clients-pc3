@@ -166,6 +166,9 @@ base class MockCartRepository implements CartRepository {
       'mfcId': noMfc ? null : 'MFC-BSJ-01',
       'items': items,
       'selectedItemAmount': amount,
+      // 서버 흉내(cart 0.2.0): 최소 15,000원, 부족액 = max(0, 최소 − 선택 합계).
+      'minOrderAmount': 15000,
+      'minOrderShortfall': (15000 - amount).clamp(0, 15000),
       'lastChangedAt': '2026-10-24T06:00:00Z',
       'expiresAt': '2026-11-23T06:00:00Z',
       'sources': [

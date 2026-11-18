@@ -151,6 +151,8 @@ Cart cartFromContract(api.Cart c) => Cart(
   isMember: c.ownerType == api.CartOwnerTypeEnum.MEMBER,
   mfcId: c.mfcId,
   selectedItemAmount: c.selectedItemAmount,
+  minOrderAmount: c.minOrderAmount,
+  minOrderShortfall: c.minOrderShortfall,
   expiresAt: c.expiresAt,
   sources: [
     for (final s in c.sources ?? const <api.CartSourcesInner>[])

@@ -3,14 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pmart_core/pmart_core.dart' show PmartFailure;
+import 'package:pmart_core/pmart_core.dart'
+    show
+        CommandStatus,
+        IdempotencyKey,
+        PmartFailure,
+        ProblemFailure,
+        UnknownResultFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../checkout/presentation/delivery_select_screen.dart'
-    show windowText;
+    show modeLabel, windowText;
 import '../../checkout/presentation/order_sheet_screen.dart' show tipReasonText;
 import '../../checkout/presentation/shipping_address_view.dart';
 import '../../claims/domain/claims.dart';
@@ -23,7 +29,8 @@ import '../../cart/domain/cart.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../cart/presentation/cart_messages.dart';
 import '../../checkout/domain/checkout.dart' show OutOfStockPreference;
-import '../data/orders_repository.dart' show OrdersRepository;
+import '../data/orders_repository.dart'
+    show OrdersRepository, orderNotFinishedCode;
 import '../domain/orders.dart';
 import '../domain/tracking.dart';
 import 'orders_providers.dart';
@@ -39,6 +46,7 @@ String _money(AppLocalizations l10n, int? v) => switch (v) {
 };
 
 /// SCR-ORDER-LIST-001. 조회 실패를 "주문 없음"으로 보이지 않는다.
+/// 위 줄: 검색 · 조회 기간 · 상태(레퍼런스 9-1 "주문내역"). 기간 기본은 서버 기본(최근 3개월, order 0.12.0).
 class OrderListScreen extends ConsumerStatefulWidget {
   const OrderListScreen({super.key});
 
@@ -49,11 +57,166 @@ class OrderListScreen extends ConsumerStatefulWidget {
 class _OrderListScreenState extends ConsumerState<OrderListScreen> {
   /// 상태 필터. null 이면 전체. 서버에 `status` 로 묻는다(앱에서 거르지 않는다).
   OrderStatus? _status;
+  OrderPeriod _period = OrderPeriod.months3;
+
+  /// 적용한 상품명 검색어(서버 `q`). null 이면 검색 안 함.
+  String? _q;
+  bool _searching = false;
+  final _searchCtl = TextEditingController();
+
+  /// 숨기기 진행 중인 주문(버튼 비활성).
+  final _hiding = <String>{};
+
+  OrderListQuery get _query =>
+      OrderListQuery(status: _status, period: _period, q: _q);
+
+  @override
+  void dispose() {
+    _searchCtl.dispose();
+    super.dispose();
+  }
+
+  String _periodText(AppLocalizations l10n, OrderPeriod p) => switch (p) {
+    OrderPeriod.months3 => l10n.ordersPeriod3m,
+    OrderPeriod.months6 => l10n.ordersPeriod6m,
+    OrderPeriod.year1 => l10n.ordersPeriod1y,
+    OrderPeriod.all => l10n.ordersPeriodAll,
+  };
+
+  Future<void> _pickPeriod(AppLocalizations l10n) async {
+    final picked = await showModalBottomSheet<OrderPeriod>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text(
+                l10n.ordersPeriod,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            for (final p in OrderPeriod.values)
+              ListTile(
+                key: ValueKey('orders-period-${p.name}'),
+                title: Text(_periodText(l10n, p)),
+                trailing: p == _period ? const Icon(Icons.check) : null,
+                onTap: () => Navigator.of(context).pop(p),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (picked != null && picked != _period) setState(() => _period = picked);
+  }
+
+  void _applySearch() {
+    final q = _searchCtl.text.trim();
+    setState(() => _q = q.isEmpty ? null : q);
+  }
+
+  void _closeSearch() {
+    _searchCtl.clear();
+    setState(() {
+      _searching = false;
+      _q = null;
+    });
+  }
+
+  /// 숨기기: 확인 창 → `POST /orders/{id}/hides`. 결과를 모르면 같은 키로 한 번 더 보낸다(계약: 같은 키는 같은 결과).
+  Future<void> _hide(AppLocalizations l10n, OrderListItem o) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.ordersHideTitle),
+        content: Text(l10n.ordersHideBody),
+        actions: [
+          TextButton(
+            key: const ValueKey('orders-hide-cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.ordersHideCancel),
+          ),
+          FilledButton(
+            key: const ValueKey('orders-hide-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.ordersHideConfirm),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _hiding.add(o.orderId));
+    final repo = ref.read(ordersRepositoryProvider);
+    final key = IdempotencyKey.generate();
+    String message;
+    try {
+      CommandStatus status;
+      try {
+        status = await repo.hide(o.orderId, key: key);
+      } on UnknownResultFailure {
+        status = await repo.hide(o.orderId, key: key);
+      }
+      message = switch (status) {
+        CommandStatus.applied => l10n.ordersHideDone,
+        CommandStatus.accepted => l10n.ordersHideAccepted,
+        _ => l10n.ordersHideFailed,
+      };
+    } on ProblemFailure catch (f) {
+      message = f.problem.code == orderNotFinishedCode
+          ? l10n.ordersHideNotFinished
+          : l10n.ordersHideFailed;
+    } on PmartFailure {
+      message = l10n.ordersHideFailed;
+    }
+    if (!mounted) return;
+    setState(() => _hiding.remove(o.orderId));
+    // 서버 목록이 정본이다. 숨겼든 못 했든 다시 읽는다.
+    ref.invalidate(orderListProvider);
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Widget _pill({
+    required Key key,
+    required Widget label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Material(
+        key: key,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: selected ? scheme.onSurface : scheme.outlineVariant,
+          ),
+        ),
+        color: scheme.surface,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: DefaultTextStyle.merge(
+              style: Theme.of(context).textTheme.bodyMedium,
+              child: label,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final provider = orderListProvider(_status);
+    final provider = orderListProvider(_query);
     final value = ref.watch(provider);
     final filters = SizedBox(
       height: 50,
@@ -61,6 +224,32 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         children: [
+          _pill(
+            key: const ValueKey('orders-search-open'),
+            selected: _q != null,
+            onTap: () => setState(() => _searching = true),
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const PmartLineIcon(PmartLineIcons.search, size: 16),
+                const SizedBox(width: 4),
+                Text(_q ?? l10n.ordersSearch),
+              ],
+            ),
+          ),
+          _pill(
+            key: const ValueKey('orders-period'),
+            selected: _period != OrderPeriod.months3,
+            onTap: () => _pickPeriod(l10n),
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_periodText(l10n, _period)),
+                const SizedBox(width: 2),
+                const Icon(Icons.keyboard_arrow_down, size: 18),
+              ],
+            ),
+          ),
           for (final s in <OrderStatus?>[null, ...orderListFilters])
             Padding(
               padding: const EdgeInsets.only(right: 6),
@@ -95,6 +284,43 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         ),
         _ => Column(
           children: [
+            if (_searching)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 6, 6, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        key: const ValueKey('orders-search-field'),
+                        controller: _searchCtl,
+                        autofocus: true,
+                        maxLength: 100,
+                        textInputAction: TextInputAction.search,
+                        decoration: InputDecoration(
+                          hintText: l10n.ordersSearchHint,
+                          counterText: '',
+                          isDense: true,
+                          prefixIcon: const Padding(
+                            padding: EdgeInsets.all(10),
+                            child: PmartLineIcon(
+                              PmartLineIcons.search,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                        onSubmitted: (_) => _applySearch(),
+                      ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('orders-search-close'),
+                      icon: const Icon(Icons.close),
+                      tooltip: MaterialLocalizations.of(context)
+                          .closeButtonTooltip,
+                      onPressed: _closeSearch,
+                    ),
+                  ],
+                ),
+              ),
             filters,
             Expanded(
               child: ColoredBox(
@@ -108,7 +334,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     );
   }
 
-  /// 주문 카드 한 장: 상태 · "주문 상세" 알약 / 주문 시각(크게) / 상품 수 · 금액.
+  /// 주문 카드 한 장: 배송 방식·상태 · "주문 상세" 알약 / 주문 시각(크게) / 대표 상품 · 금액 / (끝난 주문) 삭제.
   Widget _orderCard(
     BuildContext context,
     AppLocalizations l10n,
@@ -116,16 +342,35 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
   ) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final mode = o.deliveryMode;
+    final summary = switch ((o.representativeName, o.othersQty)) {
+      (final String name, final int others) when others > 0 =>
+        l10n.ordersRepresentative(name, others),
+      (final String name, _) when o.representativeQty != null =>
+        l10n.ordersRepresentativeOnly(name, o.representativeQty!),
+      (final String name, _) => name,
+      // 2026-11-02 전 주문은 상품명 사본이 없다 → "상품 N개".
+      (null, _) when o.itemCount != null => l10n.ordersItemCount(o.itemCount!),
+      _ => null,
+    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
+            if (mode != null)
+              Text(
+                '${modeLabel(l10n, mode)} · ',
+                key: ValueKey('order-mode-${o.orderId}'),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             Expanded(
               child: Text(
                 orderStatusText(l10n, o.status),
                 style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: mode == null ? FontWeight.w800 : FontWeight.w500,
                 ),
               ),
             ),
@@ -155,21 +400,42 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         const SizedBox(height: 6),
         Row(
           children: [
-            if (o.itemCount case final n?)
+            if (summary != null)
               Expanded(
                 child: Text(
-                  l10n.ordersItemCount(n),
+                  summary,
+                  key: ValueKey('order-summary-${o.orderId}'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium,
                 ),
               )
             else
               const Spacer(),
+            const SizedBox(width: 8),
             Text(
               _money(l10n, o.totalAmount),
               style: theme.textTheme.titleSmall,
             ),
           ],
         ),
+        if (o.canHide)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              key: ValueKey('order-hide-${o.orderId}'),
+              style: TextButton.styleFrom(
+                foregroundColor: scheme.onSurfaceVariant,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: _hiding.contains(o.orderId)
+                  ? null
+                  : () => _hide(l10n, o),
+              child: Text(l10n.ordersHide),
+            ),
+          ),
       ],
     );
   }
@@ -178,46 +444,65 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     AppLocalizations l10n,
     FutureProvider<OrderPage?> provider,
     AsyncValue<OrderPage?> value,
-  ) => UiStateView<OrderPage?>(
-    state: uiStateOf(value, isEmpty: (p) => p!.items.isEmpty),
-    onRetry: () => ref.invalidate(provider),
-    // 필터가 걸려 있으면 "주문 없음"이 아니라 "이 상태의 주문 없음"이다.
-    empty: (_) => Center(
-      key: ValueKey(_status == null ? 'orders-empty' : 'orders-empty-filtered'),
-      child: Text(
-        _status == null ? l10n.ordersEmpty : l10n.ordersEmptyFiltered,
+  ) {
+    final filtered = _status != null;
+    final narrowed = _q != null || _period != OrderPeriod.months3;
+    return UiStateView<OrderPage?>(
+      state: uiStateOf(value, isEmpty: (p) => p!.items.isEmpty),
+      onRetry: () => ref.invalidate(provider),
+      // 조건이 걸려 있으면 "주문 없음"이 아니라 "이 조건의 주문 없음"이다.
+      empty: (_) => Center(
+        key: ValueKey(
+          narrowed
+              ? 'orders-empty-search'
+              : filtered
+              ? 'orders-empty-filtered'
+              : 'orders-empty',
+        ),
+        child: Text(
+          narrowed
+              ? l10n.ordersEmptySearch
+              : filtered
+              ? l10n.ordersEmptyFiltered
+              : l10n.ordersEmpty,
+        ),
       ),
-    ),
-    ready: (context, page) => RefreshIndicator(
-      onRefresh: () => ref.refresh(provider.future),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
-        children: [
-          for (final o in page!.items)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Material(
-                key: ValueKey('order-${o.orderId}'),
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(16),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: () async {
-                    await context.push('/orders/${o.orderId}');
-                    // 상세에서 취소·변경을 했을 수 있다. 돌아오면 목록을 다시 읽는다.
-                    if (context.mounted) ref.invalidate(orderListProvider);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-                    child: _orderCard(context, l10n, o),
+      ready: (context, page) => RefreshIndicator(
+        onRefresh: () => ref.refresh(provider.future),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
+          children: [
+            for (final o in page!.items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Material(
+                  key: ValueKey('order-${o.orderId}'),
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () async {
+                      await context.push('/orders/${o.orderId}');
+                      // 상세에서 취소·변경을 했을 수 있다. 돌아오면 목록을 다시 읽는다.
+                      if (context.mounted) ref.invalidate(orderListProvider);
+                    },
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        18,
+                        14,
+                        18,
+                        o.canHide ? 6 : 16,
+                      ),
+                      child: _orderCard(context, l10n, o),
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// SCR-ORDER-DETAIL-001. 주문 당시 스냅샷 + 원천별 기준시각. 분할배송은 배송별로 보인다.
@@ -449,7 +734,8 @@ class _OrderBody extends ConsumerWidget {
         // 고객센터 문의(주문을 고른 상태로). 접수일 뿐 주문을 바꾸지 않는다.
         OutlinedButton(
           key: const ValueKey('order-inquiry'),
-          onPressed: () => visit('/support/inquiries/new?orderId=${o.orderId}'),
+          // 무엇을 도와드릴까요?(배송 신고 종류 · 그 외 문의) — 레퍼런스 9-2 3-1.
+          onPressed: () => visit('/orders/${o.orderId}/help'),
           child: Text(l10n.orderInquiry),
         ),
       ],

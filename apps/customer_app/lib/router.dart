@@ -18,9 +18,13 @@ import 'features/profile/presentation/my_info_screen.dart';
 import 'features/reviews/domain/reviews.dart'
     show ReviewEligibility, ReviewTarget;
 import 'features/reviews/presentation/reviews_screens.dart';
+import 'features/support/domain/faq.dart';
 import 'features/support/presentation/chat_screen.dart';
+import 'features/support/presentation/faq_screens.dart';
 import 'features/support/presentation/inquiry_screens.dart';
 import 'features/orders/presentation/my_screen.dart';
+import 'features/profile/presentation/consents_screens.dart';
+import 'features/orders/presentation/order_help_screen.dart';
 import 'features/orders/presentation/orders_screens.dart';
 import 'features/catalog/presentation/home_providers.dart' show SectionRef;
 import 'features/catalog/presentation/home_screen.dart';
@@ -117,6 +121,13 @@ final routerProvider = Provider<GoRouter>(
                 builder: (_, state) =>
                     RescheduleScreen(orderId: state.pathParameters['orderId']!),
               ),
+              // 주문 문의하기 — "무엇을 도와드릴까요?"(레퍼런스 9-2 3-1): 배송 신고 종류 → 문의 남기기.
+              GoRoute(
+                parentNavigatorKey: rootNavigatorKey,
+                path: 'help',
+                builder: (_, state) =>
+                    OrderHelpScreen(orderId: state.pathParameters['orderId']!),
+              ),
             ],
           ),
         ],
@@ -171,6 +182,12 @@ final routerProvider = Provider<GoRouter>(
         builder: (_, state) =>
             MyInfoScreen(signup: state.uri.queryParameters['from'] == 'signup'),
       ),
+      // 로그인해 있는 고객의 재동의(CU-1 §3 — 주문 전 확인). 동의하면 true 로 돌아간다.
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/me/consents/reconsent',
+        builder: (_, _) => const ReconsentScreen(),
+      ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/addresses',
@@ -224,6 +241,25 @@ final routerProvider = Provider<GoRouter>(
             parentNavigatorKey: rootNavigatorKey,
             path: 'chat',
             builder: (_, _) => const ChatScreen(),
+          ),
+          // 자주 묻는 질문(customer-assistant 0.2.0). 검색어·분류는 쿼리로.
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'faqs',
+            builder: (_, state) => FaqListScreen(
+              q: state.uri.queryParameters['q'],
+              category: state.uri.queryParameters['category'],
+            ),
+            routes: [
+              GoRoute(
+                parentNavigatorKey: rootNavigatorKey,
+                path: ':faqId',
+                builder: (_, state) => FaqDetailScreen(
+                  faqId: state.pathParameters['faqId']!,
+                  initial: state.extra is Faq ? state.extra! as Faq : null,
+                ),
+              ),
+            ],
           ),
           GoRoute(
             parentNavigatorKey: rootNavigatorKey,

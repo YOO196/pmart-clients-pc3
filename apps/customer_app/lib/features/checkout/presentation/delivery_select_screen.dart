@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:pmart_core/pmart_core.dart' show ProblemFailure;
+import 'package:pmart_core/pmart_core.dart'
+    show IdempotencyKey, PmartFailure, ProblemFailure, UnknownResultFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
@@ -15,6 +16,8 @@ import 'checkout_controller.dart';
 import '../../payment/presentation/payment_controller.dart'
     show paymentWidgetConfigProvider;
 import 'order_sheet_screen.dart' show draftRejection;
+import '../../profile/presentation/consents_screens.dart'
+    show ensureCurrentConsents;
 
 String modeLabel(AppLocalizations l10n, DeliveryMode m) => switch (m) {
   DeliveryMode.single => l10n.modeSingle,
@@ -131,9 +134,58 @@ class _DeliveryBody extends ConsumerStatefulWidget {
 class _DeliveryBodyState extends ConsumerState<_DeliveryBody> {
   bool _preparing = false;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedOutOfStock();
+  }
+
+  /// 저장된 "다음에도 적용"(customer 0.4.0)을 기본으로. 못 읽으면 앱 기본(품절만 취소) 그대로 — 저장값으로 단정하지 않는다.
+  Future<void> _loadSavedOutOfStock() async {
+    try {
+      final saved = await ref.read(orderPreferencesRepositoryProvider).get();
+      if (!mounted) return;
+      if (saved.outOfStock case final p?) {
+        ref.read(checkoutSetupProvider.notifier).applySavedOutOfStock(p);
+      }
+    } on PmartFailure {
+      // 기본값만 못 읽었다. 주문은 막지 않는다.
+    }
+  }
+
+  /// "다음에도 적용"을 저장한다. 결과를 모르면 같은 키로 한 번 더. 실패해도 주문은 막지 않고 알린다.
+  Future<void> _saveOutOfStock(OutOfStockPreference p) async {
+    final repo = ref.read(orderPreferencesRepositoryProvider);
+    final key = IdempotencyKey.generate();
+    try {
+      try {
+        await repo.save(p, key: key);
+      } on UnknownResultFailure {
+        await repo.save(p, key: key);
+      }
+    } on PmartFailure {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          key: const ValueKey('oos-remember-failed'),
+          content: Text(AppLocalizations.of(context).oosRememberFailed),
+        ),
+      );
+    }
+  }
+
   /// 서버가 최소 주문 미달이라고 하면 주문서로 넘어가지 않고 장바구니로 안내한다.
   Future<void> _next() async {
     setState(() => _preparing = true);
+    final setup = ref.read(checkoutSetupProvider);
+    if (setup.rememberOutOfStock) await _saveOutOfStock(setup.outOfStock);
+    if (!mounted) return;
+    // 주문 전 확인(CU-1 §3): 필수 약관이 바뀌었으면 다시 동의를 받는다. 동의하지 않으면 넘어가지 않는다.
+    if (!await ensureCurrentConsents(context, ref)) {
+      if (mounted) setState(() => _preparing = false);
+      return;
+    }
+    if (!mounted) return;
     // 결제창 설정을 초안과 동시에 받아 둔다(주문서에 들어간 뒤 차례로 받으면 결제수단이 늦게 뜬다).
     // 실패는 주문서가 결제수단 자리에 "다시 시도"로 보인다.
     ref.read(paymentWidgetConfigProvider.future).ignore();
@@ -304,6 +356,15 @@ class _DeliveryBodyState extends ConsumerState<_DeliveryBody> {
                     ),
                   ],
                 ),
+              ),
+              // 레퍼런스 6-4 "다음에도 적용" — 다음 주문서의 기본값으로 서버에 저장한다(customer 0.4.0).
+              CheckboxListTile(
+                key: const ValueKey('oos-remember'),
+                value: setup.rememberOutOfStock,
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: const EdgeInsets.only(left: 4),
+                title: Text(l10n.oosRemember),
+                onChanged: (v) => setupCtl.setRememberOutOfStock(v ?? false),
               ),
               TextField(
                 key: const ValueKey('delivery-note'),

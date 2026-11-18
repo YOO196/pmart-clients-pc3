@@ -13,7 +13,7 @@ import '../../../shared/order_status.dart';
 import '../../checkout/data/checkout_repository.dart'
     show quoteFromContract, shippingAddressFromContract;
 import '../../checkout/domain/checkout.dart'
-    show ArrivalWindow, OutOfStockPreference;
+    show ArrivalWindow, DeliveryMode, OutOfStockPreference;
 import '../../../shared/providers.dart' show sourceSystem;
 import '../../claims/data/claims_repository.dart' show requestStateOf;
 import '../../claims/domain/claims.dart' show RequestState, TimeChangeResult;
@@ -21,10 +21,24 @@ import '../domain/orders.dart';
 import '../domain/tracking.dart';
 import 'sse_parser.dart';
 
+/// 숨기기 409 — 끝나지 않은 주문(order 0.12.0).
+const orderNotFinishedCode = 'ORDER_NOT_FINISHED';
+
 /// 주문 조회·배송 도착 예상. 실패는 [PmartFailure] 로 던진다(빈 목록·배송 실패로 바꾸지 않는다).
 abstract interface class OrdersRepository {
   /// `GET /orders`. [status] 를 주면 그 상태의 주문만(계약 `status` 쿼리, 하나만 받는다).
-  Future<OrderPage> list({String? cursor, OrderStatus? status});
+  /// [from](Asia/Seoul 날짜)·[q](상품명) 가 없으면 서버가 최근 3개월만 준다(order 0.12.0).
+  /// 다음 쪽([cursor])도 같은 조건을 함께 보낸다.
+  Future<OrderPage> list({
+    String? cursor,
+    OrderStatus? status,
+    String? from,
+    String? q,
+  });
+
+  /// 주문 내역에서 숨기기 — `POST /orders/{id}/hides`(order 0.12.0). 끝난 주문만, 아니면 409 `ORDER_NOT_FINISHED`.
+  /// 되돌리기 없음. 이미 숨긴 주문도 APPLIED. 같은 키 재전송은 같은 결과.
+  Future<CommandStatus> hide(String orderId, {required IdempotencyKey key});
 
   Future<OrderDetail> get(String orderId);
 
@@ -139,14 +153,43 @@ final class ApiOrdersRepository implements OrdersRepository {
   }
 
   @override
-  Future<OrderPage> list({String? cursor, OrderStatus? status}) async {
+  Future<OrderPage> list({
+    String? cursor,
+    OrderStatus? status,
+    String? from,
+    String? q,
+  }) async {
     final res = await pmartGuard(
-      () =>
-          _orders.listOrders(cursor: cursor, status: orderStatusToWire(status)),
+      () => _orders.listOrders(
+        cursor: cursor,
+        status: orderStatusToWire(status),
+        from: from,
+        q: q,
+      ),
     );
     return orderPageFromContract(
       res.data ?? (throw const ContractViolationFailure('주문 목록 본문 없음')),
     );
+  }
+
+  @override
+  Future<CommandStatus> hide(
+    String orderId, {
+    required IdempotencyKey key,
+  }) async {
+    final res = await pmartGuard(
+      () => _orders.hideOrder(
+        orderId: orderId,
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        extra: commandOptions(key).extra,
+      ),
+    );
+    final status = res.data?.status.value;
+    if (status == null) {
+      throw const ContractViolationFailure('주문 숨기기 응답 본문 없음');
+    }
+    return CommandStatus.parse(status);
   }
 
   @override
@@ -271,6 +314,17 @@ OrderPage orderPageFromContract(api.ListOrders200Response r) => OrderPage(
         orderedAt: o.orderedAt,
         totalAmount: o.totalAmount,
         itemCount: o.itemCount,
+        deliveryMode: switch (o.deliveryMode) {
+          api.OrderSummaryDeliveryModeEnum.SINGLE => DeliveryMode.single,
+          api.OrderSummaryDeliveryModeEnum.BUNDLED => DeliveryMode.bundled,
+          api.OrderSummaryDeliveryModeEnum.SCHEDULED => DeliveryMode.scheduled,
+          _ => null,
+        },
+        representativeName: switch (o.representativeItem?.productName?.trim()) {
+          final n? when n.isNotEmpty => n,
+          _ => null,
+        },
+        representativeQty: o.representativeItem?.quantity,
       ),
   ],
   nextCursor: r.page?.nextCursor,

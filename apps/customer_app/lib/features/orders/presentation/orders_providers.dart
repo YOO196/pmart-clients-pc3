@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
+import 'package:pmart_ui/pmart_ui.dart' show toSeoulWallClock;
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/order_status.dart';
@@ -53,11 +54,21 @@ bool canRequestCancel(OrderDetail o) => switch (o.status) {
   _ => false,
 };
 
-/// 본인 주문 목록. [status] 가 있으면 그 상태만(계약 `GET /orders?status=`). 비회원이면 null(빈 목록과 구분).
+/// 본인 주문 목록(조건 [OrderListQuery] — 상태·기간·상품명). 비회원이면 null(빈 목록과 구분).
+/// 조건 없는 기본(최근 3개월)은 `const OrderListQuery()`.
 final orderListProvider = FutureProvider.autoDispose
-    .family<OrderPage?, OrderStatus?>((ref, status) async {
+    .family<OrderPage?, OrderListQuery>((ref, query) async {
       if (ref.watch(sessionProvider) is! MemberSession) return null;
-      return ref.watch(ordersRepositoryProvider).list(status: status);
+      return ref
+          .watch(ordersRepositoryProvider)
+          .list(
+            status: query.status,
+            from: orderPeriodFrom(
+              query.period,
+              toSeoulWallClock(ref.read(clockProvider)()),
+            ),
+            q: query.q,
+          );
     });
 
 /// 주문 목록의 상태 필터(앞에서부터 "전체" 다음 차례). 계약 `status` 는 하나만 받으므로 묶음 필터(진행 중 등)는 두지 않는다.

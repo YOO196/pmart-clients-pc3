@@ -54,6 +54,22 @@ enum InquiryOrigin {
   final String wire;
 }
 
+/// 배송 신고 종류(case 0.16.0 `deliveryIssue`, 지연은 0.23.0). 문의 종류 DELIVERY + 주문과 함께 보낸다.
+enum DeliveryIssue {
+  /// 늦어요 — 확정 뒤 ~ 배송 완료 전만(그 밖 422 `ORDER_NOT_IN_PROGRESS`).
+  delayed('DELAYED'),
+
+  /// 못 받았어요(완료 뒤).
+  notReceived('NOT_RECEIVED'),
+
+  /// 다른 곳에 왔어요.
+  misdelivered('MISDELIVERED');
+
+  const DeliveryIssue(this.wire);
+
+  final String wire;
+}
+
 /// 계약 한도.
 const inquiryTitleMax = 100;
 const inquiryBodyMax = 2000;
@@ -67,6 +83,8 @@ class InquiryDraft {
     this.orderId,
     this.title,
     this.origin = InquiryOrigin.inquiryPage,
+    this.deliveryIssue,
+    this.deliveryId,
   });
 
   final InquiryCategory category;
@@ -74,6 +92,12 @@ class InquiryDraft {
   final String? orderId;
   final String? title;
   final InquiryOrigin origin;
+
+  /// 배송 신고면 그 종류(종류 DELIVERY·주문 필수).
+  final DeliveryIssue? deliveryIssue;
+
+  /// 배송 신고의 배송 ID(선택, 참고값).
+  final String? deliveryId;
 }
 
 @immutable
@@ -130,4 +154,7 @@ class InquiryPage {
 abstract final class InquiryProblemCode {
   /// 남의·없는 주문(422).
   static const orderNotFound = 'ORDER_NOT_FOUND';
+
+  /// 지연 신고인데 진행 중 주문이 아님(422, case 0.23.0).
+  static const orderNotInProgress = 'ORDER_NOT_IN_PROGRESS';
 }

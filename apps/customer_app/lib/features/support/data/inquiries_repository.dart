@@ -48,6 +48,13 @@ final class ApiInquiriesRepository implements InquiriesRepository {
             InquiryOrigin.assistantHandoff =>
               api.CreateInquiryRequestOriginEnum.ASSISTANT_HANDOFF,
           },
+          deliveryIssue: switch (draft.deliveryIssue) {
+            DeliveryIssue.delayed => api.InquiryDeliveryIssue.DELAYED,
+            DeliveryIssue.notReceived => api.InquiryDeliveryIssue.NOT_RECEIVED,
+            DeliveryIssue.misdelivered => api.InquiryDeliveryIssue.MISDELIVERED,
+            null => null,
+          },
+          deliveryId: draft.deliveryId,
         ),
         extra: commandOptions(key).extra,
       ),

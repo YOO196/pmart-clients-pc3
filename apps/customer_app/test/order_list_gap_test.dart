@@ -1,0 +1,228 @@
+import 'package:dio/dio.dart' show Dio;
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:pmart_api_order/pmart_api_order.dart' as api;
+import 'package:pmart_core/pmart_core.dart';
+import 'package:pmart_core/testing.dart';
+import 'package:pmart_ui/pmart_ui.dart';
+
+import 'package:customer_app/features/checkout/presentation/checkout_controller.dart'
+    show clockProvider;
+import 'package:customer_app/features/checkout/domain/checkout.dart'
+    show DeliveryMode;
+import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
+import 'package:customer_app/features/orders/data/orders_repository.dart';
+import 'package:customer_app/features/orders/domain/orders.dart';
+import 'package:customer_app/shared/providers.dart' show sourceSystem;
+
+import 'support/app_harness.dart';
+
+/// 주문 내역 — 대표 상품·배송 방식, 기간·상품명 검색, 숨기기(order 0.12.0, 백엔드 알림 2026-11-18 gap-a §2~4). 목 모드.
+void main() {
+  setUpAll(initPmartFormatting);
+  final now = DateTime.utc(2026, 10, 24, 3);
+
+  late MockOrdersRepository orders;
+  setUp(
+    () => orders = MockOrdersRepository(latency: Duration.zero, now: () => now),
+  );
+
+  Future<void> openOrders(WidgetTester t) async {
+    t.view
+      ..physicalSize = const Size(800, 2000)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp([clockProvider.overrideWithValue(() => now)], orders: orders),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-orders')));
+    await t.pumpAndSettle();
+  }
+
+  Dio dioWith(FakeAdapter adapter) => createPmartDio(
+    baseUrl: 'http://test.invalid/api/v1',
+    sourceSystem: sourceSystem,
+    tokens: TokenStore(MemoryKeyValueStore()),
+    refresher: (_) async => null,
+    adapter: adapter,
+    delay: (_) async {},
+  );
+
+  testWidgets('카드: 배송 방식 · 상태, "<대표 상품> 외 N개"', (t) async {
+    await openOrders(t);
+    // order-seed-4: 예약배달, 그릭요거트 3개(다른 상품 없음)
+    expect(
+      t
+          .widget<Text>(find.byKey(const ValueKey('order-mode-order-seed-4')))
+          .data,
+      '예약배달 · ',
+    );
+    expect(
+      t
+          .widget<Text>(
+            find.byKey(const ValueKey('order-summary-order-seed-4')),
+          )
+          .data,
+      '그릭요거트 플레인 400g 3개',
+    );
+    // 기본 조회는 기간·검색 없이(서버 기본 최근 3개월).
+    expect(orders.listQueries.first, (from: null, q: null));
+  });
+
+  testWidgets('조회 기간을 바꾸면 from 을 보내고, 검색어는 q 로 — 결과 없음은 "조건에 맞는 주문 없음"', (
+    t,
+  ) async {
+    await openOrders(t);
+    await t.tap(find.byKey(const ValueKey('orders-period')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('orders-period-months6')));
+    await t.pumpAndSettle();
+    // 서울 2026-10-24 기준 6개월 전
+    expect(orders.listQueries.last.from, '2026-04-24');
+
+    await t.tap(find.byKey(const ValueKey('orders-search-open')));
+    await t.pumpAndSettle();
+    await t.enterText(
+      find.byKey(const ValueKey('orders-search-field')),
+      '  없는상품  ',
+    );
+    await t.testTextInput.receiveAction(TextInputAction.search);
+    await t.pumpAndSettle();
+    expect(orders.listQueries.last, (from: '2026-04-24', q: '없는상품'));
+    expect(find.byKey(const ValueKey('orders-empty-search')), findsOneWidget);
+    expect(find.byKey(const ValueKey('orders-empty')), findsNothing);
+
+    await t.tap(find.byKey(const ValueKey('orders-search-close')));
+    await t.pumpAndSettle();
+    expect(orders.listQueries.last.q, isNull);
+    expect(find.byKey(const ValueKey('order-order-seed-4')), findsOneWidget);
+  });
+
+  testWidgets('조회 실패는 "주문 없음"이 아니라 오류', (t) async {
+    orders.failNextList = true;
+    await openOrders(t);
+    expect(find.byKey(const ValueKey('orders-empty')), findsNothing);
+    expect(find.byKey(const ValueKey('order-order-seed-4')), findsNothing);
+  });
+
+  testWidgets('숨기기: 끝난 주문에만 버튼, 확인 창 뒤 서버가 숨긴 뒤 목록에서 빠짐', (t) async {
+    await openOrders(t);
+    // 진행 중 주문(order-seed-4 CONFIRMED)에는 버튼이 없다.
+    expect(find.byKey(const ValueKey('order-hide-order-seed-4')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('order-hide-order-seed-3')),
+      findsOneWidget,
+    );
+
+    // 취소를 누르면 보내지 않는다.
+    await t.tap(find.byKey(const ValueKey('order-hide-order-seed-3')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('orders-hide-cancel')));
+    await t.pumpAndSettle();
+    expect(orders.hideKeys, isEmpty);
+
+    await t.tap(find.byKey(const ValueKey('order-hide-order-seed-3')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('orders-hide-confirm')));
+    await t.pumpAndSettle();
+    expect(orders.hideKeys.keys, ['order-seed-3']);
+    expect(find.text('주문 내역에서 삭제했어요'), findsOneWidget);
+    expect(find.byKey(const ValueKey('order-order-seed-3')), findsNothing);
+  });
+
+  test('계약 → 앱: 대표 상품 이름 없음(2026-11-02 전)·모르는 배송 방식은 null', () {
+    final page = orderPageFromContract(
+      api.ListOrders200Response.fromJson({
+        'items': [
+          {
+            'orderId': 'o-1',
+            'status': 'COMPLETED',
+            'itemCount': 5,
+            'deliveryMode': 'BUNDLED',
+            'representativeItem': {
+              'sku': 'S-1',
+              'productName': '우유',
+              'quantity': 2,
+            },
+          },
+          {
+            'orderId': 'o-2',
+            'status': 'COMPLETED',
+            'itemCount': 3,
+            'representativeItem': {'sku': 'S-2', 'productName': ' '},
+          },
+        ],
+      }),
+    );
+    expect(page.items[0].deliveryMode, DeliveryMode.bundled);
+    expect(page.items[0].representativeName, '우유');
+    expect(page.items[0].othersQty, 3);
+    expect(page.items[1].representativeName, isNull);
+    expect(page.items[1].deliveryMode, isNull);
+    expect(page.items[1].othersQty, isNull);
+  });
+
+  test('기간 → from: 3개월은 보내지 않음(서버 기본), 전체는 오래전 날짜', () {
+    final today = DateTime(2026, 11, 18);
+    expect(orderPeriodFrom(OrderPeriod.months3, today), isNull);
+    expect(orderPeriodFrom(OrderPeriod.months6, today), '2026-05-18');
+    expect(orderPeriodFrom(OrderPeriod.year1, today), '2025-11-18');
+    expect(orderPeriodFrom(OrderPeriod.all, today), '2020-01-01');
+  });
+
+  test(
+    'API: GET /orders 에 from·q, POST /orders/{id}/hides 에 멱등 키·출처 헤더',
+    () async {
+      final adapter = FakeAdapter((o, _) async {
+        if (o.method == 'GET') {
+          return const FakeReply(200, body: {'items': <Object?>[]});
+        }
+        return const FakeReply(
+          200,
+          body: {'status': 'APPLIED', 'requestId': 'r-1'},
+        );
+      });
+      final repo = ApiOrdersRepository(dioWith(adapter));
+      await repo.list(from: '2026-05-18', q: '우유');
+      final key = IdempotencyKey.generate();
+      final status = await repo.hide('o-1', key: key);
+
+      final get = adapter.requests.first;
+      expect(get.uri.queryParameters['from'], '2026-05-18');
+      expect(get.uri.queryParameters['q'], '우유');
+      final post = adapter.requests.last;
+      expect(post.method, 'POST');
+      expect(post.path, endsWith('/orders/o-1/hides'));
+      expect(post.headers['Idempotency-Key'], key.value);
+      expect(post.headers['X-Source-System'], sourceSystem);
+      expect(status, CommandStatus.applied);
+    },
+  );
+
+  test('API: 숨기기 409 ORDER_NOT_FINISHED 는 그 code 로 던진다', () async {
+    final adapter = FakeAdapter(
+      (_, _) async => const FakeReply(
+        409,
+        body: {'status': 409, 'code': 'ORDER_NOT_FINISHED', 'title': 'x'},
+      ),
+    );
+    final repo = ApiOrdersRepository(dioWith(adapter));
+    await expectLater(
+      repo.hide('o-1', key: IdempotencyKey.generate()),
+      throwsA(
+        isA<ProblemFailure>().having(
+          (f) => f.problem.code,
+          'code',
+          orderNotFinishedCode,
+        ),
+      ),
+    );
+  });
+}

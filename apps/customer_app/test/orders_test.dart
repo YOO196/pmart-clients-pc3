@@ -18,8 +18,12 @@ base class _ListDown extends MockOrdersRepository {
   _ListDown() : super(latency: Duration.zero);
 
   @override
-  Future<OrderPage> list({String? cursor, OrderStatus? status}) async =>
-      throw const NetworkFailure(DioExceptionType.connectionError);
+  Future<OrderPage> list({
+    String? cursor,
+    OrderStatus? status,
+    String? from,
+    String? q,
+  }) async => throw const NetworkFailure(DioExceptionType.connectionError);
 }
 
 void main() {

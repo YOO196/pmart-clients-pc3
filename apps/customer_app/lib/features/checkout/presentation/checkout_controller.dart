@@ -10,6 +10,7 @@ import '../../cart/domain/cart.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../data/checkout_repository.dart';
 import '../data/mock_checkout_repository.dart';
+import '../data/order_preferences_repository.dart';
 import '../domain/checkout.dart';
 
 final checkoutRepositoryProvider = Provider<CheckoutRepository>(
@@ -21,6 +22,13 @@ final checkoutRepositoryProvider = Provider<CheckoutRepository>(
 
 /// 지금 시각. 테스트에서 바꾼다. 서울 날짜·남은 시간 표시에만 쓴다(확정 판단은 서버).
 final clockProvider = Provider<DateTime Function()>((_) => DateTime.now);
+
+final orderPreferencesRepositoryProvider = Provider<OrderPreferencesRepository>(
+  (ref) => switch (ref.watch(envProvider)) {
+    PmartEnv.mock => MockOrderPreferencesRepository(),
+    PmartEnv.local => ApiOrderPreferencesRepository(ref.watch(dioProvider)),
+  },
+);
 
 /// 초안 자원 확보 대기 조회 간격·횟수(계약에 서버 지정 간격이 없다).
 final draftPollPolicyProvider = Provider<({Duration interval, int attempts})>(
@@ -37,6 +45,8 @@ class CheckoutSetup {
     this.outOfStock = OutOfStockPreference.cancelOutOfStockOnly,
     this.deliveryNote = '',
     this.revision = 0,
+    this.outOfStockChosen = false,
+    this.rememberOutOfStock = false,
   });
 
   final String? purchaseIntentId;
@@ -45,6 +55,12 @@ class CheckoutSetup {
   final OutOfStockPreference outOfStock;
   final String deliveryNote;
   final int revision;
+
+  /// 고객이 이번에 품절 처리를 직접 골랐다 — 저장된 기본값으로 덮지 않는다.
+  final bool outOfStockChosen;
+
+  /// "다음에도 적용"(customer 0.4.0) — 다음 단계로 넘어갈 때 서버에 저장한다.
+  final bool rememberOutOfStock;
 
   /// 예약은 슬롯을 골라야 끝난다.
   bool get complete =>
@@ -56,6 +72,8 @@ class CheckoutSetup {
     ArrivalWindow? Function()? window,
     OutOfStockPreference? outOfStock,
     String? deliveryNote,
+    bool? outOfStockChosen,
+    bool? rememberOutOfStock,
   }) => CheckoutSetup(
     purchaseIntentId: purchaseIntentId ?? this.purchaseIntentId,
     mode: mode ?? this.mode,
@@ -63,6 +81,8 @@ class CheckoutSetup {
     outOfStock: outOfStock ?? this.outOfStock,
     deliveryNote: deliveryNote ?? this.deliveryNote,
     revision: revision + 1,
+    outOfStockChosen: outOfStockChosen ?? this.outOfStockChosen,
+    rememberOutOfStock: rememberOutOfStock ?? this.rememberOutOfStock,
   );
 }
 
@@ -94,7 +114,17 @@ class CheckoutSetupController extends Notifier<CheckoutSetup> {
       state = state.copyWith(window: () => window);
 
   void setOutOfStock(OutOfStockPreference p) =>
-      state = state.copyWith(outOfStock: p);
+      state = state.copyWith(outOfStock: p, outOfStockChosen: true);
+
+  /// 저장된 "다음에도 적용" 값을 기본으로(고객이 이번에 고르기 전에만). 저장된 값이 있으면 체크도 켠다.
+  void applySavedOutOfStock(OutOfStockPreference p) {
+    if (state.outOfStockChosen) return;
+    if (state.outOfStock == p && state.rememberOutOfStock) return;
+    state = state.copyWith(outOfStock: p, rememberOutOfStock: true);
+  }
+
+  void setRememberOutOfStock(bool v) =>
+      state = state.copyWith(rememberOutOfStock: v);
 
   void setNote(String note) => state = state.copyWith(deliveryNote: note);
 
