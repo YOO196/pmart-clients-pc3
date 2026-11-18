@@ -131,7 +131,22 @@ final class MockWorkRepository implements WorkRepository {
       return null;
     }
 
-    final t = pick('IN_PROGRESS') ?? pick('ASSIGNED') ?? pick('READY');
+    // 서버(capacity)는 피킹을 끝낸 사람에게 그 주문의 패킹을 먼저 준다 — fulfillment 상태가 아직 READY 여도.
+    Map<String, Object?>? myPack() {
+      for (final id in tasks.taskIds) {
+        final t = tasks.taskJson(id);
+        if (t['taskType'] == 'PACK' &&
+            area.taskTypes.contains('PACK') &&
+            (t['state'] == 'ASSIGNED' || t['state'] == 'READY') &&
+            (t['assignment'] as Map?)?['workerId'] == workerId) {
+          return t;
+        }
+      }
+      return null;
+    }
+
+    final t =
+        pick('IN_PROGRESS') ?? myPack() ?? pick('ASSIGNED') ?? pick('READY');
     if (t == null) {
       return const NextUnavailable(WorkProblemCode.noTaskAvailable);
     }

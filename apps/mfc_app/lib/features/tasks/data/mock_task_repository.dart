@@ -168,6 +168,9 @@ base class MockTaskRepository implements TaskRepository {
   /// 다음 실행 응답을 1회 잃는다(서버는 접수함).
   bool loseNextExecutionResponse = false;
 
+  /// 피킹이 끝나 열린 패킹을 READY 로 둔다 — 실서버에서 배정 사건이 fulfillment 에 닿기 전(배정은 capacity 에 있다).
+  bool packReadyBeforeAssignmentEvent = false;
+
   /// 실행이 재고 반영까지 몇 번 조회해야 하는지.
   int confirmPolls = 1;
 
@@ -430,7 +433,8 @@ base class MockTaskRepository implements TaskRepository {
     final String? reject;
     if (taskId == 'task-mock-4') {
       reject = TaskProblemCode.alreadyStarted;
-    } else if (t['state'] != 'ASSIGNED') {
+    } else if (t['state'] != 'ASSIGNED' && t['state'] != 'READY') {
+      // 서버와 같게 READY·ASSIGNED 만 시작(TaskRules.startRejection)
       reject = TaskProblemCode.invalidState;
     } else if (assignment['workerId'] != workerId) {
       reject = TaskProblemCode.notAssignee;
@@ -586,7 +590,7 @@ base class MockTaskRepository implements TaskRepository {
           if (x['taskType'] == 'PACK' &&
               x['shipmentId'] == t['shipmentId'] &&
               x['state'] == 'WAITING') {
-            x['state'] = 'ASSIGNED';
+            x['state'] = packReadyBeforeAssignmentEvent ? 'READY' : 'ASSIGNED';
           }
         }
       }
