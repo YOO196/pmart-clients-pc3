@@ -159,7 +159,7 @@ Future<void> endBreak(WidgetRef ref) async {
 }
 
 /// 피킹을 끝내고 패킹대로 — 서버에 다음 작업을 받아, 패킹이면 바로 그 패킹을 연다.
-/// 다른 작업이면 근무 화면이 보인다(같은 주문 패킹을 피킹한 사람에게 주는지는 BR-52 R20).
+/// 다른 작업이면 근무 화면이 보인다. 피킹한 사람에게 그 주문 PACK 을 먼저 주는 것은 서버가 보장한다(capacity 0.19.0, 백엔드 회신 2026-11-18).
 Future<void> continueToPack(BuildContext context, WidgetRef ref) async {
   final outcome = await ref
       .read(workRepositoryProvider)

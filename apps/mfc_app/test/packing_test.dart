@@ -49,7 +49,10 @@ void main() {
 
   setUp(() {
     tasks = MockTaskRepository(latency: Duration.zero, packDemo: true);
-    packing = MockPackingRepository(latency: Duration.zero);
+    packing = MockPackingRepository(
+      latency: Duration.zero,
+      onShipmentReady: tasks.shipmentReady,
+    );
   });
 
   group('패킹 흐름', () {
@@ -211,11 +214,23 @@ void main() {
       ctl.scan(task, await shipment(), MockTaskRepository.dumplingBarcode);
       await ctl.seal(task, await shipment());
       s = await shipment();
+      // 다 밀봉하면 서버가 PACK 을 스스로 끝낸다 — 끝 버튼은 실행을 보내지 않는다.
+      expect(tasks.taskJson('task-mock-2')['state'], 'COMPLETED');
       await ctl.finish(task, s);
 
-      expect(tasks.taskJson('task-mock-2')['state'], 'COMPLETED');
+      expect(c.read(packingProvider('task-mock-2')).packingFinished, isTrue);
+      expect(tasks.sentPayloads, isEmpty, reason: 'PACK 실행은 보내지 않는다');
       expect(s.state, ShipmentState.ready);
       expect(s.dispatchRequest, isNull);
+    });
+
+    test('서버 출고가 아직 READY 가 아니면 끝으로 보이지 않는다', () async {
+      final s = await shipment();
+      await ctl.finish(task, s);
+      final st = c.read(packingProvider('task-mock-2'));
+      expect(st.packingFinished, isFalse);
+      expect(st.stepError, PackStepError.notFinished);
+      expect(tasks.sentPayloads, isEmpty);
     });
 
     test('응답을 잃으면 확인 중 — 다시 확인은 같은 키·같은 분', () async {

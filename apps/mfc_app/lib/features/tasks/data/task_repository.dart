@@ -438,23 +438,6 @@ TaskDetailView taskDetailFromContract(api.TaskDetail d) => TaskDetailView(
   ],
 );
 
-/// 패킹 완료 실행의 큐 payload. 담은 수량은 밀봉된 포장 기준이다.
-Map<String, Object?> packPayload({
-  required String workerId,
-  required int? assignmentVersion,
-  required List<({String orderLineId, String sku, int qty})> lines,
-  required int durationSec,
-}) => {
-  'executionType': 'PACK',
-  'workerId': workerId,
-  'assignmentVersion': ?assignmentVersion,
-  'durationSec': durationSec,
-  'lines': [
-    for (final l in lines)
-      {'orderLineId': l.orderLineId, 'sku': l.sku, 'pickedQty': l.qty},
-  ],
-};
-
 api.TaskState? taskStateToContract(TaskState s) => switch (s) {
   TaskState.waiting => api.TaskState.WAITING,
   TaskState.ready => api.TaskState.READY,

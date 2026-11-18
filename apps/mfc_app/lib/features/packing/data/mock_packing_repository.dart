@@ -15,9 +15,13 @@ base class MockPackingRepository implements PackingRepository {
   MockPackingRepository({
     this.latency = const Duration(milliseconds: 300),
     DateTime Function()? now,
+    this.onShipmentReady,
   }) : _now = now ?? DateTime.now;
 
   final Duration latency;
+
+  /// 출고가 READY 가 됐을 때(서버는 이때 PACK 을 COMPLETED 로 바꾼다). 목 작업 저장소에 잇는다.
+  final void Function(String shipmentId)? onShipmentReady;
   final DateTime Function() _now;
 
   /// 출하마다 담아야 할 수량(피킹 확정분).
@@ -193,6 +197,7 @@ base class MockPackingRepository implements PackingRepository {
     shipment
       ..['state'] = all ? 'READY' : 'PREPARING'
       ..['version'] = (shipment['version']! as int) + 1;
+    if (all) onShipmentReady?.call(shipmentId);
   }
 
   Map<String, Object?> _dispatchJson(String shipmentId, int minutes) {
