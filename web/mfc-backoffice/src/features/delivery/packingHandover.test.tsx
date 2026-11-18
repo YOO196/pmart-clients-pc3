@@ -20,7 +20,11 @@ describe('포장 인계 현황(우리 센터)', () => {
     const row = (orderNumber: string) => rows.find((r) => r.textContent?.includes(orderNumber))!;
     expect(within(row('10000001')).getByTestId('stage')).toHaveTextContent('출고요청');
     expect(within(row('10000002')).getByTestId('stage')).toHaveTextContent('피킹중');
-    expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('배정 RD-1');
+    // 화면 번호(ADR-0070): 배송은 주문번호-순번, 라이더는 센터 관리자에게 번호·이름이 오지 않아(bff 0.15.0) ID 끝 + 비공개
+    expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('10000002-1');
+    expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('배정 RD-1 라이더 정보 비공개');
+    expect(within(row('10000002')).getByTestId('delivery')).not.toHaveTextContent('DLV-');
+    expect(within(row('10000002')).getByTestId('system-numbers')).toHaveTextContent('DLV-ORD-P-2');
     // 단계 규칙에 없는 조합은 추정하지 않고 원천 출고 상태
     expect(within(row('10000003')).getByTestId('stage')).toHaveTextContent('단계 없음 — 출고 준비 중');
     expect(within(row('10000003')).getByTestId('delivery')).toHaveTextContent('배송 없음');
@@ -29,7 +33,7 @@ describe('포장 인계 현황(우리 센터)', () => {
     expect(within(partial).getByTestId('stage')).toHaveTextContent('일부 인계');
     expect(within(partial).getByText('재발송')).toBeInTheDocument();
     expect(within(partial).getByTestId('packages')).toHaveTextContent('밀봉 1 / 2 · 인계 1 · 남음 1');
-    expect(within(partial).getByTestId('packages')).toHaveTextContent(/PKG-4-1 · 인계됨 · 인계 확정 · .* RD-2 인계/);
+    expect(within(partial).getByTestId('packages')).toHaveTextContent(/PKG-4-1 · 인계됨 · 인계 확정 · .* RD-2 라이더 정보 비공개 인계/);
     expect(within(partial).getByTestId('packages')).toHaveTextContent('PKG-4-2 · 밀봉');
   });
 
@@ -41,8 +45,8 @@ describe('포장 인계 현황(우리 센터)', () => {
     const rows = await screen.findAllByTestId('packing-row');
     expect(rows).toHaveLength(1);
     expect(within(rows[0]!).getByTestId('delivery')).toHaveTextContent('모름(조회 실패)');
-    // 주문번호가 없는 옛 주문은 주문 ID
-    expect(rows[0]).toHaveTextContent('ORD-P-5');
+    // 주문번호가 없는 옛 주문은 주문 ID 끝 8자리 + 번호 없음
+    expect(rows[0]).toHaveTextContent('ORD-P-5 번호 없음');
     expect(calls(view.sent).at(-1)!.getAll('state')).toEqual(['CANCELLED']);
   });
 });

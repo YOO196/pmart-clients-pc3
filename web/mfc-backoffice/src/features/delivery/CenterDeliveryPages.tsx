@@ -15,11 +15,14 @@ import type { components as BffC } from '../../api/generated/backoffice-bff';
 import type { components as CaseC } from '../../api/generated/case';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
+import { DisplayNumber, RiderLabel, SystemNumbers, type RiderDisplay } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
+import { Who } from '../../shared/OperatorLabel';
 
 const m = messages.centerDelivery;
 const f = messages.dispatchFailures;
 const none = messages.none;
+const sys = messages.displayNumber.system;
 const name = (map: Readonly<Record<string, string>>, v: string | null | undefined) => (v ? (map[v] ?? v) : none);
 const when = (iso: string | null | undefined) => (iso ? formatSeoul(iso) : none);
 
@@ -38,11 +41,14 @@ interface OpenCase {
 }
 interface LiveItem {
   readonly deliveryId?: string;
+  readonly deliveryNumber?: string | null;
   readonly orderId?: string;
+  readonly orderNumber?: string | null;
   readonly type?: string | null;
   readonly delivery?: StampedState;
   readonly dispatch?: StampedState;
   readonly riderId?: string | null;
+  readonly rider?: RiderDisplay;
   readonly arrivalWindow?: Record<string, unknown> | null;
   readonly promisedAt?: string | null;
   readonly openCases?: readonly OpenCase[] | null;
@@ -136,12 +142,22 @@ export function CenterDeliveriesMenu({ mfcId }: { readonly mfcId: string }) {
                         const dispatchState = it.dispatch?.state ?? null;
                         return (
                           <tr key={it.deliveryId} data-testid="center-live-row">
-                            <td className="font-mono">{it.deliveryId ?? none}</td>
-                            <td className="font-mono">{it.orderId ?? none}</td>
+                            <td>
+                              <DisplayNumber number={it.deliveryNumber} systemId={it.deliveryId} />
+                              <SystemNumbers
+                                ids={[
+                                  { label: sys.deliveryId, id: it.deliveryId },
+                                  { label: sys.orderId, id: it.orderId },
+                                ]}
+                              />
+                            </td>
+                            <td>
+                              <DisplayNumber number={it.orderNumber} systemId={it.orderId} />
+                            </td>
                             <td>{name(m.typeName, it.type)}</td>
                             <td>{it.delivery?.state ? name(m.executionState, it.delivery.state) : <span className="text-warning">{m.unknown}</span>}</td>
                             <td data-testid="dispatch-state">{dispatchState ? name(m.dispatchState, dispatchState) : <span className="text-warning">{m.unknown}</span>}</td>
-                            <td>{it.riderId ?? <span className="opacity-70">{m.noRider}</span>}</td>
+                            <td>{it.rider || it.riderId ? <RiderLabel rider={it.rider} riderId={it.riderId} /> : <span className="opacity-70">{m.noRider}</span>}</td>
                             <td>
                               {windowText(it.arrivalWindow)}
                               {late && <span className="badge badge-error badge-sm ml-1">{m.late}</span>}
@@ -324,7 +340,9 @@ function DispatchFailureDetailPage({ mfcId }: { readonly mfcId: string }) {
                 <Sla slaDueAt={c.slaDueAt} overdue={c.overdue} />
               </dd>
               <dt className="opacity-70">{f.assignee}</dt>
-              <dd>{c.assigneeId ?? f.unassigned}</dd>
+              <dd>
+                <Who id={c.assigneeId} empty={f.unassigned} />
+              </dd>
               {c.closure && (
                 <>
                   <dt className="opacity-70">{f.closure}</dt>

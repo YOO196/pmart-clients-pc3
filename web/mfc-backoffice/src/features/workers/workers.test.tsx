@@ -295,7 +295,8 @@ describe('센터 휴게 번호(capacity 0.20.0)', () => {
     await userEvent.type(again, '1234');
     await userEvent.click(within(card).getByRole('button', { name: '번호 정하기' }));
     expect(await within(card).findByText('휴게 번호를 정했어요. 5번 틀려 잠긴 작업자도 바로 풀려요.')).toBeInTheDocument();
-    expect(await within(card).findByText(/^정해 둠 · OP-sup-1/)).toBeInTheDocument();
+    // 정한 사람은 이름·사번(hr employee-labels)
+    await waitFor(() => expect(within(card).getByTestId('break-pin-status')).toHaveTextContent(/^정해 둠 · 정관리 · E-2026-0101 · /));
     expect(pin).toHaveValue('');
     const put = view.sent.find((r) => r.method === 'PUT' && new URL(r.url).pathname.endsWith('/break-pin'))!;
     expect(await sentBody(put)).toEqual({ pin: '1234' });

@@ -18,6 +18,7 @@ import { useSession } from '../../app/SessionContext';
 import { ApprovalAwareFeedback, ApprovalRefInput } from '../../shared/approval';
 import { DecisionList, DisposalList, InspectionList, ReturnReceiptList } from '../lists/CenterLists';
 import { messages } from '../../shared/messages';
+import { Who } from '../../shared/OperatorLabel';
 
 const m = messages.quality;
 
@@ -300,7 +301,11 @@ function DecisionView({ id }: { readonly id: string }) {
           )}
           {d.rejectReason && <p className="text-error">{d.rejectReason}</p>}
           <p className="opacity-70">
-            {`${m.decidedBy} ${d.decidedBy ?? messages.none} · ${m.approver} ${d.approverId ?? messages.none} · ${m.appliedQty} ${d.appliedQty ?? 0}`}
+            {`${m.decidedBy} `}
+            <Who id={d.decidedBy} />
+            {` · ${m.approver} `}
+            <Who id={d.approverId} />
+            {` · ${m.appliedQty} ${d.appliedQty ?? 0}`}
             {d.decidedAt ? ` · ${formatSeoul(d.decidedAt)}` : ''}
           </p>
           {(d.affectedOrderIds ?? []).length > 0 && <p>{`${m.affectedOrders}: ${d.affectedOrderIds!.join(', ')}`}</p>}
@@ -455,7 +460,13 @@ function DisposalView({ mfcId, id }: { readonly mfcId: string; readonly id: stri
               {notice}
             </p>
           )}
-          <p className="opacity-70">{`${m.requester} ${d.requesterId ?? messages.none} · ${m.approver} ${d.approverId ?? messages.none} · ${messages.approval.ref} ${d.approvalRef ?? messages.none}`}</p>
+          <p className="opacity-70">
+        {`${m.requester} `}
+        <Who id={d.requesterId} />
+        {` · ${m.approver} `}
+        <Who id={d.approverId} />
+        {` · ${messages.approval.ref} ${d.approvalRef ?? messages.none}`}
+      </p>
           <table className="table table-xs">
             <thead>
               <tr>
@@ -686,7 +697,10 @@ function InspectReceipt({ mfcId, receiptId, onInspected }: { readonly mfcId: str
               void inspect.run(null);
             }}
           >
-            <p className="opacity-70">{`${rr.claimId ?? ''} · ${rr.toLocationCode ?? ''} · ${rr.receivedBy ?? ''}`}</p>
+            <p className="opacity-70">
+              {`${rr.claimId ?? ''} · ${rr.toLocationCode ?? ''} · `}
+              <Who id={rr.receivedBy} />
+            </p>
             {lines.map((l, i) => {
               const v = verdicts[i] ?? defaultVerdict;
               return (

@@ -10,6 +10,7 @@ import { CommandFeedback, formatSeoul, QueryState, toUiState, useCommand } from 
 import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-fulfillment';
 import { useApi } from '../../app/ApiContext';
+import { idTail, RiderLabel } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
 
 const m = messages.tasks.checks;
@@ -67,12 +68,13 @@ function CheckRow({ mfcId, item }: { readonly mfcId: string; readonly item: Reso
         {m.pkg(packageId)} {item.orderId ? `· ${m.order(item.orderId)}` : ''}
       </p>
       <p className="text-xs">
-        {m.rider(item.riderId ?? messages.none)}
+        {`${m.rider} `}
+        {item.riderId ? <RiderLabel riderId={item.riderId} /> : messages.none}
         {item.fence?.expiresAt ? ` · ${m.expiredAt(formatSeoul(item.fence.expiresAt))}` : ''}
       </p>
       {confirming ? (
         <div role="alertdialog" aria-label={m.confirmTitle} className="space-y-1 rounded-box bg-base-200 p-2">
-          <p>{confirming === 'TAKEN_BY_RIDER' ? m.confirmTaken(item.riderId ?? messages.none) : m.confirmAtStation}</p>
+          <p>{confirming === 'TAKEN_BY_RIDER' ? m.confirmTaken(item.riderId ? idTail(item.riderId) : messages.none) : m.confirmAtStation}</p>
           <div className="flex gap-2">
             <button type="button" className="btn btn-xs btn-primary" onClick={() => send(confirming)}>
               {m.confirmOk}

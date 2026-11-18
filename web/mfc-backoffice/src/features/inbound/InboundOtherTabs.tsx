@@ -13,6 +13,7 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-inbound';
 import { useApi } from '../../app/ApiContext';
 import { messages } from '../../shared/messages';
+import { Who } from '../../shared/OperatorLabel';
 import { InitialLoadList, ReturnReceiptList, SupplyRequestList } from '../lists/CenterLists';
 
 const m = messages.inbound;
@@ -526,7 +527,10 @@ function SupplyRequestCard({ mfcId, request: s }: { readonly mfcId: string; read
           {notice}
         </p>
       )}
-      <p className="opacity-70">{`${s.submittedAt ? formatSeoul(s.submittedAt) : ''} ${s.submittedBy ?? ''}`.trim()}</p>
+      <p className="opacity-70">
+        {s.submittedAt ? `${formatSeoul(s.submittedAt)} ` : ''}
+        {s.submittedBy && <Who id={s.submittedBy} />}
+      </p>
       {editable ? (
         <form
           className="space-y-2 border-t border-base-200 pt-3"

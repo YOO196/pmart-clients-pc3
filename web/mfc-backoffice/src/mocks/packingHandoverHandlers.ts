@@ -57,6 +57,8 @@ const ships: ShipRow[] = [
   { shipmentId: 'SHP-9-S1', orderId: 'ORD-P-9', orderNumber: '10000009', mfcId: 'MFC-SEL-01', shipment: 'READY', stage: 'READY_FOR_HANDOVER', pick: 'COMPLETED', pack: 'COMPLETED', packages: [], delivery: 'ASSIGNED', riderId: 'RD-9' },
 ];
 
+const hiddenRider = (riderId: string | null) => (riderId ? { riderId, riderNumber: null, nameMasked: null } : null);
+
 export const packingHandoverHandlers = [
   http.get(`${BFF}/views/packing-handover`, ({ request }) => {
     const who = operator(request);
@@ -95,10 +97,13 @@ export const packingHandoverHandlers = [
         sealedPackages: r.packages.filter((p) => p.state === 'SEALED').length,
         handedOverQty: { qty: handed, source: stamp('mfc-fulfillment-service') },
         remainingPackages: r.packages.length - handed,
-        packages: r.packages.map((p) => ({ ...p, handoverAuthorizedAt: null })),
+        // 센터 관리자는 라이더를 못 봐 bff 가 번호·이름을 null 로 준다(0.15.0)
+        packages: r.packages.map((p) => ({ ...p, handoverAuthorizedAt: null, rider: hiddenRider(p.riderId) })),
         deliveryId: r.delivery ? `DLV-${r.orderId}` : null,
+        deliveryNumber: r.delivery && r.orderNumber ? `${r.orderNumber}-1` : null,
         delivery: r.delivery === null ? null : { state: down ? null : r.delivery, version: down ? null : 1, source: stamp('delivery-execution-service', !down) },
         riderId: down ? null : r.riderId,
+        rider: down ? null : hiddenRider(r.riderId),
       };
     });
     return HttpResponse.json({

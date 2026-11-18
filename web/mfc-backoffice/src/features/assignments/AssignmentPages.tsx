@@ -15,6 +15,7 @@ import type { components } from '../../api/generated/mfc-capacity';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
+import { Who } from '../../shared/OperatorLabel';
 import { PlanList } from '../lists/CenterLists';
 
 const m = messages.assignments;
@@ -148,7 +149,9 @@ function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonl
                 <tr key={a.assignmentId} data-testid="assignment-row">
                   <td className="font-mono text-xs">{a.taskId}</td>
                   <td>{taskName[a.taskType ?? ''] ?? a.taskType}</td>
-                  <td className="font-mono text-xs">{a.workerId}</td>
+                  <td>
+                    <Who id={a.workerId} />
+                  </td>
                   <td>{a.assignmentVersion}</td>
                   <td>{m.source[a.source ?? ''] ?? a.source ?? messages.none}</td>
                   <td>{a.assignedAt ? formatSeoul(a.assignedAt) : messages.none}</td>
@@ -453,7 +456,9 @@ function PlanView({ mfcId, plan }: { readonly mfcId: string; readonly plan: Plan
                 <tr key={i.taskId} data-testid="plan-item">
                   <td className="font-mono">{i.taskId}</td>
                   <td>{taskName[i.taskType ?? ''] ?? i.taskType}</td>
-                  <td className="font-mono">{i.workerId}</td>
+                  <td>
+                    <Who id={i.workerId} />
+                  </td>
                   <td>{i.startAt && i.endAt ? m.period(formatSeoul(i.startAt), formatSeoul(i.endAt)) : messages.none}</td>
                   <td className="text-warning">{m.late(i.lateMinutes ?? 0)}</td>
                 </tr>

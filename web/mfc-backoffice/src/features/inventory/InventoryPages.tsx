@@ -19,6 +19,7 @@ import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { ApprovalAwareFeedback, ApprovalRefInput, approvalRequired } from '../../shared/approval';
 import { messages } from '../../shared/messages';
+import { Who } from '../../shared/OperatorLabel';
 import { CountSessionList, StockUnitList } from '../lists/CenterLists';
 
 const m = messages.inventory;
@@ -433,13 +434,21 @@ function CountSessionCard({ mfcId, session: s, onDecided }: { readonly mfcId: st
       </p>
       <dl className="grid grid-cols-[9rem_1fr] gap-x-4 gap-y-1">
         <dt className="opacity-70">{f.created}</dt>
-        <dd>{s.createdBy ?? messages.none}</dd>
+        <dd>
+          <Who id={s.createdBy} />
+        </dd>
         <dt className="opacity-70">{f.first}</dt>
-        <dd>{s.firstCounter ?? messages.none}</dd>
+        <dd>
+          <Who id={s.firstCounter} />
+        </dd>
         <dt className="opacity-70">{f.recount}</dt>
-        <dd>{s.recounter ?? messages.none}</dd>
+        <dd>
+          <Who id={s.recounter} />
+        </dd>
         <dt className="opacity-70">{f.approver}</dt>
-        <dd>{s.approverId ?? messages.none}</dd>
+        <dd>
+          <Who id={s.approverId} />
+        </dd>
         <dt className="opacity-70">{f.ref}</dt>
         <dd>{s.approvalRef ?? messages.none}</dd>
         <dt className="opacity-70">{f.baseline}</dt>

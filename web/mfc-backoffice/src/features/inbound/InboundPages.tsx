@@ -16,6 +16,7 @@ import type { components } from '../../api/generated/mfc-inbound';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
+import { Who } from '../../shared/OperatorLabel';
 import { InitialStockTab, ReturnReceiptTab, SupplyRequestTab } from './InboundOtherTabs';
 
 const m = messages.inbound;
@@ -155,7 +156,9 @@ function InboundTaskList({ mfcId }: { readonly mfcId: string }) {
                   <td className="font-mono text-xs">{t.locationCode}</td>
                   <td>{m.qty(t.plannedQty, t.doneQty)}</td>
                   <td>{m.taskState[t.state] ?? t.state}</td>
-                  <td>{t.assigneeId ?? messages.none}</td>
+                  <td>
+                  <Who id={t.assigneeId} />
+                </td>
                   <td>{t.createdAt ? formatSeoul(t.createdAt) : messages.none}</td>
                 </tr>
               ))}
@@ -209,7 +212,9 @@ function InboundTaskPage({ mfcId }: { readonly mfcId: string }) {
               <dt className="opacity-70">{m.fields.parent}</dt>
               <dd className="font-mono">{t.parentTaskId ?? messages.none}</dd>
               <dt className="opacity-70">{m.fields.assignee}</dt>
-              <dd>{t.assigneeId ?? messages.none}</dd>
+              <dd>
+          <Who id={t.assigneeId} />
+        </dd>
             </dl>
             {t.assigneeId && <p className="text-xs opacity-70">{m.assigneeOnly(t.assigneeId)}</p>}
             {t.state === 'READY' && t.taskType === 'INSPECT' && <InspectForm key={t.version} mfcId={mfcId} task={t} onDone={setNotice} />}

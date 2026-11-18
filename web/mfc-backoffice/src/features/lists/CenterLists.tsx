@@ -9,6 +9,7 @@ import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { CursorList, useQueryParam } from '../../shared/CursorList';
 import { messages } from '../../shared/messages';
+import { Who } from '../../shared/OperatorLabel';
 
 const l = messages.lists;
 const when = (t: string | null | undefined) => (t ? formatSeoul(t) : messages.none);
@@ -243,7 +244,7 @@ export function CountSessionList({ mfcId }: { readonly mfcId: string }) {
         <span className="font-mono">{s.sessionId}</span>,
         inv.countState[s.state ?? ''] ?? s.state,
         (s.locationCodes ?? []).join(', ') || messages.none,
-        s.createdBy ?? messages.none,
+        <Who id={s.createdBy} />,
         when(s.updatedAt),
       ]}
       rowKey={(s) => s.sessionId ?? ''}
@@ -349,7 +350,7 @@ export function PlanList({ mfcId }: { readonly mfcId: string }) {
         <span className="font-mono">{p.planId}</span>,
         a.planState[p.state ?? ''] ?? p.state,
         p.solverStatus ?? messages.none,
-        p.createdBy ?? messages.none,
+        <Who id={p.createdBy} />,
         when(p.createdAt),
       ]}
       rowKey={(p) => p.planId ?? ''}

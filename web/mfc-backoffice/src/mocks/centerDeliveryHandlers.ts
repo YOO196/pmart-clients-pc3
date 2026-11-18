@@ -12,6 +12,8 @@ const ACTIVE = ['UNASSIGNED', 'ASSIGNED', 'ARRIVED_AT_STORE', 'PICKED_UP', 'ARRI
 
 interface Row {
   deliveryId: string;
+  deliveryNumber?: string;
+  orderNumber?: string;
   orderId: string;
   mfcId: string;
   execution: string;
@@ -23,7 +25,7 @@ interface Row {
 
 const rows: Row[] = [
   { deliveryId: 'DLV-C-1', orderId: 'ORD-C-1', mfcId: 'MFC-BSN-01', execution: 'UNASSIGNED', dispatch: 'DISPATCH_FAILED', riderId: null, promisedAt: '2026-11-16T01:00:00.000Z', openCases: [{ caseId: 'CASE-DF-1', kind: 'DISPATCH_FAILED', priority: 'P2', overdue: true }] },
-  { deliveryId: 'DLV-C-2', orderId: 'ORD-C-2', mfcId: 'MFC-BSN-01', execution: 'PICKED_UP', dispatch: 'PICKED_UP', riderId: 'RD-7', promisedAt: '2099-01-01T00:00:00.000Z', openCases: [] },
+  { deliveryId: 'DLV-C-2', deliveryNumber: '20000002-1', orderId: 'ORD-C-2', orderNumber: '20000002', mfcId: 'MFC-BSN-01', execution: 'PICKED_UP', dispatch: 'PICKED_UP', riderId: 'RD-7', promisedAt: '2099-01-01T00:00:00.000Z', openCases: [] },
   { deliveryId: 'DLV-C-3', orderId: 'ORD-C-3', mfcId: 'MFC-BSN-01', execution: 'COMPLETED', dispatch: 'CLOSED', riderId: 'RD-8', promisedAt: null, openCases: [] },
   { deliveryId: 'DLV-S-1', orderId: 'ORD-S-1', mfcId: 'MFC-SEL-01', execution: 'ASSIGNED', dispatch: 'ASSIGNED', riderId: 'RD-9', promisedAt: null, openCases: [] },
 ];
@@ -114,6 +116,10 @@ export const centerDeliveryHandlers = [
       delivery: { state: r.execution, version: 3, source: stamp('delivery-execution-service') },
       dispatch: down ? { state: null, version: null, source: stamp('delivery-dispatch-service', false) } : { state: r.dispatch, version: 2, source: stamp('delivery-dispatch-service') },
       riderId: r.riderId,
+      // 센터 관리자는 라이더를 못 봐 번호·이름이 null(bff 0.15.0)
+      rider: r.riderId ? { riderId: r.riderId, riderNumber: null, nameMasked: null } : null,
+      deliveryNumber: r.deliveryNumber ?? null,
+      orderNumber: r.orderNumber ?? null,
       arrivalWindow: { date: '2026-11-16', start: '10:00', end: '11:00' },
       promisedAt: r.promisedAt,
       latestEta: null,
