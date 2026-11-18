@@ -4,6 +4,7 @@ import 'package:pmart_core/pmart_core.dart';
 
 import '../../auth/presentation/auth_controller.dart';
 import '../../../shared/codes.dart';
+import '../../../shared/lot_code.dart';
 import '../../../shared/providers.dart';
 import '../data/mock_task_repository.dart';
 import '../data/task_repository.dart';
@@ -236,7 +237,15 @@ class StartController extends Notifier<StartFlow> {
 // 피킹 — 장바구니 → [칸 → 상품 × 수량] 반복. 한 실행 = 한 칸(계약 fromLocation).
 
 /// needLocation = 칸을 아직 확인하지 않았다(상품보다 칸 먼저).
-enum ScanResult { matched, wrongItem, overRemaining, noTarget, needLocation }
+/// wrongLot = LOT 라벨을 찍었는데 지시 LOT 이 아님(선입선출 — 서버도 LOT_MISMATCH).
+enum ScanResult {
+  matched,
+  wrongItem,
+  wrongLot,
+  overRemaining,
+  noTarget,
+  needLocation,
+}
 
 /// 칸 스캔 결과.
 enum PickLocScan {
@@ -447,7 +456,30 @@ class PickingController extends Notifier<PickingState> {
     return line != null && line.matchesBarcode(code);
   }
 
-  /// 상품 바코드 스캔. 칸 확인 전·다른 상품·이 칸 몫 초과는 수량 0 + 원인 안내.
+  /// 이 지시에 맞지 않으면 그 이유, 맞으면 null.
+  /// LOT 라벨(GS1-128·예전 QR)은 지시 LOT 번호·ID 와 대조한다. 상품 바코드도 아직 받는다 — 기존 재고에 LOT 라벨이
+  /// 붙기 전(PC 1 재고 데이터 갱신 전)에 막으면 피킹이 멈춘다(백엔드 회신 2026-11-17 §4).
+  ScanResult? _scanMismatch(PickStop stop, String code) {
+    final lot = parseLotCode(code);
+    if (lot == null) {
+      return stop.line.matchesBarcode(code) ? null : ScanResult.wrongItem;
+    }
+    if (lot.sameProduct([?stop.line.barcode, ...stop.line.barcodes]) == false) {
+      return ScanResult.wrongItem;
+    }
+    final wantNo = stop.pick?.lotNo;
+    final wantId = stop.lotId;
+    if (lot.lotNo != null && wantNo != null) {
+      return lot.lotNo == wantNo ? null : ScanResult.wrongLot;
+    }
+    if (lot.lotId != null && wantId != null) {
+      return lot.lotId == wantId ? null : ScanResult.wrongLot;
+    }
+    // 지시에 LOT 이 없거나(재고 조회 안 됨) 대조할 값이 다르면 판단하지 않고 막는다 — 상품 바코드로 찍게.
+    return ScanResult.wrongLot;
+  }
+
+  /// 상품 바코드(또는 LOT 라벨) 스캔. 칸 확인 전·다른 상품·다른 LOT·이 칸 몫 초과는 수량 0 + 원인 안내.
   ScanResult scan(TaskDetailView task, String code) {
     final stop = nextPickStop(task);
     final ScanResult result;
@@ -457,8 +489,8 @@ class PickingController extends Notifier<PickingState> {
       result = ScanResult.noTarget;
     } else if (state.at == null) {
       result = ScanResult.needLocation;
-    } else if (!stop.line.matchesBarcode(code)) {
-      result = ScanResult.wrongItem;
+    } else if (_scanMismatch(stop, code) case final ScanResult bad) {
+      result = bad;
     } else if (state.capturedFor(stop.line.orderLineId) >= stop.qty) {
       result = ScanResult.overRemaining;
     } else {

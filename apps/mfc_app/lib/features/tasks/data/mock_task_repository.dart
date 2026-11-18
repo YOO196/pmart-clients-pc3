@@ -139,6 +139,9 @@ base class MockTaskRepository implements TaskRepository {
   static const milkBarcode = '8801115114154';
   static const yogurtBarcode = '8801115220015';
 
+  /// 요거트 지시 LOT 번호(GS1 (10), inventory 0.21.0).
+  static const yogurtLotNo = 'L261105001';
+
   /// 요거트 점포 바코드(299…) — 같은 상품의 두 번째 활성 바코드.
   static const yogurtStoreBarcode = '2990000000024';
   static const chipsBarcode = '8801019606557';
@@ -245,6 +248,7 @@ base class MockTaskRepository implements TaskRepository {
         'picks': [
           {
             'lotId': 'LOT-Y-1024',
+            'lotNo': yogurtLotNo,
             'expiresOn': '2026-11-05',
             'remainingQty': 1,
             'visitSeq': 1,

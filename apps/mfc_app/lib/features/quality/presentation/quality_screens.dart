@@ -11,6 +11,7 @@ import '../../../shared/scanner/scan_input.dart';
 import '../../../shared/scanner/scanner.dart';
 import '../../work/domain/work.dart';
 import '../../work/presentation/work_screens.dart' show backToSession;
+import '../../lot_label/lot_label_buttons.dart';
 import '../domain/quality.dart';
 import 'quality_controllers.dart';
 
@@ -125,15 +126,22 @@ class InspectScreen extends ConsumerWidget {
         action: l10n.nextTask,
         onAction: () => _next(context),
       ),
-      InspectPhase.applied => ResultView(
-        key: const ValueKey('inspect-applied'),
-        icon: Icons.check_circle,
-        text: switch (s.result?.createdTaskIds.length ?? 0) {
-          0 => l10n.inspectAppliedAllQuarantined,
-          final n => l10n.inspectApplied(n),
-        },
-        action: l10n.nextTask,
-        onAction: () => _next(context),
+      InspectPhase.applied => ListView(
+        children: [
+          ResultView(
+            key: const ValueKey('inspect-applied'),
+            icon: Icons.check_circle,
+            text: switch (s.result?.createdTaskIds.length ?? 0) {
+              0 => l10n.inspectAppliedAllQuarantined,
+              final n => l10n.inspectApplied(n),
+            },
+            action: l10n.nextTask,
+            onAction: () => _next(context),
+          ),
+          // 나뉜 정상 LOT 마다 라벨(적치 작업 수량만큼) — 백엔드 회신 2026-11-17 §2. 격리분은 적치 작업이 없어 대상 아님.
+          if (s.result?.createdTaskIds case final ids? when ids.isNotEmpty)
+            LotLabelButtons(taskIds: ids),
+        ],
       ),
       InspectPhase.locate => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
