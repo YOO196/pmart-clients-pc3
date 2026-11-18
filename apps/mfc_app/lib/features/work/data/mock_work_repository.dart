@@ -53,9 +53,14 @@ final class MockWorkRepository implements WorkRepository {
   /// 목 센터 관리자 휴게 번호(실서버 번호 아님). null = 미설정.
   String? breakPin = '1234';
 
-  /// 연속으로 틀린 횟수 — 5번이면 잠김.
+  /// 연속으로 틀린 횟수 — 5번이면 잠김(서버와 같게 15분).
   int breakPinFailures = 0;
   int breakStartCalls = 0;
+
+  /// 지금 휴게가 근무에 정해진 자동 휴게(AUTO)인가 — 본인 "휴게 끝"은 409.
+  bool autoBreak = false;
+
+  static final lockedUntilForTest = DateTime.utc(2026, 11, 18, 6, 15);
 
   /// 시험용: 다음 작업 받기를 이 코드로 거절한다(예 WORKER_NOT_ACTIVE).
   String? nextRejectCode;
@@ -363,15 +368,22 @@ final class MockWorkRepository implements WorkRepository {
       return const BreakRejected(BreakProblemCode.pinNotSet);
     }
     if (breakPinFailures >= 5) {
-      return const BreakRejected(BreakProblemCode.pinLocked);
+      return BreakRejected(
+        BreakProblemCode.pinLocked,
+        lockedUntil: lockedUntilForTest,
+      );
     }
     if (supervisorPin != breakPin) {
       breakPinFailures++;
-      return BreakRejected(
-        breakPinFailures >= 5
-            ? BreakProblemCode.pinLocked
-            : BreakProblemCode.pinInvalid,
-      );
+      return breakPinFailures >= 5
+          ? BreakRejected(
+              BreakProblemCode.pinLocked,
+              lockedUntil: lockedUntilForTest,
+            )
+          : BreakRejected(
+              BreakProblemCode.pinInvalid,
+              remainingAttempts: 5 - breakPinFailures,
+            );
     }
     breakPinFailures = 0;
     onBreak = true;
@@ -385,6 +397,11 @@ final class MockWorkRepository implements WorkRepository {
     required IdempotencyKey key,
   }) async {
     await _wait();
+    if (onBreak && autoBreak) {
+      throw const ProblemFailure(
+        Problem(status: 409, code: BreakProblemCode.autoBreakSupervisorOnly),
+      );
+    }
     onBreak = false;
   }
 }

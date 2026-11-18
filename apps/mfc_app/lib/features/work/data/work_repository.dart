@@ -124,16 +124,49 @@ final class ApiWorkRepository implements WorkRepository {
     }
   }
 
-  /// mfc-capacity 계약의 휴게 시작에는 관리자 번호가 없다 — 번호 없이 보내면 작업자가 혼자 휴게를 열 수 있으므로
-  /// 보내지 않는다. 계약에 들어오면 여기서 `startWorkerBreak` 에 번호를 실어 보낸다
-  /// (요청 `docs/handoff/mfc-app/2026-11-18-backend-break-supervisor-pin.md`).
+  /// 휴게 시작(mfc-capacity 0.20.0) — 작업자 본인은 `supervisorPin` 필수. 422 세 코드는 거절 확정.
+  /// 같은 키면 같은 판정이라, 번호를 다시 받을 때마다 부르는 쪽이 새 키를 만든다.
   @override
   Future<BreakStartOutcome> startBreak(
     String mfcId,
     String workerId, {
     required String supervisorPin,
     required IdempotencyKey key,
-  }) async => const BreakPinUnsupported();
+  }) async {
+    try {
+      await pmartGuard(
+        () => _workers.startWorkerBreak(
+          mfcId: mfcId,
+          workerId: workerId,
+          idempotencyKey: key.value,
+          xSourceSystem: sourceSystem,
+          startWorkerBreakRequest: cap.StartWorkerBreakRequest(
+            supervisorPin: supervisorPin,
+          ),
+          extra: commandOptions(key).extra,
+        ),
+      );
+      return const BreakStarted();
+    } on ProblemFailure catch (f) {
+      final p = f.problem;
+      String? detail(String field) => [
+        for (final d in p.details)
+          if (d.field == field) d.reason,
+      ].firstOrNull;
+      return switch (p.code) {
+        BreakProblemCode.pinInvalid => BreakRejected(
+          p.code,
+          remainingAttempts: int.tryParse(detail('remainingAttempts') ?? ''),
+        ),
+        BreakProblemCode.pinLocked => BreakRejected(
+          p.code,
+          lockedUntil: DateTime.tryParse(detail('lockedUntil') ?? ''),
+        ),
+        BreakProblemCode.pinNotSet => BreakRejected(p.code),
+        _ => throw f,
+      };
+    }
+  }
 
   @override
   Future<void> endBreak(

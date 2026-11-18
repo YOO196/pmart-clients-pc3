@@ -172,7 +172,7 @@ final class NextUnknown extends NextTaskOutcome {
 }
 
 /// 휴게 시작 결과 — 작업자 본인 휴게는 센터 관리자 4자리 번호가 있어야 한다(사용자 2026-11-18).
-/// 번호 확인은 서버가 한다(요청 `docs/handoff/mfc-app/2026-11-18-backend-break-supervisor-pin.md`).
+/// 번호 확인은 서버가 한다(mfc-capacity 0.20.0, 회신 `clients/mfc-app/2026-11-18-reply-break-supervisor-pin.md`).
 /// 앱은 번호를 저장·기록하지 않는다.
 @immutable
 sealed class BreakStartOutcome {
@@ -185,21 +185,30 @@ final class BreakStarted extends BreakStartOutcome {
 
 /// 서버가 거절(확정) — 번호 틀림·잠김·번호 미설정 등. code 로 안내한다.
 final class BreakRejected extends BreakStartOutcome {
-  const BreakRejected(this.code);
+  const BreakRejected(this.code, {this.remainingAttempts, this.lockedUntil});
 
   final String code;
+
+  /// BREAK_PIN_INVALID — 잠기기 전 남은 횟수(서버 details `remainingAttempts`).
+  final int? remainingAttempts;
+
+  /// BREAK_PIN_LOCKED — 풀리는 시각(서버 details `lockedUntil`).
+  final DateTime? lockedUntil;
 }
 
-/// 서버 계약에 관리자 번호가 아직 없다 — 보내지 않는다(번호 없이 휴게를 열지 않음).
-final class BreakPinUnsupported extends BreakStartOutcome {
-  const BreakPinUnsupported();
-}
-
-/// 휴게 번호 거절 코드 — 요청 중(계약 확정 전 가칭).
+/// mfc-capacity 0.20.0 휴게 코드.
 abstract final class BreakProblemCode {
+  /// 422 — 번호가 다름.
   static const pinInvalid = 'BREAK_PIN_INVALID';
+
+  /// 422 — 같은 작업자 연속 5번 틀림 → 15분(관리자가 번호를 새로 정하면 바로 풀림).
   static const pinLocked = 'BREAK_PIN_LOCKED';
+
+  /// 422 — 센터가 번호를 정하지 않음.
   static const pinNotSet = 'BREAK_PIN_NOT_SET';
+
+  /// 409 — 근무에 정해진 자동 휴게는 센터 관리자만 일찍 끝낼 수 있다.
+  static const autoBreakSupervisorOnly = 'AUTO_BREAK_SUPERVISOR_ONLY';
 }
 
 abstract final class WorkProblemCode {

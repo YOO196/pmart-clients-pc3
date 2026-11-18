@@ -110,11 +110,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _breakBusy = true);
     try {
       await endBreak(ref);
-    } on PmartFailure {
+    } on PmartFailure catch (f) {
+      // 근무에 정해진 자동 휴게는 센터 관리자만 일찍 끝낸다(409 AUTO_BREAK_SUPERVISOR_ONLY).
+      final auto =
+          f is ProblemFailure &&
+          f.problem.code == BreakProblemCode.autoBreakSupervisorOnly;
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(l10n.breakFailed)));
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                auto ? l10n.breakAutoSupervisorOnly : l10n.breakFailed,
+              ),
+            ),
+          );
       }
     } finally {
       if (mounted) setState(() => _breakBusy = false);
@@ -925,24 +935,28 @@ class _BreakPinDialogState extends State<BreakPinDialog> {
     switch (outcome) {
       case BreakStarted():
         Navigator.of(context).pop();
-      case BreakRejected(:final code):
+      case BreakRejected(
+        :final code,
+        :final remainingAttempts,
+        :final lockedUntil,
+      ):
         setState(() {
           _busy = false;
           _closed =
               code == BreakProblemCode.pinLocked ||
               code == BreakProblemCode.pinNotSet;
           _error = switch (code) {
-            BreakProblemCode.pinInvalid => l10n.breakPinWrong,
-            BreakProblemCode.pinLocked => l10n.breakPinLocked,
+            BreakProblemCode.pinInvalid => switch (remainingAttempts) {
+              final n? => l10n.breakPinWrongLeft(n),
+              null => l10n.breakPinWrong,
+            },
+            BreakProblemCode.pinLocked => switch (lockedUntil) {
+              final u? => l10n.breakPinLockedUntil(formatSeoulTime(u)),
+              null => l10n.breakPinLocked,
+            },
             BreakProblemCode.pinNotSet => l10n.breakPinNotSet,
             _ => l10n.breakFailed,
           };
-        });
-      case BreakPinUnsupported():
-        setState(() {
-          _busy = false;
-          _closed = true;
-          _error = l10n.breakPinUnsupported;
         });
       case null:
         setState(() {

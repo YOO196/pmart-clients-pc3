@@ -362,7 +362,7 @@ void main() {
       isNull,
     );
     await enterPin(t, '9999');
-    expect(find.text('번호가 맞지 않아요. 다시 입력해 주세요'), findsOneWidget);
+    expect(find.text('번호가 맞지 않아요. 4번 더 틀리면 15분 동안 잠겨요'), findsOneWidget);
     expect(work.onBreak, isFalse);
     // 틀린 번호는 지운다.
     expect(
@@ -388,7 +388,10 @@ void main() {
     for (var i = 0; i < 5; i++) {
       await enterPin(t, '0000');
     }
-    expect(find.text('여러 번 틀려 잠겼어요. 센터 관리자에게 휴게를 요청해 주세요'), findsOneWidget);
+    expect(
+      find.text('여러 번 틀려 오후 3:15까지 잠겼어요. 센터 관리자에게 휴게를 요청해 주세요'),
+      findsOneWidget,
+    );
     expect(
       t.widget<TextField>(find.byKey(const ValueKey('break-pin'))).enabled,
       isFalse,
@@ -396,6 +399,16 @@ void main() {
     expect(work.breakStartCalls, 5);
     await tapKey(t, 'break-pin-cancel');
     expect(work.onBreak, isFalse);
+  });
+
+  testWidgets('정해진(자동) 휴게는 본인이 끝낼 수 없다 — 안내, 휴게 그대로', (t) async {
+    work
+      ..onBreak = true
+      ..autoBreak = true;
+    await pumpApp(t);
+    await tapKey(t, 'menu-break');
+    expect(find.text('정해진 휴게 시간이에요. 일찍 끝내려면 센터 관리자에게 요청해 주세요'), findsOneWidget);
+    expect(work.onBreak, isTrue);
   });
 
   testWidgets('휴게 중에는 업무를 눌러도 안내로 가지 않는다', (t) async {
@@ -477,18 +490,7 @@ void main() {
       expect(await next(), isA<NextUnknown>());
       final req = adapter.requests.first;
       expect(req.uri.path, '/api/v1/mfcs/MFC-1/workers/w-1/next-tasks');
-      // 계약에 관리자 번호가 없으니 휴게 시작은 보내지 않는다(번호 없이 휴게가 열리면 안 됨).
-      final n = adapter.requests.length;
-      expect(
-        await r.startBreak(
-          'MFC-1',
-          'w-1',
-          supervisorPin: '1234',
-          key: IdempotencyKey('k-b'),
-        ),
-        isA<BreakPinUnsupported>(),
-      );
-      expect(adapter.requests, hasLength(n));
+
       expect(req.method, 'POST');
       expect(req.headers['Idempotency-Key'], 'k-1');
       // 고른 업무를 본문으로 보낸다(mfc-capacity 0.13.0, BR-52 R1).
@@ -588,6 +590,98 @@ void main() {
       expect(
         adapter.requests.single.uri.path,
         '/api/v1/mfcs/MFC-1/workers/w-1',
+      );
+    });
+  });
+
+  group('휴게 연동(mfc-capacity 0.20.0)', () {
+    WorkRepository repo(FakeAdapter a) => ApiWorkRepository(
+      createPmartDio(
+        baseUrl: 'http://test.invalid/api/v1',
+        sourceSystem: sourceSystem,
+        tokens: TokenStore(MemoryKeyValueStore()),
+        refresher: (_) async => null,
+        adapter: a,
+        delay: (_) async {},
+      ),
+    );
+
+    Map<String, Object?> problemWith(
+      String code,
+      String field,
+      String reason,
+    ) => {
+      ...problemBody(code, status: 422),
+      'details': [
+        {'field': field, 'reason': reason},
+      ],
+    };
+
+    test('번호를 본문에 싣고, 422 세 코드를 거절로(남은 횟수·풀리는 시각)', () async {
+      var call = 0;
+      final adapter = FakeAdapter((_, _) async {
+        call++;
+        return switch (call) {
+          1 => const FakeReply(
+            201,
+            body: {
+              'breakId': 'b-1',
+              'workerId': 'w-1',
+              'startedAt': '2026-11-18T05:00:00Z',
+              'source': 'MANUAL',
+            },
+          ),
+          2 => FakeReply.problem(
+            422,
+            problemWith('BREAK_PIN_INVALID', 'remainingAttempts', '3'),
+          ),
+          3 => FakeReply.problem(
+            422,
+            problemWith(
+              'BREAK_PIN_LOCKED',
+              'lockedUntil',
+              '2026-11-18T06:15:00Z',
+            ),
+          ),
+          _ => FakeReply.problem(
+            422,
+            problemWith('BREAK_PIN_NOT_SET', 'x', 'y'),
+          ),
+        };
+      });
+      final r = repo(adapter);
+      Future<BreakStartOutcome> start(String k) => r.startBreak(
+        'MFC-1',
+        'w-1',
+        supervisorPin: '1234',
+        key: IdempotencyKey(k),
+      );
+
+      expect(await start('k-1'), isA<BreakStarted>());
+      final req = adapter.requests.first;
+      expect(req.uri.path, '/api/v1/mfcs/MFC-1/workers/w-1/breaks');
+      expect(req.headers['Idempotency-Key'], 'k-1');
+      expect(jsonDecode(req.data as String), {'supervisorPin': '1234'});
+
+      expect(
+        await start('k-2'),
+        isA<BreakRejected>()
+            .having((b) => b.code, 'code', 'BREAK_PIN_INVALID')
+            .having((b) => b.remainingAttempts, 'left', 3),
+      );
+      expect(
+        await start('k-3'),
+        isA<BreakRejected>()
+            .having((b) => b.code, 'code', 'BREAK_PIN_LOCKED')
+            .having(
+              (b) => b.lockedUntil,
+              'until',
+              DateTime.utc(2026, 11, 18, 6, 15),
+            ),
+      );
+      expect(
+        await start('k-4'),
+        isA<BreakRejected>().having((b) => b.code, 'code', 'BREAK_PIN_NOT_SET'),
       );
     });
   });
