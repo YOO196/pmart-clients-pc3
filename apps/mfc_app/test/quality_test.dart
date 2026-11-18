@@ -254,6 +254,15 @@ void main() {
       expect(find.byKey(const ValueKey('inspect-applied')), findsOneWidget);
       expect(quality.task('TSK-INS-mock-1')!.completed, isTrue);
 
+      // 나뉜 정상 LOT 마다 라벨 — 적치 작업 수량(10)만큼. 격리분(2)은 라벨 없음.
+      await t.pumpAndSettle();
+      expect(find.textContaining('라벨 10장 출력'), findsOneWidget);
+      await t.tap(find.textContaining('라벨 10장 출력'));
+      await t.pumpAndSettle();
+      expect(find.text('LOT 라벨 미리보기 (10장)'), findsOneWidget);
+      await t.tap(find.text('확인').last);
+      await t.pumpAndSettle();
+
       await tapKey(t, 'result-action'); // 다음 작업
       expect(
         find.byKey(const ValueKey('assigned-TSK-INS-mock-2')),

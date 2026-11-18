@@ -197,6 +197,7 @@ class PickingScreen extends ConsumerStatefulWidget {
 String pickScanText(AppLocalizations l10n, ScanResult r) => switch (r) {
   ScanResult.matched => '',
   ScanResult.wrongItem => l10n.scanWrongItem,
+  ScanResult.wrongLot => l10n.scanWrongLot,
   ScanResult.overRemaining => l10n.scanOver,
   ScanResult.noTarget => l10n.scanNoTarget,
   ScanResult.needLocation => l10n.pickNeedLocation,

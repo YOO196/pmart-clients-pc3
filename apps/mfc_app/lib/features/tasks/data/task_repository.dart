@@ -407,6 +407,7 @@ TaskDetailView taskDetailFromContract(api.TaskDetail d) => TaskDetailView(
           for (final p in l.picks ?? const <api.TaskLinePicksInner>[])
             PickInstruction(
               lotId: p.lotId,
+              lotNo: p.lotNo,
               expiresOn: p.expiresOn,
               remainingQty: p.remainingQty,
               visitSeq: p.visitSeq,

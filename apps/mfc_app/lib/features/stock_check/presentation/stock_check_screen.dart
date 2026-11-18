@@ -9,6 +9,7 @@ import '../../../shared/scanner/scan_input.dart';
 import '../../../shared/scanner/scanner.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../tasks/presentation/task_controllers.dart';
+import '../../lot_label/lot_label.dart';
 import '../data/stock_check_repository.dart';
 
 /// 찍은 값 하나의 조회 결과.
@@ -190,6 +191,16 @@ class _StockResult extends ConsumerWidget {
                         '${l10n.stockCheckQuarantined} ${n(lot.quarantined)}',
                       ),
                     ],
+                  ),
+                  // 라벨이 훼손됐을 때 같은 값으로 다시(물류 실적 없음 — 백엔드 회신 2026-11-17 §3).
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      key: ValueKey('lot-reprint-${lot.lotId}'),
+                      icon: const Icon(Icons.print_outlined),
+                      label: Text(l10n.lotLabelReprint),
+                      onPressed: () => printLotLabels(context, ref, lot.lotId),
+                    ),
                   ),
                 ],
               ),

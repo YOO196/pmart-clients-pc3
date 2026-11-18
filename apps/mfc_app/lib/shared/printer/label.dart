@@ -69,6 +69,40 @@ class ProductBarcodeLabel implements PrintableLabel {
   String zpl() => productBarcodeLabelZpl(this);
 }
 
+/// LOT 라벨(mfc-inventory 0.21.0) — 바코드는 서버가 준 GS1-128 `gs1` 그대로, 없으면 예전 QR `LOT:{lotId}`.
+/// 라벨 1장 = 그 SKU 1단위라 [copies] 장(적치 작업 수량)을 한 번에 뽑는다. 재출력도 같은 값이다(물류 실적 없음).
+@immutable
+class LotLabel implements PrintableLabel {
+  const LotLabel({
+    required this.lotId,
+    required this.lotNo,
+    required this.sku,
+    required this.labelValue,
+    this.gs1,
+    this.productName,
+    this.expiryDate,
+    this.receivedOn,
+    this.copies = 1,
+  });
+
+  final String lotId;
+  final String lotNo;
+  final String sku;
+  final String labelValue;
+  final String? gs1;
+
+  /// 화면 미리보기에만(라벨 글꼴에 한글이 없다).
+  final String? productName;
+  final String? expiryDate;
+
+  /// 납입일(서울 날짜).
+  final String? receivedOn;
+  final int copies;
+
+  @override
+  String zpl() => lotLabelZpl(this);
+}
+
 /// 필드 값은 `^FH` 로 `^`·`~`·`\` 를 16진수로 바꿔 명령으로 해석되지 않게 한다.
 String _zplField(String v) {
   final b = StringBuffer();
@@ -119,6 +153,31 @@ String productBarcodeLabelZpl(ProductBarcodeLabel l) {
     '^LL609',
     '^FO60,60^BY3^BCN,220,Y,N,N^FH\\^FD${f(l.barcode)}^FS',
     '^FO60,380^A0N,40,40^FH\\^FDSKU ${f(l.sku)}^FS',
+    '^XZ',
+  ].join('\n');
+}
+
+/// LOT 라벨(포장 라벨과 같은 용지). GS1-128 은 `^BC` D 모드 — 괄호 꼴 그대로 넣으면 프린터가 FNC1 을 넣고 괄호는 찍지 않는다.
+String lotLabelZpl(LotLabel l) {
+  String f(String v) => _zplField(v);
+  final copies = l.copies < 1 ? 1 : l.copies;
+  final y = l.gs1 != null ? 300 : 330;
+  return [
+    '^XA',
+    '^CI28',
+    '^PW812',
+    '^LL609',
+    if (l.gs1 != null)
+      '^FO40,40^BY2^BCN,180,Y,N,N,D^FH\\^FD${f(l.gs1!)}^FS'
+    else
+      '^FO40,40^BQN,2,8^FH\\^FDQA,${f(l.labelValue)}^FS',
+    '^FO40,$y^A0N,56,56^FH\\^FDLOT ${f(l.lotNo)}^FS',
+    '^FO40,${y + 70}^A0N,34,34^FH\\^FDSKU ${f(l.sku)}^FS',
+    if (l.expiryDate != null)
+      '^FO40,${y + 120}^A0N,34,34^FH\\^FDEXP ${f(l.expiryDate!)}^FS',
+    if (l.receivedOn != null)
+      '^FO40,${y + 170}^A0N,30,30^FH\\^FDIN ${f(l.receivedOn!)}^FS',
+    '^PQ$copies',
     '^XZ',
   ].join('\n');
 }

@@ -96,6 +96,7 @@ class PickInstruction {
   const PickInstruction({
     required this.locations,
     this.lotId,
+    this.lotNo,
     this.expiresOn,
     this.remainingQty,
     this.visitSeq,
@@ -106,6 +107,9 @@ class PickInstruction {
   });
 
   final String? lotId;
+
+  /// LOT 번호 — LOT 라벨 GS1 (10)(fulfillment 0.11.0·inventory 0.21.0). 재고 조회가 안 되면 null.
+  final String? lotNo;
   final String? expiresOn;
 
   /// 이 LOT 조각에서 더 집을 양.

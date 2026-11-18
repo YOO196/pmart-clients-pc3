@@ -33,6 +33,7 @@ Future<void> printLabel(
         builder: (_) => switch (label) {
           final ProductBarcodeLabel p => ProductBarcodePreviewDialog(label: p),
           final PackageLabel p => LabelPreviewDialog(label: p),
+          final LotLabel p => LotLabelPreviewDialog(label: p),
           _ => const SizedBox.shrink(),
         },
       );
@@ -53,6 +54,56 @@ Future<void> printLabel(
           ),
         ),
       );
+  }
+}
+
+/// LOT 라벨 미리보기(프린터 없음). 바코드 그림은 그리지 않고 값만 보인다.
+class LotLabelPreviewDialog extends StatelessWidget {
+  const LotLabelPreviewDialog({super.key, required this.label});
+
+  final LotLabel label;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return AlertDialog(
+      key: const ValueKey('lot-label-preview'),
+      title: Text(l10n.lotLabelPreviewTitle(label.copies)),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SelectableText(
+              label.gs1 ?? label.labelValue,
+              key: const ValueKey('lot-label-code'),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontFamily: 'monospace',
+              ),
+            ),
+            const Divider(),
+            Text(
+              l10n.lotLabelNo(label.lotNo),
+              style: theme.textTheme.headlineSmall,
+            ),
+            Text(label.productName ?? label.sku),
+            if (label.expiryDate != null)
+              Text(l10n.stockCheckExpiry(label.expiryDate!)),
+            if (label.receivedOn != null)
+              Text(l10n.lotLabelReceived(label.receivedOn!)),
+            const SizedBox(height: 12),
+            Text(l10n.labelPreviewNote, style: theme.textTheme.bodySmall),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.confirmOk),
+        ),
+      ],
+    );
   }
 }
 

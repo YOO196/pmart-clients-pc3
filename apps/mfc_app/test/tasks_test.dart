@@ -469,6 +469,42 @@ void main() {
       expect(pick.scanLocation(task, 'C-S1-01-1-01'), PickLocScan.ok);
     });
 
+    test('LOT 라벨(GS1-128)로 집기 — 지시 LOT 번호면 담고, 다른 LOT·다른 상품은 막는다', () async {
+      final (pick, task) = await atStop();
+      const gtin = '08801115220015';
+      expect(
+        pick.scan(task, '(01)$gtin(17)261105(10)L261105999'),
+        ScanResult.wrongLot,
+        reason: '같은 상품 다른 LOT — 선입선출',
+      );
+      expect(
+        pick.scan(
+          task,
+          '(01)08809999999999(10)${MockTaskRepository.yogurtLotNo}',
+        ),
+        ScanResult.wrongItem,
+        reason: '(01) 이 이 상품 바코드가 아님',
+      );
+      expect(pick.scan(task, 'LOT:LOT-OTHER'), ScanResult.wrongLot);
+      // 스캐너 원문(]C1 + GS 구분) 도 같다.
+      expect(
+        pick.scan(
+          task,
+          ']C101${gtin}17261105\u001d10${MockTaskRepository.yogurtLotNo}',
+        ),
+        ScanResult.matched,
+      );
+      expect(c.read(pickingProvider('task-mock-1')).capturedFor('ol-1'), 1);
+    });
+
+    test('LOT 라벨이 아직 없는 재고 — 상품 바코드도 받는다(기존 재고 갱신 전)', () async {
+      final (pick, task) = await atStop();
+      expect(
+        pick.scan(task, MockTaskRepository.yogurtStoreBarcode),
+        ScanResult.matched,
+      );
+    });
+
     test('칸 몫을 다 담으면 바로 보낸다 — 실행 본문은 스캔한 칸·지시 LOT, 다음 칸으로', () async {
       final (pick, task) = await atStop();
       pick.scan(task, MockTaskRepository.yogurtBarcode);
