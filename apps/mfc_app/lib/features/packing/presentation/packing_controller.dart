@@ -280,6 +280,43 @@ class PackingController extends Notifier<PackingState> {
     ref.invalidate(shipmentProvider(s.shipmentId));
   }
 
+  /// 결과를 모르는 나누기 — 같은 포장·같은 나눔이면 같은 키로만 다시 보낸다.
+  ({String sig, IdempotencyKey key})? _pendingSplit;
+
+  /// 밀봉한 봉투 [p] 를 둘로 나눈다([moved] 만큼 새 봉투로). 봉투가 무겁거나 너무 찼을 때.
+  Future<RegroupOutcome> split(
+    String shipmentId,
+    PackageView p,
+    Map<String, int> moved,
+  ) async {
+    final parts = splitContents(p, moved);
+    if (parts == null) {
+      return const RegroupRejected(PackProblemCode.contentMismatch);
+    }
+    final sig = [
+      p.packageId,
+      for (final e
+          in (moved.entries.toList()..sort((a, b) => a.key.compareTo(b.key))))
+        '${e.key}=${e.value}',
+    ].join('|');
+    final pending = _pendingSplit;
+    final key = pending != null && pending.sig == sig
+        ? pending.key
+        : IdempotencyKey.generate();
+    _pendingSplit = (sig: sig, key: key);
+    final outcome = await _repo.regroup(shipmentId, p.packageId, [
+      parts.keep,
+      parts.move,
+    ], key: key);
+    if (outcome is! RegroupUnknown) _pendingSplit = null;
+    if (ref.mounted) ref.invalidate(shipmentProvider(shipmentId));
+    return outcome;
+  }
+
+  /// 밀봉하지 않고 남은 수량(지시 − 밀봉 − 지금 봉투) 합.
+  int leftAfterBag(TaskDetailView task, ShipmentView s) =>
+      task.lines.fold(0, (n, l) => n + room(l, s).clamp(0, 1 << 30));
+
   Future<PackOutcome> repack(
     String shipmentId,
     PackageView p,

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:pmart_api_mfc_fulfillment/pmart_api_mfc_fulfillment.dart'
     as api;
 import 'package:pmart_core/pmart_core.dart';
@@ -244,6 +245,92 @@ base class MockPackingRepository implements PackingRepository {
     _byKey[key.value] = id;
     _refreshShipment(shipmentId);
     return _done(p);
+  }
+
+  /// 받은 나누기 요청 횟수(같은 키 재전송 포함).
+  int regroupCalls = 0;
+
+  /// 다음 나누기 응답을 1회 잃는다(서버는 나눔).
+  bool loseNextRegroupResponse = false;
+  final _regroupByKey = <String, List<String>>{};
+
+  @override
+  Future<RegroupOutcome> regroup(
+    String shipmentId,
+    String packageId,
+    List<List<ContentLine>> groups, {
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    regroupCalls++;
+    List<Map<String, Object?>> byIds(List<String> ids) => [
+      for (final id in ids)
+        _allPackages.firstWhere((p) => p['packageId'] == id),
+    ];
+    RegroupOutcome done(List<String> ids) => RegroupDone([
+      for (final p in byIds(ids)) packageFromContract(api.Package.fromJson(p)),
+    ]);
+    final existing = _regroupByKey[key.value];
+    if (existing != null) return done(existing);
+    final old = _allPackages.firstWhere((p) => p['packageId'] == packageId);
+    final fence = (old['fence'] as Map?)?['state'];
+    if (old['state'] != 'SEALED' || (fence != null && fence != 'NONE')) {
+      return const RegroupRejected(PackProblemCode.invalidState);
+    }
+    // 합계가 같아야 한다(주문 줄별).
+    Map<String, int> sum(Iterable<({String ol, int qty})> xs) {
+      final m = <String, int>{};
+      for (final x in xs) {
+        m[x.ol] = (m[x.ol] ?? 0) + x.qty;
+      }
+      return m;
+    }
+
+    final before = sum([
+      for (final c in (old['contents']! as List).cast<Map<String, Object?>>())
+        (ol: c['orderLineId']! as String, qty: c['qty']! as int),
+    ]);
+    final after = sum([
+      for (final g in groups)
+        for (final c in g) (ol: c.orderLineId, qty: c.qty),
+    ]);
+    if (!mapEquals(before, after) || groups.any((g) => g.isEmpty)) {
+      return const RegroupRejected(PackProblemCode.contentMismatch);
+    }
+    final version = (old['packageVersion']! as int) + 1;
+    old
+      ..['state'] = 'INVALIDATED'
+      ..['invalidatedReason'] = 'contentChange';
+    final ids = <String>[];
+    for (final g in groups) {
+      final id = 'pkg-${++_seq}';
+      _packagesOf(shipmentId).add({
+        ...old,
+        'packageId': id,
+        'packageVersion': version,
+        'state': 'SEALED',
+        'qrCode': 'PKG:$id:$version',
+        'invalidatedReason': null,
+        'contents': [
+          for (final c in g)
+            {
+              'orderLineId': c.orderLineId,
+              'sku': c.sku,
+              'qty': c.qty,
+              'lotId': ?c.lotId,
+            },
+        ],
+        'bagCount': 1,
+      });
+      ids.add(id);
+    }
+    _regroupByKey[key.value] = ids;
+    _refreshShipment(shipmentId);
+    if (loseNextRegroupResponse) {
+      loseNextRegroupResponse = false;
+      return const RegroupUnknown();
+    }
+    return done(ids);
   }
 
   @override
