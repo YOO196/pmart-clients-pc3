@@ -1,6 +1,8 @@
 // 상품 일괄 등록(seed-v1 zip) → 상품별 검증 → 유효 행 제출 준비 → PRODUCT 승인(1건 + 행 N개) → id-map.
+// 화면(2026-11-18 사용자 "밋밋하다 — Shopify·Medusa 처럼"): 올리기 화면은 단계 표시 + 점선 파일 상자,
+// 배치 화면은 머리(상태 배지·단계) → 숫자 카드(전체·유효·오류) → 한 카드 안 상품 행 표(이름 굵게·초안 ID 작게) + 아래 작업 줄 → 승인 현황 카드.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { commandParams } from '../../api/command';
@@ -15,7 +17,29 @@ import { toUiState } from '@pmart/web-ui';
 import { useCommand } from '@pmart/web-ui';
 import { RequestApproval } from '../approvals/RequestApproval';
 import { DraftProblems } from './ProductDraftPage';
-import { DataTable, PageHeader } from '../../shared/admin';
+import { NextAction, PageHeader, StatusBadge, type Tone } from '../../shared/admin';
+import { Card, JumpLink, MiniStat, Steps, tableClass, TitleWithId } from './parts';
+
+const REVIEW_TONE: Readonly<Record<string, Tone>> = {
+  REVIEW_PENDING: 'warning',
+  EVIDENCE_REQUIRED: 'warning',
+  APPROVED: 'success',
+  PARTIALLY_APPROVED: 'info',
+  REJECTED: 'error',
+};
+
+/** 배치 상태 배지 색(상품·콘텐츠·가격 배치가 같이 쓴다) */
+export const BATCH_TONE: Readonly<Record<string, Tone>> = {
+  VALIDATED: 'info',
+  UPLOADED: 'info',
+  DRAFT: 'neutral',
+  SUBMITTED: 'warning',
+  APPLIED: 'success',
+  PUBLISHED: 'success',
+  PARTIALLY_APPLIED: 'warning',
+  PARTIALLY_PUBLISHED: 'warning',
+  REJECTED: 'error',
+};
 
 /**
  * 제출한 배치의 승인 요청 현황(BR-41 회신 2026-11-03). 승인 목록을 `GET /approvals?targetRef=` 로 정확히 찾아 링크·심사 상태를 보이고,
@@ -36,18 +60,20 @@ export function BatchApprovals({ targetRef, pending }: { readonly targetRef: str
   const showRequest = !!pending && list.isSuccess && (found.length === 0 || requested !== null);
 
   return (
-    <div className="space-y-2 rounded-box border border-base-300 bg-base-100 p-4" aria-label={m.products.approvals}>
-      <h2 className="font-bold">{m.products.approvals}</h2>
+    <Card id="batch-approvals" title={m.products.approvals} label={m.products.approvals}>
       {ids.length > 0 && (
-        <ul className="space-y-1 text-sm">
+        <ul className="divide-y divide-base-300 text-sm">
           {ids.map((id) => {
             const a = found.find((x) => x.approvalId === id);
             return (
-              <li key={id}>
-                <Link className="link" to={`/approvals/${encodeURIComponent(id)}`}>
-                  {m.approvals.open}
-                </Link>
-                {` · ${id}${a?.reviewState ? ` · ${m.approvals.reviewState[a.reviewState]}` : ''}`}
+              <li key={id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span className="min-w-0">
+                  <Link className="link link-primary font-medium" to={`/approvals/${encodeURIComponent(id)}`}>
+                    {m.approvals.open}
+                  </Link>
+                  <span className="ml-2 font-mono text-xs text-base-content/50">{id}</span>
+                </span>
+                {a?.reviewState && <StatusBadge tone={REVIEW_TONE[a.reviewState] ?? 'ghost'}>{m.approvals.reviewState[a.reviewState]}</StatusBadge>}
               </li>
             );
           })}
@@ -71,8 +97,8 @@ export function BatchApprovals({ targetRef, pending }: { readonly targetRef: str
           }}
         />
       )}
-      {list.isSuccess && ids.length === 0 && !pending && requested === null && <p className="text-sm">{m.products.approvalNone}</p>}
-    </div>
+      {list.isSuccess && ids.length === 0 && !pending && requested === null && <p className="text-sm text-base-content/60">{m.products.approvalNone}</p>}
+    </Card>
   );
 }
 
@@ -91,20 +117,45 @@ export function ZipUpload({
   readonly onUpload: (file: File) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
+  // 점선 파일 상자(2026-11-18 화면 다듬기) — 이름표·버튼 이름은 그대로
   return (
-    <div className="flex flex-wrap items-end gap-2 rounded-box border border-base-300 bg-base-100 p-4">
-      <label className="flex flex-col text-sm">
-        {m.products.zipFile}
+    <div className="space-y-4 rounded-box border border-base-300 bg-base-100 p-5 shadow-sm" data-testid="zip-upload">
+      <label
+        className={`flex cursor-pointer flex-col items-center gap-3 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors ${file ? 'border-primary/40 bg-primary/5' : 'border-base-300 hover:border-primary/40 hover:bg-base-200/60'}`}
+      >
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary" aria-hidden="true">
+          <svg viewBox="0 0 24 24" className="h-6 w-6 fill-none stroke-current" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 15V4m0 0-4 4m4-4 4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" />
+          </svg>
+        </span>
+        <span className="font-semibold">{m.products.zipFile}</span>
         <input
           type="file"
           accept=".zip,application/zip"
-          className="file-input file-input-sm"
+          aria-label={m.products.zipFile}
+          className="file-input file-input-sm w-full max-w-sm"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
         />
+        <span className="text-xs text-base-content/55">{file ? m.products.zipChosen(file.name, Math.max(1, Math.round(file.size / 1024))) : m.products.zipHint}</span>
       </label>
-      <button type="button" className="btn btn-primary btn-sm" disabled={!file || busy} onClick={() => file && onUpload(file)}>
-        {m.products.upload}
-      </button>
+      <div className="flex justify-end">
+        <button type="button" className="btn btn-primary btn-sm" disabled={!file || busy} onClick={() => file && onUpload(file)}>
+          {m.products.upload}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 올리기 화면 공통 짜임: 단계 표시 + 안내 + 파일 상자(가운데 좁게) */
+export function UploadLayout({ steps, intro, children }: { readonly steps: readonly string[]; readonly intro: string; readonly children: ReactNode }) {
+  return (
+    <div className="mx-auto max-w-3xl space-y-4">
+      <div className="space-y-2 rounded-box border border-base-300 bg-base-100 px-5 py-4 shadow-sm">
+        <Steps steps={steps} now={0} />
+        <p className="text-sm text-base-content/65">{intro}</p>
+      </div>
+      {children}
     </div>
   );
 }
@@ -129,8 +180,10 @@ export function NewProductImportPage() {
   return (
     <section className="space-y-4">
       <PageHeader title={m.products.importTitle} />
-      <ZipUpload busy={upload.busy} onUpload={(file) => void upload.run(file)} />
-      <CommandFeedback command={upload} />
+      <UploadLayout steps={m.products.importSteps} intro={m.products.importIntro}>
+        <ZipUpload busy={upload.busy} onUpload={(file) => void upload.run(file)} />
+        <CommandFeedback command={upload} />
+      </UploadLayout>
     </section>
   );
 }
@@ -164,13 +217,13 @@ function FillMissing({ draft, batchId }: { readonly draft: ProductDraft; readonl
   });
   const name = draft.input?.product.internalName ?? draft.draftId;
   return (
-    <div className="flex flex-wrap items-end gap-2 text-sm" aria-label={`${m.products.fillInvalid} ${name}`}>
-      <span className="opacity-70">{m.products.volumeHint(sku?.volumeMl)}</span>
-      <label className="flex flex-col">
+    <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg border border-warning/40 bg-warning/5 px-3 py-2 text-sm" aria-label={`${m.products.fillInvalid} ${name}`}>
+      <span className="self-center text-xs text-base-content/60">{m.products.volumeHint(sku?.volumeMl)}</span>
+      <label className="flex flex-col text-xs">
         {m.products.weightG}
         <input className="input input-xs w-24" inputMode="numeric" value={weightG} onChange={(e) => setWeightG(e.target.value)} />
       </label>
-      <label className="flex flex-col">
+      <label className="flex flex-col text-xs">
         {m.products.storageType}
         <select className="select select-xs" value={storageType} onChange={(e) => setStorageType(STORAGE_TYPES.find((s) => s === e.target.value) ?? '')}>
           <option value="">{m.none}</option>
@@ -181,7 +234,7 @@ function FillMissing({ draft, batchId }: { readonly draft: ProductDraft; readonl
           ))}
         </select>
       </label>
-      <button type="button" className="btn btn-xs" disabled={save.busy || (!weightG.trim() && !storageType)} onClick={() => void save.run(null)}>
+      <button type="button" className="btn btn-xs btn-primary" disabled={save.busy || (!weightG.trim() && !storageType)} onClick={() => void save.run(null)}>
         {m.products.fillSave}
       </button>
       <CommandFeedback command={save}>{() => <span className="text-success">{m.products.fillSaved(name)}</span>}</CommandFeedback>
@@ -193,7 +246,7 @@ function FillMissing({ draft, batchId }: { readonly draft: ProductDraft; readonl
 function AnotherUpload() {
   const upload = useImportUpload();
   return (
-    <div className="space-y-2">
+    <div id="another-upload" className="scroll-mt-4 space-y-2">
       <h2 className="font-bold">{m.products.uploadAnother}</h2>
       <ZipUpload busy={upload.busy} onUpload={(file) => void upload.run(file)} />
       <CommandFeedback command={upload} />
@@ -220,6 +273,52 @@ export function batchCounts(b: Pick<ImportBatch, 'validCount' | 'invalidCount' |
   const valid = drafts.filter((d) => d.validationState === 'VALID').length;
   return { valid, invalid: drafts.length - valid };
 }
+
+/**
+ * 다음 할 일(2026-11-18 사용자 "직관적이지 않다") — 서버 배치 state 와 행의 검증 결과 수만으로 하나를 고른다.
+ * 버튼은 이 쪽의 구역(행 표·승인 현황·다른 파일 올리기)으로 내려가기만 한다.
+ */
+function BatchNextAction({ state, valid, invalid }: { readonly state: ImportBatch['state']; readonly valid: number; readonly invalid: number }) {
+  switch (state) {
+    case 'VALIDATED':
+      if (invalid > 0) {
+        return (
+          <NextAction tone="warning" title={m.products.next.batchFix(invalid)} body={m.products.next.batchFixBody(valid)}>
+            <JumpLink to="batch-rows">{m.products.go.rows}</JumpLink>
+          </NextAction>
+        );
+      }
+      return valid > 0 ? (
+        <NextAction title={m.products.next.batchSubmit(valid)}>
+          <JumpLink to="batch-rows">{m.products.go.rows}</JumpLink>
+        </NextAction>
+      ) : (
+        <NextAction tone="warning" title={m.products.next.batchNone} />
+      );
+    case 'SUBMITTED':
+      return (
+        <NextAction title={m.products.next.batchApproval}>
+          <JumpLink to="batch-approvals">{m.products.go.approvals}</JumpLink>
+        </NextAction>
+      );
+    case 'APPLIED':
+      return <NextAction tone="success" title={m.products.next.batchApplied} />;
+    case 'PARTIALLY_APPLIED':
+      return (
+        <NextAction tone="warning" title={m.products.next.batchPartial}>
+          <JumpLink to="batch-approvals">{m.products.go.approvals}</JumpLink>
+        </NextAction>
+      );
+    default:
+      return (
+        <NextAction tone="error" title={m.products.next.batchRejected}>
+          <JumpLink to="another-upload">{m.products.go.upload}</JumpLink>
+        </NextAction>
+      );
+  }
+}
+
+const importStep = (state: ImportBatch['state']) => (state === 'VALIDATED' ? 1 : state === 'SUBMITTED' ? 3 : 4);
 
 export function ProductImportPage() {
   const { batchId = '' } = useParams();
@@ -249,109 +348,149 @@ export function ProductImportPage() {
 
   return (
     <section className="space-y-4">
-      <PageHeader title={m.products.batch(batchId)} />
+      <PageHeader
+        back={{ to: '/products/import', label: m.products.importTitle }}
+        title={query.data ? <TitleWithId title={m.products.batchHeading(query.data.productCount)} id={m.products.batch(batchId)} /> : m.products.batch(batchId)}
+        actions={
+          query.data ? <StatusBadge tone={BATCH_TONE[query.data.state] ?? 'ghost'} testId="batch-state">{m.products.batchStateName[query.data.state] ?? query.data.state}</StatusBadge> : null
+        }
+      />
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(b) => {
           const counts = batchCounts(b);
+          // 다음 할 일은 아래 BatchNextAction(서버 state·행 검증 결과만)
+          const updates = (b.drafts ?? []).filter((d) => d.state === 'DRAFT' && d.registration === 'UPDATE').length;
           return (
-          <>
-            <p className="text-sm">{`${b.state} · ${m.products.counts(b.productCount, counts.valid, counts.invalid)}`}</p>
-            {(b.drafts ?? []).some((d) => d.state === 'DRAFT' && d.validationState !== 'VALID') && (
-              <p className="text-sm opacity-80">{m.products.fillInvalidHint}</p>
-            )}
-            {(() => {
-              const updates = (b.drafts ?? []).filter((d) => d.state === 'DRAFT' && d.registration === 'UPDATE').length;
-              return updates > 0 ? (
-                <p role="status" className="alert alert-warning text-sm">
+            <>
+              <Steps steps={m.products.importSteps} now={importStep(b.state)} />
+              <BatchNextAction state={b.state} valid={counts.valid} invalid={counts.invalid} />
+              <div className="grid grid-cols-3 gap-3" data-testid="batch-counts">
+                <MiniStat label={m.products.statTotal} value={b.productCount} testId="batch-total" />
+                <MiniStat label={m.products.statValid} value={counts.valid} tone="success" testId="batch-valid" />
+                <MiniStat label={m.products.statInvalid} value={counts.invalid} tone={counts.invalid > 0 ? 'error' : 'muted'} testId="batch-invalid" />
+              </div>
+              {updates > 0 && (
+                <p role="status" className="alert alert-warning alert-soft text-sm">
                   {m.products.updateNotice(updates)}
                 </p>
-              ) : null;
-            })()}
-            <DataTable>
-              <tbody>
-                {(b.drafts ?? []).map((d) => (
-                  <tr key={d.draftId}>
-                    <td>
-                      <Link className="link" to={`/products/drafts/${encodeURIComponent(d.draftId)}`}>
-                        {d.draftId}
-                      </Link>
-                    </td>
-                    <td>{d.sourceKey ?? m.none}</td>
-                    <td>
-                      {/* 재업로드 = 기존 상품의 새 버전(BR-39 회신). 승인자·운영자가 새 등록인지 갱신인지 바로 본다. */}
-                      {d.registration === 'UPDATE' ? (
-                        <span className="badge badge-warning badge-sm gap-1" title={m.products.registrationName.UPDATE}>
-                          {m.products.registrationName.UPDATE}
-                          {d.existingProductId && (
-                            <Link className="link" to={`/products/${encodeURIComponent(d.existingProductId)}`}>
-                              {d.existingProductId}
-                            </Link>
-                          )}
-                        </span>
-                      ) : d.registration === 'NEW' ? (
-                        <span className="badge badge-ghost badge-sm">{m.products.registrationName.NEW}</span>
-                      ) : null}
-                    </td>
-                    <td>{d.input?.product.internalName ?? m.none}</td>
-                    <td>
-                      <DraftProblems draft={d} />
-                      {d.state === 'DRAFT' && d.validationState !== 'VALID' && d.input && (
-                        <FillMissing key={`${d.draftId}-${d.version}`} draft={d} batchId={batchId} />
-                      )}
-                      {/* VALID 가 된 뒤에도 제출(잠금) 전이면 초안 화면에서 전체를 고칠 수 있다. */}
-                      {d.state === 'DRAFT' && (
-                        <Link className="link text-sm" to={`/products/drafts/${encodeURIComponent(d.draftId)}`}>
-                          {m.products.update}
-                        </Link>
-                      )}
-                    </td>
-                    <td>{d.resultSkus?.join(', ') ?? ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </DataTable>
-            <div className="flex gap-2">
-              {b.state === 'VALIDATED' && (
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  disabled={submit.busy || submit.phase.kind === 'done' || counts.valid === 0}
-                  onClick={() => void submit.run(null)}
-                >
-                  {m.products.submitBatch}
-                </button>
               )}
-              <button type="button" className="btn btn-sm" disabled={idMap.busy} onClick={() => void idMap.run(undefined)}>
-                {m.products.idMap}
-              </button>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => void query.refetch()}>
-                {m.checkAgain}
-              </button>
-            </div>
-            <CommandFeedback command={idMap} />
-            <CommandFeedback command={submit}>
-              {(r) =>
-                (r.excludedDraftIds?.length ?? 0) > 0 ? (
-                  // 빠진 초안은 ID 와 함께 배치 행의 서버 사유(검증 상태·problems)를 보인다.
-                  <div className="space-y-1 text-sm" aria-label={m.products.excluded}>
-                    <p className="font-bold">{`${m.products.excluded} ${r.excludedDraftIds?.length ?? 0}`}</p>
-                    <ul className="list-disc pl-5">
-                      {(r.excludedDraftIds ?? []).map((id) => {
-                        const d = (b.drafts ?? []).find((x) => x.draftId === id);
-                        const why = d
-                          ? [`${d.state} · ${d.validationState}`, ...(d.problems ?? []).map((p) => `${reasonText(p.code)}${p.field ? ` (${p.field})` : ''}`)].join(' · ')
-                          : m.none;
-                        return <li key={id}>{`${id}${d?.sourceKey ? ` (${d.sourceKey})` : ''}: ${why}`}</li>;
-                      })}
-                    </ul>
+              <div id="batch-rows" className="scroll-mt-4 overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-base-300 px-5 py-3">
+                  <h2 className="font-bold">{m.products.rowsTitle}</h2>
+                  {(b.drafts ?? []).some((d) => d.state === 'DRAFT' && d.validationState !== 'VALID') && (
+                    <p className="max-w-2xl text-xs text-base-content/60">{m.products.fillInvalidHint}</p>
+                  )}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className={tableClass}>
+                    <thead>
+                      <tr>
+                        <th>{m.products.internalName}</th>
+                        <th>{m.contents.rowHead.sourceKey}</th>
+                        <th>{m.products.registration}</th>
+                        <th>{m.products.validation}</th>
+                        <th>SKU</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(b.drafts ?? []).map((d) => (
+                        <tr key={d.draftId} className="align-top">
+                          <td className="min-w-48">
+                            <p className="font-medium">{d.input?.product.internalName ?? m.none}</p>
+                            <Link className="font-mono text-xs text-base-content/50 hover:text-primary hover:underline" to={`/products/drafts/${encodeURIComponent(d.draftId)}`}>
+                              {d.draftId}
+                            </Link>
+                          </td>
+                          <td className="font-mono text-xs">{d.sourceKey ?? m.none}</td>
+                          <td>
+                            {/* 재업로드 = 기존 상품의 새 버전(BR-39 회신). 승인자·운영자가 새 등록인지 갱신인지 바로 본다. */}
+                            {d.registration === 'UPDATE' ? (
+                              <span className="badge badge-warning badge-soft badge-sm gap-1" title={m.products.registrationName.UPDATE}>
+                                {m.products.registrationName.UPDATE}
+                                {d.existingProductId && (
+                                  <Link className="link" to={`/products/${encodeURIComponent(d.existingProductId)}`}>
+                                    {d.existingProductId}
+                                  </Link>
+                                )}
+                              </span>
+                            ) : d.registration === 'NEW' ? (
+                              <span className="badge badge-info badge-soft badge-sm">{m.products.registrationName.NEW}</span>
+                            ) : null}
+                          </td>
+                          <td className="min-w-64">
+                            <DraftProblems draft={d} />
+                            {d.state === 'DRAFT' && d.validationState !== 'VALID' && d.input && (
+                              <FillMissing key={`${d.draftId}-${d.version}`} draft={d} batchId={batchId} />
+                            )}
+                            {/* VALID 가 된 뒤에도 제출(잠금) 전이면 초안 화면에서 전체를 고칠 수 있다. */}
+                            {d.state === 'DRAFT' && (
+                              <Link className="link link-primary mt-1 inline-block text-xs" to={`/products/drafts/${encodeURIComponent(d.draftId)}`}>
+                                {m.products.update}
+                              </Link>
+                            )}
+                          </td>
+                          <td>
+                            {(d.resultSkus ?? []).length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {(d.resultSkus ?? []).map((s) => (
+                                  <span key={s} className="rounded bg-base-200 px-1.5 py-0.5 font-mono text-xs">
+                                    {s}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* 아래 작업 줄: 보조 동작 왼쪽, 제출(주 동작) 오른쪽 */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 bg-base-200/40 px-5 py-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" className="btn btn-sm" disabled={idMap.busy} onClick={() => void idMap.run(undefined)}>
+                      {m.products.idMap}
+                    </button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => void query.refetch()}>
+                      {m.checkAgain}
+                    </button>
                   </div>
-                ) : null
-              }
-            </CommandFeedback>
-            {b.state !== 'VALIDATED' && (
-              <BatchApprovals targetRef={`productImportBatch:${batchId}`} pending={b.pendingSubmission?.approvalRequest} />
-            )}
-          </>
+                  {b.state === 'VALIDATED' && (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      disabled={submit.busy || submit.phase.kind === 'done' || counts.valid === 0}
+                      onClick={() => void submit.run(null)}
+                    >
+                      {m.products.submitBatch}
+                    </button>
+                  )}
+                </div>
+              </div>
+              <CommandFeedback command={idMap} />
+              <CommandFeedback command={submit}>
+                {(r) =>
+                  (r.excludedDraftIds?.length ?? 0) > 0 ? (
+                    // 빠진 초안은 ID 와 함께 배치 행의 서버 사유(검증 상태·problems)를 보인다.
+                    <div className="space-y-1 rounded-box border border-warning/40 bg-warning/5 px-4 py-3 text-sm" aria-label={m.products.excluded}>
+                      <p className="font-bold">{`${m.products.excluded} ${r.excludedDraftIds?.length ?? 0}`}</p>
+                      <ul className="list-disc pl-5">
+                        {(r.excludedDraftIds ?? []).map((id) => {
+                          const d = (b.drafts ?? []).find((x) => x.draftId === id);
+                          const why = d
+                            ? [`${m.products.draftStateName[d.state] ?? d.state} · ${m.products.validationName[d.validationState] ?? d.validationState}`, ...(d.problems ?? []).map((p) => `${reasonText(p.code)}${p.field ? ` (${p.field})` : ''}`)].join(' · ')
+                            : m.none;
+                          return <li key={id}>{`${id}${d?.sourceKey ? ` (${d.sourceKey})` : ''}: ${why}`}</li>;
+                        })}
+                      </ul>
+                    </div>
+                  ) : null
+                }
+              </CommandFeedback>
+              {b.state !== 'VALIDATED' && (
+                <BatchApprovals targetRef={`productImportBatch:${batchId}`} pending={b.pendingSubmission?.approvalRequest} />
+              )}
+            </>
           );
         }}
       </QueryState>

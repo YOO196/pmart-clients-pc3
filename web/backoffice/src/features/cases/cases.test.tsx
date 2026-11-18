@@ -242,7 +242,8 @@ describe('지원센터 사건', () => {
     const list = await rows();
     const order = within(list[0]!).getAllByTestId('case-linked').find((l) => l.getAttribute('data-kind') === 'ORDER')!;
     expect(order).toHaveTextContent('확인 불가');
-    expect(screen.getByLabelText('원천')).toHaveTextContent(/order-service/);
+    expect(screen.getByLabelText('원천')).toHaveTextContent(/못 읽음: 주문/); // 업무 이름(2026-11-18)
+    expect(screen.getByTitle(/조회하지 못한 원천: order-service/)).toBeInTheDocument(); // 원래 이름은 마우스를 올리면
   });
 
   it('case-service 를 못 읽었으면(unavailableSources) 빈 목록이 아니라 조회 실패', async () => {
@@ -330,7 +331,7 @@ describe('접수 건 목록 — 화면 번호(bff 0.14.0, ADR-0070)', () => {
     expect(within(row).getByRole('link', { name: '배송 12345678 번호 없음' })).toHaveAttribute('href', '/deliveries/DLV-OLD-12345678');
     expect(within(row).getByRole('link', { name: '라이더 ABCDEFGH 번호 확인 불가' })).toHaveAttribute('href', '/riders/RID-ABCDEFGH');
     expect(row).not.toHaveTextContent('DLV-OLD-12345678');
-    expect(screen.getByText(/조회하지 못한 원천: rider-service/)).toBeInTheDocument();
+    expect(screen.getByText(/못 읽음: .*라이더/)).toHaveAttribute('title', expect.stringMatching(/조회하지 못한 원천: .*rider-service/)); // 원천 표시 한 줄(2026-11-18) — 업무 이름, 원래 이름은 마우스
   });
 });
 
@@ -375,7 +376,7 @@ describe('사건 다시 열기(case 0.6.0)·넘기기(0.7.0)', () => {
     await userEvent.click(within(form).getByRole('button', { name: '관리자에게 넘기기' }));
     await waitFor(() => expect(screen.getByTestId('case-group')).toHaveTextContent('관리자 팀'));
     expect(screen.getByTestId('case-group')).toHaveTextContent('관리자 처리 중');
-    expect(screen.getByRole('note')).toHaveTextContent('아직 처리가 끝나지 않았어요');
+    expect(screen.getByTestId('next-action')).toHaveTextContent('아직 처리가 끝나지 않았어요'); // 관리자 처리 중 안내는 다음 할 일 카드로(2026-11-18)
     // 지원센터에는 맡기·닫기·넘기기가 없다
     expect(screen.queryByRole('button', { name: '맡기' })).not.toBeInTheDocument();
     expect(screen.queryByRole('form', { name: '완료 처리' })).not.toBeInTheDocument();

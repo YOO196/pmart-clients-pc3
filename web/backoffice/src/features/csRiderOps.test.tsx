@@ -31,7 +31,7 @@ describe('메뉴 묶음 — 역할로 보이고(합집합) 접고 편다', () =>
     }
   });
 
-  it('지금 화면의 묶음만 펼친 채로 시작하고, 묶음 이름을 누르면 접고 편다', async () => {
+  it('지금 화면의 묶음만 펼친 채로 시작하고, 다른 묶음 이름을 누르면 그것만 펼친다(한 묶음만, 2026-11-18)', async () => {
     const user = userEvent.setup();
     renderAt('/inquiries', as.csRider);
     const cs = await screen.findByTestId('nav-group-cs');
@@ -40,8 +40,9 @@ describe('메뉴 묶음 — 역할로 보이고(합집합) 접고 편다', () =>
     expect(support).not.toHaveAttribute('open');
     await user.click(within(support).getByText('지원센터'));
     expect(support).toHaveAttribute('open');
-    await user.click(within(cs).getByText('고객센터'));
-    expect(cs).not.toHaveAttribute('open');
+    expect(cs).not.toHaveAttribute('open'); // 전 묶음은 닫힘
+    await user.click(within(support).getByText('지원센터'));
+    expect(support).not.toHaveAttribute('open'); // 다시 누르면 닫힘
   });
 
   it('같은 화면은 메뉴에 한 번만 — 함께 쓰는 조회는 조회·현황 묶음에', async () => {
@@ -55,12 +56,18 @@ describe('메뉴 묶음 — 역할로 보이고(합집합) 접고 편다', () =>
     expect(new Set(all).size).toBe(all.length);
   });
 
-  it('첫 화면은 역할로 보이는 첫 메뉴 — 상담원은 주문 조회, 라이더 운영은 접수 건(라이더 찾기는 라이더 백오피스로 옮김)', async () => {
+  // 2026-11-18 사용자: 첫 화면 = 대시보드(예전엔 역할 첫 메뉴로 바로 갔다). 숫자 카드는 역할로 보이는 메뉴의 것만.
+  it('첫 화면은 대시보드 — 상담원은 오늘 주문·답변 대기 고객 문의, 라이더 운영은 기한 지난 접수 건·답변 대기 라이더 문의', async () => {
     renderAt('/', as.cs);
-    expect(await screen.findByRole('heading', { name: '주문 조회' })).toBeInTheDocument();
+    expect(await screen.findByTestId('dashboard')).toBeInTheDocument();
+    expect(screen.getByTestId('dash-kpi-orders')).toBeInTheDocument();
+    expect(screen.getByTestId('dash-kpi-inquiries')).toBeInTheDocument();
+    expect(screen.queryByTestId('dash-kpi-casesOverdue')).not.toBeInTheDocument(); // 상담원은 접수 건을 맡지 않는다
     cleanup();
     renderAt('/', as.riderOps);
-    expect(await screen.findByRole('heading', { name: '접수 건' })).toBeInTheDocument();
+    expect(await screen.findByTestId('dash-kpi-casesOverdue')).toBeInTheDocument();
+    expect(screen.getByTestId('dash-kpi-riderInquiries')).toBeInTheDocument();
+    expect(screen.queryByTestId('dash-kpi-inquiries')).not.toBeInTheDocument();
   });
 });
 
@@ -258,6 +265,9 @@ describe('배송 확인', () => {
     const view = renderAt('/deliveries/DLV-MOCK-2', as.cs);
     expect(await screen.findByTestId('execution-state')).toHaveTextContent('전달 실패 등록');
     expect(screen.getByTestId('delivery-failure')).toHaveTextContent('세 번 전화했지만');
+    // 다음 할 일(2026-11-18): 전달 실패 등록이면 확정·반려 칸으로
+    expect(await screen.findByTestId('next-action')).toHaveTextContent('전달 실패를 확정하거나 반려해 주세요');
+    expect(screen.getByRole('link', { name: '결정 칸으로' })).toHaveAttribute('href', '#failure-decision');
     await user.click(screen.getByLabelText('실패 확정'));
     await user.click(screen.getByRole('button', { name: '결정 보내기' }));
     expect(await screen.findByTestId('decision-result')).toHaveTextContent('반영됐어요.');

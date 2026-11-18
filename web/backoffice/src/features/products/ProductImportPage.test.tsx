@@ -51,7 +51,7 @@ describe('상품 일괄 등록', () => {
     await user.selectOptions(within(fill).getByLabelText('보관 방식'), 'CHILLED');
     await user.click(within(fill).getByRole('button', { name: '저장·재검증' }));
 
-    await waitFor(() => expect(screen.getByText('VALID')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTitle('VALID')).toHaveTextContent('검증 통과'));
     expect(screen.queryByLabelText('빠진 값 채우기 부사 사과 1kg')).not.toBeInTheDocument();
     const put = view.mutations('/product-drafts/pd-seed-invalid')[0]!;
     expect(put.method).toBe('PUT');
@@ -76,7 +76,7 @@ describe('상품 일괄 등록', () => {
     db.importBatches.set(batch.batchId, batch);
     renderAt('/products/import/pib-seed-1');
 
-    expect(await screen.findByRole('heading', { name: '배치 pib-seed-1' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /배치 pib-seed-1/ })).toBeInTheDocument();
     const another = screen.getByRole('heading', { name: '다른 파일 올리기' }).parentElement!;
     expect(within(another).getByLabelText('seed-v1.zip')).toBeInTheDocument();
     // 파일을 고르기 전에는 올릴 수 없다
@@ -120,7 +120,11 @@ describe('상품 일괄 등록', () => {
     db.importBatches.set(batch.batchId, batch);
     renderAt('/products/import/pib-seed-3');
 
-    expect(await screen.findByText('VALIDATED · 전체 2 · 유효 1 · 오류 1')).toBeInTheDocument();
+    // 2026-11-18 화면: 상태 배지 + 숫자 카드(전체·유효·오류)
+    expect(await screen.findByTestId('batch-valid')).toHaveTextContent('유효1');
+    expect(screen.getByTestId('batch-total')).toHaveTextContent('전체 상품2');
+    expect(screen.getByTestId('batch-invalid')).toHaveTextContent('오류1');
+    expect(screen.getByTestId('batch-state')).toHaveTextContent('검증 끝남');
     expect(screen.getByRole('button', { name: '유효 행 제출 준비' })).toBeEnabled();
     // VALID 행도 제출 전이면 초안 화면에서 다시 고칠 수 있다(행마다 "초안 수정" 링크).
     const links = screen.getAllByRole('link', { name: '초안 수정' });
@@ -174,7 +178,8 @@ describe('상품 일괄 등록', () => {
     expect(link.getAttribute('href')).toMatch(/^\/approvals\/apv-/);
     expect(screen.queryByRole('button', { name: '승인 요청' })).not.toBeInTheDocument();
     // 승인 목록 조회가 끝나면 심사 상태도 붙는다.
-    expect(await screen.findByText(/· 심사 대기$/)).toBeInTheDocument();
+    // 2026-11-18 화면: 승인 번호 옆 심사 상태 배지
+    expect(await screen.findByText('심사 대기')).toBeInTheDocument();
   });
 
   it('재업로드 행은 "기존 상품 갱신"(상품 ID 링크)으로 구분하고 제출 전에 갱신 안내를 보인다(BR-39 회신)', async () => {

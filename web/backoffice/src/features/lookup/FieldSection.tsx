@@ -8,6 +8,7 @@ import { Link } from 'react-router';
 import { useSession } from '../../app/SessionContext';
 import { messages } from '../../shared/messages';
 import { label, text, when } from '../../shared/ops';
+import { CodeLabel } from '../../shared/admin';
 
 const m = messages.lookup.fieldWork;
 
@@ -27,8 +28,8 @@ function Task({ t }: { readonly t: Obj }) {
   const done = num(t['completedQty']);
   const cancelled = num(t['cancelledQty']);
   return (
-    <li className={`rounded-box border p-2 text-xs ${blocked ? 'border-error text-error' : 'border-base-300'}`} data-testid="field-task" data-type={str(t['taskType']) ?? ''} data-state={state ?? ''}>
-      <span className="font-semibold">{label(m.taskName, str(t['taskType']))}</span> {text(state)}
+    <li className={`rounded-lg border px-2.5 py-1.5 text-xs ${blocked ? 'border-error bg-error/5 text-error' : 'border-base-300 bg-base-100'}`} data-testid="field-task" data-type={str(t['taskType']) ?? ''} data-state={state ?? ''}>
+      <span className="font-semibold">{label(m.taskName, str(t['taskType']))}</span> {state ? <CodeLabel code={state} names={messages.packing.taskStateName} /> : messages.none}
       {planned !== null && <span className="ml-1 opacity-80">{m.qty(done ?? 0, planned, cancelled ?? 0)}</span>}
       {str(t['workerId']) && <span className="ml-1 font-mono text-base-content/60">{m.worker(str(t['workerId'])!)}</span>}
       {blocked && str(t['blockReason']) && <span className="block font-bold">{m.blocked(str(t['blockReason'])!)}</span>}
@@ -43,7 +44,7 @@ function Shipment({ s }: { readonly s: Obj }) {
   return (
     <div className="space-y-1 border-t border-base-200 pt-2" data-testid="field-shipment">
       <p className="text-sm">
-        <span className="font-mono">{text(str(s['shipmentId']))}</span> · {text(str(s['state']))}
+        <span className="font-mono">{text(str(s['shipmentId']))}</span> · {str(s['state']) ? <CodeLabel code={str(s['state'])!} names={messages.packing.stateName} /> : messages.none}
         {str(s['readyAt']) && <span className="opacity-70">{` · ${m.readyAt} ${when(str(s['readyAt']))}`}</span>}
       </p>
       {tasks.length > 0 && <ol className="flex flex-wrap items-start gap-1">{tasks.map((t, i) => <Task key={`${str(t['taskType']) ?? ''}-${i}`} t={t} />)}</ol>}
@@ -61,7 +62,8 @@ function Shipment({ s }: { readonly s: Obj }) {
         const rejected = str(p['handoverRejectReason']);
         return (
           <p key={i} className={`text-xs ${rejected ? 'text-error' : 'opacity-80'}`} data-testid="field-package">
-            {`${m.package} ${text(str(p['state']))}`}
+            {`${m.package} `}
+            {str(p['state']) ? <CodeLabel code={str(p['state'])!} names={messages.packing.packageStateName} /> : messages.none}
             {str(p['handoverStatus']) && ` · ${m.handover} ${str(p['handoverStatus'])}`}
             {str(p['handedOverAt']) && ` · ${when(str(p['handedOverAt']))}`}
             {rejected && <span className="block font-bold">{m.handoverRejected(rejected)}</span>}
@@ -75,7 +77,7 @@ function Shipment({ s }: { readonly s: Obj }) {
 function FulfillmentCard({ id, summary }: { readonly id: string; readonly summary: Obj }) {
   const rejected = str(summary['acceptance']) === 'REJECTED';
   return (
-    <div className="space-y-2" data-testid="match-FULFILLMENT">
+    <div className="space-y-2 rounded-box border border-base-300/70 bg-base-200/30 p-3" data-testid="match-FULFILLMENT">
       <p className="text-sm">
         <span className="font-mono">{id}</span> · {label(m.workKind, str(summary['kind']))} · {text(str(summary['mfcId']))}
         {str(summary['preparationStartedAt']) && <span className="opacity-70">{` · ${m.preparationStartedAt} ${when(str(summary['preparationStartedAt']))}`}</span>}
@@ -96,9 +98,10 @@ function StopCard({ id, summary }: { readonly id: string; readonly summary: Obj 
   const error = str(summary['lastError']);
   const stuck = str(summary['state']) === 'PENDING' && error !== null;
   return (
-    <div className="space-y-1 text-sm" data-testid="match-MFC_STOP">
+    <div className="space-y-1 rounded-box border border-base-300/70 bg-base-200/30 p-3 text-sm" data-testid="match-MFC_STOP">
       <p>
-        <span className="font-mono">{id}</span> · {m.stop} {text(str(summary['scope']))} · {text(str(summary['state']))}
+        <span className="font-mono">{id}</span> · {m.stop} {str(summary['scope']) ? <CodeLabel code={str(summary['scope'])!} names={m.stopScopeName} /> : messages.none} ·{' '}
+        {str(summary['state']) ? <CodeLabel code={str(summary['state'])!} names={m.stopStateName} /> : messages.none}
         {str(summary['requestedAt']) && <span className="opacity-70">{` · ${when(str(summary['requestedAt']))}`}</span>}
       </p>
       {error && <p className="text-error">{m.lastError(error)}</p>}
@@ -123,7 +126,6 @@ export function FieldWork({ matches }: { readonly matches: ReadonlyArray<{ reado
       {stops.map((s) => (
         <StopCard key={s.id} id={s.id ?? ''} summary={obj(s.summary)} />
       ))}
-      <p className="text-xs text-base-content/60">{m.note}</p>
     </div>
   );
 }

@@ -27,7 +27,7 @@ describe('통합 조회', () => {
     expect(await screen.findByText('배송 번호로 찾음 → 주문 ORD-MOCK-1001')).toBeInTheDocument();
     expect(within(section('주문')).getByRole('link', { name: '상세 보기' })).toHaveAttribute('href', '/orders/ORD-MOCK-1001');
     expect(within(section('배송(수행)')).getByText('IN_TRANSIT')).toBeInTheDocument();
-    expect(within(section('배차')).getByText('ASSIGNED')).toBeInTheDocument();
+    expect(within(section('배차')).getByTitle('ASSIGNED')).toHaveTextContent('배정'); // 원천 코드는 이름으로, 코드는 마우스를 올리면(2026-11-18)
     expect(within(section('배차')).getByRole('link', { name: '상세 보기' })).toHaveAttribute('href', '/deliveries/DLV-MOCK-1');
     expect(within(section('클레임')).getByRole('link', { name: '상세 보기' })).toHaveAttribute('href', '/claims/CLM-MOCK-1');
     // 사건은 열린 것·닫힌 것을 상태로 나눠
@@ -55,7 +55,7 @@ describe('통합 조회', () => {
     expect(within(claim).getByRole('alert')).toHaveTextContent('조회 실패 또는 볼 권한 없음');
     expect(within(claim).queryByText('없음')).not.toBeInTheDocument();
     // 원천 표시 줄에도 실패 원천이 따로 보인다
-    expect(within(screen.getByRole('region', { name: '원천' })).getByText(/조회하지 못한 원천: claim-service/)).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: '원천' })).getByText(/못 읽음: 클레임/)).toHaveAttribute('title', expect.stringMatching(/조회하지 못한 원천: claim-service/));
     // MFC 현장(bff 0.9.0) 실패도 칸에 조회 실패
     expect(within(section('현장(MFC)')).getByRole('alert')).toHaveTextContent('조회 실패 또는 볼 권한 없음');
   });

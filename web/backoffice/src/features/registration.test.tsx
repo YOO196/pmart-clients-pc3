@@ -19,7 +19,7 @@ describe('상품 등록 → 승인 요청 → 승인 → 반영', () => {
     await user.selectOptions(screen.getByLabelText('보관 방식'), 'CHILLED');
     await user.click(screen.getByRole('button', { name: '초안 저장' }));
 
-    expect(await screen.findByText('VALID')).toBeInTheDocument();
+    expect(await screen.findByTitle('VALID')).toHaveTextContent('검증 통과');
     await user.click(screen.getByRole('button', { name: '제출 준비(잠그기)' }));
     await user.click(await screen.findByRole('button', { name: '승인 요청' }));
     expect(await screen.findByText(/승인 요청을 올렸어요/)).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe('상품 등록 → 승인 요청 → 승인 → 반영', () => {
     await user.selectOptions(await screen.findByLabelText('대표 카테고리'), 'p01');
     await user.click(screen.getByRole('button', { name: '초안 저장' }));
 
-    expect(await screen.findByText('INVALID')).toBeInTheDocument();
+    expect(await screen.findByTitle('INVALID')).toHaveTextContent('검증 오류');
     const problems = screen.getByRole('list', { name: '검증 문제' });
     expect(within(problems).getByText('중량이 필요해요 (skus[0].weightG)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '제출 준비(잠그기)' })).toBeDisabled();
@@ -117,6 +117,8 @@ describe('카테고리 트리', () => {
     const user = userEvent.setup();
     renderAt('/categories');
     await user.click(await screen.findByRole('button', { name: '과일 (p01-c01)' }));
-    expect(await screen.findByText('원산지 · MULTIPLE')).toBeInTheDocument();
+    const group = await screen.findByTestId('filter-group');
+    expect(group).toHaveTextContent('원산지');
+    expect(group).toHaveTextContent('여러 개 선택'); // selectionMode MULTIPLE
   });
 });

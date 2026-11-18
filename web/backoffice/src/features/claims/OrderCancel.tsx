@@ -105,7 +105,7 @@ export function OrderCancelForm({ order, caseRef: initialCaseRef = '', onClose }
         }}
       >
         <Notice tone="warning">{m.whole}</Notice>
-        <fieldset className="space-y-3" disabled={locked}>
+        <fieldset className="grid gap-4 md:grid-cols-2" disabled={locked}>
           <label className="flex flex-col gap-1 text-sm">
             {m.reason}
             <select className="select select-sm w-64" value={reason} onChange={(e) => setReason(e.target.value as Reason | '')}>
@@ -154,7 +154,7 @@ export function OrderCancelForm({ order, caseRef: initialCaseRef = '', onClose }
         {code === 'DUPLICATE_CLAIM' && <p className="text-sm text-warning">{m.duplicate}</p>}
         <CommandFeedback command={create} unknown={{ body: m.unknown }}>
           {(c) => (
-            <div role="status" className="alert alert-success text-sm" data-testid="order-cancel-created">
+            <div role="status" className="alert alert-success alert-soft text-sm" data-testid="order-cancel-created">
               <span>{m.created(label(messages.claims.stateName, c.state))}</span>
               {c.claimId && (
                 <button type="button" className="btn btn-xs" onClick={() => void navigate(`/claims/${encodeURIComponent(c.claimId ?? '')}`)}>
