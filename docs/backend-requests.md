@@ -16,7 +16,7 @@
 | BR-06 | 높음 | 라이더 | 배차 제안 수신 채널·대기 목록(일반배차모드) API 없음 | AGREED(부분, `e817184`+`f4dd171`, check 통과 `3916354`) — 푸시·SSE·대기 목록 보류 |
 | BR-07 | 높음 | 라이더·고객·관리자 | 파일 업로드 API 없음(`photoRefs` 는 존재하지 않는 "file-service" 참조) | 일부 해소 — 리뷰 사진은 review 0.2.0 `POST /review-photos`(고객앱 반영 2026-11-16). 배송 전달 사진·CS 첨부·회수/파손 증빙은 그대로 OPEN |
 | BR-08 | 낮음 | 전체 | `X-Source-System` 클라이언트 값 목록 확정 | OPEN |
-| BR-09 | 중간 | 고객·라이더 | 푸시 토큰(FCM/APNs) 등록·해제 API 없음 | OPEN |
+| BR-09 | 중간 | 고객·라이더 | 푸시 토큰(FCM/APNs) 등록·해제 API 없음 | **RESOLVED**(notification-service 0.4.0 `PUT·DELETE /me/push-tokens/{deviceId}`·`GET /me/push-tokens`, 고객·라이더). 고객앱 반영 2026-11-17~18(요청 `docs/handoff/archive/2026-11-17-backend-customer-push-fcm.md`). 목록 상태 고침 2026-11-19 |
 | BR-10 | 중간 | 관리자 웹 | 상세 화면용 조회 경로(bff 미제공 화면)·내보내기/다운로드 API | OPEN |
 | BR-11 | 중간 | MFC | 점원 화면의 피킹·패킹·출고대기 현황, 입고 예정 화면의 조회 경로 | OPEN |
 | BR-12 | 낮음 | 고객 | 고객 노출 문구용 상태 코드(FUL_*, CXL_* 등) 와 계약 enum 대응 확정 | OPEN |
@@ -57,7 +57,7 @@
 | BR-47 | 높음 | 고객 | 상품 검색 `mfcId` 지정 시 LAN 센터의 전 상품이 미취급(carried=false)으로 빠짐 — `total` 은 뺀 상품 포함("1개"인데 빈 목록), 빈 페이지에 `nextCursor`, 미취급 숨김/구분 정책 확인 | **RESOLVED**(2026-11-04 회신 `../pmart-backend/docs/handoff/clients/archive/2026-11-04-clients-reply-br44-br48.md`): MFC-SEED-01 은 데이터 문제(275 SKU 취급 ON), `total` 의미 계약 명시, 빈 페이지는 서버가 채움(그래도 `nextCursor` 있으면 계속). 정책: 업무 문서는 구분 표시이나 사용자 결정은 미취급 숨김(2026-11-05, BR-49 와 같은 판단) — 고객앱은 기본값(false) 유지 |
 | BR-48 | 중간 | 백오피스 | 카테고리 추가(`/category-tree-additions`·`-uploads`)에 이미 있는 카테고리만 올리면 계약의 422 `NOTHING_TO_ADD` 대신 500 `INTERNAL_ERROR` | **RESOLVED**(2026-11-04 회신 `../pmart-backend/docs/handoff/clients/archive/2026-11-04-clients-reply-br44-br48.md`): 원인은 큰 zip 업로드 메모리 부족(OOM), 스트림으로 수정. 이미 있는 카테고리만이면 422 `NOTHING_TO_ADD`. 클라이언트 변경 없음 |
 | BR-49 | 중간 | 고객 | 홈·탭·섹션 진열(`storefront`)이 `mfcId` 를 줘도 미취급을 거르지 않음(`carried` 늘 null, 없는 센터도 10건) — 검색처럼 빼 달라, 빈 섹션 규칙, 숨김 정책 확인 | OPEN(요청 `docs/handoff/archive/2026-11-05-backend-storefront-not-carried.md`). 고객앱은 서버 항목 그대로 |
-| BR-50 | 중간 | 고객 | 주문서 로그인 뒤 비회원→회원 장바구니 병합(`POST /carts/{id}/merges`) 앞 확인 — `CART_MERGE_CONFIRM` 이 실제로 오는 조건, 비회원 토큰 만료 시 처리, 센터(mfcId)가 다를 때, LAN 구현 상태 | OPEN(2026-11-07). 고객앱은 병합 미구현 — 로그인 뒤 빈 회원 장바구니가 보임(사용자 실기기 보고) |
+| BR-50 | 중간 | 고객 | 주문서 로그인 뒤 비회원→회원 장바구니 병합(`POST /carts/{id}/merges`) 앞 확인 — `CART_MERGE_CONFIRM` 이 실제로 오는 조건, 비회원 토큰 만료 시 처리, 센터(mfcId)가 다를 때, LAN 구현 상태 | **ANSWERED**(2026-11-19 회신 `../pmart-backend/docs/handoff/clients/customer-app/2026-11-19-reply-br50-cart-merge.md`, auth 0.2.1·cart 0.2.2 설명만): `CART_MERGE_CONFIRM` 은 안 옴 — 앱이 비회원 장바구니 품목으로 판단, 토큰 만료 403 `FORBIDDEN_OWNER`(갱신 뒤 같은 키), 센터 달라도 거절 없음, LAN 배포됨. 고객앱 병합은 아직 미구현(2026-11-07 요청서 없이 목록에만 적었음 — 백엔드가 목록을 보고 회신) |
 | BR-51 | 높음 | MFC | 배차 자동 요청(AUTO_ON_READY) 제거 — 사용자 결정(2026-11-10): 배차는 무조건 점원 요청. 계약 0.4.5 D-5 는 READY 시 자동 요청 | OPEN(요청 `docs/handoff/archive/2026-11-10-backend-dispatch-manual-only.md`). PDA 는 직원 요청만, 서버가 AUTO_ON_READY 를 보내면 숨기지 않고 관리자 알림 문구 |
 | BR-52 | 높음 | MFC | PDA 업무 선택(입고/품질검사/재고 이동/재고 실사/피패킹) 기반 배정 — 다음 작업 받기에 고른 업무 필터, 입고·품질검사·적치 배정 포함, 회수품 반입·회수품 검사·실사 작업 유형 추가, 작업자 본인 조회 허용, 메뉴 권한 기준, 작업 가능 신호, 품질검사 LOT 은 시스템 배정(R15), 품질검사 판정 기준·격리 사유·증빙 사진 업로드·반입 줄 온도대(R18), 이동·실사·피패킹 상품 바코드·패킹 온도대·장바구니·적치 추천·격리 이동·실사 목록 밖 상품·예외 보고(R19), 피킹한 사람에게 같은 주문 패킹 배정·출하대기 랙 위치(R20) | OPEN — **R1·R3·R4 완료**(mfc-capacity 0.13, 클라이언트 PR #2 2026-11-14: `workAreas`·다음 작업 받기 `workArea`·422 `WORK_AREA_NOT_ALLOWED`). 나머지 R2·R5~R7·R12~R20 OPEN — 다음 차례로 R2·R19-1 요청(`docs/handoff/mfc-app/2026-11-14-backend-br52-next-priority.md`). 원 요청 `docs/handoff/mfc-app/2026-11-10-backend-pda-work-areas.md` |
 | BR-53 | 중간 | MFC | 입고 수령 화면에 필요한 값 — 입고 예정 행의 상품명·바코드(스캔 대조), RECEIVE 배정의 taskId ↔ trfId 연결, 송장(TRF) 바코드 원문 형식, 행당 차이 사유 1개의 우선순위(수량 차이 vs 격리 사유) | **R8~R11 완료**(mfc-inbound 0.8.0·mfc-inventory 0.15.0, 클라이언트 PR #3 2026-11-14: 실서버 `productName`·`barcodes`, 송장 라벨 `TRF:{trfId}:{version}` 은 trfId 만 비교, R9·R11 확정). 실서버 확인은 안 함. R17(박스 단위)·입고 예정 구현(서버 501)은 남음. 원 요청 `docs/handoff/mfc-app/2026-11-10-backend-pda-work-areas.md` |
@@ -66,6 +66,7 @@
 | BR-56 | 중간 | 백오피스 | 직원 주문 조회·문의에서 배송 번호(deliveryId)로 잇기 — 컴플레인 기록·배송 확인에 필요 | **DONE(2026-11-16)** — execution 0.4.0 `GET /deliveries?orderId=` — 주문 상세 "이 주문의 배송" |
 | BR-57 | 낮음 | 인사팀 백오피스 | 요청 권한으로 고를 수 있는 역할 목록 API(employee-auth) — 역할이 늘 때마다 화면 고정 목록을 맞추지 않게 | **DONE(2026-11-16)** — `GET /employee-auth/roles`(employee-auth 0.5.0, 백엔드 알림 `hr-backoffice/2026-11-15-notice-role-list-and-departments.md` §1). 직원 등록의 요청 권한 역할이 이 응답(이름·순서·센터 필요 여부)을 쓴다 |
 | BR-58 | 중간 | 백오피스 | 라이더 도움요청 상담 대화 — 상담원 쪽 대화 읽기·답장·새 메시지 표시·읽음, 상태(처리 중 시점·다시 처리 뒤 대화), 관리자 가림 | **AGREED**(2026-11-16 회신 — 대화는 delivery-execution, 백엔드 PR #60 병합 `5e2455fe` = execution 0.6.0 messages API, LAN 배포는 확인 안 함·DE-2(권한·새 메시지 필드·가림) PR #62 로 PC 5 에 요청). DE-2 반영·배포 뒤 화면을 붙인다. 전화는 보류. 요청 `docs/handoff/archive/2026-11-16-backend-rider-help-chat.md` |
+| BR-59 | 중간 | 고객 | 처음 실행 약관(레퍼런스 2-1): 위치 기반 서비스 약관(필수) 동의 유형이 없고(`consentType` 은 TERMS_OF_SERVICE·PRIVACY_POLICY·AGE_OVER_14·MARKETING 뿐), 로그인 전(비회원·기기) 동의·마케팅 푸시 수신 동의를 기록할 경로가 없음 | RESOLVED(2026-11-19, 요청 `docs/handoff/customer-app/2026-11-19-backend-first-run-consents.md` → 회신 `clients/customer-app/2026-11-19-reply-br59-first-run-consents.md`, customer 0.6.0~0.6.1 LAN 배포). 고객앱 반영(목 모드 확인, 미커밋). 백엔드 질문 1개(현재 위치 → 주소 서비스 이름) 남음 |
 
 ---
 
@@ -124,6 +125,7 @@
 
 ## BR-09 푸시 토큰
 - notification-service 채널에 `APP_PUSH` 가 있으나 기기 푸시 토큰 등록·해제 경로가 없다.
+- **끝남**: notification-service 0.4.0 `PUT·DELETE /me/push-tokens/{deviceId}`, `GET /me/push-tokens`(CUSTOMER·RIDER). 고객앱은 회원이 되면 등록·로그아웃 전 해제(2026-11-17~18). 목록 상태가 OPEN 으로 남아 있던 것을 2026-11-19 고침.
 
 ## BR-10 관리자 웹 조회·내보내기
 - bff `views` 8개 외 화면(승인 상세·결정 이력, 사건 상세, 센터·캘린더, 감사, 대량 변경, 정책 참조, 권한·대행 목록 등)은 원서비스 경로를 직접 호출해야 하는지 확인. 게이트웨이 라우트 존재 여부 포함.
@@ -340,6 +342,14 @@
   3. 비회원 장바구니와 회원 장바구니의 센터(`mfcId`)가 다르면? 항목별 재검증 실패(MERGE_PARTIAL)로 오나, 별도 거절인가?
   4. LAN 에서 병합 API 가 구현·배포돼 있나(501 아님)?
 - 고객앱: 답을 받기 전에는 목으로만 만든다.
+- 요청서 없이 이 목록에만 적어 두었다(백엔드에 전달 안 됨) — 백엔드가 2026-11-19 이 목록을 보고 회신했다.
+- **회신(2026-11-19)** `../pmart-backend/docs/handoff/clients/customer-app/2026-11-19-reply-br50-cart-merge.md` — 계약 auth 0.2.1·cart 0.2.2(설명만, 값·모양 변경 없음):
+  1. `CART_MERGE_CONFIRM` 은 서버가 보내지 않는다(로그인 요청에 비회원 정보가 없어 모른다, enum 은 하위 호환으로 남김). **앱이 정한다**: `purpose=CHECKOUT` 로그인이 끝나면(`nextAction=NONE`, `COMPLETE_CONSENT` 면 동의 뒤) 비회원 장바구니(`GET /carts/{비회원 cartId}`, 비회원 토큰)에 품목이 있으면 고객 확인(고른 항목만) → `POST /carts/{회원 cartId}/merges`, 없으면 바로 주문서. 일반 로그인은 병합 안 함.
+  2. `X-Guest-Token` 만료·무효·주인 아님 → 403 `FORBIDDEN_OWNER`. 병합 전에 비회원 토큰 갱신 가능(`POST /auth/tokens`, 비회원 refresh token, 같은 `X-Device-Id`) — 갱신 뒤 **같은 Idempotency-Key** 로 다시.
+  3. 센터가 달라도 거절 없음. 재검증은 원항목 그대로(`SOURCE_ITEM_CHANGED`)·판매 상태·구매 상한뿐. 합친 뒤 회원 장바구니를 다시 읽으면 그 센터 기준 `availability` 가 보이고 주문서 견적이 막는다.
+  4. LAN 구현·배포됨(cart-service `MergesController`, 게이트웨이 `/api/v1/carts/**`).
+  - 결과: CONFIRMED·PARTIAL(실패 항목은 `reasonCode` 와 함께 비회원 장바구니에 남음)·REJECTED, 202·불명은 `GET /carts/{cartId}/merges/{mergeId}`. 성공분은 같은 SKU 수량 합산, 비회원 장바구니에서 빠짐(한 트랜잭션).
+- 고객앱 남은 일: 위 1~3 대로 병합 구현(주문서 로그인 뒤). 생성 클라이언트는 auth·cart 다시 생성(설명만 바뀌어 코드 변화는 없을 것으로 봄 — 생성 때 확인).
 
 ## BR-51 배차 자동 요청(AUTO_ON_READY) 제거 (MFC)
 - 사용자 결정(2026-11-10): "배차에 자동요청 기능은 빼 무조건 직원 요청으로."
@@ -380,3 +390,16 @@
 - 계약(case 0.11.2·execution 0.5.1)에 대화 API 가 없다. 접수 건 메모는 직원끼리만 보는 기록이라 대신 쓸 수 없다.
 - 회신(2026-11-16): 대화는 delivery-execution `GET/POST /deliveries/{deliveryId}/help-requests/{requestId}/messages`(백엔드 PR #60 — 2026-11-16 main `5e2455fe` 에 병합, execution 0.6.0). 답장은 RIDER_OPS·OPERATOR_ADMIN, 새 메시지는 `lastRiderMessageAt`·`lastSupportMessageAt`(직원별 읽음은 화면이 기억), 관리자 가림, 처리 중 = 상담원이 집을 때 — DE-2(PR #62)로 PC 5 에 요청됨.
 - 클라이언트: DE-2 가 반영·배포되기 전에는(권한·필드가 바뀜) 화면을 만들지 않는다(추측 경로 금지). 전화 기능은 보류(사용자 2026-11-16).
+
+## BR-59 처음 실행 약관 — 위치 기반 서비스 약관·비회원 동의 기록 (고객앱)
+- 계기: 사용자 2026-11-19 "제일처음부터 주소를 무조건 요구했으면 좋겠어", 환영·약관 화면은 "화면만 넣고 백엔드 요청"으로 결정. 레퍼런스 2-1: 앱을 처음 켜면 전체동의 / 위치 기반 서비스 약관 동의(필수) / 마케팅 정보 앱 푸시 알림 수신 동의(선택), "시작하기"는 필수를 골라야 눌림. 2-2 는 마케팅 동의 뒤 "수신동의 처리완료"(전송자·일시) 안내 창.
+- 계약 공백: customer-service `consentType` 에 위치 기반 서비스 약관이 없다. auth 동의(AUTH_CONSENT)는 로그인 때만 묻고, 로그인 전(비회원·기기 단위) 동의와 마케팅 푸시 수신 동의를 남길 경로가 없다. 약관 본문(펼쳐 보기 `>`)을 받을 경로도 없다.
+- 요청: ① 위치 기반 서비스 약관 동의 유형·버전 ② 비회원(기기 ID 또는 비회원 토큰) 동의 기록 경로와, 로그인 뒤 회원 동의로 옮기는 방식 ③ 마케팅 푸시 수신 동의의 처리 결과(일시) 응답 — 법정 수신동의 안내에 쓴다 ④ 약관 본문 조회.
+- 클라이언트(처음): `features/start` — 동의를 이 기기 보안 저장소에만 두고, "처리완료" 안내 창과 약관 `>` 는 넣지 않았다.
+- 회신(2026-11-19, `../pmart-backend/docs/handoff/clients/customer-app/2026-11-19-reply-br59-first-run-consents.md`, customer-service 0.6.0·0.6.1, LAN 배포):
+  ① `LOCATION_BASED_SERVICE` — **현재 위치 기능을 쓸 때만 필수**(`required=false`, `requiredFor=CURRENT_LOCATION`), 로그인·구매 필수 목록·로그인 동의 단계에 없음.
+  ② 기기 동의 `GET /device-consents`·`POST /device-consent-changes`(X-Device-Id, MARKETING·LOCATION_BASED_SERVICE 만) — 로그인하면 서버가 계정으로 옮긴다(앱이 부를 것 없음).
+  ③ 동의 조회에 `senderName`·항목별 `lastChangedAt` — 이 값으로 처리완료 안내.
+  ④ `GET /consent-terms`(항목·현행 버전·`documentUrl`), `GET /consent-terms/{항목}/{버전}`(Markdown 본문, 시연용 초안·법률 검토 전).
+  질문: 현재 위치를 주소로 바꿀 때 쓰는 지도·주소 서비스 이름(위치기반서비스 약관 제6조) — "현재 위치로 찾기" 결정 때 답한다.
+- 클라이언트(반영, 2026-11-19): 위치 약관 선택으로("시작하기" 잠금 풀림), 시작하기 → `POST /device-consent-changes`(약관 목록의 현행 버전, 결과 불명은 같은 키 한 번 더) → 서버 응답의 `lastChangedAt`·`senderName` 으로 2-2 동의/거부 안내 → 다음 단계. 약관 `>` → 본문 화면. 기기에는 단계 통과만 남긴다. 재동의 화면은 위치 약관을 묻지 않는다.
