@@ -46,10 +46,38 @@ describe('작업 목록', () => {
     expect(screen.queryByText('조건에 맞는 작업이 없어요.')).not.toBeInTheDocument();
   });
 
-  it('확인 필요 포장은 지금 현장 작업자만 — 안내만 보인다(목록을 부르지 않는다)', async () => {
+  it('확인 필요 포장(MB-3): 센터 관리자도 목록을 보고, 가져감은 한 번 더 물은 뒤 보낸다', async () => {
     const view = renderAt('/c/MFC-BSN-01/tasks');
-    expect(await screen.findByRole('note')).toHaveTextContent('현장 작업자(PDA)만');
-    expect(view.gets('/packages')).toHaveLength(0);
+    const box = await screen.findByTestId('handover-checks');
+    const row = (await within(box).findAllByTestId('handover-check-row'))[0]!;
+    expect(row).toHaveTextContent('PKG-1');
+    expect(row).toHaveTextContent('RDR-1');
+    const req = view.gets('/packages')[0]!;
+    expect(Object.fromEntries(new URL(req.url).searchParams)).toEqual({ mfcId: 'MFC-BSN-01', checkRequired: 'true' });
+
+    // 취소하면 보내지 않는다.
+    await userEvent.click(within(row).getByRole('button', { name: '포장대에 없음(라이더가 가져감)' }));
+    await userEvent.click(within(row).getByRole('button', { name: '취소' }));
+    expect(view.sent.filter((r) => r.method === 'POST' && r.url.endsWith('/handover-checks'))).toHaveLength(0);
+
+    await userEvent.click(within(row).getByRole('button', { name: '포장대에 없음(라이더가 가져감)' }));
+    expect(within(row).getByRole('alertdialog')).toHaveTextContent('되돌릴 수 없어요');
+    await userEvent.click(within(row).getByRole('button', { name: '보내기' }));
+    await waitFor(() => expect(view.sent.some((r) => r.method === 'POST' && r.url.endsWith('/packages/PKG-1/handover-checks'))).toBe(true));
+    const post = view.sent.find((r) => r.method === 'POST' && r.url.endsWith('/packages/PKG-1/handover-checks'))!;
+    expect(await post.clone().json()).toEqual({ result: 'TAKEN_BY_RIDER' });
+    expect(post.headers.get('Idempotency-Key')).toBeTruthy();
+    // 확정되면 목록을 다시 읽어 그 포장이 빠진다.
+    expect(await within(box).findByText('확인할 포장이 없어요')).toBeInTheDocument();
+  });
+
+  it('확인 필요 포장: 허가가 아직 살아 있으면(409 FENCE_ACTIVE) 거절 안내', async () => {
+    server.use(http.post(`${API_BASE}/packages/:id/handover-checks`, () => HttpResponse.json({ status: 409, code: 'FENCE_ACTIVE', title: 'x', type: 'about:blank' }, { status: 409, headers: { 'content-type': 'application/problem+json' } })));
+    renderAt('/c/MFC-BSN-01/tasks');
+    const row = (await screen.findAllByTestId('handover-check-row'))[0]!;
+    await userEvent.click(within(row).getByRole('button', { name: '포장대에 있음' }));
+    await userEvent.click(within(row).getByRole('button', { name: '보내기' }));
+    expect(await within(row).findByRole('alert')).toBeInTheDocument();
   });
 });
 

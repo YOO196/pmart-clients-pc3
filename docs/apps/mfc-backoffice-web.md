@@ -113,7 +113,7 @@
 | 상세 `tasks/<taskId>` | `GET /tasks/{id}` | 줄(계획·완료·취소·남음·확정 대기), 막힌 이유, 포장 위치, 방문 순서 방법. 재고 확정 대기 실적이 있으면 안내 |
 | 작업 내놓기 | `POST /tasks/{id}/releases` {workerId = 지금 담당, reason?} | ASSIGNED·IN_PROGRESS 이고 담당이 있을 때만 단추. 409 `EXECUTION_IN_FLIGHT` 문구, 503 은 결과 불명(같은 키로 확인). 응답 상태가 READY 일 때만 "내놓음" |
 | 출하·포장 | `GET /shipments/{id}`, `GET /packages/{id}/handover-resolution`(누를 때만) | 화면용 주문번호(`orderNumber`, 0.13.0 F-5 — 없으면 안 보임), 포장 인계 숫자(`handoverCode`, F-8), 포장 상태·인계 허가(만료 시각)·라이더. 판정과 "점원 확인 필요" 표시 |
-- 확인 필요 포장 목록·확인(`GET /packages?checkRequired=true`, `handover-checks`)은 지금 MFC_WORKER 만(MB-3 결정 대기) — 목록 위에 안내만, 부르지 않는다.
+- 확인 필요 포장 목록·확인(`GET /packages?checkRequired=true`, `handover-checks`)— 센터 관리자도(MB-3, fulfillment 0.17.0, 2026-11-19 반영). 목록 위 "확인 필요 포장" 카드: 놓인 위치·포장·주문·라이더·허가 끝 시각, "포장대에 있음" / "포장대에 없음(라이더가 가져감)"(한 번 더 확인 — 재고가 빠지는 확정). 409 FENCE_ACTIVE·INVALID_STATE 는 거절, 결과 불명은 같은 키. 확인 뒤 목록 다시 읽기.
 - 시작·실적·포장·배차 요청은 현장 일 — 넣지 않는다.
 
 ### 4-6. 배정 — mfc-capacity-service 0.14.0 `/assignments`·`/assignment-plans*` (`features/assignments/AssignmentPages.tsx`)
@@ -121,7 +121,7 @@
 |---|---|---|
 | 배정 목록(탭 `?tab=` 기본) | `GET /assignments?mfcId=&state=&date=&workerId=&taskId=` | state 생략 = ACTIVE. 거르기는 URL 쿼리. 출처(직접·추천 확정·다음 작업 받기), 경고(OFF_SHIFT = 근무 밖), `workerEligibility`(지금 맡을 수 없으면 사유) — 서버 값. 진행 중 행에 "다시 배정" |
 | 직접 배정(`?tab=manual`) | `GET /assignments?taskId=`(지금 담당 확인) → `POST /assignments` + `X-Expected-Version` | 확인한 지금 담당 버전(없으면 0)으로 보낸다 — 확인 전·작업 ID 를 바꾸면 단추 꺼짐. 작업자는 재직 작업자 목록에서(못 불러오면 직접 입력). 응답 버전이 그대로면 "바뀐 것 없음", OFF_SHIFT 는 알리기만. 422 `WORKER_NOT_REGISTERED`·`WORKER_NOT_ACTIVE`·`DUTY_NOT_ALLOWED`·`ZONE_NOT_QUALIFIED`, 409 `VERSION_CONFLICT` 문구 |
-| 배정 추천(`?tab=plan`) | `POST /assignment-plans` {mfcId, horizonMinutes 10~480} | 계산만으로는 배정이 바뀌지 않는다. 계산하면 추천 화면으로. 지난 추천 목록 API 가 없어(MB-1) 추천 ID 로 연다 |
+| 배정 추천(`?tab=plan`) | `POST /assignment-plans` {mfcId, horizonMinutes 10~480} | 계산만으로는 배정이 바뀌지 않는다. 계산하면 추천 화면으로. 지난 추천 목록 `GET /assignment-plans?mfcId=&date=&state=`(MB-1, 2026-11-19 — 추천 탭 아래, 열기 = 추천 화면). 예전에는 목록 API 가 없어 추천 ID 로 연다 |
 | 추천 화면 `assignments/plans/<planId>` | `GET /assignment-plans/{id}`, `POST …/commits` | 상태·계산 결과·평가(못 넣음·늦음·최대 부하)·한계(limitations)·근무 미등록 작업자·추천 배정·못 넣은 작업(사유). PROPOSED 만 확정 단추. 409 `PLAN_STALE` 이면 계획을 다시 읽어 STALE·낡은 이유를 보인다(아무것도 배정 안 됨) |
 - 계산 입력(`…/input`)은 아직 화면에 넣지 않았다(재현 디버그용).
 
@@ -134,9 +134,9 @@
 | 입고 작업 상세 `inbound/tasks/<taskId>` | `GET /inbound-tasks/{id}` | 담당이 있으면 "담당만" 안내(서버 409 `NOT_ASSIGNEE`) |
 | 품질검사 | `POST …/inspections` {results[]} | 결과 여러 줄(수량·정상/격리·제조 LOT 표기·소비기한·제조일). 합계 > 남은 수량이면 보내지 않음(서버도 400). applyStatus APPLIED = 반영(+ 만든 적치 작업 ID), CAPTURED = 기록만(완료 아님), REJECTED = 재고 거절 사유(잔량 그대로), UNKNOWN_RESULT·503 = 결과 불명 → 같은 키 |
 | 적치 | `POST …/putaways` {toLocationCode, qty} | 수량 기본 = 남은 수량. 적치 후보(`/putaway-candidates`)는 누를 때만. 결과 처리는 품질검사와 같다. rejectReason 6개 문구 |
-| 초기 보유 수령(`initial`) | `GET /initial-stock-loads?approvalId=` → `POST /initial-stock-loads/{receiptId}/receipts` | 센터별 목록 API 없음(MB-1) — 승인 ID 로 찾는다. 이 센터·EXPECTED 일 때만 입력. 빠진 상품 = 0. 202 접수는 완료가 아니다 — 목록을 다시 읽어 상태(전기 대기·끝·거절)를 보인다 |
-| 회수품 반입(`returns`) | `POST /return-receipts`(202, resultId = 반입 ID) → `GET /return-receipts/{id}` | 목록 API 없음(MB-1) — 반입 ID 로 연다. 반영 상태·검수 상태를 서버 값으로 |
-| 공급 요청(`supply`) | `POST /supply-requests`, `GET/PATCH /supply-requests/{id}`(버전), `POST …/withdrawals`(버전) | 목록 API 없음(MB-1) — 요청 ID 로 연다. 작성 중·제출됨일 때만 고치기, 본사 수신 뒤엔 철회 후 다시. 희망 시각은 한국 시간 +09:00 |
+| 초기 보유 수령(`initial`) | `GET /initial-stock-loads?mfcId=&state=`(목록, 기본 수령 전 — MB-1 2026-11-19) 또는 `?approvalId=` → `POST /initial-stock-loads/{receiptId}/receipts` | 목록에서 열면 그 승인 ID 로 찾는다. 이 센터·EXPECTED 일 때만 입력. 빠진 상품 = 0. 202 접수는 완료가 아니다 — 목록을 다시 읽어 상태(전기 대기·끝·거절)를 보인다 |
+| 회수품 반입(`returns`) | `POST /return-receipts`(202, resultId = 반입 ID) → `GET /return-receipts/{id}`, 목록 `GET /return-receipts?mfcId=&state=`(MB-1 2026-11-19) | 목록에서 반입을 연다. 반영 상태·검수 상태를 서버 값으로 |
+| 공급 요청(`supply`) | `POST /supply-requests`, `GET/PATCH /supply-requests/{id}`(버전), `POST …/withdrawals`(버전), 목록 `GET /supply-requests?mfcId=&state=`(MB-1 2026-11-19) | 목록에서 요청을 연다. 작성 중·제출됨일 때만 고치기, 본사 수신 뒤엔 철회 후 다시. 희망 시각은 한국 시간 +09:00 |
 | 입고 예정(`promises`) | `/inbound-promises*` | 계약만(501, MB-2) — 안내만 |
 
 ### 4-8. 재고 — mfc-inventory-service 0.16.0 (`features/inventory/InventoryPages.tsx`)
@@ -144,16 +144,16 @@
 
 | 화면·동작 | API | 규칙 |
 |---|---|---|
-| 상품별 재고 | `GET /mfcs/{id}/stock?sku=` | 상품 코드 필수(센터 전체 목록 MB-1 — 안내). LOT 요약(보유·격리·판매 가능·예약·가용)과 위치·품질·업무 상태별 단위 행 — 서버 값만 |
+| 상품별 재고 | `GET /mfcs/{id}/stock?sku=`, 센터 전체 `GET /mfcs/{id}/stock-units`(MB-1 2026-11-19 — 품질·위치 거르기, 열기 = 그 상품) | LOT 요약(보유·격리·판매 가능·예약·가용)과 위치·품질·업무 상태별 단위 행 — 서버 값만 |
 | 위치·LOT 정정 | `POST /mfcs/{id}/stock-corrections` | 단위 행의 "정정" → 수량(보이는 수량 이하)·목적 위치·바로잡은 LOT 표기/소비기한/제조일 중 하나 이상·사유·본사 승인 번호(선택). **승인 필요(422) 뒤 다시 보낼 때는 같은 `Idempotency-Key`**(승인 대상 = 요청 키 `targetRef <mfcId>:CORRECTION:<키>`, 422 는 기록되지 않음 — 다른 거절이면 새 키). 201 CommandResponse(REJECTED·UNKNOWN_RESULT 처리), 반영 뒤 재고 다시 읽기. 422 `INSUFFICIENT_STOCK`·`APPROVAL_REQUIRED`, 409 `INVARIANT_VIOLATION` 문구 |
 | 순환 실사 시작(`counts`) | `POST …/count-sessions` {locationCodes(최대 50, 중복 제거), reason?} | 실사 잠금 칸만 — 409 `LOCATION_NOT_LOCKED`(잠금 주체는 BR-52 R14 대기, 화면은 서버 판정만 안내). 시작하면 그 실사를 연다 |
-| 실사 보기·결정 | `GET …/count-sessions/{id}`, `POST …/approvals` | 목록 API 없음(MB-1) — 실사 ID 로 연다. 계수 중에는 차이를 숨긴다(서버가 null). 승인 대기면 승인(본사 승인 번호 선택)·반려. 422 `SELF_APPROVAL`·`APPROVAL_REQUIRED`, 409 `BOOK_CHANGED`. 결정 문구는 실사 화면 위에(결정 영역은 사라진다). 계수·재계수는 PDA |
+| 실사 보기·결정 | `GET …/count-sessions?state=`(목록, 기본 승인 대기 — MB-1 2026-11-19), `GET …/count-sessions/{id}`, `POST …/approvals` | 목록에서 실사를 연다. 계수 중에는 차이를 숨긴다(서버가 null). 승인 대기면 승인(본사 승인 번호 선택)·반려. 422 `SELF_APPROVAL`·`APPROVAL_REQUIRED`, 409 `BOOK_CHANGED`. 결정 문구는 실사 화면 위에(결정 영역은 사라진다). 계수·재계수는 PDA |
 | 출하 부적격 LOT(`unshippable`) | `GET …/unshippable-lots` | 소비기한 빠른 순. 이미 기타 칸이 아니면 "이동 지시" → 이동 화면을 상품·LOT·출발 칸·수량으로 채워 연다(`moves/new?sku=&lotId=&fromLocation=&qty=`) |
 | 보충 기준(`policies`) | `GET/PUT/DELETE …/replenishment-policies` | 칸·상품·최소·목표·단위. 최소 > 목표면 보내지 않음. 고회전 선반이 아니면 422 `REPLENISH_ONLY_HIGH_TURNOVER`. 삭제는 204(`locationCode`·`sku` 쿼리) |
 | 상품 취급(`handlings`) | `GET/POST …/sku-handlings` | ON/OFF 거르기, 커서 더 보기. 켜기·끄기는 `X-Expected-Version` = 취급 레코드 version(없으면 0). `changed=false` 면 "바뀐 것 없음". 422 `SKU_INACTIVE`, 404 `SKU_NOT_FOUND` 문구. 일괄 변경(`sku-handling-batches`)은 아직 안 붙임 |
 
 ### 4-9. 품질 — mfc-quality-service 0.2.0 (`features/quality/QualityPages.tsx`)
-탭은 URL 쿼리 `tab`(격리·해제 기본 · `disposals` · `inspections` · `incidents`). 승인 대기·폐기·검수 목록 API 는 없다(MB-1) — 번호로 연다(`decisionId`·`disposalId`·`inspectionId`·`returnReceiptId` 쿼리). 요청한 사람과 승인하는 사람은 달라야 한다(422 `SELF_APPROVAL`).
+탭은 URL 쿼리 `tab`(격리·해제 기본 · `disposals` · `inspections` · `incidents`). 탭마다 위에 목록(MB-1, quality 0.5.0, 2026-11-19 — 판정 기본 해제 승인 대기, 폐기 기본 승인 대기, 검수 탭은 회수품 반입 목록 + 검수 목록). 목록 "열기" 또는 번호로 연다(`decisionId`·`disposalId`·`inspectionId`·`returnReceiptId` 쿼리). 요청한 사람과 승인하는 사람은 달라야 한다(422 `SELF_APPROVAL`).
 
 | 화면·동작 | API | 규칙 |
 |---|---|---|

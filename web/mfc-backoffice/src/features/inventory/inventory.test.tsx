@@ -18,9 +18,8 @@ async function lookup(sku: string) {
 }
 
 describe('상품별 재고·정정', () => {
-  it('상품 코드로 LOT 요약과 위치·상태별 재고를 본다(센터 전체 목록은 MB-1 안내)', async () => {
+  it('상품 코드로 LOT 요약과 위치·상태별 재고를 본다', async () => {
     renderAt('/c/MFC-BSN-01/inventory');
-    expect(await screen.findByText(/센터 전체 재고 목록\(상품 코드 없이\)은 서버 API 가 아직 없어요/)).toBeInTheDocument();
     await lookup('sku-milk-1');
     await waitFor(() => expect(screen.getAllByTestId('unit-row')).toHaveLength(3));
     expect(screen.getAllByTestId('lot-row')).toHaveLength(2);

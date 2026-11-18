@@ -3,7 +3,7 @@
 // - 직접 배정 `POST /assignments` + X-Expected-Version = 지금 활성 담당 버전(없으면 0) — 화면은 "지금 담당 확인"으로 읽은 버전을 보낸다(그 사이 바뀌면 409).
 //   같은 사람이면 서버가 바꾸지 않고 지금 배정을 돌려준다(버전이 그대로면 "바뀐 것 없음"). 근무 밖은 warnings OFF_SHIFT 로 알리기만.
 // - 추천 `POST /assignment-plans` {mfcId, horizonMinutes} → 계획(PROPOSED 등) — 배정은 바뀌지 않는다. 확정 `POST …/{planId}/commits`(전부 또는 전무, 409 PLAN_STALE → 다시 읽어 낡은 이유).
-// - 지난 추천 목록 API 는 없다(MB-1) — 추천 ID 로 연다.
+// - 지난 추천 목록 `GET /assignment-plans?mfcId=&date=&state=`(MB-1) — 추천 탭 아래, 열기 = 추천 화면.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -15,6 +15,7 @@ import type { components } from '../../api/generated/mfc-capacity';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
+import { PlanList } from '../lists/CenterLists';
 
 const m = messages.assignments;
 const taskName = messages.workers.task;
@@ -355,8 +356,8 @@ function PlanStart({ mfcId }: { readonly mfcId: string }) {
         <button type="submit" className="btn btn-sm" disabled={!planId}>
           {m.openPlan}
         </button>
-        <p className="w-full text-xs opacity-70">{m.planListMissing}</p>
       </form>
+      <PlanList mfcId={mfcId} />
     </div>
   );
 }

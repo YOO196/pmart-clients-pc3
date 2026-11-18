@@ -5,6 +5,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
+import { listPage } from './listHandlers';
 import { db, nextSeq, timestamp, type MockInboundTask, type MockReturnReceipt, type MockSupplyRequest } from './db';
 import { expectedVersion, idempotent, operator, problem, unauthorized } from './support';
 
@@ -108,7 +109,12 @@ export const inboundHandlers = [
 
   http.get(`${API_BASE}/initial-stock-loads`, ({ request }) => {
     if (!operator(request)) return unauthorized();
-    const approvalId = new URL(request.url).searchParams.get('approvalId') ?? '';
+    const q = new URL(request.url).searchParams;
+    const mfcId = q.get('mfcId');
+    // (0.12.0, MB-1) 센터로 — 커서 목록. 승인 ID 로(예전 방식)는 그 승인 것 전부.
+    if (mfcId) return listPage(request, mfcId, db.initialLoads.filter((l) => l.mfcId === mfcId), (l) => l.state);
+    const approvalId = q.get('approvalId');
+    if (!approvalId) return problem(400, 'VALIDATION_FAILED', [{ field: 'mfcId', reason: 'REQUIRED' }]);
     return HttpResponse.json({ items: db.initialLoads.filter((l) => l.approvalId === approvalId) });
   }),
 

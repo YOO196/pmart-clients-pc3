@@ -1,7 +1,7 @@
 // 재고 — mfc-inventory-service 0.16.0(요청서 mfc-backoffice/2026-11-15 §2·§2-1 "센터 재고 조회, 위치·LOT 정정, 순환 실사, 보충 기준, 출하 부적격 LOT, 상품 취급").
 // 탭(URL 쿼리 `tab`): 상품별 재고(기본) · 순환 실사 · 출하 부적격 LOT · 보충 기준 · 상품 취급.
-// - 상품별 재고 `GET /mfcs/{id}/stock?sku=`(sku 필수 — 센터 전체 목록은 MB-1). 단위 행마다 정정 `POST …/stock-corrections`(201 CommandResponse, approvalRef 필수).
-// - 실사: 시작 `POST …/count-sessions`(실사 잠금 칸만 — 409 LOCATION_NOT_LOCKED), 조회 `GET …/count-sessions/{id}`(목록 API 없음 — MB-1),
+// - 센터 전체 재고 `GET /mfcs/{id}/stock-units`(inventory 0.26.0, MB-1 — 품질·위치 거르기, 열기 = 상품별 재고). 상품별 재고 `GET /mfcs/{id}/stock?sku=`. 단위 행마다 정정 `POST …/stock-corrections`(201 CommandResponse, approvalRef 선택 — 없으면 422 APPROVAL_REQUIRED 흐름).
+// - 실사: 시작 `POST …/count-sessions`(실사 잠금 칸만 — 409 LOCATION_NOT_LOCKED), 목록 `GET …/count-sessions?state=`(기본 승인 대기, MB-1)·조회 `GET …/count-sessions/{id}`,
 //   승인·반려 `POST …/approvals`(APPROVE 는 approvalRef 필수, 시작·계수한 사람 불가 — 422 SELF_APPROVAL). 계수는 PDA.
 // - 출하 부적격 LOT `GET …/unshippable-lots` → 이동 지시로(이동 메뉴에 값을 채워 연다).
 // - 보충 기준 `GET/PUT/DELETE …/replenishment-policies`(고회전 선반만, min ≤ target).
@@ -19,6 +19,7 @@ import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { ApprovalAwareFeedback, ApprovalRefInput, approvalRequired } from '../../shared/approval';
 import { messages } from '../../shared/messages';
+import { CountSessionList, StockUnitList } from '../lists/CenterLists';
 
 const m = messages.inventory;
 const mv = messages.moves;
@@ -120,7 +121,7 @@ function StockTab({ mfcId }: { readonly mfcId: string }) {
   const u = m.unit;
   return (
     <div className="space-y-3 text-sm">
-      <p className="text-xs opacity-70">{m.centerListMissing}</p>
+      <StockUnitList mfcId={mfcId} />
       <LookupForm key={sku} label={m.sku} value={sku} button={m.lookup} onSubmit={setSku} />
       {notice && (
         <p role="status" className="text-success">
@@ -364,6 +365,7 @@ function CountsTab({ mfcId }: { readonly mfcId: string }) {
   });
   return (
     <div className="max-w-4xl space-y-3 text-sm">
+      <CountSessionList mfcId={mfcId} />
       <p className="text-xs opacity-70">{m.countsHint}</p>
       <form
         className="space-y-2 rounded-box bg-base-100 p-4"

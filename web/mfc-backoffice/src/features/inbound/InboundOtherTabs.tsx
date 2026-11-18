@@ -1,7 +1,7 @@
 // 입고 메뉴의 나머지 탭 — mfc-inbound-service 0.9.0.
-// - 초기 보유 수령(B2): `GET /initial-stock-loads?approvalId=`(센터별 목록 API 없음 — MB-1), `POST /initial-stock-loads/{receiptId}/receipts`(202 접수 — 결과는 상태로).
-// - 회수품 반입: `POST /return-receipts`(202 CommandResponse, resultId = 반입 ID), `GET /return-receipts/{id}`(목록 API 없음 — MB-1).
-// - 공급 요청: `POST /supply-requests`(201), `GET/PATCH /supply-requests/{id}`(X-Expected-Version), `POST …/withdrawals`(202, 버전). 목록 API 없음 — MB-1.
+// - 초기 보유 수령(B2): `GET /initial-stock-loads?mfcId=`(센터 목록, inbound 0.12.0 MB-1) 또는 `?approvalId=`, `POST /initial-stock-loads/{receiptId}/receipts`(202 접수 — 결과는 상태로).
+// - 회수품 반입: `POST /return-receipts`(202 CommandResponse, resultId = 반입 ID), `GET /return-receipts?mfcId=`(목록, MB-1)·`/{id}`.
+// - 공급 요청: `POST /supply-requests`(201), `GET/PATCH /supply-requests/{id}`(X-Expected-Version), `POST …/withdrawals`(202, 버전). 목록 `GET /supply-requests?mfcId=&state=`(MB-1).
 // 접수(ACCEPTED·SUBMITTED)를 완료로 보이지 않는다 — 서버가 돌려준 상태를 다시 읽어 보인다.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -13,6 +13,7 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-inbound';
 import { useApi } from '../../app/ApiContext';
 import { messages } from '../../shared/messages';
+import { InitialLoadList, ReturnReceiptList, SupplyRequestList } from '../lists/CenterLists';
 
 const m = messages.inbound;
 type Inb = components['schemas'];
@@ -77,6 +78,7 @@ export function InitialStockTab({ mfcId }: { readonly mfcId: string }) {
   return (
     <div className="max-w-4xl space-y-3 text-sm">
       <p className="text-xs opacity-70">{m.initialHint}</p>
+      <InitialLoadList mfcId={mfcId} />
       <LookupForm label={m.approvalId} value={approvalId} onSubmit={setApprovalId} />
       {approvalId && (
         <QueryState state={toUiState(query, (rows) => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.initialEmpty}>
@@ -242,6 +244,7 @@ export function ReturnReceiptTab({ mfcId }: { readonly mfcId: string }) {
   return (
     <div className="max-w-4xl space-y-3 text-sm">
       <p className="text-xs opacity-70">{m.returnsHint}</p>
+      <ReturnReceiptList mfcId={mfcId} />
       <form
         className="space-y-2 rounded-box bg-base-100 p-4"
         aria-label={m.submitReturn}
@@ -437,6 +440,7 @@ export function SupplyRequestTab({ mfcId }: { readonly mfcId: string }) {
   return (
     <div className="max-w-4xl space-y-3 text-sm">
       <p className="text-xs opacity-70">{m.supplyHint}</p>
+      <SupplyRequestList mfcId={mfcId} />
       <form
         className="space-y-2 rounded-box bg-base-100 p-4"
         aria-label={m.submitSupply}
