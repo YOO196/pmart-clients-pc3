@@ -964,6 +964,39 @@ export const messages = {
     },
   },
 
+  /** 밝은/어두운 테마(2026-11-18) */
+  theme: { toDark: '어두운 화면으로', toLight: '밝은 화면으로' },
+  /** 대시보드 최근 본 항목(2026-11-18) */
+  recent: {
+    title: '최근 본 항목',
+    clear: '지우기',
+    kind: { order: '주문', delivery: '배송', claim: '클레임', case: '접수 건', inquiry: '고객 문의', riderInquiry: '라이더 문의', product: '상품', approval: '승인' } as const,
+  },
+  /** 번호 복사(2026-11-18) */
+  copy: {
+    copy: '복사',
+    done: '복사했어요',
+    failed: '복사하지 못했어요',
+    aria: (what: string) => `${what} 복사`,
+  },
+  /** 입력 중 떠날 때 경고(2026-11-18) */
+  leaveGuard: {
+    title: '작성한 내용이 사라져요',
+    body: '저장하지 않고 나가면 지금까지 넣은 내용은 남지 않아요.',
+    stay: '계속 작성',
+    leave: '나가기',
+  },
+  /** 머리줄 번호로 바로 찾기(2026-11-18) */
+  quickJump: {
+    label: '번호로 바로 찾기',
+    placeholder: '주문·배송·라이더 번호, ID',
+    busy: '찾는 중',
+    kindOrder: '주문',
+    kindDelivery: '배송',
+    kindRider: '라이더',
+    notFound: (what: string) => `${what} 번호로 찾은 결과가 없어요. 번호를 다시 확인해 주세요.`,
+    failed: '지금은 확인하지 못했어요. 잠시 뒤 다시 찾아 주세요(없다는 뜻이 아니에요).',
+  },
   claims: {
     title: '클레임 조회',
     intro: '조회만 해요. 클레임 결정은 서버가 아직 열지 않아 이 화면에 없어요.',
