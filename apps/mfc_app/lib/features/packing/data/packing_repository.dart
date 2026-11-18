@@ -30,6 +30,15 @@ abstract interface class PackingRepository {
     required IdempotencyKey key,
   });
 
+  /// `POST /shipments/{id}/repackings`(포장 사이 재구성, 0.4.7) — 밀봉한 포장 [packageId] 를 [groups] 대로 새 포장들로.
+  /// 합계가 같아야 한다(아니면 422 CONTENT_MISMATCH). 같은 키는 같은 새 포장들.
+  Future<RegroupOutcome> regroup(
+    String shipmentId,
+    String packageId,
+    List<List<ContentLine>> groups, {
+    required IdempotencyKey key,
+  });
+
   /// `POST /shipments/{id}/dispatch-requests`(D-5). 출고당 한 번 — 이미 요청됐으면 그 요청(200).
   Future<DispatchOutcome> requestDispatch(
     String shipmentId, {
@@ -113,6 +122,45 @@ final class ApiPackingRepository implements PackingRepository {
       extra: commandOptions(key).extra,
     ),
   );
+
+  @override
+  Future<RegroupOutcome> regroup(
+    String shipmentId,
+    String packageId,
+    List<List<ContentLine>> groups, {
+    required IdempotencyKey key,
+  }) async {
+    try {
+      final res = await pmartGuard(
+        () => _shipments.regroupPackages(
+          shipmentId: shipmentId,
+          idempotencyKey: key.value,
+          xSourceSystem: sourceSystem,
+          regroupPackagesRequest: api.RegroupPackagesRequest(
+            reason: api.RegroupPackagesRequestReasonEnum.CONTENT_CHANGE,
+            packageIds: [packageId],
+            packages: [
+              for (final g in groups)
+                api.RegroupPackagesRequestPackagesInner(
+                  bagCount: 1,
+                  contents: [for (final c in g) _line(c)],
+                ),
+            ],
+          ),
+          extra: commandOptions(key).extra,
+        ),
+      );
+      final ps = res.data?.packages;
+      if (ps == null) return const RegroupUnknown();
+      return RegroupDone([for (final p in ps) packageFromContract(p)]);
+    } on PmartFailure catch (f) {
+      return switch (packFailureToOutcome(f)) {
+        PackUnknown() => const RegroupUnknown(),
+        PackRejected(:final code) => RegroupRejected(code),
+        PackDone() => const RegroupUnknown(),
+      };
+    }
+  }
 
   Future<PackOutcome> _pack(
     Future<Response<api.Package>> Function() call,

@@ -461,4 +461,182 @@ void main() {
     expect(s!.dispatchRequest?.trigger, DispatchTrigger.manual);
     expect(s.dispatchRequest?.estimatedPackMinutes, 5);
   });
+
+  Future<void> toBagStep(WidgetTester t) async {
+    await openPacking(t);
+    await scanTo(t, 'station-scan', 'PAK-C-02');
+    await scanTo(t, 'pack-cart-scan', 'CRT-C-01');
+    await t.tap(find.byKey(const ValueKey('pack-min-10')));
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('request-dispatch')));
+    await t.pumpAndSettle();
+  }
+
+  String text(WidgetTester t, String key) =>
+      t.widget<Text>(find.byKey(ValueKey(key))).data!;
+
+  testWidgets('분할 포장: 같은 온도대도 담은 만큼만 밀봉 → 남은 상품은 새 봉투(봉투 번호·남은 수량·버튼 문구)', (
+    t,
+  ) async {
+    await toBagStep(t);
+    expect(text(t, 'bag-no'), '봉투 1번째');
+    expect(find.byKey(const ValueKey('pack-split-hint')), findsOneWidget);
+    expect(text(t, 'pack-split-progress'), '아직 밀봉 안 한 상품 4개 · 이 봉투에 0개');
+
+    // 냉장 요거트 1개만 담고 밀봉 — 남은 게 있으니 "이 봉투만 밀봉".
+    await scanTo(t, 'pack-scan', MockTaskRepository.yogurtBarcode);
+    expect(text(t, 'pack-split-progress'), '아직 밀봉 안 한 상품 4개 · 이 봉투에 1개');
+    expect(find.text('이 봉투만 밀봉하고 라벨 — 남은 건 새 봉투에'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('seal')));
+    await t.pumpAndSettle();
+    await closeLabel(t);
+
+    expect(text(t, 'bag-no'), '봉투 2번째');
+    expect(text(t, 'pack-next-bag'), '봉투 1개 밀봉 — 남은 3개를 새 봉투에 담아요');
+    // 같은 냉장 우유 2개는 두 번째 봉투에.
+    await scanTo(t, 'pack-scan', MockTaskRepository.milkBarcode);
+    await scanTo(t, 'pack-scan', MockTaskRepository.milkBarcode);
+    await t.tap(find.byKey(const ValueKey('seal')));
+    await t.pumpAndSettle();
+    await closeLabel(t);
+
+    // 마지막 봉투(냉동 만두) — 다 담으면 원래 문구.
+    expect(text(t, 'bag-no'), '봉투 3번째');
+    await scanTo(t, 'pack-scan', MockTaskRepository.dumplingBarcode);
+    expect(find.text('밀봉하고 라벨 만들기'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('seal')));
+    await t.pumpAndSettle();
+    await closeLabel(t);
+
+    expect(find.text('모든 상품을 담았어요(출하 준비)'), findsOneWidget);
+    final s = await t.runAsync(() => packing.shipment('shp-2'));
+    final sealed = s!.packages
+        .where((p) => p.state == PackageState.sealed)
+        .toList();
+    expect(sealed, hasLength(3));
+    expect(
+      [
+        for (final p in sealed)
+          p.contents.map((c) => '${c.orderLineId}x${c.qty}').join(),
+      ],
+      ['ol-1x1', 'ol-2x2', 'ol-4x1'],
+    );
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('봉투 나누기: 밀봉한 봉투를 둘로(합계 그대로) → 새 라벨 2장, 옛 포장 무효', (t) async {
+    await toBagStep(t);
+    await scanTo(t, 'pack-scan', MockTaskRepository.yogurtBarcode);
+    await scanTo(t, 'pack-scan', MockTaskRepository.milkBarcode);
+    await scanTo(t, 'pack-scan', MockTaskRepository.milkBarcode);
+    await t.tap(find.byKey(const ValueKey('seal')));
+    await t.pumpAndSettle();
+    await closeLabel(t);
+
+    await t.ensureVisible(find.byKey(const ValueKey('split-pkg-1')));
+    await t.tap(find.byKey(const ValueKey('split-pkg-1')));
+    await t.pumpAndSettle();
+    // 아무것도 안 옮기면 못 나눈다.
+    expect(find.byKey(const ValueKey('split-invalid')), findsOneWidget);
+    expect(
+      t
+          .widget<FilledButton>(find.byKey(const ValueKey('split-confirm')))
+          .onPressed,
+      isNull,
+    );
+    // 전부 옮겨도 못 나눈다(한 봉투가 빈다).
+    await t.tap(find.byKey(const ValueKey('split-more-ol-1')));
+    await t.tap(find.byKey(const ValueKey('split-more-ol-2')));
+    await t.tap(find.byKey(const ValueKey('split-more-ol-2')));
+    await t.pump();
+    expect(find.byKey(const ValueKey('split-invalid')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('split-less-ol-1')));
+    await t.tap(find.byKey(const ValueKey('split-less-ol-2')));
+    await t.pump();
+    expect(text(t, 'split-qty-ol-2'), '1 / 2');
+    await t.tap(find.byKey(const ValueKey('split-confirm')));
+    await t.pumpAndSettle();
+    // 새 봉투마다 라벨.
+    await closeLabel(t);
+    await closeLabel(t);
+    expect(find.byKey(const ValueKey('label-preview')), findsNothing);
+    expect(find.text('봉투 2개로 나눴어요 — 새 라벨을 붙여요'), findsOneWidget);
+
+    expect(packing.regroupCalls, 1);
+    final s = await t.runAsync(() => packing.shipment('shp-2'));
+    final byId = {for (final p in s!.packages) p.packageId: p};
+    expect(byId['pkg-1']!.state, PackageState.invalidated);
+    expect(
+      byId['pkg-2']!.contents.map((c) => '${c.orderLineId}x${c.qty}').join(','),
+      'ol-1x1,ol-2x1',
+    );
+    expect(
+      byId['pkg-3']!.contents.map((c) => '${c.orderLineId}x${c.qty}').join(','),
+      'ol-2x1',
+    );
+    // 합계는 그대로 — 남은 건 만두 1개.
+    expect(text(t, 'pack-split-progress'), '아직 밀봉 안 한 상품 1개 · 이 봉투에 0개');
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('봉투 나누기 결과 불명 → 같은 나눔은 같은 키로(새 포장이 두 번 생기지 않음)', (t) async {
+    await toBagStep(t);
+    await scanTo(t, 'pack-scan', MockTaskRepository.milkBarcode);
+    await scanTo(t, 'pack-scan', MockTaskRepository.milkBarcode);
+    await t.tap(find.byKey(const ValueKey('seal')));
+    await t.pumpAndSettle();
+    await closeLabel(t);
+
+    packing.loseNextRegroupResponse = true;
+    Future<void> splitOne(String pkg) async {
+      await t.ensureVisible(find.byKey(ValueKey('split-$pkg')));
+      await t.tap(find.byKey(ValueKey('split-$pkg')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('split-more-ol-2')));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('split-confirm')));
+      await t.pumpAndSettle();
+    }
+
+    await splitOne('pkg-1');
+    expect(
+      find.text('나눴는지 확인하지 못했어요 — 같은 수량으로 다시 나누면 같은 요청으로 확인해요'),
+      findsOneWidget,
+    );
+    final c = ProviderScope.containerOf(t.element(find.byType(MfcApp)));
+    final ctl = c.read(packingProvider('task-mock-2').notifier);
+    final s0 = await t.runAsync(() => packing.shipment('shp-2'));
+    final old = s0!.packages.firstWhere((p) => p.packageId == 'pkg-1');
+    final again = await t.runAsync(() => ctl.split('shp-2', old, {'ol-2': 1}));
+    expect(again, isA<RegroupDone>());
+    expect(packing.regroupCalls, 2);
+    final s = await t.runAsync(() => packing.shipment('shp-2'));
+    expect(
+      s!.packages.where((p) => p.state == PackageState.sealed),
+      hasLength(2),
+    );
+    expect(s.packages, hasLength(3));
+  });
+
+  test('splitContents: 한 주문 줄이 LOT 여러 줄이면 앞 줄부터 옮기고 LOT 는 그대로', () {
+    const p = PackageView(
+      packageId: 'pkg-x',
+      packageVersion: 1,
+      version: 1,
+      state: PackageState.sealed,
+      fence: FenceState.none,
+      contents: [
+        ContentLine(orderLineId: 'ol-2', sku: 'MILK', qty: 1, lotId: 'LOT-A'),
+        ContentLine(orderLineId: 'ol-2', sku: 'MILK', qty: 2, lotId: 'LOT-B'),
+        ContentLine(orderLineId: 'ol-1', sku: 'YOG', qty: 1),
+      ],
+    );
+    final r = splitContents(p, {'ol-2': 2})!;
+    String show(List<ContentLine> xs) =>
+        xs.map((c) => '${c.orderLineId}:${c.lotId}x${c.qty}').join(',');
+    expect(show(r.move), 'ol-2:LOT-Ax1,ol-2:LOT-Bx1');
+    expect(show(r.keep), 'ol-2:LOT-Bx1,ol-1:nullx1');
+    expect(splitContents(p, {}), isNull);
+    expect(splitContents(p, {'ol-2': 3, 'ol-1': 1}), isNull);
+  });
 }

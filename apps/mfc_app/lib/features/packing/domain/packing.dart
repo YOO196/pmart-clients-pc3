@@ -130,6 +130,67 @@ final class PackUnknown extends PackOutcome {
 
 enum RepackReason { damagedBag, contentChange, labelUnreadable, shortageAdjust }
 
+/// 봉투 나누기(`POST /shipments/{id}/repackings` — 포장 사이 재구성) 결과.
+sealed class RegroupOutcome {
+  const RegroupOutcome();
+}
+
+/// 새 포장들(새 ID·새 QR). 이전 포장은 INVALIDATED.
+final class RegroupDone extends RegroupOutcome {
+  const RegroupDone(this.packages);
+
+  final List<PackageView> packages;
+}
+
+final class RegroupRejected extends RegroupOutcome {
+  const RegroupRejected(this.code);
+
+  final String code;
+}
+
+/// 나눠졌는지 모른다 — 같은 키·같은 나눔으로만 다시.
+final class RegroupUnknown extends RegroupOutcome {
+  const RegroupUnknown();
+}
+
+/// 포장 [p] 를 둘로 나눈다: [moved](주문 줄 → 옮길 수량)만큼 새 봉투로, 나머지는 남는 봉투로.
+/// 한 주문 줄이 여러 LOT 줄이면 앞 줄부터 옮긴다(LOT 는 그대로 — 합계가 같아야 서버가 받는다).
+/// 둘 중 하나가 비면 null.
+({List<ContentLine> keep, List<ContentLine> move})? splitContents(
+  PackageView p,
+  Map<String, int> moved,
+) {
+  final left = {...moved};
+  final keep = <ContentLine>[];
+  final move = <ContentLine>[];
+  for (final c in p.contents) {
+    final m = (left[c.orderLineId] ?? 0).clamp(0, c.qty);
+    left[c.orderLineId] = (left[c.orderLineId] ?? 0) - m;
+    if (m > 0) {
+      move.add(
+        ContentLine(
+          orderLineId: c.orderLineId,
+          sku: c.sku,
+          qty: m,
+          lotId: c.lotId,
+        ),
+      );
+    }
+    if (c.qty - m > 0) {
+      keep.add(
+        ContentLine(
+          orderLineId: c.orderLineId,
+          sku: c.sku,
+          qty: c.qty - m,
+          lotId: c.lotId,
+        ),
+      );
+    }
+  }
+  if (keep.isEmpty || move.isEmpty) return null;
+  return (keep: keep, move: move);
+}
+
 /// 배차 요청이 어떻게 생겼나. 점원 요청(MANUAL) 또는 출하 준비 시 자동(AUTO_ON_READY).
 enum DispatchTrigger { manual, autoOnReady, unknown }
 

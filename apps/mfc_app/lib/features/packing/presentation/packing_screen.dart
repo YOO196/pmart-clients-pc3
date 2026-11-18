@@ -87,6 +87,127 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
     }
   }
 
+  /// 봉투 나누기: 새 봉투로 옮길 수량을 고른다(주문 줄마다). 하나 이상 옮기고 하나 이상 남겨야 한다.
+  Future<void> _split(
+    TaskDetailView task,
+    ShipmentView s,
+    PackageView p,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final qtyByLine = <String, int>{};
+    for (final c in p.contents) {
+      qtyByLine[c.orderLineId] = (qtyByLine[c.orderLineId] ?? 0) + c.qty;
+    }
+    String nameOf(String ol) {
+      final l = task.lines.where((x) => x.orderLineId == ol).firstOrNull;
+      return l?.productName ?? l?.sku ?? ol;
+    }
+
+    final moved = await showDialog<Map<String, int>>(
+      context: context,
+      builder: (context) {
+        final m = <String, int>{for (final k in qtyByLine.keys) k: 0};
+        return StatefulBuilder(
+          builder: (context, setState) {
+            final total = qtyByLine.values.fold(0, (a, b) => a + b);
+            final n = m.values.fold(0, (a, b) => a + b);
+            final ok = n >= 1 && n <= total - 1;
+            return AlertDialog(
+              key: const ValueKey('split-dialog'),
+              title: Text(l10n.splitTitle),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(l10n.splitHelp),
+                  for (final e in qtyByLine.entries)
+                    Row(
+                      children: [
+                        Expanded(child: Text(nameOf(e.key))),
+                        IconButton(
+                          key: ValueKey('split-less-${e.key}'),
+                          icon: const Icon(Icons.remove),
+                          onPressed: m[e.key]! > 0
+                              ? () => setState(() => m[e.key] = m[e.key]! - 1)
+                              : null,
+                        ),
+                        Text(
+                          l10n.splitLineQty(m[e.key]!, e.value),
+                          key: ValueKey('split-qty-${e.key}'),
+                        ),
+                        IconButton(
+                          key: ValueKey('split-more-${e.key}'),
+                          icon: const Icon(Icons.add),
+                          onPressed: m[e.key]! < e.value
+                              ? () => setState(() => m[e.key] = m[e.key]! + 1)
+                              : null,
+                        ),
+                      ],
+                    ),
+                  if (!ok)
+                    Text(
+                      l10n.splitInvalid,
+                      key: const ValueKey('split-invalid'),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(l10n.cancel),
+                ),
+                FilledButton(
+                  key: const ValueKey('split-confirm'),
+                  onPressed: ok
+                      ? () => Navigator.of(context).pop({...m})
+                      : null,
+                  child: Text(l10n.splitConfirm),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (moved == null || !mounted) return;
+    final outcome = await ref
+        .read(packingProvider(widget.taskId).notifier)
+        .split(s.shipmentId, p, moved);
+    if (!mounted) return;
+    switch (outcome) {
+      case RegroupDone(:final packages):
+        // 새 봉투마다 새 라벨(새 QR) — 옛 라벨은 떼어 낸다.
+        final fresh = await ref.read(shipmentProvider(s.shipmentId).future);
+        for (final np in packages) {
+          if (!mounted) return;
+          if (np.qrCode != null) {
+            await printPackageLabel(context, ref, PackageLabel.of(fresh, np));
+          }
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(l10n.splitDone(packages.length))),
+          );
+        }
+      case RegroupRejected(:final code):
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              code == PackProblemCode.contentMismatch
+                  ? l10n.splitMismatch
+                  : l10n.splitRejected,
+            ),
+          ),
+        );
+      case RegroupUnknown():
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l10n.splitUnknown)));
+    }
+  }
+
   Widget _scanError(AppLocalizations l10n, ThemeData theme, PackingState p) =>
       SizedBox(
         height: 20,
@@ -257,7 +378,39 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                     DispatchSection(taskId: widget.taskId, shipment: s),
                   ]);
                 case 3:
+                  final sealedCount = s.packages
+                      .where(
+                        (p) =>
+                            p.state == PackageState.sealed ||
+                            p.state == PackageState.handedOver,
+                      )
+                      .length;
+                  final inBag = packing.bag.values.fold(0, (a, b) => a + b);
+                  final leftAfter = ctl.leftAfterBag(task, s);
                   children.addAll([
+                    Text(
+                      l10n.packBagNo(sealedCount + 1),
+                      key: const ValueKey('bag-no'),
+                      style: theme.textTheme.titleLarge,
+                    ),
+                    Text(
+                      l10n.packSplitProgress(leftAfter + inBag, inBag),
+                      key: const ValueKey('pack-split-progress'),
+                    ),
+                    if (sealedCount > 0 && inBag == 0 && !packing.sealUnknown)
+                      Text(
+                        l10n.packNextBag(sealedCount, leftAfter),
+                        key: const ValueKey('pack-next-bag'),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
+                      )
+                    else if (sealedCount == 0 && inBag == 0)
+                      Text(
+                        l10n.packSplitHint,
+                        key: const ValueKey('pack-split-hint'),
+                        style: theme.textTheme.bodySmall,
+                      ),
                     Text(
                       switch (ctl.bagZone(task)) {
                         final z? => l10n.bagZone(storageZoneText(l10n, z)),
@@ -353,7 +506,11 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                     CommandButton(
                       key: const ValueKey('seal'),
                       busy: packing.busy,
-                      label: packing.sealUnknown ? l10n.checkAgain : l10n.seal,
+                      label: packing.sealUnknown
+                          ? l10n.checkAgain
+                          : inBag > 0 && leftAfter > 0
+                          ? l10n.sealPartial
+                          : l10n.seal,
                       onPressed: (packing.bag.isNotEmpty || packing.sealUnknown)
                           ? () => ctl.seal(task, s)
                           : null,
@@ -448,6 +605,13 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                                 PackageLabel.of(s, p),
                               ),
                               child: Text(l10n.printLabel),
+                            ),
+                          if (p.canRepack &&
+                              p.contents.fold(0, (n, c) => n + c.qty) >= 2)
+                            TextButton(
+                              key: ValueKey('split-${p.packageId}'),
+                              onPressed: () => _split(task, s, p),
+                              child: Text(l10n.splitPackage),
                             ),
                           if (p.canRepack)
                             TextButton(
