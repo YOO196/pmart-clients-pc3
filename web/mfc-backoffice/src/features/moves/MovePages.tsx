@@ -5,7 +5,7 @@
 // - 집어 올리기·내려놓기는 현장(PDA) 일이라 이 화면에 없다.
 // - 출발·도착 고르기는 돕기만: mfc-inventory `GET /mfcs/{id}/stock?sku=`(위치·LOT 별), mfc-location `GET /putaway-candidates`. 판정은 서버.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, Route, Routes, useLocation as useRouterLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
@@ -16,6 +16,7 @@ import type { components as InventorySchemas } from '../../api/generated/mfc-inv
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
+import { Who } from '../../shared/OperatorLabel';
 
 const m = messages.moves;
 
@@ -39,7 +40,6 @@ export function MovesMenu({ mfcId }: { readonly mfcId: string }) {
 }
 
 const product = (o: MoveOrder) => (o.productName ? `${o.productName} (${o.sku ?? ''})` : (o.sku ?? messages.none));
-const who = (id: string | null | undefined) => (id === 'SYSTEM' ? m.system : (id ?? messages.none));
 
 function StateBadge({ state }: { readonly state: MoveState | undefined }) {
   if (!state) return <>{messages.none}</>;
@@ -121,7 +121,9 @@ function MoveListPage({ mfcId }: { readonly mfcId: string }) {
                   <td>
                     <StateBadge state={o.state} />
                   </td>
-                  <td>{o.assigneeId ?? messages.none}</td>
+                  <td>
+                  <Who id={o.assigneeId} />
+                </td>
                   <td>{o.createdAt ? formatSeoul(o.createdAt) : messages.none}</td>
                 </tr>
               ))}
@@ -174,7 +176,7 @@ function MoveDetailPage({ mfcId }: { readonly mfcId: string }) {
 }
 
 function MoveFacts({ order: o }: { readonly order: MoveOrder }) {
-  const rows: ReadonlyArray<readonly [string, string | number]> = [
+  const rows: ReadonlyArray<readonly [string, ReactNode]> = [
     [m.fields.product, product(o)],
     [m.fields.barcodes, o.barcodes?.length ? o.barcodes.join(', ') : messages.none],
     [m.fields.lotId, o.lotId ?? messages.none],
@@ -184,9 +186,9 @@ function MoveFacts({ order: o }: { readonly order: MoveOrder }) {
     [m.fields.qty, o.qty ?? messages.none],
     [m.fields.progress, m.progress(o.pickedQty ?? 0, o.droppedQty ?? 0, o.onCartQty ?? 0)],
     [m.fields.reason, o.reason ?? messages.none],
-    [m.fields.assignee, o.assigneeId ?? messages.none],
-    [m.fields.pickedBy, o.pickedBy ?? messages.none],
-    [m.fields.createdBy, who(o.createdBy)],
+    [m.fields.assignee, <Who id={o.assigneeId} />],
+    [m.fields.pickedBy, <Who id={o.pickedBy} />],
+    [m.fields.createdBy, o.createdBy === 'SYSTEM' ? m.system : <Who id={o.createdBy} />],
     [m.fields.createdAt, o.createdAt ? formatSeoul(o.createdAt) : messages.none],
     [m.fields.updatedAt, o.updatedAt ? formatSeoul(o.updatedAt) : messages.none],
   ];

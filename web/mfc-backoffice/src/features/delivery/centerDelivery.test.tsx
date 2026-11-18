@@ -20,6 +20,11 @@ describe('배송 현황(우리 센터)', () => {
     expect(within(failed).getByTestId('dispatch-state')).toHaveTextContent('배차 실패');
     expect(within(failed).getByText('약속 지남')).toBeInTheDocument();
     expect(within(failed).getByRole('link', { name: '배차 실패 P2' })).toHaveAttribute('href', '/c/MFC-BSN-01/dispatch-failures/CASE-DF-1');
+    // 화면 번호(ADR-0070): 번호가 있으면 배송 주문번호-순번·주문번호 8자리, 없으면 ID 끝 + 번호 없음. 라이더는 센터 관리자에게 비공개(bff 0.15.0)
+    const moving = rows.find((r) => r.textContent?.includes('20000002-1'))!;
+    expect(moving).toHaveTextContent('20000002');
+    expect(moving).toHaveTextContent('RD-7 라이더 정보 비공개');
+    expect(failed).toHaveTextContent('DLV-C-1 번호 없음');
     const q = liveCalls(view.sent)[0]!;
     expect([q.get('mfcId'), q.get('size'), q.get('state'), q.get('cursor')]).toEqual(['MFC-BSN-01', '50', null, null]);
   });

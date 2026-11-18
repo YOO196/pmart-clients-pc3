@@ -13,10 +13,12 @@ import { request } from '@pmart/web-core';
 import { formatSeoul, QueryState, toUiState } from '@pmart/web-ui';
 import type { paths } from '../../api/generated/backoffice-bff';
 import { useApi } from '../../app/ApiContext';
+import { DisplayNumber, RiderLabel, SystemNumbers } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
 
 const m = messages.packingHandover;
 const none = messages.none;
+const sys = messages.displayNumber.system;
 const name = (map: Readonly<Record<string, string>>, v: string | null | undefined) => (v ? (map[v] ?? v) : none);
 const when = (iso: string | null | undefined) => (iso ? formatSeoul(iso) : none);
 
@@ -139,9 +141,17 @@ function Row({ it }: { readonly it: Item }) {
   return (
     <tr data-testid="packing-row">
       <td>
-        <div className="font-mono font-semibold">{it.orderNumber ?? it.orderId ?? none}</div>
+        <div className="font-semibold">
+          <DisplayNumber number={it.orderNumber} systemId={it.orderId} />
+        </div>
         {it.workOrderKind === 'RESHIPMENT' && <span className="badge badge-warning badge-sm">{m.reshipment}</span>}
-        <div className="font-mono text-xs opacity-60">{it.shipmentId}</div>
+        <SystemNumbers
+          ids={[
+            { label: sys.orderId, id: it.orderId },
+            { label: sys.shipmentId, id: it.shipmentId },
+            { label: sys.deliveryId, id: it.deliveryId },
+          ]}
+        />
       </td>
       <td data-testid="stage">
         {it.stage ? (
@@ -162,7 +172,13 @@ function Row({ it }: { readonly it: Item }) {
               <li key={p.packageId} className="font-mono">
                 {`${p.packageId} · ${name(m.packageState, p.state)}`}
                 {p.fenceState && m.fenceState[p.fenceState] ? ` · ${m.fenceState[p.fenceState]}` : ''}
-                {p.handedOverAt ? ` · ${m.handedTo(when(p.handedOverAt), p.riderId ?? none)}` : ''}
+                {p.handedOverAt && (
+                  <>
+                    {` · ${when(p.handedOverAt)} `}
+                    {p.rider || p.riderId ? <RiderLabel rider={p.rider} riderId={p.riderId} /> : none}
+                    {` ${m.handedTo}`}
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -175,8 +191,16 @@ function Row({ it }: { readonly it: Item }) {
           <span className="opacity-70">{m.noDelivery}</span>
         ) : it.delivery.state ? (
           <>
-            <div>{name(messages.centerDelivery.executionState, it.delivery.state)}</div>
-            {it.riderId && <div>{m.assignedRider(it.riderId)}</div>}
+            <div>
+              {it.deliveryNumber && <span className="mr-1 font-mono">{it.deliveryNumber}</span>}
+              {name(messages.centerDelivery.executionState, it.delivery.state)}
+            </div>
+            {(it.rider || it.riderId) && (
+              <div>
+                {`${m.assignedRider} `}
+                <RiderLabel rider={it.rider} riderId={it.riderId} />
+              </div>
+            )}
           </>
         ) : (
           <span className="text-warning">{m.deliveryUnknown}</span>

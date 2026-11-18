@@ -20,6 +20,7 @@ import type { components } from '../../api/generated/mfc-capacity';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
+import { Who, WhoAt } from '../../shared/OperatorLabel';
 
 const m = messages.workers;
 
@@ -401,7 +402,7 @@ function WorkerFacts({ worker: w }: { readonly worker: WorkerDetail }) {
     [m.fields.workAreas, w.workAreas?.length ? w.workAreas.map((a) => m.area[a] ?? a).join(', ') : messages.none],
     [m.fields.today, todayText(w)],
     [m.fields.speed, w.speedFactor ?? messages.none],
-    [m.fields.registered, w.registeredAt ? m.by(w.registeredBy ?? '', formatSeoul(w.registeredAt)) : messages.none],
+    [m.fields.registered, w.registeredAt ? <WhoAt id={w.registeredBy} at={formatSeoul(w.registeredAt)} /> : messages.none],
   ];
   return (
     <dl className="grid grid-cols-[11rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm">
@@ -950,7 +951,10 @@ function Histories({ worker: w }: { readonly worker: WorkerDetail }) {
           {(w.dutyHistory ?? []).map((d) => (
             <li key={d.dutyVersion}>
               {`v${d.dutyVersion ?? ''} ${tasks(d.taskTypes)}`}
-              <span className="ml-1 text-xs opacity-70">{`${d.reason ?? ''} ${d.changedAt ? m.by(d.changedBy ?? '', formatSeoul(d.changedAt)) : ''}`.trim()}</span>
+              <span className="ml-1 text-xs opacity-70">
+                {d.reason ? `${d.reason} ` : ''}
+                {d.changedAt && <WhoAt id={d.changedBy} at={formatSeoul(d.changedAt)} />}
+              </span>
             </li>
           ))}
         </ul>
@@ -961,7 +965,10 @@ function Histories({ worker: w }: { readonly worker: WorkerDetail }) {
           {(w.stateHistory ?? []).map((s, i) => (
             <li key={`${s.changedAt ?? ''}-${i}`}>
               {`${s.fromState ? `${m.state[s.fromState] ?? s.fromState} → ` : ''}${m.state[s.toState ?? ''] ?? s.toState ?? ''}`}
-              <span className="ml-1 text-xs opacity-70">{`${s.reason ?? ''} ${s.changedAt ? m.by(s.changedBy ?? '', formatSeoul(s.changedAt)) : ''}`.trim()}</span>
+              <span className="ml-1 text-xs opacity-70">
+                {s.reason ? `${s.reason} ` : ''}
+                {s.changedAt && <WhoAt id={s.changedBy} at={formatSeoul(s.changedAt)} />}
+              </span>
             </li>
           ))}
         </ul>
@@ -999,7 +1006,15 @@ function BreakPinCard({ mfcId }: { readonly mfcId: string }) {
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(s) => (
           <p data-testid="break-pin-status">
-            {s.set ? bp.set(s.updatedBy ?? messages.none, s.updatedAt ? formatSeoul(s.updatedAt) : messages.none) : bp.notSet}
+            {s.set ? (
+              <>
+                {`${bp.set} · `}
+                <Who id={s.updatedBy} />
+                {` · ${s.updatedAt ? formatSeoul(s.updatedAt) : messages.none}`}
+              </>
+            ) : (
+              bp.notSet
+            )}
           </p>
         )}
       </QueryState>

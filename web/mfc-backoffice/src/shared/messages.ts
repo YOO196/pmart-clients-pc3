@@ -7,6 +7,26 @@ export const messages = {
   mockBadge: '목 데이터',
   ...uiMessages,
 
+  /** 번호 복사 단추 */
+  copy: {
+    copy: '복사',
+    done: '복사했어요',
+    failed: '복사하지 못했어요',
+    aria: (what: string) => `${what} 복사`,
+  },
+  /** 화면 번호(ADR-0070) */
+  displayNumber: {
+    missing: '번호 없음',
+    riderHidden: '라이더 정보 비공개',
+    systemNumbers: '시스템 번호',
+    system: { orderId: '주문', deliveryId: '배송', shipmentId: '출고', packageId: '포장', riderId: '라이더' },
+  },
+  /** 운영자 이름·사번(hr employee-labels) */
+  operator: {
+    unknown: '확인 불가',
+    failed: '이름 못 읽음',
+  },
+
   nav: {
     session: '내 세션',
     login: '로그인',
@@ -116,11 +136,11 @@ export const messages = {
       `밀봉 ${sealed ?? '?'} / ${total ?? '?'} · 인계 ${handed ?? '?'} · 남음 ${left ?? '?'}`,
     packageState: { OPEN: '담는 중', SEALED: '밀봉', HANDED_OVER: '인계됨' } as Readonly<Record<string, string>>,
     fenceState: { NONE: '', HANDOVER_IN_PROGRESS: '인계 진행 중', COMMITTED: '인계 확정', EXPIRED: '인계 허가 만료' } as Readonly<Record<string, string>>,
-    handedTo: (at: string, rider: string) => `${at} ${rider} 인계`,
+    handedTo: '인계',
     reshipment: '재발송',
     noDelivery: '배송 없음',
     deliveryUnknown: '모름(조회 실패)',
-    assignedRider: (r: string) => `배정 ${r}`,
+    assignedRider: '배정',
   },
 
   /** 우리 센터 배송 현황(bff 0.3.1 live-delivery — 센터 관리자는 자기 센터 고정) */
@@ -668,7 +688,7 @@ export const messages = {
       locationUnknown: '놓인 위치 모름',
       pkg: (id: string) => `포장 ${id}`,
       order: (id: string) => `주문 ${id}`,
-      rider: (id: string) => `허가받은 라이더 ${id}`,
+      rider: '허가받은 라이더',
       expiredAt: (t: string) => `허가 끝 ${t}`,
       atStation: '포장대에 있음',
       taken: '포장대에 없음(라이더가 가져감)',
@@ -817,7 +837,7 @@ export const messages = {
     breakPin: {
       title: '휴게 번호',
       intro: '작업자가 PDA 에서 휴게를 켤 때 넣는 4자리 번호예요(로그인 비밀번호 아님). 서버는 번호를 보여 주지 않아요 — 잊으면 새로 정해요.',
-      set: (who: string, at: string) => `정해 둠 · ${who} · ${at}`,
+      set: '정해 둠',
       notSet: '아직 정하지 않았어요 — 작업자가 PDA 로 휴게를 켤 수 없어요.',
       newPin: '새 번호(숫자 4자리)',
       confirmPin: '한 번 더',
@@ -826,7 +846,6 @@ export const messages = {
       saved: '휴게 번호를 정했어요. 5번 틀려 잠긴 작업자도 바로 풀려요.',
       lockNote: '같은 작업자가 연속 5번 틀리면 15분 잠겨요. 번호를 새로 정하면 바로 풀려요.',
     },
-    by: (who: string, at: string) => `${who} · ${at}`,
   },
 
   /** 이동·보충 — mfc-inbound-service 0.9.0 move-orders */

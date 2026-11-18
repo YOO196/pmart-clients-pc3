@@ -179,6 +179,11 @@
 - 사용자 결정(2026-11-18): 내 비밀번호는 본인이 직접(지금 + 새 비밀번호), 연락처(휴대폰·개인 메일)만 본인이 — 회사 메일은 인사팀만. 두 기능은 백엔드 EA-3·HR-3(PC 1) 대기라 "준비 중" 안내만(폼·요청 없음). 요청서 `docs/handoff/mfc-backoffice/2026-11-18-backend-my-account.md`.
 - 타입: `gen:api` 생성물 `src/api/generated/hr`(PC 2 가 mfc-backoffice 생성 목록에 `hr` 을 넣음, 2026-11-18). 처음 넣을 때 쓴 임시 `src/api/hrSelf.ts` 는 지웠다.
 
+### 4-12. 사람 이름·화면 번호(모든 메뉴, 2026-11-19 PC 3)
+- 운영자 ID(작업자·담당·요청자·결정자·승인자·만든 사람 등)는 `shared/OperatorLabel.tsx` `<Who>` 로 "이름 · 사번" — hr 0.8.0 `GET /hr/employee-labels?operatorIds=`(직원 토큰 누구나, 50개까지). 한 화면의 ID 를 모아 한 번에 묻는다. 모르는 ID 는 ID + "확인 불가", 조회 실패는 ID + "이름 못 읽음". 입력칸(작업자 ID 넣기)은 ID 그대로.
+- 배송·주문·라이더는 화면 번호(ADR-0070, bff 0.14.0) — `shared/displayNumber.tsx`: 배송 `deliveryNumber`("주문번호-순번"), 주문 `orderNumber`(8자리), 번호가 없으면 ID 끝 8자리 + "번호 없음". 시스템 ID 는 접힌 "시스템 번호"(복사 단추).
+- 라이더: 센터 관리자는 rider-service 403 이라 bff 가 번호·이름을 null 로 준다(0.15.0, 장애 아님) — ID 끝 8자리 + "라이더 정보 비공개". 번호가 오면 "김*수 · 482913".
+
 ## 5. 목 모드
 - 목 계정: 센터 관리자(MFC 1곳 `MFC-BSN-01`), 센터 관리자(MFC 2곳 `MFC-BSN-01`·`MFC-SEL-01`), 현장 작업자, 운영 관리자(센터 없음). `src/mocks/db.ts`.
 - 목 핸들러:

@@ -6,7 +6,7 @@
 // - 확인 필요 포장 목록·확인(`GET /packages?checkRequired=true`, `handover-checks`) — 센터 관리자도(MB-3, fulfillment 0.17.0). `HandoverChecks.tsx`.
 // - 늦음·멈춤은 서버 표시값 — 화면이 계산하지 않고, 자동으로 빼앗는 버튼도 없다.
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, Route, Routes, useParams, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
@@ -16,6 +16,8 @@ import type { components } from '../../api/generated/mfc-fulfillment';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
+import { RiderLabel } from '../../shared/displayNumber';
+import { Who } from '../../shared/OperatorLabel';
 import { HandoverChecks } from './HandoverChecks';
 
 const m = messages.tasks;
@@ -160,7 +162,9 @@ function TaskListPage({ mfcId }: { readonly mfcId: string }) {
                       <StateBadge state={t.state} />
                       <Flags task={t} />
                     </td>
-                    <td>{t.assignment?.workerId ?? m.unassigned}</td>
+                    <td>
+                      <Who id={t.assignment?.workerId} empty={m.unassigned} />
+                    </td>
                     <td>{m.qty(t.plannedQty ?? 0, t.completedQty ?? 0, t.remainingQty ?? 0)}</td>
                     <td>{t.promisedReadyAt ? formatSeoul(t.promisedReadyAt) : messages.none}</td>
                     <td>{t.lastActivityAt ? formatSeoul(t.lastActivityAt) : messages.none}</td>
@@ -229,9 +233,9 @@ function TaskDetailPage({ mfcId }: { readonly mfcId: string }) {
 }
 
 function TaskFacts({ task: t }: { readonly task: TaskDetail }) {
-  const rows: ReadonlyArray<readonly [string, string]> = [
+  const rows: ReadonlyArray<readonly [string, ReactNode]> = [
     [m.fields.product, m.headline(t.headline?.productName, t.headline?.otherLineCount ?? 0)],
-    [m.fields.assignee, t.assignment?.workerId ?? m.unassigned],
+    [m.fields.assignee, <Who id={t.assignment?.workerId} empty={m.unassigned} />],
     [m.fields.qty, m.qty(t.plannedQty ?? 0, t.completedQty ?? 0, t.remainingQty ?? 0)],
     [m.fields.promisedReadyAt, t.promisedReadyAt ? formatSeoul(t.promisedReadyAt) : messages.none],
     [m.fields.lastActivity, t.lastActivityAt ? formatSeoul(t.lastActivityAt) : messages.none],
@@ -389,7 +393,7 @@ function ShipmentView({ shipmentId }: { readonly shipmentId: string }) {
                         {m.fenceState[pkg.fence?.state ?? ''] ?? pkg.fence?.state ?? messages.none}
                         {pkg.fence?.expiresAt && <span className="ml-1 opacity-70">{formatSeoul(pkg.fence.expiresAt)}</span>}
                       </td>
-                      <td>{pkg.fence?.riderId ?? messages.none}</td>
+                      <td>{pkg.fence?.riderId ? <RiderLabel riderId={pkg.fence.riderId} /> : messages.none}</td>
                       <td>{pkg.sealedAt ? formatSeoul(pkg.sealedAt) : messages.none}</td>
                       <td>{pkg.handedOverAt ? formatSeoul(pkg.handedOverAt) : messages.none}</td>
                       <td>
