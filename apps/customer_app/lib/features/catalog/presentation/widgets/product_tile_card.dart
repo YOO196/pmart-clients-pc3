@@ -165,13 +165,30 @@ class ProductTileCard extends StatelessWidget {
           ),
           child: ProductImage(url: tile.imageUrl, size: size, radius: 8),
         ),
-        // 품절·미취급은 사진을 어둡게 덮고 가운데에 상태를 적는다(상태 문구는 아래에도 한 번 더).
+        // 품절·미취급은 사진을 어둡게 덮고 가운데에 상태를 적는다(레퍼런스 "다 팔렸어요").
+        // 칸 카드는 높이가 고정이라 상태 문구를 아래 줄에 더하지 않는다 — 더하면 아래가 넘친다(BOTTOM OVERFLOWED).
         if (rail && status != null)
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.38),
                 borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Text(
+                    status,
+                    key: ValueKey('tile-status-${tile.productId}'),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -202,7 +219,8 @@ class ProductTileCard extends StatelessWidget {
       ),
       const SizedBox(height: 2),
       RatingLine(rating: tile.rating, count: tile.reviewCount),
-      if (status != null) ...[
+      // 세로 목록(높이 고정 아님)만 아래 줄에 상태를 적는다. 칸 카드는 사진 위에 적었다.
+      if (status != null && !rail) ...[
         const SizedBox(height: 4),
         Text(
           status,

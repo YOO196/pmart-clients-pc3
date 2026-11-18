@@ -116,6 +116,7 @@ base class _CountingCart extends MockCartRepository {
   _CountingCart() : super(latency: Duration.zero);
 
   final adds = <String>[];
+  final setQuantities = <int>[];
 
   @override
   Future<CartChangeOutcome> change(
@@ -125,6 +126,7 @@ base class _CountingCart extends MockCartRepository {
     required int expectedVersion,
   }) {
     if (change is AddItem) adds.add(change.sku);
+    if (change is SetQuantity) setQuantities.add(change.quantity);
     return super.change(
       cartId,
       change,
@@ -462,16 +464,38 @@ void main() {
       expect(find.text('장바구니에 담았어요'), findsOneWidget);
     });
 
-    testWidgets('이미 담긴 상품은 수량을 덮어쓰지 않고 담긴 수량만 알린다', (t) async {
+    testWidgets('이미 담긴 상품은 누를 때마다 1개씩 늘린다(덮어쓰지 않고 서버 수량 + 1)', (t) async {
       final cart = _CountingCart();
       await t.pumpWidget(testApp(const [], cart: cart));
       await t.pumpAndSettle();
       await openSearch(t, '감자칩');
 
+      // 목 장바구니에 감자칩 1개가 담겨 있다.
       await t.tap(find.byKey(const ValueKey('quick-add-P-0005')));
       await t.pumpAndSettle();
       expect(cart.adds, isEmpty);
-      expect(find.text('장바구니에 1개 있어요'), findsOneWidget);
+      expect(cart.setQuantities, [2]);
+      expect(find.text('장바구니에 2개 있어요'), findsOneWidget);
+
+      await t.tap(find.byKey(const ValueKey('quick-add-P-0005')));
+      await t.pumpAndSettle();
+      expect(cart.setQuantities, [2, 3]);
+      expect(find.text('장바구니에 3개 있어요'), findsOneWidget);
+    });
+
+    testWidgets('처음 담는 상품도 두 번 누르면 2개가 된다', (t) async {
+      final cart = _CountingCart();
+      await t.pumpWidget(testApp(const [], cart: cart));
+      await t.pumpAndSettle();
+      await openSearch(t, '그릭요거트');
+
+      await t.tap(find.byKey(const ValueKey('quick-add-P-0002')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('quick-add-P-0002')));
+      await t.pumpAndSettle();
+      expect(cart.adds, ['E-00000002']);
+      expect(cart.setQuantities, [2]);
+      expect(find.text('장바구니에 2개 있어요'), findsOneWidget);
     });
 
     testWidgets('옵션이 여럿이면 담지 않고 상품 상세(옵션 선택)로 간다', (t) async {

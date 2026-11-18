@@ -1520,24 +1520,121 @@ class _ReviewPhotos extends ConsumerWidget {
             final url = resolveImageUrl(review.photoUrls[i], origin);
             return Semantics(
               image: true,
+              button: url != null,
               label: l10n.reviewPhotoLabel(i + 1),
-              child: ClipRRect(
-                key: ValueKey('review-photo-${review.reviewId}-$i'),
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox.square(
-                  dimension: 72,
-                  child: url == null
-                      ? placeholder()
-                      : Image.network(
-                          url,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => placeholder(),
-                        ),
+              child: GestureDetector(
+                // 누르면 크게 보기(주소를 그릴 수 있는 사진만).
+                onTap: url == null
+                    ? null
+                    : () => openReviewPhotoViewer(context, [
+                        for (final u in review.photoUrls)
+                          resolveImageUrl(u, origin),
+                      ], initial: i),
+                child: ClipRRect(
+                  key: ValueKey('review-photo-${review.reviewId}-$i'),
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox.square(
+                    dimension: 72,
+                    child: url == null
+                        ? placeholder()
+                        : Image.network(
+                            url,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => placeholder(),
+                          ),
+                  ),
                 ),
               ),
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// 리뷰 사진 크게 보기 — 전체 화면, 옆으로 넘기기, 두 손가락 확대. [urls] 의 null 은 그릴 수 없는 사진(자리표시).
+Future<void> openReviewPhotoViewer(
+  BuildContext context,
+  List<String?> urls, {
+  int initial = 0,
+}) => Navigator.of(context, rootNavigator: true).push(
+  MaterialPageRoute<void>(
+    fullscreenDialog: true,
+    builder: (_) => ReviewPhotoViewer(urls: urls, initial: initial),
+  ),
+);
+
+class ReviewPhotoViewer extends StatefulWidget {
+  const ReviewPhotoViewer({super.key, required this.urls, this.initial = 0});
+
+  final List<String?> urls;
+  final int initial;
+
+  @override
+  State<ReviewPhotoViewer> createState() => _ReviewPhotoViewerState();
+}
+
+class _ReviewPhotoViewerState extends State<ReviewPhotoViewer> {
+  late final _pages = PageController(initialPage: widget.initial);
+  late int _index = widget.initial;
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    Widget failed() => Center(
+      child: Text(
+        l10n.reviewPhotoLoadFailed,
+        style: const TextStyle(color: Colors.white70),
+      ),
+    );
+    return Scaffold(
+      key: const ValueKey('review-photo-viewer'),
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        leading: IconButton(
+          key: const ValueKey('review-photo-viewer-close'),
+          icon: const Icon(Icons.close),
+          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: widget.urls.length > 1
+            ? Text(
+                '${_index + 1} / ${widget.urls.length}',
+                key: const ValueKey('review-photo-viewer-count'),
+              )
+            : null,
+        centerTitle: true,
+      ),
+      body: PageView.builder(
+        controller: _pages,
+        itemCount: widget.urls.length,
+        onPageChanged: (i) => setState(() => _index = i),
+        itemBuilder: (context, i) {
+          final url = widget.urls[i];
+          return InteractiveViewer(
+            minScale: 1,
+            maxScale: 4,
+            child: Center(
+              child: url == null
+                  ? failed()
+                  : Image.network(
+                      url,
+                      key: ValueKey('review-photo-viewer-$i'),
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => failed(),
+                    ),
+            ),
+          );
+        },
       ),
     );
   }

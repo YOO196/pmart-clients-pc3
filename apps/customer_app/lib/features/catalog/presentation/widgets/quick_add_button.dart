@@ -19,7 +19,7 @@ import '../catalog_providers.dart';
 /// 카드만으로는 옵션이 여럿인지 알 수 없어, 누르면 상품 옵션(`GET /product-contents/{id}`)을 먼저 확인한다.
 /// 옵션이 하나이고 담을 수 있어 보일 때만 그 SKU 1개를 기존 담기 경로([CartController.submitWhenReady])로 보낸다.
 /// 옵션 선택이 필요하거나 확인하지 못하면 상세(옵션 선택)로 보낸다 — 임의로 담지 않는다.
-/// 이미 담긴 SKU 는 담기가 절대 수량 설정이라 보내지 않고 담긴 수량만 알린다.
+/// 이미 담긴 SKU 는 누를 때마다 1개씩 늘린다(서버 담긴 수량 + 1 로 수량 변경, 2026-11-18 사용자).
 class QuickAddButton extends ConsumerStatefulWidget {
   const QuickAddButton({super.key, required this.tile});
 
@@ -73,15 +73,26 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
       }
       if (!mounted) return;
       final inCart = cart.cart.lineForSku(option.sku);
-      if (inCart != null) {
-        say(l10n.cartInCart(inCart.quantity));
-        return;
-      }
+      // 누를 때마다 1개씩 더 담는다(사용자 2026-11-18). 담기(AddItem)는 절대 수량이라, 이미 담긴 상품은
+      // 서버가 준 담긴 수량 + 1 로 수량 변경을 보낸다(기대 버전이 붙어 그 사이 바뀌었으면 충돌로 거절된다).
+      final change = inCart == null
+          ? AddItem(sku: option.sku, quantity: 1)
+          : SetQuantity(
+              cartItemId: inCart.cartItemId,
+              quantity: inCart.quantity + 1,
+            );
       final outcome = await ref
           .read(cartControllerProvider.notifier)
-          .submitWhenReady(AddItem(sku: option.sku, quantity: 1));
+          .submitWhenReady(change);
       if (!mounted) return;
-      say(outcome == null ? l10n.reorderBusy : cartOutcomeText(l10n, outcome));
+      say(switch (outcome) {
+        null => l10n.reorderBusy,
+        // 서버가 반영한 뒤에만 늘어난 수량을 알린다.
+        CartChangeApplied() when inCart != null => l10n.cartInCart(
+          inCart.quantity + 1,
+        ),
+        final o => cartOutcomeText(l10n, o),
+      });
     } finally {
       if (mounted) setState(() => _busy = false);
     }
