@@ -10,6 +10,31 @@ export const messages = {
   nav: {
     session: '내 세션',
     login: '로그인',
+    me: '내 정보',
+  },
+
+  /** 내 정보 — hr-service GET /hr/employees/me(본인). 비밀번호·연락처 바꾸기는 백엔드 EA-3·HR-3 대기 */
+  me: {
+    title: '내 정보',
+    noRecord: '인사 기록이 없는 계정이에요. 인사팀에 확인해 주세요.',
+    fields: {
+      name: '이름',
+      employeeNo: '사번',
+      operatorId: '운영자 ID',
+      mailAddress: '회사 메일(로그인 ID)',
+      employmentType: '고용 형태',
+      affiliation: '소속',
+      status: '상태',
+    } as const,
+    employmentType: { REGULAR: '정규직', PART_TIME: '파트타임(알바)', DAILY: '일일크루' } as Readonly<Record<string, string>>,
+    status: { ACTIVE: '재직', SUSPENDED: '정지', LEFT: '퇴사' } as Readonly<Record<string, string>>,
+    center: (code: string) => `센터 ${code}`,
+    department: (code: string) => `본사 부서 ${code}`,
+    mailNote: '회사 메일은 로그인 ID 이자 사서함이라 인사팀만 바꿔요.',
+    passwordTitle: '비밀번호 바꾸기',
+    passwordPreparing: '준비 중이에요 — 서버 기능(지금 비밀번호 확인 뒤 새 비밀번호로)이 나오면 여기서 바꿔요. 그 전에는 인사팀에 비밀번호 설정 메일을 다시 보내 달라고 해 주세요.',
+    contactTitle: '연락처(휴대폰·개인 메일)',
+    contactPreparing: '준비 중이에요 — 서버에 연락처 칸이 생기면 여기서 등록하고 바꿔요.',
   },
 
   /** 메뉴 묶음·하위 메뉴(handoff 2026-11-15 §2 — 이름·순서는 클라이언트가 정해도 된다) */

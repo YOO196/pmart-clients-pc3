@@ -7,6 +7,7 @@ import type { paths as ApprovalPaths } from './generated/approval';
 import type { paths as BffPaths } from './generated/backoffice-bff';
 import type { paths as CasePaths } from './generated/case';
 import type { paths as CenterPaths } from './generated/center-master';
+import type { paths as HrPaths } from './generated/hr';
 import type { paths as CapacityPaths } from './generated/mfc-capacity';
 import type { paths as FulfillmentPaths } from './generated/mfc-fulfillment';
 import type { paths as InboundPaths } from './generated/mfc-inbound';
@@ -38,6 +39,8 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     cases: createClient<CasePaths>(options),
     // 본사 승인 요청(AP-1) — 422 APPROVAL_REQUIRED 의 요청 본문으로 변경 요청 만들기·제출, 승인 상태 조회
     approval: createClient<ApprovalPaths>(options),
+    // 내 정보 — hr-service 본인 조회
+    hr: createClient<HrPaths>(options),
   };
 }
 
