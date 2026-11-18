@@ -13,6 +13,7 @@ import 'features/handover/presentation/handover_screens.dart';
 import 'features/inbound/presentation/inbound_screen.dart';
 import 'features/my_work/presentation/my_work.dart';
 import 'features/quality/presentation/quality_screens.dart';
+import 'features/return_handover/presentation/return_handover_screen.dart';
 import 'features/stock_check/presentation/stock_check_screen.dart';
 import 'features/stock_count/presentation/stock_count_screen.dart';
 import 'features/stock_move/presentation/stock_move_screens.dart';
@@ -185,6 +186,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/handover-checks',
         builder: (_, _) => const HandoverChecksScreen(),
+      ),
+      // 반납 인증번호(delivery-execution 0.28.0) — 센터 직원 누구나(권한 판정은 서버).
+      GoRoute(
+        path: '/return-handovers',
+        builder: (_, _) => const ReturnHandoversScreen(),
       ),
       GoRoute(
         path: '/packages/:packageId/handover',

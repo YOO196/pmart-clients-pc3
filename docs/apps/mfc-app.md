@@ -8,7 +8,7 @@
 - **시작 메뉴**(사용자 2026-11-17): 앱을 켜면(로그인 전) **로그인 · 기기 설정 · 재고 확인** 큰 칸(메인 업무 목록과 같은 모양, `shared/menu_tile.dart`). 세션이 끝나 나온 경우(무활동·정지)만 이유 안내를 위해 바로 로그인 화면. 로그아웃하면 시작 메뉴.
   - 로그인 → 로그인 화면(버튼 하나). **목 앱도 실서버와 같은 로그인 화면** — 실서버는 버튼이 Keycloak 화면(Custom Tab)을, 목은 그 자리에 시험용 로그인 화면(`MockSignInPage`, 아이디·비밀번호)을 연다. 틀리면 그 화면에서 알리고, 닫으면 "취소" 안내.
   - 기기 설정 → 프린터·스캐너 확인·기기 정보(기기 ID·실행 모드). 로그인 없이 연다.
-  - **재고 확인**(로그인 필요): 누르면 로그인 화면 → 로그인되면 바로 재고 확인(메인 위에 쌓여 뒤로 = 메인). 로그인 뒤에는 홈 아래 메뉴줄 "재고 확인"(인계 확인·프린터·재고 확인·휴게). 상품 바코드(또는 SKU)를 찍으면 mfc-inventory `GET /mfcs/{id}/stock?sku=` 의 LOT 요약(보유·판매 가능·예약·격리 — 서버 값 그대로)과 칸별 줄(칸 색 블록·품질·업무 상태). 보기만. 작업자 토큰 허용 여부·상품명은 백엔드 질문 중(`docs/handoff/mfc-app/2026-11-17-backend-pda-stock-check.md`). 칸으로 찾기는 API 없음(MB-1).
+  - **재고 확인**(로그인 필요): 누르면 로그인 화면 → 로그인되면 바로 재고 확인(메인 위에 쌓여 뒤로 = 메인). 로그인 뒤에는 홈 아래 메뉴줄 "재고 확인"(인계 확인·반납 번호 / 프린터·재고 확인·휴게). 상품 바코드(또는 SKU)를 찍으면 mfc-inventory `GET /mfcs/{id}/stock?sku=` 의 LOT 요약(보유·판매 가능·예약·격리 — 서버 값 그대로)과 칸별 줄(칸 색 블록·품질·업무 상태). 보기만. 작업자 토큰 허용 여부·상품명은 백엔드 질문 중(`docs/handoff/mfc-app/2026-11-17-backend-pda-stock-check.md`). 칸으로 찾기는 API 없음(MB-1).
   - 서버 주소: 빌드 값(`PMART_API_BASE_URL`)만 쓴다. PDA 에서 바꾸는 화면은 두지 않는다(사용자 2026-11-17 — 바꾼 주소로 직원 토큰이 가거나 http 로 내려갈 수 있어서).
 - **오늘 업무 내역**(사용자 2026-11-17): 업무 고르기(메인)·업무 진행(`/work/:area`)·피킹 화면의 앱 바 아래 작은 바에 **"업무 내역 · 오늘 N건"** 칩 → `/my-work`. fulfillment `GET /tasks?assignee=me&state=COMPLETED,CLOSED_PARTIAL,IN_PROGRESS` 에서 `lastActivityAt` 이 오늘(서울)인 것만(날짜 거르기가 계약에 없어 화면이 고름). 완료·진행 중 건수, 작업별 상품·종류·시각·처리/지시 수량(서버 값)·상태. 입고·검사·이동·실사 내역은 서버 조회가 없어 안내만 — 요청 `docs/handoff/mfc-app/2026-11-17-backend-my-work-history.md`.
 - **역할별 홈**(사용자 2026-11-16): 로그인 토큰 `roles` 에 `MFC_SUPERVISOR`(센터 관리자)가 있으면 홈 위에 **관리** 메뉴를 더하고, 아래에는 작업자와 같은 업무 5개·메뉴를 둔다(관리자도 현장 작업 가능). 작업자(`MFC_WORKER`)는 지금처럼 업무만. 역할은 안내용이고 판정은 서버(작업자가 관리 화면을 열면 서버 403).
@@ -17,7 +17,7 @@
   - **이동 지시**(`/manage/moves`): 진행 중 지시 목록(inbound `listMoveOrders` 기본 ACTIVE·CANCEL_PENDING), 지시 취소(사유 필수 — `cancellations`, 카트에 실린 물건이 있으면 "출발 칸에 되돌려 놓으면 끝나요"). 새 지시(`/manage/moves/new`): 상품 바코드·SKU 스캔(바코드는 product `resolveBarcode`) → 그 SKU 의 정상·보관 재고(inventory `getCenterStock`)에서 출발 칸·LOT 고르기 → 도착 칸 스캔 → 수량(그 묶음 이하)·사유·긴급 → `POST /move-orders`(같은 키 = 같은 이동). 칸 배정·용량·칸당 한 상품은 서버 판정, 거절은 코드 그대로. 칸으로 재고를 찾는 API 가 없어 상품부터 고른다(MB-1).
   - **실사**(`/manage/counts`): 실사 번호로 찾기 + 이 기기에서 연 실사(목록 API 없음 — MB-1, 앱을 끄면 사라짐). 실사 시작(`/manage/counts/new`): 칸 스캔(최대 50) → inventory `createCountSession`. 실사 잠금은 PDA 가 하지 않는다 — 잠기지 않은 칸은 서버 409 `LOCATION_NOT_LOCKED` 를 그대로 안내(사용자 2026-11-16 "시작만, 잠금은 서버 판정", 잠금 주체는 BR-52 R14 대기). 상세(`/manage/counts/:id`): 상태·칸·계수자, 계수가 끝난 뒤에만 차이(장부 → 계수). 승인 대기면 승인(승인 번호 직접 입력 필수 — 사용자 2026-11-16, 승인 서비스가 없어 서버는 기록만, Q-11)·반려. `SELF_APPROVAL`·`APPROVAL_REQUIRED`·`BOOK_CHANGED` 안내, 결과 불명은 같은 키·같은 결정으로 "다시 확인".
   - 목 로그인: `claude-mfc-sup` = 센터 관리자(LAN 시험 계정 이름), `mfcw-*` = 작업자.
-- 크루는 **작업 목록을 볼 수 없다**(목록 화면 삭제). 메인(모든 작업자 공통): 업무 5개, 메뉴(인계 확인·프린터 설정·휴게). "작업 준비 완료" 버튼 없음 — 업무를 누르면 바로 작업 순서 안내(2026-11-10).
+- 크루는 **작업 목록을 볼 수 없다**(목록 화면 삭제). 메인(모든 작업자 공통): 업무 5개, 메뉴(인계 확인·반납 번호·프린터 설정·재고 확인·휴게). "작업 준비 완료" 버튼 없음 — 업무를 누르면 바로 작업 순서 안내(2026-11-10).
 - 업무 묶음(사용자 2026-11-10 "지금은 이렇게 묶을 거야"):
   | 업무 | 하는 일 | 작업 유형 |
   |---|---|---|
@@ -47,6 +47,7 @@
 | 재고 실사 | inventory `count-sessions` 시작·조회·counts(차이 승인은 관리자라 제외) | 있음(§0-4) |
 | 피패킹 | fulfillment tasks·starts·executions·shipments·packages·repack·dispatch-requests | 있음 |
 | 인계 확인 | fulfillment packages checkRequired·handover-resolution·handover-checks, tracking ETA | 있음 |
+| 반납 번호 | execution `return-handovers` 목록·code-reissues (0.28.0) | 있음(2026-11-18) |
 - `PMART_ENV=mock` 은 목, `local` 은 계약 API(게이트웨이). 현장 명령 결과는 `FieldOutcome`(확정/거절/불명) — APPLIED(또는 접수 + 결과 ID)만 확정, CAPTURED·UNKNOWN_RESULT·503 은 같은 키로 다시.
 - 연결 중 나온 계약 공백: BR-52 R12~R14(회수품 검수 대기 목록, 회수 라벨 형식, 실사 배정), R16(표시 문서 번호).
 - 식별자 규칙(채번 지침 요약): `docs/architecture/identifiers.md`. 목 데이터 위치 코드·ID 를 지침 형식으로 맞춤(2026-11-10).
@@ -129,6 +130,7 @@
 | 패킹 | `GET /shipments/{id}`, `POST /shipments/{id}/packages`(밀봉 → 포장 QR), `GET /packages/{id}`, `POST /packages/{id}/repackings` | |
 | 배차 요청 | `POST /shipments/{id}/dispatch-requests`(fulfillment 0.4.5, D-5), 결과는 `GET /shipments/{id}` 의 `dispatchRequest` | 포장 시작 때 예상 포장 시간(분, 1~180) 입력. 출고당 한 번, 안 하면 READY 때 자동(AUTO_ON_READY). 점원 앱은 delivery-dispatch 를 직접 부르지 않는다 |
 | 인계 확인 | `GET /packages?mfcId=&checkRequired=true`, `GET /packages/{id}/handover-resolution`, `POST /packages/{id}/handover-checks`, `GET /deliveries/{id}/eta`(pickupEta) | 라이더 스캔 결과 반영. 허가 만료 뒤 점원 확인(D-1, fulfillment 0.4.4·0.4.9). §6-1 |
+| 반납 인증번호 | `GET /return-handovers?mfcId=`, `POST /return-handovers/{deliveryId}/code-reissues` (delivery-execution 0.28.0) | 라이더가 회수품(고객 반품·오배송 회수·전달 실패 반납)을 가져오면 직원이 4자리 번호를 알려 주고, 라이더가 라이더 앱에 넣어야 반납 완료. 홈 메뉴 "반납 번호"(센터 직원 누구나). 번호는 크게, 잠기면(5번 틀림) 번호 대신 잠김 안내 + "새 번호 내고 잠김 풀기"(한 번 더 확인). 새 번호 결과를 모르면 같은 키로만 다시. 번호는 로그에 남기지 않는다. 라이더 이름은 응답에 없고 직원이 라이더 상세를 못 불러 ID 만 보인다(rider-app 요청 `docs/handoff/mfc-app/2026-11-18-rider-app-return-handover-screen.md`) |
 | 입고 | `GET /inbound-promises`, `GET /inbound-promises/{trfId}`, `POST …/arrivals`, `POST …/receipts` (+짝 조회) | 2단계(공급 루프)에 본격 사용. 1차는 초기 보유·회수 반입 |
 | 회수품 반입 | `POST /return-receipts`, `GET /return-receipts/{id}` | 반입 즉시 격리 |
 | 회수품 검수·품질 | `POST /return-inspections`, `POST /quality-decisions`, `POST /disposal-approvals` | 요청자·승인자 분리 |
