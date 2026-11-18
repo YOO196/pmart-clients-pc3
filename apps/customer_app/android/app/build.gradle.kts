@@ -6,12 +6,15 @@ plugins {
 
 android {
     namespace = "com.pmart.customer_app"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_local_notifications 23 이 컴파일 SDK 37 이상을 요구한다(targetSdk·minSdk 는 Flutter 기본 그대로).
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // flutter_local_notifications 가 요구한다(java.time 등을 낮은 Android 에서도).
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -48,6 +51,11 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // flutter_local_notifications(핵심 라이브러리 desugaring).
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
 
 // 휴대폰 푸시(FCM). google-services.json 은 git 제외(.gitignore)라 그 파일이 없는 PC 에서도 빌드되게

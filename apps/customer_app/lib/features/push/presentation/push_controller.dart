@@ -119,7 +119,7 @@ class PushRegistrationController extends Notifier<PushStatus> {
           ref.read(routerProvider).push(pushRoute(data));
         }, onError: (Object _) {}),
       )
-      // 앱을 보고 있을 때 온 푸시는 알림을 띄우지 않으니 알림함(안 읽음 수)을 다시 읽는다.
+      // 앱을 보고 있을 때 온 푸시 — 상태표시줄 알림은 Firebase 구현이 로컬 알림으로 띄우고, 여기서는 알림함(안 읽음 수)을 다시 읽는다.
       ..add(
         _source.received.listen((_) {
           if (ref.mounted && _member) ref.invalidate(inboxProvider);

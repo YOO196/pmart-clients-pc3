@@ -30,6 +30,11 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- 앱이 꺼져 있거나 뒤에 있을 때 FCM 이 띄우는 알림도 앱이 만든 "주문·배송 알림" 채널을 쓴다
+             (앱을 보고 있을 때 띄우는 로컬 알림과 같은 채널 — push_source.dart pushChannelId). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="pmart_orders" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

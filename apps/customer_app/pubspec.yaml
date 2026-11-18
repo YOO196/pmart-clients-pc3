@@ -75,6 +75,8 @@ dependencies:
   firebase_messaging: ^17.1.0
   # FAQ 답(customer-assistant 0.2.0 `answer` 마크다운) 그리기 — flutter_markdown(지원 종료)의 후속. 사용자 결정 2026-11-18.
   flutter_markdown_plus: ^1.0.12
+  # 앱을 보고 있을 때 온 푸시를 상태표시줄 알림으로 띄운다(FCM 은 이때 띄우지 않는다). 사용자 결정 2026-11-18.
+  flutter_local_notifications: ^23.0.2
 
 dev_dependencies:
   flutter_test:
