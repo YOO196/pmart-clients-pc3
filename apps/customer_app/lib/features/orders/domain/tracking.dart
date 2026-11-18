@@ -101,7 +101,7 @@ enum TrackingEventType {
   unknown,
 }
 
-/// 실시간 구독 이벤트(계약 `StreamEvent`). 라이더 좌표는 계약에도 없고 여기에도 없다.
+/// 실시간 구독 이벤트(계약 `StreamEvent`). 구독에는 라이더 좌표가 오지 않는다(계약 — 위치는 `GET /eta` 를 다시 읽는다).
 @immutable
 class TrackingEvent {
   const TrackingEvent({required this.type, this.id, this.eta, this.stage});

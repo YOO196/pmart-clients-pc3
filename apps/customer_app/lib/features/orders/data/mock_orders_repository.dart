@@ -530,6 +530,26 @@ base class MockOrdersRepository implements OrdersRepository {
     return status;
   }
 
+  /// 배송별 ETA 조회 횟수(목 라이더 위치를 한 칸씩 옮기는 데 쓴다).
+  final _etaCalls = <String, int>{};
+
+  /// ETA 조회 횟수(시험이 10초 위치 갱신을 확인한다).
+  int etaCallsOf(String deliveryId) => _etaCalls[deliveryId] ?? 0;
+
+  /// 배달 중이어도 서버가 아직 라이더 위치를 주지 않는 경우 흉내.
+  bool hideRiderLocation = false;
+
+  /// 목 라이더 위치: 출발점에서 목 배송지 좌표(35.1565, 129.0665)까지 20칸 중 [step] 번째.
+  static Map<String, Object?> _riderTowardHome(int step) {
+    const from = (lat: 35.1495, lng: 129.0590);
+    const to = (lat: 35.1565, lng: 129.0665);
+    final f = (step.clamp(0, 20)) / 20;
+    return {
+      'lat': from.lat + (to.lat - from.lat) * f,
+      'lng': from.lng + (to.lng - from.lng) * f,
+    };
+  }
+
   @override
   Future<DeliveryEtaView> eta(String deliveryId) async {
     await _wait();
@@ -556,6 +576,17 @@ base class MockOrdersRepository implements OrdersRepository {
         },
         'delayAlertTriggered': true,
         'riderLocationQuality': 'GOOD',
+        // 부를 때마다 배송지(목 배송지 geo) 쪽으로 한 칸씩 다가온다 — 지도 마커가 움직이는지 본다.
+        if (!hideRiderLocation)
+          'riderLocation': {
+            ..._riderTowardHome(
+              _etaCalls[deliveryId] = (_etaCalls[deliveryId] ?? 0) + 1,
+            ),
+            'recordedAt': current
+                .subtract(const Duration(seconds: 4))
+                .toIso8601String(),
+            'staleSeconds': 4,
+          },
         'asOf': {'asOf': current.toIso8601String(), 'freshness': 'CURRENT'},
       },
       'dlv-s1' || 'dlv-s3' => {

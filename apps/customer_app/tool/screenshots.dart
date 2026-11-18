@@ -238,6 +238,9 @@ void main() {
     await shot('order-detail');
     await scrollDown(650);
     await shot('order-detail-2');
+    // 배송현황 — 배달 중 라이더 지도(레퍼런스 8-5). 목 모드는 카카오 지도 대신 안내 칸이 그려진다.
+    await go('/deliveries/dlv-s2?orderId=order-seed-1');
+    await shot('tracking-map');
     // 오배송 다시 배송비 결제(order-seed-1 에 결제 대기 1건).
     await go('/orders/order-seed-1');
     await shot('order-detail-redelivery');
@@ -452,6 +455,42 @@ void main() {
       await t.pump();
     }
     await shot('reconsent-partial');
+    debugDisableShadows = true;
+  });
+
+  // 처음 실행(레퍼런스 2): 환영·약관 → 로그인/둘러보기 → 주소 검색.
+  testWidgets('start', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    debugDisableShadows = false;
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const [], startGate: true));
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/s-$name.png').uri),
+      );
+    }
+
+    await shot('welcome');
+    await t.tap(find.byKey(const ValueKey('start-agree-location-open')));
+    await shot('terms');
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('start-agree-all')));
+    await shot('welcome-agreed');
+    await t.tap(find.byKey(const ValueKey('start-begin')));
+    await shot('marketing-result');
+    await t.tap(find.byKey(const ValueKey('start-marketing-result-ok')));
+    await shot('entry');
+    await t.tap(find.byKey(const ValueKey('login-browse')));
+    await shot('address');
     debugDisableShadows = true;
   });
 }

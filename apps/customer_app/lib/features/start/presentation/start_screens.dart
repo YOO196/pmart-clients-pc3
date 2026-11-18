@@ -1,0 +1,571 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
+import 'package:pmart_core/pmart_core.dart';
+import 'package:pmart_ui/pmart_ui.dart';
+
+import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/ui_state_of.dart';
+import '../../address/presentation/address_screens.dart'
+    show addressSearchProvider;
+import '../../profile/data/consents_repository.dart';
+import '../../push/presentation/push_controller.dart' show pushSourceProvider;
+import '../data/device_consents_repository.dart';
+import 'start_controller.dart';
+
+/// 처음 실행 단계를 판단하는 동안(저장소·세션·주소록 읽기).
+class StartSplashScreen extends StatelessWidget {
+  const StartSplashScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => const Scaffold(
+    key: ValueKey('start-splash'),
+    body: Center(child: CircularProgressIndicator()),
+  );
+}
+
+/// 레퍼런스 2-1·2-2 "처음 다운로드 후 화면" — 환영 문구, 전체동의·위치기반서비스 약관·마케팅 앱 푸시,
+/// 알림 권한 묻기, 아래 "시작하기". BR-59 회신(customer 0.6.0): 위치 약관은 현재 위치 기능을 쓸 때만 필수라
+/// 여기서는 고르지 않아도 시작할 수 있다. 고른 값은 기기 동의(`POST /device-consent-changes`)로 보내고,
+/// 서버가 반영한 값(전송자·처리 일시)으로만 "수신동의 처리완료" 안내 창을 띄운다.
+class WelcomeScreen extends ConsumerStatefulWidget {
+  const WelcomeScreen({super.key});
+
+  @override
+  ConsumerState<WelcomeScreen> createState() => _WelcomeScreenState();
+}
+
+class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
+  bool _location = false;
+  bool _marketing = false;
+  bool _busy = false;
+  String? _error;
+
+  /// 이 선택으로 보낼 키. 결과를 모르면 같은 키로 다시 보내고, 고른 값이 바뀌면 새 키.
+  IdempotencyKey? _key;
+
+  void _choose(VoidCallback change) => setState(() {
+    change();
+    _key = null;
+    _error = null;
+  });
+
+  @override
+  void initState() {
+    super.initState();
+    // 레퍼런스처럼 첫 화면에서 알림 권한을 묻는다(거절해도 진행). 토큰 등록은 회원이 된 뒤에만 한다.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final source = ref.read(pushSourceProvider);
+      try {
+        if (await source.ready()) await source.requestPermission();
+      } on Object {
+        // 단말 쪽 오류는 첫 화면을 막지 않는다.
+      }
+    });
+  }
+
+  Future<void> _start(ConsentTerms terms) async {
+    final l10n = AppLocalizations.of(context);
+    final changes = [
+      if (terms.of(ConsentWire.marketing) case final t?)
+        ConsentChange(t.type, t.latestVersion, agreed: _marketing),
+      if (terms.of(ConsentWire.location) case final t?)
+        ConsentChange(t.type, t.latestVersion, agreed: _location),
+    ];
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final key = _key ??= IdempotencyKey.generate();
+    final repo = ref.read(deviceConsentsRepositoryProvider);
+    DeviceConsents? result;
+    String? error;
+    if (changes.isEmpty) {
+      // 서버 약관 목록에 두 항목이 없다 — 보낼 것이 없다(지어내지 않는다).
+      result = const DeviceConsents(items: []);
+    } else {
+      try {
+        try {
+          result = await repo.change(changes, key: key);
+        } on UnknownResultFailure {
+          result = await repo.change(changes, key: key);
+        }
+      } on ProblemFailure catch (f) {
+        if (f.problem.code == ConsentProblemCode.versionOutdated) {
+          ref.invalidate(consentTermsProvider);
+          _key = null;
+          error = l10n.consentVersionChanged;
+        } else {
+          error = l10n.startConsentFailed;
+        }
+      } on PmartFailure {
+        error = l10n.startConsentFailed;
+      }
+    }
+    if (!mounted) return;
+    if (result == null) {
+      setState(() {
+        _busy = false;
+        _error = error;
+      });
+      return;
+    }
+    final marketing = result.of(ConsentWire.marketing);
+    if (marketing case DeviceConsent(lastChangedAt: final at?)) {
+      final sender = result.senderName;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => MarketingConsentResultDialog(
+          agreed: marketing.agreed,
+          senderName: sender,
+          at: at,
+        ),
+      );
+      if (!mounted) return;
+    }
+    await ref.read(startFlagsProvider.notifier).completeWelcome();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  Widget _check({
+    required String key,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required String label,
+    String? hint,
+    VoidCallback? onOpen,
+  }) {
+    final theme = Theme.of(context);
+    return InkWell(
+      key: ValueKey(key),
+      onTap: () => onChanged(!value),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox.square(
+              dimension: 22,
+              child: Checkbox(
+                value: value,
+                onChanged: (v) => onChanged(v ?? false),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                side: BorderSide(color: theme.colorScheme.outline, width: 1.5),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                  ),
+                  if (hint != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        hint,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 13,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (onOpen != null)
+              InkResponse(
+                key: ValueKey('$key-open'),
+                onTap: onOpen,
+                radius: 20,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: PmartLineIcon(
+                    PmartLineIcons.chevronRight,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  VoidCallback? _opener(ConsentTerms? terms, String type) {
+    final t = terms?.of(type);
+    if (t == null || !t.hasDocument) return null;
+    return () => context.push(StartRoutes.terms(t.type, t.latestVersion));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final all = _location && _marketing;
+    final termsValue = ref.watch(consentTermsProvider);
+    final terms = termsValue.value;
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        key: const ValueKey('start-welcome'),
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(14, 60, 14, 16),
+                  children: [
+                    Text(
+                      l10n.startWelcomeTitle,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontSize: 22,
+                        height: 1.3,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    _check(
+                      key: 'start-agree-all',
+                      value: all,
+                      onChanged: (v) => _choose(() {
+                        _location = v;
+                        _marketing = v;
+                      }),
+                      label: l10n.startAgreeAll,
+                    ),
+                    const Divider(height: 16),
+                    const SizedBox(height: 8),
+                    _check(
+                      key: 'start-agree-location',
+                      value: _location,
+                      onChanged: (v) => _choose(() => _location = v),
+                      label: l10n.startLocationTerms,
+                      hint: l10n.startLocationTermsHint,
+                      onOpen: _opener(terms, ConsentWire.location),
+                    ),
+                    const SizedBox(height: 8),
+                    _check(
+                      key: 'start-agree-marketing',
+                      value: _marketing,
+                      onChanged: (v) => _choose(() => _marketing = v),
+                      label: l10n.startMarketingPush,
+                      hint: l10n.startMarketingPushHint,
+                      onOpen: _opener(terms, ConsentWire.marketing),
+                    ),
+                    if (termsValue.hasError && !termsValue.isLoading) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        l10n.startTermsLoadFailed,
+                        key: const ValueKey('start-terms-error'),
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          key: const ValueKey('start-terms-retry'),
+                          onPressed: () => ref.invalidate(consentTermsProvider),
+                          child: Text(l10n.startRetry),
+                        ),
+                      ),
+                    ],
+                    if (_error case final e?) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        e,
+                        key: const ValueKey('start-consent-error'),
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(9, 0, 9, 9),
+                child: FilledButton(
+                  key: const ValueKey('start-begin'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(45),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    textStyle: theme.textTheme.titleMedium?.copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  // 약관 버전을 읽어야 보낼 수 있다. 위치 약관은 고르지 않아도 된다(현재 위치 기능에서만 필수).
+                  onPressed: (terms != null && !_busy)
+                      ? () => _start(terms)
+                      : null,
+                  child: Text(l10n.startBegin),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 레퍼런스 2-4 "둘러보기 선택 후 주소 검색 화면". 뒤로 갈 수 없다 — 배달 주소를 정해야 홈으로 간다.
+/// 검색칸을 누르면 주소 검색 → 주소 입력(상세 주소 필수, 지도 핀) → 저장하면 홈.
+/// "현재 위치로 찾기"는 위치 라이브러리가 없어 아직 넣지 않았다(승인 필요).
+class StartAddressScreen extends ConsumerWidget {
+  const StartAddressScreen({super.key});
+
+  Future<void> _search(BuildContext context, WidgetRef ref) async {
+    final picked = await ref.read(addressSearchProvider)(context);
+    if (picked == null || !context.mounted) return;
+    await context.push('/addresses/new', extra: picked);
+    // 저장했으면 단계가 홈으로 바뀌어 있다. 다시 판단하게 한다(아니면 이 화면으로 돌아온다).
+    if (context.mounted) context.go('/');
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        key: const ValueKey('start-address'),
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          centerTitle: false,
+          title: Text(l10n.addressSearchTitle),
+        ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(15, 32, 15, 24),
+          children: [
+            Text(
+              l10n.startAddressTitle,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontSize: 22,
+                height: 1.35,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 22),
+            Material(
+              color: theme.colorScheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                key: const ValueKey('start-address-search'),
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => _search(context, ref),
+                child: SizedBox(
+                  height: 46,
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 16),
+                      PmartLineIcon(
+                        PmartLineIcons.search,
+                        size: 20,
+                        color: muted,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          l10n.startAddressSearchHint,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: 16,
+                            color: muted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.startAddressExamplesTitle,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: muted,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  for (final e in [
+                    l10n.startAddressExample1,
+                    l10n.startAddressExample2,
+                    l10n.startAddressExample3,
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        '• $e',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 12.5,
+                          color: muted,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 레퍼런스 2-1·2-2 "마케팅정보 앱 푸시 알림 동의/거부 안내". 서버가 반영해 돌려준 값(동의 여부·전송자·처리 일시)만 쓴다.
+class MarketingConsentResultDialog extends StatelessWidget {
+  const MarketingConsentResultDialog({
+    super.key,
+    required this.agreed,
+    required this.at,
+    this.senderName,
+  });
+
+  final bool agreed;
+  final DateTime at;
+  final String? senderName;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final when = DateFormat('y년 M월 d일 H시', 'ko').format(toSeoulWallClock(at));
+    final line = theme.textTheme.bodyLarge?.copyWith(
+      fontSize: 15,
+      height: 1.45,
+    );
+    return Dialog(
+      key: const ValueKey('start-marketing-result'),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 39),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+      backgroundColor: theme.colorScheme.surface,
+      surfaceTintColor: Colors.transparent,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(19, 30, 19, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  agreed
+                      ? l10n.startMarketingResultTitleAgreed
+                      : l10n.startMarketingResultTitleRefused,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                if (senderName case final s?)
+                  Text(l10n.startMarketingResultSender(s), style: line),
+                Text(
+                  agreed
+                      ? l10n.startMarketingResultAtAgreed(when)
+                      : l10n.startMarketingResultAtRefused(when),
+                  key: const ValueKey('start-marketing-result-at'),
+                  style: line,
+                ),
+                Text(
+                  agreed
+                      ? l10n.startMarketingResultDoneAgreed
+                      : l10n.startMarketingResultDoneRefused,
+                  style: line,
+                ),
+                const SizedBox(height: 18),
+                Divider(height: 1, color: theme.colorScheme.outlineVariant),
+                const SizedBox(height: 16),
+                Text(
+                  l10n.startMarketingResultNote,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 13.5,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 28),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: theme.colorScheme.outlineVariant),
+          InkWell(
+            key: const ValueKey('start-marketing-result-ok'),
+            onTap: () => Navigator.of(context).pop(),
+            child: SizedBox(
+              height: 47,
+              child: Center(
+                child: Text(
+                  l10n.startConfirm,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 약관 본문(customer 0.6.1 `GET /consent-terms/{항목}/{버전}`, Markdown). 서버 본문만 보인다 — 지어내지 않는다.
+class ConsentTermScreen extends ConsumerWidget {
+  const ConsentTermScreen({
+    super.key,
+    required this.type,
+    required this.version,
+  });
+
+  final String type;
+  final String version;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final provider = consentTermDocumentProvider((type, version));
+    final value = ref.watch(provider);
+    return Scaffold(
+      key: const ValueKey('consent-term'),
+      appBar: AppBar(title: Text(value.value?.title ?? '')),
+      body: UiStateView<ConsentTermDocument>(
+        state: uiStateOf(value),
+        onRetry: () => ref.invalidate(provider),
+        ready: (context, d) => ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+          children: [
+            MarkdownBody(
+              key: const ValueKey('consent-term-body'),
+              data: d.body,
+              // 링크는 열지 않는다(앱 밖으로 나가지 않게).
+              styleSheet: MarkdownStyleSheet.fromTheme(theme),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

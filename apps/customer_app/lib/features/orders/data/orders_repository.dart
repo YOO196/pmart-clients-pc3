@@ -480,5 +480,15 @@ DeliveryEtaView etaFromContract(String deliveryId, trk.DeliveryEta e) {
     delayAlert: e.delayAlertTriggered ?? false,
     asOf: e.asOf?.asOf,
     freshness: _freshness(e.asOf?.freshness?.value),
+    // 좌표가 빠진 위치는 버린다(지도에 0,0 으로 그리지 않는다).
+    riderLocation: switch (e.riderLocation) {
+      final r? when r.lat != null && r.lng != null => RiderPosition(
+        lat: r.lat!.toDouble(),
+        lng: r.lng!.toDouble(),
+        recordedAt: r.recordedAt,
+        staleSeconds: r.staleSeconds,
+      ),
+      _ => null,
+    },
   );
 }

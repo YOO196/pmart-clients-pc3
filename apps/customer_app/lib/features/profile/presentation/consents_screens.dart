@@ -29,6 +29,7 @@ String consentTypeLabel(AppLocalizations l10n, String type) => switch (type) {
   ConsentWire.privacy => l10n.consentPrivacy,
   ConsentWire.age14 => l10n.consentAge14,
   ConsentWire.marketing => l10n.consentMarketing,
+  ConsentWire.location => l10n.consentLocation,
   // 모르는 항목은 서버 코드 그대로(지어내지 않는다)
   _ => type,
 };
@@ -83,7 +84,8 @@ class _ReconsentScreenState extends ConsumerState<ReconsentScreen> {
       _error = null;
     });
     final changes = [
-      for (final i in c.items)
+      // 기능 필수(위치 약관)는 이 화면에서 묻지 않는다 — 보내지도 않는다.
+      for (final i in c.items.where((i) => i.requiredFor == null))
         if (i.required)
           ConsentChange(i.type, i.latestVersion, agreed: true)
         else
@@ -153,7 +155,9 @@ class _ReconsentScreenState extends ConsumerState<ReconsentScreen> {
               ]);
           }
           final required = c.items.where((i) => i.required).toList();
-          final optional = c.items.where((i) => !i.required).toList();
+          final optional = c.items
+              .where((i) => !i.required && i.requiredFor == null)
+              .toList();
           final allAgreed = required.every((i) => _agreed.contains(i.type));
           Widget box(MyConsent i, String title) => CheckboxListTile(
             key: ValueKey('reconsent-${i.type}'),

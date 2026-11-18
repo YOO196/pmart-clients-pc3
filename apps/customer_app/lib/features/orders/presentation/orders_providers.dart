@@ -34,6 +34,12 @@ final etaRefreshIntervalProvider = Provider<Duration>(
   (_) => const Duration(seconds: 30),
 );
 
+/// 라이더 위치 다시 읽기 간격(사용자 2026-11-19 "10초"). 실시간 구독(SSE)에는 라이더 좌표가 없어(계약)
+/// 배달 중(TO_CUSTOMER·AT_CUSTOMER)인 동안만 `GET /deliveries/{id}/eta` 를 이 간격으로 다시 읽는다.
+final riderLocationRefreshIntervalProvider = Provider<Duration>(
+  (_) => const Duration(seconds: 10),
+);
+
 /// 실시간 구독 재연결 대기([attempt] 는 1부터). 1·2·4·…초, 최대 60초.
 final trackingReconnectDelayProvider = Provider<Duration Function(int attempt)>(
   (_) => (attempt) {

@@ -69,6 +69,10 @@ void main() {
     expect(find.byKey(const ValueKey('reconsent-body')), findsOneWidget);
     final submit = find.byKey(const ValueKey('reconsent-submit'));
     expect(t.widget<FilledButton>(submit).onPressed, isNull);
+    expect(
+      find.byKey(const ValueKey('reconsent-${ConsentWire.location}')),
+      findsNothing,
+    );
 
     for (final type in [
       ConsentWire.terms,
@@ -92,6 +96,8 @@ void main() {
       sent.where((c) => c.type == ConsentWire.marketing).single.agreed,
       isFalse,
     );
+    // 위치 약관(현재 위치 기능에서만 필수)은 재동의에서 묻지도 보내지도 않는다.
+    expect(sent.where((c) => c.type == ConsentWire.location), isEmpty);
     expect(consents.outdated, isFalse);
     expect(find.byKey(const ValueKey('reconsent-body')), findsNothing);
     expect(find.byKey(const ValueKey('delivery-min-order')), findsOneWidget);

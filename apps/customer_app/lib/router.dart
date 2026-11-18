@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'features/address/presentation/address_screens.dart';
+import 'features/address/presentation/postcode_screen.dart' show PostcodeResult;
+import 'features/start/presentation/start_controller.dart';
+import 'features/start/presentation/start_screens.dart';
 import 'features/auth/domain/auth.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cart/presentation/cart_screen.dart';
@@ -38,11 +41,52 @@ final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 /// 라우트. 탭은 각자 내비게이션 스택을 가진다(탭을 오가도 검색어·스크롤이 남는다).
 /// 상품 상세는 탭 위로 올린다. 로그인 리다이렉트·딥링크(알림 → 화면)는 로그인 단계에서 붙인다.
-final routerProvider = Provider<GoRouter>(
-  (ref) => GoRouter(
+final routerProvider = Provider<GoRouter>((ref) {
+  // 처음 실행 단계(환영·약관 → 로그인/둘러보기 → 주소)가 바뀌면 redirect 를 다시 본다.
+  final startStep = ValueNotifier<StartStep>(ref.read(startStepProvider));
+  ref.listen(startStepProvider, (_, s) => startStep.value = s);
+  ref.onDispose(startStep.dispose);
+  var resolved = false;
+  return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/',
+    refreshListenable: startStep,
+    redirect: (_, state) {
+      final step = startStep.value;
+      if (step == StartStep.ready) resolved = true;
+      return startRedirect(step, state.matchedLocation, resolved: resolved);
+    },
     routes: [
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: StartRoutes.splash,
+        builder: (_, _) => const StartSplashScreen(),
+        routes: [
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'welcome',
+            builder: (_, _) => const WelcomeScreen(),
+          ),
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'entry',
+            builder: (_, _) => const LoginScreen(entry: true),
+          ),
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'address',
+            builder: (_, _) => const StartAddressScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '${StartRoutes.termsPrefix}:type/:version',
+        builder: (_, state) => ConsentTermScreen(
+          type: state.pathParameters['type']!,
+          version: state.pathParameters['version']!,
+        ),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => _TabShell(shell: shell),
         branches: [
@@ -204,7 +248,12 @@ final routerProvider = Provider<GoRouter>(
           GoRoute(
             parentNavigatorKey: rootNavigatorKey,
             path: 'new',
-            builder: (_, _) => const AddressFormScreen(),
+            // 처음 실행 주소 화면은 고른 검색 결과를 넘긴다.
+            builder: (_, state) => AddressFormScreen(
+              initial: state.extra is PostcodeResult
+                  ? state.extra! as PostcodeResult
+                  : null,
+            ),
           ),
         ],
       ),
@@ -336,8 +385,8 @@ final routerProvider = Provider<GoRouter>(
         ],
       ),
     ],
-  ),
-);
+  );
+});
 
 class _TabShell extends StatelessWidget {
   const _TabShell({required this.shell});

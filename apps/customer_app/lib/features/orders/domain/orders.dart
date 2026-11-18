@@ -274,6 +274,42 @@ enum DeliveryStage {
 /// 도착 예상 상태. LOCATING·ETA_PENDING 이면 수치가 없다(위치 실패 ≠ 배송 실패).
 enum EtaStatus { available, locating, pending, finalized, unknown }
 
+/// 라이더 마지막 위치(`DeliveryEta.riderLocation`, tracking 0.6.0). 서버는 고객에게 **내 상품을 픽업한 뒤 ~
+/// 끝나기 전**(TO_CUSTOMER·AT_CUSTOMER)만 준다. 지금 한 점만 — 지나온 동선은 없다.
+/// 좌표는 화면 지도에만 쓰고 로그·분석에 남기지 않는다([toString] 에 넣지 않는다).
+@immutable
+class RiderPosition {
+  const RiderPosition({
+    required this.lat,
+    required this.lng,
+    this.recordedAt,
+    this.staleSeconds,
+  });
+
+  final double lat;
+  final double lng;
+
+  /// 단말이 기록한 시각.
+  final DateTime? recordedAt;
+
+  /// 서버가 받은 뒤 지난 초(서버 값).
+  final int? staleSeconds;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RiderPosition &&
+      other.lat == lat &&
+      other.lng == lng &&
+      other.recordedAt == recordedAt &&
+      other.staleSeconds == staleSeconds;
+
+  @override
+  int get hashCode => Object.hash(lat, lng, recordedAt, staleSeconds);
+
+  @override
+  String toString() => 'RiderPosition(recordedAt: $recordedAt)';
+}
+
 @immutable
 class DeliveryEtaView {
   const DeliveryEtaView({
@@ -287,6 +323,7 @@ class DeliveryEtaView {
     this.delayAlert = false,
     this.asOf,
     this.freshness = Freshness.unknown,
+    this.riderLocation,
   });
 
   final String deliveryId;
@@ -300,6 +337,9 @@ class DeliveryEtaView {
   final DateTime? asOf;
   final Freshness freshness;
 
+  /// 라이더 지금 위치. 픽업 전·끝난 뒤·위치 미수신이면 null(서버가 정한다).
+  final RiderPosition? riderLocation;
+
   /// 실시간 구독의 STAGE_CHANGED(단계만 옴)를 반영한 사본. 도착 예상 수치는 그대로 둔다.
   DeliveryEtaView withStage(DeliveryStage next) => DeliveryEtaView(
     deliveryId: deliveryId,
@@ -312,5 +352,6 @@ class DeliveryEtaView {
     delayAlert: delayAlert,
     asOf: asOf,
     freshness: freshness,
+    riderLocation: riderLocation,
   );
 }

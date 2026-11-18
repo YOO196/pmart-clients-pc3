@@ -14,12 +14,16 @@ class MyConsent {
     required this.agreed,
     required this.latestVersion,
     this.version,
+    this.requiredFor,
   });
 
-  /// 계약 `ConsentType` 값(TERMS_OF_SERVICE·PRIVACY_POLICY·AGE_OVER_14·MARKETING).
+  /// 계약 `ConsentType` 값(TERMS_OF_SERVICE·PRIVACY_POLICY·AGE_OVER_14·MARKETING·LOCATION_BASED_SERVICE).
   final String type;
   final bool required;
   final bool agreed;
+
+  /// 이 기능을 쓸 때만 필수(0.6.0 — 위치 약관 `CURRENT_LOCATION`). 재동의 화면에서 묻지 않는다.
+  final String? requiredFor;
 
   /// 고른 버전(없으면 null).
   final String? version;
@@ -57,6 +61,9 @@ abstract final class ConsentWire {
   static const privacy = 'PRIVACY_POLICY';
   static const age14 = 'AGE_OVER_14';
   static const marketing = 'MARKETING';
+
+  /// 위치기반서비스 이용약관(0.6.0 BR-59) — 현재 위치 기능을 쓸 때만 필수.
+  static const location = 'LOCATION_BASED_SERVICE';
 }
 
 abstract final class ConsentProblemCode {
@@ -136,6 +143,7 @@ MyConsents myConsentsFromContract(api.ListMyConsents200Response r) =>
             agreed: c.agreed,
             version: c.version,
             latestVersion: c.latestVersion,
+            requiredFor: c.requiredFor?.value,
           ),
       ],
     );
@@ -159,7 +167,14 @@ final class MockConsentsRepository implements ConsentsRepository {
     ConsentWire.privacy: '2026-11-17',
     ConsentWire.age14: '1',
     ConsentWire.marketing: '2026-11-17',
+    ConsentWire.location: '2026-11-19',
   };
+
+  /// 선택 항목(마케팅)·기능 필수(위치 약관 — 0.6.0)는 필수 목록이 아니다.
+  static bool _optional(String type) =>
+      type == ConsentWire.marketing || type == ConsentWire.location;
+
+  bool locationAgreed = false;
 
   Future<void> _wait() =>
       latency == Duration.zero ? Future.value() : Future.delayed(latency);
@@ -175,7 +190,16 @@ final class MockConsentsRepository implements ConsentsRepository {
       requiredOutdated: outdated,
       items: [
         for (final MapEntry(key: type, value: latest) in _latest.entries)
-          if (type == ConsentWire.marketing)
+          if (type == ConsentWire.location)
+            MyConsent(
+              type: type,
+              required: false,
+              requiredFor: 'CURRENT_LOCATION',
+              agreed: locationAgreed,
+              version: locationAgreed ? latest : null,
+              latestVersion: latest,
+            )
+          else if (type == ConsentWire.marketing)
             MyConsent(
               type: type,
               required: false,
@@ -214,6 +238,8 @@ final class MockConsentsRepository implements ConsentsRepository {
       }
       if (c.type == ConsentWire.marketing) {
         marketingAgreed = c.agreed;
+      } else if (c.type == ConsentWire.location) {
+        locationAgreed = c.agreed;
       } else if (!c.agreed) {
         throw const ProblemFailure(
           Problem(
@@ -223,7 +249,7 @@ final class MockConsentsRepository implements ConsentsRepository {
         );
       }
     }
-    final required = _latest.keys.where((k) => k != ConsentWire.marketing);
+    final required = _latest.keys.where((k) => !_optional(k));
     if (required.every((k) => changes.any((c) => c.type == k && c.agreed))) {
       outdated = false;
     }

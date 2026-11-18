@@ -198,7 +198,10 @@ enum _PinState { none, picking, picked, notFound, failed }
 /// 고르면 서버 좌표 변환으로 지도를 열고, 고객이 핀으로 배달 위치를 맞춘다.
 
 class AddressFormScreen extends ConsumerStatefulWidget {
-  const AddressFormScreen({super.key});
+  const AddressFormScreen({super.key, this.initial});
+
+  /// 이미 고른 주소 검색 결과(처음 실행 주소 화면). 있으면 도로명을 채우고 바로 지도 핀으로 간다.
+  final PostcodeResult? initial;
 
   @override
   ConsumerState<AddressFormScreen> createState() => _AddressFormScreenState();
@@ -216,6 +219,19 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   GeoPoint? _geo;
   String? _postalCode;
   _PinState _pin = _PinState.none;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial != null) {
+      _road.text = initial.roadAddress;
+      _postalCode = initial.zoneNo;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _locate();
+      });
+    }
+  }
 
   /// 주소 검색 → 서버 좌표 변환 → 지도 핀.
   Future<void> _search() async {

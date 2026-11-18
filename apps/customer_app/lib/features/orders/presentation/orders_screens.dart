@@ -33,6 +33,7 @@ import '../data/orders_repository.dart'
     show OrdersRepository, orderNotFinishedCode;
 import '../domain/orders.dart';
 import '../domain/tracking.dart';
+import 'tracking_map.dart';
 import 'orders_providers.dart';
 import 'receipt_confirmation.dart';
 import '../../redelivery/presentation/redelivery_screens.dart'
@@ -1181,11 +1182,15 @@ class _Row extends StatelessWidget {
   }
 }
 
-/// SCR-TRACK-001. 위치 조회 실패는 배송 실패가 아니다. 라이더 좌표·다른 고객 정보는 받지도 보이지도 않는다.
+/// SCR-TRACK-001. 위치 조회 실패는 배송 실패가 아니다. 다른 고객 정보는 받지도 보이지도 않는다.
 ///
 /// 실시간 구독(`GET /deliveries/{id}/stream`)으로 갱신하고, 끊기면 재연결(1·2·4…초)을 시도하는 동안
 /// 도착 예상(`GET /deliveries/{id}/eta`)을 주기 조회한다. 화면을 닫거나 앱이 가려지면 연결을 닫는다.
 /// [orderId] 가 있으면(주문 상세에서 진입) 주문·배송 상태로 4단계와 예약 시각·변경/취소 진입을 보인다.
+///
+/// 라이더 지도(레퍼런스 8-5): 배달 중(TO_CUSTOMER·AT_CUSTOMER)이고 서버가 라이더 위치를 주면 지도 위에
+/// 라이더·내 배송지 마커를 그리고 아래 시트에 진행을 보인다. 구독에는 좌표가 없어 배달 중에만
+/// `GET /eta` 를 [riderLocationRefreshIntervalProvider](10초)마다 다시 읽어 마커를 옮긴다.
 class TrackingScreen extends ConsumerStatefulWidget {
   const TrackingScreen({super.key, required this.deliveryId, this.orderId});
 
@@ -1205,6 +1210,9 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   StreamSubscription<TrackingEvent>? _sub;
   Timer? _poll;
   Timer? _retry;
+
+  /// 배달 중 라이더 위치 다시 읽기(10초).
+  Timer? _locPoll;
   int _failures = 0;
   String? _lastEventId;
 
@@ -1218,6 +1226,23 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     _repo = ref.read(ordersRepositoryProvider);
     WidgetsBinding.instance.addObserver(this);
     _connect();
+    _startLocationPoll();
+  }
+
+  /// 배달 중인 동안만 도착 예상을 다시 읽어 라이더 위치를 새로 받는다(픽업 전·끝난 뒤엔 서버가 위치를 주지 않는다).
+  void _startLocationPoll() {
+    _locPoll?.cancel();
+    _locPoll = Timer.periodic(ref.read(riderLocationRefreshIntervalProvider), (
+      _,
+    ) {
+      if (!mounted || _mode == _Live.paused || _mode == _Live.ended) return;
+      final stage =
+          (_live ?? ref.read(deliveryEtaProvider(widget.deliveryId)).value)
+              ?.stage;
+      if (_isDelivering(stage)) {
+        ref.invalidate(deliveryEtaProvider(widget.deliveryId));
+      }
+    });
   }
 
   @override
@@ -1248,6 +1273,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     _poll = null;
     _retry?.cancel();
     _retry = null;
+    _locPoll?.cancel();
+    _locPoll = null;
   }
 
   void _pause() {
@@ -1265,6 +1292,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       _mode = _Live.connecting;
     });
     _connect();
+    _startLocationPoll();
   }
 
   void _refreshAll() {
@@ -1367,6 +1395,14 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       null => null,
     };
     final live = _live;
+    // 지도: 지금 단계가 배달 중이고 서버가 라이더 위치를 줬을 때만. 구독 값에는 좌표가 없어 조회 값을 쓴다.
+    final current = live ?? value.value;
+    final rider = _isDelivering(current?.stage)
+        ? (live?.riderLocation ?? value.value?.riderLocation)
+        : null;
+    if (current != null && rider != null) {
+      return _mapScaffold(context, current, rider, order);
+    }
     return Scaffold(
       appBar: AppBar(title: Text(l10n.trackTitle)),
       body: switch (value) {
@@ -1410,7 +1446,105 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         polling: _mode == _Live.polling,
         onVisit: _visit,
       );
+
+  /// 레퍼런스 8-5: 지도 전체 + 아래 끌어 올리는 시트(진행·도착 예상). 위 왼쪽 뒤로, 오른쪽 문의하기.
+  Widget _mapScaffold(
+    BuildContext context,
+    DeliveryEtaView eta,
+    RiderPosition rider,
+    AsyncValue<OrderDetail>? order,
+  ) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final ship = order?.value?.shippingAddress;
+    final home = switch ((ship?.lat, ship?.lng)) {
+      (final double lat, final double lng) => (lat: lat, lng: lng),
+      _ => null,
+    };
+    final orderId = widget.orderId;
+    return Scaffold(
+      key: const ValueKey('track-map-mode'),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: TrackingMap(
+              rider: (lat: rider.lat, lng: rider.lng),
+              home: home,
+            ),
+          ),
+          DraggableScrollableSheet(
+            initialChildSize: 0.45,
+            minChildSize: 0.3,
+            maxChildSize: 0.92,
+            builder: (context, scroll) => DecoratedBox(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
+                boxShadow: const [
+                  BoxShadow(blurRadius: 12, color: Color(0x22000000)),
+                ],
+              ),
+              child: SingleChildScrollView(
+                controller: scroll,
+                child: _TrackBody(
+                  eta: eta,
+                  deliveryId: widget.deliveryId,
+                  order: order,
+                  polling: _mode == _Live.polling,
+                  onVisit: _visit,
+                  rider: rider,
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Material(
+                    color: theme.colorScheme.surface,
+                    shape: const CircleBorder(),
+                    elevation: 2,
+                    child: const BackButton(),
+                  ),
+                  const Spacer(),
+                  if (orderId != null)
+                    Material(
+                      color: theme.colorScheme.surface,
+                      shape: const StadiumBorder(),
+                      elevation: 2,
+                      child: InkWell(
+                        key: const ValueKey('track-map-inquiry'),
+                        customBorder: const StadiumBorder(),
+                        onTap: () => _visit('/orders/$orderId/help'),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          child: Text(
+                            l10n.orderInquiry,
+                            style: theme.textTheme.titleSmall,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
+/// 배달 중(라이더가 내 상품을 받은 뒤 ~ 끝나기 전) — 서버가 고객에게 라이더 위치를 주는 단계(tracking 0.6.0).
+bool _isDelivering(DeliveryStage? s) =>
+    s == DeliveryStage.toCustomer || s == DeliveryStage.atCustomer;
 
 class _TrackBody extends StatelessWidget {
   const _TrackBody({
@@ -1419,10 +1553,14 @@ class _TrackBody extends StatelessWidget {
     required this.order,
     required this.polling,
     required this.onVisit,
+    this.rider,
   });
 
   final DeliveryEtaView eta;
   final String deliveryId;
+
+  /// 있으면 지도 아래 시트로 그린다(남은 시간을 크게, 라이더 위치 시각). 없으면 원래 목록.
+  final RiderPosition? rider;
 
   /// null 이면 주문을 모르고 들어왔다(알림 등). 배송 정보만으로 그린다.
   final AsyncValue<OrderDetail>? order;
@@ -1454,81 +1592,151 @@ class _TrackBody extends StatelessWidget {
       EtaStatus.finalized => l10n.stDone,
       _ => l10n.etaPending,
     };
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        // 예약배달: 서버가 준 도착 구간을 크게. 변경·취소는 진입만, 가능 여부는 서버가 판정한다.
-        if (scheduled && window != null) ...[
-          Text(
-            l10n.trackReservedWindow(windowText(window)),
-            key: const ValueKey('track-reserved'),
-            style: theme.textTheme.headlineSmall,
+    final sheet = rider != null;
+    final remainingMin =
+        e.status == EtaStatus.available && e.remainingSeconds != null
+        ? (e.remainingSeconds! / 60).ceil()
+        : null;
+    final children = <Widget>[
+      // 시트 머리(레퍼런스 8-5): 손잡이 → "N분 남음 오전 8:22" → 단계 문장 → 라이더 위치 시각.
+      if (sheet) ...[
+        Center(
+          child: Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-          if (o != null && canRequestTimeChange(o))
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                l10n.trackRescheduleNote,
-                style: theme.textTheme.bodySmall,
+        ),
+        if (remainingMin != null)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                l10n.trackRemainingShort(remainingMin),
+                key: const ValueKey('track-sheet-remaining'),
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-        ],
-        if (o != null && (canRequestTimeChange(o) || canRequestCancel(o)))
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Wrap(
-              spacing: 8,
-              children: [
-                if (canRequestCancel(o))
-                  OutlinedButton(
-                    key: const ValueKey('track-cancel'),
-                    onPressed: () => onVisit('/orders/${o.orderId}/cancel'),
-                    child: Text(l10n.cancelTitle),
-                  ),
-                if (canRequestTimeChange(o))
-                  OutlinedButton(
-                    key: const ValueKey('track-reschedule'),
-                    onPressed: () => onVisit('/orders/${o.orderId}/reschedule'),
-                    child: Text(l10n.rescheduleTitle),
-                  ),
+              if (e.etaAt case final at?) ...[
+                const SizedBox(width: 8),
+                Text(
+                  l10n.etaAt(formatSeoulTime(at)),
+                  style: theme.textTheme.titleMedium,
+                ),
               ],
+            ],
+          )
+        else
+          Text(
+            etaLine,
+            key: const ValueKey('eta-line'),
+            style: theme.textTheme.titleLarge,
+          ),
+        const SizedBox(height: 8),
+        Text(
+          stageText(l10n, e.stage),
+          key: const ValueKey('eta-stage'),
+          style: theme.textTheme.bodyLarge,
+        ),
+        if (rider!.recordedAt case final at?)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              l10n.trackRiderLocationAt(formatSeoulTime(at)),
+              key: const ValueKey('track-rider-at'),
+              style: theme.textTheme.bodySmall,
             ),
           ),
-        if (order case AsyncError() when o == null)
+        if ((e.delayedBySeconds ?? 0) > 0 && e.status == EtaStatus.available)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              l10n.trackOrderFailed,
-              key: const ValueKey('track-order-failed'),
+              l10n.etaDelayed((e.delayedBySeconds! / 60).ceil()),
+              key: const ValueKey('eta-delayed'),
               style: TextStyle(color: theme.colorScheme.error),
             ),
           ),
-        const SizedBox(height: 16),
-        _TrackSteps(progress: progress),
-        if (progress.halted)
+        const SizedBox(height: 8),
+      ],
+      // 예약배달: 서버가 준 도착 구간을 크게. 변경·취소는 진입만, 가능 여부는 서버가 판정한다.
+      if (scheduled && window != null) ...[
+        Text(
+          l10n.trackReservedWindow(windowText(window)),
+          key: const ValueKey('track-reserved'),
+          style: theme.textTheme.headlineSmall,
+        ),
+        if (o != null && canRequestTimeChange(o))
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: 4),
             child: Text(
-              switch ((shipment?.state, o?.status)) {
-                (ShipmentState.failed || ShipmentState.cancelled, _) =>
-                  shipmentStateText(l10n, shipment!.state),
-                (_, final s?) => orderStatusText(l10n, s),
-                _ => l10n.osUnknown,
-              },
-              key: const ValueKey('track-halted'),
-              style: TextStyle(color: theme.colorScheme.error),
+              l10n.trackRescheduleNote,
+              style: theme.textTheme.bodySmall,
             ),
           ),
-        // 주문 일부만 다음 단계에 갔다(PARTIALLY_*). 단계는 앞당기지 않고 그대로 알린다.
-        if (progress.partial && o != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              orderStatusText(l10n, o.status),
-              key: const ValueKey('track-partial'),
-            ),
+      ],
+      if (o != null && (canRequestTimeChange(o) || canRequestCancel(o)))
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Wrap(
+            spacing: 8,
+            children: [
+              if (canRequestCancel(o))
+                OutlinedButton(
+                  key: const ValueKey('track-cancel'),
+                  onPressed: () => onVisit('/orders/${o.orderId}/cancel'),
+                  child: Text(l10n.cancelTitle),
+                ),
+              if (canRequestTimeChange(o))
+                OutlinedButton(
+                  key: const ValueKey('track-reschedule'),
+                  onPressed: () => onVisit('/orders/${o.orderId}/reschedule'),
+                  child: Text(l10n.rescheduleTitle),
+                ),
+            ],
           ),
-        const SizedBox(height: 24),
+        ),
+      if (order case AsyncError() when o == null)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            l10n.trackOrderFailed,
+            key: const ValueKey('track-order-failed'),
+            style: TextStyle(color: theme.colorScheme.error),
+          ),
+        ),
+      const SizedBox(height: 16),
+      _TrackSteps(progress: progress),
+      if (progress.halted)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            switch ((shipment?.state, o?.status)) {
+              (ShipmentState.failed || ShipmentState.cancelled, _) =>
+                shipmentStateText(l10n, shipment!.state),
+              (_, final s?) => orderStatusText(l10n, s),
+              _ => l10n.osUnknown,
+            },
+            key: const ValueKey('track-halted'),
+            style: TextStyle(color: theme.colorScheme.error),
+          ),
+        ),
+      // 주문 일부만 다음 단계에 갔다(PARTIALLY_*). 단계는 앞당기지 않고 그대로 알린다.
+      if (progress.partial && o != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            orderStatusText(l10n, o.status),
+            key: const ValueKey('track-partial'),
+          ),
+        ),
+      const SizedBox(height: 24),
+      if (!sheet) ...[
         Text(
           stageText(l10n, e.stage),
           key: const ValueKey('eta-stage'),
@@ -1540,39 +1748,60 @@ class _TrackBody extends StatelessWidget {
           key: const ValueKey('eta-line'),
           style: theme.textTheme.titleMedium,
         ),
-        if (e.status == EtaStatus.available && e.remainingSeconds != null)
-          Text(l10n.etaRemaining((e.remainingSeconds! / 60).ceil())),
-        if (!scheduled && window != null) Text(windowText(window)),
-        if ((e.delayedBySeconds ?? 0) > 0 && e.status == EtaStatus.available)
+        if (remainingMin != null) Text(l10n.etaRemaining(remainingMin)),
+        // 배달 중인데 서버가 아직 라이더 위치를 주지 않음 — 위치를 지어내지 않고 확인 중이라고만.
+        if (_isDelivering(e.stage))
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              l10n.etaDelayed((e.delayedBySeconds! / 60).ceil()),
-              key: const ValueKey('eta-delayed'),
-              style: TextStyle(color: theme.colorScheme.error),
-            ),
-          ),
-        if (polling)
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: Text(
-              l10n.trackLiveFallback,
-              key: const ValueKey('track-live-fallback'),
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
-        if (e.asOf case final t?)
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: Text(
-              e.freshness == Freshness.current
-                  ? l10n.asOfTime(formatSeoulTime(t))
-                  : l10n.sourceStale(formatSeoulTime(t)),
+              l10n.trackRiderLocating,
+              key: const ValueKey('track-rider-locating'),
               style: theme.textTheme.bodySmall,
             ),
           ),
       ],
-    );
+      if (!scheduled && window != null) Text(windowText(window)),
+      if (!sheet &&
+          (e.delayedBySeconds ?? 0) > 0 &&
+          e.status == EtaStatus.available)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            l10n.etaDelayed((e.delayedBySeconds! / 60).ceil()),
+            key: const ValueKey('eta-delayed'),
+            style: TextStyle(color: theme.colorScheme.error),
+          ),
+        ),
+      if (polling)
+        Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Text(
+            l10n.trackLiveFallback,
+            key: const ValueKey('track-live-fallback'),
+            style: theme.textTheme.bodySmall,
+          ),
+        ),
+      if (e.asOf case final t?)
+        Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Text(
+            e.freshness == Freshness.current
+                ? l10n.asOfTime(formatSeoulTime(t))
+                : l10n.sourceStale(formatSeoulTime(t)),
+            style: theme.textTheme.bodySmall,
+          ),
+        ),
+    ];
+    if (sheet) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
+      );
+    }
+    return ListView(padding: const EdgeInsets.all(24), children: children);
   }
 }
 

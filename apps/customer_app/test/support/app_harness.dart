@@ -41,6 +41,7 @@ import 'package:customer_app/features/profile/presentation/profile_controller.da
 import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
 import 'package:customer_app/features/reviews/data/reviews_repository.dart';
 import 'package:customer_app/features/reviews/presentation/reviews_controller.dart';
+import 'package:customer_app/features/start/presentation/start_controller.dart';
 import 'package:customer_app/shared/providers.dart';
 
 /// 목 모드 앱. 둘러보기는 [catalog](기본: 지연 없는 목)를 쓰고 [overrides] 를 더한다.
@@ -63,6 +64,12 @@ Widget testApp(
 
   /// 수량 ± 모아 보내기 대기. 기본 0(탭 직후 pumpAndSettle 로 반영). 모아 보내기를 시험할 때만 늘린다.
   Duration stepperDelay = Duration.zero,
+
+  /// 처음 실행 단계를 켤지(기본 끔 — 홈에서 시작).
+  bool startGate = false,
+
+  /// 기기 보안 저장소(앱을 다시 켜는 시험에서 같은 것을 넘긴다). 기본은 새 메모리 저장소.
+  MemoryKeyValueStore? secure,
 }) {
   final checkoutRepo =
       checkout ??
@@ -137,12 +144,14 @@ Widget testApp(
       // 주소 검색(웹뷰)·카카오 지도는 시험에서 띄울 수 없어 가짜로 바꾼다.
       ...(addressPicker ?? FakeAddressPicker()).overrides,
       // 보안 저장소 대신 메모리 저장소(플랫폼 채널 없음).
-      secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+      secureStoreProvider.overrideWithValue(secure ?? MemoryKeyValueStore()),
       paymentPollPolicyProvider.overrideWithValue((
         interval: Duration.zero,
         attempts: 3,
       )),
       tokenStoreProvider.overrideWithValue(TokenStore(MemoryKeyValueStore())),
+      // 처음 실행 단계(환영·로그인/둘러보기·주소)는 그 시험(start_flow_test)에서만 켠다.
+      startGateEnabledProvider.overrideWithValue(startGate),
       ...overrides,
     ],
     child: const CustomerApp(),

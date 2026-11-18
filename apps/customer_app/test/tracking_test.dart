@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_api_delivery_tracking/pmart_api_delivery_tracking.dart'
     as trk;
@@ -337,12 +338,13 @@ void main() {
       MockOrdersRepository orders, {
       required String orderId,
       required String deliveryId,
+      List<Override> overrides = const [],
     }) async {
       t.view
         ..physicalSize = const Size(800, 2400)
         ..devicePixelRatio = 1;
       addTearDown(t.view.reset);
-      await t.pumpWidget(testApp(const [], orders: orders));
+      await t.pumpWidget(testApp(overrides, orders: orders));
       await t.pumpAndSettle();
       await t.tap(find.text('마이페이지').last);
       await t.pumpAndSettle();
@@ -518,6 +520,125 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byType(TrackingScreen), findsNothing);
       expect(orders.openTrackCount, 0);
+    });
+
+    testWidgets('배달 중 + 서버 라이더 위치 → 지도와 아래 시트(남은 시간·위치 시각)', (t) async {
+      final orders = MockOrdersRepository(latency: Duration.zero);
+      await openTracking(
+        t,
+        orders,
+        orderId: 'order-seed-1',
+        deliveryId: 'dlv-s2',
+      );
+      expect(key('track-map-mode'), findsOneWidget);
+      // 목 모드는 카카오 지도를 쓰지 않는다(지도 대신 안내 칸).
+      expect(key('track-map-unavailable'), findsOneWidget);
+      expect(find.text('12분 남음'), findsOneWidget);
+      expect(key('track-rider-at'), findsOneWidget);
+      expect(key('track-step-current-delivering'), findsOneWidget);
+      expect(key('track-map-inquiry'), findsOneWidget);
+      // 지도 화면에서도 "배달 완료"로 앞당기지 않는다.
+      expect(key('track-step-current-delivered'), findsNothing);
+    });
+
+    testWidgets('배달 중에는 10초마다 위치를 다시 읽고, 앱이 가려지면 멈춘다', (t) async {
+      final orders = MockOrdersRepository(latency: Duration.zero);
+      await openTracking(
+        t,
+        orders,
+        orderId: 'order-seed-1',
+        deliveryId: 'dlv-s2',
+      );
+      final before = orders.etaCallsOf('dlv-s2');
+      await t.pump(const Duration(seconds: 10));
+      await t.pumpAndSettle();
+      expect(orders.etaCallsOf('dlv-s2'), before + 1);
+      await t.pump(const Duration(seconds: 10));
+      await t.pumpAndSettle();
+      expect(orders.etaCallsOf('dlv-s2'), before + 2);
+
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await t.pump();
+      final paused = orders.etaCallsOf('dlv-s2');
+      await t.pump(const Duration(seconds: 30));
+      expect(orders.etaCallsOf('dlv-s2'), paused, reason: '가려진 동안 읽지 않는다');
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await t.pumpAndSettle();
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+    });
+
+    testWidgets('배달 중인데 위치가 아직 없으면 지도를 그리지 않고 확인 중이라고만', (t) async {
+      final orders = MockOrdersRepository(latency: Duration.zero)
+        ..hideRiderLocation = true;
+      await openTracking(
+        t,
+        orders,
+        orderId: 'order-seed-1',
+        deliveryId: 'dlv-s2',
+      );
+      expect(key('track-map-mode'), findsNothing);
+      expect(key('track-rider-locating'), findsOneWidget);
+      expect(key('track-step-current-delivering'), findsOneWidget);
+    });
+
+    testWidgets('픽업 전(위치 없음)에는 지도가 없다', (t) async {
+      final orders = MockOrdersRepository(latency: Duration.zero);
+      await openTracking(
+        t,
+        orders,
+        orderId: 'order-seed-4',
+        deliveryId: 'dlv-1',
+      );
+      expect(key('track-map-mode'), findsNothing);
+      expect(key('track-rider-locating'), findsNothing);
+    });
+  });
+
+  group('라이더 위치 변환', () {
+    test('좌표가 있으면 위치, 빠지면 null(0,0 으로 그리지 않음)', () {
+      final ok = etaFromContract(
+        'd',
+        trk.DeliveryEta.fromJson({
+          ..._etaJson(),
+          'riderLocation': {
+            'lat': 35.15,
+            'lng': 129.06,
+            'recordedAt': '2026-10-24T03:00:00Z',
+            'staleSeconds': 7,
+          },
+        }),
+      );
+      expect(ok.riderLocation?.lat, 35.15);
+      expect(ok.riderLocation?.lng, 129.06);
+      expect(ok.riderLocation?.staleSeconds, 7);
+      expect(
+        ok.riderLocation.toString(),
+        isNot(contains('35.15')),
+        reason: '좌표를 toString 으로 흘리지 않는다',
+      );
+      expect(
+        ok.withStage(DeliveryStage.atCustomer).riderLocation,
+        ok.riderLocation,
+      );
+
+      final missing = etaFromContract(
+        'd',
+        trk.DeliveryEta.fromJson({
+          ..._etaJson(),
+          'riderLocation': {'lat': 35.15},
+        }),
+      );
+      expect(missing.riderLocation, isNull);
+      expect(
+        etaFromContract(
+          'd',
+          trk.DeliveryEta.fromJson(_etaJson()),
+        ).riderLocation,
+        isNull,
+      );
     });
   });
 }

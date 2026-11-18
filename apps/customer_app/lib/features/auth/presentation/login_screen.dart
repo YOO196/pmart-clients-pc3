@@ -9,13 +9,21 @@ import '../domain/auth.dart';
 import 'package:pmart_core/pmart_core.dart' show PmartEnv, ProblemCode;
 
 import '../../../shared/providers.dart' show envProvider;
+import '../../start/presentation/start_controller.dart' show startFlagsProvider;
 import 'auth_controller.dart';
 
 /// SCR-AUTH-001·CONSENT-001. 로그인되면 `true` 로 돌아간다. 취소·실패는 원래 화면을 그대로 둔다.
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key, this.purpose = LoginPurpose.general});
+  const LoginScreen({
+    super.key,
+    this.purpose = LoginPurpose.general,
+    this.entry = false,
+  });
 
   final LoginPurpose purpose;
+
+  /// 처음 실행 단계(레퍼런스 2-3 "로그인 필요(둘러보기 = 비회원)"). 뒤로 가기 대신 아래 "둘러보기".
+  final bool entry;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -46,8 +54,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   /// 새로 가입한 계정은 내 정보(이름·휴대폰 번호)부터 받는다(소셜 로그인이 번호를 주지 않음). 끝나면 원래 화면으로.
   Future<void> _afterLogin({required bool newAccount}) async {
+    if (widget.entry) {
+      await ref.read(startFlagsProvider.notifier).completeEntry();
+      if (!mounted) return;
+    }
     if (newAccount) await context.push<bool>('/me/info?from=signup');
     if (!mounted) return;
+    if (widget.entry) {
+      // 처음 실행 단계: 다음 단계(주소 또는 홈)는 라우터가 정한다.
+      context.go('/');
+      return;
+    }
     if (context.canPop()) context.pop(true);
   }
 
@@ -63,8 +80,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _afterLogin(newAccount: newAccount);
       }
       if (next case LoginSettled(outcome: LoginCancelled())) {
-        // 고객 취소는 오류가 아니다. 원래 화면으로 돌아간다.
-        if (context.canPop()) context.pop(false);
+        // 고객 취소는 오류가 아니다. 원래 화면으로 돌아간다(처음 실행 단계는 이 화면에 남는다).
+        if (!widget.entry && context.canPop()) context.pop(false);
       }
     });
 
@@ -160,82 +177,107 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       LoginUnknown() => l10n.loginUnknown,
       _ => null,
     };
+    final body = ListView(
+      padding: const EdgeInsets.fromLTRB(52, 96, 52, 24),
+      children: [
+        Text(
+          l10n.appTitle,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            fontSize: 40,
+            fontWeight: FontWeight.w900,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          widget.purpose == LoginPurpose.checkout
+              ? l10n.loginForCheckout
+              : l10n.loginBody,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        if (ref.watch(envProvider) == PmartEnv.mock) ...[
+          const SizedBox(height: 8),
+          Text(
+            l10n.loginMockNotice,
+            key: const ValueKey('login-mock-notice'),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+        const SizedBox(height: 56),
+        if (message != null) ...[
+          Text(
+            message,
+            key: const ValueKey('login-message'),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (outcome is LoginUnknown)
+          OutlinedButton(
+            key: const ValueKey('login-check-again'),
+            onPressed: busy ? null : controller.checkAgain,
+            child: Text(l10n.loginCheckAgain),
+          )
+        else
+          for (final p in ref.watch(loginProvidersProvider))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: FilledButton.tonal(
+                key: ValueKey('login-${p.name}'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  shape: const StadiumBorder(),
+                  backgroundColor: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainer,
+                  foregroundColor: Theme.of(context).colorScheme.onSurface,
+                  textStyle: Theme.of(context).textTheme.bodyMedium,
+                ),
+                // 제한 중에는 다시 누를 수 없다(남은 시간은 서버 값).
+                onPressed: (busy || outcome is LoginRestricted)
+                    ? null
+                    : () => controller.start(p),
+                child: workingProvider == p
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(_providerLabel(l10n, p)),
+              ),
+            ),
+        if (widget.entry) ...[
+          const SizedBox(height: 20),
+          Center(
+            child: TextButton(
+              key: const ValueKey('login-browse'),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              onPressed: busy
+                  ? null
+                  : () => ref.read(startFlagsProvider.notifier).completeEntry(),
+              child: Text(l10n.loginBrowse),
+            ),
+          ),
+        ],
+      ],
+    );
+    if (widget.entry) {
+      return PopScope(
+        canPop: false,
+        child: Scaffold(
+          key: const ValueKey('start-entry'),
+          body: SafeArea(child: body),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: Text(l10n.loginTitle)),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(52, 96, 52, 24),
-        children: [
-          Text(
-            l10n.appTitle,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontSize: 40,
-              fontWeight: FontWeight.w900,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            widget.purpose == LoginPurpose.checkout
-                ? l10n.loginForCheckout
-                : l10n.loginBody,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          if (ref.watch(envProvider) == PmartEnv.mock) ...[
-            const SizedBox(height: 8),
-            Text(
-              l10n.loginMockNotice,
-              key: const ValueKey('login-mock-notice'),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-          const SizedBox(height: 56),
-          if (message != null) ...[
-            Text(
-              message,
-              key: const ValueKey('login-message'),
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-            const SizedBox(height: 12),
-          ],
-          if (outcome is LoginUnknown)
-            OutlinedButton(
-              key: const ValueKey('login-check-again'),
-              onPressed: busy ? null : controller.checkAgain,
-              child: Text(l10n.loginCheckAgain),
-            )
-          else
-            for (final p in ref.watch(loginProvidersProvider))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: FilledButton.tonal(
-                  key: ValueKey('login-${p.name}'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(46),
-                    shape: const StadiumBorder(),
-                    backgroundColor: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainer,
-                    foregroundColor: Theme.of(context).colorScheme.onSurface,
-                    textStyle: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  // 제한 중에는 다시 누를 수 없다(남은 시간은 서버 값).
-                  onPressed: (busy || outcome is LoginRestricted)
-                      ? null
-                      : () => controller.start(p),
-                  child: workingProvider == p
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(_providerLabel(l10n, p)),
-                ),
-              ),
-        ],
-      ),
+      body: body,
     );
   }
 }
