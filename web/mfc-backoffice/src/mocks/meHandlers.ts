@@ -2,8 +2,10 @@
 import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
-import type { EmployeeSelf } from '../api/hrSelf';
+import type { components } from '../api/generated/hr';
 import { operator, problem, unauthorized } from './support';
+
+type EmployeeSelf = components['schemas']['EmployeeSelf'];
 
 const employees: Readonly<Record<string, EmployeeSelf>> = {
   'OP-sup-1': {

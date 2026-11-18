@@ -6,10 +6,12 @@ import { useQuery } from '@tanstack/react-query';
 
 import { ProblemCode, ProblemFailure, request } from '@pmart/web-core';
 import { QueryState, toUiState } from '@pmart/web-ui';
-import type { EmployeeSelf } from '../../api/hrSelf';
+import type { components } from '../../api/generated/hr';
 import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
 import { messages } from '../../shared/messages';
+
+type EmployeeSelf = components['schemas']['EmployeeSelf'];
 
 const m = messages.me;
 
