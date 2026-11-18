@@ -38,7 +38,10 @@ enum PdaMenu {
   printerSettings({'PACK'}),
 
   /// 휴게 — 누구나.
-  rest(<String>{});
+  rest(<String>{}),
+
+  /// 반납 인증번호 — 센터 직원 누구나(delivery-execution 0.28.0 "그 센터 운영자, 작업자 포함").
+  returnHandover(<String>{});
 
   const PdaMenu(this.requires);
 

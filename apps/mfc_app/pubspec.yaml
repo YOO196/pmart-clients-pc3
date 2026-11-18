@@ -35,6 +35,8 @@ dependencies:
     path: ../../packages/pmart_api/gen/product
   pmart_api_delivery_tracking:
     path: ../../packages/pmart_api/gen/delivery-tracking
+  pmart_api_delivery_execution:
+    path: ../../packages/pmart_api/gen/delivery-execution
   mobile_scanner: ^7.5.0
   flutter_web_auth_2: ^5.1.0
   crypto: ^3.0.8

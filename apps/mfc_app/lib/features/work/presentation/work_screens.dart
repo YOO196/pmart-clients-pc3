@@ -310,6 +310,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
+                          // 반납 인증번호 — 라이더가 회수품을 가져오면 알려 줄 번호(rider-app 요청 2026-11-18).
+                          _MenuButton(
+                            key: const ValueKey('menu-return-handover'),
+                            icon: Icons.assignment_return_outlined,
+                            label: l10n.returnHandoverMenu,
+                            allowed: me.canUse(PdaMenu.returnHandover),
+                            onTap: () => _menu(
+                              me,
+                              PdaMenu.returnHandover,
+                              l10n.returnHandoverMenu,
+                              () => context.push('/return-handovers'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
                           _MenuButton(
                             key: const ValueKey('menu-printer'),
                             icon: Icons.print_outlined,
