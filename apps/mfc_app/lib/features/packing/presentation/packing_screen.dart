@@ -218,6 +218,8 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
               PackStepError.notCart => l10n.pickNotCart,
               PackStepError.otherCart => l10n.packOtherCart,
               PackStepError.notRack => l10n.packNotRack,
+              PackStepError.notFinished => l10n.packNotFinished,
+              PackStepError.finishCheckFailed => l10n.packFinishCheckFailed,
             },
             key: const ValueKey('pack-step-error'),
             style: TextStyle(color: theme.colorScheme.error),
@@ -557,7 +559,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(56),
                       ),
-                      onPressed: packing.rack == null
+                      onPressed: packing.rack == null || packing.busy
                           ? null
                           : () => ctl.finish(task, s),
                       child: Text(l10n.finishPacking),

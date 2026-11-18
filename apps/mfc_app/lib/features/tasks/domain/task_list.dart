@@ -311,5 +311,7 @@ class ExecutionReject {
 /// 큐에 넣는 실행 명령 종류.
 abstract final class FieldCommandKind {
   static const pickExecution = 'pick-execution';
+
+  /// 옛 PACK 실행(이제 보내지 않음 — 포장 밀봉이 PACK 실적, fulfillment 계약). 기기에 남은 옛 큐 항목 이름이라 둔다.
   static const packExecution = 'pack-execution';
 }

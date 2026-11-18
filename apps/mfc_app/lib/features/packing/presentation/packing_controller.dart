@@ -5,7 +5,7 @@ import 'package:pmart_core/pmart_core.dart';
 import '../../../shared/codes.dart';
 import '../../../shared/product_hints.dart';
 import '../../../shared/providers.dart';
-import '../../tasks/data/task_repository.dart' show packPayload;
+import '../../tasks/data/mock_task_repository.dart';
 import '../../tasks/domain/task_list.dart';
 import '../../tasks/presentation/task_controllers.dart';
 import '../data/mock_packing_repository.dart';
@@ -14,7 +14,12 @@ import '../domain/packing.dart';
 
 final packingRepositoryProvider = Provider<PackingRepository>(
   (ref) => switch (ref.watch(envProvider)) {
-    PmartEnv.mock => MockPackingRepository(),
+    PmartEnv.mock => MockPackingRepository(
+      onShipmentReady: (id) => switch (ref.read(taskRepositoryProvider)) {
+        final MockTaskRepository t => t.shipmentReady(id),
+        _ => null,
+      },
+    ),
     PmartEnv.local => ApiPackingRepository(ref.watch(dioProvider)),
   },
 );
@@ -30,7 +35,15 @@ final shipmentProvider = FutureProvider.autoDispose
 /// 패킹대·장바구니·랙 스캔 오류.
 /// notStation = 패킹대(PAK) 아님, notCart = 장바구니(CRT) 아님,
 /// otherCart = 이 주문을 피킹한 장바구니가 아님, notRack = 출하대기(DSP) 아님.
-enum PackStepError { notStation, notCart, otherCart, notRack }
+/// notFinished = 끝을 눌렀는데 서버 출고가 아직 READY 아님, finishCheckFailed = 출고를 다시 읽지 못함.
+enum PackStepError {
+  notStation,
+  notCart,
+  otherCart,
+  notRack,
+  notFinished,
+  finishCheckFailed,
+}
 
 /// otherZone = 지금 봉투와 다른 온도대 상품(WK-07 온도별 포장).
 enum PackScan { matched, wrongItem, overExpected, otherZone }
@@ -135,7 +148,6 @@ class PackingController extends Notifier<PackingState> {
 
   /// 결과를 모르는 배차 요청의 키·분. 확인될 때까지 이 값으로만 다시 보낸다.
   ({IdempotencyKey key, int minutes})? _pendingDispatch;
-  late final DateTime _startedAt = ref.read(mfcClockProvider)();
 
   @override
   PackingState build() => const PackingState();
@@ -336,41 +348,40 @@ class PackingController extends Notifier<PackingState> {
     return outcome;
   }
 
-  /// 패킹 완료 실적(PACK 실행)을 큐에 넣고 보낸다. 담은 수량은 유효 포장 기준이다.
+  /// 패킹 끝 — 서버 상태로만 판단한다(PACK 실행은 보내지 않는다).
+  ///
+  /// 집은 수량이 다 밀봉되면 fulfillment 가 PACK 을 스스로 COMPLETED 로, 출고를 READY 로 바꾼다.
+  /// PACK 실행(`POST /tasks/{id}/executions` executionType PACK)은 계약상 422(포장 밀봉으로 대신).
+  /// 그래서 출고를 다시 읽어 READY(또는 이미 인계 중·인계됨)일 때만 끝으로 보인다.
   Future<void> finish(TaskDetailView task, ShipmentView s) async {
-    final packed = s.packedByLine;
-    final queue = ref.read(fieldQueueProvider);
-    final now = ref.read(mfcClockProvider)();
-    await queue.enqueue(
-      kind: FieldCommandKind.packExecution,
-      targetId: taskId,
-      payload: packPayload(
-        workerId: ref.read(currentWorkerIdProvider),
-        assignmentVersion: task.assignmentVersion,
-        lines: [
-          for (final l in task.lines)
-            if ((packed[l.orderLineId] ?? 0) > 0)
-              (
-                orderLineId: l.orderLineId,
-                sku: l.sku,
-                qty: packed[l.orderLineId]!,
-              ),
-        ],
-        durationSec: now.difference(_startedAt).inSeconds,
-      ),
-    );
-    final repo = ref.read(taskRepositoryProvider);
-    await queue.flush(repo.sendExecution);
-    await queue.confirm(
-      (item) => item.resultId == null
-          ? Future.value(ConfirmResult.unknown)
-          : repo.execution(item.targetId, item.resultId!),
-    );
-    if (!ref.mounted) return;
-    state = state.copyWith(packingFinished: true);
-    ref
-      ..invalidate(taskQueueProvider(taskId))
-      ..invalidate(taskDetailProvider(taskId));
+    if (state.busy) return;
+    state = state.copyWith(busy: true, stepError: () => null);
+    try {
+      ref.invalidate(shipmentProvider(s.shipmentId));
+      final fresh = await ref.read(shipmentProvider(s.shipmentId).future);
+      if (!ref.mounted) return;
+      final done = switch (fresh.state) {
+        ShipmentState.ready ||
+        ShipmentState.partiallyHandedOver ||
+        ShipmentState.handedOver => true,
+        _ => false,
+      };
+      state = state.copyWith(
+        busy: false,
+        packingFinished: done,
+        stepError: () => done ? null : PackStepError.notFinished,
+      );
+      ref
+        ..invalidate(taskQueueProvider(taskId))
+        ..invalidate(taskDetailProvider(taskId));
+    } on PmartFailure {
+      if (!ref.mounted) return;
+      // 조회 실패를 끝(또는 안 끝남)으로 바꾸지 않는다 — 다시 눌러 확인.
+      state = state.copyWith(
+        busy: false,
+        stepError: () => PackStepError.finishCheckFailed,
+      );
+    }
   }
 
   /// 배차 요청(D-5) — 예상 포장 시간(분)과 함께. 요청 ≠ 배정.

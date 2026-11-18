@@ -10,7 +10,8 @@ import 'task_repository.dart';
 /// 목 구현. 계약(`mfc-fulfillment-service.yaml`) 모양 JSON 을 생성 모델로 읽는다.
 ///
 /// - task-mock-1: 배정된 피킹(4행, 출하 shp-1). 피킹이 끝나면 같은 주문의 패킹 shp-1-PACK 이
-///   같은 작업자에게 배정된다(피킹·패킹 동일 인원 — 업무 문서 §7-6, 서버 보장은 BR-52 R20).
+///   같은 작업자에게 배정된다(피킹·패킹 동일 인원 — 업무 문서 §7-6, 서버 보장 capacity 0.19.0).
+///   PACK 실행은 422(밀봉이 PACK 실적) — 다 밀봉되면 [shipmentReady] 로 PACK 이 COMPLETED.
 /// - task-mock-2: 진행 중 패킹(출하 shp-2) — [packDemo] 일 때만(패킹 화면 단독 시험).
 /// - task-mock-3: 막힌 피킹(결품 보고).
 /// - task-mock-4: 다른 작업자가 이미 시작한 피킹(ALREADY_STARTED 시연).
@@ -494,6 +495,14 @@ base class MockTaskRepository implements TaskRepository {
     }
     final existing = _executionByKey[item.id];
     if (existing != null) return SendAccepted(resultId: existing);
+    // PACK 실행은 받지 않는다 — 포장 밀봉이 PACK 실적(fulfillment 계약 executionType "PACK 은 422").
+    if (item.payload['executionType'] == 'PACK') {
+      return executionFailureToSend(
+        const ProblemFailure(
+          Problem(status: 422, code: 'UNSUPPORTED_EXECUTION'),
+        ),
+      );
+    }
     final t = _tasks[item.targetId]!;
     final assignment = t['assignment']! as Map<String, Object?>;
     if (t['state'] != 'IN_PROGRESS') {
@@ -559,6 +568,19 @@ base class MockTaskRepository implements TaskRepository {
       );
     }
     return SendAccepted(resultId: id);
+  }
+
+  /// 출고의 집은 수량이 다 밀봉됨(목 패킹 저장소가 알린다) → 그 출고의 PACK 을 서버처럼 COMPLETED 로.
+  void shipmentReady(String shipmentId) {
+    for (final t in _tasks.values) {
+      if (t['taskType'] == 'PACK' &&
+          t['shipmentId'] == shipmentId &&
+          t['state'] == 'IN_PROGRESS') {
+        t
+          ..['state'] = 'COMPLETED'
+          ..['version'] = (t['version']! as int) + 1;
+      }
+    }
   }
 
   /// 접수분은 pendingQty, 반영분은 completedQty·remainingQty 로 옮긴다.
