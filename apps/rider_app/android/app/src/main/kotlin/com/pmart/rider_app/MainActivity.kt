@@ -28,6 +28,11 @@ class MainActivity : FlutterActivity() {
     private var pending: MethodChannel.Result? = null
     private var pendingNavi: MethodChannel.Result? = null
 
+    // 엔진을 직접 만들어 살려 두던 것(#133 — 앱을 닫아도 위치 전송)은 되돌렸다(2026-11-18):
+    // 카카오 지도 플러그인(kakao_map_sdk 1.3.1)이 화면(Activity) 시작에 맞춰 뷰 팩토리를 등록·생명주기를 붙이는데,
+    // 엔진을 host 가 넘기면 지도가 준비되지 못해(LabelManager is null) 지도가 하얗게 비었다(사용자 "갑자기 지도 안 뜬다").
+    // 앱을 닫아도 위치를 보내는 것은 지도와 엮이지 않는 다른 방식으로 다시 한다.
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         createPushChannels()
