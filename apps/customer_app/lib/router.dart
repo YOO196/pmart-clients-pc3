@@ -121,6 +121,14 @@ final routerProvider = Provider<GoRouter>(
                 builder: (_, state) =>
                     RescheduleScreen(orderId: state.pathParameters['orderId']!),
               ),
+              // 리뷰 요청 알림(REVIEW_REQUESTED) → 그 주문의 리뷰 쓰기(하나면 바로, 여럿이면 고르기).
+              GoRoute(
+                parentNavigatorKey: rootNavigatorKey,
+                path: 'review',
+                builder: (_, state) => OrderReviewEntryScreen(
+                  orderId: state.pathParameters['orderId']!,
+                ),
+              ),
               // 주문 문의하기 — "무엇을 도와드릴까요?"(레퍼런스 9-2 3-1): 배송 신고 종류 → 문의 남기기.
               GoRoute(
                 parentNavigatorKey: rootNavigatorKey,

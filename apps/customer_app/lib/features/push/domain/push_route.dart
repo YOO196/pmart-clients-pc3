@@ -10,7 +10,10 @@ String pushRoute(Map<String, String> data) {
     type: _destinationType(data['destinationType']),
     ref: data['destinationRef'],
   );
-  if (noticeRoute(destination) case final route?) return route;
+  if (noticeRoute(destination, templateKey: data['templateKey'])
+      case final route?) {
+    return route;
+  }
   final id = data['notificationId'];
   if (id != null && id.isNotEmpty) {
     return '/notifications/${Uri.encodeComponent(id)}';

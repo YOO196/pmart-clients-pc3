@@ -22,7 +22,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 
 | 문서 | 기다리는 것 |
 |---|---|
-| `web-common/2026-11-18-backend-csrf-cookie-pileup.md` | 백오피스 CSRF 쿠키(`__Secure-pmart_ea_csrf_{sessionId}`, Path=/·만료 없음)가 같은 호스트에 쌓여 431 — C1 Max-Age(추천) 또는 C2 본문으로, LAN 머리말 한도 |
+| `web-common/2026-11-18-backend-csrf-cookie-pileup.md` | 백오피스 CSRF 쿠키(`__Secure-pmart_ea_csrf_{sessionId}`, Path=/·만료 없음)가 같은 호스트에 쌓여 431 — C1 Max-Age 반영 회신(employee-auth 0.12.1, 앱 변경 없음). **남은 것: LAN 배포 뒤 백오피스 사이트 데이터 한 번 지우기 안내, 확인되면 archive** |
 | `mfc-app/2026-11-10-backend-pda-work-areas.md` | BR-52·BR-53 회신(R1~R4 일부·R8~R11·R19-1 은 받음 — 나머지. 다음 차례 R12 → R20) |
 | `mfc-app/2026-11-17-backend-pda-stock-check.md` | PDA 재고 확인 — 작업자 토큰으로 센터 재고·바코드 조회 되는지(Q1·Q2), 상품명(Q4) |
 | `mfc-app/2026-11-17-backend-my-work-history.md` | 작업자 본인 오늘 업무 내역 — 기간 거르기·completedAt(R1·R2), 입고·검사·이동·실사 내 내역(R3) |
@@ -38,6 +38,6 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-16-backend-review-edit-delete-done.md` | 리뷰 수정·삭제 화면 반영 확인, 빈 글 수정 질문 1개 — 실서버 확인은 배송 완료 뒤 |
 | `rider-backoffice/2026-11-17-backend-rider-backoffice-base-done.md` | 라이더 백오피스 뼈대·로그인 회신 — 들어간 커밋 `756db67` 을 그대로 받음(사용자 2026-11-17), 검토·시험 11개·LAN 빌드 이름 확인. **남은 것: 실서버(8446) 로그인을 브라우저로 눌러 보기** |
 | `rider-backoffice/2026-11-18-backend-rider-ops-gaps.md` | 라이더 백오피스 직원용 API 공백 7건(PC 5) — 7번 `Evidence.method` 값 목록 먼저, 2~6번 1차 포함 여부·서비스·버전 회신 |
-| `customer-app/2026-11-18-backend-gap-a-applied.md` | 고객앱 갭 A 8가지 + CU-1 주문 전 재동의·마케팅 앱 반영(목 모드). **요청 R1: 알림함 `templateKey`(리뷰 요청 알림 구분)**. CU-1 스위치는 앱 LAN 확인 뒤 |
+| `customer-app/2026-11-18-backend-gap-a-applied.md` | 고객앱 갭 A 8가지 + CU-1 주문 전 재동의·마케팅 앱 반영(목 모드). R1(알림함 `templateKey`) 답 받아 반영(2026-11-18). **남은 것: 실서버 확인(할 일 43) 뒤 CU-1 스위치 켜기 알림** |
 | `customer-app/2026-11-18-backend-customer-push-fcm-reply.md` | 고객앱 휴대폰 푸시 회신 — 앱 반영 끝(토큰 등록 `7cbe1f2`, 누르면 목적지 화면). Q6·Q8 은 11-18 답 받음(앱 고칠 것 없음). **남은 것: 실기기 확인, `pmart-123` json 교체 — 결과 덧붙이면 archive** |
 | `customer-app/2026-11-15-backend-support-chat-inquiry.md` | 고객앱 문의·AI 상담 반영 알림 — LAN 고객 토큰으로 실제 확인, 질문 3개 |

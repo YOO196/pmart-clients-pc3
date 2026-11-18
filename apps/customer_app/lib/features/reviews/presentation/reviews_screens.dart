@@ -1752,3 +1752,103 @@ class OrderReviewsSection extends ConsumerWidget {
     );
   }
 }
+
+/// 리뷰 요청 알림(notification 0.4.4 `REVIEW_REQUESTED`)을 눌렀을 때 — 그 주문의 리뷰 쓰기.
+/// 작성 가능 여부는 서버 자격 값만 본다: 하나면 바로 쓰기 화면, 여럿이면 고르기, 없으면 안내(주문 상세로).
+class OrderReviewEntryScreen extends ConsumerStatefulWidget {
+  const OrderReviewEntryScreen({super.key, required this.orderId});
+
+  final String orderId;
+
+  @override
+  ConsumerState<OrderReviewEntryScreen> createState() =>
+      _OrderReviewEntryScreenState();
+}
+
+class _OrderReviewEntryScreenState
+    extends ConsumerState<OrderReviewEntryScreen> {
+  bool _opened = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final provider = orderReviewEligibilitiesProvider(widget.orderId);
+    final value = ref.watch(provider);
+    final writable = [
+      for (final e in value.value ?? const <ReviewEligibility>[])
+        if (e.writable) e,
+    ];
+    // 쓸 품목이 하나뿐이면 고르기 없이 바로 쓰기 화면으로(이 화면을 대신한다).
+    if (writable.length == 1 && !_opened) {
+      _opened = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.pushReplacement(
+            '/reviews/write',
+            extra: ReviewTarget.of(writable.single),
+          );
+        }
+      });
+    }
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.reviewWrite)),
+      body: switch (value) {
+        AsyncData(value: null) => LoginRequired(
+          message: l10n.reviewLoginNeeded,
+        ),
+        _ => UiStateView<List<ReviewEligibility>?>(
+          state: uiStateOf(value),
+          onRetry: () => ref.invalidate(provider),
+          ready: (context, _) => writable.isEmpty
+              ? Center(
+                  key: const ValueKey('order-review-entry-none'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(l10n.orderReviewNone, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          key: const ValueKey('order-review-entry-order'),
+                          onPressed: () => context.pushReplacement(
+                            '/orders/${Uri.encodeComponent(widget.orderId)}',
+                          ),
+                          child: Text(l10n.orderDetailTitle),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView(
+                  key: const ValueKey('order-review-entry-list'),
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    for (final e in writable)
+                      ListTile(
+                        key: ValueKey('order-review-entry-${e.orderLineId}'),
+                        contentPadding: EdgeInsets.zero,
+                        title: _ProductName(
+                          productId: e.productId,
+                          title: e.productName,
+                        ),
+                        subtitle: e.eligibleUntil != null
+                            ? Text(
+                                l10n.reviewDeadline(
+                                  formatSeoulDateTime(e.eligibleUntil!),
+                                ),
+                              )
+                            : null,
+                        trailing: TextButton(
+                          onPressed: () =>
+                              openReviewWrite(context, ReviewTarget.of(e)),
+                          child: Text(l10n.reviewWrite),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      },
+    );
+  }
+}

@@ -24,7 +24,7 @@
 | 29 | ~~**"받았어요"(고객 수령 확인)** — 주문 상세 배송 카드에 픽업 뒤·전달 전일 때 버튼, 확인 대화 뒤 `POST /deliveries/{id}/receipt-confirmations`~~ 2026-11-18 끝(커밋은 worklog) | execution 0.20.0, `clients/customer-app/2026-11-17-request-receipt-confirmation.md` | 사용자 2026-11-18 "이 요청 문서에 추가하고 바로 만들어". 실서버 확인은 30. 못 받음 신고는 6 |
 | 31 | ~~**반품 회수비 결제** — 처리 내역(클레임 상세)에 결제 카드, 토스 결제위젯·승인 결과 확인·실패 뒤 새 시도~~ 2026-11-18 끝(커밋은 worklog) | claim 0.2.0·0.3.0, `clients/all/2026-11-17-request-return-recovery.md` §3 | 사용자 2026-11-17 미뤄 둔 요청 → 2026-11-18 "진행해". 실서버 확인은 32 |
 | 33 | **문의 "상담 종료"** — 고객이 답변 받은 문의를 스스로 끝내기 | `clients/all/2026-11-17-request-inquiry-close.md` | 2026-11-17 미뤄 둔 요청. 2026-11-18 할 일 문서에 올림 |
-| 35 | 리뷰 요청 알림 `REVIEW_REQUESTED`(알림함만, 대상 ORDER) — 누르면 그 주문의 리뷰 쓰기 화면 | notification 0.4.2, `clients/customer-app/2026-11-18-notice-gap-a-built.md` §1 | **막힘: 알림함 응답에 `templateKey` 가 없다**(sourceEventType 도 배송 완료와 같은 `DeliveryCompleted`) → 요청 R1 `docs/handoff/customer-app/2026-11-18-backend-gap-a-applied.md` §3. 그때까지 주문 상세(리뷰 쓰기 구역)로 간다 |
+| 35 | ~~리뷰 요청 알림 `REVIEW_REQUESTED` → 그 주문의 리뷰 쓰기~~ 2026-11-18 끝 — 알림함 `templateKey`(notification 0.4.4, 요청 R1 반영) → `/orders/{id}/review`(쓸 상품 하나면 바로 쓰기, 여럿이면 고르기, 없으면 안내). 푸시 data 의 templateKey 도 같게 | notification 0.4.2·0.4.4, `clients/customer-app/2026-11-18-notice-gap-a-built.md` §1·추가 | 백엔드 0.4.4 는 LAN 배포 전(2026-11-18 11:19 기준) — 그 전 LAN 은 templateKey 가 없어 주문 상세로 간다 |
 | 36 | ~~주문 내역 카드 — 대표 상품 "<상품명> 외 N개", 배송 방식~~ 2026-11-18 끝 | order 0.12.0, 같은 문서 §2 | 썸네일은 넣지 않음(카드마다 상품 조회가 생김 — 회신 문서에 적음) |
 | 37 | ~~주문 내역 기간·상품명 검색~~ 2026-11-18 끝 — 검색 · 조회 기간(3개월 기본·6개월·1년·전체) · 상태 | order 0.12.0, 같은 문서 §3 | 3개월은 `from` 안 보냄(서버 기본), 전체는 `from=2020-01-01` |
 | 38 | ~~주문 내역 삭제(숨기기)~~ 2026-11-18 끝 — 끝난 주문 카드의 "삭제" → 확인 창 | order 0.12.0, 같은 문서 §4 | |

@@ -183,7 +183,8 @@ class _NoticeCard extends ConsumerWidget {
           // 읽음 처리는 이동을 막지 않는다. 결과는 목록에 서버 상태로 반영된다.
           ref.read(inboxProvider.notifier).open(n);
           context.push(
-            noticeRoute(n.destination) ?? '/notifications/${n.notificationId}',
+            noticeRoute(n.destination, templateKey: n.templateKey) ??
+                '/notifications/${n.notificationId}',
           );
         },
         child: Padding(
@@ -306,7 +307,8 @@ class NotificationDetailScreen extends ConsumerWidget {
               ],
               const SizedBox(height: 16),
               Text(l10n.noticeSnapshot, style: theme.textTheme.bodySmall),
-              if (noticeRoute(n.destination) case final route?) ...[
+              if (noticeRoute(n.destination, templateKey: n.templateKey)
+                  case final route?) ...[
                 const SizedBox(height: 16),
                 FilledButton(
                   key: const ValueKey('notice-go'),

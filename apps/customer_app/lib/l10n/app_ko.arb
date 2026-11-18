@@ -858,6 +858,7 @@
   "consentVersionChanged": "그 사이 약관이 바뀌었어요. 다시 확인해 주세요",
   "marketingConsentFailed": "마케팅 정보 수신 동의를 바꾸지 못했어요. 다시 시도해 주세요",
   "marketingConsentLoadFailed": "동의 상태를 불러오지 못했어요",
+  "orderReviewNone": "이 주문에서 지금 쓸 수 있는 리뷰가 없어요. 이미 썼거나 작성 기간이 지났을 수 있어요",
   "oosRemember": "다음에도 적용",
   "oosRememberFailed": "'다음에도 적용'을 저장하지 못했어요. 이번 주문은 고른 대로 진행돼요",
   "faqTitle": "자주 묻는 질문",

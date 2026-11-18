@@ -52,6 +52,7 @@ class InboxNotice {
     this.body,
     this.destination,
     this.readAt,
+    this.templateKey,
   });
 
   final String notificationId;
@@ -59,6 +60,9 @@ class InboxNotice {
   final String title;
   final String? body;
   final NoticeDestination? destination;
+
+  /// 알림 종류(notification 0.4.4 `templateKey` — 예 REVIEW_REQUESTED). 모르는 값·없음이면 목적지 기본 동작.
+  final String? templateKey;
 
   /// 서버 `state == NOTICE_READ`. 읽음은 배송 수령·거래 확정의 근거가 아니다.
   final bool read;
@@ -79,16 +83,24 @@ class NoticePage {
   final String? nextCursor;
 }
 
+/// 리뷰 요청 알림 종류(배송 완료 1시간 뒤, 알림함만 — notification 0.4.2·0.4.4).
+const reviewRequestedTemplate = 'REVIEW_REQUESTED';
+
 /// 알림을 눌렀을 때 갈 앱 경로. 앱에 화면이 없는 목적지(공지 등)나 참조가 없으면 null(알림 상세에 머문다).
 ///
 /// - REFUND: `ref` 는 claimId 다(notification-service 0.1.1 `Destination.ref`). 환불은 클레임 아래에서 보므로
 ///   클레임 처리 내역으로 간다.
 /// - INQUIRY: `ref` 는 inquiryId 다(notification 0.2.0 — 고객센터 답변 알림). 내 문의 상세로 간다.
 /// - DISPATCH_OFFER·CASE: 라이더·운영자용 목적지다.
-String? noticeRoute(NoticeDestination? d) {
+String? noticeRoute(NoticeDestination? d, {String? templateKey}) {
   final ref = d?.ref;
   if (d == null || ref == null || ref.isEmpty) return null;
   final id = Uri.encodeComponent(ref);
+  // 리뷰 요청(notification 0.4.4): 목적지는 주문이지만 그 주문의 리뷰 쓰기로 간다.
+  if (templateKey == reviewRequestedTemplate &&
+      d.type == NoticeDestinationType.order) {
+    return '/orders/$id/review';
+  }
   return switch (d.type) {
     NoticeDestinationType.order => '/orders/$id',
     NoticeDestinationType.delivery => '/deliveries/$id',

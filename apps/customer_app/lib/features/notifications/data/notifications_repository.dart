@@ -192,6 +192,10 @@ InboxNotice noticeFromContract(api.Notification n) => InboxNotice(
     ),
     null => null,
   },
+  templateKey: switch (n.templateKey?.trim()) {
+    final k? when k.isNotEmpty => k,
+    _ => null,
+  },
   read: n.state == api.NotificationStateEnum.NOTICE_READ,
   createdAt: n.createdAt,
   readAt: n.readAt,
