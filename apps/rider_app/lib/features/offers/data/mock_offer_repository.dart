@@ -190,6 +190,35 @@ base class MockOfferRepository implements OfferRepository, DutyRepository {
 
   bool get _oneBusy => _settings['oneAtATime'] == true && activeCount > 0;
 
+  /// 한집배달은 단독 — 서버에 이미 있다(백엔드 PR #190, LAN 배포 — 회신 2026-11-18-reply-single-delivery-exclusive,
+  /// `AcceptRules`·`OfferService`·`DispatchEngine`). 목은 서버와 같게:
+  /// - 한집(고객 배송 SINGLE)을 맡으면 새 고객 배송 제안 없음·수락 INELIGIBLE. **pollAfterSec 은 null 이 아니다**(폴링해도 안 올 뿐).
+  /// - 다른 배송을 맡고 있으면 한집 제안은 빠진다. 알뜰은 묶음 포함 3건.
+  /// - 예약(SCHEDULED)·회수(RETURN)는 한집으로 치지 않는다. 회수는 한집을 든 라이더도 받는다.
+  final _singleDeliveries = <String>{};
+
+  bool get _singleBusy => assignedDeliveries.any(
+    (id) => _singleDeliveries.contains(id) && !(finished?.call(id) ?? false),
+  );
+
+  /// 제안을 받을 수 없는 상태(계약 pollAfterSec null) — 하나씩 배달 진행 중.
+  bool get _cannotReceive => _oneBusy;
+
+  static bool _isReturn(Map<String, Object?> offer) =>
+      offer['deliveryType'] == 'RETURN';
+
+  /// 고객에게 가는 한집배달만.
+  static bool _isSingle(Map<String, Object?> offer) =>
+      !_isReturn(offer) &&
+      (offer['summary'] as Map?)?['deliveryMode'] == 'SINGLE';
+
+  /// 이 제안을 지금 받을 수 있는지(최대 건수·하나씩 배달·한집은 단독).
+  bool _fits(Map<String, Object?> offer) {
+    if (_singleBusy && !_isReturn(offer)) return false;
+    if (_isSingle(offer)) return activeCount == 0 && _capacity >= 1;
+    return _sizeOf(offer) <= _capacity;
+  }
+
   int _sizeOf(Map<String, Object?> offer) => (offer['bundleSize'] as int?) ?? 1;
 
   /// 조회 횟수(폴링 간격 확인용).
@@ -243,11 +272,11 @@ base class MockOfferRepository implements OfferRepository, DutyRepository {
         'items': receiving && aiMode
             ? [
                 for (final o in _offers)
-                  if (_sizeOf(o) <= _capacity) o,
+                  if (_fits(o)) o,
               ]
             : const <Object?>[],
         // 계약: 하나씩 배달 진행 중이면 제안을 받을 수 없어 null(폴링 멈춤).
-        'pollAfterSec': receiving && !_oneBusy ? 5 : null,
+        'pollAfterSec': receiving && !_cannotReceive ? 5 : null,
       }),
     );
   }
@@ -279,7 +308,7 @@ base class MockOfferRepository implements OfferRepository, DutyRepository {
         },
       };
       lateNext = null;
-    } else if (accept && _sizeOf(offer) > _capacity) {
+    } else if (accept && !_fits(offer)) {
       result = {
         'offerId': offerId,
         'outcome': 'LATE',
@@ -300,6 +329,7 @@ base class MockOfferRepository implements OfferRepository, DutyRepository {
             (bundle != null && o['bundleId'] == bundle),
       )) {
         assignedDeliveries.add(o['deliveryId']! as String);
+        if (_isSingle(o)) _singleDeliveries.add(o['deliveryId']! as String);
       }
       _duty = {..._duty, 'activeDeliveryCount': activeCount};
     } else {

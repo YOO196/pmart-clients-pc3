@@ -83,4 +83,53 @@ void main() {
     expect(again.offers.map((o) => o.offerId), contains('offer-single-3'));
     expect(again.pollAfter, isNotNull);
   });
+  test('한집은 단독(하나씩 배달하기 꺼도): 한집 1건 맡으면 끝날 때까지 고객 배송 제안 없음', () async {
+    final repo = MockOfferRepository(
+      latency: Duration.zero,
+      demoBundle: true,
+      demoSingles: true,
+    );
+    final done = <String>{};
+    repo.finished = done.contains;
+
+    await repo.respond(
+      'offer-single-1',
+      accept: true,
+      key: IdempotencyKey.generate(),
+    );
+    final busy = await repo.activeOffers();
+    // 서버와 같게: 고객 배송 제안은 없고 회수만 남는다, 폴링은 멈추지 않는다(pollAfterSec 그대로).
+    expect(busy.offers.map((o) => o.offerId), ['offer-return-1']);
+    expect(busy.pollAfter, isNotNull);
+    final second = await repo.respond(
+      'offer-single-2',
+      accept: true,
+      key: IdempotencyKey.generate(),
+    );
+    expect((second as OfferLate).reason, LateReason.ineligible);
+    expect(repo.activeCount, 1);
+
+    done.add('dlv-s1');
+    final again = await repo.activeOffers();
+    expect(again.offers, isNotEmpty);
+    expect(again.pollAfter, isNotNull);
+  });
+
+  test('다른 배송을 맡고 있으면 한집 제안은 오지 않는다(알뜰은 3건까지)', () async {
+    final repo = MockOfferRepository(
+      latency: Duration.zero,
+      demoBundle: true,
+      demoSingles: true,
+    );
+    repo.finished = (_) => false;
+    // 예약 1건을 맡는다
+    await repo.respond(
+      'offer-mock-1',
+      accept: true,
+      key: IdempotencyKey.generate(),
+    );
+    final ids = (await repo.activeOffers()).offers.map((o) => o.offerId);
+    expect(ids.where((id) => id.startsWith('offer-single')), isEmpty);
+    expect(ids, contains('offer-bundle-1'));
+  });
 }
