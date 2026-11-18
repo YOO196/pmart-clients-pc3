@@ -78,6 +78,29 @@ export const messages = {
     packingHandover: '포장 인계',
     deliveries: '배송 현황',
     dispatchFailures: '배차 실패',
+    returnHandovers: '반납 인증번호',
+  },
+
+  /** 반납 인증번호(delivery-execution 0.28.0 — PDA 반납 인증번호 화면과 같은 문구) */
+  returnHandovers: {
+    title: '반납 인증번호',
+    intro: '라이더가 회수품을 가져오면 이 번호를 알려 주세요. 라이더가 라이더 앱에 번호를 넣으면 반납이 끝나요. 현장 PDA 에도 같은 번호가 보여요.',
+    empty: '반납을 기다리는 배송이 없어요',
+    refresh: '새로 읽기',
+    autoRefreshNote: '30초마다 다시 읽어요',
+    purpose: { CLAIM_RETURN: '고객 반품 회수', MISDELIVERY_RECOVERY: '오배송 회수', FAILED_DELIVERY_RETURN: '전달 실패 반납' } as Readonly<Record<string, string>>,
+    purposeOther: '회수·반납',
+    col: { delivery: '배송', purpose: '종류', state: '배송 상태', rider: '라이더', code: '인증번호', issuedAt: '낸 시각', action: '' },
+    codeAria: (code: string) => `반납 인증번호 ${code.split('').join(' ')}`,
+    locked: '여러 번 틀려 잠겼어요 — 새 번호를 내 주세요',
+    failedAttempts: (n: number) => `라이더가 ${n}번 틀렸어요`,
+    reissue: '새 번호',
+    reissueUnlock: '새 번호 내고 잠김 풀기',
+    confirmTitle: '새 번호를 낼까요?',
+    confirmBody: '지금 번호는 더 이상 맞지 않아요. 라이더에게 새 번호를 다시 알려 주세요.',
+    confirmOk: '새 번호 내기',
+    confirmCancel: '그만두기',
+    done: (code: string) => `새 번호 ${code} 를 냈어요. 라이더에게 다시 알려 주세요.`,
   },
 
   /** 포장 인계 현황(bff 0.11.0 packing-handover — 센터 관리자는 자기 센터 고정, 배송 원문 §10.1·§3.1·§3.4·§3.7) */

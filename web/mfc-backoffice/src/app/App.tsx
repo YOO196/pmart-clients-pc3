@@ -8,6 +8,7 @@ import { AssignmentsMenu } from '../features/assignments/AssignmentPages';
 import { CenterSwitcher } from '../features/centers/centers';
 import { CenterDeliveriesMenu, DispatchFailuresMenu } from '../features/delivery/CenterDeliveryPages';
 import { PackingHandoverMenu } from '../features/delivery/PackingHandoverPage';
+import { ReturnHandoversMenu } from '../features/delivery/ReturnHandoverPage';
 import { InboundMenu } from '../features/inbound/InboundPages';
 import { InventoryMenu } from '../features/inventory/InventoryPages';
 import { LocationsMenu } from '../features/locations/LocationPages';
@@ -127,6 +128,7 @@ const menuPages: Partial<Record<MenuKey, ComponentType<{ readonly mfcId: string 
   packingHandover: PackingHandoverMenu,
   deliveries: CenterDeliveriesMenu,
   dispatchFailures: DispatchFailuresMenu,
+  returnHandovers: ReturnHandoversMenu,
   inbound: InboundMenu,
   inventory: InventoryMenu,
   quality: QualityMenu,
