@@ -105,7 +105,11 @@ class _TaskRunScreenState extends ConsumerState<TaskRunScreen> {
         state: uiStateOf(detail),
         onRetry: () => ref.invalidate(taskDetailProvider(id)),
         ready: (context, t) {
-          if (t.state == TaskState.assigned && t.kind != TaskKind.dispatch) {
+          // READY 도 시작을 보낸다: 배정 직후 fulfillment 는 배정 사건을 받기 전이라 잠깐 READY 다
+          // (2026-11-18 실서버 — 피킹 끝 → 패킹 배정 → "지금 할 수 없어요"). 서버 시작 판정은 READY·ASSIGNED 를 받고
+          // 배정자는 capacity 에 바로 묻는다(TaskRules.startRejection) — 내 배정이 아니면 NOT_ASSIGNEE 로 거절된다.
+          if ((t.state == TaskState.assigned || t.state == TaskState.ready) &&
+              t.kind != TaskKind.dispatch) {
             if (flow.phase == StartPhase.idle) _start(t);
           }
           final message = switch (flow.phase) {
@@ -115,6 +119,7 @@ class _TaskRunScreenState extends ConsumerState<TaskRunScreen> {
             StartPhase.clientError => l10n.startClientError,
             _
                 when t.state != TaskState.assigned &&
+                    t.state != TaskState.ready &&
                     t.state != TaskState.inProgress =>
               l10n.taskNotRunnable(taskStateText(l10n, t.state)),
             _ when t.state == TaskState.inProgress => l10n.startAlreadyStarted,

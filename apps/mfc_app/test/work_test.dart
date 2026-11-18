@@ -231,6 +231,39 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  testWidgets('피킹 끝 → 패킹 배정 직후 작업이 아직 READY 여도 시작해서 패킹이 열린다(배정 사건 늦음)', (t) async {
+    tasks.packReadyBeforeAssignmentEvent = true;
+    await pumpApp(t);
+    await tapKey(t, 'area-pickPack');
+    await tapKey(t, 'guide-ok');
+    await tapKey(t, 'run-task');
+
+    Future<void> scanTo(String id, String code) async {
+      await t.enterText(find.byKey(ValueKey(id)), code);
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await t.pumpAndSettle();
+    }
+
+    await scanTo('cart-scan', 'CRT-C-02');
+    for (final (loc, code) in [
+      ('C-S1-01-1-01', MockTaskRepository.yogurtBarcode),
+      ('C-S1-02-2-05', MockTaskRepository.milkBarcode),
+      ('C-S2-04-1-10', MockTaskRepository.milkBarcode),
+      ('F-S1-01-1-03', MockTaskRepository.dumplingBarcode),
+      ('A-S3-01-1-10', MockTaskRepository.chipsBarcode),
+    ]) {
+      await scanTo('pick-loc-scan', loc);
+      await scanTo('scan-field', code);
+    }
+    expect(tasks.taskJson('shp-1-PACK')['state'], 'READY');
+
+    await tapKey(t, 'to-pack');
+    expect(find.byKey(const ValueKey('start-message')), findsNothing);
+    expect(find.text('주문 order-seed-1 · 상품 4종 5개'), findsOneWidget);
+    expect(tasks.taskJson('shp-1-PACK')['state'], 'IN_PROGRESS');
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('검수: 줄 작업이 없으면 "지금 할 작업이 없어요" + 다시 받기', (t) async {
     await pumpApp(t);
     await tapKey(t, 'area-inspection');
