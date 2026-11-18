@@ -19,6 +19,7 @@ import { WorkersMenu } from '../features/workers/WorkerPages';
 import { PreparingPage } from '../features/menus/PreparingPage';
 import { LoginCallbackPage, LoginPage } from '../features/session/LoginPage';
 import { SessionPage } from '../features/session/SessionPage';
+import { MyInfoPage } from '../features/me/MyInfoPage';
 import { messages as m } from '../shared/messages';
 import { allMenus, centerPath, isWorkerOnly, navGroups, type MenuItem, type MenuKey } from './nav';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
@@ -48,6 +49,11 @@ function Layout() {
           <li>
             <NavLink to={session ? '/session' : '/login'}>{session ? m.nav.session : m.nav.login}</NavLink>
           </li>
+          {session && (
+            <li>
+              <NavLink to="/me">{m.nav.me}</NavLink>
+            </li>
+          )}
           {/* 센터가 정해져야 메뉴 주소가 생긴다(맡은 센터가 없으면 묶음을 보이지 않는다) */}
           {target &&
             !isWorkerOnly(session?.roles ?? []) &&
@@ -168,6 +174,7 @@ const routes = [
     children: [
       { index: true, element: guarded(<Home />) },
       { path: 'session', element: guarded(<SessionPage />) },
+      { path: 'me', element: guarded(<MyInfoPage />) },
       { path: 'c/:mfcId', element: guarded(<Home />) },
       // 메뉴 아래 화면(목록·상세·등록)은 메뉴 화면이 자기 Routes 로 나눈다
       ...allMenus.map((menu) => ({ path: `c/:mfcId/${menu.segment}/*`, element: guarded(<CenterScope menu={menu} />) })),

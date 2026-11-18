@@ -174,6 +174,11 @@
 | 해제 | `DELETE /operation-restrictions/{id}?approvalRef=` + `X-Expected-Version` → 202 | 활성일 때만. 해제는 늘 본사 승인 — 번호는 선택으로 보내고(비우면 query 없음) 없으면 422 승인 안내. APPLIED 면 "해제", 그 밖은 목록을 다시 읽어 상태로 |
 - 시간이 지나도 자동 해제하지 않는다(서버) — 화면 문구로 알린다. MFC_SUPERVISOR 가 아니면 서버 403.
 
+### 4-11. 내 정보 — hr-service `GET /hr/employees/me` (`features/me/MyInfoPage.tsx`, 2026-11-18 PC 3)
+- 왼쪽 메뉴 "내 세션" 아래 "내 정보"(`/me`, 센터와 상관없음). 이름·사번·운영자 ID·회사 메일(로그인 ID)·고용 형태·소속(센터/본사 부서)·상태 — 서버 값 그대로. 404 = 인사 기록 없음(오류 아님). LAN 에서 MFC_SUPERVISOR·MFC_WORKER 토큰 200(백엔드 확인 2026-11-18).
+- 사용자 결정(2026-11-18): 내 비밀번호는 본인이 직접(지금 + 새 비밀번호), 연락처(휴대폰·개인 메일)만 본인이 — 회사 메일은 인사팀만. 두 기능은 백엔드 EA-3·HR-3(PC 1) 대기라 "준비 중" 안내만(폼·요청 없음). 요청서 `docs/handoff/mfc-backoffice/2026-11-18-backend-my-account.md`.
+- 타입: 생성 목록에 `hr` 이 없어(`tools/web-tools/gen-api.mjs` — PC 2) 본인 조회 경로 하나를 계약 그대로 `src/api/hrSelf.ts` 에 옮겼다. 목록에 들어오면 `generated/hr` 로 바꾸고 파일을 지운다.
+
 ## 5. 목 모드
 - 목 계정: 센터 관리자(MFC 1곳 `MFC-BSN-01`), 센터 관리자(MFC 2곳 `MFC-BSN-01`·`MFC-SEL-01`), 현장 작업자, 운영 관리자(센터 없음). `src/mocks/db.ts`.
 - 목 핸들러:
