@@ -80,10 +80,8 @@ base class MockClaimsRepository
     }
     final order = orders?.orderJson(orderId);
     final status = order?['status'];
-    if (status == 'IN_DELIVERY' ||
-        status == 'PARTIALLY_DELIVERED' ||
-        status == 'COMPLETED' ||
-        status == 'CANCELLED') {
+    // 서버처럼 고객 취소는 상품 준비 전(CONFIRMED)만(claim 계약, ADR-0060). 주문을 모르면(목 밖) 막지 않는다.
+    if (status != null && status != 'CONFIRMED') {
       throw const ProblemFailure(
         Problem(status: 422, code: ClaimProblemCode.orderNotCancellable),
       );

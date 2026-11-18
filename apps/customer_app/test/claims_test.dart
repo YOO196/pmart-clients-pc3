@@ -302,6 +302,43 @@ void main() {
       expect(find.byKey(const ValueKey('cancel-order')), findsNothing);
     });
 
+    testWidgets('상품 준비(피킹)가 시작되면 취소 버튼 대신 안내 — 고객 취소는 CONFIRMED 만(ADR-0060)', (
+      t,
+    ) async {
+      orders.overrides['order-seed-4'] = {
+        ...orders.orderJson('order-seed-4')!,
+        'status': 'PREPARING',
+      };
+      await openOrder(t, 'order-seed-4');
+      expect(find.byKey(const ValueKey('cancel-order')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('cancel-closed-preparing')),
+        findsOneWidget,
+      );
+    });
+
+    test('목 서버도 CONFIRMED 가 아니면 422 ORDER_NOT_CANCELLABLE', () async {
+      orders.overrides['order-seed-4'] = {
+        ...orders.orderJson('order-seed-4')!,
+        'status': 'PREPARING',
+      };
+      await expectLater(
+        claims.requestCancel(
+          'order-seed-4',
+          const [CancelLine(orderLineId: 'ol-5', qty: 3)],
+          CancelReason.changeOfMind,
+          key: IdempotencyKey.generate(),
+        ),
+        throwsA(
+          isA<ProblemFailure>().having(
+            (f) => f.problem.code,
+            'code',
+            'ORDER_NOT_CANCELLABLE',
+          ),
+        ),
+      );
+    });
+
     testWidgets('주문 상세는 화면용 주문번호 8자리를 보이고, 없으면(변경 전 주문) orderId 를 보인다', (
       t,
     ) async {

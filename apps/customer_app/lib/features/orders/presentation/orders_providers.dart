@@ -46,11 +46,13 @@ final trackingReconnectDelayProvider = Provider<Duration Function(int attempt)>(
 bool canRequestTimeChange(OrderDetail o) =>
     o.deliveryMode == 'SCHEDULED' && o.status == OrderStatus.confirmed;
 
-/// 주문 취소(`POST /claims`) 진입을 보일지. 가능 여부는 서버가 최종 판정한다.
-bool canRequestCancel(OrderDetail o) => switch (o.status) {
-  OrderStatus.confirmed ||
-  OrderStatus.preparing ||
-  OrderStatus.partiallyHandedOver => true,
+/// 주문 취소(`POST /claims`) 진입을 보일지. 고객 취소는 상품 준비 전(CONFIRMED)만 받는다 —
+/// 피킹이 시작되면(PREPARING~) 422 ORDER_NOT_CANCELLABLE(claim 계약, ADR-0060). 가능 여부는 서버가 최종 판정한다.
+bool canRequestCancel(OrderDetail o) => o.status == OrderStatus.confirmed;
+
+/// 상품 준비가 시작돼 앱에서 취소할 수 없는 주문(받은 뒤 고객센터 반품 안내를 보인다).
+bool cancelClosedByPreparing(OrderDetail o) => switch (o.status) {
+  OrderStatus.preparing || OrderStatus.partiallyHandedOver => true,
   _ => false,
 };
 

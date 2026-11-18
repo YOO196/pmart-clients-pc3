@@ -730,6 +730,16 @@ class _OrderBody extends ConsumerWidget {
             key: const ValueKey('cancel-order'),
             onPressed: () => visit('/orders/${o.orderId}/cancel'),
             child: Text(l10n.cancelTitle),
+          )
+        else if (cancelClosedByPreparing(o))
+          // 피킹이 시작되면 앱에서 취소할 수 없다(ADR-0060) — 버튼 대신 안내.
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              l10n.cancelClosedPreparing,
+              key: const ValueKey('cancel-closed-preparing'),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ),
         // 고객센터 문의(주문을 고른 상태로). 접수일 뿐 주문을 바꾸지 않는다.
         OutlinedButton(
