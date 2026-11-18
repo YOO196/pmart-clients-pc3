@@ -32,6 +32,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `mfc-app/2026-11-17-backend-shipment-ready-at-npe.md` | **버그(급함)** 출고 조회 `GET /shipments/{id}` 가 READY 전(`ready_at` NULL)이면 500 — `TaskStore.shipmentReadyAt` NPE, 패킹 화면이 안 열림(S1·S2) |
 | `mfc-app/2026-11-18-backend-pick-then-pack-same-worker.md` | **급함** 피킹을 끝낸 사람에게 그 주문 PACK 을 먼저(R1~R3) — 지금은 다음 작업이 다른 주문 PICK 이라 한 주문 피패킹을 이어 갈 수 없다 |
 | `mfc-backoffice/2026-11-17-backend-lists-and-roles.md` | MFC 센터 관리자 웹 — 목록 API 전부(MB-1, 품질 대기 → 실사 → 입고 → 센터 재고·지난 추천 순), 품질 사고 구현(MB-2), 권한 결정(MB-3: 확인 필요 포장 관리자 허용, 정정·칸 변경 관리자만, 상품 취급 관리자+MD) |
+| `mfc-backoffice/2026-11-18-backend-my-account.md` | 직원 "내 정보" — R1 내 비밀번호 직접 바꾸기(지금 비밀번호 확인·잠금·비밀번호 기록 금지), R2 내 연락처(휴대폰·개인 메일) 등록·변경(회사 메일은 인사팀만), R3 센터 관리자로 `/hr/employees/me` 되는지 |
 | `all/2026-11-16-backend-login-code-pc1-only-done.md` | 클라이언트 표(경로 보탬) 확인 |
 | `customer-app/2026-11-16-backend-review-photos-and-inbox-done.md` | 리뷰 0.2.0(사진)·고객 알림함 0.2.0 반영 확인 — 실서버 확인은 배송 완료·고객 주문 뒤 |
 | `customer-app/2026-11-16-backend-review-edit-delete-done.md` | 리뷰 수정·삭제 화면 반영 확인, 빈 글 수정 질문 1개 — 실서버 확인은 배송 완료 뒤 |
