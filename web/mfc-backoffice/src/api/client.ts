@@ -7,6 +7,7 @@ import type { paths as ApprovalPaths } from './generated/approval';
 import type { paths as BffPaths } from './generated/backoffice-bff';
 import type { paths as CasePaths } from './generated/case';
 import type { paths as CenterPaths } from './generated/center-master';
+import type { paths as ExecutionPaths } from './generated/delivery-execution';
 import type { paths as HrPaths } from './generated/hr';
 import type { paths as CapacityPaths } from './generated/mfc-capacity';
 import type { paths as FulfillmentPaths } from './generated/mfc-fulfillment';
@@ -41,6 +42,8 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     approval: createClient<ApprovalPaths>(options),
     // 내 정보 — hr-service 본인 조회
     hr: createClient<HrPaths>(options),
+    // 반납 인증번호(delivery-execution 0.28.0) — 회수·반납 배송이 MFC 로 올 때 라이더에게 알려 줄 4자리
+    execution: createClient<ExecutionPaths>(options),
   };
 }
 

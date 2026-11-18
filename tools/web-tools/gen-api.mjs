@@ -26,8 +26,9 @@ const copies = [
     dir: join(repo, 'web/mfc-backoffice/src/api/generated'),
     // backoffice-bff·case: 우리 센터 배송 현황·배차 실패 사건(2026-11-16, bff 0.3.1·case 0.5.2)
     // approval: 본사 승인 번호 흐름(AP-1 — 422 APPROVAL_REQUIRED 뒤 change-requests·submissions, PC 3 요청 2026-11-17)
-    // hr: 직원 본인 조회 `GET /hr/employees/me`(MFC 백오피스 "내 정보" — #149, 2026-11-18)
-    services: ['approval', 'backoffice-bff', 'case', 'center-master', 'hr', 'mfc-capacity', 'mfc-fulfillment', 'mfc-inbound', 'mfc-inventory', 'mfc-location', 'mfc-quality'],
+    // hr: 직원 본인 조회 `GET /hr/employees/me`(MFC 백오피스 "내 정보" — #149, 2026-11-18)·운영자 이름 `employee-labels`(0.8.0)
+    // delivery-execution: 반납 인증번호 `GET /return-handovers?mfcId=`·새로 내기(0.28.0 — PC 3, 2026-11-19)
+    services: ['approval', 'backoffice-bff', 'case', 'center-master', 'delivery-execution', 'hr', 'mfc-capacity', 'mfc-fulfillment', 'mfc-inbound', 'mfc-inventory', 'mfc-location', 'mfc-quality'],
   },
 ];
 const excluded = ['/internal', '/webhooks', '/actuator'];

@@ -94,6 +94,14 @@ export const navGroups: readonly MenuGroup[] = [
         apiReady: ['배차 실패 사건 목록·상세(보기만)'],
         apiMissing: [],
       },
+      {
+        // 반납 인증번호(delivery-execution 0.28.0 — 2026-11-19 PC 3, PDA 와 같은 API)
+        key: 'returnHandovers',
+        segment: 'return-handovers',
+        ready: true,
+        apiReady: ['반납 기다리는 회수·반납 배송과 인증번호', '새 번호 내기(잠김 풀기)'],
+        apiMissing: [],
+      },
     ],
   },
   {

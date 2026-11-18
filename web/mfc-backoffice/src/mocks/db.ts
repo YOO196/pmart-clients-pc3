@@ -611,8 +611,28 @@ function seedGrants(): Array<[string, MockGrant]> {
   ];
 }
 
+/** 반납 인증번호(delivery-execution 0.28.0) — 센터별. 번호는 목 값 */
+export interface MockReturnHandover {
+  readonly mfcId: string;
+  readonly deliveryId: string;
+  readonly deliveryNumber: string | null;
+  readonly purpose: string | null;
+  readonly state: string;
+  readonly riderId: string | null;
+  readonly code: string;
+  readonly failedAttempts: number;
+  readonly locked: boolean;
+  readonly issuedAt: string;
+}
+
+const seedReturnHandovers = (): MockReturnHandover[] => [
+  { mfcId: 'MFC-BSN-01', deliveryId: 'DLV-RET-1', deliveryNumber: '30000001-2', purpose: 'CLAIM_RETURN', state: 'RETURN_PICKED_UP', riderId: 'RD-31', code: '4821', failedAttempts: 2, locked: false, issuedAt: '2026-11-19T01:00:00.000Z' },
+  { mfcId: 'MFC-BSN-01', deliveryId: 'DLV-RET-2', deliveryNumber: null, purpose: 'FAILED_DELIVERY_RETURN', state: 'ASSIGNED', riderId: 'RD-32', code: '1357', failedAttempts: 5, locked: true, issuedAt: '2026-11-19T00:20:00.000Z' },
+  { mfcId: 'MFC-SEL-01', deliveryId: 'DLV-RET-9', deliveryNumber: '30000009-2', purpose: 'MISDELIVERY_RECOVERY', state: 'RETURN_PICKED_UP', riderId: 'RD-39', code: '9999', failedAttempts: 0, locked: false, issuedAt: '2026-11-19T00:00:00.000Z' },
+];
+
 export const db = {
-  restrictions: new Map<string, MockRestriction>(),
+  returnHandovers: [] as MockReturnHandover[],  restrictions: new Map<string, MockRestriction>(),
   decisions: new Map<string, MockDecision>(),
   disposals: new Map<string, MockDisposal>(),
   inspections: new Map<string, MockInspection>(),
@@ -649,6 +669,7 @@ export const db = {
 };
 
 export function resetDb(): void {
+  db.returnHandovers = seedReturnHandovers();
   db.grants = new Map(seedGrants());
   db.suspended = new Set();
   db.sessions = new Map();
