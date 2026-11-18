@@ -166,6 +166,37 @@ final class NextUnknown extends NextTaskOutcome {
   const NextUnknown();
 }
 
+/// 휴게 시작 결과 — 작업자 본인 휴게는 센터 관리자 4자리 번호가 있어야 한다(사용자 2026-11-18).
+/// 번호 확인은 서버가 한다(요청 `docs/handoff/mfc-app/2026-11-18-backend-break-supervisor-pin.md`).
+/// 앱은 번호를 저장·기록하지 않는다.
+@immutable
+sealed class BreakStartOutcome {
+  const BreakStartOutcome();
+}
+
+final class BreakStarted extends BreakStartOutcome {
+  const BreakStarted();
+}
+
+/// 서버가 거절(확정) — 번호 틀림·잠김·번호 미설정 등. code 로 안내한다.
+final class BreakRejected extends BreakStartOutcome {
+  const BreakRejected(this.code);
+
+  final String code;
+}
+
+/// 서버 계약에 관리자 번호가 아직 없다 — 보내지 않는다(번호 없이 휴게를 열지 않음).
+final class BreakPinUnsupported extends BreakStartOutcome {
+  const BreakPinUnsupported();
+}
+
+/// 휴게 번호 거절 코드 — 요청 중(계약 확정 전 가칭).
+abstract final class BreakProblemCode {
+  static const pinInvalid = 'BREAK_PIN_INVALID';
+  static const pinLocked = 'BREAK_PIN_LOCKED';
+  static const pinNotSet = 'BREAK_PIN_NOT_SET';
+}
+
 abstract final class WorkProblemCode {
   static const noTaskAvailable = 'NO_TASK_AVAILABLE';
   static const onBreak = 'ON_BREAK';

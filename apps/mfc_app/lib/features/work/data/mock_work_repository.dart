@@ -50,6 +50,13 @@ final class MockWorkRepository implements WorkRepository {
   final Set<String> allowed;
   bool onBreak = false;
 
+  /// 목 센터 관리자 휴게 번호(실서버 번호 아님). null = 미설정.
+  String? breakPin = '1234';
+
+  /// 연속으로 틀린 횟수 — 5번이면 잠김.
+  int breakPinFailures = 0;
+  int breakStartCalls = 0;
+
   /// 시험용: 다음 작업 받기를 이 코드로 거절한다(예 WORKER_NOT_ACTIVE).
   String? nextRejectCode;
   int nextCalls = 0;
@@ -341,13 +348,31 @@ final class MockWorkRepository implements WorkRepository {
   }
 
   @override
-  Future<void> startBreak(
+  Future<BreakStartOutcome> startBreak(
     String mfcId,
     String workerId, {
+    required String supervisorPin,
     required IdempotencyKey key,
   }) async {
     await _wait();
+    breakStartCalls++;
+    if (breakPin == null) {
+      return const BreakRejected(BreakProblemCode.pinNotSet);
+    }
+    if (breakPinFailures >= 5) {
+      return const BreakRejected(BreakProblemCode.pinLocked);
+    }
+    if (supervisorPin != breakPin) {
+      breakPinFailures++;
+      return BreakRejected(
+        breakPinFailures >= 5
+            ? BreakProblemCode.pinLocked
+            : BreakProblemCode.pinInvalid,
+      );
+    }
+    breakPinFailures = 0;
     onBreak = true;
+    return const BreakStarted();
   }
 
   @override

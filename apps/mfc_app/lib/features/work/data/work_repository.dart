@@ -23,9 +23,11 @@ abstract interface class WorkRepository {
     required IdempotencyKey key,
   });
 
-  Future<void> startBreak(
+  /// 휴게 시작 — 센터 관리자 4자리 번호(서버가 확인).
+  Future<BreakStartOutcome> startBreak(
     String mfcId,
     String workerId, {
+    required String supervisorPin,
     required IdempotencyKey key,
   });
 
@@ -122,20 +124,16 @@ final class ApiWorkRepository implements WorkRepository {
     }
   }
 
+  /// mfc-capacity 계약의 휴게 시작에는 관리자 번호가 없다 — 번호 없이 보내면 작업자가 혼자 휴게를 열 수 있으므로
+  /// 보내지 않는다. 계약에 들어오면 여기서 `startWorkerBreak` 에 번호를 실어 보낸다
+  /// (요청 `docs/handoff/mfc-app/2026-11-18-backend-break-supervisor-pin.md`).
   @override
-  Future<void> startBreak(
+  Future<BreakStartOutcome> startBreak(
     String mfcId,
     String workerId, {
+    required String supervisorPin,
     required IdempotencyKey key,
-  }) => pmartGuard(
-    () => _workers.startWorkerBreak(
-      mfcId: mfcId,
-      workerId: workerId,
-      idempotencyKey: key.value,
-      xSourceSystem: sourceSystem,
-      extra: commandOptions(key).extra,
-    ),
-  );
+  }) async => const BreakPinUnsupported();
 
   @override
   Future<void> endBreak(

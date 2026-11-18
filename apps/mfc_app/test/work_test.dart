@@ -231,7 +231,9 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
-  testWidgets('피킹 끝 → 패킹 배정 직후 작업이 아직 READY 여도 시작해서 패킹이 열린다(배정 사건 늦음)', (t) async {
+  testWidgets('피킹 끝 → 패킹 배정 직후 작업이 아직 READY 여도 시작해서 패킹이 열린다(배정 사건 늦음)', (
+    t,
+  ) async {
     tasks.packReadyBeforeAssignmentEvent = true;
     await pumpApp(t);
     await tapKey(t, 'area-pickPack');
@@ -283,9 +285,66 @@ void main() {
     expect(find.byKey(const ValueKey('assigned-task-mock-1')), findsOneWidget);
   });
 
+  Future<void> enterPin(WidgetTester t, String pin) async {
+    await t.enterText(find.byKey(const ValueKey('break-pin')), pin);
+    await t.pump();
+    await tapKey(t, 'break-pin-ok');
+  }
+
+  testWidgets('휴게는 관리자 번호 4자리 — 틀리면 휴게 안 됨, 맞으면 휴게 중, 끝은 번호 없이', (t) async {
+    await pumpApp(t);
+    await tapKey(t, 'menu-break');
+    expect(find.byKey(const ValueKey('break-pin-dialog')), findsOneWidget);
+    // 4자리 전에는 누를 수 없다.
+    await t.enterText(find.byKey(const ValueKey('break-pin')), '12');
+    await t.pump();
+    expect(
+      t
+          .widget<FilledButton>(find.byKey(const ValueKey('break-pin-ok')))
+          .onPressed,
+      isNull,
+    );
+    await enterPin(t, '9999');
+    expect(find.text('번호가 맞지 않아요. 다시 입력해 주세요'), findsOneWidget);
+    expect(work.onBreak, isFalse);
+    // 틀린 번호는 지운다.
+    expect(
+      t
+          .widget<TextField>(find.byKey(const ValueKey('break-pin')))
+          .controller!
+          .text,
+      '',
+    );
+    await enterPin(t, '1234');
+    expect(find.byKey(const ValueKey('break-pin-dialog')), findsNothing);
+    expect(work.onBreak, isTrue);
+    expect(find.text('휴게 중'), findsOneWidget);
+    // 휴게 끝은 번호 없이.
+    await tapKey(t, 'menu-break');
+    expect(find.byKey(const ValueKey('break-pin-dialog')), findsNothing);
+    expect(work.onBreak, isFalse);
+  });
+
+  testWidgets('관리자 번호 5번 틀리면 잠김 — 창은 더 받지 않는다', (t) async {
+    await pumpApp(t);
+    await tapKey(t, 'menu-break');
+    for (var i = 0; i < 5; i++) {
+      await enterPin(t, '0000');
+    }
+    expect(find.text('여러 번 틀려 잠겼어요. 센터 관리자에게 휴게를 요청해 주세요'), findsOneWidget);
+    expect(
+      t.widget<TextField>(find.byKey(const ValueKey('break-pin'))).enabled,
+      isFalse,
+    );
+    expect(work.breakStartCalls, 5);
+    await tapKey(t, 'break-pin-cancel');
+    expect(work.onBreak, isFalse);
+  });
+
   testWidgets('휴게 중에는 업무를 눌러도 안내로 가지 않는다', (t) async {
     await pumpApp(t);
     await tapKey(t, 'menu-break');
+    await enterPin(t, '1234');
     expect(find.text('휴게 중'), findsOneWidget);
     await tapKey(t, 'area-pickPack');
     expect(find.byKey(const ValueKey('guide')), findsNothing);
@@ -361,6 +420,18 @@ void main() {
       expect(await next(), isA<NextUnknown>());
       final req = adapter.requests.first;
       expect(req.uri.path, '/api/v1/mfcs/MFC-1/workers/w-1/next-tasks');
+      // 계약에 관리자 번호가 없으니 휴게 시작은 보내지 않는다(번호 없이 휴게가 열리면 안 됨).
+      final n = adapter.requests.length;
+      expect(
+        await r.startBreak(
+          'MFC-1',
+          'w-1',
+          supervisorPin: '1234',
+          key: IdempotencyKey('k-b'),
+        ),
+        isA<BreakPinUnsupported>(),
+      );
+      expect(adapter.requests, hasLength(n));
       expect(req.method, 'POST');
       expect(req.headers['Idempotency-Key'], 'k-1');
       // 고른 업무를 본문으로 보낸다(mfc-capacity 0.13.0, BR-52 R1).
