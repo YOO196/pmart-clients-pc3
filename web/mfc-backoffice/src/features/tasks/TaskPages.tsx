@@ -3,7 +3,7 @@
 // - 상세 `GET /tasks/{taskId}`(줄·확정 대기·막힌 이유). 완료량은 서버 확정값만.
 // - 내놓기 `POST /tasks/{id}/releases` {workerId = 지금 담당, reason} — ASSIGNED·IN_PROGRESS 만, 진행 중 실적이면 409 EXECUTION_IN_FLIGHT, 503 은 결과 불명(같은 키).
 // - 출하 `GET /shipments/{id}`(포장·인계 허가), 포장 인계 판정 `GET /packages/{id}/handover-resolution`(누를 때만).
-// - 확인 필요 포장 목록·확인(`GET /packages?checkRequired=true`, `handover-checks`)은 지금 MFC_WORKER 만 — 백엔드 결정(MB-3) 전에는 안내만.
+// - 확인 필요 포장 목록·확인(`GET /packages?checkRequired=true`, `handover-checks`) — 센터 관리자도(MB-3, fulfillment 0.17.0). `HandoverChecks.tsx`.
 // - 늦음·멈춤은 서버 표시값 — 화면이 계산하지 않고, 자동으로 빼앗는 버튼도 없다.
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -16,6 +16,7 @@ import type { components } from '../../api/generated/mfc-fulfillment';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
+import { HandoverChecks } from './HandoverChecks';
 
 const m = messages.tasks;
 
@@ -104,9 +105,7 @@ function TaskListPage({ mfcId }: { readonly mfcId: string }) {
     <section className="space-y-4">
       <h1 className="text-xl font-bold">{messages.menus.tasks}</h1>
       <p className="text-sm opacity-70">{m.intro}</p>
-      <p role="note" className="alert text-sm">
-        {m.checkByWorker}
-      </p>
+      <HandoverChecks mfcId={mfcId} />
       <form className="flex flex-wrap items-end gap-2 rounded-box bg-base-100 p-3 text-sm" onSubmit={(e) => e.preventDefault()}>
         <label className="flex flex-col gap-1">
           {m.type}

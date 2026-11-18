@@ -113,7 +113,7 @@ describe('배정 추천', () => {
 
   it('계산 → 추천 화면(배정은 아직 그대로) → 확정하면 배정이 생긴다', async () => {
     const view = renderAt('/c/MFC-BSN-01/assignments?tab=plan');
-    expect(await screen.findByText(/지난 추천 목록은 서버 API 가 아직 없어요/)).toBeInTheDocument();
+    expect(await within(await screen.findByTestId('list-plans')).findByText('조건에 맞는 항목이 없어요')).toBeInTheDocument();
     const post = await calculate(view);
     expect(await sentBody(post)).toEqual({ mfcId: 'MFC-BSN-01', horizonMinutes: 60 });
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('추천됨(확정 전)');

@@ -132,7 +132,7 @@ describe('초기 보유·회수품·공급 요청', () => {
   it('초기 보유: 승인 ID 로 찾고, 이 센터 것만 받는다 — 접수 뒤 상태를 다시 읽어 보인다', async () => {
     const view = renderAt('/c/MFC-BSN-01/inbound?tab=initial');
     await userEvent.type(await screen.findByRole('textbox', { name: '승인 ID' }), 'AP-INIT-1');
-    await userEvent.click(screen.getByRole('button', { name: '열기' }));
+    await userEvent.click(within(screen.getByRole('form', { name: '승인 ID' })).getByRole('button', { name: '열기' }));
     const cards = await screen.findAllByTestId('initial-load');
     expect(cards).toHaveLength(2);
     expect(within(cards[1]!).getByText(/다른 센터의 입고 예정이에요/)).toBeInTheDocument();

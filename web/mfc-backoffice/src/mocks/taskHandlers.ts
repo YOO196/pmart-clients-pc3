@@ -4,7 +4,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
-import { db, type MockTask } from './db';
+import { db, type MockShipment, type MockTask } from './db';
 import { idempotent, operator, problem, unauthorized } from './support';
 
 const canAccess = (request: Request, mfcId: string) => operator(request)?.centers.includes(mfcId) ?? false;
@@ -40,6 +40,31 @@ function found(request: Request, taskId: string): MockTask | HttpResponse<Record
   if (!t) return problem(404, 'NOT_FOUND');
   if (!canAccess(request, t.mfcId)) return problem(403, 'FORBIDDEN');
   return t;
+}
+
+
+type Pkg = NonNullable<MockShipment['packages']>[number];
+
+/** 포장 인계 판정(HandoverResolution) — 판정 조회·확인 필요 목록·확인 응답이 같이 쓴다. */
+function resolutionOf(s: MockShipment, p: Pkg) {
+  return {
+    packageId: p.packageId,
+    packageVersion: p.packageVersion,
+    packageState: p.state,
+    verdict: p.state === 'HANDED_OVER' ? ('HANDED_OVER' as const) : ('READY' as const),
+    fence: p.fence,
+    handoverId: null,
+    inventoryCommitId: null,
+    inventoryApplyStatus: 'NOT_REQUESTED' as const,
+    stopRequestId: null,
+    checkRequired: p.state === 'SEALED' && p.fence?.state === 'EXPIRED',
+    shipmentId: s.shipmentId,
+    orderId: s.orderId,
+    packingLocation: 'PAK-C-01',
+    riderId: p.fence?.riderId ?? null,
+    lastCheck: null,
+    asOf: asOf(),
+  };
 }
 
 export const taskHandlers = [
@@ -103,24 +128,36 @@ export const taskHandlers = [
     const p = s?.packages?.find((x) => x.packageId === id);
     if (!s || !p) return problem(404, 'NOT_FOUND');
     if (!canAccess(request, s.mfcId)) return problem(403, 'FORBIDDEN');
-    const expired = p.fence?.state === 'EXPIRED';
-    return HttpResponse.json({
-      packageId: id,
-      packageVersion: p.packageVersion,
-      packageState: p.state,
-      verdict: p.state === 'HANDED_OVER' ? 'HANDED_OVER' : 'READY',
-      fence: p.fence,
-      handoverId: null,
-      inventoryCommitId: null,
-      inventoryApplyStatus: 'NOT_REQUESTED',
-      stopRequestId: null,
-      checkRequired: expired,
-      shipmentId: s.shipmentId,
-      orderId: s.orderId,
-      packingLocation: 'PAK-C-01',
-      riderId: p.fence?.riderId ?? null,
-      lastCheck: null,
-      asOf: asOf(),
+    return HttpResponse.json(resolutionOf(s, p));
+  }),
+
+  // 확인 필요 포장(MB-3 — 그 센터 작업자·센터 관리자): 인계 허가가 끝났는데(EXPIRED) 확정 없는 밀봉 포장.
+  http.get(`${API_BASE}/packages`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    const q = new URL(request.url).searchParams;
+    const mfcId = q.get('mfcId') ?? '';
+    if (q.get('checkRequired') !== 'true') return problem(400, 'VALIDATION_FAILED', [{ field: 'checkRequired', reason: 'NOT_ALLOWED' }]);
+    if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
+    const items = [...db.shipments.values()]
+      .filter((s) => s.mfcId === mfcId)
+      .flatMap((s) => (s.packages ?? []).filter((p) => p.state === 'SEALED' && p.fence?.state === 'EXPIRED').map((p) => resolutionOf(s, p)));
+    return HttpResponse.json({ items, asOf: asOf() });
+  }),
+
+  http.post(`${API_BASE}/packages/:packageId/handover-checks`, async ({ request, params }) => {
+    if (!operator(request)) return unauthorized();
+    const id = String(params.packageId);
+    const s = [...db.shipments.values()].find((x) => x.packages?.some((p) => p.packageId === id));
+    const p = s?.packages?.find((x) => x.packageId === id);
+    if (!s || !p) return problem(404, 'NOT_FOUND');
+    if (!canAccess(request, s.mfcId)) return problem(403, 'FORBIDDEN');
+    const body = (await request.json()) as { result: 'AT_STATION' | 'TAKEN_BY_RIDER' };
+    return idempotent(request, () => {
+      if (p.fence?.state === 'HANDOVER_IN_PROGRESS') return problem(409, 'FENCE_ACTIVE');
+      if (p.fence?.state !== 'EXPIRED') return problem(409, 'INVALID_STATE');
+      const next = body.result === 'TAKEN_BY_RIDER' ? { ...p, state: 'HANDED_OVER' as const, fence: { ...p.fence, state: 'COMMITTED' as const }, handedOverAt: new Date().toISOString() } : { ...p, fence: { ...p.fence, state: 'NONE' as const } };
+      s.packages = (s.packages ?? []).map((x) => (x.packageId === id ? next : x));
+      return { status: 200, body: resolutionOf(s, next) };
     });
   }),
 ];

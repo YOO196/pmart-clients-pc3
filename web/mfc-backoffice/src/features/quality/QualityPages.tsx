@@ -2,9 +2,9 @@
 // 탭(URL 쿼리 `tab`): 격리·해제(기본) · 폐기 · 회수품 검수 · 품질 사고(계약만 — 안내).
 // - 판정 `POST /quality-decisions`(202 CommandResponse): QUARANTINE 은 바로 반영(APPLIED·REJECTED·UNKNOWN_RESULT), RELEASE 는 요청만(ACCEPTED → 판정 REQUESTED).
 //   해제 승인·반려 `POST /quality-decisions/{id}/approvals`(요청자 본인 불가 — 422 SELF_APPROVAL). 조회 `GET /quality-decisions/{id}`.
-// - 폐기 `POST /disposal-approvals` {action REQUEST|APPROVE|REJECT}(APPROVE 는 approvalRef 필수 — 직접 입력, 사용자 2026-11-16), 실행 `POST …/{id}/executions`(남은 승인량 이하).
+// - 폐기 `POST /disposal-approvals` {action REQUEST|APPROVE|REJECT}(APPROVE 의 approvalRef 는 선택 — 없으면 422 APPROVAL_REQUIRED 흐름, AP-1), 실행 `POST …/{id}/executions`(남은 승인량 이하).
 // - 회수품 검수 `POST /return-inspections` — 반입(inbound `GET /return-receipts/{id}`)을 불러와 줄마다 재판매/폐기. 재판매는 상온·미개봉·신선 아님만(서버도 422).
-// 승인 대기·폐기·검수 목록 API 는 없다(MB-1) — 번호로 연다. 접수(ACCEPTED)를 완료로 보이지 않고 다시 읽은 상태를 보인다.
+// 목록(MB-1, quality 0.5.0): 판정·폐기·검수 `GET …?mfcId=&state=` — 탭 위 목록에서 열기(기본 = 해제 승인 대기·폐기 승인 대기). 검수 탭에는 회수품 반입 목록(inbound, 검수 상태)도. 접수(ACCEPTED)를 완료로 보이지 않고 다시 읽은 상태를 보인다.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -16,6 +16,7 @@ import type { components } from '../../api/generated/mfc-quality';
 import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
 import { ApprovalAwareFeedback, ApprovalRefInput } from '../../shared/approval';
+import { DecisionList, DisposalList, InspectionList, ReturnReceiptList } from '../lists/CenterLists';
 import { messages } from '../../shared/messages';
 
 const m = messages.quality;
@@ -74,7 +75,14 @@ export function QualityMenu({ mfcId }: { readonly mfcId: string }) {
           </button>
         ))}
       </div>
-      {tab !== 'incidents' && <p className="text-xs opacity-70">{m.listMissing}</p>}
+      {tab === 'decisions' && <DecisionList mfcId={mfcId} />}
+      {tab === 'disposals' && <DisposalList mfcId={mfcId} />}
+      {tab === 'inspections' && (
+        <>
+          <ReturnReceiptList mfcId={mfcId} title={messages.lists.pendingReceipts} />
+          <InspectionList mfcId={mfcId} />
+        </>
+      )}
       {tab === 'decisions' && <DecisionsTab mfcId={mfcId} />}
       {tab === 'disposals' && <DisposalsTab mfcId={mfcId} />}
       {tab === 'inspections' && <InspectionsTab mfcId={mfcId} />}

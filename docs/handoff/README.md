@@ -33,7 +33,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `mfc-app/2026-11-18-backend-pick-then-pack-same-worker.md` | **급함** 피킹을 끝낸 사람에게 그 주문 PACK 을 먼저(R1~R3) — 지금은 다음 작업이 다른 주문 PICK 이라 한 주문 피패킹을 이어 갈 수 없다 |
 | `mfc-app/2026-11-18-backend-break-supervisor-pin.md` | 휴게 관리자 번호(B1·B2)·근무 휴게 구간 자동 휴게(B3) — **모두 수용 회신**(`clients/mfc-app/2026-11-18-reply-break-supervisor-pin.md`, mfc-capacity 0.20.0). PDA(#136)·mfc-backoffice(#141) 반영, 게이트웨이 `break-pin` 라우트 있음(백엔드 PR #196). 남은 것: LAN 에서 센터 번호 정하고 PDA 실기기 확인 |
 | `mfc-app/2026-11-18-rider-app-return-handover-screen.md` | (rider-app PC 5 → mfc-app) PDA 반납 인증번호 화면 — 요청 1·2 PDA 반영(`mfc-app/return-handover-code`). 남은 것: 라이더 앱 실기기 확인, PC 1 `return-handover.required` 켜기, 요청 3 mfc-backoffice 목록 |
-| `mfc-backoffice/2026-11-17-backend-lists-and-roles.md` | MFC 센터 관리자 웹 — 목록 API 전부(MB-1, 품질 대기 → 실사 → 입고 → 센터 재고·지난 추천 순), 품질 사고 구현(MB-2), 권한 결정(MB-3: 확인 필요 포장 관리자 허용, 정정·칸 변경 관리자만, 상품 취급 관리자+MD) |
+| `mfc-backoffice/2026-11-17-backend-lists-and-roles.md` | 회신 `clients/mfc-backoffice/2026-11-18-reply-lists-and-roles.md` — MB-1 목록 9개·MB-3 확인 필요 포장 관리자 **화면 반영**(`mfc-backoffice/mb1-lists`, 2026-11-19). 남은 것: MB-2 품질 사고(백엔드가 사용자 질문 5개 — 답 필요), LAN 확인(`stock-units` 게이트웨이 라우트) |
 | `mfc-backoffice/2026-11-18-backend-my-account.md` | 직원 "내 정보" — R1 내 비밀번호 직접 바꾸기(지금 비밀번호 확인·잠금·비밀번호 기록 금지), R2 내 연락처(휴대폰·개인 메일) 등록·변경(회사 메일은 인사팀만), R3 센터 관리자로 `/hr/employees/me` 되는지 |
 | `all/2026-11-16-backend-login-code-pc1-only-done.md` | 클라이언트 표(경로 보탬) 확인 |
 | `customer-app/2026-11-16-backend-review-photos-and-inbox-done.md` | 리뷰 0.2.0(사진)·고객 알림함 0.2.0 반영 확인 — 실서버 확인은 배송 완료·고객 주문 뒤 |
