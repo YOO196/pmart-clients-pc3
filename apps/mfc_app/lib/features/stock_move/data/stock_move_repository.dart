@@ -31,15 +31,19 @@ abstract interface class StockMoveRepository {
   /// `POST /return-receipts` — 회수품 실물 반입(격리). 202 resultId = returnReceiptId.
   Future<FieldOutcome<String?>> receiveReturn({
     required String mfcId,
-    required String claimId,
-    required String returnPickupId,
     required String toLocationCode,
     required String receivedBy,
     required DateTime receivedAt,
-    required List<ReturnReceiptLine> lines,
+    String? arrivalId,
+    String? claimId,
+    String? returnPickupId,
+    List<ReturnReceiptLine>? lines,
     String? orderId,
     required IdempotencyKey key,
   });
+
+  /// `GET /return-arrivals?mfcId=&state=WAITING` — 반납 도착 대기(오래된 순).
+  Future<List<ReturnArrival>> returnArrivals(String mfcId);
 
   /// `GET /return-receipts/{id}`.
   Future<ReturnReceiptView> returnReceipt(String returnReceiptId);
@@ -112,14 +116,41 @@ final class ApiStockMoveRepository implements StockMoveRepository {
   );
 
   @override
+  Future<List<ReturnArrival>> returnArrivals(String mfcId) async {
+    final res = await pmartGuard(
+      () => _returns.listReturnArrivals(mfcId: mfcId, state: 'WAITING'),
+    );
+    final items =
+        res.data?.items ?? (throw const ContractViolationFailure('items 없음'));
+    return [
+      for (final a in items)
+        ReturnArrival(
+          arrivalId: a.arrivalId,
+          purpose: a.purpose.value,
+          arrivedAt: a.arrivedAt,
+          hasClaim: a.claimId != null,
+          lines: [
+            for (final l in a.lines)
+              ReturnArrivalLine(
+                sku: l.sku ?? '-',
+                qty: l.qty,
+                productName: l.productName,
+              ),
+          ],
+        ),
+    ];
+  }
+
+  @override
   Future<FieldOutcome<String?>> receiveReturn({
     required String mfcId,
-    required String claimId,
-    required String returnPickupId,
     required String toLocationCode,
     required String receivedBy,
     required DateTime receivedAt,
-    required List<ReturnReceiptLine> lines,
+    String? arrivalId,
+    String? claimId,
+    String? returnPickupId,
+    List<ReturnReceiptLine>? lines,
     String? orderId,
     required IdempotencyKey key,
   }) async {
@@ -130,23 +161,26 @@ final class ApiStockMoveRepository implements StockMoveRepository {
           xSourceSystem: sourceSystem,
           recordReturnReceiptRequest: ib.RecordReturnReceiptRequest(
             mfcId: mfcId,
+            arrivalId: arrivalId,
             claimId: claimId,
             returnPickupId: returnPickupId,
             toLocationCode: toLocationCode,
             orderId: orderId,
             receivedAt: receivedAt.toUtc(),
             receivedBy: receivedBy,
-            lines: [
-              for (final l in lines)
-                ib.RecordReturnReceiptRequestLinesInner(
-                  orderLineId: l.orderLineId,
-                  sku: l.sku,
-                  qty: l.qty,
-                  sourceLotRef: l.sourceLotRef,
-                  expiryDate: l.expiryDate,
-                  conditionNote: l.conditionNote,
-                ),
-            ],
+            lines: lines == null
+                ? null
+                : [
+                    for (final l in lines)
+                      ib.RecordReturnReceiptRequestLinesInner(
+                        orderLineId: l.orderLineId,
+                        sku: l.sku,
+                        qty: l.qty,
+                        sourceLotRef: l.sourceLotRef,
+                        expiryDate: l.expiryDate,
+                        conditionNote: l.conditionNote,
+                      ),
+                  ],
           ),
           extra: commandOptions(key).extra,
         ),
@@ -172,8 +206,7 @@ final class ApiStockMoveRepository implements StockMoveRepository {
       inspected: r.inspectionState?.value == 'INSPECTED',
       claimId: r.claimId,
       lines: [
-        for (final l
-            in r.lines ?? const <ib.ReturnReceiptLinesInner>[])
+        for (final l in r.lines ?? const <ib.ReturnReceiptLinesInner>[])
           ReturnedLine(
             sku: l.sku ?? (throw const ContractViolationFailure('sku 없음')),
             qty: l.qty ?? (throw const ContractViolationFailure('qty 없음')),

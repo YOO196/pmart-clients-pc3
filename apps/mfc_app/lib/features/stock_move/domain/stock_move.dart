@@ -151,3 +151,41 @@ abstract final class MoveProblemCode {
   static const notAssignee = 'NOT_ASSIGNEE';
   static const notPicker = 'NOT_PICKER';
 }
+
+/// 반납 도착 대기 건(mfc-inbound 0.13.0 `GET /return-arrivals` — 백엔드 요청 clients/mfc-app/2026-11-19-request-return-arrivals).
+/// 라이더가 회수품을 센터에 반납하면 서버가 만든다. 점원은 여기서 골라 반입한다(claimId 를 손으로 넣지 않는다).
+@immutable
+class ReturnArrival {
+  const ReturnArrival({
+    required this.arrivalId,
+    required this.purpose,
+    required this.arrivedAt,
+    required this.lines,
+    this.hasClaim = false,
+  });
+
+  final String arrivalId;
+
+  /// CLAIM_RETURN·MISDELIVERY_RECOVERY·FAILED_DELIVERY_RETURN(모르는 값은 그대로).
+  final String purpose;
+  final DateTime arrivedAt;
+  final List<ReturnArrivalLine> lines;
+
+  /// 고객 반품 클레임이 있는지 — 없으면(오배송 회수·전달 실패 반납) 검수가 환불로 이어지지 않는다.
+  final bool hasClaim;
+
+  int get totalQty => lines.fold(0, (a, l) => a + l.qty);
+}
+
+@immutable
+class ReturnArrivalLine {
+  const ReturnArrivalLine({
+    required this.sku,
+    required this.qty,
+    this.productName,
+  });
+
+  final String sku;
+  final int qty;
+  final String? productName;
+}

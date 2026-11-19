@@ -127,6 +127,9 @@ void main() {
     expect(find.byKey(const ValueKey('rh-code-dlv-ret-1')), findsOneWidget);
     expect(find.text('4821'), findsOneWidget);
     expect(find.text('배송 번호: D-1118-0042'), findsOneWidget);
+    // 라이더 ID(r-7) 대신 가린 이름·라이더 번호(ADR-0070).
+    expect(find.text('라이더: 김*수 · 482913'), findsOneWidget);
+    expect(find.textContaining('r-7'), findsNothing);
     expect(find.text('라이더가 1번 틀렸어요'), findsOneWidget);
     // 잠긴 배송은 번호 대신 잠김 안내.
     expect(find.byKey(const ValueKey('rh-locked-dlv-ret-2')), findsOneWidget);

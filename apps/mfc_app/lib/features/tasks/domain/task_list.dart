@@ -270,7 +270,9 @@ final class StartClientError extends StartOutcome {
 }
 
 /// 결품·파손·차단 보고 사유.
-enum ShortageReason { short, damaged, blocked }
+/// 결품 사유 — 실적 `shortage.reason`(SHORT·DAMAGED·SPOILED·BLOCKED). SPOILED 변질은 fulfillment 0.22.0
+/// (백엔드 요청 clients/mfc-app/2026-11-19-request-spoiled-shortage) — 파손처럼 LOT 격리 + 품질 사고(SPOILAGE) 자동.
+enum ShortageReason { short, damaged, spoiled, blocked }
 
 abstract final class TaskProblemCode {
   static const alreadyStarted = 'ALREADY_STARTED';

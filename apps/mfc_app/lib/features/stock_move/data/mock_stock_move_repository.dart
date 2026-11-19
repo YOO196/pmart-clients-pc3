@@ -160,20 +160,88 @@ final class MockStockMoveRepository implements StockMoveRepository {
     return _keys[key.value] = FieldDone(n);
   }
 
+  /// 반납 도착 대기(목). 반입하면 빠진다. ARR-mock-2 는 오배송 회수(클레임 없음).
+  final arrivals = <ReturnArrival>[
+    ReturnArrival(
+      arrivalId: 'ARR-mock-1',
+      purpose: 'CLAIM_RETURN',
+      arrivedAt: DateTime.utc(2026, 11, 10, 2, 40),
+      hasClaim: true,
+      lines: const [
+        ReturnArrivalLine(sku: 'E-00000001', qty: 2, productName: '서울우유 1L'),
+        ReturnArrivalLine(
+          sku: 'E-00000005',
+          qty: 1,
+          productName: '감자칩 오리지널 110g',
+        ),
+      ],
+    ),
+    ReturnArrival(
+      arrivalId: 'ARR-mock-2',
+      purpose: 'MISDELIVERY_RECOVERY',
+      arrivedAt: DateTime.utc(2026, 11, 10, 2, 55),
+      lines: const [
+        ReturnArrivalLine(
+          sku: 'E-00000002',
+          qty: 1,
+          productName: '그릭요거트 플레인 400g',
+        ),
+      ],
+    ),
+  ];
+
+  /// 반입 본문(시험용) — 키마다.
+  final receivedBodies =
+      <
+        String,
+        ({String? arrivalId, String to, List<ReturnReceiptLine>? lines})
+      >{};
+
+  /// 이미 다른 사람이 반입한 대기 건(409 ARRIVAL_ALREADY_RECEIVED).
+  final takenArrivals = <String>{};
+
+  /// 다음 반입 응답을 잃는다(서버는 반영).
+  bool loseNextReturnResponse = false;
+
+  @override
+  Future<List<ReturnArrival>> returnArrivals(String mfcId) async {
+    await _wait();
+    return [...arrivals];
+  }
+
   @override
   Future<FieldOutcome<String?>> receiveReturn({
     required String mfcId,
-    required String claimId,
-    required String returnPickupId,
     required String toLocationCode,
     required String receivedBy,
     required DateTime receivedAt,
-    required List<ReturnReceiptLine> lines,
+    String? arrivalId,
+    String? claimId,
+    String? returnPickupId,
+    List<ReturnReceiptLine>? lines,
     String? orderId,
     required IdempotencyKey key,
   }) async {
     await _wait();
-    return FieldDone(_returns[key.value] ??= 'RRC-mock-${++_seq}');
+    if (_returns[key.value] case final id?) return FieldDone(id);
+    if (arrivalId != null && takenArrivals.contains(arrivalId)) {
+      return const FieldRejected('ARRIVAL_ALREADY_RECEIVED');
+    }
+    if (arrivalId != null && !arrivals.any((a) => a.arrivalId == arrivalId)) {
+      return const FieldRejected('RETURN_ARRIVAL_NOT_FOUND');
+    }
+    final id = _returns[key.value] = 'RRC-mock-${++_seq}';
+    receivedBodies[key.value] = (
+      arrivalId: arrivalId,
+      to: toLocationCode,
+      lines: lines,
+    );
+    arrivals.removeWhere((a) => a.arrivalId == arrivalId);
+    if (loseNextReturnResponse) {
+      loseNextReturnResponse = false;
+      return const FieldUnknown();
+    }
+    return FieldDone(id);
   }
 
   @override

@@ -442,6 +442,16 @@ void main() {
       await shot(name);
       await home();
     }
+    // 회수품 반입(반납 인증번호 화면 위 입구 → 대기 목록 → 한 건).
+    await tap('menu-return-handover');
+    await tap('rh-to-intake');
+    await shot('return-arrivals');
+    await tap('ri-ARR-mock-1');
+    await shot('return-intake-location');
+    await scanTo('ri-location-scan', 'RTN-A-01');
+    await tap('ri-all');
+    await shot('return-intake-items');
+    await home();
     debugDisableShadows = true;
   });
 

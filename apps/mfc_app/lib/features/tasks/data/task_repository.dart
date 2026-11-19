@@ -255,6 +255,8 @@ api.TaskExecutionRequest executionRequestFromPayload(
               reason: switch (s['reason']) {
                 'DAMAGED' =>
                   api.TaskExecutionRequestLinesInnerShortageReasonEnum.DAMAGED,
+                'SPOILED' =>
+                  api.TaskExecutionRequestLinesInnerShortageReasonEnum.SPOILED,
                 'BLOCKED' =>
                   api.TaskExecutionRequestLinesInnerShortageReasonEnum.BLOCKED,
                 _ => api.TaskExecutionRequestLinesInnerShortageReasonEnum.SHORT,
