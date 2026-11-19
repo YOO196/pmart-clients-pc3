@@ -247,7 +247,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             UiStateView<WorkerProfile>(
               state: uiStateOf(ref.watch(meProvider)),
               onRetry: () => ref.invalidate(meProvider),
-              // 시안 pda-preview.html 첫 화면: 인사·상태 → 피패킹 큰 카드 → 기타 업무 2×2 → 아래 도구 줄.
+              // 첫 화면: 인사·상태 → 업무 같은 크기 2열 → 맨 아래 고정 도구 줄.
               ready: (context, me) {
                 void openArea(WorkArea a) {
                   if (!me.can(a)) {
@@ -259,138 +259,158 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     return;
                   }
                   // 고르면 바로 그 업무의 작업 순서 안내로.
-                  context.push('/work/${a.name}/guide');
+                  context.push('/guide/${a.name}');
                 }
 
-                final others = [
-                  for (final a in WorkArea.values)
-                    if (a != WorkArea.pickPack) a,
+                // 피패킹이 주 업무라 맨 앞(크기는 같다).
+                const areas = [
+                  WorkArea.pickPack,
+                  WorkArea.inbound,
+                  WorkArea.inspection,
+                  WorkArea.stockMove,
+                  WorkArea.stockCount,
                 ];
-                return SafeArea(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
+                final tools = Row(
+                  children: [
+                    _ToolButton(
+                      key: const ValueKey('menu-handover'),
+                      icon: Icons.inventory_2_outlined,
+                      label: l10n.handoverChecksMenu,
+                      allowed: me.canUse(PdaMenu.handoverCheck),
+                      onTap: () => _menu(
+                        me,
+                        PdaMenu.handoverCheck,
+                        l10n.handoverChecksMenu,
+                        () => context.push('/handover-checks'),
+                      ),
+                    ),
+                    // 반납 인증번호 — 라이더가 회수품을 가져오면 알려 줄 번호(rider-app 요청 2026-11-18).
+                    _ToolButton(
+                      key: const ValueKey('menu-return-handover'),
+                      icon: Icons.assignment_return_outlined,
+                      label: l10n.returnHandoverMenu,
+                      allowed: me.canUse(PdaMenu.returnHandover),
+                      onTap: () => _menu(
+                        me,
+                        PdaMenu.returnHandover,
+                        l10n.returnHandoverMenu,
+                        () => context.push('/return-handovers'),
+                      ),
+                    ),
+                    _ToolButton(
+                      key: const ValueKey('menu-printer'),
+                      icon: Icons.print_outlined,
+                      label: l10n.printerMenu,
+                      allowed: me.canUse(PdaMenu.printerSettings),
+                      onTap: () => _menu(
+                        me,
+                        PdaMenu.printerSettings,
+                        l10n.printerSettingsTitle,
+                        () => context.push('/settings/printer'),
+                      ),
+                    ),
+                    // 재고 확인 — 시작 메뉴와 같은 화면(사용자 2026-11-17 "홈 아래 메뉴줄에도").
+                    _ToolButton(
+                      key: const ValueKey('menu-stock'),
+                      icon: Icons.manage_search,
+                      label: l10n.stockCheckMenu,
+                      allowed: true,
+                      onTap: () => context.push('/stock-check'),
+                    ),
+                    _ToolButton(
+                      key: const ValueKey('menu-break'),
+                      icon: me.onBreak
+                          ? Icons.play_circle_outline
+                          : Icons.coffee_outlined,
+                      label: me.onBreak ? l10n.breakEnd : l10n.breakStart,
+                      allowed: me.canUse(PdaMenu.rest),
+                      onTap: _breakBusy ? null : () => _toggleBreak(me),
+                    ),
+                  ],
+                );
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                         children: [
-                          Expanded(
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  l10n.homeHello(me.displayName ?? me.workerId),
+                                  style: theme.textTheme.headlineSmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -1.2,
+                                      ),
+                                ),
+                              ),
+                              Text(
+                                me.onBreak
+                                    ? l10n.statusOnBreak
+                                    : l10n.statusReady,
+                                key: const ValueKey('worker-status'),
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: me.onBreak
+                                      ? theme.colorScheme.error
+                                      : PdaColors.muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(2, 18, 0, 8),
                             child: Text(
-                              l10n.homeHello(me.displayName ?? me.workerId),
-                              style: theme.textTheme.headlineSmall?.copyWith(
+                              l10n.chooseWork,
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: PdaColors.muted,
                                 fontWeight: FontWeight.w800,
-                                letterSpacing: -1.2,
                               ),
                             ),
                           ),
-                          Text(
-                            me.onBreak ? l10n.statusOnBreak : l10n.statusReady,
-                            key: const ValueKey('worker-status'),
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: me.onBreak
-                                  ? theme.colorScheme.error
-                                  : PdaColors.muted,
+                          // 업무는 모두 같은 크기(사용자 2026-11-19) — 2열, 고르면 그 칸이 커지며 안내 화면 위 카드가 된다.
+                          for (var r = 0; r < areas.length; r += 2)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                children: [
+                                  for (var c = r; c < r + 2; c++) ...[
+                                    if (c > r) const SizedBox(width: 8),
+                                    Expanded(
+                                      child: c < areas.length
+                                          ? _AreaTile(
+                                              area: areas[c],
+                                              allowed: me.can(areas[c]),
+                                              onTap: () => openArea(areas[c]),
+                                            )
+                                          : const SizedBox.shrink(),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
-                          ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      _HeroArea(
-                        key: const ValueKey('area-pickPack'),
-                        allowed: me.can(WorkArea.pickPack),
-                        onTap: () => openArea(WorkArea.pickPack),
+                    ),
+                    // 도구 줄은 기종과 상관없이 화면 맨 아래(사용자 2026-11-19) — 아래 시스템 막대 위로 띄운다.
+                    DecoratedBox(
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        border: Border(top: BorderSide(color: PdaColors.line)),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(2, 16, 0, 7),
-                        child: Text(
-                          l10n.otherWork,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: PdaColors.muted,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      child: SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 4, 8, 6),
+                          child: tools,
                         ),
                       ),
-                      for (var r = 0; r < others.length; r += 2)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 7),
-                          child: Row(
-                            children: [
-                              for (var c = r; c < r + 2; c++) ...[
-                                if (c > r) const SizedBox(width: 7),
-                                Expanded(
-                                  child: c < others.length
-                                      ? _AreaTile(
-                                          area: others[c],
-                                          allowed: me.can(others[c]),
-                                          onTap: () => openArea(others[c]),
-                                        )
-                                      : const SizedBox.shrink(),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      const Divider(height: 24),
-                      Row(
-                        children: [
-                          _ToolButton(
-                            key: const ValueKey('menu-handover'),
-                            icon: Icons.inventory_2_outlined,
-                            label: l10n.handoverChecksMenu,
-                            allowed: me.canUse(PdaMenu.handoverCheck),
-                            onTap: () => _menu(
-                              me,
-                              PdaMenu.handoverCheck,
-                              l10n.handoverChecksMenu,
-                              () => context.push('/handover-checks'),
-                            ),
-                          ),
-                          // 반납 인증번호 — 라이더가 회수품을 가져오면 알려 줄 번호(rider-app 요청 2026-11-18).
-                          _ToolButton(
-                            key: const ValueKey('menu-return-handover'),
-                            icon: Icons.assignment_return_outlined,
-                            label: l10n.returnHandoverMenu,
-                            allowed: me.canUse(PdaMenu.returnHandover),
-                            onTap: () => _menu(
-                              me,
-                              PdaMenu.returnHandover,
-                              l10n.returnHandoverMenu,
-                              () => context.push('/return-handovers'),
-                            ),
-                          ),
-                          _ToolButton(
-                            key: const ValueKey('menu-printer'),
-                            icon: Icons.print_outlined,
-                            label: l10n.printerMenu,
-                            allowed: me.canUse(PdaMenu.printerSettings),
-                            onTap: () => _menu(
-                              me,
-                              PdaMenu.printerSettings,
-                              l10n.printerSettingsTitle,
-                              () => context.push('/settings/printer'),
-                            ),
-                          ),
-                          // 재고 확인 — 시작 메뉴와 같은 화면(사용자 2026-11-17 "홈 아래 메뉴줄에도").
-                          _ToolButton(
-                            key: const ValueKey('menu-stock'),
-                            icon: Icons.manage_search,
-                            label: l10n.stockCheckMenu,
-                            allowed: true,
-                            onTap: () => context.push('/stock-check'),
-                          ),
-                          _ToolButton(
-                            key: const ValueKey('menu-break'),
-                            icon: me.onBreak
-                                ? Icons.play_circle_outline
-                                : Icons.coffee_outlined,
-                            label: me.onBreak ? l10n.breakEnd : l10n.breakStart,
-                            allowed: me.canUse(PdaMenu.rest),
-                            onTap: _breakBusy ? null : () => _toggleBreak(me),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -497,103 +517,67 @@ class _ManageMenu extends StatelessWidget {
   }
 }
 
-/// 피패킹 큰 카드(시안 hero) — 옅은 보라 그라데이션, 제목·설명·"업무 시작 ›", 오른쪽 큰 그림.
-class _HeroArea extends StatelessWidget {
-  const _HeroArea({super.key, required this.allowed, required this.onTap});
+/// 업무를 고른 뒤 안내 화면 위 큰 카드 — 첫 화면 칸이 [Hero] 로 커져 이 카드가 된다.
+class AreaHeroCard extends StatelessWidget {
+  const AreaHeroCard({super.key, required this.area});
 
-  final bool allowed;
-  final VoidCallback onTap;
+  final WorkArea area;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(17),
-        onTap: onTap,
-        child: Ink(
+    return Hero(
+      tag: 'area-card-${area.name}',
+      flightShuttleBuilder: _areaShuttle(area),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(17),
+          side: const BorderSide(color: PdaColors.lilac, width: 1.5),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
           padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(17),
-            color: Colors.white,
-            border: Border.all(color: PdaColors.lilac, width: 1.5),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 115),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        workAreaText(l10n, WorkArea.pickPack),
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -1.5,
-                        ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      workAreaText(l10n, area),
+                      key: const ValueKey('area-hero-title'),
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1.5,
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        l10n.featuredPickPack,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: PdaColors.muted,
-                        ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      workAreaDesc(l10n, area),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: PdaColors.muted,
                       ),
-                      const SizedBox(height: 11),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: PdaColors.primary,
-                          borderRadius: BorderRadius.circular(7),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (!allowed)
-                              const Padding(
-                                padding: EdgeInsets.only(right: 4),
-                                child: Icon(
-                                  Icons.lock_outline,
-                                  size: 14,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            Text(
-                              l10n.startWork,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-                Container(
-                  width: 96,
-                  height: 96,
-                  decoration: const BoxDecoration(
-                    color: PdaColors.softer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.shopping_cart_checkout,
-                    size: 56,
-                    color: PdaColors.primary,
-                  ),
+              ),
+              Container(
+                width: 84,
+                height: 84,
+                decoration: const BoxDecoration(
+                  color: PdaColors.softer,
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ),
+                child: Icon(
+                  workAreaIcon(area),
+                  size: 46,
+                  color: PdaColors.primary,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -601,7 +585,35 @@ class _HeroArea extends StatelessWidget {
   }
 }
 
-/// 기타 업무 칸(시안 work-tile) — 흰 칸, 왼쪽 옅은 보라 그림 + 이름. 권한이 없으면 자물쇠.
+/// 칸 → 큰 카드로 커지는 동안 그리는 모습 — 흰 카드 + 가운데 업무 그림(글자는 크기가 바뀌는 동안 넘치므로 뺀다).
+HeroFlightShuttleBuilder _areaShuttle(WorkArea area) =>
+    (_, animation, _, _, _) => Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: PdaColors.lilac, width: 1.5),
+      ),
+      child: Center(
+        child: FittedBox(
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Icon(workAreaIcon(area), size: 40, color: PdaColors.primary),
+          ),
+        ),
+      ),
+    );
+
+/// 업무 한 줄 설명(안내 화면 위 카드).
+String workAreaDesc(AppLocalizations l10n, WorkArea a) => switch (a) {
+  WorkArea.pickPack => l10n.featuredPickPack,
+  WorkArea.inbound => l10n.areaDescInbound,
+  WorkArea.inspection => l10n.areaDescInspection,
+  WorkArea.stockMove => l10n.areaDescStockMove,
+  WorkArea.stockCount => l10n.areaDescStockCount,
+};
+
+/// 업무 칸 — 모두 같은 크기, 위 그림 + 아래 이름. 권한이 없으면 자물쇠.
+/// 고르면 [Hero] 로 커지며 안내 화면 위 카드([AreaHeroCard])가 된다.
 class _AreaTile extends StatelessWidget {
   const _AreaTile({
     required this.area,
@@ -616,22 +628,59 @@ class _AreaTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return _Tile(
-      key: ValueKey('area-${area.name}'),
-      icon: allowed ? workAreaIcon(area) : Icons.lock_outline,
-      label: workAreaText(l10n, area),
-      onTap: onTap,
+    return Hero(
+      tag: 'area-card-${area.name}',
+      flightShuttleBuilder: _areaShuttle(area),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: PdaColors.line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: ValueKey('area-${area.name}'),
+          onTap: onTap,
+          child: SizedBox(
+            height: 112,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: const BoxDecoration(
+                    color: PdaColors.softer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    allowed ? workAreaIcon(area) : Icons.lock_outline,
+                    size: 28,
+                    color: allowed ? PdaColors.primary : PdaColors.muted,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  workAreaText(l10n, area),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: PdaColors.ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+  const _Tile({required this.icon, required this.label, required this.onTap});
 
   final IconData icon;
   final String label;
@@ -800,7 +849,9 @@ class WorkGuideScreen extends StatelessWidget {
             key: const ValueKey('guide'),
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 시안: 큰 제목 없이 앱바 제목 + 회색 한 줄, 번호를 선으로 이은 단계 목록.
+              AreaHeroCard(area: area),
+              const SizedBox(height: 12),
+              // 업무 카드 아래 회색 한 줄 + 번호를 선으로 이은 단계 목록.
               Text(
                 l10n.guideLead,
                 style: theme.textTheme.bodyMedium?.copyWith(
@@ -830,7 +881,9 @@ class WorkGuideScreen extends StatelessWidget {
                 key: const ValueKey('guide-ok'),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(64),
-                  textStyle: theme.textTheme.titleLarge,
+                  textStyle: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 onPressed: () => context.pushReplacement('/work/${area.name}'),
                 child: Text(l10n.guideOk),
