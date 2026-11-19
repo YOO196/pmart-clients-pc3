@@ -1,6 +1,6 @@
 {
   "@@locale": "ko",
-  "appTitle": "PMart MFC",
+  "appTitle": "픽PDA",
   "tasksTitle": "내 작업",
   "tasksEmpty": "배정된 작업이 없어요",
   "taskTypePick": "피킹",
@@ -452,7 +452,7 @@
   "@pickLocationOther": { "placeholders": { "code": { "type": "String" }, "qty": { "type": "int" } } },
   "pickStatusPartial": "일부만 칸이 정해졌어요",
   "pickStatusNotFound": "어느 칸에서도 못 찾았어요. 센터 관리자에게 알려 주세요",
-  "homeTitle": "PMart PDA",
+  "homeTitle": "픽PDA",
   "homeHello": "{name} 님",
   "@homeHello": { "placeholders": { "name": { "type": "String" } } },
   "statusReady": "작업 대기",
