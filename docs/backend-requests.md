@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | BR-01 | 높음 | 고객 | 토스 결제창 진입 정보·결제 인증 결과 전달 경로가 고객용 API에 없음 | **RESOLVED**(계약, ADR-0020): `POST /payment-confirmations` 등. 결제 진입 정보는 초안 `nextAction=PAY`·`payment`. 고객앱 반영(2026-10-31, 토스 결제위젯 SDK 연결. customerKey 는 D6 미정이라 anonymous) |
 | BR-02 | 높음 | 라이더·MFC·관리자·기사 | 고객 외 주체(라이더·점원·운영자·간선기사) 로그인·전화 본인확인 API 없음 | 일부 DONE — 운영자 로그인 `f6ed21b`(ADR-0018), 점원(mfc_app) 로그인은 employee-auth-service `app=mfc`(백엔드 ADR-0056 6단계, 2026-11-13 구현). 라이더·간선기사·본인확인 OPEN |
-| BR-03 | 높음 | 전체(특히 웹) | 사용자 토큰 보관 방식(쿠키/CSRF vs Bearer) 미정, 게이트웨이가 `Cookie` 제거 | OPEN |
+| BR-03 | 높음 | 전체(특히 웹) | 사용자 토큰 보관 방식(쿠키/CSRF vs Bearer) 미정, 게이트웨이가 `Cookie` 제거 | RESOLVED: 모바일은 회신(2026-10-24 `clients/all/2026-10-24-clients-reply-high.md`)대로 응답 본문 토큰 + 보안 저장소. 웹 직원 refresh 는 ADR-0059(2026-11-13)로 세션별 HttpOnly 쿠키 + Signed Double-Submit CSRF(web/core `employeeAuth.ts`) |
 | BR-04 | 중간 | 관리자 웹 | 게이트웨이 CORS 설정 없음 — 웹 배포 출처 결정 필요 | DONE (`f6ed21b`·`1b0f84b`, 허용 출처 localhost:5173·3000, LAN `http://d603-16`) |
 | BR-05 | 높음 | MFC | PDA 작업 목록·작업 상세(피킹 지시 행) 조회 API 없음 | AGREED (`e817184`, check 통과 `3916354`) |
 | BR-06 | 높음 | 라이더 | 배차 제안 수신 채널·대기 목록(일반배차모드) API 없음 | AGREED(부분, `e817184`+`f4dd171`, check 통과 `3916354`) — 푸시·SSE·대기 목록 보류 |
@@ -27,11 +27,11 @@
 | BR-17 | 낮음 | 고객 | 현금영수증 신청·발급 가능 여부·발급 결과 조회 없음 | 일부 해소 — 고객 문의 접수·조회는 case-service 0.2.0 `inquiries` 로 생김(고객앱 반영 2026-11-15, 종류 7가지·주문 연결). 전달 사진 조회·사진 첨부·상담 채널 운영 시간은 그대로 없음. 원 요청 `docs/handoff/archive/2026-10-24-backend-customer-gaps.md` |
 | BR-18 | 낮음 | 고객 | 주문서 이탈 시 초안 처리(명시적 취소 경로 여부) 확인 | 일부 해소 — 고객 문의 접수·조회는 case-service 0.2.0 `inquiries` 로 생김(고객앱 반영 2026-11-15, 종류 7가지·주문 연결). 전달 사진 조회·사진 첨부·상담 채널 운영 시간은 그대로 없음. 원 요청 `docs/handoff/archive/2026-10-24-backend-customer-gaps.md` |
 | BR-19 | 낮음 | 고객 | 상품 카드·상세의 100g/100mL당 가격 표시 값 없음 | OPEN |
-| BR-20 | 중간 | 고객 | 필수 동의 대기(AUTH_CONSENT)에서 토큰 없이 동의 변경을 호출할 경로·`requiredConsents` 형식 불명 | OPEN |
-| BR-21 | 낮음 | 고객 | `OrderDraft` 응답에 품목·배송 방식·도착 구간·주소 반영 내용이 없음, 품절 처리 "다음에도 적용" 저장 경로 없음 | **부분 해소**(2026-10-30, 1203209): 초안 `lines`·`delivery`·`blockers`. 품절 처리 "다음에도 적용" 저장 경로는 아직 없음 |
+| BR-20 | 중간 | 고객 | 필수 동의 대기(AUTH_CONSENT)에서 토큰 없이 동의 변경을 호출할 경로·`requiredConsents` 형식 불명 | RESOLVED(회신 2026-11-17 `clients/customer-app/2026-11-17-notice-consents.md`, auth 0.2.0): 동의는 `completions` 본문으로, 형식 `TYPE:version`. 고객앱 반영 `9f949f5` |
+| BR-21 | 낮음 | 고객 | `OrderDraft` 응답에 품목·배송 방식·도착 구간·주소 반영 내용이 없음, 품절 처리 "다음에도 적용" 저장 경로 없음 | RESOLVED: 초안 `lines`·`delivery`·`blockers`(2026-10-30, 1203209). 품절 처리 "다음에도 적용"은 customer 0.4.0 `GET`·`PUT /me/order-preferences`(2026-11-18), 고객앱 반영 `61b8553` |
 | BR-22 | 낮음 | MFC | 밀봉 요청에 포장재 종류(보냉백 XS~XL·봉투 소~대·보냉재) 필드 없음, 라벨 출력 정보 없음 | OPEN |
-| BR-23 | 높음 | 라이더 | 포장 QR 원문 형식이 계약에 없어 스캔한 QR 에서 경로의 packageId 를 얻을 수 없음 | OPEN |
-| BR-24 | 높음 | 라이더 | 라이더가 볼 전달지(주소·상세·출입 안내·요청사항·연락)를 주는 계약 경로가 없음 | OPEN |
+| BR-23 | 높음 | 라이더 | 포장 QR 원문 형식이 계약에 없어 스캔한 QR 에서 경로의 packageId 를 얻을 수 없음 | RESOLVED(회신 2026-11-14 `clients/rider-app/2026-11-14-reply-br23-br24-qr-and-drop-info.md`): MFC 형식 `PKG:<packageId>:<packageVersion>`(마지막 `:` 로 나눔, 원문 그대로 `scannedCode`). 라이더앱 반영(2026-11-16 일지, `packageIdFromQr`) |
+| BR-24 | 높음 | 라이더 | 라이더가 볼 전달지(주소·상세·출입 안내·요청사항·연락)를 주는 계약 경로가 없음 | RESOLVED(회신 2026-11-14 `clients/rider-app/2026-11-14-reply-br23-br24-qr-and-drop-info.md`): `GET /deliveries/{id}/drop-info`(delivery-execution, 픽업 뒤~전달 완료 전, 연락처는 고객 번호 그대로 — 안심번호 없음). 라이더앱 반영(2026-11-16 일지, `0bf6d58`). LAN 배포됨, 라이더 토큰 실서버 확인은 아직 |
 | BR-25 | 중간 | 관리자 웹 | 인증이 필요한 상품 이미지(`GET /content-images/{imageId}`)를 `<img>` 로 표시할 방식 미정 | OPEN(백엔드 인지, handoff 2026-10-30 §0-3) |
 | BR-26 | 낮음 | 관리자 웹 | 상품·콘텐츠 초안 목록 조회 API 없음(ID 를 알아야만 다시 열 수 있음) | OPEN |
 | BR-27 | 낮음 | 고객 | 이용 불가 계정 오류: 계약 422 `ACCOUNT_NOT_PURCHASABLE` vs 안내 403 `ACCOUNT_NOT_AVAILABLE` | SENT 준비(`docs/handoff/archive/2026-10-30-backend-customer-google-login.md`) |
@@ -86,6 +86,9 @@
 - auth-service.yaml `info.description`: "쿠키/CSRF 방식은 [팀 확인 필요]". 게이트웨이 `default-filters: RemoveRequestHeader=Cookie`.
 - 클라이언트 임시안: 모바일은 Bearer + refresh(보안 저장소). 웹은 access token 메모리 보관. 웹 refresh 를 HttpOnly 쿠키로 할지 결정 필요.
 - 2026-11-02 백오피스 임시: 새로고침마다 로그인되는 문제로, refresh token + 기기 ID 만 탭 범위 `sessionStorage` 에 두고 시작 때 refresh 회전 1회로 세션을 되살린다(`web/backoffice/src/api/sessionPersistence.ts`). access token 은 저장하지 않고 localStorage 는 쓰지 않는다. 쿠키 방식이 정해지면 이 파일을 지운다.
+- 회신(2026-10-24, `../pmart-backend/docs/handoff/clients/all/2026-10-24-clients-reply-high.md`): 쿠키/CSRF 는 팀 결정 대기. 계약은 토큰을 응답 본문으로 주므로 임시안(모바일 보안 저장소, 웹 access 메모리)대로 진행. 남은 결정은 웹 refresh 를 HttpOnly 쿠키로 할지.
+- 결정(2026-11-13, ADR-0059 `../pmart-backend/docs/adr/0059-web-staff-refresh-cookie-signed-double-submit.md`, 요청 `docs/handoff/archive/2026-11-13-web-common-request-refresh-cookie.md`): 웹 백오피스·인사팀 백오피스의 직원 refresh token 은 세션별 HttpOnly 쿠키, CSRF 는 Signed Double-Submit(`__Secure-pmart_ea_csrf_{sessionId}` → `X-CSRF-Token`). PDA 는 본문 refresh 그대로. 반영: `web/core/src/employeeAuth.ts`.
+- 정리(2026-11-19): 모바일·웹 모두 정해져 RESOLVED. `sessionPersistence.ts` 는 지금 `@pmart/web-core` 세션 복원 보관(키 `pmart.backoffice.session`)으로 남아 있다 — 위 "지운다"는 옛 계획이다(백오피스 담당 PC 2 영역).
 
 ## BR-04 CORS
 - 게이트웨이에 CORS 설정 없음. 개발은 Vite 프록시로 우회 가능. 운영에서 관리자 웹을 게이트웨이와 같은 출처로 배포할지, 허용 출처를 둘지 결정 필요.
@@ -188,6 +191,8 @@
   2. `requiredConsents: string[]` 의 항목 형식("필요한 동의 항목·버전")이 정해져 있지 않다. `ConsentType` 값만인지, 버전을 붙이는지(예 `TERMS_OF_SERVICE:2026-10`) 알 수 없다. `/me/consent-changes` 는 항목마다 `consentType`·`version` 이 필요하다.
 - 질문: (1) AUTH_CONSENT 에서 동의를 반영하는 방법 — 임시 토큰을 줄지, 동의 항목을 `completions` 본문으로 받을지, 공개 동의 경로를 둘지. (2) `requiredConsents` 항목 형식.
 - 클라이언트 처리(회신 전): 목에서는 `TYPE:version` 으로 가정해 끝까지 동작한다. 실서버 구현은 계약대로 `/me/consent-changes` → `completions` 순으로 호출하며(`// BR-20`), 401 이 나면 로그인 실패로 보인다.
+- 회신(2026-11-17, `../pmart-backend/docs/handoff/clients/customer-app/2026-11-17-notice-consents.md`, auth 0.2.0 CU-1): (1) 동의는 auth `POST /auth/social-logins/{authRequestId}/completions` 본문으로 보낸다(customer `/me/consent-changes` 를 먼저 부르지 않음, `consentChangeRequestId` 없앰). (2) `requiredConsents`·`optionalConsents` 형식은 `TYPE:version`.
+- 반영(2026-11-17, `9f949f5`): 고객앱 `auth_repository.dart` 가 completions 본문으로 보낸다. 위 "회신 전" 방식(`/me/consent-changes` 먼저)은 지웠다.
 
 ## BR-21 주문 초안 응답의 반영 내용
 - 근거: Commerce 주문서(C 1599~) "품목, 방식·시간, 주소, 라이더 요청, 연락처, 품절 시 처리(+다음에도 적용), 금액, 견적 만료·재고 예약 만료"를 보인다. order-service `OrderDraft`.
@@ -197,6 +202,9 @@
   - "품절 시 처리 — 다음에도 적용"을 저장할 경로(고객 설정)가 없다.
 - 요청: `OrderDraft` 에 `lines`(sku·수량·스냅샷 이름)와 `delivery`(mode·window·addressId 요약·note·outOfStockPreference)를 넣어 줄지 확인. "다음에도 적용" 저장 위치(customer-service 설정?) 확인.
 - 클라이언트 처리(회신 전): 주문서 품목·배송 정보는 보낸 요청 사본을 보인다. 금액·자격·만료는 서버 값만 쓴다. "다음에도 적용"은 화면에 두지 않았다.
+- 해소 1(2026-10-30, 1203209): `OrderDraft` 에 `lines`·`delivery`·`blockers` — 주문서는 서버가 받아들인 값을 보인다.
+- 해소 2(2026-11-18, customer-service 0.4.0): 주문 기본 설정 `GET`·`PUT /me/order-preferences`(`outOfStockPreference`). 앱이 주문서 기본값으로만 쓰고, 주문마다 초안 값이 정본. 고객앱 반영 `61b8553`(배송 방식 화면 "다음에도 적용" — 들어올 때 GET, 다음 단계에서 PUT, 실패해도 주문은 진행).
+  - 참고: 같은 날 백엔드 `2026-11-18-notice-reference-gap-update.md` 표는 "BR-21 그대로"라고 적혀 있지만, 0.4.0 계약 변경 기록(사용자 "A해줘")이 더 뒤의 사실이다.
 
 ## BR-22 포장재 종류·라벨 출력
 - 근거: MFC-business-logic WK-07 패킹 13단계 "포장재 스캔(보냉팩·아이스팩·드라이아이스)", "보냉백 XS/S/M/L/XL, 상온 봉투 소/중/대", "영수증·라벨 출력·부착". `docs/apps/mfc-app.md` §5.
@@ -209,12 +217,23 @@
 - 현황: 라이더는 포장 라벨의 QR 만 스캔하는데, 경로에 넣을 `packageId` 를 QR 에서 꺼내는 형식이 정해져 있지 않다. 배송의 `packageIds` 로 후보를 좁힐 수는 있지만, 어느 포장의 QR 인지는 QR 원문을 해석해야 안다.
 - 요청: (a) QR 원문 형식을 계약에 명시하거나(예: `PMART-PKG:{packageId}:v{packageVersion}`), (b) 경로 없이 `scannedCode` 만으로 승인하는 `POST /handover-authorizations` 를 둔다.
 - 클라이언트 처리(회신 전): 목 형식 `PMART-PKG:{id}:v{n}` 으로 해석한다(`packageIdFromQr`). 해석이 안 되면 "읽지 못했어요"로 안내하고 서버에 보내지 않는다.
+- 회신(2026-11-14, `../pmart-backend/docs/handoff/clients/rider-app/2026-11-14-reply-br23-br24-qr-and-drop-info.md`, 사용자 결정 "MFC 형식에 맞춰"): 형식은 `PKG:<packageId>:<packageVersion>`, mfc-fulfillment 가 밀봉 때 발급하는 `Package.qrCode` 와 같다.
+  - 마지막 `:` 로 나눈다(버전에 `v` 없음). `scannedCode` 에는 스캔 원문 그대로 넣는다.
+  - 재포장된 옛 라벨은 409 `PACKAGE_INVALIDATED`.
+  - 배송의 `packageIds` 에 없는 packageId 면 보내지 않고 "이 배송의 포장이 아닙니다"로 안내한다.
+- 반영(2026-11-16 rider-app 일지): `packageIdFromQr` 가 `PKG:` 접두어로 해석하고, 목 라벨도 같은 형식으로 바꿨다. 위 "회신 전"의 `PMART-PKG` 형식은 쓰지 않는다.
 
 ## BR-24 라이더용 전달지 정보
 - 근거: Delivery-business-logic 수행 흐름 "픽업 후: 주소·상세주소·연락(안심번호)", "고객 부재: 연락 2회 이상", `docs/apps/rider-app.md` §2 수행 흐름.
 - 현황: `DeliveryExecution`·dispatch `Offer.summary` 에는 도착 지역 요약만 있다. 픽업 뒤 라이더가 볼 상세 주소·출입 안내·요청사항·연락 수단(안심번호)을 주는 경로가 없다. 주소는 customer-service 회원 정보라 라이더가 직접 읽을 수 없다.
 - 요청: 픽업(PICKED_UP) 뒤에만 열리는 라이더용 전달지 조회(예: `GET /deliveries/{id}/drop-info`)와 노출 범위·안심번호 방식.
 - 클라이언트 처리(회신 전): 목에서만 전달지를 보인다. 실서버 구현은 null 을 돌려주고 화면은 "전달지 정보를 불러오지 못했어요"로 보인다.
+- 회신(2026-11-14, `../pmart-backend/docs/handoff/clients/rider-app/2026-11-14-reply-br23-br24-qr-and-drop-info.md`, delivery-execution 0.3.2): `GET /deliveries/{deliveryId}/drop-info`.
+  - 배정된 라이더 본인만(다른 라이더 404, 직원 403). 픽업 뒤 ~ 전달 완료 전만(그 밖 409 `DROP_INFO_CLOSED`).
+  - 도로명·상세·우편번호·받는 분·연락처·출입 방법·출입 메모·배송 요청사항·좌표. 연락처는 고객 번호 그대로(안심번호 없음, 사용자 결정 2026-11-14). 값은 주문 당시 사본.
+  - 사본 없음 404 `DROP_INFO_NOT_FOUND`, 주문 서비스 장애 503.
+- 반영(2026-11-16 rider-app 일지, `0bf6d58`): 픽업 뒤에만 부르고, 화면을 나가면 메모리에서 지운다. 수락 전 고객 전화는 잠금.
+- 배포: 회신 때는 LAN 미배포였지만, 뒤의 delivery-execution 배포(2026-11-18, 0.25.1 좌표 출처까지)에 들어 있다. 라이더 토큰으로 실서버 확인한 기록은 아직 없다(백엔드는 통합 시험으로 갈음).
 
 ## BR-25 상품 이미지 표시 방식 (관리자 웹)
 - 근거: 백엔드 handoff `2026-10-30-clients-notice-temp-backoffice-api.md` §0-3, product-content `GET /content-images/{imageId}`(bearerAuth).
