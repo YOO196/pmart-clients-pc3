@@ -307,27 +307,21 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                   ],
                   current: step,
                 ),
-                // 어느 주문인지 — 장바구니·패킹대 확인 전에도 보인다.
-                Text(
-                  l10n.packOrderLine(
-                    // 화면용 주문번호(ADR-0070). 번호 전 주문만 시스템 주문 ID.
-                    s.orderNumber ?? s.orderId ?? shipmentId,
+                // 어느 주문인지 — 장바구니·패킹대 확인 전에도 보인다. 주문번호·배차·포장 완료 예정은 작업자가
+                // 라이더·관리자와 맞춰 보는 값이라 회색 작은 글씨 대신 카드로 크게(사용자 2026-11-20).
+                _OrderCard(
+                  orderNumber: s.orderNumber ?? s.orderId ?? shipmentId,
+                  summary: l10n.packOrderItems(
                     task.lines.length,
                     task.totalPlanned,
                   ),
-                  key: const ValueKey('pack-order'),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: PdaColors.muted,
-                  ),
-                ),
-                if (s.dispatchRequest case final d? when step >= 3)
-                  Text(
-                    l10n.packDispatchDone(formatSeoulTime(d.estimatedReadyAt)),
-                    key: const ValueKey('dispatch-requested'),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: PdaColors.muted,
+                  readyAt: switch (s.dispatchRequest) {
+                    final d? when step >= 3 => formatSeoulTime(
+                      d.estimatedReadyAt,
                     ),
-                  ),
+                    _ => null,
+                  },
+                ),
                 const SizedBox(height: 14),
               ];
               switch (step) {
@@ -913,6 +907,117 @@ class _DispatchSectionState extends ConsumerState<DispatchSection> {
                 ? () => ctl.requestDispatch(shipmentId, minutes)
                 : null,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 패킹 머리 주문 카드 — 주문번호(크게)·상품 수, 배차 요청 뒤에는 "배차 요청함" 칩과 포장 완료 예정 시각.
+class _OrderCard extends StatelessWidget {
+  const _OrderCard({
+    required this.orderNumber,
+    required this.summary,
+    this.readyAt,
+  });
+
+  final String orderNumber;
+  final String summary;
+  final String? readyAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Container(
+      key: const ValueKey('pack-order'),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+      decoration: BoxDecoration(
+        color: PdaColors.softer,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: PdaColors.lilac),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.packOrderLabel,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: PdaColors.onNotice,
+                      ),
+                    ),
+                    Text(
+                      orderNumber,
+                      key: const ValueKey('pack-order-number'),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: PdaColors.ink,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                summary,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: PdaColors.ink,
+                ),
+              ),
+            ],
+          ),
+          if (readyAt case final t?) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Divider(height: 1, color: PdaColors.lilac),
+            ),
+            Row(
+              key: const ValueKey('dispatch-requested'),
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: PdaColors.primary,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    l10n.packDispatchChip,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  l10n.packReadyAtLabel,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: PdaColors.onNotice,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  t,
+                  key: const ValueKey('pack-ready-at'),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: PdaColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
