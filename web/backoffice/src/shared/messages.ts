@@ -958,6 +958,9 @@ export const messages = {
     reset: '지우기',
     any: '전체',
     filter: '거르기',
+    /** 종류별 수(case 0.26.0, 2026-11-19) */
+    countsLabel: '컴플레인 종류별 수',
+    countsFailed: '수를 읽지 못했어요(0 이 아니에요)',
     typeName: { REPORT: '신고', MISDELIVERY: '오배송', DAMAGE: '파손' } as Readonly<Record<string, string>>,
     recordedAt: '기록 시각',
     recordedBy: '기록한 직원',
