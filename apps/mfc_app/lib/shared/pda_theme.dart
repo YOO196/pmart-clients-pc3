@@ -130,8 +130,15 @@ abstract final class PdaTheme {
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(64, 56),
-          shape: shape10,
-          textStyle: bold.copyWith(fontSize: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          // 스캔 단추와 같은 글자 — 17·700(800 은 무겁고 16 은 작아 보였다).
+          textStyle: bold.copyWith(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
