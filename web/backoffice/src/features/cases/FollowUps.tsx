@@ -255,6 +255,12 @@ function ResolveForm({ o, admin, onClose, onDone }: { readonly o: Obligation; re
           {m.save}
         </button>
       </div>
+      {/* 지울 수 없다는 안내(2026-11-19 사용자 "지원센터에서 후속 처리 삭제가 안 된다"): 계약에 삭제가 없고, 할 필요가 없어진 것은 관리자 면제(사유 필수)로만 끝난다 */}
+      {!admin && (
+        <p className="text-xs text-base-content/60" data-testid="followup-no-delete">
+          {m.noDeleteHint}
+        </p>
+      )}
       <CommandFeedback command={cmd}>{() => <span className="text-xs text-success">{m.saved}</span>}</CommandFeedback>
     </form>
   );

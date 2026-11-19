@@ -26,6 +26,8 @@ describe('후속 처리', () => {
     await userEvent.click(within(pickup).getByRole('button', { name: '결과 남기기' }));
     // 지원센터에는 면제·실패가 없다
     expect(within(pickup).queryByRole('option', { name: '면제(관리자)' })).not.toBeInTheDocument();
+    // 지울 수 없다는 안내 — 할 필요가 없어진 것은 관리자 면제로(2026-11-19 사용자 "후속 처리 삭제가 안 된다")
+    expect(within(pickup).getByTestId('followup-no-delete')).toHaveTextContent('지울 수 없어요');
     await userEvent.type(within(pickup).getByLabelText('이번에 한 수량'), '1');
     await userEvent.selectOptions(within(pickup).getByLabelText('근거가 있는 곳'), 'delivery-execution-service');
     await userEvent.type(within(pickup).getByLabelText('근거 번호(클레임·통화 기록 등)'), 'HO-123');
@@ -50,6 +52,14 @@ describe('후속 처리', () => {
     await waitFor(async () => expect(within(await item('고객 연락')).getByTestId('follow-up-results')).toHaveTextContent('시도 기록'));
     expect(await item('고객 연락')).toHaveTextContent('처리 중');
     expect(await view.mutations('/obligations/OBL-MOCK-1/resolutions')[0]!.json()).toEqual({ outcome: 'ATTEMPTED', evidence: { system: 'phone', ref: 'CALL-1' }, note: '부재중 1회' });
+  });
+
+  it('관리자: 결과에 면제·실패가 있고, 지울 수 없다는 안내는 없다(면제로 끝낼 수 있음)', async () => {
+    renderAt('/cases/CASE-MOCK-1', as.admin);
+    const pickup = await item('회수');
+    await userEvent.click(within(pickup).getByRole('button', { name: '결과 남기기' }));
+    expect(within(pickup).getByRole('option', { name: '면제(관리자)' })).toBeInTheDocument();
+    expect(within(pickup).queryByTestId('followup-no-delete')).not.toBeInTheDocument();
   });
 
   it('후속 처리 추가: 종류·담당 팀·기록 금액(환불 아님 안내) → 목록에 생김', async () => {
