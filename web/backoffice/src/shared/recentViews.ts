@@ -87,3 +87,9 @@ export function useRecentViews(): { readonly items: readonly RecentEntry[]; read
   }, [subject]);
   return { items, clear: () => clearRecent(subject) };
 }
+
+/** 이 종류에서 최근 본 ID(목록에서 "최근 봄" 표시, 2026-11-19 — 여러 건을 차례로 처리할 때 어디까지 봤는지) */
+export function useSeenIds(kind: RecentKind): ReadonlySet<string> {
+  const { items } = useRecentViews();
+  return new Set(items.filter((e) => e.kind === kind).map((e) => e.id));
+}

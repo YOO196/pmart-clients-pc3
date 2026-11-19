@@ -13,6 +13,13 @@ export function ShortcutHelp() {
       if (e.key === '?') {
         e.preventDefault();
         setOpen((o) => !o);
+      } else if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        // 이 화면 검색 조건(SearchPanel)의 첫 입력 칸으로(2026-11-19). 검색 조건이 없는 화면이면 아무 일 없음
+        const first = document.querySelector<HTMLElement>('main form[data-list-part="top"] :is(input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea):not([disabled])');
+        if (first) {
+          e.preventDefault();
+          first.focus();
+        }
       } else if (e.key === 'Escape') setOpen(false);
     };
     window.addEventListener('keydown', onKey);

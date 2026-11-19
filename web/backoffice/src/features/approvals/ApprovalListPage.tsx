@@ -2,6 +2,8 @@
 // 화면(2026-11-18 사용자 "아이콘만 붙였지 똑같이 밋밋하다 — 참고 사이트처럼"): Shopify·Medusa 목록처럼 한 카드 안에
 // 심사 상태 탭 → 유형 칩 → 표(요약 굵게·ID 작게, 유형 색 배지, 상태 점 배지, "N일 전") → 아래 건수·더 보기.
 // 예전에는 더 보기가 커서를 URL 에 넣자마자 필터 함수가 지워 버려 아무 일도 없었다(2026-11-17 사용자 신고).
+import { SeenMark } from '../../shared/SeenMark';
+import { useSeenIds } from '../../shared/recentViews';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 
@@ -25,6 +27,7 @@ export function ApprovalListPage() {
   const api = useApi();
   // 오른쪽 미리보기(2026-11-19 관제 형식 — 줄을 누르면 목록을 떠나지 않고 옆에서, 번호 링크는 상세로)
   const pv = usePreview();
+  const seen = useSeenIds('approval'); // 최근 열어 본 승인(2026-11-19)
   const [params, setParams] = useSearchParams();
   const type = pick<ApprovalType>(params.get('type'), APPROVAL_TYPES);
   const reviewState = pick<ReviewState>(params.get('reviewState'), REVIEW_STATES);
@@ -130,7 +133,10 @@ export function ApprovalListPage() {
                             {a.summary ?? m.none}
                           </p>
                           {/* 승인은 번호 없이 종류 · 요청자 · 시각(ADR-0070 덧붙임) — 요청자·시각은 옆 칸, 여기는 종류만 */}
-                          <span className="text-xs text-base-content/50">{a.type ? (m.approvals.typeName[a.type] ?? a.type) : m.none}</span>
+                          <span className="text-xs text-base-content/50">
+                            {a.type ? (m.approvals.typeName[a.type] ?? a.type) : m.none}
+                            <SeenMark seen={!!a.approvalId && seen.has(a.approvalId)} />
+                          </span>
                         </td>
                         <td>{a.type ? <TypeBadge type={a.type} /> : m.none}</td>
                         <td>{a.requesterId ? <Requester id={a.requesterId} /> : m.none}</td>
