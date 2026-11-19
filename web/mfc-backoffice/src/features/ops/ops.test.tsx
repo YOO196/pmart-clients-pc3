@@ -95,11 +95,11 @@ describe('출하 약속 규칙(opsRules)', () => {
 });
 
 describe('센터 운영판', () => {
-  it('센터 첫 화면이 운영판이고 왼쪽 메뉴에서 돌아올 수 있다', async () => {
+  it('센터 첫 화면이 홈(오늘 센터 현황)이고 왼쪽 메뉴 맨 위 "홈"으로 돌아온다', async () => {
     standard();
     renderAt('/');
-    expect(await screen.findByRole('heading', { name: '센터 운영판' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '센터 운영판' })).toHaveAttribute('href', '/c/MFC-BSN-01/ops');
+    expect(await screen.findByRole('heading', { name: '오늘 센터 현황' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '홈' })).toHaveAttribute('href', '/c/MFC-BSN-01/ops');
   });
 
   it('요약 카드: 출하 약속(서버 약속 시각) · 결품·파손(서버 지표) · 인계 확인 필요 — 작업 목록은 끝나지 않은 상태를 모두, 큰 쪽으로', async () => {

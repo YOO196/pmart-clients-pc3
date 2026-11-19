@@ -1,7 +1,7 @@
 import { UiTextProvider } from '@pmart/web-ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ComponentType, ReactNode } from 'react';
-import { createBrowserRouter, createMemoryRouter, Link, Navigate, NavLink, Outlet, RouterProvider, useParams } from 'react-router';
+import { createBrowserRouter, createMemoryRouter, Link, Navigate, NavLink, Outlet, RouterProvider, useLocation, useParams } from 'react-router';
 
 import { env } from '../env';
 import { AssignmentsMenu } from '../features/assignments/AssignmentPages';
@@ -34,50 +34,68 @@ function useCenter(): { readonly mfcId: string; readonly mine: boolean } | null 
   return { mfcId, mine: session?.centers.includes(mfcId) ?? false };
 }
 
+/** 위 바(앱 이름·센터·목 표시·내 정보) + 왼쪽 메뉴(홈·묶음별 메뉴) + 본문. 2026-11-19 다듬기 — PDA 와 같은 흰 바탕·보라 포인트. */
 function Layout() {
   const { session } = useSession();
   const center = useCenter();
+  const { pathname } = useLocation();
   const target = center?.mine ? center.mfcId : session?.centers[0];
+  // 지금 메뉴(`/c/:mfcId/<segment>/…`) — 센터를 바꾸면 같은 메뉴로 간다
+  const segment = pathname.split('/')[3] ?? allMenus[0]!.segment;
+  const showMenus = !!target && !isWorkerOnly(session?.roles ?? []);
   return (
-    <div className="flex min-h-screen bg-base-200">
-      <aside className="w-52 shrink-0 bg-base-100 shadow-sm">
-        <div className="p-4">
-          <Link to="/" className="text-lg font-bold" aria-label={m.goHome}>
-            {m.appTitle}
-          </Link>
-          {env.isMock && <span className="badge badge-outline ml-2">{m.mockBadge}</span>}
-        </div>
-        <ul className="menu w-full">
-          <li>
-            <NavLink to={session ? '/session' : '/login'}>{session ? m.nav.session : m.nav.login}</NavLink>
-          </li>
+    <div className="flex min-h-screen flex-col bg-base-200">
+      <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b border-base-300 bg-base-100 px-4">
+        <Link to="/" className="flex items-center gap-2 text-lg font-extrabold tracking-tight" aria-label={m.goHome}>
+          <span className="inline-block size-6 rounded-md bg-primary" aria-hidden />
+          {m.appTitle}
+        </Link>
+        {env.isMock && <span className="badge badge-outline badge-sm">{m.mockBadge}</span>}
+        <div className="flex-1" />
+        {session && center?.mine && <CenterSwitcher centers={session.centers} current={center.mfcId} segment={segment} />}
+        <nav className="flex items-center gap-1 text-sm">
           {session && (
-            <li>
-              <NavLink to="/me">{m.nav.me}</NavLink>
-            </li>
+            <NavLink to="/me" className={({ isActive }) => `btn btn-ghost btn-sm ${isActive ? 'btn-active' : ''}`}>
+              {m.nav.me}
+            </NavLink>
           )}
-          {/* 센터가 정해져야 메뉴 주소가 생긴다(맡은 센터가 없으면 묶음을 보이지 않는다) */}
-          {target &&
-            !isWorkerOnly(session?.roles ?? []) &&
-            navGroups.map((g) => (
-              <li key={g.key}>
-                <details open>
-                  <summary>{m.groups[g.key]}</summary>
-                  <ul>
+          <NavLink to={session ? '/session' : '/login'} className={({ isActive }) => `btn btn-ghost btn-sm ${isActive ? 'btn-active' : ''}`}>
+            {session ? m.nav.session : m.nav.login}
+          </NavLink>
+        </nav>
+      </header>
+      <div className="flex flex-1">
+        {showMenus && (
+          <aside className="w-56 shrink-0 border-r border-base-300 bg-base-100">
+            <nav className="sticky top-14 space-y-4 p-3" aria-label={m.nav.menu}>
+              {navGroups.map((g) => (
+                <div key={g.key}>
+                  {g.key !== 'overview' && <p className="px-3 pb-1 text-xs font-semibold text-base-content/50">{m.groups[g.key]}</p>}
+                  <ul className="space-y-0.5">
                     {g.items.map((item) => (
                       <li key={item.key}>
-                        <NavLink to={centerPath(target, item.segment)}>{m.menus[item.key]}</NavLink>
+                        <NavLink
+                          to={centerPath(target, item.segment)}
+                          className={({ isActive }) =>
+                            `block rounded-field px-3 py-1.5 text-sm ${isActive ? 'bg-secondary font-bold text-secondary-content' : 'hover:bg-base-200'}`
+                          }
+                        >
+                          {m.menus[item.key]}
+                        </NavLink>
                       </li>
                     ))}
                   </ul>
-                </details>
-              </li>
-            ))}
-        </ul>
-      </aside>
-      <main className="min-w-0 flex-1 space-y-4 p-6">
-        <Outlet />
-      </main>
+                </div>
+              ))}
+            </nav>
+          </aside>
+        )}
+        <main className="min-w-0 flex-1 space-y-4 p-6">
+          <div className="mx-auto max-w-7xl space-y-4">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
@@ -106,9 +124,9 @@ function CenterScope({ menu }: { readonly menu: MenuItem }) {
       </div>
     );
   }
+  // 센터 표시·고르기는 위 바(Layout)에 있다.
   return (
     <>
-      <CenterSwitcher centers={session.centers} current={center.mfcId} segment={menu.segment} />
       {!session.roles.includes('MFC_SUPERVISOR') && (
         <p role="note" className="alert alert-warning text-sm">
           {m.noSupervisor}
