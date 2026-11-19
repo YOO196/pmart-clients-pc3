@@ -51,6 +51,11 @@ Future<void> _loadFonts() async {
   ]);
   const win = 'C:/Windows/Fonts';
   await _font('Roboto', ['$win/malgun.ttf', '$win/malgunbd.ttf']);
+  // 앱 글꼴(Pretendard — 앱 assets 에 있음, 실제 기기와 같은 굵기로 캡처).
+  await _font('Pretendard', [
+    for (final w in const ['Regular', 'SemiBold', 'Bold', 'ExtraBold'])
+      'assets/fonts/Pretendard-$w.otf',
+  ]);
 }
 
 void main() {
