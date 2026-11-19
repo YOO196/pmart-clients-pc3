@@ -404,6 +404,7 @@
   },
   "printLabel": "라벨 출력",
   "reprintButton": "바코드가 안 찍혀요",
+  "reprintShort": "재출력",
   "reprintPickTitle": "어떤 상품인가요?",
   "reprintConfirmTitle": "실물이 이 상품이 맞나요?",
   "reprintConfirmBody": "손에 든 상품의 이름·용량이 맞는지 확인하고 눌러 주세요. 같은 바코드 스티커를 다시 출력해요. 다른 상품이면 출력하지 말고 문제를 보고해 주세요.",

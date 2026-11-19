@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/gen/app_localizations.dart';
 import '../product_hints.dart';
+import '../pda_theme.dart';
 import 'label.dart';
 import 'printer_ui.dart';
 
@@ -28,15 +29,52 @@ class BarcodeReprintButton extends ConsumerWidget {
     super.key,
     required this.id,
     required this.targets,
+    this.compact = false,
   });
 
   /// 버튼 키는 `ValueKey('$id-reprint')`.
   final String id;
   final List<ReprintTarget> targets;
 
+  /// 스캔 줄 오른쪽 네모 단추(아이콘 + "재출력").
+  final bool compact;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    if (compact) {
+      return Tooltip(
+        message: l10n.reprintButton,
+        child: SizedBox(
+          width: 64,
+          height: 58,
+          child: OutlinedButton(
+            key: ValueKey('$id-reprint'),
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(64, 58),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              side: const BorderSide(color: PdaColors.line, width: 1.5),
+            ),
+            onPressed: targets.isEmpty ? null : () => _start(context, ref),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.print_outlined, size: 22),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.reprintShort,
+                  style: Theme.of(context).textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return Align(
       alignment: Alignment.centerRight,
       child: TextButton.icon(
