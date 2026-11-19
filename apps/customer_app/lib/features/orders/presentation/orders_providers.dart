@@ -24,6 +24,8 @@ final ordersRepositoryProvider = Provider<OrdersRepository>(
         _ => null,
       },
       now: ref.watch(clockProvider),
+      // 목 앱: 라이더 위치가 5초마다 구독으로 온다(실서버 라이더 앱 올리기 간격).
+      liveRiderInterval: const Duration(seconds: 5),
     ),
     PmartEnv.local => ApiOrdersRepository(ref.watch(dioProvider)),
   },
@@ -34,8 +36,8 @@ final etaRefreshIntervalProvider = Provider<Duration>(
   (_) => const Duration(seconds: 30),
 );
 
-/// 라이더 위치 다시 읽기 간격(사용자 2026-11-19 "10초"). 실시간 구독(SSE)에는 라이더 좌표가 없어(계약)
-/// 배달 중(TO_CUSTOMER·AT_CUSTOMER)인 동안만 `GET /deliveries/{id}/eta` 를 이 간격으로 다시 읽는다.
+/// 라이더 위치 다시 읽기 간격(사용자 2026-11-19 "10초"). 위치는 실시간 구독(SSE `ETA_UPDATED` 의 `eta.riderLocation`)
+/// 으로 받고, 구독이 끊겼거나 다시 붙는 동안 배달 중(TO_CUSTOMER·AT_CUSTOMER)이면 `GET /deliveries/{id}/eta` 를 이 간격으로 읽는다.
 final riderLocationRefreshIntervalProvider = Provider<Duration>(
   (_) => const Duration(seconds: 10),
 );

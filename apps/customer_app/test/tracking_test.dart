@@ -11,12 +11,15 @@ import 'package:pmart_api_delivery_tracking/pmart_api_delivery_tracking.dart'
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
+import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart'
+    show mockShippingAddressJson;
 import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
 import 'package:customer_app/features/orders/data/orders_repository.dart';
 import 'package:customer_app/features/orders/data/sse_parser.dart';
 import 'package:customer_app/features/orders/domain/orders.dart';
 import 'package:customer_app/features/orders/domain/tracking.dart';
 import 'package:customer_app/features/orders/presentation/orders_screens.dart';
+import 'package:customer_app/features/orders/presentation/tracking_map.dart';
 import 'package:customer_app/shared/order_status.dart';
 import 'package:customer_app/shared/providers.dart' show sourceSystem;
 
@@ -541,7 +544,27 @@ void main() {
       expect(key('track-step-current-delivered'), findsNothing);
     });
 
-    testWidgets('배달 중에는 10초마다 위치를 다시 읽고, 앱이 가려지면 멈춘다', (t) async {
+    // PC 5 요청 2026-11-19(clients/all/2026-11-19-notice-live-rider-location.md): 위치는 SSE ETA_UPDATED 로.
+    TrackingEvent riderAt(double lat, double lng, {int stale = 3}) =>
+        TrackingEvent(
+          type: TrackingEventType.etaUpdated,
+          eta: etaFromContract(
+            'dlv-s2',
+            trk.DeliveryEta.fromJson({
+              ..._etaJson(),
+              'riderLocation': {
+                'lat': lat,
+                'lng': lng,
+                'recordedAt': '2026-10-24T03:00:00Z',
+                'staleSeconds': stale,
+              },
+            }),
+          ),
+        );
+    TrackingMap map(WidgetTester t) =>
+        t.widget<TrackingMap>(find.byType(TrackingMap));
+
+    testWidgets('구독이 붙어 있으면 다시 읽지 않고, ETA_UPDATED 의 위치로 마커를 옮긴다', (t) async {
       final orders = MockOrdersRepository(latency: Duration.zero);
       await openTracking(
         t,
@@ -550,24 +573,161 @@ void main() {
         deliveryId: 'dlv-s2',
       );
       final before = orders.etaCallsOf('dlv-s2');
-      await t.pump(const Duration(seconds: 10));
+      await t.pump(const Duration(seconds: 30));
       await t.pumpAndSettle();
-      expect(orders.etaCallsOf('dlv-s2'), before + 1);
-      await t.pump(const Duration(seconds: 10));
-      await t.pumpAndSettle();
-      expect(orders.etaCallsOf('dlv-s2'), before + 2);
+      expect(orders.etaCallsOf('dlv-s2'), before, reason: '구독 중에는 주기 조회 없음');
 
+      orders.emitTracking('dlv-s2', riderAt(35.1500, 129.0600));
+      await t.pumpAndSettle();
+      expect(map(t).rider, (lat: 35.1500, lng: 129.0600));
+      expect(map(t).riderStale, isFalse);
+      orders.emitTracking('dlv-s2', riderAt(35.1510, 129.0610));
+      await t.pumpAndSettle();
+      expect(map(t).rider, (lat: 35.1510, lng: 129.0610));
+      expect(TrackingMap.glide, const Duration(seconds: 1));
+    });
+
+    testWidgets('목 서버: 5초마다 구독으로 새 위치가 와서 마커가 움직인다', (t) async {
+      final orders = MockOrdersRepository(
+        latency: Duration.zero,
+        liveRiderInterval: const Duration(seconds: 5),
+      );
+      await openTracking(
+        t,
+        orders,
+        orderId: 'order-seed-1',
+        deliveryId: 'dlv-s2',
+      );
+      final first = map(t).rider;
+      await t.pump(const Duration(seconds: 5));
+      await t.pumpAndSettle();
+      final second = map(t).rider;
+      expect(second, isNot(first));
+      await t.pump(const Duration(seconds: 5));
+      await t.pumpAndSettle();
+      expect(map(t).rider, isNot(second));
+      // 화면을 닫으면 구독(과 목 타이머)도 닫힌다.
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+      expect(orders.openTrackCount, 0);
+    });
+
+    testWidgets('구독이 끊긴 동안만 10초마다 위치를 읽고, 다시 붙으면 멈춘다', (t) async {
+      final orders = MockOrdersRepository(latency: Duration.zero);
+      await openTracking(
+        t,
+        orders,
+        orderId: 'order-seed-1',
+        deliveryId: 'dlv-s2',
+      );
+      orders.trackFails = true;
+      await orders.dropTracking(
+        'dlv-s2',
+        error: const NetworkFailure(DioExceptionType.connectionError),
+      );
+      await t.pumpAndSettle();
+      expect(key('track-live-fallback'), findsOneWidget);
+      final dropped = orders.etaCallsOf('dlv-s2');
+      await t.pump(const Duration(seconds: 10));
+      await t.pumpAndSettle();
+      expect(orders.etaCallsOf('dlv-s2'), greaterThan(dropped));
+
+      orders.trackFails = false;
+      await t.pump(const Duration(seconds: 60));
+      await t.pumpAndSettle();
+      expect(orders.openTrackCount, 1);
+      final live = orders.etaCallsOf('dlv-s2');
+      await t.pump(const Duration(seconds: 30));
+      await t.pumpAndSettle();
+      expect(orders.etaCallsOf('dlv-s2'), live, reason: '다시 붙으면 주기 조회 멈춤');
+
+      // 앱이 가려지면 구독을 닫고 읽지도 않는다.
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       await t.pump();
+      expect(orders.openTrackCount, 0);
       final paused = orders.etaCallsOf('dlv-s2');
       await t.pump(const Duration(seconds: 30));
-      expect(orders.etaCallsOf('dlv-s2'), paused, reason: '가려진 동안 읽지 않는다');
+      expect(orders.etaCallsOf('dlv-s2'), paused);
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await t.pumpAndSettle();
+      expect(orders.openTrackCount, 1);
       await t.tap(find.byType(BackButton));
       await t.pumpAndSettle();
+    });
+
+    testWidgets('받은 지 60초 넘은 위치는 흐리게 + 확인 중, 새 위치가 오면 되돌린다', (t) async {
+      final orders = MockOrdersRepository(latency: Duration.zero)
+        ..riderStaleSeconds = 90;
+      await openTracking(
+        t,
+        orders,
+        orderId: 'order-seed-1',
+        deliveryId: 'dlv-s2',
+      );
+      expect(map(t).riderStale, isTrue);
+      expect(key('track-rider-locating'), findsOneWidget);
+      expect(key('track-rider-at'), findsNothing);
+
+      orders.emitTracking('dlv-s2', riderAt(35.1520, 129.0620, stale: 2));
+      await t.pumpAndSettle();
+      expect(map(t).riderStale, isFalse);
+      expect(key('track-rider-locating'), findsNothing);
+      expect(key('track-rider-at'), findsOneWidget);
+    });
+
+    testWidgets('구독이 위치 없이(null) 오면 라이더 마커만 숨긴다 — 내 배송지 지도·도착 예정은 그대로', (
+      t,
+    ) async {
+      final orders = MockOrdersRepository(latency: Duration.zero);
+      // 내 배송지 핀이 있는 주문(사본 geo).
+      orders.overrides['order-seed-1'] = {
+        ...orders.orderJson('order-seed-1')!,
+        'shippingAddress': mockShippingAddressJson,
+      };
+      await openTracking(
+        t,
+        orders,
+        orderId: 'order-seed-1',
+        deliveryId: 'dlv-s2',
+      );
+      expect(map(t).rider, isNotNull);
+      expect(map(t).home, (lat: 35.1565, lng: 129.0665));
+
+      orders.emitTracking(
+        'dlv-s2',
+        TrackingEvent(
+          type: TrackingEventType.etaUpdated,
+          eta: etaFromContract('dlv-s2', trk.DeliveryEta.fromJson(_etaJson())),
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(key('track-map-mode'), findsOneWidget);
+      expect(map(t).rider, isNull, reason: '예전 위치로 채우지 않는다');
+      expect(map(t).home, isNotNull);
+      expect(key('track-rider-locating'), findsOneWidget);
+      expect(find.text('10분 남음'), findsOneWidget);
+    });
+
+    testWidgets('내 배송지 핀도 없고 위치도 없으면 지도 없이 확인 중이라고만', (t) async {
+      final orders = MockOrdersRepository(latency: Duration.zero);
+      await openTracking(
+        t,
+        orders,
+        orderId: 'order-seed-1',
+        deliveryId: 'dlv-s2',
+      );
+      orders.emitTracking(
+        'dlv-s2',
+        TrackingEvent(
+          type: TrackingEventType.etaUpdated,
+          eta: etaFromContract('dlv-s2', trk.DeliveryEta.fromJson(_etaJson())),
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(key('track-map-mode'), findsNothing);
+      expect(key('track-rider-locating'), findsOneWidget);
     });
 
     testWidgets('배달 중인데 위치가 아직 없으면 지도를 그리지 않고 확인 중이라고만', (t) async {

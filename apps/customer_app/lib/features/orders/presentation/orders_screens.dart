@@ -15,6 +15,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_screens.dart' show LoginRequired;
+import '../../address/presentation/map_pick_screen.dart' show GeoPoint;
 import '../../checkout/presentation/delivery_select_screen.dart'
     show modeLabel, windowText;
 import '../../checkout/presentation/order_sheet_screen.dart' show tipReasonText;
@@ -1188,9 +1189,11 @@ class _Row extends StatelessWidget {
 /// 도착 예상(`GET /deliveries/{id}/eta`)을 주기 조회한다. 화면을 닫거나 앱이 가려지면 연결을 닫는다.
 /// [orderId] 가 있으면(주문 상세에서 진입) 주문·배송 상태로 4단계와 예약 시각·변경/취소 진입을 보인다.
 ///
-/// 라이더 지도(레퍼런스 8-5): 배달 중(TO_CUSTOMER·AT_CUSTOMER)이고 서버가 라이더 위치를 주면 지도 위에
-/// 라이더·내 배송지 마커를 그리고 아래 시트에 진행을 보인다. 구독에는 좌표가 없어 배달 중에만
-/// `GET /eta` 를 [riderLocationRefreshIntervalProvider](10초)마다 다시 읽어 마커를 옮긴다.
+/// 라이더 지도(레퍼런스 8-5): 배달 중(TO_CUSTOMER·AT_CUSTOMER)이면 지도 위에 라이더·내 배송지 마커를 그리고
+/// 아래 시트에 진행을 보인다. 라이더 위치는 구독의 `ETA_UPDATED` 에 실린 `eta.riderLocation` 으로 옮긴다
+/// (PC 5 요청 2026-11-19 — 서버는 새 위치를 3초 안에 보낸다). 구독이 끊겼거나 다시 붙는 동안에만
+/// `GET /eta` 를 [riderLocationRefreshIntervalProvider](10초)마다 읽는다. 서버가 위치를 주지 않으면 마커를 숨기고,
+/// 받은 지 60초가 넘은 위치는 흐리게 + "라이더 위치를 확인하고 있어요".
 class TrackingScreen extends ConsumerStatefulWidget {
   const TrackingScreen({super.key, required this.deliveryId, this.orderId});
 
@@ -1211,7 +1214,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   Timer? _poll;
   Timer? _retry;
 
-  /// 배달 중 라이더 위치 다시 읽기(10초).
+  /// 구독이 없는 동안의 라이더 위치 다시 읽기(10초).
   Timer? _locPoll;
   int _failures = 0;
   String? _lastEventId;
@@ -1229,13 +1232,19 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     _startLocationPoll();
   }
 
-  /// 배달 중인 동안만 도착 예상을 다시 읽어 라이더 위치를 새로 받는다(픽업 전·끝난 뒤엔 서버가 위치를 주지 않는다).
+  /// 구독이 끊겼거나 다시 붙는 동안(배달 중일 때만) 도착 예상을 다시 읽어 라이더 위치를 새로 받는다.
+  /// 구독이 붙어 있으면 읽지 않는다 — 위치는 `ETA_UPDATED` 로 온다. 픽업 전·끝난 뒤엔 서버가 위치를 주지 않는다.
   void _startLocationPoll() {
     _locPoll?.cancel();
     _locPoll = Timer.periodic(ref.read(riderLocationRefreshIntervalProvider), (
       _,
     ) {
-      if (!mounted || _mode == _Live.paused || _mode == _Live.ended) return;
+      if (!mounted ||
+          _mode == _Live.paused ||
+          _mode == _Live.ended ||
+          _mode == _Live.live) {
+        return;
+      }
       final stage =
           (_live ?? ref.read(deliveryEtaProvider(widget.deliveryId)).value)
               ?.stage;
@@ -1395,13 +1404,18 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       null => null,
     };
     final live = _live;
-    // 지도: 지금 단계가 배달 중이고 서버가 라이더 위치를 줬을 때만. 구독 값에는 좌표가 없어 조회 값을 쓴다.
+    // 지도: 배달 중이면. 라이더 위치는 구독 값이 있으면 그것만(null 이면 숨김 — 예전 조회 값으로 채우지 않는다),
+    // 구독이 없으면 조회 값.
     final current = live ?? value.value;
-    final rider = _isDelivering(current?.stage)
-        ? (live?.riderLocation ?? value.value?.riderLocation)
-        : null;
-    if (current != null && rider != null) {
-      return _mapScaffold(context, current, rider, order);
+    final delivering = _isDelivering(current?.stage);
+    final rider = delivering ? current?.riderLocation : null;
+    final ship = order?.value?.shippingAddress;
+    final home = switch ((ship?.lat, ship?.lng)) {
+      (final double lat, final double lng) => (lat: lat, lng: lng),
+      _ => null,
+    };
+    if (current != null && delivering && (rider != null || home != null)) {
+      return _mapScaffold(context, current, rider, home, order);
     }
     return Scaffold(
       appBar: AppBar(title: Text(l10n.trackTitle)),
@@ -1451,16 +1465,12 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   Widget _mapScaffold(
     BuildContext context,
     DeliveryEtaView eta,
-    RiderPosition rider,
+    RiderPosition? rider,
+    GeoPoint? home,
     AsyncValue<OrderDetail>? order,
   ) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final ship = order?.value?.shippingAddress;
-    final home = switch ((ship?.lat, ship?.lng)) {
-      (final double lat, final double lng) => (lat: lat, lng: lng),
-      _ => null,
-    };
     final orderId = widget.orderId;
     return Scaffold(
       key: const ValueKey('track-map-mode'),
@@ -1468,7 +1478,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         children: [
           Positioned.fill(
             child: TrackingMap(
-              rider: (lat: rider.lat, lng: rider.lng),
+              rider: switch (rider) {
+                final r? => (lat: r.lat, lng: r.lng),
+                null => null,
+              },
+              riderStale: rider?.stale ?? false,
               home: home,
             ),
           ),
@@ -1494,6 +1508,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                   order: order,
                   polling: _mode == _Live.polling,
                   onVisit: _visit,
+                  sheet: true,
                   rider: rider,
                 ),
               ),
@@ -1553,13 +1568,17 @@ class _TrackBody extends StatelessWidget {
     required this.order,
     required this.polling,
     required this.onVisit,
+    this.sheet = false,
     this.rider,
   });
 
   final DeliveryEtaView eta;
   final String deliveryId;
 
-  /// 있으면 지도 아래 시트로 그린다(남은 시간을 크게, 라이더 위치 시각). 없으면 원래 목록.
+  /// 지도 아래 시트로 그린다(남은 시간을 크게, 라이더 위치 시각). 아니면 원래 목록.
+  final bool sheet;
+
+  /// 시트일 때 라이더 위치(없거나 오래됐으면 "확인하고 있어요").
   final RiderPosition? rider;
 
   /// null 이면 주문을 모르고 들어왔다(알림 등). 배송 정보만으로 그린다.
@@ -1592,7 +1611,6 @@ class _TrackBody extends StatelessWidget {
       EtaStatus.finalized => l10n.stDone,
       _ => l10n.etaPending,
     };
-    final sheet = rider != null;
     final remainingMin =
         e.status == EtaStatus.available && e.remainingSeconds != null
         ? (e.remainingSeconds! / 60).ceil()
@@ -1644,12 +1662,22 @@ class _TrackBody extends StatelessWidget {
           key: const ValueKey('eta-stage'),
           style: theme.textTheme.bodyLarge,
         ),
-        if (rider!.recordedAt case final at?)
+        // 위치가 없거나(서버가 주지 않음) 받은 지 60초가 넘었으면 지어내지 않고 확인 중이라고만.
+        if (rider case final r? when !r.stale && r.recordedAt != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              l10n.trackRiderLocationAt(formatSeoulTime(at)),
+              l10n.trackRiderLocationAt(formatSeoulTime(r.recordedAt!)),
               key: const ValueKey('track-rider-at'),
+              style: theme.textTheme.bodySmall,
+            ),
+          )
+        else if (rider == null || rider!.stale)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              l10n.trackRiderLocating,
+              key: const ValueKey('track-rider-locating'),
               style: theme.textTheme.bodySmall,
             ),
           ),

@@ -269,6 +269,12 @@ void main() {
     // 배송현황 — 배달 중 라이더 지도(레퍼런스 8-5). 목 모드는 카카오 지도 대신 안내 칸이 그려진다.
     await go('/deliveries/dlv-s2?orderId=order-seed-1');
     await shot('tracking-map');
+    // 받은 지 60초 넘은 라이더 위치 — 마커 흐리게 + "라이더 위치를 확인하고 있어요"(PC 5 요청 2026-11-19).
+    orders.riderStaleSeconds = 90;
+    await go('/orders/order-seed-1');
+    await go('/deliveries/dlv-s2?orderId=order-seed-1');
+    await shot('tracking-map-stale');
+    orders.riderStaleSeconds = 4;
     // 오배송 다시 배송비 결제(order-seed-1 에 결제 대기 1건).
     await go('/orders/order-seed-1');
     await shot('order-detail-redelivery');
