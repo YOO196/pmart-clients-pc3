@@ -26,7 +26,7 @@ enum InquiryCategory {
   }
 }
 
-/// 계약 `InquiryStatus`. 종료(CLOSED) API 는 아직 없다.
+/// 계약 `InquiryStatus`. 닫기는 `POST /inquiries/{id}/closures`(case 0.19.0, 다시 열기 없음).
 enum InquiryStatus {
   received,
   answered,
@@ -85,7 +85,11 @@ class InquiryDraft {
     this.origin = InquiryOrigin.inquiryPage,
     this.deliveryIssue,
     this.deliveryId,
+    this.photoIds = const [],
   });
+
+  /// 먼저 `POST /inquiry-photos` 로 올린 사진(case 0.14.0, 문의 하나에 [inquiryPhotosMax] 장).
+  final List<String> photoIds;
 
   final InquiryCategory category;
   final String body;
@@ -130,18 +134,46 @@ class InquiryReply {
   final DateTime? createdAt;
 }
 
+/// 남긴 만족도(case 0.15.0 — 답변 뒤 한 번, 고치기 없음).
+@immutable
+class InquirySatisfactionView {
+  const InquirySatisfactionView({required this.score, this.comment});
+
+  final int score;
+  final String? comment;
+}
+
 @immutable
 class InquiryDetail {
   const InquiryDetail({
     required this.summary,
     required this.body,
     required this.replies,
+    this.photoIds = const [],
+    this.satisfaction,
+    this.closedAt,
   });
 
   final InquirySummary summary;
   final String body;
   final List<InquiryReply> replies;
+
+  /// 붙은 사진(본문은 `GET /inquiry-photos/{id}` — 본인 토큰).
+  final List<String> photoIds;
+  final InquirySatisfactionView? satisfaction;
+  final DateTime? closedAt;
+
+  bool get closed => summary.status == InquiryStatus.closed;
+
+  /// 만족도를 남길 수 있다: 답변을 받았고 아직 안 남겼다. 최종 판정은 서버(409).
+  bool get canRate => replies.isNotEmpty && satisfaction == null;
 }
+
+/// 문의 하나에 붙일 수 있는 사진 수(계약).
+const inquiryPhotosMax = 5;
+
+/// 만족도 의견 한도(계약).
+const inquiryCommentMax = 200;
 
 @immutable
 class InquiryPage {
@@ -157,4 +189,19 @@ abstract final class InquiryProblemCode {
 
   /// 지연 신고인데 진행 중 주문이 아님(422, case 0.23.0).
   static const orderNotInProgress = 'ORDER_NOT_IN_PROGRESS';
+
+  /// 내가 올린 사진이 아니거나 이미 다른 문의에 붙음(422) — 문의도 남지 않는다.
+  static const photoNotFound = 'PHOTO_NOT_FOUND';
+
+  /// 사진 형식·크기(422).
+  static const photoInvalid = 'PHOTO_INVALID';
+
+  /// 닫힌 문의(409).
+  static const inquiryClosed = 'INQUIRY_CLOSED';
+
+  /// 답변 전 만족도(409).
+  static const notAnswered = 'INQUIRY_NOT_ANSWERED';
+
+  /// 이미 만족도를 남김(409).
+  static const alreadyRated = 'ALREADY_RATED';
 }

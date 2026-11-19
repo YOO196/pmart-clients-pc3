@@ -1253,7 +1253,50 @@
   "inqTitleLabel": "제목 (선택)",
   "inqBodyLabel": "문의 내용",
   "inqBodyHint": "어떤 점이 불편하셨는지 적어 주세요",
-  "inqFormNote": "문의는 접수만 돼요. 주문 취소는 주문 내역에서, 반품·교환은 신청 화면에서 해 주세요. 사진은 아직 첨부할 수 없어요.",
+  "inqFormNote": "문의는 접수만 돼요. 주문 취소는 주문 내역에서, 반품·교환은 신청 화면에서 해 주세요.",
+  "inqPhotosLabel": "사진 (선택, 최대 {max}장)",
+  "@inqPhotosLabel": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "inqPhotoAdd": "사진 추가",
+  "inqPhotoRemove": "사진 빼기",
+  "inqPhotoRetry": "다시 올리기",
+  "inqPhotoFailed": "올리지 못했어요",
+  "inqPhotoInvalid": "올릴 수 없는 사진이에요(JPEG·PNG·WEBP, 10MB 이하)",
+  "inqPhotoUnavailable": "지금은 사진을 올릴 수 없어요. 글만 남기실 수 있어요",
+  "inqPhotosPending": "사진을 다 올린 뒤 남길 수 있어요. 실패한 사진은 다시 올리거나 빼 주세요",
+  "inqPhotoNotFound": "사진을 확인하지 못했어요. 사진을 다시 골라 주세요",
+  "inqPhotoLoadFailed": "사진을 불러오지 못했어요",
+  "inqRateTitle": "전반적인 상담 경험은 어떠셨나요?",
+  "inqRateSubtitle": "더 나은 서비스를 위해 고객님의 의견을 들려주세요.",
+  "inqRate5": "많은 도움이 되었어요",
+  "inqRate4": "도움이 되었어요",
+  "inqRate3": "그럭저럭 괜찮았어요",
+  "inqRate2": "아쉬워요",
+  "inqRate1": "매우 아쉬워요",
+  "inqRateComment": "한 줄 의견 (선택)",
+  "inqRateSubmit": "보내기",
+  "inqRated": "남긴 평가: {label}",
+  "@inqRated": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "inqRateDone": "만족도를 남겼어요",
+  "inqRateFailed": "보내지 못했어요. 다시 시도해 주세요",
+  "inqClose": "문의 닫기",
+  "inqCloseConfirmTitle": "문의를 닫을까요?",
+  "inqCloseConfirmBody": "닫은 문의는 다시 열 수 없어요. 더 궁금한 점은 새 문의로 남겨 주세요",
+  "inqCloseCancel": "취소",
+  "inqClosed": "문의를 닫았어요",
+  "inqCloseFailed": "닫지 못했어요. 다시 시도해 주세요",
+  "inqClosedNote": "닫힌 문의예요. 더 궁금한 점은 새 문의로 남겨 주세요",
   "inqSubmit": "문의 남기기",
   "inqSubmitted": "문의를 접수했어요",
   "inqCheckAgain": "접수됐는지 다시 확인",

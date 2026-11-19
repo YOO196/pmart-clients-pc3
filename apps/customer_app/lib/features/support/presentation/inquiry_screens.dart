@@ -1,6 +1,11 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pmart_core/pmart_core.dart'
+    show IdempotencyKey, PmartFailure, ProblemFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
@@ -11,6 +16,8 @@ import '../../auth/presentation/auth_controller.dart';
 import '../../orders/presentation/orders_providers.dart'
     show orderDetailProvider, orderListProvider, orderStatusText;
 import '../../orders/domain/orders.dart' show OrderListQuery;
+import '../../reviews/presentation/reviews_controller.dart'
+    show ReviewPhotoSource, reviewPhotoPickerProvider;
 import '../domain/inquiry.dart';
 import 'faq_screens.dart' show SupportFaqBlock;
 import 'inquiry_controller.dart';
@@ -270,8 +277,15 @@ class InquiryDetailScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final provider = inquiryProvider(inquiryId);
+    final loaded = ref.watch(provider).value;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.inqDetailTitle)),
+      appBar: AppBar(
+        title: Text(l10n.inqDetailTitle),
+        actions: [
+          if (loaded != null && !loaded.closed)
+            _CloseButton(inquiryId: inquiryId),
+        ],
+      ),
       body: UiStateView<InquiryDetail>(
         state: uiStateOf(ref.watch(provider)),
         onRetry: () => ref.invalidate(provider),
@@ -323,6 +337,16 @@ class InquiryDetailScreen extends ConsumerWidget {
                   ),
                 ),
               Text(d.body, key: const ValueKey('inquiry-body')),
+              if (d.photoIds.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final p in d.photoIds) _InquiryPhotoThumb(photoId: p),
+                  ],
+                ),
+              ],
               const Divider(height: 32),
               Text(
                 l10n.inqRepliesTitle,
@@ -366,11 +390,406 @@ class InquiryDetailScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
+              if (d.satisfaction case final s?)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    [
+                      l10n.inqRated(rateLabel(l10n, s.score)),
+                      ?s.comment,
+                    ].join(' · '),
+                    key: const ValueKey('inquiry-rated'),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                )
+              else if (d.canRate)
+                _RateBox(inquiryId: inquiryId),
               const SizedBox(height: 16),
-              Text(l10n.inqDetailNote, style: theme.textTheme.bodySmall),
+              Text(
+                d.closed ? l10n.inqClosedNote : l10n.inqDetailNote,
+                key: d.closed ? const ValueKey('inquiry-closed-note') : null,
+                style: theme.textTheme.bodySmall,
+              ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 붙은 사진 한 장(본인 토큰으로 받은 바이트). 실패는 "불러오지 못했어요" 칸.
+class _InquiryPhotoThumb extends ConsumerWidget {
+  const _InquiryPhotoThumb({required this.photoId});
+
+  final String photoId;
+
+  static const size = 88.0;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final value = ref.watch(inquiryPhotoProvider(photoId));
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return ClipRRect(
+      key: ValueKey('inquiry-photo-$photoId'),
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox.square(
+        dimension: size,
+        child: switch (value) {
+          AsyncData(:final value) => Image.memory(
+            value,
+            fit: BoxFit.cover,
+            cacheWidth: (size * dpr).round(),
+          ),
+          AsyncError() => InkWell(
+            onTap: () => ref.invalidate(inquiryPhotoProvider(photoId)),
+            child: ColoredBox(
+              color: theme.colorScheme.surfaceContainer,
+              child: Center(
+                child: Text(
+                  l10n.inqPhotoLoadFailed,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall,
+                ),
+              ),
+            ),
+          ),
+          _ => ColoredBox(color: theme.colorScheme.surfaceContainer),
+        },
+      ),
+    );
+  }
+}
+
+/// 만족도 점수(1~5)의 문구(레퍼런스 고객센터 2-2-2).
+String rateLabel(AppLocalizations l10n, int score) => switch (score) {
+  5 => l10n.inqRate5,
+  4 => l10n.inqRate4,
+  3 => l10n.inqRate3,
+  2 => l10n.inqRate2,
+  _ => l10n.inqRate1,
+};
+
+IconData _rateIcon(int s) => switch (s) {
+  5 => Icons.sentiment_very_satisfied,
+  4 => Icons.sentiment_satisfied,
+  3 => Icons.sentiment_neutral,
+  2 => Icons.sentiment_dissatisfied,
+  _ => Icons.sentiment_very_dissatisfied,
+};
+
+Color _rateColor(int s) => switch (s) {
+  5 => const Color(0xFF12B76A),
+  4 => const Color(0xFF66C61C),
+  3 => const Color(0xFFF5B800),
+  2 => const Color(0xFFF79009),
+  _ => const Color(0xFFF04438),
+};
+
+/// 답변 뒤 만족도(1~5점 + 한 줄, 한 번). 서버가 받은 뒤 상세를 다시 읽어 보인다.
+class _RateBox extends ConsumerStatefulWidget {
+  const _RateBox({required this.inquiryId});
+
+  final String inquiryId;
+
+  @override
+  ConsumerState<_RateBox> createState() => _RateBoxState();
+}
+
+class _RateBoxState extends ConsumerState<_RateBox> {
+  int? _score;
+  final _comment = TextEditingController();
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _comment.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final score = _score;
+    if (score == null) return;
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final comment = _comment.text.trim();
+    setState(() => _busy = true);
+    String message;
+    try {
+      final d = await runInquiryCommand(
+        ref,
+        widget.inquiryId,
+        (key) => ref
+            .read(inquiriesRepositoryProvider)
+            .rate(
+              widget.inquiryId,
+              score: score,
+              comment: comment.isEmpty ? null : comment,
+              key: key,
+            ),
+        applied: (d) => d.satisfaction != null,
+      );
+      message = d == null ? l10n.inqRateFailed : l10n.inqRateDone;
+    } on ProblemFailure catch (f) {
+      // 이미 남김·답변 전은 최신 상세로 다시 보인다.
+      ref.invalidate(inquiryProvider(widget.inquiryId));
+      message = f.problem.code == InquiryProblemCode.alreadyRated
+          ? l10n.inqRateDone
+          : l10n.inqRateFailed;
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Container(
+      key: const ValueKey('inquiry-rate'),
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.inqRateTitle,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(l10n.inqRateSubtitle, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 10),
+          // 레퍼런스(고객센터 2-2-2 만족도 조사): 얼굴 + 문구 5줄. 위에서부터 5점 → 1점.
+          for (final s in const [5, 4, 3, 2, 1])
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Material(
+                color: _score == s
+                    ? theme.colorScheme.primaryContainer
+                    : theme.colorScheme.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: _score == s
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.outlineVariant,
+                  ),
+                ),
+                child: InkWell(
+                  key: ValueKey('inquiry-rate-$s'),
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: _busy ? null : () => setState(() => _score = s),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(_rateIcon(s), size: 20, color: _rateColor(s)),
+                        const SizedBox(width: 8),
+                        Text(rateLabel(l10n, s)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(height: 4),
+          TextField(
+            key: const ValueKey('inquiry-rate-comment'),
+            controller: _comment,
+            enabled: !_busy,
+            maxLength: inquiryCommentMax,
+            decoration: InputDecoration(labelText: l10n.inqRateComment),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              key: const ValueKey('inquiry-rate-send'),
+              onPressed: _busy || _score == null ? null : _send,
+              child: Text(l10n.inqRateSubmit),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 문의 닫기(확인 뒤). 닫힌 문의는 다시 열 수 없다.
+class _CloseButton extends ConsumerStatefulWidget {
+  const _CloseButton({required this.inquiryId});
+
+  final String inquiryId;
+
+  @override
+  ConsumerState<_CloseButton> createState() => _CloseButtonState();
+}
+
+class _CloseButtonState extends ConsumerState<_CloseButton> {
+  bool _busy = false;
+
+  Future<void> _close() async {
+    final l10n = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.inqCloseConfirmTitle),
+        content: Text(l10n.inqCloseConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.inqCloseCancel),
+          ),
+          TextButton(
+            key: const ValueKey('inquiry-close-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.inqClose),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    String message;
+    try {
+      final d = await runInquiryCommand(
+        ref,
+        widget.inquiryId,
+        (key) => ref
+            .read(inquiriesRepositoryProvider)
+            .close(widget.inquiryId, key: key),
+        applied: (d) => d.closed,
+      );
+      message = d == null ? l10n.inqCloseFailed : l10n.inqClosed;
+    } on ProblemFailure catch (f) {
+      ref.invalidate(inquiryProvider(widget.inquiryId));
+      message = f.problem.code == InquiryProblemCode.inquiryClosed
+          ? l10n.inqClosed
+          : l10n.inqCloseFailed;
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return TextButton(
+      key: const ValueKey('inquiry-close'),
+      onPressed: _busy ? null : _close,
+      child: Text(l10n.inqClose),
+    );
+  }
+}
+
+/// 작성 화면의 사진 한 칸.
+class _PhotoSlot {
+  _PhotoSlot(this.bytes, this.name, this.key);
+
+  final Uint8List bytes;
+  final String name;
+
+  /// 이 칸의 올리기 키. 다시 올리기도 같은 키(같은 photoId).
+  final IdempotencyKey key;
+  String? photoId;
+  bool uploading = false;
+  bool failed = false;
+}
+
+class _PhotoSlotView extends StatelessWidget {
+  const _PhotoSlotView({
+    super.key,
+    required this.slot,
+    required this.onRemove,
+    required this.onRetry,
+  });
+
+  final _PhotoSlot slot;
+  final VoidCallback? onRemove;
+  final VoidCallback? onRetry;
+
+  static const size = 72.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return SizedBox.square(
+      dimension: size,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.memory(
+              slot.bytes,
+              fit: BoxFit.cover,
+              cacheWidth: (size * dpr).round(),
+            ),
+          ),
+          if (slot.uploading)
+            const ColoredBox(
+              color: Color(0x66000000),
+              child: Center(
+                child: SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else if (slot.failed)
+            Material(
+              color: theme.colorScheme.errorContainer.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                onTap: onRetry,
+                child: Center(
+                  child: Text(
+                    l10n.inqPhotoRetry,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelSmall,
+                  ),
+                ),
+              ),
+            ),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: IconButton(
+              tooltip: l10n.inqPhotoRemove,
+              visualDensity: VisualDensity.compact,
+              iconSize: 16,
+              style: IconButton.styleFrom(
+                backgroundColor: const Color(0x99000000),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(24, 24),
+                padding: EdgeInsets.zero,
+                // 72dp 칸 가운데 "다시 올리기"를 가리지 않게 누르는 영역을 버튼 크기로.
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              constraints: const BoxConstraints.tightFor(width: 24, height: 24),
+              onPressed: onRemove,
+              icon: const Icon(Icons.close),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -511,8 +930,70 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
     super.dispose();
   }
 
+  /// 고른 사진 칸. 고르면 바로 올린다(칸마다 자기 키 — 다시 올리기도 같은 키).
+  final _photos = <_PhotoSlot>[];
+  String? _photoMessage;
+
+  bool get _photosReady => _photos.every((p) => p.photoId != null);
+
   bool get _canSend =>
-      !_busy && _category != null && _body.text.trim().isNotEmpty;
+      !_busy &&
+      _category != null &&
+      _body.text.trim().isNotEmpty &&
+      _photosReady;
+
+  Future<void> _addPhotos() async {
+    final room = inquiryPhotosMax - _photos.length;
+    if (room <= 0) return;
+    final files = await ref.read(reviewPhotoPickerProvider)(
+      ReviewPhotoSource.gallery,
+      room,
+    );
+    if (!mounted || files.isEmpty) return;
+    final slots = [
+      for (final f in files.take(room))
+        _PhotoSlot(f.bytes, f.name, IdempotencyKey.generate()),
+    ];
+    setState(() {
+      _photos.addAll(slots);
+      _photoMessage = null;
+    });
+    for (final s in slots) {
+      unawaited(_upload(s));
+    }
+  }
+
+  Future<void> _upload(_PhotoSlot s) async {
+    final l10n = AppLocalizations.of(context);
+    setState(() {
+      s.uploading = true;
+      s.failed = false;
+    });
+    try {
+      final id = await ref
+          .read(inquiriesRepositoryProvider)
+          .uploadPhoto(s.bytes, name: s.name, key: s.key);
+      if (!mounted) return;
+      setState(() {
+        s.photoId = id;
+        s.uploading = false;
+      });
+    } on PmartFailure catch (f) {
+      if (!mounted) return;
+      setState(() {
+        s.uploading = false;
+        s.failed = true;
+        _photoMessage = switch (f) {
+          ProblemFailure(:final problem)
+              when problem.code == InquiryProblemCode.photoInvalid =>
+            l10n.inqPhotoInvalid,
+          ProblemFailure(:final problem) when problem.status == 503 =>
+            l10n.inqPhotoUnavailable,
+          _ => l10n.inqPhotoFailed,
+        };
+      });
+    }
+  }
 
   Future<void> _pickOrder() async {
     final picked = await showModalBottomSheet<String>(
@@ -548,6 +1029,7 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
         deliveryId: widget.args.deliveryIssue == null
             ? null
             : widget.args.deliveryId,
+        photoIds: [for (final p in _photos) ?p.photoId],
       ),
     );
     if (!mounted) return;
@@ -566,6 +1048,7 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
           _message = switch (code) {
             InquiryProblemCode.orderNotFound => l10n.inqOrderNotFound,
             InquiryProblemCode.orderNotInProgress => l10n.inqOrderNotInProgress,
+            InquiryProblemCode.photoNotFound => l10n.inqPhotoNotFound,
             _ when status == 403 => l10n.inqLoginNeeded,
             _ => l10n.inqRejected,
           };
@@ -684,6 +1167,56 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
+                Text(
+                  l10n.inqPhotosLabel(inquiryPhotosMax),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final (i, p) in _photos.indexed)
+                      _PhotoSlotView(
+                        key: ValueKey('inq-photo-$i'),
+                        slot: p,
+                        onRemove: locked
+                            ? null
+                            : () => setState(() => _photos.remove(p)),
+                        onRetry: locked || !p.failed ? null : () => _upload(p),
+                      ),
+                    if (_photos.length < inquiryPhotosMax)
+                      OutlinedButton.icon(
+                        key: const ValueKey('inq-photo-add'),
+                        onPressed: locked ? null : _addPhotos,
+                        icon: const PmartLineIcon(
+                          PmartLineIcons.camera,
+                          size: 18,
+                        ),
+                        label: Text(l10n.inqPhotoAdd),
+                      ),
+                  ],
+                ),
+                if (_photoMessage case final m?)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      m,
+                      key: const ValueKey('inq-photo-message'),
+                      style: TextStyle(color: theme.colorScheme.error),
+                    ),
+                  ),
+                if (!_photosReady && !_photos.any((p) => p.uploading))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      l10n.inqPhotosPending,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                const SizedBox(height: 12),
                 Text(l10n.inqFormNote, style: theme.textTheme.bodySmall),
                 if (_message case final message?)
                   Padding(

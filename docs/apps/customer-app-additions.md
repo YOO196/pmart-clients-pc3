@@ -57,9 +57,9 @@
 | 최근 검색어 | search `GET/DELETE /me/recent-searches`, `DELETE …/{keyword}` | **완료 2026-11-20**. 인기 키워드(`suggestions.popular`)는 q 가 있어야 와서 빈 화면에 못 씀 |
 | 회원 탈퇴·철회 | customer `POST /me/withdrawals`, `GET …/{id}`, `POST …/revocations` | **보류**: 아래 "탈퇴" 참고 |
 | 주소 삭제 | customer `DELETE /me/addresses/{id}` | **완료 2026-11-20**: 주소 관리 "편집" → 주소 편집 |
-| 문의 사진 첨부 | case `POST /inquiry-photos`, `POST /inquiries/{id}/photos`, `GET /inquiry-photos/{id}`, 작성 `photoIds` | 다음 |
-| 문의 만족도 | case `POST /inquiries/{id}/satisfaction`(답변 뒤 1~5점 + 한 줄, 한 번) | 다음 |
-| 문의 닫기 | case `POST /inquiries/{id}/closures`(닫을 때 만족도 선택) | 다음 |
+| 문의 사진 첨부 | case `POST /inquiry-photos`, `POST /inquiries/{id}/photos`, `GET /inquiry-photos/{id}`, 작성 `photoIds` | **완료 2026-11-20**: 작성할 때 첨부·상세에서 보기. 남긴 문의에 보완(`…/photos`)은 남음 |
+| 문의 만족도 | case `POST /inquiries/{id}/satisfaction`(답변 뒤 1~5점 + 한 줄, 한 번) | **완료 2026-11-20**(레퍼런스 고객센터 2-2-2 모양) |
+| 문의 닫기 | case `POST /inquiries/{id}/closures`(닫을 때 만족도 선택) | **완료 2026-11-20**(확인 창, 다시 열기 없음) |
 | 배달 완료 증빙 | execution `GET /deliveries/{id}/delivery-proof`, `…/evidence-photos/{photoRef}` | 남음 |
 | 배너 | storefront `GET /storefront/banners`(HOME_MIDDLE·CATEGORY) — 홈 응답 안 배너는 이미 씀 | 남음 |
 | 100g/100mL당 가격 | storefront `unitPrice`, product-content `netContent`·`unitPrice` | **결정 필요**: 백엔드 결정 문서 L-10 은 "표시 안 함" |

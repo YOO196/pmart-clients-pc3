@@ -262,4 +262,8 @@ final class _FailingRepository implements InquiriesRepository {
   @override
   Future<InquiryPage> list({String? cursor}) =>
       throw const NetworkFailure(DioExceptionType.connectionError);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw const NetworkFailure(DioExceptionType.connectionError);
 }

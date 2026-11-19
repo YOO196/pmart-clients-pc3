@@ -79,6 +79,42 @@ final inquiryProvider = FutureProvider.autoDispose
       (ref, inquiryId) => ref.watch(inquiriesRepositoryProvider).get(inquiryId),
     );
 
+/// 문의 사진 바이트(본인 토큰). 실패는 실패로(빈 칸으로 바꾸지 않는다).
+final inquiryPhotoProvider = FutureProvider.autoDispose
+    .family<Uint8List, String>(
+      (ref, photoId) => ref.watch(inquiriesRepositoryProvider).photo(photoId),
+    );
+
+/// 만족도·닫기처럼 서버가 바뀐 문의를 돌려주는 명령. 결과를 모르면 같은 키로 한 번 더 보내고,
+/// 그래도 모르면 상세를 다시 읽어 [applied] 로 반영 여부를 본다. 거절(Problem)은 그대로 던진다.
+Future<InquiryDetail?> runInquiryCommand(
+  WidgetRef ref,
+  String inquiryId,
+  Future<InquiryDetail> Function(IdempotencyKey key) send, {
+  required bool Function(InquiryDetail d) applied,
+}) async {
+  final key = IdempotencyKey.generate();
+  for (var i = 0; i < 2; i++) {
+    try {
+      final d = await send(key);
+      ref.invalidate(inquiryProvider(inquiryId));
+      ref.invalidate(inquiryListProvider);
+      return d;
+    } on ProblemFailure {
+      rethrow;
+    } on PmartFailure {
+      continue;
+    }
+  }
+  try {
+    final d = await ref.read(inquiriesRepositoryProvider).get(inquiryId);
+    ref.invalidate(inquiryProvider(inquiryId));
+    return applied(d) ? d : null;
+  } on PmartFailure {
+    return null;
+  }
+}
+
 @immutable
 sealed class InquirySubmitOutcome {
   const InquirySubmitOutcome();

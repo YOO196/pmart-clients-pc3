@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:pmart_core/pmart_core.dart';
 
 import '../domain/inquiry.dart';
@@ -103,6 +105,9 @@ final class MockInquiriesRepository implements InquiriesRepository {
           createdAt: at,
         ),
       ],
+      photoIds: old.photoIds,
+      satisfaction: old.satisfaction,
+      closedAt: old.closedAt,
     );
     _items[i] = next;
     _byKey.updateAll((_, v) => v.summary.inquiryId == inquiryId ? next : v);
@@ -127,6 +132,15 @@ final class MockInquiriesRepository implements InquiriesRepository {
         Problem(status: 422, code: InquiryProblemCode.orderNotFound),
       );
     }
+    // 서버처럼 내가 올린, 아직 안 붙은 사진만 받는다(하나라도 아니면 문의도 남지 않음).
+    if (draft.photoIds.any(
+      (p) => !photos.containsKey(p) || _attached.contains(p),
+    )) {
+      throw const ProblemFailure(
+        Problem(status: 422, code: InquiryProblemCode.photoNotFound),
+      );
+    }
+    _attached.addAll(draft.photoIds);
     _seq += 1;
     created += 1;
     lastOrigin = draft.origin;
@@ -145,6 +159,7 @@ final class MockInquiriesRepository implements InquiriesRepository {
       ),
       body: draft.body,
       replies: const [],
+      photoIds: draft.photoIds,
     );
     _byKey[key.value] = made;
     _items.insert(0, made);
@@ -154,6 +169,127 @@ final class MockInquiriesRepository implements InquiriesRepository {
       throw fail;
     }
     return made;
+  }
+
+  /// 올린 사진(photoId → 바이트), 아직 문의에 안 붙은 것 포함.
+  final photos = <String, Uint8List>{};
+  final _photoByKey = <String, String>{};
+  final _attached = <String>{};
+
+  /// 다음 사진 올리기를 한 번 실패시킨다(시험용).
+  PmartFailure? failNextUpload;
+
+  /// 받은 만족도·닫기 명령 키(시험용).
+  final rateKeys = <String>[];
+  final closeKeys = <String>[];
+
+  int _index(String inquiryId) {
+    final i = _items.indexWhere((x) => x.summary.inquiryId == inquiryId);
+    if (i < 0) {
+      throw const ProblemFailure(
+        Problem(status: 404, code: ProblemCode.notFound),
+      );
+    }
+    return i;
+  }
+
+  InquiryDetail _replace(
+    int i, {
+    InquiryStatus? status,
+    InquirySatisfactionView? satisfaction,
+    DateTime? closedAt,
+  }) {
+    final old = _items[i];
+    final next = InquiryDetail(
+      summary: InquirySummary(
+        inquiryId: old.summary.inquiryId,
+        category: old.summary.category,
+        status: status ?? old.summary.status,
+        createdAt: old.summary.createdAt,
+        orderId: old.summary.orderId,
+        title: old.summary.title,
+        answeredAt: old.summary.answeredAt,
+      ),
+      body: old.body,
+      replies: old.replies,
+      photoIds: old.photoIds,
+      satisfaction: satisfaction ?? old.satisfaction,
+      closedAt: closedAt ?? old.closedAt,
+    );
+    _items[i] = next;
+    return next;
+  }
+
+  @override
+  Future<String> uploadPhoto(
+    Uint8List bytes, {
+    required String name,
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    final fail = failNextUpload;
+    if (fail != null) {
+      failNextUpload = null;
+      throw fail;
+    }
+    final known = _photoByKey[key.value];
+    if (known != null) return known;
+    final id = 'inq-photo-${photos.length + 1}';
+    photos[id] = bytes;
+    _photoByKey[key.value] = id;
+    return id;
+  }
+
+  @override
+  Future<Uint8List> photo(String photoId) async {
+    await _wait();
+    return photos[photoId] ??
+        (throw const ProblemFailure(
+          Problem(status: 404, code: ProblemCode.notFound),
+        ));
+  }
+
+  @override
+  Future<InquiryDetail> rate(
+    String inquiryId, {
+    required int score,
+    String? comment,
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    rateKeys.add(key.value);
+    final i = _index(inquiryId);
+    final d = _items[i];
+    if (d.replies.isEmpty) {
+      throw const ProblemFailure(
+        Problem(status: 409, code: InquiryProblemCode.notAnswered),
+      );
+    }
+    if (d.satisfaction != null) {
+      throw const ProblemFailure(
+        Problem(status: 409, code: InquiryProblemCode.alreadyRated),
+      );
+    }
+    return _replace(
+      i,
+      satisfaction: InquirySatisfactionView(score: score, comment: comment),
+    );
+  }
+
+  @override
+  Future<InquiryDetail> close(
+    String inquiryId, {
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    closeKeys.add(key.value);
+    final i = _index(inquiryId);
+    if (_items[i].closed) {
+      throw const ProblemFailure(
+        Problem(status: 409, code: InquiryProblemCode.inquiryClosed),
+      );
+    }
+    return _replace(i, status: InquiryStatus.closed, closedAt: _now().toUtc());
   }
 
   @override

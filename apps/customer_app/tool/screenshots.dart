@@ -453,10 +453,28 @@ void main() {
     await shot('support');
     await go('/support/inquiries/new');
     await shot('inquiry-new');
+    // 사진 첨부(case 0.14.0) — 두 장 고르면 바로 올린다.
+    await t.scrollUntilVisible(
+      find.byKey(const ValueKey('inq-photo-add')),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await t.tap(find.byKey(const ValueKey('inq-photo-add')));
+    await t.pumpAndSettle();
+    // 사진 미리보기(Image.memory) 디코딩은 실제 시간이 걸린다.
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    await t.pumpAndSettle();
+    await shot('inquiry-new-photos');
     await go('/support/inquiries');
     await shot('inquiries');
     await go('/support/inquiries/inq-seed-1');
     await shot('inquiry-detail');
+    // 답변 뒤 만족도(case 0.15.0)
+    await t.tap(find.byKey(const ValueKey('inquiry-rate-4')));
+    await t.pumpAndSettle();
+    await shot('inquiry-rate');
     // 주문 문의하기 → 무엇을 도와드릴까요?(레퍼런스 9-2 3-1) → 배송 신고(case deliveryIssue)
     await go('/orders/order-seed-4/help');
     await shot('order-help');
