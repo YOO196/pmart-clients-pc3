@@ -20,6 +20,7 @@ import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { StartGuide } from '../../shared/StartGuide';
 import { useWorkCounts, workText } from '../../app/DashboardWidgets';
 import { useSession } from '../../app/SessionContext';
+import { DeliveryStartActions } from '../../shared/StartActions';
 import { deliveryIdOfNumber, isDeliveryNumber, isOrderNumber, isRiderNumber, riderIdOfNumber, useRiderLabels } from '../../shared/numberLookups';
 import { SavedViews } from '../../shared/SavedViews';
 import { CopyButton } from '../../shared/CopyButton';
@@ -333,6 +334,10 @@ export function DeliveryOpenPage() {
                     detailTo={`/deliveries/${encodeURIComponent(pv.id)}`}
                   >
                     <DeliveryPreview deliveryId={pv.id} />
+                    {/* 여기서 바로 시작(2026-11-19) — 번호를 옮겨 적지 않는다 */}
+                    <div className="mt-4 border-t border-base-300 pt-3">
+                      <DeliveryStartActions deliveryId={pv.id} size="xs" />
+                    </div>
                   </PreviewDrawer>
                 )}
                 {nextCursor && (
@@ -767,12 +772,7 @@ export function DeliveryDetailPage() {
           </>
         }
         summary={d ? m.deliveries.summaryOf(d.orderNumber ?? m.none, d.riderId ? (rl?.riderNumber ? `${rl.nameMasked ?? ''} · ${rl.riderNumber}` : m.none) : m.deliveries.noAssignment, text(d.mfcId)) : undefined}
-        actions={
-          <Link className="btn btn-sm" to={`/rider-complaints/new?deliveryId=${encodeURIComponent(deliveryId)}`}>
-            <Icon name="flag" className="h-4 w-4" />
-            {m.deliveries.recordComplaint}
-          </Link>
-        }
+        actions={<DeliveryStartActions deliveryId={deliveryId} />}
       />
       <SystemNumbers ids={[{ label: m.displayNumber.system.deliveryId, id: deliveryId }, { label: m.displayNumber.system.orderId, id: d?.orderId }, { label: m.displayNumber.system.riderId, id: d?.riderId }]} />
       {/* 다음 할 일 — 서버 수행 상태가 전달 실패 등록(FAILURE_REPORTED)일 때만: 확정·반려 칸으로 */}

@@ -1033,6 +1033,28 @@ export const messages = {
   },
   /** 목록 미리보기 칸(2026-11-18) */
   /** 번호 또는 ID 입력 칸(2026-11-19) */
+  /** 그 물건이 있는 곳에서 바로 시작(2026-11-19) */
+  startActions: {
+    label: '이 배송으로 바로 시작',
+    misdelivery: '오배송 접수',
+    complaint: '컴플레인 기록',
+  },
+  /** 배송 고르기(2026-11-19) — 번호를 몰라도 사람이 아는 것으로 */
+  deliveryPicker: {
+    open: '번호를 몰라요 — 찾아서 고르기',
+    title: '배송 찾는 방법',
+    way: { recent: '최근 본 배송', customer: '고객 연락처로', rider: '라이더 전화로' } as const,
+    customerPhone: '고객(수령인) 연락처',
+    riderPhone: '라이더 전화번호',
+    find: '찾기',
+    pick: '고르기',
+    close: '닫기',
+    none: '찾은 배송이 없어요.',
+    noRider: '그 전화번호의 라이더가 없어요.',
+    forbidden: '이 방법은 지금 역할로 쓸 수 없어요.',
+    failed: '찾지 못했어요(조회 실패) — 잠시 뒤 다시 해 주세요.',
+    privacy: '연락처는 찾는 데만 쓰고 저장하지 않아요. 전체 번호가 맞아야 하고, 고객 연락처는 최근 31일 주문에서 찾아요.',
+  },
   refField: {
     kind: { delivery: '배송', rider: '라이더', order: '주문' } as const,
     found: (kind: string, v: string) => `✓ ${kind} ${v} 을(를) 찾았어요`,
