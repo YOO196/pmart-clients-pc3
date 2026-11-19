@@ -2,6 +2,7 @@
 // - Eum: 아이콘 색 타일 숫자 카드·자동 갱신 표시·주문 상태 분포·판매 막대.  Shopify·Medusa 홈: 어제 대비 증감·7일 미니 추세선·최근 활동 피드.
 // - 숫자는 모두 이미 있는 서버 조회에서만(새 API·새 라이브러리 없음, 그림은 CSS·SVG). 못 읽으면 "?"(0 아님), 쪽 상한(100)은 "100+"·"앞 100건 기준"으로 밝힌다.
 // - 금액은 더하지 않는다(서버 집계 요청 docs/handoff/backoffice/2026-11-18-backend-dashboard-metrics.md D2).
+import { useStatChange } from '../shared/motion';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
@@ -91,8 +92,9 @@ const ICONS: Record<string, string> = {
 const tileTone = { primary: 'bg-primary/10 text-primary', info: 'bg-info/10 text-info', success: 'bg-success/10 text-success', warning: 'bg-warning/15 text-warning', error: 'bg-error/10 text-error' } as const;
 
 function StatCard({ icon, tone, label: title, value, sub, to, testId, children, failed }: { readonly icon: string; readonly tone: keyof typeof tileTone; readonly label: string; readonly value: ReactNode; readonly sub?: ReactNode; readonly to: string; readonly testId: string; readonly children?: ReactNode; readonly failed?: boolean }) {
+  const ch = useStatChange(value); // 방금 바뀐 칸만 잠깐 빛남 + ▲▼(2026-11-19)
   return (
-    <Link to={to} data-testid={testId} className="group flex items-start gap-4 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
+    <Link to={to} data-testid={testId} className={`group flex items-start gap-4 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md ${ch.cls}`}>
       <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tileTone[tone]}`} aria-hidden="true">
         <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
           <path d={ICONS[icon]} />
@@ -102,6 +104,7 @@ function StatCard({ icon, tone, label: title, value, sub, to, testId, children, 
         <span className="block text-xs font-medium text-base-content/55">{title}</span>
         <span className={`block text-[28px] font-extrabold leading-tight tabular-nums ${failed ? 'text-base-content/35' : ''}`} title={failed ? m.failed : undefined}>
           {value}
+          {ch.badge}
         </span>
         {sub && <span className="block text-xs text-base-content/55">{sub}</span>}
       </span>
@@ -540,11 +543,13 @@ export const workText = (s: WorkSum) => (s.complete ? String(s.value) : m.work.a
 function WorkTile({ label: title, sum, to, tone, testId }: { readonly label: string; readonly sum: WorkSum | null | undefined; readonly to: string; readonly tone: 'error' | 'warning' | 'info'; readonly testId: string }) {
   const has = !!sum && sum.value > 0;
   const color = { error: 'text-error border-l-error', warning: 'text-warning border-l-warning', info: 'text-info border-l-info' }[tone];
+  const ch = useStatChange(sum ? sum.value : undefined);
   return (
-    <Link to={to} data-testid={testId} className={`block rounded-lg border border-l-4 border-base-300 px-4 py-3 transition hover:bg-base-200/60 ${has ? color.split(' ')[1] : 'border-l-base-300'}`}>
+    <Link to={to} data-testid={testId} className={`block rounded-lg border border-l-4 border-base-300 px-4 py-3 transition hover:bg-base-200/60 ${has ? color.split(' ')[1] : 'border-l-base-300'} ${ch.cls}`}>
       <p className="text-xs text-base-content/60">{title}</p>
       <p className={`mt-0.5 text-2xl font-bold tabular-nums ${sum === null ? 'text-base-content/40' : has ? color.split(' ')[0] : 'text-base-content/70'}`} title={sum === null ? m.failed : undefined}>
         {sum === undefined ? '…' : sum === null ? m.work.unknown : workText(sum)}
+        {ch.badge}
       </p>
     </Link>
   );

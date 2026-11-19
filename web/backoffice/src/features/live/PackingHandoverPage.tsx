@@ -7,6 +7,7 @@
 //   링크는 시스템 ID 로. 번호가 null 이면 ID 끝 8자리 회색 + "번호 없음", rider-service 실패면 라이더 "번호 확인 불가".
 // - unavailableSources: mfc-fulfillment-service = 목록 전체를 못 읽음(0건 아님), delivery-execution-service = 배송 칸만 "—".
 // - 새로고침은 30초(한 번 부를 때 MFC 1회 + 출고 수만큼 배송 조회 — 백엔드 권고). 개인정보·QR 없음.
+import { useNewIds } from '../../shared/motion';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -127,6 +128,8 @@ export function PackingHandoverPage() {
   const first = query.data?.pages[0];
   const failed = new Set(first?.unavailableSources ?? []);
   const items = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
+  // 새로 들어온 포장 줄 — 5초 동안 강조(2026-11-19). 거르기·더 보기(쪽 수)가 바뀌면 다시 센다
+  const fresh = useNewIds(query.data ? items.flatMap((it) => (it.shipmentId ? [it.shipmentId] : [])) : undefined, `${params.toString()}|${query.data?.pages.length ?? 0}`);
   const deliveryFailed = failed.has(DELIVERY);
   const riderFailed = riderSourceFailed(first?.unavailableSources);
   const pageState: UiState<View> = first
@@ -225,7 +228,7 @@ export function PackingHandoverPage() {
                         </thead>
                         <tbody>
                           {items.map((it) => (
-                            <tr key={it.shipmentId} data-testid="packing-row" id={it === items.find(isBlocked) ? 'packing-first-blocked' : undefined} className="scroll-mt-12">
+                            <tr key={it.shipmentId} data-testid="packing-row" id={it === items.find(isBlocked) ? 'packing-first-blocked' : undefined} className={`scroll-mt-12 ${it.shipmentId && fresh.has(it.shipmentId) ? 'row-new' : ''}`} data-new={it.shipmentId && fresh.has(it.shipmentId) ? 'true' : undefined}>
                               {/* 첫 칸: 주문번호 굵게 + 출고 ID 작게 */}
                               <td>
                                 {it.orderId ? (

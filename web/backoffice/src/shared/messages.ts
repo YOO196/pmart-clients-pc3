@@ -465,6 +465,8 @@ export const messages = {
     } as Readonly<Record<string, string>>,
     sla: '처리 기한',
     overdue: '기한 넘김',
+    /** 기한 임박(15분 안) — 남은 시간은 서버 기한에서 화면이 셈 */
+    dueSoon: (min: number) => `${min}분 남음`,
     assignee: '담당',
     unassigned: '아무도 안 맡음',
     assigneeGroup: '담당 팀',
@@ -562,6 +564,8 @@ export const messages = {
   /** 라이더 도움요청 대화(execution 0.6.0) — 라이더 ↔ 지원센터 */
   helpChat: {
     title: '라이더와 대화',
+    /** 열어 둔 동안 새로 온 라이더 메시지(몇 초 동안만) */
+    newFromRider: (n: number) => `새 메시지 ${n}`,
     intro: '라이더 앱의 도움요청 화면과 같은 대화예요. 여기에 쓴 답장은 라이더에게 보여요(직원끼리 기록은 아래 메모에). 열어 둔 동안 5초마다 새 메시지를 확인해요.',
     empty: '아직 주고받은 메시지가 없어요.',
     rider: '라이더',

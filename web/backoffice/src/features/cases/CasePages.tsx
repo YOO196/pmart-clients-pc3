@@ -20,6 +20,7 @@
 //   버튼은 할 수 있어 보일 때만(판정은 서버 — 403·409·422 는 코드 문구).
 // - bff 0.14.0 화면 번호(ADR-0070): 목록 관련 칸은 배송·주문 번호(linked[].displayNumber)·라이더(riders[]) — 링크는 시스템 ID.
 //   상세는 case-service 직접(화면 번호 없음)이라 지금 모양 그대로.
+import { useNewIds, useNow } from '../../shared/motion';
 import { useStaffText } from '../../shared/employeeLabels';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
@@ -251,13 +252,22 @@ function LinkedState({ l, role, seenAt }: { readonly l: Linked; readonly role: D
   );
 }
 
-function Sla({ c }: { readonly c: Pick<Summary, 'slaDueAt' | 'overdue'> }) {
+/** 기한 임박 — 이 시간 안이면 주황 점이 숨쉰다(2026-11-19). 넘김 판단은 서버 overdue 만 */
+const DUE_SOON_MS = 15 * 60_000;
+
+function Sla({ c }: { readonly c: Pick<Summary, 'slaDueAt' | 'overdue'> & { readonly state?: string | null } }) {
+  const now = useNow(30_000);
   if (!c.slaDueAt) return <span>{m.none}</span>;
+  const left = Date.parse(c.slaDueAt) - now;
+  // 서버가 넘겼다고 하지 않았고, 닫히지 않았고, 15분 안 — 화면은 남은 분만 센다(넘김 확정은 서버 overdue)
+  const soon = !c.overdue && c.state !== 'CLOSED' && Number.isFinite(left) && left > 0 && left <= DUE_SOON_MS;
   return (
-    <span className={`inline-flex items-center gap-1 ${c.overdue ? 'font-semibold text-error' : ''}`} data-overdue={c.overdue ? 'true' : 'false'}>
+    <span className={`inline-flex items-center gap-1 ${c.overdue ? 'font-semibold text-error' : soon ? 'font-semibold text-warning' : ''}`} data-overdue={c.overdue ? 'true' : 'false'} data-due-soon={soon ? 'true' : undefined}>
       {c.overdue && <Icon d={ICON.alert} className="h-3.5 w-3.5 shrink-0" />}
+      {soon && <span className="breathe h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden="true" data-testid="due-soon-dot" />}
       {when(c.slaDueAt)}
       {c.overdue && ` · ${m.cases.overdue}`}
+      {soon && ` · ${m.cases.dueSoon(Math.max(1, Math.ceil(left / 60_000)))}`}
     </span>
   );
 }
@@ -434,6 +444,8 @@ export function CaseListPage() {
       return view;
     },
   });
+  // 새로 들어온 접수 건 — 5초 동안 강조(2026-11-19). 탭·종류·쪽이 바뀌면 다시 센다
+  const fresh = useNewIds(query.data?.items?.flatMap((c) => (c.caseId ? [c.caseId] : [])), `${tab}|${kind ?? ''}|${cursor}`);
   return (
     <section className="max-w-7xl space-y-4">
       <PageHeader title={m.cases.title} description={m.cases.intro} />
@@ -503,7 +515,8 @@ export function CaseListPage() {
                         key={c.caseId ?? `case-${i}`}
                         data-testid="case-row"
                         {...pv.row(c.caseId)}
-                        className={`${pv.row(c.caseId).className ?? ''} ${c.overdue && pv.id !== c.caseId ? 'bg-error/5 shadow-[inset_3px_0_0_var(--color-error)]' : ''}`}
+                        className={`${pv.row(c.caseId).className ?? ''} ${c.overdue && pv.id !== c.caseId ? 'bg-error/5 shadow-[inset_3px_0_0_var(--color-error)]' : ''} ${c.caseId && fresh.has(c.caseId) ? 'row-new' : ''}`}
+                        data-new={c.caseId && fresh.has(c.caseId) ? 'true' : undefined}
                       >
                         <td>
                           <PriorityBadge p={c.priority} />
@@ -538,7 +551,7 @@ export function CaseListPage() {
                           )}
                         </td>
                         <td className="whitespace-nowrap text-sm">
-                          <Sla c={{ slaDueAt: c.slaDueAt ?? null, overdue: c.overdue ?? false }} />
+                          <Sla c={{ slaDueAt: c.slaDueAt ?? null, overdue: c.overdue ?? false, state: c.state ?? null }} />
                         </td>
                         <td className="text-sm">
                           {withAdminTeam(c) && (
@@ -610,7 +623,7 @@ function CasePreview({ caseId }: { readonly caseId: string }) {
           {c.summary && <p className="rounded-box bg-base-200/60 px-3 py-2 text-sm">{c.summary}</p>}
           <PreviewFacts
             rows={[
-              [m.cases.sla, <Sla key="s" c={{ slaDueAt: c.slaDueAt ?? null, overdue: c.overdue ?? false }} />],
+              [m.cases.sla, <Sla key="s" c={{ slaDueAt: c.slaDueAt ?? null, overdue: c.overdue ?? false, state: c.state ?? null }} />],
               [m.cases.previewGroup, label(m.cases.groupName, c.assigneeGroup)],
               [m.cases.assignee, <Person key="a" id={c.assigneeId} />],
               [m.cases.openedAt, when(c.openedAt)],

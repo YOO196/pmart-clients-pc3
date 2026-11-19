@@ -7,6 +7,7 @@
 // - 결과 줄: "N건" + 최신순/과거순 토글
 // - 표: 회색 머리줄, 줄 전체 누르면 상세
 // - 상세: 제목·표시·요약 + 오른쪽 동작 버튼, 그 아래 구역 상자(제목 줄 + 항목명/값 줄), 구역으로 가는 밑줄 탭
+import { useStatChange } from './motion';
 import type { FormEvent, ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router';
 
@@ -253,15 +254,19 @@ export function FieldList({ rows, testId }: { readonly rows: ReadonlyArray<reado
  */
 export function StatCard({ label, value, hint, to, tone, testId, active = false }: { readonly label: ReactNode; readonly value: ReactNode; readonly hint?: ReactNode; readonly to?: string; readonly tone?: 'warning' | 'error' | 'info' | 'success' | undefined; readonly testId?: string; readonly active?: boolean }) {
   const bar = tone ? { error: 'bg-error', warning: 'bg-warning', info: 'bg-info', success: 'bg-success' }[tone] : 'bg-base-300';
+  const ch = useStatChange(value); // 방금 바뀐 칸만 잠깐 빛남 + ▲▼(2026-11-19)
   const body = (
     <>
       <span className={`absolute inset-y-0 left-0 w-1 ${bar}`} aria-hidden="true" />
       <p className="text-xs font-medium text-base-content/60">{label}</p>
-      <p className={`text-2xl font-bold leading-tight tabular-nums ${tone === 'error' ? 'text-error' : tone === 'warning' ? 'text-warning' : ''}`}>{value}</p>
+      <p className={`text-2xl font-bold leading-tight tabular-nums ${tone === 'error' ? 'text-error' : tone === 'warning' ? 'text-warning' : ''}`}>
+        {value}
+        {ch.badge}
+      </p>
       {hint && <p className="text-[11px] text-base-content/50">{hint}</p>}
     </>
   );
-  const cls = `relative block space-y-0.5 overflow-hidden rounded-box border bg-base-100 py-3 pl-4 pr-3 shadow-sm ${active ? 'border-primary ring-1 ring-primary/30' : 'border-base-300'}`;
+  const cls = `relative block space-y-0.5 overflow-hidden rounded-box border bg-base-100 py-3 pl-4 pr-3 shadow-sm ${active ? 'border-primary ring-1 ring-primary/30' : 'border-base-300'} ${ch.cls}`;
   return to ? (
     <Link to={to} className={`${cls} transition hover:-translate-y-0.5 hover:shadow-md`} data-testid={testId} aria-current={active ? 'true' : undefined}>
       {body}

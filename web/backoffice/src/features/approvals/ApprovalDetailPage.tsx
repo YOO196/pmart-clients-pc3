@@ -249,9 +249,13 @@ export function ApprovalDetailPage() {
                 ))}
 
               {watching && !watchedOut && (
-                <div role="status" className="flex items-center gap-2 rounded-box bg-info/10 px-4 py-2.5 text-sm text-info">
-                  <span className="loading loading-spinner loading-sm" />
-                  {m.approvals.executionWaiting}
+                <div role="status" className="relative overflow-hidden rounded-box bg-info/10 text-sm text-info" data-testid="execution-waiting">
+                  <div className="flex items-center gap-2 px-4 py-2.5">
+                    <span className="loading loading-spinner loading-sm" />
+                    {m.approvals.executionWaiting}
+                  </div>
+                  {/* 반영 중 흐르는 막대(2026-11-19) — 서버가 아직 반영 중일 때만. 끝나거나 기다림이 끝나면 이 상자째 사라진다 */}
+                  <span className="flow-bar absolute inset-x-0 bottom-0 h-0.5 text-info" aria-hidden="true" data-testid="flow-bar" />
                 </div>
               )}
               {watchedOut && (

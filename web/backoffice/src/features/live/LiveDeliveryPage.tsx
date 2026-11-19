@@ -7,6 +7,7 @@
 // - 화면 번호(bff 0.14.0, ADR-0070): 배송·주문 칸은 deliveryNumber·orderNumber, 라이더는 가린 이름 + 라이더 번호. 링크는 시스템 ID 로.
 //   번호가 null 이면 시스템 ID 끝 8자리 회색 + "번호 없음", rider-service 를 못 읽었으면 라이더 칸 "번호 확인 불가"(원천 줄에도 보인다).
 // - 자동 새로 고침 1분(요청서: 서버 부담 — 30초 이상 권장). 화면이 숨겨지면 멈춘다(TanStack Query 기본).
+import { useNewIds } from '../../shared/motion';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
 
@@ -274,6 +275,9 @@ function LiveNext({ items }: { readonly items: readonly LiveItem[] }) {
 
 function LiveTable({ items, composedAt, casesTruncated = false, riderFailed = false }: { readonly items: readonly LiveItem[]; readonly composedAt: string | undefined; readonly casesTruncated?: boolean; readonly riderFailed?: boolean }) {
   const rowLink = useRowLink();
+  // 새로 들어온 배송 줄 — 5초 동안 강조(2026-11-19). 거르기·쪽이 바뀌면 다시 센다
+  const [params] = useSearchParams();
+  const fresh = useNewIds(items.flatMap((it) => (it.deliveryId ? [it.deliveryId] : [])), params.toString());
   return (
     <DataTable>
       <thead>
@@ -292,7 +296,7 @@ function LiveTable({ items, composedAt, casesTruncated = false, riderFailed = fa
           const late = isLate(it, composedAt);
           const dispatchState = it.dispatch?.state ?? null;
           return (
-            <tr key={it.deliveryId} data-testid="live-row" {...(it.deliveryId ? rowLink(`/deliveries/${encodeURIComponent(it.deliveryId)}`) : {})} className={`cursor-pointer ${late ? 'bg-error/5' : ''}`}>
+            <tr key={it.deliveryId} data-testid="live-row" {...(it.deliveryId ? rowLink(`/deliveries/${encodeURIComponent(it.deliveryId)}`) : {})} className={`cursor-pointer ${late ? 'bg-error/5' : ''} ${it.deliveryId && fresh.has(it.deliveryId) ? 'row-new' : ''}`} data-new={it.deliveryId && fresh.has(it.deliveryId) ? 'true' : undefined}>
               {/* 첫 칸: 배송 번호 굵게 + 주문 번호 작게 — 화면 번호(bff 0.14.0, ADR-0070), 링크는 시스템 ID */}
               <td>
                 <span className="block font-semibold" data-testid="live-delivery">

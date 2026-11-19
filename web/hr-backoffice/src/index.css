@@ -168,3 +168,13 @@ main .rounded-box.border.p-4 > h2:first-child {
 @media (prefers-reduced-motion: reduce) {
   .step-pulse { display: none; }
 }
+
+/* 숫자 띠: 방금 바뀐 칸만 잠깐 빛남(2026-11-19, 백오피스와 같게). 움직임 줄이기면 없음 */
+@keyframes pmart-changed {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-primary) 50%, transparent); }
+  100% { box-shadow: 0 0 0 12px transparent; }
+}
+.stat-changed { animation: pmart-changed 1.4s ease-out 2; }
+@media (prefers-reduced-motion: reduce) {
+  .stat-changed { animation: none !important; }
+}
