@@ -215,7 +215,7 @@ class _StartCountScreenState extends ConsumerState<StartCountScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           Text(l10n.countStartHelp),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           ScanInput(
             id: 'count-start-loc',
             label: l10n.countStartScan,
@@ -227,7 +227,7 @@ class _StartCountScreenState extends ConsumerState<StartCountScreen> {
             ],
             onScan: _scan,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 4,
@@ -438,7 +438,7 @@ class _CountSessionAdminScreenState
               l10n.countDecideUnknown,
               key: const ValueKey('count-decide-unknown'),
             ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(

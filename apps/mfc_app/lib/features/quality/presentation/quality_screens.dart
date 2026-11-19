@@ -171,7 +171,7 @@ class InspectScreen extends ConsumerWidget {
             ),
             if (s.lastScan == InspectScan.wrong)
               Padding(
-                padding: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.only(top: 12),
                 child: Text(
                   l10n.moveWrongPlace,
                   key: const ValueKey('inspect-scan-error'),
@@ -224,7 +224,7 @@ class InspectScreen extends ConsumerWidget {
             _ProductHeader(task: t),
             if (s.lastScan == InspectScan.wrong)
               Padding(
-                padding: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.only(top: 12),
                 child: Text(
                   l10n.inspectWrongProduct,
                   key: const ValueKey('inspect-scan-error'),
@@ -294,7 +294,7 @@ class _ProductHeader extends StatelessWidget {
               '${task.sku} · ${l10n.inspectFrom(task.locationCode)}',
               style: const TextStyle(color: PdaColors.body),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               l10n.inspectTarget(task.remainingQty),
               style: theme.textTheme.titleMedium?.copyWith(
@@ -371,7 +371,7 @@ class _JudgeStep extends ConsumerWidget {
                   ),
                 ),
                 if (c.needsTemperature) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Text(
                     l10n.inspectTemperatureQ,
                     style: theme.textTheme.titleSmall,
@@ -395,7 +395,7 @@ class _JudgeStep extends ConsumerWidget {
                     },
                   ),
                 ],
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 for (final (i, r) in s.rows.indexed)
                   _JudgeRow(
                     key: ValueKey('inspect-row-${r.id}'),
@@ -412,7 +412,7 @@ class _JudgeStep extends ConsumerWidget {
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             l10n.inspectTotal(s.total, t.remainingQty),
             key: const ValueKey('inspect-total'),
@@ -533,7 +533,7 @@ class _JudgeRow extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             // 판정 — 기본값 없음. 기준 미달·온도 이탈이면 격리로 고정.
             SegmentedButton<bool>(
               key: ValueKey('verdict-$index'),

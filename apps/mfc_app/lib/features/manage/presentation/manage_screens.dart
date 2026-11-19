@@ -251,7 +251,7 @@ class CenterWorkersScreen extends ConsumerWidget {
               key: const ValueKey('manage-workers-summary'),
               style: theme.textTheme.titleMedium,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             for (final w in workers)
               Card(
                 key: ValueKey('worker-${w.workerId}'),
