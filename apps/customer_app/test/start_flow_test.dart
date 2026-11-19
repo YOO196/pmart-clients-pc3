@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart';
 
 import 'package:customer_app/features/address/data/guest_address_store.dart';
+import 'package:customer_app/features/address/data/geocoding_repository.dart';
 import 'package:customer_app/features/address/data/mock_address_repository.dart';
 import 'package:customer_app/features/address/domain/address.dart';
 import 'package:customer_app/features/address/data/current_location.dart';
@@ -373,6 +374,55 @@ void main() {
       expect(key('f-road'), findsNothing);
     });
 
+    testWidgets('도로명 없이 지번만 오면 그 지번을 주소 검색해 도로명으로 주소 입력', (t) async {
+      final geo = _JibunOnlyGeocoding(roadForJibun: '부산 부산진구 중앙대로 680');
+      await t.pumpWidget(
+        testApp(
+          [
+            deviceConsentsRepositoryProvider.overrideWithValue(consents),
+            currentLocationSourceProvider.overrideWithValue(location),
+          ],
+          addressPicker: FakeAddressPicker(customGeocoding: geo),
+          startGate: true,
+          secure: secure,
+        ),
+      );
+      await t.pumpAndSettle();
+      await t.tap(key('start-address-locate'));
+      await t.pumpAndSettle();
+      await t.tap(key('dialog-confirm'));
+      await t.pumpAndSettle();
+      // 첫 검색은 지번(도로명 찾기). 그 뒤는 주소 입력이 지도 핀을 놓으려고 도로명을 다시 찾는 것.
+      expect(geo.queries.first, '부산 부산진구 부전동 168-1');
+      expect(key('f-road'), findsOneWidget);
+      expect(find.text('부산 부산진구 중앙대로 680'), findsOneWidget);
+    });
+
+    testWidgets('지번으로도 도로명을 못 찾으면 지번을 보여 주며 검색으로 안내', (t) async {
+      final geo = _JibunOnlyGeocoding();
+      await t.pumpWidget(
+        testApp(
+          [
+            deviceConsentsRepositoryProvider.overrideWithValue(consents),
+            currentLocationSourceProvider.overrideWithValue(location),
+          ],
+          addressPicker: FakeAddressPicker(customGeocoding: geo),
+          startGate: true,
+          secure: secure,
+        ),
+      );
+      await t.pumpAndSettle();
+      await t.tap(key('start-address-locate'));
+      await t.pumpAndSettle();
+      await t.tap(key('dialog-confirm'));
+      await t.pumpAndSettle();
+      expect(
+        find.text('지금 위치(부산 부산진구 부전동 168-1)에는 도로명 주소가 없어요. 가까운 건물 주소로 검색해 주세요'),
+        findsOneWidget,
+      );
+      expect(key('f-road'), findsNothing);
+    });
+
     testWidgets('위치를 못 받으면 안내만 하고 주소를 지어내지 않는다', (t) async {
       location.fix = const LocationUnavailable();
       await open(t);
@@ -428,5 +478,32 @@ final class _EmptyAddressRepository extends MockAddressRepository {
       ],
       context: const ShoppingContext(version: 1),
     );
+  }
+}
+
+/// 역지오코딩이 지번만 주는 위치(도로·빈터). [roadForJibun] 이 있으면 지번 검색이 그 도로명을 준다.
+final class _JibunOnlyGeocoding implements GeocodingRepository {
+  _JibunOnlyGeocoding({this.roadForJibun});
+
+  final String? roadForJibun;
+  final queries = <String>[];
+
+  @override
+  Future<List<AddressCandidate>> reverse(double lat, double lng) async => [
+    AddressCandidate(lat: lat, lng: lng, jibunAddress: '부산 부산진구 부전동 168-1'),
+  ];
+
+  @override
+  Future<List<AddressCandidate>> geocode(String query) async {
+    queries.add(query);
+    return [
+      if (roadForJibun case final r?)
+        AddressCandidate(
+          lat: 35.15,
+          lng: 129.06,
+          roadAddress: r,
+          zoneNo: '47296',
+        ),
+    ];
   }
 }

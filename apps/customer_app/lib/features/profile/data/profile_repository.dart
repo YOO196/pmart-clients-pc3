@@ -125,6 +125,7 @@ Profile profileFromContract(api.Profile p) {
     version: p.version ?? (throw const ContractViolationFailure('version 없음')),
     nickname: p.nickname,
     phoneMasked: p.phoneMasked,
+    phone: text(p.phone),
     name: text(p.name),
     email: text(p.email),
     emailVerified: p.emailVerified,

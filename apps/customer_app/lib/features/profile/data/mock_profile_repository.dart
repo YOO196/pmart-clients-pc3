@@ -11,8 +11,11 @@ final class MockProfileRepository implements ProfileRepository {
 
   final Duration latency;
 
-  /// 등록된 휴대폰 번호(서버가 가려서 돌려준다). 연락처 변경은 아직 열리지 않아 여기서는 바뀌지 않는다.
+  /// 등록된 휴대폰 번호(숫자). 서버처럼 가린 값과 본인용 원래 값을 같이 돌려준다(customer 0.7.0 — BR-32).
   String? phone;
+
+  /// 다음 연락처 저장을 400(옛 서버처럼)으로 만든다.
+  bool rejectPhone = false;
 
   /// 새로 가입한 계정처럼 이름이 비어 있다.
   String? nickname;
@@ -47,6 +50,7 @@ final class MockProfileRepository implements ProfileRepository {
       version: _version,
       nickname: nickname,
       phoneMasked: phone == null ? null : mask(phone!),
+      phone: phone,
       name: name,
       email: email,
       emailVerified: emailVerified,
@@ -76,9 +80,13 @@ final class MockProfileRepository implements ProfileRepository {
     if (expectedVersion != _version) {
       return const ProfileChangeRejected(ProblemCode.versionConflict);
     }
-    // 서버처럼 연락처 변경은 아직 받지 않는다(2026-11-03 안내: phone 이 오면 400 VALIDATION_FAILED).
+    // 0.7.0: 휴대폰 01X 10~11자리(하이픈은 서버가 뗀다), 빈 값이면 지운다. 그 밖은 400 VALIDATION_FAILED.
     if (phone != null) {
-      return const ProfileChangeRejected(ProblemCode.validationFailed);
+      final digits = PhoneInput.normalize(phone);
+      if (rejectPhone || (digits.isNotEmpty && !PhoneInput.valid(digits))) {
+        return const ProfileChangeRejected(ProblemCode.validationFailed);
+      }
+      this.phone = digits.isEmpty ? null : digits;
     }
     if (nickname != null) this.nickname = nickname;
     _version++;

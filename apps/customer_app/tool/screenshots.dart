@@ -27,6 +27,9 @@ import 'package:customer_app/features/checkout/data/mock_checkout_repository.dar
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
 import 'package:customer_app/features/claims/data/mock_claims_repository.dart';
 import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
+import 'package:customer_app/features/profile/data/mock_profile_repository.dart';
+import 'package:customer_app/features/profile/presentation/profile_controller.dart'
+    show profileProvider;
 import 'package:customer_app/features/redelivery/data/mock_redelivery_payments_repository.dart';
 import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
 import 'package:customer_app/features/reviews/domain/reviews.dart';
@@ -132,8 +135,12 @@ void main() {
       left: const Duration(hours: 23, minutes: 40),
     );
     checkout.externals.add(claims);
+    // 주소 입력 캡처용 회원 프로필(처음엔 연락처 없음 → "내 연락처"만 묻는 모습).
+    final profile = MockProfileRepository(latency: Duration.zero)
+      ..nickname = '김피마';
     await t.pumpWidget(
       testApp(
+        profile: profile,
         checkout: checkout,
         reviews: reviews,
         orders: orders,
@@ -358,6 +365,13 @@ void main() {
     reviews.reviewJson.firstWhere(
       (r) => r['reviewId'] == 'rv-mine-1',
     )['state'] = 'PUBLISHED';
+    await go('/addresses/new');
+    await shot('address-new-no-phone');
+    // 프로필에 연락처가 있으면 받는 분·연락처 칸이 없다(BR-60, 레퍼런스 2-7-1).
+    profile.phone = '01012345678';
+    ProviderScope.containerOf(t.element(find.byType(Scaffold).first))
+        .invalidate(profileProvider);
+    await go('/addresses');
     await go('/addresses/new');
     await shot('address-new');
     await go('/notifications/settings');

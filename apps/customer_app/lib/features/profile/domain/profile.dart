@@ -9,6 +9,7 @@ class Profile {
     required this.version,
     this.nickname,
     this.phoneMasked,
+    this.phone,
     this.name,
     this.email,
     this.emailVerified,
@@ -39,6 +40,10 @@ class Profile {
   final String? phoneMasked;
 
   bool get hasPhone => phoneMasked?.isNotEmpty ?? false;
+
+  /// 본인에게만 주는 가리지 않은 번호(숫자, customer 0.7.0 — BR-32). 배송지 받는 분 연락처를 채울 때만 쓴다.
+  /// 본인 확인을 거치지 않은 번호다(`phoneVerified=false`). 로그·화면 문자열에 남기지 않는다. 없으면 null.
+  final String? phone;
 
   @override
   String toString() => 'Profile($accountId, v$version)';

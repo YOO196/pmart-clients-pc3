@@ -59,12 +59,26 @@ Future<PostcodeResult?> findCurrentAddress(
       return null;
     case LocationFound(:final lat, :final lng):
       try {
-        final found = await ref
-            .read(geocodingRepositoryProvider)
-            .reverse(lat, lng);
-        final road = found.where((c) => c.roadAddress != null).firstOrNull;
+        final geocoding = ref.read(geocodingRepositoryProvider);
+        final found = await geocoding.reverse(lat, lng);
+        var road = found.where((c) => c.roadAddress != null).firstOrNull;
+        // 휴대폰 위치가 도로·빈터에 찍히면 카카오가 지번만 준다(도로명 없음). 그 지번을 주소 검색에 넣어
+        // 그 필지의 도로명을 찾는다(배송 가능 판정은 도로명으로 한다 — ADR-0023).
+        final jibun = found
+            .map((c) => c.jibunAddress)
+            .whereType<String>()
+            .firstOrNull;
+        if (road == null && jibun != null) {
+          road = (await geocoding.geocode(jibun))
+              .where((c) => c.roadAddress != null)
+              .firstOrNull;
+        }
         if (road == null) {
-          say(l10n.locateNoAddress);
+          say(
+            jibun == null
+                ? l10n.locateNoAddress
+                : l10n.locateNoRoadAddress(jibun),
+          );
           return null;
         }
         return PostcodeResult(

@@ -39,7 +39,7 @@
 | BR-29 | 높음 | 고객 | 주소 좌표(`AddressInput.geo`)의 출처: 앱에 주소 검색(좌표 제공)이 없어 회원 주소 판정이 늘 UNKNOWN | **RESOLVED**(2026-10-31): 우편번호 검색 + 서버 좌표 변환(BR-30) + 카카오 지도 핀. 판정은 서버가 도로명으로(핀은 배달 위치 참고) |
 | BR-30 | 높음 | 고객 | 주소 → 좌표 변환 API(카카오 로컬, REST 키는 서버). 지도 핀 조정 전 시작 좌표 | **RESOLVED**(2026-10-31, 백엔드 회신 `clients-reply-address-geocoding`, ADR-0023). 고객앱 주소 검색·지도 핀 반영 |
 | BR-31 | 중간 | 백오피스 | 상품 목록 `GET /products` 에 검색어(상품명·ID) 파라미터가 없음. 콘텐츠 등록의 상품 고르기가 불러온 쪽 안에서만 찾는다 | OPEN |
-| BR-32 | 높음 | 고객 | 휴대폰 번호 저장(`POST /me/profile-changes`)이 501. 배송지 받는 분·연락처 자동 채움에 쓸 본인 연락처(가리지 않은 값)·기본 수령정보가 없음 | OPEN(요청 `docs/handoff/archive/2026-10-31-backend-customer-profile-and-refunds.md`) |
+| BR-32 | 높음 | 고객 | 휴대폰 번호 저장(`POST /me/profile-changes`)이 501. 배송지 받는 분·연락처 자동 채움에 쓸 본인 연락처(가리지 않은 값)·기본 수령정보가 없음 | **RESOLVED**(계약, 회신 `clients/customer-app/2026-11-19-reply-location-in-url-and-open-items.md` §3·덧붙임, customer 0.7.0 — LAN 배포 전): `profile-changes {phone}` 저장(본인 확인 없음, `phoneVerified=false`), `GET /me` `phone`(가리지 않은 값). 고객앱 반영은 BR-60 과 함께 |
 | BR-33 | 중간 | 고객 | 내 취소·반품·환불 목록 경로가 없음(클레임 단건 환불 조회만) | OPEN(같은 요청서 §3) |
 | BR-34 | 높음 | 고객 | 주문서형 결제위젯: 결제 진입 전에 토스 clientKey(·customerKey)를 받을 경로가 없음(지금은 PAY 이후에만) | **RESOLVED**(2026-11-02, 백엔드 회신 `clients-reply-br34-payment-widget-config`·`clients-notice-toss-customer-key`): `GET /payment-widget-config` → {provider, clientKey, customerKey=accountId}. 고객앱 주문서형 결제위젯 반영 |
 | BR-35 | 높음 | 고객 | 주문·초안 품목 `productName`(주문 당시 사본)이 비어 와서 주문 내역에 SKU 가 보임 | **RESOLVED**(회신 `../pmart-backend/docs/handoff/clients/archive/2026-11-02-clients-reply-br35-product-name-snapshot.md`, 초안·주문 `productName`·`optionLabel` 사본). 고객앱 반영 2026-11-02(주문 상세·취소 화면 품목 제목, 이름 없으면 sku) |
@@ -67,6 +67,7 @@
 | BR-57 | 낮음 | 인사팀 백오피스 | 요청 권한으로 고를 수 있는 역할 목록 API(employee-auth) — 역할이 늘 때마다 화면 고정 목록을 맞추지 않게 | **DONE(2026-11-16)** — `GET /employee-auth/roles`(employee-auth 0.5.0, 백엔드 알림 `hr-backoffice/2026-11-15-notice-role-list-and-departments.md` §1). 직원 등록의 요청 권한 역할이 이 응답(이름·순서·센터 필요 여부)을 쓴다 |
 | BR-58 | 중간 | 백오피스 | 라이더 도움요청 상담 대화 — 상담원 쪽 대화 읽기·답장·새 메시지 표시·읽음, 상태(처리 중 시점·다시 처리 뒤 대화), 관리자 가림 | **AGREED**(2026-11-16 회신 — 대화는 delivery-execution, 백엔드 PR #60 병합 `5e2455fe` = execution 0.6.0 messages API, LAN 배포는 확인 안 함·DE-2(권한·새 메시지 필드·가림) PR #62 로 PC 5 에 요청). DE-2 반영·배포 뒤 화면을 붙인다. 전화는 보류. 요청 `docs/handoff/archive/2026-11-16-backend-rider-help-chat.md` |
 | BR-59 | 중간 | 고객 | 처음 실행 약관(레퍼런스 2-1): 위치 기반 서비스 약관(필수) 동의 유형이 없고(`consentType` 은 TERMS_OF_SERVICE·PRIVACY_POLICY·AGE_OVER_14·MARKETING 뿐), 로그인 전(비회원·기기) 동의·마케팅 푸시 수신 동의를 기록할 경로가 없음 | RESOLVED(2026-11-19, 요청 `docs/handoff/customer-app/2026-11-19-backend-first-run-consents.md` → 회신 `clients/customer-app/2026-11-19-reply-br59-first-run-consents.md`, customer 0.6.0~0.6.1 LAN 배포). 고객앱 반영(목 모드 확인, 미커밋). 백엔드 질문(현재 위치 → 주소 서비스 이름)은 답 `docs/handoff/customer-app/2026-11-19-backend-br59-location-service-answer.md`(카카오 로컬·카카오맵, 휴대폰 위치는 geolocator — 2026-11-19 승인·반영) + 역지오코딩 좌표 쿼리 로그 질문 1개 |
+| BR-60 | 중간 | 고객 | 레퍼런스 주소 상세에는 받는 분·연락처가 없고 연락처는 주문서 "내 연락처"에 있는데, 계약 `AddressInput` 은 `receiverName`·`receiverPhone` 필수 | OPEN(요청 `docs/handoff/customer-app/2026-11-19-backend-address-receiver-to-checkout.md` — R1 필수 해제, R2 초안 사본은 프로필 연락처·없으면 막힘, R3 주문서 번호 변경 방식, R4 이름 없을 때) |
 
 ---
 
@@ -424,3 +425,9 @@
   ④ `GET /consent-terms`(항목·현행 버전·`documentUrl`), `GET /consent-terms/{항목}/{버전}`(Markdown 본문, 시연용 초안·법률 검토 전).
   질문: 현재 위치를 주소로 바꿀 때 쓰는 지도·주소 서비스 이름(위치기반서비스 약관 제6조) — "현재 위치로 찾기" 결정 때 답한다.
 - 클라이언트(반영, 2026-11-19): 위치 약관 선택으로("시작하기" 잠금 풀림), 시작하기 → `POST /device-consent-changes`(약관 목록의 현행 버전, 결과 불명은 같은 키 한 번 더) → 서버 응답의 `lastChangedAt`·`senderName` 으로 2-2 동의/거부 안내 → 다음 단계. 약관 `>` → 본문 화면. 기기에는 단계 통과만 남긴다. 재동의 화면은 위치 약관을 묻지 않는다.
+
+## BR-60 배송지에서 받는 분·연락처 빼기, 연락처는 주문서로 (고객앱)
+- 계기: 사용자 2026-11-19 "처음 주소관리 쪽에 받는분이랑 연락처 있는데 이거 원래 고객앱 레퍼런스쪽에 이런식으로 있던게 맞아?" → "백엔드에 요청서 올리고 그리고 앱도 바꾸자".
+- 레퍼런스: 주소 상세(2-7-1, 3-1 2-4)에는 받는 분·연락처가 없다. 연락처는 주문하기 "내 연락처"(6-3, "번호 변경"). 받는 분 이름 칸은 어디에도 없다.
+- 계약 공백: customer-service `AddressInput` 이 `receiverName`·`receiverPhone` 필수. 초안은 이 값을 사본으로 고정(BR-37).
+- 요청(`docs/handoff/customer-app/2026-11-19-backend-address-receiver-to-checkout.md`): R1 주소록·비회원 배송지에서 두 값 선택으로, R2 초안 사본은 주소에 없으면 프로필 연락처·이름(BR-32 0.7.0), 연락처가 없으면 막힘, R3 주문서 번호 변경 = 프로필 저장 + 초안 다시(앱 추천) 또는 초안 필드, R4 이름이 없을 때.

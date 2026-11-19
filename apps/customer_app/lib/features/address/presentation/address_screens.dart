@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show TextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart' show PmartFailure;
@@ -7,9 +8,15 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
+import '../../auth/domain/auth.dart' show MemberSession;
+import '../../auth/presentation/auth_controller.dart' show sessionProvider;
+import '../../profile/domain/profile.dart' show Profile;
+import '../../profile/presentation/profile_controller.dart'
+    show profileProvider;
 import '../data/geocoding_repository.dart';
 import '../domain/address.dart';
 import 'map_pick_screen.dart';
+import 'phone_number_formatter.dart';
 import 'postcode_screen.dart';
 import 'address_controller.dart';
 
@@ -284,10 +291,71 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
       ? AppLocalizations.of(context).fieldRequired
       : null;
 
+  /// 받는 분·연락처를 물을지. 레퍼런스 주소 상세(2-7-1)에는 두 칸이 없다 — 회원은 프로필 이름·연락처로 채운다(BR-60).
+  /// 계약 `AddressInput` 이 아직 두 값을 필수로 받아서, 프로필에 없거나 프로필을 못 읽으면 그 칸만 묻는다.
+  /// 비회원은 프로필이 없어 둘 다 묻는다(BR-60 R1 회신 뒤 뺀다).
+  _Receiver _receiver() {
+    if (ref.watch(sessionProvider) is! MemberSession) {
+      return const _Receiver(member: false, askName: true, askPhone: true);
+    }
+    return switch (ref.watch(profileProvider)) {
+      AsyncData(value: final p?) => _Receiver(
+        member: true,
+        askName: _profileName(p) == null,
+        askPhone: p.phone == null,
+        profile: p,
+      ),
+      // 읽는 중에는 칸을 숨기고, 저장 때 다 읽힐 때까지 기다린다.
+      AsyncLoading() => const _Receiver(
+        member: true,
+        askName: false,
+        askPhone: false,
+        loading: true,
+      ),
+      // 못 읽었으면 값을 지어내지 않고 묻는다.
+      _ => const _Receiver(member: true, askName: true, askPhone: true),
+    };
+  }
+
+  static String? _profileName(Profile p) => switch (p.nickname?.trim()) {
+    final n? when n.isNotEmpty => n,
+    _ => p.name,
+  };
+
   Future<void> _save() async {
     if (!(_form.currentState?.validate() ?? false)) return;
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
+    var receiver = _receiver();
+    if (receiver.loading) {
+      try {
+        await ref.read(profileProvider.future);
+      } on PmartFailure {
+        // 아래에서 다시 판단한다(칸이 보이게 된다).
+      }
+      if (!mounted) return;
+      receiver = _receiver();
+      // 프로필에 없어 이제 칸을 보여야 하면 입력을 받은 뒤 다시 누르게 한다.
+      if (receiver.askName || receiver.askPhone) {
+        setState(() {});
+        return;
+      }
+    }
+    final profile = receiver.profile;
+    final receiverName = receiver.askName
+        ? _name.text.trim()
+        : _profileName(profile!)!;
+    final receiverPhone = receiver.askPhone
+        ? _phone.text.trim()
+        : PhoneNumberFormatter.format(profile!.phone!);
+    // 회원이 처음 넣은 연락처는 프로필에도 남겨 다음부터 묻지 않는다(BR-32 — 본인 확인 없는 연락처).
+    // 저장이 안 돼도(옛 서버·형식) 주소는 그 번호로 저장한다.
+    if (receiver.askPhone && profile != null) {
+      await ref
+          .read(profileProvider.notifier)
+          .changeProfile(phone: receiverPhone);
+      if (!mounted) return;
+    }
     final outcome = await ref
         .read(addressBookProvider.notifier)
         .add(
@@ -295,8 +363,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
             label: _label.text.trim().isEmpty ? null : _label.text.trim(),
             roadAddress: _road.text.trim(),
             detailAddress: _detail.text.trim(),
-            receiverName: _name.text.trim(),
-            receiverPhone: _phone.text.trim(),
+            receiverName: receiverName,
+            receiverPhone: receiverPhone,
             entranceMethod: _entrance,
             entranceNote: _note.text.trim().isEmpty ? null : _note.text.trim(),
             geo: _geo,
@@ -319,6 +387,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     int max, {
     bool required = true,
     TextInputType? keyboard,
+    List<TextInputFormatter>? formatters,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: TextFormField(
@@ -326,6 +395,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
       controller: c,
       maxLength: max,
       keyboardType: keyboard,
+      inputFormatters: formatters,
       decoration: InputDecoration(labelText: label),
       validator: required ? _required : null,
     ),
@@ -334,6 +404,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final receiver = _receiver();
     return Scaffold(
       appBar: AppBar(title: Text(l10n.addressAdd)),
       body: Form(
@@ -400,19 +471,22 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               l10n.addressDetail,
               AddressLimits.detailAddress,
             ),
-            _field(
-              'f-name',
-              _name,
-              l10n.addressReceiver,
-              AddressLimits.receiverName,
-            ),
-            _field(
-              'f-phone',
-              _phone,
-              l10n.addressPhone,
-              AddressLimits.receiverPhone,
-              keyboard: TextInputType.phone,
-            ),
+            if (receiver.askName)
+              _field(
+                'f-name',
+                _name,
+                l10n.addressReceiver,
+                AddressLimits.receiverName,
+              ),
+            if (receiver.askPhone)
+              _field(
+                'f-phone',
+                _phone,
+                receiver.member ? l10n.addressMyPhone : l10n.addressPhone,
+                AddressLimits.receiverPhone,
+                keyboard: TextInputType.phone,
+                formatters: const [PhoneNumberFormatter()],
+              ),
             DropdownButtonFormField<EntranceMethod>(
               initialValue: _entrance,
               decoration: InputDecoration(labelText: l10n.addressEntrance),
@@ -463,4 +537,25 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
       ),
     );
   }
+}
+
+/// 주소 입력에서 받는 분·연락처를 물을지([_AddressFormScreenState._receiver]).
+final class _Receiver {
+  const _Receiver({
+    required this.member,
+    required this.askName,
+    required this.askPhone,
+    this.profile,
+    this.loading = false,
+  });
+
+  final bool member;
+  final bool askName;
+  final bool askPhone;
+
+  /// 회원 프로필(읽었을 때만). 묻지 않는 값은 여기서 채운다.
+  final Profile? profile;
+
+  /// 프로필을 읽는 중.
+  final bool loading;
 }

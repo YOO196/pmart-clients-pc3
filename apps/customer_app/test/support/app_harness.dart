@@ -164,15 +164,19 @@ final class FakeAddressPicker {
     this.road = '서울 송파구 올림픽로 300',
     this.pin,
     MockGeocodingRepository? geocoding,
+    this.customGeocoding,
   }) : geocoding = geocoding ?? MockGeocodingRepository(latency: Duration.zero);
 
   String? road;
   GeoPoint? pin;
   final MockGeocodingRepository geocoding;
+
+  /// 목 대신 쓸 주소↔좌표 변환(예: 지번만 주는 위치). 있으면 [geocoding] 대신 이것을 쓴다.
+  final GeocodingRepository? customGeocoding;
   final mapStarts = <GeoPoint>[];
 
   List<Override> get overrides => [
-    geocodingRepositoryProvider.overrideWithValue(geocoding),
+    geocodingRepositoryProvider.overrideWithValue(customGeocoding ?? geocoding),
     addressSearchProvider.overrideWithValue(
       (_) async => road == null
           ? null
