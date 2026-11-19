@@ -36,6 +36,57 @@ export const messages = {
   /** 머리줄 역할 칩 */
   roleChip: { supervisor: '센터 관리자' },
 
+  /** 화면 틀 보탬(2026-11-19 통합 백오피스와 같게) — 끊김 띠·최근 봄·제목 띠 */
+  chrome: {
+    offline: '인터넷 연결이 끊겼어요.',
+    offlineHint: '지금 화면의 숫자·목록은 끊기기 전 것이에요. 다시 이어지면 저절로 새로 읽어요.',
+    onlineAgain: '다시 연결됐어요 — 화면을 새로 읽는 중이에요.',
+    seen: '최근 봄',
+    seenTitle: '이 브라우저에서 최근 열어 본 것이에요(최근 8개).',
+    toTop: '↑ 맨 위로',
+  },
+  /** 목록 순서대로 상세 넘기기 */
+  queue: {
+    label: '목록 순서대로 넘기기',
+    backToList: '‹ 보던 목록으로',
+    prev: '이전',
+    next: '다음',
+    position: (at: number, total: number) => `${at} / ${total}`,
+  },
+  /** 목록 미리보기 칸 */
+  preview: {
+    label: '미리보기',
+    prev: '앞 줄',
+    next: '다음 줄',
+    close: '닫기',
+    openDetail: '상세 열기',
+    position: (n: number, total: number) => `${total}줄 중 ${n}번째 · ↑↓ 로 넘기기 · Enter 로 상세`,
+  },
+  /** 목록 "내 보기"(지금 거르기 조건 저장 — 이 브라우저에만) */
+  savedViews: {
+    title: '내 보기',
+    empty: '저장한 보기가 없어요',
+    add: '+ 지금 조건 저장',
+    noFilter: '조건을 먼저 고르세요',
+    nameLabel: '보기 이름',
+    namePlaceholder: '예: 막힌 피킹',
+    save: '저장',
+    cancel: '취소',
+    remove: (n: string) => `${n} 보기 지우기`,
+  },
+  /** 목록 공통 부품(숫자 카드·검색 칩·다 끝났어요) */
+  listParts: {
+    count: (n: number) => `${n}건`,
+    atLeast: (n: number) => `${n}건 이상`,
+    search: '검색 조건',
+    all: '전체',
+    open: '검색 열기 ▾',
+    close: '검색 닫기 ▴',
+    allDone: '수고하셨어요!',
+    guide: '안내',
+    systemNumbers: '시스템 번호',
+  },
+
   /** 내 정보 — hr-service GET /hr/employees/me(본인). 비밀번호·연락처 바꾸기는 백엔드 EA-3·HR-3 대기 */
   me: {
     title: '내 정보',
@@ -166,7 +217,7 @@ export const messages = {
     orderLabel: '주문',
     taskLabel: '작업',
     packageLabel: '포장',
-    incidentLabel: '사고',
+    incidentLabel: '파손 사고',
     rider: (r: string) => `라이더 ${r}`,
     riderPrefix: '라이더',
   },
@@ -313,7 +364,8 @@ export const messages = {
     emptyClosed: '처리가 끝난 배차 실패가 없어요.',
     kindName: '배차 실패',
     overdue: '기한 넘김',
-    col: { priority: '우선순위', summary: '요약', refs: '관련', sla: '처리 기한', state: '상태' },
+    col: { priority: '우선순위', summary: '요약', number: '접수 번호', sla: '처리 기한', state: '상태' },
+    caseLabel: '접수 건',
     refName: { deliveryId: '배송', orderId: '주문' } as Readonly<Record<string, string>>,
     stateName: { OPEN: '접수됨', ASSIGNED: '맡음', ACTION_PENDING: '조치 대기', MONITORING: '지켜보는 중', RESOLUTION_REVIEW: '결과 검토', CLOSED: '처리 끝남', REOPENED: '다시 처리 중' } as Readonly<Record<string, string>>,
     actionName: { OPENED: '접수', RECURRED: '재발', ASSIGNED: '맡음', CLOSED: '처리 끝냄', REOPENED: '다시 처리', TRANSFERRED: '넘김' } as Readonly<Record<string, string>>,
@@ -324,7 +376,7 @@ export const messages = {
     closure: '처리 결과',
     history: '이력',
     back: '배차 실패 목록',
-    detailTitle: (id: string) => `배차 실패 접수 건 ${id}`,
+    detailTitle: (number: string) => `배차 실패 접수 건 ${number}`,
   },
 
   center: {
@@ -615,7 +667,8 @@ export const messages = {
       createdAt: '생긴 시각',
     },
     qty: (planned: number, done: number) => `${planned} / ${done} / ${planned - done}`,
-    assigneeOnly: (who: string) => `담당(${who})만 실행할 수 있어요. 다른 사람이 보내면 서버가 거절해요.`,
+    assigneeOnly: '담당만 실행할 수 있어요. 다른 사람이 보내면 서버가 거절해요.',
+    ui: { task: '입고 작업' },
     inspect: '품질검사 결과',
     inspectHint: '결과를 여러 줄로 나눠 넣어요(수량·판정·제조 LOT 표기·소비기한·제조일). 같은 LOT 표기·기한은 같은 LOT 으로 합쳐져요. 합계는 남은 수량 이하 — 남은 것은 나중에 다시.',
     resultRow: (n: number) => `${n}번째 결과`,
@@ -695,6 +748,8 @@ export const messages = {
 
   /** 배정 — mfc-capacity-service 0.14.0 assignments·assignment-plans */
   assignments: {
+    openTask: '작업 보기',
+    planLabel: '배정 추천',
     intro: '작업마다 담당 한 명을 정해요. 직접 정하거나, 추천(OR-Tools)을 계산해 보고 확정해요. 작업 시작 가능 여부는 현장 작업 서비스가 시작 때 판정해요.',
     tabs: { list: '배정 목록', manual: '직접 배정', plan: '배정 추천' },
     filters: { state: '상태', date: '배정한 날(한국)', worker: '작업자', task: '작업 ID' },
@@ -774,6 +829,21 @@ export const messages = {
 
   /** 작업 현황 — mfc-fulfillment-service 0.4.11 tasks·shipments·packages */
   tasks: {
+    /** 통합 백오피스와 같은 목록·상세 부품(2026-11-19 PC 2 요청) */
+    ui: {
+      guideTitle: '작업 현황 안내',
+      sortNote: '늦음·멈춤 작업을 맨 위로 올려요(나머지는 서버 순서).',
+      countsLabel: '상태별 작업 수',
+      countHint: '서버 목록 기준 · 50건까지 셈',
+      allDoneBody: '대기·배정·진행·막힘 작업이 하나도 없어요.',
+      dueIn: (min: number) => `${min}분 남음`,
+      title: (type: string, at: string) => `${type} · ${at}`,
+      steps: ['대기', '배정', '진행', '완료'],
+      stepsLabel: '작업 진행',
+      blockedNote: '막힘',
+      unknownStep: (s: string) => `알 수 없는 상태 ${s}`,
+      task: '작업',
+    },
     /** 행 조치 — 담당 바꾸기·내려놓기(백엔드 알림 2026-11-19 notice-reassign-release) */
     actions: {
       col: '조치',
@@ -784,7 +854,9 @@ export const messages = {
       releaseTitle: '내려놓기 — 멈추고 대기로 돌려요',
       releaseHint: '담당이 없어지고 대기로 돌아가요. 끝낸 수량은 그대로고, 다음 작업 받기로 다른 사람에게 가요.',
       worker: '새 담당',
-      chooseWorker: '작업자 고르기',
+      chooseWorker: '이름으로 찾기(초성도)',
+      chosenWorker: '고른 작업자',
+      noName: '이름 없음',
       onBreak: '휴게 중',
       noWorkers: '이 작업 유형을 맡을 수 있는 재직 중인 다른 작업자가 없어요.',
       reason: '사유',
@@ -877,15 +949,13 @@ export const messages = {
       stale: '서버 기준 시각이 늦어요 — 새로 읽어 확인해 주세요',
       location: (code: string) => `놓인 위치 ${code}`,
       locationUnknown: '놓인 위치 모름',
-      pkg: (id: string) => `포장 ${id}`,
-      order: (id: string) => `주문 ${id}`,
       rider: '허가받은 라이더',
       expiredAt: (t: string) => `허가 끝 ${t}`,
       atStation: '포장대에 있음',
       taken: '포장대에 없음(라이더가 가져감)',
       confirmTitle: '확인',
       confirmAtStation: '포장대에 그대로 있다고 보낼까요? 다시 인계할 수 있게 돼요.',
-      confirmTaken: (rider: string) => `라이더 ${rider} 가 가져간 것으로 확정할까요? 재고가 빠지고 되돌릴 수 없어요.`,
+      confirmTaken: '위 라이더가 가져간 것으로 확정할까요? 재고가 빠지고 되돌릴 수 없어요.',
       confirmOk: '보내기',
       confirmCancel: '취소',
       doneAtStation: '포장대에 있다고 확인했어요.',
@@ -895,6 +965,18 @@ export const messages = {
 
   /** 작업자 — mfc-capacity-service 0.14.0 workers */
   workers: {
+    /** 통합 백오피스와 같은 목록·상세 부품(2026-11-19 PC 2 요청) */
+    ui: {
+      guideTitle: '작업자 안내',
+      countNote: '숫자는 서버 기본 목록(재직·정지)에서 센 값이에요.',
+      countsLabel: '작업자 상태별 수',
+      count: (n: number) => `${n}명`,
+      breakHint: '지금 휴게 중(서버 값)',
+      dailyNotEnrolled: '일일크루 출근 전',
+      dailyHint: '오늘 출근 등록 안 한 일일크루',
+      employee: '작업자(이름 · 사번)',
+      noEmployeeNo: '사번 못 읽음',
+    },
     intro: '센터 작업자의 업무·자격·상태·근무를 관리해요. 로그인 계정과 센터 권한은 인사팀(직원 계정)이 다뤄요 — 여기서는 바꾸지 않아요.',
     register: '작업자 등록',
     stateFilter: '상태',
@@ -1042,6 +1124,19 @@ export const messages = {
 
   /** 이동·보충 — mfc-inbound-service 0.9.0 move-orders */
   moves: {
+    /** 통합 백오피스와 같은 목록·상세 부품(2026-11-19 PC 2 요청) */
+    ui: {
+      guideTitle: '이동·보충 안내',
+      countNote: '숫자는 서버의 진행 중 목록(진행·취소 대기)에서 센 값이에요.',
+      countsLabel: '진행 중 이동 수',
+      count: (n: number) => `${n}건`,
+      urgentHint: '진행 중 가운데 긴급',
+      title: (kind: string, at: string) => `${kind} · ${at}`,
+      steps: ['지시', '옮기는 중', '끝남'],
+      stepsLabel: '이동 진행',
+      unknownStep: (s: string) => `알 수 없는 상태 ${s}`,
+      move: '이동 지시',
+    },
     intro: '선반 사이 재고 이동을 지시하고 지켜봐요. 작업자가 PDA 로 출발 칸 → 카트 → 도착 칸 순서로 옮겨요. 자동 보충은 시스템이 만들어요.',
     create: '이동 지시',
     stateFilter: '상태',

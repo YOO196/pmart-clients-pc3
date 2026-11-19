@@ -33,7 +33,9 @@ describe('배정 목록', () => {
   it('기본은 진행 중(state 를 보내지 않는다), 최근 순. 지금 맡을 수 없는 배정·근무 밖 경고는 서버 값', async () => {
     const view = renderAt('/c/MFC-BSN-01/assignments');
     await waitFor(() => expect(rows()).toHaveLength(3));
-    expect(rows().map((r) => within(r).getAllByRole('cell')[0]!.textContent)).toEqual(['TASK-PACK-1', 'TASK-PICK-3', 'TASK-PICK-1']);
+    // 작업 칸은 시스템 ID 대신 작업 상세 링크(ADR-0070 덧붙임)
+    expect(rows().map((r) => within(r).getByTestId('task-link').getAttribute('href'))).toEqual(['/c/MFC-BSN-01/tasks/TASK-PACK-1', '/c/MFC-BSN-01/tasks/TASK-PICK-3', '/c/MFC-BSN-01/tasks/TASK-PICK-1']);
+    expect(rows()[0]).not.toHaveTextContent('TASK-PACK-1');
     expect(within(rows()[0]!).getByText('근무 밖')).toBeInTheDocument();
     expect(within(rows()[0]!).getByText('다음 작업 받기')).toBeInTheDocument();
     expect(within(rows()[1]!).getByText('지금은 맡을 수 없음(재직 중이 아님)')).toBeInTheDocument();
@@ -107,7 +109,7 @@ describe('직접 배정', () => {
 describe('배정 추천', () => {
   async function calculate(view: ReturnType<typeof renderAt>) {
     await userEvent.click(await screen.findByRole('button', { name: '추천 계산' }));
-    await screen.findByRole('heading', { level: 1, name: /PLAN-/ });
+    await screen.findByRole('heading', { level: 1, name: /^배정 추천 · / });
     return postsTo(view.sent, '/assignment-plans')[0]!;
   }
 
@@ -118,7 +120,7 @@ describe('배정 추천', () => {
     expect(await sentBody(post)).toEqual({ mfcId: 'MFC-BSN-01', horizonMinutes: 60 });
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('추천됨(확정 전)');
     const items = screen.getAllByTestId('plan-item');
-    expect(within(items[0]!).getByText('TASK-PICK-2')).toBeInTheDocument();
+    expect(within(items[0]!).getByTestId('task-link')).toHaveAttribute('href', '/c/MFC-BSN-01/tasks/TASK-PICK-2');
     expect(within(items[0]!).getByText('OP-wkr-1')).toBeInTheDocument();
     expect(db.assignments.some((a) => a.taskId === 'TASK-PICK-2')).toBe(false);
     await userEvent.click(screen.getByRole('button', { name: '추천 확정' }));

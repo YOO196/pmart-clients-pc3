@@ -6,8 +6,8 @@
 //   applyStatus APPLIED = 반영, CAPTURED = 기록만(완료 아님), REJECTED = 재고 거절(rejectReason, 잔량 그대로), UNKNOWN_RESULT·503 = 결과 불명(같은 키로 다시).
 //   담당(assigneeId)이 있으면 담당만 — 409 NOT_ASSIGNEE. 합계 ≤ 남은 수량은 화면에서도 막고 서버가 판정한다.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { Link, Route, Routes, useParams, useSearchParams } from 'react-router';
+import { useRef, useState } from 'react';
+import { Link, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router';
 
 import { request, UnknownResultFailure } from '@pmart/web-core';
 import { CommandFeedback, formatSeoul, QueryState, toUiState, useCommand } from '@pmart/web-ui';
@@ -16,7 +16,15 @@ import type { components } from '../../api/generated/mfc-inbound';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
+import { SystemNumbers } from '../../shared/displayNumber';
+import { SearchBar } from '../../shared/listParts';
+import { useNewIds } from '../../shared/motion';
 import { Who } from '../../shared/OperatorLabel';
+import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
+import { SavedViews } from '../../shared/SavedViews';
+import { SeenMark } from '../../shared/SeenMark';
+import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
+import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 import { InitialStockTab, ReturnReceiptTab, SupplyRequestTab } from './InboundOtherTabs';
 
 const m = messages.inbound;
@@ -104,9 +112,22 @@ function InboundTaskList({ mfcId }: { readonly mfcId: string }) {
     else next.delete(key);
     setParams(next, { replace: true });
   };
+  const { pathname, search } = useLocation();
+  const ids = (query.data ?? []).map((t) => t.taskId);
+  const fresh = useNewIds(query.data ? ids : undefined, `${taskType ?? ''}|${state ?? ''}|${receiptId}`);
+  const seen = useSeenIds('inboundTask', mfcId);
+  useRememberQueue('inboundTask', mfcId, query.data ? ids : undefined, `${pathname}${search}`);
+  const stateText = rawState === 'COMPLETED' ? m.taskState.COMPLETED : rawState === 'ALL' ? m.filters.all : m.taskState.READY;
   return (
     <div className="space-y-3">
-      <form className="flex flex-wrap items-end gap-2 rounded-box bg-base-100 p-3 text-sm" onSubmit={(e) => e.preventDefault()}>
+      <SearchBar
+        summary={[
+          [m.filters.type, taskType ? (m.taskType[taskType] ?? taskType) : ''],
+          [m.filters.state, stateText ?? ''],
+          [m.filters.receipt, receiptId],
+        ]}
+        startOpen={!rawType && !rawState && !receiptId}
+      >
         <label className="flex flex-col gap-1">
           {m.filters.type}
           <select className="select select-sm w-32" value={taskType ?? ''} onChange={(e) => set('taskType', e.target.value)}>
@@ -127,7 +148,8 @@ function InboundTaskList({ mfcId }: { readonly mfcId: string }) {
           {m.filters.receipt}
           <input className="input input-sm w-40 font-mono" value={receiptId} onChange={(e) => set('receiptId', e.target.value.trim())} />
         </label>
-      </form>
+      </SearchBar>
+      <SavedViews listKey={`inbound-tasks.${mfcId}`} />
       <QueryState state={toUiState(query, (rows) => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.empty}>
         {(rows) => (
           <table className="table table-sm rounded-box bg-base-100">
@@ -145,11 +167,12 @@ function InboundTaskList({ mfcId }: { readonly mfcId: string }) {
             </thead>
             <tbody>
               {rows.map((t) => (
-                <tr key={t.taskId} data-testid="inbound-task-row">
+                <tr key={t.taskId} data-testid="inbound-task-row" className={fresh.has(t.taskId) ? 'row-new' : undefined}>
                   <td>
                     <Link className="link" to={inboundPath(mfcId, `tasks/${encodeURIComponent(t.taskId)}`)}>
                       {m.taskType[t.taskType] ?? t.taskType}
                     </Link>
+                    <SeenMark seen={seen.has(t.taskId)} />
                   </td>
                   <td>{t.productName ? `${t.productName} (${t.sku})` : t.sku}</td>
                   <td className="font-mono text-xs">{t.lotId}</td>
@@ -180,19 +203,29 @@ function InboundTaskPage({ mfcId }: { readonly mfcId: string }) {
     queryKey: ['inbound-task', taskId],
     queryFn: () => request('GET', api.inbound.GET('/inbound-tasks/{taskId}', { params: { path: { taskId } } })),
   });
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const past = useScrolledPast(titleRef);
+  // 화면 표기(ADR-0070 덧붙임 "작업 지시 = 종류 · 시각") — 시스템 ID 는 시스템 번호 칸에만
+  const title = (t: { readonly taskType: string; readonly createdAt?: string }) => `${m.taskType[t.taskType] ?? t.taskType} · ${t.createdAt ? formatSeoul(t.createdAt) : messages.none}`;
+  useRecordRecent('inboundTask', mfcId, taskId, query.data ? title(query.data) : null);
   return (
     <section className="max-w-4xl space-y-4">
-      <Link to={inboundPath(mfcId)} className="link text-sm">
-        {m.back}
-      </Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to={inboundPath(mfcId)} className="link text-sm">
+          {m.back}
+        </Link>
+        <div className="ml-auto">
+          <QueueNav kind="inboundTask" mfcId={mfcId} id={taskId} />
+        </div>
+      </div>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(t) => (
           <>
-            <h1 className="flex flex-wrap items-center gap-2 text-xl font-bold">
-              {m.taskType[t.taskType] ?? t.taskType}
-              <span className="font-mono text-base opacity-70">{t.taskId}</span>
+            <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
+              {title(t)}
               <span className={`badge badge-sm ${t.state === 'READY' ? 'badge-info' : 'badge-success'}`}>{m.taskState[t.state] ?? t.state}</span>
             </h1>
+            <StickyTitle show={past} title={title(t)} badges={<span className={`badge badge-sm ${t.state === 'READY' ? 'badge-info' : 'badge-success'}`}>{m.taskState[t.state] ?? t.state}</span>} />
             {notice && (
               <p role="status" className={`text-sm ${notice.kind === 'ok' ? 'text-success' : notice.kind === 'warn' ? 'text-warning' : 'text-error'}`}>
                 {notice.text}
@@ -207,16 +240,19 @@ function InboundTaskPage({ mfcId }: { readonly mfcId: string }) {
               <dd className="font-mono">{t.locationCode}</dd>
               <dt className="opacity-70">{m.fields.qty}</dt>
               <dd>{m.qty(t.plannedQty, t.doneQty)}</dd>
-              <dt className="opacity-70">{m.fields.receipt}</dt>
-              <dd className="font-mono">{t.receiptId}</dd>
-              <dt className="opacity-70">{m.fields.parent}</dt>
-              <dd className="font-mono">{t.parentTaskId ?? messages.none}</dd>
               <dt className="opacity-70">{m.fields.assignee}</dt>
               <dd>
           <Who id={t.assigneeId} />
         </dd>
             </dl>
-            {t.assigneeId && <p className="text-xs opacity-70">{m.assigneeOnly(t.assigneeId)}</p>}
+            {t.assigneeId && <p className="text-xs opacity-70">{m.assigneeOnly}</p>}
+            <SystemNumbers
+              ids={[
+                { label: m.ui.task, id: t.taskId },
+                { label: m.fields.receipt, id: t.receiptId },
+                { label: m.fields.parent, id: t.parentTaskId },
+              ]}
+            />
             {t.state === 'READY' && t.taskType === 'INSPECT' && <InspectForm key={t.version} mfcId={mfcId} task={t} onDone={setNotice} />}
             {t.state === 'READY' && t.taskType === 'PUTAWAY' && <PutawayForm key={t.version} mfcId={mfcId} task={t} onDone={setNotice} />}
           </>

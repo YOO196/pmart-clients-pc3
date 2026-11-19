@@ -12,7 +12,7 @@ import { server } from '../../test/server';
 const rows = () => screen.getAllByTestId('inbound-task-row');
 const sentBody = async (r: Request) => (await r.clone().json()) as Record<string, unknown>;
 const postsTo = (sent: Request[], suffix: string) => sent.filter((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith(suffix));
-const heading = () => screen.findByRole('heading', { level: 1, name: /ITK-/ });
+const heading = () => screen.findByRole('heading', { level: 1 });
 
 describe('입고 작업 목록', () => {
   it('화면 기본은 대기(state=READY 를 보낸다), "전체"는 state 없이', async () => {
@@ -73,7 +73,8 @@ describe('품질검사·적치', () => {
   it('담당이 따로 있으면 서버가 NOT_ASSIGNEE 로 거절', async () => {
     renderAt('/c/MFC-BSN-01/inbound/tasks/ITK-2');
     await heading();
-    expect(screen.getByText(/담당\(OP-wkr-1\)만 실행할 수 있어요/)).toBeInTheDocument();
+    // 담당 안내에 운영자 ID 를 내지 않는다(ADR-0070 — 담당은 위 칸에 이름 · 사번)
+    expect(screen.getByText(/^담당만 실행할 수 있어요/)).toBeInTheDocument();
     const form = screen.getByRole('form', { name: '품질검사 결과' });
     await userEvent.type(within(form).getByRole('spinbutton'), '2');
     await userEvent.click(within(form).getByRole('button', { name: '검사 결과 보내기' }));

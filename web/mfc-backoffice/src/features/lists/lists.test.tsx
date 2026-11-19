@@ -17,7 +17,7 @@ describe('센터 목록(MB-1)', () => {
     const list = await screen.findByTestId('list-decisions');
     const rows = await within(list).findAllByTestId('list-decisions-row');
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toHaveTextContent('QD-1');
+    expect(rows[0]).not.toHaveTextContent('QD-1'); // 목록에는 시스템 ID 를 내지 않는다(ADR-0070 덧붙임)
     expect(rows[0]).toHaveTextContent('해제 승인 대기');
     const req = getsTo(view.sent, '/quality-decisions')[0]!;
     expect(new URL(req.url).searchParams.getAll('state')).toEqual(['REQUESTED']);
@@ -40,7 +40,7 @@ describe('센터 목록(MB-1)', () => {
     renderAt('/c/MFC-BSN-01/quality?tab=inspections');
     const list = await screen.findByTestId('list-return-receipts');
     const row = (await within(list).findAllByTestId('list-return-receipts-row'))[0]!;
-    expect(row).toHaveTextContent('RR-1');
+    expect(row).not.toHaveTextContent('RR-1');
     expect(row).toHaveTextContent('검수 대기');
     await userEvent.click(within(row).getByRole('button', { name: '열기' }));
     const form = await screen.findByRole('form', { name: '검수 결과 보내기' });
@@ -51,7 +51,7 @@ describe('센터 목록(MB-1)', () => {
     renderAt('/c/MFC-BSN-01/inventory?tab=counts');
     const rows = await within(await screen.findByTestId('list-count-sessions')).findAllByTestId('list-count-sessions-row');
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toHaveTextContent('CNT-1');
+    expect(rows[0]).not.toHaveTextContent('CNT-1');
     expect(rows[0]).toHaveTextContent('승인 대기');
   });
 
@@ -71,15 +71,16 @@ describe('센터 목록(MB-1)', () => {
       http.get(`${API_BASE}/supply-requests`, ({ request }) => {
         calls++;
         const cursor = new URL(request.url).searchParams.get('cursor');
-        const item = (id: string) => ({ supplyRequestId: id, mfcId: 'MFC-BSN-01', state: 'SUBMITTED', lines: [{ sku: 'SKU-MILK-1', qty: 1 }], version: 1 });
-        return HttpResponse.json(cursor === 'c2' ? { items: [item('SR-2')], nextCursor: null } : { items: [item('SR-1')], nextCursor: 'c2' });
+        const item = (id: string, at: string) => ({ supplyRequestId: id, mfcId: 'MFC-BSN-01', state: 'SUBMITTED', lines: [{ sku: 'SKU-MILK-1', qty: 1 }], version: 1, submittedAt: at });
+        return HttpResponse.json(cursor === 'c2' ? { items: [item('SR-2', '2026-11-19T02:00:00.000Z')], nextCursor: null } : { items: [item('SR-1', '2026-11-19T01:00:00.000Z')], nextCursor: 'c2' });
       }),
     );
     renderAt('/c/MFC-BSN-01/inbound?tab=supply');
     const list = await screen.findByTestId('list-supply-requests');
-    await within(list).findByText('SR-1');
+    // 줄은 시각으로 알아본다(시스템 ID 는 목록에 없다)
+    await waitFor(() => expect(within(list).getAllByTestId('list-supply-requests-row')).toHaveLength(1));
     await userEvent.click(within(list).getByRole('button', { name: '더 보기' }));
-    expect(await within(list).findByText('SR-2')).toBeInTheDocument();
+    await waitFor(() => expect(within(list).getAllByTestId('list-supply-requests-row')).toHaveLength(2));
     expect(calls).toBe(2);
     expect(within(list).queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
   });

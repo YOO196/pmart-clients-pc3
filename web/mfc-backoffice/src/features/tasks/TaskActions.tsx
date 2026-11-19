@@ -13,6 +13,7 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-fulfillment';
 import { useApi } from '../../app/ApiContext';
 import { messages } from '../../shared/messages';
+import { SearchSelect } from '../../shared/SearchSelect';
 
 const m = messages.tasks.actions;
 type TaskSummary = components['schemas']['TaskSummary'];
@@ -75,7 +76,9 @@ export function ReassignForm({ mfcId, task, onClose }: { readonly mfcId: string;
         body: { mfcId, taskId, taskType: task.taskType!, workerId, reason: reason.trim() },
       }),
     );
-    const notes = [r.assignmentVersion === version ? m.unchanged : m.assigned(r.workerId ?? workerId)];
+    // 직원 표기는 이름(운영자 ID 를 안내 글에 내지 않는다 — ADR-0070)
+    const name = workers.data?.find((w) => w.workerId === (r.workerId ?? workerId))?.displayName ?? m.chosenWorker;
+    const notes = [r.assignmentVersion === version ? m.unchanged : m.assigned(name)];
     if (r.warnings?.includes('OFF_SHIFT')) notes.push(m.offShift);
     setNotice(notes.join(' '));
     await refresh(taskId);
@@ -108,17 +111,18 @@ export function ReassignForm({ mfcId, task, onClose }: { readonly mfcId: string;
             <p className="text-xs opacity-70">{m.noWorkers}</p>
           ) : (
             <div className="flex flex-wrap items-end gap-2">
-              <label className="flex flex-col gap-1">
-                {m.worker}
-                <select className="select select-sm w-64" value={workerId} onChange={(e) => setWorkerId(e.target.value)}>
-                  <option value="">{m.chooseWorker}</option>
-                  {fit.map((w) => (
-                    <option key={w.workerId} value={w.workerId}>
-                      {`${w.displayName ?? w.workerId} (${w.workerId})${w.onBreak ? ` · ${m.onBreak}` : ''}`}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {/* 쳐서 찾는 고르기(초성도) — 이름으로 보이고, 운영자 ID 는 숨은 찾기 낱말(붙여 넣어도 찾는다) */}
+              <div className="flex flex-col gap-1">
+                <span>{m.worker}</span>
+                <SearchSelect
+                  label={m.worker}
+                  value={workerId}
+                  onChange={setWorkerId}
+                  placeholder={m.chooseWorker}
+                  className="w-64"
+                  options={fit.map((w) => ({ value: w.workerId ?? '', label: w.displayName ?? m.noName, ...(w.onBreak ? { hint: m.onBreak } : {}), keywords: w.workerId ?? '' }))}
+                />
+              </div>
               <label className="flex flex-col gap-1">
                 {m.reason}
                 <input className="input input-sm w-64" maxLength={REASON_MAX} placeholder={m.reasonPlaceholder} value={reason} onChange={(e) => setReason(e.target.value)} />

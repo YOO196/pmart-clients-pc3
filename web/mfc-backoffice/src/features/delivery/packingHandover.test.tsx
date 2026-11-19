@@ -22,7 +22,7 @@ describe('포장 인계 현황(우리 센터)', () => {
     expect(within(row('10000002')).getByTestId('stage')).toHaveTextContent('피킹중');
     // 화면 번호(ADR-0070): 배송은 주문번호-순번, 라이더는 센터 관리자에게 번호·이름이 오지 않아(bff 0.15.0) ID 끝 + 비공개
     expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('10000002-1');
-    expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('배정 RD-1 라이더 정보 비공개');
+    expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('배정 라이더 정보 비공개');
     expect(within(row('10000002')).getByTestId('delivery')).not.toHaveTextContent('DLV-');
     expect(within(row('10000002')).getByTestId('system-numbers')).toHaveTextContent('DLV-ORD-P-2');
     // 단계 규칙에 없는 조합은 추정하지 않고 원천 출고 상태
@@ -33,8 +33,11 @@ describe('포장 인계 현황(우리 센터)', () => {
     expect(within(partial).getByTestId('stage')).toHaveTextContent('일부 인계');
     expect(within(partial).getByText('재발송')).toBeInTheDocument();
     expect(within(partial).getByTestId('packages')).toHaveTextContent('밀봉 1 / 2 · 인계 1 · 남음 1');
-    expect(within(partial).getByTestId('packages')).toHaveTextContent(/PKG-4-1 · 인계됨 · 인계 확정 · .* RD-2 라이더 정보 비공개 인계/);
-    expect(within(partial).getByTestId('packages')).toHaveTextContent('PKG-4-2 · 밀봉');
+    expect(within(partial).getByTestId('packages')).toHaveTextContent(/포장 1 · 인계됨 · 인계 확정 · .* 라이더 정보 비공개 인계/);
+    expect(within(partial).getByTestId('packages')).toHaveTextContent('포장 2 · 밀봉');
+    // 포장 시스템 ID 는 접힌 시스템 번호 칸에만
+    expect(within(partial).getByTestId('packages')).not.toHaveTextContent('PKG-4-');
+    expect(within(partial).getByTestId('system-numbers')).toHaveTextContent('PKG-4-1');
   });
 
   it('상태를 고르면 state 로 부르고, 배송 원천을 못 읽으면 "모름(조회 실패)"와 경고(배송 없음과 구분)', async () => {
@@ -45,8 +48,8 @@ describe('포장 인계 현황(우리 센터)', () => {
     const rows = await screen.findAllByTestId('packing-row');
     expect(rows).toHaveLength(1);
     expect(within(rows[0]!).getByTestId('delivery')).toHaveTextContent('모름(조회 실패)');
-    // 주문번호가 없는 옛 주문은 주문 ID 끝 8자리 + 번호 없음
-    expect(rows[0]).toHaveTextContent('ORD-P-5 번호 없음');
+    // 주문번호가 없는 옛 주문은 "번호 없음"만(ADR-0070 덧붙임 — 시스템 ID 끝자리도 목록에 내지 않는다)
+    expect(within(rows[0]!).getAllByTestId('display-number')[0]).toHaveTextContent(/^번호 없음$/);
     expect(calls(view.sent).at(-1)!.getAll('state')).toEqual(['CANCELLED']);
   });
 });

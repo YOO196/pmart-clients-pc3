@@ -237,11 +237,9 @@ function Sla({ slaDueAt, overdue }: { readonly slaDueAt: string | null | undefin
   );
 }
 
-const refsText = (refs: Case['refs']) =>
-  (refs ?? [])
-    .filter((r) => r.refType === 'deliveryId' || r.refType === 'orderId')
-    .map((r) => `${name(f.refName, r.refType)} ${r.refId ?? ''}`)
-    .join(' · ') || none;
+/** 관련 배송·주문(시스템 ID) — 상세의 시스템 번호 칸에만 */
+const refIds = (refs: Case['refs']) =>
+  (refs ?? []).filter((r) => r.refType === 'deliveryId' || r.refType === 'orderId').map((r) => ({ label: name(f.refName, r.refType), id: r.refId }));
 
 function DispatchFailureListPage({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
@@ -273,7 +271,7 @@ function DispatchFailureListPage({ mfcId }: { readonly mfcId: string }) {
               <tr>
                 <th>{f.col.priority}</th>
                 <th>{f.col.summary}</th>
-                <th>{f.col.refs}</th>
+                <th>{f.col.number}</th>
                 <th>{f.col.sla}</th>
                 <th>{f.col.state}</th>
               </tr>
@@ -289,7 +287,10 @@ function DispatchFailureListPage({ mfcId }: { readonly mfcId: string }) {
                       {c.summary || f.kindName}
                     </Link>
                   </td>
-                  <td className="font-mono text-xs">{refsText(c.refs)}</td>
+                  {/* 목록에는 화면 표기만(ADR-0070 덧붙임) — 접수 번호 C-MMDD-일련, 관련 배송·주문 시스템 ID 는 상세의 시스템 번호 칸 */}
+                  <td>
+                    <DisplayNumber number={c.caseNumber} />
+                  </td>
                   <td>
                     <Sla slaDueAt={c.slaDueAt} overdue={c.overdue} />
                   </td>
@@ -317,7 +318,7 @@ function DispatchFailureDetailPage({ mfcId }: { readonly mfcId: string }) {
       <Link className="link text-sm" to={centerPath(mfcId, 'dispatch-failures')}>
         {f.back}
       </Link>
-      <h1 className="text-xl font-bold">{f.detailTitle(caseId)}</h1>
+      <h1 className="text-xl font-bold">{f.detailTitle(query.data?.caseNumber ?? (query.isSuccess ? messages.displayNumber.missing : ''))}</h1>
       <p role="note" className="alert alert-info text-sm">
         {f.handledBySupport}
       </p>
@@ -331,8 +332,6 @@ function DispatchFailureDetailPage({ mfcId }: { readonly mfcId: string }) {
               <dd>{c.priority ?? none}</dd>
               <dt className="opacity-70">{f.col.state}</dt>
               <dd>{name(f.stateName, c.state)}</dd>
-              <dt className="opacity-70">{f.col.refs}</dt>
-              <dd className="font-mono">{refsText(c.refs)}</dd>
               <dt className="opacity-70">{f.openedAt}</dt>
               <dd>{when(c.openedAt)}</dd>
               <dt className="opacity-70">{f.col.sla}</dt>
@@ -350,6 +349,7 @@ function DispatchFailureDetailPage({ mfcId }: { readonly mfcId: string }) {
                 </>
               )}
             </dl>
+            <SystemNumbers ids={[{ label: f.caseLabel, id: c.caseId }, ...refIds(c.refs)]} />
             <div>
               <h2 className="font-bold">{f.history}</h2>
               {(c.history ?? []).length === 0 ? (

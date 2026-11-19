@@ -13,28 +13,26 @@ import { Link, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
 import { formatSeoul } from '@pmart/web-ui';
-import type { Api } from '../../api/client';
 import type { components as QualitySchemas } from '../../api/generated/mfc-quality';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { DisplayNumber, RiderLabel } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
+import { AllDone } from '../../shared/listParts';
+import { useStatChange } from '../../shared/motion';
 import { Who } from '../../shared/OperatorLabel';
 import {
   DUE_SOON_MINUTES,
   minutesSince,
   minutesText,
-  OPEN_TASK_STATES,
   promiseRows,
   seoulToday,
-  TASK_MAX_PAGES,
-  TASK_PAGE_SIZE,
   type PromiseRow,
   type TaskSummary,
 } from './opsRules';
+import { OPS_REFRESH_MS, useOpenTasks } from './opsQueries';
 
 const m = messages.ops;
-const REFRESH_MS = 60_000;
 
 type Filter = 'promise' | 'picking' | 'handover';
 const FILTERS: readonly Filter[] = ['promise', 'picking', 'handover'];
@@ -42,27 +40,10 @@ type Incident = QualitySchemas['schemas']['QualityIncident'];
 
 // ---------------------------------------------------------------- 읽기
 
-async function readOpenTasks(api: Api, mfcId: string) {
-  const items: TaskSummary[] = [];
-  let cursor: string | undefined;
-  let asOf: string | undefined;
-  for (let page = 0; page < TASK_MAX_PAGES; page += 1) {
-    const r = await request(
-      'GET',
-      api.fulfillment.GET('/tasks', { params: { query: { mfcId, state: [...OPEN_TASK_STATES], size: TASK_PAGE_SIZE, ...(cursor ? { cursor } : {}) } } }),
-    );
-    asOf ??= r.asOf?.asOf ?? undefined;
-    items.push(...(r.items ?? []));
-    cursor = r.page?.nextCursor ?? undefined;
-    if (!cursor) return { items, complete: true, asOf };
-  }
-  return { items, complete: false, asOf };
-}
-
 function useOps(mfcId: string) {
   const api = useApi();
-  const common = { refetchInterval: REFRESH_MS } as const;
-  const tasks = useQuery({ ...common, queryKey: ['ops', mfcId, 'tasks'], queryFn: () => readOpenTasks(api, mfcId) });
+  const common = { refetchInterval: OPS_REFRESH_MS } as const;
+  const tasks = useOpenTasks(mfcId);
   const metrics = useQuery({
     ...common,
     queryKey: ['ops', mfcId, 'picking-lines'],
@@ -239,7 +220,7 @@ interface QueryLike {
   readonly refetch: () => unknown;
 }
 
-/** "내 할 일" 숫자 칸 — 통합 백오피스 WorkTile 과 같은 모양(왼쪽 색 띠는 일이 있을 때만). 누르면 아래 처리함이 그 유형으로 */
+/** "내 할 일" 숫자 칸 — 일이 있으면 숫자 색(왼쪽 색 띠 없음, 쿠팡 윙). 누르면 아래 처리함이 그 유형으로 */
 function Tile({
   testId,
   label,
@@ -259,15 +240,17 @@ function Tile({
   readonly active: boolean;
   readonly onClick: () => void;
 }) {
-  const [text, stripe] = { error: ['text-error', 'border-l-error'], warning: ['text-warning', 'border-l-warning'], info: ['text-info', 'border-l-info'] }[tone];
+  // 왼쪽 색 띠 없이 숫자 색으로만(통합 백오피스 지침 1-1 — 쿠팡 윙)
+  const text = { error: 'text-error', warning: 'text-warning', info: 'text-info' }[tone];
   const failed = state.isError;
+  const ch = useStatChange(state.isPending || failed ? undefined : value); // 방금 바뀐 칸만 잠깐 빛남·▲▼(움직임 줄이기면 없음)
   return (
     <button
       type="button"
       data-testid={testId}
       aria-pressed={active}
       onClick={onClick}
-      className={`block rounded-lg border border-l-4 bg-base-100 px-4 py-3 text-left transition hover:bg-base-200/60 ${active ? 'border-primary/40 ring-1 ring-primary/30' : 'border-base-300'} ${has && !failed ? stripe : 'border-l-base-300'}`}
+      className={`block rounded-lg border bg-base-100 px-4 py-3 text-left transition hover:bg-base-200/60 ${active ? 'border-primary/40 ring-1 ring-primary/30' : 'border-base-300'} ${ch.cls}`}
     >
       <p className="text-xs text-base-content/60">{label}</p>
       {state.isPending ? (
@@ -279,6 +262,7 @@ function Tile({
       ) : (
         <p data-testid={`${testId}-value`} className={`mt-0.5 text-2xl font-bold tabular-nums ${has ? text : 'text-base-content/70'}`}>
           {value}
+          {ch.badge}
         </p>
       )}
     </button>
@@ -398,11 +382,8 @@ function ExceptionList({
       {pending && rows.length === 0 ? (
         <span className="loading loading-dots loading-sm" aria-label={messages.loading} />
       ) : rows.length === 0 ? (
-        failed.length === 0 && (
-          <p data-state="empty" className="p-2 opacity-70">
-            {m.empty}
-          </p>
-        )
+        // 모든 원천을 읽었고 서버가 0건일 때만 "수고하셨어요"(읽는 중·실패면 그리지 않는다)
+        failed.length === 0 && !pending && <AllDone body={m.empty} />
       ) : (
         <div className="overflow-x-auto">
           <table className="table table-sm">
@@ -452,7 +433,8 @@ function promiseRow(mfcId: string, r: PromiseRow): Row {
           {`${m.orderLabel} `}
           {r.orderNumber ? <DisplayNumber number={r.orderNumber} /> : m.noInfo}
         </div>
-        <div className="font-mono opacity-70">{`${m.taskLabel} ${taskId}`}</div>
+        {/* 작업은 화면 표기(종류 · 상태)만 — 시스템 ID 는 작업 상세의 시스템 번호 칸(ADR-0070 덧붙임) */}
+        <div className="opacity-70">{`${m.taskLabel} ${taskStage(r.task)}`}</div>
       </>
     ),
     reason: m.reason.promise(formatSeoul(r.promisedAt), taskStage(r.task)),
@@ -475,7 +457,8 @@ function damageRow(mfcId: string, i: Incident, nowMs: number): Row {
     group: 'picking',
     rank: 600_000 - (min ?? 0),
     type: m.type.damaged,
-    id: <div className="font-mono">{`${m.incidentLabel} ${id}`}</div>,
+    // 품질 사고 = 종류 · 시각(화면 번호가 없다 — ADR-0070 덧붙임)
+    id: <div>{`${m.incidentLabel} · ${i.openedAt ? formatSeoul(i.openedAt) : m.noInfo}`}</div>,
     reason: m.reason.damaged(lots),
     elapsed: min === null ? m.noInfo : minutesText(min),
     // 품질 사고에는 담당자가 없다(계약) — 추정하지 않는다.
@@ -504,7 +487,7 @@ function handoverRow(mfcId: string, p: Resolution, nowMs: number): Row {
           {`${m.orderLabel} `}
           <DisplayNumber systemId={p.orderId} />
         </div>
-        <div className="font-mono opacity-70">{`${m.packageLabel} ${p.packageId ?? m.noInfo}`}</div>
+        <div className="opacity-70">{`${m.packageLabel} · ${p.packingLocation ?? m.noInfo}`}</div>
       </>
     ),
     reason: (
@@ -519,7 +502,6 @@ function handoverRow(mfcId: string, p: Resolution, nowMs: number): Row {
           ) : (
             m.rider(m.noInfo)
           )}
-          {p.packingLocation ? ` · ${p.packingLocation}` : ''}
         </div>
       </>
     ),

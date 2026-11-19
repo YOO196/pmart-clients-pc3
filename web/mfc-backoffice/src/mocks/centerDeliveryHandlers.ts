@@ -32,6 +32,8 @@ const rows: Row[] = [
 
 interface MockCase {
   caseId: string;
+  /** 화면 접수 번호(case 0.25.0, ADR-0070) — 옛 건은 null */
+  caseNumber: string | null;
   centerId: string;
   state: string;
   priority: string;
@@ -47,6 +49,7 @@ interface MockCase {
 const cases: MockCase[] = [
   {
     caseId: 'CASE-DF-1',
+    caseNumber: 'C-1116-0007',
     centerId: 'MFC-BSN-01',
     state: 'OPEN',
     priority: 'P2',
@@ -62,6 +65,7 @@ const cases: MockCase[] = [
   },
   {
     caseId: 'CASE-DF-2',
+    caseNumber: 'C-1115-0003',
     centerId: 'MFC-BSN-01',
     state: 'CLOSED',
     priority: 'P1',
@@ -75,6 +79,7 @@ const cases: MockCase[] = [
   },
   {
     caseId: 'CASE-DF-S',
+    caseNumber: null,
     centerId: 'MFC-SEL-01',
     state: 'OPEN',
     priority: 'P2',
@@ -87,7 +92,7 @@ const cases: MockCase[] = [
   },
 ];
 
-const summaryOf = (c: MockCase) => ({ caseId: c.caseId, kind: 'DISPATCH_FAILED', state: c.state, priority: c.priority, summary: c.summary, centerId: c.centerId, overdue: c.overdue, slaDueAt: c.slaDueAt, openedAt: c.openedAt, refs: c.refs, assigneeGroup: 'DELIVERY_OPS', assigneeId: null });
+const summaryOf = (c: MockCase) => ({ caseId: c.caseId, caseNumber: c.caseNumber, kind: 'DISPATCH_FAILED', state: c.state, priority: c.priority, summary: c.summary, centerId: c.centerId, overdue: c.overdue, slaDueAt: c.slaDueAt, openedAt: c.openedAt, refs: c.refs, assigneeGroup: 'DELIVERY_OPS', assigneeId: null });
 
 export const centerDeliveryHandlers = [
   http.get(`${BFF}/views/live-delivery`, ({ request }) => {

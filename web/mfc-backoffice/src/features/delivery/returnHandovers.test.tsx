@@ -22,13 +22,13 @@ describe('반납 인증번호(우리 센터)', () => {
     expect(within(claim).getByTestId('return-code')).toHaveTextContent('4821');
     expect(within(claim).getByText('고객 반품 회수')).toBeInTheDocument();
     expect(within(claim).getByText('라이더가 2번 틀렸어요')).toBeInTheDocument();
-    expect(claim).toHaveTextContent('RD-31 라이더 정보 비공개');
+    expect(within(claim).getByTestId('rider-label')).toHaveTextContent(/^라이더 정보 비공개$/);
 
     const locked = cards.find((c) => c.textContent?.includes('1357'))!;
     expect(within(locked).getByRole('alert')).toHaveTextContent('잠겼어요');
     expect(within(locked).getByText('전달 실패 반납')).toBeInTheDocument();
-    // 화면 번호가 없으면 ID 끝 8자리 + 번호 없음
-    expect(locked).toHaveTextContent('LV-RET-2 번호 없음');
+    // 화면 번호가 없으면 "번호 없음"만(ADR-0070 덧붙임)
+    expect(within(locked).getAllByTestId('display-number')[0]).toHaveTextContent(/^번호 없음$/);
   });
 
   it('잠긴 번호 → 한 번 더 묻고 새 번호(멱등키·출처 헤더), 그만두면 보내지 않는다', async () => {
