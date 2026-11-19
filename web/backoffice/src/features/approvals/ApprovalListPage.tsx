@@ -13,7 +13,8 @@ import { SavedViews } from '../../shared/SavedViews';
 import { messages as m } from '../../shared/messages';
 import { QueryState } from '@pmart/web-ui';
 import { toUiState } from '@pmart/web-ui';
-import { CodeLabel, PageHeader, StatCard, StatStrip, StatusBadge, countCell, type Tone, useRowLink } from '../../shared/admin';
+import { CodeLabel, PageHeader, StatCard, StatStrip, StatusBadge, countCell, type Tone } from '../../shared/admin';
+import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { useApprovalTypeCounts } from '../../app/listCounts';
 
 const pick = <T extends string>(value: string | null, allowed: readonly T[]): T | undefined =>
@@ -21,7 +22,8 @@ const pick = <T extends string>(value: string | null, allowed: readonly T[]): T 
 
 export function ApprovalListPage() {
   const api = useApi();
-  const rowLink = useRowLink();
+  // 오른쪽 미리보기(2026-11-19 관제 형식 — 줄을 누르면 목록을 떠나지 않고 옆에서, 번호 링크는 상세로)
+  const pv = usePreview();
   const [params, setParams] = useSearchParams();
   const type = pick<ApprovalType>(params.get('type'), APPROVAL_TYPES);
   const reviewState = pick<ReviewState>(params.get('reviewState'), REVIEW_STATES);
@@ -121,7 +123,7 @@ export function ApprovalListPage() {
                   </thead>
                   <tbody>
                     {rows.map((a, i) => (
-                      <tr key={a.approvalId ?? `row-${i}`} data-testid="approval-row" {...(a.approvalId ? rowLink(`/approvals/${encodeURIComponent(a.approvalId)}`) : {})}>
+                      <tr key={a.approvalId ?? `row-${i}`} data-testid="approval-row" {...pv.row(a.approvalId)}>
                         <td className="max-w-xl">
                           <p className="truncate font-medium" title={a.summary ?? undefined}>
                             {a.summary ?? m.none}
@@ -153,6 +155,29 @@ export function ApprovalListPage() {
                   </tbody>
                 </table>
               </div>
+              {pv.id &&
+                (() => {
+                  const a = rows.find((r) => r.approvalId === pv.id);
+                  return (
+                    <PreviewDrawer id={pv.id} ids={rows.flatMap((r) => (r.approvalId ? [r.approvalId] : []))} onMove={pv.open} onClose={pv.close} title={a?.summary ?? pv.id} detailTo={`/approvals/${encodeURIComponent(pv.id)}`}>
+                      {a ? (
+                        <div className="space-y-4" data-testid="approval-preview">
+                          <p className="font-mono text-xs text-base-content/50">{a.approvalId}</p>
+                          <PreviewFacts
+                            rows={[
+                              [m.approvals.type, a.type ? <TypeBadge type={a.type} /> : m.none],
+                              [m.approvals.requester, a.requesterId ? <Requester id={a.requesterId} /> : m.none],
+                              [m.approvals.review, a.reviewState ? <StatusBadge tone={REVIEW_TONE[a.reviewState] ?? 'ghost'}>{m.approvals.reviewState[a.reviewState]}</StatusBadge> : m.none],
+                              [m.approvals.execution, a.executionState ? <StatusBadge tone={EXEC_TONE[a.executionState] ?? 'ghost'}>{m.approvals.executionState[a.executionState]}</StatusBadge> : m.none],
+                              [m.approvals.submittedAt, a.submittedAt ? `${formatSeoul(a.submittedAt)} (${ago(a.submittedAt)})` : m.none],
+                            ]}
+                          />
+                          <p className="text-xs text-base-content/55">{m.preview.decideInDetail}</p>
+                        </div>
+                      ) : null}
+                    </PreviewDrawer>
+                  );
+                })()}
               {/* 아래: 받은 건수 · 더 보기. 다음 쪽을 못 읽으면 받은 줄은 두고 경고만(0건·끝으로 보이지 않게) */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 px-4 py-3 text-sm">
                 <span className="text-base-content/55">{m.approvals.shown(rows.length, query.hasNextPage)}</span>
