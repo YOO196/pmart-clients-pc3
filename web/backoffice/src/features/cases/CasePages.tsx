@@ -20,6 +20,8 @@
 //   버튼은 할 수 있어 보일 때만(판정은 서버 — 403·409·422 는 코드 문구).
 // - bff 0.14.0 화면 번호(ADR-0070): 목록 관련 칸은 배송·주문 번호(linked[].displayNumber)·라이더(riders[]) — 링크는 시스템 ID.
 //   상세는 case-service 직접(화면 번호 없음)이라 지금 모양 그대로.
+import { SeenMark } from '../../shared/SeenMark';
+import { useSeenIds } from '../../shared/recentViews';
 import { useNewIds, useNow } from '../../shared/motion';
 import { useStaffText } from '../../shared/employeeLabels';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -446,6 +448,7 @@ export function CaseListPage() {
   });
   // 새로 들어온 접수 건 — 5초 동안 강조(2026-11-19). 탭·종류·쪽이 바뀌면 다시 센다
   const fresh = useNewIds(query.data?.items?.flatMap((c) => (c.caseId ? [c.caseId] : [])), `${tab}|${kind ?? ''}|${cursor}`);
+  const seen = useSeenIds('case');
   return (
     <section className="max-w-7xl space-y-4">
       <PageHeader title={m.cases.title} description={m.cases.intro} />
@@ -526,7 +529,12 @@ export function CaseListPage() {
                             {c.summary ? c.summary : label(m.cases.kindName, c.kind)}
                           </Link>
                           {/* 화면 번호(ADR-0070 덧붙임 2026-11-19, bff caseNumber) — 시스템 ID 는 보이지 않는다 */}
-                          {c.caseNumber && <span className="block font-mono text-xs text-base-content/50" data-testid="case-number">{c.caseNumber}</span>}
+                          {c.caseNumber && (
+                            <span className="block font-mono text-xs text-base-content/50" data-testid="case-number">
+                              {c.caseNumber}
+                              <SeenMark seen={!!c.caseId && seen.has(c.caseId)} />
+                            </span>
+                          )}
                         </td>
                         <td>
                           <KindBadge kind={c.kind} />

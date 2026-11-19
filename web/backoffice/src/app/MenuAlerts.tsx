@@ -89,6 +89,14 @@ function alertQuery(api: Api, key: AlertKey) {
   };
 }
 
+/** 브라우저 탭 제목에 붙일 급한 일 수(기한 넘긴 접수 건) — 맡을 수 있는 사람만, 메뉴 배지와 같은 조회(2026-11-19) */
+export function useUrgentTotal(): Count | undefined {
+  const api = useApi();
+  const allowed = useAllowed(['casesOverdue']).length > 0;
+  const q = useQuery({ ...alertQuery(api, 'casesOverdue'), enabled: allowed });
+  return allowed ? q.data : undefined;
+}
+
 export function useAlertCount(key: AlertKey) {
   const api = useApi();
   return useQuery(alertQuery(api, key));

@@ -1,3 +1,4 @@
+import { ConnectionBanner, useDocumentTitle } from './PageChrome';
 import { useStaffText } from '../shared/employeeLabels';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppLauncher, QueryState, UiTextProvider } from '@pmart/web-ui';
@@ -166,6 +167,8 @@ function Layout() {
     if (activeGroup) setOpenGroup(activeGroup);
   }
   const current = currentMenu(groups, pathname);
+  // 브라우저 탭 제목 — 화면 이름 + 기한 넘긴 접수 건 수(2026-11-19)
+  useDocumentTitle(pathname === '/' && session ? m.chrome.home : (current?.menu ?? null));
   // 메뉴 접기(2026-11-19) — 접으면 묶음 아이콘만(마우스를 올리면 이름, 누르면 그 묶음 첫 화면), 업무 알림 개수는 그대로
   const [collapsed, toggleMenu] = useMenuCollapsed();
   // 머리줄 내 세션 — 이름 · 사번(OP-… 대신, ADR-0070 덧붙임). 읽는 중·못 읽음은 "내 세션"만
@@ -267,6 +270,8 @@ function Layout() {
             />
           </div>
         </header>
+        {/* 인터넷 끊김 띠(2026-11-19) */}
+        <ConnectionBanner />
         <main className="min-w-0 flex-1 p-6">
           {/* 화면을 받는 동안 뼈대(QueryState 불러오는 중 모양, 2026-11-19) */}
           <Suspense fallback={<QueryState state={{ kind: 'loading' }}>{() => null}</QueryState>}>
