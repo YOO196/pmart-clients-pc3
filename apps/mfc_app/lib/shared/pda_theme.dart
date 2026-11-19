@@ -133,9 +133,9 @@ abstract final class PdaTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          // 스캔 단추와 같은 글자 — 17·700(800 은 무겁고 16 은 작아 보였다).
+          // 스캔 단추와 같은 글자 — 20·700(단추 높이 56~58 에 맞는 비율, 사용자 2026-11-20 "글자가 작다").
           textStyle: bold.copyWith(
-            fontSize: 17,
+            fontSize: 20,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.2,
           ),

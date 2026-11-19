@@ -247,8 +247,8 @@ class _ScanButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.barcode_reader, size: 24, color: Colors.white),
-              const SizedBox(width: 10),
+              const Icon(Icons.barcode_reader, size: 30, color: Colors.white),
+              const SizedBox(width: 12),
               Flexible(
                 child: Text(
                   label,
@@ -256,7 +256,7 @@ class _ScanButton extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: text?.copyWith(
                     color: Colors.white,
-                    fontSize: 17,
+                    fontSize: 20,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.2,
                   ),
