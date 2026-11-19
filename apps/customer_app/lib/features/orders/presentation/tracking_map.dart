@@ -196,7 +196,7 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
   }
 }
 
-/// 라이더 마커: 브랜드색 원 + 흰 테두리(지금 위치 한 점).
+/// 라이더 마커: 브랜드색 원 + 흰 테두리 + 흰 오토바이(지금 위치 한 점).
 class _RiderMarker extends StatelessWidget {
   const _RiderMarker({required this.color});
 
@@ -205,36 +205,49 @@ class _RiderMarker extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(
     child: Container(
-      width: 36,
-      height: 36,
+      width: 42,
+      height: 42,
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 4),
+        border: Border.all(color: Colors.white, width: 3),
         boxShadow: const [BoxShadow(blurRadius: 6, color: Color(0x40000000))],
+      ),
+      alignment: Alignment.center,
+      child: const PmartLineIcon(
+        PmartLineIcons.scooter,
+        size: 24,
+        color: Colors.white,
+        strokeWidth: 2,
       ),
     ),
   );
 }
 
-/// 내 배송지 마커: 흰 원 안에 얇은 선 집 아이콘.
+/// 내 배송지 마커(레퍼런스 8-5): 검은 원 안에 흰 집.
 class _HomeMarker extends StatelessWidget {
   const _HomeMarker({required this.color});
 
+  // ignore: unused_field — 마커 색은 레퍼런스대로 검정(브랜드색을 받는 자리는 남겨 둔다).
   final Color color;
 
   @override
   Widget build(BuildContext context) => Center(
     child: Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: Colors.white,
+      width: 38,
+      height: 38,
+      decoration: const BoxDecoration(
+        color: Color(0xFF1B1B1F),
         shape: BoxShape.circle,
-        border: Border.all(color: color, width: 2),
+        boxShadow: [BoxShadow(blurRadius: 6, color: Color(0x40000000))],
       ),
       alignment: Alignment.center,
-      child: PmartLineIcon(PmartLineIcons.home, size: 20, color: color),
+      child: const PmartLineIcon(
+        PmartLineIcons.home,
+        size: 20,
+        color: Colors.white,
+        strokeWidth: 2.2,
+      ),
     ),
   );
 }

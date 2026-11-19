@@ -9,7 +9,7 @@ import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../orders/presentation/orders_providers.dart'
-    show orderListProvider, orderStatusText;
+    show orderDetailProvider, orderListProvider, orderStatusText;
 import '../../orders/domain/orders.dart' show OrderListQuery;
 import '../domain/inquiry.dart';
 import 'faq_screens.dart' show SupportFaqBlock;
@@ -633,7 +633,14 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
                     alignment: Alignment.centerLeft,
                     child: InputChip(
                       key: const ValueKey('inq-order'),
-                      label: Text(l10n.inqOrderChosen(orderId)),
+                      // 시스템 주문 ID(ORD-…)는 보이지 않는다 — 화면용 8자리 주문번호, 없으면 "선택한 주문".
+                      label: Text(switch (ref
+                          .watch(orderDetailProvider(orderId))
+                          .value
+                          ?.orderNumber) {
+                        final n? => l10n.inqOrderChosen(n),
+                        null => l10n.inqOrderChosenNoNumber,
+                      }),
                       onDeleted: fixed
                           ? null
                           : () => setState(() => _orderId = null),

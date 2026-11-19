@@ -746,6 +746,71 @@ void main() {
       expect(key('track-step-current-delivering'), findsOneWidget);
     });
 
+    // BR-61: 실서버 주문 응답은 shipments 가 비어 배송 ID 를 모른다 — 그래도 주문 상세에서 지도가 바로 뜬다.
+    Future<void> openOrder(
+      WidgetTester t,
+      MockOrdersRepository orders,
+      String id,
+    ) async {
+      t.view
+        ..physicalSize = const Size(800, 2400)
+        ..devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(testApp(const [], orders: orders));
+      await t.pumpAndSettle();
+      await t.tap(find.text('마이페이지').last);
+      await t.pumpAndSettle();
+      await t.tap(key('my-login'));
+      await t.pumpAndSettle();
+      await t.tap(key('login-kakao'));
+      await t.pumpAndSettle();
+      await t.tap(key('my-orders'));
+      await t.pumpAndSettle();
+      await t.tap(key('order-$id'));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('배송 ID 가 없는 주문도 "배송현황 보기" → 지도(내 배송지)·주문 단계', (t) async {
+      final orders = MockOrdersRepository(latency: Duration.zero);
+      orders.overrides['order-seed-4'] = {
+        ...orders.orderJson('order-seed-4')!,
+        'shipments': <Object?>[],
+      };
+      await openOrder(t, orders, 'order-seed-4');
+      expect(key('order-track'), findsOneWidget);
+      await t.tap(key('order-track'));
+      await t.pumpAndSettle();
+
+      expect(key('track-map-mode'), findsOneWidget);
+      expect(find.byType(TrackingScreen), findsNothing);
+      expect(map(t).home, (lat: 35.1565, lng: 129.0665));
+      expect(map(t).rider, isNull);
+      expect(key('track-no-delivery'), findsOneWidget);
+      expect(key('track-step-current-confirmed'), findsOneWidget);
+      expect(orders.trackOpens, 0, reason: '배송 ID 없이는 구독하지 않는다');
+
+      // 레퍼런스: 배달정보 자세히(주소·요청사항), 센터·상세내역, 주문 상품, 총 결제금액.
+      await t.ensureVisible(key('track-total'));
+      expect(key('track-store'), findsOneWidget);
+      expect(key('track-order-detail'), findsOneWidget);
+      expect(find.text('21,040원'), findsOneWidget);
+      await t.ensureVisible(key('track-delivery-info'));
+      await t.tap(key('track-delivery-info'));
+      await t.pumpAndSettle();
+      expect(key('track-delivery-info-body'), findsOneWidget);
+      expect(key('track-request'), findsOneWidget);
+    });
+
+    testWidgets('배송 ID 가 있으면 "배송현황 보기"가 실시간 화면으로', (t) async {
+      final orders = MockOrdersRepository(latency: Duration.zero);
+      await openOrder(t, orders, 'order-seed-4');
+      await t.tap(key('order-track'));
+      await t.pumpAndSettle();
+      expect(find.byType(TrackingScreen), findsOneWidget);
+      expect(key('track-map-mode'), findsOneWidget);
+      expect(orders.openTrackCount, 1);
+    });
+
     testWidgets('픽업 전에도 지도가 바로 뜬다 — 내 배송지 마커만, 라이더 위치 문구 없음', (t) async {
       final orders = MockOrdersRepository(latency: Duration.zero);
       await openTracking(
