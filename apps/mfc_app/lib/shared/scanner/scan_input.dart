@@ -4,6 +4,7 @@ import 'package:pmart_core/pmart_core.dart';
 
 import '../../l10n/gen/app_localizations.dart';
 import '../printer/reprint.dart';
+import '../pda_theme.dart';
 import '../providers.dart';
 import 'scanner.dart';
 
@@ -133,49 +134,53 @@ class _ScanInputState extends ConsumerState<ScanInput> {
             autocorrect: false,
             enableSuggestions: false,
             style: const TextStyle(color: Colors.transparent),
-            // 한 줄 안내만(무엇을 찍을지) — 라벨·힌트를 겹쳐 두 줄로 자르지 않는다.
-            // 스캐너 입력을 받는 중(포커스)이면 테두리가 굵은 기본색.
+            // 시안의 보라 "○○ 스캔" 버튼 모양 — 한 줄 안내(무엇을 찍을지)와 스캔 표시.
+            // 스캐너 입력을 받는 중(포커스)이면 옅은 보라 굵은 테두리.
             decoration: InputDecoration(
               hintText: widget.label,
               hintMaxLines: 1,
-              hintStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              hintStyle: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
               ),
-              prefixIcon: const Icon(Icons.barcode_reader, size: 28),
+              prefixIcon: const Icon(
+                Icons.barcode_reader,
+                size: 26,
+                color: Colors.white,
+              ),
               filled: true,
+              fillColor: PdaColors.primary,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 12,
                 vertical: 18,
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                ),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: PdaColors.primary),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: Theme.of(context).colorScheme.primary,
-                  width: 2.5,
-                ),
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: PdaColors.lilac, width: 3),
               ),
             ),
             onSubmitted: _submit,
           ),
         ),
-        const SizedBox(width: 8),
-        IconButton.filled(
+        const SizedBox(width: 7),
+        IconButton.filledTonal(
           key: ValueKey('${widget.id}-camera'),
           tooltip: l10n.scanWithCamera,
-          iconSize: 32,
+          iconSize: 28,
           style: IconButton.styleFrom(
+            backgroundColor: PdaColors.softer,
+            foregroundColor: PdaColors.dark,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
           ),
-          constraints: const BoxConstraints(minWidth: 64, minHeight: 64),
-          icon: const Icon(Icons.qr_code_scanner),
+          constraints: const BoxConstraints(minWidth: 56, minHeight: 56),
+          icon: const Icon(Icons.photo_camera_outlined),
           onPressed: _camera,
         ),
         if (ref.watch(envProvider) == PmartEnv.mock &&
