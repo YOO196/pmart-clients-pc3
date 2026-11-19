@@ -3,7 +3,7 @@
 // 원본은 투명 대신 검은 바탕에 둥근 사각이 그려져 있다 → 가장자리에서 이어진 검은 칸을 투명으로 바꾸고 둥근 사각만 잘라 쓴다.
 // - mipmap-*/ic_launcher.png: 둥근 사각 그대로(모서리 투명) — Android 7 이하·적응형 아이콘 없는 런처.
 // - mipmap-*/ic_launcher_foreground.png + mipmap-anydpi-v26/ic_launcher.xml: 적응형 아이콘. 런처가 모양(원·둥근 사각)을
-//   잘라 쓰므로 투명 모서리를 안쪽 색으로 채운 정사각을 보이는 영역(108dp 중 가운데 72dp)에 꽉 채운다.
+//   잘라 쓰므로 투명 모서리를 안쪽 색으로 채운 정사각을 108dp 가운데 64dp 에 둔다(가장자리는 배경 연보라).
 import 'dart:io';
 
 import 'package:image/image.dart' as img;
@@ -101,7 +101,7 @@ void main(List<String> args) {
     final dir = '$res/mipmap-$name';
     final legacy = img.copyResize(square, width: (48 * k).round(), interpolation: img.Interpolation.average);
     File('$dir/ic_launcher.png').writeAsBytesSync(img.encodePng(legacy));
-    final canvas = (108 * k).round(), inner = (72 * k).round();
+    final canvas = (108 * k).round(), inner = (64 * k).round(); // 원형 마스크에서도 P·장바구니가 안 잘리게 72dp 보다 작게
     final fg = img.Image(width: canvas, height: canvas, numChannels: 4);
     final art = img.copyResize(edgeless, width: inner, interpolation: img.Interpolation.average);
     img.compositeImage(fg, art, dstX: (canvas - inner) ~/ 2, dstY: (canvas - inner) ~/ 2);
