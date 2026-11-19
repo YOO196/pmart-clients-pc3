@@ -213,36 +213,15 @@ void main() {
     await shot('pack-bag-chilled');
     await tap('seal');
     await shot('pack-label');
-    await t.tap(
-      find
-          .descendant(
-            of: find.byKey(const ValueKey('label-preview')),
-            matching: find.byType(TextButton),
-          )
-          .last,
-    );
+    await t.tap(find.byKey(const ValueKey('label-ok')));
     await t.pumpAndSettle();
     await scanTo('pack-scan', MockTaskRepository.dumplingBarcode);
     await tap('seal');
-    await t.tap(
-      find
-          .descendant(
-            of: find.byKey(const ValueKey('label-preview')),
-            matching: find.byType(TextButton),
-          )
-          .last,
-    );
+    await t.tap(find.byKey(const ValueKey('label-ok')));
     await t.pumpAndSettle();
     await scanTo('pack-scan', MockTaskRepository.chipsBarcode);
     await tap('seal');
-    await t.tap(
-      find
-          .descendant(
-            of: find.byKey(const ValueKey('label-preview')),
-            matching: find.byType(TextButton),
-          )
-          .last,
-    );
+    await t.tap(find.byKey(const ValueKey('label-ok')));
     await t.pumpAndSettle();
     await shot('pack-rack');
     await scanTo('rack-scan', 'DSP-A-01');

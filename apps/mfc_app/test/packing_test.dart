@@ -644,7 +644,7 @@ void main() {
     // 냉장 요거트 1개만 담고 밀봉 — 남은 게 있으니 "이 봉투만 밀봉".
     await scanTo(t, 'pack-scan', MockTaskRepository.yogurtBarcode);
     expect(text(t, 'pack-split-progress'), '아직 밀봉 안 한 상품 4개 · 이 봉투에 1개');
-    expect(find.text('이 봉투 밀봉 · 남은 건 새 봉투'), findsOneWidget);
+    expect(find.text('담은 만큼 밀봉하기'), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('seal')));
     await t.pumpAndSettle();
     await closeLabel(t);
