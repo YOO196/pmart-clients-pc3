@@ -143,7 +143,9 @@ describe('센터 운영판', () => {
     await waitFor(() => expect(rows().every((r) => r.dataset.group === 'picking')).toBe(true));
     expect(rows()).toHaveLength(1);
     expect(rows()[0]).toHaveTextContent('피킹 파손');
-    expect(rows()[0]).toHaveTextContent('LOT-MILK-A');
+    // LOT 은 화면 번호(inventory lot-numbers) — 시스템 LOT ID 는 내지 않는다
+    await waitFor(() => expect(rows()[0]).toHaveTextContent('L261107000497'));
+    expect(rows()[0]).not.toHaveTextContent('LOT-MILK-A');
     expect(within(rows()[0]!).getByRole('link', { name: '품질 사고 — 격리·폐기' })).toHaveAttribute('href', '/c/MFC-BSN-01/quality?tab=incidents&incidentId=QI-1');
     expect(screen.getByText(/결품\(SHORT\) 건별 목록은 서버에 센터 조회가 없어/)).toBeInTheDocument();
 
@@ -160,7 +162,7 @@ describe('센터 운영판', () => {
     await userEvent.click(screen.getByRole('button', { name: '출하 약속' }));
     await waitFor(() => expect(rows()[0]!.dataset.group).toBe('promise'));
     await userEvent.click(within(rows()[0]!).getByRole('link'));
-    expect(await screen.findByRole('heading', { level: 1, name: /^피킹 · / })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /^20000001 피킹/ })).toBeInTheDocument();
   });
 
   it('필터는 URL 에 — 주소로 바로 열어도 그 유형', async () => {
@@ -283,10 +285,10 @@ describe('홈 보탬 — 작업 흐름·작업자 지금·최근 본 것, 메뉴
     expect(await screen.findByTestId('recent-panel')).toHaveTextContent('최근 연 상세가 없어요');
     await waitFor(() => expect(rows().length).toBeGreaterThan(0));
     await userEvent.click(within(rows()[0]!).getByRole('link'));
-    await screen.findByRole('heading', { level: 1, name: /^피킹 · / });
+    await screen.findByRole('heading', { level: 1, name: /^20000001 피킹/ });
     await userEvent.click(screen.getByRole('link', { name: '홈' }));
     const item = await screen.findByTestId('recent-item');
-    expect(item).toHaveTextContent(/^피킹 · /);
+    expect(item).toHaveTextContent(/^20000001 피킹$/);
     expect(item).not.toHaveTextContent('TASK-');
   });
 

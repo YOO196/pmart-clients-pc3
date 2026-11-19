@@ -19,6 +19,7 @@ import { centerPath } from '../../app/nav';
 import { DisplayNumber, RiderLabel } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
 import { AllDone } from '../../shared/listParts';
+import { LotLabel } from '../../shared/LotLabel';
 import { useStatChange } from '../../shared/motion';
 import { Who } from '../../shared/OperatorLabel';
 import {
@@ -483,7 +484,16 @@ function promiseRow(mfcId: string, r: PromiseRow): Row {
 
 function damageRow(mfcId: string, i: Incident, nowMs: number): Row {
   const id = i.incidentId ?? '';
-  const lots = (i.affectedLots ?? []).map((l) => l.lotId).join(', ') || m.noInfo;
+  const lotIds = (i.affectedLots ?? []).map((l) => l.lotId).filter((x): x is string => !!x);
+  const lots =
+    lotIds.length === 0
+      ? m.noInfo
+      : lotIds.map((id, k) => (
+          <span key={id}>
+            {k > 0 && ', '}
+            <LotLabel lotId={id} />
+          </span>
+        ));
   const min = i.openedAt ? minutesSince(i.openedAt, nowMs) : null;
   return {
     key: `damage-${id}`,
@@ -492,7 +502,12 @@ function damageRow(mfcId: string, i: Incident, nowMs: number): Row {
     type: m.type.damaged,
     // 품질 사고 = 종류 · 시각(화면 번호가 없다 — ADR-0070 덧붙임)
     id: <div>{`${m.incidentLabel} · ${i.openedAt ? formatSeoul(i.openedAt) : m.noInfo}`}</div>,
-    reason: m.reason.damaged(lots),
+    reason: (
+      <>
+        {m.reason.damaged}
+        {lots})
+      </>
+    ),
     elapsed: min === null ? m.noInfo : minutesText(min),
     // 품질 사고에는 담당자가 없다(계약) — 추정하지 않는다.
     assignee: m.noInfo,

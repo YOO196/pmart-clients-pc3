@@ -215,6 +215,13 @@
   - 포장: 인계 판정·bff 포장 인계에 라벨 번호(`handoverCode`)가 없어 목록에는 포장대 위치·"포장 1·2"(출고 안 순서), 포장 시스템 ID 는 시스템 번호 칸. 화면 번호 요청 `docs/handoff/mfc-backoffice/2026-11-19-backend-display-labels.md`.
   - 센터 목록(판정·폐기 승인·검수·반입·공급 요청·초기 보유·실사·배정 추천)은 ID 칸을 빼고 종류·상태·시각으로 알아본다(열면 상세). 배정 목록·추천 줄의 작업은 "작업 보기" 링크.
 
+- (2026-11-19 백엔드 요청 `clients/mfc-backoffice/2026-11-19-request-display-numbers.md` 반영)
+  - 작업 = **주문번호 + 종류**(`20000001 피킹`, 주문번호가 없으면 종류 · 시각). 출고 줄에서 출고 ID 뺌, 포장은 라벨 숫자 6자리(`handoverCode`) — 포장 시스템 ID 는 시스템 번호 칸.
+  - LOT = **LOT 번호**(`shared/LotLabel.tsx` — inventory 0.30.0 `GET /mfcs/{mfcId}/lot-numbers?lotIds=` 한 화면 200개씩 묶음, 모르면 "LOT 번호 없음", 실패면 "LOT 번호 확인 불가"). 이동·입고·재고·품질·품질 사고·센터 전체 재고·홈 파손 줄.
+  - 직원(`<Who>`): 이름을 모르거나 못 읽어도 운영자 ID 를 글자로 내지 않는다 — "직원"·"직원(이름 못 읽음)", ID 는 title 에만. 작업자는 capacity 0.23.0 `name`·`employeeNo`(없으면 hr employee-labels).
+  - 이동 = 종류 · 상품 · 시각. 판정·폐기·검수·실사·수령·반입·공급 요청 상세 머리에서 시스템 ID 를 빼고 시스템 번호 칸으로.
+  - 아직: 라이더 표기(rider `GET /riders?riderIds=` 가 센터 관리자 403 — PC 5 회신 뒤), 처리자 이름을 capacity `staff-names` 로 바꾸기(지금 hr employee-labels 로 같은 "이름 · 사번").
+
 ### 4-13. 통합 백오피스와 같은 겉모습·목록·상세 부품(2026-11-19 PC 3 — 지침 `docs/handoff/all/2026-11-19-request-ui-ux-align.md`)
 - 겉모습: `main[data-skin=wing]`(index.css) — 연회색 바탕·흰 상자, 파랑 `#346aff` 하나, 그림자 없는 얇은 테두리, 큰 제목, 넉넉한 표, 흰 단추. 왼쪽 메뉴는 P 배지 로고·고른 메뉴 파란 채움·흰 글자(민트 안 씀).
 - 부품(사본 — web-ui 로 올라오면 바꿔 낀다): `shared/listParts.tsx`(StatCard 가로형·StatStrip·countCell·GuideBox·AllDone·SearchBar 칩 접기), `motion.tsx`, `ProgressSteps.tsx`, `StickyTitle.tsx`, `Preview.tsx`, `SavedViews.tsx`, `SearchSelect.tsx`(초성), `SeenMark.tsx`. 앱 것: `recentViews.ts`·`workQueue.tsx`(센터·종류마다), `app/PageChrome.tsx`(탭 제목·끊김 띠·'/' 키), `features/ops/opsQueries.ts`(운영판·탭 제목이 같은 조회).

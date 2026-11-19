@@ -12,6 +12,8 @@ import { CommandFeedback, formatSeoul, QueryState, toUiState, useCommand } from 
 import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-inbound';
 import { useApi } from '../../app/ApiContext';
+import { LotLabel } from '../../shared/LotLabel';
+import { SystemNumbers } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 import { InitialLoadList, ReturnReceiptList, SupplyRequestList } from '../lists/CenterLists';
@@ -122,11 +124,11 @@ function InitialLoadCard({ mfcId, load, approvalId }: { readonly mfcId: string; 
   return (
     <div className="space-y-2 rounded-box bg-base-100 p-4" data-testid="initial-load">
       <p className="flex flex-wrap items-center gap-2">
-        <span className="font-mono">{load.receiptId}</span>
         <span>{load.mfcId ?? messages.none}</span>
         <span className="badge badge-sm">{m.loadState[load.state] ?? load.state}</span>
         {load.receivingLocation && <span className="font-mono opacity-70">{load.receivingLocation}</span>}
       </p>
+      <SystemNumbers ids={[{ label: m.sys.receipt, id: load.receiptId }]} />
       {load.rejectReason && <p className="text-error">{load.rejectReason}</p>}
       {load.lastError && <p className="text-warning text-xs">{`${m.lastError}: ${load.lastError}`}</p>}
       {accepted && <p role="status" className="text-success">{m.receiveAccepted}</p>}
@@ -328,15 +330,23 @@ function ReturnReceiptView({ id }: { readonly id: string }) {
       {(r) => (
         <div className="space-y-1 rounded-box bg-base-100 p-4" data-testid="return-receipt">
           <p className="flex flex-wrap items-center gap-2">
-            <span className="font-mono">{r.returnReceiptId}</span>
             <span className="badge badge-sm">{m.applyStatus[r.inventoryApplyStatus ?? ''] ?? r.inventoryApplyStatus}</span>
             <span className="badge badge-sm badge-outline">{m.inspectionState[r.inspectionState ?? ''] ?? r.inspectionState}</span>
           </p>
+          <SystemNumbers ids={[{ label: m.sys.returnReceipt, id: r.returnReceiptId }]} />
           <p>{`${m.claimId} ${r.claimId ?? ''} · ${m.returnLocation} ${r.toLocationCode ?? ''} · ${r.receivedAt ? formatSeoul(r.receivedAt) : ''}`}</p>
           {r.rejectReason && <p className="text-error">{r.rejectReason}</p>}
           <ul className="list-disc pl-5">
             {(r.lines ?? []).map((l, i) => (
-              <li key={`${l.sku ?? ''}-${i}`}>{`${l.sku ?? ''} × ${l.qty ?? 0} ${l.lotId ? `(${l.lotId})` : ''} ${l.conditionNote ?? ''}`.trim()}</li>
+              <li key={`${l.sku ?? ''}-${i}`}>
+                {`${l.sku ?? ''} × ${l.qty ?? 0} `}
+                {l.lotId && (
+                  <>
+                    (<LotLabel lotId={l.lotId} />){' '}
+                  </>
+                )}
+                {l.conditionNote ?? ''}
+              </li>
             ))}
           </ul>
         </div>
@@ -517,11 +527,11 @@ function SupplyRequestCard({ mfcId, request: s }: { readonly mfcId: string; read
   return (
     <div className="space-y-3 rounded-box bg-base-100 p-4" data-testid="supply-request">
       <p className="flex flex-wrap items-center gap-2">
-        <span className="font-mono">{s.supplyRequestId}</span>
         <span className="badge badge-sm">{m.supplyState[s.state ?? ''] ?? s.state}</span>
         <span>{m.urgency[s.urgency] ?? s.urgency}</span>
         {s.linkedTrfId && <span className="opacity-70">{`${m.linkedTrf} ${s.linkedTrfId}`}</span>}
       </p>
+      <SystemNumbers ids={[{ label: m.sys.supply, id: s.supplyRequestId }]} />
       {notice && (
         <p role="status" className="text-success">
           {notice}

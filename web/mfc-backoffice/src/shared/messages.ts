@@ -22,10 +22,15 @@ export const messages = {
     systemNumbers: '시스템 번호',
     system: { orderId: '주문', deliveryId: '배송', shipmentId: '출고', packageId: '포장', riderId: '라이더' },
   },
+  /** LOT 화면 번호(inventory lot-numbers) */
+  lot: {
+    missing: 'LOT 번호 없음',
+    failed: 'LOT 번호 확인 불가',
+  },
   /** 운영자 이름·사번(hr employee-labels) */
   operator: {
-    unknown: '확인 불가',
-    failed: '이름 못 읽음',
+    unknown: '직원',
+    failed: '직원(이름 못 읽음)',
   },
 
   nav: {
@@ -243,7 +248,7 @@ export const messages = {
     dueIn: (t: string) => `${t} 남음`,
     reason: {
       promise: (at: string, stage: string) => `약속 ${at} · 지금 ${stage}`,
-      damaged: (lots: string) => `피킹 중 파손 보고 — 품질 사고(${lots})`,
+      damaged: '피킹 중 파손 보고 — 품질 사고(',
       handover: '라이더 스캔 뒤 인계 확정 없이 허가 만료',
     },
     next: {
@@ -488,6 +493,8 @@ export const messages = {
 
   /** 품질 — mfc-quality-service 0.2.0 */
   quality: {
+    /** 시스템 번호 칸 이름(ADR-0070 — 상세 머리에서 뺀 시스템 ID) */
+    sys: { decision: '판정', disposal: '폐기 승인', inspection: '검수' },
     intro: '격리·해제, 폐기, 회수품 검수를 다뤄요. 재고 반영은 재고 서비스 결과로만 확정해요. 요청한 사람과 승인하는 사람은 달라야 해요.',
     tabs: { decisions: '격리·해제', disposals: '폐기', inspections: '회수품 검수', incidents: '품질 사고' },
     /** 품질 사고(MB-2 1차, quality 0.6.0) */
@@ -616,6 +623,8 @@ export const messages = {
 
   /** 재고 — mfc-inventory-service 0.16.0 */
   inventory: {
+    /** 시스템 번호 칸 이름(ADR-0070 — 상세 머리에서 뺀 시스템 ID) */
+    sys: { session: '실사' },
     intro: '상품별 재고(위치·LOT·품질)를 보고, 정정·순환 실사·보충 기준·상품 취급을 다뤄요. 수량은 재고 서비스 값만 보여요.',
     tabs: { stock: '상품별 재고', counts: '순환 실사', unshippable: '출하 부적격 LOT', policies: '보충 기준', handlings: '상품 취급' },
     sku: '상품 코드(SKU)',
@@ -706,6 +715,8 @@ export const messages = {
 
   /** 입고 — mfc-inbound-service 0.9.0 */
   inbound: {
+    /** 시스템 번호 칸 이름(ADR-0070 — 상세 머리에서 뺀 시스템 ID) */
+    sys: { receipt: '수령', returnReceipt: '반입', supply: '공급 요청' },
     intro: '수령 → 품질검사(정상/격리, LOT 나누기) → 적치를 거쳐야 판매 가능 재고가 돼요. 현장(PDA)과 같은 API 를 써요.',
     tabs: { tasks: '입고 작업', initial: '초기 보유 수령', returns: '회수품 반입', supply: '공급 요청', promises: '입고 예정(TRF)' },
     promisesMissing: '입고 예정(TRF)은 계약만 있고 서버가 아직 501 이에요(간선 쪽 입고 예정이 생긴 뒤 — 백엔드 MB-2).',
@@ -915,6 +926,7 @@ export const messages = {
       allDoneBody: '대기·배정·진행·막힘 작업이 하나도 없어요.',
       dueIn: (min: number) => `${min}분 남음`,
       title: (type: string, at: string) => `${type} · ${at}`,
+      orderTitle: (orderNumber: string, type: string) => `${orderNumber} ${type}`,
       steps: ['대기', '배정', '진행', '완료'],
       stepsLabel: '작업 진행',
       blockedNote: '막힘',

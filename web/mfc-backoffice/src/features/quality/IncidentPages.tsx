@@ -18,6 +18,7 @@ import { useApi } from '../../app/ApiContext';
 import { CursorList, useQueryParam } from '../../shared/CursorList';
 import { SystemNumbers } from '../../shared/displayNumber';
 import { countCell, StatCard, StatStrip } from '../../shared/listParts';
+import { LotLabel } from '../../shared/LotLabel';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 
@@ -280,7 +281,9 @@ function IncidentDetail({ incident: i }: { readonly incident: Incident }) {
             {(i.affectedLots ?? []).map((lot, n) => (
               <tr key={`${lot.lotId ?? ''}-${n}`} data-testid="incident-lot">
                 <td className="font-mono">{lot.sku ?? messages.none}</td>
-                <td className="font-mono">{lot.lotId}</td>
+                <td>
+                    <LotLabel lotId={lot.lotId} />
+                  </td>
                 <td>{lot.qty ?? messages.none}</td>
                 <td>{lot.resolved ? <span className="text-success">{m.resolved}</span> : <span className="text-warning">{m.unresolved}</span>}</td>
                 <td className="font-mono text-xs">{lot.resolvedBy ?? ''}</td>

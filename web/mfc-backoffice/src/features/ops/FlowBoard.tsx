@@ -139,7 +139,7 @@ export function WorkerLoad({ mfcId, tasks }: { readonly mfcId: string; readonly 
               return (
                 <li key={w.workerId} className="flex flex-wrap items-center gap-2 py-1.5" data-testid="worker-load-row">
                   <Link to={centerPath(mfcId, `workers/${encodeURIComponent(w.workerId ?? '')}`)} className="link min-w-0 font-medium">
-                    <WorkerLabel name={w.displayName} workerId={w.workerId} />
+                    <WorkerLabel name={w.name ?? w.displayName} employeeNo={w.employeeNo} workerId={w.workerId} />
                   </Link>
                   {w.onBreak && <span className="badge badge-sm badge-info">{m.onBreak}</span>}
                   {alert && <span className="badge badge-sm badge-error">{m.hasLate}</span>}
@@ -172,12 +172,13 @@ export function WorkerLoad({ mfcId, tasks }: { readonly mfcId: string; readonly 
 }
 
 /** "이름 · 사번" — 사번은 hr employee-labels(못 읽으면 이름만) */
-function WorkerLabel({ name, workerId }: { readonly name: string | undefined; readonly workerId: string | undefined }) {
-  const label = useOperatorLabel(workerId);
+function WorkerLabel({ name, employeeNo, workerId }: { readonly name: string | null | undefined; readonly employeeNo: string | null | undefined; readonly workerId: string | undefined }) {
+  const label = useOperatorLabel(employeeNo ? null : workerId);
+  const no = employeeNo ?? label.data?.employeeNo ?? null;
   return (
     <>
       {name ?? label.data?.name ?? messages.none}
-      {label.data && <span className="font-normal text-base-content/60">{` · ${label.data.employeeNo}`}</span>}
+      {no && <span className="font-normal text-base-content/60">{` · ${no}`}</span>}
     </>
   );
 }

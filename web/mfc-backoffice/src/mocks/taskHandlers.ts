@@ -21,6 +21,8 @@ function summary(t: MockTask) {
     mfcId: t.mfcId,
     fulfillmentId: t.fulfillmentId,
     shipmentId: t.shipmentId,
+    // 주문 화면 번호(계약 TaskSummary.orderNumber) — 목은 출고에서
+    orderNumber: (t.shipmentId ? db.shipments.get(t.shipmentId)?.orderNumber : null) ?? null,
     assignment: t.assignment,
     lineCount: t.lineCount,
     plannedQty: t.plannedQty,
@@ -110,7 +112,7 @@ export const taskHandlers = [
   http.get(`${API_BASE}/tasks/:taskId`, ({ request, params }) => {
     if (!operator(request)) return unauthorized();
     const t = found(request, String(params.taskId));
-    return t instanceof Response ? t : HttpResponse.json({ ...t, asOf: asOf() });
+    return t instanceof Response ? t : HttpResponse.json({ ...t, orderNumber: (t.shipmentId ? db.shipments.get(t.shipmentId)?.orderNumber : null) ?? null, asOf: asOf() });
   }),
 
   http.post(`${API_BASE}/tasks/:taskId/releases`, async ({ request, params }) => {

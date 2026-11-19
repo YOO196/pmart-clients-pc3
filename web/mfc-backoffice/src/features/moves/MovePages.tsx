@@ -15,6 +15,7 @@ import type { components } from '../../api/generated/mfc-inbound';
 import type { components as InventorySchemas } from '../../api/generated/mfc-inventory';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
+import { LotLabel } from '../../shared/LotLabel';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
 import { GuideBox, SearchBar, StatCard, StatStrip } from '../../shared/listParts';
@@ -148,7 +149,9 @@ function MoveListPage({ mfcId }: { readonly mfcId: string }) {
                     <SeenMark seen={seen.has(o.moveId ?? '')} />
                   </td>
                   <td>{product(o)}</td>
-                  <td className="font-mono text-xs">{o.lotId}</td>
+                  <td>
+                    <LotLabel lotId={o.lotId} />
+                  </td>
                   <td className="font-mono text-xs">{`${o.fromLocation ?? ''} → ${o.toLocation ?? ''}`}</td>
                   <td>{o.qty}</td>
                   <td>{m.progress(o.pickedQty ?? 0, o.droppedQty ?? 0, o.onCartQty ?? 0)}</td>
@@ -227,8 +230,10 @@ function MoveDetailPage({ mfcId }: { readonly mfcId: string }) {
   );
 }
 
-/** 화면 표기(ADR-0070 덧붙임 "작업 지시 = 종류 · 시각") — 시스템 ID 는 시스템 번호 칸에만 */
-const moveTitle = (o: MoveOrder) => m.ui.title(m.kind[o.kind ?? ''] ?? o.kind ?? m.ui.move, o.createdAt ? formatSeoul(o.createdAt) : messages.none);
+/** 화면 표기(ADR-0070 덧붙임) — 시스템 ID 는 시스템 번호 칸에만 */
+// 백엔드 요청 2026-11-19 request-display-numbers: 이동 = "종류 · 상품 · 시각"(상품명이 없으면 SKU)
+const moveTitle = (o: MoveOrder) =>
+  m.ui.title(`${m.kind[o.kind ?? ''] ?? o.kind ?? m.ui.move}${o.productName || o.sku ? ` · ${o.productName ?? o.sku}` : ''}`, o.createdAt ? formatSeoul(o.createdAt) : messages.none);
 
 /** 이동 상태 → 진행 단계(지시 → 옮기는 중 → 끝남). 취소 대기는 옮기는 중에서 주의(카트에 남은 것 정리) */
 function movePlace(s: MoveState | undefined): StepPlace | null {
@@ -248,7 +253,7 @@ function MoveFacts({ order: o }: { readonly order: MoveOrder }) {
   const rows: ReadonlyArray<readonly [string, ReactNode]> = [
     [m.fields.product, product(o)],
     [m.fields.barcodes, o.barcodes?.length ? o.barcodes.join(', ') : messages.none],
-    [m.fields.lotId, o.lotId ?? messages.none],
+    [m.fields.lotId, <LotLabel lotId={o.lotId} />],
     [m.fields.from, o.fromLocation ?? messages.none],
     [m.fields.to, o.toLocation ?? messages.none],
     [m.fields.cart, o.cartLocation ?? messages.none],
@@ -478,7 +483,9 @@ function StockPicker({ mfcId, sku, onPick }: { readonly mfcId: string; readonly 
                 {s.units.map((u, i) => (
                   <tr key={`${u.locationCode ?? ''}-${u.lotId ?? ''}-${i}`} data-testid="stock-row">
                     <td className="font-mono">{u.locationCode}</td>
-                    <td className="font-mono">{u.lotId}</td>
+                    <td>
+                    <LotLabel lotId={u.lotId} />
+                  </td>
                     <td>{m.quality[u.qualityState ?? ''] ?? u.qualityState}</td>
                     <td>{m.work[u.workState ?? ''] ?? u.workState}</td>
                     <td>{u.qty}</td>

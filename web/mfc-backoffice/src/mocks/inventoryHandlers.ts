@@ -21,7 +21,24 @@ function gate(request: Request, params: Record<string, unknown>): string | Respo
   return canAccess(request, mfcId) ? mfcId : problem(403, 'FORBIDDEN');
 }
 
+/** LOT 화면 번호(inventory 0.30.0 lot-numbers 목) — 목에 없는 LOT 은 응답에서 빠진다 */
+export const MOCK_LOT_NUMBERS: Readonly<Record<string, { lotNo: string; sku: string; expiryDate: string }>> = {
+  'LOT-MILK-A': { lotNo: 'L261107000497', sku: 'SKU-MILK-1', expiryDate: '2026-11-25' },
+  'LOT-MILK-B': { lotNo: 'L261110000102', sku: 'SKU-MILK-1', expiryDate: '2026-11-28' },
+  'LOT-RAMEN-1': { lotNo: 'L261101000033', sku: 'SKU-RAMEN-5', expiryDate: '2027-05-01' },
+  'LOT-RCV-1': { lotNo: 'L261118000201', sku: 'SKU-MILK-1', expiryDate: '2026-11-30' },
+};
+
 export const inventoryHandlers = [
+  http.get(`${API_BASE}/mfcs/:mfcId/lot-numbers`, ({ request, params }) => {
+    const who = operator(request);
+    if (!who) return unauthorized();
+    if (!who.centers.includes(String(params.mfcId))) return problem(403, 'FORBIDDEN');
+    const ids = [...new Set(new URL(request.url).searchParams.getAll('lotIds'))];
+    if (ids.length === 0 || ids.length > 200) return problem(400, 'VALIDATION_FAILED');
+    const items = ids.filter((id) => MOCK_LOT_NUMBERS[id]).map((id) => ({ lotId: id, productName: null, ...MOCK_LOT_NUMBERS[id]! }));
+    return HttpResponse.json({ items });
+  }),
   http.post(`${base}/stock-corrections`, async ({ request, params }) => {
     const mfcId = gate(request, params);
     if (mfcId instanceof Response) return mfcId;
