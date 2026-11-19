@@ -200,16 +200,28 @@ class _StockResult extends ConsumerWidget {
                       ),
                     ),
                   const SizedBox(height: 8),
+                  // 수량 넷을 숫자 칸으로(옅은 바탕·큰 숫자) — 한 줄 글자로는 안 보였다(사용자 2026-11-20).
+                  // 판매 가능은 보라로 강조.
                   Wrap(
-                    // 수량은 굵게.
-                    spacing: 16,
-                    runSpacing: 4,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      Text('${l10n.stockCheckOnHand} ${n(lot.onHand)}'),
-                      Text('${l10n.stockCheckAvailable} ${n(lot.available)}'),
-                      Text('${l10n.stockCheckReserved} ${n(lot.reserved)}'),
-                      Text(
-                        '${l10n.stockCheckQuarantined} ${n(lot.quarantined)}',
+                      StatBox(
+                        label: l10n.stockCheckOnHand,
+                        value: n(lot.onHand),
+                      ),
+                      StatBox(
+                        label: l10n.stockCheckAvailable,
+                        value: n(lot.available),
+                        strong: true,
+                      ),
+                      StatBox(
+                        label: l10n.stockCheckReserved,
+                        value: n(lot.reserved),
+                      ),
+                      StatBox(
+                        label: l10n.stockCheckQuarantined,
+                        value: n(lot.quarantined),
                       ),
                     ],
                   ),

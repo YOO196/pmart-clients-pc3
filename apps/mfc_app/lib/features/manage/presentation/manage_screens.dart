@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/pda_theme.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../tasks/domain/task_list.dart';
 import '../../tasks/presentation/task_controllers.dart';
@@ -267,19 +268,34 @@ class CenterWorkersScreen extends ConsumerWidget {
                     null => l10n.manageAreasUnknown,
                     _ => l10n.manageNoAreas,
                   }),
-                  trailing: Text(
-                    !w.active
-                        ? l10n.manageWorkerSuspended
-                        : w.onBreak
-                        ? l10n.statusOnBreak
-                        : l10n.manageWorkerOn,
-                    style: TextStyle(
+                  // 근무 상태 — 작은 글자 대신 색 칩(근무 초록·휴게 노랑·정지 빨강).
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
                       color: !w.active
-                          ? theme.colorScheme.error
+                          ? PdaColors.dangerSoft
                           : w.onBreak
-                          ? theme.colorScheme.tertiary
-                          : theme.colorScheme.primary,
-                      fontWeight: FontWeight.w700,
+                          ? PdaColors.warning
+                          : PdaColors.okSoft,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      !w.active
+                          ? l10n.manageWorkerSuspended
+                          : w.onBreak
+                          ? l10n.statusOnBreak
+                          : l10n.manageWorkerOn,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: !w.active
+                            ? theme.colorScheme.error
+                            : w.onBreak
+                            ? PdaColors.onWarning
+                            : PdaColors.okInk,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
                 ),
