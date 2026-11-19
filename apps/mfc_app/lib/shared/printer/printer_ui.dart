@@ -121,14 +121,6 @@ class LabelPreviewDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final zone = label.temperatureZone?.toUpperCase();
-    final zoneText = switch (zone) {
-      'AMBIENT' => l10n.zoneAmbient,
-      'CHILLED' => l10n.zoneChilled,
-      'FROZEN' => l10n.zoneFrozen,
-      null => null,
-      final z => z,
-    };
     final muted = theme.textTheme.bodySmall?.copyWith(color: PdaColors.muted);
     return Dialog(
       key: const ValueKey('label-preview'),
@@ -145,100 +137,7 @@ class LabelPreviewDialog extends StatelessWidget {
             Text(l10n.labelPreviewNote, style: muted),
             const SizedBox(height: 16),
             // 라벨 한 장(용지 812×609 — 가로가 긴 꼴).
-            Container(
-              key: const ValueKey('label-card'),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: PdaColors.ink, width: 1.5),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 92,
-                    height: 92,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: PdaColors.line, width: 1.5),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Icon(
-                      Icons.qr_code_2,
-                      size: 80,
-                      color: PdaColors.ink,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (label.handoverCode case final c?) ...[
-                          Text(l10n.labelHandoverCode, style: muted),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              c,
-                              key: const ValueKey('label-handover-code'),
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 3,
-                                color: PdaColors.ink,
-                              ),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            if (zoneText != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: tempChipColor(switch (zone) {
-                                    'CHILLED' => 'C',
-                                    'FROZEN' => 'F',
-                                    _ => 'A',
-                                  }),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  zoneText,
-                                  key: const ValueKey('label-zone'),
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: PdaColors.ink,
-                                  ),
-                                ),
-                              ),
-                            if (label.bagCount != null)
-                              Text(
-                                l10n.labelBags(label.bagCount!),
-                                style: theme.textTheme.titleSmall,
-                              ),
-                          ],
-                        ),
-                        if (label.orderNumber case final n?) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            l10n.labelOrderNumber(n),
-                            style: theme.textTheme.bodyMedium,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            PackageLabelCard(label: label),
             const SizedBox(height: 10),
             // 시스템 값 — 맨 아래 작게(문의·대조용).
             SelectableText(
@@ -396,6 +295,27 @@ class _PrinterSettingsFormState extends ConsumerState<_PrinterSettingsForm> {
         ),
         const SizedBox(height: 8),
         Text(network ? l10n.printerNetworkHelp : l10n.printerPreviewHelp),
+        // 화면 미리보기면 라벨이 어떻게 뜨는지 바로 보인다(사용자 2026-11-20 "화면 미리보기라면서 왜 라벨 미리보기가 안 떠 있어").
+        if (!network) ...[
+          const SizedBox(height: 12),
+          Text(
+            l10n.printerPreviewSample,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 6),
+          const PackageLabelCard(
+            key: ValueKey('printer-sample-label'),
+            label: PackageLabel(
+              packageId: 'SAMPLE',
+              packageVersion: 1,
+              qrCode: 'PKG:SAMPLE:1',
+              handoverCode: '3817',
+              orderNumber: '10000001',
+              temperatureZone: 'CHILLED',
+              bagCount: 1,
+            ),
+          ),
+        ],
         if (network) ...[
           TextField(
             key: const ValueKey('printer-host'),
@@ -442,6 +362,118 @@ class _PrinterSettingsFormState extends ConsumerState<_PrinterSettingsForm> {
           child: Text(l10n.printerTestPrint),
         ),
       ],
+    );
+  }
+}
+
+/// 포장 라벨 한 장 모양(왼쪽 QR 자리, 오른쪽 인계 번호·온도대·봉투·주문번호) — 미리보기 창·프린터 설정이 같이 쓴다.
+class PackageLabelCard extends StatelessWidget {
+  const PackageLabelCard({super.key, required this.label});
+
+  final PackageLabel label;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final zone = label.temperatureZone?.toUpperCase();
+    final zoneText = switch (zone) {
+      'AMBIENT' => l10n.zoneAmbient,
+      'CHILLED' => l10n.zoneChilled,
+      'FROZEN' => l10n.zoneFrozen,
+      null => null,
+      final z => z,
+    };
+    final muted = theme.textTheme.bodySmall?.copyWith(color: PdaColors.muted);
+    return Container(
+      key: const ValueKey('label-card'),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: PdaColors.ink, width: 1.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 92,
+            height: 92,
+            decoration: BoxDecoration(
+              border: Border.all(color: PdaColors.line, width: 1.5),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Icon(Icons.qr_code_2, size: 80, color: PdaColors.ink),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (label.handoverCode case final c?) ...[
+                  Text(l10n.labelHandoverCode, style: muted),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      c,
+                      key: const ValueKey('label-handover-code'),
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 3,
+                        color: PdaColors.ink,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (zoneText != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: tempChipColor(switch (zone) {
+                            'CHILLED' => 'C',
+                            'FROZEN' => 'F',
+                            _ => 'A',
+                          }),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          zoneText,
+                          key: const ValueKey('label-zone'),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: PdaColors.ink,
+                          ),
+                        ),
+                      ),
+                    if (label.bagCount != null)
+                      Text(
+                        l10n.labelBags(label.bagCount!),
+                        style: theme.textTheme.titleSmall,
+                      ),
+                  ],
+                ),
+                if (label.orderNumber case final n?) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    l10n.labelOrderNumber(n),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

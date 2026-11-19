@@ -317,20 +317,32 @@ class ReturnIntakeScreen extends ConsumerWidget {
               names: [l10n.riStepLocation, l10n.riStepItems],
               current: step,
             ),
-            Row(
-              children: [
-                Text(
-                  arrivalPurposeText(l10n, a.purpose),
-                  style: theme.textTheme.titleMedium,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  l10n.riArrivedAt(formatSeoulTime(a.arrivedAt)),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: PdaColors.body,
+            // 어떤 반납인지 — 옅은 보라 상자(종류 굵게·도착 시각).
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: PdaColors.softer,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: PdaColors.lilac),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      arrivalPurposeText(l10n, a.purpose),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                  Text(
+                    l10n.riArrivedAt(formatSeoulTime(a.arrivedAt)),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: PdaColors.primary,
+                    ),
+                  ),
+                ],
+              ),
             ),
             // 클레임이 없는 반납은 검수 결과가 환불로 이어지지 않는다(요청 3).
             if (!a.hasClaim)
@@ -378,9 +390,19 @@ class ReturnIntakeScreen extends ConsumerWidget {
             );
           } else {
             body.addAll([
-              ScanPrompt(
-                text: l10n.riItemsTitle,
-                detail: l10n.riLocationConfirmed(s.location!),
+              ScanPrompt(text: l10n.riItemsTitle),
+              // 찍은 반품 칸 — 회색 한 줄 대신 확인 표시 상자(출하대기 랙과 같은 모양, 사용자 2026-11-20).
+              Card(
+                key: const ValueKey('ri-location-confirmed'),
+                margin: const EdgeInsets.only(bottom: 4),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: TargetLine(
+                    label: l10n.riStepLocation,
+                    code: s.location!,
+                    confirmed: true,
+                  ),
+                ),
               ),
               Card(
                 child: Padding(
