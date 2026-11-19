@@ -66,16 +66,13 @@ void main() {
   testWidgets('반품 칸 → 반납 수량 그대로 → 반입: 줄을 보내지 않고 대기 건으로, 목록에서 빠진다', (t) async {
     await open(t, '/return-arrivals');
     await tap(t, 'ri-ARR-mock-1');
-    await t.enterText(
-      find.byKey(const ValueKey('ri-location-scan')),
-      'C-S1-01-1-01',
-    );
+    await t.enterText(find.byKey(const ValueKey('ri-scan')), 'C-S1-01-1-01');
     await t.testTextInput.receiveAction(TextInputAction.done);
     await t.pump();
     expect(find.byKey(const ValueKey('ri-scan-error')), findsOneWidget);
     await t.pumpAndSettle();
-    await scanTo(t, 'ri-location-scan', 'RTN-A-01');
-    expect(find.text('받은 상품을 확인하세요'), findsOneWidget);
+    await scanTo(t, 'ri-scan', 'RTN-A-01');
+    expect(find.byKey(const ValueKey('ri-location-confirmed')), findsOneWidget);
 
     await tap(t, 'ri-all');
     await tap(t, 'ri-submit');
@@ -89,13 +86,10 @@ void main() {
 
   testWidgets('받은 수량이 다르면 스캔한 줄만 보낸다(SKU·수량)', (t) async {
     await open(t, '/return-arrivals/ARR-mock-1');
-    await scanTo(t, 'ri-location-scan', 'RTN-A-01');
-    await scanTo(t, 'ri-item-scan', '8801115114154'); // 서울우유 1개만
+    await scanTo(t, 'ri-scan', 'RTN-A-01');
+    await scanTo(t, 'ri-scan', '8801115114154'); // 서울우유 1개만
     expect(find.text('1개 반입'), findsOneWidget);
-    await t.enterText(
-      find.byKey(const ValueKey('ri-item-scan')),
-      '0000000000000',
-    );
+    await t.enterText(find.byKey(const ValueKey('ri-scan')), '0000000000000');
     await t.testTextInput.receiveAction(TextInputAction.done);
     await t.pump();
     expect(find.byKey(const ValueKey('ri-scan-error')), findsOneWidget);
@@ -116,7 +110,7 @@ void main() {
   ) async {
     repo.takenArrivals.add('ARR-mock-1');
     await open(t, '/return-arrivals/ARR-mock-1');
-    await scanTo(t, 'ri-location-scan', 'RTN-A-01');
+    await scanTo(t, 'ri-scan', 'RTN-A-01');
     await tap(t, 'ri-all');
     await tap(t, 'ri-submit');
     expect(find.text('다른 직원이 이미 반입했어요'), findsOneWidget);
@@ -125,7 +119,7 @@ void main() {
   testWidgets('결과를 모르면 다시 확인 — 같은 키로 한 번만 반입된다', (t) async {
     repo.loseNextReturnResponse = true;
     await open(t, '/return-arrivals/ARR-mock-1');
-    await scanTo(t, 'ri-location-scan', 'RTN-A-01');
+    await scanTo(t, 'ri-scan', 'RTN-A-01');
     await tap(t, 'ri-all');
     await tap(t, 'ri-submit');
     expect(find.byKey(const ValueKey('ri-unknown')), findsOneWidget);
@@ -133,5 +127,22 @@ void main() {
     await tap(t, 'ri-submit');
     expect(find.byKey(const ValueKey('ri-done')), findsOneWidget);
     expect(repo.receivedBodies, hasLength(1), reason: '같은 키 — 반입 한 번');
+  });
+
+  testWidgets('한 화면 — 상품을 먼저 찍어도 되고, 반입은 반품 칸을 찍어야 켜진다', (t) async {
+    await open(t, '/return-arrivals/ARR-mock-1');
+    // 반품 칸과 상품 목록이 같은 화면에 있다(단계를 넘기지 않는다).
+    expect(find.byKey(const ValueKey('ri-location-needed')), findsOneWidget);
+    expect(find.byKey(const ValueKey('ri-count-E-00000001')), findsOneWidget);
+    await scanTo(t, 'ri-scan', '8801115114154'); // 상품 먼저
+    await scanTo(t, 'ri-scan', '8801115114154');
+    expect(
+      find.text('반품 칸을 먼저 찍어요'),
+      findsOneWidget,
+      reason: '칸 전에는 반입 단추가 안내만',
+    );
+    await scanTo(t, 'ri-scan', 'RTN-A-01'); // 그다음 칸
+    expect(find.byKey(const ValueKey('ri-location-confirmed')), findsOneWidget);
+    expect(find.text('2개 반입'), findsOneWidget);
   });
 }
