@@ -33,6 +33,19 @@ void main() {
   );
 
   group('ZPL', () {
+    test('인계 숫자 6자리가 있으면 가장 크게, 포장 ID 는 작게', () {
+      final z = packageLabelZpl(
+        const PackageLabel(
+          packageId: 'pkg-9',
+          packageVersion: 1,
+          qrCode: 'PKG:pkg-9:1',
+          handoverCode: '482913',
+        ),
+      );
+      expect(z, contains(r'^FO380,28^A0N,70,70^FH\^FD482913^FS'));
+      expect(z, contains(r'^A0N,22,22^FH\^FDpkg-9^FS'));
+    });
+
     test('QR 은 서버 qrCode 원문, 포장·주문·배송·온도대·봉투', () {
       final z = packageLabelZpl(label);
       expect(z, startsWith('^XA'));
