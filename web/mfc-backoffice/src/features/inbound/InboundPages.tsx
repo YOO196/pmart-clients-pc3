@@ -15,6 +15,7 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-inbound';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
+import { LotLabel } from '../../shared/LotLabel';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
 import { SearchBar } from '../../shared/listParts';
@@ -175,7 +176,9 @@ function InboundTaskList({ mfcId }: { readonly mfcId: string }) {
                     <SeenMark seen={seen.has(t.taskId)} />
                   </td>
                   <td>{t.productName ? `${t.productName} (${t.sku})` : t.sku}</td>
-                  <td className="font-mono text-xs">{t.lotId}</td>
+                  <td>
+                    <LotLabel lotId={t.lotId} />
+                  </td>
                   <td className="font-mono text-xs">{t.locationCode}</td>
                   <td>{m.qty(t.plannedQty, t.doneQty)}</td>
                   <td>{m.taskState[t.state] ?? t.state}</td>
@@ -235,7 +238,9 @@ function InboundTaskPage({ mfcId }: { readonly mfcId: string }) {
               <dt className="opacity-70">{m.fields.product}</dt>
               <dd>{t.productName ? `${t.productName} (${t.sku})` : t.sku}</dd>
               <dt className="opacity-70">{m.fields.lot}</dt>
-              <dd className="font-mono">{t.lotId}</dd>
+              <dd>
+                <LotLabel lotId={t.lotId} />
+              </dd>
               <dt className="opacity-70">{m.fields.from}</dt>
               <dd className="font-mono">{t.locationCode}</dd>
               <dt className="opacity-70">{m.fields.qty}</dt>

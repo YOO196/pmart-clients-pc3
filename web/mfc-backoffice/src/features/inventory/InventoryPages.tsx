@@ -19,6 +19,8 @@ import type { components } from '../../api/generated/mfc-inventory';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { ApprovalAwareFeedback, ApprovalRefInput, approvalRequired } from '../../shared/approval';
+import { LotLabel } from '../../shared/LotLabel';
+import { SystemNumbers } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 import { CountSessionList, StockUnitList } from '../lists/CenterLists';
@@ -148,7 +150,9 @@ function StockTab({ mfcId }: { readonly mfcId: string }) {
                   <tbody>
                     {s.lots.map((lot) => (
                       <tr key={lot.lotId} data-testid="lot-row">
-                        <td className="font-mono">{lot.lotId}</td>
+                        <td>
+                    <LotLabel lotId={lot.lotId} />
+                  </td>
                         <td>{m.tracking[lot.tracking ?? ''] ?? lot.tracking}</td>
                         <td>{lot.expiryDate ?? messages.none}</td>
                         <td>{lot.manufactureDate ?? messages.none}</td>
@@ -179,7 +183,9 @@ function StockTab({ mfcId }: { readonly mfcId: string }) {
                     {s.units.map((unit, i) => (
                       <tr key={`${unit.locationCode ?? ''}-${unit.lotId ?? ''}-${unit.qualityState ?? ''}-${i}`} data-testid="unit-row">
                         <td className="font-mono">{unit.locationCode}</td>
-                        <td className="font-mono">{unit.lotId}</td>
+                        <td>
+                    <LotLabel lotId={unit.lotId} />
+                  </td>
                         <td>{mv.quality[unit.qualityState ?? ''] ?? unit.qualityState}</td>
                         <td>{mv.work[unit.workState ?? ''] ?? unit.workState}</td>
                         <td>{unit.qty}</td>
@@ -430,10 +436,10 @@ function CountSessionCard({ mfcId, session: s, onDecided }: { readonly mfcId: st
   return (
     <div className="space-y-3 rounded-box bg-base-100 p-4" data-testid="count-session">
       <p className="flex flex-wrap items-center gap-2">
-        <span className="font-mono">{s.sessionId}</span>
         <span className="badge badge-sm">{m.countState[s.state ?? ''] ?? s.state}</span>
         <span className="opacity-70">{(s.locationCodes ?? []).join(', ')}</span>
       </p>
+      <SystemNumbers ids={[{ label: m.sys.session, id: s.sessionId }]} />
       <dl className="grid grid-cols-[9rem_1fr] gap-x-4 gap-y-1">
         <dt className="opacity-70">{f.created}</dt>
         <dd>
@@ -478,7 +484,9 @@ function CountSessionCard({ mfcId, session: s, onDecided }: { readonly mfcId: st
                 <tr key={`${x.locationCode ?? ''}-${x.lotId ?? ''}-${i}`} data-testid="diff-row">
                   <td className="font-mono">{x.locationCode}</td>
                   <td className="font-mono">{x.sku}</td>
-                  <td className="font-mono">{x.lotId}</td>
+                  <td>
+                    <LotLabel lotId={x.lotId} />
+                  </td>
                   <td>{x.bookQty}</td>
                   <td>{x.heldQty}</td>
                   <td>{x.countedQty}</td>
@@ -572,7 +580,9 @@ function UnshippableTab({ mfcId }: { readonly mfcId: string }) {
               {rows.map((r, i) => (
                 <tr key={`${r.lotId ?? ''}-${r.locationCode ?? ''}-${i}`} data-testid="unshippable-row">
                   <td className="font-mono">{r.sku}</td>
-                  <td className="font-mono">{r.lotId}</td>
+                  <td>
+                    <LotLabel lotId={r.lotId} />
+                  </td>
                   <td>{r.expiryDate ?? messages.none}</td>
                   <td className="font-mono">{r.locationCode}</td>
                   <td>{r.onMiscShelf ? m.onMisc : (r.locationCategoryId ?? messages.none)}</td>

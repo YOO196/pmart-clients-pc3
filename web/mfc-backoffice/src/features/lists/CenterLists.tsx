@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { CursorList, useQueryParam } from '../../shared/CursorList';
+import { LotLabel } from '../../shared/LotLabel';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 
@@ -282,7 +283,7 @@ export function StockUnitList({ mfcId }: { readonly mfcId: string }) {
         <span>
           <span className="font-mono">{u.sku}</span> {u.productName ?? ''}
         </span>,
-        <span className="font-mono">{u.lotNo ?? u.lotId}</span>,
+        <LotLabel lotId={u.lotId} lotNo={u.lotNo} />,
         <span className="font-mono">{u.locationCode}</span>,
         u.qty,
         mv.quality[u.qualityState] ?? u.qualityState,

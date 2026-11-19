@@ -177,14 +177,15 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
   );
 }
 
-/** "이름 · 사번" — 이름은 작업자 등록 이름, 사번은 인사(hr employee-labels). 사번을 못 읽으면 이름만 + 알림(운영자 ID 를 대신 내지 않는다) */
+/** "이름 · 사번" — capacity 0.23.0 작업자 `name`·`employeeNo`(인사 사본)가 있으면 그것, 없으면 hr employee-labels. 못 읽으면 이름만 + 알림(운영자 ID 를 대신 내지 않는다) */
 function WorkerName({ worker: w }: { readonly worker: Worker }) {
-  const label = useOperatorLabel(w.workerId);
+  const label = useOperatorLabel(w.employeeNo ? null : w.workerId);
+  const no = w.employeeNo ?? label.data?.employeeNo ?? null;
   return (
     <span data-testid="worker-name">
-      {w.displayName ?? label.data?.name ?? messages.none}
-      {label.data ? (
-        <span className="text-base-content/60">{` · ${label.data.employeeNo}`}</span>
+      {w.name ?? w.displayName ?? label.data?.name ?? messages.none}
+      {no ? (
+        <span className="text-base-content/60">{` · ${no}`}</span>
       ) : label.isError ? (
         <span className="ml-1 text-xs text-warning">{m.ui.noEmployeeNo}</span>
       ) : null}

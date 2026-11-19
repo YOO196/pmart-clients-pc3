@@ -15,6 +15,7 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-fulfillment';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
+import { LotLabel } from '../../shared/LotLabel';
 import { messages } from '../../shared/messages';
 import { RiderLabel, SystemNumbers } from '../../shared/displayNumber';
 import { AllDone, countCell, GuideBox, SearchBar, StatCard, StatStrip } from '../../shared/listParts';
@@ -322,7 +323,11 @@ function PromisedAt({ task: t, now }: { readonly task: TaskSummary; readonly now
 }
 
 /** 화면 표기(ADR-0070 덧붙임 2026-11-19 "작업 지시 = 종류 · 시각") — 시스템 ID 는 상세의 시스템 번호 칸에만 */
-const taskTitle = (t: TaskSummary) => m.ui.title(m.taskType[t.taskType ?? ''] ?? t.taskType ?? m.ui.task, t.createdAt ? formatSeoul(t.createdAt) : messages.none);
+// 주문번호가 있으면 "74939255 피킹"(백엔드 요청 2026-11-19 request-display-numbers), 없으면(복귀 등) "종류 · 시각"
+const taskTitle = (t: TaskSummary) => {
+  const type = m.taskType[t.taskType ?? ''] ?? t.taskType ?? m.ui.task;
+  return t.orderNumber ? m.ui.orderTitle(t.orderNumber, type) : m.ui.title(type, t.createdAt ? formatSeoul(t.createdAt) : messages.none);
+};
 
 // ---------------------------------------------------------------- 상세
 
@@ -470,7 +475,9 @@ function TaskLines({ task: t }: { readonly task: TaskDetail }) {
               <td>{line.productName ?? messages.none}</td>
               <td className="font-mono">{line.sku}</td>
               <td className="font-mono">{line.locationId ?? messages.none}</td>
-              <td className="font-mono">{line.lotId ?? messages.none}</td>
+              <td>
+                <LotLabel lotId={line.lotId} />
+              </td>
               <td>{line.plannedQty}</td>
               <td>{line.completedQty}</td>
               <td>{line.cancelledQty}</td>
@@ -550,7 +557,7 @@ function ShipmentView({ shipmentId }: { readonly shipmentId: string }) {
                   {m.orderNumber(s.orderNumber)}
                 </span>
               )}
-              <span className="font-mono">{s.shipmentId}</span> · {m.shipmentState[s.state ?? ''] ?? s.state}
+              {m.shipmentState[s.state ?? ''] ?? s.state}
               {s.holdReason && <span className="ml-1 opacity-70">{s.holdReason}</span>}
             </p>
             {(s.packages ?? []).length === 0 ? (
@@ -559,7 +566,6 @@ function ShipmentView({ shipmentId }: { readonly shipmentId: string }) {
               <table className="table table-xs">
                 <thead>
                   <tr>
-                    <th>{p.id}</th>
                     <th>{p.handoverCode}</th>
                     <th>{p.state}</th>
                     <th>{p.fence}</th>
@@ -572,7 +578,7 @@ function ShipmentView({ shipmentId }: { readonly shipmentId: string }) {
                 <tbody>
                   {(s.packages ?? []).map((pkg) => (
                     <tr key={pkg.packageId} data-testid="package-row">
-                      <td className="font-mono">{pkg.packageId}</td>
+                      {/* 포장 표기 = 라벨 숫자 6자리(ADR-0070) — 포장 시스템 ID 는 아래 시스템 번호 칸 */}
                       <td className="font-mono" data-testid="handover-code">
                         {pkg.handoverCode ?? messages.none}
                       </td>
@@ -592,6 +598,7 @@ function ShipmentView({ shipmentId }: { readonly shipmentId: string }) {
                 </tbody>
               </table>
             )}
+            <SystemNumbers ids={(s.packages ?? []).map((pkg, i) => ({ label: `${messages.displayNumber.system.packageId} ${i + 1}`, id: pkg.packageId }))} />
           </>
         )}
       </QueryState>

@@ -11,8 +11,8 @@ import { server } from '../../test/server';
 
 const rows = () => screen.getAllByTestId('task-row');
 const firstCells = () => rows().map((r) => within(r).getAllByRole('cell')[0]!.textContent);
-// 상세 제목은 화면 표기(종류 · 시각, ADR-0070 덧붙임) — 시스템 ID 는 시스템 번호 칸에만
-const heading = () => screen.findByRole('heading', { level: 1, name: / · / });
+// 상세 제목은 화면 표기("20000001 피킹" — 주문번호가 없으면 "종류 · 시각", ADR-0070) — 시스템 ID 는 시스템 번호 칸에만
+const heading = () => screen.findByRole('heading', { level: 1, name: /^(\d{8} )?(피킹|포장|배차 요청|복귀)/ });
 const problem = (status: number, code: string) =>
   HttpResponse.json({ type: 'about:blank', status, code }, { status, headers: { 'content-type': 'application/problem+json' } });
 

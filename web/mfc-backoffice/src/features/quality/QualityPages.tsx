@@ -19,6 +19,8 @@ import { useSession } from '../../app/SessionContext';
 import { ApprovalAwareFeedback, ApprovalRefInput } from '../../shared/approval';
 import { DecisionList, DisposalList, InspectionList, ReturnReceiptList } from '../lists/CenterLists';
 import { IncidentsTab } from './IncidentPages';
+import { LotLabel } from '../../shared/LotLabel';
+import { SystemNumbers } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 
@@ -192,7 +194,9 @@ function LinesTable({ lines }: { readonly lines: readonly QualityLine[] }) {
         {lines.map((l, i) => (
           <tr key={`${l.lotId}-${l.locationCode}-${i}`}>
             <td className="font-mono">{l.sku}</td>
-            <td className="font-mono">{l.lotId}</td>
+            <td>
+                    <LotLabel lotId={l.lotId} />
+                  </td>
             <td className="font-mono">{l.locationCode}</td>
             <td>{l.qty}</td>
           </tr>
@@ -300,11 +304,11 @@ function DecisionView({ id }: { readonly id: string }) {
       {(d) => (
         <div className="space-y-2 rounded-box bg-base-100 p-4" data-testid="decision">
           <p className="flex flex-wrap items-center gap-2">
-            <span className="font-mono">{d.qualityDecisionId}</span>
             <span>{m.type[d.decisionType] ?? d.decisionType}</span>
             <span className="badge badge-sm">{m.decisionState[d.state ?? ''] ?? d.state}</span>
             <span className="opacity-70">{m.reason[d.reason] ?? d.reason}</span>
           </p>
+          <SystemNumbers ids={[{ label: m.sys.decision, id: d.qualityDecisionId }]} />
           {notice && (
             <p role="status" className="text-success">
               {notice}
@@ -462,10 +466,10 @@ function DisposalView({ mfcId, id }: { readonly mfcId: string; readonly id: stri
       {(d) => (
         <div className="space-y-2 rounded-box bg-base-100 p-4" data-testid="disposal">
           <p className="flex flex-wrap items-center gap-2">
-            <span className="font-mono">{d.disposalApprovalId}</span>
             <span className="badge badge-sm">{m.disposalState[d.state ?? ''] ?? d.state}</span>
             {d.reason && <span className="opacity-70">{d.reason}</span>}
           </p>
+          <SystemNumbers ids={[{ label: m.sys.disposal, id: d.disposalApprovalId }]} />
           {notice && (
             <p role="status" className="text-success">
               {notice}
@@ -494,7 +498,9 @@ function DisposalView({ mfcId, id }: { readonly mfcId: string; readonly id: stri
               {(d.lines ?? []).map((l, i) => (
                 <tr key={`${l.lotId ?? ''}-${l.locationCode ?? ''}-${i}`} data-testid="disposal-line">
                   <td className="font-mono">{l.sku}</td>
-                  <td className="font-mono">{l.lotId}</td>
+                  <td>
+                    <LotLabel lotId={l.lotId} />
+                  </td>
                   <td className="font-mono">{l.locationCode}</td>
                   <td>{l.requestedQty}</td>
                   <td>{l.approvedQty}</td>
@@ -780,9 +786,9 @@ function InspectionView({ id }: { readonly id: string }) {
       {(r) => (
         <div className="space-y-1 rounded-box bg-base-100 p-4" data-testid="inspection">
           <p className="flex flex-wrap items-center gap-2">
-            <span className="font-mono">{r.returnInspectionId}</span>
             <span className="badge badge-sm">{r.inventoryApplyStatus}</span>
           </p>
+          <SystemNumbers ids={[{ label: m.sys.inspection, id: r.returnInspectionId }]} />
           <p>{`${m.resaleQty} ${r.resaleQty ?? 0} · ${m.disposeQty} ${r.disposeQty ?? 0}`}</p>
           {r.disposalApprovalId && <p>{`${m.disposalLink}: ${r.disposalApprovalId}`}</p>}
           <p className="opacity-70">{r.inspectedAt ? formatSeoul(r.inspectedAt) : ''}</p>

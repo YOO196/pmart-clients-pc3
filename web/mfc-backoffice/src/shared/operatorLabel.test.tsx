@@ -24,18 +24,19 @@ describe('운영자 ID 대신 이름·사번', () => {
     expect(ids).toEqual(expect.arrayContaining(['OP-wkr-1', 'OP-wkr-2']));
   });
 
-  it('모르는 ID 는 ID + 확인 불가, 조회 실패는 ID + 이름 못 읽음(섞지 않는다)', async () => {
+  it('모르는 ID 는 "직원", 조회 실패는 "직원(이름 못 읽음)" — 운영자 ID 는 글자로 내지 않는다(ADR-0070 덧붙임)', async () => {
     server.use(http.get(`${API_BASE}/hr/employee-labels`, () => HttpResponse.json({ items: [] })));
     const first = renderAt('/c/MFC-BSN-01/assignments');
     await waitFor(() => expect(screen.getAllByTestId('operator-label')[0]).toHaveAttribute('data-fallback', 'unknown'));
-    expect(screen.getAllByText('확인 불가').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('OP-wkr-1').length).toBeGreaterThan(0);
+    const label = screen.getAllByTestId('operator-label')[0]!;
+    expect(label).toHaveTextContent(/^직원$/);
+    expect(label).toHaveAttribute('title', expect.stringMatching(/^OP-/));
+    expect(screen.queryByText('OP-wkr-1')).not.toBeInTheDocument();
     first.unmount();
 
     server.use(http.get(`${API_BASE}/hr/employee-labels`, () => new HttpResponse(null, { status: 500 })));
     renderAt('/c/MFC-BSN-01/assignments');
     await waitFor(() => expect(screen.getAllByTestId('operator-label')[0]).toHaveAttribute('data-fallback', 'failed'));
-    expect(screen.getAllByText('이름 못 읽음').length).toBeGreaterThan(0);
-    expect(screen.queryByText('확인 불가')).not.toBeInTheDocument();
+    expect(screen.getAllByText('직원(이름 못 읽음)').length).toBeGreaterThan(0);
   });
 });

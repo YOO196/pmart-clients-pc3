@@ -1,8 +1,8 @@
 // 운영자 ID → "이름 · 사번"(hr-service 0.8.0 `GET /hr/employee-labels?operatorIds=…` — 직원 토큰이면 누구나, 50개까지).
 // 작업자 ID·요청자·결정자·처리자 칸이 OP-… 로만 보이던 것을 사람이 알아보게 한다. 이름은 가리지 않는 값이지만 로그에 남기지 않는다.
 // - 한 화면의 여러 칸을 한 번에 묻는다: 같은 틱에 요청된 ID 를 모아 50개씩 한 요청(ID 마다 TanStack Query 캐시 — 다시 묻지 않는다).
-// - 모르는 ID 는 응답에서 빠진다(오류 아님) → ID + "확인 불가". 조회가 실패하면 ID + "이름 못 읽음"(없는 것과 못 읽은 것을 섞지 않는다).
-// - 읽는 동안은 ID 를 그대로 보인다. ID 는 늘 title 로 남는다(대조용).
+// - 모르는 ID 는 응답에서 빠진다(오류 아님) → "직원". 조회가 실패하면 "직원(이름 못 읽음)"(없는 것과 못 읽은 것을 섞지 않는다).
+// - 읽는 동안은 "…". 운영자 ID 는 화면 글자로 내지 않고 title 로만 남긴다(대조용, ADR-0070 덧붙임).
 import { useQuery } from '@tanstack/react-query';
 
 import { request } from '@pmart/web-core';
@@ -89,11 +89,11 @@ export function Who({ id, empty }: { readonly id: string | null | undefined; rea
         <span className="text-base-content/60">{` · ${q.data.employeeNo}`}</span>
       </span>
     );
-  const note = q.isError ? messages.operator.failed : q.isSuccess ? messages.operator.unknown : '';
+  // 이름을 모르거나 못 읽어도 운영자 ID 는 화면에 내지 않는다(ADR-0070 덧붙임 2026-11-19 — 모르는 ID 는 "직원"). ID 는 title(대조용)에만
+  const note = q.isError ? messages.operator.failed : q.isSuccess ? messages.operator.unknown : '…';
   return (
-    <span title={id} data-testid="operator-label" data-fallback={q.isError ? 'failed' : q.isSuccess ? 'unknown' : 'loading'}>
-      <span className="font-mono text-xs">{id}</span>
-      {note && <span className={`ml-1 text-xs ${q.isError ? 'text-warning' : 'text-base-content/50'}`}>{note}</span>}
+    <span title={id} data-testid="operator-label" data-fallback={q.isError ? 'failed' : q.isSuccess ? 'unknown' : 'loading'} className={`text-xs ${q.isError ? 'text-warning' : 'text-base-content/60'}`}>
+      {note}
     </span>
   );
 }
