@@ -5,6 +5,7 @@ import 'package:pmart_core/pmart_core.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../router.dart' show afterLoginProvider;
+import '../../../shared/field_widgets.dart' show StepBody;
 import '../../../shared/menu_tile.dart';
 import '../../../shared/pda_theme.dart';
 import '../../../shared/printer/label_printer.dart';
@@ -274,6 +275,7 @@ class _StartTile extends StatelessWidget {
 }
 
 /// 스캐너 확인 — 찍은 값을 그대로 보인다(서버로 보내지 않는다).
+/// 스캔 단추는 다른 화면처럼 아래 고정 칸, 가운데는 읽은 값(크게)·읽은 횟수(사용자 2026-11-20 "확인이 안 되네").
 class ScannerCheckScreen extends StatefulWidget {
   const ScannerCheckScreen({super.key});
 
@@ -291,81 +293,229 @@ class _ScannerCheckScreenState extends State<ScannerCheckScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(l10n.scannerCheckTitle)),
-      body: SafeArea(
-        child: ListView(
+      body: StepBody(
+        actions: [
+          ScanInput(
+            id: 'scanner-check',
+            label: l10n.scannerCheckLabel,
+            cameraTitle: l10n.scannerCheckLabel,
+            testValues: const [TestScan('8801115114154', '8801115114154')],
+            onScan: (code) {
+              setState(() {
+                _last = code;
+                _count++;
+              });
+              return const ScanFeedback.ok();
+            },
+          ),
+        ],
+        child: Padding(
           padding: const EdgeInsets.all(16),
-          children: [
-            ScanInput(
-              id: 'scanner-check',
-              label: l10n.scannerCheckLabel,
-              cameraTitle: l10n.scannerCheckLabel,
-              testValues: const [TestScan('8801115114154', '8801115114154')],
-              onScan: (code) {
-                setState(() {
-                  _last = code;
-                  _count++;
-                });
-                return const ScanFeedback.ok();
-              },
-            ),
-            const SizedBox(height: 24),
-            if (_last == null)
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Text(
-                l10n.scannerCheckEmpty,
-                key: const ValueKey('scanner-check-empty'),
-                style: theme.textTheme.bodyLarge,
-              )
-            else ...[
-              Text(l10n.scannerCheckLast, style: theme.textTheme.labelLarge),
-              SelectableText(
-                _last!,
-                key: const ValueKey('scanner-check-value'),
-                style: theme.textTheme.headlineSmall,
+                l10n.scannerCheckHelp,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: PdaColors.body,
+                ),
               ),
-              Text(l10n.scannerCheckCount(_count)),
+              const SizedBox(height: 16),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: _last == null ? PdaColors.soft : PdaColors.softer,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _last == null ? PdaColors.line : PdaColors.lilac,
+                      width: 1.5,
+                    ),
+                  ),
+                  padding: const EdgeInsets.all(20),
+                  child: _last == null
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const BarcodeIcon(size: 56, color: PdaColors.muted),
+                            const SizedBox(height: 12),
+                            Text(
+                              l10n.scannerCheckEmpty,
+                              key: const ValueKey('scanner-check-empty'),
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: PdaColors.body,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: PdaColors.ok,
+                                  size: 22,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  l10n.scannerCheckLast,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    color: PdaColors.okInk,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: SelectableText(
+                                _last!,
+                                key: const ValueKey('scanner-check-value'),
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: PdaColors.lilac),
+                              ),
+                              child: Text(
+                                l10n.scannerCheckCount(_count),
+                                key: const ValueKey('scanner-check-count'),
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: PdaColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                ),
+              ),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// 기기 정보 — 문의할 때 알려 줄 값.
+/// 기기 정보 — 기기 ID·실행 모드·서버 주소를 한 상자에 줄마다(이름표 + 진한 값).
 class DeviceInfoScreen extends ConsumerWidget {
   const DeviceInfoScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final mock = ref.watch(envProvider) == PmartEnv.mock;
+    Widget row(String label, Widget value) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(color: PdaColors.body),
+          ),
+          const SizedBox(height: 4),
+          value,
+        ],
+      ),
+    );
+    final valueStyle = theme.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.w700,
+    );
     return Scaffold(
       appBar: AppBar(title: Text(l10n.deviceInfoTitle)),
       body: SafeArea(
         child: ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            ListTile(
-              title: Text(l10n.deviceInfoId),
-              subtitle: FutureBuilder<String>(
-                future: ref.watch(deviceIdProvider).get(),
-                builder: (_, s) => SelectableText(
-                  s.data ?? '…',
-                  key: const ValueKey('device-id'),
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    row(
+                      l10n.deviceInfoMode,
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: mock ? PdaColors.warning : PdaColors.okSoft,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            mock
+                                ? l10n.deviceInfoModeMock
+                                : l10n.deviceInfoModeLocal,
+                            key: const ValueKey('device-mode'),
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: mock
+                                  ? PdaColors.onWarning
+                                  : PdaColors.okInk,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const Divider(),
+                    row(
+                      l10n.deviceInfoId,
+                      FutureBuilder<String>(
+                        future: ref.watch(deviceIdProvider).get(),
+                        builder: (_, s) => SelectableText(
+                          s.data ?? '…',
+                          key: const ValueKey('device-id'),
+                          style: valueStyle?.copyWith(
+                            letterSpacing: 0.3,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (!mock) ...[
+                      const Divider(),
+                      row(
+                        l10n.deviceInfoServer,
+                        SelectableText(
+                          ref.watch(apiBaseUrlProvider),
+                          style: valueStyle,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
-            ListTile(
-              title: Text(l10n.deviceInfoMode),
-              subtitle: Text(
-                mock ? l10n.deviceInfoModeMock : l10n.deviceInfoModeLocal,
-                key: const ValueKey('device-mode'),
+            const SizedBox(height: 12),
+            Text(
+              l10n.deviceInfoHelp,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: PdaColors.body,
               ),
             ),
-            if (!mock)
-              ListTile(
-                title: Text(l10n.deviceInfoServer),
-                subtitle: Text(ref.watch(apiBaseUrlProvider)),
-              ),
           ],
         ),
       ),

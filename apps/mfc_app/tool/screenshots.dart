@@ -551,6 +551,27 @@ void main() {
     await shot('31-start');
     await t.tap(find.byKey(const ValueKey('start-setup')));
     await shot('32-setup');
+    // 기기 설정 안 세 화면(프린터·스캐너 확인·기기 정보).
+    for (final (key, name) in const [
+      ('setup-printer', '32a-printer'),
+      ('setup-scanner', '32b-scanner'),
+      ('setup-device', '32c-device'),
+    ]) {
+      await t.tap(find.byKey(ValueKey(key)));
+      await t.pumpAndSettle();
+      await shot(name);
+      Navigator.of(t.element(find.byType(Scaffold).last)).pop();
+      await t.pumpAndSettle();
+    }
+    // 스캐너 확인에서 하나 찍은 모습.
+    await t.tap(find.byKey(const ValueKey('setup-scanner')));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('scanner-check')), '8801115114154');
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pumpAndSettle();
+    await shot('32d-scanner-read');
+    Navigator.of(t.element(find.byType(Scaffold).last)).pop();
+    await t.pumpAndSettle();
     Navigator.of(t.element(find.byType(Scaffold).last)).pop();
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('start-stock')));
