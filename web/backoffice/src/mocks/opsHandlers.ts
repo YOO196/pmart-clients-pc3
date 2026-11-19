@@ -690,6 +690,56 @@ export const opsHandlers = [
     return found ? HttpResponse.json(found) : problem(404, 'NOT_FOUND');
   }),
 
+  // ---- bff 0.18.0·0.19.0 화면용 목록(2026-11-19 — 줄마다 부르지 않게 번호를 한 번에). 원천 권한은 그대로 ----
+  http.get(`${BFF_BASE}/views/claims`, ({ request }) => {
+    const { denied } = allow(request, ...CS);
+    if (denied) return denied;
+    const url = new URL(request.url);
+    const q = url.searchParams;
+    const all = ops.claims.filter((c) => (!q.get('orderId') || c.orderId === q.get('orderId')) && (!q.get('type') || c.type === q.get('type')) && (!q.get('state') || c.state === q.get('state')));
+    const page = cursorPage(all, url);
+    return HttpResponse.json({
+      composedAt: new Date().toISOString(),
+      sources: [],
+      unavailableSources: [],
+      items: page.items.map((c) => ({ claimId: c.claimId, orderId: c.orderId, orderNumber: (c.orderId && ORDER_NUMBERS[c.orderId]) ?? null, type: c.type, state: c.state, openedAt: c.openedAt })),
+      page: page.page,
+    });
+  }),
+  http.get(`${BFF_BASE}/views/rider-complaints`, ({ request }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const url = new URL(request.url);
+    const q = url.searchParams;
+    const all = ops.complaints.filter(
+      (c) =>
+        (!q.get('riderId') || c.riderId === q.get('riderId')) &&
+        (!q.get('deliveryId') || c.deliveryId === q.get('deliveryId')) &&
+        (!q.get('complaintType') || c.complaintType === q.get('complaintType')) &&
+        inRange(c.recordedAt, q.get('from'), q.get('to')),
+    );
+    const page = cursorPage(all, url);
+    return HttpResponse.json({
+      composedAt: new Date().toISOString(),
+      sources: [],
+      unavailableSources: [],
+      items: page.items.map((c) => {
+        const sum = complaintSummary(c);
+        const r = RIDER_PROFILES.find((x) => x.riderId === c.riderId);
+        const { source, ...rest } = sum as typeof sum & { source?: string | null };
+        return {
+          ...rest,
+          recordedVia: source ?? null,
+          deliveryNumber: ops.executions.get(c.deliveryId)?.deliveryNumber ?? null,
+          orderNumber: (c.orderId && ORDER_NUMBERS[c.orderId]) ?? null,
+          rider: r ? { riderId: r.riderId, riderNumber: r.riderNumber, nameMasked: maskName(r.name.replace(/^\[목\] /, '')) ?? null } : null,
+          recordedByLabel: operatorLabel(c.recordedBy),
+        };
+      }),
+      page: page.page,
+    });
+  }),
+
   // ---- claim 0.1.0 (조회만) ----
   http.get(`${API_BASE}/claims`, ({ request }) => {
     const { denied } = allow(request, ...CS);

@@ -81,3 +81,23 @@ describe('ID 칸 → 번호로·골라 넣기', () => {
     }
   });
 });
+
+describe('목록 번호는 bff 화면 조회 한 번으로(2026-11-19 백엔드 회신 — 줄마다 부르지 않는다)', () => {
+  it('클레임 목록: bff views/claims 한 번, 주문 번호 조회(orders/lookups)는 줄마다 부르지 않는다', async () => {
+    const view = renderAt('/claims', as.cs);
+    await waitFor(() => expect(screen.getAllByTestId('claim-label').map((l) => l.textContent)).toEqual(expect.arrayContaining(['74939002 취소'])));
+    const paths = view.sent.map((r) => new URL(r.url).pathname);
+    expect(paths.filter((p) => p.endsWith('/views/claims')).length).toBeGreaterThan(0);
+    expect(paths.some((p) => p.endsWith('/orders/lookups'))).toBe(false);
+    expect(paths.some((p) => /\/claims$/.test(p) && !p.includes('/views/'))).toBe(false);
+  });
+
+  it('라이더 컴플레인 목록: bff views/rider-complaints 한 번, 배송 상세·라이더 일괄 조회는 부르지 않는다', async () => {
+    const view = renderAt('/rider-complaints', as.riderOps);
+    await screen.findAllByTestId('complaint-row');
+    const paths = view.sent.map((r) => new URL(r.url).pathname);
+    expect(paths.some((p) => p.endsWith('/views/rider-complaints'))).toBe(true);
+    expect(paths.some((p) => /\/deliveries\/[^/]+$/.test(p))).toBe(false);
+    expect(paths.some((p) => p.endsWith('/riders'))).toBe(false);
+  });
+});
