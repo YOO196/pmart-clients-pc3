@@ -568,6 +568,8 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                       ],
                       label: l10n.pickScanItem,
                       cameraTitle: l10n.packCameraTitle,
+                      // 피킹처럼 한 번에 하나 — 맞게 인식하면 카메라를 내린다(사용자 2026-11-19). 한 번 스캔 = 1개.
+                      continuous: false,
                       onScan: (code) => switch (ctl.scan(task, s, code)) {
                         PackScan.matched => const ScanFeedback.ok(),
                         final r => ScanFeedback.error(packScanText(l10n, r)),
