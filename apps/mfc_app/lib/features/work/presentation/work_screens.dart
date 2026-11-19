@@ -388,7 +388,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           // 업무는 모두 같은 크기(사용자 2026-11-19) — 2열, 고르면 그 칸이 커지며 안내 화면 위 카드가 된다.
                           for (var r = 0; r < areas.length; r += 2)
                             Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.only(bottom: 10),
                               child: Row(
                                 children: [
                                   for (var c = r; c < r + 2; c++) ...[
@@ -483,7 +483,7 @@ class _ManageMenu extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(l10n.manageTitle, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         // 2×2 — 작은 화면에서도 글자가 잘리지 않게.
         Row(
           children: [
@@ -504,7 +504,7 @@ class _ManageMenu extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Row(
           children: [
             _MenuButton(
@@ -906,12 +906,12 @@ class _ToolButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(10),
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(allowed ? icon : Icons.lock_outline, color: PdaColors.muted),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(
               label,
               maxLines: 1,
@@ -986,7 +986,7 @@ class WorkGuideScreen extends StatelessWidget {
                   color: PdaColors.muted,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Expanded(
                 child: Column(
                   children: [
@@ -1002,7 +1002,7 @@ class WorkGuideScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               NoticeBox(text: l10n.guideCommon),
               const SizedBox(height: 12),
               FilledButton(
@@ -1095,7 +1095,7 @@ class WorkSessionScreen extends ConsumerWidget {
         // 서버 코드 — 관리자가 원인을 바로 찾게(작업 없음은 빼고).
         if (s.code case final code?
             when code != WorkProblemCode.noTaskAvailable) ...[
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
           Text(
             l10n.nextReasonCode(code),
             key: const ValueKey('session-unavailable-code'),
@@ -1135,7 +1135,7 @@ class WorkSessionScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(child: body),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               OutlinedButton(
                 key: const ValueKey('session-end'),
                 style: OutlinedButton.styleFrom(
@@ -1173,9 +1173,9 @@ class _AssignedView extends StatelessWidget {
       key: ValueKey('assigned-${task.taskId}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 8),
-        StepCaption(l10n.sessionNow),
         const SizedBox(height: 4),
+        StepCaption(l10n.sessionNow),
+        const SizedBox(height: 2),
         Row(
           children: [
             Text(
@@ -1204,7 +1204,7 @@ class _AssignedView extends StatelessWidget {
             ),
           ),
         ],
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         if (!area.taskTypes.contains(task.taskType))
           Text(
             l10n.areaMismatch,
@@ -1268,7 +1268,7 @@ class _AssignedView extends StatelessWidget {
           ),
         ),
         if (!task.detailAvailable) Text(l10n.detailUnavailable),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         if (task.runnable)
           CommandButton(
             key: const ValueKey('run-task'),
@@ -1281,7 +1281,7 @@ class _AssignedView extends StatelessWidget {
             key: const ValueKey('task-not-runnable'),
             style: TextStyle(color: theme.colorScheme.error),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           OutlinedButton(onPressed: onRetry, child: Text(l10n.checkAgain)),
         ],
       ],
@@ -1487,7 +1487,7 @@ class _BreakPinDialogState extends State<BreakPinDialog> {
             onSubmitted: (_) => _submit(),
           ),
           if (_error case final e?) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               e,
               key: const ValueKey('break-pin-error'),

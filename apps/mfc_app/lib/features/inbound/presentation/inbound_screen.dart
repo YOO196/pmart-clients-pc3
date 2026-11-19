@@ -280,7 +280,7 @@ class _ArrivalStep extends ConsumerWidget {
               l10n.inboundArrivalUnknown,
               key: const ValueKey('inbound-unknown'),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           // 입고 예정 상품 전부(박스 수·입수·수량).
           Expanded(
             child: Card(
@@ -473,7 +473,7 @@ class _CountStep extends ConsumerWidget {
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 5),
                   counter(
                     'normal',
                     l10n.qtyNormal,
@@ -531,7 +531,7 @@ class _CountStep extends ConsumerWidget {
               ),
             ),
           if (c.quarantined > 0) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               l10n.inboundQuarantineReason,
               style: const TextStyle(fontWeight: FontWeight.w800),
@@ -615,7 +615,7 @@ class _ReviewStep extends ConsumerWidget {
                       final r = c.reasonFor(l.expectedQty);
                       final ok = c.total == l.expectedQty;
                       return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
+                        margin: const EdgeInsets.only(bottom: 10),
                         child: ListTile(
                           key: ValueKey('review-${l.key}'),
                           title: Text(
@@ -1134,7 +1134,7 @@ class _BoxInspectStep extends ConsumerWidget {
               fontWeight: FontWeight.w900,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
           Expanded(
             child: ListView(
               children: [

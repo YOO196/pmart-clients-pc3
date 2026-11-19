@@ -131,7 +131,7 @@ class LabelPreviewDialog extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(l10n.labelPreviewTitle, style: theme.textTheme.titleLarge),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(l10n.labelPreviewNote, style: muted),
             const SizedBox(height: 16),
             // 라벨 한 장(용지 812×609 — 가로가 긴 꼴).
@@ -289,7 +289,7 @@ class _PrinterSettingsFormState extends ConsumerState<_PrinterSettingsForm> {
           selected: {_mode},
           onSelectionChanged: (v) => setState(() => _mode = v.first),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Text(network ? l10n.printerNetworkHelp : l10n.printerPreviewHelp),
         // 화면 미리보기면 라벨이 어떻게 뜨는지 바로 보인다(사용자 2026-11-20 "화면 미리보기라면서 왜 라벨 미리보기가 안 떠 있어").
         if (!network) ...[
@@ -333,7 +333,7 @@ class _PrinterSettingsFormState extends ConsumerState<_PrinterSettingsForm> {
           onPressed: _save,
           child: Text(l10n.printerSave),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         OutlinedButton(
           key: const ValueKey('printer-test'),
           style: OutlinedButton.styleFrom(
@@ -422,7 +422,7 @@ class PackageLabelCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
                   runSpacing: 6,
@@ -459,7 +459,7 @@ class PackageLabelCard extends StatelessWidget {
                   ],
                 ),
                 if (label.orderNumber case final n?) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   Text(
                     l10n.labelOrderNumber(n),
                     style: theme.textTheme.bodyMedium,

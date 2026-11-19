@@ -179,7 +179,7 @@ class _StockResult extends ConsumerWidget {
         for (final lot in view.lots)
           Card(
             key: ValueKey('stock-lot-${lot.lotId}'),
-            margin: const EdgeInsets.only(bottom: 12),
+            margin: const EdgeInsets.only(bottom: 10),
             child: Padding(
               padding: const EdgeInsets.all(15),
               child: Column(
@@ -199,7 +199,7 @@ class _StockResult extends ConsumerWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   // 수량 넷을 숫자 칸으로(옅은 바탕·큰 숫자) — 한 줄 글자로는 안 보였다(사용자 2026-11-20).
                   // 판매 가능은 보라로 강조.
                   Wrap(

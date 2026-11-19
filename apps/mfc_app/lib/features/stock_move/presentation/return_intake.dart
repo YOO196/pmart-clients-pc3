@@ -349,7 +349,7 @@ class ReturnIntakeScreen extends ConsumerWidget {
                 textKey: const ValueKey('ri-no-claim'),
                 text: l10n.riNoClaim,
               ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             ScanPrompt(text: l10n.riOneTitle, detail: l10n.riOneHelp),
             // 반품 칸 — 찍었으면 ✓ 상자, 아직이면 노란 "반품 칸을 찍어요" 상자.
             Container(
@@ -394,7 +394,7 @@ class ReturnIntakeScreen extends ConsumerWidget {
             ),
             if (s.scanError != null)
               Padding(
-                padding: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.only(top: 10),
                 child: Text(
                   s.scanError == 'location'
                       ? l10n.riNotReturnLocation
@@ -414,7 +414,7 @@ class ReturnIntakeScreen extends ConsumerWidget {
                     for (final (i, l) in a.lines.indexed) ...[
                       if (i > 0) const Divider(),
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                         child: Row(
                           children: [
                             Expanded(

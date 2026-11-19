@@ -101,7 +101,7 @@ class _MoveProductCard extends StatelessWidget {
                 MetaPair(label: l10n.metaLot, value: lot),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Text(
               line,
               style: theme.textTheme.titleSmall?.copyWith(
@@ -272,7 +272,7 @@ class MoveScreen extends ConsumerWidget {
                 code: s.cart ?? l10n.moveCartScan,
                 confirmed: s.cart != null,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Opacity(
                 key: const ValueKey('target-from-lock'),
                 opacity: s.cart == null ? 0.4 : 1,
@@ -288,7 +288,7 @@ class MoveScreen extends ConsumerWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.only(top: 10),
                 // ① 위치 확인 쪽에는 수량·싣기 버튼이 없다 — 둘 다 찍으면 상품 싣기 쪽으로 넘어간다.
                 child: Text(
                   s.cart == null
@@ -336,7 +336,7 @@ class MoveScreen extends ConsumerWidget {
             ),
             if (s.lastScan != null && s.lastScan != LocScan.ok)
               Padding(
-                padding: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.only(top: 10),
                 child: Text(
                   locScanText(l10n, s.lastScan!),
                   key: const ValueKey('move-scan-error'),
@@ -582,7 +582,7 @@ class PutawayScreen extends ConsumerWidget {
                   title: l10n.putawayFromTitle,
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: 10),
                   child: Text(
                     l10n.moveLocateFrom,
                     key: const ValueKey('putaway-locate-hint'),
@@ -639,7 +639,7 @@ class PutawayScreen extends ConsumerWidget {
               ),
               if (s.lastScan != null && s.lastScan != LocScan.ok)
                 Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: 10),
                   child: Text(
                     locScanText(l10n, s.lastScan!),
                     key: const ValueKey('putaway-scan-error'),

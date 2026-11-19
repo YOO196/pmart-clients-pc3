@@ -274,7 +274,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
         children: [
           for (final r in ShortageReason.values)
             Padding(
-              padding: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.only(top: 10),
               child: OutlinedButton(
                 key: ValueKey('shortage-${r.name}'),
                 style: OutlinedButton.styleFrom(
@@ -493,7 +493,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
               if (picking.lastLocScan case final r? when r != PickLocScan.ok) {
                 body.add(
                   Padding(
-                    padding: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.only(top: 10),
                     child: Text(
                       pickLocText(l10n, r),
                       key: const ValueKey('pick-loc-error'),
@@ -560,7 +560,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
               if (picking.lastScan case final s? when s != ScanResult.matched) {
                 body.add(
                   Padding(
-                    padding: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.only(top: 10),
                     child: Text(
                       pickScanText(l10n, s),
                       key: const ValueKey('scan-error'),
@@ -745,7 +745,7 @@ class _PickCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             Wrap(
               spacing: 14,
               runSpacing: 2,
@@ -764,7 +764,7 @@ class _PickCard extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               l10n.pickStopQty(stop.qty, captured),
               key: const ValueKey('pick-counts'),
@@ -832,7 +832,7 @@ class PickInstructionTile extends StatelessWidget {
     };
     return Padding(
       key: ValueKey('pick-${pick.lotId ?? pick.visitSeq}'),
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
