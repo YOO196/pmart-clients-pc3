@@ -57,6 +57,7 @@ flutter:
   # 픽PDA 시작 그림(원본 tool/icon/pick_pda_splash.png, 사용자 지시 2026-11-20).
   assets:
     - assets/images/splash.jpg
+    - assets/images/pick_pda_logo.png
   # Pretendard (SIL OFL 1.1, assets/fonts/Pretendard-LICENSE.txt) — 고객앱과 같은 글꼴. 기기 기본 글꼴이 얇아
   # 현장에서 안 보였다(사용자 2026-11-20). 400 본문 · 600 이름표·중요 값 · 700 제목 · 800 큰 숫자.
   fonts:

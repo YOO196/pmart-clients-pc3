@@ -82,111 +82,99 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 onPressed: () => context.go('/setup'),
               ),
       ),
+      // 화면 위쪽 = 앱 로고·이름·한 줄 설명, 아래쪽 = 큰 로그인 단추(엄지가 닿는 자리)와 짧은 안내.
+      // 예전엔 창고 아이콘 + 카드 안 버튼 + 긴 문장(두세 줄)이라 허술해 보였다(사용자 2026-11-20). 로그인 동작은 그대로.
       body: SafeArea(
         child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-            child: ConstrainedBox(
-              // 폰·PDA 폭에서는 꽉 차고, 태블릿·브라우저에서는 늘어지지 않는다.
-              constraints: const BoxConstraints(maxWidth: 420),
+          child: ConstrainedBox(
+            // 폰·PDA 폭에서는 꽉 차고, 태블릿·브라우저에서는 늘어지지 않는다.
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(
-                    Icons.warehouse_outlined,
-                    size: 56,
-                    color: scheme.primary,
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // 앱 아이콘과 같은 로고(tool/icon/pick_pda_icon.png 에서 만든 assets/images/pick_pda_logo.png).
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: Image.asset(
+                            'assets/images/pick_pda_logo.png',
+                            key: const ValueKey('login-logo'),
+                            width: 112,
+                            height: 112,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          l10n.homeTitle,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: scheme.onSurface,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          l10n.loginSubtitle,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                        if (mock) ...[
+                          const SizedBox(height: 14),
+                          Chip(
+                            key: const ValueKey('login-mock-badge'),
+                            label: Text(l10n.mockModeBadge),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  // 세션이 끝나서 나온 경우의 안내(지금 누른 로그인의 오류가 있으면 그것을 먼저 보인다)
+                  if (ended != null && _error == null)
+                    _Notice(
+                      key: const ValueKey('session-ended'),
+                      text: switch (ended) {
+                        SessionEnd.accountBlocked => l10n.sessionEndedBlocked,
+                        SessionEnd.expired => l10n.sessionEndedExpired,
+                      },
+                    ),
+                  if (_error != null)
+                    _Notice(
+                      key: const ValueKey('login-error'),
+                      text: loginErrorText(l10n, _error!),
+                      error: true,
+                    ),
+                  // 장갑을 끼고도 누를 수 있게 크게.
+                  FilledButton.icon(
+                    key: const ValueKey('employee-login'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(60),
+                    ),
+                    onPressed: _busy ? null : _login,
+                    icon: _busy
+                        ? const SizedBox.square(
+                            dimension: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.login, size: 24),
+                    label: Text(
+                      _busy ? l10n.loginInProgress : l10n.loginButton,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    l10n.homeTitle,
+                    l10n.loginNote,
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: scheme.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.loginSubtitle,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  if (mock) ...[
-                    const SizedBox(height: 12),
-                    Center(
-                      child: Chip(
-                        key: const ValueKey('login-mock-badge'),
-                        label: Text(l10n.mockModeBadge),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 32),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: scheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: scheme.outlineVariant),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            l10n.loginTitle,
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          // 세션이 끝나서 나온 경우의 안내(지금 누른 로그인의 오류가 있으면 그것을 먼저 보인다)
-                          if (ended != null && _error == null)
-                            _Notice(
-                              key: const ValueKey('session-ended'),
-                              text: switch (ended) {
-                                SessionEnd.accountBlocked =>
-                                  l10n.sessionEndedBlocked,
-                                SessionEnd.expired => l10n.sessionEndedExpired,
-                              },
-                            ),
-                          if (_error != null)
-                            _Notice(
-                              key: const ValueKey('login-error'),
-                              text: loginErrorText(l10n, _error!),
-                              error: true,
-                            ),
-                          // 장갑을 끼고도 누를 수 있게 크게.
-                          FilledButton.icon(
-                            key: const ValueKey('employee-login'),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(60),
-                              textStyle: theme.textTheme.titleMedium,
-                            ),
-                            onPressed: _busy ? null : _login,
-                            icon: _busy
-                                ? const SizedBox.square(
-                                    dimension: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.login),
-                            label: Text(
-                              _busy ? l10n.loginInProgress : l10n.loginButton,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            l10n.loginNote,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
+                      height: 1.5,
                     ),
                   ),
                 ],

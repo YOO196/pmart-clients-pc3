@@ -547,6 +547,15 @@ void main() {
     Navigator.of(t.element(find.byType(Scaffold).last)).pop();
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('start-stock')));
+    await t.pumpAndSettle();
+    // 로고 그림(asset)은 테스트에서 따로 읽어 들여야 그려진다.
+    await t.runAsync(
+      () => precacheImage(
+        const AssetImage('assets/images/pick_pda_logo.png'),
+        t.element(find.byKey(const ValueKey('login-logo'))),
+      ),
+    );
+    await t.pumpAndSettle();
     await shot('34-login');
     await t.tap(find.byKey(const ValueKey('employee-login')));
     await shot('35-mock-signin');
