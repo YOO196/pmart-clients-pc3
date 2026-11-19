@@ -21,6 +21,7 @@ import 'features/tasks/presentation/tasks_screen.dart';
 import 'features/work/domain/work.dart';
 import 'features/work/presentation/work_screens.dart';
 import 'shared/printer/printer_ui.dart';
+import 'features/stock_move/presentation/return_intake.dart';
 import 'shared/start_splash.dart';
 
 /// 라우트. 로그인 전에는 시작 메뉴(로그인·기기 설정·재고 확인, 사용자 2026-11-17)로, 세션이 끝나면 로그인 화면으로 보낸다
@@ -232,6 +233,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/return-handovers',
         pageBuilder: (_, s) => _page(s, const ReturnHandoversScreen()),
+      ),
+      // 회수품 반입 — 반납 도착 대기에서 골라 반품 칸에(mfc-inbound 0.13.0).
+      GoRoute(
+        path: '/return-arrivals',
+        pageBuilder: (_, s) => _page(s, const ReturnArrivalsScreen()),
+        routes: [
+          GoRoute(
+            path: ':arrivalId',
+            pageBuilder: (_, s) => _page(
+              s,
+              ReturnIntakeScreen(arrivalId: s.pathParameters['arrivalId']!),
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: '/packages/:packageId/handover',

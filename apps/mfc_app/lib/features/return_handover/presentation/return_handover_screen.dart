@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/pda_theme.dart';
 import '../../../shared/ui_state_of.dart';
 import '../domain/return_handover.dart';
+import '../../handover/presentation/handover_controller.dart';
 import 'return_handover_controller.dart';
 
 String returnPurposeText(AppLocalizations l10n, ReturnPurpose p) => switch (p) {
@@ -41,6 +43,19 @@ class ReturnHandoversScreen extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // 라이더가 번호로 반납을 끝내면 회수품은 반납 도착 대기로 — 여기서 바로 반입한다.
+          Card(
+            key: const ValueKey('rh-to-intake'),
+            margin: const EdgeInsets.only(bottom: 12),
+            color: PdaColors.softer,
+            child: ListTile(
+              leading: const Icon(Icons.move_to_inbox_outlined),
+              title: Text(l10n.riMenu),
+              subtitle: Text(l10n.riMenuHint),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/return-arrivals'),
+            ),
+          ),
           Text(
             l10n.rhIntro,
             style: Theme.of(context).textTheme.bodyMedium
@@ -144,8 +159,20 @@ class _ReturnCard extends ConsumerWidget {
               l10n.rhDelivery(item.deliveryNumber ?? id),
               style: const TextStyle(color: PdaColors.body),
             ),
+            // 라이더 ID 대신 "김*수 · 482913"(rider 0.18.0, ADR-0070). 모르면 "라이더", 실패면 "라이더(이름 못 읽음)".
             Text(
-              l10n.rhRider(item.riderId ?? '-'),
+              l10n.rhRider(switch (item.riderId) {
+                null => l10n.riderUnknown,
+                final rid => switch (ref.watch(
+                  riderLabelsProvider(riderKey([rid])),
+                )) {
+                  AsyncData(:final value) =>
+                    value[rid]?.text ?? l10n.riderUnknown,
+                  AsyncError() => l10n.riderUnreadable,
+                  _ => '…',
+                },
+              }),
+              key: ValueKey('rh-rider-$id'),
               style: const TextStyle(color: PdaColors.body),
             ),
             const SizedBox(height: 10),

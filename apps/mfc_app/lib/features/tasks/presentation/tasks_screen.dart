@@ -295,6 +295,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                       ShortageReason.short =>
                         Icons.remove_shopping_cart_outlined,
                       ShortageReason.damaged => Icons.broken_image_outlined,
+                      ShortageReason.spoiled => Icons.coronavirus_outlined,
                       ShortageReason.blocked => Icons.block,
                     }, size: 28),
                     const SizedBox(width: 12),
@@ -305,10 +306,13 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                           Text(switch (r) {
                             ShortageReason.short => l10n.shortageShort,
                             ShortageReason.damaged => l10n.shortageDamaged,
+                            ShortageReason.spoiled => l10n.shortageSpoiled,
                             ShortageReason.blocked => l10n.shortageBlocked,
                           }, style: Theme.of(context).textTheme.titleMedium),
                           // mfc-quality 0.6.0: 파손 결품 보고는 서버가 품질 사고(자동)를 연다
-                          if (r == ShortageReason.damaged)
+                          // 0.22.0: 변질도 파손처럼 품질 사고(변질)가 열린다.
+                          if (r == ShortageReason.damaged ||
+                              r == ShortageReason.spoiled)
                             Text(
                               l10n.shortageDamagedNote,
                               style: Theme.of(context).textTheme.bodySmall,
