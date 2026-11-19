@@ -112,6 +112,14 @@ void main() {
         .data;
     final before = tabLabel();
     expect(find.byKey(const ValueKey('waiting-hide-dlv-l1')), findsOneWidget);
+    // 취소가 배차 수락보다 가로가 짧다(2:3, 사용자 2026-11-19)
+    final hideW = t
+        .getSize(find.byKey(const ValueKey('waiting-hide-dlv-l1')))
+        .width;
+    final acceptW = t
+        .getSize(find.byKey(const ValueKey('waiting-accept-dlv-l1')))
+        .width;
+    expect(hideW, lessThan(acceptW));
 
     await t.tap(find.byKey(const ValueKey('waiting-hide-dlv-l1')));
     for (var i = 0; i < 6; i++) {
