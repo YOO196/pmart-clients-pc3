@@ -36,7 +36,8 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `mfc-backoffice/2026-11-17-backend-lists-and-roles.md` | 회신 `clients/mfc-backoffice/2026-11-18-reply-lists-and-roles.md` — MB-1 목록 9개·MB-3 확인 필요 포장 관리자 **화면 반영**(`mfc-backoffice/mb1-lists`, 2026-11-19). 남은 것: MB-2 품질 사고(백엔드가 사용자 질문 5개 — 답 필요), LAN 확인(`stock-units` 게이트웨이 라우트) |
 | `mfc-backoffice/2026-11-18-backend-my-account.md` | 직원 "내 정보" — R1 내 비밀번호 직접 바꾸기(지금 비밀번호 확인·잠금·비밀번호 기록 금지), R2 내 연락처(휴대폰·개인 메일) 등록·변경(회사 메일은 인사팀만), R3 센터 관리자로 `/hr/employees/me` 되는지 |
 | `all/2026-11-16-backend-login-code-pc1-only-done.md` | 클라이언트 표(경로 보탬) 확인 |
-| `customer-app/2026-11-19-backend-first-run-consents.md` | BR-59 처음 실행 약관 — ①~④ 모두 회신(`clients/customer-app/2026-11-19-reply-br59-first-run-consents.md`, customer 0.6.0~0.6.1) · 고객앱 반영(목 모드). **남은 것: 백엔드 질문(현재 위치 → 주소 서비스 이름) 답, LAN 실서버 확인 뒤 archive** |
+| `customer-app/2026-11-19-backend-first-run-consents.md` | BR-59 처음 실행 약관 — ①~④ 모두 회신(`clients/customer-app/2026-11-19-reply-br59-first-run-consents.md`, customer 0.6.0~0.6.1) · 고객앱 반영(목 모드). 질문 답은 아래 문서로 보냄. **남은 것: LAN 실서버 확인 뒤 archive** |
+| `customer-app/2026-11-19-backend-br59-location-service-answer.md` | BR-59 질문 답(좌표→주소 카카오 로컬 서버 경유, 지도 카카오맵 SDK, 휴대폰 위치 Android geolocator — 사용자 승인·고객앱 반영) + Q1 역지오코딩 좌표가 URL 쿼리로 추적 기록에 남는 문제 |
 | `customer-app/2026-11-16-backend-review-photos-and-inbox-done.md` | 리뷰 0.2.0(사진)·고객 알림함 0.2.0 반영 확인 — 실서버 확인은 배송 완료·고객 주문 뒤 |
 | `customer-app/2026-11-16-backend-review-edit-delete-done.md` | 리뷰 수정·삭제 화면 반영 확인, 빈 글 수정 질문 1개 — 실서버 확인은 배송 완료 뒤 |
 | `rider-backoffice/2026-11-17-backend-rider-backoffice-base-done.md` | 라이더 백오피스 뼈대·로그인 회신 — 들어간 커밋 `756db67` 을 그대로 받음(사용자 2026-11-17), 검토·시험 11개·LAN 빌드 이름 확인. **남은 것: 실서버(8446) 로그인을 브라우저로 눌러 보기** |
