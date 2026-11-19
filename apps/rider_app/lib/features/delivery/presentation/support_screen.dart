@@ -352,7 +352,6 @@ class _FailureReceived extends StatelessWidget {
             Text(
               [
                 if (t != null) clockText(t.sentAt),
-                if (t?.caseId case final no?) l10n.supportCaseNo(no),
                 l10n.failureReceivedNote,
               ].join(' · '),
               style: const TextStyle(
@@ -482,15 +481,8 @@ class _TicketCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                if (ticket.caseId case final no?)
-                  Text(
-                    l10n.supportCaseNo(no),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: RiderColors.sub,
-                    ),
-                  ),
+                // 접수 건 ID(CASE-…)는 시스템 번호라 라이더 화면에 내지 않는다(ADR-0070) —
+                // 길어서 줄을 넘쳤다(사용자 2026-11-19).
                 const Spacer(),
                 Text(
                   l10n.supportOpenThread,

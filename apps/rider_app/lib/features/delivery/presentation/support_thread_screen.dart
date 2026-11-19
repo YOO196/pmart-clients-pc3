@@ -202,10 +202,7 @@ class _TicketHeader extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            [
-              clockText(ticket.sentAt),
-              if (ticket.caseId case final no?) l10n.supportCaseNo(no),
-            ].join(' · '),
+            [clockText(ticket.sentAt)].join(' · '),
             style: const TextStyle(fontSize: 13, color: RiderColors.sub),
           ),
         ],
