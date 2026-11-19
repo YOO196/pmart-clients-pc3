@@ -80,9 +80,7 @@ class LotLabelPreviewDialog extends StatelessWidget {
             SelectableText(
               label.gs1 ?? label.labelValue,
               key: const ValueKey('lot-label-code'),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontFamily: 'monospace',
-              ),
+              style: theme.textTheme.titleMedium?.copyWith(letterSpacing: 0.5),
             ),
             const Divider(),
             Text(
@@ -143,7 +141,7 @@ class LabelPreviewDialog extends StatelessWidget {
             SelectableText(
               label.qrCode,
               key: const ValueKey('label-qr-text'),
-              style: muted?.copyWith(fontFamily: 'monospace'),
+              style: muted?.copyWith(letterSpacing: 0.5),
             ),
             const SizedBox(height: 16),
             FilledButton(
@@ -182,9 +180,7 @@ class ProductBarcodePreviewDialog extends StatelessWidget {
           SelectableText(
             label.barcode,
             key: const ValueKey('barcode-label-text'),
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontFamily: 'monospace',
-            ),
+            style: theme.textTheme.headlineSmall?.copyWith(letterSpacing: 0.5),
           ),
           const Divider(),
           if (label.productName != null)

@@ -83,7 +83,8 @@ class ScanPrompt extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      // 큰 제목 위아래 숨 쉴 틈(사용자 2026-11-20 "글자는 큰데 위아래 간격이 좁아 답답") — 위 6, 아래 16.
+      padding: const EdgeInsets.only(top: 6, bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -97,7 +98,7 @@ class ScanPrompt extends StatelessWidget {
           ),
           if (detail case final d?)
             Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: 6),
               child: Text(
                 d,
                 style: theme.textTheme.bodyMedium?.copyWith(

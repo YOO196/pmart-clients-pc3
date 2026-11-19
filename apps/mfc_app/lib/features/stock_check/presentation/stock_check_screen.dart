@@ -153,7 +153,7 @@ class _StockResult extends ConsumerWidget {
     String n(int? v) => v == null ? '—' : l10n.qtyUnit(v);
     return ListView(
       key: const ValueKey('stock-check-result'),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
       children: [
         Text(
           name ?? view.sku,
@@ -169,7 +169,7 @@ class _StockResult extends ConsumerWidget {
               color: scheme.onSurfaceVariant,
             ),
           ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         if (view.isEmpty)
           Text(
             l10n.stockCheckNone,
@@ -240,7 +240,7 @@ class _StockResult extends ConsumerWidget {
             ),
           ),
         if (view.lines.isNotEmpty) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           StepCaption(l10n.stockCheckByLocation),
           for (final line in view.lines)
             Container(
