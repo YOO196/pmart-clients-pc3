@@ -138,19 +138,23 @@ class _ScanInputState extends ConsumerState<ScanInput> {
             style: const TextStyle(color: Colors.transparent),
             // 시안의 보라 "○○ 스캔" 버튼 모양 — 한 줄 안내(무엇을 찍을지)와 스캔 표시.
             // 스캐너 입력을 받는 중(포커스)이면 옅은 보라 굵은 테두리.
+            // 글자는 다른 주 버튼처럼 가운데·크게(사용자 2026-11-20 "버튼에 비해 글자가 작고 왼쪽으로 치우쳐"):
+            // 왼쪽 스캐너 아이콘과 같은 폭의 빈 칸을 오른쪽에 두어 글자가 칸 한가운데 오게 한다.
+            textAlign: TextAlign.center,
             decoration: InputDecoration(
               hintText: widget.label,
               hintMaxLines: 1,
               hintStyle: const TextStyle(
                 color: Colors.white,
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: FontWeight.w800,
               ),
               prefixIcon: const Icon(
                 Icons.barcode_reader,
-                size: 26,
+                size: 28,
                 color: Colors.white,
               ),
+              suffixIcon: const SizedBox(width: 48),
               filled: true,
               fillColor: PdaColors.primary,
               contentPadding: const EdgeInsets.symmetric(
