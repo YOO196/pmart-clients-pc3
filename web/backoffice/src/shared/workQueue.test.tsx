@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { as, renderAt } from '../test/render';
+import { safeFrom } from './workQueue';
 
 beforeEach(() => sessionStorage.clear());
 
@@ -37,5 +38,22 @@ describe('목록 순서대로 이전·다음', () => {
     await user.click(rows[1]!);
     await user.click(await screen.findByRole('link', { name: '상세 열기' }));
     expect(await screen.findByTestId('queue-pos')).toHaveTextContent(`2 / ${rows.length}`);
+  });
+});
+
+describe('미리보기에서 Enter · 기억하는 주소', () => {
+  it('승인함 줄을 눌러 미리보기 → Enter 로 그 건 상세(이전·다음 띠도)', async () => {
+    const user = userEvent.setup();
+    renderAt('/approvals', as.admin);
+    const rows = await screen.findAllByTestId('approval-row');
+    await user.click(rows[0]!);
+    await screen.findByRole('link', { name: '상세 열기' });
+    fireEvent.keyDown(document.body, { key: 'Enter' });
+    expect(await screen.findByTestId('queue-pos')).toHaveTextContent(`1 / ${rows.length}`);
+  });
+
+  it('고객 전화 같은 조건은 기억하는 목록 주소에서 뺀다', () => {
+    expect(safeFrom('/orders?phone=01012345678&status=PAID')).toBe('/orders?status=PAID');
+    expect(safeFrom('/orders?phone=01012345678')).toBe('/orders');
   });
 });

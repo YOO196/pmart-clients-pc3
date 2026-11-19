@@ -2,6 +2,7 @@
 // 조건은 URL 쿼리에 둔다. orderId·customerId 가 없으면 기간 두 값이 필요하고 31일 이하(서버 400 — 화면은 보내기 전에 안내만).
 // 연락처는 숫자만 완전 일치(부분 검색 없음). 목록 연락처·상세 배송지는 서버가 가린 값(0.4.0·0.5.0) — 원문은 사유를 적고 pii-reveals(열람 기록).
 // 검색 조건·배송지·연락처를 로그에 남기지 않는다. 고객센터는 주문을 취소하지 않는다(ADR-0060) — 취소 버튼 없음.
+import { QueueNav, RememberQueue } from '../../shared/workQueue';
 import { useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
@@ -166,6 +167,8 @@ export function OrderLookupPage() {
               <>
                 {/* 전체 건수는 서버가 세지 않는다(page.hasNext) — 이 쪽 건수만 */}
                 <ResultBar count={r.items.length} more={r.page.hasNext} />
+                {/* 상세에서 이전·다음으로 넘기도록 지금 목록 순서를 기억(2026-11-19) — 고객 전화 같은 조건은 기억하지 않는다 */}
+                <RememberQueue kind="order" ids={r.items.map((o) => o.orderId)} from={`/orders?${search.toString()}`} />
                 {/* 목록(2026-11-18 Shopify 주문 목록처럼): 첫 칸 주문 번호 굵게 + 고객 ID 작게, 상태 점 꼬리표, "N일 전", 금액 오른쪽 굵게 */}
                 <DataTable>
                   <thead>
@@ -482,6 +485,8 @@ export function OrderDetailPage() {
               summary={`${when(o.confirmedAt)} · ${o.mfcId} · ${won(o.amounts.approvedAmount)}`}
               actions={<OrderCancelAction order={o} open={cancelOpen} onOpen={() => setCancelOpen(true)} />}
             />
+            {/* 보던 목록 순서대로 이전·다음(2026-11-19) */}
+            <QueueNav kind="order" id={orderId} />
             <SystemNumbers ids={[{ label: m.displayNumber.system.orderId, id: orderId }, { label: m.displayNumber.system.customerId, id: query.data?.customerId }]} />
             {/* 주문 진행 단계(2026-11-18 Refine 참고) — 서버 상태를 계약 상태표 순서대로 */}
             <OrderProgress status={o.status} />

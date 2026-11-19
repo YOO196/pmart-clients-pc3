@@ -10,6 +10,17 @@ import { recentPath, type RecentKind } from './recentViews';
 
 const m = messages.queue;
 const keyOf = (kind: RecentKind) => `pmart.backoffice.queue.${kind}`;
+/** 목록 주소에 있어도 기억하지 않는 조건(연락처 같은 개인정보 — 주문 조회는 고객 전화로 찾는다) */
+const PII_PARAMS = ['phone', 'receiverPhone', 'contact', 'customerPhone', 'riderPhone', 'q'];
+
+/** 목록 주소에서 개인정보 조건을 뺀다 — 빼면 '보던 목록으로'는 조건 없는 목록으로 간다 */
+export function safeFrom(from: string): string {
+  const [path = '', query = ''] = from.split('?');
+  const p = new URLSearchParams(query);
+  for (const k of PII_PARAMS) p.delete(k);
+  const rest = p.toString();
+  return rest ? `${path}?${rest}` : path;
+}
 
 interface Queue {
   readonly ids: readonly string[];
@@ -35,12 +46,18 @@ export function useRememberQueue(kind: RecentKind, ids: readonly string[] | unde
   useEffect(() => {
     if (!ids || ids.length === 0) return;
     try {
-      window.sessionStorage.setItem(keyOf(kind), JSON.stringify({ ids, from }));
+      window.sessionStorage.setItem(keyOf(kind), JSON.stringify({ ids, from: safeFrom(from) }));
     } catch {
       // 저장이 막힌 브라우저 — 띠 없이 동작
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, key, from]);
+}
+
+/** 목록 줄을 그리는 콜백 안에서도 쓰게(훅을 부를 수 없는 자리) — 아무것도 그리지 않는다 */
+export function RememberQueue({ kind, ids, from }: { readonly kind: RecentKind; readonly ids: readonly string[]; readonly from: string }) {
+  useRememberQueue(kind, ids, from);
+  return null;
 }
 
 /** 상세: 기억한 목록 안에 이 건이 있으면 이전·다음 띠. [ · ] 키로도 넘긴다 */

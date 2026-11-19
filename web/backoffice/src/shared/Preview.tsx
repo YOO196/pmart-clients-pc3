@@ -3,7 +3,7 @@
 // 열린 것은 주소 `?preview=<ID>` 에 둔다(새로 고침·링크 보내기에도 그대로, 다른 조건은 건드리지 않는다).
 // ↑↓ 로 앞뒤 줄, Esc 로 닫기(입력 칸에 있을 때는 키를 가로채지 않는다). 내용은 상세와 같은 조회 키라 상세로 가도 다시 읽지 않는다.
 import { useEffect, type ReactNode } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 
 import { messages as m } from './messages';
 
@@ -53,6 +53,7 @@ export function PreviewDrawer({
   readonly detailTo: string;
   readonly children: ReactNode;
 }) {
+  const navigate = useNavigate();
   const at = ids.indexOf(id);
   const prev = at > 0 ? ids[at - 1] : undefined;
   const next = at >= 0 && at < ids.length - 1 ? ids[at + 1] : undefined;
@@ -67,11 +68,15 @@ export function PreviewDrawer({
       } else if (e.key === 'ArrowDown' && next) {
         e.preventDefault();
         onMove(next);
+      } else if (e.key === 'Enter' && !(t instanceof HTMLElement && ['A', 'BUTTON', 'SUMMARY'].includes(t.tagName)) && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        // Enter = 미리보던 건의 상세 열기(2026-11-19). 단추·링크에 초점이 있으면 그 단추가 먼저(가로채지 않는다)
+        e.preventDefault();
+        void navigate(detailTo);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [prev, next, onClose, onMove]);
+  }, [prev, next, onClose, onMove, navigate, detailTo]);
 
   return (
     <aside
