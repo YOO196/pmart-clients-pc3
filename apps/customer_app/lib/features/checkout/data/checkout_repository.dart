@@ -280,13 +280,15 @@ HoldState _hold(String? wire) => switch (wire) {
   _ => HoldState.other,
 };
 
-/// 주문 당시 배송지 사본(BR-37). 없거나(배포 전 초안·주문) 필수값이 비면 null — 현재 주소로 대신하지 않는다.
+/// 주문 당시 배송지 사본(BR-37). 없거나(배포 전 초안·주문) 도로명이 비면 null — 현재 주소로 대신하지 않는다.
+/// 받는 분·연락처는 없을 수 있다(order 0.14.0 — BR-60 R2·R4).
 ShippingAddress? shippingAddressFromContract(api.ShippingAddress? s) {
   if (s == null) return null;
   final road = s.roadAddress;
-  final name = s.receiverName;
-  final phone = s.receiverPhone;
-  if (road == null || name == null || phone == null) return null;
+  if (road == null) return null;
+  String? text(String? v) => (v == null || v.trim().isEmpty) ? null : v;
+  final name = text(s.receiverName);
+  final phone = text(s.receiverPhone);
   return ShippingAddress(
     roadAddress: road,
     detailAddress: s.detailAddress ?? '',
@@ -373,6 +375,8 @@ OrderDraft draftFromContract(api.OrderDraft d) {
           api.DraftBlockerCodeEnum.SLOT_REQUIRED => DraftBlocker.slotRequired,
           api.DraftBlockerCodeEnum.SLOT_UNAVAILABLE =>
             DraftBlocker.slotUnavailable,
+          api.DraftBlockerCodeEnum.CONTACT_REQUIRED =>
+            DraftBlocker.contactRequired,
         },
     ],
     resources: r == null

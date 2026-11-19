@@ -31,6 +31,14 @@ abstract interface class AddressRepository {
   /// 같은 비회원 배송지를 입력값 그대로(받는 분 전화·출입 메모·핀 포함) 읽는다 — 로그인 뒤 회원 주소록에 옮길 때 쓴다.
   /// 서버에 옮기는 경로가 없어 앱이 이 값으로 `POST /me/addresses` 한다(고객 확인 뒤).
   Future<AddressDraft> guestDraft(String guestAddressId);
+
+  /// 회원 주소에 예전에 저장한 연락처를 비운다 — 그 뒤 주문 초안은 프로필 연락처를 쓴다(BR-60 R3).
+  /// `GET /me/addresses/{id}` 로 지금 값을 읽어, 연락처만 빈 문자열로 `PATCH`(전체 교체, X-Expected-Version).
+  /// 저장된 연락처가 없으면 아무것도 보내지 않고 false. 결과 불명은 같은 [key] 재전송으로 해소한다.
+  Future<bool> clearStoredPhone(
+    String addressId, {
+    required IdempotencyKey key,
+  });
 }
 
 final class ApiAddressRepository implements AddressRepository {
@@ -86,6 +94,50 @@ final class ApiAddressRepository implements AddressRepository {
     return draftFromContract(
       res.data ?? (throw const ContractViolationFailure('배송지 본문 없음')),
     );
+  }
+
+  @override
+  Future<bool> clearStoredPhone(
+    String addressId, {
+    required IdempotencyKey key,
+  }) async {
+    final res = await pmartGuard(
+      () => _addresses.getMyAddress(addressId: addressId),
+    );
+    final a = res.data ?? (throw const ContractViolationFailure('주소 본문 없음'));
+    if (a.receiverPhone?.trim().isEmpty ?? true) return false;
+    final draft = draftFromContract(a);
+    final input = addressInputToContract(
+      AddressDraft(
+        label: draft.label,
+        roadAddress: draft.roadAddress,
+        detailAddress: draft.detailAddress,
+        receiverName: draft.receiverName,
+        // 빈 값 = 없음 → 프로필 번호를 쓴다(칸을 빼면 저장된 값이 남는다 — 회신 R3).
+        receiverPhone: '',
+        entranceMethod: draft.entranceMethod,
+        entranceNote: draft.entranceNote,
+        geo: draft.geo,
+        postalCode: draft.postalCode,
+      ),
+    );
+    final version = a.version;
+    Future<void> send() => pmartGuard(
+      () => _addresses.updateMyAddress(
+        addressId: addressId,
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        xExpectedVersion: version,
+        addressInput: input,
+        extra: commandOptions(key, expectedVersion: version).extra,
+      ),
+    );
+    try {
+      await send();
+    } on UnknownResultFailure {
+      await send();
+    }
+    return true;
   }
 
   @override

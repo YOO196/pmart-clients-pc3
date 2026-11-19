@@ -17,6 +17,8 @@ import '../../payment/presentation/payment_screen.dart' show paymentPhaseText;
 import '../../payment/presentation/pg_widget_session.dart';
 import '../domain/checkout.dart';
 import 'checkout_controller.dart';
+import '../../address/presentation/phone_number_formatter.dart';
+import 'contact_sheet.dart';
 import 'delivery_select_screen.dart' show modeLabel, windowText;
 import 'shipping_address_view.dart';
 
@@ -51,6 +53,7 @@ String blockerText(AppLocalizations l10n, DraftBlocker b) => switch (b) {
   DraftBlocker.deliveryModeUnavailable => l10n.blockerModeUnavailable,
   DraftBlocker.slotRequired => l10n.blockerSlotRequired,
   DraftBlocker.slotUnavailable => l10n.blockerSlotUnavailable,
+  DraftBlocker.contactRequired => l10n.blockerContactRequired,
   DraftBlocker.unknown => l10n.blockerUnknown,
 };
 
@@ -407,10 +410,16 @@ class _SheetState extends ConsumerState<_Sheet> {
             key: ValueKey('blocker-${b.name}'),
             icon: Icons.block,
             text: blockerText(l10n, b),
-            action: TextButton(
-              onPressed: () => context.push('/checkout/delivery'),
-              child: Text(l10n.checkoutChange),
-            ),
+            action: b == DraftBlocker.contactRequired
+                ? TextButton(
+                    key: const ValueKey('contact-enter'),
+                    onPressed: () => editMyContact(context, ref),
+                    child: Text(l10n.contactEnter),
+                  )
+                : TextButton(
+                    onPressed: () => context.push('/checkout/delivery'),
+                    child: Text(l10n.checkoutChange),
+                  ),
           ),
       if (state.checkoutUnknown)
         _Banner(
@@ -524,6 +533,25 @@ class _SheetState extends ConsumerState<_Sheet> {
                       Text(address.label ?? address.roadAddress),
                       Text('${address.roadAddress} ${address.detailAddress}'),
                     ],
+                  ],
+                ),
+                // 레퍼런스 6-3 "내 연락처" — 초안 사본의 연락처(서버 값). 바꾸면 프로필에 저장하고 초안을 다시 만든다(BR-60 R3).
+                _Section(
+                  title: l10n.contactTitle,
+                  trailing: TextButton(
+                    key: const ValueKey('contact-change'),
+                    onPressed: () => editMyContact(context, ref),
+                    child: Text(
+                      draft.shippingAddress?.receiverPhone == null
+                          ? l10n.contactEnter
+                          : l10n.contactChange,
+                    ),
+                  ),
+                  children: [
+                    Text(switch (draft.shippingAddress?.receiverPhone) {
+                      final p? => PhoneNumberFormatter.format(p),
+                      null => l10n.contactNone,
+                    }, key: const ValueKey('contact-phone')),
                   ],
                 ),
                 _Section(

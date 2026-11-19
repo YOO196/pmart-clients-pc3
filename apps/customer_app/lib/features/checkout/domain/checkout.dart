@@ -177,6 +177,9 @@ enum DraftBlocker {
   deliveryModeUnavailable,
   slotRequired,
   slotUnavailable,
+
+  /// 받는 분 연락처가 없다(주소에도 프로필에도) — "내 연락처"를 받아 프로필에 저장하고 초안을 다시 만든다(BR-60 R2).
+  contactRequired,
   unknown,
 }
 
@@ -235,8 +238,8 @@ class ShippingAddress {
   const ShippingAddress({
     required this.roadAddress,
     required this.detailAddress,
-    required this.receiverName,
-    required this.receiverPhone,
+    this.receiverName,
+    this.receiverPhone,
     this.postalCode,
     this.entranceMethod,
     this.entranceNote,
@@ -248,8 +251,11 @@ class ShippingAddress {
   final String roadAddress;
   final String detailAddress;
   final String? postalCode;
-  final String receiverName;
-  final String receiverPhone;
+
+  /// 받는 분·연락처(order 0.14.0 — BR-60). 주소 값이 먼저, 없으면 회원 프로필. 이름이 없으면 null(R4),
+  /// 연락처가 없으면 초안 막힘 `CONTACT_REQUIRED`.
+  final String? receiverName;
+  final String? receiverPhone;
   final EntranceMethod? entranceMethod;
   final String? entranceNote;
   final double? lat;

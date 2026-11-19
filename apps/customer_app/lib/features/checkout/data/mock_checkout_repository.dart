@@ -83,6 +83,10 @@ base class MockCheckoutRepository
   /// 다음 초안 생성을 이 코드로 거절한다(422, MFC_CHANGED 는 409).
   String? rejectNextDraft;
 
+  /// 초안 사본의 연락처를 어디서 읽을지(시험이 프로필 목과 잇는다 — BR-60 R2). null 이면 목 고정 번호.
+  /// 함수가 null 을 돌려주면 사본 연락처가 비고 막힘 `CONTACT_REQUIRED` 를 준다.
+  String? Function()? contactOf;
+
   /// [rejectNextDraft] 에 실을 `details[]`(예: INSUFFICIENT_STOCK — field = sku,
   /// reason = `requestedQty=2;availableQty=1` 또는 `NOT_HANDLED`, order 0.8.0).
   List<ProblemDetail> rejectNextDraftDetails = const [];
@@ -288,6 +292,10 @@ base class MockCheckoutRepository
     }
     final id = 'draft-${++_seq}';
     final created = now();
+    final phone = switch (contactOf) {
+      final f? => f(),
+      null => mockShippingAddressJson['receiverPhone'] as String?,
+    };
     final d = MockDraft(
       {
         'draftId': id,
@@ -312,6 +320,7 @@ base class MockCheckoutRepository
         'blockers': [
           if (_quote(request, 1, created)['minOrderSatisfied'] != true)
             {'code': 'MIN_ORDER_AMOUNT'},
+          if (phone == null) {'code': 'CONTACT_REQUIRED'},
         ],
         'resources': {
           'inventoryReservation': 'NOT_REQUESTED',
@@ -327,6 +336,7 @@ base class MockCheckoutRepository
           'shoppingAddressId': request.shoppingAddressId,
           'shippingAddress': {
             ...mockShippingAddressJson,
+            'receiverPhone': phone,
             'capturedAt': created.toUtc().toIso8601String(),
           },
         },

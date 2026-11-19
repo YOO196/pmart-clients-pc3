@@ -28,7 +28,8 @@ final class _RecordingAddresses extends MockAddressRepository {
   }
 }
 
-/// BR-60: 레퍼런스 주소 상세에는 받는 분·연락처가 없다. 회원은 프로필 값으로 채우고 없는 것만 묻는다.
+/// BR-60(customer 0.8.0): 레퍼런스 주소 상세에는 받는 분·연락처가 없다. 회원·비회원 모두 묻지도 보내지도 않는다 —
+/// 주문 초안이 프로필 값을 쓰고, 없으면 주문서가 "내 연락처"를 받는다(checkout_contact_test).
 void main() {
   setUpAll(initPmartFormatting);
 
@@ -72,65 +73,21 @@ void main() {
     await t.enterText(key('f-detail'), '1층');
   }
 
-  testWidgets('프로필에 이름·연락처가 있으면 칸 없이 그 값으로 저장한다', (t) async {
-    final addresses = _RecordingAddresses();
-    final profile = MockProfileRepository(latency: Duration.zero)
-      ..nickname = '김피마'
-      ..phone = '01012345678';
-    await openForm(t, addresses: addresses, profile: profile);
+  for (final member in [true, false]) {
+    testWidgets('${member ? '회원' : '비회원'}: 받는 분·연락처 칸이 없고 보내지 않는다', (t) async {
+      final addresses = _RecordingAddresses();
+      final profile = MockProfileRepository(latency: Duration.zero);
+      await openForm(t, addresses: addresses, profile: profile, member: member);
 
-    expect(key('f-name'), findsNothing);
-    expect(key('f-phone'), findsNothing);
-    await t.tap(key('address-save'));
-    await t.pumpAndSettle();
+      expect(key('f-name'), findsNothing);
+      expect(key('f-phone'), findsNothing);
+      await t.tap(key('address-save'));
+      await t.pumpAndSettle();
 
-    expect(addresses.drafts.single.receiverName, '김피마');
-    expect(addresses.drafts.single.receiverPhone, '010-1234-5678');
-    expect(profile.changeKeys, isEmpty);
-  });
-
-  testWidgets('연락처가 없으면 "내 연락처"만 묻고 프로필에도 저장한다', (t) async {
-    final addresses = _RecordingAddresses();
-    final profile = MockProfileRepository(latency: Duration.zero)..name = '김구글';
-    await openForm(t, addresses: addresses, profile: profile);
-
-    expect(key('f-name'), findsNothing);
-    expect(
-      find.descendant(of: key('f-phone'), matching: find.text('내 연락처')),
-      findsOneWidget,
-    );
-    await t.enterText(key('f-phone'), '01098765432');
-    await t.tap(key('address-save'));
-    await t.pumpAndSettle();
-
-    expect(addresses.drafts.single.receiverName, '김구글');
-    expect(addresses.drafts.single.receiverPhone, '010-9876-5432');
-    expect(profile.phone, '01098765432');
-  });
-
-  testWidgets('프로필에 연락처를 못 남겨도 주소는 입력한 번호로 저장한다', (t) async {
-    final addresses = _RecordingAddresses();
-    final profile = MockProfileRepository(latency: Duration.zero)
-      ..nickname = '김피마'
-      ..rejectPhone = true;
-    await openForm(t, addresses: addresses, profile: profile);
-
-    await t.enterText(key('f-phone'), '01098765432');
-    await t.tap(key('address-save'));
-    await t.pumpAndSettle();
-
-    expect(addresses.drafts.single.receiverPhone, '010-9876-5432');
-    expect(profile.phone, isNull);
-  });
-
-  testWidgets('비회원은 프로필이 없어 받는 분·연락처를 묻는다', (t) async {
-    final addresses = _RecordingAddresses();
-    await openForm(t, addresses: addresses, member: false);
-
-    expect(key('f-name'), findsOneWidget);
-    expect(
-      find.descendant(of: key('f-phone'), matching: find.text('연락처')),
-      findsOneWidget,
-    );
-  });
+      expect(addresses.drafts.last.receiverName, isNull);
+      expect(addresses.drafts.last.receiverPhone, isNull);
+      // 주소 입력에서는 프로필을 바꾸지 않는다.
+      expect(profile.changeKeys, isEmpty);
+    });
+  }
 }

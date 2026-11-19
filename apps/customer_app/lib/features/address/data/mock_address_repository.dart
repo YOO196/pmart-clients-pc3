@@ -167,6 +167,31 @@ base class MockAddressRepository implements AddressRepository {
     return draftFromContract(api.Address.fromJson(json));
   }
 
+  /// 연락처를 비운 주소 ID(시험 확인용).
+  final clearedPhones = <String>[];
+
+  @override
+  Future<bool> clearStoredPhone(
+    String addressId, {
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    final json = _addresses
+        .where((a) => a['addressId'] == addressId)
+        .firstOrNull;
+    if (json == null) {
+      throw const ProblemFailure(
+        Problem(status: 404, code: ProblemCode.notFound),
+      );
+    }
+    final phone = json['receiverPhone'] as String?;
+    if (phone == null || phone.trim().isEmpty) return false;
+    json['receiverPhone'] = null;
+    json['version'] = (json['version']! as int) + 1;
+    clearedPhones.add(addressId);
+    return true;
+  }
+
   @override
   Future<ShoppingContext> context() async {
     await _wait();

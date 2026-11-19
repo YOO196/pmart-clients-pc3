@@ -47,8 +47,6 @@ void main() {
 
   Future<void> fillRest(WidgetTester t) async {
     await t.enterText(find.byKey(const ValueKey('f-detail')), '1층');
-    await t.enterText(find.byKey(const ValueKey('f-name')), '김피마');
-    await t.enterText(find.byKey(const ValueKey('f-phone')), '01000000000');
   }
 
   String pinText(WidgetTester t) =>

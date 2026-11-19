@@ -504,4 +504,12 @@ class DraftController extends AsyncNotifier<DraftState?> {
     state = const AsyncData(null);
     await enter();
   }
+
+  /// 내 연락처를 바꿨다 — 연락처는 초안을 만들 때 사본으로 고정되므로(BR-37) 새 의도로 초안을 다시 만든다.
+  /// 같은 의도면 서버가 예전 초안(옛 연락처)을 돌려준다(BR-60 R3).
+  Future<void> contactChanged() async {
+    ref.read(checkoutSetupProvider.notifier).renewIntent();
+    state = const AsyncData(null);
+    await enter();
+  }
 }

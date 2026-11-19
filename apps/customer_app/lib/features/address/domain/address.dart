@@ -12,8 +12,8 @@ class Address {
     required this.version,
     required this.roadAddress,
     required this.detailAddress,
-    required this.receiverName,
     required this.serviceability,
+    this.receiverName,
     this.label,
     this.entranceMethod,
     this.mfcId,
@@ -24,7 +24,9 @@ class Address {
   final String? label;
   final String roadAddress;
   final String detailAddress;
-  final String receiverName;
+
+  /// 받는 분. customer 0.8.0(BR-60)부터 없을 수 있다 — 주문 때 서버가 프로필 이름으로 채운다.
+  final String? receiverName;
   final EntranceMethod? entranceMethod;
   final Serviceability serviceability;
 
@@ -38,8 +40,8 @@ class AddressDraft {
   const AddressDraft({
     required this.roadAddress,
     required this.detailAddress,
-    required this.receiverName,
-    required this.receiverPhone,
+    this.receiverName,
+    this.receiverPhone,
     this.label,
     this.entranceMethod,
     this.entranceNote,
@@ -50,8 +52,11 @@ class AddressDraft {
   final String? label;
   final String roadAddress;
   final String detailAddress;
-  final String receiverName;
-  final String receiverPhone;
+
+  /// 받는 분·연락처. customer 0.8.0(BR-60 R1)부터 보내지 않아도 된다 — 주문 초안이 회원 프로필 값을 쓴다.
+  /// 주소 입력 화면은 보내지 않고, 비회원 배송지를 회원 주소록으로 옮길 때만 그 값이 남아 있으면 그대로 옮긴다.
+  final String? receiverName;
+  final String? receiverPhone;
   final EntranceMethod? entranceMethod;
   final String? entranceNote;
 

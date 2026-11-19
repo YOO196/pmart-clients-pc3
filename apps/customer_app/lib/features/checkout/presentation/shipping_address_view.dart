@@ -38,7 +38,10 @@ class ShippingAddressView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('${a.roadAddress} ${a.detailAddress}'.trim()),
-        Text(l10n.receiverLine(a.receiverName, a.receiverPhone)),
+        // 받는 분·연락처는 없을 수 있다(BR-60) — 있는 것만 보인다.
+        if ([?a.receiverName, ?a.receiverPhone] case final parts
+            when parts.isNotEmpty)
+          Text(parts.join(' · ')),
         if (entrance.isNotEmpty) Text(entrance),
       ],
     );

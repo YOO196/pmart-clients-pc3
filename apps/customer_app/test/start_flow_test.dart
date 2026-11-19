@@ -37,8 +37,6 @@ void main() {
 
   Future<void> fillAndSave(WidgetTester t) async {
     await t.enterText(key('f-detail'), '101동 202호');
-    await t.enterText(key('f-name'), '김피마');
-    await t.enterText(key('f-phone'), '010-0000-0000');
     await t.tap(key('address-save'));
     await t.pumpAndSettle();
   }

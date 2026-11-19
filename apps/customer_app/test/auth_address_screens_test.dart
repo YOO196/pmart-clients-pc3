@@ -31,8 +31,6 @@ void main() {
     await t.tap(find.byKey(const ValueKey('address-search')));
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('f-detail')), '101동');
-    await t.enterText(find.byKey(const ValueKey('f-name')), '김피마');
-    await t.enterText(find.byKey(const ValueKey('f-phone')), '01000000000');
     await t.tap(find.byKey(const ValueKey('address-save')));
     await t.pumpAndSettle();
 
@@ -293,8 +291,6 @@ void main() {
     await t.tap(find.byKey(const ValueKey('address-search')));
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('f-detail')), '1층');
-    await t.enterText(find.byKey(const ValueKey('f-name')), '김피마');
-    await t.enterText(find.byKey(const ValueKey('f-phone')), '010-0000-0000');
     await t.tap(find.byKey(const ValueKey('address-save')));
     await t.pumpAndSettle();
 

@@ -236,6 +236,15 @@ void main() {
     unawaited(router().push('/checkout'));
     await t.pumpAndSettle();
     await shot('order-sheet');
+    // 레퍼런스 6-3 "내 연락처"(BR-60) — 주문서 칸과 번호 변경 창.
+    await t.ensureVisible(find.byKey(const ValueKey('contact-change')));
+    await t.pumpAndSettle();
+    await shot('order-sheet-contact');
+    await t.tap(find.byKey(const ValueKey('contact-change')));
+    await t.pumpAndSettle();
+    await shot('contact-sheet');
+    await t.tap(find.byKey(const ValueKey('contact-close')));
+    await t.pumpAndSettle();
     await scrollDown(700);
     await shot('order-sheet-2');
 
