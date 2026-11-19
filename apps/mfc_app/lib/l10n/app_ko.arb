@@ -1293,5 +1293,10 @@
   "countCountTitle": "칸의 상품을 세어 주세요",
   "returnInspectTitle": "회수품 상태를 확인하세요",
   "scanItemBtn": "상품 스캔",
-  "scanLocationBtn": "위치 바코드 스캔"
+  "scanLocationBtn": "위치 바코드 스캔",
+  "chooseWork": "업무 선택",
+  "areaDescInbound": "트럭 도착·박스 확인·수량 세기",
+  "areaDescInspection": "소비기한·제조일·온도 기준으로 정상·격리 판정",
+  "areaDescStockMove": "출발 칸에서 집어 도착 칸에 내려놓기",
+  "areaDescStockCount": "칸마다 상품을 세기 — 장부 수량은 안 보여요"
 }
