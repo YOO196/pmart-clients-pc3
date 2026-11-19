@@ -740,6 +740,7 @@ class _PickCard extends StatelessWidget {
             if (stop.otherLocations.isNotEmpty)
               NoticeBox(
                 key: const ValueKey('pick-other-locations'),
+                warning: true,
                 text: l10n.pickOtherLocations(stop.otherLocations.join(', ')),
               ),
           ],
