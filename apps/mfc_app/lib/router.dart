@@ -21,6 +21,7 @@ import 'features/tasks/presentation/tasks_screen.dart';
 import 'features/work/domain/work.dart';
 import 'features/work/presentation/work_screens.dart';
 import 'shared/printer/printer_ui.dart';
+import 'shared/start_splash.dart';
 
 /// 라우트. 로그인 전에는 시작 메뉴(로그인·기기 설정·재고 확인, 사용자 2026-11-17)로, 세션이 끝나면 로그인 화면으로 보낸다
 /// (직원 로그인 — 백엔드 handoff 2026-11-13).
@@ -101,7 +102,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/starting',
-        pageBuilder: (_, s) => _page(s, const StartingScreen()),
+        pageBuilder: (_, s) => _page(s, const StartSplashScreen()),
       ),
       GoRoute(
         path: '/start',

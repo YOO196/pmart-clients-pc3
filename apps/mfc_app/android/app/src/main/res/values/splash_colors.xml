@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 픽PDA 시작 그림 바탕 연보라(lib/shared/start_splash.dart 의 background 와 같게) -->
+    <color name="splash_background">#E6D8FC</color>
+</resources>
