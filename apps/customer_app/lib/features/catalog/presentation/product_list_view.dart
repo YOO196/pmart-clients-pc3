@@ -16,6 +16,7 @@ String sortLabel(AppLocalizations l10n, SortKey s) => switch (s) {
   SortKey.priceAsc => l10n.sortPriceAsc,
   SortKey.priceDesc => l10n.sortPriceDesc,
   SortKey.rating => l10n.sortRating,
+  SortKey.reviewCount => l10n.sortReviewCount,
 };
 
 /// SCR-LIST-001 본문. 정렬·필터는 이 위젯이 들고, 결과는 조건별 provider 에서 읽는다.
@@ -107,6 +108,7 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
               key: const PageStorageKey('product-list'),
               list: list,
               onLoadMore: () => ref.read(provider.notifier).loadMore(),
+              autoLoadMore: true,
             ),
           ),
         ),
@@ -117,10 +119,20 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
 
 /// 상품 2칸 격자 + 목록 끝의 "더 보기". 검색·카테고리·전체보기가 같이 쓴다.
 class ProductGrid extends StatelessWidget {
-  const ProductGrid({super.key, required this.list, required this.onLoadMore});
+  const ProductGrid({
+    super.key,
+    required this.list,
+    required this.onLoadMore,
+    this.autoLoadMore = false,
+  });
 
   final ProductListState list;
   final VoidCallback onLoadMore;
+
+  /// 남은 카드가 [autoLoadAhead] 개쯤일 때 다음 묶음을 미리 부른다(검색·카테고리, 한 묶음 20개).
+  /// 실패하면 멈추고 "더 보기"로 다시 받는다.
+  final bool autoLoadMore;
+  static const autoLoadAhead = 6;
 
   @override
   Widget build(BuildContext context) {
@@ -138,6 +150,15 @@ class ProductGrid extends StatelessWidget {
             ),
             itemCount: list.items.length,
             itemBuilder: (context, i) {
+              if (autoLoadMore &&
+                  i >= list.items.length - autoLoadAhead &&
+                  list.hasMore &&
+                  !list.loadingMore &&
+                  list.loadMoreFailure == null) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => onLoadMore(),
+                );
+              }
               final tile = list.items[i];
               return ProductTileCard(
                 rail: true,

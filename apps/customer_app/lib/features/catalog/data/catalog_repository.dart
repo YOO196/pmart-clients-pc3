@@ -89,6 +89,9 @@ final class ApiCatalogRepository implements CatalogRepository {
     return categoriesFromContract(_body(res.data, 'CategoryTree'));
   }
 
+  /// 검색·카테고리 한 묶음 크기. 서버 기본 50 대신 첫 화면 두세 쪽 분량(백엔드 요청 2026-11-19 search-page-size).
+  static const searchPageSize = 20;
+
   @override
   Future<ProductPage> search(
     ProductQuery query, {
@@ -104,6 +107,7 @@ final class ApiCatalogRepository implements CatalogRepository {
         sort: _sortToContract(query.sort),
         filters: query.filters.isEmpty ? null : query.filters.toList(),
         cursor: cursor,
+        size: searchPageSize,
         cancelToken: cancelToken,
       ),
     );
@@ -221,6 +225,7 @@ sr.SortKey _sortToContract(SortKey s) => switch (s) {
   SortKey.priceAsc => sr.SortKey.PRICE_ASC,
   SortKey.priceDesc => sr.SortKey.PRICE_DESC,
   SortKey.rating => sr.SortKey.RATING,
+  SortKey.reviewCount => sr.SortKey.REVIEW_COUNT,
 };
 
 SaleState _saleState(String? wire) => switch (wire) {

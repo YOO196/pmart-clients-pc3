@@ -425,6 +425,8 @@ base class MockCatalogRepository implements CatalogRepository {
         all.sort((a, b) => b.price.compareTo(a.price));
       case SortKey.rating:
         all.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+      case SortKey.reviewCount:
+        all.sort((a, b) => (b.reviewCount ?? 0).compareTo(a.reviewCount ?? 0));
     }
     final start = int.tryParse(cursor ?? '') ?? 0;
     final end = (start + pageSize).clamp(0, all.length);
@@ -456,6 +458,7 @@ base class MockCatalogRepository implements CatalogRepository {
     SortKey.priceAsc => 'PRICE_ASC',
     SortKey.priceDesc => 'PRICE_DESC',
     SortKey.rating => 'RATING',
+    SortKey.reviewCount => 'REVIEW_COUNT',
   };
 
   @override

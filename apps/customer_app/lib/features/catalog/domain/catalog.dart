@@ -153,7 +153,17 @@ class CategoryNode {
 }
 
 /// 정렬. 할인율순은 1차 제외(계약 SortKey).
-enum SortKey { relevance, popular, newest, priceAsc, priceDesc, rating }
+enum SortKey {
+  relevance,
+  popular,
+  newest,
+  priceAsc,
+  priceDesc,
+  rating,
+
+  /// 리뷰 많은 순(search 0.3.0 `REVIEW_COUNT`).
+  reviewCount,
+}
 
 @immutable
 class ProductQuery {

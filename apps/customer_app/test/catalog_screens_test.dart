@@ -274,6 +274,42 @@ void main() {
       expect(find.text('다음 상품을 불러오지 못했어요'), findsOneWidget);
       expect(find.byType(ProductTileCard), findsNWidgets(2));
     });
+
+    testWidgets('목록 끝에 가까워지면 "더 보기"를 누르지 않아도 다음 묶음을 받는다', (t) async {
+      Future<int> open(MockCatalogRepository repo) async {
+        await t.pumpWidget(const SizedBox()); // 앞 화면 상태를 버린다
+        await t.pumpWidget(testApp(const [], catalog: repo));
+        await t.pumpAndSettle();
+        await t.tap(find.text('카테고리').last);
+        await t.pumpAndSettle();
+        await t.tap(find.text('과일·채소'));
+        await t.pumpAndSettle();
+        await t.tap(find.text('과일·채소 전체'));
+        await t.pumpAndSettle();
+        return find.byType(ProductTileCard).evaluate().length;
+      }
+
+      final all = await open(
+        MockCatalogRepository(latency: Duration.zero, pageSize: 100),
+      );
+      expect(all, greaterThan(1));
+      // 한 묶음 1개여도 남은 카드가 적으니 끝까지 이어 받는다.
+      final paged = await open(
+        MockCatalogRepository(latency: Duration.zero, pageSize: 1),
+      );
+      expect(paged, all);
+      expect(find.byKey(const ValueKey('load-more')), findsNothing);
+    });
+
+    test('리뷰 많은 순(REVIEW_COUNT)은 리뷰 수가 많은 상품부터', () async {
+      final page = await MockCatalogRepository(
+        latency: Duration.zero,
+        pageSize: 100,
+      ).search(const ProductQuery(sort: SortKey.reviewCount));
+      // 품절 상품은 목록 변환에서 맨 뒤로 가므로 앞쪽 순서만 본다.
+      final counts = [for (final p in page.items) p.reviewCount ?? 0];
+      expect(counts.take(3), [1203, 640, 312]);
+    });
   });
 
   group('상품 상세', () {
