@@ -528,7 +528,7 @@ class _SheetState extends ConsumerState<_Sheet> {
                   children: [
                     // 초안에 고정된 배송지 사본(BR-37). 사본이 없는 옛 초안만 초안을 만든 현재 쇼핑 주소를 보인다.
                     if (draft.shippingAddress case final a?)
-                      ShippingAddressView(address: a)
+                      ShippingAddressView(address: a, showPhone: false)
                     else if (address != null) ...[
                       Text(address.label ?? address.roadAddress),
                       Text('${address.roadAddress} ${address.detailAddress}'),

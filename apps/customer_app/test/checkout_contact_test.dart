@@ -64,6 +64,9 @@ void main() {
   testWidgets('주문서에 사본의 연락처를 보이고, 번호 변경 → 프로필 저장·주소의 옛 번호 비움·초안 다시', (t) async {
     await toOrderSheet(t);
     expect(find.text('내 연락처'), findsOneWidget);
+    // 받는 곳에는 이름만 — 같은 번호가 두 번 보이지 않는다.
+    expect(find.textContaining('010-0000-0000'), findsOneWidget);
+    expect(find.text('김피마'), findsOneWidget);
     expect(t.widget<Text>(key('contact-phone')).data, '010-0000-0000');
     final draftsBefore = checkout.drafts.length;
 

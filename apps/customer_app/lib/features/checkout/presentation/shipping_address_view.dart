@@ -15,9 +15,16 @@ String entranceMethodText(AppLocalizations l10n, EntranceMethod m) =>
 /// 주문 당시 배송지 사본(BR-37). [address] 가 null 이면 "배송지 정보 없음"이다 —
 /// 주소록의 현재 주소를 대신 보이지 않는다(배포 전 주문·사본 없음).
 class ShippingAddressView extends StatelessWidget {
-  const ShippingAddressView({super.key, required this.address});
+  const ShippingAddressView({
+    super.key,
+    required this.address,
+    this.showPhone = true,
+  });
 
   final ShippingAddress? address;
+
+  /// 연락처를 같이 보일지. 주문서는 "내 연락처" 칸이 따로 있어 끈다(같은 번호가 두 번 보이지 않게).
+  final bool showPhone;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +46,7 @@ class ShippingAddressView extends StatelessWidget {
       children: [
         Text('${a.roadAddress} ${a.detailAddress}'.trim()),
         // 받는 분·연락처는 없을 수 있다(BR-60) — 있는 것만 보인다.
-        if ([?a.receiverName, ?a.receiverPhone] case final parts
+        if ([?a.receiverName, if (showPhone) ?a.receiverPhone] case final parts
             when parts.isNotEmpty)
           Text(parts.join(' · ')),
         if (entrance.isNotEmpty) Text(entrance),
