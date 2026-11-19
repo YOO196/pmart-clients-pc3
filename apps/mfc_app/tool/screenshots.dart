@@ -448,7 +448,7 @@ void main() {
     await shot('return-arrivals');
     await tap('ri-ARR-mock-1');
     await shot('return-intake-location');
-    await scanTo('ri-location-scan', 'RTN-A-01');
+    await scanTo('ri-scan', 'RTN-A-01');
     await tap('ri-all');
     await shot('return-intake-items');
     await home();
