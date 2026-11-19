@@ -443,6 +443,18 @@ void main() {
     await shot('count-counting');
     await scanTo('count-item-scan', MockTaskRepository.milkBarcode);
     await shot('count-counted');
+    await home();
+
+    // 아래 도구 줄 화면들.
+    for (final (key, name) in [
+      ('menu-handover', 'handover-checks'),
+      ('menu-return-handover', 'return-numbers'),
+      ('menu-printer', 'printer'),
+    ]) {
+      await tap(key);
+      await shot(name);
+      await home();
+    }
     debugDisableShadows = true;
   });
 
