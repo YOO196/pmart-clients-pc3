@@ -9,7 +9,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../auth/presentation/auth_controller.dart';
 import '../../../l10n/gen/app_localizations.dart';
-import '../../../shared/field_widgets.dart' show NoticeBox;
+import '../../../shared/field_widgets.dart' show NoticeBox, StepCaption;
 import '../../../shared/pda_theme.dart';
 import '../../../shared/providers.dart';
 import '../../../shared/ui_state_of.dart';
@@ -1160,14 +1160,16 @@ class _AssignedView extends StatelessWidget {
       key: ValueKey('assigned-${task.taskId}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.sessionNow, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 4),
+        StepCaption(l10n.sessionNow),
         Row(
           children: [
             Text(
               assignedTypeText(l10n, task.taskType),
               key: const ValueKey('assigned-type'),
-              style: theme.textTheme.headlineMedium,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -1.2,
+              ),
             ),
             if (task.urgent) ...[
               const SizedBox(width: 8),
@@ -1180,6 +1182,10 @@ class _AssignedView extends StatelessWidget {
             task.taskType == 'RECEIVE'
                 ? l10n.inboundPlannedAt(formatSeoulTime(t))
                 : l10n.promisedReadyAt(formatSeoulTime(t)),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: PdaColors.primary,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         if (!area.taskTypes.contains(task.taskType))
           Text(
@@ -1190,25 +1196,34 @@ class _AssignedView extends StatelessWidget {
         const SizedBox(height: 12),
         // 받은 작업의 상품을 전부 보인다("외 N개" 없이).
         Expanded(
-          child: ListView(
-            key: const ValueKey('assigned-lines'),
-            children: [
-              for (final l in task.lines)
-                Card(
-                  child: ListTile(
-                    title: Text(l.productName ?? l.sku ?? '-'),
-                    subtitle: Text(
-                      [
-                        if (l.boxes case final b?) l10n.boxesUnit(b),
-                        if (l.qty case final q?) l10n.qtyUnit(q),
-                        ?l.fromLocation,
-                        if (l.toLocation case final t?) '→ $t',
-                        ?l.notice,
-                      ].join(' · '),
-                    ),
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: ListView.separated(
+              key: const ValueKey('assigned-lines'),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              itemCount: task.lines.length,
+              separatorBuilder: (_, _) => const Divider(),
+              itemBuilder: (_, i) {
+                final l = task.lines[i];
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    l.productName ?? l.sku ?? '-',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
-                ),
-            ],
+                  subtitle: Text(
+                    [
+                      if (l.boxes case final b?) l10n.boxesUnit(b),
+                      if (l.qty case final q?) l10n.qtyUnit(q),
+                      ?l.fromLocation,
+                      if (l.toLocation case final t?) '→ $t',
+                      ?l.notice,
+                    ].join(' · '),
+                    style: const TextStyle(color: PdaColors.muted),
+                  ),
+                );
+              },
+            ),
           ),
         ),
         if (!task.detailAvailable) Text(l10n.detailUnavailable),

@@ -1298,5 +1298,14 @@
   "areaDescInbound": "트럭 도착·박스 확인·수량 세기",
   "areaDescInspection": "소비기한·제조일·온도 기준으로 정상·격리 판정",
   "areaDescStockMove": "출발 칸에서 집어 도착 칸에 내려놓기",
-  "areaDescStockCount": "칸마다 상품을 세기 — 장부 수량은 안 보여요"
+  "areaDescStockCount": "칸마다 상품을 세기 — 장부 수량은 안 보여요",
+  "moveCartTitle": "카트를 스캔하세요",
+  "moveFromTitle": "출발 칸으로 이동해 주세요",
+  "moveLoadTitle": "카트에 {qty}개를 실으세요",
+  "@moveLoadTitle": {"placeholders": {"qty": {"type": "int"}}},
+  "moveDropTitle": "도착 칸에 내려놓으세요",
+  "moveDropReady": "수량을 확인하고 내려놓으세요",
+  "putawayFromTitle": "출발 위치로 이동해 주세요",
+  "putawayDropTitle": "추천 칸에 적치하세요",
+  "putawayDropReady": "수량을 확인하고 적치하세요"
 }
