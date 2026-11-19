@@ -23,7 +23,12 @@ base class MockOrdersRepository implements OrdersRepository {
     this.checkout,
     this.latency = const Duration(milliseconds: 300),
     DateTime Function()? now,
+    this.liveRiderInterval,
   }) : now = now ?? DateTime.now;
+
+  /// 배달 중 목 배송(dlv-s2)의 구독에 이 간격으로 라이더 위치가 바뀐 `ETA_UPDATED` 를 흘린다(실서버 흉내 —
+  /// 라이더 앱 5초 올리기, PC 5 요청 2026-11-19). null 이면 흘리지 않는다(시험은 [emitTracking] 으로 직접).
+  final Duration? liveRiderInterval;
 
   final MockCheckoutRepository? checkout;
   final Duration latency;
@@ -539,6 +544,9 @@ base class MockOrdersRepository implements OrdersRepository {
   /// 배달 중이어도 서버가 아직 라이더 위치를 주지 않는 경우 흉내.
   bool hideRiderLocation = false;
 
+  /// 목 라이더 위치의 `staleSeconds`(서버가 받은 뒤 지난 초). 60 을 넘기면 앱이 "확인 중"으로 보인다.
+  int riderStaleSeconds = 4;
+
   /// 목 라이더 위치: 출발점에서 목 배송지 좌표(35.1565, 129.0665)까지 20칸 중 [step] 번째.
   static Map<String, Object?> _riderTowardHome(int step) {
     const from = (lat: 35.1495, lng: 129.0590);
@@ -556,8 +564,16 @@ base class MockOrdersRepository implements OrdersRepository {
     if (etaFails) {
       throw const NetworkFailure(DioExceptionType.connectionTimeout);
     }
+    return etaFromContract(
+      deliveryId,
+      trk.DeliveryEta.fromJson(_etaJson(deliveryId)),
+    );
+  }
+
+  /// 목 서버의 지금 도착 예상(조회·구독이 같은 값을 쓴다). 배달 중 배송은 부를 때마다 라이더가 한 칸 다가온다.
+  Map<String, Object?> _etaJson(String deliveryId) {
     final current = now().toUtc();
-    final json = switch (deliveryId) {
+    return switch (deliveryId) {
       final id when received.contains(id) => {
         'deliveryId': deliveryId,
         'stage': 'DONE',
@@ -583,9 +599,9 @@ base class MockOrdersRepository implements OrdersRepository {
               _etaCalls[deliveryId] = (_etaCalls[deliveryId] ?? 0) + 1,
             ),
             'recordedAt': current
-                .subtract(const Duration(seconds: 4))
+                .subtract(Duration(seconds: riderStaleSeconds))
                 .toIso8601String(),
-            'staleSeconds': 4,
+            'staleSeconds': riderStaleSeconds,
           },
         'asOf': {'asOf': current.toIso8601String(), 'freshness': 'CURRENT'},
       },
@@ -603,7 +619,6 @@ base class MockOrdersRepository implements OrdersRepository {
         'asOf': {'asOf': current.toIso8601String(), 'freshness': 'CURRENT'},
       },
     };
-    return etaFromContract(deliveryId, trk.DeliveryEta.fromJson(json));
   }
 
   /// 실시간 구독 실패 시연(연결 즉시 오류). 주기 조회로 넘어가는지 본다.
@@ -649,6 +664,24 @@ base class MockOrdersRepository implements OrdersRepository {
         (openTracks[deliveryId] ??= []).add(c);
         // 연결되면 서버가 HEARTBEAT 를 보낸다(목은 바로 한 번).
         c.add(const TrackingEvent(type: TrackingEventType.heartbeat));
+        // 배달 중 배송: 라이더가 움직일 때마다 서버가 ETA_UPDATED(eta.riderLocation)를 보낸다.
+        if (liveRiderInterval case final every? when deliveryId == 'dlv-s2') {
+          _riderTimers[c] = Timer.periodic(every, (_) {
+            if (c.isClosed) return;
+            final eta = etaFromContract(
+              deliveryId,
+              trk.DeliveryEta.fromJson(_etaJson(deliveryId)),
+            );
+            c.add(
+              TrackingEvent(
+                type: TrackingEventType.etaUpdated,
+                id: 'evt-${++_eventSeq}',
+                eta: eta,
+                stage: eta.stage,
+              ),
+            );
+          });
+        }
       },
       onCancel: () => _forget(deliveryId, c),
     );
@@ -656,7 +689,11 @@ base class MockOrdersRepository implements OrdersRepository {
     return c.stream;
   }
 
+  final _riderTimers = <StreamController<TrackingEvent>, Timer>{};
+  int _eventSeq = 0;
+
   void _forget(String deliveryId, StreamController<TrackingEvent> c) {
+    _riderTimers.remove(c)?.cancel();
     final list = openTracks[deliveryId];
     list?.remove(c);
     if (list != null && list.isEmpty) openTracks.remove(deliveryId);

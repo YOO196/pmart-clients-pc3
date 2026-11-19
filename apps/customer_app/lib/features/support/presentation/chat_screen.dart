@@ -128,7 +128,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            l10n.chatOrderTopicBar(order.orderId),
+                            // 시스템 주문 ID 는 보이지 않는다(주문 시각, 없으면 상태).
+                            l10n.chatOrderTopicBar(switch (order.orderedAt) {
+                              final at? => formatSeoulDateTime(at),
+                              null => order.statusLabel,
+                            }),
                             style: theme.textTheme.bodySmall,
                           ),
                         ),

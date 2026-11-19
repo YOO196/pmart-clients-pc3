@@ -24,6 +24,19 @@ export interface MenuGroup {
 
 export const navGroups: readonly MenuGroup[] = [
   {
+    // 센터 첫 화면(2026-11-19) — 출하 약속 임박·초과, 피킹 결품·파손, 인계 확인 필요를 한 화면에서 찾고 상세로 간다.
+    key: 'overview',
+    items: [
+      {
+        key: 'ops',
+        segment: 'ops',
+        ready: true,
+        apiReady: ['출하 약속 초과·임박(작업 promisedReadyAt)', '결품·파손 줄 수(fulfillment 결품 지표)', '피킹 파손 품질 사고', '인계 확인 필요 포장'],
+        apiMissing: ['결품(SHORT) 건별 센터 목록', '출하 약속 임박·초과 서버 건수'],
+      },
+    ],
+  },
+  {
     key: 'people',
     items: [
       {
