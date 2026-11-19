@@ -14,7 +14,8 @@ import { SavedViews } from '../../shared/SavedViews';
 import { messages as m } from '../../shared/messages';
 import { QueryState } from '@pmart/web-ui';
 import { toUiState } from '@pmart/web-ui';
-import { PageHeader, StatusBadge, type Tone, useRowLink } from '../../shared/admin';
+import { PageHeader, StatusBadge, type Tone } from '../../shared/admin';
+import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { LineIcon, tableClass, UnderlineTabs } from './parts';
 
 export const SALE_TONE: Readonly<Record<SaleState, Tone>> = {
@@ -71,7 +72,8 @@ function Lookup() {
 
 export function ProductListPage() {
   const api = useApi();
-  const rowLink = useRowLink();
+  // 오른쪽 미리보기(2026-11-19 관제 형식)
+  const pv = usePreview();
   const [params, setParams] = useSearchParams();
   const saleState: SaleState | undefined = SALE_STATES.find((s) => s === params.get('saleState'));
   const categoryId = params.get('categoryId') ?? '';
@@ -165,7 +167,7 @@ export function ProductListPage() {
                   </thead>
                   <tbody>
                     {(d.items ?? []).map((p, i) => (
-                      <tr key={p.productId ?? i} data-testid="product-row" {...(p.productId ? rowLink(`/products/${encodeURIComponent(p.productId)}`) : {})}>
+                      <tr key={p.productId ?? i} data-testid="product-row" {...pv.row(p.productId)}>
                         <td className="max-w-xl">
                           <div className="flex items-center gap-3">
                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-base-200 text-base-content/45" aria-hidden="true">
@@ -193,6 +195,28 @@ export function ProductListPage() {
                   </tbody>
                 </table>
               </div>
+              {pv.id &&
+                (() => {
+                  const items = d.items ?? [];
+                  const p = items.find((x) => x.productId === pv.id);
+                  return (
+                    <PreviewDrawer id={pv.id} ids={items.flatMap((x) => (x.productId ? [x.productId] : []))} onMove={pv.open} onClose={pv.close} title={p?.internalName ?? pv.id} detailTo={`/products/${encodeURIComponent(pv.id)}`}>
+                      {p ? (
+                        <div className="space-y-4" data-testid="product-preview">
+                          <p className="font-mono text-xs text-base-content/50">{p.productId}</p>
+                          <PreviewFacts
+                            rows={[
+                              [m.products.primaryCategoryId, p.primaryCategoryId ?? m.none],
+                              [m.products.saleState, p.saleState ? <StatusBadge tone={SALE_TONE[p.saleState]}>{m.products.saleStateName[p.saleState]}</StatusBadge> : m.none],
+                              [m.products.version, p.version === undefined ? m.none : `v${p.version}`],
+                            ]}
+                          />
+                          <p className="text-xs text-base-content/55">{m.preview.moreInDetail}</p>
+                        </div>
+                      ) : null}
+                    </PreviewDrawer>
+                  );
+                })()}
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 px-4 py-3 text-sm">
                 <span className="text-base-content/55">{m.products.listShown(d.items?.length ?? 0, Boolean(d.page?.nextCursor))}</span>
                 {d.page?.nextCursor && (

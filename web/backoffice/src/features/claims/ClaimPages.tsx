@@ -17,6 +17,7 @@ import { useRecordRecent } from '../../shared/recentViews';
 import { messages as m } from '../../shared/messages';
 import { isOrderNumber, orderIdOfNumber, useOrderNumbers } from '../../shared/numberLookups';
 import { label, text, when, won } from '../../shared/ops';
+import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { availableActions, RecoveryActions, ReturnProgress } from './ReturnClaim';
 
 type ClaimType = components['schemas']['ClaimType'];
@@ -54,8 +55,10 @@ function useClaimList(filter: { orderId?: string | undefined; type?: ClaimType |
   });
 }
 
-function ClaimTable({ query, withCount = false }: { readonly query: ReturnType<typeof useClaimList>; readonly withCount?: boolean }) {
+function ClaimTable({ query, withCount = false, preview = false }: { readonly query: ReturnType<typeof useClaimList>; readonly withCount?: boolean; readonly preview?: boolean }) {
   const navigate = useNavigate();
+  // 오른쪽 미리보기(2026-11-19 관제 형식) — 클레임 목록 화면에서만(주문 상세 안의 표는 전처럼 상세로)
+  const pv = usePreview();
   const items: ClaimSummary[] = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
   // 화면 주문번호(ADR-0070) — 클레임 응답엔 번호가 없어 주문 조회로 붙인다(같은 주문은 캐시)
   const orders = useOrderNumbers(items.map((c) => c.orderId));
@@ -91,8 +94,7 @@ function ClaimTable({ query, withCount = false }: { readonly query: ReturnType<t
             <tr
               key={c.claimId ?? `claim-${i}`}
               data-testid="claim-row"
-              className={c.claimId ? 'cursor-pointer' : undefined}
-              onClick={() => c.claimId && void navigate(`/claims/${encodeURIComponent(c.claimId)}`)}
+              {...(preview ? pv.row(c.claimId) : { className: c.claimId ? 'cursor-pointer' : undefined, onClick: () => c.claimId && void navigate(`/claims/${encodeURIComponent(c.claimId)}`) })}
             >
               <td>
                 <span className="flex flex-wrap items-center gap-2">
@@ -125,6 +127,37 @@ function ClaimTable({ query, withCount = false }: { readonly query: ReturnType<t
           ))}
         </tbody>
       </DataTable>
+      {preview &&
+        pv.id &&
+        (() => {
+          const c = items.find((x) => x.claimId === pv.id);
+          return (
+            <PreviewDrawer id={pv.id} ids={items.flatMap((x) => (x.claimId ? [x.claimId] : []))} onMove={pv.open} onClose={pv.close} title={pv.id} detailTo={`/claims/${encodeURIComponent(pv.id)}`}>
+              {c ? (
+                <div className="space-y-4" data-testid="claim-preview">
+                  <ClaimTypeChip type={c.type} />
+                  <PreviewFacts
+                    rows={[
+                      [m.claims.state, <StatusBadge key="s" tone={claimTone(c.state)}>{c.state ? <CodeLabel code={c.state} names={m.claims.stateName} /> : m.none}</StatusBadge>],
+                      [
+                        m.claims.orderId,
+                        c.orderId ? (
+                          <Link key="o" className="link text-sm" to={`/orders/${encodeURIComponent(c.orderId)}`}>
+                            <DisplayNumber number={orders.get(c.orderId)} systemId={c.orderId} failed={orders.failed(c.orderId)} />
+                          </Link>
+                        ) : (
+                          m.none
+                        ),
+                      ],
+                      [m.claims.openedAt, when(c.openedAt)],
+                    ]}
+                  />
+                  <p className="text-xs text-base-content/55">{m.preview.claimInDetail}</p>
+                </div>
+              ) : null}
+            </PreviewDrawer>
+          );
+        })()}
       {(query.hasNextPage || query.isFetchNextPageError) && (
         <ListFoot>
           <span className="text-base-content/55">{m.approvals.shown(items.length, !!query.hasNextPage)}</span>
@@ -203,7 +236,7 @@ export function ClaimListPage() {
           <ChipGroup label={m.claims.state} value={draft.state} options={stateOptions} onChange={(v) => setDraft((d) => ({ ...d, state: v }))} />
         </SearchRow>
       </SearchPanel>
-      <ClaimTable query={query} withCount />
+      <ClaimTable query={query} withCount preview />
     </section>
   );
 }
