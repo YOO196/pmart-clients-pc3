@@ -22,7 +22,8 @@ describe('반납 인증번호(우리 센터)', () => {
     expect(within(claim).getByTestId('return-code')).toHaveTextContent('4821');
     expect(within(claim).getByText('고객 반품 회수')).toBeInTheDocument();
     expect(within(claim).getByText('라이더가 2번 틀렸어요')).toBeInTheDocument();
-    expect(within(claim).getByTestId('rider-label')).toHaveTextContent(/^라이더 정보 비공개$/);
+    // 라이더 ID 대신 "가린 이름 · 라이더 번호"(rider 0.18.0 RS-MFC)
+    await waitFor(() => expect(within(claim).getByTestId('rider-label')).toHaveTextContent(/^한\*우 · 715520$/));
 
     const locked = cards.find((c) => c.textContent?.includes('1357'))!;
     expect(within(locked).getByRole('alert')).toHaveTextContent('잠겼어요');

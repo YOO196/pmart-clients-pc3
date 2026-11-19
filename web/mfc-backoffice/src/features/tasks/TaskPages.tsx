@@ -578,7 +578,7 @@ function ShipmentView({ shipmentId }: { readonly shipmentId: string }) {
                 <tbody>
                   {(s.packages ?? []).map((pkg) => (
                     <tr key={pkg.packageId} data-testid="package-row">
-                      {/* 포장 표기 = 라벨 숫자 6자리(ADR-0070) — 포장 시스템 ID 는 아래 시스템 번호 칸 */}
+                      {/* 포장 표기 = 라벨 인계 번호(ADR-0070 — fulfillment 0.23.0 부터 4자리, 예전 포장 6자리, 길이는 가정하지 않는다) — 포장 시스템 ID 는 아래 시스템 번호 칸 */}
                       <td className="font-mono" data-testid="handover-code">
                         {pkg.handoverCode ?? messages.none}
                       </td>

@@ -64,12 +64,19 @@ function CheckRow({ mfcId, item }: { readonly mfcId: string; readonly item: Reso
   return (
     <li className="space-y-1 rounded-box border border-base-300 p-2" data-testid="handover-check-row">
       <p className="font-semibold">{item.packingLocation ? m.location(item.packingLocation) : m.locationUnknown}</p>
+      {/* 화면 번호(fulfillment 0.21.0 DL-1, ADR-0070) — 라벨 인계 번호·주문번호. 없으면 "번호 없음"(시스템 ID 는 아래 시스템 번호 칸) */}
+      <p className="text-sm" data-testid="check-numbers">
+        {`${m.code} `}
+        <span className="font-mono font-semibold">{item.handoverCode ?? messages.displayNumber.missing}</span>
+        {` · ${m.order} `}
+        <span className="font-mono">{item.orderNumber ?? messages.displayNumber.missing}</span>
+      </p>
       <p className="text-xs">
         {`${m.rider} `}
         {item.riderId ? <RiderLabel riderId={item.riderId} /> : messages.none}
         {item.fence?.expiresAt ? ` · ${m.expiredAt(formatSeoul(item.fence.expiresAt))}` : ''}
       </p>
-      {/* 포장·주문은 시스템 번호 칸에만(ADR-0070 덧붙임 — 인계 판정 응답에 화면 번호가 없다, 요청 handoff 2026-11-19-backend-display-labels) */}
+      {/* 포장·주문 시스템 ID 는 시스템 번호 칸에만(ADR-0070 덧붙임) */}
       <SystemNumbers
         ids={[
           { label: messages.displayNumber.system.packageId, id: packageId },

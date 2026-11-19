@@ -179,10 +179,10 @@ function Row({ it }: { readonly it: Item }) {
         <div>{m.packageSummary(it.sealedPackages ?? null, it.packageCount ?? null, it.handedOverQty?.qty ?? null, it.remainingPackages ?? null)}</div>
         {(it.packages ?? []).length > 0 && (
           <ul className="mt-1 space-y-0.5">
-            {/* 목록에는 화면 표기만(ADR-0070 덧붙임) — bff 포장에 라벨 번호(handoverCode)가 없어 출고 안 순서로 "포장 1"(시스템 ID 는 시스템 번호 칸) */}
+            {/* 목록에는 화면 표기만(ADR-0070 덧붙임) — 라벨 인계 번호(bff 0.21.0 DL-2 `handoverCode`, 새 포장 4자리), 원천이 아직 안 주면 출고 안 순서 "포장 1"(시스템 ID 는 시스템 번호 칸) */}
             {(it.packages ?? []).map((p, i) => (
               <li key={p.packageId}>
-                {`${sys.packageId} ${i + 1} · ${name(m.packageState, p.state)}`}
+                {`${sys.packageId} ${p.handoverCode ?? i + 1} · ${name(m.packageState, p.state)}`}
                 {p.fenceState && m.fenceState[p.fenceState] ? ` · ${m.fenceState[p.fenceState]}` : ''}
                 {p.handedOverAt && (
                   <>

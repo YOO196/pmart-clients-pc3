@@ -52,9 +52,11 @@ describe('작업 목록', () => {
     const view = renderAt('/c/MFC-BSN-01/tasks');
     const box = await screen.findByTestId('handover-checks');
     const row = (await within(box).findAllByTestId('handover-check-row'))[0]!;
-    // 포장 시스템 ID 는 접힌 시스템 번호 칸에만, 라이더는 화면 표기(번호가 없으면 "라이더 정보 비공개")
+    // 포장 시스템 ID 는 접힌 시스템 번호 칸에만, 라이더는 화면 표기 — 표기 조회에 없는 라이더는 "라이더"(ID 를 글자로 내지 않는다)
     expect(within(row).getByTestId('system-numbers')).toHaveTextContent('PKG-1');
-    expect(within(row).getByTestId('rider-label')).toHaveTextContent('라이더 정보 비공개');
+    // 화면 번호(0.21.0 DL-1): 라벨 인계 번호·주문번호
+    expect(within(row).getByTestId('check-numbers')).toHaveTextContent('인계 번호 3817 · 주문 20000001');
+    await waitFor(() => expect(within(row).getByTestId('rider-label')).toHaveTextContent(/^라이더$/));
     const req = view.gets('/packages')[0]!;
     expect(Object.fromEntries(new URL(req.url).searchParams)).toEqual({ mfcId: 'MFC-BSN-01', checkRequired: 'true' });
 
@@ -94,7 +96,7 @@ describe('작업 상세', () => {
     expect(within(pkg).getByText('밀봉')).toBeInTheDocument();
     // 화면용 주문번호·라벨 인계 숫자(fulfillment 0.13.0 F-5·F-8)
     expect(screen.getByTestId('order-number')).toHaveTextContent('주문번호 20000001');
-    expect(within(pkg).getByTestId('handover-code')).toHaveTextContent('482913');
+    expect(within(pkg).getByTestId('handover-code')).toHaveTextContent('3817');
     expect(view.gets('/handover-resolution')).toHaveLength(0);
     await userEvent.click(within(pkg).getByRole('button', { name: '인계 판정 보기' }));
     const r = await screen.findByTestId('resolution');

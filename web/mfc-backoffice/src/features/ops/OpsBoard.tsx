@@ -2,7 +2,8 @@
 // 원천(모두 기존 API — 새 계약 없음):
 // - 출하 약속 초과·임박: mfc-fulfillment `GET /tasks?mfcId=&state=WAITING…BLOCKED`(커서로 끝까지, 최대 TASK_MAX_PAGES 쪽 — 넘으면 "N건 이상"),
 //   promisedReadyAt + 작업 상태로만 판정(opsRules.ts). 상세 = 작업 상세(출고·포장·작업 풀기).
-// - 피킹 결품·파손 건수: mfc-fulfillment `GET /metrics/picking-lines?from=오늘&to=오늘&mfcId=`(0.19.0, 서버가 센 줄 수 — 사유 SHORT·DAMAGED).
+// - 피킹 결품·파손 건수: mfc-fulfillment `GET /metrics/picking-lines?from=오늘&to=오늘&mfcId=`(0.19.0, 서버가 센 줄 수 — 사유 SHORT·DAMAGED·SPOILED(0.22.0 변질, 선택 칸)).
+// - 피킹 파손·변질 사고: quality `kind=DAMAGE`·`kind=SPOILAGE` 중 결품 보고(LineShortageReported)로 자동으로 열린 것.
 //   건별: 파손은 mfc-quality `GET /quality-incidents?mfcId=&kind=DAMAGE`(열림·판정됨) 중 결품 보고(LineShortageReported)로 열린 것 → 품질 사고 상세.
 //   결품(SHORT) 건별 센터 목록은 계약이 없다 → 안내만(막힘·수량 차이를 결품으로 추정하지 않는다).
 // - 인계 확인 필요: mfc-fulfillment `GET /packages?mfcId=&checkRequired=true`(전체 목록) → 작업 현황의 확인 필요 포장(확인 버튼은 그 화면).
@@ -55,16 +56,19 @@ function useOps(mfcId: string) {
       const r = await request('GET', api.fulfillment.GET('/metrics/picking-lines', { params: { query: { from: today, to: today, mfcId } } }));
       // 0건 날짜는 줄이 없다(계약) — 그날 줄이 없으면 실제 0.
       const row = (r.items ?? []).find((i) => i.mfcId === mfcId && i.date === today);
-      return { short: row?.shortLinesByReason.SHORT ?? 0, damaged: row?.shortLinesByReason.DAMAGED ?? 0, asOf: r.asOf ?? null };
+      return { short: row?.shortLinesByReason.SHORT ?? 0, damaged: row?.shortLinesByReason.DAMAGED ?? 0, spoiled: row?.shortLinesByReason.SPOILED ?? 0, asOf: r.asOf ?? null };
     },
   });
   const damages = useQuery({
     ...common,
     queryKey: ['ops', mfcId, 'damage-incidents'],
     queryFn: async () => {
-      const r = await request('GET', api.quality.GET('/quality-incidents', { params: { query: { mfcId, kind: 'DAMAGE', size: 200 } } }));
-      // 피킹 결품 보고(DAMAGED)로 열린 사고만 — 직접 등록·다른 원천은 빼고(서버 sourceEvent 값).
-      return { items: (r.items ?? []).filter((i) => i.sourceEvent === 'LineShortageReported'), complete: !r.nextCursor };
+      // 파손(DAMAGE)·변질(SPOILAGE, fulfillment 0.22.0) 둘 다 — 결품 보고로 열린 사고만(직접 등록·다른 원천은 빼고, 서버 sourceEvent 값).
+      const [d, s] = await Promise.all(
+        (['DAMAGE', 'SPOILAGE'] as const).map((kind) => request('GET', api.quality.GET('/quality-incidents', { params: { query: { mfcId, kind, size: 200 } } }))),
+      );
+      const items = [...(d?.items ?? []), ...(s?.items ?? [])].filter((i) => i.sourceEvent === 'LineShortageReported');
+      return { items, complete: !d?.nextCursor && !s?.nextCursor };
     },
   });
   const handovers = useQuery({
@@ -104,6 +108,7 @@ function OpsBoard({ mfcId }: { readonly mfcId: string }) {
   const asOf = tasks.data?.asOf ?? null;
   const shortN = metrics.data?.short ?? 0;
   const damagedN = metrics.data?.damaged ?? 0;
+  const spoiledN = metrics.data?.spoiled ?? 0;
   const handoverN = (handovers.data?.items ?? []).length;
   const notes = [
     m.card.promiseRule(DUE_SOON_MINUTES),
@@ -174,6 +179,16 @@ function OpsBoard({ mfcId }: { readonly mfcId: string }) {
             state={metrics}
             value={m.lines(damagedN)}
             has={damagedN > 0}
+            active={filter === 'picking'}
+            onClick={() => choose('picking')}
+          />
+          <Tile
+            testId="tile-spoiled"
+            label={m.tile.spoiled}
+            tone="warning"
+            state={metrics}
+            value={m.lines(spoiledN)}
+            has={spoiledN > 0}
             active={filter === 'picking'}
             onClick={() => choose('picking')}
           />

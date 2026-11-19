@@ -16,6 +16,7 @@ import type { paths as InboundPaths } from './generated/mfc-inbound';
 import type { paths as InventoryPaths } from './generated/mfc-inventory';
 import type { paths as LocationPaths } from './generated/mfc-location';
 import type { paths as QualityPaths } from './generated/mfc-quality';
+import type { paths as RiderPaths } from './generated/rider';
 
 export { SOURCE_SYSTEM };
 
@@ -47,6 +48,8 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     execution: createClient<ExecutionPaths>(options),
     // 배차 지연 목록(delivery-dispatch 0.12.0)
     dispatch: createClient<DispatchPaths>(options),
+    // 라이더 화면 표기 묶음 조회(rider 0.18.0 RS-MFC — "김*수 · 482913")
+    rider: createClient<RiderPaths>(options),
   };
 }
 
