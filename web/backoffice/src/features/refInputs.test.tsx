@@ -35,7 +35,7 @@ describe('화면 번호로 넣기', () => {
   it('배송 확인 바로 열기: 배송 번호로 그 배송 상세', async () => {
     const view = renderAt('/deliveries', as.riderOps);
     await userEvent.type(await screen.findByRole('textbox', { name: '배송 번호' }), '74939001-1');
-    await userEvent.click(screen.getByRole('button', { name: '열기', exact: true }));
+    await userEvent.click(screen.getByRole('button', { name: /^열기$/ }));
     await waitFor(() => expect(view.sent.some((r) => new URL(r.url).pathname.endsWith('/deliveries/DLV-MOCK-1'))).toBe(true));
   });
 });
