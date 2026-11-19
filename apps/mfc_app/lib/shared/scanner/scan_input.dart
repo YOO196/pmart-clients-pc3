@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
@@ -125,54 +127,44 @@ class _ScanInputState extends ConsumerState<ScanInput> {
           // 하드웨어 스캐너(키보드 웨지)는 글자 + Enter 를 보내므로 받을 자리는 있어야 한다. 그래서 입력칸은 두되
           // 화면 키보드를 띄우지 않고(TextInputType.none), 커서·글자·붙여넣기 메뉴를 보이지 않게 한다.
           // 눌러서 이 자리를 고르면(포커스) 스캐너 입력이 여기로 온다.
-          child: TextField(
-            key: ValueKey(widget.id),
-            controller: _text,
-            focusNode: _focus,
-            autofocus: widget.autofocus,
-            keyboardType: TextInputType.none,
-            showCursor: false,
-            enableInteractiveSelection: false,
-            autocorrect: false,
-            enableSuggestions: false,
-            style: const TextStyle(color: Colors.transparent),
-            // 시안의 보라 "○○ 스캔" 버튼 모양 — 한 줄 안내(무엇을 찍을지)와 스캔 표시.
-            // 스캐너 입력을 받는 중(포커스)이면 옅은 보라 굵은 테두리.
-            // 글자는 다른 주 버튼처럼 가운데·크게(사용자 2026-11-20 "버튼에 비해 글자가 작고 왼쪽으로 치우쳐"):
-            // 왼쪽 스캐너 아이콘과 같은 폭의 빈 칸을 오른쪽에 두어 글자가 칸 한가운데 오게 한다.
-            textAlign: TextAlign.center,
-            decoration: InputDecoration(
-              hintText: widget.label,
-              hintMaxLines: 1,
-              hintStyle: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-              prefixIcon: const Icon(
-                Icons.barcode_reader,
-                size: 28,
-                color: Colors.white,
-              ),
-              suffixIcon: const SizedBox(width: 48),
-              filled: true,
-              fillColor: PdaColors.primary,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 18,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: PdaColors.primary),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: PdaColors.lilac, width: 3),
-              ),
+          // 보이는 것은 진짜 단추(누르면 카메라, 눌림 물결·그림자), 그 밑에 스캐너 입력을 받는 칸을 숨겨 둔다.
+          // 예전엔 입력칸을 단추처럼 칠해 글자가 안내 글씨(왼쪽·작게)였고 포커스 테두리가 안쪽에 그려져 허술해 보였다
+          // (사용자 2026-11-20 "그 버튼이랑 폰트가 여전히 별로, 없어 보여").
+          child: SizedBox(
+            height: 58,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // 하드웨어 스캐너(키보드 웨지)는 글자 + Enter 를 보내므로 받을 자리는 있어야 한다 — 화면 키보드 없이, 보이지 않게.
+                Opacity(
+                  opacity: 0,
+                  child: TextField(
+                    key: ValueKey(widget.id),
+                    controller: _text,
+                    focusNode: _focus,
+                    autofocus: widget.autofocus,
+                    keyboardType: TextInputType.none,
+                    showCursor: false,
+                    enableInteractiveSelection: false,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    onSubmitted: _submit,
+                  ),
+                ),
+                ListenableBuilder(
+                  listenable: _focus,
+                  builder: (context, _) => _ScanButton(
+                    label: widget.label,
+                    // 스캐너 입력을 받는 중이면 바깥에 옅은 보라 테두리(안쪽이 아니라 — 글자·아이콘을 가리지 않게).
+                    ready: _focus.hasFocus,
+                    onTap: () {
+                      _focus.requestFocus();
+                      unawaited(_camera());
+                    },
+                  ),
+                ),
+              ],
             ),
-            onSubmitted: _submit,
-            // 칸 자체가 버튼 — 누르면 카메라(하드웨어 스캐너는 누르지 않아도 이 칸으로 들어온다).
-            onTap: _camera,
           ),
         ),
         if (ref.watch(envProvider) == PmartEnv.mock &&
@@ -212,6 +204,68 @@ class _ScanInputState extends ConsumerState<ScanInput> {
             ],
           ),
       ],
+    );
+  }
+}
+
+/// 스캔 단추 — 다른 주 단추(FilledButton)와 같은 높이·모서리·글자(17·700), 가운데 아이콘 + 글자.
+class _ScanButton extends StatelessWidget {
+  const _ScanButton({
+    required this.label,
+    required this.ready,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool ready;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme.labelLarge;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          if (ready)
+            const BoxShadow(color: PdaColors.lilac, spreadRadius: 3)
+          else
+            BoxShadow(
+              color: PdaColors.primary.withValues(alpha: 0.28),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+        ],
+      ),
+      child: Material(
+        color: PdaColors.primary,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.barcode_reader, size: 24, color: Colors.white),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: text?.copyWith(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
