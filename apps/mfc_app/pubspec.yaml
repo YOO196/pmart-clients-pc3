@@ -40,6 +40,9 @@ dependencies:
   mobile_scanner: ^7.5.0
   flutter_web_auth_2: ^5.1.0
   crypto: ^3.0.8
+  # 라이더 화면 표기(번호·가린 이름) 묶음 조회 — rider 0.18.0 RS-MFC(MFC_WORKER 허용).
+  pmart_api_rider:
+    path: ../../packages/pmart_api/gen/rider
   pmart_api_employee_auth:
     path: ../../packages/pmart_api/gen/employee-auth
 

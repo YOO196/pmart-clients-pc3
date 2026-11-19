@@ -181,7 +181,7 @@ void main() {
     // ③ 내려놓기: "이동하세요" 안내 → 도착 칸.
     expect(find.byKey(const ValueKey('step-2')), findsOneWidget);
     expect(find.byKey(const ValueKey('move-go')), findsOneWidget);
-    expect(find.textContaining('이동하세요'), findsOneWidget);
+    expect(find.text('도착 칸으로 이동해 칸을 찍어요'), findsOneWidget);
     expect((await t.runAsync(() => stockMove.move('MV-mock-1')))!.onCartQty, 6);
     expect(enabled(t, 'move-submit'), isFalse); // 도착 칸 아직
     await scan(t, 'move-scan', 'C-S1-02-2-05');

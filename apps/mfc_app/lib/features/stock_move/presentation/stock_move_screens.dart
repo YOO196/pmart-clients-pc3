@@ -51,18 +51,20 @@ class _ProductCheck extends StatelessWidget {
   }
 }
 
-/// 옮길 상품 카드 — 이름(굵게)·SKU·LOT(회색)·진행 한 줄(보라).
+/// 옮길 상품 카드 — 이름(굵게)·SKU·LOT(이름표 + 진한 값)·진행 한 줄(보라).
 class _MoveProductCard extends StatelessWidget {
   const _MoveProductCard({
     required this.name,
-    required this.meta,
+    required this.sku,
+    required this.lot,
     required this.line,
     this.urgent = false,
     this.warning,
   });
 
   final String name;
-  final String meta;
+  final String sku;
+  final String lot;
   final String line;
   final bool urgent;
   final String? warning;
@@ -91,7 +93,14 @@ class _MoveProductCard extends StatelessWidget {
                 if (urgent) Chip(label: Text(l10n.urgent)),
               ],
             ),
-            Text(meta, style: const TextStyle(color: PdaColors.body)),
+            Wrap(
+              spacing: 14,
+              runSpacing: 2,
+              children: [
+                MetaPair(label: l10n.metaSku, value: sku),
+                MetaPair(label: l10n.metaLot, value: lot),
+              ],
+            ),
             const SizedBox(height: 4),
             Text(
               line,
@@ -317,7 +326,8 @@ class MoveScreen extends ConsumerWidget {
             ],
             _MoveProductCard(
               name: ctl.productName ?? m.sku,
-              meta: [m.sku, l10n.lot(m.lotId)].join(' · '),
+              sku: m.sku,
+              lot: m.lotId,
               line: l10n.moveProgress(m.qty, m.pickedQty, m.droppedQty),
               urgent: m.urgent,
               warning: m.state == MoveState.cancelPending
@@ -623,7 +633,8 @@ class PutawayScreen extends ConsumerWidget {
               ],
               _MoveProductCard(
                 name: t.productName ?? t.sku,
-                meta: '${t.sku} · ${l10n.lot(t.lotId)}',
+                sku: t.sku,
+                lot: t.lotId,
                 line: l10n.putawayRemaining(t.remainingQty),
               ),
               if (s.lastScan != null && s.lastScan != LocScan.ok)

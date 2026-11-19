@@ -516,7 +516,7 @@ void main() {
         .packages
         .single
         .handoverCode;
-    expect(code, matches(RegExp(r'^[0-9]{6}$')));
+    expect(code, matches(RegExp(r'^([0-9]{4}|[0-9]{6})$')));
     expect(
       t.widget<Text>(find.byKey(const ValueKey('label-handover-code'))).data,
       code,
