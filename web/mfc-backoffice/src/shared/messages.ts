@@ -31,6 +31,7 @@ export const messages = {
     session: '내 세션',
     login: '로그인',
     me: '내 정보',
+    menu: '메뉴',
   },
 
   /** 내 정보 — hr-service GET /hr/employees/me(본인). 비밀번호·연락처 바꾸기는 백엔드 EA-3·HR-3 대기 */
@@ -82,7 +83,7 @@ export const messages = {
     delivery: '배송',
   },
   menus: {
-    ops: '센터 운영판',
+    ops: '홈',
     workers: '작업자',
     assignments: '배정',
     tasks: '작업 현황',
@@ -100,7 +101,7 @@ export const messages = {
 
   /** 센터 운영판·예외 처리함(features/ops) */
   ops: {
-    title: '센터 운영판',
+    title: '오늘 센터 현황',
     intro: '출하가 늦어지거나 현장에서 막힌 일을 먼저 찾아요. 조치는 각 상세 화면에서 해요.',
     refresh: '새로 읽기',
     autoRefreshNote: '1분마다 다시 읽어요',
