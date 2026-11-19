@@ -11,9 +11,8 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/case';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback } from '../../shared/Feedback';
-import { CopyButton } from '../../shared/CopyButton';
 import { LeaveGuard } from '../../shared/LeaveGuard';
-import { DisplayNumber, RiderLabel } from '../../shared/displayNumber';
+import { DisplayNumber, RiderLabel, SystemNumbers } from '../../shared/displayNumber';
 import { useDeliveryNumbers, useOrderNumbers, useRiderLabels } from '../../shared/numberLookups';
 import { messages as m } from '../../shared/messages';
 import { isSeoulDate, label, seoulDayEnd, seoulDayStart, text, when } from '../../shared/ops';
@@ -22,7 +21,7 @@ import { RefStatus } from '../../shared/RefField';
 import { DeliveryPicker } from '../../shared/DeliveryPicker';
 import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { ChipGroup, CodeLabel, DataTable, DetailHeader, FieldList, NextAction, PageHeader, SearchPanel, SearchRow, Section, type Tone } from '../../shared/admin';
-import { EmptyBox, Icon, IdLink, KindChip, ListFoot, Person, SideFields, When, type IconName } from '../lookup/parts';
+import { EmptyBox, Icon, KindChip, ListFoot, Person, SideFields, StaffName, When, type IconName } from '../lookup/parts';
 
 type ComplaintType = components['schemas']['RiderComplaintType'];
 type Summary = components['schemas']['RiderComplaintSummary'];
@@ -111,12 +110,10 @@ export function RiderComplaintTable({ riderId, deliveryId, complaintType, from, 
           {items.map((c) => (
             <tr key={c.complaintId} data-testid="complaint-row" {...(preview ? pv.row(c.complaintId) : {})}>
               <td>
-                <span className="block">
+                {/* 컴플레인은 번호 없이 종류 · 시각(ADR-0070 덧붙임) — 종류 꼬리표가 상세 링크, 시각은 옆 칸 */}
+                <Link className="block hover:opacity-80" to={`/rider-complaints/${encodeURIComponent(c.complaintId)}`} onClick={(e) => e.stopPropagation()} data-testid="complaint-link">
                   <ComplaintType type={c.complaintType} />
-                </span>
-                <span className="mt-1 block font-normal">
-                  <IdLink id={c.complaintId} to={`/rider-complaints/${encodeURIComponent(c.complaintId)}`} />
-                </span>
+                </Link>
               </td>
               <td data-testid="complaint-rider">
                 <Link className="text-sm hover:text-primary hover:underline" to={`/riders/${encodeURIComponent(c.riderId)}`}>
@@ -152,7 +149,7 @@ export function RiderComplaintTable({ riderId, deliveryId, complaintType, from, 
         (() => {
           const c = items.find((x) => x.complaintId === pv.id);
           return (
-            <PreviewDrawer id={pv.id} ids={items.map((x) => x.complaintId)} onMove={pv.open} onClose={pv.close} title={pv.id} detailTo={`/rider-complaints/${encodeURIComponent(pv.id)}`}>
+            <PreviewDrawer id={pv.id} ids={items.map((x) => x.complaintId)} onMove={pv.open} onClose={pv.close} title={(() => { const x = items.find((y) => y.complaintId === pv.id); return x ? `${label(m.complaints.typeName, x.complaintType)} · ${when(x.recordedAt)}` : m.complaints.detailTitle; })()} detailTo={`/rider-complaints/${encodeURIComponent(pv.id)}`}>
               {c ? (
                 <div className="space-y-4" data-testid="complaint-preview">
                   <ComplaintType type={c.complaintType} />
@@ -406,13 +403,17 @@ export function RiderComplaintDetailPage() {
               title={
                 <>
                   {m.complaints.titleOf(label(m.complaints.typeName, c.complaintType), riderText(c.riderId))}
-                  <span className="ml-2 font-mono text-sm font-normal text-base-content/50">{complaintId}</span>
-                  <CopyButton value={complaintId} />
                 </>
               }
               badges={<ComplaintType type={c.complaintType} />}
-              summary={`${when(c.recordedAt)} · ${c.recordedBy}`}
+              summary={
+                <>
+                  {when(c.recordedAt)} · <StaffName id={c.recordedBy} />
+                </>
+              }
             />
+            {/* 시스템 번호(ADR-0070 덧붙임) — 상세에서만 */}
+            <SystemNumbers ids={[{ label: m.complaints.detailTitle, id: complaintId }]} />
             {/* 다음 할 일 — 서버가 준 접수 건이 있으면 거기서 이어서, 없으면 할 일 없음(제한 검토는 서버) */}
             {c.caseId ? (
               <NextAction tone="info" title={m.complaints.nextStep.caseTitle}>

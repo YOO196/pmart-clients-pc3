@@ -20,7 +20,7 @@ import { label, text, when } from '../../shared/ops';
 import { SourceStamps } from '../../shared/SourceStamps';
 import { CodeLabel, DataTable, NextAction, PageHeader, StatusBadge } from '../../shared/admin';
 import { executionTone } from '../deliveries/DeliveryPages';
-import { EmptyBox, Icon, IdLink, KindChip, Kpi, UnderlineTabs } from '../lookup/parts';
+import { EmptyBox, Icon, KindChip, Kpi, UnderlineTabs } from '../lookup/parts';
 import { DisplayNumber, RiderLabel, riderSourceFailed } from '../../shared/displayNumber';
 
 const m = messages.packing;
@@ -242,9 +242,6 @@ export function PackingHandoverPage() {
                                     </KindChip>
                                   </span>
                                 )}
-                                <span className="mt-0.5 block font-normal">
-                                  <IdLink id={it.shipmentId} />
-                                </span>
                               </td>
                               <td>
                                 <StageCell it={it} />

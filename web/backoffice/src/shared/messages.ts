@@ -374,7 +374,9 @@ export const messages = {
     missing: '번호 없음',
     failed: '번호 확인 불가',
     systemNumbers: '시스템 번호',
-    system: { orderId: '주문', deliveryId: '배송', riderId: '라이더' },
+    system: { orderId: '주문', deliveryId: '배송', riderId: '라이더', customerId: '고객' },
+    /** 고객번호(customer CU-3) 전 — 고객 ID 는 상세 시스템 번호 칸에서만 */
+    customerPending: '고객 (고객번호 준비 중)',
   },
 
   /** 개인정보 기본 가림 */
@@ -618,6 +620,8 @@ export const messages = {
     outcomeName: { PENDING: '받기 전', ACCEPTED: '받음', EXCLUDED: '안 받음(미인수)', SKIPPED_CHANGED: '그사이 바뀌어 건너뜀', SKIPPED_NOT_ALLOWED: '권한 없어 건너뜀', CANCELLED: '취소됨' } as Readonly<Record<string, string>>,
     unreceived: '미인수',
     fromTo: (from: string, to: string) => `${from} → ${to}`,
+    /** 교대 인계 표기(ADR-0070 덧붙임) */
+    label: (day: string, half: string) => (day ? `${day} ${half} 교대 인계` : '교대 인계'),
     pendingNote: '아직 받기 전이에요 — 담당은 전임 그대로예요.',
     snapshot: (n: number) => `작성 때 팀의 처리 중 접수 건 ${n}건(기록)`,
     receive: (id: string) => `${id} 받기`,

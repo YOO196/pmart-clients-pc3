@@ -56,6 +56,13 @@ export function Person({ id, to }: { readonly id: string | null | undefined; rea
   );
 }
 
+/** 직원 이름 · 사번 글자만(문장 안에 넣을 때, ADR-0070 덧붙임) */
+export function StaffName({ id }: { readonly id: string | null | undefined }) {
+  const q = useEmployeeLabel(id);
+  if (!id) return <>{messages.none}</>;
+  return <>{q.data ? labelText(q.data) : q.isError ? messages.displayNumber.staffFailed : q.isPending ? '…' : messages.displayNumber.staffUnknown}</>;
+}
+
 /** 작은 ID 링크(목록 첫 칸 아래 줄·상세 연결) */
 export function IdLink({ id, to }: { readonly id: string | null | undefined; readonly to?: string | null }) {
   if (!id) return <span className="text-xs text-base-content/40">{messages.none}</span>;

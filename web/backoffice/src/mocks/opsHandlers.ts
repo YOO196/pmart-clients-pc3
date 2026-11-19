@@ -12,6 +12,13 @@ import type { components as ExecutionC } from '../api/generated/delivery-executi
 import type { components as OrderC } from '../api/generated/order';
 import type { components as RiderC } from '../api/generated/rider';
 import { expectedVersion, idempotent, keyOf, operator, problem, unauthorized } from './support';
+import { MOCK_EMPLOYEE_LABELS } from './hrLabelHandlers';
+
+/** bff 0.17.0 직원 표시(이름 · 사번) — 목 직원 표시와 같은 값, 모르는 직원이면 null */
+const operatorLabel = (id: string | null | undefined) => {
+  const l = id ? MOCK_EMPLOYEE_LABELS[id] : undefined;
+  return id && l ? { operatorId: id, name: l.name, employeeNo: l.employeeNo } : null;
+};
 
 type StaffOrder = OrderC['schemas']['StaffOrderDetail'];
 type Issue = OrderC['schemas']['FulfillmentIssue'];
@@ -568,7 +575,11 @@ export const opsHandlers = [
         .filter((x) => !x.done)
         .map((x) => ({ kind: x.kind, refId: x.refId, orderId: x.orderId, mfcId: x.mfcId, state: x.state, reasonCode: x.reasonCode, reasonMessage: x.reasonMessage, since: x.since, allowedActions: ['RETRY'], lastRetry: x.lastRetry, source: stamp('mfc-fulfillment-service') })),
     ].sort((a, b) => a.since.localeCompare(b.since));
-    return HttpResponse.json({ composedAt: now, sources: [stamp('order-orchestration-service'), stamp('order-service'), stamp('mfc-fulfillment-service')], unavailableSources: [], items });
+    return HttpResponse.json({ composedAt: now, sources: [stamp('order-orchestration-service'), stamp('order-service'), stamp('mfc-fulfillment-service')], unavailableSources: [], items: items.map((it) => ({
+        ...it,
+        orderNumber: (it.orderId && ORDER_NUMBERS[it.orderId]) ?? null,
+        ...('lastRetry' in it && it.lastRetry ? { lastRetry: { ...it.lastRetry, operator: operatorLabel(it.lastRetry.operatorId) } } : {}),
+      })) });
   }),
 
   // bff 명령 프록시: order-orchestration-service saga-requery·saga-resolve(승인 없음, OPERATOR_ADMIN). 이미 바뀐 사가는 422.

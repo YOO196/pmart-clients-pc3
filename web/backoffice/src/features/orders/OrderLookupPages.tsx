@@ -187,9 +187,10 @@ export function OrderLookupPage() {
                           <Link className="font-semibold text-base-content hover:text-primary hover:underline" to={`/orders/${encodeURIComponent(o.orderId)}`} onClick={(e) => e.stopPropagation()} data-testid="order-number">
                             <DisplayNumber number={o.orderNumber} systemId={o.orderId} />
                           </Link>
-                          <span className="mt-0.5 flex items-center gap-1 text-xs font-normal text-base-content/50" title={o.customerId}>
+                          {/* 고객: 고객번호(customer CU-3) 전까지 "고객"만 — 고객 ID 는 상세의 시스템 번호 칸(ADR-0070 덧붙임) */}
+                          <span className="mt-0.5 flex items-center gap-1 text-xs font-normal text-base-content/50">
                             <Icon name="user" className="h-3 w-3" />
-                            <span className="max-w-[12rem] truncate font-mono">{o.customerId}</span>
+                            {m.displayNumber.customerPending}
                           </span>
                         </td>
                         <td>
@@ -481,7 +482,7 @@ export function OrderDetailPage() {
               summary={`${when(o.confirmedAt)} · ${o.mfcId} · ${won(o.amounts.approvedAmount)}`}
               actions={<OrderCancelAction order={o} open={cancelOpen} onOpen={() => setCancelOpen(true)} />}
             />
-            <SystemNumbers ids={[{ label: m.displayNumber.system.orderId, id: orderId }]} />
+            <SystemNumbers ids={[{ label: m.displayNumber.system.orderId, id: orderId }, { label: m.displayNumber.system.customerId, id: query.data?.customerId }]} />
             {/* 주문 진행 단계(2026-11-18 Refine 참고) — 서버 상태를 계약 상태표 순서대로 */}
             <OrderProgress status={o.status} />
             {cancelOpen && o.status === 'CONFIRMED' && <OrderCancelForm order={o} onClose={() => setCancelOpen(false)} />}
@@ -590,7 +591,7 @@ export function OrderDetailPage() {
                     testId="order-summary"
                     rows={[
                       [m.orders.confirmedAt, <When key="c" iso={o.confirmedAt} />],
-                      [m.orders.customerId, <span key="u" className="font-mono">{o.customerId}</span>],
+                      [m.orders.customerId, <span key="u" className="text-base-content/60">{m.displayNumber.customerPending}</span>],
                       [m.orders.mfcId, o.mfcId],
                       [m.orders.deliveryMode, label(m.orders.mode, o.deliveryMode)],
                       [m.orders.arrival, o.arrivalWindow ? `${o.arrivalWindow.date} ${o.arrivalWindow.start}~${o.arrivalWindow.end}` : m.none],

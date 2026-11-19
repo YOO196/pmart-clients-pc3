@@ -21,6 +21,15 @@ import { useSession } from '../../app/SessionContext';
 import { messages } from '../../shared/messages';
 import { label, text, when } from '../../shared/ops';
 import { CodeLabel, NextAction, Notice, PageHeader } from '../../shared/admin';
+import { StaffName } from '../lookup/parts';
+
+const seoulParts = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: 'numeric', hourCycle: 'h23' });
+/** "11/19 오전 교대 인계" — 서울 시각 기준 표시만 */
+export function handoverLabel(iso: string | null | undefined): string {
+  if (!iso) return messages.handovers.label('', '');
+  const p = Object.fromEntries(seoulParts.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return messages.handovers.label(`${p.month}/${p.day}`, Number(p.hour) < 12 ? '오전' : '오후');
+}
 
 const m = messages.handovers;
 type Handover = components['schemas']['ShiftHandover'];
@@ -316,13 +325,16 @@ function HandoverCard({ h, mode }: { readonly h: Handover; readonly mode: 'inbox
           </span>
           <Initial id={h.toOperatorId} />
         </span>
-        <span className="font-medium">{m.fromTo(text(h.fromOperatorId), text(h.toOperatorId))}</span>
+        <span className="font-medium" data-testid="handover-people">
+          <StaffName id={h.fromOperatorId} /> → <StaffName id={h.toOperatorId} />
+        </span>
         <span className={`badge badge-sm badge-soft ${STATE_TONE[h.state ?? ''] ?? ''}`}>{h.state ? <CodeLabel code={h.state} names={m.stateName} /> : messages.none}</span>
         {h.unreceived && <span className="badge badge-warning badge-sm">{m.unreceived}</span>}
         <span className="ml-auto flex flex-wrap items-center gap-2 text-xs text-base-content/55">
           <span>{h.group ? <CodeLabel code={h.group} names={messages.cases.groupName} /> : messages.none}</span>
           <span>{when(h.createdAt)}</span>
-          <span className="font-mono">{h.shiftHandoverId}</span>
+          {/* 교대 인계 표기(ADR-0070 덧붙임): 날짜 + 오전/오후 — 시스템 ID 는 보이지 않는다 */}
+          <span data-testid="handover-label">{handoverLabel(h.createdAt)}</span>
         </span>
       </div>
       <div className="space-y-3 px-4 py-3">

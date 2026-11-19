@@ -24,7 +24,8 @@ import { CommandFeedback, QueryState, uiStateFromError, useCommand, type UiState
 import { commandParams } from '../../api/command';
 import type { components, paths } from '../../api/generated/backoffice-bff';
 import { useApi } from '../../app/ApiContext';
-import { messages as m } from '../../shared/messages';
+import { messages as m, messages } from '../../shared/messages';
+import { DisplayNumber } from '../../shared/displayNumber';
 import { label, text, when } from '../../shared/ops';
 import { SourceStamps } from '../../shared/SourceStamps';
 import { CodeLabel, NextAction, PageHeader, StatCard, StatStrip } from '../../shared/admin';
@@ -200,7 +201,7 @@ function ActionForm({ item, action, onClose, onRestart }: { readonly item: Item;
   return (
     <form
       className="space-y-1"
-      aria-label={`${ACTION_LABEL[action]} ${item.refId}`}
+      aria-label={`${ACTION_LABEL[action]} ${item.orderNumber ?? ''}`.trim()}
       onSubmit={(e) => {
         e.preventDefault();
         if (!ok) return;
@@ -249,14 +250,19 @@ function ActionForm({ item, action, onClose, onRestart }: { readonly item: Item;
 }
 
 /** 주문 칸 — MFC 거절 인계는 주문 번호가 없을 수 있다(bff 0.9.2). 없으면 "—"(빈 링크를 만들지 않는다) */
-function OrderCell({ orderId }: { readonly orderId: string | null | undefined }) {
+/** 주문 칸 — 화면 주문번호(bff 0.19.0 orderNumber, ADR-0070 덧붙임). 시스템 ID 는 링크 대상으로만 */
+function OrderCell({ orderId, orderNumber }: { readonly orderId: string | null | undefined; readonly orderNumber?: string | null | undefined }) {
   if (!orderId) return <span className="opacity-70">{m.none}</span>;
   return (
     <Link className="link" to={`/orders/${encodeURIComponent(orderId)}`}>
-      {orderId}
+      <DisplayNumber number={orderNumber} systemId={orderId} />
     </Link>
   );
 }
+
+/** 직원 — bff 가 준 "이름 · 사번"(lastRetry.operator). 없으면 "직원" */
+const operatorText = (o: { readonly name?: string | null; readonly employeeNo?: string | null } | null | undefined) =>
+  o?.name ? `${o.name}${o.employeeNo ? ` · ${o.employeeNo}` : ''}` : messages.displayNumber.staffUnknown;
 
 function Actions({ item }: { readonly item: Item }) {
   const [open, setOpen] = useState<Action | null>(null);
@@ -412,14 +418,15 @@ function PendingGroups({ items }: { readonly items: readonly Item[] }) {
                       <div className="flex gap-1.5">
                         <dt>{m.pending.orderId}</dt>
                         <dd>
-                          <OrderCell orderId={i.orderId} />
+                          <OrderCell orderId={i.orderId} orderNumber={i.orderNumber} />
                         </dd>
                       </div>
                       {i.sagaType && (
                         <div className="flex gap-1.5">
                           <dt>{m.pending.saga}</dt>
                           <dd>
-                            {label(m.pending.sagaTypeName, i.sagaType)}
+                            {/* 사가 표기 "74939255 재발송"(ADR-0070 덧붙임) */}
+                            {`${i.orderNumber ? `${i.orderNumber} ` : ''}${label(m.pending.sagaTypeName, i.sagaType)}`}
                             {i.step && (
                               <>
                                 {' · '}
@@ -443,7 +450,7 @@ function PendingGroups({ items }: { readonly items: readonly Item[] }) {
                     {/* bff 0.8.0 — 최근 운영자 재시도(MFC 에 남은 기록). 없으면 줄 없음 */}
                     {i.lastRetry && (
                       <p className="mt-1 text-xs text-base-content/60" data-testid="pending-last-retry">
-                        {m.pending.lastRetry(text(i.lastRetry.operatorId), when(i.lastRetry.retriedAt), text(i.lastRetry.reason))}
+                        {m.pending.lastRetry(operatorText(i.lastRetry.operator), when(i.lastRetry.retriedAt), text(i.lastRetry.reason))}
                       </p>
                     )}
                   </div>

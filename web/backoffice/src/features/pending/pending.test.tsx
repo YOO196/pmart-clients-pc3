@@ -17,7 +17,7 @@ describe('처리 대기', () => {
     const rows = await screen.findAllByTestId('pending-item');
     // 종류별 묶음(2026-11-18) — 묶음은 서버 순서(오래된 것부터)에서 처음 나온 차례, 묶음 안도 서버 순서 그대로
     expect(rows.map((r) => r.getAttribute('data-kind'))).toEqual(['MFC_HANDOVER_REJECTED', 'STUCK_SAGA', 'STUCK_SAGA', 'FULFILLMENT_ISSUE', 'FULFILLMENT_ISSUE', 'MFC_STOP_FAILED']);
-    const payment = await rowOf('ORD-MOCK-1001');
+    const payment = await rowOf('74939001'); // 주문 칸은 화면 주문번호(ADR-0070 덧붙임 — 시스템 ID 는 링크 대상으로만)
     const saga1 = (await screen.findAllByTestId('pending-item')).find((r) => r.textContent?.includes('PG 승인 결과'))!;
     expect(within(saga1).getByRole('button', { name: '결제 결과 다시 확인' })).toBeInTheDocument();
     expect(within(saga1).getByRole('button', { name: '처리 완료(밖에서 해결)' })).toBeInTheDocument();
@@ -133,14 +133,14 @@ describe('처리 대기', () => {
     expect(screen.getByText(/재고와 인계 수량이 다름/)).toBeInTheDocument();
     expect(view.mutations('/commands/mfc-fulfillment-service/handover-retry')).toHaveLength(1);
     // bff 0.8.0: 다시 읽은 목록의 최근 재시도 = 방금 보낸 운영자·사유
-    await waitFor(() => expect(within(screen.getByText(/재고와 인계 수량이 다름/).closest('[data-testid="pending-item"]')!).getByTestId('pending-last-retry')).toHaveTextContent('op-admin-1'));
+    await waitFor(() => expect(within(screen.getByText(/재고와 인계 수량이 다름/).closest('[data-testid="pending-item"]')!).getByTestId('pending-last-retry')).toHaveTextContent('[목] 관리자 · P2026-00001'));
     expect(within(screen.getByText(/재고와 인계 수량이 다름/).closest('[data-testid="pending-item"]')!).getByTestId('pending-last-retry')).toHaveTextContent('재고 정정함');
   });
 
   it('최근 재시도(bff 0.8.0): 누가·언제·사유, 없으면 줄 없음', async () => {
     renderAt('/pending', as.admin);
     const handover = await rowOf('재고와 인계 수량이 다름');
-    expect(within(handover).getByTestId('pending-last-retry')).toHaveTextContent('최근 재시도: op-admin-1 ·');
+    expect(within(handover).getByTestId('pending-last-retry')).toHaveTextContent('최근 재시도: [목] 관리자 · P2026-00001 ·');
     expect(within(handover).getByTestId('pending-last-retry')).toHaveTextContent('실물 확인 전 재시도');
     const stop = await rowOf('PDA 응답 없음');
     expect(within(stop).queryByTestId('pending-last-retry')).not.toBeInTheDocument();
