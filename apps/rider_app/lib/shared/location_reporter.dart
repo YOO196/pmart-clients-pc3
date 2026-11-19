@@ -98,6 +98,8 @@ final locationReporterProvider = NotifierProvider<LocationReporter, bool>(
 class LocationReporter extends Notifier<bool> {
   LocationSource? _source;
   BackgroundLocation? _background;
+  LocationNotice? _notice;
+  bool _backgroundStarted = false;
   StreamSubscription<GeoPoint>? _sub;
   Timer? _timer;
   final _buffer = <LocationSample>[];
@@ -117,7 +119,17 @@ class LocationReporter extends Notifier<bool> {
     state = active;
   }
 
+  /// 위치 권한을 받은 뒤(권한 창·설정에서 돌아옴) 부른다. 권한이 없어 못 켠 위치 전송 서비스·위치 구독을 다시 켠다.
+  /// 이미 켜졌으면 아무것도 안 한다(가입 직후 권한을 묻는 동안 앱이 꺼지던 문제, 2026-11-19).
+  void retryAfterPermission() {
+    if (!state || _backgroundStarted) return;
+    final notice = _notice;
+    _stop();
+    _start(notice);
+  }
+
   void _start(LocationNotice? notice) {
+    _notice = notice;
     final source = ref.read(locationSourceProvider);
     if (source == null) return;
     _source = source;
@@ -129,9 +141,14 @@ class LocationReporter extends Notifier<bool> {
     _background = background;
     if (background != null && notice != null) {
       unawaited(source.keepAlive(null));
-      unawaited(background.start(notice));
+      unawaited(
+        background.start(notice).then((ok) {
+          if (identical(_background, background)) _backgroundStarted = ok;
+        }),
+      );
     } else {
       unawaited(source.keepAlive(notice));
+      _backgroundStarted = true;
     }
     _sub = source.watch().listen(
       (p) => _buffer.add((
@@ -139,6 +156,8 @@ class LocationReporter extends Notifier<bool> {
         lng: p.lng,
         recordedAt: DateTime.now().toUtc(),
       )),
+      // 권한이 아직 없으면 위치 스트림이 오류로 끝난다 — 권한을 받으면 retryAfterPermission 이 다시 구독한다.
+      onError: (Object _) => _backgroundStarted = false,
     );
     _timer = Timer.periodic(
       ref.read(locationFlushIntervalProvider),
@@ -150,6 +169,7 @@ class LocationReporter extends Notifier<bool> {
     unawaited(_source?.keepAlive(null));
     unawaited(_background?.stop());
     _background = null;
+    _backgroundStarted = false;
     _source = null;
     _sub?.cancel();
     _timer?.cancel();

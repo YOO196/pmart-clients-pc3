@@ -80,6 +80,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _lifecycle = AppLifecycleListener(
       onResume: () {
         ref.read(offerPollerProvider.notifier).refreshNow();
+        // 설정에서 위치 권한을 켜고 돌아온 경우
+        ref.read(locationReporterProvider.notifier).retryAfterPermission();
         ref
           ..invalidate(profileProvider)
           ..invalidate(myActiveDeliveriesProvider);
@@ -110,6 +112,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         l10n.locationAskBody,
       );
       if (go) await permission.request();
+      // 권한을 받았으면 못 켠 위치 전송을 지금 켠다(앱을 다시 열지 않아도).
+      if (mounted) {
+        ref.read(locationReporterProvider.notifier).retryAfterPermission();
+      }
     }
     final battery = ref.read(batteryOptimizationProvider);
     if (battery == null || await battery.isExempt() || !mounted) return;

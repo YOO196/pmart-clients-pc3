@@ -14,7 +14,8 @@ import 'providers.dart';
 /// "앱이 준 토큰으로만"). 토큰이 끝나면 서비스가 멈추고 "앱을 열어 주세요" 알림을 띄운다.
 abstract interface class BackgroundLocation {
   /// 운행 시작 — 상시 알림을 띄우고 넘겨받을 준비를 한다. 다시 부르면 Dart 가 보내는 쪽으로 돌려받는다.
-  Future<void> start(LocationNotice notice);
+  /// 못 켰으면(위치 권한이 아직 없음 등) false — 권한이 생기면 [LocationReporter.retryAfterPermission] 이 다시 부른다.
+  Future<bool> start(LocationNotice notice);
 
   /// 넘겨받을 때 쓸 최신 access token 을 건넨다(값이 바뀐 때만 보낸다).
   Future<void> syncToken();
@@ -37,10 +38,10 @@ final class NativeBackgroundLocation implements BackgroundLocation {
   String? _sentToken;
 
   @override
-  Future<void> start(LocationNotice notice) async {
+  Future<bool> start(LocationNotice notice) async {
     final token = tokens.accessToken;
     _sentToken = token;
-    await _call('start', {
+    return _call('start', {
       'baseUrl': baseUrl,
       'accessToken': ?token,
       'deviceId': await deviceId.get(),
@@ -65,14 +66,15 @@ final class NativeBackgroundLocation implements BackgroundLocation {
     await _call('stop', const {});
   }
 
-  Future<void> _call(String method, Map<String, Object?> args) async {
+  Future<bool> _call(String method, Map<String, Object?> args) async {
     try {
-      await _channel.invokeMethod<bool>(method, args);
+      return await _channel.invokeMethod<bool>(method, args) ?? false;
     } on PlatformException {
       // 서비스를 못 켜면 앱을 닫았을 때만 위치가 끊긴다(앱이 열려 있으면 Dart 가 보낸다). 토큰 값은 남기지 않는다.
     } on MissingPluginException {
       // 채널이 없는 환경
     }
+    return false;
   }
 }
 

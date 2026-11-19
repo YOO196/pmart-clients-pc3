@@ -87,11 +87,17 @@ class RiderLocationService : Service() {
                 deviceId = intent.getStringExtra(EXTRA_DEVICE_ID) ?: deviceId
                 sourceSystem = intent.getStringExtra(EXTRA_SOURCE) ?: sourceSystem
                 intent.getStringExtra(EXTRA_TOKEN)?.let { accessToken = it }
-                startInForeground(
-                    intent.getStringExtra(EXTRA_TITLE) ?: "PMart 라이더 운행 중",
-                    intent.getStringExtra(EXTRA_TEXT) ?: "배차와 배달을 위해 위치를 보내고 있어요",
-                    intent.getStringExtra(EXTRA_CHANNEL) ?: "운행 중 위치 전송",
-                )
+                // 권한이 그 사이 빠졌으면(설정에서 끔) startForeground 가 SecurityException 으로 앱을 종료한다 — 조용히 내린다.
+                try {
+                    startInForeground(
+                        intent.getStringExtra(EXTRA_TITLE) ?: "PMart 라이더 운행 중",
+                        intent.getStringExtra(EXTRA_TEXT) ?: "배차와 배달을 위해 위치를 보내고 있어요",
+                        intent.getStringExtra(EXTRA_CHANNEL) ?: "운행 중 위치 전송",
+                    )
+                } catch (_: SecurityException) {
+                    stopAll()
+                    return START_NOT_STICKY
+                }
                 running = true
                 handBack()
             }
