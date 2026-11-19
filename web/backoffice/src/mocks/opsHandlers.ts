@@ -12,6 +12,13 @@ import type { components as ExecutionC } from '../api/generated/delivery-executi
 import type { components as OrderC } from '../api/generated/order';
 import type { components as RiderC } from '../api/generated/rider';
 import { expectedVersion, idempotent, keyOf, operator, problem, unauthorized } from './support';
+import { MOCK_EMPLOYEE_LABELS } from './hrLabelHandlers';
+
+/** bff 0.17.0 직원 표시(이름 · 사번) — 목 직원 표시와 같은 값, 모르는 직원이면 null */
+const operatorLabel = (id: string | null | undefined) => {
+  const l = id ? MOCK_EMPLOYEE_LABELS[id] : undefined;
+  return id && l ? { operatorId: id, name: l.name, employeeNo: l.employeeNo } : null;
+};
 
 type StaffOrder = OrderC['schemas']['StaffOrderDetail'];
 type Issue = OrderC['schemas']['FulfillmentIssue'];
@@ -568,7 +575,11 @@ export const opsHandlers = [
         .filter((x) => !x.done)
         .map((x) => ({ kind: x.kind, refId: x.refId, orderId: x.orderId, mfcId: x.mfcId, state: x.state, reasonCode: x.reasonCode, reasonMessage: x.reasonMessage, since: x.since, allowedActions: ['RETRY'], lastRetry: x.lastRetry, source: stamp('mfc-fulfillment-service') })),
     ].sort((a, b) => a.since.localeCompare(b.since));
-    return HttpResponse.json({ composedAt: now, sources: [stamp('order-orchestration-service'), stamp('order-service'), stamp('mfc-fulfillment-service')], unavailableSources: [], items });
+    return HttpResponse.json({ composedAt: now, sources: [stamp('order-orchestration-service'), stamp('order-service'), stamp('mfc-fulfillment-service')], unavailableSources: [], items: items.map((it) => ({
+        ...it,
+        orderNumber: (it.orderId && ORDER_NUMBERS[it.orderId]) ?? null,
+        ...('lastRetry' in it && it.lastRetry ? { lastRetry: { ...it.lastRetry, operator: operatorLabel(it.lastRetry.operatorId) } } : {}),
+      })) });
   }),
 
   // bff 명령 프록시: order-orchestration-service saga-requery·saga-resolve(승인 없음, OPERATOR_ADMIN). 이미 바뀐 사가는 422.
@@ -677,6 +688,56 @@ export const opsHandlers = [
     if (denied) return denied;
     const found = ops.complaints.find((c) => c.complaintId === params['complaintId']);
     return found ? HttpResponse.json(found) : problem(404, 'NOT_FOUND');
+  }),
+
+  // ---- bff 0.18.0·0.19.0 화면용 목록(2026-11-19 — 줄마다 부르지 않게 번호를 한 번에). 원천 권한은 그대로 ----
+  http.get(`${BFF_BASE}/views/claims`, ({ request }) => {
+    const { denied } = allow(request, ...CS);
+    if (denied) return denied;
+    const url = new URL(request.url);
+    const q = url.searchParams;
+    const all = ops.claims.filter((c) => (!q.get('orderId') || c.orderId === q.get('orderId')) && (!q.get('type') || c.type === q.get('type')) && (!q.get('state') || c.state === q.get('state')));
+    const page = cursorPage(all, url);
+    return HttpResponse.json({
+      composedAt: new Date().toISOString(),
+      sources: [],
+      unavailableSources: [],
+      items: page.items.map((c) => ({ claimId: c.claimId, orderId: c.orderId, orderNumber: (c.orderId && ORDER_NUMBERS[c.orderId]) ?? null, type: c.type, state: c.state, openedAt: c.openedAt })),
+      page: page.page,
+    });
+  }),
+  http.get(`${BFF_BASE}/views/rider-complaints`, ({ request }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const url = new URL(request.url);
+    const q = url.searchParams;
+    const all = ops.complaints.filter(
+      (c) =>
+        (!q.get('riderId') || c.riderId === q.get('riderId')) &&
+        (!q.get('deliveryId') || c.deliveryId === q.get('deliveryId')) &&
+        (!q.get('complaintType') || c.complaintType === q.get('complaintType')) &&
+        inRange(c.recordedAt, q.get('from'), q.get('to')),
+    );
+    const page = cursorPage(all, url);
+    return HttpResponse.json({
+      composedAt: new Date().toISOString(),
+      sources: [],
+      unavailableSources: [],
+      items: page.items.map((c) => {
+        const sum = complaintSummary(c);
+        const r = RIDER_PROFILES.find((x) => x.riderId === c.riderId);
+        const { source, ...rest } = sum as typeof sum & { source?: string | null };
+        return {
+          ...rest,
+          recordedVia: source ?? null,
+          deliveryNumber: ops.executions.get(c.deliveryId)?.deliveryNumber ?? null,
+          orderNumber: (c.orderId && ORDER_NUMBERS[c.orderId]) ?? null,
+          rider: r ? { riderId: r.riderId, riderNumber: r.riderNumber, nameMasked: maskName(r.name.replace(/^\[목\] /, '')) ?? null } : null,
+          recordedByLabel: operatorLabel(c.recordedBy),
+        };
+      }),
+      page: page.page,
+    });
   }),
 
   // ---- claim 0.1.0 (조회만) ----

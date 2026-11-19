@@ -368,10 +368,15 @@ export const messages = {
 
   /** 화면 번호(ADR-0070, bff 0.14.0) — 주문 8자리·배송 "주문번호-순번"·라이더 가린 이름 + 번호 */
   displayNumber: {
+    /** 직원 표시(ADR-0070 덧붙임 2026-11-19) */
+    staffFailed: '직원 · 확인 불가',
+    staffUnknown: '직원 · 이름 없음',
     missing: '번호 없음',
     failed: '번호 확인 불가',
     systemNumbers: '시스템 번호',
-    system: { orderId: '주문', deliveryId: '배송', riderId: '라이더' },
+    system: { orderId: '주문', deliveryId: '배송', riderId: '라이더', customerId: '고객' },
+    /** 고객번호(customer CU-3) 전 — 고객 ID 는 상세 시스템 번호 칸에서만 */
+    customerPending: '고객 (고객번호 준비 중)',
   },
 
   /** 개인정보 기본 가림 */
@@ -615,6 +620,8 @@ export const messages = {
     outcomeName: { PENDING: '받기 전', ACCEPTED: '받음', EXCLUDED: '안 받음(미인수)', SKIPPED_CHANGED: '그사이 바뀌어 건너뜀', SKIPPED_NOT_ALLOWED: '권한 없어 건너뜀', CANCELLED: '취소됨' } as Readonly<Record<string, string>>,
     unreceived: '미인수',
     fromTo: (from: string, to: string) => `${from} → ${to}`,
+    /** 교대 인계 표기(ADR-0070 덧붙임) */
+    label: (day: string, half: string) => (day ? `${day} ${half} 교대 인계` : '교대 인계'),
     pendingNote: '아직 받기 전이에요 — 담당은 전임 그대로예요.',
     snapshot: (n: number) => `작성 때 팀의 처리 중 접수 건 ${n}건(기록)`,
     receive: (id: string) => `${id} 받기`,
@@ -701,6 +708,7 @@ export const messages = {
     csEmpty: '고객센터가 처리할 후속 처리가 없어요.',
     csEmptyDone: '처리가 끝난 후속 처리가 없어요.',
     ofCase: (id: string) => `접수 건 ${id}`,
+    ofCaseLabel: '접수 건',
     // 화면 짜임(2026-11-18)
     results: '결과 이력',
     addHint: '종류만 골라도 추가돼요. 나머지는 필요할 때만 적어요.',
@@ -1056,8 +1064,22 @@ export const messages = {
     failed: '찾지 못했어요(조회 실패) — 잠시 뒤 다시 해 주세요.',
     privacy: '연락처는 찾는 데만 쓰고 저장하지 않아요. 전체 번호가 맞아야 하고, 고객 연락처는 최근 31일 주문에서 찾아요.',
   },
+  /** 승인 고르기(2026-11-19 — 번호 없이 종류 · 요청자 · 시각) */
+  approvalPicker: {
+    open: '승인 번호를 몰라요 — 승인 난 요청에서 고르기',
+    title: (type: string) => `승인 난 ${type} 요청`,
+    pick: '고르기',
+    close: '닫기',
+    none: '승인 난 요청이 없어요.',
+    failed: '목록을 읽지 못했어요 — 잠시 뒤 다시 해 주세요.',
+    chosen: (summary: string) => `✓ ${summary}`,
+    noSummary: '요약 없음',
+    notFound: '그 승인을 찾지 못했어요 — 다시 골라 주세요.',
+  },
   refField: {
-    kind: { delivery: '배송', rider: '라이더', order: '주문' } as const,
+    kind: { delivery: '배송', rider: '라이더', order: '주문', case: '접수 건' } as const,
+    caseHint: '접수 건 번호(예 C-1119-0042) 또는 ID',
+    orderHint: '주문번호(8자리) 또는 주문 ID',
     found: (kind: string, v: string) => `✓ ${kind} ${v} 을(를) 찾았어요`,
     loading: '번호로 찾는 중…',
     notFound: (kind: string, v: string) => `${kind} ${v} 을(를) 찾지 못했어요 — 번호를 확인해 주세요`,
@@ -2581,6 +2603,8 @@ export const messages = {
       customer: '고객 계정 ID 를 넣으세요.',
       method: '본인 확인 방법을 고르세요.',
       orderForMatch: '주문 내용 대조에는 주문 번호가 필요해요.',
+      linkCaseResolved: '연결할 접수 건 번호를 확인해 주세요(찾지 못했거나 찾는 중)',
+      subjectResolved: '대상 주문번호를 확인해 주세요(찾지 못했거나 찾는 중)',
       chatOnly: '앱 로그인 채팅은 채팅일 때만 고를 수 있어요.',
       note: '기타는 어떻게 확인했는지 적어야 해요.',
       relation: '본인인지 대리인지 고르세요.',
@@ -2592,6 +2616,7 @@ export const messages = {
     savedNew: '접수를 남겼어요. 상담원 문의가 새로 생겼어요.',
     savedLinked: '접수를 남기고 기존 건에 연결했어요.',
     openCase: (id: string) => `접수 건 ${id}`,
+    openCaseLabel: '접수 건',
     openInquiry: (id: string) => `문의 ${id}`,
     caseLog: '이 건의 연락 기록',
     caseRecord: '이 건으로 고객 연락 남기기',

@@ -7,6 +7,7 @@
 // - 금액은 기록만 — 환불·보상 실행은 클레임·결제 메뉴. 이 화면에서 환불되는 것처럼 보이지 않게 "기록 금액"으로만.
 // - 메모·사유는 직원이 쓴 글 — 화면에만, 로그에 남기지 않는다. 판정은 서버(403·409·422 는 코드 문구).
 // 화면(2026-11-18 사용자 "밋밋하다"): 한 카드 안 항목 줄(종류 아이콘·담당 팀·상태 점 꼬리표·기한, 수량·기록 금액 막대, 결과 이력 줄), 아래 추가 칸. 고객센터 메뉴는 밑줄 탭 + 같은 줄. 동작은 그대로.
+import { CaseNumber } from '../../shared/CaseNumber';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -450,7 +451,7 @@ export function CsFollowUpPage() {
                 onChanged={() => void queryClient.invalidateQueries({ queryKey: ['obligations'] })}
                 caseLink={
                   <Link className="font-mono text-xs text-base-content/50 hover:text-primary hover:underline" to={`/cases/${encodeURIComponent(o.caseId ?? '')}`}>
-                    {m.ofCase(o.caseId ?? '')}
+                    {m.ofCaseLabel} <CaseNumber caseId={o.caseId ?? ''} />
                   </Link>
                 }
               />

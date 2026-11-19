@@ -120,7 +120,7 @@ describe('주문 조회', () => {
     expect(screen.getByTestId('order-entrance-note')).toHaveTextContent('가림');
     expect(screen.getByTestId('order-delivery-note')).toHaveTextContent('가림');
     expect(screen.queryByText('01055556666')).not.toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'CLM-MOCK-1' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: '74939002 취소' })).toBeInTheDocument(); // ADR-0070 덧붙임(2026-11-19): 시스템 ID·끝 8자리를 보이지 않는다
     expect(screen.queryByRole('button', { name: /취소/ })).not.toBeInTheDocument();
   });
 
@@ -252,7 +252,7 @@ describe('클레임 조회', () => {
     const user = userEvent.setup();
     renderAt('/claims', as.cs);
     expect(await screen.findAllByTestId('claim-row')).toHaveLength(3);
-    await user.click(screen.getByRole('link', { name: 'CLM-MOCK-2' }));
+    await user.click(screen.getByRole('link', { name: '74939003 취소' }));
     expect(await screen.findByTestId('claim-state')).toHaveTextContent('출고 중지 대기');
     expect(await screen.findByTestId('refund-row')).toHaveTextContent('실행 대기');
     expect(screen.queryByText('환불 완료')).not.toBeInTheDocument();
@@ -374,7 +374,7 @@ describe('라이더 상세(보기만 — 라이더 운영 묶음은 2026-11-18 �
     renderAt('/orders/ORD-MOCK-1003', as.cs);
     const rows = await screen.findAllByTestId('delivery-row');
     // 화면 배송 번호, 번호가 없으면 ID 끝 8자리 + "번호 없음"(ADR-0070)
-    expect(rows.map((r) => within(r).getAllByRole('link')[0]!.textContent)).toEqual(expect.arrayContaining(['74939003-1', 'V-MOCK-4 번호 없음']));
+    expect(rows.map((r) => within(r).getAllByRole('link')[0]!.textContent)).toEqual(expect.arrayContaining(['74939003-1', '번호 없음']));
   });
 
   it('도움요청 대기는 사건함으로 — 라이더 도움요청 사건 상세에 라이더가 쓴 내용', async () => {

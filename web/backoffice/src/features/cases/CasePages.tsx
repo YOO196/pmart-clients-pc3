@@ -20,6 +20,7 @@
 //   버튼은 할 수 있어 보일 때만(판정은 서버 — 403·409·422 는 코드 문구).
 // - bff 0.14.0 화면 번호(ADR-0070): 목록 관련 칸은 배송·주문 번호(linked[].displayNumber)·라이더(riders[]) — 링크는 시스템 ID.
 //   상세는 case-service 직접(화면 번호 없음)이라 지금 모양 그대로.
+import { useStaffText } from '../../shared/employeeLabels';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -39,7 +40,9 @@ import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { messages as m } from '../../shared/messages';
 import { label, text, when } from '../../shared/ops';
 import { SourceStamps } from '../../shared/SourceStamps';
-import { DisplayNumber, RiderLabel, riderSourceFailed } from '../../shared/displayNumber';
+import { DisplayNumber, RiderLabel, riderSourceFailed, SystemNumbers } from '../../shared/displayNumber';
+import { CaseNumber } from '../../shared/CaseNumber';
+import { DeliveryNo, OrderNo, RiderNo } from '../../shared/RefNumber';
 import { useResolvedRef } from '../../shared/numberLookups';
 import { RefStatus } from '../../shared/RefField';
 import { DeliveryStartActions } from '../../shared/StartActions';
@@ -109,8 +112,34 @@ const refLink = (refType: string | undefined, refId: string | undefined) => {
               : refType === 'lastDeliveryId'
                 ? `/deliveries/${encodeURIComponent(refId)}`
                 : null;
-  const value = refType === 'fault' ? label(m.cases.faultName, refId) : refType === 'resolution' ? label(m.cases.resolutionChoiceName, refId) : refId;
-  const name = `${label(m.cases.refName, refType)} ${value}`;
+  // 시스템 ID 인 관련 칸(…Id — 사가·클레임·사고 등)은 종류 이름만(ADR-0070 덧붙임 — 글자로 ID 를 보이지 않고 링크 대상으로만)
+  const isSystemId = Boolean(refType?.endsWith('Id'));
+  const value = refType === 'fault' ? label(m.cases.faultName, refId) : refType === 'resolution' ? label(m.cases.resolutionChoiceName, refId) : isSystemId ? '' : refId;
+  const name = `${label(m.cases.refName, refType)}${value ? ` ${value}` : ''}`;
+  // 배송·주문·라이더는 그 원천의 화면 번호로(ADR-0070 덧붙임 — 시스템 ID 는 링크 대상으로만)
+  const numbered =
+    refType === 'deliveryId' || refType === 'recoveryDeliveryId' || refType === 'reshipmentDeliveryId' || refType === 'lastDeliveryId' ? (
+      <DeliveryNo id={refId} />
+    ) : refType === 'orderId' ? (
+      <OrderNo id={refId} />
+    ) : refType === 'riderId' ? (
+      <RiderNo id={refId} />
+    ) : null;
+  if (numbered && to)
+    return (
+      <Link key={`${refType}:${refId}`} className="link" to={to}>
+        {`${label(m.cases.refName, refType)} `}
+        {numbered}
+      </Link>
+    );
+  // 이전 접수 건은 화면 번호로(ADR-0070 덧붙임)
+  if (refType === 'previousCaseId' && to)
+    return (
+      <Link key={`${refType}:${refId}`} className="link" to={to}>
+        {`${label(m.cases.refName, refType)} `}
+        <CaseNumber caseId={refId} />
+      </Link>
+    );
   return to ? (
     <Link key={`${refType}:${refId}`} className="link" to={to}>
       {name}
@@ -284,18 +313,27 @@ function PriorityBadge({ p }: { readonly p: string | null | undefined }) {
 const stateTone = (c: { readonly state?: string | null; readonly overdue?: boolean | null }): Tone =>
   c.state === 'CLOSED' ? 'ghost' : c.overdue ? 'error' : c.state === 'REOPENED' ? 'warning' : 'info';
 
-/** 운영자 — 머리글자 동그라미 + ID. 비었으면 "아무도 안 맡음"(흐리게) */
+/** 운영자 — 머리글자 동그라미 + 이름 · 사번(ADR-0070 덧붙임). 비었으면 "아무도 안 맡음"(흐리게) */
 function Person({ id }: { readonly id: string | null | undefined }) {
+  const name = useStaffText(id);
   if (!id) return <span className="text-base-content/50">{m.cases.unassigned}</span>;
-  const letter = id.replace(/^op-/i, '').charAt(0).toUpperCase() || '?';
+  const letter = name.replace(/^\[목\]\s*/, '').charAt(0) || '?';
   return (
-    <span className="inline-flex min-w-0 items-center gap-2" title={id}>
+    <span className="inline-flex min-w-0 items-center gap-2">
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary" aria-hidden="true">
         {letter}
       </span>
-      <span className="truncate">{id}</span>
+      <span className="truncate">{name}</span>
     </span>
   );
+}
+
+/** 이력 한 줄(한 문장) — 행위자는 직원이면 이름 · 사번(ADR-0070 덧붙임), 시스템(SYSTEM 등 직원 아님)은 그대로 */
+function HistoryText({ h }: { readonly h: { readonly action?: string | null; readonly actorId?: string | null; readonly toState?: string | null; readonly note?: string | null } }) {
+  const system = Boolean(h.actorId && /^[A-Z_]+$/.test(h.actorId));
+  const name = useStaffText(system ? null : h.actorId);
+  const actor = system ? (h.actorId ?? '') : name || text(h.actorId);
+  return <p>{`${h.action ? label(m.cases.actionName, h.action) : text(h.action)} · ${actor}${h.toState ? ` → ${label(m.cases.stateName, h.toState)}` : ''}${h.note ? ` · ${h.note}` : ''}`}</p>;
 }
 
 /** 상세 본문 칸 — 제목 줄(아이콘) + 내용 */
@@ -471,7 +509,8 @@ export function CaseListPage() {
                           <Link className="block truncate font-medium hover:text-primary hover:underline" to={`/cases/${encodeURIComponent(c.caseId ?? '')}`} onClick={(e) => e.stopPropagation()}>
                             {c.summary ? c.summary : label(m.cases.kindName, c.kind)}
                           </Link>
-                          {/* 접수 건 번호는 목록에 보이지 않는다(요약 없으면 종류 이름 — 백엔드 회신 reply-case-inbox-questions §2-1) */}
+                          {/* 화면 번호(ADR-0070 덧붙임 2026-11-19, bff caseNumber) — 시스템 ID 는 보이지 않는다 */}
+                          {c.caseNumber && <span className="block font-mono text-xs text-base-content/50" data-testid="case-number">{c.caseNumber}</span>}
                         </td>
                         <td>
                           <KindBadge kind={c.kind} />
@@ -882,11 +921,13 @@ export function CaseDetailPage() {
         title={
           <>
             {query.data?.kind ? <CodeLabel code={query.data.kind} names={m.cases.kindName} /> : m.cases.title}
-            <span className="ml-2 font-mono text-xs font-normal text-base-content/45">{m.cases.detailTitle(caseId)}</span>
+            <span className="ml-2 font-mono text-xs font-normal text-base-content/45" data-testid="case-number">{query.data ? (query.data.caseNumber ?? m.displayNumber.missing) : ''}</span>
           </>
         }
         back={{ to: '/cases', label: m.cases.back }}
       />
+      {/* 시스템 번호(ADR-0070 덧붙임) — 장애 문의·로그 대조용, 상세에서만 */}
+      <SystemNumbers ids={[{ label: m.cases.title, id: caseId }]} />
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(c) => {
           const closed = c.state === 'CLOSED';
@@ -999,7 +1040,7 @@ export function CaseDetailPage() {
                         {history.map((h, i) => (
                           <li key={`${h.at ?? ''}-${i}`} className="relative">
                             <span className={`absolute -left-[1.6rem] top-1 h-3 w-3 rounded-full ring-4 ring-base-100 ${HISTORY_DOT[h.action ?? ''] ?? 'bg-base-300'}`} aria-hidden="true" />
-                            <p>{`${h.action ? label(m.cases.actionName, h.action) : text(h.action)} · ${text(h.actorId)}${h.toState ? ` → ${label(m.cases.stateName, h.toState)}` : ''}${h.note ? ` · ${h.note}` : ''}`}</p>
+                            <HistoryText h={h} />
                             <p className="text-xs text-base-content/50">{when(h.at)}</p>
                           </li>
                         ))}
@@ -1083,6 +1124,8 @@ export function CaseDetailPage() {
  * 내가 맡음 → 후속 처리 남음이면 후속 처리로, 아니면 완료 처리로(기한 넘김이면 빨강) · 다른 사람이 맡음 → 안내만
  */
 function CaseNext({ c, me, viewer, canPick, canClose, openFollowUps, onDone }: { readonly c: Case; readonly me: string; readonly viewer: boolean; readonly canPick: boolean; readonly canClose: boolean; readonly openFollowUps: number; readonly onDone: (c: Case) => void }) {
+  // 담당자 이름 · 사번(ADR-0070 덧붙임) — 훅이라 먼저
+  const assigneeName = useStaffText(c.assigneeId);
   const n = m.cases.next;
   const overdue = c.overdue === true;
   if (c.state === 'CLOSED') {
@@ -1100,7 +1143,7 @@ function CaseNext({ c, me, viewer, canPick, canClose, openFollowUps, onDone }: {
       </NextAction>
     );
   }
-  if (c.assigneeId && c.assigneeId !== me) return <NextAction tone={overdue ? 'warning' : 'info'} title={overdue ? n.otherAssigneeOverdue(c.assigneeId) : n.otherAssignee(c.assigneeId)} />;
+  if (c.assigneeId && c.assigneeId !== me) return <NextAction tone={overdue ? 'warning' : 'info'} title={overdue ? n.otherAssigneeOverdue(assigneeName) : n.otherAssignee(assigneeName)} />;
   if (openFollowUps > 0) {
     return (
       <NextAction tone={overdue ? 'error' : 'warning'} title={n.followUps(openFollowUps)} body={n.followUpsBody}>

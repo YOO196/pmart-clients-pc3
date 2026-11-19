@@ -1,6 +1,7 @@
 // 라이더 컴플레인(고객센터 기록 · 고객센터·라이더 운영 조회) — case-service 0.3.0 `/rider-complaints`(2026-11-15 LAN 배포).
 // 기록: 배송 번호·종류(+주문·문의·메모). 라이더는 서버가 배송의 배정 라이더로 채운다(없으면 422 RIDER_NOT_ASSIGNED).
 // 같은 종류 7일 안 서로 다른 배송 3건이면 라이더가 제한 검토 대상에 오른다(자동 제재 없음 — 서버). 메모는 내부용이고 상세에만, 로그 금지.
+import type { components as BffC } from '../../api/generated/backoffice-bff';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
@@ -11,21 +12,20 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/case';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback } from '../../shared/Feedback';
-import { CopyButton } from '../../shared/CopyButton';
 import { LeaveGuard } from '../../shared/LeaveGuard';
-import { DisplayNumber, RiderLabel } from '../../shared/displayNumber';
+import { DisplayNumber, RIDER_SOURCE, RiderLabel, SystemNumbers } from '../../shared/displayNumber';
 import { useDeliveryNumbers, useOrderNumbers, useRiderLabels } from '../../shared/numberLookups';
 import { messages as m } from '../../shared/messages';
 import { isSeoulDate, label, seoulDayEnd, seoulDayStart, text, when } from '../../shared/ops';
-import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { useResolvedRef } from '../../shared/numberLookups';
 import { RefStatus } from '../../shared/RefField';
 import { DeliveryPicker } from '../../shared/DeliveryPicker';
+import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { ChipGroup, CodeLabel, DataTable, DetailHeader, FieldList, NextAction, PageHeader, SearchPanel, SearchRow, Section, type Tone } from '../../shared/admin';
-import { EmptyBox, Icon, IdLink, KindChip, ListFoot, Person, SideFields, When, type IconName } from '../lookup/parts';
+import { EmptyBox, Icon, KindChip, ListFoot, Person, SideFields, StaffName, When, type IconName } from '../lookup/parts';
 
 type ComplaintType = components['schemas']['RiderComplaintType'];
-type Summary = components['schemas']['RiderComplaintSummary'];
+type ListItem = BffC['schemas']['RiderComplaintListItem'];
 
 const TYPES = Object.keys(m.complaints.typeName) as ComplaintType[];
 const isType = (v: string | null): v is ComplaintType => v !== null && (TYPES as readonly string[]).includes(v);
@@ -57,7 +57,8 @@ export function RiderComplaintTable({ riderId, deliveryId, complaintType, from, 
     queryFn: ({ pageParam }) =>
       request(
         'GET',
-        api.cases.GET('/rider-complaints', {
+        // bff `views/rider-complaints`(2026-11-19 백엔드 회신 — 웹 요청 display-numbers-in-responses): 배송·주문 번호·라이더·기록자를 한 번에(줄마다 부르지 않는다)
+        api.bff.GET('/views/rider-complaints', {
           params: {
             query: {
               ...(riderId ? { riderId } : {}),
@@ -73,11 +74,13 @@ export function RiderComplaintTable({ riderId, deliveryId, complaintType, from, 
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) => last.page?.nextCursor ?? undefined,
   });
-  const items: Summary[] = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
-  // 화면 번호(ADR-0070, 2026-11-18): 컴플레인 응답엔 번호가 없어 라이더 일괄·배송·주문 조회로 붙인다(같은 값은 캐시)
-  const riders = useRiderLabels(items.map((c) => c.riderId));
-  const deliveries = useDeliveryNumbers(items.map((c) => c.deliveryId));
-  const orders = useOrderNumbers(items.map((c) => c.orderId));
+  const items = (query.data?.pages.flatMap((p) => p.items ?? []) ?? []).filter((c): c is ListItem & { complaintId: string; riderId: string; deliveryId: string } => Boolean(c.complaintId && c.riderId && c.deliveryId));
+  // 화면 번호 — bff 응답 값. 원천을 못 읽었으면 그 칸만 null + unavailableSources → "번호 확인 불가"(없음과 구분)
+  const missing = new Set((query.data?.pages ?? []).flatMap((p) => p.unavailableSources ?? []));
+  const of = (key: 'riderId' | 'deliveryId' | 'orderId', id: string | null | undefined) => (id ? items.find((c) => c[key] === id) : undefined);
+  const riders = { get: (id: string | null | undefined) => of('riderId', id)?.rider ?? undefined, failed: missing.has(RIDER_SOURCE) };
+  const deliveries = { get: (id: string | null | undefined) => of('deliveryId', id)?.deliveryNumber, failed: (id: string | null | undefined) => missing.has('delivery-execution-service') && !of('deliveryId', id)?.deliveryNumber };
+  const orders = { get: (id: string | null | undefined) => of('orderId', id)?.orderNumber, failed: (id: string | null | undefined) => missing.has('order-service') && !of('orderId', id)?.orderNumber };
 
   if (query.isPending) return <QueryState state={{ kind: 'loading' }}>{() => null}</QueryState>;
   if (query.isError && items.length === 0) {
@@ -111,12 +114,10 @@ export function RiderComplaintTable({ riderId, deliveryId, complaintType, from, 
           {items.map((c) => (
             <tr key={c.complaintId} data-testid="complaint-row" {...(preview ? pv.row(c.complaintId) : {})}>
               <td>
-                <span className="block">
+                {/* 컴플레인은 번호 없이 종류 · 시각(ADR-0070 덧붙임) — 종류 꼬리표가 상세 링크, 시각은 옆 칸 */}
+                <Link className="block hover:opacity-80" to={`/rider-complaints/${encodeURIComponent(c.complaintId)}`} onClick={(e) => e.stopPropagation()} data-testid="complaint-link">
                   <ComplaintType type={c.complaintType} />
-                </span>
-                <span className="mt-1 block font-normal">
-                  <IdLink id={c.complaintId} to={`/rider-complaints/${encodeURIComponent(c.complaintId)}`} />
-                </span>
+                </Link>
               </td>
               <td data-testid="complaint-rider">
                 <Link className="text-sm hover:text-primary hover:underline" to={`/riders/${encodeURIComponent(c.riderId)}`}>
@@ -152,7 +153,7 @@ export function RiderComplaintTable({ riderId, deliveryId, complaintType, from, 
         (() => {
           const c = items.find((x) => x.complaintId === pv.id);
           return (
-            <PreviewDrawer id={pv.id} ids={items.map((x) => x.complaintId)} onMove={pv.open} onClose={pv.close} title={pv.id} detailTo={`/rider-complaints/${encodeURIComponent(pv.id)}`}>
+            <PreviewDrawer id={pv.id} ids={items.map((x) => x.complaintId)} onMove={pv.open} onClose={pv.close} title={(() => { const x = items.find((y) => y.complaintId === pv.id); return x ? `${label(m.complaints.typeName, x.complaintType)} · ${when(x.recordedAt)}` : m.complaints.detailTitle; })()} detailTo={`/rider-complaints/${encodeURIComponent(pv.id)}`}>
               {c ? (
                 <div className="space-y-4" data-testid="complaint-preview">
                   <ComplaintType type={c.complaintType} />
@@ -281,7 +282,10 @@ export function NewRiderComplaintPage() {
   const locked = record.busy || record.phase.kind === 'done';
   // 배송 번호(74939255-1)로도 — 찾은 배송 ID 로 보낸다(2026-11-19)
   const delivery = useResolvedRef('delivery', form.deliveryId);
-  const ready = delivery.id !== null && form.complaintType !== '';
+  const order = useResolvedRef('order', form.orderId);
+  // 주문은 고르지 않아도 되지만, 넣었는데 못 찾았으면 보내지 않는다(다른 값으로 바꾸지 않음)
+  const orderOk = order.state === 'empty' || order.id !== null;
+  const ready = delivery.id !== null && orderOk && form.complaintType !== '';
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!ready || locked || form.complaintType === '') return;
@@ -289,7 +293,7 @@ export function NewRiderComplaintPage() {
     void record.run({
       deliveryId: delivery.id ?? '',
       complaintType: form.complaintType,
-      ...(form.orderId.trim() ? { orderId: form.orderId.trim() } : {}),
+      ...(order.id ? { orderId: order.id } : {}),
       ...(form.inquiryId.trim() ? { inquiryId: form.inquiryId.trim() } : {}),
       ...(form.note.trim() ? { note: form.note.trim() } : {}),
     });
@@ -332,7 +336,8 @@ export function NewRiderComplaintPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1 text-sm">
               <span className="font-medium">{m.complaints.orderId}</span>
-              <input className="input input-sm w-full font-mono" maxLength={64} {...field('orderId')} />
+              <input className="input input-sm w-full font-mono" maxLength={64} placeholder={m.refField.orderHint} {...field('orderId')} />
+              <RefStatus r={order} kind="order" />
             </label>
             <label className="block space-y-1 text-sm">
               <span className="font-medium">{m.complaints.inquiryId}</span>
@@ -406,13 +411,17 @@ export function RiderComplaintDetailPage() {
               title={
                 <>
                   {m.complaints.titleOf(label(m.complaints.typeName, c.complaintType), riderText(c.riderId))}
-                  <span className="ml-2 font-mono text-sm font-normal text-base-content/50">{complaintId}</span>
-                  <CopyButton value={complaintId} />
                 </>
               }
               badges={<ComplaintType type={c.complaintType} />}
-              summary={`${when(c.recordedAt)} · ${c.recordedBy}`}
+              summary={
+                <>
+                  {when(c.recordedAt)} · <StaffName id={c.recordedBy} />
+                </>
+              }
             />
+            {/* 시스템 번호(ADR-0070 덧붙임) — 상세에서만 */}
+            <SystemNumbers ids={[{ label: m.complaints.detailTitle, id: complaintId }]} />
             {/* 다음 할 일 — 서버가 준 접수 건이 있으면 거기서 이어서, 없으면 할 일 없음(제한 검토는 서버) */}
             {c.caseId ? (
               <NextAction tone="info" title={m.complaints.nextStep.caseTitle}>

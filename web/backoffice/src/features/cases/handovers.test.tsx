@@ -39,7 +39,7 @@ describe('교대 인계', () => {
     expect(await sent.json()).toEqual({ group: 'DELIVERY_OPS', toOperatorId: 'op-cs-rider-1', items: [{ caseId: 'CASE-MOCK-3', nextAction: '라이더에게 다시 연락' }] });
     cleanup();
     renderAt('/cases/CASE-MOCK-3', as.riderOps);
-    expect(await screen.findByTestId('case-assignee')).toHaveTextContent('op-rider-ops-1');
+    await waitFor(() => expect(screen.getByTestId('case-assignee')).toHaveTextContent('[목] 정운영 · P2026-00006'));
   });
 
   it('후임이 모두 받기 → 건별 "받음", 담당이 후임으로, 이력 "인계됨"', async () => {
@@ -54,8 +54,9 @@ describe('교대 인계', () => {
     expect(await view.mutations('/acceptances')[0]!.json()).toEqual({});
     cleanup();
     renderAt('/cases/CASE-MOCK-3', as.csRider);
-    expect(await screen.findByTestId('case-assignee')).toHaveTextContent('op-cs-rider-1');
-    expect(screen.getByText(/인계됨 · op-cs-rider-1 → .* · op-rider-ops-1 → op-cs-rider-1: 라이더에게 다시 연락/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('case-assignee')).toHaveTextContent('[목] 한상담 · P2026-00007'));
+    // 행위자는 이름 · 사번(ADR-0070 덧붙임). 뒤의 메모 글은 서버가 쓴 글 그대로
+    expect(await screen.findByText(/인계됨 · \[목\] 한상담 · P2026-00007 → .* · op-rider-ops-1 → op-cs-rider-1: 라이더에게 다시 연락/)).toBeInTheDocument();
   });
 
   it('안 받은 건은 "안 받음(미인수)" — 전임 그대로, 관리자 미인수 목록에 보인다', async () => {

@@ -22,7 +22,7 @@ describe('지원센터 사건', () => {
     expect(list[0]).toHaveTextContent('라이더 도움요청');
     expect(within(list[0]!).getByText(/기한 넘김/)).toHaveAttribute('data-overdue', 'true');
     expect(within(list[0]!).getByRole('link', { name: '배송 74939255-1' })).toHaveAttribute('href', '/deliveries/DLV-MOCK-1');
-    expect(within(list[0]!).getByRole('link', { name: '주문 OCK-1001 번호 확인 불가' })).toHaveAttribute('href', '/orders/ORD-MOCK-1001');
+    expect(within(list[0]!).getByRole('link', { name: '주문 번호 확인 불가' })).toHaveAttribute('href', '/orders/ORD-MOCK-1001');
     expect(within(list[0]!).getByRole('link', { name: '라이더 김*수 · 482913' })).toHaveAttribute('href', '/riders/RID-MOCK-1');
     const q = inboxCalls(view.sent)[0]!;
     expect([q.get('unassigned'), q.get('size')]).toEqual(['true', '50']);
@@ -42,7 +42,7 @@ describe('지원센터 사건', () => {
   it('맡기: 내 운영자 ID 로 assignments → 담당이 나로 바뀌고 닫기 폼이 보인다', async () => {
     const view = renderAt('/cases/CASE-MOCK-2', as.riderOps);
     await userEvent.click(await screen.findByRole('button', { name: '내가 맡기' }));
-    await waitFor(() => expect(screen.getByTestId('case-assignee')).toHaveTextContent('op-rider-ops-1'));
+    await waitFor(() => expect(screen.getByTestId('case-assignee')).toHaveTextContent('[목] 정운영 · P2026-00006')); // 직원은 이름 · 사번(ADR-0070 덧붙임)
     const sent = view.mutations('/cases/CASE-MOCK-2/assignments')[0]!;
     expect(sent.headers.get('Idempotency-Key')).toBeTruthy();
     expect(sent.headers.get('X-Source-System')).toBe('backoffice-web');
@@ -75,7 +75,8 @@ describe('지원센터 사건', () => {
     const order = list.find((r) => r.textContent?.includes('결과 불일치 확인'))!;
     expect(order).toBeTruthy();
     expect(within(order).getByRole('link', { name: '주문 74939259' })).toHaveAttribute('href', '/orders/ORD-MOCK-1004');
-    expect(within(order).getByText('주문 처리 SAGA-MOCK-1')).toBeInTheDocument();
+    expect(within(order).getByText('주문 처리')).toBeInTheDocument(); // 사가 ID 는 글자로 안 보인다(ADR-0070 덧붙임)
+    expect(order).not.toHaveTextContent('SAGA-MOCK-1');
     expect(screen.getByText(/결과 불일치 확인·결제 결과 불명은 본사 관리자만 봐요/)).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('종류'), 'PAYMENT_UNKNOWN');
     await waitFor(() => expect(view.sent.some((r) => new URL(r.url).searchParams.get('kind') === 'PAYMENT_UNKNOWN')).toBe(true));
@@ -97,7 +98,7 @@ describe('지원센터 사건', () => {
     }
     renderAt('/cases/CASE-MOCK-6', as.riderOps);
     expect(await screen.findByText(/재발 · SYSTEM · 3번째 — NO_RIDER/)).toBeInTheDocument();
-    expect(screen.getByText('배송 DLV-MOCK-6')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: '배송 번호 없음' })).toHaveAttribute('href', '/deliveries/DLV-MOCK-6'); // 번호가 없는 배송 — ID 는 링크 대상으로만
   });
 
   it('사가·결제 이상은 배송 팀 목록·종류 필터에 없다', async () => {
@@ -113,7 +114,7 @@ describe('지원센터 사건', () => {
     const form = await screen.findByRole('form', { name: '다른 사람에게 배정(관리자)' });
     await userEvent.type(within(form).getByPlaceholderText('운영자 ID'), 'op-cs-rider-1');
     await userEvent.click(within(form).getByRole('button', { name: '배정' }));
-    await waitFor(() => expect(screen.getByTestId('case-assignee')).toHaveTextContent('op-cs-rider-1'));
+    await waitFor(() => expect(screen.getByTestId('case-assignee')).toHaveTextContent('[목] 한상담 · P2026-00007'));
     expect(await view.mutations('/assignments')[0]!.json()).toEqual({ assigneeId: 'op-cs-rider-1' });
   });
 
@@ -124,7 +125,7 @@ describe('지원센터 사건', () => {
     expect(screen.getByRole('button', { name: '오배송 접수하기' })).toBeDisabled(); // 귀책을 골라야
     await userEvent.click(screen.getByRole('radio', { name: '지도·시스템 오류' }));
     await userEvent.click(screen.getByRole('button', { name: '오배송 접수하기' }));
-    expect(await screen.findByRole('heading', { name: /접수 건 CASE-MOCK-101/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /C-1119-0101/ })).toBeInTheDocument();
     expect(await view.mutations('/cases')[0]!.json()).toEqual({ kind: 'MISDELIVERY', subjectType: 'DELIVERY', subjectRef: 'DLV-MOCK-2', summary: '옆 동 경비실로 전달됨(고객 확인)', misdelivery: { fault: 'SYSTEM', resolution: 'RESHIP' } });
     expect(await screen.findByText('귀책 지도·시스템 오류')).toBeInTheDocument();
     expect(screen.getByText('고객 선택 재발송')).toBeInTheDocument();
@@ -164,7 +165,7 @@ describe('지원센터 사건', () => {
     await userEvent.type(within(box).getByLabelText('상세 주소'), '101동 1001호');
     await userEvent.type(within(box).getByLabelText('기록 사유(필수, 2~200자)'), '고객 통화 — 동 호수 잘못 입력');
     await userEvent.click(screen.getByRole('button', { name: '오배송 접수하기' }));
-    expect(await screen.findByRole('heading', { name: /접수 건 CASE-MOCK-/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /C-1119-0\d{3}/ })).toBeInTheDocument();
     const rec = view.mutations('/redelivery-destinations')[0]!;
     expect(new URL(rec.url).pathname).toContain('/orders/lookups/ORD-MOCK-');
     expect(await rec.json()).toEqual({ deliveryId: 'DLV-MOCK-3', roadAddress: '부산 부산진구 시험로 1', detailAddress: '101동 1001호', reason: '고객 통화 — 동 호수 잘못 입력' });
@@ -193,7 +194,7 @@ describe('지원센터 사건', () => {
     expect(await screen.findByTestId('address-recorded')).toHaveTextContent('실제 주소를 기록했어요');
     expect(screen.queryByLabelText('도로명 주소(필수)')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '오배송 접수하기' }));
-    expect(await screen.findByRole('heading', { name: /접수 건 CASE-MOCK-/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /C-1119-0\d{3}/ })).toBeInTheDocument();
     expect(view.mutations('/redelivery-destinations')).toHaveLength(1); // 주소는 한 번만 기록
   });
 
@@ -296,7 +297,7 @@ describe('접수 건 목록 — 화면 번호(bff 0.14.0, ADR-0070)', () => {
     // RID-MOCK-2 는 rider-service 에서 못 찾음(탈퇴 등) — 번호를 지어내지 않는다
     const failed = list.find((r) => r.textContent?.includes('전달 실패'));
     expect(failed).toBeDefined();
-    expect(within(failed!).getByRole('link', { name: '라이더 D-MOCK-2 번호 없음' })).toHaveAttribute('href', '/riders/RID-MOCK-2');
+    expect(within(failed!).getByRole('link', { name: '라이더 번호 없음' })).toHaveAttribute('href', '/riders/RID-MOCK-2');
   });
 
   it('번호가 null 이면 ID 끝 8자리 + "번호 없음", rider-service 를 못 읽으면 라이더 "번호 확인 불가" + 실패 원천', async () => {
@@ -328,8 +329,8 @@ describe('접수 건 목록 — 화면 번호(bff 0.14.0, ADR-0070)', () => {
     );
     renderAt('/cases', as.riderOps);
     const row = (await rows())[0]!;
-    expect(within(row).getByRole('link', { name: '배송 12345678 번호 없음' })).toHaveAttribute('href', '/deliveries/DLV-OLD-12345678');
-    expect(within(row).getByRole('link', { name: '라이더 ABCDEFGH 번호 확인 불가' })).toHaveAttribute('href', '/riders/RID-ABCDEFGH');
+    expect(within(row).getByRole('link', { name: '배송 번호 없음' })).toHaveAttribute('href', '/deliveries/DLV-OLD-12345678');
+    expect(within(row).getByRole('link', { name: '라이더 번호 확인 불가' })).toHaveAttribute('href', '/riders/RID-ABCDEFGH');
     expect(row).not.toHaveTextContent('DLV-OLD-12345678');
     expect(screen.getByText(/못 불러온 정보: .*라이더/)).toHaveAttribute('title', expect.stringMatching(/조회하지 못한 원천: .*rider-service/)); // 원천 표시 한 줄(2026-11-18) — 업무 이름, 원래 이름은 마우스
   });
@@ -344,7 +345,7 @@ describe('사건 다시 열기(case 0.6.0)·넘기기(0.7.0)', () => {
     await userEvent.click(within(form).getByRole('button', { name: '다시 처리하기' }));
     await waitFor(() => expect(screen.getByTestId('case-state')).toHaveTextContent('다시 처리 중'));
     expect(screen.getByTestId('case-assignee')).toHaveTextContent('아무도 안 맡음');
-    expect(screen.getByText(/다시 처리 · op-rider-ops-1 → 다시 처리 중 · 고객이 다시 다른 집이라고 연락/)).toBeInTheDocument();
+    expect(await screen.findByText(/다시 처리 · \[목\] 정운영 · P2026-00006 → 다시 처리 중 · 고객이 다시 다른 집이라고 연락/)).toBeInTheDocument();
     const sent = view.mutations('/cases/CASE-MOCK-4/reopenings')[0]!;
     expect(sent.headers.get('Idempotency-Key')).toBeTruthy();
     expect(await sent.json()).toEqual({ reason: '고객이 다시 다른 집이라고 연락' });
@@ -382,7 +383,7 @@ describe('사건 다시 열기(case 0.6.0)·넘기기(0.7.0)', () => {
     expect(screen.queryByRole('form', { name: '완료 처리' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('case-transfer')).not.toBeInTheDocument();
     expect(await view.mutations('/cases/CASE-MOCK-1/transfers')[0]!.json()).toEqual({ toGroup: 'ORDER_OPS', reason: '환불이 얽힌 오배송' });
-    expect(screen.getByText(/넘김 · op-rider-ops-1 → 접수됨 · DELIVERY_OPS → ORDER_OPS: 환불이 얽힌 오배송/)).toBeInTheDocument();
+    expect(await screen.findByText(/넘김 · \[목\] 정운영 · P2026-00006 → 접수됨 · DELIVERY_OPS → ORDER_OPS: 환불이 얽힌 오배송/)).toBeInTheDocument();
     // 목록에도 "관리자 처리 중"
     cleanup();
     renderAt('/cases', as.riderOps);
@@ -417,6 +418,10 @@ describe('사건 다시 열기(case 0.6.0)·넘기기(0.7.0)', () => {
       ),
     );
     renderAt('/cases/CASE-NEXT', as.riderOps);
-    expect(await screen.findByRole('link', { name: '이전 접수 건 CASE-MOCK-4' })).toHaveAttribute('href', '/cases/CASE-MOCK-4');
+    // 이 시험의 목은 모든 접수 건 조회에 CASE-NEXT(번호 없음)를 돌려준다 — 이전 접수 건 글자는 번호(없으면 "번호 없음"), 시스템 ID 는 링크 대상으로만
+    const prev = await screen.findByRole('link', { name: /^이전 접수 건 / });
+    expect(prev).toHaveAttribute('href', '/cases/CASE-MOCK-4');
+    await waitFor(() => expect(prev).toHaveTextContent('번호 없음'));
+    expect(prev).not.toHaveTextContent('CASE-MOCK-4');
   });
 });

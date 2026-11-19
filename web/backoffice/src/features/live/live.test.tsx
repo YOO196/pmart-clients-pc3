@@ -57,9 +57,9 @@ describe('실시간 배송 현황', () => {
       }),
     );
     const view = renderAt('/live-delivery?state=UNASSIGNED', as.riderOps);
-    expect(await screen.findByText('DLV-P1')).toBeInTheDocument();
+    expect(within(await screen.findByTestId('live-delivery')).getByRole('link')).toHaveAttribute('href', '/deliveries/DLV-P1');
     await userEvent.click(screen.getByRole('button', { name: '다음 쪽' }));
-    expect(await screen.findByText('DLV-P2')).toBeInTheDocument();
+    await waitFor(() => expect(within(screen.getByTestId('live-delivery')).getByRole('link')).toHaveAttribute('href', '/deliveries/DLV-P2'));
     const last = liveCalls(view.sent).at(-1)!;
     expect([last.get('state'), last.get('cursor')]).toEqual(['UNASSIGNED', 'C1']);
     expect(screen.queryByRole('button', { name: '다음 쪽' })).not.toBeInTheDocument();
@@ -122,7 +122,7 @@ describe('실시간 배송 현황', () => {
     expect(eta('74939251-1')).toHaveTextContent(/도착 예정 .*10:12/);
     expect(eta('74939251-1')).toHaveTextContent('12분 늦음');
     expect(eta('74939252-1')).toHaveTextContent('도착 예정 확인 중');
-    expect(eta('V-LIVE-3')).toHaveTextContent('도착 예정 확인 중');
+    expect(within(rows.find((r) => r.querySelector('a[href="/deliveries/DLV-LIVE-3"]'))!).getByTestId('live-eta')).toHaveTextContent('도착 예정 확인 중');
     // tracking 에 없는 배송(목 DLV-LIVE-5~9 미배정)은 '—'
     expect(rows.filter((r) => within(r).getByTestId('live-eta').textContent === '도착 예정 —').length).toBeGreaterThan(0);
   });
@@ -151,17 +151,18 @@ describe('실시간 배송 현황 — 화면 번호(bff 0.14.0, ADR-0070)', () =
     expect(within(row).getByRole('link', { name: '74939251-1' })).toHaveAttribute('href', '/deliveries/DLV-LIVE-1');
   });
 
-  it('번호가 null 이면 시스템 ID 끝 8자리 + "번호 없음"(번호를 지어내지 않는다), 미배정은 "미배정"', async () => {
+  it('번호가 null 이면 "번호 없음"(번호를 지어내지 않고 ID 끝 8자리도 안 보인다 — ADR-0070 덧붙임), 미배정은 "미배정"', async () => {
     renderAt('/live-delivery', as.cs);
     const rows = await screen.findAllByTestId('live-row');
-    const noNumber = rowWith(rows, 'V-LIVE-3');
+    const noNumber = rows.find((r) => r.querySelector('a[href="/deliveries/DLV-LIVE-3"]'))!;
     const delivery = within(noNumber).getByTestId('live-delivery');
-    expect(delivery).toHaveTextContent('V-LIVE-3 번호 없음');
+    expect(delivery).toHaveTextContent('번호 없음');
+    expect(delivery).not.toHaveTextContent('V-LIVE-3');
     expect(delivery).not.toHaveTextContent('DLV-LIVE-3');
     expect(within(delivery).getByRole('link')).toHaveAttribute('href', '/deliveries/DLV-LIVE-3');
-    expect(within(noNumber).getByTestId('live-order')).toHaveTextContent('D-LIVE-3 번호 없음');
+    expect(within(noNumber).getByTestId('live-order')).toHaveTextContent('번호 없음');
     // 탈퇴 라이더처럼 번호·이름이 null — riderId 끝 8자리 + 번호 없음
-    expect(within(rowWith(rows, '74939252-1')).getByTestId('live-rider')).toHaveTextContent('RD-2 번호 없음');
+    expect(within(rowWith(rows, '74939252-1')).getByTestId('live-rider')).toHaveTextContent('번호 없음');
     expect(within(rowWith(rows, '74939255-1')).getByTestId('live-rider')).toHaveTextContent('미배정');
   });
 
@@ -169,7 +170,7 @@ describe('실시간 배송 현황 — 화면 번호(bff 0.14.0, ADR-0070)', () =
     renderAt('/live-delivery?mfcId=MFC-MOCK-DOWN', as.admin);
     const row = rowWith(await screen.findAllByTestId('live-row'), '74939251-1');
     const rider = within(row).getByTestId('live-rider');
-    expect(rider).toHaveTextContent('RD-1 번호 확인 불가');
+    expect(rider).toHaveTextContent('번호 확인 불가');
     expect(rider).not.toHaveTextContent('번호 없음');
     expect(within(screen.getByRole('region', { name: '가져온 곳' })).getByText(/못 불러온 정보: .*라이더/, { selector: '.badge-error' })).toHaveAttribute('title', expect.stringMatching(/rider-service/));
     expect(within(row).getByTestId('live-order')).toHaveTextContent('74939251');

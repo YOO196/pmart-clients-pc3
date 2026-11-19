@@ -5,6 +5,8 @@
 // - 기존 건 연결(linkCaseId)이 없으면 서버가 상담원 문의(STAFF_INTAKE — 고객 앱에 안 보임, 답변 알림 없음)를 만든다.
 // - 연락 기록 `GET /cs-intakes?caseId|customerRef|subjectRef` — 접수 건·문의 상세에 붙인다. 요약·메모는 화면에만(로그 없음).
 // 화면(2026-11-18 사용자 "밋밋하다"): 접수 폼은 번호 단계 카드 4개(다 채우면 체크) + 오른쪽 "남기기 전에 확인" 카드(빈칸 목록·남기기 버튼), 연락 기록은 시간 순 줄(타임라인). 동작은 그대로.
+import { OrderNo } from '../../shared/RefNumber';
+import { StaffName } from '../lookup/parts';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -17,8 +19,11 @@ import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
 import { CommandFeedback } from '../../shared/Feedback';
 import { LeaveGuard } from '../../shared/LeaveGuard';
+import { CaseNumber } from '../../shared/CaseNumber';
+import { useResolvedRef } from '../../shared/numberLookups';
+import { RefStatus } from '../../shared/RefField';
 import { messages } from '../../shared/messages';
-import { text, when } from '../../shared/ops';
+import { when } from '../../shared/ops';
 import { CodeLabel, PageHeader } from '../../shared/admin';
 import { Icon, ICON } from '../inquiries/HelpdeskParts';
 
@@ -97,6 +102,8 @@ export function NewCsIntakePage() {
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
   // 떠날 때 경고(2026-11-18): 연 값과 다르면 "작성 중" — 저장을 누르면 그 값이 새 기준(저장 뒤 폼은 잠긴다)
   const [baseline, setBaseline] = useState(() => JSON.stringify(d));
+  // 연결 접수 건 — 접수 건 번호(C-1119-0042)로도, 찾은 ID 로 보낸다(2026-11-19)
+  const linkCase = useResolvedRef('case', d.linkCaseId);
   const dirty = JSON.stringify(d) !== baseline;
 
   const save = useCommand(async (body: NewIntake, key) => {
@@ -106,7 +113,10 @@ export function NewCsIntakePage() {
     return r;
   });
   const locked = save.busy || save.phase.kind === 'done';
-  const missing = problems(d);
+  // 대상 주문 — 주문번호(8자리)로도(2026-11-19). 넣은 번호를 아직 못 찾았으면 보내지 않는다 — 연결 없이 새 문의가 되거나 다른 주문이 되지 않게
+  const subject = useResolvedRef('order', d.subjectRef);
+  const unresolved = (r: { readonly state: string }) => r.state === 'loading' || r.state === 'notFound' || r.state === 'failed';
+  const missing = [...problems(d), ...(unresolved(linkCase) ? [m.need.linkCaseResolved] : []), ...(unresolved(subject) ? [m.need.subjectResolved] : [])];
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -117,14 +127,14 @@ export function NewCsIntakePage() {
       channel: d.channel,
       category: d.category,
       customerRef: d.customerRef.trim(),
-      ...(d.subjectRef.trim() ? { subjectRef: d.subjectRef.trim() } : {}),
+      ...(subject.id ? { subjectRef: subject.id } : {}),
       summary: d.summary.trim(),
       identityCheck: { method: d.method, ...(d.note.trim() ? { note: d.note.trim() } : {}) },
       callerRelation: d.relation,
       ...(d.consentOn
         ? { consent: { consentType: d.consentType.trim(), given: d.consentGiven, ...(d.consentDetail.trim() ? { detail: d.consentDetail.trim() } : {}) } }
         : {}),
-      ...(d.linkCaseId.trim() ? { linkCaseId: d.linkCaseId.trim() } : {}),
+      ...(linkCase.id ? { linkCaseId: linkCase.id } : {}),
     });
   };
 
@@ -170,10 +180,11 @@ export function NewCsIntakePage() {
               <div>
                 <label className="block text-xs font-medium text-base-content/60">
                   {m.subjectRef}
-                  <input className={`input input-sm font-mono text-base-content ${field}`} maxLength={64} value={d.subjectRef} disabled={locked} onChange={(e) => set('subjectRef', e.target.value)} />
+                  <input className={`input input-sm font-mono text-base-content ${field}`} maxLength={64} placeholder={messages.refField.orderHint} value={d.subjectRef} disabled={locked} onChange={(e) => set('subjectRef', e.target.value)} />
                 </label>
-                {d.subjectRef.trim() && (
-                  <Link className="link link-primary mt-1 inline-block text-xs" to={`/orders/${encodeURIComponent(d.subjectRef.trim())}`} target="_blank" rel="noreferrer">
+                <RefStatus r={subject} kind="order" />
+                {subject.id && (
+                  <Link className="link link-primary mt-1 inline-block text-xs" to={`/orders/${encodeURIComponent(subject.id)}`} target="_blank" rel="noreferrer">
                     {m.openOrder}
                   </Link>
                 )}
@@ -267,7 +278,8 @@ export function NewCsIntakePage() {
             <div>
               <label className="block text-xs font-medium text-base-content/60">
                 {m.linkCaseId}
-                <input className={`input input-sm font-mono text-base-content ${field}`} maxLength={64} value={d.linkCaseId} disabled={locked} onChange={(e) => set('linkCaseId', e.target.value)} />
+                <input className={`input input-sm font-mono text-base-content ${field}`} maxLength={64} placeholder={messages.refField.caseHint} value={d.linkCaseId} disabled={locked} onChange={(e) => set('linkCaseId', e.target.value)} />
+                <RefStatus r={linkCase} kind="case" />
               </label>
               <p className="mt-1 text-xs text-base-content/50">{m.linkHint}</p>
             </div>
@@ -309,7 +321,7 @@ export function NewCsIntakePage() {
                     <p className="flex flex-wrap gap-3">
                       {r.caseId && (
                         <Link className="link" to={`/cases/${encodeURIComponent(r.caseId)}`}>
-                          {m.openCase(r.caseId)}
+                          {m.openCaseLabel} <CaseNumber caseId={r.caseId} />
                         </Link>
                       )}
                       {r.inquiryId && (
@@ -405,8 +417,8 @@ export function CsIntakeLog({ caseId, customerRef, subjectRef, title }: {
                     <p className="whitespace-pre-wrap break-words">{x.summary}</p>
                     <p className="flex flex-wrap gap-x-2 text-xs text-base-content/55">
                       <span>{codeOf(m.methodName, x.identityCheck?.method)}</span>
-                      {x.subjectRef && <span className="font-mono">{x.subjectRef}</span>}
-                      <span>{text(x.receivedBy)}</span>
+                      {x.subjectRef && <span><OrderNo id={x.subjectRef} /></span>}
+                      <span><StaffName id={x.receivedBy} /></span>
                       {x.linked && <span>{m.linkedMark}</span>}
                     </p>
                     {x.consent && <p className="text-xs text-base-content/60">{m.consentLine(x.consent.consentType ?? '', x.consent.given === true)}</p>}

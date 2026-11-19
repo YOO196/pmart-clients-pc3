@@ -14,6 +14,7 @@ import { useSession } from '../../app/SessionContext';
 import { CommandFeedback } from '../../shared/Feedback';
 import { formatSeoul } from '@pmart/web-ui';
 import { useRecordRecent } from '../../shared/recentViews';
+import { ApprovalChosen, ApprovalPicker } from '../../shared/ApprovalPicker';
 import { messages as m } from '../../shared/messages';
 import { QueryState } from '@pmart/web-ui';
 import { toUiState } from '@pmart/web-ui';
@@ -115,7 +116,9 @@ function SaleStateChange({ product }: { readonly product: ProductDetail }) {
           <label className="flex flex-col gap-1 text-sm">
             <span className={fieldLabel}>{m.products.approvalIdLabel}</span>
             <input className="input input-sm w-full max-w-sm" value={approvalId} onChange={(e) => setApprovalId(e.target.value)} />
+            <ApprovalChosen approvalId={approvalId} />
           </label>
+          <ApprovalPicker type="PRODUCT" selectedId={approvalId} onPick={setApprovalId} />
           {approvalBody ? (
             <RequestApproval body={approvalBody} onRequested={(r) => r.approvalId && setApprovalId(r.approvalId)} />
           ) : (

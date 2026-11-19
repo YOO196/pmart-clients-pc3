@@ -3,7 +3,7 @@
 // 심사 상태 탭 → 유형 칩 → 표(요약 굵게·ID 작게, 유형 색 배지, 상태 점 배지, "N일 전") → 아래 건수·더 보기.
 // 예전에는 더 보기가 커서를 URL 에 넣자마자 필터 함수가 지워 버려 아무 일도 없었다(2026-11-17 사용자 신고).
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 
 import { APPROVAL_TYPES, REVIEW_STATES, type ApprovalType, type ReviewState } from '../../api/models';
 import { request } from '@pmart/web-core';
@@ -16,6 +16,7 @@ import { toUiState } from '@pmart/web-ui';
 import { CodeLabel, PageHeader, StatCard, StatStrip, StatusBadge, countCell, type Tone } from '../../shared/admin';
 import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { useApprovalTypeCounts } from '../../app/listCounts';
+import { Person } from '../lookup/parts';
 
 const pick = <T extends string>(value: string | null, allowed: readonly T[]): T | undefined =>
   allowed.find((a) => a === value);
@@ -128,13 +129,8 @@ export function ApprovalListPage() {
                           <p className="truncate font-medium" title={a.summary ?? undefined}>
                             {a.summary ?? m.none}
                           </p>
-                          {a.approvalId ? (
-                            <Link className="font-mono text-xs text-base-content/50 hover:text-primary hover:underline" to={`/approvals/${encodeURIComponent(a.approvalId)}`}>
-                              {a.approvalId}
-                            </Link>
-                          ) : (
-                            <span className="text-xs text-base-content/40">{m.none}</span>
-                          )}
+                          {/* 승인은 번호 없이 종류 · 요청자 · 시각(ADR-0070 덧붙임) — 요청자·시각은 옆 칸, 여기는 종류만 */}
+                          <span className="text-xs text-base-content/50">{a.type ? (m.approvals.typeName[a.type] ?? a.type) : m.none}</span>
                         </td>
                         <td>{a.type ? <TypeBadge type={a.type} /> : m.none}</td>
                         <td>{a.requesterId ? <Requester id={a.requesterId} /> : m.none}</td>
@@ -162,7 +158,6 @@ export function ApprovalListPage() {
                     <PreviewDrawer id={pv.id} ids={rows.flatMap((r) => (r.approvalId ? [r.approvalId] : []))} onMove={pv.open} onClose={pv.close} title={a?.summary ?? pv.id} detailTo={`/approvals/${encodeURIComponent(pv.id)}`}>
                       {a ? (
                         <div className="space-y-4" data-testid="approval-preview">
-                          <p className="font-mono text-xs text-base-content/50">{a.approvalId}</p>
                           <PreviewFacts
                             rows={[
                               [m.approvals.type, a.type ? <TypeBadge type={a.type} /> : m.none],
@@ -223,17 +218,9 @@ function TypeBadge({ type }: { readonly type: string }) {
   );
 }
 
-/** 요청자 — 머리글자 동그라미 + ID(길면 줄여 보이고 전체는 마우스를 올리면) */
+/** 요청자 — 직원 표시(이름 · 사번, ADR-0070 덧붙임) */
 function Requester({ id }: { readonly id: string }) {
-  const letter = id.replace(/^OP-/i, '').charAt(0).toUpperCase() || '?';
-  return (
-    <span className="flex items-center gap-2" title={id}>
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-base-300 text-[11px] font-bold text-base-content/70" aria-hidden="true">
-        {letter}
-      </span>
-      <span className="max-w-[10rem] truncate text-sm">{id}</span>
-    </span>
-  );
+  return <Person id={id} />;
 }
 
 const REVIEW_TONE: Readonly<Record<string, Tone>> = {

@@ -14,6 +14,9 @@ const photo = (photoId: string) => ({ photoId, url: `/api/v1/inquiry-photos/${ph
 
 type Inquiry = components['schemas']['Inquiry'];
 
+/** 목 화면 번호(case 0.25.0 inquiryNumber) — INQ-MOCK-3 → Q-1119-0003, INQ-MOCK-R2 → Q-1119-0102 */
+const mockInquiryNumber = (id: string) => `Q-1119-${String((id.includes('-R') ? 100 : 0) + Number(id.match(/\d+$/)?.[0] ?? 0)).padStart(4, '0')}`;
+
 const seed = (): Inquiry[] => [
   {
     inquiryId: 'INQ-MOCK-3',
@@ -215,6 +218,7 @@ export const inquiryHandlers = [
       // 목록은 InquirySummary — 본문·답변은 싣지 않는다.
       items: slice.map((i) => ({
         inquiryId: i.inquiryId,
+        inquiryNumber: mockInquiryNumber(i.inquiryId),
         requesterType: kindOf(i),
         category: i.category,
         orderId: i.orderId,
@@ -239,7 +243,7 @@ export const inquiryHandlers = [
     if (!found) return problem(404, 'NOT_FOUND');
     // 만족도는 관리자에게만(0.15.0) — 상담원·지원센터 응답에는 없다
     const { satisfaction, ...rest } = found;
-    return HttpResponse.json({ ...rest, requesterType: kindOf(found), ...(r.admin && satisfaction ? { satisfaction } : {}) });
+    return HttpResponse.json({ ...rest, inquiryNumber: mockInquiryNumber(found.inquiryId), requesterType: kindOf(found), ...(r.admin && satisfaction ? { satisfaction } : {}) });
   }),
 
   // case 0.19.0 문의 닫기 — 답변 역할 직원만(관리자 403), 사유 2~500자, 이미 닫힘 409

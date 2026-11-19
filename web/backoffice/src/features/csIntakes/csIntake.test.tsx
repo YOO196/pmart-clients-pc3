@@ -98,7 +98,7 @@ describe('전화·채팅 접수', () => {
     expect(within(saved).queryByRole('link', { name: /^문의 / })).not.toBeInTheDocument();
     expect(await view.mutations('/cs-intakes')[0]!.json()).toMatchObject({ linkCaseId: 'CASE-MOCK-1', identityCheck: { method: 'OTHER', note: '가입 메일 주소로 회신' } });
 
-    await userEvent.click(within(saved).getByRole('link', { name: '접수 건 CASE-MOCK-1' }));
+    await userEvent.click(within(saved).getByRole('link', { name: '접수 건 C-1119-0001' }));
     const log = await screen.findByRole('region', { name: '이 건의 연락 기록' });
     const row = await within(log).findByTestId('cs-intake-row');
     expect(row).toHaveTextContent('메일');

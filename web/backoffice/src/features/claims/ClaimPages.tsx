@@ -1,5 +1,6 @@
 // 클레임 조회(고객센터) — claim-service 0.1.0 `GET /claims`, `GET /claims/{id}`, `GET /claims/{id}/refunds`. 조회만.
 // 클레임 결정(`POST …/decisions`)은 서버가 아직 501 — 화면에 넣지 않는다(요청서 §2). PG 환불 성공 전에는 "완료"로 보이지 않는다(서버 상태 그대로).
+import type { components as BffC } from '../../api/generated/backoffice-bff';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -10,9 +11,8 @@ import type { components } from '../../api/generated/claim';
 import { useApi } from '../../app/ApiContext';
 import { ChipGroup, CodeLabel, DataTable, DetailHeader, NextAction, Notice, PageHeader, ResultBar, SearchPanel, SearchRow, Section, StatusBadge, type Tone } from '../../shared/admin';
 import { EmptyBox, KindChip, ListFoot, SideFields, When } from '../lookup/parts';
-import { DisplayNumber } from '../../shared/displayNumber';
+import { DisplayNumber, SystemNumbers } from '../../shared/displayNumber';
 import { SavedViews } from '../../shared/SavedViews';
-import { CopyButton } from '../../shared/CopyButton';
 import { useRecordRecent } from '../../shared/recentViews';
 import { messages as m } from '../../shared/messages';
 import { isOrderNumber, orderIdOfNumber, useOrderNumbers } from '../../shared/numberLookups';
@@ -22,14 +22,23 @@ import { availableActions, RecoveryActions, ReturnProgress } from './ReturnClaim
 
 type ClaimType = components['schemas']['ClaimType'];
 type ClaimState = components['schemas']['ClaimState'];
-type ClaimSummary = components['schemas']['ClaimSummary'];
+type ClaimSummary = BffC['schemas']['ClaimListItem'];
+/** 주문번호 원천(bff unavailableSources 이름) */
+const ORDER_SOURCE = 'order-service';
 
 const TYPES = Object.keys(m.claims.typeName) as ClaimType[];
 const STATES = Object.keys(m.claims.stateName) as ClaimState[];
 const isType = (v: string | null): v is ClaimType => v !== null && (TYPES as readonly string[]).includes(v);
 const isState = (v: string | null): v is ClaimState => v !== null && (STATES as readonly string[]).includes(v);
+/**
+ * 클레임 화면 표기(ADR-0070 덧붙임 2026-11-19): 주문번호 + 종류(순번은 claim CL-4 뒤). 주문번호를 아직 모르면 종류 · 시각.
+ * 시스템 ID(CLM-…)는 상세의 시스템 번호 칸에서만.
+ */
+export const claimLabel = (orderNumber: string | null | undefined, type: string | null | undefined, openedAt: string | null | undefined) =>
+  orderNumber ? `${orderNumber} ${label(m.claims.typeName, type ?? null)}` : `${label(m.claims.typeName, type ?? null)} · ${openedAt ? when(openedAt) : m.none}`;
+
 /** 상태 꼬리표 색(표시만) */
-export const claimTone = (s: string | undefined): Tone =>
+export const claimTone = (s: string | null | undefined): Tone =>
   s === 'CLOSED' ? 'success' : s === 'REJECTED' || s === 'CANCELLED' || s === 'WITHDRAWN' ? 'ghost' : s === 'RECOVERY_FAILED' ? 'error' : s === 'FEE_PENDING' || s === 'STOP_PENDING' ? 'warning' : 'info';
 
 function useClaimList(filter: { orderId?: string | undefined; type?: ClaimType | undefined; state?: ClaimState | undefined }) {
@@ -39,7 +48,8 @@ function useClaimList(filter: { orderId?: string | undefined; type?: ClaimType |
     queryFn: ({ pageParam }) =>
       request(
         'GET',
-        api.claims.GET('/claims', {
+        // bff 0.18.0 `views/claims`(2026-11-19 백엔드 회신 — 웹 요청 display-numbers-in-responses): claim 줄 값 그대로 + 주문번호를 한 번에. 원천 권한(401·403·400)은 그대로 온다
+        api.bff.GET('/views/claims', {
           params: {
             query: {
               ...(filter.orderId ? { orderId: filter.orderId } : {}),
@@ -60,8 +70,12 @@ function ClaimTable({ query, withCount = false, preview = false }: { readonly qu
   // 오른쪽 미리보기(2026-11-19 관제 형식) — 클레임 목록 화면에서만(주문 상세 안의 표는 전처럼 상세로)
   const pv = usePreview();
   const items: ClaimSummary[] = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
-  // 화면 주문번호(ADR-0070) — 클레임 응답엔 번호가 없어 주문 조회로 붙인다(같은 주문은 캐시)
-  const orders = useOrderNumbers(items.map((c) => c.orderId));
+  // 화면 주문번호 — bff 응답의 orderNumber(줄마다 따로 부르지 않는다). 주문 원천을 못 읽었으면 그 칸만 null + unavailableSources → "번호 확인 불가"
+  const orderSourceFailed = (query.data?.pages ?? []).some((p) => (p.unavailableSources ?? []).includes(ORDER_SOURCE));
+  const orders = {
+    get: (id: string | null | undefined) => (id ? items.find((c) => c.orderId === id)?.orderNumber : undefined),
+    failed: (id: string | null | undefined) => orderSourceFailed && !items.find((c) => c.orderId === id)?.orderNumber,
+  };
   if (query.isPending) return <QueryState state={{ kind: 'loading' }}>{() => null}</QueryState>;
   if (query.isError && items.length === 0) {
     return (
@@ -100,8 +114,8 @@ function ClaimTable({ query, withCount = false, preview = false }: { readonly qu
                 <span className="flex flex-wrap items-center gap-2">
                   <ClaimTypeChip type={c.type} />
                   {c.claimId ? (
-                    <Link className="font-mono font-semibold text-base-content hover:text-primary hover:underline" to={`/claims/${encodeURIComponent(c.claimId)}`} onClick={(e) => e.stopPropagation()}>
-                      {c.claimId}
+                    <Link className="font-mono font-semibold text-base-content hover:text-primary hover:underline" to={`/claims/${encodeURIComponent(c.claimId)}`} onClick={(e) => e.stopPropagation()} data-testid="claim-label">
+                      {claimLabel(orders.get(c.orderId), c.type, c.openedAt)}
                     </Link>
                   ) : (
                     m.none
@@ -132,7 +146,7 @@ function ClaimTable({ query, withCount = false, preview = false }: { readonly qu
         (() => {
           const c = items.find((x) => x.claimId === pv.id);
           return (
-            <PreviewDrawer id={pv.id} ids={items.flatMap((x) => (x.claimId ? [x.claimId] : []))} onMove={pv.open} onClose={pv.close} title={pv.id} detailTo={`/claims/${encodeURIComponent(pv.id)}`}>
+            <PreviewDrawer id={pv.id} ids={items.flatMap((x) => (x.claimId ? [x.claimId] : []))} onMove={pv.open} onClose={pv.close} title={(() => { const x = items.find((y) => y.claimId === pv.id); return x ? claimLabel(orders.get(x.orderId), x.type, x.openedAt) : m.claims.detailTitle; })()} detailTo={`/claims/${encodeURIComponent(pv.id)}`}>
               {c ? (
                 <div className="space-y-4" data-testid="claim-preview">
                   <ClaimTypeChip type={c.type} />
@@ -318,8 +332,7 @@ export function ClaimDetailPage() {
               title={
                 <>
                   {c.type ? m.claims.titleOf(label(m.claims.typeName, c.type), label(m.claims.reasonName, c.reason)) : m.claims.detailTitle}
-                  <span className="ml-2 font-mono text-sm font-normal text-base-content/50">{claimId}</span>
-                  <CopyButton value={claimId} />
+                  <span className="ml-2 font-mono text-sm font-normal text-base-content/50" data-testid="claim-label">{claimLabel(detailOrders.get(c.orderId), c.type, c.openedAt)}</span>
                 </>
               }
               badges={
@@ -332,6 +345,8 @@ export function ClaimDetailPage() {
               }
               summary={`${m.claims.orderId} ${detailOrders.get(c.orderId) ?? (c.orderId ? m.claims.orderNumberUnknown : m.none)} · ${when(c.openedAt)}`}
             />
+            {/* 시스템 번호(ADR-0070 덧붙임) — 상세에서만 */}
+            <SystemNumbers ids={[{ label: m.claims.detailTitle, id: claimId }, { label: m.displayNumber.system.orderId, id: c.orderId }]} />
             {next && (
               <NextAction tone={next.tone} title={next.title} body={next.body}>
                 <a className="btn btn-sm" href="#recovery-actions">

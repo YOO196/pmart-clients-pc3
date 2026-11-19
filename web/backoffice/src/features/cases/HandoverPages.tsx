@@ -8,6 +8,7 @@
 // - 다음 조치·메모는 직원이 쓴 글 — 화면에만(로그 없음), 개인정보 금지 안내.
 // - case 0.13.1 역할(백엔드 요청 2026-11-17 request-handover-roles, 사용자 "(나)"): 작성은 지원센터 팀 = RIDER_OPS·OPERATOR_ADMIN, 관리자 팀 = OPERATOR_ADMIN.
 //   메뉴·작성 탭은 그 역할에만, 라이더 운영은 팀 고정. 수락은 후임에게 그 팀 역할이 없으면 403 — 인계서는 PENDING 그대로(전임·관리자가 취소 뒤 다시 씀).
+import { useStaffText } from '../../shared/employeeLabels';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -21,6 +22,15 @@ import { useSession } from '../../app/SessionContext';
 import { messages } from '../../shared/messages';
 import { label, text, when } from '../../shared/ops';
 import { CodeLabel, NextAction, Notice, PageHeader } from '../../shared/admin';
+import { StaffName } from '../lookup/parts';
+
+const seoulParts = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: 'numeric', hourCycle: 'h23' });
+/** "11/19 오전 교대 인계" — 서울 시각 기준 표시만 */
+export function handoverLabel(iso: string | null | undefined): string {
+  if (!iso) return messages.handovers.label('', '');
+  const p = Object.fromEntries(seoulParts.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return messages.handovers.label(`${p.month}/${p.day}`, Number(p.hour) < 12 ? '오전' : '오후');
+}
 
 const m = messages.handovers;
 type Handover = components['schemas']['ShiftHandover'];
@@ -85,6 +95,7 @@ function WriteForm() {
   const [note, setNote] = useState('');
   const [rows, setRows] = useState<Record<string, Row>>({});
   const owner = fromApplied || me;
+  const ownerName = useStaffText(owner);
   const query = useQuery({
     queryKey: ['cases', 'mine-for-handover', owner],
     queryFn: () => request('GET', api.cases.GET('/cases', { params: { query: { assigneeId: owner, size: 100 } } })),
@@ -128,7 +139,7 @@ function WriteForm() {
     >
       <div className="min-w-0 space-y-3 lg:col-span-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold">{m.ownerLine(owner)}</p>
+          <p className="text-sm font-semibold">{m.ownerLine(ownerName)}</p>
           {query.isSuccess && mine.length > 0 && <span className="badge badge-ghost badge-sm">{`${picked.length} / ${mine.length}`}</span>}
         </div>
         <QueryState state={toUiState(query, () => mine.length === 0)} onRetry={() => void query.refetch()} emptyText={m.noCases}>
@@ -316,13 +327,16 @@ function HandoverCard({ h, mode }: { readonly h: Handover; readonly mode: 'inbox
           </span>
           <Initial id={h.toOperatorId} />
         </span>
-        <span className="font-medium">{m.fromTo(text(h.fromOperatorId), text(h.toOperatorId))}</span>
+        <span className="font-medium" data-testid="handover-people">
+          <StaffName id={h.fromOperatorId} /> → <StaffName id={h.toOperatorId} />
+        </span>
         <span className={`badge badge-sm badge-soft ${STATE_TONE[h.state ?? ''] ?? ''}`}>{h.state ? <CodeLabel code={h.state} names={m.stateName} /> : messages.none}</span>
         {h.unreceived && <span className="badge badge-warning badge-sm">{m.unreceived}</span>}
         <span className="ml-auto flex flex-wrap items-center gap-2 text-xs text-base-content/55">
           <span>{h.group ? <CodeLabel code={h.group} names={messages.cases.groupName} /> : messages.none}</span>
           <span>{when(h.createdAt)}</span>
-          <span className="font-mono">{h.shiftHandoverId}</span>
+          {/* 교대 인계 표기(ADR-0070 덧붙임): 날짜 + 오전/오후 — 시스템 ID 는 보이지 않는다 */}
+          <span data-testid="handover-label">{handoverLabel(h.createdAt)}</span>
         </span>
       </div>
       <div className="space-y-3 px-4 py-3">
