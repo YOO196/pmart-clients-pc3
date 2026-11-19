@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:go_router/go_router.dart';
@@ -19,14 +20,28 @@ import '../data/device_consents_repository.dart';
 import 'current_location_flow.dart';
 import 'start_controller.dart';
 
-/// 처음 실행 단계를 판단하는 동안(저장소·세션·주소록 읽기).
+/// 처음 실행 단계를 판단하는 동안(저장소·세션·주소록 읽기) — 바로픽 시작 그림(사용자 지시 2026-11-19).
+/// 배경색은 Android 시작 화면(`splash_background`)과 같아 그림이 뜨기 전에도 이어 보인다.
 class StartSplashScreen extends StatelessWidget {
   const StartSplashScreen({super.key});
 
+  static const background = Color(0xFF7E24E6);
+  static const image = 'assets/images/splash.jpg';
+
   @override
-  Widget build(BuildContext context) => const Scaffold(
-    key: ValueKey('start-splash'),
-    body: Center(child: CircularProgressIndicator()),
+  Widget build(BuildContext context) => const AnnotatedRegion(
+    value: SystemUiOverlayStyle.light,
+    child: Scaffold(
+      key: ValueKey('start-splash'),
+      backgroundColor: background,
+      body: SizedBox.expand(
+        child: Image(
+          image: AssetImage(image),
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+        ),
+      ),
+    ),
   );
 }
 
