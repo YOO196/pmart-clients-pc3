@@ -36,6 +36,10 @@ abstract final class PdaColors {
   /// 됐다(초록) — 확인된 상태 한 줄.
   static const ok = Color(0xFF2E8B57);
   static const okInk = Color(0xFF1F5E3B);
+  static const okSoft = Color(0xFFE3F4EA);
+
+  /// 거절·오류 칩 바탕(옅은 빨강).
+  static const dangerSoft = Color(0xFFFBE6E3);
 }
 
 abstract final class PdaTheme {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/pda_theme.dart';
 import '../../../shared/product_hints.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../tasks/presentation/task_controllers.dart';
@@ -125,39 +126,61 @@ class _MyWorkList extends ConsumerWidget {
               style: TextStyle(color: scheme.error),
             ),
           ),
-        Card(
+        // 오늘 합계 — 옅은 보라 상자에 종류별 칸을 폭에 고르게(왼쪽으로 몰리지 않게, 사용자 2026-11-20).
+        Container(
           key: const ValueKey('my-work-summary'),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: a.totals.isEmpty
-                ? Text(l10n.myWorkNoTotals)
-                : Wrap(
-                    spacing: 16,
-                    runSpacing: 8,
-                    children: [
-                      for (final t in a.totals)
-                        Column(
-                          key: ValueKey('my-work-total-${t.type}'),
-                          children: [
-                            Text(
-                              activityTypeText(l10n, t.type),
-                              style: theme.textTheme.labelLarge,
-                            ),
-                            Text(
-                              l10n.myWorkCount(t.count),
-                              style: theme.textTheme.headlineSmall,
-                            ),
-                            Text(
-                              l10n.myWorkTotalQty(t.qty),
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+          decoration: BoxDecoration(
+            color: PdaColors.softer,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: PdaColors.lilac),
           ),
+          child: a.totals.isEmpty
+              ? Center(child: Text(l10n.myWorkNoTotals))
+              : LayoutBuilder(
+                  builder: (context, c) {
+                    final per = a.totals.length < 3 ? a.totals.length : 3;
+                    final w = c.maxWidth / per;
+                    return Wrap(
+                      runSpacing: 12,
+                      children: [
+                        for (final t in a.totals)
+                          SizedBox(
+                            width: w,
+                            child: Column(
+                              key: ValueKey('my-work-total-${t.type}'),
+                              children: [
+                                Text(
+                                  activityTypeText(l10n, t.type),
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    color: PdaColors.onNotice,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  l10n.myWorkCount(t.count),
+                                  style: theme.textTheme.headlineMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: PdaColors.primary,
+                                      ),
+                                ),
+                                Text(
+                                  l10n.myWorkTotalQty(t.qty),
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: PdaColors.body,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         if (a.items.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 32),
@@ -168,35 +191,71 @@ class _MyWorkList extends ConsumerWidget {
               style: theme.textTheme.titleMedium,
             ),
           ),
+        // 한 건 = 한 상자. 결과는 색 칩(반영 초록·거절 빨강·그 밖 회색) — 오른쪽 작은 글씨로는 안 보였다.
         for (final i in a.items)
-          ListTile(
+          Container(
             key: ValueKey('my-work-${i.refId}'),
-            contentPadding: EdgeInsets.zero,
-            title: Text(
-              [
-                activityTypeText(l10n, i.type),
-                if (i.sku case final s?) hints.bySku(s)?.name ?? s,
-              ].join(' · '),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: PdaColors.line, width: 1.5),
             ),
-            subtitle: Text(
-              [
-                formatSeoulTime(i.at),
-                if (i.qty case final q?) l10n.myWorkItemQty(q),
-              ].join(' · '),
-            ),
-            trailing: switch (activityResultText(l10n, i.result)) {
-              final r? => Text(
-                r,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: i.result == 'REJECTED'
-                      ? scheme.error
-                      : i.result == 'APPLIED'
-                      ? scheme.primary
-                      : scheme.onSurfaceVariant,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        [
+                          activityTypeText(l10n, i.type),
+                          if (i.sku case final s?) hints.bySku(s)?.name ?? s,
+                        ].join(' · '),
+                        style: theme.textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          formatSeoulTime(i.at),
+                          if (i.qty case final q?) l10n.myWorkItemQty(q),
+                        ].join(' · '),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: PdaColors.body,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              null => null,
-            },
+                if (activityResultText(l10n, i.result) case final r?)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: switch (i.result) {
+                        'APPLIED' => PdaColors.okSoft,
+                        'REJECTED' => PdaColors.dangerSoft,
+                        _ => PdaColors.soft,
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      r,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: switch (i.result) {
+                          'APPLIED' => PdaColors.okInk,
+                          'REJECTED' => scheme.error,
+                          _ => PdaColors.body,
+                        },
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         const SizedBox(height: 16),
         Text(

@@ -108,69 +108,76 @@ class StartScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 로그인 — 큰 보라 상자.
+              // 로그인 — 큰 보라 상자. 아래 두 칸을 키워 상자를 조금 줄였다(사용자 2026-11-20 "너무 커졌어, 조금만 줄여").
               Expanded(
-                child: Material(
-                  color: PdaColors.primary,
-                  borderRadius: BorderRadius.circular(20),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    key: const ValueKey('start-login'),
-                    onTap: () {
-                      ref.read(afterLoginProvider.notifier).set(null);
-                      context.push('/login');
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(26),
-                            child: Image.asset(
-                              'assets/images/pick_pda_logo.png',
-                              key: const ValueKey('start-logo'),
-                              width: 104,
-                              height: 104,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          Row(
+                child: SizedBox(
+                  width: double.infinity,
+                  child: SizedBox(
+                    height: double.infinity,
+                    child: Material(
+                      color: PdaColors.primary,
+                      borderRadius: BorderRadius.circular(20),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        key: const ValueKey('start-login'),
+                        onTap: () {
+                          ref.read(afterLoginProvider.notifier).set(null);
+                          context.push('/login');
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(
-                                Icons.login,
-                                color: Colors.white,
-                                size: 28,
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(26),
+                                child: Image.asset(
+                                  'assets/images/pick_pda_logo.png',
+                                  key: const ValueKey('start-logo'),
+                                  width: 104,
+                                  height: 104,
+                                ),
                               ),
-                              const SizedBox(width: 8),
+                              const SizedBox(height: 20),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.login,
+                                    color: Colors.white,
+                                    size: 28,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    l10n.startLogin,
+                                    style: theme.textTheme.headlineMedium
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
                               Text(
-                                l10n.startLogin,
-                                style: theme.textTheme.headlineMedium?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w800,
+                                l10n.startLoginHint,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.85),
                                 ),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            l10n.startLoginHint,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.85),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              // 기기 설정 · 재고 확인 — 아래 나란히.
+              // 기기 설정 · 재고 확인 — 아래 나란히(크게).
               SizedBox(
-                height: 128,
+                height: 180,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
