@@ -75,7 +75,10 @@ void main() {
   }
 
   Future<void> tapKey(WidgetTester t, String key) async {
-    await t.ensureVisible(find.byKey(ValueKey(key)));
+    // 화면 가운데로 — 아래 끝에 맞추면 고정 버튼 칸에 가린다.
+    final e = find.byKey(ValueKey(key)).evaluate().single;
+    await t.runAsync(() => Scrollable.ensureVisible(e, alignment: 0.5));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(ValueKey(key)));
     await t.pumpAndSettle();
   }

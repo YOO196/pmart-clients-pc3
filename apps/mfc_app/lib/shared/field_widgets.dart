@@ -70,7 +70,7 @@ class StepHeader extends StatelessWidget {
   }
 }
 
-/// 지금 할 일 — 시안의 큰 제목(예 "장바구니를 스캔하세요") + 회색 한 줄 설명.
+/// 지금 할 일 — 시안의 큰 제목(예 "장바구니를 스캔하세요") + 한 줄 설명(진한 글씨, 한 줄에 들어가게 짧게).
 class ScanPrompt extends StatelessWidget {
   const ScanPrompt({super.key, required this.text, this.detail});
 
@@ -99,7 +99,8 @@ class ScanPrompt extends StatelessWidget {
               child: Text(
                 d,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: PdaColors.muted,
+                  color: PdaColors.body,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
@@ -132,8 +133,8 @@ class ProgressLine extends StatelessWidget {
         Text(
           text,
           key: textKey,
-          style: Theme.of(context).textTheme.labelMedium
-              ?.copyWith(color: PdaColors.muted, fontWeight: FontWeight.w800),
+          style: Theme.of(context).textTheme.titleSmall
+              ?.copyWith(color: PdaColors.ink, fontWeight: FontWeight.w800),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -327,9 +328,9 @@ class NoticeBox extends StatelessWidget {
           child: Text(
             text,
             key: textKey,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: warning ? PdaColors.onWarning : PdaColors.onNotice,
-              fontWeight: warning ? FontWeight.w700 : null,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -556,10 +557,14 @@ class ResultView extends StatelessWidget {
     required this.action,
     required this.onAction,
     this.busy = false,
+    this.detail,
   });
 
   final IconData icon;
   final String text;
+
+  /// 제목 아래 크게 한 줄(예 출하대기 랙 코드).
+  final String? detail;
   final String action;
   final Future<void> Function() onAction;
   final bool busy;
@@ -577,8 +582,22 @@ class ResultView extends StatelessWidget {
       Text(
         text,
         textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.titleMedium,
+        style: Theme.of(context).textTheme.titleLarge
+            ?.copyWith(fontWeight: FontWeight.w800),
       ),
+      if (detail case final d?)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            d,
+            key: const ValueKey('result-detail'),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: PdaColors.primary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
       const SizedBox(height: 24),
       CommandButton(
         key: const ValueKey('result-action'),
@@ -879,4 +898,151 @@ class MarkCircle extends StatelessWidget {
       child: Icon(icon, size: 36, color: PdaColors.dark),
     ),
   );
+}
+
+/// 온도대 칩(냉장 하늘·냉동 보라·상온 살구) — 봉투·상품의 온도대처럼 놓치면 안 되는 값을 크게.
+/// [code] 는 C·F·A 또는 CHILLED·FROZEN·AMBIENT.
+class ZoneChip extends StatelessWidget {
+  const ZoneChip({
+    super.key,
+    required this.code,
+    required this.text,
+    this.large = false,
+  });
+
+  final String code;
+  final String text;
+  final bool large;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = switch (code.toUpperCase()) {
+      'C' || 'CHILLED' => 'C',
+      'F' || 'FROZEN' => 'F',
+      _ => 'A',
+    };
+    final theme = Theme.of(context);
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: large ? 12 : 8,
+        vertical: large ? 5 : 2,
+      ),
+      decoration: BoxDecoration(
+        color: tempChipColor(c),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Text(
+        text,
+        style:
+            (large ? theme.textTheme.titleMedium : theme.textTheme.labelLarge)
+                ?.copyWith(fontWeight: FontWeight.w800, color: PdaColors.ink),
+      ),
+    );
+  }
+}
+
+/// 숫자 칸 — 작은 이름 + 큰 숫자(예 "이 봉투 3개"). [strong] 이면 보라.
+class StatBox extends StatelessWidget {
+  const StatBox({
+    super.key,
+    required this.label,
+    required this.value,
+    this.strong = false,
+    this.valueKey,
+  });
+
+  final String label;
+  final String value;
+  final bool strong;
+  final Key? valueKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: strong ? PdaColors.softer : PdaColors.soft,
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: strong ? PdaColors.lilac : PdaColors.line),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(color: PdaColors.body),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            key: valueKey,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: strong ? PdaColors.primary : PdaColors.ink,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 됐다는 한 줄(초록 체크 + 굵은 글씨) — "모든 상품 포장 끝" 처럼 확인된 상태.
+class DoneLine extends StatelessWidget {
+  const DoneLine({super.key, required this.text, this.textKey});
+
+  final String text;
+  final Key? textKey;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 4, bottom: 4),
+    child: Row(
+      children: [
+        const Icon(Icons.check_circle, size: 20, color: PdaColors.ok),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            key: textKey,
+            style: Theme.of(context).textTheme.titleSmall
+                ?.copyWith(fontWeight: FontWeight.w800, color: PdaColors.okInk),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// 이름표 + 값 한 쌍(예 "LOT  L261107000497", "유통기한  2026-11-05") — 값은 진하게.
+class MetaPair extends StatelessWidget {
+  const MetaPair({super.key, required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '$label  ',
+            style: theme.textTheme.bodyMedium?.copyWith(color: PdaColors.muted),
+          ),
+          TextSpan(
+            text: value,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: PdaColors.ink,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

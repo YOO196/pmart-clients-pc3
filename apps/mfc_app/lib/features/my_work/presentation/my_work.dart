@@ -182,7 +182,6 @@ class _MyWorkList extends ConsumerWidget {
               [
                 formatSeoulTime(i.at),
                 if (i.qty case final q?) l10n.myWorkItemQty(q),
-                ?i.taskId,
               ].join(' · '),
             ),
             trailing: switch (activityResultText(l10n, i.result)) {
