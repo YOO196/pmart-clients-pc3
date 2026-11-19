@@ -31,8 +31,14 @@
 - **R6. BR-32 휴대폰 번호와의 관계** — 지금 프로필 `phone`(확인 안 됨, `phoneVerified=false`)을 본인 인증 번호로 바꿀지(`phoneVerified=true`), 주문 연락처(BR-60)는 이 번호를 쓸지.
 - **R7. 탈퇴 1달 재가입 금지** — 탈퇴 처리와 같이(번호 기준).
 - **BR-65. 카카오·네이버 로그인** — auth-service 가 지금 Google 만 검증한다(`CustomerSocialLoginService` "GOOGLE 만").
-  - 카카오: OpenID Connect ID 토큰 검증 제안(iss `https://kauth.kakao.com`, JWKS `https://kauth.kakao.com/.well-known/jwks.json`, aud = 앱 키) — Google 과 같은 방식(ADR-0055). 콘솔에서 OIDC 활성화 필요.
-  - 네이버: 모바일에 ID 토큰이 없다. 앱 SDK 는 Client Secret 을 앱에 넣어야 하고 액세스 토큰만으로는 우리 앱 토큰인지 확인이 약하다 → **서버 인가 코드 교환**(앱은 코드만, 서버가 Secret 으로 교환 후 `/v1/nid/me`) 제안. 계약의 "인가 코드는 받지 않는다"(ADR-0055)를 네이버만 바꾸는 결정이 필요하다. 방식은 사용자 확인 대기(앱 쪽 카카오 SDK 추가 승인도 대기).
+  - 카카오: OpenID Connect ID 토큰 검증 제안(iss `https://kauth.kakao.com`, JWKS `https://kauth.kakao.com/.well-known/jwks.json`, aud = 앱 키) — Google 과 같은 방식(ADR-0055). 콘솔: 사용자가 카카오 로그인·OIDC 활성화함(2026-11-19).
+  - 앱 SDK 2종(`kakao_flutter_sdk_user`·`flutter_naver_login`) 추가 사용자 승인(2026-11-19) — 고객 앱이 먼저 붙여 두고, 서버가 받기 전에는 실서버 로그인 목록에 넣지 않는다.
+  - 네이버: 모바일에 ID 토큰이 없다. **네이버 모바일 표준 방식** — 앱이 네이버 Android SDK 로 로그인해 **액세스 토큰**을 `providerToken` 으로 보내고, 서버가 `GET https://openapi.naver.com/v1/nid/me` 로 회원 정보(`id`·이름·이메일·사진)를 확인한다.
+    - 사용자 2026-11-19: 고객앱은 Android 만 — 네이버 개발자 센터 서비스 환경은 **Android 만**(패키지 `com.pmart.customer_app`, 다운로드 URL 은 스토어 전이라 임시). PC 웹·Callback URL·서버 코드 교환은 하지 않는다.
+    - Client Secret 이 앱에 들어간다(SDK 방식) — 저장소에 넣지 않고 빌드 때 `.secrets/customer.env` 로만. 서버는 토큰이 우리 앱 것인지 확인할 방법이 있으면(네이버 토큰 확인 API 등) 같이 확인해 달라.
+    - 앱 `flutter_naver_login`(네이버 SDK) 추가는 사용자 승인 대기.
+    - 키: Client ID·Secret 을 **앱과 백엔드 모두** 가진다(사용자가 각자 비밀 보관 방식으로 넣는다 — 문서·저장소에 적지 않음). 백엔드는 **회원 탈퇴 때 네이버 연동 해제**(토큰 삭제 — Client ID·Secret 필요)와, 가능하면 토큰이 우리 앱(Client ID) 것인지 확인에 쓴다. 카카오도 탈퇴 때 연결 끊기(unlink)를 같이 검토해 달라.
+  - **받을 정보(사용자에게 안내한 목록, 2026-11-19)** — 네이버 "제공 정보 선택": 필수 **회원이름**(프로필 이름·받는 분 기본값 — BR-60), 필수 **연락처 이메일**(계정 표시·BR-64 안내의 가린 이메일), 추가 **프로필 사진**. 휴대전화번호는 받지 않는다(본인 인증은 옥토모), 별명·성별·생일·연령대·출생연도도 받지 않는다. 카카오도 같은 기준(닉네임·이메일·프로필 사진, 전화번호 받지 않음 — 이메일은 비즈 앱 필요). 개인정보처리방침 수집 항목도 이 목록으로.
 
 ## 앱이 할 것(계약이 정해진 뒤)
 - 로그인 뒤 "휴대폰 인증" 화면(옥토모 방식에 맞춰), "이미 가입된 계정이 있어요" 안내(제공자·가입일·가린 이메일 + 그 제공자 로그인 버튼), 재가입 금지 안내.
