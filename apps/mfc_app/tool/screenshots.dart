@@ -389,18 +389,21 @@ void main() {
       await t.pumpAndSettle();
     }
 
-    // 첫 화면 → 업무 칸이 커지며 안내 화면 위 카드로(중간 한 장).
+    // 첫 화면 → 업무 칸이 커지며 안내 화면 위 카드로(중간 세 장 — 그림이 이어서 움직이는지).
     await shot('home');
     await t.tap(find.byKey(const ValueKey('area-inbound')));
     await t.pump();
-    await t.pump(const Duration(milliseconds: 140));
-    n += 1;
-    await expectLater(
-      find.byType(MfcApp),
-      matchesGoldenFile(
-        File('$_dir/fx-${n.toString().padLeft(2, '0')}-hero-mid.png').uri,
-      ),
-    );
+    for (final ms in [95, 95, 95]) {
+      await t.pump(Duration(milliseconds: ms));
+      expect(t.takeException(), isNull);
+      n += 1;
+      await expectLater(
+        find.byType(MfcApp),
+        matchesGoldenFile(
+          File('$_dir/fx-${n.toString().padLeft(2, '0')}-hero-mid.png').uri,
+        ),
+      );
+    }
     await shot('guide');
 
     // 입고.
