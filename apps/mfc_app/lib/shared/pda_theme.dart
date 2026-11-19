@@ -39,6 +39,9 @@ abstract final class PdaColors {
 }
 
 abstract final class PdaTheme {
+  /// 앱 글꼴(pubspec fonts). 시험은 글꼴 파일이 없어도 이름만 두면 기본 글꼴로 그린다.
+  static const fontFamily = 'Pretendard';
+
   static ThemeData light() {
     final scheme =
         ColorScheme.fromSeed(
@@ -68,17 +71,33 @@ abstract final class PdaTheme {
     );
     // 글자 모양은 기본 글꼴 묶음에서 이어 받는다(글꼴 이름을 비워 두면 화면마다 글꼴이 달라진다).
     // PDA 는 팔 길이에서 본다 — 작은 글씨를 한 단계 키운다(본문 15, 작은 글씨 13).
-    final m3 = ThemeData(colorScheme: scheme, useMaterial3: true).textTheme;
+    // 글꼴은 Pretendard(앱에 넣음) — 기기 기본 글꼴은 얇아 안 보였다. 굵기는 역할마다 정한다:
+    // 본문 400, 이름표·단추 600, 제목 700, 큰 제목 800(사용자 2026-11-20 "너무 얇아도, 너무 두꺼워도 문제").
+    final m3 = ThemeData(
+      colorScheme: scheme,
+      useMaterial3: true,
+      fontFamily: fontFamily,
+    ).textTheme;
+    const w4 = FontWeight.w400, w6 = FontWeight.w600, w7 = FontWeight.w700;
     final base = m3.copyWith(
-      bodyMedium: m3.bodyMedium!.copyWith(fontSize: 15),
-      bodySmall: m3.bodySmall!.copyWith(fontSize: 13),
-      labelMedium: m3.labelMedium!.copyWith(fontSize: 13),
-      labelSmall: m3.labelSmall!.copyWith(fontSize: 12),
+      headlineLarge: m3.headlineLarge!.copyWith(fontWeight: FontWeight.w800),
+      headlineMedium: m3.headlineMedium!.copyWith(fontWeight: FontWeight.w800),
+      headlineSmall: m3.headlineSmall!.copyWith(fontWeight: FontWeight.w800),
+      titleLarge: m3.titleLarge!.copyWith(fontWeight: w7),
+      titleMedium: m3.titleMedium!.copyWith(fontWeight: w7),
+      titleSmall: m3.titleSmall!.copyWith(fontWeight: w6),
+      bodyLarge: m3.bodyLarge!.copyWith(fontWeight: w4),
+      bodyMedium: m3.bodyMedium!.copyWith(fontSize: 15, fontWeight: w4),
+      bodySmall: m3.bodySmall!.copyWith(fontSize: 13, fontWeight: w4),
+      labelLarge: m3.labelLarge!.copyWith(fontWeight: w6),
+      labelMedium: m3.labelMedium!.copyWith(fontSize: 13, fontWeight: w6),
+      labelSmall: m3.labelSmall!.copyWith(fontSize: 12, fontWeight: w6),
     );
     final bold = base.labelLarge!.copyWith(fontWeight: FontWeight.w800);
     return ThemeData(
       colorScheme: scheme,
       useMaterial3: true,
+      fontFamily: fontFamily,
       textTheme: base,
       scaffoldBackgroundColor: PdaColors.paper,
       visualDensity: VisualDensity.standard,
@@ -165,7 +184,15 @@ abstract final class PdaTheme {
           borderSide: const BorderSide(color: PdaColors.line),
         ),
       ),
-      listTileTheme: const ListTileThemeData(iconColor: PdaColors.primary),
+      // 목록 줄 이름은 600(얇으면 안 보인다), 아래 줄은 본문 400 진한 글씨.
+      listTileTheme: ListTileThemeData(
+        iconColor: PdaColors.primary,
+        titleTextStyle: base.bodyLarge!.copyWith(
+          fontWeight: FontWeight.w600,
+          color: PdaColors.ink,
+        ),
+        subtitleTextStyle: base.bodyMedium!.copyWith(color: PdaColors.body),
+      ),
     );
   }
 }

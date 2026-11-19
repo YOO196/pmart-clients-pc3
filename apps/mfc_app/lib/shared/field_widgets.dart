@@ -55,7 +55,9 @@ class StepHeader extends StatelessWidget {
                         maxLines: 1,
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: i == current ? Colors.white : PdaColors.muted,
-                          fontWeight: i == current ? FontWeight.w800 : null,
+                          fontWeight: i == current
+                              ? FontWeight.w800
+                              : FontWeight.w600,
                         ),
                       ),
                     ],

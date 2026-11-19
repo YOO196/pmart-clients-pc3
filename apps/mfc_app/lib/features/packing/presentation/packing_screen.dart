@@ -523,13 +523,16 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(l.productName ?? l.sku),
+                                          Text(
+                                            l.productName ?? l.sku,
+                                            style: theme.textTheme.titleSmall,
+                                          ),
                                           if (ctl.zoneOf(l) case final z?)
                                             Text(
                                               storageZoneText(l10n, z),
-                                              style: theme.textTheme.bodySmall
+                                              style: theme.textTheme.labelMedium
                                                   ?.copyWith(
-                                                    color: PdaColors.muted,
+                                                    color: PdaColors.body,
                                                   ),
                                             ),
                                         ],
