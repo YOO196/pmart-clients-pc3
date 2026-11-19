@@ -10,7 +10,7 @@
 // - (0.20.0) 센터 휴게 번호 `GET·PUT /mfcs/{mfcId}/break-pin` — 작업자가 PDA 로 휴게를 켤 때 넣는 4자리. 서버는 번호를 돌려주지 않는다.
 // - 지금 배정 조건(effectiveTaskTypes)·PDA 업무(workAreas)는 서버 값을 보이기만 한다(계산하지 않음).
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Link, Route, Routes, useLocation as useRouterLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
@@ -20,7 +20,14 @@ import type { components } from '../../api/generated/mfc-capacity';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
-import { WhoAt } from '../../shared/OperatorLabel';
+import { SystemNumbers } from '../../shared/displayNumber';
+import { GuideBox, SearchBar, StatCard, StatStrip } from '../../shared/listParts';
+import { useOperatorLabel, WhoAt } from '../../shared/OperatorLabel';
+import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
+import { SavedViews } from '../../shared/SavedViews';
+import { SeenMark } from '../../shared/SeenMark';
+import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
+import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 import { BreakPinCard } from './BreakPinCard';
 
 const m = messages.workers;
@@ -68,6 +75,7 @@ const todayText = (w: Worker) => (w.employmentType !== 'DAILY' ? messages.none :
 function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
   const [params, setParams] = useSearchParams();
+  const { pathname, search } = useRouterLocation();
   const raw = params.get('state');
   const state = isState(raw) ? raw : undefined;
   const query = useQuery({
@@ -75,43 +83,64 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
     queryFn: async () =>
       (await request('GET', api.capacity.GET('/mfcs/{mfcId}/workers', { params: { path: { mfcId }, query: state ? { state } : {} } }))).items ?? [],
   });
+  // 숫자 카드: 서버 기본 목록(재직·정지 — 쪽 나눔 없이 전부)을 센다. 거르기와 상관없이 같은 숫자(같은 조회 키라 두 번 읽지 않는다)
+  const all = useQuery({
+    queryKey: ['workers', mfcId, 'DEFAULT'],
+    queryFn: async () => (await request('GET', api.capacity.GET('/mfcs/{mfcId}/workers', { params: { path: { mfcId }, query: {} } }))).items ?? [],
+  });
+  const cell = (pick: (w: Worker) => boolean) => (all.data ? m.ui.count(all.data.filter(pick).length) : all.isError ? '?' : '…');
+  const setState = (v: string) => {
+    const next = new URLSearchParams(params);
+    if (v) next.set('state', v);
+    else next.delete('state');
+    setParams(next, { replace: true });
+  };
+  const seen = useSeenIds('worker', mfcId);
+  const ids = (query.data ?? []).map((w) => w.workerId ?? '').filter(Boolean);
+  useRememberQueue('worker', mfcId, query.data ? ids : undefined, `${pathname}${search}`);
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold">{messages.menus.workers}</h1>
+        <h1>{messages.menus.workers}</h1>
         <Link to={workersPath(mfcId, 'new')} className="btn btn-sm btn-primary">
           {m.register}
         </Link>
       </div>
-      <p className="text-sm opacity-70">{m.intro}</p>
+      <GuideBox title={m.ui.guideTitle} storeKey="workers" items={[m.intro, m.ui.countNote]} />
+      <StatStrip label={m.ui.countsLabel} testId="worker-counts">
+        <StatCard testId="count-ACTIVE" label={m.state.ACTIVE} value={cell((w) => w.state === 'ACTIVE')} tone="info" active={state === 'ACTIVE'} onClick={() => setState(state === 'ACTIVE' ? '' : 'ACTIVE')} />
+        <StatCard
+          testId="count-SUSPENDED"
+          label={m.state.SUSPENDED}
+          value={cell((w) => w.state === 'SUSPENDED')}
+          tone={(all.data ?? []).some((w) => w.state === 'SUSPENDED') ? 'warning' : undefined}
+          active={state === 'SUSPENDED'}
+          onClick={() => setState(state === 'SUSPENDED' ? '' : 'SUSPENDED')}
+        />
+        <StatCard testId="count-break" label={m.onBreak} value={cell((w) => !!w.onBreak)} hint={m.ui.breakHint} />
+        <StatCard testId="count-daily" label={m.ui.dailyNotEnrolled} value={cell((w) => w.employmentType === 'DAILY' && !w.todayEnrollment)} hint={m.ui.dailyHint} />
+      </StatStrip>
       <BreakPinCard mfcId={mfcId} />
-      <label className="flex w-fit flex-col gap-1 rounded-box bg-base-100 p-3 text-sm">
-        {m.stateFilter}
-        <select
-          className="select select-sm w-44"
-          value={state ?? ''}
-          onChange={(e) => {
-            const next = new URLSearchParams(params);
-            if (e.target.value) next.set('state', e.target.value);
-            else next.delete('state');
-            setParams(next, { replace: true });
-          }}
-        >
-          <option value="">{m.defaultFilter}</option>
-          {STATES.map((s) => (
-            <option key={s} value={s}>
-              {m.state[s]}
-            </option>
-          ))}
-        </select>
-      </label>
+      <SearchBar summary={[[m.stateFilter, state ? (m.state[state] ?? state) : m.defaultFilter]]} startOpen={!state}>
+        <label className="flex flex-col gap-1">
+          {m.stateFilter}
+          <select className="select select-sm w-44" value={state ?? ''} onChange={(e) => setState(e.target.value)}>
+            <option value="">{m.defaultFilter}</option>
+            {STATES.map((s) => (
+              <option key={s} value={s}>
+                {m.state[s]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </SearchBar>
+      <SavedViews listKey={`workers.${mfcId}`} />
       <QueryState state={toUiState(query, (rows) => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.empty}>
         {(rows) => (
           <table className="table table-sm rounded-box bg-base-100">
             <thead>
               <tr>
-                <th>{m.fields.name}</th>
-                <th>{m.fields.workerId}</th>
+                <th>{m.ui.employee}</th>
                 <th>{m.fields.employmentType}</th>
                 <th>{m.fields.state}</th>
                 <th>{m.fields.effective}</th>
@@ -124,11 +153,12 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
               {rows.map((w) => (
                 <tr key={w.workerId} data-testid="worker-row">
                   <td>
+                    {/* 직원 표기 = 이름 · 사번(ADR-0070) — 운영자 ID 는 상세의 시스템 번호 칸에만 */}
                     <Link className="link" to={workersPath(mfcId, encodeURIComponent(w.workerId ?? ''))}>
-                      {w.displayName}
+                      <WorkerName worker={w} />
                     </Link>
+                    <SeenMark seen={seen.has(w.workerId ?? '')} />
                   </td>
-                  <td className="font-mono text-xs">{w.workerId}</td>
                   <td>{m.employment[w.employmentType ?? ''] ?? w.employmentType ?? messages.none}</td>
                   <td>
                     <StateBadge state={w.state} />
@@ -144,6 +174,21 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
         )}
       </QueryState>
     </section>
+  );
+}
+
+/** "이름 · 사번" — 이름은 작업자 등록 이름, 사번은 인사(hr employee-labels). 사번을 못 읽으면 이름만 + 알림(운영자 ID 를 대신 내지 않는다) */
+function WorkerName({ worker: w }: { readonly worker: Worker }) {
+  const label = useOperatorLabel(w.workerId);
+  return (
+    <span data-testid="worker-name">
+      {w.displayName ?? label.data?.name ?? messages.none}
+      {label.data ? (
+        <span className="text-base-content/60">{` · ${label.data.employeeNo}`}</span>
+      ) : label.isError ? (
+        <span className="ml-1 text-xs text-warning">{m.ui.noEmployeeNo}</span>
+      ) : null}
+    </span>
   );
 }
 
@@ -292,20 +337,38 @@ function WorkerDetailPage({ mfcId }: { readonly mfcId: string }) {
     queryKey: ['worker', mfcId, workerId],
     queryFn: () => request('GET', api.capacity.GET('/mfcs/{mfcId}/workers/{workerId}', { params: { path: { mfcId, workerId } } })),
   });
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const past = useScrolledPast(titleRef);
+  useRecordRecent('worker', mfcId, workerId, query.data?.displayName);
   return (
     <section className="max-w-4xl space-y-4">
-      <Link to={workersPath(mfcId)} className="link text-sm">
-        {m.back}
-      </Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to={workersPath(mfcId)} className="link text-sm">
+          {m.back}
+        </Link>
+        <div className="ml-auto">
+          <QueueNav kind="worker" mfcId={mfcId} id={workerId} />
+        </div>
+      </div>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(w) => (
           <>
-            <h1 className="flex flex-wrap items-center gap-2 text-xl font-bold">
-              {w.displayName}
-              <span className="font-mono text-base opacity-70">{w.workerId}</span>
+            {/* 직원 표기 = 이름 · 사번(ADR-0070) — 운영자 ID 는 시스템 번호 칸에만 */}
+            <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
+              <WorkerName worker={w} />
               <StateBadge state={w.state} />
               {w.onBreak && <span className="badge badge-sm badge-info">{m.onBreak}</span>}
             </h1>
+            <StickyTitle
+              show={past}
+              title={<WorkerName worker={w} />}
+              badges={
+                <>
+                  <StateBadge state={w.state} />
+                  {w.onBreak && <span className="badge badge-sm badge-info">{m.onBreak}</span>}
+                </>
+              }
+            />
             {notice.text && (
               <p role="status" className="text-success text-sm">
                 {notice.text}
@@ -343,6 +406,7 @@ function WorkerDetailPage({ mfcId }: { readonly mfcId: string }) {
             </Section>
             <Activities mfcId={mfcId} workerId={workerId} />
             <Histories worker={w} />
+            <SystemNumbers ids={[{ label: m.fields.workerId, id: w.workerId }]} />
           </>
         )}
       </QueryState>

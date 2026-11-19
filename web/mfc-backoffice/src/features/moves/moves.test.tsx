@@ -43,13 +43,13 @@ describe('이동 목록', () => {
 describe('이동 상세·취소', () => {
   it('취소: 사유가 있어야 보내고, 서버가 돌려준 상태(취소됨)를 보인다', async () => {
     const view = renderAt('/c/MFC-BSN-01/moves/MOVE-1');
-    expect(await screen.findByRole('heading', { name: /MOVE-1/ })).toHaveTextContent('긴급');
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('긴급');
     const button = screen.getByRole('button', { name: '이동 취소' });
     expect(button).toBeDisabled();
     await userEvent.type(screen.getByRole('textbox', { name: '취소 사유' }), '진열 계획 바뀜');
     await userEvent.click(button);
     expect(await screen.findByText('취소했어요.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /MOVE-1/ })).toHaveTextContent('취소됨');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('취소됨');
     expect(screen.queryByRole('button', { name: '이동 취소' })).not.toBeInTheDocument();
     const post = view.sent.find((r) => r.method === 'POST')!;
     expect(new URL(post.url).pathname).toMatch(/\/move-orders\/MOVE-1\/cancellations$/);
@@ -61,11 +61,11 @@ describe('이동 상세·취소', () => {
   it('카트에 실린 몫이 있으면 취소 뒤 "카트 정리 대기" — 끝났다고 하지 않는다', async () => {
     db.moves.set('MOVE-1', { ...db.moves.get('MOVE-1')!, pickedQty: 2, onCartQty: 2, cartLocation: 'CRT-C-02' });
     renderAt('/c/MFC-BSN-01/moves/MOVE-1');
-    await screen.findByRole('heading', { name: /MOVE-1/ });
+    await screen.findByRole('heading', { level: 1 });
     await userEvent.type(screen.getByRole('textbox', { name: '취소 사유' }), '중단');
     await userEvent.click(screen.getByRole('button', { name: '이동 취소' }));
     expect(await screen.findByText('취소했어요. 카트에 남은 물건을 작업자가 되돌려 놓으면 끝나요.')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /MOVE-1/ })).toHaveTextContent('카트 정리 대기');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('카트 정리 대기');
     expect(screen.queryByText('취소했어요.')).not.toBeInTheDocument();
   });
 
@@ -79,7 +79,7 @@ describe('이동 상세·취소', () => {
 
   it('센터 관리자가 아니면 서버 403 — 권한 문구', async () => {
     renderAt('/c/MFC-BSN-01/moves/MOVE-1', as.adminWithCenter);
-    await screen.findByRole('heading', { name: /MOVE-1/ });
+    await screen.findByRole('heading', { level: 1 });
     await userEvent.type(screen.getByRole('textbox', { name: '취소 사유' }), '중단');
     await userEvent.click(screen.getByRole('button', { name: '이동 취소' }));
     expect(await screen.findByText('이 센터 권한이 없습니다.')).toBeInTheDocument();

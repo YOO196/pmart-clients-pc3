@@ -5,7 +5,7 @@
 // - 집어 올리기·내려놓기는 현장(PDA) 일이라 이 화면에 없다.
 // - 출발·도착 고르기는 돕기만: mfc-inventory `GET /mfcs/{id}/stock?sku=`(위치·LOT 별), mfc-location `GET /putaway-candidates`. 판정은 서버.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Link, Route, Routes, useLocation as useRouterLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
@@ -16,7 +16,16 @@ import type { components as InventorySchemas } from '../../api/generated/mfc-inv
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
+import { SystemNumbers } from '../../shared/displayNumber';
+import { GuideBox, SearchBar, StatCard, StatStrip } from '../../shared/listParts';
+import { useNewIds } from '../../shared/motion';
 import { Who } from '../../shared/OperatorLabel';
+import { ProgressSteps, type StepPlace } from '../../shared/ProgressSteps';
+import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
+import { SavedViews } from '../../shared/SavedViews';
+import { SeenMark } from '../../shared/SeenMark';
+import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
+import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 
 const m = messages.moves;
 
@@ -59,27 +68,49 @@ function MoveListPage({ mfcId }: { readonly mfcId: string }) {
     queryFn: async () =>
       (await request('GET', api.inbound.GET('/move-orders', { params: { query: { mfcId, ...(state ? { state } : {}) } } }))).items ?? [],
   });
+  // 숫자 카드: 서버 기본 목록(진행 중 = ACTIVE·CANCEL_PENDING, 쪽 나눔 없이 전부)에서 센다 — 거르기와 상관없이 같은 숫자
+  const open = useQuery({
+    queryKey: ['moves', mfcId, 'IN_PROGRESS'],
+    queryFn: async () => (await request('GET', api.inbound.GET('/move-orders', { params: { query: { mfcId } } }))).items ?? [],
+  });
+  const cell = (pick: (o: MoveOrder) => boolean) => (open.data ? m.ui.count(open.data.filter(pick).length) : open.isError ? '?' : '…');
+  const has = (pick: (o: MoveOrder) => boolean) => (open.data ?? []).some(pick);
+  const { pathname, search } = useRouterLocation();
+  const setState = (v: string) => {
+    const next = new URLSearchParams(params);
+    if (v) next.set('state', v);
+    else next.delete('state');
+    setParams(next, { replace: true });
+  };
+  const ids = (query.data ?? []).map((o) => o.moveId ?? '').filter(Boolean);
+  const fresh = useNewIds(query.data ? ids : undefined, state ?? '');
+  const seen = useSeenIds('move', mfcId);
+  useRememberQueue('move', mfcId, query.data ? ids : undefined, `${pathname}${search}`);
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold">{messages.menus.moves}</h1>
+        <h1>{messages.menus.moves}</h1>
         <Link to={movesPath(mfcId, 'new')} className="btn btn-sm btn-primary">
           {m.create}
         </Link>
       </div>
-      <p className="text-sm opacity-70">{m.intro}</p>
-      <label className="flex w-fit flex-col gap-1 rounded-box bg-base-100 p-3 text-sm">
+      <GuideBox title={m.ui.guideTitle} storeKey="moves" items={[m.intro, m.ui.countNote]} />
+      <StatStrip label={m.ui.countsLabel} testId="move-counts">
+        <StatCard testId="count-ACTIVE" label={m.state.ACTIVE} value={cell((o) => o.state === 'ACTIVE')} tone="info" active={state === 'ACTIVE'} onClick={() => setState(state === 'ACTIVE' ? '' : 'ACTIVE')} />
+        <StatCard
+          testId="count-CANCEL_PENDING"
+          label={m.state.CANCEL_PENDING}
+          value={cell((o) => o.state === 'CANCEL_PENDING')}
+          tone={has((o) => o.state === 'CANCEL_PENDING') ? 'warning' : undefined}
+          active={state === 'CANCEL_PENDING'}
+          onClick={() => setState(state === 'CANCEL_PENDING' ? '' : 'CANCEL_PENDING')}
+        />
+        <StatCard testId="count-urgent" label={m.fields.urgent} value={cell((o) => !!o.urgent)} tone={has((o) => !!o.urgent) ? 'error' : undefined} hint={m.ui.urgentHint} />
+      </StatStrip>
+      <SearchBar summary={[[m.stateFilter, state ? (m.state[state] ?? state) : m.inProgress]]} startOpen={!state}>
+        <label className="flex flex-col gap-1">
         {m.stateFilter}
-        <select
-          className="select select-sm w-44"
-          value={state ?? ''}
-          onChange={(e) => {
-            const next = new URLSearchParams(params);
-            if (e.target.value) next.set('state', e.target.value);
-            else next.delete('state');
-            setParams(next, { replace: true });
-          }}
-        >
+        <select className="select select-sm w-44" value={state ?? ''} onChange={(e) => setState(e.target.value)}>
           <option value="">{m.inProgress}</option>
           {STATES.map((s) => (
             <option key={s} value={s}>
@@ -87,7 +118,9 @@ function MoveListPage({ mfcId }: { readonly mfcId: string }) {
             </option>
           ))}
         </select>
-      </label>
+        </label>
+      </SearchBar>
+      <SavedViews listKey={`moves.${mfcId}`} />
       <QueryState state={toUiState(query, (rows) => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.empty}>
         {(rows) => (
           <table className="table table-sm rounded-box bg-base-100">
@@ -106,12 +139,13 @@ function MoveListPage({ mfcId }: { readonly mfcId: string }) {
             </thead>
             <tbody>
               {rows.map((o) => (
-                <tr key={o.moveId} data-testid="move-row">
+                <tr key={o.moveId} data-testid="move-row" className={fresh.has(o.moveId ?? '') ? 'row-new' : undefined}>
                   <td>
                     <Link className="link" to={movesPath(mfcId, encodeURIComponent(o.moveId ?? ''))}>
                       {m.kind[o.kind ?? ''] ?? o.kind}
                     </Link>
                     {o.urgent && <span className="badge badge-sm badge-error ml-1">{m.fields.urgent}</span>}
+                    <SeenMark seen={seen.has(o.moveId ?? '')} />
                   </td>
                   <td>{product(o)}</td>
                   <td className="font-mono text-xs">{o.lotId}</td>
@@ -146,20 +180,37 @@ function MoveDetailPage({ mfcId }: { readonly mfcId: string }) {
     queryKey: ['move', moveId],
     queryFn: () => request('GET', api.inbound.GET('/move-orders/{moveId}', { params: { path: { moveId } } })),
   });
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const past = useScrolledPast(titleRef);
+  useRecordRecent('move', mfcId, moveId, query.data ? moveTitle(query.data) : null);
   return (
     <section className="max-w-3xl space-y-4">
-      <Link to={movesPath(mfcId)} className="link text-sm">
-        {m.back}
-      </Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to={movesPath(mfcId)} className="link text-sm">
+          {m.back}
+        </Link>
+        <div className="ml-auto">
+          <QueueNav kind="move" mfcId={mfcId} id={moveId} />
+        </div>
+      </div>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(o) => (
           <>
-            <h1 className="flex flex-wrap items-center gap-2 text-xl font-bold">
-              {m.kind[o.kind ?? ''] ?? o.kind}
-              <span className="font-mono text-base">{o.moveId}</span>
+            <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
+              {moveTitle(o)}
               <StateBadge state={o.state} />
               {o.urgent && <span className="badge badge-sm badge-error">{m.fields.urgent}</span>}
             </h1>
+            <StickyTitle show={past} title={moveTitle(o)} badges={<StateBadge state={o.state} />} />
+            <ProgressSteps
+              steps={m.ui.steps}
+              place={movePlace(o.state)}
+              ended={o.state === 'CANCELLED' ? m.state.CANCELLED : undefined}
+              unknownText={o.state ? m.ui.unknownStep(o.state) : undefined}
+              label={m.ui.stepsLabel}
+              testId="move-steps"
+              endedTestId="move-ended"
+            />
             {notice && (
               <p role="status" className="text-success text-sm">
                 {notice}
@@ -168,11 +219,29 @@ function MoveDetailPage({ mfcId }: { readonly mfcId: string }) {
             {o.state === 'CANCEL_PENDING' && <p className="alert alert-warning text-sm">{m.cancelPendingNote}</p>}
             <MoveFacts order={o} />
             {o.state === 'ACTIVE' && <CancelMove mfcId={mfcId} order={o} onDone={setNotice} />}
+            <SystemNumbers ids={[{ label: m.ui.move, id: o.moveId }]} />
           </>
         )}
       </QueryState>
     </section>
   );
+}
+
+/** 화면 표기(ADR-0070 덧붙임 "작업 지시 = 종류 · 시각") — 시스템 ID 는 시스템 번호 칸에만 */
+const moveTitle = (o: MoveOrder) => m.ui.title(m.kind[o.kind ?? ''] ?? o.kind ?? m.ui.move, o.createdAt ? formatSeoul(o.createdAt) : messages.none);
+
+/** 이동 상태 → 진행 단계(지시 → 옮기는 중 → 끝남). 취소 대기는 옮기는 중에서 주의(카트에 남은 것 정리) */
+function movePlace(s: MoveState | undefined): StepPlace | null {
+  switch (s) {
+    case 'ACTIVE':
+      return { step: 1, done: false };
+    case 'CANCEL_PENDING':
+      return { step: 1, done: false, warn: true, note: m.state.CANCEL_PENDING ?? 'CANCEL_PENDING' };
+    case 'COMPLETED':
+      return { step: 2, done: true };
+    default:
+      return null;
+  }
 }
 
 function MoveFacts({ order: o }: { readonly order: MoveOrder }) {

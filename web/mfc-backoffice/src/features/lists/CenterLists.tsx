@@ -1,5 +1,6 @@
 // 센터 목록(MB-1 — 백엔드 회신 2026-11-18 `clients/mfc-backoffice/2026-11-18-reply-lists-and-roles.md`).
 // 지금까지 번호로만 열던 화면 위에 그 센터 목록을 둔다. "열기"는 그 화면의 번호 쿼리를 채운다(아래 상세·처리 흐름은 그대로).
+// 목록에는 화면 표기만(ADR-0070 덧붙임 2026-11-19) — 판정·승인·검수·반입·요청·실사의 시스템 ID 는 열어 본 상세(번호 칸)에서. 줄은 종류·상태·시각으로 알아본다.
 // 기본 거르기는 일이 남은 상태(해제 승인 대기·폐기 승인 대기·실사 승인 대기 등) — 전체로 바꿀 수 있다.
 import { request } from '@pmart/web-core';
 import { formatSeoul } from '@pmart/web-ui';
@@ -35,9 +36,8 @@ export function DecisionList({ mfcId }: { readonly mfcId: string }) {
       fetchPage={(cursor) =>
         request('GET', api.quality.GET('/quality-decisions', { params: { query: { mfcId, ...arr<DecisionState>(state), ...(cursor ? { cursor } : {}) } } }))
       }
-      head={[l.id, l.kind, l.reason, l.stateCol, l.at]}
+      head={[l.kind, l.reason, l.stateCol, l.at]}
       cells={(d) => [
-        <span className="font-mono">{d.qualityDecisionId}</span>,
         q.type[d.decisionType] ?? d.decisionType,
         q.reason[d.reason] ?? d.reason,
         q.decisionState[d.state ?? ''] ?? d.state,
@@ -70,8 +70,8 @@ export function DisposalList({ mfcId }: { readonly mfcId: string }) {
       fetchPage={(cursor) =>
         request('GET', api.quality.GET('/disposal-approvals', { params: { query: { mfcId, ...arr<DisposalState>(state), ...(cursor ? { cursor } : {}) } } }))
       }
-      head={[l.id, l.stateCol, l.requester, l.at, l.reason]}
-      cells={(d) => [<span className="font-mono">{d.disposalApprovalId}</span>, q.disposalState[d.state ?? ''] ?? d.state, <Who id={d.requesterId} />, when(d.requestedAt), d.reason ?? messages.none]}
+      head={[l.stateCol, l.requester, l.at, l.reason]}
+      cells={(d) => [q.disposalState[d.state ?? ''] ?? d.state, <Who id={d.requesterId} />, when(d.requestedAt), d.reason ?? messages.none]}
       rowKey={(d) => d.disposalApprovalId ?? ''}
       onOpen={(d) => d.disposalApprovalId && open(d.disposalApprovalId)}
       emptyText={l.empty}
@@ -99,10 +99,8 @@ export function InspectionList({ mfcId }: { readonly mfcId: string }) {
       fetchPage={(cursor) =>
         request('GET', api.quality.GET('/return-inspections', { params: { query: { mfcId, ...arr<ApplyState>(state), ...(cursor ? { cursor } : {}) } } }))
       }
-      head={[l.id, l.claim, l.resale, l.dispose, l.stateCol, l.at]}
+      head={[l.resale, l.dispose, l.stateCol, l.at]}
       cells={(r) => [
-        <span className="font-mono">{r.returnInspectionId}</span>,
-        <span className="font-mono">{r.claimId}</span>,
         r.resaleQty ?? messages.none,
         r.disposeQty ?? messages.none,
         apply[r.inventoryApplyStatus ?? ''] ?? r.inventoryApplyStatus,
@@ -135,10 +133,8 @@ export function ReturnReceiptList({ mfcId, title }: { readonly mfcId: string; re
       fetchPage={(cursor) =>
         request('GET', api.inbound.GET('/return-receipts', { params: { query: { mfcId, ...arr<ApplyState>(state), ...(cursor ? { cursor } : {}) } } }))
       }
-      head={[l.id, l.claim, l.stateCol, l.inspection, l.at]}
+      head={[l.stateCol, l.inspection, l.at]}
       cells={(r) => [
-        <span className="font-mono">{r.returnReceiptId}</span>,
-        <span className="font-mono">{r.claimId}</span>,
         i.applyStatus[r.inventoryApplyStatus ?? ''] ?? r.inventoryApplyStatus,
         i.inspectionState[r.inspectionState ?? ''] ?? r.inspectionState ?? messages.none,
         when(r.receivedAt),
@@ -170,8 +166,8 @@ export function SupplyRequestList({ mfcId }: { readonly mfcId: string }) {
       fetchPage={(cursor) =>
         request('GET', api.inbound.GET('/supply-requests', { params: { query: { mfcId, ...arr<SupplyState>(state), ...(cursor ? { cursor } : {}) } } }))
       }
-      head={[l.id, l.stateCol, l.lineCount, l.at]}
-      cells={(r) => [<span className="font-mono">{r.supplyRequestId}</span>, i.supplyState[r.state ?? ''] ?? r.state, l.lines(r.lines.length), when(r.submittedAt)]}
+      head={[l.stateCol, l.lineCount, l.at]}
+      cells={(r) => [i.supplyState[r.state ?? ''] ?? r.state, l.lines(r.lines.length), when(r.submittedAt)]}
       rowKey={(r) => r.supplyRequestId ?? ''}
       onOpen={(r) => r.supplyRequestId && open(r.supplyRequestId)}
       emptyText={l.empty}
@@ -199,10 +195,8 @@ export function InitialLoadList({ mfcId }: { readonly mfcId: string }) {
       fetchPage={(cursor) =>
         request('GET', api.inbound.GET('/initial-stock-loads', { params: { query: { mfcId, ...arr<LoadState>(state), ...(cursor ? { cursor } : {}) } } }))
       }
-      head={[l.receipt, l.approval, l.stateCol, l.lineCount, l.at]}
+      head={[l.stateCol, l.lineCount, l.at]}
       cells={(r) => [
-        <span className="font-mono">{r.receiptId}</span>,
-        <span className="font-mono">{r.approvalId}</span>,
         i.loadState[r.state] ?? r.state,
         l.lines(r.lines.length),
         when(r.createdAt),
@@ -239,9 +233,8 @@ export function CountSessionList({ mfcId }: { readonly mfcId: string }) {
           api.inventory.GET('/mfcs/{mfcId}/count-sessions', { params: { path: { mfcId }, query: { ...arr<CountState>(state), ...(cursor ? { cursor } : {}) } } }),
         )
       }
-      head={[l.id, l.stateCol, l.locations, l.createdBy, l.updatedAt]}
+      head={[l.stateCol, l.locations, l.createdBy, l.updatedAt]}
       cells={(s) => [
-        <span className="font-mono">{s.sessionId}</span>,
         inv.countState[s.state ?? ''] ?? s.state,
         (s.locationCodes ?? []).join(', ') || messages.none,
         <Who id={s.createdBy} />,
@@ -345,9 +338,8 @@ export function PlanList({ mfcId }: { readonly mfcId: string }) {
           }),
         )
       }
-      head={[l.id, l.stateCol, a.solver, l.createdBy, l.at]}
+      head={[l.stateCol, a.solver, l.createdBy, l.at]}
       cells={(p) => [
-        <span className="font-mono">{p.planId}</span>,
         a.planState[p.state ?? ''] ?? p.state,
         p.solverStatus ?? messages.none,
         <Who id={p.createdBy} />,

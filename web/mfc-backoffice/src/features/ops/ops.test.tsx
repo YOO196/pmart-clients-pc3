@@ -151,7 +151,8 @@ describe('센터 운영판', () => {
     await userEvent.click(screen.getByTestId('tile-handover'));
     await waitFor(() => expect(rows().every((r) => r.dataset.group === 'handover')).toBe(true));
     expect(rows()).toHaveLength(1);
-    expect(rows()[0]).toHaveTextContent('PKG-1');
+    // 목록에는 화면 표기만(포장대 위치) — 포장 시스템 ID 는 내지 않는다(ADR-0070 덧붙임)
+    expect(rows()[0]).not.toHaveTextContent('PKG-1');
     expect(within(rows()[0]!).getByRole('link', { name: '확인 필요 포장 — 실물 확인' })).toHaveAttribute('href', '/c/MFC-BSN-01/tasks#handover-checks');
     expect(screen.queryByRole('button', { name: '포장대에 있음' })).not.toBeInTheDocument();
 
@@ -159,7 +160,7 @@ describe('센터 운영판', () => {
     await userEvent.click(screen.getByRole('button', { name: '출하 약속' }));
     await waitFor(() => expect(rows()[0]!.dataset.group).toBe('promise'));
     await userEvent.click(within(rows()[0]!).getByRole('link'));
-    expect(await screen.findByRole('heading', { level: 1, name: /TASK-PICK-1/ })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: /^피킹 · / })).toBeInTheDocument();
   });
 
   it('필터는 URL 에 — 주소로 바로 열어도 그 유형', async () => {

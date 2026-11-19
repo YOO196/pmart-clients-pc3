@@ -13,5 +13,7 @@ afterEach(() => {
   cleanup();
   // 세션 복원 보관(refresh token)·로그인 시작 기록이 다음 테스트로 새지 않게
   sessionStorage.clear();
+  // 최근 봄·내 보기·안내 상자 접힘(이 브라우저 보관)도 다음 테스트로 새지 않게
+  window.localStorage.clear();
 });
 afterAll(() => server.close());

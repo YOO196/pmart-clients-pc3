@@ -6,8 +6,8 @@
 // - 확인 필요 포장 목록·확인(`GET /packages?checkRequired=true`, `handover-checks`) — 센터 관리자도(MB-3, fulfillment 0.17.0). `HandoverChecks.tsx`.
 // - 늦음·멈춤은 서버 표시값 — 화면이 계산하지 않고, 자동으로 빼앗는 버튼도 없다.
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Fragment, useState, type ReactNode } from 'react';
-import { Link, Route, Routes, useParams, useSearchParams } from 'react-router';
+import { Fragment, useRef, useState, type ReactNode } from 'react';
+import { Link, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
 import { CommandFeedback, formatSeoul, QueryState, toUiState, useCommand } from '@pmart/web-ui';
@@ -16,7 +16,17 @@ import type { components } from '../../api/generated/mfc-fulfillment';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
-import { RiderLabel } from '../../shared/displayNumber';
+import { RiderLabel, SystemNumbers } from '../../shared/displayNumber';
+import { AllDone, countCell, GuideBox, SearchBar, StatCard, StatStrip } from '../../shared/listParts';
+import { useNewIds, useNow } from '../../shared/motion';
+import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
+import { ProgressSteps, type StepPlace } from '../../shared/ProgressSteps';
+import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
+import { SavedViews } from '../../shared/SavedViews';
+import { SeenMark } from '../../shared/SeenMark';
+import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
+import { QueueNav, useRememberQueue } from '../../shared/workQueue';
+import { DUE_SOON_MINUTES } from '../ops/opsRules';
 import { Who } from '../../shared/OperatorLabel';
 import { HandoverChecks } from './HandoverChecks';
 import { ReassignForm, ReleaseForm, TaskActionButtons, type TaskAction } from './TaskActions';
@@ -78,6 +88,7 @@ function Flags({ task }: { readonly task: TaskSummary }) {
 function TaskListPage({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
   const [params, setParams] = useSearchParams();
+  const { pathname } = useLocation();
   const rawType = params.get('type');
   const rawState = params.get('state');
   const type = isType(rawType) ? rawType : undefined;
@@ -100,18 +111,53 @@ function TaskListPage({ mfcId }: { readonly mfcId: string }) {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
     else next.delete(key);
+    next.delete('preview');
     setParams(next, { replace: true });
   };
   // 늦음·멈춤을 위로(빼앗을 대상을 찾기 쉽게 — 백엔드 알림 2026-11-19 §3), 나머지는 서버 순서 그대로
   const rows = (query.data?.pages ?? []).flatMap((p) => p.items ?? []).sort((a, b) => Number(!!(b.late || b.idle)) - Number(!!(a.late || a.idle)));
+  const ids = rows.map((t) => t.taskId ?? '').filter(Boolean);
   const [open, setOpen] = useState<{ readonly taskId: string; readonly action: TaskAction } | null>(null);
   const asOf = query.data?.pages[0]?.asOf?.asOf;
+  const counts = useStateCounts(mfcId, type);
+  const fresh = useNewIds(query.data ? ids : undefined, `${type ?? ''}|${state ?? ''}`);
+  const seen = useSeenIds('task', mfcId);
+  const preview = usePreview();
+  const now = useNow();
+  const listQuery = new URLSearchParams(params);
+  listQuery.delete('preview');
+  useRememberQueue('task', mfcId, query.data ? ids : undefined, `${pathname}${listQuery.size ? `?${listQuery.toString()}` : ''}`);
+  const previewed = preview.id ? rows.find((t) => t.taskId === preview.id) : undefined;
+  // 할 일 0건 — 상태 카드 넷을 모두 서버에서 읽었고 모두 0일 때만(읽는 중·실패면 그리지 않는다)
+  const allDone = !type && COUNT_STATES.every((s) => counts[s].data?.n === 0 && !counts[s].data.more);
   return (
     <section className="space-y-4">
-      <h1 className="text-xl font-bold">{messages.menus.tasks}</h1>
-      <p className="text-sm opacity-70">{m.intro}</p>
+      <h1>{messages.menus.tasks}</h1>
+      <GuideBox title={m.ui.guideTitle} storeKey="tasks" items={[m.intro, m.lateHint, m.ui.sortNote]} />
+      <StatStrip label={m.ui.countsLabel} testId="task-counts">
+        {COUNT_STATES.map((s) => (
+          <StatCard
+            key={s}
+            testId={`count-${s}`}
+            label={m.taskState[s]}
+            value={countCell(counts[s])}
+            hint={m.ui.countHint}
+            tone={countTone(s, counts[s].data?.n ?? 0)}
+            active={state === s}
+            onClick={() => setFilter('state', state === s ? '' : s)}
+          />
+        ))}
+      </StatStrip>
+      {allDone && <AllDone body={m.ui.allDoneBody} />}
       <HandoverChecks mfcId={mfcId} />
-      <form className="flex flex-wrap items-end gap-2 rounded-box bg-base-100 p-3 text-sm" onSubmit={(e) => e.preventDefault()}>
+      <SearchBar
+        summary={[
+          [m.type, type ? (m.taskType[type] ?? type) : ''],
+          [m.state, state ? (m.taskState[state] ?? state) : m.defaultState],
+        ]}
+        startOpen={!type && !state}
+        extra={asOf && <span className="text-xs text-base-content/60">{m.asOf(formatSeoul(asOf))}</span>}
+      >
         <label className="flex flex-col gap-1">
           {m.type}
           <select className="select select-sm w-32" value={type ?? ''} onChange={(e) => setFilter('type', e.target.value)}>
@@ -134,9 +180,8 @@ function TaskListPage({ mfcId }: { readonly mfcId: string }) {
             ))}
           </select>
         </label>
-        {asOf && <span className="text-xs opacity-70">{m.asOf(formatSeoul(asOf))}</span>}
-      </form>
-      <p className="text-xs opacity-70">{m.lateHint}</p>
+      </SearchBar>
+      <SavedViews listKey={`tasks.${mfcId}`} />
       <QueryState state={toUiState(query, () => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.empty}>
         {() => (
           <div className="space-y-2">
@@ -154,46 +199,52 @@ function TaskListPage({ mfcId }: { readonly mfcId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((t) => (
-                  <Fragment key={t.taskId}>
-                  <tr data-testid="task-row">
-                    <td>
-                      <Link className="link" to={tasksPath(mfcId, encodeURIComponent(t.taskId ?? ''))}>
-                        {m.taskType[t.taskType ?? ''] ?? t.taskType}
-                      </Link>
-                    </td>
-                    <td>{m.headline(t.headline?.productName, t.headline?.otherLineCount ?? 0)}</td>
-                    <td>
-                      <StateBadge state={t.state} />
-                      <Flags task={t} />
-                    </td>
-                    <td>
-                      <Who id={t.assignment?.workerId} empty={m.unassigned} />
-                    </td>
-                    <td>{m.qty(t.plannedQty ?? 0, t.completedQty ?? 0, t.remainingQty ?? 0)}</td>
-                    <td>{t.promisedReadyAt ? formatSeoul(t.promisedReadyAt) : messages.none}</td>
-                    <td>{t.lastActivityAt ? formatSeoul(t.lastActivityAt) : messages.none}</td>
-                    <td>
-                      <TaskActionButtons
-                        task={t}
-                        open={open && open.taskId === t.taskId ? open.action : null}
-                        onOpen={(a) => setOpen(a ? { taskId: t.taskId ?? '', action: a } : null)}
-                      />
-                    </td>
-                  </tr>
-                  {open && open.taskId === t.taskId && (
-                    <tr data-testid="task-action-row">
-                      <td colSpan={8}>
-                        {open.action === 'reassign' ? (
-                          <ReassignForm key={`${t.taskId}-reassign`} mfcId={mfcId} task={t} onClose={() => setOpen(null)} />
-                        ) : (
-                          <ReleaseForm key={`${t.taskId}-release`} mfcId={mfcId} task={t} onClose={() => setOpen(null)} />
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                  </Fragment>
-                ))}
+                {rows.map((t) => {
+                  const row = preview.row(t.taskId);
+                  return (
+                    <Fragment key={t.taskId}>
+                      <tr data-testid="task-row" {...row} className={`${row.className ?? ''} ${fresh.has(t.taskId ?? '') ? 'row-new' : ''}`}>
+                        <td>
+                          <Link className="link" to={tasksPath(mfcId, encodeURIComponent(t.taskId ?? ''))}>
+                            {m.taskType[t.taskType ?? ''] ?? t.taskType}
+                          </Link>
+                          <SeenMark seen={seen.has(t.taskId ?? '')} />
+                        </td>
+                        <td>{m.headline(t.headline?.productName, t.headline?.otherLineCount ?? 0)}</td>
+                        <td>
+                          <StateBadge state={t.state} />
+                          <Flags task={t} />
+                        </td>
+                        <td>
+                          <Who id={t.assignment?.workerId} empty={m.unassigned} />
+                        </td>
+                        <td>{m.qty(t.plannedQty ?? 0, t.completedQty ?? 0, t.remainingQty ?? 0)}</td>
+                        <td>
+                          <PromisedAt task={t} now={now} />
+                        </td>
+                        <td>{t.lastActivityAt ? formatSeoul(t.lastActivityAt) : messages.none}</td>
+                        <td>
+                          <TaskActionButtons
+                            task={t}
+                            open={open && open.taskId === t.taskId ? open.action : null}
+                            onOpen={(a) => setOpen(a ? { taskId: t.taskId ?? '', action: a } : null)}
+                          />
+                        </td>
+                      </tr>
+                      {open && open.taskId === t.taskId && (
+                        <tr data-testid="task-action-row">
+                          <td colSpan={8}>
+                            {open.action === 'reassign' ? (
+                              <ReassignForm key={`${t.taskId}-reassign`} mfcId={mfcId} task={t} onClose={() => setOpen(null)} />
+                            ) : (
+                              <ReleaseForm key={`${t.taskId}-release`} mfcId={mfcId} task={t} onClose={() => setOpen(null)} />
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
             {query.hasNextPage && (
@@ -209,9 +260,69 @@ function TaskListPage({ mfcId }: { readonly mfcId: string }) {
           </div>
         )}
       </QueryState>
+      {previewed && preview.id && (
+        <PreviewDrawer id={preview.id} ids={ids} onMove={preview.open} onClose={preview.close} title={taskTitle(previewed)} detailTo={tasksPath(mfcId, encodeURIComponent(preview.id))}>
+          <div className="mb-3 flex flex-wrap items-center gap-1">
+            <StateBadge state={previewed.state} />
+            <Flags task={previewed} />
+          </div>
+          <PreviewFacts
+            rows={[
+              [m.fields.product, m.headline(previewed.headline?.productName, previewed.headline?.otherLineCount ?? 0)],
+              [m.fields.assignee, <Who id={previewed.assignment?.workerId} empty={m.unassigned} />],
+              [m.fields.qty, m.qty(previewed.plannedQty ?? 0, previewed.completedQty ?? 0, previewed.remainingQty ?? 0)],
+              [m.fields.promisedReadyAt, <PromisedAt task={previewed} now={now} />],
+              [m.fields.lastActivity, previewed.lastActivityAt ? formatSeoul(previewed.lastActivityAt) : messages.none],
+            ]}
+          />
+        </PreviewDrawer>
+      )}
     </section>
   );
 }
+
+/** 상태 카드에 세는 상태(끝나지 않은 것) */
+const COUNT_STATES = ['READY', 'ASSIGNED', 'IN_PROGRESS', 'BLOCKED'] as const satisfies readonly TaskState[];
+type CountState = (typeof COUNT_STATES)[number];
+const COUNT_SIZE = 50;
+
+/** 막힘이 있으면 빨강, 배정 대기가 있으면 주황, 배정·진행은 파랑(일이 돌아가는 중) */
+const countTone = (s: CountState, n: number) => (s === 'BLOCKED' ? (n > 0 ? 'error' : undefined) : s === 'READY' ? (n > 0 ? 'warning' : undefined) : 'info');
+
+/** 상태마다 서버 목록 한 쪽(50건)으로 센다 — 쪽이 더 있으면 "50건 이상". 조회 키가 ['tasks', mfcId, …] 아래라 명령 뒤 같이 새로 읽는다 */
+function useStateCounts(mfcId: string, type: TaskType | undefined) {
+  const api = useApi();
+  const options = (s: CountState) => ({
+    queryKey: ['tasks', mfcId, 'count', type ?? 'ALL', s],
+    queryFn: async () => {
+      const r = await request('GET', api.fulfillment.GET('/tasks', { params: { query: { mfcId, ...(type ? { type } : {}), state: [s], size: COUNT_SIZE } } }));
+      return { n: (r.items ?? []).length, more: !!r.page?.nextCursor };
+    },
+  });
+  const ready = useQuery(options('READY'));
+  const assigned = useQuery(options('ASSIGNED'));
+  const inProgress = useQuery(options('IN_PROGRESS'));
+  const blocked = useQuery(options('BLOCKED'));
+  return { READY: ready, ASSIGNED: assigned, IN_PROGRESS: inProgress, BLOCKED: blocked } as const;
+}
+
+/** 출하 준비 약속 시각 — 15분 안으로 다가오면 점이 천천히 숨쉬고 남은 분(움직임 줄이기면 점만). 지났으면 서버 "늦음" 표시가 따로 있다 */
+function PromisedAt({ task: t, now }: { readonly task: TaskSummary; readonly now: number }) {
+  if (!t.promisedReadyAt) return <>{messages.none}</>;
+  const left = Math.floor((Date.parse(t.promisedReadyAt) - now) / 60_000);
+  const open = t.state !== 'COMPLETED' && t.state !== 'CANCELLED' && t.state !== 'FAILED' && t.state !== 'CLOSED_PARTIAL';
+  const soon = open && left >= 0 && left < DUE_SOON_MINUTES;
+  return (
+    <span className="inline-flex items-center gap-1.5" data-testid={soon ? 'due-soon' : undefined}>
+      {soon && <span className="breathe h-2 w-2 rounded-full bg-warning" aria-hidden="true" />}
+      {formatSeoul(t.promisedReadyAt)}
+      {soon && <span className="text-xs font-semibold text-warning">{m.ui.dueIn(left)}</span>}
+    </span>
+  );
+}
+
+/** 화면 표기(ADR-0070 덧붙임 2026-11-19 "작업 지시 = 종류 · 시각") — 시스템 ID 는 상세의 시스템 번호 칸에만 */
+const taskTitle = (t: TaskSummary) => m.ui.title(m.taskType[t.taskType ?? ''] ?? t.taskType ?? m.ui.task, t.createdAt ? formatSeoul(t.createdAt) : messages.none);
 
 // ---------------------------------------------------------------- 상세
 
@@ -223,20 +334,46 @@ function TaskDetailPage({ mfcId }: { readonly mfcId: string }) {
     queryKey: ['task', taskId],
     queryFn: () => request('GET', api.fulfillment.GET('/tasks/{taskId}', { params: { path: { taskId } } })),
   });
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const past = useScrolledPast(titleRef);
+  useRecordRecent('task', mfcId, taskId, query.data ? taskTitle(query.data) : null);
   return (
     <section className="max-w-5xl space-y-4">
-      <Link to={tasksPath(mfcId)} className="link text-sm">
-        {m.back}
-      </Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to={tasksPath(mfcId)} className="link text-sm">
+          {m.back}
+        </Link>
+        <div className="ml-auto">
+          <QueueNav kind="task" mfcId={mfcId} id={taskId} />
+        </div>
+      </div>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(t) => (
           <>
-            <h1 className="flex flex-wrap items-center gap-2 text-xl font-bold">
-              {m.taskType[t.taskType ?? ''] ?? t.taskType}
-              <span className="font-mono text-base opacity-70">{t.taskId}</span>
+            <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
+              {taskTitle(t)}
               <StateBadge state={t.state} />
               <Flags task={t} />
             </h1>
+            <StickyTitle
+              show={past}
+              title={taskTitle(t)}
+              badges={
+                <>
+                  <StateBadge state={t.state} />
+                  <Flags task={t} />
+                </>
+              }
+            />
+            <ProgressSteps
+              steps={m.ui.steps}
+              place={taskPlace(t.state)}
+              ended={taskEnded(t.state)}
+              unknownText={t.state ? m.ui.unknownStep(t.state) : undefined}
+              label={m.ui.stepsLabel}
+              testId="task-steps"
+              endedTestId="task-ended"
+            />
             {notice && (
               <p role="status" className="text-success text-sm">
                 {notice}
@@ -249,12 +386,40 @@ function TaskDetailPage({ mfcId }: { readonly mfcId: string }) {
             )}
             <TaskLines task={t} />
             {t.shipmentId ? <ShipmentView shipmentId={t.shipmentId} /> : <p className="text-sm opacity-70">{m.noShipment}</p>}
+            <SystemNumbers
+              ids={[
+                { label: m.ui.task, id: t.taskId },
+                { label: messages.displayNumber.system.shipmentId, id: t.shipmentId },
+              ]}
+            />
           </>
         )}
       </QueryState>
     </section>
   );
 }
+
+/** 작업 상태 → 진행 단계 자리(mfc-states: WAITING·READY → ASSIGNED → IN_PROGRESS → COMPLETED, BLOCKED 는 진행에서 막힘) */
+function taskPlace(s: TaskState | undefined): StepPlace | null {
+  switch (s) {
+    case 'WAITING':
+    case 'READY':
+      return { step: 0, done: false };
+    case 'ASSIGNED':
+      return { step: 1, done: false };
+    case 'IN_PROGRESS':
+      return { step: 2, done: false };
+    case 'BLOCKED':
+      return { step: 2, done: false, warn: true, note: m.ui.blockedNote };
+    case 'COMPLETED':
+      return { step: 3, done: true };
+    default:
+      return null;
+  }
+}
+
+/** 단계 밖으로 끝남(실패·취소·일부 끝남) — 오른쪽 ✕ 갈래 */
+const taskEnded = (s: TaskState | undefined) => (s === 'FAILED' || s === 'CANCELLED' || s === 'CLOSED_PARTIAL' ? m.taskState[s] : undefined);
 
 function TaskFacts({ task: t }: { readonly task: TaskDetail }) {
   const rows: ReadonlyArray<readonly [string, ReactNode]> = [
@@ -267,7 +432,6 @@ function TaskFacts({ task: t }: { readonly task: TaskDetail }) {
     [m.fields.blockReason, t.blockReason ?? messages.none],
     [m.fields.packingLocations, t.packingLocations?.length ? t.packingLocations.join(', ') : messages.none],
     [m.fields.routeMethod, t.routeMethod ? (m.route[t.routeMethod] ?? t.routeMethod) : messages.none],
-    [m.fields.shipment, t.shipmentId ?? messages.none],
   ];
   return (
     <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm">

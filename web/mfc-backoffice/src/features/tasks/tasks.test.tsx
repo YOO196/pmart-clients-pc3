@@ -11,7 +11,8 @@ import { server } from '../../test/server';
 
 const rows = () => screen.getAllByTestId('task-row');
 const firstCells = () => rows().map((r) => within(r).getAllByRole('cell')[0]!.textContent);
-const heading = () => screen.findByRole('heading', { level: 1, name: /TASK-/ });
+// 상세 제목은 화면 표기(종류 · 시각, ADR-0070 덧붙임) — 시스템 ID 는 시스템 번호 칸에만
+const heading = () => screen.findByRole('heading', { level: 1, name: / · / });
 const problem = (status: number, code: string) =>
   HttpResponse.json({ type: 'about:blank', status, code }, { status, headers: { 'content-type': 'application/problem+json' } });
 
@@ -50,8 +51,9 @@ describe('작업 목록', () => {
     const view = renderAt('/c/MFC-BSN-01/tasks');
     const box = await screen.findByTestId('handover-checks');
     const row = (await within(box).findAllByTestId('handover-check-row'))[0]!;
-    expect(row).toHaveTextContent('PKG-1');
-    expect(row).toHaveTextContent('RDR-1');
+    // 포장 시스템 ID 는 접힌 시스템 번호 칸에만, 라이더는 화면 표기(번호가 없으면 "라이더 정보 비공개")
+    expect(within(row).getByTestId('system-numbers')).toHaveTextContent('PKG-1');
+    expect(within(row).getByTestId('rider-label')).toHaveTextContent('라이더 정보 비공개');
     const req = view.gets('/packages')[0]!;
     expect(Object.fromEntries(new URL(req.url).searchParams)).toEqual({ mfcId: 'MFC-BSN-01', checkRequired: 'true' });
 
@@ -181,14 +183,18 @@ describe('작업 목록 행 조치', () => {
     const form = await screen.findByRole('form', { name: /담당 바꾸기/ });
     expect(within(form).getByTestId('reassign-warn')).toHaveTextContent('"시작"부터 다시');
     expect(within(form).getByTestId('reassign-warn')).toHaveTextContent('장바구니');
-    const select = await within(form).findByRole('combobox', { name: '새 담당' });
-    // 지금 담당(OP-wkr-1)·정지(OP-wkr-3)·피킹 업무 없는 사람은 없다
-    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['작업자 고르기', '이알바 (OP-wkr-2) · 휴게 중']);
+    const box = await within(form).findByRole('combobox', { name: '새 담당' });
+    // 지금 담당(OP-wkr-1)·정지(OP-wkr-3)·피킹 업무 없는 사람은 없다. 이름만 보이고 운영자 ID 는 보이지 않는다(ADR-0070)
+    await userEvent.click(box);
+    expect(within(screen.getByRole('listbox', { name: '새 담당' })).getAllByRole('option').map((o) => o.textContent)).toEqual(['이알바휴게 중']);
     expect(within(form).getByRole('button', { name: '담당 바꾸기' })).toBeDisabled(); // 사유 전
-    await userEvent.selectOptions(select, 'OP-wkr-2');
+    // 쳐서 찾기(초성)
+    await userEvent.type(box, 'ㅇㅇㅂ');
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    expect(box).toHaveValue('이알바');
     await userEvent.type(within(form).getByRole('textbox', { name: '사유' }), '교대');
     await userEvent.click(within(form).getByRole('button', { name: '담당 바꾸기' }));
-    expect(await within(form).findByRole('status')).toHaveTextContent('OP-wkr-2 에게 넘겼어요.');
+    expect(await within(form).findByRole('status')).toHaveTextContent('이알바 에게 넘겼어요.');
     const post = view.sent.find((r) => r.method === 'POST' && r.url.endsWith('/assignments'))!;
     expect(post.headers.get('X-Expected-Version')).toBe('1');
     expect(post.headers.get('Idempotency-Key')).toBeTruthy();
@@ -203,7 +209,9 @@ describe('작업 목록 행 조치', () => {
     await waitFor(() => expect(rows()).toHaveLength(3));
     await userEvent.click(within(rowOf('피킹')).getByRole('button', { name: '담당 바꾸기' }));
     const form = await screen.findByRole('form', { name: /담당 바꾸기/ });
-    await userEvent.selectOptions(await within(form).findByRole('combobox', { name: '새 담당' }), 'OP-wkr-2');
+    const box = await within(form).findByRole('combobox', { name: '새 담당' });
+    await userEvent.click(box);
+    await userEvent.click(within(screen.getByRole('listbox', { name: '새 담당' })).getByRole('option', { name: /이알바/ }));
     await userEvent.type(within(form).getByRole('textbox', { name: '사유' }), '지연');
     await userEvent.click(within(form).getByRole('button', { name: '담당 바꾸기' }));
     expect(await within(form).findByRole('alert')).toHaveTextContent('다른 사람이 먼저 바꿨어요');

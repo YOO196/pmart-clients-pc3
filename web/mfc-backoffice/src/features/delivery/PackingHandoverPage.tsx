@@ -150,6 +150,7 @@ function Row({ it }: { readonly it: Item }) {
             { label: sys.orderId, id: it.orderId },
             { label: sys.shipmentId, id: it.shipmentId },
             { label: sys.deliveryId, id: it.deliveryId },
+            ...(it.packages ?? []).map((p, i) => ({ label: `${sys.packageId} ${i + 1}`, id: p.packageId })),
           ]}
         />
       </td>
@@ -168,9 +169,10 @@ function Row({ it }: { readonly it: Item }) {
         <div>{m.packageSummary(it.sealedPackages ?? null, it.packageCount ?? null, it.handedOverQty?.qty ?? null, it.remainingPackages ?? null)}</div>
         {(it.packages ?? []).length > 0 && (
           <ul className="mt-1 space-y-0.5">
-            {(it.packages ?? []).map((p) => (
-              <li key={p.packageId} className="font-mono">
-                {`${p.packageId} · ${name(m.packageState, p.state)}`}
+            {/* 목록에는 화면 표기만(ADR-0070 덧붙임) — bff 포장에 라벨 번호(handoverCode)가 없어 출고 안 순서로 "포장 1"(시스템 ID 는 시스템 번호 칸) */}
+            {(it.packages ?? []).map((p, i) => (
+              <li key={p.packageId}>
+                {`${sys.packageId} ${i + 1} · ${name(m.packageState, p.state)}`}
                 {p.fenceState && m.fenceState[p.fenceState] ? ` · ${m.fenceState[p.fenceState]}` : ''}
                 {p.handedOverAt && (
                   <>

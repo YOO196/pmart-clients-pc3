@@ -15,11 +15,22 @@ import type { components } from '../../api/generated/mfc-capacity';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
+import { SystemNumbers } from '../../shared/displayNumber';
 import { Who } from '../../shared/OperatorLabel';
 import { PlanList } from '../lists/CenterLists';
 
 const m = messages.assignments;
 const taskName = messages.workers.task;
+
+/** 작업 칸 — 시스템 ID 대신 그 작업 상세로 가는 링크(ADR-0070 덧붙임: 목록에는 화면 표기만). 작업 현황에 상세가 있는 유형(피킹·포장·배차·복귀)만 링크 */
+function TaskLink({ mfcId, taskId, taskType }: { readonly mfcId: string; readonly taskId: string | undefined; readonly taskType: string | undefined }) {
+  if (!taskId || !['PICK', 'PACK', 'DISPATCH', 'RETURN'].includes(taskType ?? '')) return <>{messages.none}</>;
+  return (
+    <Link className="link" to={centerPath(mfcId, `tasks/${encodeURIComponent(taskId)}`)} data-testid="task-link">
+      {m.openTask}
+    </Link>
+  );
+}
 
 type Cap = components['schemas'];
 type Assignment = Cap['Assignment'];
@@ -147,7 +158,9 @@ function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonl
             <tbody>
               {rows.map((a) => (
                 <tr key={a.assignmentId} data-testid="assignment-row">
-                  <td className="font-mono text-xs">{a.taskId}</td>
+                  <td>
+                    <TaskLink mfcId={mfcId} taskId={a.taskId} taskType={a.taskType} />
+                  </td>
                   <td>{taskName[a.taskType ?? ''] ?? a.taskType}</td>
                   <td>
                     <Who id={a.workerId} />
@@ -407,8 +420,8 @@ function PlanView({ mfcId, plan }: { readonly mfcId: string; readonly plan: Plan
   return (
     <>
       <h1 className="flex flex-wrap items-center gap-2 text-xl font-bold">
-        {m.tabs.plan}
-        <span className="font-mono text-base opacity-70">{plan.planId}</span>
+        {/* 화면 표기 = 종류 · 시각(ADR-0070 덧붙임) — 계획 ID 는 아래 시스템 번호 칸 */}
+        {`${m.tabs.plan} · ${plan.createdAt ? formatSeoul(plan.createdAt) : messages.none}`}
         <span className={`badge badge-sm ${plan.state === 'PROPOSED' ? 'badge-info' : plan.state === 'COMMITTED' ? 'badge-success' : 'badge-warning'}`}>
           {m.planState[plan.state ?? ''] ?? plan.state}
         </span>
@@ -428,7 +441,16 @@ function PlanView({ mfcId, plan }: { readonly mfcId: string; readonly plan: Plan
         <dt className="opacity-70">{m.limitations}</dt>
         <dd>{plan.limitations?.length ? plan.limitations.join(', ') : messages.none}</dd>
         <dt className="opacity-70">{m.unverified}</dt>
-        <dd>{plan.availabilityUnverifiedWorkers?.length ? plan.availabilityUnverifiedWorkers.join(', ') : messages.none}</dd>
+        <dd>
+          {plan.availabilityUnverifiedWorkers?.length
+            ? plan.availabilityUnverifiedWorkers.map((w, i) => (
+                <span key={w}>
+                  {i > 0 && ', '}
+                  <Who id={w} />
+                </span>
+              ))
+            : messages.none}
+        </dd>
         {(plan.staleReasons ?? []).length > 0 && (
           <>
             <dt className="opacity-70">{m.staleReasons}</dt>
@@ -436,6 +458,7 @@ function PlanView({ mfcId, plan }: { readonly mfcId: string; readonly plan: Plan
           </>
         )}
       </dl>
+      <SystemNumbers ids={[{ label: m.planLabel, id: plan.planId }]} />
       <div className="rounded-box bg-base-100 p-4 text-sm">
         <h2 className="mb-2 font-semibold">{m.items}</h2>
         {(plan.items ?? []).length === 0 ? (
@@ -454,7 +477,9 @@ function PlanView({ mfcId, plan }: { readonly mfcId: string; readonly plan: Plan
             <tbody>
               {(plan.items ?? []).map((i) => (
                 <tr key={i.taskId} data-testid="plan-item">
-                  <td className="font-mono">{i.taskId}</td>
+                  <td>
+                    <TaskLink mfcId={mfcId} taskId={i.taskId} taskType={i.taskType} />
+                  </td>
                   <td>{taskName[i.taskType ?? ''] ?? i.taskType}</td>
                   <td>
                     <Who id={i.workerId} />

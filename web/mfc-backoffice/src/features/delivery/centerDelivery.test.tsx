@@ -23,8 +23,8 @@ describe('배송 현황(우리 센터)', () => {
     // 화면 번호(ADR-0070): 번호가 있으면 배송 주문번호-순번·주문번호 8자리, 없으면 ID 끝 + 번호 없음. 라이더는 센터 관리자에게 비공개(bff 0.15.0)
     const moving = rows.find((r) => r.textContent?.includes('20000002-1'))!;
     expect(moving).toHaveTextContent('20000002');
-    expect(moving).toHaveTextContent('RD-7 라이더 정보 비공개');
-    expect(failed).toHaveTextContent('DLV-C-1 번호 없음');
+    expect(moving).toHaveTextContent('라이더 정보 비공개');
+    expect(failed).toHaveTextContent('번호 없음');
     const q = liveCalls(view.sent)[0]!;
     expect([q.get('mfcId'), q.get('size'), q.get('state'), q.get('cursor')]).toEqual(['MFC-BSN-01', '50', null, null]);
   });
@@ -44,7 +44,9 @@ describe('배차 실패(우리 센터, 보기만)', () => {
     const rows = await screen.findAllByTestId('dispatch-failure-row');
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveTextContent('응답 만료');
-    expect(rows[0]).toHaveTextContent('배송 DLV-C-1 · 주문 ORD-C-1');
+    // 목록에는 접수 번호만(ADR-0070 덧붙임) — 관련 배송·주문 시스템 ID 는 상세의 시스템 번호 칸
+    expect(rows[0]).toHaveTextContent('C-1116-0007');
+    expect(rows[0]).not.toHaveTextContent('DLV-C-1');
     expect(within(rows[0]!).getByText(/기한 넘김/)).toHaveAttribute('data-overdue', 'true');
     expect(screen.getByRole('note')).toHaveTextContent('지원센터');
     expect(screen.queryByRole('button', { name: /맡기|닫기/ })).not.toBeInTheDocument();
@@ -65,8 +67,12 @@ describe('배차 실패(우리 센터, 보기만)', () => {
     const detail = await screen.findByTestId('dispatch-failure-detail');
     expect(detail).toHaveTextContent('배차 실패 2번째');
     expect(detail).toHaveTextContent('아직 아무도 안 맡음');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('배차 실패 접수 건 C-1116-0007');
+    expect(screen.getByTestId('system-numbers')).toHaveTextContent('CASE-DF-1');
+    expect(screen.getByTestId('system-numbers')).toHaveTextContent('DLV-C-1');
     expect(screen.getByTestId('dispatch-failure-history')).toHaveTextContent('재발');
-    expect(screen.queryByRole('button')).toBeNull();
+    // 명령 단추 없음(시스템 번호 복사 단추만)
+    expect(screen.getAllByRole('button').every((b) => /복사/.test(b.getAttribute('aria-label') ?? ''))).toBe(true);
   });
 
   it('다른 센터 사건은 404 — 없음(권한 밖) 화면', async () => {

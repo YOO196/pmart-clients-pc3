@@ -25,7 +25,9 @@ import { MyInfoPage } from '../features/me/MyInfoPage';
 import { messages as m } from '../shared/messages';
 import { GroupIcon } from './groupIcons';
 import { allMenus, centerPath, isWorkerOnly, navGroups, type MenuItem, type MenuKey } from './nav';
+import { ConnectionBanner, useDocumentTitle, useSlashToSearch } from './PageChrome';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
+import { DETAIL_BAR_SLOT } from '../shared/StickyTitle';
 
 /** 주소의 센터(`/c/:mfcId/…`). 세션 centers(sessions/current)에 있을 때만 그 센터 */
 function useCenter(): { readonly mfcId: string; readonly mine: boolean } | null {
@@ -35,8 +37,9 @@ function useCenter(): { readonly mfcId: string; readonly mine: boolean } | null 
   return { mfcId, mine: session?.centers.includes(mfcId) ?? false };
 }
 
-/** 화면 틀 — 통합 백오피스(web/backoffice)와 같은 모양(2026-11-19 사용자 "다른 통합 백오피스 앱 참조"):
- *  왼쪽 진한 남색 메뉴(앱 이름 · 홈 · 묶음 아이콘+이름 · 하위 메뉴 왼쪽 띠, 지금 메뉴 민트) + 위 머리줄(묶음 › 메뉴 · 역할 · 센터 · 목 · 내 정보·세션). */
+/** 화면 틀 — 통합 백오피스(web/backoffice)와 같은 모양(2026-11-19 사용자 "다른 통합 백오피스 앱 참조", PC 2 요청 "같은 느낌으로"):
+ *  왼쪽 진한 남색 메뉴(P 배지 로고 · 홈 · 묶음 아이콘+이름 · 고른 메뉴 파란 채움·흰 글자) + 위 머리줄(묶음 › 메뉴 · 역할 · 센터 · 목 · 내 정보·세션)
+ *  + 상세 제목 띠 자리 + 인터넷 끊김 띠. 본문은 쿠팡 윙 느낌(index.css data-skin=wing). 탭 제목에 약속 초과 수, '/' 키로 검색 칸. */
 function Layout() {
   const { session } = useSession();
   const center = useCenter();
@@ -47,12 +50,18 @@ function Layout() {
   const showMenus = !!target && !isWorkerOnly(session?.roles ?? []);
   const currentGroup = navGroups.find((g) => g.items.some((i) => i.segment === segment));
   const currentItem = currentGroup?.items.find((i) => i.segment === segment);
+  useDocumentTitle(currentItem ? m.menus[currentItem.key] : null, showMenus && center?.mine ? center.mfcId : null);
+  useSlashToSearch();
   return (
     <div className="flex min-h-screen bg-base-200">
       <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col self-start overflow-y-auto bg-neutral text-neutral-content" data-testid="side-menu">
         <div className="flex h-14 shrink-0 items-center border-b border-neutral-content/10 px-5">
-          <Link to="/" className="truncate text-base font-bold text-neutral-content" aria-label={m.goHome}>
-            {m.appTitle}
+          <Link to="/" className="flex min-w-0 items-center gap-2 font-bold text-neutral-content" aria-label={m.goHome}>
+            {/* 로고 배지(통합·라이더 백오피스와 같게) */}
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-accent text-sm text-accent-content" aria-hidden="true">
+              P
+            </span>
+            <span className="truncate text-[15px]">{m.appTitle}</span>
           </Link>
         </div>
         {showMenus && (
@@ -64,7 +73,7 @@ function Layout() {
                     key={item.key}
                     to={centerPath(target, item.segment)}
                     className={({ isActive }) =>
-                      `mx-2 mb-2 flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[15px] font-bold transition-colors ${isActive ? 'bg-accent/20 text-accent' : 'text-neutral-content/85 hover:bg-neutral-content/10'}`
+                      `mx-2 mb-2 flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[15px] font-bold transition-colors ${isActive ? 'bg-primary text-primary-content' : 'text-neutral-content/85 hover:bg-neutral-content/10'}`
                     }
                   >
                     <GroupIcon id="dashboard" className="h-5 w-5 shrink-0" />
@@ -73,7 +82,7 @@ function Layout() {
                 ))
               ) : (
                 <section key={g.key} className="mx-2 mb-1" data-testid={`nav-group-${g.key}`}>
-                  <p className={`flex items-center gap-2.5 px-3 py-2 text-[15px] font-bold ${currentGroup?.key === g.key ? 'text-accent' : 'text-neutral-content/85'}`}>
+                  <p className={`flex items-center gap-2.5 px-3 py-2 text-[15px] font-bold ${currentGroup?.key === g.key ? 'text-neutral-content' : 'text-neutral-content/60'}`}>
                     <GroupIcon id={g.key} className="h-5 w-5 shrink-0" />
                     <span data-group-label>{m.groups[g.key]}</span>
                   </p>
@@ -83,7 +92,7 @@ function Layout() {
                         <NavLink
                           to={centerPath(target, item.segment)}
                           className={({ isActive }) =>
-                            `my-0.5 ml-5 mr-1 flex items-center gap-1 rounded-r-lg border-l-4 py-2 pl-4 pr-3 text-[13px] transition-colors ${isActive ? 'border-accent bg-accent/20 font-bold text-white' : 'border-neutral-content/10 text-neutral-content/70 hover:bg-neutral-content/10 hover:text-neutral-content'}`
+                            `my-0.5 flex items-center gap-1 rounded-md py-1.5 pl-10 pr-3 text-sm transition-colors active:scale-[0.98] ${isActive ? 'bg-primary font-semibold text-primary-content' : 'text-neutral-content/75 hover:bg-neutral-content/10 hover:text-neutral-content'}`
                           }
                         >
                           {m.menus[item.key]}
@@ -129,7 +138,9 @@ function Layout() {
             </NavLink>
           </div>
         </header>
-        <main className="min-w-0 flex-1 space-y-4 p-6">
+        <div id={DETAIL_BAR_SLOT} className="sticky top-14 z-[9]" />
+        <ConnectionBanner />
+        <main className="min-w-0 flex-1 space-y-4 p-6" data-skin="wing">
           <div className="mx-auto max-w-7xl space-y-4">
             <Outlet />
           </div>
