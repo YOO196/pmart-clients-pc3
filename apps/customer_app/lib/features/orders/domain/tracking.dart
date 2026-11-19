@@ -101,7 +101,8 @@ enum TrackingEventType {
   unknown,
 }
 
-/// 실시간 구독 이벤트(계약 `StreamEvent`). 구독에는 라이더 좌표가 오지 않는다(계약 — 위치는 `GET /eta` 를 다시 읽는다).
+/// 실시간 구독 이벤트(계약 `StreamEvent`). `ETA_UPDATED`·`STAGE_CHANGED` 의 [eta] 에 라이더 위치(`riderLocation`)가
+/// 실린다 — 서버는 볼 수 있는 위치가 바뀌면 3초 안에 보낸다(tracking 0.11.1 설명, PC 5 2026-11-19).
 @immutable
 class TrackingEvent {
   const TrackingEvent({required this.type, this.id, this.eta, this.stage});

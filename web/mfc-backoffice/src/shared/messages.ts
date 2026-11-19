@@ -74,6 +74,7 @@ export const messages = {
 
   /** 메뉴 묶음·하위 메뉴(handoff 2026-11-15 §2 — 이름·순서는 클라이언트가 정해도 된다) */
   groups: {
+    overview: '운영',
     people: '작업자 관리', // '인력' 에서 바꿈(사용자 2026-11-16)
     work: '작업',
     stock: '재고·품질',
@@ -81,6 +82,7 @@ export const messages = {
     delivery: '배송',
   },
   menus: {
+    ops: '센터 운영판',
     workers: '작업자',
     assignments: '배정',
     tasks: '작업 현황',
@@ -94,6 +96,58 @@ export const messages = {
     deliveries: '배송 현황',
     dispatchFailures: '배차 실패',
     returnHandovers: '반납 인증번호',
+  },
+
+  /** 센터 운영판·예외 처리함(features/ops) */
+  ops: {
+    title: '센터 운영판',
+    intro: '출하가 늦어지거나 현장에서 막힌 일을 먼저 찾아요. 조치는 각 상세 화면에서 해요.',
+    refresh: '새로 읽기',
+    autoRefreshNote: '1분마다 다시 읽어요',
+    asOf: (at: string) => `기준 ${at}`,
+    failed: '조회 실패',
+    retry: '다시 시도',
+    atLeast: (n: number) => `${n}건 이상`,
+    count: (n: number) => `${n}건`,
+    card: {
+      promise: '출하 약속',
+      promiseValue: (overdue: string, dueSoon: string) => `초과 ${overdue} · 임박 ${dueSoon}`,
+      promiseRule: (min: number) => `임박 = 약속 시각까지 ${min}분 안 · 약속 시각은 서버 값`,
+      noPromise: (n: number) => `약속 시각 없는 출고 ${n}건은 세지 않아요`,
+      picking: '피킹 결품·파손(오늘)',
+      pickingValue: (short: number, damaged: number) => `결품 ${short}줄 · 파손 ${damaged}줄`,
+      pickingRule: '서버 결품 지표 — 오늘 피킹을 시작한 줄 중 보고된 줄(사유별)',
+      handover: '인계 확인 필요',
+      handoverRule: '라이더가 찍은 뒤 인계 확정 없이 허가가 끝난 포장',
+      showList: '목록 보기',
+    },
+    filter: { all: '전체', promise: '출하 약속', picking: '결품·파손', handover: '인계 확인' } as const,
+    listTitle: '예외 처리함',
+    col: { type: '유형', id: '주문·작업·포장', reason: '막힌 이유', elapsed: '경과', assignee: '담당자', next: '다음 조치' },
+    type: { overdue: '출하 약속 초과', dueSoon: '출하 약속 임박', damaged: '피킹 파손', handover: '인계 확인 필요' },
+    empty: '처리할 예외가 없어요',
+    sourceFailed: (what: string) => `${what} 조회에 실패해 이 목록에 빠졌어요`,
+    truncated: (n: number) => `작업이 많아 앞의 ${n}건까지만 읽었어요 — 출하 약속 건수는 "이상"으로 보여요`,
+    noInfo: '정보 없음',
+    overdueFor: (t: string) => `${t} 지남`,
+    dueIn: (t: string) => `${t} 남음`,
+    reason: {
+      promise: (at: string, stage: string) => `약속 ${at} · 지금 ${stage}`,
+      damaged: (lots: string) => `피킹 중 파손 보고 — 품질 사고(${lots})`,
+      handover: '라이더 스캔 뒤 인계 확정 없이 허가 만료',
+    },
+    next: {
+      task: '작업 상세 — 재배정·작업 풀기',
+      incident: '품질 사고 — 격리·폐기',
+      handover: '확인 필요 포장 — 실물 확인',
+    },
+    shortListMissing: '결품(SHORT) 건별 목록은 서버에 센터 조회가 없어 아직 보이지 않아요. 건수는 위 카드(서버 지표)로 봐요.',
+    orderLabel: '주문',
+    taskLabel: '작업',
+    packageLabel: '포장',
+    incidentLabel: '사고',
+    rider: (r: string) => `라이더 ${r}`,
+    riderPrefix: '라이더',
   },
 
   /** 반납 인증번호(delivery-execution 0.28.0 — PDA 반납 인증번호 화면과 같은 문구) */

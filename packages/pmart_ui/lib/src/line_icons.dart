@@ -21,6 +21,12 @@ enum PmartLineIcons {
 
   /// 현재 위치로 찾기(고객앱 주소 검색, 레퍼런스 2-4 — 원 + 네 방향 눈금).
   locate,
+
+  /// 배달 오토바이(고객앱 배송 현황 — 라이더 마커·지금 단계).
+  scooter,
+
+  /// 상담(고객앱 배송 현황 "문의하기").
+  headset,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -237,6 +243,71 @@ class _LinePainter extends CustomPainter {
         canvas.drawLine(const Offset(12, 17), const Offset(12, 21.4), line);
         canvas.drawLine(const Offset(2.6, 12), const Offset(7, 12), line);
         canvas.drawLine(const Offset(17, 12), const Offset(21.4, 12), line);
+      case PmartLineIcons.scooter:
+        // 바퀴 둘
+        canvas.drawCircle(const Offset(5.8, 17.6), 2.4, line);
+        canvas.drawCircle(const Offset(18.4, 17.6), 2.4, line);
+        // 발판·앞 기둥·손잡이
+        canvas.drawPath(
+          Path()
+            ..moveTo(8.2, 17.6)
+            ..lineTo(13.6, 17.6)
+            ..quadraticBezierTo(15.4, 17.6, 15.8, 15.2)
+            ..lineTo(17.2, 7.6)
+            ..moveTo(15.6, 7.2)
+            ..lineTo(19.2, 7.2)
+            ..moveTo(17.2, 7.6)
+            ..lineTo(18.4, 15.2),
+          line,
+        );
+        // 안장과 뒷몸통
+        canvas.drawPath(
+          Path()
+            ..moveTo(4.2, 12.6)
+            ..lineTo(10.6, 12.6)
+            ..lineTo(12.4, 17.6),
+          line,
+        );
+        // 짐 상자(안장 위 작게)
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(4.6, 7.4, 4.8, 3.8),
+            const Radius.circular(0.8),
+          ),
+          line,
+        );
+      case PmartLineIcons.headset:
+        canvas.drawPath(
+          Path()
+            ..moveTo(4.4, 14)
+            ..lineTo(4.4, 12)
+            ..arcToPoint(
+              const Offset(19.6, 12),
+              radius: const Radius.circular(7.6),
+            )
+            ..lineTo(19.6, 14),
+          line,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(3.4, 13, 3.6, 5.6),
+            const Radius.circular(1.4),
+          ),
+          line,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(17, 13, 3.6, 5.6),
+            const Radius.circular(1.4),
+          ),
+          line,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(18.8, 18.6)
+            ..quadraticBezierTo(18.8, 20.8, 14, 20.8),
+          line,
+        );
     }
   }
 

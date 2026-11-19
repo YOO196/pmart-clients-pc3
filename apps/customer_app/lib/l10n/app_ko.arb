@@ -777,6 +777,16 @@
   "@trackRiderLocationAt": { "placeholders": { "time": { "type": "String" } } },
   "trackRiderLocating": "라이더 위치를 확인하고 있어요",
   "trackMapUnavailable": "이 기기에서는 지도를 보여 줄 수 없어요",
+  "trackMapPending": "지도 위치를 확인하고 있어요",
+  "trackAddress": "배달주소",
+  "trackDeliveryInfo": "배달정보 자세히",
+  "trackRequest": "요청사항",
+  "trackRequestNone": "요청사항 없음",
+  "trackStoreName": "PMart",
+  "trackOrderDetail": "상세내역",
+  "trackTotalAmount": "총 결제금액",
+  "trackRiderNotLinked": "라이더 위치는 배송이 연결되면 지도에 실시간으로 보여요",
+  "trackOrder": "배송현황 보기",
   "etaRemaining": "약 {minutes}분 남았어요",
   "@etaRemaining": {
     "placeholders": {
@@ -1240,7 +1250,7 @@
       "orderId": { "type": "String" }
     }
   },
-  "chatOrderTopicBar": "주문 {orderId} 에 대해 묻고 있어요",
+  "chatOrderTopicBar": "{orderId} 주문에 대해 묻고 있어요",
   "@chatOrderTopicBar": {
     "placeholders": {
       "orderId": { "type": "String" }
@@ -1253,7 +1263,8 @@
   "inqPickOrderTitle": "어떤 주문에 대한 문의인가요?",
   "inqPickOrderEmpty": "주문 내역이 없어요",
   "inqPickOrderFailed": "주문 내역을 불러오지 못했어요",
-  "inqOrderChosen": "주문 {orderId}",
+  "inqOrderChosen": "주문번호 {orderId}",
+  "inqOrderChosenNoNumber": "선택한 주문",
   "@inqOrderChosen": {
     "placeholders": {
       "orderId": { "type": "String" }
