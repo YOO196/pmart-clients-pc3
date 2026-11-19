@@ -8,7 +8,12 @@ import 'package:flutter/material.dart';
 /// 기본 보라 #6B45B0 · 옅은 보라 #F6F1FD / #ECE2FA(포인트 바탕).
 abstract final class PdaColors {
   static const ink = Color(0xFF1F1D24);
-  static const muted = Color(0xFF6B6873);
+
+  /// 보조 글씨. 예전 #6B6873 은 현장 밝은 곳에서 안 보였다(사용자 2026-11-20 "중요한 걸 회색으로 안 보이게") — 더 진하게.
+  static const muted = Color(0xFF55525D);
+
+  /// 설명 글씨(제목 아래 한 줄 등) — 보조보다 진하게.
+  static const body = Color(0xFF3A3741);
   static const line = Color(0xFFE9E8EE);
   static const paper = Colors.white;
   static const dark = Color(0xFF3F2A66);
@@ -27,6 +32,10 @@ abstract final class PdaColors {
   static const warning = Color(0xFFFFF2DA);
   static const onWarning = Color(0xFF724815);
   static const danger = Color(0xFF9B392B);
+
+  /// 됐다(초록) — 확인된 상태 한 줄.
+  static const ok = Color(0xFF2E8B57);
+  static const okInk = Color(0xFF1F5E3B);
 }
 
 abstract final class PdaTheme {
@@ -58,11 +67,19 @@ abstract final class PdaTheme {
       borderRadius: BorderRadius.circular(10),
     );
     // 글자 모양은 기본 글꼴 묶음에서 이어 받는다(글꼴 이름을 비워 두면 화면마다 글꼴이 달라진다).
-    final base = ThemeData(colorScheme: scheme, useMaterial3: true).textTheme;
+    // PDA 는 팔 길이에서 본다 — 작은 글씨를 한 단계 키운다(본문 15, 작은 글씨 13).
+    final m3 = ThemeData(colorScheme: scheme, useMaterial3: true).textTheme;
+    final base = m3.copyWith(
+      bodyMedium: m3.bodyMedium!.copyWith(fontSize: 15),
+      bodySmall: m3.bodySmall!.copyWith(fontSize: 13),
+      labelMedium: m3.labelMedium!.copyWith(fontSize: 13),
+      labelSmall: m3.labelSmall!.copyWith(fontSize: 12),
+    );
     final bold = base.labelLarge!.copyWith(fontWeight: FontWeight.w800);
     return ThemeData(
       colorScheme: scheme,
       useMaterial3: true,
+      textTheme: base,
       scaffoldBackgroundColor: PdaColors.paper,
       visualDensity: VisualDensity.standard,
       appBarTheme: AppBarTheme(

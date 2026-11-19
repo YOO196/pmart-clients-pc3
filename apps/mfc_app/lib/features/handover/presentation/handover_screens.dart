@@ -263,7 +263,7 @@ class HandoverChecksScreen extends ConsumerWidget {
               Text(
                 l10n.handoverChecksIntro,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: PdaColors.muted,
+                  color: PdaColors.body,
                 ),
               ),
               if (!list.fresh)
@@ -292,7 +292,7 @@ class HandoverChecksScreen extends ConsumerWidget {
                           ),
                         ),
                         DefaultTextStyle.merge(
-                          style: const TextStyle(color: PdaColors.muted),
+                          style: const TextStyle(color: PdaColors.body),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -409,7 +409,7 @@ class PackageHandoverScreen extends ConsumerWidget {
                     ),
                     Text(
                       l10n.hoPackage(h.packageId, '${h.packageVersion ?? '-'}'),
-                      style: const TextStyle(color: PdaColors.muted),
+                      style: const TextStyle(color: PdaColors.body),
                     ),
                     Text(
                       packageStateText(l10n, h.packageState),
@@ -421,12 +421,12 @@ class PackageHandoverScreen extends ConsumerWidget {
                     if (h.orderId != null)
                       Text(
                         l10n.hoOrder(h.orderId!),
-                        style: const TextStyle(color: PdaColors.muted),
+                        style: const TextStyle(color: PdaColors.body),
                       ),
                     if (h.riderId != null)
                       Text(
                         l10n.hoRider(h.riderId!),
-                        style: const TextStyle(color: PdaColors.muted),
+                        style: const TextStyle(color: PdaColors.body),
                       ),
                   ],
                 ),

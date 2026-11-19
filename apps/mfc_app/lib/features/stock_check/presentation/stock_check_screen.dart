@@ -194,7 +194,10 @@ class _StockResult extends ConsumerWidget {
                   if (lot.expiryDate != null)
                     Text(
                       l10n.stockCheckExpiry(lot.expiryDate!),
-                      style: const TextStyle(color: PdaColors.muted),
+                      style: const TextStyle(
+                        color: PdaColors.ink,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   const SizedBox(height: 8),
                   Wrap(

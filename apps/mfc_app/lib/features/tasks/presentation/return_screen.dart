@@ -432,7 +432,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                           l10n.returnShelfLocateFrom,
                           key: const ValueKey('return-locate-hint'),
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            color: PdaColors.muted,
+                            color: PdaColors.body,
                           ),
                         ),
                       ),
@@ -464,7 +464,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                           child: Text(
                             l10n.returnShelfSuggested(p.suggested.join(', ')),
                             key: const ValueKey('return-suggested'),
-                            style: const TextStyle(color: PdaColors.muted),
+                            style: const TextStyle(color: PdaColors.body),
                           ),
                         ),
                       if (s.to case final to?
@@ -490,7 +490,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                             ),
                             Text(
                               l10n.lot(p.lotId),
-                              style: const TextStyle(color: PdaColors.muted),
+                              style: const TextStyle(color: PdaColors.body),
                             ),
                             const SizedBox(height: 4),
                             Text(

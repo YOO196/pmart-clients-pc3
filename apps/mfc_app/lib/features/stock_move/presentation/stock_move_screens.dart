@@ -91,7 +91,7 @@ class _MoveProductCard extends StatelessWidget {
                 if (urgent) Chip(label: Text(l10n.urgent)),
               ],
             ),
-            Text(meta, style: const TextStyle(color: PdaColors.muted)),
+            Text(meta, style: const TextStyle(color: PdaColors.body)),
             const SizedBox(height: 4),
             Text(
               line,
@@ -287,7 +287,7 @@ class MoveScreen extends ConsumerWidget {
                       : l10n.moveLocateFrom,
                   key: const ValueKey('move-locate-hint'),
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: PdaColors.muted,
+                    color: PdaColors.body,
                   ),
                 ),
               ),
@@ -577,7 +577,7 @@ class PutawayScreen extends ConsumerWidget {
                     l10n.moveLocateFrom,
                     key: const ValueKey('putaway-locate-hint'),
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: PdaColors.muted,
+                      color: PdaColors.body,
                     ),
                   ),
                 ),
@@ -609,7 +609,7 @@ class PutawayScreen extends ConsumerWidget {
                       ? Text(
                           l10n.returnShelfSuggested(suggested.join(', ')),
                           key: const ValueKey('putaway-suggested'),
-                          style: const TextStyle(color: PdaColors.muted),
+                          style: const TextStyle(color: PdaColors.body),
                         )
                       : Text(
                           l10n.putawayNoSuggestion,
