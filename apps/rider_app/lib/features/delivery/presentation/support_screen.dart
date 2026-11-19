@@ -11,6 +11,7 @@ import '../domain/delivery.dart';
 import 'delivery_controller.dart';
 import 'delivery_texts.dart';
 import 'support_thread_screen.dart' show HelpStateChip, helpStateLook;
+import '../../../shared/keyboard.dart';
 
 /// 지원센터 화면에서 배송 화면으로 돌려보낼 처리(배송 화면이 실제로 한다).
 /// 전달 불가는 고른 문제에 맞춰 사유를 미리 고른다(고객 연락 안 됨 / 주소 문제).
@@ -44,6 +45,10 @@ class SupportScreen extends ConsumerStatefulWidget {
 class _SupportScreenState extends ConsumerState<SupportScreen> {
   final _detail = TextEditingController();
   HelpCategory? _category;
+
+  /// 보낸 요청은 최근 이만큼만 먼저 보인다.
+  static const _ticketPreview = 3;
+  bool _showAllTickets = false;
 
   String get _id => widget.deliveryId;
 
@@ -157,11 +162,30 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
                 ),
               ],
             ),
-            for (final t in listed.reversed)
+            // 최근 3건만 — 나머지는 "더보기"로 펼친다(10건이 되면 줄줄이 내려야 해서, 사용자 2026-11-19).
+            for (final t in listed.reversed.take(
+              _showAllTickets ? listed.length : _ticketPreview,
+            ))
               _TicketCard(
                 ticket: t,
                 onOpen: () =>
                     context.push('/deliveries/$_id/support/${t.key.value}'),
+              ),
+            if (listed.length > _ticketPreview)
+              Center(
+                child: TextButton.icon(
+                  key: const ValueKey('support-more'),
+                  onPressed: () =>
+                      setState(() => _showAllTickets = !_showAllTickets),
+                  icon: Icon(
+                    _showAllTickets ? Icons.expand_less : Icons.expand_more,
+                  ),
+                  label: Text(
+                    _showAllTickets
+                        ? l10n.supportShowLess
+                        : l10n.supportShowMore(listed.length - _ticketPreview),
+                  ),
+                ),
               ),
             const SizedBox(height: 6),
             Text(
@@ -278,6 +302,7 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
             ),
           const SizedBox(height: 14),
           TextField(
+            onTapOutside: dismissKeyboard,
             key: const ValueKey('support-detail'),
             controller: _detail,
             maxLength: 500,
@@ -352,7 +377,6 @@ class _FailureReceived extends StatelessWidget {
             Text(
               [
                 if (t != null) clockText(t.sentAt),
-                if (t?.caseId case final no?) l10n.supportCaseNo(no),
                 l10n.failureReceivedNote,
               ].join(' · '),
               style: const TextStyle(
@@ -482,15 +506,8 @@ class _TicketCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                if (ticket.caseId case final no?)
-                  Text(
-                    l10n.supportCaseNo(no),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: RiderColors.sub,
-                    ),
-                  ),
+                // 접수 건 ID(CASE-…)는 시스템 번호라 라이더 화면에 내지 않는다(ADR-0070) —
+                // 길어서 줄을 넘쳤다(사용자 2026-11-19).
                 const Spacer(),
                 Text(
                   l10n.supportOpenThread,

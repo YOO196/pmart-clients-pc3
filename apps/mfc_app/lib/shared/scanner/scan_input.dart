@@ -133,12 +133,33 @@ class _ScanInputState extends ConsumerState<ScanInput> {
             autocorrect: false,
             enableSuggestions: false,
             style: const TextStyle(color: Colors.transparent),
+            // 한 줄 안내만(무엇을 찍을지) — 라벨·힌트를 겹쳐 두 줄로 자르지 않는다.
+            // 스캐너 입력을 받는 중(포커스)이면 테두리가 굵은 기본색.
             decoration: InputDecoration(
-              labelText: widget.label,
-              hintText: l10n.scanHint,
-              floatingLabelBehavior: FloatingLabelBehavior.always,
-              prefixIcon: const Icon(Icons.barcode_reader),
+              hintText: widget.label,
+              hintMaxLines: 1,
+              hintStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              prefixIcon: const Icon(Icons.barcode_reader, size: 28),
               filled: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 18,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 2.5,
+                ),
+              ),
             ),
             onSubmitted: _submit,
           ),
@@ -148,7 +169,12 @@ class _ScanInputState extends ConsumerState<ScanInput> {
           key: ValueKey('${widget.id}-camera'),
           tooltip: l10n.scanWithCamera,
           iconSize: 32,
-          constraints: const BoxConstraints(minWidth: 56, minHeight: 56),
+          style: IconButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          constraints: const BoxConstraints(minWidth: 64, minHeight: 64),
           icon: const Icon(Icons.qr_code_scanner),
           onPressed: _camera,
         ),

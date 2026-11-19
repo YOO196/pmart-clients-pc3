@@ -9,6 +9,7 @@ import 'package:rider_app/app.dart';
 import 'package:rider_app/features/auth/data/session.dart';
 import 'package:rider_app/features/delivery/data/mock_delivery_repository.dart';
 import 'package:rider_app/features/delivery/domain/delivery.dart';
+import 'package:rider_app/shared/rider_style.dart';
 import 'package:rider_app/features/delivery/presentation/delivery_controller.dart';
 import 'package:rider_app/features/offers/data/mock_offer_repository.dart';
 import 'package:rider_app/features/offers/presentation/offer_controllers.dart';
@@ -156,7 +157,9 @@ void main() {
     await t.pump(const Duration(seconds: 4));
     await settle();
     expect(find.text('지원센터가 처리하고 있어요'), findsOneWidget);
-    expect(find.textContaining('접수번호 CS-'), findsOneWidget);
+    // 접수 건 ID(시스템 ID)는 라이더 화면에 내지 않는다(ADR-0070, 사용자 2026-11-19)
+    expect(find.textContaining('접수번호'), findsNothing);
+    expect(find.textContaining('CS-'), findsNothing);
     expect(find.textContaining('PMart 지원센터입니다'), findsOneWidget);
 
     // 라이더 ↔ 상담원 대화.
@@ -179,6 +182,17 @@ void main() {
     expect(find.byKey(const ValueKey('support-center')), findsNothing);
     expect(find.byKey(const ValueKey('help-status')), findsOneWidget);
     expect(find.textContaining('지원센터가 처리하고 있어요'), findsOneWidget);
+    // 상태 한 줄만(종류 없이) — 두 줄로 내려가지 않는다(사용자 2026-11-19)
+    final statusText = t.widget<Text>(
+      find.byKey(const ValueKey('help-status-text')),
+    );
+    expect(statusText.data, '지원센터가 처리하고 있어요');
+    expect(statusText.maxLines, 1);
+    // 회색이 아니라 연보라 바탕(사용자 2026-11-19)
+    expect(
+      t.widget<Material>(find.byKey(const ValueKey('help-status-box'))).color,
+      RiderColors.primaryMist,
+    );
     await t.tap(find.byKey(const ValueKey('help-status')));
     await settle();
     expect(find.byKey(const ValueKey('support-center')), findsOneWidget);
@@ -434,5 +448,66 @@ void main() {
     await c.read(p.notifier).send(HelpCategory.goodsIssue);
     expect(c.read(p).key, isNot(first));
     expect(c.read(p).sentCount, 2);
+  });
+
+  testWidgets('보낸 요청이 많으면 최근 3건만, 나머지는 "더보기"로 펼친다(사용자 2026-11-19)', (t) async {
+    t.view
+      ..physicalSize = const Size(800, 2400)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final offers = MockOfferRepository(latency: Duration.zero);
+    await t.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [
+          ...overrides(),
+          initialSessionProvider.overrideWithValue(
+            const RiderSession(riderId: 'rider-mock-1'),
+          ),
+          offerRepositoryProvider.overrideWithValue(offers),
+          dutyRepositoryProvider.overrideWithValue(offers),
+        ],
+        child: const RiderApp(),
+      ),
+    );
+    Future<void> settle() async {
+      for (var i = 0; i < 12; i++) {
+        await t.pump(const Duration(milliseconds: 25));
+      }
+    }
+
+    await settle();
+    final c = ProviderScope.containerOf(t.element(find.byType(RiderApp)));
+    final help = helpFlowProvider('dlv-1');
+    final keep = c.listen(help, (_, _) {});
+    addTearDown(keep.close);
+    for (final cat in [
+      HelpCategory.customerUnreachable,
+      HelpCategory.addressIssue,
+      HelpCategory.accident,
+      HelpCategory.appError,
+      HelpCategory.other,
+    ]) {
+      await t.runAsync(() => c.read(help.notifier).send(cat));
+    }
+    await settle();
+    await t.tap(find.byKey(const ValueKey('delivery-dlv-1')));
+    await settle();
+    await t.tap(find.byKey(const ValueKey('help')));
+    await settle();
+
+    Finder cards() => find.byWidgetPredicate(
+      (w) =>
+          w is InkWell &&
+          w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('ticket-') &&
+          !(w.key! as ValueKey<String>).value.startsWith('ticket-state-'),
+    );
+    expect(cards(), findsNWidgets(3));
+    expect(find.text('더보기 (2건)'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('support-more')));
+    await settle();
+    expect(cards(), findsNWidgets(5));
+    expect(find.text('접기'), findsOneWidget);
   });
 }

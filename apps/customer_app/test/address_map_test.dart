@@ -79,10 +79,17 @@ void main() {
     await t.tap(find.byKey(const ValueKey('address-search')));
     await t.pumpAndSettle();
 
-    // 지도는 서버 주소 변환 좌표에서 시작한다(목: 35.1529, 129.0596).
+    // 레퍼런스 2-7-1: 고르면 큰 지도를 바로 열지 않고 미리보기만 — 확인 전에는 geo 를 보내지 않는다.
+    expect(picker.mapStarts, isEmpty);
+    expect(find.byKey(const ValueKey('address-map-preview')), findsOneWidget);
+    expect(pinText(t), '표시된 위치가 다르다면 지도에서 위치 확인을 눌러 변경해주세요');
+    expect(find.text('부산 부산진구 중앙대로 672'), findsOneWidget);
+
+    // "지도에서 위치 확인" → 큰 지도는 서버 주소 변환 좌표에서 시작한다(목: 35.1529, 129.0596).
+    await t.tap(find.byKey(const ValueKey('address-map')));
+    await t.pumpAndSettle();
     expect(picker.mapStarts.single, (lat: 35.1529, lng: 129.0596));
     expect(pinText(t), '배달 위치를 지도에서 맞췄어요');
-    expect(find.text('부산 부산진구 중앙대로 672'), findsOneWidget);
 
     await fillRest(t);
     await t.tap(find.byKey(const ValueKey('address-save')));
@@ -92,6 +99,47 @@ void main() {
     expect(saved.roadAddress, '부산 부산진구 중앙대로 672');
     expect(saved.postalCode, '05551');
     expect(saved.geo, (lat: 35.1531, lng: 129.0601));
+  });
+
+  testWidgets('공동현관 비밀번호·찾아오는 길은 계약 출입 방법·출입 메모로 보낸다', (t) async {
+    final addresses = _RecordingAddresses();
+    await openForm(
+      t,
+      testApp(const [], addressPicker: FakeAddressPicker(), address: addresses),
+    );
+    await t.tap(find.byKey(const ValueKey('address-search')));
+    await t.pumpAndSettle();
+    await fillRest(t);
+    await t.enterText(
+      find.byKey(const ValueKey('f-entrance-password')),
+      '#1234',
+    );
+    await t.enterText(find.byKey(const ValueKey('f-note')), '편의점 옆 건물');
+    await t.tap(find.byKey(const ValueKey('address-save')));
+    await t.pumpAndSettle();
+
+    final saved = addresses.drafts.single;
+    expect(saved.entranceMethod, EntranceMethod.password);
+    expect(saved.entranceNote, '#1234 · 편의점 옆 건물');
+    expect(saved.label, isNull);
+    // 큰 지도에서 확인하지 않았으면 좌표를 보내지 않는다(서버가 도로명으로 채운다).
+    expect(saved.geo, isNull);
+  });
+
+  testWidgets('비밀번호·찾아오는 길이 없으면 자유 출입, 메모 없음', (t) async {
+    final addresses = _RecordingAddresses();
+    await openForm(
+      t,
+      testApp(const [], addressPicker: FakeAddressPicker(), address: addresses),
+    );
+    await t.tap(find.byKey(const ValueKey('address-search')));
+    await t.pumpAndSettle();
+    await fillRest(t);
+    await t.tap(find.byKey(const ValueKey('address-save')));
+    await t.pumpAndSettle();
+
+    expect(addresses.drafts.single.entranceMethod, EntranceMethod.free);
+    expect(addresses.drafts.single.entranceNote, isNull);
   });
 
   testWidgets('좌표 조회 실패는 "주소 없음"이 아니고, 주소만으로 저장할 수 있다', (t) async {
@@ -136,6 +184,8 @@ void main() {
     await t.tap(find.byKey(const ValueKey('address-search')));
     await t.pumpAndSettle();
 
+    await t.tap(find.byKey(const ValueKey('address-map')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('address-map')));
     await t.pumpAndSettle();
 

@@ -116,7 +116,6 @@
       }
     }
   },
-  "scanHint": "상품 바코드를 스캔하세요",
   "scanWrongItem": "다른 상품이에요. 지시된 상품을 스캔해 주세요 (실적에 넣지 않았어요)",
   "lotLabelPrint": "LOT {lot} 라벨 {n}장 출력",
   "@lotLabelPrint": {"placeholders": {"lot": {"type": "String"}, "n": {"type": "int"}}},
@@ -148,6 +147,7 @@
   },
   "shortageShort": "결품",
   "shortageDamaged": "파손",
+  "shortageDamagedNote": "센터 관리자 화면에 품질 사고로 올라가요",
   "shortageBlocked": "꺼낼 수 없음",
   "pickAllConfirmed": "모든 실적이 확정됐어요",
   "pickWaitingConfirm": "보낸 실적의 확정을 기다리고 있어요",
@@ -1216,10 +1216,10 @@
   "@packBagNo": {"placeholders": {"n": {"type": "int"}}},
   "packSplitProgress": "아직 밀봉 안 한 상품 {left}개 · 이 봉투에 {inBag}개",
   "@packSplitProgress": {"placeholders": {"left": {"type": "int"}, "inBag": {"type": "int"}}},
-  "packSplitHint": "한 봉투에 다 안 들어가거나 무거우면, 담은 만큼만 밀봉하고 남은 상품은 새 봉투에 담아요(분할 포장)",
+  "packSplitHint": "다 안 들어가거나 무거우면 담은 만큼만 밀봉하고, 남은 건 새 봉투에 담아요",
   "packNextBag": "봉투 {n}개 밀봉 — 남은 {left}개를 새 봉투에 담아요",
   "@packNextBag": {"placeholders": {"n": {"type": "int"}, "left": {"type": "int"}}},
-  "sealPartial": "이 봉투만 밀봉하고 라벨 — 남은 건 새 봉투에",
+  "sealPartial": "이 봉투 밀봉 · 남은 건 새 봉투",
   "splitPackage": "나누기",
   "splitTitle": "봉투 나누기",
   "splitHelp": "새 봉투로 옮길 수량을 골라요. 두 봉투 모두 새 라벨이 나오고, 지금 라벨은 떼어 내요",

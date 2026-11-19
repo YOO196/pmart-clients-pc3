@@ -366,6 +366,10 @@ void main() {
       (r) => r['reviewId'] == 'rv-mine-1',
     )['state'] = 'PUBLISHED';
     await go('/addresses/new');
+    await shot('address-new-empty');
+    // 주소를 고른 뒤(레퍼런스 2-7-1: 지도 미리보기·도로명/지번·상세주소·공동현관).
+    await t.tap(find.byKey(const ValueKey('address-search')));
+    await t.pumpAndSettle();
     await shot('address-new-no-phone');
     // 프로필에 연락처가 있으면 받는 분·연락처 칸이 없다(BR-60, 레퍼런스 2-7-1).
     profile.phone = '01012345678';
@@ -373,6 +377,8 @@ void main() {
         .invalidate(profileProvider);
     await go('/addresses');
     await go('/addresses/new');
+    await t.tap(find.byKey(const ValueKey('address-search')));
+    await t.pumpAndSettle();
     await shot('address-new');
     await go('/notifications/settings');
     await shot('notice-settings');

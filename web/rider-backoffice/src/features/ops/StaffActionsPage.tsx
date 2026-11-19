@@ -5,6 +5,7 @@
 // 원천마다 쪽(커서)이 따로라, 아직 덜 불러온 원천이 있으면 그 원천의 마지막 시각보다 오래된 줄은 숨기고 "더 불러오기"로 채운다
 // (안 그러면 섞은 순서가 틀린다). 한 원천이 실패하면 그 원천만 "불러오지 못함"으로 알리고 나머지는 보인다(실패를 빈 목록으로 보이지 않는다).
 // 표시(ADR-0070): 라이더 = RiderName, 배송 = DeliveryNo. 직원은 "이름 · 사번"이 정본이지만 HR 이름 조회가 아직 없어 actorId 그대로(PC 1 에 요청).
+import { humanizeCodes } from '../../shared/codeText';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -266,7 +267,7 @@ export function StaffActionsMenu() {
                         )}
                       </td>
                       <td className="text-xs">
-                        {r.detail && <p className="font-mono">{r.detail}</p>}
+                        {r.detail && <p title={r.detail}>{humanizeCodes(r.detail)}</p>}
                         {r.reason && <p className="whitespace-pre-wrap text-base-content/70">{r.reason}</p>}
                         {!r.detail && !r.reason && '—'}
                       </td>

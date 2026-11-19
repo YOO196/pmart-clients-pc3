@@ -497,7 +497,9 @@ class _WaitingState extends ConsumerState<_Waiting> {
                     children: [
                       // 취소 = 이 목록에서 숨기기(서버에 보내지 않음 — 거절 API 없음).
                       // 배차 수락과 같은 사각형·높이·글씨, 바탕만 회색(사용자 2026-11-18 "같은 사각형으로").
+                      // 가로는 배차 수락이 더 길게 2:3(사용자 2026-11-19 "취소가 더 면적이 작아야").
                       Expanded(
+                        flex: 2,
                         child: RiderButton(
                           key: ValueKey('waiting-hide-${w.deliveryId}'),
                           height: 46,
@@ -515,6 +517,7 @@ class _WaitingState extends ConsumerState<_Waiting> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
+                        flex: 3,
                         child: RiderButton(
                           key: ValueKey('waiting-accept-${w.deliveryId}'),
                           height: 46,

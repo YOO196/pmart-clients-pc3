@@ -318,11 +318,10 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
               switch (step) {
                 case 0:
                   children.addAll([
-                    TargetLine(
+                    ScanPrompt(
                       key: const ValueKey('target-station'),
-                      label: l10n.packStepStation,
-                      code: l10n.packScanStation,
-                      confirmed: false,
+                      icon: Icons.countertops_outlined,
+                      text: l10n.packScanStation,
                     ),
                     ScanInput(
                       id: 'station-scan',
@@ -331,7 +330,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                           TestScan(l10n.tsStation, x),
                         TestScan(l10n.tsWrong, 'C-S1-01-1-01'),
                       ],
-                      label: l10n.packScanStation,
+                      label: l10n.scanHint,
                       cameraTitle: l10n.packingTitle,
                       continuous: false,
                       autofocus: false,
@@ -348,12 +347,19 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                       code: packing.station!,
                       confirmed: true,
                     ),
-                    TargetLine(
-                      key: const ValueKey('target-cart'),
-                      label: l10n.moveCart,
-                      code: expectedCart ?? l10n.moveCartScan,
-                      confirmed: false,
-                    ),
+                    if (expectedCart != null)
+                      TargetLine(
+                        key: const ValueKey('target-cart'),
+                        label: l10n.moveCart,
+                        code: expectedCart,
+                        confirmed: false,
+                      )
+                    else
+                      ScanPrompt(
+                        key: const ValueKey('target-cart'),
+                        icon: Icons.shopping_cart_outlined,
+                        text: l10n.moveCartScan,
+                      ),
                     ScanInput(
                       id: 'pack-cart-scan',
                       testValues: [
@@ -533,19 +539,27 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                             .length,
                       ),
                     ),
-                    TargetLine(
-                      key: const ValueKey('target-rack'),
-                      label: l10n.packStepRack,
-                      code: packing.rack ?? l10n.packRackShort,
-                      confirmed: packing.rack != null,
-                    ),
+                    const SizedBox(height: 12),
+                    if (packing.rack case final rack?)
+                      TargetLine(
+                        key: const ValueKey('target-rack'),
+                        label: l10n.packStepRack,
+                        code: rack,
+                        confirmed: true,
+                      )
+                    else
+                      ScanPrompt(
+                        key: const ValueKey('target-rack'),
+                        icon: Icons.shelves,
+                        text: l10n.packScanRack,
+                      ),
                     ScanInput(
                       id: 'rack-scan',
                       testValues: [
                         TestScan(l10n.tsRack, 'DSP-A-01'),
                         TestScan(l10n.tsWrong, 'PAK-C-01'),
                       ],
-                      label: l10n.packScanRack,
+                      label: l10n.scanHint,
                       cameraTitle: l10n.packingTitle,
                       continuous: false,
                       autofocus: false,
@@ -571,57 +585,90 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                 children.addAll([
                   const Divider(height: 24),
                   Text(l10n.packagesTitle, style: theme.textTheme.titleSmall),
+                  // 봉투마다 카드 한 장: 위에 상태·온도대·QR, 아래에 버튼(항상 왼쪽부터 같은 자리).
                   for (final p in s.packages)
-                    ListTile(
+                    Card(
                       key: ValueKey('package-${p.packageId}'),
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        [
-                          packageStateText(l10n, p.state),
-                          if (p.temperatureZone case final z?)
-                            zoneText(
-                              l10n,
-                              TemperatureZone.values.byName(z.toLowerCase()),
-                            ),
-                        ].join(' · '),
-                      ),
-                      subtitle: Text(p.qrCode ?? '-'),
-                      onTap:
-                          p.state == PackageState.sealed ||
-                              p.state == PackageState.handedOver
-                          ? () => context.push(
-                              '/packages/${p.packageId}/handover',
-                            )
-                          : null,
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (p.state == PackageState.sealed &&
-                              p.qrCode != null)
-                            TextButton(
-                              key: ValueKey('print-${p.packageId}'),
-                              onPressed: () => printPackageLabel(
-                                context,
-                                ref,
-                                PackageLabel.of(s, p),
+                      margin: const EdgeInsets.only(top: 8),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap:
+                            p.state == PackageState.sealed ||
+                                p.state == PackageState.handedOver
+                            ? () => context.push(
+                                '/packages/${p.packageId}/handover',
+                              )
+                            : null,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 4, 4),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.inventory_2_outlined,
+                                    size: 20,
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      [
+                                        packageStateText(l10n, p.state),
+                                        if (p.temperatureZone case final z?)
+                                          zoneText(
+                                            l10n,
+                                            TemperatureZone.values.byName(
+                                              z.toLowerCase(),
+                                            ),
+                                          ),
+                                      ].join(' · '),
+                                      style: theme.textTheme.titleSmall,
+                                    ),
+                                  ),
+                                  Text(
+                                    p.qrCode ?? '-',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
                               ),
-                              child: Text(l10n.printLabel),
-                            ),
-                          if (p.canRepack &&
-                              p.contents.fold(0, (n, c) => n + c.qty) >= 2)
-                            TextButton(
-                              key: ValueKey('split-${p.packageId}'),
-                              onPressed: () => _split(task, s, p),
-                              child: Text(l10n.splitPackage),
-                            ),
-                          if (p.canRepack)
-                            TextButton(
-                              key: ValueKey('repack-${p.packageId}'),
-                              onPressed: () => _repack(s, p),
-                              child: Text(l10n.repack),
-                            ),
-                        ],
+                              Wrap(
+                                spacing: 4,
+                                children: [
+                                  if (p.state == PackageState.sealed &&
+                                      p.qrCode != null)
+                                    TextButton(
+                                      key: ValueKey('print-${p.packageId}'),
+                                      onPressed: () => printPackageLabel(
+                                        context,
+                                        ref,
+                                        PackageLabel.of(s, p),
+                                      ),
+                                      child: Text(l10n.printLabel),
+                                    ),
+                                  if (p.canRepack &&
+                                      p.contents.fold(0, (n, c) => n + c.qty) >=
+                                          2)
+                                    TextButton(
+                                      key: ValueKey('split-${p.packageId}'),
+                                      onPressed: () => _split(task, s, p),
+                                      child: Text(l10n.splitPackage),
+                                    ),
+                                  if (p.canRepack)
+                                    TextButton(
+                                      key: ValueKey('repack-${p.packageId}'),
+                                      onPressed: () => _repack(s, p),
+                                      child: Text(l10n.repack),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                 ]);

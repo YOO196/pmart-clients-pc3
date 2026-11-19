@@ -26,6 +26,7 @@ import 'photo_box.dart';
 import 'support_screen.dart';
 import 'support_thread_screen.dart' show helpStateLook;
 import 'trip_widgets.dart';
+import '../../../shared/keyboard.dart';
 
 /// 배송 수행: 가게 도착 → QR 인계 → 픽업 완료 → 전달완료. 화면 상태는 서버 확정으로만 바꾼다.
 ///
@@ -297,6 +298,8 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
     if (outcome != CancelOutcome.unknown) _cancelKey = null;
     switch (outcome) {
       case CancelOutcome.accepted:
+        // dispatch 가 배정 해제를 확정(APPLIED). 수행 서비스 목록이 늦게 따라와도 진행 중에 남기지 않는다.
+        ref.read(releasedDeliveriesProvider.notifier).add(_id);
         showRiderToast(context, l10n.cancelAccepted);
         _finish();
       case CancelOutcome.pickedUpCaseRequired:
@@ -882,46 +885,73 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
       if (help.last case final last?)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          // 회색이면 묻혀서 연보라 바탕 + 보라 테두리(사용자 2026-11-19 "연보라색이나 연주황색으로").
           child: Material(
-            color: RiderColors.field,
-            borderRadius: BorderRadius.circular(8),
+            key: const ValueKey('help-status-box'),
+            color: RiderColors.primaryMist,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(
+                color: RiderColors.primary.withValues(alpha: 0.35),
+              ),
+            ),
             child: InkWell(
               key: const ValueKey('help-status'),
               borderRadius: BorderRadius.circular(8),
               onTap: () => _openHelp(d),
+              // 상태 한 줄만 크게("지원센터에 접수했어요"), 종류·건수는 대화 화면에서 —
+              // 두 줄로 내려가지 않게(사용자 2026-11-19). 대화 보기는 큰 버튼 모양.
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
                 child: Row(
                   children: [
                     const Icon(
                       Icons.support_agent,
-                      size: 20,
-                      color: RiderColors.sub,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        [
-                          helpCategoryText(l10n, last.category),
-                          helpStateLook(l10n, last.state).$1,
-                          if (help.sentCount > 1)
-                            l10n.supportCount(help.sentCount),
-                        ].join(' · '),
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ),
-                    Text(
-                      l10n.supportOpenThread,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: RiderColors.primary,
-                      ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right,
-                      size: 18,
+                      size: 24,
                       color: RiderColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          helpStateLook(l10n, last.state).$1,
+                          key: const ValueKey('help-status-text'),
+                          maxLines: 1,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      key: const ValueKey('help-status-open'),
+                      padding: const EdgeInsets.fromLTRB(14, 9, 8, 9),
+                      decoration: BoxDecoration(
+                        color: RiderColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            l10n.supportOpenThread,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            size: 22,
+                            color: Colors.white,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1651,6 +1681,7 @@ class _ReturnCodeDialogState extends ConsumerState<_ReturnCodeDialog> {
           Text(l10n.returnCodeBody(ReturnHandoverCode.length)),
           const SizedBox(height: 16),
           TextField(
+            onTapOutside: dismissKeyboard,
             key: const ValueKey('return-code'),
             controller: _code,
             autofocus: true,

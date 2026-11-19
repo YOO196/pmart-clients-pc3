@@ -255,6 +255,30 @@ void main() {
       );
       expect(pushRoute(const {}), '/notifications');
     });
+
+    // 백엔드 알림 2026-11-19 notice-delivery-notifications·incident-reshipment (notification 0.5.1).
+    test('배송 진행 알림(레퍼런스 10. 3-1~3-5)·사고 재발송은 목적지대로', () {
+      String route(String key, String type, String ref) => pushRoute({
+        'notificationId': 'n1',
+        'templateKey': key,
+        'destinationType': type,
+        'destinationRef': ref,
+      });
+      expect(route('PREPARATION_STARTED', 'ORDER', 'o1'), '/orders/o1');
+      expect(route('DELIVERY_STARTED', 'DELIVERY', 'd1'), '/deliveries/d1');
+      expect(route('DELIVERY_HEADING', 'DELIVERY', 'd1'), '/deliveries/d1');
+      expect(
+        route('DELIVERY_ARRIVING_SOON', 'DELIVERY', 'd1'),
+        '/deliveries/d1',
+      );
+      expect(route('DELIVERY_COMPLETED', 'ORDER', 'o1'), '/orders/o1');
+      expect(
+        route('DELIVERY_INCIDENT_RESHIPMENT', 'ORDER', 'o1'),
+        '/orders/o1',
+      );
+      // 옛 배송 출발 알림(목적지 ORDER)은 주문 상세 그대로.
+      expect(route('DELIVERY_STARTED', 'ORDER', 'o1'), '/orders/o1');
+    });
   });
 
   group('API 연동', () {

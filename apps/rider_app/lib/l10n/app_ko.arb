@@ -584,13 +584,14 @@
   "supportSend": "지원센터에 보내기",
   "supportSent": "지원센터에 보냈어요",
   "supportHistory": "보낸 요청",
-  "supportEmpty": "아직 보낸 요청이 없어요",
-  "supportCaseNo": "접수번호 {no}",
-  "@supportCaseNo": {
+  "supportShowMore": "더보기 ({count}건)",
+  "@supportShowMore": {
     "placeholders": {
-      "no": {"type": "String"}
+      "count": {"type": "int"}
     }
   },
+  "supportShowLess": "접기",
+  "supportEmpty": "아직 보낸 요청이 없어요",
   "supportReplyPending": "요청을 누르면 진행상황과 상담원 대화를 볼 수 있어요.",
   "supportOpenThread": "대화 보기",
   "supportCount": "요청 {count}건",
@@ -602,7 +603,7 @@
   "supportThreadTitle": "지원센터 대화",
   "supportThreadIntro": "상담원과 이 요청에 대해 이야기할 수 있어요.",
   "supportThreadWaiting": "상담원이 배정되면 여기로 답장이 와요.",
-  "supportThreadUnavailable": "상담원 대화는 아직 서버에서 지원하지 않아요. 처리 상태와 접수번호만 볼 수 있어요.",
+  "supportThreadUnavailable": "상담원 대화는 아직 서버에서 지원하지 않아요. 처리 상태만 볼 수 있어요.",
   "supportThreadFailed": "대화를 불러오지 못했어요. 잠시 뒤 다시 확인할게요.",
   "supportThreadClosed": "처리가 끝난 요청이에요. 더 필요하면 지원센터에서 새 요청을 보내 주세요.",
   "supportThreadHint": "상담원에게 보낼 내용",

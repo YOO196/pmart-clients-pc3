@@ -28,7 +28,6 @@ void main() {
 
     await t.tap(find.byKey(const ValueKey('address-add')));
     await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('f-label')), '우리집');
     await t.tap(find.byKey(const ValueKey('address-search')));
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('f-detail')), '101동');
@@ -41,7 +40,8 @@ void main() {
     expect(find.textContaining('배달 가능 지역이에요'), findsWidgets);
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
-    expect(find.text('우리집'), findsOneWidget);
+    // 주소 이름 칸은 레퍼런스(2-7-1)에 없어 뺐다 — 목록은 도로명으로 보인다.
+    expect(find.text('서울 송파구 올림픽로 300'), findsOneWidget);
   });
 
   testWidgets('회원은 로그인 뒤 서버 주소록이 보인다', (t) async {

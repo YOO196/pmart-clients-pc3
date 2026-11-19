@@ -176,7 +176,12 @@
 
 ### 4-11. 내 정보 — hr-service `GET /hr/employees/me` (`features/me/MyInfoPage.tsx`, 2026-11-18 PC 3)
 - 왼쪽 메뉴 "내 세션" 아래 "내 정보"(`/me`, 센터와 상관없음). 이름·사번·운영자 ID·회사 메일(로그인 ID)·고용 형태·소속(센터/본사 부서)·상태 — 서버 값 그대로. 404 = 인사 기록 없음(오류 아님). LAN 에서 MFC_SUPERVISOR·MFC_WORKER 토큰 200(백엔드 확인 2026-11-18).
-- 사용자 결정(2026-11-18): 내 비밀번호는 본인이 직접(지금 + 새 비밀번호), 연락처(휴대폰·개인 메일)만 본인이 — 회사 메일은 인사팀만. 두 기능은 백엔드 EA-3·HR-3(PC 1) 대기라 "준비 중" 안내만(폼·요청 없음). 요청서 `docs/handoff/mfc-backoffice/2026-11-18-backend-my-account.md`.
+- 사용자 정정(2026-11-18, 회신 `clients/mfc-backoffice/2026-11-18-reply-my-account.md`): "비밀번호" = 로그인 비밀번호가 아니라 **센터 휴게 번호**, 연락처 = 시스템이 쓰지 않는 **연락 수단 표시용**(mfc-capacity). EA-3·HR-3 철회. 회사 메일은 인사팀만.
+- (2026-11-19) 맡은 센터마다(두 곳 이상이면 고르기, 없으면 안내):
+  - 센터 휴게 번호(capacity 0.20.0 `break-pin`) — 작업자 목록 위와 같은 카드(`features/workers/BreakPinCard.tsx`). MFC_SUPERVISOR 만 정하기, 그 밖은 보기만.
+  - 내 연락처(capacity 0.21.0 `GET·PUT /mfcs/{mfcId}/staff-contacts/me`) — 표시 이름·휴대폰·이메일, X-Expected-Version(처음 0), 빈 칸 = null(지움). 형식(휴대폰 숫자·- 9~11자리, 메일, 이름 50자)은 화면에서 먼저 막고 확정은 서버(400·409). 바뀐 것이 없으면 저장 버튼이 꺼진다.
+  - 이 센터 직원 연락처(`GET /mfcs/{mfcId}/staff-contacts`) — 서버 순서 그대로, 이름이 없으면 "이름 · 사번", 내 줄은 "나". 조회 실패 ≠ 빈 목록.
+  - 연락처는 라이더·다른 센터가 보라고 둔 값이라 가리지 않고 보인다(사용자 결정). 로그·주소·저장소에는 남기지 않는다.
 - 타입: `gen:api` 생성물 `src/api/generated/hr`(PC 2 가 mfc-backoffice 생성 목록에 `hr` 을 넣음, 2026-11-18). 처음 넣을 때 쓴 임시 `src/api/hrSelf.ts` 는 지웠다.
 
 ### 4-12. 사람 이름·화면 번호(모든 메뉴, 2026-11-19 PC 3)
