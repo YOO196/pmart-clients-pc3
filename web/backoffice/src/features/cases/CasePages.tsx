@@ -40,6 +40,8 @@ import { messages as m } from '../../shared/messages';
 import { label, text, when } from '../../shared/ops';
 import { SourceStamps } from '../../shared/SourceStamps';
 import { DisplayNumber, RiderLabel, riderSourceFailed } from '../../shared/displayNumber';
+import { useResolvedRef } from '../../shared/numberLookups';
+import { RefStatus } from '../../shared/RefField';
 import { canSeeIntakes, CsIntakeLog } from '../csIntakes/CsIntakePages';
 import { CaseNotes } from './CaseNotes';
 import { ActionRequests } from './ActionRequests';
@@ -1201,12 +1203,14 @@ export function NewMisdeliveryPage() {
     void navigate(`/cases/${encodeURIComponent(c.caseId ?? '')}`);
     return c;
   });
-  const recorded = needsAddress && destination !== null && destination.deliveryId === deliveryId.trim();
+  // 배송 번호(74939255-1)로도 — 찾은 배송 ID 로 보낸다(2026-11-19)
+  const delivery = useResolvedRef('delivery', deliveryId);
+  const recorded = needsAddress && destination !== null && destination.deliveryId === delivery.id;
   const addressOk =
     !needsAddress ||
     recorded ||
     (address.road.trim().length >= 1 && address.road.trim().length <= 200 && address.reason.trim().length >= 2 && address.reason.trim().length <= 200);
-  const ok = deliveryId.trim() !== '' && summary.trim() !== '' && fault !== '' && addressOk;
+  const ok = delivery.id !== null && summary.trim() !== '' && fault !== '' && addressOk;
   const setAddr = (k: keyof Address, val: string) => setAddress((a) => ({ ...a, [k]: val }));
   return (
     <section className="max-w-5xl space-y-4">
@@ -1219,7 +1223,7 @@ export function NewMisdeliveryPage() {
           if (!ok) return;
           if (open.phase.kind === 'rejected') open.reset();
           void open.run({
-            deliveryId: deliveryId.trim(),
+            deliveryId: delivery.id ?? '',
             summary: summary.trim(),
             evidence: evidence.trim(),
             fault,
@@ -1229,10 +1233,11 @@ export function NewMisdeliveryPage() {
         }}
       >
         <div className="min-w-0 space-y-4 text-sm lg:col-span-2">
-          <Step n={1} title={m.cases.newStepWhat} done={deliveryId.trim() !== '' && summary.trim() !== ''}>
+          <Step n={1} title={m.cases.newStepWhat} done={delivery.id !== null && summary.trim() !== ''}>
             <label className="flex flex-col gap-1">
               {m.cases.deliveryId}
-              <input className="input input-sm w-64 font-mono" value={deliveryId} onChange={(e) => setDeliveryId(e.target.value)} />
+              <input className="input input-sm w-64 font-mono" placeholder={m.refField.deliveryHint} value={deliveryId} onChange={(e) => setDeliveryId(e.target.value)} />
+              <RefStatus r={delivery} kind="delivery" />
             </label>
             <label className="flex flex-col gap-1">
               {m.cases.summary}

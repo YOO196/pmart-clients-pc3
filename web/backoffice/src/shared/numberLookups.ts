@@ -85,3 +85,37 @@ export async function riderIdOfNumber(api: ReturnType<typeof useApi>, riderNumbe
 
 export const isOrderNumber = (v: string) => /^\d{8}$/.test(v.replace(/[\s-]/g, ''));
 export const isRiderNumber = (v: string) => /^[1-9]\d{5}$/.test(v.trim());
+
+/** 화면 배송 번호(주문번호 8자리-순번, 예 74939255-1) */
+export const isDeliveryNumber = (v: string) => /^\d{8}-\d{1,3}$/.test(v.trim());
+
+/**
+ * 화면 배송 번호 → 배송 ID(2026-11-19 사용자 "난수 ID 를 일일이 확인 안 하고 불러올 방법"). 새 API 없이:
+ * execution `GET /deliveries?orderNumber=` 로 그 주문의 배송들을 받아 deliveryNumber 가 같은 것. 없으면 null.
+ */
+export async function deliveryIdOfNumber(api: ReturnType<typeof useApi>, deliveryNumber: string): Promise<string | null> {
+  const v = deliveryNumber.trim();
+  const r = await request('GET', api.execution.GET('/deliveries', { params: { query: { orderNumber: v.slice(0, 8), size: 50 } } }));
+  return (r.items ?? []).find((d) => d.deliveryNumber === v)?.deliveryId ?? null;
+}
+
+export type RefKind = 'delivery' | 'rider' | 'order';
+const isNumberOf: Readonly<Record<RefKind, (v: string) => boolean>> = { delivery: isDeliveryNumber, rider: isRiderNumber, order: isOrderNumber };
+
+/** 입력 칸 값 → 시스템 ID. 화면 번호 모양이면 서버에서 찾고, 아니면 넣은 값을 ID 로 그대로(기존처럼) */
+export function useResolvedRef(kind: RefKind, input: string) {
+  const api = useApi();
+  const value = input.trim();
+  const byNumber = value !== '' && isNumberOf[kind](value);
+  const q = useQuery({
+    queryKey: ['ref', kind, value],
+    enabled: byNumber,
+    staleTime: 60_000,
+    queryFn: () => (kind === 'delivery' ? deliveryIdOfNumber(api, value) : kind === 'rider' ? riderIdOfNumber(api, value) : orderIdOfNumber(api, value.replace(/[\s-]/g, ''))),
+  });
+  if (value === '') return { id: null, state: 'empty' as const, value };
+  if (!byNumber) return { id: value, state: 'id' as const, value };
+  if (q.isPending) return { id: null, state: 'loading' as const, value };
+  if (q.isError) return { id: null, state: 'failed' as const, value };
+  return q.data ? { id: q.data, state: 'found' as const, value } : { id: null, state: 'notFound' as const, value };
+}

@@ -78,7 +78,7 @@ function queryOf(c: Criteria, page: number) {
   const usePeriod = isSeoulDate(c.from) && isSeoulDate(c.to);
   return {
     // 화면 주문번호(8자리, ADR-0070)면 orderNumber 로, 그 밖은 시스템 ID 로(2026-11-18)
-    ...(c.orderId ? (isOrderNumber(c.orderId) ? { orderNumber: c.orderId.replace(/[s-]/g, '') } : { orderId: c.orderId.trim() }) : {}),
+    ...(c.orderId ? (isOrderNumber(c.orderId) ? { orderNumber: c.orderId.replace(/[\s-]/g, '') } : { orderId: c.orderId.trim() }) : {}),
     ...(c.customerId ? { customerId: c.customerId.trim() } : {}),
     ...(isStatus(c.status) ? { status: c.status } : {}),
     ...(c.mfcId ? { mfcId: c.mfcId.trim() } : {}),

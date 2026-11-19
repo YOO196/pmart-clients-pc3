@@ -18,6 +18,8 @@ import { useDeliveryNumbers, useOrderNumbers, useRiderLabels } from '../../share
 import { messages as m } from '../../shared/messages';
 import { isSeoulDate, label, seoulDayEnd, seoulDayStart, text, when } from '../../shared/ops';
 import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
+import { useResolvedRef } from '../../shared/numberLookups';
+import { RefStatus } from '../../shared/RefField';
 import { ChipGroup, CodeLabel, DataTable, DetailHeader, FieldList, NextAction, PageHeader, SearchPanel, SearchRow, Section, type Tone } from '../../shared/admin';
 import { EmptyBox, Icon, IdLink, KindChip, ListFoot, Person, SideFields, When, type IconName } from '../lookup/parts';
 
@@ -196,6 +198,10 @@ export function RiderComplaintListPage() {
   const field = (k: keyof typeof draft) => ({ value: draft[k], onChange: (e: { target: { value: string } }) => setDraft((d) => ({ ...d, [k]: e.target.value })) });
   const from = get('from');
   const to = get('to');
+  // 번호로도 거른다(2026-11-19) — 주소에는 넣은 값 그대로, 조회에는 찾은 ID
+  const rider = useResolvedRef('rider', get('riderId'));
+  const delivery = useResolvedRef('delivery', get('deliveryId'));
+  const unresolved = [rider, delivery].some((r) => r.state === 'notFound' || r.state === 'failed' || r.state === 'loading');
 
   return (
     <section className="space-y-4">
@@ -217,8 +223,10 @@ export function RiderComplaintListPage() {
         label={m.complaints.title}
       >
         <SearchRow label={m.complaints.ids}>
-          <input aria-label={m.complaints.riderId} placeholder={m.complaints.riderId} className="input input-sm w-48" {...field('riderId')} />
-          <input aria-label={m.complaints.deliveryId} placeholder={m.complaints.deliveryId} className="input input-sm w-48" {...field('deliveryId')} />
+          <input aria-label={m.complaints.riderId} placeholder={m.refField.riderHint} className="input input-sm w-56" {...field('riderId')} />
+          <input aria-label={m.complaints.deliveryId} placeholder={m.refField.deliveryHint} className="input input-sm w-60" {...field('deliveryId')} />
+          <RefStatus r={rider} kind="rider" />
+          <RefStatus r={delivery} kind="delivery" />
         </SearchRow>
         <SearchRow label={m.complaints.type}>
           <ChipGroup
@@ -234,14 +242,15 @@ export function RiderComplaintListPage() {
           <input type="date" aria-label={m.complaints.to} className="input input-sm w-40" {...field('to')} />
         </SearchRow>
       </SearchPanel>
-      <RiderComplaintTable
-        riderId={get('riderId') || undefined}
-        deliveryId={get('deliveryId') || undefined}
+      {/* 번호를 아직 못 찾았으면 표를 그리지 않는다(잘못된 값으로 거른 빈 목록을 "없음"으로 보이지 않게) */}
+      {!unresolved && <RiderComplaintTable
+        riderId={rider.id ?? undefined}
+        deliveryId={delivery.id ?? undefined}
         complaintType={isType(type) ? type : undefined}
         from={isSeoulDate(from) ? from : undefined}
         to={isSeoulDate(to) ? to : undefined}
         preview
-      />
+      />}
     </section>
   );
 }
