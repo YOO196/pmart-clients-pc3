@@ -235,6 +235,51 @@ void main() {
     });
   });
 
+  testWidgets('인계 확인 목록은 시스템 ID 대신 인계 번호·주문번호·라이더 표기(ADR-0070)', (t) async {
+    t.view
+      ..physicalSize = const Size(800, 2400)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: overrides(),
+        child: const MfcApp(),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('menu-handover')));
+    await t.pumpAndSettle();
+    expect(find.text('인계 번호 3817'), findsOneWidget);
+    expect(find.text('주문 20000007'), findsOneWidget);
+    expect(find.text('허가받은 라이더: 박*민 · 503217'), findsOneWidget);
+    // 탈퇴로 이름이 지워진 라이더는 번호만.
+    expect(find.text('허가받은 라이더: 611045'), findsOneWidget);
+    expect(find.textContaining('pkg-chk-1'), findsNothing);
+    expect(find.textContaining('order-seed'), findsNothing);
+    expect(find.textContaining('rider-mock'), findsNothing);
+  });
+
+  testWidgets('라이더 표기 조회 실패는 "라이더(이름 못 읽음)" — ID 를 대신 보이지 않는다', (t) async {
+    handovers.failRiderLabels = true;
+    t.view
+      ..physicalSize = const Size(800, 2400)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: overrides(),
+        child: const MfcApp(),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('menu-handover')));
+    await t.pumpAndSettle();
+    expect(find.text('허가받은 라이더: 라이더(이름 못 읽음)'), findsNWidgets(2));
+    expect(find.textContaining('rider-mock'), findsNothing);
+  });
+
   testWidgets('인계 확인: 목록 → 포장대에 없음(한 번 더 확인) → 확정 안내', (t) async {
     t.view
       ..physicalSize = const Size(800, 2400)

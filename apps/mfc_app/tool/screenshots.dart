@@ -436,6 +436,9 @@ void main() {
       ('menu-printer', 'printer'),
     ]) {
       await tap(key);
+      // 라이더 표기처럼 화면이 뜬 뒤 따로 묻는 값까지 기다린다(목 지연 300ms).
+      await t.pump(const Duration(milliseconds: 400));
+      await t.pumpAndSettle();
       await shot(name);
       await home();
     }

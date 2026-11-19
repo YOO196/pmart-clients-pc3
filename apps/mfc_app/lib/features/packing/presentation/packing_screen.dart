@@ -758,7 +758,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                                       style: theme.textTheme.titleSmall,
                                     ),
                                   ),
-                                  // 포장 번호 = 라벨의 인계 숫자 6자리(ADR-0070 — QR 원문·포장 ID 대신).
+                                  // 포장 번호 = 라벨의 인계 번호(4자리, 예전 포장 6자리)(ADR-0070 — QR 원문·포장 ID 대신).
                                   Text(
                                     p.handoverCode ?? l10n.packNoHandoverCode,
                                     key: ValueKey('pkg-code-${p.packageId}'),

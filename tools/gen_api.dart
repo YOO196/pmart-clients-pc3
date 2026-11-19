@@ -47,7 +47,7 @@ const services = <String, List<String>>{
   'delivery-tracking-service': ['customer', 'rider', 'mfc'],
   'delivery-dispatch-service': ['rider'],
   'delivery-execution-service': ['rider', 'customer'],
-  'rider-service': ['rider'],
+  'rider-service': ['rider', 'mfc'],
   // 라이더 Google 로그인·지점 목록(PC 5 rider-app, 2026-11-17 사용자 지시 — PC 1 알림 handoff rider-app/2026-11-17-pc1-gen-rider-auth-center-master.md)
   'rider-auth-service': ['rider'],
   'center-master-service': ['rider'],

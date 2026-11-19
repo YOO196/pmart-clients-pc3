@@ -70,8 +70,8 @@ base class MockPackingRepository implements PackingRepository {
   /// 다음 랙 올리기 응답을 1회 잃는다(서버는 기록함).
   bool loseNextStageResponse = false;
 
-  /// 목 인계 숫자 6자리(서버는 무작위 — 목은 순번으로 겹치지 않게).
-  static String _code(int seq) => '${(318204 + seq * 7919) % 900000 + 100000}';
+  /// 목 인계 번호 4자리(fulfillment 0.23.0 — 센터 안 겹치지 않게, 목은 순번으로).
+  static String _code(int seq) => '${(3817 + seq * 791) % 9000 + 1000}';
 
   Future<void> _wait() => Future<void>.delayed(latency);
 

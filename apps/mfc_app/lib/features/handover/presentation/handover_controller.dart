@@ -111,3 +111,15 @@ class CheckController extends Notifier<CheckFlow> {
       ..invalidate(handoverProvider(packageId));
   }
 }
+
+/// 라이더 화면 표기 — 키는 정렬해 쉼표로 이은 라이더 ID(한 화면의 라이더를 한 번에 묻는다).
+final riderLabelsProvider = FutureProvider.autoDispose
+    .family<Map<String, RiderLabel>, String>(
+      (ref, ids) => ref
+          .watch(handoverRepositoryProvider)
+          .riderLabels(ids.isEmpty ? const [] : ids.split(',')),
+    );
+
+/// [ids] 를 [riderLabelsProvider] 키로.
+String riderKey(Iterable<String?> ids) =>
+    ({for (final i in ids) ?i}.toList()..sort()).join(',');

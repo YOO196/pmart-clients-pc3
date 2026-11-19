@@ -35,6 +35,28 @@ base class MockHandoverRepository implements HandoverRepository {
 
   Future<void> _wait() => Future<void>.delayed(latency);
 
+  /// 목 라이더 표기. rider-mock-3 은 탈퇴(이름 지워짐), 목록에 없는 ID 는 응답에서 빠진다.
+  static const riderNames = {
+    'rider-mock-1': RiderLabel(riderNumber: '482913', nameMasked: '김*수'),
+    'rider-mock-2': RiderLabel(riderNumber: '503217', nameMasked: '박*민'),
+    'rider-mock-3': RiderLabel(riderNumber: '611045'),
+  };
+
+  /// 라이더 표기 조회를 실패시킨다.
+  bool failRiderLabels = false;
+
+  @override
+  Future<Map<String, RiderLabel>> riderLabels(List<String> riderIds) async {
+    await _wait();
+    if (failRiderLabels) {
+      throw const ProblemFailure(Problem(status: 503, code: 'UNAVAILABLE'));
+    }
+    return {
+      for (final id in riderIds)
+        id: ?riderNames[id],
+    };
+  }
+
   static const _asOf = {
     'asOf': '2026-11-10T03:00:00Z',
     'sourceVersion': 1,
@@ -47,6 +69,7 @@ base class MockHandoverRepository implements HandoverRepository {
     required String location,
     required String expiresAt,
     required String order,
+    required String code,
   }) => {
     'packageId': id,
     'packageVersion': 1,
@@ -62,6 +85,8 @@ base class MockHandoverRepository implements HandoverRepository {
     'checkRequired': true,
     'shipmentId': 'shp-$id',
     'orderId': order,
+    'orderNumber': '2000000${order.substring(order.length - 1)}',
+    'handoverCode': code,
     'packingLocation': location,
     'riderId': rider,
     'asOf': _asOf,
@@ -74,6 +99,7 @@ base class MockHandoverRepository implements HandoverRepository {
       location: 'PAK-C-03',
       expiresAt: '2026-11-10T02:48:00Z',
       order: 'order-seed-7',
+      code: '3817',
     ),
     _expired(
       id: 'pkg-chk-2',
@@ -81,6 +107,7 @@ base class MockHandoverRepository implements HandoverRepository {
       location: 'PAK-C-01',
       expiresAt: '2026-11-10T02:57:00Z',
       order: 'order-seed-8',
+      code: '5902',
     ),
     {
       'packageId': 'pkg-live-1',
