@@ -39,7 +39,8 @@ export function ProgressSteps({
                   ? 'bg-warning text-warning-content ring-4 ring-warning/20'
                   : 'bg-primary text-primary-content ring-4 ring-primary/20'
                 : 'bg-base-200 text-base-content/40';
-          const line = place && i < place.step ? 'bg-success' : 'bg-base-300';
+          // 이 단계로 들어오는 선(앞 단계 → 이 단계) — 이 단계에 닿았으면 초록(2026-11-19 사용자 "완료인데 막대가 끝까지 안 간다": `<` 라 마지막 단계 앞 반쪽이 회색이었다)
+          const line = place && i <= place.step ? 'bg-success' : 'bg-base-300';
           return (
             <li key={name} className="relative flex flex-1 flex-col items-center text-center" aria-current={state === 'now' ? 'step' : undefined} data-step-state={state}>
               {i > 0 && <span className={`absolute left-0 right-1/2 top-4 -z-0 h-0.5 -translate-y-1/2 ${line}`} aria-hidden="true" />}

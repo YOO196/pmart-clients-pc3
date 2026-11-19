@@ -128,3 +128,14 @@ describe('라이더 컴플레인 종류별 수(case 0.26.0)', () => {
     expect(strip).not.toHaveTextContent(/^0$/);
   });
 });
+
+describe('직원 표시 묶음 조회', () => {
+  it('승인함 한 쪽의 요청자들을 hr employee-labels 한두 번에 묻는다(줄마다 아님)', async () => {
+    const view = renderAt('/approvals', as.admin);
+    const rows = await screen.findAllByTestId('approval-row');
+    await waitFor(() => expect(rows.some((r) => r.textContent?.includes('P2026-'))).toBe(true));
+    const label = view.sent.filter((r) => new URL(r.url).pathname.endsWith('/hr/employee-labels'));
+    expect(label.length).toBeLessThanOrEqual(2);
+    expect(label.length).toBeLessThan(rows.length + 1);
+  });
+});

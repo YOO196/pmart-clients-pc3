@@ -51,7 +51,8 @@ function loadLabel(api: Api, id: string): Promise<EmployeeLabel | null> {
     queue.push({ id, resolve, reject });
     if (!scheduled) {
       scheduled = true;
-      setTimeout(flush, 0);
+      // 같은 그리기(같은 커밋의 effect 들)에서 부른 ID 를 모아 바로 보낸다 — 타이머로 미루면 화면을 닫고 토큰을 지운 뒤에 나가 401·토큰 갱신을 한 번 더 부른다
+      queueMicrotask(flush);
     }
   });
 }

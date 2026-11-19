@@ -56,7 +56,7 @@ describe('목 로그인 화면', () => {
     await clickAccount(user, /MD 김/);
 
     expect(await screen.findByRole('heading', { name: '상품 조회' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '내 세션: op-md-1' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: '내 세션: [목] 김엠디 · P2026-00002' })).toBeInTheDocument(); // 운영자 ID 대신 이름 · 사번(ADR-0070 덧붙임)
 
     const post = rec.sent.find((r) => new URL(r.url).pathname.endsWith('/employee-auth/tokens'));
     expect(post?.headers.get('X-Source-System')).toBe('backoffice-web');
@@ -104,7 +104,7 @@ describe('목 로그인 화면', () => {
 
     expect(await screen.findByRole('heading', { name: '상품 조회' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '운영자 로그인' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '내 세션: op-md-1' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: '내 세션: [목] 김엠디 · P2026-00002' })).toBeInTheDocument(); // 운영자 ID 대신 이름 · 사번(ADR-0070 덧붙임)
     // refresh 는 회전된다(같은 값을 다시 쓰지 않는다).
     const rotated = (JSON.parse(sessionStorage.getItem(SESSION_STORAGE_KEY)!) as { refreshToken: string }).refreshToken;
     expect(rotated).not.toBe(savedRefresh);
