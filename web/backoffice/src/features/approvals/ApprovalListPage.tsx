@@ -3,7 +3,7 @@
 // 심사 상태 탭 → 유형 칩 → 표(요약 굵게·ID 작게, 유형 색 배지, 상태 점 배지, "N일 전") → 아래 건수·더 보기.
 // 예전에는 더 보기가 커서를 URL 에 넣자마자 필터 함수가 지워 버려 아무 일도 없었다(2026-11-17 사용자 신고).
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 
 import { APPROVAL_TYPES, REVIEW_STATES, type ApprovalType, type ReviewState } from '../../api/models';
 import { request } from '@pmart/web-core';
@@ -129,13 +129,8 @@ export function ApprovalListPage() {
                           <p className="truncate font-medium" title={a.summary ?? undefined}>
                             {a.summary ?? m.none}
                           </p>
-                          {a.approvalId ? (
-                            <Link className="font-mono text-xs text-base-content/50 hover:text-primary hover:underline" to={`/approvals/${encodeURIComponent(a.approvalId)}`}>
-                              {a.approvalId}
-                            </Link>
-                          ) : (
-                            <span className="text-xs text-base-content/40">{m.none}</span>
-                          )}
+                          {/* 승인은 번호 없이 종류 · 요청자 · 시각(ADR-0070 덧붙임) — 요청자·시각은 옆 칸, 여기는 종류만 */}
+                          <span className="text-xs text-base-content/50">{a.type ? (m.approvals.typeName[a.type] ?? a.type) : m.none}</span>
                         </td>
                         <td>{a.type ? <TypeBadge type={a.type} /> : m.none}</td>
                         <td>{a.requesterId ? <Requester id={a.requesterId} /> : m.none}</td>
@@ -163,7 +158,6 @@ export function ApprovalListPage() {
                     <PreviewDrawer id={pv.id} ids={rows.flatMap((r) => (r.approvalId ? [r.approvalId] : []))} onMove={pv.open} onClose={pv.close} title={a?.summary ?? pv.id} detailTo={`/approvals/${encodeURIComponent(pv.id)}`}>
                       {a ? (
                         <div className="space-y-4" data-testid="approval-preview">
-                          <p className="font-mono text-xs text-base-content/50">{a.approvalId}</p>
                           <PreviewFacts
                             rows={[
                               [m.approvals.type, a.type ? <TypeBadge type={a.type} /> : m.none],

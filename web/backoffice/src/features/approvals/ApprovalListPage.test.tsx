@@ -22,10 +22,10 @@ describe('승인함 목록 — 더 보기', () => {
     );
     const view = renderAt('/approvals?type=PRODUCT', as.admin);
     // 관리자 첫 화면은 메뉴 알림 등 조회가 많아 전체 시험 중에는 1초를 넘길 때가 있다 — 기다림만 늘린다(확인 내용은 그대로)
-    expect(await screen.findByRole('link', { name: 'APV-2' }, { timeout: 5000 })).toBeInTheDocument();
+    expect(await screen.findByText('요청 2', {}, { timeout: 5000 })).toBeInTheDocument(); // 승인은 번호 없이 요약·종류·요청자·시각(ADR-0070 덧붙임)
     await userEvent.click(screen.getByRole('button', { name: '더 보기' }));
-    expect(await screen.findByRole('link', { name: 'APV-3' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'APV-1' })).toBeInTheDocument(); // 앞 줄은 그대로
+    expect(await screen.findByText('요청 3')).toBeInTheDocument();
+    expect(screen.getByText('요청 1')).toBeInTheDocument(); // 앞 줄은 그대로
     await waitFor(() => expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument()); // 끝
     const second = view.sent.find((r) => new URL(r.url).searchParams.get('cursor') === 'C2')!;
     expect(new URL(second.url).searchParams.get('type')).toBe('PRODUCT'); // 같은 필터
@@ -42,7 +42,7 @@ describe('승인함 목록 — 더 보기', () => {
     renderAt('/approvals', as.admin);
     await userEvent.click(await screen.findByRole('button', { name: '더 보기' }));
     expect(await screen.findByText(/이전 기록을 더 불러오지 못했어요/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'APV-1' })).toBeInTheDocument();
+    expect(screen.getByText('요청 1')).toBeInTheDocument();
   });
 });
 

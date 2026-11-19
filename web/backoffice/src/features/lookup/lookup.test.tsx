@@ -110,11 +110,12 @@ describe('통합 조회', () => {
     expect(within(section('주문')).getByRole('link', { name: '상세 보기' })).toHaveAttribute('href', '/orders/ORD-MOCK-1001');
   });
 
-  it('고객의 주문 목록: 주문번호, 없으면 주문 ID 끝 8자리 + "번호 없음"', async () => {
+  it('고객의 주문 목록: 주문번호, 없으면 "번호 없음"(ADR-0070 덧붙임 — 끝 8자리도 안 보인다)', async () => {
     renderAt('/lookup?q=CU-MOCK-1', as.cs);
     const orders = await screen.findAllByTestId('customer-order');
     expect(within(orders[0]!).getAllByTestId('display-number')[0]).toHaveTextContent('74939255');
-    expect(within(orders[1]!).getAllByTestId('display-number')[0]).toHaveTextContent('OCK-0990 번호 없음');
+    expect(within(orders[1]!).getAllByTestId('display-number')[0]).toHaveTextContent('번호 없음');
+    expect(orders[1]).not.toHaveTextContent('OCK-0990');
   });
 
   it('없는 대상은 "찾는 대상이 없어요"(오류 아님)', async () => {

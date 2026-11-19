@@ -49,9 +49,9 @@ describe('배송 신고(case 0.16.0)', () => {
   it('목록에 "배송 신고 · 못 받음", 상세에 배송 번호 링크', async () => {
     renderAt('/inquiries', as.cs);
     const rows = await screen.findAllByTestId('inquiry-row');
-    const row = rows.find((r) => r.textContent?.includes('INQ-MOCK-3'))!;
+    const row = rows.find((r) => r.textContent?.includes('Q-1119-0003'))!;
     expect(within(row).getByTestId('inquiry-delivery-issue')).toHaveTextContent('배송 신고 · 못 받음');
-    await userEvent.click(within(row).getByRole('link', { name: 'INQ-MOCK-3' }));
+    await userEvent.click(within(row).getByRole('link', { name: 'Q-1119-0003' }));
     const issue = await screen.findByTestId('inquiry-delivery-issue');
     expect(issue).toHaveTextContent('못 받음 · 배송');
     // 화면 배송 번호(ADR-0070) — 링크는 시스템 ID

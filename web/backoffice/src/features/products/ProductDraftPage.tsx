@@ -276,7 +276,7 @@ export function ProductDraftPage() {
                   {d.approvalId && (
                     <p className="text-sm">
                       <Link className="link link-primary" to={`/approvals/${encodeURIComponent(d.approvalId)}`}>
-                        {`${m.approvals.open} (${d.approvalId})`}
+                        {m.approvals.open}
                       </Link>
                     </p>
                   )}

@@ -276,7 +276,7 @@ function LookupResult({ view, onOpenOrder }: { readonly view: LookupView; readon
                     </button>
                   </div>
                   <SummaryFacts summary={o.summary} skip={['orderId', ...NUMBER_KEYS]} kind="ORDER" />
-                  <SystemNumbers ids={[{ label: messages.displayNumber.system.orderId, id: o.id }]} />
+                  {/* 목록 줄이라 시스템 번호 칸은 두지 않는다(ADR-0070 덧붙임 — 시스템 ID 는 주문 상세에서) */}
                 </li>
               ))}
             </ul>

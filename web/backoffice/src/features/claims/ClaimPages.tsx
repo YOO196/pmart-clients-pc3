@@ -10,9 +10,8 @@ import type { components } from '../../api/generated/claim';
 import { useApi } from '../../app/ApiContext';
 import { ChipGroup, CodeLabel, DataTable, DetailHeader, NextAction, Notice, PageHeader, ResultBar, SearchPanel, SearchRow, Section, StatusBadge, type Tone } from '../../shared/admin';
 import { EmptyBox, KindChip, ListFoot, SideFields, When } from '../lookup/parts';
-import { DisplayNumber } from '../../shared/displayNumber';
+import { DisplayNumber, SystemNumbers } from '../../shared/displayNumber';
 import { SavedViews } from '../../shared/SavedViews';
-import { CopyButton } from '../../shared/CopyButton';
 import { useRecordRecent } from '../../shared/recentViews';
 import { messages as m } from '../../shared/messages';
 import { isOrderNumber, orderIdOfNumber, useOrderNumbers } from '../../shared/numberLookups';
@@ -28,6 +27,13 @@ const TYPES = Object.keys(m.claims.typeName) as ClaimType[];
 const STATES = Object.keys(m.claims.stateName) as ClaimState[];
 const isType = (v: string | null): v is ClaimType => v !== null && (TYPES as readonly string[]).includes(v);
 const isState = (v: string | null): v is ClaimState => v !== null && (STATES as readonly string[]).includes(v);
+/**
+ * 클레임 화면 표기(ADR-0070 덧붙임 2026-11-19): 주문번호 + 종류(순번은 claim CL-4 뒤). 주문번호를 아직 모르면 종류 · 시각.
+ * 시스템 ID(CLM-…)는 상세의 시스템 번호 칸에서만.
+ */
+export const claimLabel = (orderNumber: string | null | undefined, type: string | null | undefined, openedAt: string | null | undefined) =>
+  orderNumber ? `${orderNumber} ${label(m.claims.typeName, type ?? null)}` : `${label(m.claims.typeName, type ?? null)} · ${openedAt ? when(openedAt) : m.none}`;
+
 /** 상태 꼬리표 색(표시만) */
 export const claimTone = (s: string | undefined): Tone =>
   s === 'CLOSED' ? 'success' : s === 'REJECTED' || s === 'CANCELLED' || s === 'WITHDRAWN' ? 'ghost' : s === 'RECOVERY_FAILED' ? 'error' : s === 'FEE_PENDING' || s === 'STOP_PENDING' ? 'warning' : 'info';
@@ -100,8 +106,8 @@ function ClaimTable({ query, withCount = false, preview = false }: { readonly qu
                 <span className="flex flex-wrap items-center gap-2">
                   <ClaimTypeChip type={c.type} />
                   {c.claimId ? (
-                    <Link className="font-mono font-semibold text-base-content hover:text-primary hover:underline" to={`/claims/${encodeURIComponent(c.claimId)}`} onClick={(e) => e.stopPropagation()}>
-                      {c.claimId}
+                    <Link className="font-mono font-semibold text-base-content hover:text-primary hover:underline" to={`/claims/${encodeURIComponent(c.claimId)}`} onClick={(e) => e.stopPropagation()} data-testid="claim-label">
+                      {claimLabel(orders.get(c.orderId), c.type, c.openedAt)}
                     </Link>
                   ) : (
                     m.none
@@ -132,7 +138,7 @@ function ClaimTable({ query, withCount = false, preview = false }: { readonly qu
         (() => {
           const c = items.find((x) => x.claimId === pv.id);
           return (
-            <PreviewDrawer id={pv.id} ids={items.flatMap((x) => (x.claimId ? [x.claimId] : []))} onMove={pv.open} onClose={pv.close} title={pv.id} detailTo={`/claims/${encodeURIComponent(pv.id)}`}>
+            <PreviewDrawer id={pv.id} ids={items.flatMap((x) => (x.claimId ? [x.claimId] : []))} onMove={pv.open} onClose={pv.close} title={(() => { const x = items.find((y) => y.claimId === pv.id); return x ? claimLabel(orders.get(x.orderId), x.type, x.openedAt) : m.claims.detailTitle; })()} detailTo={`/claims/${encodeURIComponent(pv.id)}`}>
               {c ? (
                 <div className="space-y-4" data-testid="claim-preview">
                   <ClaimTypeChip type={c.type} />
@@ -318,8 +324,7 @@ export function ClaimDetailPage() {
               title={
                 <>
                   {c.type ? m.claims.titleOf(label(m.claims.typeName, c.type), label(m.claims.reasonName, c.reason)) : m.claims.detailTitle}
-                  <span className="ml-2 font-mono text-sm font-normal text-base-content/50">{claimId}</span>
-                  <CopyButton value={claimId} />
+                  <span className="ml-2 font-mono text-sm font-normal text-base-content/50" data-testid="claim-label">{claimLabel(detailOrders.get(c.orderId), c.type, c.openedAt)}</span>
                 </>
               }
               badges={
@@ -332,6 +337,8 @@ export function ClaimDetailPage() {
               }
               summary={`${m.claims.orderId} ${detailOrders.get(c.orderId) ?? (c.orderId ? m.claims.orderNumberUnknown : m.none)} · ${when(c.openedAt)}`}
             />
+            {/* 시스템 번호(ADR-0070 덧붙임) — 상세에서만 */}
+            <SystemNumbers ids={[{ label: m.claims.detailTitle, id: claimId }, { label: m.displayNumber.system.orderId, id: c.orderId }]} />
             {next && (
               <NextAction tone={next.tone} title={next.title} body={next.body}>
                 <a className="btn btn-sm" href="#recovery-actions">

@@ -443,7 +443,7 @@ export function ContentDraftPage() {
                   </CommandFeedback>
                   {d.approvalId && (
                     <Link className="link link-primary text-sm" to={`/approvals/${encodeURIComponent(d.approvalId)}`}>
-                      {`${m.approvals.open} (${d.approvalId})`}
+                      {m.approvals.open}
                     </Link>
                   )}
                   {d.state !== 'DRAFT' && !d.approvalId && <p className="text-sm text-base-content/55">{m.none}</p>}

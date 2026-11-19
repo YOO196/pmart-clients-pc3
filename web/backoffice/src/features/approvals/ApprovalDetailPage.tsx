@@ -13,10 +13,10 @@ import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
 import { CommandFeedback } from '../../shared/Feedback';
 import { formatKrw, formatSeoul } from '@pmart/web-ui';
-import { CopyButton } from '../../shared/CopyButton';
 import { useRecordRecent } from '../../shared/recentViews';
 import { ApprovalProgress } from './ApprovalProgress';
 import { messages as m } from '../../shared/messages';
+import { SystemNumbers } from '../../shared/displayNumber';
 import { QueryState } from '@pmart/web-ui';
 import { toUiState } from '@pmart/web-ui';
 import { useCommand } from '@pmart/web-ui';
@@ -202,8 +202,6 @@ export function ApprovalDetailPage() {
                 title={
                   <>
                     {a.summary ?? m.approvals.detailTitle}
-                    <span className="ml-2 font-mono text-sm font-normal text-base-content/50">{approvalId}</span>
-                  <CopyButton value={approvalId} />
                   </>
                 }
                 badges={
@@ -223,6 +221,8 @@ export function ApprovalDetailPage() {
                 }
                 summary={`${m.approvals.requester} ${a.requesterId ?? m.none} · ${m.approvals.submittedAt} ${a.submittedAt ? formatSeoul(a.submittedAt) : m.none}`}
               />
+              {/* 시스템 번호(ADR-0070 덧붙임 — 승인은 화면 번호가 없고 시스템 ID 는 상세에서만) */}
+              <SystemNumbers ids={[{ label: m.approvals.detailTitle, id: approvalId }]} />
               {/* 진행 단계(2026-11-18) — 요청·심사·결정·반영 */}
               <ApprovalProgress approval={a} />
               {/* 다음 할 일 — 심사 칸이 열린 서버 상태(REVIEW_PENDING·EVIDENCE_REQUIRED)일 때만. 내 요청·내 권한 요청은 버튼 없이 안내 */}
