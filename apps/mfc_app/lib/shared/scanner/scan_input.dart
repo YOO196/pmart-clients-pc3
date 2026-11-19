@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../l10n/gen/app_localizations.dart';
+import '../field_widgets.dart' show ActionScope;
 import '../printer/reprint.dart';
 import '../pda_theme.dart';
 import '../providers.dart';
@@ -104,19 +105,7 @@ class _ScanInputState extends ConsumerState<ScanInput> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final row = _row(context);
-    final reprint = widget.reprint;
-    if (reprint == null) return row;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        row,
-        BarcodeReprintButton(id: widget.id, targets: reprint),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => _row(context);
 
   Widget _row(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -155,6 +144,7 @@ class _ScanInputState extends ConsumerState<ScanInput> {
                   listenable: _focus,
                   builder: (context, _) => _ScanButton(
                     label: widget.label,
+                    secondary: ActionScope.secondaryScanOf(context),
                     // 스캐너 입력을 받는 중이면 바깥에 옅은 보라 테두리(안쪽이 아니라 — 글자·아이콘을 가리지 않게).
                     ready: _focus.hasFocus,
                     onTap: () {
@@ -167,6 +157,11 @@ class _ScanInputState extends ConsumerState<ScanInput> {
             ),
           ),
         ),
+        // "바코드가 안 찍혀요"(재출력) — 단추 사이에 글줄로 끼어 있던 것을 스캔 줄 오른쪽 네모 단추로.
+        if (widget.reprint case final targets?) ...[
+          const SizedBox(width: 8),
+          BarcodeReprintButton(id: widget.id, targets: targets, compact: true),
+        ],
         if (ref.watch(envProvider) == PmartEnv.mock &&
             (widget.testValues.isNotEmpty || widget.testActions.isNotEmpty))
           PopupMenuButton<String>(
@@ -214,11 +209,15 @@ class _ScanButton extends StatelessWidget {
     required this.label,
     required this.ready,
     required this.onTap,
+    this.secondary = false,
   });
 
   final String label;
   final bool ready;
   final VoidCallback onTap;
+
+  /// 주 단추가 따로 있으면 옅은 보라 바탕·보라 글자(그림자 없음).
+  final bool secondary;
 
   @override
   Widget build(BuildContext context) {
@@ -229,8 +228,13 @@ class _ScanButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           if (ready)
-            const BoxShadow(color: PdaColors.lilac, spreadRadius: 3)
-          else
+            BoxShadow(
+              color: secondary
+                  ? PdaColors.primary.withValues(alpha: 0.35)
+                  : PdaColors.lilac,
+              spreadRadius: secondary ? 1.5 : 3,
+            )
+          else if (!secondary)
             BoxShadow(
               color: PdaColors.primary.withValues(alpha: 0.28),
               blurRadius: 10,
@@ -239,7 +243,7 @@ class _ScanButton extends StatelessWidget {
         ],
       ),
       child: Material(
-        color: PdaColors.primary,
+        color: secondary ? PdaColors.lilac : PdaColors.primary,
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -248,7 +252,10 @@ class _ScanButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // 스캐너(총) 그림 대신 바코드 그림(사용자 2026-11-20).
-              const BarcodeIcon(size: 30, color: Colors.white),
+              BarcodeIcon(
+                size: 30,
+                color: secondary ? PdaColors.primary : Colors.white,
+              ),
               const SizedBox(width: 12),
               Flexible(
                 child: Text(
@@ -256,7 +263,7 @@ class _ScanButton extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: text?.copyWith(
-                    color: Colors.white,
+                    color: secondary ? PdaColors.dark : Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.2,
