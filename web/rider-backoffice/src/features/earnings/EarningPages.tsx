@@ -1,6 +1,7 @@
 // 수행료(2026-11-17, PC 5): 산정 불가 조정(execution 0.13.0 — 귀책으로 지급/미지급, 바로 확정), 엘리베이터 고장 추가 배달료(0.19.0 — 승인·반려).
 // 지급 처리(지급 중·완료·실패)는 외부 회계 — 화면에 없다(사용자 2026-11-17 "외부 회계를 기다려").
 // 2026-11-18: 관리자 화면 모양 — 머리말, (추가 배달료) 검색 조건 상자, 결과 줄, 건마다 카드(머리 줄 + 항목 + 회색 처리 줄).
+import { humanizeCodes } from '../../shared/codeText';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
@@ -87,7 +88,7 @@ export function AdjustmentsMenu() {
                   <FieldList
                     rows={[
                       [e.col.rider, <RiderRef riderId={it.riderId} summary={riders.get(it.riderId ?? '')} />],
-                      it.note ? [e.col.note, it.note] : null,
+                      it.note ? [e.col.note, humanizeCodes(it.note)] : null,
                     ]}
                   />
                   <SystemIds ids={[[sysLabel.earning, it.earningId], [sysLabel.delivery, it.deliveryId], [sysLabel.rider, it.riderId]]} />
