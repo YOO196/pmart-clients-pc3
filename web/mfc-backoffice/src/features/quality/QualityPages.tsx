@@ -1,5 +1,6 @@
 // 품질 — mfc-quality-service 0.2.0(요청서 mfc-backoffice/2026-11-15 §2·§2-1 "격리·해제(다른 관리자 승인), 폐기, 회수품 검수").
-// 탭(URL 쿼리 `tab`): 격리·해제(기본) · 폐기 · 회수품 검수 · 품질 사고(계약만 — 안내).
+// 탭(URL 쿼리 `tab`): 격리·해제(기본) · 폐기 · 회수품 검수 · 품질 사고(0.6.0 — `IncidentPages.tsx`).
+// 품질 사고 상세의 "격리 요청"은 이 탭에 `incidentId`·LOT 을 채워 온다 — 판정 본문 `incidentId` 로 사고에 잇는다(백엔드 회신 2026-11-19 R4).
 // - 판정 `POST /quality-decisions`(202 CommandResponse): QUARANTINE 은 바로 반영(APPLIED·REJECTED·UNKNOWN_RESULT), RELEASE 는 요청만(ACCEPTED → 판정 REQUESTED).
 //   해제 승인·반려 `POST /quality-decisions/{id}/approvals`(요청자 본인 불가 — 422 SELF_APPROVAL). 조회 `GET /quality-decisions/{id}`.
 // - 폐기 `POST /disposal-approvals` {action REQUEST|APPROVE|REJECT}(APPROVE 의 approvalRef 는 선택 — 없으면 422 APPROVAL_REQUIRED 흐름, AP-1), 실행 `POST …/{id}/executions`(남은 승인량 이하).
@@ -17,6 +18,7 @@ import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
 import { ApprovalAwareFeedback, ApprovalRefInput } from '../../shared/approval';
 import { DecisionList, DisposalList, InspectionList, ReturnReceiptList } from '../lists/CenterLists';
+import { IncidentsTab } from './IncidentPages';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 
@@ -87,11 +89,7 @@ export function QualityMenu({ mfcId }: { readonly mfcId: string }) {
       {tab === 'decisions' && <DecisionsTab mfcId={mfcId} />}
       {tab === 'disposals' && <DisposalsTab mfcId={mfcId} />}
       {tab === 'inspections' && <InspectionsTab mfcId={mfcId} />}
-      {tab === 'incidents' && (
-        <p role="note" className="alert text-sm">
-          {m.incidentsMissing}
-        </p>
-      )}
+      {tab === 'incidents' && <IncidentsTab mfcId={mfcId} />}
     </section>
   );
 }
@@ -209,17 +207,22 @@ function LinesTable({ lines }: { readonly lines: readonly QualityLine[] }) {
 function DecisionsTab({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
   const [openId, setOpenId] = useParam('decisionId');
+  const [params] = useSearchParams();
+  const [incidentId, setIncidentId] = useParam('incidentId');
   const [decisionType, setType] = useState<'QUARANTINE' | 'RELEASE'>('QUARANTINE');
   const [reason, setReason] = useState<DecisionReason>('DAMAGE');
   const [note, setNote] = useState('');
-  const [lines, setLines] = useState<LineInput[]>([emptyLine]);
+  // 품질 사고에서 왔으면 그 LOT 을 채운다(칸·수량은 확인해 넣는다)
+  const [lines, setLines] = useState<LineInput[]>(() =>
+    incidentId && params.get('lotId') ? [{ ...emptyLine, lotId: params.get('lotId') ?? '', sku: params.get('sku') ?? '', qty: params.get('qty') ?? '' }] : [emptyLine],
+  );
   const create = useCommand(async (_: null, key) => {
     const r = checkCommand(
       await request(
         'POST',
         api.quality.POST('/quality-decisions', {
           ...commandParams(key),
-          body: { mfcId, decisionType, reason, ...(note.trim() ? { note: note.trim() } : {}), lines: toLines(lines, true) },
+          body: { mfcId, decisionType, reason, ...(note.trim() ? { note: note.trim() } : {}), ...(incidentId ? { incidentId } : {}), lines: toLines(lines, true) },
         }),
       ),
     );
@@ -242,6 +245,14 @@ function DecisionsTab({ mfcId }: { readonly mfcId: string }) {
         }}
       >
         <p className="text-xs opacity-70">{m.decisionHint}</p>
+        {incidentId && (
+          <p role="note" className="flex flex-wrap items-center gap-2 text-info" data-testid="decision-incident">
+            {m.incidents.linkedFromIncident(incidentId)}
+            <button type="button" className="btn btn-xs" onClick={() => setIncidentId('')}>
+              {m.incidents.unlink}
+            </button>
+          </p>
+        )}
         <div className="flex flex-wrap items-end gap-2">
           <label className="flex flex-col gap-1">
             {m.decisionType}

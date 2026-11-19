@@ -18,7 +18,7 @@ type Line = { sku: string; lotId: string; locationCode: string; qty: number; wor
 export const qualityHandlers = [
   http.post(`${API_BASE}/quality-decisions`, async ({ request }) => {
     if (!operator(request)) return unauthorized();
-    const body = (await request.json()) as { mfcId: string; decisionType: 'QUARANTINE' | 'RELEASE'; reason: MockDecision['reason']; note?: string; lines: Line[] };
+    const body = (await request.json()) as { mfcId: string; decisionType: 'QUARANTINE' | 'RELEASE'; reason: MockDecision['reason']; note?: string; incidentId?: string; lines: Line[] };
     if (!canAccess(request, body.mfcId)) return problem(403, 'FORBIDDEN');
     return idempotent(request, () => {
       const release = body.decisionType === 'RELEASE';
@@ -29,6 +29,7 @@ export const qualityHandlers = [
         decidedBy: actor(request),
         reason: body.reason,
         ...(body.note ? { note: body.note } : {}),
+        ...(body.incidentId ? { incidentId: body.incidentId } : {}),
         lines: body.lines,
         version: 1,
         state: release ? 'REQUESTED' : 'APPLIED',

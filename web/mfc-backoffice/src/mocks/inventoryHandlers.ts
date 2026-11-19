@@ -169,11 +169,19 @@ export const inventoryHandlers = [
   http.get(`${base}/sku-handlings`, ({ request, params }) => {
     const mfcId = gate(request, params);
     if (mfcId instanceof Response) return mfcId;
-    const enabled = new URL(request.url).searchParams.get('enabled');
-    const items = db.handlings
+    const q = new URL(request.url).searchParams;
+    const enabled = q.get('enabled');
+    // 0.27.0: undecided = 정한 적 없음(레코드 없음 = version 0)·단종 제외, introducedSince = 그 뒤 생긴 상품(생긴 시각 모르는 예전 상품은 빠짐), totalCount = 거르기 전체 수
+    const undecided = q.get('undecided') === 'true';
+    const since = q.get('introducedSince');
+    const size = Number(q.get('size') ?? 50);
+    const all = db.handlings
       .filter((h) => enabled === null || String(h.handlingEnabled) === enabled)
-      .map((h) => ({ sku: h.sku, handlingEnabled: h.handlingEnabled, version: h.version, skuState: h.skuState, productId: null, changedBy: null, reason: null, updatedAt: null }));
-    return HttpResponse.json({ centerId: mfcId, items, page: { nextCursor: null, size: items.length } });
+      .filter((h) => !undecided || (h.version === 0 && h.offReason !== 'DISCONTINUED' && h.saleState !== 'DISCONTINUED'))
+      .filter((h) => !since || (!!h.introducedAt && h.introducedAt >= since))
+      .map((h) => ({ sku: h.sku, handlingEnabled: h.handlingEnabled, version: h.version, skuState: h.skuState, productId: null, changedBy: h.offReason === 'DISCONTINUED' ? 'product-service' : null, reason: h.offReason === 'DISCONTINUED' ? '본사 단종' : null, updatedAt: null, saleState: h.saleState ?? null, offReason: h.offReason ?? null, introducedAt: h.introducedAt ?? null }));
+    const items = all.slice(0, size);
+    return HttpResponse.json({ centerId: mfcId, items, totalCount: all.length, page: { nextCursor: null, size: items.length } });
   }),
 
   http.post(`${base}/sku-handlings`, async ({ request, params }) => {
@@ -185,8 +193,9 @@ export const inventoryHandlers = [
       if (!h) return problem(404, 'SKU_NOT_FOUND');
       if (expectedVersion(request) !== h.version) return problem(409, 'VERSION_CONFLICT');
       if (body.enabled && h.skuState === 'INACTIVE') return problem(422, 'SKU_INACTIVE');
+      if (body.enabled && (h.offReason === 'DISCONTINUED' || h.saleState === 'DISCONTINUED')) return problem(409, 'SKU_DISCONTINUED');
       const changed = h.handlingEnabled !== body.enabled;
-      const next = changed ? { ...h, handlingEnabled: body.enabled, version: h.version + 1 } : h;
+      const next = changed ? { ...h, handlingEnabled: body.enabled, version: h.version + 1, offReason: body.enabled ? null : ('CENTER' as const) } : h.version === 0 ? { ...h, version: 1, offReason: 'CENTER' as const } : h;
       db.handlings = db.handlings.map((x) => (x === h ? next : x));
       return {
         status: 200,

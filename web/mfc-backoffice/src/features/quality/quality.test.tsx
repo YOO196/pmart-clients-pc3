@@ -71,9 +71,11 @@ describe('격리·해제', () => {
     await waitFor(() => expect(document.querySelector('[data-state="error"]')).not.toBeNull());
   });
 
-  it('품질 사고 탭은 계약만 있다는 안내', async () => {
+  it('품질 사고 탭은 이제 목록·등록(0.6.0 — 자세한 시험은 incidents.test.tsx), 계약만 있다는 안내는 없다', async () => {
     renderAt('/c/MFC-BSN-01/quality?tab=incidents');
-    expect(await screen.findByRole('note')).toHaveTextContent('501');
+    expect(await screen.findByTestId('list-incidents')).toBeInTheDocument();
+    expect(screen.getByRole('form', { name: '품질 사고 등록' })).toBeInTheDocument();
+    expect(screen.queryByText(/501/)).not.toBeInTheDocument();
   });
 });
 

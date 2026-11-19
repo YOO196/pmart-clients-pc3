@@ -5,7 +5,8 @@
 //   승인·반려 `POST …/approvals`(APPROVE 는 approvalRef 필수, 시작·계수한 사람 불가 — 422 SELF_APPROVAL). 계수는 PDA.
 // - 출하 부적격 LOT `GET …/unshippable-lots` → 이동 지시로(이동 메뉴에 값을 채워 연다).
 // - 보충 기준 `GET/PUT/DELETE …/replenishment-policies`(고회전 선반만, min ≤ target).
-// - 상품 취급 `GET/POST …/sku-handlings`(X-Expected-Version = 취급 레코드 version, 없으면 0).
+// - 상품 취급 `GET/POST …/sku-handlings`(X-Expected-Version = 취급 레코드 version, 없으면 0). 권한 = 그 센터 관리자·그 센터 권한 MD(지금대로, 사용자 2026-11-19).
+//   0.27.0: 본사 단종(offReason DISCONTINUED)은 모든 센터에서 꺼지고 켜기 막힘(409 SKU_DISCONTINUED), 신상품(정한 적 없음)은 맨 위 배너로 안내(자동으로 켜지 않음).
 // 본사 승인 번호(approvalRef)는 선택(AP-1, 0.22.0) — 기준 이상이면 422 APPROVAL_REQUIRED(shared/approval.tsx). 정정은 승인 뒤 같은 Idempotency-Key 로 다시.
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
@@ -28,6 +29,7 @@ const mv = messages.moves;
 type Inv = components['schemas'];
 type StockUnit = Inv['CenterStock']['units'][number];
 type CountSession = Inv['CountSession'];
+type SkuHandling = Inv['SkuHandling'];
 
 type Tab = 'stock' | 'counts' | 'unshippable' | 'policies' | 'handlings';
 const TABS: readonly Tab[] = ['stock', 'counts', 'unshippable', 'policies', 'handlings'];
@@ -726,9 +728,43 @@ function PoliciesTab({ mfcId }: { readonly mfcId: string }) {
 
 // ---------------------------------------------------------------- 상품 취급
 
+/**
+ * 신상품 배너(0.27.0 R8, 사용자 2026-11-19 "신상품은 도입 말고 상단 배너로 안내"): 이 센터가 한 번도 정하지 않은 상품(`undecided=true`, 단종 제외).
+ * `introducedSince` 를 주면 생긴 시각을 모르는 예전 상품(이번 배포 전 — introducedAt null)이 빠진다 → 배포 뒤 생긴 상품 전부를 보려고 아주 이른 시각을 준다.
+ * 숫자는 서버 `totalCount` 그대로. 못 읽으면 0 으로 보이지 않고 "못 읽음".
+ */
+const NEW_SINCE = '2000-01-01T00:00:00Z';
+
+function NewProductsBanner({ mfcId, onShow }: { readonly mfcId: string; readonly onShow: () => void }) {
+  const api = useApi();
+  const query = useQuery({
+    queryKey: ['handlings-new-count', mfcId],
+    queryFn: () =>
+      request('GET', api.inventory.GET('/mfcs/{mfcId}/sku-handlings', { params: { path: { mfcId }, query: { undecided: true, introducedSince: NEW_SINCE, size: 1 } } })),
+  });
+  if (query.isError)
+    return (
+      <p role="alert" className="text-xs text-warning" data-testid="new-products-banner">
+        {m.newProductsFailed}
+      </p>
+    );
+  const n = query.data?.totalCount ?? 0;
+  if (!query.isSuccess || n === 0) return null;
+  return (
+    <div role="status" className="alert alert-info flex flex-wrap items-center justify-between gap-2 text-sm" data-testid="new-products-banner">
+      <span>{m.newProducts(n)}</span>
+      <button type="button" className="btn btn-sm" onClick={onShow}>
+        {m.newProductsShow}
+      </button>
+    </div>
+  );
+}
+
 function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
   const [enabledRaw, setEnabled] = useParam('enabled');
+  /** `enabled=new` = 신상품(정한 적 없음)만 */
+  const onlyNew = enabledRaw === 'new';
   const enabled = enabledRaw === 'true' ? true : enabledRaw === 'false' ? false : undefined;
   const [notice, setNotice] = useState<string | null>(null);
   const query = useInfiniteQuery({
@@ -738,7 +774,13 @@ function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
       request(
         'GET',
         api.inventory.GET('/mfcs/{mfcId}/sku-handlings', {
-          params: { path: { mfcId }, query: { ...(enabled === undefined ? {} : { enabled }), ...(pageParam ? { cursor: pageParam } : {}) } },
+          params: {
+            path: { mfcId },
+            query: {
+              ...(onlyNew ? { undecided: true, introducedSince: NEW_SINCE } : enabled === undefined ? {} : { enabled }),
+              ...(pageParam ? { cursor: pageParam } : {}),
+            },
+          },
         }),
       ),
     getNextPageParam: (last) => last.page?.nextCursor ?? undefined,
@@ -746,13 +788,15 @@ function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
   const rows = (query.data?.pages ?? []).flatMap((p) => p.items ?? []);
   return (
     <div className="max-w-4xl space-y-3 text-sm">
+      <NewProductsBanner mfcId={mfcId} onShow={() => setEnabled('new')} />
       <p className="text-xs opacity-70">{m.handlingsHint}</p>
       <label className="flex w-fit flex-col gap-1 rounded-box bg-base-100 p-3">
         {m.enabledFilter}
-        <select className="select select-sm w-28" value={enabledRaw} onChange={(e) => setEnabled(e.target.value)}>
+        <select className="select select-sm w-36" value={enabledRaw} onChange={(e) => setEnabled(e.target.value)}>
           <option value="">{m.all}</option>
           <option value="true">{m.on}</option>
           <option value="false">{m.off}</option>
+          <option value="new">{m.newOnly}</option>
         </select>
       </label>
       {notice && (
@@ -766,7 +810,7 @@ function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
             <table className="table table-sm rounded-box bg-base-100">
               <tbody>
                 {rows.map((h) => (
-                  <HandlingRow key={`${h.sku}-${h.version}`} mfcId={mfcId} sku={h.sku} enabled={h.handlingEnabled} version={h.version} skuState={h.skuState} onDone={setNotice} />
+                  <HandlingRow key={`${h.sku}-${h.version}`} mfcId={mfcId} handling={h} onDone={setNotice} />
                 ))}
               </tbody>
             </table>
@@ -782,21 +826,11 @@ function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
   );
 }
 
-function HandlingRow({
-  mfcId,
-  sku,
-  enabled,
-  version,
-  skuState,
-  onDone,
-}: {
-  readonly mfcId: string;
-  readonly sku: string;
-  readonly enabled: boolean;
-  readonly version: number;
-  readonly skuState: string | undefined;
-  readonly onDone: (t: string | null) => void;
-}) {
+function HandlingRow({ mfcId, handling: h, onDone }: { readonly mfcId: string; readonly handling: SkuHandling; readonly onDone: (t: string | null) => void }) {
+  const { sku, version, skuState } = h;
+  const enabled = h.handlingEnabled;
+  // 본사 단종(0.27.0 R7): 모든 센터에서 꺼지고 켤 수 없다(서버도 409 SKU_DISCONTINUED)
+  const discontinued = h.offReason === 'DISCONTINUED' || h.saleState === 'DISCONTINUED';
   const api = useApi();
   const queryClient = useQueryClient();
   const toggle = useCommand(async (next: boolean, key) => {
@@ -804,6 +838,7 @@ function HandlingRow({
     const r = await request('POST', api.inventory.POST('/mfcs/{mfcId}/sku-handlings', { ...commandParams(key, { path: { mfcId }, version }), body: { sku, enabled: next } }));
     onDone(r.changed ? m.toggled(sku, r.handling.handlingEnabled) : m.unchanged);
     await queryClient.invalidateQueries({ queryKey: ['handlings', mfcId] });
+    await queryClient.invalidateQueries({ queryKey: ['handlings-new-count', mfcId] });
     return r;
   });
   return (
@@ -812,12 +847,18 @@ function HandlingRow({
       <td>
         <span className={`badge badge-sm ${enabled ? 'badge-success' : 'badge-ghost'}`}>{enabled ? m.on : m.off}</span>
       </td>
-      <td>{m.skuState[skuState ?? ''] ?? skuState ?? messages.none}</td>
       <td>
+        {m.skuState[skuState ?? ''] ?? skuState ?? messages.none}
+        {discontinued && <span className="badge badge-sm badge-error ml-1">{m.discontinued}</span>}
+        {!discontinued && h.offReason === 'CENTER' && <span className="ml-1 text-xs opacity-70">{m.offByCenter}</span>}
+        {h.introducedAt && <span className="ml-1 text-xs opacity-70">{m.introducedAt(formatSeoul(h.introducedAt))}</span>}
+      </td>
+      <td>
+        {discontinued && !enabled && <p className="text-xs opacity-70">{m.discontinuedNote}</p>}
         <button
           type="button"
           className="btn btn-xs"
-          disabled={toggle.busy}
+          disabled={toggle.busy || (discontinued && !enabled)}
           onClick={() => {
             if (toggle.phase.kind === 'rejected') toggle.reset();
             void toggle.run(!enabled);
