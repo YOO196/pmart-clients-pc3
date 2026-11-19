@@ -261,11 +261,22 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
             SimpleDialogOption(
               key: ValueKey('shortage-${r.name}'),
               onPressed: () => Navigator.of(context).pop(r),
-              child: Text(switch (r) {
-                ShortageReason.short => l10n.shortageShort,
-                ShortageReason.damaged => l10n.shortageDamaged,
-                ShortageReason.blocked => l10n.shortageBlocked,
-              }),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(switch (r) {
+                    ShortageReason.short => l10n.shortageShort,
+                    ShortageReason.damaged => l10n.shortageDamaged,
+                    ShortageReason.blocked => l10n.shortageBlocked,
+                  }),
+                  // mfc-quality 0.6.0: 파손 결품 보고는 서버가 품질 사고(자동)를 연다
+                  if (r == ShortageReason.damaged)
+                    Text(
+                      l10n.shortageDamagedNote,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                ],
+              ),
             ),
         ],
       ),

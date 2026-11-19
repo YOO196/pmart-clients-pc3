@@ -148,6 +148,7 @@
   },
   "shortageShort": "결품",
   "shortageDamaged": "파손",
+  "shortageDamagedNote": "센터 관리자 화면에 품질 사고로 올라가요",
   "shortageBlocked": "꺼낼 수 없음",
   "pickAllConfirmed": "모든 실적이 확정됐어요",
   "pickWaitingConfirm": "보낸 실적의 확정을 기다리고 있어요",
