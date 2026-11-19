@@ -882,9 +882,16 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
       if (help.last case final last?)
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          // 회색이면 묻혀서 연보라 바탕 + 보라 테두리(사용자 2026-11-19 "연보라색이나 연주황색으로").
           child: Material(
-            color: RiderColors.field,
-            borderRadius: BorderRadius.circular(8),
+            key: const ValueKey('help-status-box'),
+            color: RiderColors.primaryMist,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: BorderSide(
+                color: RiderColors.primary.withValues(alpha: 0.35),
+              ),
+            ),
             child: InkWell(
               key: const ValueKey('help-status'),
               borderRadius: BorderRadius.circular(8),
@@ -898,7 +905,7 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
                     const Icon(
                       Icons.support_agent,
                       size: 24,
-                      color: RiderColors.sub,
+                      color: RiderColors.primary,
                     ),
                     const SizedBox(width: 8),
                     Expanded(

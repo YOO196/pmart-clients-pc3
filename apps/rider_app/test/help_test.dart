@@ -9,6 +9,7 @@ import 'package:rider_app/app.dart';
 import 'package:rider_app/features/auth/data/session.dart';
 import 'package:rider_app/features/delivery/data/mock_delivery_repository.dart';
 import 'package:rider_app/features/delivery/domain/delivery.dart';
+import 'package:rider_app/shared/rider_style.dart';
 import 'package:rider_app/features/delivery/presentation/delivery_controller.dart';
 import 'package:rider_app/features/offers/data/mock_offer_repository.dart';
 import 'package:rider_app/features/offers/presentation/offer_controllers.dart';
@@ -185,6 +186,11 @@ void main() {
     );
     expect(statusText.data, '지원센터가 처리하고 있어요');
     expect(statusText.maxLines, 1);
+    // 회색이 아니라 연보라 바탕(사용자 2026-11-19)
+    expect(
+      t.widget<Material>(find.byKey(const ValueKey('help-status-box'))).color,
+      RiderColors.primaryMist,
+    );
     await t.tap(find.byKey(const ValueKey('help-status')));
     await settle();
     expect(find.byKey(const ValueKey('support-center')), findsOneWidget);
