@@ -65,6 +65,10 @@ class PackingState {
     this.station,
     this.cart,
     this.rack,
+    this.rackPending,
+    this.stageBusy = false,
+    this.stageUnknown = false,
+    this.stageRejectCode,
     this.stepError,
   });
 
@@ -74,8 +78,20 @@ class PackingState {
   /// 확인한 장바구니(`CRT-…`).
   final String? cart;
 
-  /// 올려둔 출하대기 랙(`DSP-…`). 보낼 곳이 계약에 없다(BR-52 R20) — 화면 확인만.
+  /// 올려둔 출하대기 랙(`DSP-…`) — 서버가 모든 밀봉 포장의 랙 위치를 기록했을 때만(fulfillment 0.20.0 staging, BR-52 R20).
   final String? rack;
+
+  /// 찍었지만 아직 서버 확인 전인 랙(보내는 중·결과 모름·거절).
+  final String? rackPending;
+
+  /// 랙 올리기를 보내는 중.
+  final bool stageBusy;
+
+  /// 랙에 올렸는지 모른다. "다시 확인"은 같은 키로만 보낸다.
+  final bool stageUnknown;
+
+  /// 랙 올리기 거절 코드(STAGING_REJECTED·INVALID_STATE 등).
+  final String? stageRejectCode;
 
   /// 패킹대·장바구니·랙 스캔 오류.
   final PackStepError? stepError;
@@ -114,11 +130,21 @@ class PackingState {
     String? Function()? station,
     String? Function()? cart,
     String? Function()? rack,
+    String? Function()? rackPending,
+    bool? stageBusy,
+    bool? stageUnknown,
+    String? Function()? stageRejectCode,
     PackStepError? Function()? stepError,
   }) => PackingState(
     station: station != null ? station() : this.station,
     cart: cart != null ? cart() : this.cart,
     rack: rack != null ? rack() : this.rack,
+    rackPending: rackPending != null ? rackPending() : this.rackPending,
+    stageBusy: stageBusy ?? this.stageBusy,
+    stageUnknown: stageUnknown ?? this.stageUnknown,
+    stageRejectCode: stageRejectCode != null
+        ? stageRejectCode()
+        : this.stageRejectCode,
     stepError: stepError != null ? stepError() : this.stepError,
     bag: bag ?? this.bag,
     zone: zone ?? this.zone,
@@ -148,6 +174,9 @@ class PackingController extends Notifier<PackingState> {
 
   /// 결과를 모르는 배차 요청의 키·분. 확인될 때까지 이 값으로만 다시 보낸다.
   ({IdempotencyKey key, int minutes})? _pendingDispatch;
+
+  /// 랙 올리기 키 — 포장·랙마다 하나. 결과를 모르면 같은 키로만 다시 보낸다.
+  final _stageKeys = <String, IdempotencyKey>{};
 
   @override
   PackingState build() => const PackingState();
@@ -236,15 +265,64 @@ class PackingController extends Notifier<PackingState> {
     return err == null;
   }
 
-  /// 5. 출하대기 랙(`DSP-…`).
-  bool scanRack(String code) {
+  /// 5. 출하대기 랙(`DSP-…`) — 찍으면 밀봉한 포장마다 서버에 랙 위치를 보낸다(`POST /packages/{id}/staging`).
+  /// 모양이 랙이 아니면 보내지 않는다(랙인지 최종 판정은 서버 — 422 STAGING_REJECTED).
+  bool scanRack(String code, ShipmentView s) {
     final c = code.trim();
     final ok = isMfcLocation(c) && c.startsWith('DSP-');
+    if (!ok || state.stageBusy) {
+      if (!ok) state = state.copyWith(stepError: () => PackStepError.notRack);
+      return ok;
+    }
     state = state.copyWith(
-      rack: ok ? () => c : null,
-      stepError: () => ok ? null : PackStepError.notRack,
+      rack: () => null,
+      rackPending: () => c,
+      stepError: () => null,
     );
-    return ok;
+    stage(s);
+    return true;
+  }
+
+  /// 찍은 랙(또는 결과를 모르는 랙)을 밀봉한 포장마다 보낸다. 모두 서버가 기록해야 [PackingState.rack] 이 정해진다.
+  Future<void> stage(ShipmentView s) async {
+    final rack = state.rackPending;
+    if (rack == null || state.stageBusy) return;
+    state = state.copyWith(
+      stageBusy: true,
+      stageUnknown: false,
+      stageRejectCode: () => null,
+    );
+    final targets = [
+      for (final p in s.packages)
+        if (p.state == PackageState.sealed && p.stagingLocation != rack)
+          p.packageId,
+    ];
+    var unknown = false;
+    String? rejected;
+    for (final id in targets) {
+      final key = _stageKeys['$id|$rack'] ??= IdempotencyKey.generate();
+      final outcome = await _repo.stage(id, rack, key: key);
+      if (!ref.mounted) return;
+      switch (outcome) {
+        case StageDone():
+          _stageKeys.remove('$id|$rack');
+        case StageRejected(:final code):
+          _stageKeys.remove('$id|$rack');
+          rejected ??= code;
+        case StageUnknown():
+          unknown = true;
+      }
+      if (rejected != null) break;
+    }
+    final done = !unknown && rejected == null;
+    state = state.copyWith(
+      stageBusy: false,
+      stageUnknown: unknown,
+      stageRejectCode: () => rejected,
+      rack: () => done ? rack : null,
+      rackPending: () => rejected != null ? null : (done ? null : rack),
+    );
+    ref.invalidate(shipmentProvider(s.shipmentId));
   }
 
   /// 밀봉 → 포장 QR. 결과를 모르면 같은 키로만 다시 보낸다(포장이 두 개 생기지 않게).

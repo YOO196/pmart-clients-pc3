@@ -39,6 +39,14 @@ abstract interface class PackingRepository {
     required IdempotencyKey key,
   });
 
+  /// `POST /packages/{id}/staging`(fulfillment 0.20.0, BR-52 R20) — 밀봉한 포장을 찍은 출하대기 랙에 올렸다고 알린다.
+  /// 출고에 포장이 여럿이면 포장마다 부른다. 같은 랙 다시 찍기도 200.
+  Future<StageOutcome> stage(
+    String packageId,
+    String stagingLocation, {
+    required IdempotencyKey key,
+  });
+
   /// `POST /shipments/{id}/dispatch-requests`(D-5). 출고당 한 번 — 이미 요청됐으면 그 요청(200).
   Future<DispatchOutcome> requestDispatch(
     String shipmentId, {
@@ -176,6 +184,31 @@ final class ApiPackingRepository implements PackingRepository {
   }
 
   @override
+  Future<StageOutcome> stage(
+    String packageId,
+    String stagingLocation, {
+    required IdempotencyKey key,
+  }) async {
+    try {
+      final res = await pmartGuard(
+        () => _shipments.stagePackage(
+          packageId: packageId,
+          idempotencyKey: key.value,
+          xSourceSystem: sourceSystem,
+          stagePackageRequest: api.StagePackageRequest(
+            stagingLocation: stagingLocation,
+          ),
+          extra: commandOptions(key).extra,
+        ),
+      );
+      final at = res.data?.stagingLocation;
+      return at == null ? const StageUnknown() : StageDone(at);
+    } on PmartFailure catch (f) {
+      return stageFailureToOutcome(f);
+    }
+  }
+
+  @override
   Future<DispatchOutcome> requestDispatch(
     String shipmentId, {
     required int estimatedPackMinutes,
@@ -227,6 +260,16 @@ PackOutcome packFailureToOutcome(PmartFailure f) => switch (f) {
   _ => throw f,
 };
 
+StageOutcome stageFailureToOutcome(PmartFailure f) => switch (f) {
+  UnknownResultFailure() => const StageUnknown(),
+  ProblemFailure(:final problem)
+      when problem.code == ProblemCode.idempotencyConflict &&
+          problem.retryable =>
+    const StageUnknown(),
+  ProblemFailure(:final problem) => StageRejected(problem.code),
+  _ => throw f,
+};
+
 PackageView packageFromContract(api.Package p) => PackageView(
   packageId:
       p.packageId ?? (throw const ContractViolationFailure('packageId 없음')),
@@ -252,6 +295,7 @@ PackageView packageFromContract(api.Package p) => PackageView(
   ],
   bagCount: p.bagCount,
   temperatureZone: p.temperatureZone,
+  stagingLocation: p.stagingLocation,
   fence: switch (p.fence?.state?.value) {
     null || 'NONE' => FenceState.none,
     'HANDOVER_IN_PROGRESS' => FenceState.inProgress,

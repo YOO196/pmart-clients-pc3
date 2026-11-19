@@ -344,6 +344,49 @@ void main() {
       });
     });
 
+    test('랙 올리기: 포장 경로·랙 본문·멱등키, 422 STAGING_REJECTED·409 INVALID_STATE 는 거절, 타임아웃은 불명', () async {
+      var i = 0;
+      final adapter = FakeAdapter((_, _) async {
+        i++;
+        return switch (i) {
+          1 => const FakeReply(
+            200,
+            body: {
+              'packageId': 'pkg-1',
+              'packageVersion': 1,
+              'state': 'SEALED',
+              'stagingLocation': 'DSP-A-01',
+            },
+          ),
+          2 => FakeReply.problem(422, problemBody('STAGING_REJECTED')),
+          3 => FakeReply.problem(409, problemBody('INVALID_STATE')),
+          _ => const FakeReply.transport(DioExceptionType.receiveTimeout),
+        };
+      });
+      final r = repo(adapter);
+      Future<StageOutcome> send(String rack) =>
+          r.stage('pkg-1', rack, key: IdempotencyKey('k-s'));
+      expect(
+        await send('DSP-A-01'),
+        isA<StageDone>().having((d) => d.stagingLocation, 'rack', 'DSP-A-01'),
+      );
+      expect(
+        await send('PAK-C-01'),
+        isA<StageRejected>().having((d) => d.code, 'code', 'STAGING_REJECTED'),
+      );
+      expect(
+        await send('DSP-A-01'),
+        isA<StageRejected>().having((d) => d.code, 'code', 'INVALID_STATE'),
+      );
+      expect(await send('DSP-A-01'), isA<StageUnknown>());
+      final req = adapter.requests.first;
+      expect(req.uri.path, '/api/v1/packages/pkg-1/staging');
+      expect(req.headers['Idempotency-Key'], 'k-s');
+      expect(jsonDecode(req.data as String) as Map<String, dynamic>, {
+        'stagingLocation': 'DSP-A-01',
+      });
+    });
+
     test('배차 요청 409 INVALID_STATE 는 거절', () async {
       final r = repo(
         FakeAdapter(
@@ -465,7 +508,36 @@ void main() {
     );
     await scanTo(t, 'rack-scan', 'PAK-C-02');
     expect(find.text('출하대기 랙(DSP) 바코드가 아니에요'), findsWidgets);
+    expect(packing.stageCalls, isEmpty, reason: '랙 모양이 아니면 보내지 않는다');
+    // 응답을 잃으면 확인 중 — 끝 단추는 막히고, 다시 확인은 같은 키로(BR-52 R20 staging)
+    packing.loseNextStageResponse = true;
     await scanTo(t, 'rack-scan', 'DSP-A-01');
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('stage-unknown')), findsOneWidget);
+    expect(
+      t
+          .widget<FilledButton>(find.byKey(const ValueKey('finish-packing')))
+          .onPressed,
+      isNull,
+    );
+    final firstKey = packing.stageCalls.first.key;
+    await t.tap(find.byKey(const ValueKey('stage-recheck')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('stage-unknown')), findsNothing);
+    expect(find.text('랙에 올렸어요'), findsOneWidget);
+    // 밀봉한 봉투 둘 다 같은 랙으로, 잃은 요청은 같은 키로 다시
+    expect(packing.stageCalls.map((c) => c.rack).toSet(), {'DSP-A-01'});
+    expect(packing.stageCalls.map((c) => c.packageId).toSet(), {
+      'pkg-1',
+      'pkg-2',
+    });
+    expect(
+      packing.stageCalls
+          .where((c) => c.packageId == packing.stageCalls.first.packageId)
+          .map((c) => c.key)
+          .toSet(),
+      {firstKey},
+    );
     await t.tap(find.byKey(const ValueKey('finish-packing')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('packing-finished')), findsOneWidget);
