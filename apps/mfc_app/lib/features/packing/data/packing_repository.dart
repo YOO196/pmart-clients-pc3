@@ -310,6 +310,7 @@ ShipmentView shipmentFromContract(api.Shipment s) => ShipmentView(
   shipmentId:
       s.shipmentId ?? (throw const ContractViolationFailure('shipmentId 없음')),
   orderId: s.orderId,
+  orderNumber: s.orderNumber,
   deliveryId: s.deliveryId,
   version: s.version ?? 0,
   state: switch (s.state?.value) {

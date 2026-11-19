@@ -24,14 +24,7 @@ import 'package:mfc_app/shared/scanner/scan_input.dart';
 import 'support.dart';
 
 Future<void> closeLabel(WidgetTester t) async {
-  await t.tap(
-    find
-        .descendant(
-          of: find.byKey(const ValueKey('label-preview')),
-          matching: find.byType(TextButton),
-        )
-        .last,
-  );
+  await t.tap(find.byKey(const ValueKey('label-ok')));
   await t.pumpAndSettle();
 }
 
