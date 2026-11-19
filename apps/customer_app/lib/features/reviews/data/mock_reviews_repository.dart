@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'package:pmart_api_review/pmart_api_review.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
 
+import '../../catalog/data/mock_catalog_repository.dart' show mockProducts;
 import '../domain/reviews.dart';
 import 'reviews_repository.dart';
 
@@ -14,8 +15,12 @@ final class MockReviewsRepository implements ReviewsRepository {
     this.pageSize = 5,
     List<Map<String, dynamic>>? eligibilities,
     List<Map<String, dynamic>>? reviews,
+    this.synthesizeFromCatalog = true,
   }) : eligibilityJson = eligibilities ?? seedEligibilities(),
        reviewJson = reviews ?? seedReviews();
+
+  /// 심어 둔 리뷰가 없는 상품의 리뷰를 상품 목(별점·리뷰 수)에 맞춰 만든다. 시험에서 "리뷰 0건"을 보려면 끈다.
+  final bool synthesizeFromCatalog;
 
   final Duration latency;
   final int pageSize;
@@ -444,6 +449,43 @@ final class MockReviewsRepository implements ReviewsRepository {
           r,
     ];
     final start = cursor == null ? 0 : int.parse(cursor);
+    // 심어 둔 리뷰가 없는 상품은 상품 목(별점·리뷰 수)과 같게 그때그때 만든다 — 상세 위 "★4.8 (1,203)" 과
+    // 아래 "리뷰 0개"가 어긋나지 않게(실서버는 같은 집계에서 온다). 요청한 쪽만 만든다.
+    final product = mockProducts
+        .where((p) => p.productId == productId)
+        .firstOrNull;
+    if (visible.isEmpty &&
+        synthesizeFromCatalog &&
+        product != null &&
+        (product.reviewCount ?? 0) > 0) {
+      final total = product.reviewCount!;
+      final avg = product.rating ?? 5;
+      final end = (start + pageSize).clamp(0, total);
+      return productReviewPageFromContract(
+        api.ListProductReviews200Response.fromJson({
+          'items': [
+            for (var i = start; i < end; i++)
+              {
+                'reviewId': 'rv-gen-$productId-$i',
+                'productId': productId,
+                'sku': product.sku,
+                'authorMasked': '${'김이박최정'[i % 5]}**',
+                'rating': (i % 4 == 3 ? avg - 1 : avg).round().clamp(1, 5),
+                'text': '[목] ${product.name} 후기 ${i + 1}',
+                'state': 'PUBLISHED',
+                'version': 1,
+                'createdAt': DateTime.utc(
+                  2026,
+                  10,
+                  20,
+                ).subtract(Duration(hours: i)).toIso8601String(),
+              },
+          ],
+          'page': {'nextCursor': end < total ? '$end' : null, 'size': pageSize},
+          'summary': {'averageRating': avg, 'reviewCount': total},
+        }),
+      );
+    }
     final end = (start + pageSize).clamp(0, visible.length);
     final ratings = [for (final r in visible) r['rating'] as int];
     return productReviewPageFromContract(

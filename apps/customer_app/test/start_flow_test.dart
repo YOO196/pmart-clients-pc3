@@ -285,6 +285,9 @@ void main() {
     expect(key('consent-term'), findsOneWidget);
     expect(key('consent-term-body'), findsOneWidget);
     expect(find.textContaining('시연용 약관 본문'), findsOneWidget);
+    // 제목은 약관 이름(서버 title) — 내부 코드(LOCATION_BASED_SERVICE)가 보이지 않는다.
+    expect(find.textContaining('LOCATION_BASED_SERVICE'), findsNothing);
+    expect(find.text('위치기반서비스 이용약관'), findsWidgets);
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
     expect(key('start-welcome'), findsOneWidget);

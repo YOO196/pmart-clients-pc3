@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pmart_ui/pmart_ui.dart' show keepWords;
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../data/auth_repository.dart' show consentTypeOf;
@@ -191,16 +192,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
         const SizedBox(height: 18),
         Text(
-          widget.purpose == LoginPurpose.checkout
-              ? l10n.loginForCheckout
-              : l10n.loginBody,
+          // 띄어쓰기에서만 줄바꿈("확인하세 / 요"처럼 끝 글자만 넘어가지 않게)
+          keepWords(
+            widget.purpose == LoginPurpose.checkout
+                ? l10n.loginForCheckout
+                : l10n.loginBody,
+          ),
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         if (ref.watch(envProvider) == PmartEnv.mock) ...[
           const SizedBox(height: 8),
           Text(
-            l10n.loginMockNotice,
+            keepWords(l10n.loginMockNotice),
             key: const ValueKey('login-mock-notice'),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall,

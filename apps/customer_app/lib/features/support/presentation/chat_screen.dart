@@ -367,11 +367,26 @@ class _TopicSection extends ConsumerWidget {
   }
 }
 
+/// 주문 고르기 단추·고른 말풍선. 시스템 주문 ID 는 고객에게 보이지 않는다(계약 OrderBrief 에 화면용 주문번호가 없어
+/// 주문 시각 · 상태로 구분한다).
 String _orderPickLabel(AppLocalizations l10n, ChatOrder o) =>
     switch (o.orderedAt) {
-      final DateTime t => l10n.chatOrderPick(formatSeoulDateTime(t), o.orderId),
-      null => o.orderId,
+      final DateTime t => l10n.chatOrderPick(
+        formatSeoulDateTime(t),
+        o.statusLabel,
+      ),
+      null => o.statusLabel,
     };
+
+/// 도착 예정 시간대(서울 날짜·시각 문자열) → 다른 화면과 같은 "11월 15일 (일) 오후 2:00~3:00". 읽지 못하면 null.
+String? _arrivalText(ChatOrder o) {
+  final (d, s, e) = (o.arrivalDate, o.arrivalStart, o.arrivalEnd);
+  if (d == null || s == null || e == null) return null;
+  final start = DateTime.tryParse('${d}T$s:00+09:00');
+  final end = DateTime.tryParse('${d}T$e:00+09:00');
+  if (start == null || end == null) return null;
+  return '${formatSeoulDate(start)} ${formatSeoulWindow(start, end)}';
+}
 
 class _RecentOrderPicker extends ConsumerWidget {
   const _RecentOrderPicker();
@@ -681,15 +696,9 @@ class _OrderCard extends StatelessWidget {
       if (order.itemCount case final n?) l10n.chatOrderItems(n),
       if (order.totalAmount case final a?) formatKrw(a),
     ];
-    final arrival = switch ((
-      order.arrivalDate,
-      order.arrivalStart,
-      order.arrivalEnd,
-    )) {
-      (final String d, final String s, final String e) => l10n.chatOrderArrival(
-        '$d $s~$e',
-      ),
-      _ => null,
+    final arrival = switch (_arrivalText(order)) {
+      final w? => l10n.chatOrderArrival(w),
+      null => null,
     };
     return Card(
       key: ValueKey('chat-order-${order.orderId}'),

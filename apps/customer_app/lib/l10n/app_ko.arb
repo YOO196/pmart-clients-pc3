@@ -1187,7 +1187,7 @@
   "reviewRetry": "다시 시도",
   "reviewSectionTitle": "리뷰",
   "reviewSectionCount": "리뷰 {count}개",
-  "@reviewSectionCount": { "placeholders": { "count": { "type": "int" } } },
+  "@reviewSectionCount": { "placeholders": { "count": { "type": "int", "format": "decimalPattern" } } },
   "reviewSectionEmpty": "아직 리뷰가 없어요",
   "reviewSeeAll": "전체보기",
   "reviewsTitle": "상품 리뷰",
@@ -1330,17 +1330,17 @@
   "chatRecentOrdersFailed": "최근 주문을 불러오지 못했어요",
   "chatRetry": "다시 시도",
   "chatAskGeneralInstead": "일반 문의로 물어보기",
-  "chatOrderPick": "{date} / {orderId}",
+  "chatOrderPick": "{date} · {status}",
   "@chatOrderPick": {
     "placeholders": {
       "date": { "type": "String" },
-      "orderId": { "type": "String" }
+      "status": { "type": "String" }
     }
   },
-  "chatOrderTopicBar": "{orderId} 주문에 대해 묻고 있어요",
+  "chatOrderTopicBar": "{when} 주문에 대해 묻고 있어요",
   "@chatOrderTopicBar": {
     "placeholders": {
-      "orderId": { "type": "String" }
+      "when": { "type": "String" }
     }
   },
   "chatTopicChange": "종류 바꾸기",

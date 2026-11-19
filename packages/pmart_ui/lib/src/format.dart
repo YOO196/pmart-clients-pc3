@@ -33,6 +33,17 @@ String formatSeoulDateTime(DateTime instant) =>
 String formatSeoulTime(DateTime instant) =>
     DateFormat('a h:mm', 'ko').format(toSeoulWallClock(instant));
 
+/// `11월 15일 (일)`
+String formatSeoulDate(DateTime instant) =>
+    DateFormat('M월 d일 (E)', 'ko').format(toSeoulWallClock(instant));
+
+/// 한글 문장을 띄어쓰기에서만 줄바꿈되게 한다(글자 사이에 WORD JOINER U+2060).
+/// Flutter 는 한글을 글자마다 끊어 "확인하세 / 요"처럼 끝 글자만 다음 줄로 넘기는 일이 있다 — 짧은 안내 문구에만 쓴다.
+String keepWords(String text) => text
+    .split(' ')
+    .map((w) => w.runes.map(String.fromCharCode).join('⁠'))
+    .join(' ');
+
 /// 도착 슬롯 `오전 8:00~9:00`
 String formatSeoulWindow(DateTime start, DateTime end) {
   final s = toSeoulWallClock(start);

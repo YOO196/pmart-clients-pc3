@@ -273,12 +273,21 @@ final class MockDeviceConsentsRepository implements DeviceConsentsRepository {
         Problem(status: 404, code: 'CONSENT_TERM_NOT_FOUND'),
       );
     }
+    // 실서버는 본문 첫 줄 제목(# 뒤)을 title 로 준다. 목도 내부 코드 대신 약관 이름을 쓴다.
+    final name = switch (type) {
+      ConsentWire.terms => '이용약관',
+      ConsentWire.privacy => '개인정보 수집·이용',
+      ConsentWire.age14 => '만 14세 이상 확인',
+      ConsentWire.marketing => '마케팅 정보 수신',
+      ConsentWire.location => '위치기반서비스 이용약관',
+      _ => '약관',
+    };
     return ConsentTermDocument(
       type: type,
       version: version,
-      title: '$type (목)',
+      title: name,
       body:
-          '# $type (목)\n\n시연용 약관 본문입니다.\n\n| 항목 | 내용 |\n|---|---|\n| 버전 | $version |\n',
+          '# $name\n\n[목] 시연용 약관 본문입니다.\n\n| 항목 | 내용 |\n|---|---|\n| 버전 | $version |\n',
     );
   }
 

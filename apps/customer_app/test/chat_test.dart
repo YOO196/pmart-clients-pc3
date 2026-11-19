@@ -411,13 +411,15 @@ void main() {
       // 앞에서 고른 주문 1 은 지워지지 않고 그 자리에 남는다.
       final picks = find.byKey(const ValueKey('chat-topic-order-picked'));
       expect(picks, findsNWidgets(2));
+      // 시스템 주문 ID 는 보이지 않고 주문 시각 · 상태로 구분한다(주문 1 = 상품 준비 중, 주문 2 = 배송 완료).
       expect(
         find.descendant(
           of: picks.first,
-          matching: find.textContaining('order-seed-4'),
+          matching: find.textContaining('상품 준비 중'),
         ),
         findsOneWidget,
       );
+      expect(find.textContaining('order-seed'), findsNothing);
       // 순서: 주문 1 고름 < 첫 질문 < 주문 2 고름 < 두 번째 질문
       expect(y(picks.first), lessThan(y(firstQuestion)));
       expect(y(firstQuestion), lessThan(y(picks.last)));

@@ -1042,8 +1042,24 @@ void main() {
       );
     });
 
+    testWidgets(
+      '목: 심어 둔 리뷰가 없는 상품은 상품 목의 리뷰 수와 같게 보인다(위 별점과 아래 리뷰 칸이 어긋나지 않게)',
+      (t) async {
+        final repo = MockReviewsRepository(latency: Duration.zero);
+        await openProduct(t, repo, 'P-0001'); // 상품 목: 4.8 · 1,203개
+        expect(find.text('리뷰 1,203개'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('product-reviews-empty')),
+          findsNothing,
+        );
+      },
+    );
+
     testWidgets('상품 상세: 정상 0건만 "아직 리뷰가 없어요"', (t) async {
-      final repo = MockReviewsRepository(latency: Duration.zero);
+      final repo = MockReviewsRepository(
+        latency: Duration.zero,
+        synthesizeFromCatalog: false,
+      );
       await openProduct(t, repo, 'P-0001');
       expect(
         find.byKey(const ValueKey('product-reviews-empty')),

@@ -36,7 +36,8 @@ void main() {
     await t.tap(find.byKey(const ValueKey('cart-order')));
     await t.pumpAndSettle();
     // 비회원이라 주문 목적 로그인을 거친다.
-    expect(find.text('주문하려면 로그인이 필요해요'), findsOneWidget);
+    // 띄어쓰기에서만 줄바꿈되게 글자 사이에 보이지 않는 이음표가 들어간다(keepWords).
+    expect(find.text(keepWords('주문하려면 로그인이 필요해요')), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('login-kakao')));
     await t.pumpAndSettle();
   }
