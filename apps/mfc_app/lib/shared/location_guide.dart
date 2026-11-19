@@ -96,7 +96,7 @@ class LocationGuide extends StatelessWidget {
   }
 }
 
-/// 진한 보라 위치 카드 — 위에 온도대 칩·코드, 아래 구역·랙·단·칸(선반 형식이 아니면 코드 한 칸).
+/// 위치 카드(흰 바탕·옅은 보라 칸·보라 값) — 위에 온도대 칩·코드, 아래 구역·랙·단·칸(선반 형식이 아니면 코드 한 칸).
 class LocationCard extends StatelessWidget {
   const LocationCard({super.key, required this.code, this.codeKey});
 
@@ -119,8 +119,9 @@ class LocationCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: PdaColors.dark,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: PdaColors.lilac, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -151,7 +152,7 @@ class LocationCard extends StatelessWidget {
                 code,
                 key: codeKey,
                 style: const TextStyle(
-                  color: Color(0xFFEEE3FC),
+                  color: PdaColors.muted,
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                 ),
@@ -168,7 +169,7 @@ class LocationCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0x1DFFFFFF),
+                        color: PdaColors.softer,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Column(
@@ -182,7 +183,7 @@ class LocationCard extends StatelessWidget {
                               child: Text(
                                 value,
                                 style: const TextStyle(
-                                  color: Colors.white,
+                                  color: PdaColors.primary,
                                   fontSize: 30,
                                   height: 1.2,
                                   fontWeight: FontWeight.w800,
@@ -195,7 +196,7 @@ class LocationCard extends StatelessWidget {
                             Text(
                               label,
                               style: const TextStyle(
-                                color: Color(0xFFEEE3FC),
+                                color: PdaColors.muted,
                                 fontSize: 12,
                               ),
                             ),
@@ -220,7 +221,7 @@ Color _tempChip(String t) => switch (t) {
   _ => const Color(0xFFFDE7CF),
 };
 
-/// 선반 위치 조각 한 줄(위치 줄 아래 — 아직 확인 안 한 칸). 진한 보라 띠에 구역·랙·단·칸.
+/// 선반 위치 조각 한 줄(위치 줄 아래 — 아직 확인 안 한 칸). 흰 띠에 구역·랙·단·칸(값은 보라).
 /// 칸 안내 줄([TargetLine])이 코드 원문을 이미 보이므로 머리글 없이 작게. 선반 형식이 아니면 아무것도 그리지 않는다.
 class LocationBlocks extends StatelessWidget {
   const LocationBlocks({super.key, required this.code, this.height = 48});
@@ -247,8 +248,9 @@ class LocationBlocks extends StatelessWidget {
         height: height,
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
-          color: PdaColors.dark,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: PdaColors.lilac, width: 1.5),
         ),
         child: Row(
           children: [
@@ -257,7 +259,7 @@ class LocationBlocks extends StatelessWidget {
               Expanded(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: const Color(0x1DFFFFFF),
+                    color: PdaColors.softer,
                     borderRadius: BorderRadius.circular(7),
                   ),
                   child: Row(
@@ -268,7 +270,7 @@ class LocationBlocks extends StatelessWidget {
                       Text(
                         label,
                         style: const TextStyle(
-                          color: Color(0xFFEEE3FC),
+                          color: PdaColors.muted,
                           fontSize: 10,
                         ),
                       ),
@@ -276,7 +278,7 @@ class LocationBlocks extends StatelessWidget {
                       Text(
                         value,
                         style: const TextStyle(
-                          color: Colors.white,
+                          color: PdaColors.primary,
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
                         ),

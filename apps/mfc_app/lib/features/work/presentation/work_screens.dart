@@ -517,12 +517,8 @@ class _HeroArea extends StatelessWidget {
           padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(17),
-            border: Border.all(color: const Color(0xFFDEC9F4)),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFF1E7FD), Color(0xFFE4D0FA)],
-            ),
+            color: Colors.white,
+            border: Border.all(color: PdaColors.lilac, width: 1.5),
           ),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 115),
@@ -544,7 +540,7 @@ class _HeroArea extends StatelessWidget {
                       Text(
                         l10n.featuredPickPack,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFF534066),
+                          color: PdaColors.muted,
                         ),
                       ),
                       const SizedBox(height: 11),
@@ -554,7 +550,7 @@ class _HeroArea extends StatelessWidget {
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF492773),
+                          color: PdaColors.primary,
                           borderRadius: BorderRadius.circular(7),
                         ),
                         child: Row(
@@ -587,13 +583,13 @@ class _HeroArea extends StatelessWidget {
                   width: 96,
                   height: 96,
                   decoration: const BoxDecoration(
-                    color: Color(0x66FFFFFF),
+                    color: PdaColors.softer,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
                     Icons.shopping_cart_checkout,
                     size: 56,
-                    color: Color(0xFF593787),
+                    color: PdaColors.primary,
                   ),
                 ),
               ],
@@ -661,10 +657,10 @@ class _Tile extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFE2FD),
+                  color: PdaColors.softer,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: const Color(0xFF593787)),
+                child: Icon(icon, color: PdaColors.primary),
               ),
               const SizedBox(width: 9),
               Expanded(
@@ -737,16 +733,13 @@ class _ToolButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              allowed ? icon : Icons.lock_outline,
-              color: const Color(0xFF5B4A6E),
-            ),
+            Icon(allowed ? icon : Icons.lock_outline, color: PdaColors.muted),
             const SizedBox(height: 4),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF5B4A6E)),
+              style: const TextStyle(fontSize: 12, color: PdaColors.muted),
             ),
           ],
         ),
@@ -1111,7 +1104,7 @@ class _GuideStep extends StatelessWidget {
                     left: 11,
                     child: SizedBox(
                       width: 1,
-                      child: ColoredBox(color: Color(0xFFD8C3EB)),
+                      child: ColoredBox(color: PdaColors.lilac),
                     ),
                   ),
                 Positioned(
@@ -1121,13 +1114,13 @@ class _GuideStep extends StatelessWidget {
                     height: 23,
                     alignment: Alignment.center,
                     decoration: const BoxDecoration(
-                      color: Color(0xFFEDDEFA),
+                      color: PdaColors.softer,
                       shape: BoxShape.circle,
                     ),
                     child: Text(
                       '$n',
                       style: const TextStyle(
-                        color: Color(0xFF4B286E),
+                        color: PdaColors.primary,
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),
@@ -1141,10 +1134,10 @@ class _GuideStep extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: const Color(0xFFF0E8FA),
+              color: PdaColors.softer,
               borderRadius: BorderRadius.circular(13),
             ),
-            child: Icon(icon, size: 30, color: const Color(0xFF593787)),
+            child: Icon(icon, size: 30, color: PdaColors.primary),
           ),
           const SizedBox(width: 11),
           Expanded(

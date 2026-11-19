@@ -31,7 +31,7 @@ class StepHeader extends StatelessWidget {
                 alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(horizontal: 2),
                 decoration: BoxDecoration(
-                  color: i == current ? PdaColors.dark : PdaColors.soft,
+                  color: i == current ? PdaColors.primary : PdaColors.soft,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
@@ -162,7 +162,7 @@ class ActionBar extends StatelessWidget {
         border: Border(top: BorderSide(color: PdaColors.line)),
         boxShadow: [
           BoxShadow(
-            color: Color(0x09322048),
+            color: Color(0x0A000000),
             blurRadius: 20,
             offset: Offset(0, -5),
           ),
