@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -144,14 +144,26 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, s) => WorkSessionScreen(
           area: WorkArea.fromName(s.pathParameters['area'])!,
         ),
-        routes: [
-          GoRoute(
-            path: 'guide',
-            builder: (_, s) => WorkGuideScreen(
-              area: WorkArea.fromName(s.pathParameters['area'])!,
-            ),
+      ),
+      // 안내는 첫 화면 바로 위 한 장(업무 화면 아래에 두지 않는다) — 고른 칸이 커지며 안내 카드가 되게
+      // (Hero, 사용자 2026-11-19). 확인을 누르면 업무 화면으로 바꾼다.
+      GoRoute(
+        path: '/guide/:area',
+        redirect: (_, s) =>
+            WorkArea.fromName(s.pathParameters['area']) == null ? '/' : null,
+        // 넘김 효과가 있어야 칸이 커지는 모습(Hero)이 보인다 — 이 화면만 페이지 넘김을 직접 정한다.
+        pageBuilder: (_, s) => CustomTransitionPage<void>(
+          key: s.pageKey,
+          transitionDuration: const Duration(milliseconds: 380),
+          reverseTransitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (_, animation, _, child) => FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            child: child,
           ),
-        ],
+          child: WorkGuideScreen(
+            area: WorkArea.fromName(s.pathParameters['area'])!,
+          ),
+        ),
       ),
       GoRoute(
         path: '/inbound/:trfId',
