@@ -27,6 +27,10 @@ abstract interface class AddressRepository {
 
   /// `GET /guest-delivery-addresses/{id}`(같은 기기만).
   Future<Address> guest(String guestAddressId);
+
+  /// 같은 비회원 배송지를 입력값 그대로(받는 분 전화·출입 메모·핀 포함) 읽는다 — 로그인 뒤 회원 주소록에 옮길 때 쓴다.
+  /// 서버에 옮기는 경로가 없어 앱이 이 값으로 `POST /me/addresses` 한다(고객 확인 뒤).
+  Future<AddressDraft> guestDraft(String guestAddressId);
 }
 
 final class ApiAddressRepository implements AddressRepository {
@@ -66,6 +70,20 @@ final class ApiAddressRepository implements AddressRepository {
       ),
     );
     return addressFromContract(
+      res.data ?? (throw const ContractViolationFailure('배송지 본문 없음')),
+    );
+  }
+
+  @override
+  Future<AddressDraft> guestDraft(String guestAddressId) async {
+    final deviceId = await _deviceId.get();
+    final res = await pmartGuard(
+      () => _addresses.getGuestDeliveryAddress(
+        guestAddressId: guestAddressId,
+        xDeviceId: deviceId,
+      ),
+    );
+    return draftFromContract(
       res.data ?? (throw const ContractViolationFailure('배송지 본문 없음')),
     );
   }
@@ -176,6 +194,32 @@ Address addressFromContract(api.Address a) => Address(
     _ => Serviceability.unknown,
   },
   mfcId: a.serviceability?.mfcId,
+);
+
+/// 저장된 배송지를 다시 등록할 입력값으로(서버 판정·ID·버전은 빼고 고객이 넣은 값만).
+AddressDraft draftFromContract(api.Address a) => AddressDraft(
+  label: a.label,
+  roadAddress: a.roadAddress,
+  detailAddress: a.detailAddress,
+  receiverName: a.receiverName,
+  receiverPhone: a.receiverPhone,
+  postalCode: a.postalCode,
+  entranceNote: a.entranceNote,
+  entranceMethod: switch (a.entranceMethod) {
+    api.AddressEntranceMethodEnum.FREE => EntranceMethod.free,
+    api.AddressEntranceMethodEnum.PASSWORD => EntranceMethod.password,
+    api.AddressEntranceMethodEnum.CALL => EntranceMethod.call,
+    api.AddressEntranceMethodEnum.OTHER => EntranceMethod.other,
+    null => null,
+  },
+  // 고객이 찍은 핀만 옮긴다 — 서버가 도로명으로 채운 좌표(GEOCODE)는 회원 주소 저장 때 서버가 다시 채운다.
+  geo: switch ((a.geo?.lat, a.geo?.lng, a.geoSource)) {
+    (final num lat, final num lng, api.AddressGeoSourceEnum.PIN) => (
+      lat: lat.toDouble(),
+      lng: lng.toDouble(),
+    ),
+    _ => null,
+  },
 );
 
 ShoppingContext contextFromContract(api.ShoppingContext c) => ShoppingContext(

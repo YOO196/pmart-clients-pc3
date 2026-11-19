@@ -8,8 +8,10 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
+import '../../address/domain/address.dart';
+import '../../address/presentation/address_controller.dart';
 import '../../address/presentation/address_screens.dart'
-    show addressSearchProvider;
+    show addressOutcomeText, addressSearchProvider;
 import '../../address/presentation/postcode_screen.dart' show PostcodeResult;
 import '../../profile/data/consents_repository.dart';
 import '../../push/presentation/push_controller.dart' show pushSourceProvider;
@@ -335,6 +337,76 @@ class StartAddressScreen extends ConsumerStatefulWidget {
 
 class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
   bool _locating = false;
+  String? _saving;
+
+  /// 로그인 전에 쓰던 비회원 배송지를 회원 주소록에 그대로 저장한다(고객이 누른 뒤에만). 저장되면 단계가 홈으로 바뀐다.
+  Future<void> _saveGuest(Address a) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _saving = a.addressId);
+    AddressCommandOutcome outcome;
+    try {
+      final draft = await ref
+          .read(addressRepositoryProvider)
+          .guestDraft(a.addressId);
+      outcome = await ref.read(addressBookProvider.notifier).add(draft);
+    } on PmartFailure catch (f) {
+      outcome = AddressCommandFailed(f);
+    }
+    if (!mounted) return;
+    setState(() => _saving = null);
+    messenger.showSnackBar(
+      SnackBar(content: Text(addressOutcomeText(l10n, outcome))),
+    );
+    if (outcome is AddressSaved || outcome is AddressCommandUnknown) {
+      context.go('/');
+    }
+  }
+
+  Widget _guestCard(AppLocalizations l10n, ThemeData theme, Address a) =>
+      Container(
+        key: ValueKey('start-guest-address-${a.addressId}'),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              a.roadAddress,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontSize: 15.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            if (a.detailAddress.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  a.detailAddress,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 12),
+            FilledButton(
+              key: ValueKey('start-guest-address-save-${a.addressId}'),
+              onPressed: _saving == null ? () => _saveGuest(a) : null,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(42),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(l10n.startGuestAddressSave),
+            ),
+          ],
+        ),
+      );
 
   Future<void> _open(PostcodeResult? picked) async {
     if (picked == null || !mounted) return;
@@ -356,6 +428,8 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final guestAddresses =
+        ref.watch(loginGuestAddressesProvider).value ?? const <Address>[];
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
@@ -380,6 +454,27 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
               ),
             ),
             const SizedBox(height: 22),
+            // 로그인 전에 입력한 주소가 있으면 먼저 묻는다(그대로 저장하거나, 아래에서 다른 주소를 찾는다).
+            if (guestAddresses.isNotEmpty) ...[
+              Text(
+                l10n.startGuestAddressTitle,
+                key: const ValueKey('start-guest-address'),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                l10n.startGuestAddressBody,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final a in guestAddresses) _guestCard(l10n, theme, a),
+              const SizedBox(height: 10),
+            ],
             Material(
               color: theme.colorScheme.surfaceContainer,
               borderRadius: BorderRadius.circular(14),

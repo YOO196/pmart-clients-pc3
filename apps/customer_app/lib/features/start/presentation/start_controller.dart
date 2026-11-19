@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart';
+import '../../address/domain/address.dart';
 import '../../address/presentation/address_controller.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -96,6 +97,32 @@ final startStepProvider = Provider<StartStep>((ref) {
   final b = book.value;
   if (b == null) return StartStep.ready;
   return b.addresses.isEmpty ? StartStep.address : StartStep.ready;
+});
+
+/// 로그인한 회원의 주소록이 비었을 때, 이 기기에 남은 비회원 배송지(로그인 전에 입력한 주소). 주소 화면이
+/// "이 주소 저장하고 시작하기"로 묻는다(사용자 결정 2026-11-19 "물어보고 옮기기" — 서버에 옮기는 경로가 없다).
+/// 비회원이면 빈 목록. 서버에 없는(404) 것은 뺀다. 그 밖의 조회 실패는 실패로 남는다(화면은 묻지 않고 검색만 보인다).
+final loginGuestAddressesProvider = FutureProvider.autoDispose<List<Address>>((
+  ref,
+) async {
+  if (ref.watch(sessionProvider) is! MemberSession) return const [];
+  final store = ref.watch(guestAddressStoreProvider);
+  final repo = ref.watch(addressRepositoryProvider);
+  final selected = await store.selected();
+  final found = <Address>[];
+  for (final id in await store.ids()) {
+    try {
+      found.add(await repo.guest(id));
+    } on ProblemFailure catch (f) {
+      if (f.problem.code != ProblemCode.notFound) rethrow;
+    }
+  }
+  // 비회원일 때 쓰던(고른) 주소를 맨 앞에.
+  found.sort(
+    (a, b) =>
+        (b.addressId == selected ? 1 : 0) - (a.addressId == selected ? 1 : 0),
+  );
+  return found;
 });
 
 /// 처음 실행 단계 화면 경로.

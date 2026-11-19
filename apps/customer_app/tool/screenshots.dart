@@ -15,6 +15,9 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:customer_app/app.dart';
 import 'package:customer_app/features/address/data/current_location.dart';
+import 'package:customer_app/features/address/domain/address.dart';
+import 'package:customer_app/features/address/data/mock_address_repository.dart';
+import 'package:customer_app/features/address/data/guest_address_store.dart';
 import 'package:customer_app/features/auth/data/mock_auth_repository.dart';
 import 'package:customer_app/features/cart/data/cart_merge_repository.dart';
 import 'package:customer_app/features/cart/data/mock_cart_repository.dart';
@@ -31,7 +34,11 @@ import 'package:customer_app/features/reviews/presentation/reviews_controller.da
 import 'package:customer_app/features/checkout/domain/checkout.dart'
     show CheckoutProblemCode;
 import 'package:pmart_core/pmart_core.dart'
-    show ProblemDetail, UnknownResultFailure;
+    show
+        IdempotencyKey,
+        MemoryKeyValueStore,
+        ProblemDetail,
+        UnknownResultFailure;
 
 import '../test/support/app_harness.dart';
 
@@ -549,4 +556,57 @@ void main() {
     await shot('result');
     debugDisableShadows = true;
   });
+
+  // 비회원으로 주소를 넣었던 사람이 로그인 → 회원 주소록이 비면 그 주소를 저장할지 묻는다.
+  testWidgets('guest-address', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final secure = MemoryKeyValueStore();
+    await secure.write('pmart.start.welcome', 'at=x');
+    final repo = _NoMemberAddresses();
+    final guest = await t.runAsync(
+      () => repo.addGuest(
+        const AddressDraft(
+          roadAddress: '부산 부산진구 중앙대로 672',
+          detailAddress: '12층',
+          receiverName: '김피마',
+          receiverPhone: '010-1234-5678',
+        ),
+        key: IdempotencyKey.generate(),
+      ),
+    );
+    await GuestAddressStore(secure).add(guest!.addressId);
+    await t.pumpWidget(
+      testApp(const [], address: repo, startGate: true, secure: secure),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/g-guest-address.png').uri),
+    );
+  });
+}
+
+/// 회원 주소록이 빈 목(캡처용).
+final class _NoMemberAddresses extends MockAddressRepository {
+  _NoMemberAddresses() : super(latency: Duration.zero);
+
+  @override
+  Future<AddressBook> book() async {
+    final b = await super.book();
+    return AddressBook(
+      addresses: [
+        for (final a in b.addresses)
+          if (a.addressId != 'addr-1') a,
+      ],
+      context: const ShoppingContext(version: 1),
+    );
+  }
 }

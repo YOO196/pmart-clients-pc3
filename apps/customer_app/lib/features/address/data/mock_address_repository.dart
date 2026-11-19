@@ -156,6 +156,18 @@ base class MockAddressRepository implements AddressRepository {
   }
 
   @override
+  Future<AddressDraft> guestDraft(String guestAddressId) async {
+    await _wait();
+    final json = _guestAddresses[guestAddressId];
+    if (json == null) {
+      throw const ProblemFailure(
+        Problem(status: 404, code: ProblemCode.notFound),
+      );
+    }
+    return draftFromContract(api.Address.fromJson(json));
+  }
+
+  @override
   Future<ShoppingContext> context() async {
     await _wait();
     return contextFromContract(api.ShoppingContext.fromJson(_contextJson()));

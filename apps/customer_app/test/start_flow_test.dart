@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart';
 
+import 'package:customer_app/features/address/data/guest_address_store.dart';
 import 'package:customer_app/features/address/data/mock_address_repository.dart';
 import 'package:customer_app/features/address/domain/address.dart';
 import 'package:customer_app/features/address/data/current_location.dart';
@@ -166,6 +167,50 @@ void main() {
     await t.tap(key('login-kakao'));
     await t.pumpAndSettle();
     expect(key('start-address'), findsOneWidget);
+    // 이 기기에 비회원 배송지가 없으면 묻지 않는다
+    expect(key('start-guest-address'), findsNothing);
+  });
+
+  testWidgets('비회원으로 주소를 넣었던 사람이 로그인하면 그 주소를 저장할지 묻고, 저장하면 바로 홈', (t) async {
+    final secure = MemoryKeyValueStore();
+    await secure.write('pmart.start.welcome', 'at=x');
+    final empty = _EmptyAddressRepository();
+    final guest = await t.runAsync(
+      () => empty.addGuest(
+        const AddressDraft(
+          roadAddress: '부산 부산진구 중앙대로 672',
+          detailAddress: '12층',
+          receiverName: '김피마',
+          receiverPhone: '010-1234-5678',
+          entranceNote: '1층 공동현관',
+        ),
+        key: IdempotencyKey.generate(),
+      ),
+    );
+    final store = GuestAddressStore(secure);
+    await store.add(guest!.addressId);
+    await store.select(guest.addressId);
+
+    await t.pumpWidget(
+      testApp([], address: empty, startGate: true, secure: secure),
+    );
+    await t.pumpAndSettle();
+    await t.tap(key('login-kakao'));
+    await t.pumpAndSettle();
+
+    // 회원 주소록은 비었지만 로그인 전 주소를 먼저 보인다
+    expect(key('start-address'), findsOneWidget);
+    expect(key('start-guest-address'), findsOneWidget);
+    expect(find.text('부산 부산진구 중앙대로 672'), findsOneWidget);
+    await t.tap(key('start-guest-address-save-${guest.addressId}'));
+    await t.pumpAndSettle();
+
+    expect(key('start-address'), findsNothing);
+    final book = await t.runAsync(empty.book);
+    final saved = book!.addresses.single;
+    expect(saved.roadAddress, '부산 부산진구 중앙대로 672');
+    expect(saved.detailAddress, '12층');
+    expect(saved.receiverName, '김피마');
   });
 
   testWidgets('마케팅 거부도 서버 처리 결과로 거부 안내', (t) async {
