@@ -17,6 +17,7 @@ import { DisplayNumber, RiderLabel } from '../../shared/displayNumber';
 import { useDeliveryNumbers, useOrderNumbers, useRiderLabels } from '../../shared/numberLookups';
 import { messages as m } from '../../shared/messages';
 import { isSeoulDate, label, seoulDayEnd, seoulDayStart, text, when } from '../../shared/ops';
+import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { ChipGroup, CodeLabel, DataTable, DetailHeader, FieldList, NextAction, PageHeader, SearchPanel, SearchRow, Section, type Tone } from '../../shared/admin';
 import { EmptyBox, Icon, IdLink, KindChip, ListFoot, Person, SideFields, When, type IconName } from '../lookup/parts';
 
@@ -36,7 +37,9 @@ interface NewComplaint {
 }
 
 /** 다른 화면(라이더 상세·배송)에서 쓰는 목록 — riderId·deliveryId 로 거른 컴플레인. */
-export function RiderComplaintTable({ riderId, deliveryId, complaintType, from, to }: {
+export function RiderComplaintTable({ riderId, deliveryId, complaintType, from, to, preview = false }: {
+  /** 오른쪽 미리보기(2026-11-19 관제 형식) — 컴플레인 목록 화면에서만 */
+  readonly preview?: boolean;
   readonly riderId?: string | undefined;
   readonly deliveryId?: string | undefined;
   readonly complaintType?: ComplaintType | undefined;
@@ -44,6 +47,7 @@ export function RiderComplaintTable({ riderId, deliveryId, complaintType, from, 
   readonly to?: string | undefined;
 }) {
   const api = useApi();
+  const pv = usePreview();
   const filter = { riderId, deliveryId, complaintType, from, to };
   const query = useInfiniteQuery({
     queryKey: ['rider-complaints', 'list', filter],
@@ -102,7 +106,7 @@ export function RiderComplaintTable({ riderId, deliveryId, complaintType, from, 
         </thead>
         <tbody>
           {items.map((c) => (
-            <tr key={c.complaintId} data-testid="complaint-row">
+            <tr key={c.complaintId} data-testid="complaint-row" {...(preview ? pv.row(c.complaintId) : {})}>
               <td>
                 <span className="block">
                   <ComplaintType type={c.complaintType} />
@@ -140,6 +144,30 @@ export function RiderComplaintTable({ riderId, deliveryId, complaintType, from, 
           ))}
         </tbody>
       </DataTable>
+      {preview &&
+        pv.id &&
+        (() => {
+          const c = items.find((x) => x.complaintId === pv.id);
+          return (
+            <PreviewDrawer id={pv.id} ids={items.map((x) => x.complaintId)} onMove={pv.open} onClose={pv.close} title={pv.id} detailTo={`/rider-complaints/${encodeURIComponent(pv.id)}`}>
+              {c ? (
+                <div className="space-y-4" data-testid="complaint-preview">
+                  <ComplaintType type={c.complaintType} />
+                  <PreviewFacts
+                    rows={[
+                      [m.complaints.colRider, <RiderLabel key="r" rider={riders.get(c.riderId)} riderId={c.riderId} failed={riders.failed} />],
+                      [m.complaints.colDelivery, <DisplayNumber key="d" number={deliveries.get(c.deliveryId)} systemId={c.deliveryId} failed={deliveries.failed(c.deliveryId)} />],
+                      [m.complaints.colOrder, c.orderId ? <DisplayNumber key="o" number={orders.get(c.orderId)} systemId={c.orderId} failed={orders.failed(c.orderId)} /> : m.none],
+                      [m.complaints.recordedBy, <Person key="p" id={c.recordedBy} />],
+                      [m.complaints.recordedAt, when(c.recordedAt)],
+                    ]}
+                  />
+                  <p className="text-xs text-base-content/55">{m.preview.moreInDetail2}</p>
+                </div>
+              ) : null}
+            </PreviewDrawer>
+          );
+        })()}
       <ListFoot>
         <span className="text-base-content/55">{m.approvals.shown(items.length, !!query.hasNextPage)}</span>
         {query.isFetchNextPageError && <span className="text-error">{m.complaints.moreFailed}</span>}
@@ -212,6 +240,7 @@ export function RiderComplaintListPage() {
         complaintType={isType(type) ? type : undefined}
         from={isSeoulDate(from) ? from : undefined}
         to={isSeoulDate(to) ? to : undefined}
+        preview
       />
     </section>
   );
