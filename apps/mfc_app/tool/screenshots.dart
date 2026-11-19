@@ -541,6 +541,13 @@ void main() {
       );
     }
 
+    await t.runAsync(
+      () => precacheImage(
+        const AssetImage('assets/images/pick_pda_logo.png'),
+        t.element(find.byKey(const ValueKey('start-logo'))),
+      ),
+    );
+    await t.pumpAndSettle();
     await shot('31-start');
     await t.tap(find.byKey(const ValueKey('start-setup')));
     await shot('32-setup');

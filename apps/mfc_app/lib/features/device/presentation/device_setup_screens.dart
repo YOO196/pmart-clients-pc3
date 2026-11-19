@@ -5,8 +5,8 @@ import 'package:pmart_core/pmart_core.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../router.dart' show afterLoginProvider;
-import '../../../shared/field_widgets.dart' show StepCaption;
 import '../../../shared/menu_tile.dart';
+import '../../../shared/pda_theme.dart';
 import '../../../shared/printer/label_printer.dart';
 import '../../../shared/providers.dart';
 import '../../../shared/scanner/scan_input.dart';
@@ -66,10 +66,10 @@ class DeviceSetupScreen extends ConsumerWidget {
                   onTap: () => context.push('/setup/device'),
                 ),
               ])
-                // 시작 메뉴와 같은 높이(96) — 늘려 채우지 않는다.
+                // 메뉴 칸 높이 96 — 늘려 채우지 않는다.
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: SizedBox(height: StartScreen.tileHeight, child: tile),
+                  child: SizedBox(height: 96, child: tile),
                 ),
             ],
           ),
@@ -80,46 +80,17 @@ class DeviceSetupScreen extends ConsumerWidget {
 }
 
 /// 앱 시작 메뉴(로그인 전, 사용자 2026-11-17) — 로그인 · 기기 설정 · 재고 확인.
-/// 모양은 메인의 업무 고르기 목록과 같다([MenuTile]). 재고 확인은 로그인이 필요해 누르면 로그인 화면 →
-/// 로그인되면 바로 재고 확인으로 간다.
+/// 2026-11-20 사용자 "첫 화면 아래 공간이 많다, 로그인 상자를 키우고 기기 설정·재고 확인은 아래에":
+/// 로그인 = 화면 대부분을 쓰는 큰 보라 상자(로고·이름·설명), 기기 설정·재고 확인 = 아래 나란히 두 칸.
+/// 재고 확인은 로그인이 필요해 누르면 로그인 화면 → 로그인되면 바로 재고 확인으로 간다.
 class StartScreen extends ConsumerWidget {
   const StartScreen({super.key});
-
-  static const tileHeight = 96.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final mock = ref.watch(envProvider) == PmartEnv.mock;
-    final tiles = [
-      MenuTile(
-        key: const ValueKey('start-login'),
-        icon: Icons.login,
-        title: l10n.startLogin,
-        hint: l10n.startLoginHint,
-        onTap: () {
-          ref.read(afterLoginProvider.notifier).set(null);
-          context.push('/login');
-        },
-      ),
-      MenuTile(
-        key: const ValueKey('start-setup'),
-        icon: Icons.settings_outlined,
-        title: l10n.setupTitle,
-        hint: l10n.startSetupHint,
-        onTap: () => context.push('/setup'),
-      ),
-      MenuTile(
-        key: const ValueKey('start-stock'),
-        icon: Icons.manage_search,
-        title: l10n.stockCheckTitle,
-        hint: '${l10n.startStockHint} · ${l10n.startNeedsLogin}',
-        onTap: () {
-          ref.read(afterLoginProvider.notifier).set('/stock-check');
-          context.push('/login');
-        },
-      ),
-    ];
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.homeTitle),
@@ -132,16 +103,162 @@ class StartScreen extends ConsumerWidget {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          children: [
-            StepCaption(l10n.startChoose),
-            const SizedBox(height: 8),
-            for (final tile in tiles)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: SizedBox(height: tileHeight, child: tile),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 로그인 — 큰 보라 상자.
+              Expanded(
+                child: Material(
+                  color: PdaColors.primary,
+                  borderRadius: BorderRadius.circular(20),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    key: const ValueKey('start-login'),
+                    onTap: () {
+                      ref.read(afterLoginProvider.notifier).set(null);
+                      context.push('/login');
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(26),
+                            child: Image.asset(
+                              'assets/images/pick_pda_logo.png',
+                              key: const ValueKey('start-logo'),
+                              width: 104,
+                              height: 104,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.login,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                l10n.startLogin,
+                                style: theme.textTheme.headlineMedium?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            l10n.startLoginHint,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
+              const SizedBox(height: 12),
+              // 기기 설정 · 재고 확인 — 아래 나란히.
+              SizedBox(
+                height: 128,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _StartTile(
+                        key: const ValueKey('start-setup'),
+                        icon: Icons.settings_outlined,
+                        title: l10n.setupTitle,
+                        hint: l10n.startSetupHintShort,
+                        onTap: () => context.push('/setup'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _StartTile(
+                        key: const ValueKey('start-stock'),
+                        icon: Icons.manage_search,
+                        title: l10n.stockCheckTitle,
+                        hint: l10n.startNeedsLogin,
+                        onTap: () {
+                          ref
+                              .read(afterLoginProvider.notifier)
+                              .set('/stock-check');
+                          context.push('/login');
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 시작 화면 아래 칸 — 아이콘 동그라미 + 이름 + 한 줄.
+class _StartTile extends StatelessWidget {
+  const _StartTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.hint,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String hint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: PdaColors.line, width: 1.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: const BoxDecoration(
+                color: PdaColors.softer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: PdaColors.primary, size: 26),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              hint,
+              style: theme.textTheme.bodySmall?.copyWith(color: PdaColors.body),
+            ),
           ],
         ),
       ),

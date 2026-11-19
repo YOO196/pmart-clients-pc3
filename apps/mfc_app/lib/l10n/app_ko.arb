@@ -1177,6 +1177,7 @@
   "startLoginHint": "직원 계정으로 업무 시작",
   "startSetupHint": "프린터 · 스캐너 · 기기 정보",
   "startStockHint": "상품별 칸 · 수량",
+  "startSetupHintShort": "프린터 · 스캐너",
   "startNeedsLogin": "로그인 필요",
   "stockCheckTitle": "재고 확인",
   "stockCheckScanHint": "상품 바코드",
