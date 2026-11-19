@@ -5,6 +5,8 @@
 //   같은 Idempotency-Key 는 같은 결과, 409 = 반납을 기다리는 배송이 아님(이미 끝남). 결과 불명은 같은 키로 다시.
 // - 번호는 화면에만 — 로그·주소·저장소에 남기지 않는다. 라이더는 ID 만 오고 센터 관리자는 라이더 번호를 못 봐(bff 0.15.0 과 같음) ID 끝 + 비공개.
 // - 현장 PDA(mfc_app 반납 인증번호 화면)와 같은 API·같은 번호다.
+// - 아래 "도착한 회수품(반입 대기)": mfc-inbound 0.13.0 `GET /return-arrivals?mfcId=&state=WAITING`(백엔드 요청 clients/mfc-app/2026-11-19-request-return-arrivals —
+//   백오피스는 보기만, 반입은 PDA). 종류·도착 시각·상품 × 수량·라이더 표기, 시스템 ID 없음(ADR-0070).
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -47,6 +49,56 @@ export function ReturnHandoversMenu({ mfcId }: { readonly mfcId: string }) {
           <ul className="grid gap-3 md:grid-cols-2">
             {r.items.map((h) => (
               <HandoverCard key={h.deliveryId} mfcId={mfcId} item={h} />
+            ))}
+          </ul>
+        )}
+      </QueryState>
+      <ArrivalsSection mfcId={mfcId} />
+    </section>
+  );
+}
+
+function ArrivalsSection({ mfcId }: { readonly mfcId: string }) {
+  const api = useApi();
+  const a = m.arrivals;
+  const query = useQuery({
+    queryKey: ['return-arrivals', mfcId],
+    refetchInterval: REFRESH_MS,
+    queryFn: () => request('GET', api.inbound.GET('/return-arrivals', { params: { query: { mfcId, state: 'WAITING' } } })),
+  });
+  return (
+    <section className="space-y-2" data-testid="return-arrivals">
+      <h2 className="text-lg font-semibold">
+        {a.title}
+        {query.data ? <span className="badge badge-neutral ml-2">{a.count(query.data.items.length)}</span> : null}
+      </h2>
+      <p className="text-sm opacity-80">{a.intro}</p>
+      <QueryState state={toUiState(query, (r) => r.items.length === 0)} onRetry={() => void query.refetch()} emptyText={a.empty}>
+        {(r) => (
+          <ul className="grid gap-2 md:grid-cols-2">
+            {r.items.map((x) => (
+              <li key={x.arrivalId} className="rounded-box border border-base-300 p-3" data-testid="return-arrival">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="font-semibold">{m.purpose[x.purpose] ?? m.purposeOther}</span>
+                  <span className="text-sm">{a.arrivedAt(formatSeoul(x.arrivedAt))}</span>
+                </div>
+                <ul className="mt-1 text-sm">
+                  {x.lines.map((l, i) => (
+                    <li key={`${l.sku ?? ''}-${i}`}>{a.line(l.productName ?? l.sku ?? messages.none, l.qty)}</li>
+                  ))}
+                </ul>
+                <p className="mt-1 text-xs">
+                  {`${m.col.rider} `}
+                  {x.riderId ? <RiderLabel riderId={x.riderId} /> : messages.none}
+                </p>
+                {!x.claimId && <p className="mt-1 text-xs text-warning">{a.noClaim}</p>}
+                <SystemNumbers
+                  ids={[
+                    { label: sys.orderId, id: x.orderId },
+                    { label: sys.deliveryId, id: x.originDeliveryId },
+                  ]}
+                />
+              </li>
             ))}
           </ul>
         )}

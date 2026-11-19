@@ -13,7 +13,7 @@ const nameCalls = (sent: readonly Request[]) =>
 describe('라이더 ID 대신 "가린 이름 · 라이더 번호"', () => {
   it('한 화면의 라이더를 모아 한 번에 묻는다(쉼표)', async () => {
     const view = renderAt('/c/MFC-BSN-01/return-handovers');
-    await waitFor(() => expect(screen.getAllByTestId('rider-label').map((e) => e.textContent)).toEqual(['한*우 · 715520', '오*림 · 826631']));
+    await waitFor(() => expect(screen.getAllByTestId('rider-label').slice(0, 2).map((e) => e.textContent)).toEqual(['한*우 · 715520', '오*림 · 826631']));
     const calls = nameCalls(view.sent);
     expect(calls).toHaveLength(1);
     expect(calls[0]!.split(',').sort()).toEqual(['RD-31', 'RD-32']);

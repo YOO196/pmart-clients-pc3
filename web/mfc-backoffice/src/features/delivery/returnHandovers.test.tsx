@@ -37,13 +37,13 @@ describe('반납 인증번호(우리 센터)', () => {
     const cards = await screen.findAllByTestId('return-handover');
     const locked = cards.find((c) => c.textContent?.includes('1357'))!;
 
-    await userEvent.click(within(locked).getByRole('button', { name: '새 번호 내고 잠김 풀기' }));
-    await userEvent.click(within(locked).getByRole('button', { name: '그만두기' }));
+    await userEvent.click(within(locked).getByRole('button', { name: '재발급하고 잠금 해제' }));
+    await userEvent.click(within(locked).getByRole('button', { name: '취소' }));
     expect(reissues(view.sent)).toHaveLength(0);
 
-    await userEvent.click(within(locked).getByRole('button', { name: '새 번호 내고 잠김 풀기' }));
-    expect(within(locked).getByRole('alertdialog')).toHaveTextContent('지금 번호는 더 이상 맞지 않아요');
-    await userEvent.click(within(locked).getByRole('button', { name: '새 번호 내기' }));
+    await userEvent.click(within(locked).getByRole('button', { name: '재발급하고 잠금 해제' }));
+    expect(within(locked).getByRole('alertdialog')).toHaveTextContent('지금 번호는 더 이상 쓸 수 없어요');
+    await userEvent.click(within(locked).getByRole('button', { name: '재발급' }));
     await waitFor(() => expect(reissues(view.sent)).toHaveLength(1));
     const req = reissues(view.sent)[0]!;
     expect(new URL(req.url).pathname).toMatch(/\/return-handovers\/DLV-RET-2\/code-reissues$/);
@@ -54,15 +54,15 @@ describe('반납 인증번호(우리 센터)', () => {
     await waitFor(() => expect(screen.queryByText('1357')).not.toBeInTheDocument());
     const after = (await screen.findAllByTestId('return-handover')).find((c) => c.textContent?.includes('DLV-RET-2'))!;
     expect(within(after).queryByRole('alert')).not.toBeInTheDocument();
-    expect(within(after).getByText(/^새 번호 \d{4} 를 냈어요/)).toBeInTheDocument();
+    expect(within(after).getByText(/^번호 \d{4}을\(를\) 재발급했어요/)).toBeInTheDocument();
   });
 
   it('이미 반납이 끝나 409 면 거절로 보이고, 조회 실패는 빈 목록이 아니다', async () => {
     server.use(http.post(`${API_BASE}/return-handovers/:deliveryId/code-reissues`, () => HttpResponse.json({ type: 'about:blank', title: 'Conflict', status: 409, code: 'INVALID_STATE' }, { status: 409, headers: { 'Content-Type': 'application/problem+json' } })));
     const first = renderAt('/c/MFC-BSN-01/return-handovers');
     const cards = await screen.findAllByTestId('return-handover');
-    await userEvent.click(within(cards[0]!).getByRole('button', { name: /새 번호/ }));
-    await userEvent.click(within(cards[0]!).getByRole('button', { name: '새 번호 내기' }));
+    await userEvent.click(within(cards[0]!).getByRole('button', { name: /번호 재발급|재발급하고/ }));
+    await userEvent.click(within(cards[0]!).getByRole('button', { name: '재발급' }));
     expect(await within(cards[0]!).findByRole('alert')).toBeInTheDocument();
     first.unmount();
 
@@ -70,5 +70,21 @@ describe('반납 인증번호(우리 센터)', () => {
     renderAt('/c/MFC-BSN-01/return-handovers');
     await waitFor(() => expect(screen.queryByText('반납을 기다리는 배송이 없어요')).not.toBeInTheDocument());
     expect(await screen.findByRole('button', { name: /다시/ })).toBeInTheDocument();
+  });
+
+  it('도착한 회수품(반입 대기): 종류·도착 시각·상품 × 수량·라이더 표기 — 이 센터 것만, 시스템 ID 는 시스템 번호 칸에만', async () => {
+    const view = renderAt('/c/MFC-BSN-01/return-handovers');
+    const box = await screen.findByTestId('return-arrivals');
+    const cards = await within(box).findAllByTestId('return-arrival');
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toHaveTextContent('고객 반품 회수');
+    expect(cards[0]).toHaveTextContent('서울우유 1L × 2');
+    await waitFor(() => expect(cards[0]).toHaveTextContent('한*우 · 715520'));
+    // 클레임 없는 반납(오배송 회수)은 환불로 이어지지 않는다는 표시
+    expect(cards[1]).toHaveTextContent('클레임 없음');
+    expect(cards[0]).not.toHaveTextContent('클레임 없음');
+    expect(within(box).queryByText(/DLV-RET|RD-3/)).not.toBeInTheDocument();
+    const q = new URL(view.gets('/return-arrivals')[0]!.url).searchParams;
+    expect([q.get('mfcId'), q.get('state')]).toEqual(['MFC-BSN-01', 'WAITING']);
   });
 });
