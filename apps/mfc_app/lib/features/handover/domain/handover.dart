@@ -47,6 +47,8 @@ class HandoverView {
     this.handoverId,
     this.shipmentId,
     this.orderId,
+    this.orderNumber,
+    this.handoverCode,
     this.packingLocation,
     this.riderId,
     this.lastCheck,
@@ -66,12 +68,35 @@ class HandoverView {
   final bool checkRequired;
   final String? shipmentId;
   final String? orderId;
+
+  /// 화면용 주문번호(fulfillment 0.21.0 `HandoverResolution.orderNumber`, ADR-0070).
+  final String? orderNumber;
+
+  /// 포장 라벨 인계 번호(0.21.0 — 새 포장 4자리, 예전 포장 6자리).
+  final String? handoverCode;
   final String? packingLocation;
   final String? riderId;
   final LastCheckView? lastCheck;
 
   /// `asOf.freshness == CURRENT`.
   final bool fresh;
+}
+
+/// 라이더 화면 표기(rider 0.18.0 `GET /riders/display-names`) — "김*수 · 482913".
+@immutable
+class RiderLabel {
+  const RiderLabel({this.riderNumber, this.nameMasked});
+
+  final String? riderNumber;
+
+  /// 가린 이름(첫·끝 글자). 탈퇴로 지워졌으면 null.
+  final String? nameMasked;
+
+  /// 둘 다 없으면 null(화면은 "라이더").
+  String? get text {
+    final parts = [?nameMasked, ?riderNumber];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
 }
 
 @immutable

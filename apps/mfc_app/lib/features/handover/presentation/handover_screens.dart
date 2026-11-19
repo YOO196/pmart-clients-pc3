@@ -255,85 +255,96 @@ class HandoverChecksScreen extends ConsumerWidget {
             ],
           ),
         ),
-        ready: (context, list) => RefreshIndicator(
-          onRefresh: () => ref.refresh(handoverChecksProvider.future),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text(
-                l10n.handoverChecksIntro,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: PdaColors.body,
-                ),
-              ),
-              if (!list.fresh)
-                ListTile(
-                  key: const ValueKey('checks-stale'),
-                  leading: const Icon(Icons.info_outline),
-                  title: Text(l10n.viewStale),
-                ),
-              const SizedBox(height: 8),
-              for (final h in list.items)
-                Card(
-                  key: ValueKey('check-item-${h.packageId}'),
-                  margin: const EdgeInsets.only(top: 10),
-                  child: Padding(
-                    padding: const EdgeInsets.all(15),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          h.packingLocation == null
-                              ? l10n.hoLocationUnknown
-                              : l10n.hoLocation(h.packingLocation!),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        DefaultTextStyle.merge(
-                          style: const TextStyle(color: PdaColors.body),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                l10n.hoPackage(
-                                  h.packageId,
-                                  '${h.packageVersion ?? '-'}',
-                                ),
-                              ),
-                              if (h.orderId != null)
-                                Text(l10n.hoOrder(h.orderId!)),
-                              Text(l10n.hoRider(h.riderId ?? '-')),
-                            ],
-                          ),
-                        ),
-                        if (h.fenceExpiresAt != null)
-                          NoticeBox(
-                            text: l10n.hoExpiredAt(
-                              formatSeoulTime(h.fenceExpiresAt!),
-                            ),
-                            warning: true,
-                          ),
-                        const SizedBox(height: 8),
-                        HandoverCheckButtons(item: h),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton(
-                            key: ValueKey('open-handover-${h.packageId}'),
-                            onPressed: () => context.push(
-                              '/packages/${h.packageId}/handover',
-                            ),
-                            child: Text(l10n.viewHandover),
-                          ),
-                        ),
-                      ],
-                    ),
+        ready: (context, list) {
+          final riderIds = riderKey(list.items.map((h) => h.riderId));
+          return RefreshIndicator(
+            onRefresh: () => ref.refresh(handoverChecksProvider.future),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Text(
+                  l10n.handoverChecksIntro,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: PdaColors.body,
                   ),
                 ),
-            ],
-          ),
-        ),
+                if (!list.fresh)
+                  ListTile(
+                    key: const ValueKey('checks-stale'),
+                    leading: const Icon(Icons.info_outline),
+                    title: Text(l10n.viewStale),
+                  ),
+                const SizedBox(height: 8),
+                for (final h in list.items)
+                  Card(
+                    key: ValueKey('check-item-${h.packageId}'),
+                    margin: const EdgeInsets.only(top: 10),
+                    child: Padding(
+                      padding: const EdgeInsets.all(15),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            h.packingLocation == null
+                                ? l10n.hoLocationUnknown
+                                : l10n.hoLocation(h.packingLocation!),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          DefaultTextStyle.merge(
+                            style: const TextStyle(color: PdaColors.body),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // 시스템 ID 대신 화면 번호(ADR-0070) — 인계 번호·주문번호·라이더 표기.
+                                Text(
+                                  l10n.hoHandoverCode(
+                                    h.handoverCode ?? l10n.packNoHandoverCode,
+                                  ),
+                                  key: ValueKey('ho-code-${h.packageId}'),
+                                  style: const TextStyle(
+                                    color: PdaColors.ink,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                if (h.orderNumber != null)
+                                  Text(l10n.hoOrder(h.orderNumber!)),
+                                RiderLabelText(
+                                  riderId: h.riderId,
+                                  ids: riderIds,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (h.fenceExpiresAt != null)
+                            NoticeBox(
+                              text: l10n.hoExpiredAt(
+                                formatSeoulTime(h.fenceExpiresAt!),
+                              ),
+                              warning: true,
+                            ),
+                          const SizedBox(height: 8),
+                          HandoverCheckButtons(item: h),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              key: ValueKey('open-handover-${h.packageId}'),
+                              onPressed: () => context.push(
+                                '/packages/${h.packageId}/handover',
+                              ),
+                              child: Text(l10n.viewHandover),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -408,8 +419,13 @@ class PackageHandoverScreen extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      l10n.hoPackage(h.packageId, '${h.packageVersion ?? '-'}'),
-                      style: const TextStyle(color: PdaColors.body),
+                      l10n.hoHandoverCode(
+                        h.handoverCode ?? l10n.packNoHandoverCode,
+                      ),
+                      style: const TextStyle(
+                        color: PdaColors.ink,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                     Text(
                       packageStateText(l10n, h.packageState),
@@ -418,16 +434,27 @@ class PackageHandoverScreen extends ConsumerWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    if (h.orderId != null)
+                    if (h.orderNumber != null)
                       Text(
-                        l10n.hoOrder(h.orderId!),
+                        l10n.hoOrder(h.orderNumber!),
                         style: const TextStyle(color: PdaColors.body),
                       ),
                     if (h.riderId != null)
-                      Text(
-                        l10n.hoRider(h.riderId!),
-                        style: const TextStyle(color: PdaColors.body),
+                      RiderLabelText(
+                        riderId: h.riderId,
+                        ids: riderKey([h.riderId]),
                       ),
+                    // 시스템 번호는 상세에만 작게(문의·대조용).
+                    Text(
+                      l10n.hoSystemNo(
+                        h.packageId,
+                        '${h.packageVersion ?? '-'}',
+                      ),
+                      key: const ValueKey('ho-system-no'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: PdaColors.muted,
+                      ),
+                    ),
                   ],
                 ),
                 _InfoCard(
@@ -574,5 +601,30 @@ class _PackageQrScan extends StatelessWidget {
         return const ScanFeedback.ok();
       },
     );
+  }
+}
+
+/// 허가받은 라이더 한 줄 — "허가받은 라이더: 김*수 · 482913". 모르면 "라이더", 조회 실패면 "라이더(이름 못 읽음)".
+/// 라이더 ID 는 글자로 내지 않는다(ADR-0070).
+class RiderLabelText extends ConsumerWidget {
+  const RiderLabelText({super.key, required this.riderId, required this.ids});
+
+  final String? riderId;
+
+  /// 같은 화면 라이더를 한 번에 묻는 키([riderKey]).
+  final String ids;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final id = riderId;
+    if (id == null) return Text(l10n.hoRider(l10n.riderUnknown));
+    final q = ref.watch(riderLabelsProvider(ids));
+    final text = switch (q) {
+      AsyncData(:final value) => value[id]?.text ?? l10n.riderUnknown,
+      AsyncError() => l10n.riderUnreadable,
+      _ => '…',
+    };
+    return Text(l10n.hoRider(text), key: ValueKey('ho-rider-$id'));
   }
 }

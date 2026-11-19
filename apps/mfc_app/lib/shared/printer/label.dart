@@ -48,7 +48,7 @@ class PackageLabel implements PrintableLabel {
   final String? temperatureZone;
   final int? bagCount;
 
-  /// 라이더가 QR 대신 넣는 6자리(서버 값). 라벨에 가장 크게 찍는다.
+  /// 라이더가 QR 대신 넣는 인계 번호(서버 값, 4자리·예전 6자리). 라벨에 가장 크게 찍는다.
   final String? handoverCode;
 
   /// 화면용 주문번호(미리보기에만 — 라벨 인쇄 항목은 BR-22 전이라 그대로).
@@ -142,7 +142,7 @@ String packageLabelZpl(PackageLabel l) {
     '^PW812',
     '^LL609',
     '^FO30,40^BQN,2,9^FH\\^FDQA,${f(l.qrCode)}^FS',
-    // 인계 숫자(6자리)를 가장 크게 — 라이더가 QR 이 안 읽히면 이 숫자를 넣는다(fulfillment handover-code-authorizations).
+    // 인계 번호(4자리·예전 6자리)를 가장 크게 — 라이더가 QR 이 안 읽히면 이 숫자를 넣는다(fulfillment handover-code-authorizations).
     if (l.handoverCode != null) text(380, 28, 70, l.handoverCode!),
     // 시스템 포장 ID·버전은 작게(인계 숫자가 없으면 예전처럼 위에).
     ...l.handoverCode != null

@@ -3,6 +3,7 @@ import 'package:pmart_api_delivery_tracking/pmart_api_delivery_tracking.dart'
     as trk;
 import 'package:pmart_api_mfc_fulfillment/pmart_api_mfc_fulfillment.dart'
     as api;
+import 'package:pmart_api_rider/pmart_api_rider.dart' as rider;
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart' show sourceSystem;
@@ -26,15 +27,37 @@ abstract interface class HandoverRepository {
 
   /// `GET /deliveries/{id}/eta` 의 픽업 구간.
   Future<PickupEtaView> pickupEta(String deliveryId);
+
+  /// 라이더 화면 표기 묶음 조회(50개까지). 모르는 ID 는 빠진다.
+  Future<Map<String, RiderLabel>> riderLabels(List<String> riderIds);
 }
 
 final class ApiHandoverRepository implements HandoverRepository {
   ApiHandoverRepository(Dio dio)
     : _handovers = api.PmartApiMfcFulfillment(dio: dio).getHandoversApi(),
-      _eta = trk.PmartApiDeliveryTracking(dio: dio).getEtaApi();
+      _eta = trk.PmartApiDeliveryTracking(dio: dio).getEtaApi(),
+      _riders = rider.PmartApiRider(dio: dio).getOperatorApi();
 
   final api.HandoversApi _handovers;
   final trk.EtaApi _eta;
+  final rider.OperatorApi _riders;
+
+  @override
+  Future<Map<String, RiderLabel>> riderLabels(List<String> riderIds) async {
+    if (riderIds.isEmpty) return const {};
+    final res = await pmartGuard(
+      () => _riders.getRiderDisplayNames(riderIds: riderIds.take(50).join(',')),
+    );
+    final items =
+        res.data?.items ?? (throw const ContractViolationFailure('items 없음'));
+    return {
+      for (final i in items)
+        i.riderId: RiderLabel(
+          riderNumber: i.riderNumber,
+          nameMasked: i.nameMasked,
+        ),
+    };
+  }
 
   @override
   Future<HandoverCheckList> toCheck(String mfcId) async {
@@ -143,6 +166,8 @@ HandoverView handoverFromContract(api.HandoverResolution r) => HandoverView(
     _ => FenceState.unknown,
   },
   fenceExpiresAt: r.fence?.expiresAt,
+  orderNumber: r.orderNumber,
+  handoverCode: r.handoverCode,
   handoverId: r.handoverId,
   inventory: switch (r.inventoryApplyStatus?.value) {
     'NOT_REQUESTED' => InventoryApply.notRequested,
