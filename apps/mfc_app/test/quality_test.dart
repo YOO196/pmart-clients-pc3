@@ -314,7 +314,7 @@ void main() {
     expect(find.text('상품 정보: 상온 · 신선 아님'), findsOneWidget);
     expect(find.text('상품 정보: 냉장 · 신선 아님'), findsOneWidget);
     expect(find.text('재판매'), findsOneWidget);
-    expect(find.text('폐기 — 냉장·냉동'), findsOneWidget);
+    expect(find.text('폐기 · 냉장·냉동'), findsOneWidget);
     expect(enabled(t, 'return-submit'), isFalse); // 폐기 사진 필요
 
     await tapKey(t, 'evidence-1');

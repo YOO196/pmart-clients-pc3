@@ -531,7 +531,7 @@ void main() {
     await closeLabel(t);
 
     // 5. 출하대기 랙.
-    expect(find.text('모든 상품 포장 끝'), findsOneWidget);
+    expect(find.text('모든 상품 포장 완료'), findsOneWidget);
     expect(
       t
           .widget<FilledButton>(find.byKey(const ValueKey('finish-packing')))
@@ -666,7 +666,7 @@ void main() {
     await t.pumpAndSettle();
     await closeLabel(t);
 
-    expect(find.text('모든 상품 포장 끝'), findsOneWidget);
+    expect(find.text('모든 상품 포장 완료'), findsOneWidget);
     final s = await t.runAsync(() => packing.shipment('shp-2'));
     final sealed = s!.packages
         .where((p) => p.state == PackageState.sealed)

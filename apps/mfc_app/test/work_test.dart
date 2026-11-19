@@ -216,7 +216,7 @@ void main() {
       await scanTo('pick-loc-scan', loc);
       await scanTo('scan-field', code);
     }
-    expect(find.text('피킹을 다 했어요.\n장바구니를 들고 패킹대로 가요'), findsOneWidget);
+    expect(find.text('피킹을 마쳤어요.\n장바구니를 패킹대로 옮겨 주세요'), findsOneWidget);
     expect(tasks.taskJson('shp-1-PACK')['state'], 'ASSIGNED');
 
     // 패킹대 도착 → 같은 주문의 패킹이 바로 열린다.

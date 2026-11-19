@@ -147,14 +147,14 @@ void main() {
     expect(find.byKey(const ValueKey('step-1')), findsOneWidget);
     expect(find.text('상품을 하나씩 스캔'), findsOneWidget);
     // 수량은 0부터 — 상품을 스캔해 센다. 다른 상품은 세지 않는다.
-    expect(find.text('스캔해 센 수량 0'), findsOneWidget);
+    expect(find.text('스캔 수량 0'), findsOneWidget);
     expect(enabled(t, 'move-submit'), isFalse); // 상품 아직
     await scan(t, 'move-scan', MockTaskRepository.yogurtBarcode);
     expect(find.text('지시한 상품이 아니에요 — 세지 않았어요'), findsWidgets);
     // 첫 개를 스캔하면 수량 칸(피킹과 같게) — 스캔·+·수기, 1 ~ 옮길 양.
     expect(find.byKey(const ValueKey('move-qty')), findsNothing);
     await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
-    expect(find.text('스캔해 센 수량 0'), findsNothing);
+    expect(find.text('스캔 수량 0'), findsNothing);
     String qty() => t.widget<TextField>(find.byKey(const ValueKey('move-qty'))).controller!.text;
     expect(qty(), '1');
     await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
@@ -402,7 +402,7 @@ void main() {
       await tapKey(t, 'count-zero-C-S1-02-2-05|E-00000005|LOT-C-0901');
       await tapKey(t, 'count-next');
 
-      expect(find.text('센 수량을 확인해 주세요'), findsOneWidget);
+      expect(find.text('계수 수량을 확인해 주세요'), findsOneWidget);
       expect(find.byKey(const ValueKey('review-extra-$water')), findsOneWidget);
       await tapKey(t, 'count-submit');
       expect(
