@@ -22,3 +22,20 @@ describe('진행 단계 막대', () => {
     expect(l[4]).toEqual(['gray']); // 전달 완료로 들어오는 선 회색
   });
 });
+
+describe('진행 중 표시(숨쉬기)', () => {
+  it('진행 중이면 지금 단계 하나에만', () => {
+    render(<ProgressSteps steps={STEPS} place={{ step: 3, done: false }} label="주문 진행" testId="p" endedTestId="e" />);
+    const pulses = screen.getAllByTestId('step-pulse');
+    expect(pulses).toHaveLength(1);
+    expect(pulses[0]!.closest('li')).toHaveAttribute('data-step-state', 'now');
+  });
+
+  it('끝까지 끝났거나(완료) 끝나 버렸으면(취소·실패) 움직이지 않는다', () => {
+    const { unmount } = render(<ProgressSteps steps={STEPS} place={{ step: 4, done: true }} label="주문 진행" testId="p" endedTestId="e" />);
+    expect(screen.queryByTestId('step-pulse')).not.toBeInTheDocument();
+    unmount();
+    render(<ProgressSteps steps={STEPS} place={null} ended="취소됨" label="주문 진행" testId="p" endedTestId="e" />);
+    expect(screen.queryByTestId('step-pulse')).not.toBeInTheDocument();
+  });
+});

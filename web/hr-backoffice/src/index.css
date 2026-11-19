@@ -148,3 +148,23 @@ main .rounded-box.border.p-4 > h2:first-child {
     padding-right: calc(26rem + 1.5rem);
   }
 }
+
+/* 진행 중인 단계 숨쉬기(2026-11-19 사용자 "진행 중인 것들에 다") — 지금 단계 동그라미에서만 고리가 2초마다 천천히 퍼진다.
+   끝난·취소·실패 단계에는 없다(그 단계는 'now' 가 아니다). 움직임 줄이기를 켠 사람에게는 보이지 않는다. */
+@keyframes pmart-step-pulse {
+  0% { transform: scale(1); opacity: 0.55; }
+  70%, 100% { transform: scale(1.75); opacity: 0; }
+}
+.step-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .step-pulse { animation: pmart-step-pulse 2s ease-out infinite; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-pulse { display: none; }
+}
