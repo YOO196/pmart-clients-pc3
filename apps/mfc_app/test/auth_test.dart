@@ -819,7 +819,7 @@ void main() {
         ),
       );
       await t.pump();
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byKey(const ValueKey('start-splash')), findsOneWidget);
       expect(find.byKey(const ValueKey('employee-login')), findsNothing);
 
       repo.done.complete(MockAuthRepository.mockSession);
