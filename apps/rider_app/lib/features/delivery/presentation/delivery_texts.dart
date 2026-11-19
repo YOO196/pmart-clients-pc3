@@ -93,7 +93,22 @@ String handoverRejectText(AppLocalizations l10n, String? code) =>
       HandoverProblemCode.deliveryMismatch => l10n.hoMismatch,
       HandoverProblemCode.fenceActive => l10n.hoFenceActive,
       'FORBIDDEN' => l10n.hoForbidden,
+      HandoverProblemCode.handoverCodeMismatch => l10n.labelNumberUnknown,
+      HandoverProblemCode.handoverCodeAmbiguous => l10n.labelNumberAmbiguous,
+      HandoverProblemCode.handoverCodeLocked => l10n.labelNumberLocked,
       _ => l10n.hoRejected,
+    };
+
+/// 라벨 숫자 입력 결과 안내. 허가는 null(진행 상황은 포장 인계 수로 보인다).
+String? labelNumberResultText(AppLocalizations l10n, HandoverStep? step) =>
+    switch (step) {
+      null => l10n.labelNumberFormat,
+      HandoverRejected(:final code, attemptsLeft: final left?)
+          when code == HandoverProblemCode.handoverCodeMismatch =>
+        l10n.labelNumberWrong(left),
+      HandoverRejected(:final code) => handoverRejectText(l10n, code),
+      HandoverUnknown() => l10n.labelNumberNoResult,
+      _ => null,
     };
 
 /// 앱 안 길안내(카카오내비 SDK)를 못 쓴 이유. 코드는 카카오모빌리티 안내 기준.

@@ -64,6 +64,62 @@ Dio _dio(_FakeAdapter a) =>
     Dio(BaseOptions(baseUrl: 'http://fake/api/v1'))..httpClientAdapter = a;
 
 void main() {
+  test('라벨 숫자 인계(mfc-fulfillment handover-code-authorizations): 허가 → 포장 ID·허가, 틀림 → 남은 횟수, 잠김', () async {
+    final ok = _FakeAdapter({
+      'POST /api/v1/packages/handover-code-authorizations': (
+        201,
+        {
+          'handoverAuthorizationId': 'HAU-1',
+          'packageId': 'PKG-1',
+          'deliveryId': 'd1',
+          'riderId': 'r1',
+          'fenceVersion': 2,
+          'state': 'HANDOVER_IN_PROGRESS',
+        },
+      ),
+    });
+    final step = await ApiHandoverRepository(_dio(ok)).authorizeByCode(
+      riderId: 'r1',
+      deliveryId: 'd1',
+      handoverCode: '0427',
+      key: IdempotencyKey('k-code'),
+    );
+    expect(step, isA<HandoverCodeAuthorized>());
+    final a = step as HandoverCodeAuthorized;
+    expect(a.packageId, 'PKG-1');
+    expect(a.authorization.authorizationId, 'HAU-1');
+    expect(a.authorization.fenceVersion, 2);
+
+    Future<HandoverStep> rejected(Map<String, Object?> body) =>
+        ApiHandoverRepository(
+          _dio(
+            _FakeAdapter({
+              'POST /api/v1/packages/handover-code-authorizations': (409, body),
+            }),
+          ),
+        ).authorizeByCode(
+          riderId: 'r1',
+          deliveryId: 'd1',
+          handoverCode: '9999',
+          key: IdempotencyKey('k-bad'),
+        );
+    final wrong = await rejected({
+      'status': 409,
+      'code': 'HANDOVER_CODE_MISMATCH',
+      'details': [
+        {'field': 'attemptsLeft', 'reason': '3'},
+      ],
+    });
+    expect((wrong as HandoverRejected).code, 'HANDOVER_CODE_MISMATCH');
+    expect(wrong.attemptsLeft, 3);
+    final locked = await rejected({
+      'status': 409,
+      'code': 'HANDOVER_CODE_LOCKED',
+    });
+    expect((locked as HandoverRejected).code, 'HANDOVER_CODE_LOCKED');
+    expect(locked.attemptsLeft, isNull);
+  });
+
   test('도움요청 대화: 상담원 ID 없이 "지원센터", 가린 메시지는 본문 없이', () {
     final m = supportMessageFromContract(
       ex.HelpMessage(

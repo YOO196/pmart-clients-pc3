@@ -200,6 +200,15 @@ abstract interface class HandoverRepository {
     required IdempotencyKey key,
   });
 
+  /// 라벨 숫자로 인계 허가(QR 이 안 찍힐 때, `POST /packages/handover-code-authorizations`).
+  /// 허가면 [HandoverCodeAuthorized](어느 포장인지 함께), 틀림·잠김은 [HandoverRejected].
+  Future<HandoverStep> authorizeByCode({
+    required String riderId,
+    required String deliveryId,
+    required String handoverCode,
+    required IdempotencyKey key,
+  });
+
   Future<HandoverResolutionView> resolution(String packageId);
 }
 
@@ -628,6 +637,38 @@ final class ApiHandoverRepository implements HandoverRepository {
     };
   });
 
+  @override
+  Future<HandoverStep> authorizeByCode({
+    required String riderId,
+    required String deliveryId,
+    required String handoverCode,
+    required IdempotencyKey key,
+  }) => _step(() async {
+    final res = await _handovers.authorizeHandoverByCode(
+      idempotencyKey: key.value,
+      xSourceSystem: sourceSystem,
+      authorizeHandoverByCodeRequest: mf.AuthorizeHandoverByCodeRequest(
+        riderId: riderId,
+        deliveryId: deliveryId,
+        handoverCode: handoverCode,
+      ),
+      extra: commandOptions(key).extra,
+    );
+    final a = res.data;
+    if (a?.packageId == null ||
+        a?.handoverAuthorizationId == null ||
+        a?.fenceVersion == null) {
+      return const HandoverUnknown();
+    }
+    return HandoverCodeAuthorized(
+      packageId: a!.packageId!,
+      authorization: HandoverAuthorized(
+        authorizationId: a.handoverAuthorizationId!,
+        fenceVersion: a.fenceVersion!,
+      ),
+    );
+  });
+
   Future<HandoverStep> _step(Future<HandoverStep> Function() call) async {
     try {
       return await pmartGuard(call);
@@ -638,7 +679,14 @@ final class ApiHandoverRepository implements HandoverRepository {
           f.problem.retryable) {
         return const HandoverUnknown();
       }
-      return HandoverRejected(f.problem.code);
+      return HandoverRejected(
+        f.problem.code,
+        attemptsLeft: f.problem.details
+            .where((d) => d.field == PackageLabelNumber.attemptsLeftField)
+            .map((d) => int.tryParse(d.reason ?? ''))
+            .nonNulls
+            .firstOrNull,
+      );
     }
   }
 

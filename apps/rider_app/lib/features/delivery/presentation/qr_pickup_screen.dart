@@ -2,31 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pmart_core/pmart_core.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
-import '../../../shared/providers.dart';
 import '../../../shared/qr_camera.dart';
 import '../../../shared/rider_style.dart';
 import '../../../shared/rider_widgets.dart';
-import '../data/mock_delivery_repository.dart';
 import '../data/trip_repository.dart';
 import '../domain/delivery.dart';
 import 'delivery_controller.dart';
 import 'delivery_texts.dart';
 import '../../../shared/keyboard.dart';
 
-/// 라벨 숫자 → QR 원문. null 이면 숫자 입력을 쓸 수 없다(실서버 — 계약에 아직 없음).
-final labelNumberResolverProvider = Provider<String? Function(String)?>(
-  (ref) => switch (ref.watch(envProvider)) {
-    PmartEnv.mock => MockDeliveryRepository.qrForLabelNumber,
-    PmartEnv.local => null,
-  },
-);
-
 /// QR코드 픽업. 포장마다 스캔하고, 서버가 인계를 확정한 포장만 인계 완료로 센다.
 /// 모든 포장이 확정돼야 픽업 완료를 보낼 수 있다(스캔 ≠ 인계).
-/// 스캔이 안 되면 라벨의 숫자를 직접 입력한다(입력도 스캔과 같은 인계 절차를 탄다).
+/// 스캔이 안 되면 라벨의 숫자(4자리, 옛 포장 6자리)를 직접 입력한다 — 숫자로 허가를 받고(mfc-fulfillment
+/// `handover-code-authorizations`) 확정은 스캔과 같다. 5번 틀리면 숫자 입력이 막힌다(QR·직원 확인).
 class QrPickupScreen extends ConsumerStatefulWidget {
   const QrPickupScreen({super.key, required this.deliveryId});
 
@@ -52,20 +42,20 @@ class _QrPickupScreenState extends ConsumerState<QrPickupScreen> {
     }
   }
 
-  /// 숫자 입력 → QR 원문으로 바꿔 스캔과 같이 처리한다.
+  /// 숫자 입력 → 숫자로 인계 허가·확정. 안내는 아래 칸에 바로 보인다(토스트가 픽업 버튼을 가리지 않게).
   Future<void> _enterNumber(DeliveryView d, String digits) async {
-    final l10n = AppLocalizations.of(context);
-    final resolve = ref.read(labelNumberResolverProvider);
-    final code = resolve?.call(digits);
-    // 안내는 아래 칸에 바로 보인다(토스트가 픽업 버튼을 가리지 않게).
-    setState(
-      () => _numberError = resolve == null
-          ? l10n.labelNumberUnsupported
-          : code == null
-          ? l10n.labelNumberUnknown
-          : null,
-    );
-    if (code != null) await _scan(d, code);
+    if (_scanning) return;
+    _scanning = true;
+    try {
+      final step = await ref
+          .read(deliveryFlowProvider(_id).notifier)
+          .enterCode(d, digits);
+      if (!mounted) return;
+      final l10n = AppLocalizations.of(context);
+      setState(() => _numberError = labelNumberResultText(l10n, step));
+    } finally {
+      _scanning = false;
+    }
   }
 
   Future<void> _openNumberPad(DeliveryView d) async {
@@ -331,7 +321,10 @@ class _NumberFieldState extends State<_NumberField> {
             controller: _input,
             autofocus: widget.autofocus,
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(PackageLabelNumber.maxLength),
+            ],
             textInputAction: TextInputAction.done,
             decoration: InputDecoration(hintText: l10n.labelNumberHint),
             onSubmitted: (_) => _submit(),
