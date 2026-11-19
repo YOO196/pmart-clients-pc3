@@ -127,7 +127,19 @@ class _TaskRunScreenState extends ConsumerState<TaskRunScreen> {
             _ => null,
           };
           if (message == null) {
-            return const Center(child: CircularProgressIndicator());
+            // 시작 판정을 기다리는 동안 — 상세 읽기("불러오는 중")에서 글자 없는 빙글이로 바뀌어 깜빡여 보였다
+            // (에뮬레이터 확인 2026-11-20). 무엇을 기다리는지 글로 보인다.
+            return Center(
+              key: const ValueKey('task-starting'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(l10n.taskStartingWait),
+                ],
+              ),
+            );
           }
           final retry =
               flow.phase == StartPhase.unknown ||
@@ -420,7 +432,22 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
               ),
             );
           }
-          if (stop != null && picking.cart == null) {
+          if (picking.waitingAfter(stop)) {
+            // 방금 보낸 칸 — 서버 확인·새 상세를 받기 전에는 옛 상세가 같은 칸을 가리킨다.
+            body.add(
+              ScanPrompt(
+                key: const ValueKey('pick-sent-wait'),
+                text: l10n.pickSentTitle,
+                detail: l10n.pickSentHelp,
+              ),
+            );
+            body.add(
+              const Padding(
+                padding: EdgeInsets.only(top: 24),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+            );
+          } else if (stop != null && picking.cart == null) {
             // 1. 장바구니 — 주문과 장바구니를 잇는다(업무 문서 §7-6).
             body.add(
               ScanPrompt(

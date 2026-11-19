@@ -134,8 +134,20 @@ class LabelPreviewDialog extends StatelessWidget {
               ),
             ),
             const Divider(),
-            Text(label.packageId, style: theme.textTheme.headlineSmall),
-            Text('v${label.packageVersion}'),
+            // 라이더가 QR 대신 넣는 인계 숫자 — 라벨에서 가장 크게(시스템 포장 ID 는 작게).
+            if (label.handoverCode case final c?)
+              Text(
+                c,
+                key: const ValueKey('label-handover-code'),
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 4,
+                ),
+              ),
+            Text(
+              '${label.packageId} · v${label.packageVersion}',
+              style: theme.textTheme.bodySmall,
+            ),
             if (label.orderId != null) Text(l10n.hoOrder(label.orderId!)),
             if (label.deliveryId != null)
               Text(l10n.labelDelivery(label.deliveryId!)),

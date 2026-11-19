@@ -489,6 +489,16 @@ void main() {
     await t.pumpAndSettle();
     // 밀봉하면 라벨이 바로 나온다(프린터 없음 = 미리보기).
     expect(find.byKey(const ValueKey('label-preview')), findsOneWidget);
+    // 라이더가 QR 대신 넣는 인계 숫자(6자리)가 라벨에 크게 — 서버(목) 값 그대로.
+    final code = (await t.runAsync(() => packing.shipment('shp-2')))!
+        .packages
+        .single
+        .handoverCode;
+    expect(code, matches(RegExp(r'^[0-9]{6}$')));
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('label-handover-code'))).data,
+      code,
+    );
     await closeLabel(t);
     expect(packing.sealedAt['pkg-1'], 'PAK-C-02', reason: '밀봉 본문 포장 위치 = 패킹대');
 
@@ -559,6 +569,33 @@ void main() {
     final s = await t.runAsync(() => packing.shipment('shp-2'));
     expect(s!.dispatchRequest?.trigger, DispatchTrigger.manual);
     expect(s.dispatchRequest?.estimatedPackMinutes, 5);
+  });
+
+  testWidgets('배차 요청 뒤 출고를 다시 읽는 동안 단추가 다시 눌리지 않는다(에뮬레이터 확인)', (t) async {
+    packing = MockPackingRepository(
+      latency: const Duration(milliseconds: 300),
+      onShipmentReady: tasks.shipmentReady,
+    );
+    await openPacking(t);
+    await scanTo(t, 'station-scan', 'PAK-C-01');
+    await scanTo(t, 'pack-cart-scan', 'CRT-C-01');
+    await t.tap(find.byKey(const ValueKey('pack-min-5')));
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('request-dispatch')));
+    for (var i = 0; i < 15; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+      if (find.byKey(const ValueKey('request-dispatch')).evaluate().isEmpty) {
+        break;
+      }
+      expect(
+        enabled(t, 'request-dispatch'),
+        isFalse,
+        reason: '요청 뒤 다시 누를 수 없다',
+      );
+    }
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('pack-scan')), findsOneWidget);
+    expect(packing.dispatchCalls, 1);
   });
 
   Future<void> toBagStep(WidgetTester t) async {

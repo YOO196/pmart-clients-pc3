@@ -480,19 +480,31 @@ class PackingController extends Notifier<PackingState> {
     switch (outcome) {
       case DispatchDone():
         _pendingDispatch = null;
+        // 다음 단계(담기)는 다시 읽은 출고로 정해진다 — 다 읽을 때까지 단추를 막아 둔다. 먼저 풀면 옛 출고로
+        // "배차 요청" 단추가 잠깐 다시 눌릴 수 있게 보였다(에뮬레이터 확인 2026-11-20).
+        await _reloadShipment(shipmentId);
+        if (!ref.mounted) return;
         state = state.copyWith(dispatchBusy: false, dispatchUnknown: false);
-        ref.invalidate(shipmentProvider(shipmentId));
       case DispatchRejected(:final code):
         _pendingDispatch = null;
+        await _reloadShipment(shipmentId);
+        if (!ref.mounted) return;
         state = state.copyWith(
           dispatchBusy: false,
           dispatchUnknown: false,
           dispatchRejectCode: () => code,
         );
-        ref.invalidate(shipmentProvider(shipmentId));
       case DispatchUnknown():
         state = state.copyWith(dispatchBusy: false, dispatchUnknown: true);
     }
+  }
+
+  /// 출고를 다시 읽고 끝날 때까지 기다린다(조회 실패는 화면이 오류로 보인다).
+  Future<void> _reloadShipment(String shipmentId) async {
+    ref.invalidate(shipmentProvider(shipmentId));
+    try {
+      await ref.read(shipmentProvider(shipmentId).future);
+    } catch (_) {}
   }
 
   /// 결과를 모르는 요청을 다시 확인한다(같은 키·같은 분).

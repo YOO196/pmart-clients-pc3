@@ -45,9 +45,14 @@ class PackageView {
     this.bagCount,
     this.temperatureZone,
     this.stagingLocation,
+    this.handoverCode,
   });
 
   final String packageId;
+
+  /// 포장 라벨에 크게 찍는 6자리 숫자(fulfillment 0.13.0 `Package.handoverCode`). 라이더가 QR 대신 이 숫자를
+  /// 넣어 인계받는다. 화면·라벨에서 포장을 가리키는 번호(ADR-0070) — 시스템 포장 ID 대신.
+  final String? handoverCode;
 
   /// 올려 둔 출하대기 랙(fulfillment 0.20.0 `Package.stagingLocation`). null 이면 아직 패킹대.
   final String? stagingLocation;

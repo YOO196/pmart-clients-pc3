@@ -824,4 +824,44 @@ void main() {
 
     expect(find.byKey(const ValueKey('do-not-redo')), findsOneWidget);
   });
+
+  testWidgets('칸 몫을 보낸 뒤 새 상세를 받기 전에는 방금 끝낸 칸을 다시 보이지 않는다(에뮬레이터 확인)', (t) async {
+    t.view
+      ..physicalSize = const Size(800, 2000)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final repo = MockTaskRepository(latency: const Duration(milliseconds: 300));
+    await t.pumpWidget(_app(repo, MemoryKeyValueStore()));
+    await t.pumpAndSettle();
+    await openRoute(t, '/tasks/task-mock-1');
+    await scanTo(t, 'cart-scan', 'CRT-C-01');
+    await scanTo(t, 'pick-loc-scan', 'C-S1-01-1-01');
+    await t.enterText(
+      find.byKey(const ValueKey('scan-field')),
+      MockTaskRepository.yogurtBarcode,
+    );
+    await t.testTextInput.receiveAction(TextInputAction.done);
+
+    // 보내고 다시 읽는 동안(서버 지연) — 매 100ms 마다 옛 칸이 안 보이는지 본다.
+    var sawWait = false;
+    for (var i = 0; i < 20; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+      final loc = find.byKey(const ValueKey('pick-location'));
+      // pick-location 은 칸 코드 글자 자체의 키.
+      if (loc.evaluate().isNotEmpty) {
+        expect(
+          (t.widget<Text>(loc)).data,
+          isNot('C-S1-01-1-01'),
+          reason: '방금 끝낸 칸을 다시 가리키면 안 된다',
+        );
+      }
+      if (find.byKey(const ValueKey('pick-sent-wait')).evaluate().isNotEmpty) {
+        sawWait = true;
+      }
+    }
+    await t.pumpAndSettle();
+    expect(sawWait, isTrue);
+    expect(find.byKey(const ValueKey('pick-sent-wait')), findsNothing);
+    expect(find.text('C-S1-02-2-05'), findsOneWidget, reason: '다음 칸 지시');
+  });
 }
