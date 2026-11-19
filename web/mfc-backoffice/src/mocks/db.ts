@@ -672,8 +672,28 @@ const seedIncidents = (): Array<[string, MockIncident]> => [
   ],
 ];
 
+export interface MockStaffContact {
+  readonly mfcId: string;
+  readonly operatorId: string;
+  readonly name: string | null;
+  readonly phone: string | null;
+  readonly email: string | null;
+  readonly version: number;
+  readonly updatedAt: string | null;
+}
+
+/** 센터 직원 연락처(mfc-capacity 0.21.0) — 목 값 */
+const seedStaffContacts = (): Array<[string, MockStaffContact]> => [
+  ['MFC-BSN-01/OP-wkr-1', { mfcId: 'MFC-BSN-01', operatorId: 'OP-wkr-1', name: null, phone: '010-0000-0201', email: null, version: 1, updatedAt: '2026-11-18T01:00:00.000Z' }],
+  ['MFC-SEL-01/OP-sup-2', { mfcId: 'MFC-SEL-01', operatorId: 'OP-sup-2', name: '센터장 한관리', phone: null, email: 'sel-desk@pmart.test', version: 2, updatedAt: '2026-11-18T02:00:00.000Z' }],
+];
+
 export const db = {
-  incidents: new Map<string, MockIncident>(),  returnHandovers: [] as MockReturnHandover[],  restrictions: new Map<string, MockRestriction>(),
+  /** 키 = `${mfcId}/${operatorId}` */
+  staffContacts: new Map<string, MockStaffContact>(),
+  incidents: new Map<string, MockIncident>(),
+  returnHandovers: [] as MockReturnHandover[],
+  restrictions: new Map<string, MockRestriction>(),
   decisions: new Map<string, MockDecision>(),
   disposals: new Map<string, MockDisposal>(),
   inspections: new Map<string, MockInspection>(),
@@ -710,6 +730,7 @@ export const db = {
 };
 
 export function resetDb(): void {
+  db.staffContacts = new Map(seedStaffContacts());
   db.incidents = new Map(seedIncidents());
   db.returnHandovers = seedReturnHandovers();
   db.grants = new Map(seedGrants());
