@@ -454,7 +454,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                           ),
                         ),
                       ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Wrap(
                       key: const ValueKey('pack-split-progress'),
                       spacing: 8,
@@ -514,7 +514,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                               Padding(
                                 key: ValueKey('pack-line-${l.orderLineId}'),
                                 padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
+                                  vertical: 12,
                                 ),
                                 child: Row(
                                   children: [
@@ -560,7 +560,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                     if (packing.lastScan != null &&
                         packing.lastScan != PackScan.matched)
                       Padding(
-                        padding: const EdgeInsets.only(top: 12),
+                        padding: const EdgeInsets.only(top: 10),
                         child: Text(
                           packScanText(l10n, packing.lastScan!),
                           key: const ValueKey('pack-scan-error'),
@@ -720,7 +720,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                   for (final p in s.packages)
                     Card(
                       key: ValueKey('package-${p.packageId}'),
-                      margin: const EdgeInsets.only(top: 12),
+                      margin: const EdgeInsets.only(top: 10),
                       clipBehavior: Clip.antiAlias,
                       child: InkWell(
                         onTap:
@@ -884,7 +884,7 @@ class _DispatchSectionState extends ConsumerState<DispatchSection> {
 
     final minutes = _minutes;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -924,7 +924,7 @@ class _DispatchSectionState extends ConsumerState<DispatchSection> {
               key: const ValueKey('dispatch-rejected'),
               style: TextStyle(color: theme.colorScheme.error),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           CommandButton(
             key: const ValueKey('request-dispatch'),
             busy: packing.dispatchBusy,
@@ -1006,7 +1006,7 @@ class _OrderCard extends StatelessWidget {
           ),
           if (readyAt case final t?) ...[
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
+              padding: EdgeInsets.symmetric(vertical: 10),
               child: Divider(height: 1, color: PdaColors.lilac),
             ),
             Row(

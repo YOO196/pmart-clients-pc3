@@ -119,7 +119,7 @@ class _MyWorkList extends ConsumerWidget {
       children: [
         if (a.unavailableSources.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.only(bottom: 10),
             child: Text(
               l10n.myWorkPartial(a.unavailableSources.join(', ')),
               key: const ValueKey('my-work-partial'),
@@ -195,7 +195,7 @@ class _MyWorkList extends ConsumerWidget {
         for (final i in a.items)
           Container(
             key: ValueKey('my-work-${i.refId}'),
-            margin: const EdgeInsets.only(bottom: 12),
+            margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
             decoration: BoxDecoration(
               color: Colors.white,

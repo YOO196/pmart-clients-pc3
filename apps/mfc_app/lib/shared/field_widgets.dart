@@ -19,7 +19,7 @@ class StepHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 17),
       child: Row(
         key: ValueKey('step-$current'),
         children: [
@@ -84,7 +84,7 @@ class ScanPrompt extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       // 큰 제목 위아래 숨 쉴 틈(사용자 2026-11-20 "글자는 큰데 위아래 간격이 좁아 답답") — 위 6, 아래 16.
-      padding: const EdgeInsets.only(top: 10, bottom: 20),
+      padding: const EdgeInsets.only(top: 8, bottom: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -130,7 +130,7 @@ class ProgressLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 20),
+    padding: const EdgeInsets.only(bottom: 18),
     child: Row(
       children: [
         Text(
@@ -190,13 +190,13 @@ class ActionBar extends StatelessWidget {
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            padding: const EdgeInsets.fromLTRB(15, 12, 15, 14),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final (i, c) in children.indexed) ...[
-                  if (i > 0) const SizedBox(height: 10),
+                  if (i > 0) const SizedBox(height: 9),
                   c,
                 ],
               ],
@@ -244,7 +244,7 @@ class StepBody extends StatelessWidget {
       Expanded(
         child: Padding(
           // 위아래 여유(사용자 2026-11-20 "전반적으로 위아래 간격을 여유롭게").
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
           child: child,
         ),
       ),
@@ -345,8 +345,8 @@ class NoticeBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    margin: const EdgeInsets.only(top: 14),
-    padding: const EdgeInsets.all(12),
+    margin: const EdgeInsets.only(top: 12),
+    padding: const EdgeInsets.all(11),
     decoration: BoxDecoration(
       color: warning ? PdaColors.warning : PdaColors.notice,
       borderRadius: BorderRadius.circular(8),

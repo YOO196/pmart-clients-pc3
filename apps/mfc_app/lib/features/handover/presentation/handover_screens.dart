@@ -154,7 +154,7 @@ class HandoverCheckButtons extends ConsumerWidget {
       children: [
         if (message != null)
           Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.only(bottom: 10),
             child: Text(
               message,
               key: ValueKey('check-message-$id'),
@@ -284,7 +284,7 @@ class HandoverChecksScreen extends ConsumerWidget {
                     leading: const Icon(Icons.info_outline),
                     title: Text(l10n.viewStale),
                   ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 for (final h in list.items)
                   Card(
                     key: ValueKey('check-item-${h.packageId}'),
@@ -335,7 +335,7 @@ class HandoverChecksScreen extends ConsumerWidget {
                               ),
                               warning: true,
                             ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           HandoverCheckButtons(item: h, riderIds: riderIds),
                           Align(
                             alignment: Alignment.centerRight,
