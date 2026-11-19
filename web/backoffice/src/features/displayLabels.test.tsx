@@ -2,7 +2,11 @@
 // 상세에는 시스템 번호 칸. 그리고 ID 를 넣던 칸은 번호로 넣거나 골라 넣는다(사용자 "배송 번호처럼 입력하는 곳은 전부").
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
+
+import { API_BASE } from '../api/client';
+import { server } from '../test/server';
 
 import { as, renderAt } from '../test/render';
 
@@ -99,5 +103,28 @@ describe('목록 번호는 bff 화면 조회 한 번으로(2026-11-19 백엔드 
     expect(paths.some((p) => p.endsWith('/views/rider-complaints'))).toBe(true);
     expect(paths.some((p) => /\/deliveries\/[^/]+$/.test(p))).toBe(false);
     expect(paths.some((p) => p.endsWith('/riders'))).toBe(false);
+  });
+});
+
+describe('라이더 컴플레인 종류별 수(case 0.26.0)', () => {
+  it('종류마다 칸, 누르면 그 종류로 거르고 강조, 거르기 조건(라이더 등)은 수에도 그대로', async () => {
+    const user = userEvent.setup();
+    const view = renderAt('/rider-complaints?riderId=482913', as.riderOps);
+    const strip = await screen.findByTestId('complaint-counts');
+    await waitFor(() => expect(within(strip).getAllByRole('link').length).toBe(3));
+    await waitFor(() => expect(within(strip).getByTestId('complaint-count-MISDELIVERY')).toHaveTextContent(/\d/));
+    const counts = view.sent.find((r) => new URL(r.url).pathname.endsWith('/rider-complaints/counts'))!;
+    expect(new URL(counts.url).searchParams.get('riderId')).toBe('RID-MOCK-1'); // 번호로 거른 라이더 ID 그대로
+    expect(new URL(counts.url).searchParams.get('complaintType')).toBeNull(); // 종류는 빼고 센다
+    await user.click(within(strip).getByTestId('complaint-count-MISDELIVERY'));
+    expect(await screen.findByTestId('complaint-count-MISDELIVERY')).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('수를 못 읽으면(배포 전 404 등) 칸마다 "?" — 0 으로 보이지 않는다', async () => {
+    server.use(http.get(`${API_BASE}/rider-complaints/counts`, () => HttpResponse.json({ type: 'about:blank', title: 'x', status: 404, code: 'NOT_FOUND', traceId: 't' }, { status: 404, headers: { 'content-type': 'application/problem+json' } })));
+    renderAt('/rider-complaints', as.riderOps);
+    const strip = await screen.findByTestId('complaint-counts');
+    await waitFor(() => expect(within(strip).getByTestId('complaint-count-REPORT')).toHaveTextContent('?'));
+    expect(strip).not.toHaveTextContent(/^0$/);
   });
 });

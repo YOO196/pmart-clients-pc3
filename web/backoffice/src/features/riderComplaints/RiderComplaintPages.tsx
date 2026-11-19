@@ -21,7 +21,7 @@ import { useResolvedRef } from '../../shared/numberLookups';
 import { RefStatus } from '../../shared/RefField';
 import { DeliveryPicker } from '../../shared/DeliveryPicker';
 import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
-import { ChipGroup, CodeLabel, DataTable, DetailHeader, FieldList, NextAction, PageHeader, SearchPanel, SearchRow, Section, type Tone } from '../../shared/admin';
+import { ChipGroup, CodeLabel, DataTable, DetailHeader, FieldList, NextAction, PageHeader, SearchPanel, SearchRow, Section, StatCard, StatStrip, type Tone } from '../../shared/admin';
 import { EmptyBox, Icon, KindChip, ListFoot, Person, SideFields, StaffName, When, type IconName } from '../lookup/parts';
 
 type ComplaintType = components['schemas']['RiderComplaintType'];
@@ -216,6 +216,16 @@ export function RiderComplaintListPage() {
           </Link>
         }
       />
+      {/* 종류별 숫자 띠(case 0.26.0 counts, 2026-11-19) — 지금 거르기(라이더·배송·기간) 그대로, 종류만 빼고 센다. 누르면 그 종류로 */}
+      {!unresolved && (
+        <ComplaintCounts
+          riderId={rider.id ?? undefined}
+          deliveryId={delivery.id ?? undefined}
+          from={isSeoulDate(from) ? from : undefined}
+          to={isSeoulDate(to) ? to : undefined}
+          active={isType(type) ? type : undefined}
+        />
+      )}
       {/* 관리자 형식(2026-11-18): 검색 조건 상자 — 줄마다 왼쪽 항목명 */}
       <SearchPanel
         onSubmit={submit}
@@ -481,5 +491,51 @@ function ComplaintType({ type }: { readonly type: string | null | undefined }) {
     <KindChip tone={TYPE_TONE[type] ?? 'ghost'} icon={TYPE_ICON[type] ?? 'flag'}>
       {label(m.complaints.typeName, type)}
     </KindChip>
+  );
+}
+
+/**
+ * 컴플레인 종류별 수(case 0.26.0 `GET /rider-complaints/counts` — 웹 요청 backend-list-status-counts 회신, 정확한 수).
+ * 모든 종류를 0 까지 서버가 준다. 못 읽으면(배포 전 404·403·503 포함) 칸마다 "?" — 0 으로 보이지 않는다.
+ */
+function ComplaintCounts({ riderId, deliveryId, from, to, active }: { readonly riderId?: string | undefined; readonly deliveryId?: string | undefined; readonly from?: string | undefined; readonly to?: string | undefined; readonly active?: ComplaintType | undefined }) {
+  const api = useApi();
+  const [search] = useSearchParams();
+  const q = useQuery({
+    queryKey: ['rider-complaints', 'counts', { riderId, deliveryId, from, to }],
+    queryFn: () =>
+      request(
+        'GET',
+        api.cases.GET('/rider-complaints/counts', {
+          params: { query: { ...(riderId ? { riderId } : {}), ...(deliveryId ? { deliveryId } : {}), ...(from ? { from: seoulDayStart(from) } : {}), ...(to ? { to: seoulDayEnd(to) } : {}) } },
+        }),
+      ),
+  });
+  const byKey = new Map((q.data?.counts ?? []).map((c) => [c.key, c]));
+  const keys = q.data ? q.data.counts.map((c) => c.key) : TYPES;
+  const hrefOf = (key: string) => {
+    const next = new URLSearchParams(search);
+    next.set('complaintType', key);
+    return `/rider-complaints?${next.toString()}`;
+  };
+  return (
+    <StatStrip label={m.complaints.countsLabel} testId="complaint-counts">
+      {keys.map((key) => {
+        const c = byKey.get(key);
+        const value = c ? `${c.count}${c.capped ? '+' : ''}` : q.isError ? '?' : '…';
+        return (
+          <StatCard
+            key={key}
+            label={label(m.complaints.typeName, key)}
+            value={value}
+            tone={c && c.count > 0 ? 'info' : undefined}
+            to={hrefOf(key)}
+            active={active === key}
+            testId={`complaint-count-${key}`}
+            {...(q.isError ? { hint: m.complaints.countsFailed } : {})}
+          />
+        );
+      })}
+    </StatStrip>
   );
 }

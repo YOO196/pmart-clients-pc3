@@ -683,6 +683,16 @@ export const opsHandlers = [
     const page = cursorPage(all, url);
     return HttpResponse.json({ items: page.items.map(complaintSummary), page: page.page });
   }),
+  // case 0.26.0 종류별 수 — :complaintId 보다 먼저(같은 모양 경로). 모든 종류 0 까지, 정확한 수(capped false)
+  http.get(`${API_BASE}/rider-complaints/counts`, ({ request }) => {
+    const { denied } = allow(request, ...LOOKUP);
+    if (denied) return denied;
+    const q = new URL(request.url).searchParams;
+    const hit = ops.complaints.filter((c) => (!q.get('riderId') || c.riderId === q.get('riderId')) && (!q.get('deliveryId') || c.deliveryId === q.get('deliveryId')) && inRange(c.recordedAt, q.get('from'), q.get('to')));
+    const kinds: readonly string[] = ['REPORT', 'MISDELIVERY', 'DAMAGE']; // case RiderComplaintType
+    const all = [...new Set([...kinds, ...hit.map((c) => c.complaintType)])];
+    return HttpResponse.json({ asOf: new Date().toISOString(), counts: all.map((key) => ({ key, count: hit.filter((c) => c.complaintType === key).length, capped: false })) });
+  }),
   http.get(`${API_BASE}/rider-complaints/:complaintId`, ({ request, params }) => {
     const { denied } = allow(request, ...LOOKUP);
     if (denied) return denied;
