@@ -252,6 +252,9 @@ class DeliveryFlowController extends Notifier<DeliveryFlowState> {
   final _commitKeys = <String, IdempotencyKey>{};
   final _auths = <String, HandoverAuthorized>{};
 
+  /// 라벨 숫자 허가 멱등 키(숫자별) — 결과를 모를 때 같은 숫자를 다시 넣으면 같은 키로 보낸다.
+  final _codeKeys = <String, IdempotencyKey>{};
+
   @override
   DeliveryFlowState build() => const DeliveryFlowState();
 
@@ -334,6 +337,37 @@ class DeliveryFlowController extends Notifier<DeliveryFlowState> {
         return;
     }
     await _commit(pkg);
+  }
+
+  /// 라벨 숫자로 인계(QR 이 안 찍힐 때). 숫자로 허가를 받으면 서버가 찾은 포장을 알게 되고, 확정은 QR 과 같다.
+  /// 반환: 허가 [HandoverCodeAuthorized]·거절 [HandoverRejected](틀림 남은 횟수·잠김)·모름 [HandoverUnknown](같은 숫자로 다시 — 같은 키),
+  /// 형식이 틀리면(4·6자리 숫자가 아님) 서버에 보내지 않고 null.
+  Future<HandoverStep?> enterCode(DeliveryView d, String digits) async {
+    final code = digits.trim();
+    if (!PackageLabelNumber.pattern.hasMatch(code)) return null;
+    state = state.copyWith(lastRejectCode: () => null);
+    final key = _codeKeys[code] ??= IdempotencyKey.generate();
+    HandoverStep step = const HandoverUnknown();
+    for (var i = 0; i < 3 && step is HandoverUnknown; i++) {
+      step = await _handovers.authorizeByCode(
+        riderId: ref.read(currentRiderIdProvider),
+        deliveryId: d.deliveryId,
+        handoverCode: code,
+        key: key,
+      );
+    }
+    if (step is! HandoverUnknown) _codeKeys.remove(code);
+    if (step case HandoverCodeAuthorized(
+      :final packageId,
+      :final authorization,
+    )) {
+      final phase = state.phaseOf(packageId).phase;
+      if (phase == HandoverPhase.handedOver) return step;
+      _auths[packageId] = authorization;
+      _setPhase(packageId, HandoverPhase.authorizing);
+      await _commit(packageId);
+    }
+    return step;
   }
 
   Future<void> _commit(String pkg) async {

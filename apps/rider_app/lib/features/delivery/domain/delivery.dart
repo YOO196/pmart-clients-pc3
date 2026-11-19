@@ -287,9 +287,23 @@ final class HandoverCommitted extends HandoverStep {
 }
 
 final class HandoverRejected extends HandoverStep {
-  const HandoverRejected(this.code);
+  const HandoverRejected(this.code, {this.attemptsLeft});
 
   final String code;
+
+  /// 라벨 숫자가 틀렸을 때 남은 횟수(409 HANDOVER_CODE_MISMATCH details `attemptsLeft`). 없으면 null.
+  final int? attemptsLeft;
+}
+
+/// 라벨 숫자로 받은 인계 허가 — 서버가 숫자로 찾은 포장([packageId])과 그 허가. 확정은 QR 허가와 같다.
+final class HandoverCodeAuthorized extends HandoverStep {
+  const HandoverCodeAuthorized({
+    required this.packageId,
+    required this.authorization,
+  });
+
+  final String packageId;
+  final HandoverAuthorized authorization;
 }
 
 final class HandoverUnknown extends HandoverStep {
@@ -393,6 +407,25 @@ abstract final class HandoverProblemCode {
   static const contactAttemptsRequired = 'CONTACT_ATTEMPTS_REQUIRED';
   static const handoverRiderMismatch = 'HANDOVER_RIDER_MISMATCH';
   static const photoInvalid = 'PHOTO_INVALID';
+
+  /// 409 — 이 배송의 포장 라벨 숫자가 아님(details `attemptsLeft`).
+  static const handoverCodeMismatch = 'HANDOVER_CODE_MISMATCH';
+
+  /// 409 — 같은 숫자의 포장이 여럿(옛 6자리 포장에서만) → QR 로.
+  static const handoverCodeAmbiguous = 'HANDOVER_CODE_AMBIGUOUS';
+
+  /// 409 — 같은 배송에서 5번 틀려 숫자 입력이 막힘(맞는 번호도 거절) → QR·직원 확인.
+  static const handoverCodeLocked = 'HANDOVER_CODE_LOCKED';
+}
+
+/// 포장 라벨 숫자(mfc-fulfillment `handoverCode`). 새 포장은 4자리(0.23.0), 그 전 포장은 6자리.
+abstract final class PackageLabelNumber {
+  static final pattern = RegExp(r'^([0-9]{4}|[0-9]{6})$');
+
+  /// 입력칸 최대 길이(옛 6자리 포장).
+  static const maxLength = 6;
+
+  static const attemptsLeftField = 'attemptsLeft';
 }
 
 /// 도움요청 유형(지원센터 사건으로 이어진다).

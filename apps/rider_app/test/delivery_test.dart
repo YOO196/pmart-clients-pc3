@@ -309,8 +309,14 @@ void main() {
     }
 
     final pickup = find.byKey(const ValueKey('pickup'));
+    // 4·6자리가 아니면 보내지 않는다, 틀리면 남은 횟수(5번이면 잠김 — mfc-fulfillment 0.23.0)
+    await enterNumber('12');
+    expect(find.text('라벨 숫자 4자리를 입력해 주세요'), findsOneWidget);
     await enterNumber('9999');
-    expect(find.text('이 배달의 포장 숫자가 아니에요. 다시 확인해 주세요'), findsOneWidget);
+    expect(
+      find.text('이 배달의 포장 숫자가 아니에요. 4번 더 틀리면 숫자 입력이 막혀요'),
+      findsOneWidget,
+    );
     await enterNumber(MockDeliveryRepository.labelNumbers['pkg-1']!);
     expect(find.text('포장 인계 1 / 2'), findsOneWidget);
     expect(find.byKey(const ValueKey('partial-handover')), findsOneWidget);

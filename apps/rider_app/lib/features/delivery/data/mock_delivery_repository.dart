@@ -129,7 +129,7 @@ base class MockDeliveryRepository
   static String qrFor(String packageId, {int version = 1}) =>
       'PKG:$packageId:$version';
 
-  /// 목 포장 라벨에 QR 과 함께 찍힌 숫자(스캔이 안 될 때 입력). 계약에 아직 없다(백엔드 요청 중).
+  /// 목 포장 라벨에 QR 과 함께 찍힌 숫자(스캔이 안 될 때 입력 — mfc-fulfillment `handoverCode`, 0.23.0 부터 4자리).
   static const labelNumbers = <String, String>{
     'pkg-1': '1001',
     'pkg-2': '1002',
@@ -298,6 +298,60 @@ base class MockDeliveryRepository
     }
     _results[key.value] = step;
     return step;
+  }
+
+  /// 라벨 숫자 틀린 횟수(라이더·배송별) — 서버처럼 5번이면 잠긴다.
+  final _codeFailures = <String, int>{};
+
+  /// 서버와 같은 규칙: 이 배송의 포장 숫자면 그 포장을 QR 로 찍은 것과 같은 허가, 아니면 409 HANDOVER_CODE_MISMATCH(남은 횟수),
+  /// 5번 틀리면 HANDOVER_CODE_LOCKED(맞는 숫자도 거절).
+  @override
+  Future<HandoverStep> authorizeByCode({
+    required String riderId,
+    required String deliveryId,
+    required String handoverCode,
+    required IdempotencyKey key,
+  }) async {
+    final previous = _results[key.value];
+    if (previous != null) return previous;
+    final who = '$riderId/$deliveryId';
+    const max = 5;
+    if ((_codeFailures[who] ?? 0) >= max) {
+      await _wait();
+      return const HandoverRejected(HandoverProblemCode.handoverCodeLocked);
+    }
+    final pkg = labelNumbers.entries
+        .where((e) => e.value == handoverCode.trim())
+        .firstOrNull
+        ?.key;
+    final mine =
+        (_deliveries[deliveryId]?['packageIds'] as List?)?.contains(pkg) ??
+        false;
+    if (pkg == null || !mine) {
+      await _wait();
+      final n = (_codeFailures[who] ?? 0) + 1;
+      _codeFailures[who] = n;
+      final HandoverStep step = n >= max
+          ? const HandoverRejected(HandoverProblemCode.handoverCodeLocked)
+          : HandoverRejected(
+              HandoverProblemCode.handoverCodeMismatch,
+              attemptsLeft: max - n,
+            );
+      _results[key.value] = step;
+      return step;
+    }
+    final step = await authorize(
+      pkg,
+      riderId: riderId,
+      deliveryId: deliveryId,
+      scannedCode: qrFor(pkg),
+      key: key,
+    );
+    final HandoverStep out = step is HandoverAuthorized
+        ? HandoverCodeAuthorized(packageId: pkg, authorization: step)
+        : step;
+    _results[key.value] = out;
+    return out;
   }
 
   @override
