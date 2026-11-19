@@ -40,6 +40,9 @@ base class MockHandoverRepository implements HandoverRepository {
     'rider-mock-1': RiderLabel(riderNumber: '482913', nameMasked: '김*수'),
     'rider-mock-2': RiderLabel(riderNumber: '503217', nameMasked: '박*민'),
     'rider-mock-3': RiderLabel(riderNumber: '611045'),
+    // 반납 인증번호 목(return_handover)의 라이더.
+    'r-7': RiderLabel(riderNumber: '482913', nameMasked: '김*수'),
+    'r-9': RiderLabel(riderNumber: '377102', nameMasked: '이*진'),
   };
 
   /// 라이더 표기 조회를 실패시킨다.
@@ -51,10 +54,7 @@ base class MockHandoverRepository implements HandoverRepository {
     if (failRiderLabels) {
       throw const ProblemFailure(Problem(status: 503, code: 'UNAVAILABLE'));
     }
-    return {
-      for (final id in riderIds)
-        id: ?riderNames[id],
-    };
+    return {for (final id in riderIds) id: ?riderNames[id]};
   }
 
   static const _asOf = {

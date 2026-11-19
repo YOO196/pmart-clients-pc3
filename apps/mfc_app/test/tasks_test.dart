@@ -165,6 +165,38 @@ void main() {
       );
     });
 
+    test('결품 사유는 본문에 그대로 — 변질은 SPOILED(0.22.0), 결품(SHORT)로 바뀌지 않는다', () {
+      for (final (r, wire) in [
+        (ShortageReason.short, 'SHORT'),
+        (ShortageReason.damaged, 'DAMAGED'),
+        (ShortageReason.spoiled, 'SPOILED'),
+        (ShortageReason.blocked, 'BLOCKED'),
+      ]) {
+        final body = executionRequestFromPayload(
+          pickPayload(
+            workerId: 'w',
+            assignmentVersion: 1,
+            line: const TaskLineView(
+              taskLineId: 'tl',
+              orderLineId: 'ol-1',
+              sku: 'E-00000001',
+              plannedQty: 1,
+              completedQty: 0,
+              cancelledQty: 0,
+              remainingQty: 1,
+            ),
+            pickedQty: 0,
+            shortage: (qty: 1, reason: r, note: null),
+          ),
+        );
+        expect(
+          body.lines.single.shortage?.toJson()['reason'],
+          wire,
+          reason: r.name,
+        );
+      }
+    });
+
     test('실행 전송: 연결 불가는 전송 대기, 응답 없음은 확인 중, 본문에 배정 버전', () async {
       final item = QueueItem(
         id: 'k-9',
@@ -825,7 +857,9 @@ void main() {
     expect(find.byKey(const ValueKey('do-not-redo')), findsOneWidget);
   });
 
-  testWidgets('칸 몫을 보낸 뒤 새 상세를 받기 전에는 방금 끝낸 칸을 다시 보이지 않는다(에뮬레이터 확인)', (t) async {
+  testWidgets('칸 몫을 보낸 뒤 새 상세를 받기 전에는 방금 끝낸 칸을 다시 보이지 않는다(에뮬레이터 확인)', (
+    t,
+  ) async {
     t.view
       ..physicalSize = const Size(800, 2000)
       ..devicePixelRatio = 1;
