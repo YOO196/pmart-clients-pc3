@@ -69,7 +69,7 @@ class DeviceSetupScreen extends ConsumerWidget {
               ])
                 // 메뉴 칸 높이 96 — 늘려 채우지 않는다.
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: 10),
                   child: SizedBox(height: 96, child: tile),
                 ),
             ],
@@ -256,7 +256,7 @@ class _StartTile extends StatelessWidget {
               ),
               child: Icon(icon, color: PdaColors.primary, size: 26),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               title,
               style: theme.textTheme.titleMedium?.copyWith(
@@ -428,7 +428,7 @@ class DeviceInfoScreen extends ConsumerWidget {
             label,
             style: theme.textTheme.labelLarge?.copyWith(color: PdaColors.body),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 5),
           value,
         ],
       ),
