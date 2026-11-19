@@ -188,6 +188,46 @@ class ActionBar extends StatelessWidget {
   }
 }
 
+/// 단계 화면 몸통 — 위 내용(좌우 16) + 아래 고정 버튼 칸([ActionBar]).
+/// [child] 는 남은 높이를 다 받는다(안에서 `Expanded` 목록을 써도 된다).
+class StepBody extends StatelessWidget {
+  const StepBody({super.key, required this.child, this.actions = const []});
+
+  final Widget child;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Expanded(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: child,
+        ),
+      ),
+      ActionBar(children: actions),
+    ],
+  );
+}
+
+/// 작은 회색 머리줄(예 "상품 2 / 7", "칸 1 / 3").
+class StepCaption extends StatelessWidget {
+  const StepCaption(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 2),
+    child: Text(
+      text,
+      style: Theme.of(context).textTheme.labelLarge
+          ?.copyWith(color: PdaColors.muted, fontWeight: FontWeight.w800),
+    ),
+  );
+}
+
 /// 끝 표시(시안 complete) — 옅은 보라 원 안의 ✓ + 큰 제목 + 설명.
 class DoneMark extends StatelessWidget {
   const DoneMark({
@@ -398,7 +438,7 @@ class _TaskDoneViewState extends State<TaskDoneView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Spacer(),
-        const _MarkCircle(icon: Icons.check),
+        const MarkCircle(icon: Icons.check),
         const SizedBox(height: 12),
         Text(
           widget.title,
@@ -505,7 +545,7 @@ class ResultView extends StatelessWidget {
       if (busy)
         const Center(child: CircularProgressIndicator())
       else
-        _MarkCircle(icon: icon == Icons.check_circle ? Icons.check : icon),
+        MarkCircle(icon: icon == Icons.check_circle ? Icons.check : icon),
       const SizedBox(height: 16),
       Text(
         text,
@@ -795,8 +835,8 @@ class _CountQtyFieldState extends State<CountQtyField> {
 }
 
 /// 옅은 보라 원 안의 그림(시안 complete 의 ✓).
-class _MarkCircle extends StatelessWidget {
-  const _MarkCircle({required this.icon});
+class MarkCircle extends StatelessWidget {
+  const MarkCircle({super.key, required this.icon});
 
   final IconData icon;
 
