@@ -163,7 +163,7 @@ describe('메뉴', () => {
     await screen.findByRole('heading', { name: '오늘 센터 현황' });
     // 묶음 제목(홈은 제목 없이 맨 위)
     const menu = screen.getByRole('navigation', { name: '메뉴' });
-    for (const group of ['작업자 관리', '작업', '배송', '재고·품질', '센터']) expect(within(menu).getByText(group, { selector: 'p' })).toBeInTheDocument();
+    for (const group of ['작업자 관리', '작업', '배송', '재고·품질', '센터']) expect(within(menu).getByText(group, { selector: '[data-group-label]' })).toBeInTheDocument();
     expect(allMenus).toHaveLength(14);
     for (const label of ['홈', '작업자', '배정', '작업 현황', '이동·보충', '입고', '재고', '품질', '위치(칸)', '운영 제한', '포장 인계', '배송 현황', '배차 실패', '반납 인증번호']) {
       expect(screen.getByRole('link', { name: label }).getAttribute('href')).toMatch(/^\/c\/MFC-BSN-01\//);
