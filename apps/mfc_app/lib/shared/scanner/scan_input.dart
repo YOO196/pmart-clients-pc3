@@ -247,7 +247,8 @@ class _ScanButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.barcode_reader, size: 30, color: Colors.white),
+              // 스캐너(총) 그림 대신 바코드 그림(사용자 2026-11-20).
+              const BarcodeIcon(size: 30, color: Colors.white),
               const SizedBox(width: 12),
               Flexible(
                 child: Text(
@@ -268,4 +269,50 @@ class _ScanButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 바코드 그림(세로 막대) — Material 아이콘에 맨 바코드가 없어 직접 그린다. 크기를 키워도 선이 또렷하다.
+class BarcodeIcon extends StatelessWidget {
+  const BarcodeIcon({super.key, this.size = 24, this.color});
+
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: size,
+    height: size,
+    child: CustomPaint(
+      painter: _BarcodePainter(
+        color ?? IconTheme.of(context).color ?? Colors.black,
+      ),
+    ),
+  );
+}
+
+class _BarcodePainter extends CustomPainter {
+  _BarcodePainter(this.color);
+
+  final Color color;
+
+  /// 막대·틈 폭(단위) — 막대, 틈, 막대, 틈 … (실제 바코드처럼 굵기가 섞이게).
+  static const _pattern = [2, 1, 1, 1, 3, 1, 1, 2, 2, 1, 1, 1, 3, 1, 1, 1, 2];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final total = _pattern.fold(0, (a, b) => a + b);
+    final unit = size.width * 0.9 / total;
+    final top = size.height * 0.18, bottom = size.height * 0.82;
+    final paint = Paint()..color = color;
+    var x = size.width * 0.05;
+    for (final (i, w) in _pattern.indexed) {
+      if (i.isEven) {
+        canvas.drawRect(Rect.fromLTRB(x, top, x + w * unit, bottom), paint);
+      }
+      x += w * unit;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BarcodePainter old) => old.color != color;
 }
