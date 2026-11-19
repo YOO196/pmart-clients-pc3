@@ -157,7 +157,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           transitionDuration: const Duration(milliseconds: 380),
           reverseTransitionDuration: const Duration(milliseconds: 300),
           transitionsBuilder: (_, animation, _, child) => FadeTransition(
-            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            opacity: CurvedAnimation(
+              parent: animation,
+              // 앞 절반에 바탕을 다 덮어 겹쳐 보이지 않게 — 뒤 절반은 칸이 커지는 것만 보인다.
+              curve: const Interval(0, 0.45, curve: Curves.easeOut),
+            ),
             child: child,
           ),
           child: WorkGuideScreen(
