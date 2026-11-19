@@ -169,7 +169,7 @@ class _ReturnCard extends ConsumerWidget {
               l10n.rhDelivery(item.deliveryNumber ?? id),
               style: const TextStyle(color: PdaColors.body),
             ),
-            // 라이더 ID 대신 "김*수 · 482913"(rider 0.18.0, ADR-0070). 모르면 "라이더", 실패면 "라이더(이름 못 읽음)".
+            // 라이더 ID 대신 "김*수 · 482913"(rider 0.18.0, ADR-0070). 모르면 "라이더", 실패면 "라이더 조회 실패".
             Text(
               l10n.rhRider(riderDisplayText(l10n, ref, item.riderId, riderIds)),
               key: ValueKey('rh-rider-$id'),

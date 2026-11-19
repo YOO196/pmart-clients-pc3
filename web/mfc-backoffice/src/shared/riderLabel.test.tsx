@@ -20,10 +20,10 @@ describe('라이더 ID 대신 "가린 이름 · 라이더 번호"', () => {
     expect(screen.queryByText(/RD-3/)).not.toBeInTheDocument();
   });
 
-  it('조회 실패는 "라이더(이름 못 읽음)" — ID 를 대신 보이지 않는다', async () => {
+  it('조회 실패는 "라이더 조회 실패" — ID 를 대신 보이지 않는다', async () => {
     server.use(http.get(`${API_BASE}/riders/display-names`, () => new HttpResponse(null, { status: 503 })));
     renderAt('/c/MFC-BSN-01/return-handovers');
-    await waitFor(() => expect(screen.getAllByTestId('rider-label')[0]).toHaveTextContent('라이더(이름 못 읽음)'));
+    await waitFor(() => expect(screen.getAllByTestId('rider-label')[0]).toHaveTextContent('라이더 조회 실패'));
     expect(screen.queryByText(/RD-3/)).not.toBeInTheDocument();
   });
 });

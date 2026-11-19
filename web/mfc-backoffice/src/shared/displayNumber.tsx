@@ -4,7 +4,7 @@
 // - 화면 번호가 null(옛 기록·번호 전 주문)이면 "번호 없음"만(ADR-0070 덧붙임 2026-11-19 — 끝 8자리도 쓰지 않는다). 번호를 화면에서 만들지 않는다.
 // - 라이더: bff 가 번호를 주면 그대로. 없으면(센터 관리자는 bff 가 null — 0.15.0) rider 0.18.0 `GET /riders/display-names`(RS-MFC,
 //   MFC_SUPERVISOR 허용 — 회신 clients/mfc-backoffice/2026-11-20-reply-rider-display-names)를 한 화면 모아 묻는다.
-//   모르는 ID "라이더", 조회 실패 "라이더(이름 못 읽음)", 탈퇴로 이름이 지워졌으면 번호만. 라이더 ID 는 글자로 내지 않는다(title 에만).
+//   모르는 ID "라이더", 조회 실패 "라이더 조회 실패", 탈퇴로 이름이 지워졌으면 번호만. 라이더 ID 는 글자로 내지 않는다(title 에만).
 import { useQuery } from '@tanstack/react-query';
 
 import type { components } from '../api/generated/backoffice-bff';
