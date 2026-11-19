@@ -25,9 +25,14 @@ final class _Source implements LocationSource {
 final class _Background implements BackgroundLocation {
   final calls = <String>[];
 
+  /// 위치 권한이 있는지(없으면 서비스가 못 켜져 false)
+  bool permitted = true;
+
   @override
-  Future<void> start(LocationNotice notice) async =>
-      calls.add('start:${notice.title}');
+  Future<bool> start(LocationNotice notice) async {
+    calls.add('start:${notice.title}');
+    return permitted;
+  }
 
   @override
   Future<void> syncToken() async => calls.add('token');
@@ -97,5 +102,25 @@ void main() {
     c.read(locationReporterProvider.notifier).setActive(true, notice: notice);
     await Future<void>.delayed(Duration.zero);
     expect(source.notices, [notice]);
+  });
+
+  test('위치 권한 없이 운행이 켜지면 서비스를 못 켜고, 권한을 받은 뒤 retryAfterPermission 이 다시 켠다(가입 직후 앱 꺼짐, 2026-11-19)', () async {
+    final source = _Source();
+    final bg = _Background()..permitted = false;
+    final c = container(source, bg);
+    final reporter = c.read(locationReporterProvider.notifier)
+      ..setActive(true, notice: notice);
+    await Future<void>.delayed(Duration.zero);
+    expect(bg.calls, ['start:운행 중']);
+
+    bg.permitted = true;
+    reporter.retryAfterPermission();
+    await Future<void>.delayed(Duration.zero);
+    expect(bg.calls, ['start:운행 중', 'stop', 'start:운행 중']);
+
+    // 이미 켜졌으면 다시 켜지 않는다(앱으로 돌아올 때마다 부름)
+    reporter.retryAfterPermission();
+    await Future<void>.delayed(Duration.zero);
+    expect(bg.calls, hasLength(3));
   });
 }

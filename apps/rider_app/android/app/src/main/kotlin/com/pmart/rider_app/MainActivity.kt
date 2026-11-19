@@ -119,6 +119,12 @@ class MainActivity : FlutterActivity() {
                 try {
                     when (call.method) {
                         "start" -> {
+                            // 위치 권한 없이 위치 포그라운드 서비스를 켜면 Android 14+ 가 SecurityException 으로 앱을 종료한다
+                            // (가입 직후 권한을 묻는 동안 앱이 꺼지던 원인, 2026-11-19). 권한이 생기면 Dart 가 다시 부른다.
+                            if (!hasLocationPermission()) {
+                                result.success(false)
+                                return@setMethodCallHandler
+                            }
                             service.action = RiderLocationService.ACTION_START
                             for (k in listOf(
                                 RiderLocationService.EXTRA_BASE_URL,
@@ -189,6 +195,10 @@ class MainActivity : FlutterActivity() {
                 startActivityForResult(intent, NAVI_REQUEST_CODE)
             }
     }
+
+    private fun hasLocationPermission(): Boolean =
+        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
     private fun isBatteryExempt(): Boolean {
         val power = getSystemService(PowerManager::class.java) ?: return false
