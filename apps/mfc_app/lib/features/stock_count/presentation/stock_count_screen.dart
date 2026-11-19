@@ -106,7 +106,7 @@ class CountScreen extends ConsumerWidget {
             ),
             if (s.wrongPlace)
               Padding(
-                padding: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.only(top: 12),
                 child: Text(
                   l10n.moveWrongPlace,
                   key: const ValueKey('count-wrong-place'),
@@ -114,7 +114,7 @@ class CountScreen extends ConsumerWidget {
                 ),
               ),
             NoticeBox(text: l10n.countBlindHelp),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerLeft,
               child: IssueButton(
@@ -291,7 +291,7 @@ class CountScreen extends ConsumerWidget {
                       ),
                     if (extras.isNotEmpty) ...[
                       Padding(
-                        padding: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.only(top: 12),
                         child: Text(
                           l10n.countExtrasTitle,
                           style: theme.textTheme.titleMedium,
