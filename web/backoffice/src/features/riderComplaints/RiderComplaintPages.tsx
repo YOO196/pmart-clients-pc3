@@ -20,6 +20,7 @@ import { isSeoulDate, label, seoulDayEnd, seoulDayStart, text, when } from '../.
 import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { useResolvedRef } from '../../shared/numberLookups';
 import { RefStatus } from '../../shared/RefField';
+import { DeliveryPicker } from '../../shared/DeliveryPicker';
 import { ChipGroup, CodeLabel, DataTable, DetailHeader, FieldList, NextAction, PageHeader, SearchPanel, SearchRow, Section, type Tone } from '../../shared/admin';
 import { EmptyBox, Icon, IdLink, KindChip, ListFoot, Person, SideFields, When, type IconName } from '../lookup/parts';
 
@@ -278,13 +279,15 @@ export function NewRiderComplaintPage() {
   });
 
   const locked = record.busy || record.phase.kind === 'done';
-  const ready = form.deliveryId.trim() !== '' && form.complaintType !== '';
+  // 배송 번호(74939255-1)로도 — 찾은 배송 ID 로 보낸다(2026-11-19)
+  const delivery = useResolvedRef('delivery', form.deliveryId);
+  const ready = delivery.id !== null && form.complaintType !== '';
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!ready || locked || form.complaintType === '') return;
     setBaseline(JSON.stringify(form));
     void record.run({
-      deliveryId: form.deliveryId.trim(),
+      deliveryId: delivery.id ?? '',
       complaintType: form.complaintType,
       ...(form.orderId.trim() ? { orderId: form.orderId.trim() } : {}),
       ...(form.inquiryId.trim() ? { inquiryId: form.inquiryId.trim() } : {}),
@@ -307,8 +310,10 @@ export function NewRiderComplaintPage() {
           <LeaveGuard when={dirty} />
           <label className="block space-y-1 text-sm">
             <span className="font-medium">{m.complaints.deliveryId}</span>
-            <input className="input input-sm w-full font-mono" required maxLength={64} {...field('deliveryId')} />
+            <input className="input input-sm w-full font-mono" required maxLength={64} placeholder={m.refField.deliveryHint} {...field('deliveryId')} />
+            <RefStatus r={delivery} kind="delivery" />
           </label>
+          {!locked && <DeliveryPicker onPick={(v) => setForm((f) => ({ ...f, deliveryId: v }))} />}
           <fieldset className="space-y-2 text-sm" disabled={locked}>
             <legend className="mb-2 font-medium">{m.complaints.type}</legend>
             <div className="grid gap-2 sm:grid-cols-3">

@@ -42,6 +42,8 @@ import { SourceStamps } from '../../shared/SourceStamps';
 import { DisplayNumber, RiderLabel, riderSourceFailed } from '../../shared/displayNumber';
 import { useResolvedRef } from '../../shared/numberLookups';
 import { RefStatus } from '../../shared/RefField';
+import { DeliveryStartActions } from '../../shared/StartActions';
+import { DeliveryPicker } from '../../shared/DeliveryPicker';
 import { canSeeIntakes, CsIntakeLog } from '../csIntakes/CsIntakePages';
 import { CaseNotes } from './CaseNotes';
 import { ActionRequests } from './ActionRequests';
@@ -1044,6 +1046,15 @@ export function CaseDetailPage() {
                         <span className="text-sm [&_.flex]:flex-col [&_.flex]:gap-y-1">
                           <Refs c={c} />
                         </span>
+                        {/* 원래 배송으로 바로 시작(2026-11-19 — 번호를 옮겨 적지 않는다). 이미 오배송 접수 건이면 오배송 단추는 뺀다 */}
+                        {(() => {
+                          const dl = (c.refs ?? []).find((r) => r.refType === 'deliveryId')?.refId;
+                          return dl ? (
+                            <span className="mt-2 block">
+                              <DeliveryStartActions deliveryId={dl} size="xs" noMisdelivery={c.kind === 'MISDELIVERY'} />
+                            </span>
+                          ) : null;
+                        })()}
                       </Prop>
                     </dl>
                     {!closed && (
@@ -1239,6 +1250,8 @@ export function NewMisdeliveryPage() {
               <input className="input input-sm w-64 font-mono" placeholder={m.refField.deliveryHint} value={deliveryId} onChange={(e) => setDeliveryId(e.target.value)} />
               <RefStatus r={delivery} kind="delivery" />
             </label>
+            {/* 번호를 몰라도 — 최근 본 배송·고객 연락처·라이더 전화로 찾아 고르기(2026-11-19) */}
+            <DeliveryPicker onPick={setDeliveryId} />
             <label className="flex flex-col gap-1">
               {m.cases.summary}
               <textarea className="textarea textarea-sm w-full" rows={3} maxLength={1000} value={summary} onChange={(e) => setSummary(e.target.value)} />
