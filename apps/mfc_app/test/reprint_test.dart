@@ -138,7 +138,7 @@ void main() {
     );
     await t.tap(find.byKey(const ValueKey('p-reprint')));
     await t.pumpAndSettle();
-    expect(find.text('다시 뽑을 수 없어요'), findsOneWidget);
+    expect(find.text('다시 출력할 수 없어요'), findsOneWidget);
     expect(find.byKey(const ValueKey('reprint-yes')), findsNothing);
   });
 }
