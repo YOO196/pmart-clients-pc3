@@ -1282,5 +1282,16 @@
   "packScanRackBtn": "랙 바코드 스캔",
   "otherWork": "기타 업무",
   "featuredPickPack": "상품 피킹부터 포장·출하대기까지",
-  "startWork": "업무 시작 ›"
+  "startWork": "업무 시작 ›",
+  "inboundArrivalTitle": "송장을 스캔하세요",
+  "boxCheckTitle": "박스를 하나씩 스캔하세요",
+  "boxInspectTitle": "박스를 열어 낱개를 세세요",
+  "inspectLocTitle": "검사 위치로 이동해 주세요",
+  "inspectProductTitle": "상품 바코드를 스캔하세요",
+  "inspectJudgeTitle": "기준대로 판정하세요",
+  "countGoTitle": "이 칸으로 이동해 주세요",
+  "countCountTitle": "칸의 상품을 세어 주세요",
+  "returnInspectTitle": "회수품 상태를 확인하세요",
+  "scanItemBtn": "상품 스캔",
+  "scanLocationBtn": "위치 바코드 스캔"
 }
