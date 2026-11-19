@@ -34,6 +34,9 @@ describe('칸 목록', () => {
     const view = renderAt('/c/MFC-BSN-01/locations?state=CLOSED');
     await waitFor(() => expect(codes()).toEqual(['F-S2-02-1-03', 'QRT-A-01']));
     expect(new URL(view.gets('/locations').at(-1)!.url).searchParams.get('state')).toBe('CLOSED');
+    // 조건을 건 목록은 검색 조건이 칩 한 줄로 접혀 있다 — 칩에 지금 조건, "검색 열기"로 펼친다
+    expect(screen.getAllByTestId('search-chip').map((c) => c.textContent)).toContain('상태닫힘▾');
+    await userEvent.click(screen.getByTestId('search-toggle'));
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '온도대' }), 'FROZEN');
     await waitFor(() => expect(codes()).toEqual(['F-S2-02-1-03']));
     const last = new URL(view.gets('/locations').at(-1)!.url).searchParams;

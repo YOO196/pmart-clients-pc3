@@ -14,6 +14,9 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-capacity';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
+import { GuideBox, SearchBar } from '../../shared/listParts';
+import { SavedViews } from '../../shared/SavedViews';
+import { SearchSelect } from '../../shared/SearchSelect';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
 import { Who } from '../../shared/OperatorLabel';
@@ -65,7 +68,7 @@ function AssignmentsHome({ mfcId }: { readonly mfcId: string }) {
   return (
     <section className="space-y-4">
       <h1>{messages.menus.assignments}</h1>
-      <p className="text-sm opacity-70">{m.intro}</p>
+      <GuideBox title={messages.listParts.guideOf(messages.menus.assignments)} storeKey="assignments" items={[m.intro]} />
       {/* 작업 시작(capacity 0.22.0) — 누르면 추천대로 바로 배정. 바꾸기는 아래 목록·담당 없는 작업·직접 배정에서 */}
       <StartWork mfcId={mfcId} />
       <div role="tablist" className="tabs tabs-box w-fit">
@@ -115,9 +118,24 @@ function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonl
     setParams(next, { replace: true });
   };
   const rows = query.data?.items ?? [];
+  // 작업자 거르기는 이름으로 쳐서 찾기(초성) — 운영자 ID 는 숨은 찾기 낱말(ADR-0070: 화면에 ID 를 내지 않는다)
+  const workers = useQuery({
+    queryKey: ['workers', mfcId, 'DEFAULT'],
+    queryFn: async () => (await request('GET', api.capacity.GET('/mfcs/{mfcId}/workers', { params: { path: { mfcId }, query: {} } }))).items ?? [],
+  });
+  const workerName = workers.data?.find((w) => w.workerId === workerId);
   return (
     <div className="space-y-3">
-      <form className="flex flex-wrap items-end gap-2 rounded-box bg-base-100 p-3 text-sm" onSubmit={(e) => e.preventDefault()}>
+      <SearchBar
+        summary={[
+          [m.filters.state, m.state[state ?? 'ACTIVE'] ?? state ?? ''],
+          [m.filters.date, date],
+          [m.filters.worker, workerId ? (workerName?.name ?? workerName?.displayName ?? m.filters.someone) : ''],
+          [m.filters.task, taskId ? m.filters.oneTask : ''],
+        ]}
+        startOpen={!state && !date && !workerId && !taskId}
+        extra={query.data?.asOf?.asOf && <span className="text-xs text-base-content/60">{m.asOf(formatSeoul(query.data.asOf.asOf))}</span>}
+      >
         <label className="flex flex-col gap-1">
           {m.filters.state}
           <select className="select select-sm w-32" value={state ?? 'ACTIVE'} onChange={(e) => set('state', e.target.value === 'ACTIVE' ? '' : e.target.value)}>
@@ -132,16 +150,24 @@ function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonl
           {m.filters.date}
           <input className="input input-sm w-40" type="date" value={date} onChange={(e) => set('date', e.target.value)} />
         </label>
-        <label className="flex flex-col gap-1">
-          {m.filters.worker}
-          <input className="input input-sm w-36 font-mono" value={workerId} onChange={(e) => set('workerId', e.target.value.trim())} />
-        </label>
+        <div className="flex flex-col gap-1">
+          <span>{m.filters.worker}</span>
+          <SearchSelect
+            label={m.filters.worker}
+            value={workerId}
+            onChange={(v) => set('workerId', v)}
+            allowEmpty={m.filters.allWorkers}
+            loading={workers.isPending}
+            className="w-48"
+            options={(workers.data ?? []).map((w) => ({ value: w.workerId ?? '', label: w.name ?? w.displayName ?? m.filters.someone, ...(w.employeeNo ? { hint: w.employeeNo } : {}), keywords: w.workerId ?? '' }))}
+          />
+        </div>
         <label className="flex flex-col gap-1">
           {m.filters.task}
           <input className="input input-sm w-40 font-mono" value={taskId} onChange={(e) => set('taskId', e.target.value.trim())} />
         </label>
-        {query.data?.asOf?.asOf && <span className="text-xs opacity-70">{m.asOf(formatSeoul(query.data.asOf.asOf))}</span>}
-      </form>
+      </SearchBar>
+      <SavedViews listKey={`assignments.${mfcId}`} />
       <p className="text-xs opacity-70">{m.eligibilityNote}</p>
       <QueryState state={toUiState(query, () => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.empty}>
         {() => (

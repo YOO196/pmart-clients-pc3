@@ -104,6 +104,7 @@ export const messages = {
     close: '검색 닫기 ▴',
     allDone: '수고하셨어요!',
     guide: '안내',
+    guideOf: (menu: string) => `${menu} 안내`,
     systemNumbers: '시스템 번호',
   },
 
@@ -195,7 +196,7 @@ export const messages = {
       unknownLoad: '맡은 작업 모름',
       recentTitle: '최근 본 것',
       recentEmpty: '이 센터에서 최근 연 상세가 없어요.',
-      recentKind: { task: '작업', worker: '작업자', move: '이동', inboundTask: '입고' } as Readonly<Record<string, string>>,
+      recentKind: { task: '작업', worker: '작업자', move: '이동', inboundTask: '입고', location: '칸' } as Readonly<Record<string, string>>,
     },
     title: '오늘 센터 현황',
     intro: '출하가 늦어지거나 현장에서 막힌 일을 먼저 찾아요. 조치는 각 상세 화면에서 해요.',
@@ -840,7 +841,7 @@ export const messages = {
       noUnassigned: '담당 없는 작업이 없어요.',
       moreInTasks: '50건이 넘어요 — 나머지는 작업 현황(대기)에서 봐요.',
     },
-    filters: { state: '상태', date: '배정한 날(한국)', worker: '작업자', task: '작업 ID' },
+    filters: { state: '상태', date: '배정한 날(한국)', worker: '작업자', task: '작업 ID', allWorkers: '모든 작업자', someone: '고른 작업자', oneTask: '한 작업' },
     state: { ACTIVE: '진행 중', SUPERSEDED: '바뀜', RELEASED: '풀림' } as Readonly<Record<string, string>>,
     source: { MANUAL: '직접', PLAN: '추천 확정', SYSTEM: '다음 작업 받기' } as Readonly<Record<string, string>>,
     empty: '조건에 맞는 배정이 없어요.',
@@ -1284,6 +1285,7 @@ export const messages = {
 
   /** 위치(칸) — mfc-location-service 0.7.1 */
   locations: {
+    locationLabel: '칸',
     intro: '센터 안 칸(선반·수령·포장·격리 등)을 등록하고 고쳐요. 닫은 칸에는 새 적치·이동이 들어가지 않아요.',
     register: '칸 등록',
     filter: '거르기',
@@ -1472,6 +1474,8 @@ export const messages = {
 
   // 센터 목록(MB-1)
   lists: {
+    loaded: (n: number) => `${n}건`,
+    loadedMore: (n: number) => `불러온 ${n}건 — 더 있어요`,
     state: '상태',
     all: '전체',
     refresh: '새로 읽기',

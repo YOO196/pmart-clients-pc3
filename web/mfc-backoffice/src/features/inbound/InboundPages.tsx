@@ -18,7 +18,7 @@ import { centerPath } from '../../app/nav';
 import { LotLabel } from '../../shared/LotLabel';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
-import { SearchBar } from '../../shared/listParts';
+import { GuideBox, SearchBar } from '../../shared/listParts';
 import { useNewIds } from '../../shared/motion';
 import { Who } from '../../shared/OperatorLabel';
 import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
@@ -55,8 +55,8 @@ function InboundHome({ mfcId }: { readonly mfcId: string }) {
   const tab: Tab = (TABS as readonly string[]).includes(raw ?? '') ? (raw as Tab) : 'tasks';
   return (
     <section className="space-y-4">
-      <h1 className="text-xl font-bold">{messages.menus.inbound}</h1>
-      <p className="text-sm opacity-70">{m.intro}</p>
+      <h1>{messages.menus.inbound}</h1>
+      <GuideBox title={messages.listParts.guideOf(messages.menus.inbound)} storeKey="inbound" items={[m.intro]} />
       <div role="tablist" className="tabs tabs-box w-fit">
         {TABS.map((t) => (
           <button

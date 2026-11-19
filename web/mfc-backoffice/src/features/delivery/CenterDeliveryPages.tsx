@@ -16,6 +16,8 @@ import type { components as CaseC } from '../../api/generated/case';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { DisplayNumber, RiderLabel, SystemNumbers, type RiderDisplay } from '../../shared/displayNumber';
+import { GuideBox, SearchBar } from '../../shared/listParts';
+import { SavedViews } from '../../shared/SavedViews';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 
@@ -83,9 +85,20 @@ export function CenterDeliveriesMenu({ mfcId }: { readonly mfcId: string }) {
   });
   return (
     <section className="space-y-4">
-      <h1 className="text-xl font-bold">{m.title}</h1>
-      <p className="text-sm opacity-70">{m.intro}</p>
-      <div className="flex flex-wrap items-end gap-2 rounded-box bg-base-100 p-3 text-sm">
+      <h1>{m.title}</h1>
+      <GuideBox title={messages.listParts.guideOf(messages.menus.deliveries)} storeKey="deliveries" items={[m.intro]} />
+      <SearchBar
+        summary={[[m.state, state ? name(m.executionState, state) : m.activeStates]]}
+        startOpen={!state}
+        extra={
+          <>
+            <span className="text-xs text-base-content/60">{m.autoRefreshNote}</span>
+            <button type="button" className="btn btn-xs" onClick={() => void query.refetch()} disabled={query.isFetching}>
+              {m.refresh}
+            </button>
+          </>
+        }
+      >
         <label className="flex flex-col gap-1">
           {m.state}
           <select className="select select-sm w-40" value={state} onChange={(e) => set({ state: e.target.value })}>
@@ -97,11 +110,8 @@ export function CenterDeliveriesMenu({ mfcId }: { readonly mfcId: string }) {
             ))}
           </select>
         </label>
-        <button type="button" className="btn btn-sm" onClick={() => void query.refetch()} disabled={query.isFetching}>
-          {m.refresh}
-        </button>
-        <span className="text-xs opacity-70">{m.autoRefreshNote}</span>
-      </div>
+      </SearchBar>
+      <SavedViews listKey={`deliveries.${mfcId}`} />
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(view) => {
           const items = (view.items ?? []) as readonly LiveItem[];
@@ -252,7 +262,7 @@ function DispatchFailureListPage({ mfcId }: { readonly mfcId: string }) {
   });
   return (
     <section className="space-y-4">
-      <h1 className="text-xl font-bold">{f.title}</h1>
+      <h1>{f.title}</h1>
       <p className="text-sm opacity-70">{f.intro}</p>
       <p role="note" className="alert alert-info text-sm">
         {f.handledBySupport}
@@ -318,7 +328,7 @@ function DispatchFailureDetailPage({ mfcId }: { readonly mfcId: string }) {
       <Link className="link text-sm" to={centerPath(mfcId, 'dispatch-failures')}>
         {f.back}
       </Link>
-      <h1 className="text-xl font-bold">{f.detailTitle(query.data?.caseNumber ?? (query.isSuccess ? messages.displayNumber.missing : ''))}</h1>
+      <h1>{f.detailTitle(query.data?.caseNumber ?? (query.isSuccess ? messages.displayNumber.missing : ''))}</h1>
       <p role="note" className="alert alert-info text-sm">
         {f.handledBySupport}
       </p>
