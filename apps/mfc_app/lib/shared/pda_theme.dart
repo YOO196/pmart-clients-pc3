@@ -22,6 +22,10 @@ abstract final class PdaColors {
   static const lilac = Color(0xFFECE2FA);
   static const notice = Color(0xFFF6F1FD);
   static const onNotice = Color(0xFF4E3285);
+
+  /// 주의 띠(노랑) — 멈춰 확인해야 하는 안내에만.
+  static const warning = Color(0xFFFFF2DA);
+  static const onWarning = Color(0xFF724815);
   static const danger = Color(0xFF9B392B);
 }
 

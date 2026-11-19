@@ -1053,7 +1053,7 @@ class _BoxInspectStep extends ConsumerWidget {
               ),
             ),
             if (c.total != b.unitsPerBox && c.total > 0)
-              NoticeBox(text: l10n.boxCountDiff),
+              NoticeBox(text: l10n.boxCountDiff, warning: true),
           ],
         ),
       );

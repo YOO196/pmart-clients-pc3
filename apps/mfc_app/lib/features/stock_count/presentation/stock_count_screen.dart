@@ -200,7 +200,7 @@ class CountScreen extends ConsumerWidget {
               })
                 Card(
                   key: ValueKey('count-lots-$sku'),
-                  color: choosing == sku ? PdaColors.notice : null,
+                  color: choosing == sku ? PdaColors.warning : null,
                   child: Padding(
                     padding: const EdgeInsets.all(8),
                     child: Column(
