@@ -589,7 +589,7 @@ class NewMoveScreen extends ConsumerWidget {
               ),
             if (s.loading) const LinearProgressIndicator(),
             if (s.phase != NewMovePhase.product) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(l10n.newMoveChooseFrom, style: theme.textTheme.titleMedium),
               for (final u in s.units)
                 RadioListTile<StockUnit>(
@@ -612,7 +612,7 @@ class NewMoveScreen extends ConsumerWidget {
                 ),
             ],
             if (s.source != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               TargetLine(
                 key: const ValueKey('new-move-to-line'),
                 label: l10n.moveTo,

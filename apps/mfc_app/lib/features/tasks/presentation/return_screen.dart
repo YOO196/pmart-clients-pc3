@@ -427,7 +427,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                         title: l10n.putawayFromTitle,
                       ),
                       Padding(
-                        padding: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.only(top: 12),
                         child: Text(
                           l10n.returnShelfLocateFrom,
                           key: const ValueKey('return-locate-hint'),
@@ -492,7 +492,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                               l10n.lot(p.lotId),
                               style: const TextStyle(color: PdaColors.body),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 6),
                             Text(
                               l10n.returnShelfLeft(p.left),
                               style: theme.textTheme.titleSmall?.copyWith(
@@ -506,7 +506,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                     ),
                     if (s.lastScan case final r? when r != LocScan.ok)
                       Padding(
-                        padding: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.only(top: 12),
                         child: Text(
                           locScanText(l10n, r),
                           key: const ValueKey('return-scan-error'),
@@ -568,14 +568,14 @@ class ReturnShelfScreen extends ConsumerWidget {
                       ),
                     // 온도 확인은 내려놓기 직전에 묻는다(복귀 조건).
                     if (cold && step == 2) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       Text(
                         l10n.returnColdQuestion,
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       SegmentedButton<bool>(
                         key: const ValueKey('return-cold'),
                         emptySelectionAllowed: true,

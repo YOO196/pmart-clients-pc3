@@ -63,7 +63,7 @@ class ReturnHandoversScreen extends ConsumerWidget {
             style: Theme.of(context).textTheme.bodyMedium
                 ?.copyWith(color: PdaColors.body),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 6),
           ...children,
         ],
       ),
@@ -205,7 +205,7 @@ class _ReturnCard extends ConsumerWidget {
                   ),
                 ),
               ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               l10n.rhIssuedAt(formatSeoulTime(item.issuedAt)),
               textAlign: TextAlign.center,
@@ -220,14 +220,14 @@ class _ReturnCard extends ConsumerWidget {
               ),
             if (message != null)
               Padding(
-                padding: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.only(top: 12),
                 child: Text(
                   message,
                   key: ValueKey('rh-message-$id'),
                   style: bad ? TextStyle(color: theme.colorScheme.error) : null,
                 ),
               ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             if (unknown)
               // 결과를 모를 때는 같은 키로만 다시 보낸다(새 키면 번호가 한 번 더 바뀐다).
               CommandButton(
