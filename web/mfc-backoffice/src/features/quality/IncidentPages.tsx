@@ -16,6 +16,8 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-quality';
 import { useApi } from '../../app/ApiContext';
 import { CursorList, useQueryParam } from '../../shared/CursorList';
+import { SystemNumbers } from '../../shared/displayNumber';
+import { countCell, StatCard, StatStrip } from '../../shared/listParts';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 
@@ -37,12 +39,37 @@ export function IncidentsTab({ mfcId }: { readonly mfcId: string }) {
   return (
     <div className="max-w-4xl space-y-3 text-sm">
       <p className="opacity-70">{m.intro}</p>
+      <IncidentCounts mfcId={mfcId} />
       <IncidentList mfcId={mfcId} />
       <CreateIncident mfcId={mfcId} onCreated={setOpenId} />
       {openId && <IncidentView key={openId} id={openId} />}
     </div>
   );
 }
+
+/** 상태 숫자 카드(2026-11-19) — 상태마다 서버 목록 한 쪽(50건)으로 센다, 넘치면 "50건 이상", 실패 "?". 누르면 그 상태로 */
+function IncidentCounts({ mfcId }: { readonly mfcId: string }) {
+  const api = useApi();
+  const [state, setState] = useQueryParam('incidentState');
+  const count = (s: IncidentState) => ({
+    queryKey: ['list', 'quality-incidents', mfcId, 'count', s],
+    queryFn: async () => {
+      const r = await request('GET', api.quality.GET('/quality-incidents', { params: { query: { mfcId, state: [s], size: 50 } } }));
+      return { n: (r.items ?? []).length, more: !!r.nextCursor };
+    },
+  });
+  const open = useQuery(count('OPEN'));
+  const decided = useQuery(count('DECIDED'));
+  return (
+    <StatStrip label={m.countsLabel} testId="incident-counts">
+      <StatCard testId="count-OPEN" label={m.state.OPEN} value={countCell(open)} tone={(open.data?.n ?? 0) > 0 ? 'warning' : undefined} hint={m.countHint} active={state === 'OPEN'} onClick={() => setState(state === 'OPEN' ? '' : 'OPEN')} />
+      <StatCard testId="count-DECIDED" label={m.state.DECIDED} value={countCell(decided)} tone="info" hint={m.countHint} active={state === 'DECIDED'} onClick={() => setState(state === 'DECIDED' ? '' : 'DECIDED')} />
+    </StatStrip>
+  );
+}
+
+/** 화면 표기(ADR-0070 덧붙임) = 종류 · 연 시각 — 사고 번호(시스템 ID)는 상세의 시스템 번호 칸 */
+const incidentTitle = (i: Incident) => `${m.kind[i.kind ?? ''] ?? i.kind ?? messages.none} · ${when(i.openedAt)}`;
 
 function IncidentList({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
@@ -59,9 +86,8 @@ function IncidentList({ mfcId }: { readonly mfcId: string }) {
           api.quality.GET('/quality-incidents', { params: { query: { mfcId, ...(state ? { state: [state as IncidentState] } : {}), ...(cursor ? { cursor } : {}) } } }),
         )
       }
-      head={[m.col.id, m.col.kind, m.col.state, m.col.origin, m.col.remaining, m.col.openedAt]}
+      head={[m.col.kind, m.col.state, m.col.origin, m.col.remaining, m.col.openedAt]}
       cells={(i) => [
-        <span className="font-mono">{i.incidentId}</span>,
         m.kind[i.kind ?? ''] ?? i.kind ?? messages.none,
         m.state[i.state ?? ''] ?? i.state ?? messages.none,
         m.origin[i.origin ?? ''] ?? i.origin ?? messages.none,
@@ -200,8 +226,7 @@ function IncidentDetail({ incident: i }: { readonly incident: Incident }) {
   return (
     <div className="space-y-3 rounded-box bg-base-100 p-4" data-testid="incident">
       <p className="flex flex-wrap items-center gap-2">
-        <span className="font-mono">{i.incidentId}</span>
-        <span className="badge badge-sm">{m.kind[i.kind ?? ''] ?? i.kind}</span>
+        <span className="font-semibold">{incidentTitle(i)}</span>
         <span className={`badge badge-sm ${i.state === 'OPEN' ? 'badge-warning' : i.state === 'DECIDED' ? 'badge-info' : 'badge-ghost'}`}>{m.state[i.state ?? ''] ?? i.state}</span>
         <span className="opacity-70">{m.origin[i.origin ?? ''] ?? i.origin}</span>
       </p>
@@ -279,6 +304,7 @@ function IncidentDetail({ incident: i }: { readonly incident: Incident }) {
       {(i.decisionIds ?? []).length > 0 && <p className="text-xs">{`${m.decisions}: ${i.decisionIds!.join(', ')}`}</p>}
 
       {i.state !== 'CLOSED' && (remaining > 0 ? <p className="text-warning">{m.remainingNote(remaining)}</p> : <CloseIncident key={i.version} incident={i} />)}
+      <SystemNumbers ids={[{ label: m.col.id, id: i.incidentId }]} />
     </div>
   );
 }

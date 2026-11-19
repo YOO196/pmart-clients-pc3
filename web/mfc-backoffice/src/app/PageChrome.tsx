@@ -2,9 +2,10 @@
 // 1) 브라우저 탭 제목: 지금 화면 이름 + 출하 약속을 넘긴 출고 수(운영판과 같은 서버 값·같은 조회) — 다른 탭에 있어도 급한 일이 보인다.
 // 2) 인터넷 끊김 띠: 끊긴 동안 화면 숫자가 최신이 아님을 알린다. 다시 이어지면 잠깐 알리고 화면은 저절로 다시 읽는다.
 // 3) '/' 키: 이 화면 검색 조건(SearchBar)의 첫 입력으로. 접혀 있으면 펼친다. 입력 칸에 있을 때는 가로채지 않는다.
+// 4) 왼쪽 메뉴 작업 현황 옆 늦음·막힘 수, '?' 단축키 안내(2026-11-19 "필요한 기능 알아서").
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
-import { useOverdueCount } from '../features/ops/opsQueries';
+import { useOpenTasks, useOverdueCount } from '../features/ops/opsQueries';
 import { messages } from '../shared/messages';
 
 const m = messages.chrome;
@@ -91,4 +92,70 @@ export function ConnectionBanner() {
       </div>
     );
   return null;
+}
+
+/** 왼쪽 메뉴 "작업 현황" 옆 숫자 — 늦음·막힘 작업 수(운영판과 같은 조회, 서버 표시값). 0·못 읽음이면 그리지 않는다 */
+export function TaskAlertBadge({ mfcId }: { readonly mfcId: string }) {
+  const q = useOpenTasks(mfcId);
+  if (!q.data) return null;
+  const n = q.data.items.filter((t) => t.late || t.state === 'BLOCKED').length;
+  if (n === 0) return null;
+  return (
+    <span className="badge badge-error badge-sm ml-auto tabular-nums" title={m.taskAlertTitle} data-testid="menu-alert-tasks">
+      {q.data.complete ? n : `${n}+`}
+    </span>
+  );
+}
+
+/** 단축키 안내 — "?" 로 연다(입력 칸에서는 가로채지 않는다) */
+export function ShortcutHelp() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target;
+      if (t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return;
+      if (e.key === '?') {
+        e.preventDefault();
+        setOpen((o) => !o);
+      } else if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  const s = messages.shortcuts;
+  return (
+    <>
+      <button type="button" className="btn btn-ghost btn-xs h-7 w-7 p-0 font-bold" onClick={() => setOpen(true)} aria-label={s.open} title={`${s.open} (?)`} data-testid="shortcut-help-button">
+        ?
+      </button>
+      {open && (
+        <div className="modal modal-open" role="dialog" aria-modal="true" aria-labelledby="shortcut-help-title" data-testid="shortcut-help" onClick={() => setOpen(false)}>
+          <div className="modal-box max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h3 id="shortcut-help-title" className="text-base font-bold">
+              {s.title}
+            </h3>
+            <dl className="mt-4 space-y-2.5 text-sm">
+              {s.items.map((it) => (
+                <div key={it.what} className="flex items-center justify-between gap-4">
+                  <dt className="text-base-content/75">{it.what}</dt>
+                  <dd className="flex shrink-0 gap-1">
+                    {it.keys.map((k) => (
+                      <kbd key={k} className="kbd kbd-sm">
+                        {k}
+                      </kbd>
+                    ))}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <div className="modal-action mt-5">
+              <button type="button" className="btn btn-sm" onClick={() => setOpen(false)} autoFocus>
+                {s.close}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

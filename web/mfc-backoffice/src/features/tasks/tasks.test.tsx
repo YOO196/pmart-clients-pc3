@@ -24,8 +24,9 @@ describe('작업 목록', () => {
     expect(within(rows()[1]!).getByText('멈춤(30분 실적 없음)')).toBeInTheDocument();
     expect(within(rows()[1]!).getByText('서울우유 1L 외 1건')).toBeInTheDocument();
     expect(screen.getByText(/담당 기준/)).toBeInTheDocument();
-    const q = new URL(view.gets('/tasks')[0]!.url).searchParams;
-    expect([q.get('mfcId'), q.getAll('state')]).toEqual(['MFC-BSN-01', []]);
+    // 목록 요청(상태 카드·운영 조회는 state 를 보낸다)
+    const q = view.gets('/tasks').map((r) => new URL(r.url).searchParams).find((p) => p.getAll('state').length === 0)!;
+    expect(q.get('mfcId')).toBe('MFC-BSN-01');
   });
 
   it('상태(대기)·유형 거르기는 URL 쿼리 → 서버로', async () => {

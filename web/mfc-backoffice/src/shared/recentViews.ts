@@ -62,7 +62,7 @@ export function useRecordRecent(kind: RecentKind, mfcId: string, id: string, lab
   }, [subject, kind, mfcId, id, label]);
 }
 
-function useRecentViews(): readonly RecentEntry[] {
+export function useRecentViews(): readonly RecentEntry[] {
   const subject = useSession().session?.subject ?? '';
   const [items, setItems] = useState(() => (subject ? readRecent(subject) : []));
   useEffect(() => {

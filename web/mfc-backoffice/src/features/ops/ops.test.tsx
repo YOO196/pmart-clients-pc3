@@ -235,3 +235,68 @@ describe('센터 운영판', () => {
     expect(view.gets('/tasks')).toHaveLength(0);
   });
 });
+
+describe('홈 보탬 — 작업 흐름·작업자 지금·최근 본 것, 메뉴 배지, 단축키 안내', () => {
+  it('작업 흐름: 유형별 단계 수(서버 목록), 먼저 확인, 누르면 작업 현황이 그 조건으로', async () => {
+    standard();
+    renderAt('/c/MFC-BSN-01/ops');
+    const board = await screen.findByTestId('flow-board');
+    await waitFor(() => expect(within(board).getByTestId('flow-PICK-doing')).toHaveTextContent(/^3$/));
+    expect(within(board).getByTestId('flow-PICK-wait')).toHaveTextContent(/^1$/);
+    expect(within(board).getByTestId('flow-PACK-before')).toHaveTextContent(/^1$/);
+    expect(within(board).getByTestId('flow-RETURN-doing')).toHaveTextContent(/^1$/);
+    expect(within(board).getByTestId('flow-first-unassigned')).toHaveTextContent(/1$/);
+    expect(within(board).getByTestId('flow-first-blocked')).toHaveTextContent(/0$/);
+    expect(within(board).getByTestId('flow-PICK-wait')).toHaveAttribute('href', '/c/MFC-BSN-01/tasks?type=PICK&state=READY');
+  });
+
+  it('쪽 상한에 걸려 다 못 읽었으면 단계 수는 "N+"', async () => {
+    withTasks(Array.from({ length: 6 }, (_, p) => [task({ taskId: `T-${p}`, shipmentId: null })]));
+    renderAt('/c/MFC-BSN-01/ops');
+    const board = await screen.findByTestId('flow-board');
+    await waitFor(() => expect(within(board).getByTestId('flow-PICK-doing')).toHaveTextContent(/^5\+$/));
+  });
+
+  it('작업자 지금: 재직 작업자마다 맡은 작업 수, 쉬지 않는데 맡은 일 없으면 표시', async () => {
+    standard();
+    renderAt('/c/MFC-BSN-01/ops');
+    const box = await screen.findByTestId('worker-load');
+    await waitFor(() => expect(within(box).getAllByTestId('worker-load-row')).toHaveLength(3));
+    const row = (name: string) => within(box).getAllByTestId('worker-load-row').find((r) => r.textContent?.includes(name))!;
+    await waitFor(() => expect(row('김현장')).toHaveTextContent('맡은 작업 1(진행 1)'));
+    expect(row('이알바')).toHaveTextContent('휴게 중');
+    expect(within(row('이알바')).queryByTestId('worker-free')).not.toBeInTheDocument();
+    expect(within(row('박일일')).getByTestId('worker-free')).toHaveTextContent('맡은 일 없음');
+  });
+
+  it('작업 목록을 못 읽으면 "맡은 일 없음"이라 하지 않는다', async () => {
+    server.use(http.get(`${API_BASE}/tasks`, () => HttpResponse.json({ status: 503, code: 'DEPENDENCY_UNAVAILABLE', type: 'about:blank' }, { status: 503, headers: { 'content-type': 'application/problem+json' } })));
+    renderAt('/c/MFC-BSN-01/ops');
+    const box = await screen.findByTestId('worker-load');
+    await waitFor(() => expect(within(box).getAllByTestId('worker-load-row')[0]).toHaveTextContent('맡은 작업 모름'));
+    expect(within(box).queryByTestId('worker-free')).not.toBeInTheDocument();
+  });
+
+  it('최근 본 것: 상세를 열면 이 센터 홈에 화면 표기로 남는다(시스템 ID 없이)', async () => {
+    standard();
+    renderAt('/c/MFC-BSN-01/ops');
+    expect(await screen.findByTestId('recent-panel')).toHaveTextContent('최근 연 상세가 없어요');
+    await waitFor(() => expect(rows().length).toBeGreaterThan(0));
+    await userEvent.click(within(rows()[0]!).getByRole('link'));
+    await screen.findByRole('heading', { level: 1, name: /^피킹 · / });
+    await userEvent.click(screen.getByRole('link', { name: '홈' }));
+    const item = await screen.findByTestId('recent-item');
+    expect(item).toHaveTextContent(/^피킹 · /);
+    expect(item).not.toHaveTextContent('TASK-');
+  });
+
+  it('메뉴 "작업 현황" 옆 늦음·막힘 수, "?" 로 단축키 안내', async () => {
+    withTasks([[{ ...task({ taskId: 'L-1' }), late: true }, task({ taskId: 'B-1', state: 'BLOCKED' }), task({ taskId: 'N-1' })]]);
+    renderAt('/c/MFC-BSN-01/ops');
+    expect(await screen.findByTestId('menu-alert-tasks')).toHaveTextContent(/^2$/);
+    await userEvent.keyboard('?');
+    expect(await screen.findByTestId('shortcut-help')).toHaveTextContent('이전 건·다음 건');
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId('shortcut-help')).not.toBeInTheDocument());
+  });
+});
