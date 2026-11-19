@@ -68,7 +68,8 @@
 | BR-58 | 중간 | 백오피스 | 라이더 도움요청 상담 대화 — 상담원 쪽 대화 읽기·답장·새 메시지 표시·읽음, 상태(처리 중 시점·다시 처리 뒤 대화), 관리자 가림 | **AGREED**(2026-11-16 회신 — 대화는 delivery-execution, 백엔드 PR #60 병합 `5e2455fe` = execution 0.6.0 messages API, LAN 배포는 확인 안 함·DE-2(권한·새 메시지 필드·가림) PR #62 로 PC 5 에 요청). DE-2 반영·배포 뒤 화면을 붙인다. 전화는 보류. 요청 `docs/handoff/archive/2026-11-16-backend-rider-help-chat.md` |
 | BR-59 | 중간 | 고객 | 처음 실행 약관(레퍼런스 2-1): 위치 기반 서비스 약관(필수) 동의 유형이 없고(`consentType` 은 TERMS_OF_SERVICE·PRIVACY_POLICY·AGE_OVER_14·MARKETING 뿐), 로그인 전(비회원·기기) 동의·마케팅 푸시 수신 동의를 기록할 경로가 없음 | RESOLVED(2026-11-19, 요청 `docs/handoff/customer-app/2026-11-19-backend-first-run-consents.md` → 회신 `clients/customer-app/2026-11-19-reply-br59-first-run-consents.md`, customer 0.6.0~0.6.1 LAN 배포). 고객앱 반영(목 모드 확인, 미커밋). 백엔드 질문(현재 위치 → 주소 서비스 이름)은 답 `docs/handoff/customer-app/2026-11-19-backend-br59-location-service-answer.md`(카카오 로컬·카카오맵, 휴대폰 위치는 geolocator — 2026-11-19 승인·반영) + 역지오코딩 좌표 쿼리 로그 질문 1개 |
 | BR-60 | 중간 | 고객 | 레퍼런스 주소 상세에는 받는 분·연락처가 없고 연락처는 주문서 "내 연락처"에 있는데, 계약 `AddressInput` 은 `receiverName`·`receiverPhone` 필수 | **RESOLVED**(회신 `clients/customer-app/2026-11-19-reply-br60-address-receiver.md`, customer 0.8.0·order 0.14.0 LAN 배포 12:51): R1 두 값 선택, R2 주소 → 프로필, 없으면 `CONTACT_REQUIRED`, R3 프로필 저장 + 초안 다시(주소의 옛 번호는 PATCH `receiverPhone:""`), R4 이름 null. 고객앱 반영 2026-11-19(목 모드) |
-| BR-61 | 높음 | 고객 | 고객 주문 조회 `GET /orders/{orderId}` 의 `shipments` 가 늘 빈 배열(`OrdersController` `.shipments(List.of())`) — 고객이 배송 ID 를 알 길이 없어 배송 현황·라이더 지도를 열 수 없음 | OPEN(급함, 요청 `docs/handoff/customer-app/2026-11-19-backend-order-shipments-empty.md`) |
+| BR-61 | 높음 | 고객 | 고객 주문 조회 `GET /orders/{orderId}` 의 `shipments` 가 늘 빈 배열(`OrdersController` `.shipments(List.of())`) — 고객이 배송 ID 를 알 길이 없어 배송 현황·라이더 지도를 열 수 없음 | OPEN(급함, 요청 `docs/handoff/customer-app/2026-11-19-backend-order-shipments-empty.md` + 묶음 요청 `…/2026-11-19-backend-delivery-status-screen.md` R1) — 이것 때문에 라이더가 지도에 안 뜸 |
+| BR-62 | 중간 | 고객 | 배송 현황 시트의 주문한 센터 이름 — 고객용 센터 이름 경로가 없어 브랜드만 보임(`Order.mfcId` 만) | OPEN(요청 `docs/handoff/customer-app/2026-11-19-backend-delivery-status-screen.md` R2 — 주문 응답 `mfcName` 제안) |
 
 ---
 
@@ -439,3 +440,8 @@
 - 계기: 사용자 2026-11-19 실기기 "배송현황에 지도 안 보인다". 고객 앱 로그 — 주문 상세만 열리고 `/eta`·`/stream` 호출 0번.
 - 원인: order-service `GET /orders/{orderId}` 가 `shipments` 를 늘 `[]` 로 준다. 고객용 주문 → 배송 ID 경로가 따로 없다(`GET /deliveries?orderId=` 는 직원 전용).
 - 요청: R1 `shipments[]`(deliveryId·state·lines) 채우기, R2 채워지는 시점. 대안 — 고객용 "내 주문의 배송" 조회.
+
+## BR-62 배송 현황의 주문한 센터 이름 (고객앱)
+- 계기: 사용자 2026-11-19 "주문 넣은 MFC … 다 떠야지"(레퍼런스 "B마트 부산동래").
+- 공백: 고객은 `Order.mfcId` 만 받는다. 센터 이름은 center-master(직원 전용)·배차/실행 직원 응답 `mfcName` 에만 있다.
+- 요청(`docs/handoff/customer-app/2026-11-19-backend-delivery-status-screen.md` R2): 고객 주문 응답에 `mfcName`. 앱은 그때까지 브랜드만(ID 를 보이지 않음).
