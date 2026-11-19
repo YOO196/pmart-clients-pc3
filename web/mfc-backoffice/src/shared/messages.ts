@@ -21,7 +21,7 @@ export const messages = {
     /** 라이더 표기 조회(rider display-names)에 없는 ID */
     riderUnknown: '라이더',
     /** 라이더 표기 조회 실패 — 없는 것과 못 읽은 것을 섞지 않는다 */
-    riderFailed: '라이더(이름 못 읽음)',
+    riderFailed: '라이더 조회 실패',
     systemNumbers: '시스템 번호',
     system: { orderId: '주문', deliveryId: '배송', shipmentId: '출고', packageId: '포장', riderId: '라이더' },
   },

@@ -289,7 +289,7 @@ void main() {
     expect(find.textContaining('rider-mock'), findsNothing);
   });
 
-  testWidgets('라이더 표기 조회 실패는 "라이더(이름 못 읽음)" — ID 를 대신 보이지 않는다', (t) async {
+  testWidgets('라이더 표기 조회 실패는 "라이더 조회 실패" — ID 를 대신 보이지 않는다', (t) async {
     handovers.failRiderLabels = true;
     t.view
       ..physicalSize = const Size(800, 2400)
@@ -305,7 +305,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('menu-handover')));
     await t.pumpAndSettle();
-    expect(find.text('허가받은 라이더: 라이더(이름 못 읽음)'), findsNWidgets(2));
+    expect(find.text('허가받은 라이더: 라이더 조회 실패'), findsNWidgets(2));
     expect(find.textContaining('rider-mock'), findsNothing);
   });
 

@@ -238,7 +238,7 @@
   "hoSystemNo": "시스템 번호 {packageId} · v{version}",
   "@hoSystemNo": { "placeholders": {"packageId": {"type": "String"}, "version": {"type": "String"}} },
   "riderUnknown": "라이더",
-  "riderUnreadable": "라이더(이름 못 읽음)",
+  "riderUnreadable": "라이더 조회 실패",
   "hoOrder": "주문 {orderId}",
   "@hoOrder": {
     "placeholders": {

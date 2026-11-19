@@ -614,7 +614,7 @@ class _PackageQrScan extends StatelessWidget {
   }
 }
 
-/// 허가받은 라이더 한 줄 — "허가받은 라이더: 김*수 · 482913". 모르면 "라이더", 조회 실패면 "라이더(이름 못 읽음)".
+/// 허가받은 라이더 한 줄 — "허가받은 라이더: 김*수 · 482913". 모르면 "라이더", 조회 실패면 "라이더 조회 실패".
 /// 라이더 ID 는 글자로 내지 않는다(ADR-0070).
 class RiderLabelText extends ConsumerWidget {
   const RiderLabelText({super.key, required this.riderId, required this.ids});
@@ -635,7 +635,7 @@ class RiderLabelText extends ConsumerWidget {
   }
 }
 
-/// 라이더 한 명의 화면 표기 — "김*수 · 482913", 탈퇴는 번호만, 모르면 "라이더", 조회 실패면 "라이더(이름 못 읽음)".
+/// 라이더 한 명의 화면 표기 — "김*수 · 482913", 탈퇴는 번호만, 모르면 "라이더", 조회 실패면 "라이더 조회 실패".
 /// [ids] 는 같은 화면 라이더 전체 키([riderKey]) — 같은 키면 조회는 한 번이다.
 String riderDisplayText(
   AppLocalizations l10n,
