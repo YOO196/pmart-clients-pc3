@@ -698,17 +698,25 @@ class _PickCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final meta = [
-      if (stop.pick?.visitSeq case final n?) l10n.pickVisit(n),
-      if (stop.lotId case final lot?) l10n.lot(lot),
-      if (stop.expiresOn case final e?) l10n.expiresOn(e),
-    ].join(' · ');
+    // LOT·유통기한은 오로트 집품을 막는 값 — 회색 한 줄로 이어 쓰면 두 줄로 꺾이고 안 보였다(사용자 2026-11-20).
+    // 이름표 + 진한 값으로 나눠 보인다. LOT 은 화면 번호(lotNo, ADR-0070), 없으면 시스템 ID.
+    final lotText = stop.pick?.lotNo ?? stop.lotId;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 서버 방문 순서 — 상품 이름 위 작은 머리글(한 줄을 따로 차지하지 않게).
+            if (stop.pick?.visitSeq case final n?)
+              Text(
+                l10n.pickVisit(n),
+                key: const ValueKey('pick-visit'),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: PdaColors.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -733,20 +741,32 @@ class _PickCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (meta.isNotEmpty)
-              Text(
-                meta,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: PdaColors.muted,
-                ),
-              ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 14,
+              runSpacing: 2,
+              children: [
+                if (lotText != null)
+                  MetaPair(
+                    key: const ValueKey('pick-lot'),
+                    label: l10n.metaLot,
+                    value: lotText,
+                  ),
+                if (stop.expiresOn case final e?)
+                  MetaPair(
+                    key: const ValueKey('pick-expires'),
+                    label: l10n.metaExpires,
+                    value: e,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Text(
               l10n.pickStopQty(stop.qty, captured),
               key: const ValueKey('pick-counts'),
               style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: emphasize ? FontWeight.w800 : null,
-                color: emphasize ? PdaColors.dark : PdaColors.muted,
+                fontWeight: FontWeight.w800,
+                color: emphasize ? PdaColors.primary : PdaColors.ink,
               ),
             ),
             if (stop.pick case final p?) ...[

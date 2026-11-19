@@ -254,11 +254,16 @@ class CountScreen extends ConsumerWidget {
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              Text(
-                                [l.sku, lotText(l)].join(' · '),
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: PdaColors.muted,
-                                ),
+                              // SKU·유통기한·로트를 한 줄로 이으면 두 줄로 꺾였다 — 이름표 + 진한 값으로 나눈다.
+                              Wrap(
+                                spacing: 14,
+                                runSpacing: 2,
+                                children: [
+                                  MetaPair(label: l10n.metaSku, value: l.sku),
+                                  if (l.expiryDate case final e?)
+                                    MetaPair(label: l10n.metaExpires, value: e),
+                                  MetaPair(label: l10n.metaLot, value: l.lotId),
+                                ],
                               ),
                               // 바코드를 알면 스캔이 +1(＋ 버튼 없음) — 많으면 하나 찍은 뒤 숫자를 눌러 넣는다.
                               QtyStepper(

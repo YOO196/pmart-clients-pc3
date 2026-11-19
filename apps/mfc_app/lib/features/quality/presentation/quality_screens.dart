@@ -292,7 +292,7 @@ class _ProductHeader extends StatelessWidget {
             ),
             Text(
               '${task.sku} · ${l10n.inspectFrom(task.locationCode)}',
-              style: const TextStyle(color: PdaColors.muted),
+              style: const TextStyle(color: PdaColors.body),
             ),
             const SizedBox(height: 4),
             Text(
@@ -807,9 +807,7 @@ class _ReturnLineCard extends StatelessWidget {
             ),
             Text(
               subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: PdaColors.muted,
-              ),
+              style: theme.textTheme.bodySmall?.copyWith(color: PdaColors.body),
             ),
             // 상품 정보 값 — 작업자가 바꾸지 않는다.
             Text(

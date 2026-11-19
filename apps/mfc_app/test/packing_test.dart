@@ -489,7 +489,7 @@ void main() {
 
     // 4. 담기 — 온도대는 상품 정보로, 다른 온도대는 같은 봉투에 안 담는다.
     expect(find.byKey(const ValueKey('zone-select')), findsNothing);
-    expect(find.text('봉투 온도대는 처음 담는 상품으로 정해져요'), findsOneWidget);
+    expect(find.text('첫 상품의 온도대로 봉투가 정해져요'), findsOneWidget);
     // 피킹처럼 한 번에 하나 — 카메라는 맞게 한 번 찍으면 닫힌다(사용자 2026-11-19)
     expect(
       t
@@ -502,7 +502,7 @@ void main() {
       isFalse,
     );
     await scanTo(t, 'pack-scan', MockTaskRepository.yogurtBarcode);
-    expect(find.text('지금 봉투: 냉장'), findsOneWidget);
+    expect(find.text('냉장 봉투'), findsOneWidget);
     await scanTo(t, 'pack-scan', MockTaskRepository.dumplingBarcode);
     expect(find.byKey(const ValueKey('pack-scan-error')), findsOneWidget);
     await scanTo(t, 'pack-scan', MockTaskRepository.milkBarcode);
@@ -525,13 +525,13 @@ void main() {
     expect(packing.sealedAt['pkg-1'], 'PAK-C-02', reason: '밀봉 본문 포장 위치 = 패킹대');
 
     await scanTo(t, 'pack-scan', MockTaskRepository.dumplingBarcode);
-    expect(find.text('지금 봉투: 냉동'), findsOneWidget);
+    expect(find.text('냉동 봉투'), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('seal')));
     await t.pumpAndSettle();
     await closeLabel(t);
 
     // 5. 출하대기 랙.
-    expect(find.text('모든 상품을 담았어요(출하 준비)'), findsOneWidget);
+    expect(find.text('모든 상품 포장 끝'), findsOneWidget);
     expect(
       t
           .widget<FilledButton>(find.byKey(const ValueKey('finish-packing')))
@@ -573,7 +573,7 @@ void main() {
     await t.tap(find.byKey(const ValueKey('finish-packing')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('packing-finished')), findsOneWidget);
-    expect(find.text('패킹을 끝냈어요 — 출하대기 DSP-A-01'), findsOneWidget);
+    expect(find.text('출하대기 DSP-A-01'), findsOneWidget);
     expect(tasks.taskJson('task-mock-2')['state'], 'COMPLETED');
   });
 
@@ -581,7 +581,7 @@ void main() {
     await openPacking(t);
     await scanTo(t, 'station-scan', 'PAK-C-01');
     await scanTo(t, 'pack-cart-scan', 'CRT-C-01');
-    expect(find.text('포장을 시작해요. 예상 포장 시간을 고르고 배차를 요청해요'), findsOneWidget);
+    expect(find.text('시간을 고르고 배차를 요청해요'), findsOneWidget);
     expect(find.byKey(const ValueKey('pack-scan')), findsNothing);
     await t.tap(find.byKey(const ValueKey('pack-min-5')));
     await t.pump();
@@ -639,18 +639,18 @@ void main() {
     await toBagStep(t);
     expect(text(t, 'bag-no'), '봉투 1번째');
     expect(find.byKey(const ValueKey('pack-split-hint')), findsOneWidget);
-    expect(text(t, 'pack-split-progress'), '아직 밀봉 안 한 상품 4개 · 이 봉투에 0개');
+    expect((text(t, 'bag-left'), text(t, 'bag-in')), ('4개', '0개'));
 
     // 냉장 요거트 1개만 담고 밀봉 — 남은 게 있으니 "이 봉투만 밀봉".
     await scanTo(t, 'pack-scan', MockTaskRepository.yogurtBarcode);
-    expect(text(t, 'pack-split-progress'), '아직 밀봉 안 한 상품 4개 · 이 봉투에 1개');
+    expect((text(t, 'bag-left'), text(t, 'bag-in')), ('4개', '1개'));
     expect(find.text('담은 만큼 밀봉하기'), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('seal')));
     await t.pumpAndSettle();
     await closeLabel(t);
 
     expect(text(t, 'bag-no'), '봉투 2번째');
-    expect(text(t, 'pack-next-bag'), '봉투 1개 밀봉 — 남은 3개를 새 봉투에 담아요');
+    expect(text(t, 'pack-next-bag'), '봉투 1개 완료 · 남은 3개는 새 봉투에');
     // 같은 냉장 우유 2개는 두 번째 봉투에.
     await scanTo(t, 'pack-scan', MockTaskRepository.milkBarcode);
     await scanTo(t, 'pack-scan', MockTaskRepository.milkBarcode);
@@ -666,7 +666,7 @@ void main() {
     await t.pumpAndSettle();
     await closeLabel(t);
 
-    expect(find.text('모든 상품을 담았어요(출하 준비)'), findsOneWidget);
+    expect(find.text('모든 상품 포장 끝'), findsOneWidget);
     final s = await t.runAsync(() => packing.shipment('shp-2'));
     final sealed = s!.packages
         .where((p) => p.state == PackageState.sealed)
@@ -733,7 +733,7 @@ void main() {
       'ol-2x1',
     );
     // 합계는 그대로 — 남은 건 만두 1개.
-    expect(text(t, 'pack-split-progress'), '아직 밀봉 안 한 상품 1개 · 이 봉투에 0개');
+    expect((text(t, 'bag-left'), text(t, 'bag-in')), ('1개', '0개'));
     expect(t.takeException(), isNull);
   });
 

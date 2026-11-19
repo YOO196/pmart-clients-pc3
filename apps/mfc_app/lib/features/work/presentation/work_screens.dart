@@ -348,16 +348,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       ),
                                 ),
                               ),
-                              Text(
-                                me.onBreak
-                                    ? l10n.statusOnBreak
-                                    : l10n.statusReady,
-                                key: const ValueKey('worker-status'),
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
+                              // 근무 상태 — 작은 회색 글씨 대신 칩(휴게 중은 노랑).
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
                                   color: me.onBreak
-                                      ? theme.colorScheme.error
-                                      : PdaColors.muted,
+                                      ? PdaColors.warning
+                                      : PdaColors.lilac,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  me.onBreak
+                                      ? l10n.statusOnBreak
+                                      : l10n.statusReady,
+                                  key: const ValueKey('worker-status'),
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: me.onBreak
+                                        ? PdaColors.onWarning
+                                        : PdaColors.onNotice,
+                                  ),
                                 ),
                               ),
                             ],
@@ -1211,15 +1224,38 @@ class _AssignedView extends StatelessWidget {
                     l.productName ?? l.sku ?? '-',
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
-                  subtitle: Text(
-                    [
-                      if (l.boxes case final b?) l10n.boxesUnit(b),
-                      if (l.qty case final q?) l10n.qtyUnit(q),
-                      ?l.fromLocation,
-                      if (l.toLocation case final t?) '→ $t',
-                      ?l.notice,
-                    ].join(' · '),
-                    style: const TextStyle(color: PdaColors.muted),
+                  // 수량·칸은 이 작업의 핵심 — 회색 한 줄 대신 수량 보라 굵게, 칸 진하게(사용자 2026-11-20).
+                  subtitle: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: [
+                            if (l.boxes case final b?) l10n.boxesUnit(b),
+                            if (l.qty case final q?) l10n.qtyUnit(q),
+                          ].join(' · '),
+                          style: const TextStyle(
+                            color: PdaColors.primary,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        TextSpan(
+                          text: [
+                            '',
+                            ?l.fromLocation,
+                            if (l.toLocation case final t?) '→ $t',
+                          ].join('   '),
+                          style: const TextStyle(
+                            color: PdaColors.ink,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (l.notice case final n?)
+                          TextSpan(
+                            text: '\n$n',
+                            style: const TextStyle(color: PdaColors.body),
+                          ),
+                      ],
+                    ),
                   ),
                 );
               },

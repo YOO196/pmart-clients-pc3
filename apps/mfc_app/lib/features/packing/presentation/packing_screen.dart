@@ -275,7 +275,8 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                   child: ResultView(
                     key: const ValueKey('packing-finished'),
                     icon: Icons.check_circle,
-                    text: l10n.packingFinishedAt(packing.rack ?? '-'),
+                    text: l10n.packingFinished,
+                    detail: l10n.packingFinishedRack(packing.rack ?? '-'),
                     action: l10n.nextTask,
                     onAction: () async =>
                         backToSession(context, WorkArea.pickPack),
@@ -416,32 +417,61 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                       .length;
                   final inBag = packing.bag.values.fold(0, (a, b) => a + b);
                   final leftAfter = ctl.leftAfterBag(task, s);
+                  final zone = ctl.bagZone(task);
                   children.addAll([
-                    Text(
-                      l10n.packBagNo(sealedCount + 1),
-                      key: const ValueKey('bag-no'),
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -1.2,
-                      ),
+                    // 봉투 번호 + 지금 봉투 온도대(크게 — 다른 온도대를 섞지 않게, 사용자 2026-11-20).
+                    Row(
+                      children: [
+                        Text(
+                          l10n.packBagNo(sealedCount + 1),
+                          key: const ValueKey('bag-no'),
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -1.2,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        if (zone != null)
+                          ZoneChip(
+                            key: const ValueKey('bag-zone'),
+                            code: zone.name,
+                            text: l10n.bagZone(storageZoneText(l10n, zone)),
+                            large: true,
+                          ),
+                      ],
                     ),
-                    Text(
-                      switch (ctl.bagZone(task)) {
-                        final z? => l10n.bagZone(storageZoneText(l10n, z)),
-                        null when ctl.zonesKnown(task) => l10n.bagZoneEmpty,
-                        null => l10n.zoneUnknownPick,
-                      },
-                      key: const ValueKey('bag-zone'),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: PdaColors.muted,
+                    if (zone == null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          ctl.zonesKnown(task)
+                              ? l10n.bagZoneEmpty
+                              : l10n.zoneUnknownPick,
+                          key: const ValueKey('bag-zone-empty'),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: PdaColors.body,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
-                    ),
-                    Text(
-                      l10n.packSplitProgress(leftAfter + inBag, inBag),
+                    const SizedBox(height: 8),
+                    Wrap(
                       key: const ValueKey('pack-split-progress'),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: PdaColors.muted,
-                      ),
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        StatBox(
+                          label: l10n.packInBagLabel,
+                          value: l10n.countN(inBag),
+                          valueKey: const ValueKey('bag-in'),
+                          strong: true,
+                        ),
+                        StatBox(
+                          label: l10n.packLeftLabel,
+                          value: l10n.countN(leftAfter + inBag),
+                          valueKey: const ValueKey('bag-left'),
+                        ),
+                      ],
                     ),
                     if (sealedCount > 0 && inBag == 0 && !packing.sealUnknown)
                       NoticeBox(
@@ -604,12 +634,9 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                             .length,
                       ),
                     ),
-                    Text(
-                      l10n.shipmentReady,
-                      key: const ValueKey('shipment-state'),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: PdaColors.muted,
-                      ),
+                    DoneLine(
+                      text: l10n.shipmentReady,
+                      textKey: const ValueKey('shipment-state'),
                     ),
                     if (packing.rack case final rack?)
                       Card(

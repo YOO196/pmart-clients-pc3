@@ -239,11 +239,17 @@ class _ArrivalStep extends ConsumerWidget {
                   if (p.eta ?? p.plannedArrivalAt case final t?)
                     Text(
                       l10n.inboundPlannedAt(formatSeoulTime(t)),
-                      style: const TextStyle(color: PdaColors.muted),
+                      style: const TextStyle(
+                        color: PdaColors.ink,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   Text(
                     l10n.inboundLinesSummary(p.lines.length, p.expectedTotal),
-                    style: const TextStyle(color: PdaColors.muted),
+                    style: const TextStyle(
+                      color: PdaColors.ink,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   if (p.boxes case final b?)
                     Padding(
@@ -298,7 +304,7 @@ class _ArrivalStep extends ConsumerWidget {
                         l.sku,
                         if (l.unitsPerBox case final per?) l10n.boxPer(per),
                       ].join(' · '),
-                      style: const TextStyle(color: PdaColors.muted),
+                      style: const TextStyle(color: PdaColors.body),
                     ),
                     trailing: Text(
                       [
@@ -919,11 +925,12 @@ class _BoxCheckStep extends ConsumerWidget {
               ],
             ),
           ),
+          // 목록 아래 빨간 한 줄이 잘린 목록 끝과 겹쳐 보였다 — 노란 주의 띠로 떼어 놓는다.
           if (s.arrived.length < total)
-            Text(
-              l10n.boxMissingWarn(total - s.arrived.length),
-              key: const ValueKey('box-missing'),
-              style: TextStyle(color: theme.colorScheme.error),
+            NoticeBox(
+              warning: true,
+              textKey: const ValueKey('box-missing'),
+              text: l10n.boxMissingWarn(total - s.arrived.length),
             ),
         ],
       ),

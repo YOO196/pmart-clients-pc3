@@ -44,7 +44,7 @@ class ReturnHandoversScreen extends ConsumerWidget {
           Text(
             l10n.rhIntro,
             style: Theme.of(context).textTheme.bodyMedium
-                ?.copyWith(color: PdaColors.muted),
+                ?.copyWith(color: PdaColors.body),
           ),
           const SizedBox(height: 4),
           ...children,
@@ -142,11 +142,11 @@ class _ReturnCard extends ConsumerWidget {
             ),
             Text(
               l10n.rhDelivery(item.deliveryNumber ?? id),
-              style: const TextStyle(color: PdaColors.muted),
+              style: const TextStyle(color: PdaColors.body),
             ),
             Text(
               l10n.rhRider(item.riderId ?? '-'),
-              style: const TextStyle(color: PdaColors.muted),
+              style: const TextStyle(color: PdaColors.body),
             ),
             const SizedBox(height: 10),
             if (item.locked)
