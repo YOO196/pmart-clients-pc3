@@ -284,14 +284,21 @@ class DoneMark extends StatelessWidget {
   }
 }
 
-/// 노란 안내 띠(시안 notice) — 같은 LOT 다른 칸 같은 참고.
+/// 안내 띠 — 보통은 옅은 보라, [warning] 이면 노랑(같은 LOT 다른 칸·입수와 다름처럼
+/// 작업자가 멈춰 확인해야 하는 주의. 사용자 2026-11-19 "주의 안내만 노랑으로").
 class NoticeBox extends StatelessWidget {
-  const NoticeBox({super.key, required this.text, this.textKey});
+  const NoticeBox({
+    super.key,
+    required this.text,
+    this.textKey,
+    this.warning = false,
+  });
 
   final String text;
 
   /// 안의 [Text] 키(시험·화면이 문구를 읽는 자리).
   final Key? textKey;
+  final bool warning;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -299,14 +306,32 @@ class NoticeBox extends StatelessWidget {
     margin: const EdgeInsets.only(top: 10),
     padding: const EdgeInsets.all(10),
     decoration: BoxDecoration(
-      color: PdaColors.notice,
+      color: warning ? PdaColors.warning : PdaColors.notice,
       borderRadius: BorderRadius.circular(8),
     ),
-    child: Text(
-      text,
-      key: textKey,
-      style: Theme.of(context).textTheme.bodySmall
-          ?.copyWith(color: PdaColors.onNotice),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (warning)
+          const Padding(
+            padding: EdgeInsets.only(right: 6),
+            child: Icon(
+              Icons.warning_amber_rounded,
+              size: 18,
+              color: PdaColors.onWarning,
+            ),
+          ),
+        Expanded(
+          child: Text(
+            text,
+            key: textKey,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: warning ? PdaColors.onWarning : PdaColors.onNotice,
+              fontWeight: warning ? FontWeight.w700 : null,
+            ),
+          ),
+        ),
+      ],
     ),
   );
 }
