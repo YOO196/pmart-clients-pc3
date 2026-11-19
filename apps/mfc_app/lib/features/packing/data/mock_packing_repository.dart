@@ -39,6 +39,7 @@ base class MockPackingRepository implements PackingRepository {
         'shipmentId': id,
         'fulfillmentId': 'ful-${id.substring(4)}',
         'orderId': 'order-seed-$n',
+        'orderNumber': '1000000$n',
         'deliveryId': 'dlv-${id.substring(4)}',
         'version': 1,
         'state': 'PREPARING',

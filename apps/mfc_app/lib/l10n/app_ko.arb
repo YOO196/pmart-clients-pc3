@@ -412,7 +412,10 @@
   "printNotConfigured": "프린터 주소가 없어요. 프린터 설정에서 입력해 주세요.",
   "printUnreachable": "프린터에 연결하지 못했어요. 전원·네트워크·주소를 확인해 주세요.",
   "labelPreviewTitle": "라벨 미리보기",
-  "labelPreviewNote": "프린터 없이 보는 화면이에요. 프린터 설정에서 네트워크 프린터를 고르면 출력돼요.",
+  "labelPreviewNote": "프린터가 연결되지 않아 화면으로 보여요. 프린터 설정에서 네트워크 프린터를 고르면 출력돼요.",
+  "labelHandoverCode": "인계 번호",
+  "labelOrderNumber": "주문 {number}",
+  "@labelOrderNumber": { "placeholders": {"number": {"type": "String"}} },
   "labelDelivery": "배송 {deliveryId}",
   "@labelDelivery": {
     "placeholders": {
