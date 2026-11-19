@@ -23,6 +23,7 @@ import { LoginCallbackPage, LoginPage } from '../features/session/LoginPage';
 import { SessionPage } from '../features/session/SessionPage';
 import { MyInfoPage } from '../features/me/MyInfoPage';
 import { messages as m } from '../shared/messages';
+import { GroupIcon } from './groupIcons';
 import { allMenus, centerPath, isWorkerOnly, navGroups, type MenuItem, type MenuKey } from './nav';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
 
@@ -34,7 +35,8 @@ function useCenter(): { readonly mfcId: string; readonly mine: boolean } | null 
   return { mfcId, mine: session?.centers.includes(mfcId) ?? false };
 }
 
-/** 위 바(앱 이름·센터·목 표시·내 정보) + 왼쪽 메뉴(홈·묶음별 메뉴) + 본문. 2026-11-19 다듬기 — PDA 와 같은 흰 바탕·보라 포인트. */
+/** 화면 틀 — 통합 백오피스(web/backoffice)와 같은 모양(2026-11-19 사용자 "다른 통합 백오피스 앱 참조"):
+ *  왼쪽 진한 남색 메뉴(앱 이름 · 홈 · 묶음 아이콘+이름 · 하위 메뉴 왼쪽 띠, 지금 메뉴 민트) + 위 머리줄(묶음 › 메뉴 · 역할 · 센터 · 목 · 내 정보·세션). */
 function Layout() {
   const { session } = useSession();
   const center = useCenter();
@@ -43,41 +45,45 @@ function Layout() {
   // 지금 메뉴(`/c/:mfcId/<segment>/…`) — 센터를 바꾸면 같은 메뉴로 간다
   const segment = pathname.split('/')[3] ?? allMenus[0]!.segment;
   const showMenus = !!target && !isWorkerOnly(session?.roles ?? []);
+  const currentGroup = navGroups.find((g) => g.items.some((i) => i.segment === segment));
+  const currentItem = currentGroup?.items.find((i) => i.segment === segment);
   return (
-    <div className="flex min-h-screen flex-col bg-base-200">
-      <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b border-base-300 bg-base-100 px-4">
-        <Link to="/" className="flex items-center gap-2 text-lg font-extrabold tracking-tight" aria-label={m.goHome}>
-          <span className="inline-block size-6 rounded-md bg-primary" aria-hidden />
-          {m.appTitle}
-        </Link>
-        {env.isMock && <span className="badge badge-outline badge-sm">{m.mockBadge}</span>}
-        <div className="flex-1" />
-        {session && center?.mine && <CenterSwitcher centers={session.centers} current={center.mfcId} segment={segment} />}
-        <nav className="flex items-center gap-1 text-sm">
-          {session && (
-            <NavLink to="/me" className={({ isActive }) => `btn btn-ghost btn-sm ${isActive ? 'btn-active' : ''}`}>
-              {m.nav.me}
-            </NavLink>
-          )}
-          <NavLink to={session ? '/session' : '/login'} className={({ isActive }) => `btn btn-ghost btn-sm ${isActive ? 'btn-active' : ''}`}>
-            {session ? m.nav.session : m.nav.login}
-          </NavLink>
-        </nav>
-      </header>
-      <div className="flex flex-1">
+    <div className="flex min-h-screen bg-base-200">
+      <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col self-start overflow-y-auto bg-neutral text-neutral-content" data-testid="side-menu">
+        <div className="flex h-14 shrink-0 items-center border-b border-neutral-content/10 px-5">
+          <Link to="/" className="truncate text-base font-bold text-neutral-content" aria-label={m.goHome}>
+            {m.appTitle}
+          </Link>
+        </div>
         {showMenus && (
-          <aside className="w-56 shrink-0 border-r border-base-300 bg-base-100">
-            <nav className="sticky top-14 space-y-4 p-3" aria-label={m.nav.menu}>
-              {navGroups.map((g) => (
-                <div key={g.key}>
-                  {g.key !== 'overview' && <p className="px-3 pb-1 text-xs font-semibold text-base-content/50">{m.groups[g.key]}</p>}
-                  <ul className="space-y-0.5">
+          <nav aria-label={m.nav.menu} className="flex-1 py-3">
+            {navGroups.map((g) =>
+              g.key === 'overview' ? (
+                g.items.map((item) => (
+                  <NavLink
+                    key={item.key}
+                    to={centerPath(target, item.segment)}
+                    className={({ isActive }) =>
+                      `mx-2 mb-2 flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-[15px] font-bold transition-colors ${isActive ? 'bg-accent/20 text-accent' : 'text-neutral-content/85 hover:bg-neutral-content/10'}`
+                    }
+                  >
+                    <GroupIcon id="dashboard" className="h-5 w-5 shrink-0" />
+                    {m.menus[item.key]}
+                  </NavLink>
+                ))
+              ) : (
+                <section key={g.key} className="mx-2 mb-1" data-testid={`nav-group-${g.key}`}>
+                  <p className={`flex items-center gap-2.5 px-3 py-2 text-[15px] font-bold ${currentGroup?.key === g.key ? 'text-accent' : 'text-neutral-content/85'}`}>
+                    <GroupIcon id={g.key} className="h-5 w-5 shrink-0" />
+                    <span data-group-label>{m.groups[g.key]}</span>
+                  </p>
+                  <ul className="pb-2">
                     {g.items.map((item) => (
                       <li key={item.key}>
                         <NavLink
                           to={centerPath(target, item.segment)}
                           className={({ isActive }) =>
-                            `block rounded-field px-3 py-1.5 text-sm ${isActive ? 'bg-secondary font-bold text-secondary-content' : 'hover:bg-base-200'}`
+                            `my-0.5 ml-5 mr-1 flex items-center gap-1 rounded-r-lg border-l-4 py-2 pl-4 pr-3 text-[13px] transition-colors ${isActive ? 'border-accent bg-accent/20 font-bold text-white' : 'border-neutral-content/10 text-neutral-content/70 hover:bg-neutral-content/10 hover:text-neutral-content'}`
                           }
                         >
                           {m.menus[item.key]}
@@ -85,11 +91,44 @@ function Layout() {
                       </li>
                     ))}
                   </ul>
-                </div>
-              ))}
-            </nav>
-          </aside>
+                </section>
+              ),
+            )}
+          </nav>
         )}
+      </aside>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-base-300 bg-base-100 px-6">
+          <p className="truncate text-sm text-base-content/60" data-testid="page-title">
+            {currentItem && currentGroup ? (
+              currentGroup.key === 'overview' ? (
+                <span className="font-semibold text-base-content">{m.menus[currentItem.key]}</span>
+              ) : (
+                <>
+                  {m.groups[currentGroup.key]} <span className="px-1 text-base-content/30">›</span>
+                  <span className="font-semibold text-base-content">{m.menus[currentItem.key]}</span>
+                </>
+              )
+            ) : null}
+          </p>
+          {session && session.roles.length > 0 && (
+            <span className="badge badge-ghost badge-sm" data-testid="role-chip">
+              {session.roles.includes('MFC_SUPERVISOR') ? m.roleChip.supervisor : session.roles.join(', ')}
+            </span>
+          )}
+          <div className="ml-auto flex items-center gap-2 text-sm">
+            {session && center?.mine && <CenterSwitcher centers={session.centers} current={center.mfcId} segment={segment} />}
+            {env.isMock && <span className="badge badge-accent badge-sm">{m.mockBadge}</span>}
+            {session && (
+              <NavLink to="/me" className={({ isActive }) => `btn btn-ghost btn-xs font-normal ${isActive ? 'btn-active' : ''}`}>
+                {m.nav.me}
+              </NavLink>
+            )}
+            <NavLink to={session ? '/session' : '/login'} className={({ isActive }) => `btn btn-ghost btn-xs font-normal ${isActive ? 'btn-active' : ''}`}>
+              {session ? m.nav.session : m.nav.login}
+            </NavLink>
+          </div>
+        </header>
         <main className="min-w-0 flex-1 space-y-4 p-6">
           <div className="mx-auto max-w-7xl space-y-4">
             <Outlet />
