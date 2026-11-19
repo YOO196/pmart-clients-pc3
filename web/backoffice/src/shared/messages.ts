@@ -405,7 +405,7 @@ export const messages = {
       RIDER_LOCATION_STALE: '위치 끊김',
       MISDELIVERY: '오배송',
       DISPATCH_FAILED: '배차 실패',
-      RECONCILIATION: '맞춰 보기 필요',
+      RECONCILIATION: '결과 불일치 확인',
       PAYMENT_UNKNOWN: '결제 결과 불명',
       RETURN_RECOVERY_FAILED: '반품 회수 실패',
       // 계약 CaseKind 의 나머지(2026-11-18 코드 이름 — 지금 열리지 않아도 이름만)
@@ -422,7 +422,7 @@ export const messages = {
     /** 이력 동작 이름 — 모르는 코드는 그대로 */
     actionName: { RECURRED: '재발', REOPENED: '다시 처리', TRANSFERRED: '넘김', OPENED: '접수', ASSIGNED: '맡음', CLOSED: '처리 끝냄', HANDOVER_REQUESTED: '인계서에 들어감', HANDED_OVER: '인계됨', RECOVERY_CREATED: '회수 배송 생김', RECOVERY_PICKED_UP: '회수함', RECOVERY_RETURNED: '매장 반납', RESHIPMENT_CREATED: '재발송 배송 생김', ACTION_REQUESTED: '행위 요청', ACTION_RESULT_RECORDED: '행위 결과', CLAIM_CLOSED: '반품 끝남' } as Readonly<Record<string, string>>,
     /** case 0.5.0 사가·결제 이상(관리자만) — 사건은 알림·기록, 조치는 처리 대기 */
-    orderNote: '맞춰 보기 필요·결제 결과 불명은 본사 관리자만 봐요. 이 접수 건은 알림·기록이고, 조치는 처리 대기와 각 메뉴(환불·재고 정정)에서 해요.',
+    orderNote: '결과 불일치 확인·결제 결과 불명은 본사 관리자만 봐요. 이 접수 건은 알림·기록이고, 조치는 처리 대기와 각 메뉴(환불·재고 정정)에서 해요.',
     orderAction: '처리 대기에서 조치하기',
     priority: '우선순위',
     summary: '요약',
@@ -642,7 +642,7 @@ export const messages = {
       REFUND: '환불',
       RETURN_PICKUP: '회수',
       REDELIVERY: '재배송',
-      RECONCILIATION: '맞춰 보기',
+      RECONCILIATION: '불일치 확인',
       CUSTOMER_CONTACT: '고객 연락',
       EVIDENCE_COLLECTION: '증빙 수집',
       COMPENSATION: '보상',
@@ -761,7 +761,7 @@ export const messages = {
     /** 코드 이름(2026-11-18 "직관적이지 않다") — 계약 뜻을 그대로 옮김. 상태 값은 종류마다 뜻이 달라 종류별로 */
     stateNameByKind: {
       // order-orchestration StuckSaga.state
-      STUCK_SAGA: { ESCALATED: '사람 확인 대기', RECONCILIATION_REQUIRED: '맞춰 보기 필요', UNKNOWN_TRACKING: '결과 확인 중' },
+      STUCK_SAGA: { ESCALATED: '사람 확인 대기', RECONCILIATION_REQUIRED: '결과 불일치', UNKNOWN_TRACKING: '결과 확인 중' },
       // order-service FulfillmentIssue.state
       FULFILLMENT_ISSUE: { OPEN: '확인 전', ACKNOWLEDGED: '확인함', RESOLVED: '해소됨' },
       // mfc-fulfillment FailedStopRequest.state·RejectedHandover.status
@@ -776,7 +776,7 @@ export const messages = {
       HOLD_SLOT: '배송 시간 잡기',
       START_PAYMENT: '결제 시작',
       AWAIT_PAYMENT_RESULT: '결제 결과 기다림',
-      RECONCILE_PAYMENT: '결제 맞춰 보기',
+      RECONCILE_PAYMENT: '결제 불일치 확인',
       CONFIRM_ORDER: '주문 확정',
       CONFIRM_RESOURCES: '자원 확정',
       REQUEST_FULFILLMENT: 'MFC 작업 요청',
@@ -1032,6 +1032,16 @@ export const messages = {
     ] as const,
   },
   /** 목록 미리보기 칸(2026-11-18) */
+  /** 번호 또는 ID 입력 칸(2026-11-19) */
+  refField: {
+    kind: { delivery: '배송', rider: '라이더', order: '주문' } as const,
+    found: (kind: string, v: string) => `✓ ${kind} ${v} 을(를) 찾았어요`,
+    loading: '번호로 찾는 중…',
+    notFound: (kind: string, v: string) => `${kind} ${v} 을(를) 찾지 못했어요 — 번호를 확인해 주세요`,
+    failed: '번호로 찾지 못했어요(조회 실패) — 잠시 뒤 다시 하거나 시스템 ID 를 넣어 주세요',
+    deliveryHint: '배송 번호(예 74939255-1) 또는 배송 ID',
+    riderHint: '라이더 번호(6자리) 또는 라이더 ID',
+  },
   preview: {
     label: '미리보기',
     prev: '앞 줄',

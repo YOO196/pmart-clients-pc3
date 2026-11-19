@@ -25,6 +25,7 @@ import { RequireSession, SessionProvider, useSession } from './SessionContext';
 import { GroupIcon } from './groupIcons';
 import { GroupAlertBadge, MenuGroupAlert, MenuItemAlerts } from './MenuAlerts';
 import { NavRail } from './NavRail';
+import { AlertsAutoRefresh } from './AlertsAutoRefresh';
 import { LiveClock, RoleChips } from './HeaderContext';
 
 // 화면은 열 때 받는다(2026-11-19 — 앱 전체가 파일 하나라 첫 화면이 느렸다). 로그인·세션·대시보드·업무 도우미 틀은 처음부터.
@@ -374,6 +375,8 @@ export function App({
   const [port] = useState(() => assistantPort ?? defaultAssistantPort(api));
   return (
     <QueryClientProvider client={queryClient}>
+      {/* 처리한 뒤 알림·대시보드 숫자 바로 맞추기(2026-11-19) */}
+      <AlertsAutoRefresh />
       <UiTextProvider problem={m.problem} reason={m.reason}>
         <SessionProvider {...(initialToken ? { initialToken } : {})}>
           <AssistantProvider port={port}>

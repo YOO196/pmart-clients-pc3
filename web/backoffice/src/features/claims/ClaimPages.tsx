@@ -166,7 +166,7 @@ export function ClaimListPage() {
     const order = draft.orderId.trim();
     // 화면 주문번호(8자리)를 넣으면 주문 조회로 주문 ID 를 찾아 그 ID 로 거른다(클레임 목록은 주문 ID 로만 거른다)
     if (order && isOrderNumber(order)) {
-      const id = await orderIdOfNumber(api, order.replace(/[s-]/g, '')).catch(() => undefined);
+      const id = await orderIdOfNumber(api, order.replace(/[\s-]/g, '')).catch(() => undefined);
       if (!id) {
         setNotFound(order);
         return;

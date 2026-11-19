@@ -72,11 +72,11 @@ describe('지원센터 사건', () => {
   it('사가·결제 이상(case 0.5.0): 관리자에게만 종류·사건이 보이고, 상세는 처리 대기로 안내', async () => {
     const view = renderAt('/cases', as.admin);
     const list = await rows();
-    const order = list.find((r) => r.textContent?.includes('맞춰 보기 필요'))!;
+    const order = list.find((r) => r.textContent?.includes('결과 불일치 확인'))!;
     expect(order).toBeTruthy();
     expect(within(order).getByRole('link', { name: '주문 74939259' })).toHaveAttribute('href', '/orders/ORD-MOCK-1004');
     expect(within(order).getByText('주문 처리 SAGA-MOCK-1')).toBeInTheDocument();
-    expect(screen.getByText(/맞춰 보기 필요·결제 결과 불명은 본사 관리자만 봐요/)).toBeInTheDocument();
+    expect(screen.getByText(/결과 불일치 확인·결제 결과 불명은 본사 관리자만 봐요/)).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('종류'), 'PAYMENT_UNKNOWN');
     await waitFor(() => expect(view.sent.some((r) => new URL(r.url).searchParams.get('kind') === 'PAYMENT_UNKNOWN')).toBe(true));
     view.unmount();

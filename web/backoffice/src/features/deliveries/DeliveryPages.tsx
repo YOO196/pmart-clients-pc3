@@ -20,7 +20,7 @@ import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { StartGuide } from '../../shared/StartGuide';
 import { useWorkCounts, workText } from '../../app/DashboardWidgets';
 import { useSession } from '../../app/SessionContext';
-import { isOrderNumber, isRiderNumber, riderIdOfNumber, useRiderLabels } from '../../shared/numberLookups';
+import { deliveryIdOfNumber, isDeliveryNumber, isOrderNumber, isRiderNumber, riderIdOfNumber, useRiderLabels } from '../../shared/numberLookups';
 import { SavedViews } from '../../shared/SavedViews';
 import { CopyButton } from '../../shared/CopyButton';
 import { useRecordRecent } from '../../shared/recentViews';
@@ -218,15 +218,33 @@ export function DeliveryOpenPage() {
     const rider = f.rider.trim();
     setParams({
       q: '1',
-      ...(order ? (isOrderNumber(order) ? { orderNumber: order.replace(/[s-]/g, '') } : { orderId: order }) : {}),
+      ...(order ? (isOrderNumber(order) ? { orderNumber: order.replace(/[\s-]/g, '') } : { orderId: order }) : {}),
       ...(rider ? (isRiderNumber(rider) ? { riderNumber: rider } : { riderId: rider }) : {}),
       ...(f.state ? { state: f.state } : {}),
       ...(f.oldest ? { sort: 'OLDEST' } : {}),
     });
   };
-  const open = (e: FormEvent) => {
+  // 바로 열기 — 배송 번호(74939255-1)도 받는다(2026-11-19). 못 찾으면 칸 아래에 알리고 옮기지 않는다
+  const [openMiss, setOpenMiss] = useState<'notFound' | 'failed' | null>(null);
+  const open = async (e: FormEvent) => {
     e.preventDefault();
-    if (id.trim()) void navigate(`/deliveries/${encodeURIComponent(id.trim())}`);
+    const v = id.trim();
+    if (!v) return;
+    setOpenMiss(null);
+    let target: string | null = v;
+    if (isDeliveryNumber(v)) {
+      try {
+        target = await deliveryIdOfNumber(api, v);
+      } catch {
+        setOpenMiss('failed');
+        return;
+      }
+    }
+    if (!target) {
+      setOpenMiss('notFound');
+      return;
+    }
+    void navigate(`/deliveries/${encodeURIComponent(target)}`);
   };
   return (
     <section className="space-y-5">
@@ -235,14 +253,19 @@ export function DeliveryOpenPage() {
         title={m.deliveries.title}
         description={m.deliveries.intro}
         actions={
-          <form className="join" onSubmit={open} aria-label={m.deliveries.open}>
+          <form className="join" onSubmit={(e) => void open(e)} aria-label={m.deliveries.open}>
             <label className="input input-sm join-item w-60">
               <Icon name="search" className="h-4 w-4 text-base-content/40" />
-              <input aria-label={m.deliveries.deliveryId} placeholder={`${m.deliveries.quickOpen} — ${m.deliveries.deliveryId}`} className="font-mono" value={id} onChange={(e) => setId(e.target.value)} />
+              <input aria-label={m.deliveries.deliveryId} placeholder={`${m.deliveries.quickOpen} — ${m.refField.deliveryHint}`} className="font-mono" value={id} onChange={(e) => setId(e.target.value)} />
             </label>
             <button type="submit" className="btn btn-primary btn-sm join-item" disabled={!id.trim()}>
               {m.deliveries.open}
             </button>
+            {openMiss && (
+              <span role="status" className="ml-2 self-center text-xs text-warning" data-testid="delivery-open-miss">
+                {openMiss === 'notFound' ? m.refField.notFound(m.refField.kind.delivery, id.trim()) : m.refField.failed}
+              </span>
+            )}
           </form>
         }
       />
