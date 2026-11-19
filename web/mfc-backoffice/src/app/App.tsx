@@ -13,6 +13,7 @@ import { InboundMenu } from '../features/inbound/InboundPages';
 import { InventoryMenu } from '../features/inventory/InventoryPages';
 import { LocationsMenu } from '../features/locations/LocationPages';
 import { MovesMenu } from '../features/moves/MovePages';
+import { OpsMenu } from '../features/ops/OpsBoard';
 import { QualityMenu } from '../features/quality/QualityPages';
 import { RestrictionsMenu } from '../features/restrictions/RestrictionPages';
 import { TasksMenu } from '../features/tasks/TaskPages';
@@ -120,6 +121,7 @@ function CenterScope({ menu }: { readonly menu: MenuItem }) {
 
 /** 만든 메뉴 화면(nav.ts `ready`). 아직이면 "준비 중" */
 const menuPages: Partial<Record<MenuKey, ComponentType<{ readonly mfcId: string }>>> = {
+  ops: OpsMenu,
   locations: LocationsMenu,
   moves: MovesMenu,
   workers: WorkersMenu,
@@ -148,7 +150,7 @@ function WorkerOnly() {
   );
 }
 
-/** 첫 화면: 맡은 첫 센터의 첫 메뉴로. 센터가 없거나 워커 전용이면 안내 */
+/** 첫 화면: 맡은 첫 센터의 센터 운영판(첫 메뉴)으로. 센터가 없거나 워커 전용이면 안내 */
 function Home() {
   const { session } = useSession();
   if (!session) return null;

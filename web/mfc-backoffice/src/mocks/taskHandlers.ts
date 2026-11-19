@@ -67,7 +67,29 @@ function resolutionOf(s: MockShipment, p: Pkg) {
   };
 }
 
+/** 결품 지표 목(0.19.0): 오늘 피킹 시작 줄·결품 줄(사유별). 0건 날짜는 줄이 없다(계약) — 서울 센터는 줄 없음. */
+const seoulToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+const pickingLines: Readonly<Record<string, { readonly pickedLines: number; readonly SHORT: number; readonly DAMAGED: number; readonly BLOCKED: number }>> = {
+  'MFC-BSN-01': { pickedLines: 40, SHORT: 2, DAMAGED: 1, BLOCKED: 0 },
+};
+
 export const taskHandlers = [
+  http.get(`${API_BASE}/metrics/picking-lines`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    const q = new URL(request.url).searchParams;
+    const mfcId = q.get('mfcId') ?? '';
+    if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
+    const today = seoulToday();
+    const from = q.get('from') ?? '';
+    const to = q.get('to') ?? '';
+    const v = pickingLines[mfcId];
+    const items =
+      v && from <= today && today <= to
+        ? [{ date: today, mfcId, pickedLines: v.pickedLines, shortLines: v.SHORT + v.DAMAGED + v.BLOCKED, shortLinesByReason: { SHORT: v.SHORT, DAMAGED: v.DAMAGED, BLOCKED: v.BLOCKED } }]
+        : [];
+    return HttpResponse.json({ items, asOf: new Date().toISOString() });
+  }),
+
   http.get(`${API_BASE}/tasks`, ({ request }) => {
     if (!operator(request)) return unauthorized();
     const q = new URL(request.url).searchParams;
