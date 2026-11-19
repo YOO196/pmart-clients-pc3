@@ -664,6 +664,7 @@ export const messages = {
     amountDone: (w: string) => `기록 금액 ${w}`,
     evidence: '근거',
     resolve: '결과 남기기',
+    noDeleteHint: '후속 처리는 지울 수 없어요. 잘못 등록했거나 할 필요가 없어졌으면 관리자에게 "면제"로 끝내 달라고 해 주세요(사유 필요).',
     outcome: '결과',
     outcomeName: { FULFILLED: '완료', ATTEMPTED: '시도 기록', WAIVED: '면제(관리자)', FAILED: '실패(관리자)' } as Readonly<Record<string, string>>,
     doneQty: '이번에 한 수량',
