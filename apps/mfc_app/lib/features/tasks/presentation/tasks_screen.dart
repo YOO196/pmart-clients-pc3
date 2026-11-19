@@ -254,28 +254,57 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
     if (missing <= 0) return;
     final reason = await showDialog<ShortageReason>(
       context: context,
+      // 장갑 낀 손으로도 누르게 큰 칸 셋(아이콘 + 이름, 파손은 품질 사고 안내 한 줄).
       builder: (context) => SimpleDialog(
         title: Text(l10n.shortageTitle(missing)),
+        contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         children: [
           for (final r in ShortageReason.values)
-            SimpleDialogOption(
-              key: ValueKey('shortage-${r.name}'),
-              onPressed: () => Navigator.of(context).pop(r),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(switch (r) {
-                    ShortageReason.short => l10n.shortageShort,
-                    ShortageReason.damaged => l10n.shortageDamaged,
-                    ShortageReason.blocked => l10n.shortageBlocked,
-                  }),
-                  // mfc-quality 0.6.0: 파손 결품 보고는 서버가 품질 사고(자동)를 연다
-                  if (r == ShortageReason.damaged)
-                    Text(
-                      l10n.shortageDamagedNote,
-                      style: Theme.of(context).textTheme.bodySmall,
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: OutlinedButton(
+                key: ValueKey('shortage-${r.name}'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(64),
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => Navigator.of(context).pop(r),
+                child: Row(
+                  children: [
+                    Icon(switch (r) {
+                      ShortageReason.short =>
+                        Icons.remove_shopping_cart_outlined,
+                      ShortageReason.damaged => Icons.broken_image_outlined,
+                      ShortageReason.blocked => Icons.block,
+                    }, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(switch (r) {
+                            ShortageReason.short => l10n.shortageShort,
+                            ShortageReason.damaged => l10n.shortageDamaged,
+                            ShortageReason.blocked => l10n.shortageBlocked,
+                          }, style: Theme.of(context).textTheme.titleMedium),
+                          // mfc-quality 0.6.0: 파손 결품 보고는 서버가 품질 사고(자동)를 연다
+                          if (r == ShortageReason.damaged)
+                            Text(
+                              l10n.shortageDamagedNote,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                        ],
+                      ),
                     ),
-                ],
+                  ],
+                ),
               ),
             ),
         ],
@@ -366,12 +395,26 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                   ],
                   current: step,
                 ),
-              const SizedBox(height: 8),
-              Text(
-                l10n.taskProgress(task.totalCompleted, task.totalPlanned),
-                key: const ValueKey('pick-progress'),
-                style: theme.textTheme.titleMedium,
+              Row(
+                children: [
+                  Text(
+                    l10n.taskProgress(task.totalCompleted, task.totalPlanned),
+                    key: const ValueKey('pick-progress'),
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: LinearProgressIndicator(
+                      value: task.totalPlanned == 0
+                          ? 0
+                          : task.totalCompleted / task.totalPlanned,
+                      minHeight: 6,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 12),
               if (checking)
                 Card(
                   key: const ValueKey('do-not-redo'),
@@ -383,11 +426,10 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                 ),
               if (stop != null && picking.cart == null) ...[
                 // 1. 장바구니 — 주문과 장바구니를 잇는다(업무 문서 §7-6).
-                TargetLine(
+                ScanPrompt(
                   key: const ValueKey('target-cart'),
-                  label: l10n.moveCart,
-                  code: l10n.moveCartScan,
-                  confirmed: false,
+                  icon: Icons.shopping_cart_outlined,
+                  text: l10n.moveCartScan,
                 ),
                 ScanInput(
                   id: 'cart-scan',
@@ -395,7 +437,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                     TestScan(l10n.tsCart, 'CRT-C-01'),
                     TestScan(l10n.tsWrong, 'C-S1-01-1-01'),
                   ],
-                  label: l10n.moveCartScan,
+                  label: l10n.scanHint,
                   cameraTitle: l10n.pickCameraTitle,
                   continuous: false,
                   autofocus: false,
@@ -503,7 +545,13 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                             picking.capturedFor(stop.line.orderLineId),
                           ),
                           key: const ValueKey('pick-counts'),
-                          style: theme.textTheme.titleLarge,
+                          // 상품 단계에서는 몇 개 집을지가 제일 중요하다 — 크게.
+                          style: picking.at == null
+                              ? theme.textTheme.titleMedium
+                              : theme.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: theme.colorScheme.primary,
+                                ),
                         ),
                         if (stop.pick case final p?) ...[
                           if (switch (p.status) {

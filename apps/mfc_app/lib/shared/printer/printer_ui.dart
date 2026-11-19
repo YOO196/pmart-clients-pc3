@@ -140,8 +140,15 @@ class LabelPreviewDialog extends StatelessWidget {
             if (label.deliveryId != null)
               Text(l10n.labelDelivery(label.deliveryId!)),
             if (label.temperatureZone != null)
+              // 화면은 한국어(냉장·냉동·상온), 서버 값은 그대로 둔다.
               Text(
-                label.temperatureZone!,
+                switch (label.temperatureZone!.toUpperCase()) {
+                  'AMBIENT' => l10n.zoneAmbient,
+                  'CHILLED' => l10n.zoneChilled,
+                  'FROZEN' => l10n.zoneFrozen,
+                  final z => z,
+                },
+                key: const ValueKey('label-zone'),
                 style: theme.textTheme.headlineMedium,
               ),
             if (label.bagCount != null) Text(l10n.labelBags(label.bagCount!)),

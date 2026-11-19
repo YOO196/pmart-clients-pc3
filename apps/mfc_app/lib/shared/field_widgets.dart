@@ -7,7 +7,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../l10n/gen/app_localizations.dart';
 import 'location_guide.dart';
 
-/// 단계 표시(1 → 2 → 3 …). [current] 까지 채운다.
+/// 단계 표시(1 → 2 → 3 …). 끝난 단계는 ✓, 지금 단계는 진한 색·굵은 글씨, 단계 사이는 선으로 잇는다.
 class StepHeader extends StatelessWidget {
   const StepHeader({super.key, required this.names, required this.current});
 
@@ -16,36 +16,128 @@ class StepHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Row(
-      key: ValueKey('step-$current'),
-      children: [
-        for (final (i, n) in names.indexed)
-          Expanded(
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: i <= current
-                      ? scheme.primary
-                      : scheme.surfaceContainerHighest,
-                  foregroundColor: i <= current
-                      ? scheme.onPrimary
-                      : scheme.onSurfaceVariant,
-                  child: Text('${i + 1}'),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  n,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontWeight: i == current ? FontWeight.bold : null,
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    Widget line(bool done) => Expanded(
+      child: Container(
+        height: 2,
+        color: done ? scheme.primary : scheme.outlineVariant,
+      ),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        key: ValueKey('step-$current'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final (i, n) in names.indexed)
+            Expanded(
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 28,
+                    child: Row(
+                      children: [
+                        if (i == 0) const Spacer() else line(i <= current),
+                        Container(
+                          width: 28,
+                          height: 28,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: i <= current
+                                ? scheme.primary
+                                : scheme.surface,
+                            border: Border.all(
+                              color: i <= current
+                                  ? scheme.primary
+                                  : scheme.outlineVariant,
+                              width: 2,
+                            ),
+                          ),
+                          child: i < current
+                              ? Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: scheme.onPrimary,
+                                )
+                              : Text(
+                                  '${i + 1}',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    color: i == current
+                                        ? scheme.onPrimary
+                                        : scheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                        ),
+                        if (i == names.length - 1)
+                          const Spacer()
+                        else
+                          line(i < current),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    n,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: i == current
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant,
+                      fontWeight: i == current ? FontWeight.w800 : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 지금 무엇을 찍을지 크게 — 아이콘 + 한 줄(예 "카트 바코드를 찍어 주세요"). 아래에 [ScanInput] 을 둔다.
+class ScanPrompt extends StatelessWidget {
+  const ScanPrompt({super.key, required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: scheme.primaryContainer,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: Row(
+            children: [
+              Icon(icon, size: 40, color: scheme.onPrimaryContainer),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  text,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 19,
+                    color: scheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-      ],
+        ),
+      ),
     );
   }
 }

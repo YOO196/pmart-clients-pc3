@@ -105,6 +105,153 @@ void main() {
     debugDisableShadows = true; // 테스트 끝 검사 전에 되돌린다.
   });
 
+  // 피패킹 한 주문 전체(업무 고르기 → 피킹 → 패킹 → 끝) — 단계마다 한 장. 파일 이름 pp-NN-<단계>.
+  testWidgets('pickpack-flow', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    debugDisableShadows = false;
+    t.view
+      ..physicalSize = const Size(1080, 2160)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final tasks = MockTaskRepository(latency: Duration.zero);
+    await t.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [
+          envProvider.overrideWithValue(PmartEnv.mock),
+          taskRepositoryProvider.overrideWithValue(tasks),
+          packingRepositoryProvider.overrideWithValue(
+            MockPackingRepository(
+              latency: Duration.zero,
+              onShipmentReady: tasks.shipmentReady,
+            ),
+          ),
+          workRepositoryProvider.overrideWithValue(
+            MockWorkRepository(tasks: tasks, latency: Duration.zero),
+          ),
+          secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+        ],
+        child: const MfcApp(),
+      ),
+    );
+    await t.pumpAndSettle();
+
+    var n = 0;
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      n += 1;
+      await expectLater(
+        find.byType(MfcApp),
+        matchesGoldenFile(
+          File('$_dir/pp-${n.toString().padLeft(2, '0')}-$name.png').uri,
+        ),
+      );
+    }
+
+    Future<void> tap(String key) async {
+      await t.ensureVisible(find.byKey(ValueKey(key)));
+      await t.tap(find.byKey(ValueKey(key)));
+      await t.pumpAndSettle();
+    }
+
+    Future<void> scanTo(String id, String code) async {
+      await t.enterText(find.byKey(ValueKey(id)), code);
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await t.pumpAndSettle();
+    }
+
+    // 업무 고르기 → 안내 → 받은 작업
+    await shot('home');
+    await tap('area-pickPack');
+    await shot('guide');
+    await tap('guide-ok');
+    await shot('assigned');
+    await tap('run-task');
+
+    // 피킹
+    await shot('pick-cart');
+    await scanTo('cart-scan', 'CRT-C-02');
+    final stops = [
+      ('C-S1-01-1-01', MockTaskRepository.yogurtBarcode),
+      ('C-S1-02-2-05', MockTaskRepository.milkBarcode),
+      ('C-S2-04-1-10', MockTaskRepository.milkBarcode),
+      ('F-S1-01-1-03', MockTaskRepository.dumplingBarcode),
+      ('A-S3-01-1-10', MockTaskRepository.chipsBarcode),
+    ];
+    for (var i = 0; i < stops.length; i++) {
+      final (loc, code) = stops[i];
+      if (i == 0) await shot('pick-location');
+      await scanTo('pick-loc-scan', loc);
+      if (i == 0) {
+        await shot('pick-item');
+        // 결품·파손 보고 창(닫고 계속)
+        await tap('report-shortage');
+        await shot('pick-shortage');
+        Navigator.of(t.element(find.byType(SimpleDialog))).pop();
+        await t.pumpAndSettle();
+      }
+      await scanTo('scan-field', code);
+      if (i == 0) await shot('pick-next-location');
+    }
+    await shot('pick-done');
+
+    // 패킹
+    await tap('to-pack');
+    await shot('pack-station');
+    await scanTo('station-scan', 'PAK-C-01');
+    await shot('pack-cart');
+    await scanTo('pack-cart-scan', 'CRT-C-02');
+    await shot('pack-dispatch');
+    await tap('pack-min-10');
+    await tap('request-dispatch');
+    await shot('pack-bag-empty');
+    await scanTo('pack-scan', MockTaskRepository.yogurtBarcode);
+    await scanTo('pack-scan', MockTaskRepository.milkBarcode);
+    await scanTo('pack-scan', MockTaskRepository.milkBarcode);
+    await shot('pack-bag-chilled');
+    await tap('seal');
+    await shot('pack-label');
+    await t.tap(
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('label-preview')),
+            matching: find.byType(TextButton),
+          )
+          .last,
+    );
+    await t.pumpAndSettle();
+    await scanTo('pack-scan', MockTaskRepository.dumplingBarcode);
+    await tap('seal');
+    await t.tap(
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('label-preview')),
+            matching: find.byType(TextButton),
+          )
+          .last,
+    );
+    await t.pumpAndSettle();
+    await scanTo('pack-scan', MockTaskRepository.chipsBarcode);
+    await tap('seal');
+    await t.tap(
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('label-preview')),
+            matching: find.byType(TextButton),
+          )
+          .last,
+    );
+    await t.pumpAndSettle();
+    await shot('pack-rack');
+    await scanTo('rack-scan', 'DSP-A-01');
+    await shot('pack-rack-scanned');
+    await tap('finish-packing');
+    await shot('pack-finished');
+    debugDisableShadows = true;
+  });
+
   testWidgets('move', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
     await t.runAsync(_loadFonts);

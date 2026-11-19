@@ -270,7 +270,8 @@ void main() {
     expect(field.keyboardType, TextInputType.none); // 화면 키보드를 띄우지 않는다
     expect(field.showCursor, isFalse);
     expect(field.enableInteractiveSelection, isFalse); // 붙여넣기 메뉴 없음
-    expect(find.text('바코드를 찍어 주세요'), findsOneWidget);
+    // 안내는 한 줄 — 넘긴 label 만(고정 힌트를 겹쳐 두 줄로 자르지 않는다).
+    expect(find.text('출발 칸'), findsOneWidget);
     expect(find.byKey(const ValueKey('x-camera')), findsOneWidget);
 
     // 키보드 웨지: 글자가 들어오고 Enter.
