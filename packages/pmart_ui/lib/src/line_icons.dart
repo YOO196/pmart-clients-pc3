@@ -18,6 +18,9 @@ enum PmartLineIcons {
 
   /// 사진 올리기(고객앱 리뷰 쓰기).
   camera,
+
+  /// 현재 위치로 찾기(고객앱 주소 검색, 레퍼런스 2-4 — 원 + 네 방향 눈금).
+  locate,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -228,6 +231,12 @@ class _LinePainter extends CustomPainter {
           line,
         );
         canvas.drawCircle(const Offset(12, 12.8), 3.6, line);
+      case PmartLineIcons.locate:
+        canvas.drawCircle(const Offset(12, 12), 8, line);
+        canvas.drawLine(const Offset(12, 2.6), const Offset(12, 7), line);
+        canvas.drawLine(const Offset(12, 17), const Offset(12, 21.4), line);
+        canvas.drawLine(const Offset(2.6, 12), const Offset(7, 12), line);
+        canvas.drawLine(const Offset(17, 12), const Offset(21.4, 12), line);
     }
   }
 

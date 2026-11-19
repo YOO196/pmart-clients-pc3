@@ -77,6 +77,9 @@ dependencies:
   flutter_markdown_plus: ^1.0.12
   # 앱을 보고 있을 때 온 푸시를 상태표시줄 알림으로 띄운다(FCM 은 이때 띄우지 않는다). 사용자 결정 2026-11-18.
   flutter_local_notifications: ^23.0.2
+  # "현재 위치로 찾기"(레퍼런스 2-4) — 휴대폰 위치 한 번 읽기. 라이더앱과 같은 버전. 사용자 승인 2026-11-19.
+  # 좌표 → 주소는 서버 /address-reverse-geocodes(카카오 로컬, ADR-0023). 위치기반서비스 약관 동의 뒤에만 쓴다(BR-59).
+  geolocator: ^14.1.2
 
 dev_dependencies:
   flutter_test:

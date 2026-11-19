@@ -5,7 +5,10 @@ import 'package:pmart_core/pmart_core.dart';
 
 import 'package:customer_app/features/address/data/mock_address_repository.dart';
 import 'package:customer_app/features/address/domain/address.dart';
+import 'package:customer_app/features/address/data/current_location.dart';
+import 'package:customer_app/features/profile/data/consents_repository.dart';
 import 'package:customer_app/features/start/data/device_consents_repository.dart';
+import 'package:customer_app/features/start/presentation/current_location_flow.dart';
 import 'package:customer_app/features/start/presentation/start_controller.dart';
 
 import 'support/app_harness.dart';
@@ -241,6 +244,98 @@ void main() {
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
     expect(key('start-welcome'), findsOneWidget);
+  });
+
+  group('현재 위치로 찾기', () {
+    late MemoryKeyValueStore secure;
+    late MockDeviceConsentsRepository consents;
+    late MockCurrentLocationSource location;
+
+    setUp(() async {
+      secure = MemoryKeyValueStore();
+      await secure.write('pmart.start.welcome', 'at=x');
+      await secure.write('pmart.start.entry', '1');
+      consents = MockDeviceConsentsRepository();
+      location = MockCurrentLocationSource();
+    });
+
+    Future<void> open(WidgetTester t) async {
+      await t.pumpWidget(
+        testApp(
+          [
+            deviceConsentsRepositoryProvider.overrideWithValue(consents),
+            currentLocationSourceProvider.overrideWithValue(location),
+          ],
+          startGate: true,
+          secure: secure,
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(key('start-address'), findsOneWidget);
+      await t.tap(key('start-address-locate'));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('위치 약관 동의가 없으면 묻고 서버(기기 동의)에 남긴 뒤 위치 → 도로명주소로 주소 입력', (
+      t,
+    ) async {
+      await open(t);
+      expect(key('locate-consent'), findsOneWidget);
+      expect(location.calls, 0);
+      await t.tap(key('dialog-confirm'));
+      await t.pumpAndSettle();
+
+      final (sent, _) = consents.changes.single;
+      expect(
+        [for (final c in sent) (c.type, c.version, c.agreed)],
+        [('LOCATION_BASED_SERVICE', '2026-11-19', true)],
+      );
+      expect(location.calls, 1);
+      // 목 역지오코딩 결과가 주소 입력에 채워진다
+      expect(key('f-road'), findsOneWidget);
+      expect(find.text('부산 부산진구 중앙대로 672'), findsOneWidget);
+    });
+
+    testWidgets('이미 동의했으면 묻지 않는다', (t) async {
+      await consents.change(const [
+        ConsentChange('LOCATION_BASED_SERVICE', '2026-11-19', agreed: true),
+      ], key: IdempotencyKey.generate());
+      await open(t);
+      expect(key('locate-consent'), findsNothing);
+      expect(location.calls, 1);
+      expect(key('f-road'), findsOneWidget);
+    });
+
+    testWidgets('동의 창을 닫으면 위치를 읽지 않는다', (t) async {
+      await open(t);
+      await t.tap(key('dialog-cancel'));
+      await t.pumpAndSettle();
+      expect(location.calls, 0);
+      expect(consents.changes, isEmpty);
+      expect(key('start-address'), findsOneWidget);
+    });
+
+    testWidgets('권한 거부면 레퍼런스 5-2 안내 → 설정을 연다', (t) async {
+      location.fix = const LocationDenied(forever: true);
+      await open(t);
+      await t.tap(key('dialog-confirm'));
+      await t.pumpAndSettle();
+      expect(key('locate-settings'), findsOneWidget);
+      expect(find.text("현재 위치 검색을 위해 '위치 공유 설정'을 변경(허용)해주세요."), findsOneWidget);
+      await t.tap(key('dialog-confirm'));
+      await t.pumpAndSettle();
+      expect(location.settingsOpened, [false]);
+      expect(key('f-road'), findsNothing);
+    });
+
+    testWidgets('위치를 못 받으면 안내만 하고 주소를 지어내지 않는다', (t) async {
+      location.fix = const LocationUnavailable();
+      await open(t);
+      await t.tap(key('dialog-confirm'));
+      await t.pumpAndSettle();
+      expect(find.text('현재 위치를 찾지 못했어요. 주소를 검색해 주세요'), findsOneWidget);
+      expect(key('f-road'), findsNothing);
+    });
   });
 
   test('redirect: 판단 중에는 처음 화면만 대기, 그 뒤 다시 읽기는 그대로', () {

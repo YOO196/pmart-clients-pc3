@@ -10,9 +10,11 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_screens.dart'
     show addressSearchProvider;
+import '../../address/presentation/postcode_screen.dart' show PostcodeResult;
 import '../../profile/data/consents_repository.dart';
 import '../../push/presentation/push_controller.dart' show pushSourceProvider;
 import '../data/device_consents_repository.dart';
+import 'current_location_flow.dart';
 import 'start_controller.dart';
 
 /// 처음 실행 단계를 판단하는 동안(저장소·세션·주소록 읽기).
@@ -323,20 +325,37 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
 
 /// 레퍼런스 2-4 "둘러보기 선택 후 주소 검색 화면". 뒤로 갈 수 없다 — 배달 주소를 정해야 홈으로 간다.
 /// 검색칸을 누르면 주소 검색 → 주소 입력(상세 주소 필수, 지도 핀) → 저장하면 홈.
-/// "현재 위치로 찾기"는 위치 라이브러리가 없어 아직 넣지 않았다(승인 필요).
-class StartAddressScreen extends ConsumerWidget {
+/// "현재 위치로 찾기"(geolocator, 사용자 승인 2026-11-19)는 위치기반서비스 약관 동의 뒤 휴대폰 위치로 도로명주소를 찾는다.
+class StartAddressScreen extends ConsumerStatefulWidget {
   const StartAddressScreen({super.key});
 
-  Future<void> _search(BuildContext context, WidgetRef ref) async {
-    final picked = await ref.read(addressSearchProvider)(context);
-    if (picked == null || !context.mounted) return;
+  @override
+  ConsumerState<StartAddressScreen> createState() => _StartAddressScreenState();
+}
+
+class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
+  bool _locating = false;
+
+  Future<void> _open(PostcodeResult? picked) async {
+    if (picked == null || !mounted) return;
     await context.push('/addresses/new', extra: picked);
     // 저장했으면 단계가 홈으로 바뀌어 있다. 다시 판단하게 한다(아니면 이 화면으로 돌아온다).
-    if (context.mounted) context.go('/');
+    if (mounted) context.go('/');
+  }
+
+  Future<void> _search() async =>
+      _open(await ref.read(addressSearchProvider)(context));
+
+  Future<void> _locate() async {
+    setState(() => _locating = true);
+    final picked = await findCurrentAddress(context, ref);
+    if (!mounted) return;
+    setState(() => _locating = false);
+    await _open(picked);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant;
@@ -367,7 +386,7 @@ class StartAddressScreen extends ConsumerWidget {
               child: InkWell(
                 key: const ValueKey('start-address-search'),
                 borderRadius: BorderRadius.circular(14),
-                onTap: () => _search(context, ref),
+                onTap: _search,
                 child: SizedBox(
                   height: 46,
                   child: Row(
@@ -423,6 +442,38 @@ class StartAddressScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+            OutlinedButton(
+              key: const ValueKey('start-address-locate'),
+              onPressed: _locating ? null : _locate,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(46),
+                foregroundColor: theme.colorScheme.onSurface,
+                side: BorderSide(color: theme.colorScheme.onSurface),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                textStyle: theme.textTheme.titleMedium?.copyWith(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 찾는 동안은 버튼만 잠근다(약관·권한 창이 떠 있을 수 있어 돌아가는 표시는 두지 않는다).
+                  PmartLineIcon(
+                    PmartLineIcons.locate,
+                    size: 18,
+                    color: _locating
+                        ? theme.disabledColor
+                        : theme.colorScheme.onSurface,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(l10n.startAddressLocate),
                 ],
               ),
             ),

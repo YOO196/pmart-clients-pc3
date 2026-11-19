@@ -911,11 +911,23 @@ class _AddToCartBarState extends ConsumerState<AddToCartBar> {
   }
 }
 
-/// 비회원은 주문 목적으로 로그인한 뒤 이어간다(자동 병합 없음).
+/// 비회원은 주문 목적으로 로그인한 뒤 이어간다. 서버는 병합 신호를 주지 않으므로(BR-50 회신) 로그인 전
+/// 비회원 장바구니를 기억해 두었다가 병합 확인 화면이 읽는다 — 품목이 없으면 바로 주문서로, 있으면 고객이 고른 것만.
 Future<void> _order(BuildContext context, WidgetRef ref) async {
   if (ref.read(sessionProvider) is! MemberSession) {
-    final ok = await context.push<bool>('/login?purpose=checkout');
-    if (ok != true || !context.mounted) return;
+    final guestCartId = ref.read(cartControllerProvider).value?.cart.cartId;
+    // 로그인하면 회원 장바구니를 다시 읽느라 이 버튼(context)이 새로 그려진다 — 라우터·컨테이너를 붙잡아 이어 간다.
+    final router = GoRouter.of(context);
+    final container = ProviderScope.containerOf(context);
+    final ok = await router.push<bool>('/login?purpose=checkout');
+    if (ok != true) return;
+    if (guestCartId != null) {
+      final go = await router.push<bool>('/cart/merge', extra: guestCartId);
+      if (go != true) return;
+    }
+    container.read(checkoutSetupProvider.notifier).begin();
+    await router.push('/checkout/delivery');
+    return;
   }
   ref.read(checkoutSetupProvider.notifier).begin();
   await context.push('/checkout/delivery');

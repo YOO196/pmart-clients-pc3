@@ -5,6 +5,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import 'features/address/presentation/address_screens.dart';
 import 'features/address/presentation/postcode_screen.dart' show PostcodeResult;
+import 'features/cart/presentation/cart_merge_screen.dart';
 import 'features/start/presentation/start_controller.dart';
 import 'features/start/presentation/start_screens.dart';
 import 'features/auth/domain/auth.dart';
@@ -227,6 +228,13 @@ final routerProvider = Provider<GoRouter>((ref) {
               ? LoginPurpose.checkout
               : LoginPurpose.general,
         ),
+      ),
+      // 주문서 로그인 뒤 병합 확인(SCR-CART-MERGE-001). extra = 로그인 전 비회원 cartId.
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/cart/merge',
+        builder: (_, state) =>
+            CartMergeScreen(guestCartId: state.extra! as String),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,

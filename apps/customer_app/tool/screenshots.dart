@@ -14,7 +14,12 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:customer_app/app.dart';
+import 'package:customer_app/features/address/data/current_location.dart';
 import 'package:customer_app/features/auth/data/mock_auth_repository.dart';
+import 'package:customer_app/features/cart/data/cart_merge_repository.dart';
+import 'package:customer_app/features/cart/data/mock_cart_repository.dart';
+import 'package:customer_app/features/cart/presentation/cart_merge_screen.dart';
+import 'package:customer_app/features/start/presentation/current_location_flow.dart';
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
 import 'package:customer_app/features/claims/data/mock_claims_repository.dart';
@@ -468,7 +473,13 @@ void main() {
       ..physicalSize = const Size(1080, 2180)
       ..devicePixelRatio = 3;
     addTearDown(t.view.reset);
-    await t.pumpWidget(testApp(const [], startGate: true));
+    await t.pumpWidget(
+      testApp([
+        currentLocationSourceProvider.overrideWithValue(
+          MockCurrentLocationSource(fix: const LocationDenied(forever: true)),
+        ),
+      ], startGate: true),
+    );
     await t.pumpAndSettle();
     Future<void> shot(String name) async {
       await t.pumpAndSettle();
@@ -491,6 +502,51 @@ void main() {
     await shot('entry');
     await t.tap(find.byKey(const ValueKey('login-browse')));
     await shot('address');
+    await t.tap(find.byKey(const ValueKey('start-address-locate')));
+    await shot('locate-consent');
+    await t.tap(find.byKey(const ValueKey('dialog-confirm')));
+    await shot('locate-settings');
+    debugDisableShadows = true;
+  });
+
+  // 주문서 로그인 뒤 병합 확인(SCR-CART-MERGE-001, BR-50): 고르기 → 결과(일부 거절).
+  testWidgets('merge', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    debugDisableShadows = false;
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final member = MockCartRepository(latency: Duration.zero);
+    final guest = MockCartRepository(latency: Duration.zero, seeded: false)
+      ..seedLine('E-00000002', 1)
+      ..seedLine('E-00000003', 2);
+    final merges = MockCartMergeRepository(member: member, guest: guest)
+      ..rejectSkus = {'E-00000003': 'QUANTITY_LIMIT_EXCEEDED'};
+    await t.pumpWidget(
+      testApp(cart: member, [
+        cartMergeRepositoryProvider.overrideWithValue(merges),
+      ]),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/m-$name.png').uri),
+      );
+    }
+
+    await t.tap(find.text('장바구니').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('cart-order')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await shot('choose');
+    await t.tap(find.byKey(const ValueKey('merge-confirm')));
+    await shot('result');
     debugDisableShadows = true;
   });
 }

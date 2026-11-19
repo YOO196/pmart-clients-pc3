@@ -95,6 +95,9 @@ abstract interface class DeviceConsentsRepository {
   /// `GET /consent-terms/{type}/{version}`(토큰 없음). 없으면 404 `CONSENT_TERM_NOT_FOUND`.
   Future<ConsentTermDocument> document(String type, String version);
 
+  /// `GET /device-consents`(X-Device-Id). 로그인해 계정으로 옮긴 뒤에는 고르지 않은 상태로 온다.
+  Future<DeviceConsents> list();
+
   /// `POST /device-consent-changes`(X-Device-Id). 응답 = 반영 뒤 상태. 같은 키 재전송은 다시 반영하지 않는다.
   Future<DeviceConsents> change(
     List<ConsentChange> changes, {
@@ -148,6 +151,17 @@ final class ApiDeviceConsentsRepository implements DeviceConsentsRepository {
       version: d.version,
       title: d.title,
       body: d.body,
+    );
+  }
+
+  @override
+  Future<DeviceConsents> list() async {
+    final deviceId = await _deviceId.get();
+    final res = await pmartGuard(
+      () => _api.listDeviceConsents(xDeviceId: deviceId),
+    );
+    return deviceConsentsFromContract(
+      res.data ?? (throw const ContractViolationFailure('기기 동의 본문 없음')),
     );
   }
 
@@ -268,6 +282,17 @@ final class MockDeviceConsentsRepository implements DeviceConsentsRepository {
     );
   }
 
+  DeviceConsents _snapshot() => DeviceConsents(
+    senderName: sender,
+    items: [
+      for (final type in [ConsentWire.marketing, ConsentWire.location])
+        _state[type] ?? DeviceConsent(type: type, agreed: false),
+    ],
+  );
+
+  @override
+  Future<DeviceConsents> list() async => _snapshot();
+
   @override
   Future<DeviceConsents> change(
     List<ConsentChange> changes, {
@@ -299,12 +324,6 @@ final class MockDeviceConsentsRepository implements DeviceConsentsRepository {
         );
       }
     }
-    return DeviceConsents(
-      senderName: sender,
-      items: [
-        for (final type in [ConsentWire.marketing, ConsentWire.location])
-          _state[type] ?? DeviceConsent(type: type, agreed: false),
-      ],
-    );
+    return _snapshot();
   }
 }
