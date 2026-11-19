@@ -9,7 +9,8 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../auth/presentation/auth_controller.dart';
 import '../../../l10n/gen/app_localizations.dart';
-import '../../../shared/menu_tile.dart';
+import '../../../shared/field_widgets.dart' show NoticeBox;
+import '../../../shared/pda_theme.dart';
 import '../../../shared/providers.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../my_work/presentation/my_work.dart';
@@ -246,58 +247,93 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             UiStateView<WorkerProfile>(
               state: uiStateOf(ref.watch(meProvider)),
               onRetry: () => ref.invalidate(meProvider),
-              ready: (context, me) => SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+              // 시안 pda-preview.html 첫 화면: 인사·상태 → 피패킹 큰 카드 → 기타 업무 2×2 → 아래 도구 줄.
+              ready: (context, me) {
+                void openArea(WorkArea a) {
+                  if (!me.can(a)) {
+                    unawaited(showNoPermission(context, workAreaText(l10n, a)));
+                    return;
+                  }
+                  if (me.onBreak) {
+                    unawaited(_onBreakDialog(me));
+                    return;
+                  }
+                  // 고르면 바로 그 업무의 작업 순서 안내로.
+                  context.push('/work/${a.name}/guide');
+                }
+
+                final others = [
+                  for (final a in WorkArea.values)
+                    if (a != WorkArea.pickPack) a,
+                ];
+                return SafeArea(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                     children: [
-                      Text(
-                        l10n.homeHello(me.displayName ?? me.workerId),
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      Text(
-                        me.onBreak ? l10n.statusOnBreak : l10n.statusReady,
-                        key: const ValueKey('worker-status'),
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: me.onBreak
-                              ? theme.colorScheme.error
-                              : theme.colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(l10n.chooseArea, style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 8),
-                      for (final a in WorkArea.values)
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: _AreaTile(
-                              area: a,
-                              allowed: me.can(a),
-                              onTap: () {
-                                if (!me.can(a)) {
-                                  unawaited(
-                                    showNoPermission(
-                                      context,
-                                      workAreaText(l10n, a),
-                                    ),
-                                  );
-                                  return;
-                                }
-                                if (me.onBreak) {
-                                  unawaited(_onBreakDialog(me));
-                                  return;
-                                }
-                                // 고르면 바로 그 업무의 작업 순서 안내로.
-                                context.push('/work/${a.name}/guide');
-                              },
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l10n.homeHello(me.displayName ?? me.workerId),
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1.2,
+                              ),
                             ),
                           ),
+                          Text(
+                            me.onBreak ? l10n.statusOnBreak : l10n.statusReady,
+                            key: const ValueKey('worker-status'),
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: me.onBreak
+                                  ? theme.colorScheme.error
+                                  : PdaColors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      _HeroArea(
+                        key: const ValueKey('area-pickPack'),
+                        allowed: me.can(WorkArea.pickPack),
+                        onTap: () => openArea(WorkArea.pickPack),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(2, 16, 0, 7),
+                        child: Text(
+                          l10n.otherWork,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: PdaColors.muted,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
+                      ),
+                      for (var r = 0; r < others.length; r += 2)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 7),
+                          child: Row(
+                            children: [
+                              for (var c = r; c < r + 2; c++) ...[
+                                if (c > r) const SizedBox(width: 7),
+                                Expanded(
+                                  child: c < others.length
+                                      ? _AreaTile(
+                                          area: others[c],
+                                          allowed: me.can(others[c]),
+                                          onTap: () => openArea(others[c]),
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      const Divider(height: 24),
                       Row(
                         children: [
-                          _MenuButton(
+                          _ToolButton(
                             key: const ValueKey('menu-handover'),
                             icon: Icons.inventory_2_outlined,
                             label: l10n.handoverChecksMenu,
@@ -309,9 +345,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               () => context.push('/handover-checks'),
                             ),
                           ),
-                          const SizedBox(width: 8),
                           // 반납 인증번호 — 라이더가 회수품을 가져오면 알려 줄 번호(rider-app 요청 2026-11-18).
-                          _MenuButton(
+                          _ToolButton(
                             key: const ValueKey('menu-return-handover'),
                             icon: Icons.assignment_return_outlined,
                             label: l10n.returnHandoverMenu,
@@ -323,12 +358,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               () => context.push('/return-handovers'),
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          _MenuButton(
+                          _ToolButton(
                             key: const ValueKey('menu-printer'),
                             icon: Icons.print_outlined,
                             label: l10n.printerMenu,
@@ -340,17 +370,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               () => context.push('/settings/printer'),
                             ),
                           ),
-                          const SizedBox(width: 8),
                           // 재고 확인 — 시작 메뉴와 같은 화면(사용자 2026-11-17 "홈 아래 메뉴줄에도").
-                          _MenuButton(
+                          _ToolButton(
                             key: const ValueKey('menu-stock'),
                             icon: Icons.manage_search,
                             label: l10n.stockCheckMenu,
                             allowed: true,
                             onTap: () => context.push('/stock-check'),
                           ),
-                          const SizedBox(width: 8),
-                          _MenuButton(
+                          _ToolButton(
                             key: const ValueKey('menu-break'),
                             icon: me.onBreak
                                 ? Icons.play_circle_outline
@@ -363,8 +391,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ],
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ),
     );
@@ -469,6 +497,115 @@ class _ManageMenu extends StatelessWidget {
   }
 }
 
+/// 피패킹 큰 카드(시안 hero) — 옅은 보라 그라데이션, 제목·설명·"업무 시작 ›", 오른쪽 큰 그림.
+class _HeroArea extends StatelessWidget {
+  const _HeroArea({super.key, required this.allowed, required this.onTap});
+
+  final bool allowed;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(17),
+        onTap: onTap,
+        child: Ink(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: const Color(0xFFDEC9F4)),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFF1E7FD), Color(0xFFE4D0FA)],
+            ),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 115),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        workAreaText(l10n, WorkArea.pickPack),
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        l10n.featuredPickPack,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: const Color(0xFF534066),
+                        ),
+                      ),
+                      const SizedBox(height: 11),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF492773),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!allowed)
+                              const Padding(
+                                padding: EdgeInsets.only(right: 4),
+                                child: Icon(
+                                  Icons.lock_outline,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            Text(
+                              l10n.startWork,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: const BoxDecoration(
+                    color: Color(0x66FFFFFF),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.shopping_cart_checkout,
+                    size: 56,
+                    color: Color(0xFF593787),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 기타 업무 칸(시안 work-tile) — 흰 칸, 왼쪽 옅은 보라 그림 + 이름. 권한이 없으면 자물쇠.
 class _AreaTile extends StatelessWidget {
   const _AreaTile({
     required this.area,
@@ -483,17 +620,74 @@ class _AreaTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return MenuTile(
+    return _Tile(
       key: ValueKey('area-${area.name}'),
-      icon: workAreaIcon(area),
-      title: workAreaText(l10n, area),
-      hint: workAreaHint(l10n, area),
-      allowed: allowed,
+      icon: allowed ? workAreaIcon(area) : Icons.lock_outline,
+      label: workAreaText(l10n, area),
       onTap: onTap,
     );
   }
 }
 
+class _Tile extends StatelessWidget {
+  const _Tile({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+      side: const BorderSide(color: PdaColors.line),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 62),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFE2FD),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: const Color(0xFF593787)),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    height: 1.25,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// 관리 메뉴 칸(센터 관리자) — 기타 업무 칸과 같은 모양.
 class _MenuButton extends StatelessWidget {
   const _MenuButton({
     super.key,
@@ -510,18 +704,52 @@ class _MenuButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Expanded(
-    child: OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(64),
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-      ),
-      onPressed: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(allowed ? icon : Icons.lock_outline),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-        ],
+    child: _Tile(
+      icon: allowed ? icon : Icons.lock_outline,
+      label: label,
+      onTap: onTap,
+    ),
+  );
+}
+
+/// 아래 도구 줄(시안 tools) — 작은 그림 + 이름.
+class _ToolButton extends StatelessWidget {
+  const _ToolButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.allowed,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool allowed;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              allowed ? icon : Icons.lock_outline,
+              color: const Color(0xFF5B4A6E),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, color: Color(0xFF5B4A6E)),
+            ),
+          ],
+        ),
       ),
     ),
   );
@@ -579,38 +807,31 @@ class WorkGuideScreen extends StatelessWidget {
             key: const ValueKey('guide'),
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // 시안: 큰 제목 없이 앱바 제목 + 회색 한 줄, 번호를 선으로 이은 단계 목록.
               Text(
                 l10n.guideLead,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: PdaColors.muted,
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Expanded(
                 child: Column(
                   children: [
-                    for (final (i, (icon, text)) in steps.indexed) ...[
-                      if (i > 0)
-                        Icon(
-                          Icons.arrow_downward,
-                          size: 20,
-                          color: theme.colorScheme.outline,
-                        ),
+                    for (final (i, (icon, text)) in steps.indexed)
                       Expanded(
-                        child: _GuideStep(n: i + 1, icon: icon, text: text),
+                        child: _GuideStep(
+                          n: i + 1,
+                          icon: icon,
+                          text: text,
+                          last: i == steps.length - 1,
+                        ),
                       ),
-                    ],
                   ],
                 ),
               ),
               const SizedBox(height: 8),
-              Card(
-                margin: EdgeInsets.zero,
-                color: theme.colorScheme.secondaryContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(l10n.guideCommon),
-                ),
-              ),
+              NoticeBox(text: l10n.guideCommon),
               const SizedBox(height: 12),
               FilledButton(
                 key: const ValueKey('guide-ok'),
@@ -852,59 +1073,92 @@ class _AssignedView extends StatelessWidget {
 }
 
 /// 안내 한 단계: 번호 + 픽토그램 + 한 줄.
+/// 안내 한 단계(시안 flow) — 왼쪽 번호 원(아래로 선), 옅은 보라 그림 칸, 한 줄 안내. 아래 구분선.
 class _GuideStep extends StatelessWidget {
-  const _GuideStep({required this.n, required this.icon, required this.text});
+  const _GuideStep({
+    required this.n,
+    required this.icon,
+    required this.text,
+    required this.last,
+  });
 
   final int n;
   final IconData icon;
   final String text;
+  final bool last;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Card(
+    return DecoratedBox(
       key: ValueKey('guide-step-$n'),
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: Row(
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
+      decoration: BoxDecoration(
+        border: last
+            ? null
+            : const Border(bottom: BorderSide(color: PdaColors.line)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 31,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: scheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(16),
+                if (!last)
+                  const Positioned(
+                    top: 0,
+                    bottom: 0,
+                    left: 11,
+                    child: SizedBox(
+                      width: 1,
+                      child: ColoredBox(color: Color(0xFFD8C3EB)),
+                    ),
                   ),
-                  child: Icon(icon, size: 40, color: scheme.onPrimaryContainer),
-                ),
                 Positioned(
-                  left: -6,
-                  top: -6,
-                  child: CircleAvatar(
-                    radius: 12,
-                    backgroundColor: scheme.primary,
-                    foregroundColor: scheme.onPrimary,
-                    child: Text('$n', style: theme.textTheme.labelLarge),
+                  left: 0,
+                  child: Container(
+                    width: 23,
+                    height: 23,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEDDEFA),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '$n',
+                      style: const TextStyle(
+                        color: Color(0xFF4B286E),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                text,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium,
+          ),
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0E8FA),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, size: 30, color: const Color(0xFF593787)),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                height: 1.35,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
