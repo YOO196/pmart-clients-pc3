@@ -14,6 +14,7 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/delivery-execution';
 import { useApi } from '../../app/ApiContext';
 import { DisplayNumber, RiderLabel, SystemNumbers } from '../../shared/displayNumber';
+import { GuideBox } from '../../shared/listParts';
 import { messages } from '../../shared/messages';
 
 const m = messages.returnHandovers;
@@ -33,8 +34,8 @@ export function ReturnHandoversMenu({ mfcId }: { readonly mfcId: string }) {
   });
   return (
     <section className="space-y-4">
-      <h1 className="text-xl font-bold">{m.title}</h1>
-      <p className="text-sm opacity-70">{m.intro}</p>
+      <h1>{m.title}</h1>
+      <GuideBox title={messages.listParts.guideOf(messages.menus.returnHandovers)} storeKey="return-handovers" items={[m.intro]} />
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <button type="button" className="btn btn-sm" onClick={() => void query.refetch()} disabled={query.isFetching}>
           {m.refresh}

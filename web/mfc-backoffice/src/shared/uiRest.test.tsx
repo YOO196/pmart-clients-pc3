@@ -1,0 +1,61 @@
+// 나머지 메뉴도 같은 틀(2026-11-19) — 안내 상자, 검색 칩 접기·내 보기, 위치 최근 봄·이전/다음, 센터 목록 건수.
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it } from 'vitest';
+
+import { renderAt } from '../test/render';
+
+describe('나머지 메뉴도 같은 틀', () => {
+  it.each([
+    ['assignments', '배정 안내'],
+    ['deliveries', '배송 현황 안내'],
+    ['packing-handover', '포장 인계 안내'],
+    ['return-handovers', '반납 인증번호 안내'],
+    ['inbound', '입고 안내'],
+    ['inventory', '재고 안내'],
+    ['locations', '위치(칸) 안내'],
+    ['quality', '품질 안내'],
+    ['restrictions', '운영 제한 안내'],
+  ])('%s: 안내 상자(접으면 이 브라우저에 기억)', async (segment, title) => {
+    renderAt(`/c/MFC-BSN-01/${segment}`);
+    const box = await screen.findByTestId('guide-box');
+    expect(box).toHaveTextContent(title);
+    await userEvent.click(within(box).getByRole('button', { name: (n: string) => n.includes(title) }));
+    expect(within(box).getByRole('button', { name: (n: string) => n.includes(title) })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('배송 현황: 상태를 고르면 칩으로 접히고 내 보기로 저장할 수 있다', async () => {
+    renderAt('/c/MFC-BSN-01/deliveries?state=ASSIGNED');
+    const bar = await screen.findByTestId('search-bar');
+    expect(within(bar).getByTestId('search-chip')).toHaveTextContent(/상태/);
+    expect(within(bar).getByRole('form', { hidden: true })).not.toBeVisible();
+    await userEvent.click(within(screen.getByTestId('saved-views')).getByRole('button', { name: '+ 지금 조건 저장' }));
+    await userEvent.type(screen.getByRole('textbox', { name: '보기 이름' }), '배정됨');
+    await userEvent.click(screen.getByRole('button', { name: '저장' }));
+    expect(within(screen.getByTestId('saved-views')).getByRole('link', { name: '배정됨' })).toHaveAttribute('href', '/c/MFC-BSN-01/deliveries?state=ASSIGNED');
+  });
+
+  it('배정: 작업자 거르기는 이름으로 쳐서 찾기(운영자 ID 를 치지 않는다)', async () => {
+    const view = renderAt('/c/MFC-BSN-01/assignments');
+    const box = await screen.findByRole('combobox', { name: '작업자' });
+    await userEvent.click(box);
+    await userEvent.type(box, 'ㄱㅎㅈ');
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    await waitFor(() => expect(view.gets('/assignments').some((r) => new URL(r.url).searchParams.get('workerId') === 'OP-wkr-1')).toBe(true));
+  });
+
+  it('위치: 상세를 열면 목록에 "최근 봄", 상세는 목록 순서대로 이전·다음', async () => {
+    renderAt('/c/MFC-BSN-01/locations');
+    const rows = await screen.findAllByTestId('location-row');
+    await userEvent.click(within(rows[0]!).getByRole('link'));
+    expect(await screen.findByTestId('queue-pos')).toHaveTextContent(`1 / ${rows.length}`);
+    expect(screen.getByTestId('system-numbers')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: '‹ 보던 목록으로' }));
+    expect(await screen.findByTestId('seen-mark')).toBeInTheDocument();
+  });
+
+  it('센터 목록: 불러온 건수를 보인다', async () => {
+    renderAt('/c/MFC-BSN-01/quality');
+    expect(await screen.findByTestId('list-decisions-count')).toHaveTextContent(/^1건$/);
+  });
+});

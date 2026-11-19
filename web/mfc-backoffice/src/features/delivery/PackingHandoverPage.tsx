@@ -14,6 +14,8 @@ import { formatSeoul, QueryState, toUiState } from '@pmart/web-ui';
 import type { paths } from '../../api/generated/backoffice-bff';
 import { useApi } from '../../app/ApiContext';
 import { DisplayNumber, RiderLabel, SystemNumbers } from '../../shared/displayNumber';
+import { GuideBox, SearchBar } from '../../shared/listParts';
+import { SavedViews } from '../../shared/SavedViews';
 import { messages } from '../../shared/messages';
 
 const m = messages.packingHandover;
@@ -60,9 +62,20 @@ export function PackingHandoverMenu({ mfcId }: { readonly mfcId: string }) {
   });
   return (
     <section className="space-y-4">
-      <h1 className="text-xl font-bold">{m.title}</h1>
-      <p className="text-sm opacity-70">{m.intro}</p>
-      <div className="flex flex-wrap items-end gap-2 rounded-box bg-base-100 p-3 text-sm">
+      <h1>{m.title}</h1>
+      <GuideBox title={messages.listParts.guideOf(messages.menus.packingHandover)} storeKey="packing-handover" items={[m.intro]} />
+      <SearchBar
+        summary={[[m.state, state ? name(m.shipmentState, state) : m.activeStates]]}
+        startOpen={!state}
+        extra={
+          <>
+            <span className="text-xs text-base-content/60">{m.autoRefreshNote}</span>
+            <button type="button" className="btn btn-xs" onClick={() => void query.refetch()} disabled={query.isFetching}>
+              {m.refresh}
+            </button>
+          </>
+        }
+      >
         <label className="flex flex-col gap-1">
           {m.state}
           <select className="select select-sm w-44" value={state} onChange={(e) => set({ state: e.target.value })}>
@@ -74,11 +87,8 @@ export function PackingHandoverMenu({ mfcId }: { readonly mfcId: string }) {
             ))}
           </select>
         </label>
-        <button type="button" className="btn btn-sm" onClick={() => void query.refetch()} disabled={query.isFetching}>
-          {m.refresh}
-        </button>
-        <span className="text-xs opacity-70">{m.autoRefreshNote}</span>
-      </div>
+      </SearchBar>
+      <SavedViews listKey={`packing-handover.${mfcId}`} />
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(view) => {
           const items = view.items ?? [];

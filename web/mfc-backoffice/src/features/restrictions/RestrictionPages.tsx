@@ -14,6 +14,7 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-capacity';
 import { useApi } from '../../app/ApiContext';
 import { ApprovalAwareFeedback, ApprovalRefInput } from '../../shared/approval';
+import { GuideBox, SearchBar } from '../../shared/listParts';
 import { messages } from '../../shared/messages';
 
 const m = messages.restrictions;
@@ -42,20 +43,22 @@ export function RestrictionsMenu({ mfcId }: { readonly mfcId: string }) {
   });
   return (
     <section className="max-w-5xl space-y-4">
-      <h1 className="text-xl font-bold">{messages.menus.restrictions}</h1>
-      <p className="text-sm opacity-70">{m.intro}</p>
+      <h1>{messages.menus.restrictions}</h1>
+      <GuideBox title={messages.listParts.guideOf(messages.menus.restrictions)} storeKey="restrictions" items={[m.intro]} />
       {notice && (
         <p role="status" className="text-success text-sm">
           {notice}
         </p>
       )}
-      <label className="flex w-fit flex-col gap-1 rounded-box bg-base-100 p-3 text-sm">
-        {m.filter}
-        <select className="select select-sm w-40" value={all ? '1' : ''} onChange={(e) => setParams(e.target.value ? { all: '1' } : {}, { replace: true })}>
-          <option value="">{m.activeOnly}</option>
-          <option value="1">{m.all}</option>
-        </select>
-      </label>
+      <SearchBar summary={[[m.filter, all ? m.all : m.activeOnly]]} startOpen={!all}>
+        <label className="flex flex-col gap-1">
+          {m.filter}
+          <select className="select select-sm w-40" value={all ? '1' : ''} onChange={(e) => setParams(e.target.value ? { all: '1' } : {}, { replace: true })}>
+            <option value="">{m.activeOnly}</option>
+            <option value="1">{m.all}</option>
+          </select>
+        </label>
+      </SearchBar>
       <QueryState state={toUiState(query, (rows) => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.empty}>
         {(rows) => (
           <div className="space-y-2">

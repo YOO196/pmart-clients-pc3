@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router';
 
 import { QueryState, toUiState } from '@pmart/web-ui';
 import { messages } from './messages';
+import { useNewIds } from './motion';
 
 const m = messages.lists;
 
@@ -67,6 +68,8 @@ export function CursorList<T>({
     getNextPageParam: (last) => last.nextCursor ?? undefined,
   });
   const rows = (query.data?.pages ?? []).flatMap((p) => p.items);
+  // 저절로·다시 읽어 새로 들어온 줄만 잠깐 강조(거르기를 바꾸면 처음부터 — 통합 백오피스와 같은 움직임)
+  const fresh = useNewIds(query.data ? rows.map(rowKey) : undefined, state ?? '');
   return (
     <div className="space-y-2 rounded-box bg-base-100 p-3" data-testid={testId}>
       <div className="flex flex-wrap items-end gap-3">
@@ -103,7 +106,7 @@ export function CursorList<T>({
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={rowKey(r)} data-testid={`${testId}-row`}>
+                  <tr key={rowKey(r)} data-testid={`${testId}-row`} className={fresh.has(rowKey(r)) ? 'row-new' : undefined}>
                     {cells(r).map((c, i) => (
                       <td key={i}>{c}</td>
                     ))}
@@ -118,6 +121,9 @@ export function CursorList<T>({
                 ))}
               </tbody>
             </table>
+            <p className="text-xs text-base-content/60" data-testid={`${testId}-count`}>
+              {query.hasNextPage ? m.loadedMore(rows.length) : m.loaded(rows.length)}
+            </p>
             {query.hasNextPage && (
               <button type="button" className="btn btn-sm" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>
                 {m.more}

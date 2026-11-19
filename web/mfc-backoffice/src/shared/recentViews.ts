@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { centerPath } from '../app/nav';
 import { useSession } from '../app/SessionContext';
 
-export type RecentKind = 'task' | 'worker' | 'move' | 'inboundTask';
+export type RecentKind = 'task' | 'worker' | 'move' | 'inboundTask' | 'location';
 export interface RecentEntry {
   readonly kind: RecentKind;
   readonly mfcId: string;
@@ -25,6 +25,7 @@ export const recentPath: Readonly<Record<RecentKind, (mfcId: string, id: string)
   worker: (mfcId, id) => centerPath(mfcId, `workers/${encodeURIComponent(id)}`),
   move: (mfcId, id) => centerPath(mfcId, `moves/${encodeURIComponent(id)}`),
   inboundTask: (mfcId, id) => centerPath(mfcId, `inbound/tasks/${encodeURIComponent(id)}`),
+  location: (mfcId, id) => centerPath(mfcId, `locations/${encodeURIComponent(id)}`),
 };
 
 const KINDS = Object.keys(recentPath);

@@ -6,7 +6,7 @@
 // - COUNT_LOCKED 는 실사 잠금(실사 세션이 건다) — 이 화면에서 걸거나 풀지 않는다.
 // 권한 판정은 서버(그 센터 centers — 403 은 "이 센터 권한이 없습니다").
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Link, Route, Routes, useLocation as useRouterLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { CommandRejectedFailure, request, settleCommand, UnknownResultFailure, type CommandResponse, type IdempotencyKey } from '@pmart/web-core';
@@ -15,7 +15,14 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-location';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
+import { GuideBox, SearchBar } from '../../shared/listParts';
+import { SavedViews } from '../../shared/SavedViews';
+import { SystemNumbers } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
+import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
+import { SeenMark } from '../../shared/SeenMark';
+import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
+import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 
 const m = messages.locations;
 
@@ -82,21 +89,32 @@ function LocationListPage({ mfcId }: { readonly mfcId: string }) {
   };
   const rows = (query.data?.pages ?? []).flatMap((p) => p.items ?? []);
   const state$ = toUiState(query, () => rows.length === 0);
+  const seen = useSeenIds('location', mfcId);
+  const { pathname, search } = useRouterLocation();
+  useRememberQueue('location', mfcId, query.data ? rows.map((l) => l.locationId ?? '').filter(Boolean) : undefined, `${pathname}${search}`);
 
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold">{messages.menus.locations}</h1>
+        <h1>{messages.menus.locations}</h1>
         <Link to={locationsPath(mfcId, 'new')} className="btn btn-sm btn-primary">
           {m.register}
         </Link>
       </div>
-      <p className="text-sm opacity-70">{m.intro}</p>
-      <form className="flex flex-wrap items-end gap-2 rounded-box bg-base-100 p-3 text-sm" aria-label={m.filter} onSubmit={(e) => e.preventDefault()}>
+      <GuideBox title={messages.listParts.guideOf(messages.menus.locations)} storeKey="locations" items={[m.intro]} />
+      <SearchBar
+        label={m.filter}
+        summary={[
+          [m.fields.zone, zone ? (m.zone[zone] ?? zone) : ''],
+          [m.fields.temperatureZone, temperatureZone ? (m.temperature[temperatureZone] ?? temperatureZone) : ''],
+          [m.fields.state, state ? (m.state[state] ?? state) : ''],
+        ]}
+      >
         <FilterSelect label={m.fields.zone} value={zone ?? ''} options={ZONES} names={m.zone} onChange={(v) => setFilter('zone', v)} />
         <FilterSelect label={m.fields.temperatureZone} value={temperatureZone ?? ''} options={TEMPERATURES} names={m.temperature} onChange={(v) => setFilter('temperatureZone', v)} />
         <FilterSelect label={m.fields.state} value={state ?? ''} options={STATES} names={m.state} onChange={(v) => setFilter('state', v)} />
-      </form>
+      </SearchBar>
+      <SavedViews listKey={`locations.${mfcId}`} />
       <QueryState state={state$} onRetry={() => void query.refetch()} emptyText={m.empty}>
         {() => (
           <div className="space-y-2">
@@ -120,6 +138,7 @@ function LocationListPage({ mfcId }: { readonly mfcId: string }) {
                       <Link className="link font-mono" to={locationsPath(mfcId, encodeURIComponent(l.locationId ?? ''))}>
                         {l.locationCode}
                       </Link>
+                      <SeenMark seen={seen.has(l.locationId ?? '')} />
                     </td>
                     <td>{m.zone[l.zone] ?? l.zone}</td>
                     <td>{m.temperature[l.temperatureZone] ?? l.temperatureZone}</td>
@@ -392,7 +411,7 @@ function LocationRegisterPage({ mfcId }: { readonly mfcId: string }) {
       <Link to={locationsPath(mfcId)} className="link text-sm">
         {m.back}
       </Link>
-      <h1 className="text-xl font-bold">{m.register}</h1>
+      <h1>{m.register}</h1>
       <LocationForm
         initial={formFrom(undefined)}
         codeEditable
@@ -427,18 +446,28 @@ function LocationDetailPage({ mfcId }: { readonly mfcId: string }) {
   const query = useLocation(locationId);
   const location = useRouterLocation();
   const [notice, setNotice] = useState<string | null>((location.state as { created?: boolean } | null)?.created ? m.created : null);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const past = useScrolledPast(titleRef);
+  // 칸 코드(A-H2-01)가 화면 표기 — 칸 ID 는 시스템 번호 칸에만
+  useRecordRecent('location', mfcId, locationId, query.data?.locationCode);
   return (
     <section className="max-w-3xl space-y-4">
-      <Link to={locationsPath(mfcId)} className="link text-sm">
-        {m.back}
-      </Link>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to={locationsPath(mfcId)} className="link text-sm">
+          {m.back}
+        </Link>
+        <div className="ml-auto">
+          <QueueNav kind="location" mfcId={mfcId} id={locationId} />
+        </div>
+      </div>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(l) => (
           <>
-            <h1 className="flex items-center gap-2 text-xl font-bold">
+            <h1 ref={titleRef} className="flex items-center gap-2">
               <span className="font-mono">{l.locationCode}</span>
               <StateBadge state={l.state} />
             </h1>
+            <StickyTitle show={past} title={l.locationCode} badges={<StateBadge state={l.state} />} />
             {notice && (
               <p role="status" className="text-success text-sm">
                 {notice}
@@ -453,6 +482,7 @@ function LocationDetailPage({ mfcId }: { readonly mfcId: string }) {
                 <EditLocation key={l.version} mfcId={mfcId} location={l} onDone={setNotice} />
               </details>
             )}
+            <SystemNumbers ids={[{ label: m.locationLabel, id: l.locationId }]} />
           </>
         )}
       </QueryState>
