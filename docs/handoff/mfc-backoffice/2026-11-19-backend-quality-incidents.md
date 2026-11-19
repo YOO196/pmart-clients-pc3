@@ -1,10 +1,10 @@
-# 요청: 품질 사고(MB-2) — 사용자 결정과 필요한 API
+# 요청: 품질 사고(MB-2)·상품 취급(질문 5) — 사용자 결정과 필요한 API
 
 보낸 앱: mfc-backoffice (PC 3)
 받는 백엔드 영역: mfc (mfc-quality-service, 고객 영향은 case-service)
 
 - 작성: pmart-clients PC 3, 2026-11-19
-- 답하는 것: 회신 `clients/mfc-backoffice/2026-11-18-reply-lists-and-roles.md` §3 의 질문 1~4(사용자 2026-11-19 답). 질문 5(본사 MD 가 센터 권한 없이 상품 취급 변경)는 아직 답이 없어 **지금대로(센터 권한 필요)** 둔다.
+- 답하는 것: 회신 `clients/mfc-backoffice/2026-11-18-reply-lists-and-roles.md` §3 의 질문 1~5(사용자 2026-11-19 답). 질문 5 는 §3(R7 단종·R8 신상품 배너).
 - 지금 계약: `GET /quality-incidents`·`/{incidentId}` 조회만, 501. 화면은 이 문서의 API 가 계약에 들어온 뒤 만든다(계약에 없는 것은 부르지 않는다).
 
 ## 1. 사용자 결정(2026-11-19)
@@ -42,5 +42,19 @@
 ### R6. 고객 영향 case
 - 영향 LOT 이 출고된 고객 주문에 있으면 서버가 case-service 사건을 열고 `caseId` 를 채운다(직접 등록·자동 둘 다). case 종류·처리 주체(고객센터)는 백엔드 판단. 센터 관리자는 사고 상세에서 case 상태를 보기만 한다(지금 배차 실패 사건처럼 — `GET /cases/{caseId}` 를 센터 관리자도 볼 수 있어야 함).
 
-## 3. 게이트웨이
+## 3. 상품 취급(질문 5) — 사용자 결정 2026-11-19
+
+> "A(지금대로) 하되 단종품은 본사 차원에서 뺄 수 있어야 하고, 신상품은 도입 말고 상품 페이지 상단 배너로 안내되는 식이면 됨"
+
+- **기본은 지금대로**: 상품 취급 ON·OFF 변경 = 그 센터의 `MFC_SUPERVISOR` 또는 **그 센터 권한이 있는** MD. 센터 권한 없는 본사 MD 에게 넓히지 않는다.
+- **R7. 단종은 본사가 전 센터에서 뺀다**
+  - 본사(MD·OPERATOR_ADMIN — 누가 할지는 product 쪽 기존 권한대로)가 상품을 단종하면 **모든 센터의 취급이 OFF** 가 되고, 단종인 동안 센터가 다시 ON 으로 못 바꾼다(409 + 사유 코드, 예 `SKU_DISCONTINUED`).
+  - 단종을 무엇으로 나타낼지는 백엔드 판단 — product-service `SaleState.SALE_STOPPED` 를 단종으로 볼지, 일시 중지와 구분해 새 값(예 `DISCONTINUED`)을 둘지 회신 주세요. (일시 품절·일시 중지는 센터 취급을 건드리지 않는 것이 맞아 보임.)
+  - `SkuHandling` 에 꺼진 까닭을 실어 주세요(예 `offReason`: `CENTER`·`DISCONTINUED`, `changedBy`·`reason`) — 센터 화면은 "본사 단종으로 꺼짐"을 보이고 켜기 단추를 막는다.
+- **R8. 신상품은 자동으로 켜지 않고 센터에 알린다**
+  - 새 SKU(SkuIssued)가 생겨도 센터 취급은 지금처럼 OFF(레코드 없음). 대신 센터 관리자 웹의 상품 취급 화면 **맨 위 배너**로 "새 상품 n개 — 취급 여부를 정해 주세요"를 보이고, 누르면 그 목록으로.
+  - 이를 위해 `GET /mfcs/{mfcId}/sku-handlings` 에: 이 센터가 아직 한 번도 정하지 않은 상품만 거르는 값(예 `undecided=true` — 레코드 없음), 상품이 생긴 시각(`introducedAt` — SkuIssued 시각) 과 그 기준 거르기(예 `introducedSince=`), 건수(배너 숫자용 — `totalCount` 또는 별도 개수 조회). 정한 뒤(ON 이든 OFF 든 레코드가 생기면)에는 배너에서 빠진다.
+  - 단종 상품은 배너에 넣지 않는다.
+
+## 4. 게이트웨이
 - `/quality-incidents*` 가 이미 quality 라우트에 걸리는지 확인 부탁(POST 둘 포함).
