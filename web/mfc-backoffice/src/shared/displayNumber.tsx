@@ -2,9 +2,14 @@
 // - 목록·표에는 화면 번호만: 주문 orderNumber(8자리), 배송 deliveryNumber("주문번호-순번") + 종류, 라이더 가린 이름 + 라이더 번호 6자리.
 // - 시스템 ID(orderId·deliveryId·riderId·packageId)는 접힌 "시스템 번호" 칸에만(복사 단추).
 // - 화면 번호가 null(옛 기록·번호 전 주문)이면 "번호 없음"만(ADR-0070 덧붙임 2026-11-19 — 끝 8자리도 쓰지 않는다). 번호를 화면에서 만들지 않는다.
-// - 라이더: 센터 관리자는 rider-service 가 403 이라 bff 가 번호·이름을 null 로 준다(0.15.0, unavailableSources 아님) — "번호 없음"이 아니라
-//   "라이더 정보 비공개"로 보인다(없는 것과 못 보는 것을 섞지 않는다). 번호가 오면 그대로 보인다.
+// - 라이더: bff 가 번호를 주면 그대로. 없으면(센터 관리자는 bff 가 null — 0.15.0) rider 0.18.0 `GET /riders/display-names`(RS-MFC,
+//   MFC_SUPERVISOR 허용 — 회신 clients/mfc-backoffice/2026-11-20-reply-rider-display-names)를 한 화면 모아 묻는다.
+//   모르는 ID "라이더", 조회 실패 "라이더(이름 못 읽음)", 탈퇴로 이름이 지워졌으면 번호만. 라이더 ID 는 글자로 내지 않는다(title 에만).
+import { useQuery } from '@tanstack/react-query';
+
 import type { components } from '../api/generated/backoffice-bff';
+import { useApi } from '../app/ApiContext';
+import { loadRiderName } from './riderNames';
 import { CopyButton } from './CopyButton';
 import { messages } from './messages';
 
@@ -33,20 +38,30 @@ export function DisplayNumber({ number, systemId, failed = false }: { readonly n
   return failed ? <Fallback note={m.failed} kind="failed" /> : <Fallback note={m.missing} kind="missing" />;
 }
 
-/** 라이더 한 칸 — "김*수 · 482913". 번호가 없으면 "라이더 정보 비공개". 라이더가 없으면 부르는 쪽이 정한다. */
+/** 라이더 한 칸 — "김*수 · 482913". bff 값이 없으면 rider display-names 로 채운다. 라이더가 없으면 부르는 쪽이 정한다. */
 export function RiderLabel({ rider, riderId }: { readonly rider?: RiderDisplay | null | undefined; readonly riderId?: string | null | undefined }) {
+  const api = useApi();
   const id = rider?.riderId ?? riderId ?? null;
-  if (rider?.riderNumber)
+  const known = !!rider?.riderNumber;
+  const q = useQuery({
+    queryKey: ['rider-name', id],
+    enabled: !!id && !known,
+    staleTime: 10 * 60_000,
+    retry: false,
+    queryFn: () => loadRiderName(api, id ?? ''),
+  });
+  const shown = known ? { nameMasked: rider?.nameMasked ?? null, riderNumber: rider?.riderNumber ?? null } : q.data;
+  if (shown?.riderNumber || shown?.nameMasked)
     return (
-      <span data-testid="rider-label">
-        {rider.nameMasked ? `${rider.nameMasked} · ` : ''}
-        <span className="font-mono">{rider.riderNumber}</span>
+      <span data-testid="rider-label" title={id ?? undefined}>
+        {shown.nameMasked ? `${shown.nameMasked}${shown.riderNumber ? ' · ' : ''}` : ''}
+        {shown.riderNumber && <span className="font-mono">{shown.riderNumber}</span>}
       </span>
     );
   if (!id) return <span>{messages.none}</span>;
   return (
-    <span data-testid="rider-label">
-      <Fallback note={m.riderHidden} kind="hidden" />
+    <span data-testid="rider-label" title={id}>
+      {q.isError ? <Fallback note={m.riderFailed} kind="failed" /> : q.isSuccess ? <Fallback note={m.riderUnknown} kind="unknown" /> : <Fallback note="…" kind="loading" />}
     </span>
   );
 }

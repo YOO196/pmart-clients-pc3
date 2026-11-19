@@ -62,6 +62,9 @@ function resolutionOf(s: MockShipment, p: Pkg) {
     checkRequired: p.state === 'SEALED' && p.fence?.state === 'EXPIRED',
     shipmentId: s.shipmentId,
     orderId: s.orderId,
+    // 화면 번호(0.21.0 DL-1) — 출고의 주문번호·포장 라벨 인계 번호
+    orderNumber: s.orderNumber ?? null,
+    handoverCode: p.handoverCode ?? null,
     packingLocation: 'PAK-C-01',
     riderId: p.fence?.riderId ?? null,
     lastCheck: null,
@@ -71,8 +74,8 @@ function resolutionOf(s: MockShipment, p: Pkg) {
 
 /** 결품 지표 목(0.19.0): 오늘 피킹 시작 줄·결품 줄(사유별). 0건 날짜는 줄이 없다(계약) — 서울 센터는 줄 없음. */
 const seoulToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
-const pickingLines: Readonly<Record<string, { readonly pickedLines: number; readonly SHORT: number; readonly DAMAGED: number; readonly BLOCKED: number }>> = {
-  'MFC-BSN-01': { pickedLines: 40, SHORT: 2, DAMAGED: 1, BLOCKED: 0 },
+const pickingLines: Readonly<Record<string, { readonly pickedLines: number; readonly SHORT: number; readonly DAMAGED: number; readonly SPOILED: number; readonly BLOCKED: number }>> = {
+  'MFC-BSN-01': { pickedLines: 40, SHORT: 2, DAMAGED: 1, SPOILED: 1, BLOCKED: 0 },
 };
 
 export const taskHandlers = [
@@ -87,7 +90,7 @@ export const taskHandlers = [
     const v = pickingLines[mfcId];
     const items =
       v && from <= today && today <= to
-        ? [{ date: today, mfcId, pickedLines: v.pickedLines, shortLines: v.SHORT + v.DAMAGED + v.BLOCKED, shortLinesByReason: { SHORT: v.SHORT, DAMAGED: v.DAMAGED, BLOCKED: v.BLOCKED } }]
+        ? [{ date: today, mfcId, pickedLines: v.pickedLines, shortLines: v.SHORT + v.DAMAGED + v.SPOILED + v.BLOCKED, shortLinesByReason: { SHORT: v.SHORT, DAMAGED: v.DAMAGED, SPOILED: v.SPOILED, BLOCKED: v.BLOCKED } }]
         : [];
     return HttpResponse.json({ items, asOf: new Date().toISOString() });
   }),

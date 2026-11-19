@@ -285,7 +285,7 @@ function seedShipments(): Array<[string, MockShipment]> {
             version: 2,
             state: 'SEALED',
             qrCode: 'PKG:PKG-1:1',
-            handoverCode: '482913',
+            handoverCode: '3817', // 0.23.0 — 새 포장 4자리(예전 포장 6자리)
             contents: [{ orderLineId: 'OL-1', sku: 'SKU-MILK-1', qty: 2, lotId: 'LOT-MILK-A' }],
             bagCount: 1,
             containsAlcohol: false,

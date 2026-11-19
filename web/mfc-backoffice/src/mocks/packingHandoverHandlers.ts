@@ -12,6 +12,8 @@ const OPEN_SHIPMENTS = ['PREPARING', 'READY', 'PARTIALLY_HANDED_OVER'];
 
 interface Pkg {
   packageId: string;
+  /** 라벨 인계 번호(bff 0.21.0 DL-2, 새 포장 4자리) — 원천이 아직 안 주면 없음 */
+  handoverCode?: string | null;
   state: string;
   fenceState: string;
   handedOverAt: string | null;
@@ -47,7 +49,7 @@ const ships: ShipRow[] = [
     pack: 'COMPLETED',
     kind: 'RESHIPMENT',
     packages: [
-      { packageId: 'PKG-4-1', state: 'HANDED_OVER', fenceState: 'COMMITTED', handedOverAt: '2026-11-17T08:00:00.000Z', riderId: 'RD-2' },
+      { packageId: 'PKG-4-1', handoverCode: '5902', state: 'HANDED_OVER', fenceState: 'COMMITTED', handedOverAt: '2026-11-17T08:00:00.000Z', riderId: 'RD-2' },
       { packageId: 'PKG-4-2', state: 'SEALED', fenceState: 'NONE', handedOverAt: null, riderId: null },
     ],
     delivery: 'PICKED_UP',

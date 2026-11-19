@@ -19,6 +19,10 @@ export const messages = {
     missing: '번호 없음',
     failed: '번호 확인 불가',
     riderHidden: '라이더 정보 비공개',
+    /** 라이더 표기 조회(rider display-names)에 없는 ID */
+    riderUnknown: '라이더',
+    /** 라이더 표기 조회 실패 — 없는 것과 못 읽은 것을 섞지 않는다 */
+    riderFailed: '라이더(이름 못 읽음)',
     systemNumbers: '시스템 번호',
     system: { orderId: '주문', deliveryId: '배송', shipmentId: '출고', packageId: '포장', riderId: '라이더' },
   },
@@ -207,12 +211,12 @@ export const messages = {
     subtitle: (at: string) => `${at} 기준 · 숫자를 누르면 아래 처리함이 그 일만 보여요. 1분마다 다시 읽어요.`,
     todoTitle: '내 할 일',
     todoHint: '급한 것부터 · 누르면 그 일만 모아 봐요',
-    tile: { overdue: '출하 약속 초과', dueSoon: '출하 약속 임박', short: '결품 줄(오늘)', damaged: '파손 줄(오늘)', handover: '인계 확인 필요', dispatchDelay: '배차 지연(픽업 전)' },
+    tile: { overdue: '출하 약속 초과', dueSoon: '출하 약속 임박', short: '결품 줄(오늘)', damaged: '파손 줄(오늘)', spoiled: '변질 줄(오늘)', handover: '인계 확인 필요', dispatchDelay: '배차 지연(픽업 전)' },
     lines: (n: number) => `${n}줄`,
     issue: {
       overdue: (n: number) => `출하 약속 초과 ${n}건`,
       handover: (n: number) => `인계 확인 필요 ${n}건`,
-      damaged: (n: number) => `피킹 파손 사고 ${n}건`,
+      damaged: (n: number) => `피킹 파손·변질 사고 ${n}건`,
     },
     status: {
       issues: (n: number) => `이상 ${n}`,
@@ -1026,7 +1030,7 @@ export const messages = {
     fenceState: { NONE: '허가 없음', HANDOVER_IN_PROGRESS: '인계 진행 중', COMMITTED: '인계 확정', EXPIRED: '허가 만료' } as Readonly<Record<string, string>>,
     noPackages: '아직 포장이 없어요.',
     noShipment: '출하가 없는 작업이에요.',
-    pkg: { id: '포장', handoverCode: '인계 숫자', state: '상태', fence: '인계 허가', rider: '라이더', sealedAt: '밀봉', handedOverAt: '인계' },
+    pkg: { id: '포장', handoverCode: '인계 번호', state: '상태', fence: '인계 허가', rider: '라이더', sealedAt: '밀봉', handedOverAt: '인계' },
     /** 화면용 주문번호(fulfillment 0.13.0 F-5) — 번호 전 주문은 null */
     orderNumber: (n: string) => `주문번호 ${n}`,
     resolution: '인계 판정 보기',
@@ -1040,6 +1044,8 @@ export const messages = {
       location: (code: string) => `놓인 위치 ${code}`,
       locationUnknown: '놓인 위치 모름',
       rider: '허가받은 라이더',
+      code: '인계 번호',
+      order: '주문',
       expiredAt: (t: string) => `허가 끝 ${t}`,
       atStation: '포장대에 있음',
       taken: '포장대에 없음(라이더가 가져감)',

@@ -210,7 +210,7 @@
 ### 4-12. 사람 이름·화면 번호(모든 메뉴, 2026-11-19 PC 3 — ADR-0070 덧붙임 2026-11-19 반영)
 - 운영자 ID(작업자·담당·요청자·결정자·승인자·만든 사람 등)는 `shared/OperatorLabel.tsx` `<Who>` 로 "이름 · 사번" — hr 0.8.0 `GET /hr/employee-labels?operatorIds=`(직원 토큰 누구나, 50개까지). 한 화면의 ID 를 모아 한 번에 묻는다. 모르는 ID 는 ID + "확인 불가", 조회 실패는 ID + "이름 못 읽음". 입력칸(작업자 ID 넣기)은 ID 그대로. 작업자 목록·상세는 "등록 이름 · 사번"(사번을 못 읽으면 이름 + "사번 못 읽음").
 - **목록·표·링크·칩·안내 글에는 화면 표기만**(덧붙임 — 시스템 ID 도 "끝 8자리"도 쓰지 않는다). 시스템 ID 는 상세의 접힌 "시스템 번호"(복사 단추)에만.
-  - 배송 `deliveryNumber`·주문 `orderNumber`(bff 0.14.0) — 번호가 없으면 "번호 없음"만. 라이더는 센터 관리자에게 bff 가 null(0.15.0) → "라이더 정보 비공개"만.
+  - 배송 `deliveryNumber`·주문 `orderNumber`(bff 0.14.0) — 번호가 없으면 "번호 없음"만. 라이더는 bff 가 센터 관리자에게 null(0.15.0)이라 rider 0.18.0 `GET /riders/display-names`(RS-MFC)를 한 화면 모아 물어 "김*수 · 482913"(모르면 "라이더", 실패 "라이더(이름 못 읽음)", 2026-11-20).
   - 작업 지시(작업·이동·입고 작업·배정 추천) = "종류 · 생긴 시각". 품질 사고 = "파손 사고 · 시각". 배차 실패 접수 건 = case `caseNumber`(C-MMDD-일련).
   - 포장: 인계 판정·bff 포장 인계에 라벨 번호(`handoverCode`)가 없어 목록에는 포장대 위치·"포장 1·2"(출고 안 순서), 포장 시스템 ID 는 시스템 번호 칸. 화면 번호 요청 `docs/handoff/mfc-backoffice/2026-11-19-backend-display-labels.md`.
   - 센터 목록(판정·폐기 승인·검수·반입·공급 요청·초기 보유·실사·배정 추천)은 ID 칸을 빼고 종류·상태·시각으로 알아본다(열면 상세). 배정 목록·추천 줄의 작업은 "작업 보기" 링크.
@@ -220,7 +220,7 @@
   - LOT = **LOT 번호**(`shared/LotLabel.tsx` — inventory 0.30.0 `GET /mfcs/{mfcId}/lot-numbers?lotIds=` 한 화면 200개씩 묶음, 모르면 "LOT 번호 없음", 실패면 "LOT 번호 확인 불가"). 이동·입고·재고·품질·품질 사고·센터 전체 재고·홈 파손 줄.
   - 직원(`<Who>`): 이름을 모르거나 못 읽어도 운영자 ID 를 글자로 내지 않는다 — "직원"·"직원(이름 못 읽음)", ID 는 title 에만. 작업자는 capacity 0.23.0 `name`·`employeeNo`(없으면 hr employee-labels).
   - 이동 = 종류 · 상품 · 시각. 판정·폐기·검수·실사·수령·반입·공급 요청 상세 머리에서 시스템 ID 를 빼고 시스템 번호 칸으로.
-  - 아직: 라이더 표기(rider `GET /riders?riderIds=` 가 센터 관리자 403 — PC 5 회신 뒤), 처리자 이름을 capacity `staff-names` 로 바꾸기(지금 hr employee-labels 로 같은 "이름 · 사번").
+  - 라이더 표기 됨(2026-11-20, rider display-names). 아직: 처리자 이름을 capacity `staff-names` 로 바꾸기(지금 hr employee-labels 로 같은 "이름 · 사번").
 
 ### 4-13. 통합 백오피스와 같은 겉모습·목록·상세 부품(2026-11-19 PC 3 — 지침 `docs/handoff/all/2026-11-19-request-ui-ux-align.md`)
 - 겉모습: `main[data-skin=wing]`(index.css) — 연회색 바탕·흰 상자, 파랑 `#346aff` 하나, 그림자 없는 얇은 테두리, 큰 제목, 넉넉한 표, 흰 단추. 왼쪽 메뉴는 P 배지 로고·고른 메뉴 파란 채움·흰 글자(민트 안 씀).
@@ -272,9 +272,17 @@
 
 ### 4-4c. 반납 인증번호 — delivery-execution 0.28.0 `/return-handovers*` (`features/delivery/ReturnHandoverPage.tsx`, 2026-11-19 PC 3)
 - 회수·반납 배송이 MFC 로 올 때 라이더에게 알려 줄 4자리(PDA 반납 인증번호 화면과 같은 API·번호). `GET /return-handovers?mfcId=` 30초마다, 반납이 끝나면 목록에서 빠진다.
-- 5번 틀리면 잠김 → "새 번호 내고 잠김 풀기"(한 번 더 확인, `POST …/{deliveryId}/code-reissues` — 앞 번호는 더 안 맞음, 409 = 이미 끝남). 라이더는 "라이더 정보 비공개"(ADR-0070 덧붙임 — ID 끝자리 안 씀).
+- 5번 틀리면 잠김 → "새 번호 내고 잠김 풀기"(한 번 더 확인, `POST …/{deliveryId}/code-reissues` — 앞 번호는 더 안 맞음, 409 = 이미 끝남). 라이더는 "가린 이름 · 라이더 번호"(rider display-names, ID 끝자리 안 씀).
 
 ### 4-9b. 품질 사고·상품 취급 단종/신상품 — mfc-quality 0.6.0·mfc-inventory 0.27.0 (`features/quality/IncidentPages.tsx`, 2026-11-19 PC 3)
 - 사용자 결정(2026-11-19): 자동(결품 보고 중 파손만) + 센터 관리자 직접 등록, 영향 LOT 을 모두 처리(격리 해제 APPLIED·폐기 승인)한 뒤 관리자가 사유를 적고 닫는다. 고객 영향 case 자동은 백엔드 2차.
 - 품질 > 품질 사고 탭: 목록(기본 처리 중·닫기 대기), 직접 등록(종류·설명·LOT 1~50 — 이 센터에 재고가 남은 LOT 만, 등록은 격리를 걸지 않음), 상세(영향 LOT 별 처리·남은 LOT 수는 서버 값). "격리 요청"은 격리·해제 탭에 사고 번호·LOT 을 채워 판정 본문 `incidentId` 로 잇는다. 닫기는 남은 LOT 0 일 때만 단추(서버도 409 LOTS_NOT_RESOLVED), 사고 `version` 으로.
 - 재고 > 상품 취급: 권한은 지금대로(그 센터 관리자·그 센터 권한 MD). 본사 단종(`offReason` DISCONTINUED)은 "본사 단종" + 켜기 막힘(409 SKU_DISCONTINUED). 신상품(정한 적 없음 `undecided=true`)은 자동으로 켜지 않고 맨 위 배너 "새 상품 n개"(서버 `totalCount`) → "새 상품 보기".
+
+### 4-14. 백엔드 요청·회신 반영(2026-11-20)
+- 라이더 표기: `shared/RiderLabel` 이 bff 값이 없으면 `shared/riderNames.ts` 로 rider display-names 묶음 조회(쉼표 50개, 같은 틱 모음). 배송 현황·포장 인계·반납 번호·배차 지연·확인 필요 포장·작업 상세·운영판 모두.
+- 확인 필요 포장(DL-1 회신, fulfillment 0.21.0): 줄마다 "인계 번호 3817 · 주문 20000001"(없으면 번호 없음), 시스템 ID 는 시스템 번호 칸.
+- 포장 인계 현황(DL-2, bff 0.21.0): 포장 줄 "포장 {인계 번호}", 원천이 아직 안 주면 "포장 n".
+- 인계 번호 4자리(fulfillment 0.23.0 — 새 포장 4자리, 예전 6자리, 길이 가정 안 함): 목·주석.
+- 변질(SPOILED, fulfillment 0.22.0): 운영판 "변질 줄(오늘)" 칸, 피킹 사고 목록은 파손(DAMAGE)·변질(SPOILAGE) 자동 사고 둘 다.
+- 반납 도착 대기(mfc-inbound 0.13.0)는 백오피스 보기 선택 — 이번엔 PDA 만(회수품 반입 화면).

@@ -29,7 +29,8 @@ const copies = [
     // hr: 직원 본인 조회 `GET /hr/employees/me`(MFC 백오피스 "내 정보" — #149, 2026-11-18)·운영자 이름 `employee-labels`(0.8.0)
     // delivery-execution: 반납 인증번호 `GET /return-handovers?mfcId=`·새로 내기(0.28.0 — PC 3, 2026-11-19)
     // delivery-dispatch: 배차 지연 목록 `GET /dispatch-delays?mfcId=`(0.12.0 — PC 3, 2026-11-19)
-    services: ['approval', 'backoffice-bff', 'case', 'center-master', 'delivery-dispatch', 'delivery-execution', 'hr', 'mfc-capacity', 'mfc-fulfillment', 'mfc-inbound', 'mfc-inventory', 'mfc-location', 'mfc-quality'],
+    // rider: 라이더 화면 표기 `GET /riders/display-names`(0.18.0 RS-MFC — MFC_SUPERVISOR 허용, PC 3 2026-11-20)
+    services: ['approval', 'backoffice-bff', 'case', 'center-master', 'delivery-dispatch', 'delivery-execution', 'hr', 'mfc-capacity', 'mfc-fulfillment', 'mfc-inbound', 'mfc-inventory', 'mfc-location', 'mfc-quality', 'rider'],
   },
 ];
 const excluded = ['/internal', '/webhooks', '/actuator'];

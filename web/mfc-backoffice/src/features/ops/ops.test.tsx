@@ -111,6 +111,8 @@ describe('센터 운영판', () => {
     expect(screen.getByTestId('ops-rules')).toHaveTextContent('약속 시각 없는 출고 1건은 세지 않아요');
     expect(await value('tile-short')).toHaveTextContent('2줄');
     expect(await value('tile-damaged')).toHaveTextContent('1줄');
+    // 변질(SPOILED — fulfillment 0.22.0) 줄도 따로
+    expect(await value('tile-spoiled')).toHaveTextContent('1줄');
     expect(await value('tile-handover')).toHaveTextContent('1건');
     // 이상 N 한 줄(서버 숫자) — 약속 초과·인계 확인·파손 사고
     expect(await screen.findByTestId('ops-status')).toHaveTextContent('이상 3');

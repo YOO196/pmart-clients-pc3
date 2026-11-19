@@ -1,5 +1,5 @@
 // 포장 인계 현황(bff 0.11.0 packing-handover, 보기만) — 목(MSW) 기준. 실서버 확인은 아니다.
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
@@ -20,9 +20,9 @@ describe('포장 인계 현황(우리 센터)', () => {
     const row = (orderNumber: string) => rows.find((r) => r.textContent?.includes(orderNumber))!;
     expect(within(row('10000001')).getByTestId('stage')).toHaveTextContent('출고요청');
     expect(within(row('10000002')).getByTestId('stage')).toHaveTextContent('피킹중');
-    // 화면 번호(ADR-0070): 배송은 주문번호-순번, 라이더는 센터 관리자에게 번호·이름이 오지 않아(bff 0.15.0) ID 끝 + 비공개
+    // 화면 번호(ADR-0070): 배송은 주문번호-순번, 라이더는 rider display-names(0.18.0 RS-MFC)로 "김*수 · 482913"
     expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('10000002-1');
-    expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('배정 라이더 정보 비공개');
+    await waitFor(() => expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('배정 김*수 · 482913'));
     expect(within(row('10000002')).getByTestId('delivery')).not.toHaveTextContent('DLV-');
     expect(within(row('10000002')).getByTestId('system-numbers')).toHaveTextContent('DLV-ORD-P-2');
     // 단계 규칙에 없는 조합은 추정하지 않고 원천 출고 상태
@@ -33,7 +33,8 @@ describe('포장 인계 현황(우리 센터)', () => {
     expect(within(partial).getByTestId('stage')).toHaveTextContent('일부 인계');
     expect(within(partial).getByText('재발송')).toBeInTheDocument();
     expect(within(partial).getByTestId('packages')).toHaveTextContent('밀봉 1 / 2 · 인계 1 · 남음 1');
-    expect(within(partial).getByTestId('packages')).toHaveTextContent(/포장 1 · 인계됨 · 인계 확정 · .* 라이더 정보 비공개 인계/);
+    // 포장 표기 = 라벨 인계 번호(bff 0.21.0 DL-2, 새 포장 4자리), 원천이 아직 안 주면 출고 안 순서 "포장 2"
+    expect(within(partial).getByTestId('packages')).toHaveTextContent(/포장 5902 · 인계됨 · 인계 확정 · .* 박\*민 · 503217 인계/);
     expect(within(partial).getByTestId('packages')).toHaveTextContent('포장 2 · 밀봉');
     // 포장 시스템 ID 는 접힌 시스템 번호 칸에만
     expect(within(partial).getByTestId('packages')).not.toHaveTextContent('PKG-4-');
