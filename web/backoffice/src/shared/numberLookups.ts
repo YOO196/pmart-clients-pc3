@@ -119,3 +119,22 @@ export function useResolvedRef(kind: RefKind, input: string) {
   if (q.isError) return { id: null, state: 'failed' as const, value };
   return q.data ? { id: q.data, state: 'found' as const, value } : { id: null, state: 'notFound' as const, value };
 }
+
+/** 접수 건 ID → 화면 번호(C-MMDD-일련, case 0.25.0 caseNumber). 상세와 같은 queryKey 라 상세로 가도 다시 읽지 않는다 */
+export function useCaseNumber(caseId: string | null | undefined) {
+  const api = useApi();
+  return useQuery({
+    queryKey: ['cases', 'detail', caseId],
+    enabled: Boolean(caseId),
+    queryFn: () => request('GET', api.cases.GET('/cases/{caseId}', { params: { path: { caseId: caseId ?? '' } } })),
+    select: (c) => c.caseNumber ?? null,
+  });
+}
+
+/** 접수 건 화면 번호(C-1119-0042) */
+export const isCaseNumber = (v: string) => /^C-\d{4}-\d{4,5}$/i.test(v.trim());
+/** 접수 건 화면 번호 → 접수 건 ID. case 0.25.0 `GET /cases?caseNumber=` */
+export async function caseIdOfNumber(api: ReturnType<typeof useApi>, caseNumber: string): Promise<string | null> {
+  const r = await request('GET', api.cases.GET('/cases', { params: { query: { caseNumber: caseNumber.trim().toUpperCase(), size: 1 } } }));
+  return r.items?.[0]?.caseId ?? null;
+}

@@ -368,6 +368,9 @@ export const messages = {
 
   /** 화면 번호(ADR-0070, bff 0.14.0) — 주문 8자리·배송 "주문번호-순번"·라이더 가린 이름 + 번호 */
   displayNumber: {
+    /** 직원 표시(ADR-0070 덧붙임 2026-11-19) */
+    staffFailed: '직원 · 확인 불가',
+    staffUnknown: '직원 · 이름 없음',
     missing: '번호 없음',
     failed: '번호 확인 불가',
     systemNumbers: '시스템 번호',
@@ -2591,6 +2594,7 @@ export const messages = {
     savedNew: '접수를 남겼어요. 상담원 문의가 새로 생겼어요.',
     savedLinked: '접수를 남기고 기존 건에 연결했어요.',
     openCase: (id: string) => `접수 건 ${id}`,
+    openCaseLabel: '접수 건',
     openInquiry: (id: string) => `문의 ${id}`,
     caseLog: '이 건의 연락 기록',
     caseRecord: '이 건으로 고객 연락 남기기',

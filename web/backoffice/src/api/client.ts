@@ -16,6 +16,7 @@ import type { paths as RiderPaths } from './generated/rider';
 import type { paths as PricingPaths } from './generated/pricing';
 import type { paths as ProductPaths } from './generated/product';
 import type { paths as ContentPaths } from './generated/product-content';
+import type { paths as HrPaths } from './generated/hr';
 import { SOURCE_SYSTEM } from './command';
 import { refreshEmployeeTokens } from './employeeAuth';
 import { createPmartFetch, TokenStore, type EmployeeAuthPaths, type PmartFetch } from '@pmart/web-core';
@@ -55,6 +56,8 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     execution: createClient<ExecutionPaths>(options),
     // 개인정보 열람 기록(audit 0.3.0, OPERATOR_ADMIN)
     audit: createClient<AuditPaths>(options),
+    // 직원 표시(ADR-0070 덧붙임 2026-11-19 — OP- 대신 이름 · 사번, hr 0.8.0 GET /hr/employee-labels)
+    hr: createClient<HrPaths>(options),
   };
 }
 

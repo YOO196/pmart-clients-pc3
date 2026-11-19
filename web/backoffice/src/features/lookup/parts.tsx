@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
 import { formatSeoul } from '@pmart/web-ui';
+import { labelText, useEmployeeLabel } from '../../shared/employeeLabels';
 import { messages } from '../../shared/messages';
 import type { Tone } from '../../shared/admin';
 
@@ -30,21 +31,26 @@ export function When({ iso, align = 'left' }: { readonly iso: string | null | un
   );
 }
 
-/** 사람(직원·라이더·고객) ID — 머리글자 동그라미 + ID(길면 줄임, 전체는 마우스를 올리면). to 가 있으면 링크 */
+/**
+ * 직원 — 머리글자 동그라미 + "이름 · 사번"(ADR-0070 덧붙임 2026-11-19, hr employee-labels). OP-… 는 글자로 보이지 않는다(상세의 시스템 번호 칸에서만).
+ * 못 읽으면 "직원 · 확인 불가", 모르는 ID 면 "직원 · 이름 없음"(없는 것과 못 읽은 것을 섞지 않는다). to 가 있으면 링크
+ */
 export function Person({ id, to }: { readonly id: string | null | undefined; readonly to?: string | undefined }) {
+  const q = useEmployeeLabel(id);
   if (!id) return <span className="text-base-content/40">{messages.none}</span>;
-  const letter = id.replace(/^(OP|RID|CU|E)-/i, '').charAt(0).toUpperCase() || '?';
+  const text = q.data ? labelText(q.data) : q.isError ? messages.displayNumber.staffFailed : q.isPending ? '…' : messages.displayNumber.staffUnknown;
+  const letter = q.data?.name.replace(/^\[목\]\s*/, '').charAt(0) || '?';
   return (
-    <span className="flex items-center gap-2" title={id}>
+    <span className="flex items-center gap-2" data-testid="staff-label">
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-base-300 text-[11px] font-bold text-base-content/70" aria-hidden="true">
         {letter}
       </span>
       {to ? (
-        <Link className="max-w-[10rem] truncate text-sm hover:text-primary hover:underline" to={to}>
-          {id}
+        <Link className="max-w-[14rem] truncate text-sm hover:text-primary hover:underline" to={to}>
+          {text}
         </Link>
       ) : (
-        <span className="max-w-[10rem] truncate text-sm">{id}</span>
+        <span className={`max-w-[14rem] truncate text-sm ${q.isError ? 'text-warning' : ''}`}>{text}</span>
       )}
     </span>
   );

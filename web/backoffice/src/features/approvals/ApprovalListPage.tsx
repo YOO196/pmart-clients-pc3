@@ -16,6 +16,7 @@ import { toUiState } from '@pmart/web-ui';
 import { CodeLabel, PageHeader, StatCard, StatStrip, StatusBadge, countCell, type Tone } from '../../shared/admin';
 import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { useApprovalTypeCounts } from '../../app/listCounts';
+import { Person } from '../lookup/parts';
 
 const pick = <T extends string>(value: string | null, allowed: readonly T[]): T | undefined =>
   allowed.find((a) => a === value);
@@ -223,17 +224,9 @@ function TypeBadge({ type }: { readonly type: string }) {
   );
 }
 
-/** 요청자 — 머리글자 동그라미 + ID(길면 줄여 보이고 전체는 마우스를 올리면) */
+/** 요청자 — 직원 표시(이름 · 사번, ADR-0070 덧붙임) */
 function Requester({ id }: { readonly id: string }) {
-  const letter = id.replace(/^OP-/i, '').charAt(0).toUpperCase() || '?';
-  return (
-    <span className="flex items-center gap-2" title={id}>
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-base-300 text-[11px] font-bold text-base-content/70" aria-hidden="true">
-        {letter}
-      </span>
-      <span className="max-w-[10rem] truncate text-sm">{id}</span>
-    </span>
-  );
+  return <Person id={id} />;
 }
 
 const REVIEW_TONE: Readonly<Record<string, Tone>> = {

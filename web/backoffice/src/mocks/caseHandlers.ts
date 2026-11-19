@@ -21,6 +21,8 @@ const DELIVERY_KINDS: readonly Kind[] = ['RIDER_HELP', 'DELIVERY_INCIDENT', 'RID
 const HOUR = 3_600_000;
 const at = (hours: number) => new Date(Date.now() + hours * HOUR).toISOString();
 const PRIORITY_ORDER = { P1: 1, P2: 2, P3: 3, P4: 4 } as const;
+/** 목 화면 번호(case 0.25.0 caseNumber) — CASE-MOCK-3 → C-1119-0003 */
+export const mockCaseNumber = (caseId: string) => `C-1119-${(caseId.match(/\d+$/)?.[0] ?? '0').padStart(4, '0')}`;
 
 function seed(): Case[] {
   const base = (c: Partial<Case> & Pick<Case, 'caseId' | 'kind' | 'priority' | 'summary'>): Case => ({
@@ -32,6 +34,7 @@ function seed(): Case[] {
     assigneeGroup: 'DELIVERY_OPS', // 배송 쪽 기본 팀(사가·결제 사건은 ORDER_OPS 로 덮어쓴다)
     version: 1,
     history: [{ action: 'OPENED', at: at(-2), toState: 'OPEN', actorId: 'SYSTEM' }],
+    caseNumber: mockCaseNumber(c.caseId ?? ''),
     ...c,
   });
   return [
@@ -433,6 +436,7 @@ export const caseHandlers = [
       seq += 1;
       const c: Case = {
         caseId: `CASE-MOCK-${seq}`,
+        caseNumber: mockCaseNumber(`CASE-MOCK-${seq}`),
         kind: 'MISDELIVERY',
         priority: 'P2',
         state: 'OPEN',

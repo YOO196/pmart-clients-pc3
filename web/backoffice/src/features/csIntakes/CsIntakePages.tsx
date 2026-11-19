@@ -17,6 +17,7 @@ import { useApi } from '../../app/ApiContext';
 import { useSession } from '../../app/SessionContext';
 import { CommandFeedback } from '../../shared/Feedback';
 import { LeaveGuard } from '../../shared/LeaveGuard';
+import { CaseNumber } from '../../shared/CaseNumber';
 import { messages } from '../../shared/messages';
 import { text, when } from '../../shared/ops';
 import { CodeLabel, PageHeader } from '../../shared/admin';
@@ -309,7 +310,7 @@ export function NewCsIntakePage() {
                     <p className="flex flex-wrap gap-3">
                       {r.caseId && (
                         <Link className="link" to={`/cases/${encodeURIComponent(r.caseId)}`}>
-                          {m.openCase(r.caseId)}
+                          {m.openCaseLabel} <CaseNumber caseId={r.caseId} />
                         </Link>
                       )}
                       {r.inquiryId && (

@@ -1,7 +1,7 @@
 // 화면 번호(ADR-0070, bff 0.14.0 — 백엔드 알림 backoffice/2026-11-18-notice-bff-display-numbers).
 // - 목록·표에는 화면 번호만: 주문 orderNumber(8자리), 배송 deliveryNumber("주문번호-순번"), 라이더 가린 이름 + 라이더 번호 6자리.
 // - 시스템 ID(orderId·deliveryId·riderId)는 링크 대상과 상세의 접힌 "시스템 번호" 칸에만 둔다.
-// - 화면 번호가 null(옛 기록·번호 전 주문)이면 시스템 ID 끝 8자리를 회색으로 + "번호 없음".
+// - 화면 번호가 null(옛 기록·번호 전 주문)이면 "번호 없음"만(2026-11-19 ADR-0070 덧붙임 — 끝 8자리도 쓰지 않는다).
 // - 원천을 못 읽어 번호가 null 이면(라이더 = unavailableSources 에 rider-service, 연결 주문 = 원천 UNKNOWN) "번호 없음"이 아니라 "번호 확인 불가"
 //   — 없는 것과 못 읽은 것을 섞지 않는다. 번호를 화면에서 만들지 않는다.
 import type { components } from '../api/generated/backoffice-bff';
@@ -21,11 +21,11 @@ export const riderSourceFailed = (unavailableSources: readonly string[] | null |
 /** 시스템 ID 끝 8자리(번호가 없을 때 알아보는 용도로만) */
 export const idTail = (id: string) => id.slice(-8);
 
-function Fallback({ systemId, failed }: { readonly systemId: string; readonly failed: boolean }) {
+/** 번호가 없을 때(ADR-0070 덧붙임 2026-11-19): 시스템 ID 도 "끝 8자리 회색"도 보이지 않는다 — "번호 없음"·"번호 확인 불가"만. 시스템 ID 는 상세의 시스템 번호 칸에서 */
+function Fallback({ failed }: { readonly systemId: string; readonly failed: boolean }) {
   return (
-    <span data-testid="display-number" data-fallback={failed ? 'failed' : 'missing'}>
-      <span className="font-mono text-base-content/50">{idTail(systemId)}</span>{' '}
-      <span className={`text-xs ${failed ? 'text-warning' : 'text-base-content/50'}`}>{failed ? m.failed : m.missing}</span>
+    <span data-testid="display-number" data-fallback={failed ? 'failed' : 'missing'} className={`text-xs ${failed ? 'text-warning' : 'text-base-content/50'}`}>
+      {failed ? m.failed : m.missing}
     </span>
   );
 }

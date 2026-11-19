@@ -29,6 +29,7 @@ import { LeaveGuard } from '../../shared/LeaveGuard';
 import { useRecordRecent } from '../../shared/recentViews';
 import { TabCount } from '../../app/MenuAlerts';
 import { PreviewDrawer, usePreview } from '../../shared/Preview';
+import { CaseNumber } from '../../shared/CaseNumber';
 import { messages as m } from '../../shared/messages';
 
 type Inquiry = components['schemas']['Inquiry'];
@@ -175,8 +176,9 @@ export function InquiryListPage({ kind = 'CUSTOMER' }: { readonly kind?: Request
                             className="font-mono text-xs text-base-content/50 hover:text-primary hover:underline"
                             to={`${basePath(kind)}/${encodeURIComponent(i.inquiryId)}`}
                             onClick={(e) => e.stopPropagation()}
+                            data-testid="inquiry-number"
                           >
-                            {i.inquiryId}
+                            {i.inquiryNumber ?? m.displayNumber.missing}
                           </Link>
                           {i.origin === 'ASSISTANT_HANDOFF' && <span className="badge badge-ghost badge-xs">{m.inquiries.fromAssistant}</span>}
                           {i.origin === 'STAFF_INTAKE' && (
@@ -515,8 +517,8 @@ export function InquiryDetailPage({ kind = 'CUSTOMER' }: { readonly kind?: Reque
                 }
                 summary={
                   <>
-                    <span className="font-mono text-xs text-base-content/55" title={m.inquiries.id}>
-                      {inquiryId}
+                    <span className="font-mono text-xs text-base-content/55" title={m.inquiries.id} data-testid="inquiry-number">
+                      {q.inquiryNumber ?? m.displayNumber.missing}
                     </span>
                     {` · ${asker} · ${formatSeoul(q.createdAt)}`}
                   </>
@@ -626,7 +628,7 @@ export function InquiryDetailPage({ kind = 'CUSTOMER' }: { readonly kind?: Reque
                               'inquiry-satisfaction',
                             ]
                           : null,
-                        [m.inquiries.caseId, <span className="font-mono text-xs">{q.caseId}</span>],
+                        [m.inquiries.caseId, <Link key="c" className="link text-sm" to={`/cases/${encodeURIComponent(q.caseId)}`}><CaseNumber caseId={q.caseId} /></Link>],
                       ]}
                     />
                   </Card>

@@ -43,6 +43,8 @@ const REFRESH_MS = 60_000;
 type StampedState = components['schemas']['StampedState'];
 interface OpenCase {
   readonly caseId?: string;
+  /** bff 0.19.0 화면 번호(ADR-0070 덧붙임) */
+  readonly caseNumber?: string | null;
   readonly kind?: string;
   readonly priority?: string | null;
   readonly overdue?: boolean | null;
@@ -343,7 +345,7 @@ function LiveTable({ items, composedAt, casesTruncated = false, riderFailed = fa
                     {it.openCases.map((c) => (
                       <li key={c.caseId} className="flex flex-wrap items-center gap-1">
                         <Link className={`text-sm hover:underline ${c.overdue ? 'font-semibold text-error' : 'text-primary'}`} to={`/cases/${encodeURIComponent(c.caseId ?? '')}`}>
-                          {`${label(messages.cases.kindName, c.kind)}${c.priority ? ` ${c.priority}` : ''}`}
+                          {`${c.caseNumber ? `${c.caseNumber} ` : ''}${label(messages.cases.kindName, c.kind)}${c.priority ? ` ${c.priority}` : ''}`}
                         </Link>
                         {c.overdue && <span className="badge badge-error badge-sm">{m.overdue}</span>}
                       </li>

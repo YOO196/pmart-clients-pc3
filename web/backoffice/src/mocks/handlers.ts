@@ -15,6 +15,7 @@ import { opsHandlers } from './opsHandlers';
 import { workCountsHandlers } from './workCountsHandlers';
 import { salesMetricsHandlers } from './salesMetricsHandlers';
 import { piiAccessLogHandlers } from './piiAccessLogHandlers';
+import { hrLabelHandlers } from './hrLabelHandlers';
 import { priceImportHandlers } from './priceImportHandlers';
 import { pricingHandlers } from './pricingHandlers';
 import { operator, unauthorized } from './support';
@@ -49,4 +50,5 @@ export const handlers = [
   ...liveDeliveryHandlers,
   ...packingHandlers,
   ...piiAccessLogHandlers,
+  ...hrLabelHandlers,
 ];

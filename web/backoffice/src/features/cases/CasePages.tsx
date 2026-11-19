@@ -39,7 +39,8 @@ import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { messages as m } from '../../shared/messages';
 import { label, text, when } from '../../shared/ops';
 import { SourceStamps } from '../../shared/SourceStamps';
-import { DisplayNumber, RiderLabel, riderSourceFailed } from '../../shared/displayNumber';
+import { DisplayNumber, RiderLabel, riderSourceFailed, SystemNumbers } from '../../shared/displayNumber';
+import { CaseNumber } from '../../shared/CaseNumber';
 import { useResolvedRef } from '../../shared/numberLookups';
 import { RefStatus } from '../../shared/RefField';
 import { DeliveryStartActions } from '../../shared/StartActions';
@@ -111,6 +112,14 @@ const refLink = (refType: string | undefined, refId: string | undefined) => {
                 : null;
   const value = refType === 'fault' ? label(m.cases.faultName, refId) : refType === 'resolution' ? label(m.cases.resolutionChoiceName, refId) : refId;
   const name = `${label(m.cases.refName, refType)} ${value}`;
+  // 이전 접수 건은 화면 번호로(ADR-0070 덧붙임)
+  if (refType === 'previousCaseId' && to)
+    return (
+      <Link key={`${refType}:${refId}`} className="link" to={to}>
+        {`${label(m.cases.refName, refType)} `}
+        <CaseNumber caseId={refId} />
+      </Link>
+    );
   return to ? (
     <Link key={`${refType}:${refId}`} className="link" to={to}>
       {name}
@@ -471,7 +480,8 @@ export function CaseListPage() {
                           <Link className="block truncate font-medium hover:text-primary hover:underline" to={`/cases/${encodeURIComponent(c.caseId ?? '')}`} onClick={(e) => e.stopPropagation()}>
                             {c.summary ? c.summary : label(m.cases.kindName, c.kind)}
                           </Link>
-                          {/* 접수 건 번호는 목록에 보이지 않는다(요약 없으면 종류 이름 — 백엔드 회신 reply-case-inbox-questions §2-1) */}
+                          {/* 화면 번호(ADR-0070 덧붙임 2026-11-19, bff caseNumber) — 시스템 ID 는 보이지 않는다 */}
+                          {c.caseNumber && <span className="block font-mono text-xs text-base-content/50" data-testid="case-number">{c.caseNumber}</span>}
                         </td>
                         <td>
                           <KindBadge kind={c.kind} />
@@ -882,11 +892,13 @@ export function CaseDetailPage() {
         title={
           <>
             {query.data?.kind ? <CodeLabel code={query.data.kind} names={m.cases.kindName} /> : m.cases.title}
-            <span className="ml-2 font-mono text-xs font-normal text-base-content/45">{m.cases.detailTitle(caseId)}</span>
+            <span className="ml-2 font-mono text-xs font-normal text-base-content/45" data-testid="case-number">{query.data ? (query.data.caseNumber ?? m.displayNumber.missing) : ''}</span>
           </>
         }
         back={{ to: '/cases', label: m.cases.back }}
       />
+      {/* 시스템 번호(ADR-0070 덧붙임) — 장애 문의·로그 대조용, 상세에서만 */}
+      <SystemNumbers ids={[{ label: m.cases.title, id: caseId }]} />
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(c) => {
           const closed = c.state === 'CLOSED';
