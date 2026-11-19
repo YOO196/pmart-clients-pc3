@@ -6,6 +6,8 @@
 //   관리자는 메시지를 사유(2~500자)와 함께 가린다(`…/messages/{messageId}/maskings`) — body null·masked, 라이더에게도 가려 보인다. 가리면 받은 대화를 처음부터 다시 읽는다(after 로는 옛 메시지가 안 바뀜).
 //   새 메시지 표시는 bff 사건함(#88) 뒤.
 // - 대화는 화면에만(로그 없음). 입력란에 개인정보 안내.
+import { RiderNo } from '../../shared/RefNumber';
+import { StaffName } from '../lookup/parts';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 
@@ -165,7 +167,8 @@ export function HelpChat({
                   <div className={`max-w-[80%] space-y-1 rounded-box p-2 ${rider ? 'bg-base-100' : 'bg-primary/10'}`}>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
                       <span className="font-semibold">{rider ? m.rider : m.support}</span>
-                      <span className="font-mono">{text(x.senderId)}</span>
+                      {/* 보낸 사람 — 라이더는 가린 이름 · 번호, 직원은 이름 · 사번(ADR-0070 덧붙임) */}
+                      <span>{rider ? <RiderNo id={x.senderId ?? ''} /> : <StaffName id={x.senderId} />}</span>
                       <span>{when(x.createdAt)}</span>
                     </div>
                     {x.masked ? (

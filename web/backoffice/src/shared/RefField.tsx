@@ -6,7 +6,7 @@ import { messages } from './messages';
 
 const m = messages.refField;
 
-export function RefStatus({ r, kind }: { readonly r: ReturnType<typeof useResolvedRef>; readonly kind: 'delivery' | 'rider' | 'order' }) {
+export function RefStatus({ r, kind }: { readonly r: ReturnType<typeof useResolvedRef>; readonly kind: 'delivery' | 'rider' | 'order' | 'case' }) {
   if (r.state === 'empty' || r.state === 'id') return null;
   const tone = r.state === 'found' ? 'text-success' : r.state === 'loading' ? 'text-base-content/50' : 'text-warning';
   const text = r.state === 'found' ? m.found(m.kind[kind], r.value) : r.state === 'loading' ? m.loading : r.state === 'notFound' ? m.notFound(m.kind[kind], r.value) : m.failed;

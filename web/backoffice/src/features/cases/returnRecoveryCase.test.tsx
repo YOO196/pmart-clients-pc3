@@ -9,7 +9,7 @@ describe('반품 회수 실패 접수 건', () => {
   it('상담원: 상세에 클레임·회수 조치, 맡기·완료 처리 가능, 넘기기 없음, "보기만" 안내 없음', async () => {
     renderAt('/cases/CASE-MOCK-R8', as.cs);
     expect(await screen.findByTestId('case-group')).toHaveTextContent('고객센터');
-    expect(screen.getByRole('link', { name: /클레임 CLM-MOCK-RF/ })).toHaveAttribute('href', '/claims/CLM-MOCK-RF');
+    expect(screen.getByRole('link', { name: /^클레임$/ })).toHaveAttribute('href', '/claims/CLM-MOCK-RF'); // 클레임 ID 는 글자로 안 보인다(ADR-0070 덧붙임)
     const claim = await screen.findByTestId('case-claim');
     expect(await within(claim).findByTestId('case-claim-state')).toHaveTextContent('회수 실패');
     expect(within(claim).getByTestId('recovery-actions')).toBeInTheDocument();

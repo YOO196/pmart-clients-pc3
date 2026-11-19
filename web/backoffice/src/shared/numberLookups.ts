@@ -99,8 +99,8 @@ export async function deliveryIdOfNumber(api: ReturnType<typeof useApi>, deliver
   return (r.items ?? []).find((d) => d.deliveryNumber === v)?.deliveryId ?? null;
 }
 
-export type RefKind = 'delivery' | 'rider' | 'order';
-const isNumberOf: Readonly<Record<RefKind, (v: string) => boolean>> = { delivery: isDeliveryNumber, rider: isRiderNumber, order: isOrderNumber };
+export type RefKind = 'delivery' | 'rider' | 'order' | 'case';
+const isNumberOf: Readonly<Record<RefKind, (v: string) => boolean>> = { delivery: isDeliveryNumber, rider: isRiderNumber, order: isOrderNumber, case: (v) => isCaseNumber(v) };
 
 /** 입력 칸 값 → 시스템 ID. 화면 번호 모양이면 서버에서 찾고, 아니면 넣은 값을 ID 로 그대로(기존처럼) */
 export function useResolvedRef(kind: RefKind, input: string) {
@@ -111,7 +111,8 @@ export function useResolvedRef(kind: RefKind, input: string) {
     queryKey: ['ref', kind, value],
     enabled: byNumber,
     staleTime: 60_000,
-    queryFn: () => (kind === 'delivery' ? deliveryIdOfNumber(api, value) : kind === 'rider' ? riderIdOfNumber(api, value) : orderIdOfNumber(api, value.replace(/[\s-]/g, ''))),
+    queryFn: () =>
+      kind === 'delivery' ? deliveryIdOfNumber(api, value) : kind === 'rider' ? riderIdOfNumber(api, value) : kind === 'case' ? caseIdOfNumber(api, value) : orderIdOfNumber(api, value.replace(/[\s-]/g, '')),
   });
   if (value === '') return { id: null, state: 'empty' as const, value };
   if (!byNumber) return { id: value, state: 'id' as const, value };

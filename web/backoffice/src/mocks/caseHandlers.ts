@@ -313,7 +313,9 @@ export const caseHandlers = [
     const v = viewer(request);
     if ('denied' in v) return v.denied;
     const q = new URL(request.url).searchParams;
-    const items = listCases(v.sees, q).map((x) => ({ ...x, myLastSeenAt: seenAt(v.who.subject, x.caseId) }));
+    const items = listCases(v.sees, q)
+      // case 0.25.0 화면 번호로 찾기(?caseNumber= 완전 일치, 대문자)
+      .filter((x) => !q.get('caseNumber') || x.caseNumber === q.get('caseNumber')).map((x) => ({ ...x, myLastSeenAt: seenAt(v.who.subject, x.caseId) }));
     return HttpResponse.json({ items, page: { nextCursor: null, size: items.length } });
   }),
 

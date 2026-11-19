@@ -8,6 +8,7 @@
 // - 다음 조치·메모는 직원이 쓴 글 — 화면에만(로그 없음), 개인정보 금지 안내.
 // - case 0.13.1 역할(백엔드 요청 2026-11-17 request-handover-roles, 사용자 "(나)"): 작성은 지원센터 팀 = RIDER_OPS·OPERATOR_ADMIN, 관리자 팀 = OPERATOR_ADMIN.
 //   메뉴·작성 탭은 그 역할에만, 라이더 운영은 팀 고정. 수락은 후임에게 그 팀 역할이 없으면 403 — 인계서는 PENDING 그대로(전임·관리자가 취소 뒤 다시 씀).
+import { useStaffText } from '../../shared/employeeLabels';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -94,6 +95,7 @@ function WriteForm() {
   const [note, setNote] = useState('');
   const [rows, setRows] = useState<Record<string, Row>>({});
   const owner = fromApplied || me;
+  const ownerName = useStaffText(owner);
   const query = useQuery({
     queryKey: ['cases', 'mine-for-handover', owner],
     queryFn: () => request('GET', api.cases.GET('/cases', { params: { query: { assigneeId: owner, size: 100 } } })),
@@ -137,7 +139,7 @@ function WriteForm() {
     >
       <div className="min-w-0 space-y-3 lg:col-span-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold">{m.ownerLine(owner)}</p>
+          <p className="text-sm font-semibold">{m.ownerLine(ownerName)}</p>
           {query.isSuccess && mine.length > 0 && <span className="badge badge-ghost badge-sm">{`${picked.length} / ${mine.length}`}</span>}
         </div>
         <QueryState state={toUiState(query, () => mine.length === 0)} onRetry={() => void query.refetch()} emptyText={m.noCases}>

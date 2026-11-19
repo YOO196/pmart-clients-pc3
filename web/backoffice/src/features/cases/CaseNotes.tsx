@@ -3,6 +3,7 @@
 //   처리 끝난 접수 건에도 남길 수 있다(상태 그대로). 고치기·지우기 없음.
 // - 가림 `POST …/notes/{noteId}/maskings` {reason} — 관리자만(버튼도 관리자에게만). 가린 메모는 내용 없이 "가린 메모"·가린 사람·사유.
 // - 메모는 직원이 쓴 글 — 화면에만(로그 없음). 입력란에 "개인정보(전화번호·주소)는 쓰지 마세요"(요청서).
+import { StaffName } from '../lookup/parts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -99,7 +100,7 @@ export function CaseNotes({ caseId }: { readonly caseId: string }) {
                   </span>
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-baseline gap-2 text-xs">
-                      <span className="font-mono font-semibold text-base-content/80">{text(n.authorId)}</span>
+                      <span className="font-semibold text-base-content/80"><StaffName id={n.authorId} /></span>
                       <span className="text-base-content/50">{when(n.createdAt)}</span>
                     </div>
                     {n.masked ? (

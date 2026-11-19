@@ -42,7 +42,7 @@ describe('지원센터 사건', () => {
   it('맡기: 내 운영자 ID 로 assignments → 담당이 나로 바뀌고 닫기 폼이 보인다', async () => {
     const view = renderAt('/cases/CASE-MOCK-2', as.riderOps);
     await userEvent.click(await screen.findByRole('button', { name: '내가 맡기' }));
-    await waitFor(() => expect(screen.getByTestId('case-assignee')).toHaveTextContent('op-rider-ops-1'));
+    await waitFor(() => expect(screen.getByTestId('case-assignee')).toHaveTextContent('[목] 정운영 · P2026-00006')); // 직원은 이름 · 사번(ADR-0070 덧붙임)
     const sent = view.mutations('/cases/CASE-MOCK-2/assignments')[0]!;
     expect(sent.headers.get('Idempotency-Key')).toBeTruthy();
     expect(sent.headers.get('X-Source-System')).toBe('backoffice-web');
@@ -75,7 +75,8 @@ describe('지원센터 사건', () => {
     const order = list.find((r) => r.textContent?.includes('결과 불일치 확인'))!;
     expect(order).toBeTruthy();
     expect(within(order).getByRole('link', { name: '주문 74939259' })).toHaveAttribute('href', '/orders/ORD-MOCK-1004');
-    expect(within(order).getByText('주문 처리 SAGA-MOCK-1')).toBeInTheDocument();
+    expect(within(order).getByText('주문 처리')).toBeInTheDocument(); // 사가 ID 는 글자로 안 보인다(ADR-0070 덧붙임)
+    expect(order).not.toHaveTextContent('SAGA-MOCK-1');
     expect(screen.getByText(/결과 불일치 확인·결제 결과 불명은 본사 관리자만 봐요/)).toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('종류'), 'PAYMENT_UNKNOWN');
     await waitFor(() => expect(view.sent.some((r) => new URL(r.url).searchParams.get('kind') === 'PAYMENT_UNKNOWN')).toBe(true));
@@ -97,7 +98,7 @@ describe('지원센터 사건', () => {
     }
     renderAt('/cases/CASE-MOCK-6', as.riderOps);
     expect(await screen.findByText(/재발 · SYSTEM · 3번째 — NO_RIDER/)).toBeInTheDocument();
-    expect(screen.getByText('배송 DLV-MOCK-6')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: '배송 번호 없음' })).toHaveAttribute('href', '/deliveries/DLV-MOCK-6'); // 번호가 없는 배송 — ID 는 링크 대상으로만
   });
 
   it('사가·결제 이상은 배송 팀 목록·종류 필터에 없다', async () => {
@@ -113,7 +114,7 @@ describe('지원센터 사건', () => {
     const form = await screen.findByRole('form', { name: '다른 사람에게 배정(관리자)' });
     await userEvent.type(within(form).getByPlaceholderText('운영자 ID'), 'op-cs-rider-1');
     await userEvent.click(within(form).getByRole('button', { name: '배정' }));
-    await waitFor(() => expect(screen.getByTestId('case-assignee')).toHaveTextContent('op-cs-rider-1'));
+    await waitFor(() => expect(screen.getByTestId('case-assignee')).toHaveTextContent('[목] 한상담 · P2026-00007'));
     expect(await view.mutations('/assignments')[0]!.json()).toEqual({ assigneeId: 'op-cs-rider-1' });
   });
 
@@ -344,7 +345,7 @@ describe('사건 다시 열기(case 0.6.0)·넘기기(0.7.0)', () => {
     await userEvent.click(within(form).getByRole('button', { name: '다시 처리하기' }));
     await waitFor(() => expect(screen.getByTestId('case-state')).toHaveTextContent('다시 처리 중'));
     expect(screen.getByTestId('case-assignee')).toHaveTextContent('아무도 안 맡음');
-    expect(screen.getByText(/다시 처리 · op-rider-ops-1 → 다시 처리 중 · 고객이 다시 다른 집이라고 연락/)).toBeInTheDocument();
+    expect(await screen.findByText(/다시 처리 · \[목\] 정운영 · P2026-00006 → 다시 처리 중 · 고객이 다시 다른 집이라고 연락/)).toBeInTheDocument();
     const sent = view.mutations('/cases/CASE-MOCK-4/reopenings')[0]!;
     expect(sent.headers.get('Idempotency-Key')).toBeTruthy();
     expect(await sent.json()).toEqual({ reason: '고객이 다시 다른 집이라고 연락' });
@@ -382,7 +383,7 @@ describe('사건 다시 열기(case 0.6.0)·넘기기(0.7.0)', () => {
     expect(screen.queryByRole('form', { name: '완료 처리' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('case-transfer')).not.toBeInTheDocument();
     expect(await view.mutations('/cases/CASE-MOCK-1/transfers')[0]!.json()).toEqual({ toGroup: 'ORDER_OPS', reason: '환불이 얽힌 오배송' });
-    expect(screen.getByText(/넘김 · op-rider-ops-1 → 접수됨 · DELIVERY_OPS → ORDER_OPS: 환불이 얽힌 오배송/)).toBeInTheDocument();
+    expect(await screen.findByText(/넘김 · \[목\] 정운영 · P2026-00006 → 접수됨 · DELIVERY_OPS → ORDER_OPS: 환불이 얽힌 오배송/)).toBeInTheDocument();
     // 목록에도 "관리자 처리 중"
     cleanup();
     renderAt('/cases', as.riderOps);

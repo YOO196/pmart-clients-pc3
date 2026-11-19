@@ -278,7 +278,10 @@ export function NewRiderComplaintPage() {
   const locked = record.busy || record.phase.kind === 'done';
   // 배송 번호(74939255-1)로도 — 찾은 배송 ID 로 보낸다(2026-11-19)
   const delivery = useResolvedRef('delivery', form.deliveryId);
-  const ready = delivery.id !== null && form.complaintType !== '';
+  const order = useResolvedRef('order', form.orderId);
+  // 주문은 고르지 않아도 되지만, 넣었는데 못 찾았으면 보내지 않는다(다른 값으로 바꾸지 않음)
+  const orderOk = order.state === 'empty' || order.id !== null;
+  const ready = delivery.id !== null && orderOk && form.complaintType !== '';
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!ready || locked || form.complaintType === '') return;
@@ -286,7 +289,7 @@ export function NewRiderComplaintPage() {
     void record.run({
       deliveryId: delivery.id ?? '',
       complaintType: form.complaintType,
-      ...(form.orderId.trim() ? { orderId: form.orderId.trim() } : {}),
+      ...(order.id ? { orderId: order.id } : {}),
       ...(form.inquiryId.trim() ? { inquiryId: form.inquiryId.trim() } : {}),
       ...(form.note.trim() ? { note: form.note.trim() } : {}),
     });
@@ -329,7 +332,8 @@ export function NewRiderComplaintPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1 text-sm">
               <span className="font-medium">{m.complaints.orderId}</span>
-              <input className="input input-sm w-full font-mono" maxLength={64} {...field('orderId')} />
+              <input className="input input-sm w-full font-mono" maxLength={64} placeholder={m.refField.orderHint} {...field('orderId')} />
+              <RefStatus r={order} kind="order" />
             </label>
             <label className="block space-y-1 text-sm">
               <span className="font-medium">{m.complaints.inquiryId}</span>

@@ -40,7 +40,7 @@ describe('후속 처리', () => {
   it('고객센터 후속 처리: 상담원이 시도 기록(메모 필수) → 상태 그대로, 결과 이력에 남음', async () => {
     const view = renderAt('/follow-ups/cs', as.cs);
     const contact = await item('고객 연락');
-    expect(screen.getByRole('link', { name: '접수 건 CASE-MOCK-1' })).toHaveAttribute('href', '/cases/CASE-MOCK-1');
+    expect(await screen.findByRole('link', { name: '접수 건 C-1119-0001' })).toHaveAttribute('href', '/cases/CASE-MOCK-1'); // 접수 건 번호(ADR-0070 덧붙임)
     await userEvent.click(within(contact).getByRole('button', { name: '결과 남기기' }));
     await userEvent.selectOptions(within(contact).getByLabelText('결과'), 'ATTEMPTED');
     await userEvent.type(within(contact).getByLabelText('근거 번호(클레임·통화 기록 등)'), 'CALL-1');

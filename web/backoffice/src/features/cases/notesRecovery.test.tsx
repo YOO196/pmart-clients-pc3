@@ -15,7 +15,7 @@ describe('접수 건 메모', () => {
     await userEvent.click(within(section).getByRole('button', { name: '메모 남기기' }));
     const note = await within(section).findByTestId('case-note');
     expect(note).toHaveTextContent('고객이 재방문 요청');
-    expect(note).toHaveTextContent('op-cs-1');
+    await waitFor(() => expect(note).toHaveTextContent('[목] 최상담 · P2026-00005')); // 작성자는 이름 · 사번(ADR-0070 덧붙임)
     expect(within(note).queryByRole('button', { name: '가리기' })).not.toBeInTheDocument(); // 가림은 관리자만
     const sent = view.sent.find((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith('/cases/CASE-MOCK-4/notes'))!;
     expect(sent.headers.get('Idempotency-Key')).toBeTruthy();
@@ -43,8 +43,8 @@ describe('접수 건 메모', () => {
 describe('오배송 회수 진행', () => {
   it('상세: "회수 배송" 링크, 이력 회수 배송 생김·회수함·매장 반납, 저절로 끝나지 않는다는 안내', async () => {
     renderAt('/cases/CASE-MOCK-4', as.riderOps);
-    expect(await screen.findByRole('link', { name: '회수 배송 DLV-MOCK-R1' })).toHaveAttribute('href', '/deliveries/DLV-MOCK-R1');
-    expect(screen.getByRole('link', { name: '재발송 배송 DLV-MOCK-S1' })).toHaveAttribute('href', '/deliveries/DLV-MOCK-S1');
+    expect(await screen.findByRole('link', { name: /^회수 배송 / })).toHaveAttribute('href', '/deliveries/DLV-MOCK-R1'); // 글자는 화면 번호(없으면 번호 없음), ID 는 링크 대상
+    expect(screen.getByRole('link', { name: /^재발송 배송 / })).toHaveAttribute('href', '/deliveries/DLV-MOCK-S1');
     expect(screen.getByTestId('case-recovery-note')).toHaveTextContent('저절로 끝나지 않고');
     for (const t of ['회수 배송 생김', '회수함', '매장 반납 · SYSTEM · MFC-BSN-01', '재발송 배송 생김 · SYSTEM · DLV-MOCK-S1']) expect(screen.getByText(new RegExp(t))).toBeInTheDocument();
   });

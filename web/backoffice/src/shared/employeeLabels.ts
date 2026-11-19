@@ -68,3 +68,12 @@ export function useEmployeeLabel(operatorId: string | null | undefined) {
 }
 
 export const labelText = (l: EmployeeLabel) => `${l.name} · ${l.employeeNo}`;
+
+/** 직원 "이름 · 사번" 글자(문장 안에 넣을 때). 읽는 중 "…", 못 읽음·모름은 직원 표시 문구 */
+export function useStaffText(operatorId: string | null | undefined): string {
+  const q = useEmployeeLabel(operatorId);
+  if (!operatorId) return '';
+  return q.data ? labelText(q.data) : q.isError ? STAFF_FAILED : q.isPending ? '…' : STAFF_UNKNOWN;
+}
+const STAFF_FAILED = '직원 · 확인 불가';
+const STAFF_UNKNOWN = '직원 · 이름 없음';

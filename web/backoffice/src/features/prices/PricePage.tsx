@@ -14,6 +14,7 @@ import { randomUuid } from '@pmart/web-core';
 import { useApi } from '../../app/ApiContext';
 import { CommandFeedback } from '../../shared/Feedback';
 import { formatKrw, formatSeoul } from '@pmart/web-ui';
+import { ApprovalChosen, ApprovalPicker } from '../../shared/ApprovalPicker';
 import { messages as m } from '../../shared/messages';
 import { QueryState } from '@pmart/web-ui';
 import { toUiState } from '@pmart/web-ui';
@@ -268,7 +269,9 @@ function PriceChange({ initialSku }: { readonly initialSku: string }) {
           <label className="flex flex-col gap-1 text-sm">
             <span className={label}>{m.prices.approvalId}</span>
             <input className="input input-sm" value={approvalId} onChange={(e) => setApprovalId(e.target.value)} />
+            <ApprovalChosen approvalId={approvalId} />
           </label>
+          <ApprovalPicker type="PRICE" selectedId={approvalId} onPick={setApprovalId} />
           <button
             type="button"
             className="btn btn-sm"
