@@ -82,9 +82,16 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
         .read(packingProvider(widget.taskId).notifier)
         .repack(s.shipmentId, p, reason);
     if (!mounted) return;
-    if (outcome is PackRejected) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l10n.repackRejected)));
+    switch (outcome) {
+      case PackRejected():
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l10n.repackRejected)));
+      case PackUnknown():
+        // 결과 모름을 말없이 넘기지 않는다 — 같은 사유로 다시 누르면 같은 요청으로 확인.
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l10n.repackUnknown)));
+      case PackDone():
+        break; // 새 라벨은 lastSealed 를 듣는 쪽이 바로 출력한다.
     }
   }
 

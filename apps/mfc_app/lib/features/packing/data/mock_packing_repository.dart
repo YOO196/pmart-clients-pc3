@@ -261,8 +261,17 @@ base class MockPackingRepository implements PackingRepository {
     _packagesOf(shipmentId).add(p);
     _byKey[key.value] = id;
     _refreshShipment(shipmentId);
+    if (loseNextRepackResponse) {
+      loseNextRepackResponse = false;
+      return packFailureToOutcome(
+        UnknownResultFailure(requestId: key.value, httpStatus: 504),
+      );
+    }
     return _done(p);
   }
+
+  /// 다음 재포장 응답을 잃는다(서버는 반영) — 같은 키 재전송 시험용.
+  bool loseNextRepackResponse = false;
 
   /// 받은 나누기 요청 횟수(같은 키 재전송 포함).
   int regroupCalls = 0;

@@ -372,6 +372,7 @@ class PackingController extends Notifier<PackingState> {
 
   /// 결과를 모르는 나누기 — 같은 포장·같은 나눔이면 같은 키로만 다시 보낸다.
   ({String sig, IdempotencyKey key})? _pendingSplit;
+  ({String sig, IdempotencyKey key})? _pendingRepack;
 
   /// 밀봉한 봉투 [p] 를 둘로 나눈다([moved] 만큼 새 봉투로). 봉투가 무겁거나 너무 찼을 때.
   Future<RegroupOutcome> split(
@@ -412,11 +413,14 @@ class PackingController extends Notifier<PackingState> {
     PackageView p,
     RepackReason reason,
   ) async {
-    final outcome = await _repo.repack(
-      p.packageId,
-      reason,
-      key: IdempotencyKey.generate(),
-    );
+    // 결과를 모르면 같은 포장·같은 사유는 같은 키로만 다시 보낸다(새 포장이 두 번 생기지 않게).
+    final sig = '${p.packageId}|${reason.name}';
+    final key =
+        (_pendingRepack?.sig == sig ? _pendingRepack!.key : null) ??
+        IdempotencyKey.generate();
+    _pendingRepack = (sig: sig, key: key);
+    final outcome = await _repo.repack(p.packageId, reason, key: key);
+    if (outcome is! PackUnknown) _pendingRepack = null;
     if (ref.mounted) {
       if (outcome is PackDone) {
         state = state.copyWith(lastSealed: outcome.package);
