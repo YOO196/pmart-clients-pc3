@@ -156,7 +156,9 @@ void main() {
     await t.pump(const Duration(seconds: 4));
     await settle();
     expect(find.text('지원센터가 처리하고 있어요'), findsOneWidget);
-    expect(find.textContaining('접수번호 CS-'), findsOneWidget);
+    // 접수 건 ID(시스템 ID)는 라이더 화면에 내지 않는다(ADR-0070, 사용자 2026-11-19)
+    expect(find.textContaining('접수번호'), findsNothing);
+    expect(find.textContaining('CS-'), findsNothing);
     expect(find.textContaining('PMart 지원센터입니다'), findsOneWidget);
 
     // 라이더 ↔ 상담원 대화.
