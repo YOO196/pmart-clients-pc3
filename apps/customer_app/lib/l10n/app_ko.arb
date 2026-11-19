@@ -340,6 +340,23 @@
   "addressReceiver": "받는 분",
   "addressPhone": "연락처",
   "addressMyPhone": "내 연락처",
+  "addressDetailTitle": "주소 상세",
+  "addressDetailHint": "건물명, 동/호수 등 상세주소",
+  "addressChange": "변경",
+  "addressMapCheck": "지도에서 위치 확인",
+  "addressPinPreview": "표시된 위치가 다르다면 지도에서 위치 확인을 눌러 변경해주세요",
+  "addressEntrancePassword": "공동현관 비밀번호",
+  "addressEntrancePasswordHint": "예) #1234",
+  "addressDirections": "찾아오는 길 안내",
+  "addressDirectionsHint": "예) 편의점 옆 건물이에요",
+  "addressEntranceTooLong": "공동현관 비밀번호와 찾아오는 길은 합쳐서 {max}자까지 쓸 수 있어요",
+  "@addressEntranceTooLong": {
+    "placeholders": {
+      "max": {"type": "int"}
+    }
+  },
+  "addressEntranceGuide": "입력된 공동현관 비밀번호는 원활한 배달을 위해 필요한 정보로, 배달을 진행하는 라이더님께 전달됩니다.",
+  "addressRegister": "주소 등록",
   "addressEntrance": "공동현관 출입 방법",
   "addressEntranceNote": "출입 안내 (선택)",
   "addressSave": "저장",

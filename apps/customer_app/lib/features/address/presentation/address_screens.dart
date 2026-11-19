@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show TextInputFormatter;
+import 'package:flutter/services.dart'
+    show LengthLimitingTextInputFormatter, TextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart' show PmartFailure;
@@ -15,6 +16,7 @@ import '../../profile/presentation/profile_controller.dart'
     show profileProvider;
 import '../data/geocoding_repository.dart';
 import '../domain/address.dart';
+import 'address_map_preview.dart';
 import 'map_pick_screen.dart';
 import 'phone_number_formatter.dart';
 import 'postcode_screen.dart';
@@ -199,10 +201,11 @@ final mapPickProvider = Provider<MapPick>(
 );
 
 /// 배달 위치(지도 핀) 상태. 판정은 서버가 도로명으로 하므로 위치를 못 맞춰도 저장은 된다.
-enum _PinState { none, picking, picked, notFound, failed }
+/// [preview] = 서버 좌표로 미리보기만 보임(고객 확인 전), [picked] = 큰 지도에서 확인함.
+enum _PinState { none, picking, preview, picked, notFound, failed }
 
-/// SCR-ADDRESS-EDIT-001. 도로명주소는 주소 검색에서만 고른다(직접 입력하지 않음 — 판정이 도로명 기준, ADR-0023).
-/// 고르면 서버 좌표 변환으로 지도를 열고, 고객이 핀으로 배달 위치를 맞춘다.
+/// SCR-ADDRESS-EDIT-001 주소 상세(레퍼런스 2-7-1). 도로명주소는 주소 검색에서만 고른다(직접 입력하지 않음 — 판정이 도로명 기준, ADR-0023).
+/// 고르면 서버 좌표 변환으로 지도 미리보기를 보이고, "지도에서 위치 확인"으로 큰 지도에서 핀을 맞춘다(7-2).
 
 class AddressFormScreen extends ConsumerStatefulWidget {
   const AddressFormScreen({super.key, this.initial});
@@ -216,14 +219,19 @@ class AddressFormScreen extends ConsumerStatefulWidget {
 
 class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   final _form = GlobalKey<FormState>();
-  final _label = TextEditingController();
   final _road = TextEditingController();
   final _detail = TextEditingController();
   final _name = TextEditingController();
   final _phone = TextEditingController();
-  final _note = TextEditingController();
-  EntranceMethod _entrance = EntranceMethod.free;
+  final _password = TextEditingController();
+  final _directions = TextEditingController();
+
+  /// 고객이 큰 지도에서 확인한 배달 위치(보낼 `geo`). 확인 전에는 null — 서버가 도로명으로 채운다.
   GeoPoint? _geo;
+
+  /// 서버 주소 변환 좌표(미리보기·큰 지도 시작 위치). 보내지 않는다.
+  GeoPoint? _preview;
+  String? _jibun;
   String? _postalCode;
   _PinState _pin = _PinState.none;
 
@@ -235,12 +243,12 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
       _road.text = initial.roadAddress;
       _postalCode = initial.zoneNo;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _locate();
+        if (mounted) _geocode();
       });
     }
   }
 
-  /// 주소 검색 → 서버 좌표 변환 → 지도 핀.
+  /// 주소 검색 → 서버 좌표 변환 → 미리보기(레퍼런스 2-7-1). 큰 지도는 "지도에서 위치 확인"으로 연다(7-2).
   Future<void> _search() async {
     final picked = await ref.read(addressSearchProvider)(context);
     if (picked == null || !mounted) return;
@@ -248,11 +256,13 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
       _road.text = picked.roadAddress;
       _postalCode = picked.zoneNo;
       _geo = null;
+      _preview = null;
+      _jibun = null;
     });
-    await _locate();
+    await _geocode();
   }
 
-  Future<void> _locate() async {
+  Future<void> _geocode() async {
     final road = _road.text.trim();
     if (road.isEmpty) return;
     setState(() => _pin = _PinState.picking);
@@ -266,25 +276,61 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     }
     if (!mounted) return;
     final start = found.firstOrNull;
-    if (start == null) {
-      setState(() => _pin = _PinState.notFound);
-      return;
-    }
-    final initial = _geo ?? (lat: start.lat, lng: start.lng);
-    final point = await ref.read(mapPickProvider)(context, initial, road);
-    if (!mounted) return;
     setState(() {
-      if (point != null) _geo = point;
-      _pin = _geo == null ? _PinState.none : _PinState.picked;
+      _preview = start == null ? null : (lat: start.lat, lng: start.lng);
+      _jibun = start?.jibunAddress;
+      _pin = start == null
+          ? _PinState.notFound
+          : (_geo == null ? _PinState.preview : _PinState.picked);
+    });
+  }
+
+  /// 큰 지도에서 배달 위치를 맞춘다. 앞서 맞춘 핀이 있으면 거기서 시작한다.
+  Future<void> _openMap() async {
+    if (_pin == _PinState.failed) await _geocode();
+    final start = _geo ?? _preview;
+    if (start == null || !mounted) return;
+    final point = await ref.read(mapPickProvider)(
+      context,
+      start,
+      _road.text.trim(),
+    );
+    if (point == null || !mounted) return;
+    setState(() {
+      _geo = point;
+      _pin = _PinState.picked;
     });
   }
 
   @override
   void dispose() {
-    for (final c in [_label, _road, _detail, _name, _phone, _note]) {
+    for (final c in [_road, _detail, _name, _phone, _password, _directions]) {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// 공동현관 비밀번호·찾아오는 길 → 계약 `entranceMethod`·`entranceNote`(칸이 하나라 이어 붙인다, 100자).
+  /// 비밀번호를 넣으면 PASSWORD, 아니면 지금까지의 기본값처럼 FREE.
+  ({EntranceMethod method, String? note}) _entrance() {
+    final password = _password.text.trim();
+    final directions = _directions.text.trim();
+    final note = [
+      if (password.isNotEmpty) password,
+      if (directions.isNotEmpty) directions,
+    ].join(' · ');
+    return (
+      method: password.isEmpty ? EntranceMethod.free : EntranceMethod.password,
+      note: note.isEmpty ? null : note,
+    );
+  }
+
+  String? _noteLength(String? _) {
+    final note = _entrance().note;
+    return note != null && note.length > AddressLimits.entranceNote
+        ? AppLocalizations.of(context)
+              .addressEntranceTooLong(AddressLimits.entranceNote)
+        : null;
   }
 
   String? _required(String? v) => (v == null || v.trim().isEmpty)
@@ -356,17 +402,17 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
           .changeProfile(phone: receiverPhone);
       if (!mounted) return;
     }
+    final entrance = _entrance();
     final outcome = await ref
         .read(addressBookProvider.notifier)
         .add(
           AddressDraft(
-            label: _label.text.trim().isEmpty ? null : _label.text.trim(),
             roadAddress: _road.text.trim(),
             detailAddress: _detail.text.trim(),
             receiverName: receiverName,
             receiverPhone: receiverPhone,
-            entranceMethod: _entrance,
-            entranceNote: _note.text.trim().isEmpty ? null : _note.text.trim(),
+            entranceMethod: entrance.method,
+            entranceNote: entrance.note,
             geo: _geo,
             postalCode: _postalCode,
           ),
@@ -380,140 +426,221 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     }
   }
 
+  /// 레퍼런스 2-7-1 입력 칸: 위에 회색 이름(있으면), 둥근 테두리 칸 안에 예시 글. 글자 수는 보이지 않는다(상한만).
   Widget _field(
     String key,
-    TextEditingController c,
-    String label,
-    int max, {
+    TextEditingController c, {
+    String? label,
+    String? hint,
+    required int max,
     bool required = true,
     TextInputType? keyboard,
     List<TextInputFormatter>? formatters,
-  }) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: TextFormField(
-      key: ValueKey(key),
-      controller: c,
-      maxLength: max,
-      keyboardType: keyboard,
-      inputFormatters: formatters,
-      decoration: InputDecoration(labelText: label),
-      validator: required ? _required : null,
-    ),
-  );
+    FormFieldValidator<String>? validator,
+  }) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (label != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                label,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontSize: 13.5,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          TextFormField(
+            key: ValueKey(key),
+            controller: c,
+            keyboardType: keyboard,
+            inputFormatters: [
+              LengthLimitingTextInputFormatter(max),
+              ...?formatters,
+            ],
+            style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+            decoration: InputDecoration(
+              // 칸 이름은 위에 따로 둔다 — 칸 안에는 예시만.
+              hintText: hint ?? label,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 15,
+                vertical: 14,
+              ),
+            ),
+            validator: validator ?? (required ? _required : null),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 도로명 제목(크게)·지번(작게). 주소를 아직 고르지 않았으면 검색 칸.
+  Widget _addressHeader(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final road = _road.text.trim();
+    if (road.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 20),
+        child: TextFormField(
+          key: const ValueKey('f-road'),
+          controller: _road,
+          readOnly: true,
+          onTap: _search,
+          decoration: InputDecoration(
+            hintText: l10n.addressSearchHint,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            suffixIcon: IconButton(
+              key: const ValueKey('address-search'),
+              icon: const PmartLineIcon(PmartLineIcons.search, size: 22),
+              tooltip: l10n.addressSearchTitle,
+              onPressed: _search,
+            ),
+          ),
+          validator: _required,
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 10, 0, 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  road,
+                  key: const ValueKey('f-road'),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (_jibun case final j?) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    j,
+                    key: const ValueKey('address-jibun'),
+                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 14.5),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          TextButton(
+            key: const ValueKey('address-search'),
+            onPressed: _search,
+            child: Text(l10n.addressChange),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final receiver = _receiver();
+    final chosen = _road.text.trim().isNotEmpty;
+    final small = theme.textTheme.bodySmall?.copyWith(
+      fontSize: 11,
+      color: theme.colorScheme.onSurfaceVariant,
+    );
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.addressAdd)),
+      appBar: AppBar(title: Text(l10n.addressDetailTitle)),
       body: Form(
         key: _form,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(15, 12, 15, 24),
           children: [
-            _field(
-              'f-label',
-              _label,
-              l10n.addressLabel,
-              AddressLimits.label,
-              required: false,
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: TextFormField(
-                key: const ValueKey('f-road'),
-                controller: _road,
-                readOnly: true,
-                onTap: _search,
-                decoration: InputDecoration(
-                  labelText: l10n.addressRoad,
-                  hintText: l10n.addressSearchHint,
-                  suffixIcon: IconButton(
-                    key: const ValueKey('address-search'),
-                    icon: const Icon(Icons.search),
-                    tooltip: l10n.addressSearchTitle,
-                    onPressed: _search,
-                  ),
-                ),
-                validator: _required,
+            if (chosen) ...[
+              AddressMapPreview(
+                point: _geo ?? _preview,
+                onOpen: _pin == _PinState.picking || _pin == _PinState.notFound
+                    ? null
+                    : _openMap,
               ),
+              const SizedBox(height: 6),
+            ],
+            Text(
+              switch (_pin) {
+                _PinState.none => l10n.addressPinNone,
+                _PinState.picking => l10n.addressPinPicking,
+                _PinState.preview => l10n.addressPinPreview,
+                _PinState.picked => l10n.addressPinPicked,
+                _PinState.notFound => l10n.addressPinNotFound,
+                _PinState.failed => l10n.addressPinFailed,
+              },
+              key: const ValueKey('address-pin-state'),
+              style: small,
             ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      switch (_pin) {
-                        _PinState.none => l10n.addressPinNone,
-                        _PinState.picking => l10n.addressPinPicking,
-                        _PinState.picked => l10n.addressPinPicked,
-                        _PinState.notFound => l10n.addressPinNotFound,
-                        _PinState.failed => l10n.addressPinFailed,
-                      },
-                      key: const ValueKey('address-pin-state'),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                  if (_road.text.trim().isNotEmpty && _pin != _PinState.picking)
-                    TextButton(
-                      key: const ValueKey('address-map'),
-                      onPressed: _locate,
-                      child: Text(l10n.addressPinAdjust),
-                    ),
-                ],
-              ),
-            ),
+            const SizedBox(height: 4),
+            _addressHeader(l10n),
             _field(
               'f-detail',
               _detail,
-              l10n.addressDetail,
-              AddressLimits.detailAddress,
+              hint: l10n.addressDetailHint,
+              max: AddressLimits.detailAddress,
             ),
             if (receiver.askName)
               _field(
                 'f-name',
                 _name,
-                l10n.addressReceiver,
-                AddressLimits.receiverName,
+                label: l10n.addressReceiver,
+                max: AddressLimits.receiverName,
               ),
             if (receiver.askPhone)
               _field(
                 'f-phone',
                 _phone,
-                receiver.member ? l10n.addressMyPhone : l10n.addressPhone,
-                AddressLimits.receiverPhone,
+                label: receiver.member
+                    ? l10n.addressMyPhone
+                    : l10n.addressPhone,
+                max: AddressLimits.receiverPhone,
                 keyboard: TextInputType.phone,
                 formatters: const [PhoneNumberFormatter()],
               ),
-            DropdownButtonFormField<EntranceMethod>(
-              initialValue: _entrance,
-              decoration: InputDecoration(labelText: l10n.addressEntrance),
-              items: [
-                for (final m in EntranceMethod.values)
-                  DropdownMenuItem(
-                    value: m,
-                    child: Text(switch (m) {
-                      EntranceMethod.free => l10n.entranceFree,
-                      EntranceMethod.password => l10n.entrancePassword,
-                      EntranceMethod.call => l10n.entranceCall,
-                      EntranceMethod.other => l10n.entranceOther,
-                    }),
-                  ),
-              ],
-              onChanged: (m) => setState(() => _entrance = m ?? _entrance),
+            _field(
+              'f-entrance-password',
+              _password,
+              label: l10n.addressEntrancePassword,
+              hint: l10n.addressEntrancePasswordHint,
+              max: AddressLimits.entranceNote,
+              required: false,
+              validator: _noteLength,
             ),
-            const SizedBox(height: 12),
             _field(
               'f-note',
-              _note,
-              l10n.addressEntranceNote,
-              AddressLimits.entranceNote,
+              _directions,
+              label: l10n.addressDirections,
+              hint: l10n.addressDirectionsHint,
+              max: AddressLimits.entranceNote,
               required: false,
+              validator: _noteLength,
+            ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(2, 0, 6, 0),
+                  child: Text('•', style: small),
+                ),
+                Expanded(child: Text(l10n.addressEntranceGuide, style: small)),
+              ],
             ),
             // 개발 빌드 전용: 카카오 지도가 안 되는 x86 에뮬레이터에서 시험할 때 권역 안 실제 도로명주소를 넣는다.
             if (showDevTestGeo) ...[
+              const SizedBox(height: 20),
               OutlinedButton.icon(
                 key: const ValueKey('dev-test-geo'),
                 icon: const Icon(Icons.science_outlined),
@@ -522,17 +649,30 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                   _road.text = DevTestAddress.roadAddress;
                   _postalCode = DevTestAddress.postalCode;
                   _geo = DevTestAddress.geo;
+                  _preview = DevTestAddress.geo;
                   _pin = _PinState.picked;
                 }),
               ),
-              const SizedBox(height: 12),
             ],
-            CommandButton(
+          ],
+        ),
+      ),
+      // 레퍼런스: 아래 고정 "주소 등록"(위에 얇은 선).
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(color: theme.colorScheme.outlineVariant),
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: CommandButton(
               key: const ValueKey('address-save'),
-              label: l10n.addressSave,
+              label: l10n.addressRegister,
               onPressed: _save,
             ),
-          ],
+          ),
         ),
       ),
     );
