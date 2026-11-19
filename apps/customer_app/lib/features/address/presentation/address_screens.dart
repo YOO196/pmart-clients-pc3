@@ -4,7 +4,8 @@ import 'package:flutter/services.dart'
     show LengthLimitingTextInputFormatter, TextInputFormatter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pmart_core/pmart_core.dart' show PmartFailure;
+import 'package:pmart_core/pmart_core.dart'
+    show PmartFailure, ProblemCode, ProblemFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
@@ -15,6 +16,8 @@ import 'address_map_preview.dart';
 import 'map_pick_screen.dart';
 import 'postcode_screen.dart';
 import 'address_controller.dart';
+import '../../auth/domain/auth.dart' show MemberSession;
+import '../../auth/presentation/auth_controller.dart' show sessionProvider;
 
 String serviceabilityText(AppLocalizations l10n, Serviceability s) =>
     switch (s) {
@@ -30,8 +33,13 @@ String addressOutcomeText(
   AddressSaved(:final address) =>
     '${l10n.addressSaved}\n${serviceabilityText(l10n, address.serviceability)}',
   ShoppingAddressChanged() => l10n.shoppingAddressChanged,
+  AddressDeleted() => l10n.addressDeleted,
   AddressCommandUnknown() => l10n.addressCommandUnknown,
   AddressConflict() => l10n.addressConflict,
+  AddressCommandFailed(:final failure)
+      when failure is ProblemFailure &&
+          failure.problem.code == ProblemCode.invalidState =>
+    l10n.addressDeleteInUse,
   AddressCommandFailed() => l10n.addressCommandFailed,
 };
 
@@ -69,8 +77,22 @@ class AddressListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final value = ref.watch(addressBookProvider);
+    // 삭제는 회원 주소록만(비회원 배송지는 이 기기의 목록).
+    final canEdit =
+        ref.watch(sessionProvider) is MemberSession &&
+        (value.value?.addresses.isNotEmpty ?? false);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.addressTitle)),
+      appBar: AppBar(
+        title: Text(l10n.addressTitle),
+        actions: [
+          if (canEdit)
+            TextButton(
+              key: const ValueKey('address-edit'),
+              onPressed: () => context.push('/addresses/edit'),
+              child: Text(l10n.addressEdit),
+            ),
+        ],
+      ),
       floatingActionButton: value.value == null
           ? null
           : FloatingActionButton.extended(
@@ -160,6 +182,161 @@ class _AddressListState extends ConsumerState<_AddressList> {
               isThreeLine: true,
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// 레퍼런스 3-1 2-3 "주소 편집". 현재 쇼핑 주소는 표시만 하고(서버도 409), 나머지는 확인 뒤 삭제.
+/// 지운 결과는 서버 주소록을 다시 읽어 보인다.
+class AddressEditScreen extends ConsumerStatefulWidget {
+  const AddressEditScreen({super.key});
+
+  @override
+  ConsumerState<AddressEditScreen> createState() => _AddressEditScreenState();
+}
+
+class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
+  String? _deleting;
+
+  Future<void> _delete(Address a) async {
+    final l10n = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.addressDeleteConfirmTitle),
+        content: Text(l10n.addressDeleteConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.addressDeleteCancel),
+          ),
+          TextButton(
+            key: const ValueKey('address-delete-confirm'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.addressDelete),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _deleting = a.addressId);
+    final outcome = await ref
+        .read(addressBookProvider.notifier)
+        .remove(a.addressId);
+    if (!mounted) return;
+    setState(() => _deleting = null);
+    messenger.showSnackBar(
+      SnackBar(content: Text(addressOutcomeText(l10n, outcome))),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final value = ref.watch(addressBookProvider);
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.addressEditTitle)),
+      body: UiStateView<AddressBook?>(
+        state: uiStateOf(value),
+        onRetry: () => ref.invalidate(addressBookProvider),
+        ready: (context, book) {
+          final addresses = book?.addresses ?? const <Address>[];
+          if (addresses.isEmpty) return Center(child: Text(l10n.addressEmpty));
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            itemCount: addresses.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, i) {
+              final a = addresses[i];
+              final current = a.addressId == book!.context.shoppingAddressId;
+              return Padding(
+                key: ValueKey('address-edit-${a.addressId}'),
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2, right: 14),
+                      child: Icon(Icons.place, size: 22),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              Text(
+                                a.label ?? a.roadAddress,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              if (current)
+                                Container(
+                                  key: const ValueKey('address-current-badge'),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    l10n.addressCurrent,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${a.roadAddress} ${a.detailAddress}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 13,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          if (!current) ...[
+                            const SizedBox(height: 10),
+                            OutlinedButton(
+                              key: ValueKey('address-delete-${a.addressId}'),
+                              onPressed: _deleting == null
+                                  ? () => _delete(a)
+                                  : null,
+                              style: OutlinedButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                minimumSize: const Size(0, 34),
+                              ),
+                              child: _deleting == a.addressId
+                                  ? const SizedBox.square(
+                                      dimension: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(l10n.addressDelete),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

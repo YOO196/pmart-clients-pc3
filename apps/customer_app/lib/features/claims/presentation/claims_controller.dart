@@ -51,6 +51,74 @@ final orderClaimsProvider = FutureProvider.autoDispose
           ref.watch(claimsRepositoryProvider).listForOrder(orderId),
     );
 
+/// 마이 "취소·반품 내역" 목록 상태. 다음 쪽 실패는 받은 목록을 지우지 않는다.
+@immutable
+class MyClaimsState {
+  const MyClaimsState({
+    required this.items,
+    this.nextCursor,
+    this.loadingMore = false,
+    this.loadMoreFailure,
+  });
+
+  final List<ClaimSummaryView> items;
+  final String? nextCursor;
+  final bool loadingMore;
+  final PmartFailure? loadMoreFailure;
+
+  bool get hasMore => nextCursor != null;
+}
+
+final myClaimsProvider =
+    AsyncNotifierProvider.autoDispose<MyClaimsController, MyClaimsState>(
+      MyClaimsController.new,
+    );
+
+class MyClaimsController extends AsyncNotifier<MyClaimsState> {
+  @override
+  Future<MyClaimsState> build() async {
+    final page = await ref.watch(claimsRepositoryProvider).listMine();
+    return MyClaimsState(items: page.items, nextCursor: page.nextCursor);
+  }
+
+  Future<void> loadMore() async {
+    final current = state.value;
+    if (current == null || !current.hasMore || current.loadingMore) return;
+    state = AsyncData(
+      MyClaimsState(
+        items: current.items,
+        nextCursor: current.nextCursor,
+        loadingMore: true,
+      ),
+    );
+    try {
+      final page = await ref
+          .read(claimsRepositoryProvider)
+          .listMine(cursor: current.nextCursor);
+      if (!ref.mounted) return;
+      final seen = {for (final c in current.items) c.claimId};
+      state = AsyncData(
+        MyClaimsState(
+          items: [
+            ...current.items,
+            ...page.items.where((c) => !seen.contains(c.claimId)),
+          ],
+          nextCursor: page.nextCursor,
+        ),
+      );
+    } on PmartFailure catch (e) {
+      if (!ref.mounted) return;
+      state = AsyncData(
+        MyClaimsState(
+          items: current.items,
+          nextCursor: current.nextCursor,
+          loadMoreFailure: e,
+        ),
+      );
+    }
+  }
+}
+
 /// 클레임 화면이 끝 상태(CLOSED·REJECTED·WITHDRAWN)가 될 때까지 다시 조회하는 간격.
 /// 백엔드: 보통 몇 초 안에 IN_PROGRESS → CLOSED(handoff 2026-10-31 주문 취소 §4).
 final claimRefreshIntervalProvider = Provider<Duration>(

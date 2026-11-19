@@ -22,6 +22,10 @@ abstract interface class AddressRepository {
 
   Future<ShoppingContext> context();
 
+  /// `DELETE /me/addresses/{id}`(204). 현재 쇼핑 주소면 409 INVALID_STATE, 없으면 404.
+  /// 짝 조회가 없어 결과 불명은 같은 [key] 재전송·주소록 다시 읽기로 해소한다.
+  Future<void> delete(String addressId, {required IdempotencyKey key});
+
   /// `POST /guest-delivery-addresses`(토큰 없음, X-Device-Id). 결과 불명은 같은 [key] 재전송으로 해소한다.
   Future<Address> addGuest(AddressDraft draft, {required IdempotencyKey key});
 
@@ -154,6 +158,18 @@ final class ApiAddressRepository implements AddressRepository {
       context: ctx == null
           ? throw const ContractViolationFailure('shoppingContext 없음')
           : contextFromContract(ctx),
+    );
+  }
+
+  @override
+  Future<void> delete(String addressId, {required IdempotencyKey key}) async {
+    await pmartGuard(
+      () => _addresses.deleteMyAddress(
+        addressId: addressId,
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        extra: commandOptions(key).extra,
+      ),
     );
   }
 

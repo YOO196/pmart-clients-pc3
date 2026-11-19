@@ -42,6 +42,11 @@ final class ShoppingAddressChanged extends AddressCommandOutcome {
   const ShoppingAddressChanged();
 }
 
+/// 서버가 지웠다(주소록을 다시 읽어 확인함).
+final class AddressDeleted extends AddressCommandOutcome {
+  const AddressDeleted();
+}
+
 /// 반영 여부를 아직 모른다. 주소록을 다시 불러와 확인하게 한다(같은 행위를 새로 하지 않게).
 final class AddressCommandUnknown extends AddressCommandOutcome {
   const AddressCommandUnknown();
@@ -140,6 +145,34 @@ class AddressBookController extends AsyncNotifier<AddressBook?> {
     return last is UnknownResultFailure
         ? const AddressCommandUnknown()
         : AddressCommandFailed(last!);
+  }
+
+  /// 회원 주소 삭제. 결과 불명은 같은 키로 다시 보내고, 그래도 모르면 주소록을 다시 읽어 남았는지로 판단한다.
+  /// 404(이미 없음)도 지워진 것으로 본다. 현재 쇼핑 주소면 서버가 409 INVALID_STATE 로 거절한다.
+  Future<AddressCommandOutcome> remove(String addressId) async {
+    final key = IdempotencyKey.generate();
+    final attempts = 1 + ref.read(addressResendAttemptsProvider);
+    for (var i = 0; i < attempts; i++) {
+      try {
+        await _repo.delete(addressId, key: key);
+        await _reload();
+        return const AddressDeleted();
+      } on UnknownResultFailure {
+        continue;
+      } on ProblemFailure catch (f) {
+        if (f.problem.code == ProblemCode.notFound) {
+          await _reload();
+          return const AddressDeleted();
+        }
+        return AddressCommandFailed(f);
+      } on PmartFailure catch (f) {
+        return AddressCommandFailed(f);
+      }
+    }
+    await _reload();
+    final gone =
+        state.value?.addresses.every((a) => a.addressId != addressId) ?? false;
+    return gone ? const AddressDeleted() : const AddressCommandUnknown();
   }
 
   Future<AddressCommandOutcome> select(String addressId) async {

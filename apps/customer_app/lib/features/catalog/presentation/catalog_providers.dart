@@ -8,6 +8,9 @@ import '../../../shared/providers.dart';
 import '../../../shared/shopping_context.dart';
 import '../data/catalog_repository.dart';
 import '../data/mock_catalog_repository.dart';
+import '../data/recent_searches_repository.dart';
+import '../../auth/domain/auth.dart' show MemberSession;
+import '../../auth/presentation/auth_controller.dart' show sessionProvider;
 import '../domain/catalog.dart';
 
 final catalogRepositoryProvider = Provider<CatalogRepository>(
@@ -16,6 +19,27 @@ final catalogRepositoryProvider = Provider<CatalogRepository>(
     PmartEnv.local => ApiCatalogRepository(ref.watch(dioProvider)),
   },
 );
+
+final recentSearchesRepositoryProvider = Provider<RecentSearchesRepository>(
+  (ref) => switch (ref.watch(envProvider)) {
+    PmartEnv.mock => MockRecentSearchesRepository(),
+    PmartEnv.local => ApiRecentSearchesRepository(ref.watch(dioProvider)),
+  },
+);
+
+/// 검색 화면의 최근 검색어. 회원이 아니거나 서버 설정이 없으면(422 CONFIG_REQUIRED) null — 칸을 숨긴다.
+/// 그 밖의 실패는 던진다(빈 목록으로 바꾸지 않는다).
+final recentSearchesProvider = FutureProvider.autoDispose<List<String>?>((
+  ref,
+) async {
+  if (ref.watch(sessionProvider) is! MemberSession) return null;
+  try {
+    return await ref.watch(recentSearchesRepositoryProvider).list();
+  } on ProblemFailure catch (f) {
+    if (f.problem.code == ProblemCode.configRequired) return null;
+    rethrow;
+  }
+});
 
 /// 홈이 다시 보일 때(상세에서 뒤로·다른 탭에서 홈으로) 마지막 조회가 이보다 오래됐으면 다시 읽는다.
 /// 홈은 화면을 떠나도 남아 있어, 다시 읽지 않으면 승인·발효된 새 가격이 상세와 다르게 보인다.

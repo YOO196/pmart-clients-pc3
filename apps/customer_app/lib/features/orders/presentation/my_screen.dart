@@ -67,6 +67,14 @@ class MyScreen extends ConsumerWidget {
             title: Text(l10n.ordersTitle),
             onTap: () => context.push('/orders'),
           ),
+          // 취소·반품 목록은 회원 본인 것만 서버가 준다(claim 0.6.0).
+          if (member)
+            ListTile(
+              key: const ValueKey('my-claims'),
+              leading: const Icon(Icons.assignment_return_outlined),
+              title: Text(l10n.myClaimsTitle),
+              onTap: () => context.push('/claims'),
+            ),
           ListTile(
             key: const ValueKey('my-reviews'),
             leading: const Icon(Icons.rate_review_outlined),

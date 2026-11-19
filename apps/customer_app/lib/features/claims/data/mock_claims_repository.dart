@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart' show DioExceptionType;
 import 'package:pmart_api_claim/pmart_api_claim.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
 
@@ -404,6 +405,69 @@ base class MockClaimsRepository
           },
         ),
     ];
+  }
+
+  /// 내 목록 한 쪽 크기(시험에서 줄여 커서를 본다).
+  int myPageSize = 20;
+
+  /// 다음 [listMine] 을 한 번 실패시킨다.
+  bool failNextMine = false;
+
+  /// 서버처럼 상품 환불 의도들의 합으로 요약한다(회수비 돌려주기는 뺀다).
+  static Map<String, Object?> _refundSummary(Map<String, Object?> c) {
+    final refunds = (c['refunds'] as List? ?? const [])
+        .cast<Map<String, Object?>>()
+        .where((r) => r['kind'] != 'RETURN_FEE')
+        .toList();
+    if (refunds.isEmpty) {
+      return {'state': 'NONE', 'requestedAmount': 0, 'refundedAmount': 0};
+    }
+    final ok = refunds.where((r) => r['pgResult'] == 'SUCCESS').toList();
+    final state = refunds.any((r) => r['state'] == 'FAILED')
+        ? 'FAILED'
+        : ok.length == refunds.length
+        ? 'COMPLETED'
+        : 'IN_PROGRESS';
+    return {
+      'state': state,
+      'requestedAmount': refunds.fold<int>(
+        0,
+        (s, r) => s + (r['amount'] as int? ?? 0),
+      ),
+      'refundedAmount': ok.fold<int>(
+        0,
+        (s, r) => s + (r['amount'] as int? ?? 0),
+      ),
+      if (state == 'COMPLETED') 'completedAt': ok.last['completedAt'],
+    };
+  }
+
+  @override
+  Future<MyClaimsPage> listMine({String? cursor}) async {
+    await _wait();
+    if (failNextMine) {
+      failNextMine = false;
+      throw const NetworkFailure(DioExceptionType.connectionError);
+    }
+    final all = claims.values.toList().reversed.toList(); // 최근 순
+    final start = int.tryParse(cursor ?? '') ?? 0;
+    final end = (start + myPageSize).clamp(0, all.length);
+    return MyClaimsPage(
+      items: [
+        for (final c in all.sublist(start, end))
+          ?claimSummaryFromContract(
+            api.ClaimSummary.fromJson({
+              'claimId': c['claimId'],
+              'orderId': c['orderId'],
+              'type': c['type'],
+              'state': c['state'],
+              'openedAt': c['openedAt'],
+              'refund': _refundSummary(c),
+            }),
+          ),
+      ],
+      nextCursor: end < all.length ? '$end' : null,
+    );
   }
 
   @override

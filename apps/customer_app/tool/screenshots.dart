@@ -420,6 +420,34 @@ void main() {
     await shot('notifications');
     await go('/addresses');
     await shot('addresses');
+    await go('/addresses/edit');
+    await shot('address-edit');
+    // 마이 "취소·반품 내역"(BR-33) — 환불 완료 줄 하나를 더 보인다.
+    claims.claims['claim-demo-done'] = {
+      'claimId': 'claim-demo-done',
+      'version': 3,
+      'orderId': 'order-seed-1',
+      'type': 'CANCEL',
+      'state': 'CLOSED',
+      'openedAt': '2026-11-18T05:10:00Z',
+      'reason': 'CHANGE_OF_MIND',
+      'lines': <Object?>[],
+      'refunds': [
+        {
+          'state': 'COMPLETED',
+          'pgResult': 'SUCCESS',
+          'amount': 15960,
+          'completedAt': '2026-11-18T05:30:00Z',
+        },
+      ],
+    };
+    await go('/claims');
+    await shot('my-claims');
+    await go('/search');
+    await t.enterText(find.byKey(const ValueKey('search-field')), '');
+    await t.pumpAndSettle();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await shot('search-recent');
     // 고객센터(레퍼런스 9-2 "3-1. 문의하기" 모양) · 문의 남기기 · 내 문의 · AI 상담
     await go('/support');
     await shot('support');

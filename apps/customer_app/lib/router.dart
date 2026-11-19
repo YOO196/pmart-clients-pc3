@@ -14,6 +14,7 @@ import 'features/cart/presentation/cart_screen.dart';
 import 'features/checkout/presentation/delivery_select_screen.dart';
 import 'features/checkout/presentation/order_sheet_screen.dart';
 import 'features/claims/presentation/claims_screens.dart';
+import 'features/claims/presentation/my_claims_screen.dart';
 import 'features/catalog/domain/catalog.dart' show ProductTile;
 import 'features/catalog/presentation/category_screen.dart';
 import 'features/notifications/presentation/notifications_screens.dart';
@@ -206,6 +207,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
+        path: '/claims',
+        builder: (_, _) => const MyClaimsScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
         path: '/claims/:claimId',
         builder: (_, state) =>
             ClaimScreen(claimId: state.pathParameters['claimId']!),
@@ -278,6 +284,11 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ? state.extra! as PostcodeResult
                   : null,
             ),
+          ),
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'edit',
+            builder: (_, _) => const AddressEditScreen(),
           ),
         ],
       ),

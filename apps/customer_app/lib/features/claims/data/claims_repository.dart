@@ -22,6 +22,10 @@ abstract interface class ClaimsRepository {
   /// (백엔드 안내 2026-10-31 주문 취소 §6). 실패는 던진다(빈 목록으로 바꾸지 않는다).
   Future<List<ClaimSummaryView>> listForOrder(String orderId);
 
+  /// 내 취소·반품 목록(`GET /claims`, claim 0.6.0 BR-33 — 고객 토큰이면 본인 것만, 최근 순).
+  /// [cursor] 는 앞 쪽 `nextCursor`. 실패는 던진다(빈 목록으로 바꾸지 않는다).
+  Future<MyClaimsPage> listMine({String? cursor});
+
   /// 접수 결과를 모를 때의 짝 조회: 이 주문의 살아 있는 취소 클레임(철회·거절 제외, 최근 것).
   /// `GET /claims?orderId=&type=CANCEL`. 없으면 null.
   Future<ClaimView?> findActiveCancel(String orderId);
@@ -100,16 +104,26 @@ final class ApiClaimsRepository implements ClaimsRepository {
         res.data?.items ??
         (throw const ContractViolationFailure('ClaimList 본문 없음'));
     return [
-      for (final s in items)
-        if (s.claimId case final id?)
-          ClaimSummaryView(
-            claimId: id,
-            orderId: s.orderId ?? orderId,
-            type: claimTypeFromWire(s.type?.value),
-            state: claimStateFromWire(s.state?.value),
-            openedAt: s.openedAt,
-          ),
+      for (final s in items) ?claimSummaryFromContract(s, orderId: orderId),
     ];
+  }
+
+  /// 한 쪽 크기. 서버 기본 50 대신 화면 두세 쪽 분량.
+  static const myClaimsPageSize = 20;
+
+  @override
+  Future<MyClaimsPage> listMine({String? cursor}) async {
+    final res = await pmartGuard(
+      () => _claims.listClaims(size: myClaimsPageSize, cursor: cursor),
+    );
+    final body =
+        res.data ?? (throw const ContractViolationFailure('ClaimList 본문 없음'));
+    final items =
+        body.items ?? (throw const ContractViolationFailure('ClaimList 본문 없음'));
+    return MyClaimsPage(
+      items: [for (final s in items) ?claimSummaryFromContract(s)],
+      nextCursor: body.page?.nextCursor,
+    );
   }
 
   @override
@@ -189,6 +203,38 @@ RequestState requestStateOf(String? wire) => switch (wire) {
   'REJECTED' => RequestState.rejected,
   _ => RequestState.unknown,
 };
+
+/// 목록 줄 → 앱 값. claimId 가 없으면 null(줄을 뺀다).
+ClaimSummaryView? claimSummaryFromContract(
+  api.ClaimSummary s, {
+  String? orderId,
+}) {
+  final id = s.claimId;
+  if (id == null) return null;
+  return ClaimSummaryView(
+    claimId: id,
+    orderId: s.orderId ?? orderId ?? '',
+    type: claimTypeFromWire(s.type?.value),
+    state: claimStateFromWire(s.state?.value),
+    openedAt: s.openedAt,
+    refund: switch (s.refund) {
+      null => null,
+      final r => ClaimRefundSummaryView(
+        state: switch (r.state) {
+          api.ClaimRefundSummaryStateEnum.NONE => ClaimRefundState.none,
+          api.ClaimRefundSummaryStateEnum.IN_PROGRESS =>
+            ClaimRefundState.inProgress,
+          api.ClaimRefundSummaryStateEnum.COMPLETED =>
+            ClaimRefundState.completed,
+          api.ClaimRefundSummaryStateEnum.FAILED => ClaimRefundState.failed,
+        },
+        requestedAmount: r.requestedAmount,
+        refundedAmount: r.refundedAmount,
+        completedAt: r.completedAt,
+      ),
+    },
+  );
+}
 
 ClaimView claimFromContract(api.Claim c) => ClaimView(
   claimId: c.claimId ?? (throw const ContractViolationFailure('claimId 없음')),

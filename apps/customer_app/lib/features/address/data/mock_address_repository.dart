@@ -120,6 +120,34 @@ base class MockAddressRepository implements AddressRepository {
     return contextFromContract(api.ShoppingContext.fromJson(_contextJson()));
   }
 
+  /// 다음 삭제를 "반영됐지만 응답 잃음"으로 만든다.
+  bool loseNextDelete = false;
+
+  /// 받은 삭제 명령 키(시험용).
+  final deleteKeys = <String>[];
+
+  @override
+  Future<void> delete(String addressId, {required IdempotencyKey key}) async {
+    await _wait();
+    deleteKeys.add(key.value);
+    if (addressId == _shoppingAddressId) {
+      throw const ProblemFailure(
+        Problem(status: 409, code: ProblemCode.invalidState),
+      );
+    }
+    final before = _addresses.length;
+    _addresses.removeWhere((a) => a['addressId'] == addressId);
+    if (_addresses.length == before) {
+      throw const ProblemFailure(
+        Problem(status: 404, code: ProblemCode.notFound),
+      );
+    }
+    if (loseNextDelete) {
+      loseNextDelete = false;
+      throw UnknownResultFailure(requestId: key.value, httpStatus: 504);
+    }
+  }
+
   final _guestAddresses = <String, Map<String, Object?>>{};
   final _guestByKey = <String, Map<String, Object?>>{};
 

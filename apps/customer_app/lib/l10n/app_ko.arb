@@ -75,6 +75,20 @@
   "searchHint": "상품을 검색해 보세요",
   "searchTitle": "검색",
   "searchSubmit": "검색",
+  "searchRecentTitle": "최근 검색어",
+  "searchRecentClear": "전체 삭제",
+  "searchRecentEmpty": "최근 검색어가 없어요",
+  "searchRecentLoadFailed": "최근 검색어를 불러오지 못했어요",
+  "searchRecentRetry": "다시 시도",
+  "searchRecentDelete": "{keyword} 삭제",
+  "@searchRecentDelete": {
+    "placeholders": {
+      "keyword": {
+        "type": "String"
+      }
+    }
+  },
+  "searchRecentDeleteFailed": "지우지 못했어요. 잠시 후 다시 시도해 주세요",
   "searchNoResult": "검색 결과가 없어요",
   "searchResultCount": "상품 {count}개",
   "@searchResultCount": {
@@ -333,6 +347,15 @@
   "consentSubmit": "동의하고 시작하기",
   "addressTitle": "주소 관리",
   "addressAdd": "새 주소 추가",
+  "addressEdit": "편집",
+  "addressEditTitle": "주소 편집",
+  "addressCurrent": "현재 설정된 주소",
+  "addressDelete": "삭제",
+  "addressDeleteConfirmTitle": "이 주소를 삭제할까요?",
+  "addressDeleteConfirmBody": "지난 주문의 배송지는 그대로 남아요",
+  "addressDeleteCancel": "취소",
+  "addressDeleted": "주소를 삭제했어요",
+  "addressDeleteInUse": "지금 쓰고 있는 주소는 삭제할 수 없어요. 다른 주소를 먼저 골라 주세요",
   "addressEmpty": "등록한 주소가 없어요",
   "addressLoginNeeded": "주소를 저장하려면 로그인이 필요해요",
   "addressLabel": "주소 이름 (예: 집, 회사)",
@@ -844,6 +867,26 @@
   "cancelDuplicate": "이미 취소가 진행 중이에요",
   "claimTitle": "취소·반품 처리 내역",
   "orderClaimsTitle": "처리 내역",
+  "myClaimsTitle": "취소·반품 내역",
+  "myClaimsEmpty": "취소·반품 내역이 없어요",
+  "myClaimsLoadMoreFailed": "다음 내역을 불러오지 못했어요",
+  "myClaimsRefundInProgress": "환불 진행 중 {amount}",
+  "@myClaimsRefundInProgress": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "myClaimsRefundCompleted": "환불 완료 {amount}",
+  "@myClaimsRefundCompleted": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "myClaimsRefundFailed": "환불에 문제가 있어요. 고객센터에서 도와드릴게요",
   "orderClaimsLoadFailed": "처리 내역을 불러오지 못했어요",
   "claimTypeCancel": "취소 요청",
   "claimTypeReturn": "반품 요청",

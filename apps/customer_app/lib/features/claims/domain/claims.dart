@@ -96,6 +96,7 @@ class ClaimSummaryView {
     required this.type,
     required this.state,
     this.openedAt,
+    this.refund,
   });
 
   final String claimId;
@@ -103,6 +104,42 @@ class ClaimSummaryView {
   final ClaimType type;
   final ClaimState state;
   final DateTime? openedAt;
+
+  /// 상품 환불 요약(claim 0.6.0, BR-33). 서버가 주지 않으면 null — "환불 없음"으로 바꾸지 않는다.
+  final ClaimRefundSummaryView? refund;
+}
+
+/// 클레임 목록 줄의 환불 요약 상태. 진행 중은 PG 결과 전이라 완료로 보이지 않는다.
+enum ClaimRefundState { none, inProgress, completed, failed, unknown }
+
+@immutable
+class ClaimRefundSummaryView {
+  const ClaimRefundSummaryView({
+    required this.state,
+    required this.requestedAmount,
+    required this.refundedAmount,
+    this.completedAt,
+  });
+
+  final ClaimRefundState state;
+
+  /// 환불하기로 한 금액 합(서버 값).
+  final int requestedAmount;
+
+  /// PG 가 성공한 금액 합(서버 값).
+  final int refundedAmount;
+  final DateTime? completedAt;
+}
+
+/// 내 취소·반품 목록 한 쪽(`GET /claims`, 고객 토큰이면 본인 것만, 최근 순).
+@immutable
+class MyClaimsPage {
+  const MyClaimsPage({required this.items, this.nextCursor});
+
+  final List<ClaimSummaryView> items;
+
+  /// 다음 쪽 커서. null 이면 끝.
+  final String? nextCursor;
 }
 
 /// 계약 ClaimType 문자열 → 앱 값. 모르는 값은 unknown.
