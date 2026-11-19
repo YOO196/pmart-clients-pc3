@@ -310,13 +310,12 @@ class ReturnIntakeScreen extends ConsumerWidget {
               child: Text(l10n.riGone, style: theme.textTheme.titleMedium),
             );
           }
-          final step = s.location == null ? 0 : 1;
+          // 한 화면(사용자 2026-11-20 "반품 칸이랑 상품 확인을 나누면 안 되지 — 무거운데 넘길 시간이 어딨냐"):
+          // 반품 칸 줄 + 상품 목록을 같이 보이고, 스캔 단추 하나가 반품 칸(RTN-…)이면 칸으로, 아니면 상품으로 받는다.
+          // 순서는 자유 — 상품을 먼저 찍어도 되고, 반입 단추는 칸을 찍어야 켜진다.
           final total = s.counts.values.fold(0, (x, y) => x + y);
+          final located = s.location != null;
           final body = <Widget>[
-            StepHeader(
-              names: [l10n.riStepLocation, l10n.riStepItems],
-              current: step,
-            ),
             // 어떤 반납인지 — 옅은 보라 상자(종류 굵게·도착 시각).
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -350,186 +349,194 @@ class ReturnIntakeScreen extends ConsumerWidget {
                 textKey: const ValueKey('ri-no-claim'),
                 text: l10n.riNoClaim,
               ),
-            const SizedBox(height: 12),
-          ];
-          final actions = <Widget>[];
-          if (step == 0) {
-            body.add(
-              ScanPrompt(
-                text: l10n.riLocationTitle,
-                detail: l10n.riLocationHelp,
+            const SizedBox(height: 4),
+            ScanPrompt(text: l10n.riOneTitle, detail: l10n.riOneHelp),
+            // 반품 칸 — 찍었으면 ✓ 상자, 아직이면 노란 "반품 칸을 찍어요" 상자.
+            Container(
+              key: ValueKey(
+                located ? 'ri-location-confirmed' : 'ri-location-needed',
               ),
-            );
-            if (s.scanError == 'location') {
-              body.add(
-                Text(
-                  l10n.riNotReturnLocation,
-                  key: const ValueKey('ri-scan-error'),
-                  style: TextStyle(
-                    color: theme.colorScheme.error,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              );
-            }
-            actions.add(
-              ScanInput(
-                id: 'ri-location-scan',
-                testValues: [
-                  TestScan(l10n.riTestLocation, 'RTN-A-01'),
-                  TestScan(l10n.tsWrong, 'C-S1-01-1-01'),
-                ],
-                label: l10n.riScanLocation,
-                cameraTitle: l10n.riTitle,
-                continuous: false,
-                autofocus: false,
-                onScan: (c) => ctl.scanLocation(c)
-                    ? const ScanFeedback.ok()
-                    : ScanFeedback.error(l10n.riNotReturnLocation),
-              ),
-            );
-          } else {
-            body.addAll([
-              ScanPrompt(text: l10n.riItemsTitle),
-              // 찍은 반품 칸 — 회색 한 줄 대신 확인 표시 상자(출하대기 랙과 같은 모양, 사용자 2026-11-20).
-              Card(
-                key: const ValueKey('ri-location-confirmed'),
-                margin: const EdgeInsets.only(bottom: 4),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: TargetLine(
-                    label: l10n.riStepLocation,
-                    code: s.location!,
-                    confirmed: true,
-                  ),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: located ? Colors.white : PdaColors.warning,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: located
+                      ? PdaColors.line
+                      : PdaColors.onWarning.withValues(alpha: 0.3),
+                  width: 1.5,
                 ),
               ),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: Column(
-                    children: [
-                      for (final (i, l) in a.lines.indexed) ...[
-                        if (i > 0) const Divider(),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      l.productName ?? l.sku,
-                                      style: theme.textTheme.titleSmall,
-                                    ),
-                                    Text(
-                                      l10n.riExpected(l.qty),
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(color: PdaColors.body),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                key: ValueKey('ri-less-${l.sku}'),
-                                onPressed: s.countOf(l.sku) > 0
-                                    ? () => ctl.setCount(
-                                        l.sku,
-                                        s.countOf(l.sku) - 1,
-                                      )
-                                    : null,
-                                icon: const Icon(Icons.remove_circle_outline),
-                              ),
-                              SizedBox(
-                                width: 36,
-                                child: Text(
-                                  '${s.countOf(l.sku)}',
-                                  key: ValueKey('ri-count-${l.sku}'),
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: s.countOf(l.sku) == l.qty
-                                        ? PdaColors.primary
-                                        : PdaColors.ink,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                key: ValueKey('ri-more-${l.sku}'),
-                                onPressed: () =>
-                                    ctl.setCount(l.sku, s.countOf(l.sku) + 1),
-                                icon: const Icon(Icons.add_circle_outline),
-                              ),
-                            ],
+              child: located
+                  ? TargetLine(
+                      label: l10n.riStepLocation,
+                      code: s.location!,
+                      confirmed: true,
+                    )
+                  : Row(
+                      children: [
+                        const Icon(
+                          Icons.place_outlined,
+                          color: PdaColors.onWarning,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            l10n.riLocationNeeded,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: PdaColors.onWarning,
+                            ),
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                ),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  key: const ValueKey('ri-all'),
-                  onPressed: () => ctl.receiveAll(a),
-                  child: Text(l10n.riReceiveAll),
-                ),
-              ),
-              if (s.scanError == 'item')
-                Text(
-                  l10n.riNotThisReturn,
+                    ),
+            ),
+            if (s.scanError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  s.scanError == 'location'
+                      ? l10n.riNotReturnLocation
+                      : l10n.riNotThisReturn,
                   key: const ValueKey('ri-scan-error'),
                   style: TextStyle(
                     color: theme.colorScheme.error,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-              if (s.phase == IntakePhase.unknown)
-                NoticeBox(
-                  warning: true,
-                  textKey: const ValueKey('ri-unknown'),
-                  text: l10n.riUnknown,
+              ),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Column(
+                  children: [
+                    for (final (i, l) in a.lines.indexed) ...[
+                      if (i > 0) const Divider(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    l.productName ?? l.sku,
+                                    style: theme.textTheme.titleSmall,
+                                  ),
+                                  Text(
+                                    l10n.riExpected(l.qty),
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: PdaColors.body,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              key: ValueKey('ri-less-${l.sku}'),
+                              onPressed: s.countOf(l.sku) > 0
+                                  ? () => ctl.setCount(
+                                      l.sku,
+                                      s.countOf(l.sku) - 1,
+                                    )
+                                  : null,
+                              icon: const Icon(Icons.remove_circle_outline),
+                            ),
+                            SizedBox(
+                              width: 36,
+                              child: Text(
+                                '${s.countOf(l.sku)}',
+                                key: ValueKey('ri-count-${l.sku}'),
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: s.countOf(l.sku) == l.qty
+                                      ? PdaColors.primary
+                                      : PdaColors.ink,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              key: ValueKey('ri-more-${l.sku}'),
+                              onPressed: () =>
+                                  ctl.setCount(l.sku, s.countOf(l.sku) + 1),
+                              icon: const Icon(Icons.add_circle_outline),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              if (s.phase == IntakePhase.rejected)
-                NoticeBox(
-                  warning: true,
-                  textKey: const ValueKey('ri-rejected'),
-                  text: switch (s.rejectCode) {
-                    'ARRIVAL_ALREADY_RECEIVED' => l10n.riAlreadyReceived,
-                    'RETURN_ARRIVAL_NOT_FOUND' => l10n.riGone,
-                    final c => l10n.riRejected(c ?? '-'),
-                  },
-                ),
-            ]);
-            actions.addAll([
-              ScanInput(
-                id: 'ri-item-scan',
-                testValues: [
-                  for (final l in a.lines)
-                    if (ref.read(productHintsProvider).bySku(l.sku)?.barcode
-                        case final bc?)
-                      TestScan(l.productName ?? l.sku, bc),
-                  TestScan(l10n.tsWrong, '0000000000000'),
-                ],
-                label: l10n.scanItemBtn,
-                cameraTitle: l10n.riTitle,
-                autofocus: false,
-                onScan: (c) => ctl.scanItem(a, c)
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                key: const ValueKey('ri-all'),
+                onPressed: () => ctl.receiveAll(a),
+                child: Text(l10n.riReceiveAll),
+              ),
+            ),
+            if (s.phase == IntakePhase.unknown)
+              NoticeBox(
+                warning: true,
+                textKey: const ValueKey('ri-unknown'),
+                text: l10n.riUnknown,
+              ),
+            if (s.phase == IntakePhase.rejected)
+              NoticeBox(
+                warning: true,
+                textKey: const ValueKey('ri-rejected'),
+                text: switch (s.rejectCode) {
+                  'ARRIVAL_ALREADY_RECEIVED' => l10n.riAlreadyReceived,
+                  'RETURN_ARRIVAL_NOT_FOUND' => l10n.riGone,
+                  final c => l10n.riRejected(c ?? '-'),
+                },
+              ),
+          ];
+          final actions = <Widget>[
+            ScanInput(
+              id: 'ri-scan',
+              testValues: [
+                TestScan(l10n.riTestLocation, 'RTN-A-01'),
+                for (final l in a.lines)
+                  if (ref.read(productHintsProvider).bySku(l.sku)?.barcode
+                      case final bc?)
+                    TestScan(l.productName ?? l.sku, bc),
+                TestScan(l10n.tsWrong, 'C-S1-01-1-01'),
+              ],
+              label: l10n.riScanBoth,
+              cameraTitle: l10n.riTitle,
+              autofocus: false,
+              onScan: (c) {
+                // 반품 칸 모양이면 칸으로, 아니면 상품으로.
+                if (isReturnLocation(c)) {
+                  ctl.scanLocation(c);
+                  return const ScanFeedback.ok();
+                }
+                if (isMfcLocation(c)) {
+                  ctl.scanLocation(c); // 반품 칸이 아닌 칸 — 안내만
+                  return ScanFeedback.error(l10n.riNotReturnLocation);
+                }
+                return ctl.scanItem(a, c)
                     ? const ScanFeedback.ok()
-                    : ScanFeedback.error(l10n.riNotThisReturn),
-              ),
-              CommandButton(
-                key: const ValueKey('ri-submit'),
-                busy: s.phase == IntakePhase.sending,
-                label: s.phase == IntakePhase.unknown
-                    ? l10n.checkAgain
-                    : l10n.riSubmit(total),
-                onPressed: total > 0 ? () => ctl.submit(a) : null,
-              ),
-            ]);
-          }
+                    : ScanFeedback.error(l10n.riNotThisReturn);
+              },
+            ),
+            CommandButton(
+              key: const ValueKey('ri-submit'),
+              busy: s.phase == IntakePhase.sending,
+              label: !located
+                  ? l10n.riNeedLocationBtn
+                  : s.phase == IntakePhase.unknown
+                  ? l10n.checkAgain
+                  : l10n.riSubmit(total),
+              onPressed: located && total > 0 ? () => ctl.submit(a) : null,
+            ),
+          ];
           return StepBody(
             actions: actions,
             child: ListView(
