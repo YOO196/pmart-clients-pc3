@@ -2,7 +2,7 @@
 
 - 작성: PC 1(customer-app), 2026-11-19. 고객앱에서 붙인 방식을 다른 PC(특히 **PC 5 rider-app** — 백엔드가 rider-auth-service 도 같은 방식으로 이어서 만든다)가 그대로 쓰도록 적는다.
 - 서버 정본: `../pmart-backend/contracts/openapi/auth-service.yaml` 0.4.0(ADR-0071), 백엔드 요청 `../pmart-backend/docs/handoff/clients/customer-app/2026-11-19-request-kakao-naver-login.md`. 라이더는 rider-auth-service 계약이 나오면 그 계약을 따른다(아래는 고객 기준).
-- 고객앱 코드: `apps/customer_app/lib/features/auth/data/kakao_naver_token_sources.dart`, `android/app/build.gradle.kts`(dart-define → 매니페스트), `AndroidManifest.xml`.
+- 고객앱 코드(2026-11-19 네이버 OIDC 반영): `apps/customer_app/lib/features/auth/data/kakao_naver_token_sources.dart`(`NaverSocialTokenSource`), `android/app/build.gradle.kts`(dart-define → 매니페스트), `AndroidManifest.xml`.
 
 ## 1. 서버가 받는 것 — 세 제공자 모두 같다
 - `POST /auth/social-logins` 에 `provider`(GOOGLE·KAKAO·NAVER)와 `providerToken` = **제공자 OpenID Connect ID 토큰(JWT)**.
@@ -33,6 +33,7 @@
   - scheme 에 밑줄(`_`)은 못 쓴다(URI 규칙) — 패키지명 `com.pmart.customer_app` 을 그대로 쓰지 않은 이유.
 - 라이더앱(제안): `com.pmart.rider://oauth/naver` — 앱마다 다른 scheme 을 써야 결과가 엉뚱한 앱으로 가지 않는다.
 - **네이버 개발자 콘솔**: 해당 애플리케이션 → API 설정 → 로그인 오픈 API 서비스 환경에 Callback URL 을 넣는 칸이 있어야 한다. 2026-11-19 사용자 확인으로는 **Android 환경만 고르면 Callback URL 칸이 없었다** — 칸이 나오는 환경(PC 웹 등)을 추가해 위 주소를 넣어야 하는지, 네이버가 `http(s)` 가 아닌 앱 주소를 받아 주는지는 **아직 확인 전**. 확인되면 이 문서를 고친다.
+- **2026-11-19 갱신**: 네이버 콘솔이 앱 주소를 받지 않음(사용자 확인), 도메인 없음 → LAN 게이트웨이에 중계 주소를 요청(BR-66, `docs/handoff/customer-app/2026-11-19-backend-naver-oauth-callback-relay.md`). 회신이 오면 Callback URL·앱 redirectUrl 을 그 주소로 바꾼다.
 
 ## 4. 키 두는 곳
 - 키는 저장소에 넣지 않는다. 고객앱은 `apps/customer_app/.secrets/customer.env`(git 제외)를 `--dart-define-from-file` 로 넣고, `build.gradle.kts` 가 dart-define 을 풀어 매니페스트 값으로 쓴다.
