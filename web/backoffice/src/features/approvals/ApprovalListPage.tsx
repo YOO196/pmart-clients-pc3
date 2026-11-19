@@ -2,6 +2,7 @@
 // 화면(2026-11-18 사용자 "아이콘만 붙였지 똑같이 밋밋하다 — 참고 사이트처럼"): Shopify·Medusa 목록처럼 한 카드 안에
 // 심사 상태 탭 → 유형 칩 → 표(요약 굵게·ID 작게, 유형 색 배지, 상태 점 배지, "N일 전") → 아래 건수·더 보기.
 // 예전에는 더 보기가 커서를 URL 에 넣자마자 필터 함수가 지워 버려 아무 일도 없었다(2026-11-17 사용자 신고).
+import { useRememberQueue } from '../../shared/workQueue';
 import { SeenMark } from '../../shared/SeenMark';
 import { useSeenIds } from '../../shared/recentViews';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -59,6 +60,8 @@ export function ApprovalListPage() {
   };
 
   const rows = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
+  // 상세에서 이전·다음으로 넘기도록 지금 목록 순서를 기억(2026-11-19)
+  useRememberQueue('approval', query.data ? rows.flatMap((a) => (a.approvalId ? [a.approvalId] : [])) : undefined, `/approvals?${params.toString()}`);
 
   return (
     <section className="space-y-4">

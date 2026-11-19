@@ -20,6 +20,7 @@
 //   버튼은 할 수 있어 보일 때만(판정은 서버 — 403·409·422 는 코드 문구).
 // - bff 0.14.0 화면 번호(ADR-0070): 목록 관련 칸은 배송·주문 번호(linked[].displayNumber)·라이더(riders[]) — 링크는 시스템 ID.
 //   상세는 case-service 직접(화면 번호 없음)이라 지금 모양 그대로.
+import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 import { pushToast } from '../../shared/toast';
 import { SeenMark } from '../../shared/SeenMark';
 import { useSeenIds } from '../../shared/recentViews';
@@ -450,6 +451,8 @@ export function CaseListPage() {
   // 새로 들어온 접수 건 — 5초 동안 강조(2026-11-19). 탭·종류·쪽이 바뀌면 다시 센다
   const fresh = useNewIds(query.data?.items?.flatMap((c) => (c.caseId ? [c.caseId] : [])), `${tab}|${kind ?? ''}|${cursor}`);
   const seen = useSeenIds('case');
+  // 상세에서 이전·다음으로 넘기도록 지금 목록 순서를 기억(2026-11-19)
+  useRememberQueue('case', query.data?.items?.flatMap((c) => (c.caseId ? [c.caseId] : [])), `/cases?${params.toString()}`);
   const roles = { admin, team, agent };
   return (
     <section className="max-w-7xl space-y-4">
@@ -991,6 +994,8 @@ export function CaseDetailPage() {
         }
         back={{ to: '/cases', label: m.cases.back }}
       />
+      {/* 보던 목록 순서대로 이전·다음(2026-11-19) */}
+      <QueueNav kind="case" id={caseId} />
       {/* 시스템 번호(ADR-0070 덧붙임) — 장애 문의·로그 대조용, 상세에서만 */}
       <SystemNumbers ids={[{ label: m.cases.title, id: caseId }]} />
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>

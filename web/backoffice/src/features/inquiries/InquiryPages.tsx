@@ -7,6 +7,7 @@
 // 문의·답변 본문은 고객이 쓴 신뢰할 수 없는 텍스트 — 일반 텍스트로만 그린다. 로그에 남기지 않는다.
 // 화면(2026-11-18 사용자 "밋밋하다 — 헬프데스크(Zendesk·Intercom)처럼"): 목록은 한 카드 안 상태 탭 → 표(제목 굵게·번호 작게·종류 색 꼬리표·"N분 전") → 아래 건수·더 보기.
 // 상세는 왼쪽 대화(고객/라이더 말풍선 ↔ 답변 말풍선, 아래 답변 쓰기 카드), 오른쪽 정보 카드(문의 정보·고객/라이더·이어서 할 일·연락 기록). 동작은 그대로.
+import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
@@ -104,6 +105,8 @@ export function InquiryListPage({ kind = 'CUSTOMER' }: { readonly kind?: Request
     getNextPageParam: (last) => last.page?.nextCursor ?? undefined,
   });
   const items: InquirySummary[] = query.data?.pages.flatMap((p) => p.items ?? []) ?? [];
+  // 상세에서 이전·다음으로 넘기도록 지금 목록 순서를 기억(2026-11-19)
+  useRememberQueue(rider ? 'riderInquiry' : 'inquiry', query.data ? items.map((i) => i.inquiryId) : undefined, `${basePath(kind)}?${search.toString()}`);
   const tabs: ReadonlyArray<{ readonly value: InquiryStatus | ''; readonly label: string }> = [
     { value: '', label: m.inquiries.all },
     ...STATUSES.map((st) => ({ value: st, label: m.inquiries.status[st] ?? st })),
@@ -499,6 +502,8 @@ export function InquiryDetailPage({ kind = 'CUSTOMER' }: { readonly kind?: Reque
   useRecordRecent(kind === 'RIDER' ? 'riderInquiry' : 'inquiry', inquiryId, query.data ? inquiryId : null);
   return (
     <section className="space-y-4">
+      {/* 보던 목록 순서대로 이전·다음(2026-11-19) */}
+      <QueueNav kind={kind === 'RIDER' ? 'riderInquiry' : 'inquiry'} id={inquiryId} />
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(q) => {
           const riderAsk = q.requesterType === 'RIDER';

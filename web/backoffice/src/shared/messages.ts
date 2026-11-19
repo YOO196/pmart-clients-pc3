@@ -1019,6 +1019,14 @@ export const messages = {
     offlineHint: '지금 화면의 숫자·목록은 끊기기 전 것이에요. 다시 이어지면 저절로 새로 읽어요.',
     onlineAgain: '다시 연결됐어요 — 화면을 새로 읽는 중이에요.',
   },
+  /** 목록 순서대로 상세 넘기기(2026-11-19) */
+  queue: {
+    label: '목록 순서대로 넘기기',
+    backToList: '‹ 보던 목록으로',
+    prev: '이전',
+    next: '다음',
+    position: (at: number, total: number) => `${at} / ${total}`,
+  },
   shortcuts: {
     open: '단축키 보기',
     title: '단축키',
@@ -1026,6 +1034,7 @@ export const messages = {
     items: [
       { what: '번호로 바로 찾기', keys: ['Ctrl', 'K'] },
       { what: '이 화면의 검색 조건 첫 칸으로', keys: ['/'] },
+      { what: '상세 — 보던 목록의 이전 건·다음 건', keys: ['[', ']'] },
       { what: '목록 미리보기 — 앞 줄·다음 줄', keys: ['↑', '↓'] },
       { what: '미리보기·찾기 칸·이 안내 닫기', keys: ['Esc'] },
       { what: '이 안내 열기·닫기', keys: ['?'] },

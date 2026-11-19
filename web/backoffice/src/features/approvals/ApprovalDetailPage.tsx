@@ -1,5 +1,6 @@
 // 승인 상세·결정. 5축(요청·심사·실행·전달·사건)을 한 상태로 합치지 않는다.
 // 결정은 APPROVE·REJECT 만(나머지는 백엔드 미지원 → 버튼 없음). 결정 뒤 정본 반영은 비동기라 짧게 폴링한다.
+import { QueueNav } from '../../shared/workQueue';
 import { StaffName } from '../lookup/parts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -229,6 +230,8 @@ export function ApprovalDetailPage() {
                 }
               />
               {/* 시스템 번호(ADR-0070 덧붙임 — 승인은 화면 번호가 없고 시스템 ID 는 상세에서만) */}
+              {/* 보던 목록 순서대로 이전·다음(2026-11-19) */}
+              <QueueNav kind="approval" id={approvalId} />
               <SystemNumbers ids={[{ label: m.approvals.detailTitle, id: approvalId }]} />
               {/* 진행 단계(2026-11-18) — 요청·심사·결정·반영 */}
               <ApprovalProgress approval={a} />

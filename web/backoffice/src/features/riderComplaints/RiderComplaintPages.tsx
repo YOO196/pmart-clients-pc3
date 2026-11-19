@@ -1,6 +1,7 @@
 // 라이더 컴플레인(고객센터 기록 · 고객센터·라이더 운영 조회) — case-service 0.3.0 `/rider-complaints`(2026-11-15 LAN 배포).
 // 기록: 배송 번호·종류(+주문·문의·메모). 라이더는 서버가 배송의 배정 라이더로 채운다(없으면 422 RIDER_NOT_ASSIGNED).
 // 같은 종류 7일 안 서로 다른 배송 3건이면 라이더가 제한 검토 대상에 오른다(자동 제재 없음 — 서버). 메모는 내부용이고 상세에만, 로그 금지.
+import { SavedViews } from '../../shared/SavedViews';
 import type { components as BffC } from '../../api/generated/backoffice-bff';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
@@ -216,6 +217,8 @@ export function RiderComplaintListPage() {
           </Link>
         }
       />
+      {/* 내 보기(2026-11-19 — 다른 목록과 같게) — 지금 주소 조건을 이름 붙여 저장 */}
+      <SavedViews listKey="rider-complaints" />
       {/* 종류별 숫자 띠(case 0.26.0 counts, 2026-11-19) — 지금 거르기(라이더·배송·기간) 그대로, 종류만 빼고 센다. 누르면 그 종류로 */}
       {!unresolved && (
         <ComplaintCounts
