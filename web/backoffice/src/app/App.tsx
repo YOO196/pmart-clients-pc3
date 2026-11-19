@@ -1,3 +1,4 @@
+import { DETAIL_BAR_SLOT } from '../shared/StickyTitle';
 import { ConnectionBanner, useDocumentTitle } from './PageChrome';
 import { useStaffText } from '../shared/employeeLabels';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -270,6 +271,8 @@ function Layout() {
             />
           </div>
         </header>
+        {/* 상세 제목 띠 자리(2026-11-19) — 상세를 내리면 DetailHeader 가 여기에 얇은 제목 띠를 그린다 */}
+        <div id={DETAIL_BAR_SLOT} className="sticky top-0 z-20" />
         {/* 인터넷 끊김 띠(2026-11-19) */}
         <ConnectionBanner />
         <main className="min-w-0 flex-1 p-6">

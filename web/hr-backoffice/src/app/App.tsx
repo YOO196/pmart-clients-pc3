@@ -1,3 +1,4 @@
+import { ConnectionBanner, useDocumentTitle } from './PageChrome';
 import { AppLauncher, UiTextProvider } from '@pmart/web-ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, type ReactNode } from 'react';
@@ -60,6 +61,8 @@ function Layout() {
   const [collapsed, toggleMenu] = useMenuCollapsed();
   // 머리줄 위치(가장 긴 메뉴 경로 — /employees/new 는 직원 등록, /employees/xxx 는 직원 목록)
   const current = [...nav].sort((x, y) => y[0].length - x[0].length).find(([to]) => pathname === to || pathname.startsWith(`${to}/`));
+  // 브라우저 탭 제목 — 화면 이름 + 계정 발급 실패 수(2026-11-19, 백오피스와 같게)
+  useDocumentTitle(current?.[1] ?? null);
   // 화면 틀(2026-11-18 — PC 5 요청 "관리자 형식", 사본: rider-backoffice App.tsx Layout PR #93 461ff31 — 이 앱에서 따로 고친다)
   return (
     <div className="flex min-h-screen bg-base-200">
@@ -152,6 +155,8 @@ function Layout() {
             <AppLauncher current="hr-backoffice" />
           </div>
         </header>
+        {/* 인터넷 끊김 띠(2026-11-19) */}
+        <ConnectionBanner />
         <main className="min-w-0 flex-1 space-y-4 p-6">
           {/* 안내만 한다 — 화면을 막지 않고, 판정은 서버(403 → 이용할 수 없는 화면) */}
           {session && !session.roles.includes('HR_ADMIN') && (
