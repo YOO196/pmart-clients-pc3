@@ -21,11 +21,13 @@ class PackageLabel implements PrintableLabel {
     this.temperatureZone,
     this.bagCount,
     this.handoverCode,
+    this.orderNumber,
   });
 
   factory PackageLabel.of(ShipmentView s, PackageView p) => PackageLabel(
     packageId: p.packageId,
     handoverCode: p.handoverCode,
+    orderNumber: s.orderNumber,
     packageVersion: p.packageVersion,
     qrCode: p.qrCode!,
     orderId: s.orderId,
@@ -48,6 +50,9 @@ class PackageLabel implements PrintableLabel {
 
   /// 라이더가 QR 대신 넣는 6자리(서버 값). 라벨에 가장 크게 찍는다.
   final String? handoverCode;
+
+  /// 화면용 주문번호(미리보기에만 — 라벨 인쇄 항목은 BR-22 전이라 그대로).
+  final String? orderNumber;
 
   @override
   String zpl() => packageLabelZpl(this);

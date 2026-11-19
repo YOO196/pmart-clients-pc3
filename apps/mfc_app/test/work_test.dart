@@ -222,7 +222,7 @@ void main() {
     // 패킹대 도착 → 같은 주문의 패킹이 바로 열린다.
     await tapKey(t, 'to-pack');
     expect(find.text('패킹'), findsOneWidget);
-    expect(find.text('주문 order-seed-1 · 상품 4종 5개'), findsOneWidget);
+    expect(find.text('주문 10000001 · 상품 4종 5개'), findsOneWidget);
     await scanTo('station-scan', 'PAK-C-01');
     // 피킹한 장바구니가 아니면 받지 않는다.
     await scanTo('pack-cart-scan', 'CRT-C-01');
@@ -268,7 +268,7 @@ void main() {
 
     await tapKey(t, 'to-pack');
     expect(find.byKey(const ValueKey('start-message')), findsNothing);
-    expect(find.text('주문 order-seed-1 · 상품 4종 5개'), findsOneWidget);
+    expect(find.text('주문 10000001 · 상품 4종 5개'), findsOneWidget);
     expect(tasks.taskJson('shp-1-PACK')['state'], 'IN_PROGRESS');
     expect(t.takeException(), isNull);
   });

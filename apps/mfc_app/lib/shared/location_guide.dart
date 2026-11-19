@@ -135,7 +135,7 @@ class LocationCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: _tempChip(shelf!.temp),
+                    color: tempChipColor(shelf!.temp),
                     borderRadius: BorderRadius.circular(5),
                   ),
                   child: Text(
@@ -214,8 +214,8 @@ class LocationCard extends StatelessWidget {
   }
 }
 
-/// 온도대 칩 바탕 — 냉장 하늘, 냉동 보라, 상온 살구.
-Color _tempChip(String t) => switch (t) {
+/// 온도대 칩 바탕 — 냉장 하늘, 냉동 보라, 상온 살구(C·F·A). 라벨 미리보기도 같은 색.
+Color tempChipColor(String t) => switch (t) {
   'C' => const Color(0xFFD8EDF9),
   'F' => const Color(0xFFEADCFC),
   _ => const Color(0xFFFDE7CF),

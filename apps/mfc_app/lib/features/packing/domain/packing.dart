@@ -80,6 +80,7 @@ class ShipmentView {
     required this.state,
     required this.packages,
     this.orderId,
+    this.orderNumber,
     this.deliveryId,
     this.holdReason,
     this.dispatchRequest,
@@ -87,6 +88,9 @@ class ShipmentView {
 
   final String shipmentId;
   final String? orderId;
+
+  /// 화면용 주문번호 8자리(fulfillment 0.13.0) — 점원이 라이더·상담원과 같은 번호로 말한다. 번호 전 주문은 null.
+  final String? orderNumber;
 
   /// 배송번호. 출하 준비(ShipmentReady) 전에는 없을 수 있다.
   final String? deliveryId;

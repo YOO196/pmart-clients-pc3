@@ -303,7 +303,8 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                 // 어느 주문인지 — 장바구니·패킹대 확인 전에도 보인다.
                 Text(
                   l10n.packOrderLine(
-                    s.orderId ?? shipmentId,
+                    // 화면용 주문번호(ADR-0070). 번호 전 주문만 시스템 주문 ID.
+                    s.orderNumber ?? s.orderId ?? shipmentId,
                     task.lines.length,
                     task.totalPlanned,
                   ),
