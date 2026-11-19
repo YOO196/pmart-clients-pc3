@@ -3,6 +3,7 @@
 // 전달 실패 확정·반려 `POST /deliveries/{id}/failure-decisions`(FAILURE_REPORTED 일 때만, X-Expected-Version = 수행 version).
 // 픽업 전 배차 취소 `POST /deliveries/{id}/assignment-cancellations`(202 접수 → 짝 조회 `GET …/{requestId}` 로 결과 확인, X-Expected-Version = 배차 version).
 // 권한은 서버 판정(PC 5 PR #17 — BOD-1·2 반영): 배차 조회는 CS_AGENT·RIDER_OPS 도, 결정은 RIDER_OPS 도, 취소는 RIDER_OPS·관리자(CS_AGENT 는 취소하지 않음 — ADR-0060).
+import { QueueNav, RememberQueue } from '../../shared/workQueue';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -323,6 +324,8 @@ export function DeliveryOpenPage() {
             return (
               <>
                 <ResultBar count={rows.length} more={!!nextCursor} />
+                {/* 상세에서 이전·다음으로 넘기도록 지금 목록 순서를 기억(2026-11-19) */}
+                <RememberQueue kind="delivery" ids={rows.flatMap((d) => (d.deliveryId ? [d.deliveryId] : []))} from={`/deliveries?${params.toString()}`} />
                 <DeliveryTable rows={rows} preview={pv} />
                 {pv.id && (
                   <PreviewDrawer
@@ -774,6 +777,8 @@ export function DeliveryDetailPage() {
         summary={d ? m.deliveries.summaryOf(d.orderNumber ?? m.none, d.riderId ? (rl?.riderNumber ? `${rl.nameMasked ?? ''} · ${rl.riderNumber}` : m.none) : m.deliveries.noAssignment, text(d.mfcId)) : undefined}
         actions={<DeliveryStartActions deliveryId={deliveryId} />}
       />
+      {/* 보던 목록 순서대로 이전·다음(2026-11-19) */}
+      <QueueNav kind="delivery" id={deliveryId} />
       <SystemNumbers ids={[{ label: m.displayNumber.system.deliveryId, id: deliveryId }, { label: m.displayNumber.system.orderId, id: d?.orderId }, { label: m.displayNumber.system.riderId, id: d?.riderId }]} />
       {/* 다음 할 일 — 서버 수행 상태가 전달 실패 등록(FAILURE_REPORTED)일 때만: 확정·반려 칸으로 */}
       {d?.state === 'FAILURE_REPORTED' && (

@@ -6,8 +6,9 @@
 // - 결과 줄: "N건" + 최신순/과거순 토글
 // - 표: 회색 머리줄, 줄 전체 누르면 상세
 // - 상세: 제목·표시·요약 + 오른쪽 동작 버튼, 그 아래 구역 상자(제목 줄 + 항목명/값 줄), 구역으로 가는 밑줄 탭
+import { StickyTitle, useScrolledPast } from './StickyTitle';
 import { useStatChange } from './motion';
-import type { FormEvent, ReactNode } from 'react';
+import { type FormEvent, type ReactNode, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 
 import { GroupIcon } from '../app/groupIcons';
@@ -201,13 +202,17 @@ export function CursorPager({ hasPrev, nextCursor, onFirst, onNext, page }: { re
 
 /** 상세 머리: 제목 + 표시 + 요약, 오른쪽 동작 */
 export function DetailHeader({ back, title, badges, summary, actions }: { readonly back: { readonly to: string; readonly label: string }; readonly title: ReactNode; readonly badges?: ReactNode; readonly summary?: ReactNode; readonly actions?: ReactNode }) {
+  // 제목 카드가 화면 위로 지나가면 위에 얇은 제목 띠(2026-11-19)
+  const card = useRef<HTMLDivElement>(null);
+  const past = useScrolledPast(card);
   return (
     <header className="space-y-2">
+      <StickyTitle show={past} title={title} badges={badges} />
       <Link to={back.to} className="inline-flex items-center gap-1 text-sm text-base-content/60 hover:text-base-content">
         <span aria-hidden>‹</span>
         {back.label}
       </Link>
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-box border border-base-300 bg-base-100 px-5 py-4 shadow-sm">
+      <div ref={card} className="flex flex-wrap items-start justify-between gap-3 rounded-box border border-base-300 bg-base-100 px-5 py-4 shadow-sm">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold">{title}</h1>

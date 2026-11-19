@@ -499,6 +499,9 @@ export const messages = {
     assignee_: '운영자 ID',
     assign: '배정',
     picked: '맡았어요.',
+    /** 목록 줄 빠른 맡기(2026-11-19) — 마우스를 올리면 보인다 */
+    quickPick: '맡기',
+    quickPickTitle: '목록에서 바로 내가 맡아요 — 지금 상태를 다시 읽고 맡고, 그 사이 다른 사람이 맡았으면 서버가 거절해요.',
     close: '완료 처리',
     resolution: '결과',
     resolutionName: {
@@ -1010,9 +1013,19 @@ export const messages = {
     offline: '인터넷 연결이 끊겼어요.',
     /** 목록에서 최근 열어 본 줄 */
     seen: '최근 봄',
+    /** 상세 제목 띠 */
+    toTop: '↑ 맨 위로',
     seenTitle: '이 브라우저에서 최근 열어 본 것이에요(최근 8개).',
     offlineHint: '지금 화면의 숫자·목록은 끊기기 전 것이에요. 다시 이어지면 저절로 새로 읽어요.',
     onlineAgain: '다시 연결됐어요 — 화면을 새로 읽는 중이에요.',
+  },
+  /** 목록 순서대로 상세 넘기기(2026-11-19) */
+  queue: {
+    label: '목록 순서대로 넘기기',
+    backToList: '‹ 보던 목록으로',
+    prev: '이전',
+    next: '다음',
+    position: (at: number, total: number) => `${at} / ${total}`,
   },
   shortcuts: {
     open: '단축키 보기',
@@ -1021,7 +1034,9 @@ export const messages = {
     items: [
       { what: '번호로 바로 찾기', keys: ['Ctrl', 'K'] },
       { what: '이 화면의 검색 조건 첫 칸으로', keys: ['/'] },
+      { what: '상세 — 보던 목록의 이전 건·다음 건', keys: ['[', ']'] },
       { what: '목록 미리보기 — 앞 줄·다음 줄', keys: ['↑', '↓'] },
+      { what: '목록 미리보기 — 그 건 상세 열기', keys: ['Enter'] },
       { what: '미리보기·찾기 칸·이 안내 닫기', keys: ['Esc'] },
       { what: '이 안내 열기·닫기', keys: ['?'] },
     ],

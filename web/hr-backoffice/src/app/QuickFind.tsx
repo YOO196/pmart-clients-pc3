@@ -11,6 +11,17 @@ export function QuickFind() {
   const [value, setValue] = useState('');
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // "/" — 이 화면 검색 조건(SearchPanel)의 첫 칸으로(2026-11-19, 백오피스와 같게). 입력 칸 안에서는 글자 그대로
+      const t = e.target;
+      const typing = t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName));
+      if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const first = document.querySelector<HTMLElement>('main form[data-list-part="top"] :is(input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea):not([disabled])');
+        if (first) {
+          e.preventDefault();
+          first.focus();
+        }
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         input.current?.focus();

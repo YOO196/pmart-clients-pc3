@@ -20,6 +20,8 @@
 //   버튼은 할 수 있어 보일 때만(판정은 서버 — 403·409·422 는 코드 문구).
 // - bff 0.14.0 화면 번호(ADR-0070): 목록 관련 칸은 배송·주문 번호(linked[].displayNumber)·라이더(riders[]) — 링크는 시스템 ID.
 //   상세는 case-service 직접(화면 번호 없음)이라 지금 모양 그대로.
+import { QueueNav, useRememberQueue } from '../../shared/workQueue';
+import { pushToast } from '../../shared/toast';
 import { SeenMark } from '../../shared/SeenMark';
 import { useSeenIds } from '../../shared/recentViews';
 import { useNewIds, useNow } from '../../shared/motion';
@@ -409,7 +411,7 @@ function Prop({ name, children, testId }: { readonly name: ReactNode; readonly c
 
 export function CaseListPage() {
   const api = useApi();
-  const { me, admin, agent } = useCaseRoles();
+  const { me, admin, team, agent } = useCaseRoles();
   // 미리보기 칸(2026-11-18) — 줄을 누르면 목록을 떠나지 않고 오른쪽에 요약
   const pv = usePreview();
   // 반품 회수 실패(CS 팀)는 상담원·관리자만 — 지원센터에는 안 보인다(서버도 목록에서 뺀다)
@@ -449,6 +451,9 @@ export function CaseListPage() {
   // 새로 들어온 접수 건 — 5초 동안 강조(2026-11-19). 탭·종류·쪽이 바뀌면 다시 센다
   const fresh = useNewIds(query.data?.items?.flatMap((c) => (c.caseId ? [c.caseId] : [])), `${tab}|${kind ?? ''}|${cursor}`);
   const seen = useSeenIds('case');
+  // 상세에서 이전·다음으로 넘기도록 지금 목록 순서를 기억(2026-11-19)
+  useRememberQueue('case', query.data?.items?.flatMap((c) => (c.caseId ? [c.caseId] : [])), `/cases?${params.toString()}`);
+  const roles = { admin, team, agent };
   return (
     <section className="max-w-7xl space-y-4">
       <PageHeader title={m.cases.title} description={m.cases.intro} />
@@ -535,6 +540,7 @@ export function CaseListPage() {
                               <SeenMark seen={!!c.caseId && seen.has(c.caseId)} />
                             </span>
                           )}
+                          {c.caseId && canPickCase(c, roles) && <QuickPick caseId={c.caseId} caseNumber={c.caseNumber ?? null} />}
                         </td>
                         <td>
                           <KindBadge kind={c.kind} />
@@ -646,8 +652,46 @@ function CasePreview({ caseId }: { readonly caseId: string }) {
 }
 
 /** 내가 맡을 수 있나(버튼을 보일지만 — 판정은 서버) */
-const canPickCase = (c: Case, r: { readonly admin: boolean; readonly team: boolean; readonly agent: boolean }) =>
+const canPickCase = (c: { readonly kind?: string | null; readonly assigneeGroup?: string | null; readonly assigneeId?: string | null }, r: { readonly admin: boolean; readonly team: boolean; readonly agent: boolean }) =>
   ((isCsCase(c) ? r.agent : r.team && !withAdminTeam(c)) || r.admin) && !c.assigneeId;
+
+/**
+ * 목록 줄 빠른 맡기(2026-11-19 "계속 넣어") — 줄에 마우스를 올리거나 키보드로 오면 보인다.
+ * 목록 줄에는 version 이 없어서 그 건을 다시 읽어 지금 version 으로 맡는다(그 사이 바뀌었으면 서버가 거절 — 화면은 서버 결과만).
+ * 같은 키로 다시 보내면 다시 읽고 같은 Idempotency-Key 로 보낸다. 끝나면 목록·상세 조회를 다시 읽는다.
+ */
+function QuickPick({ caseId, caseNumber }: { readonly caseId: string; readonly caseNumber?: string | null }) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const { me } = useCaseRoles();
+  const pick = useCommand(async (_: null, key) => {
+    const now = await request('GET', api.cases.GET('/cases/{caseId}', { params: { path: { caseId } } }));
+    const r = await request('POST', api.cases.POST('/cases/{caseId}/assignments', { ...commandParams(key, { path: { caseId }, version: now.version }), body: { assigneeId: me } }));
+    queryClient.setQueryData(['cases', 'detail', caseId], r);
+    // 목록을 다시 읽으면 이 줄은 "맡음"이 되어 단추·결과 글자가 사라진다 — 서버가 받아 준 뒤 구석 알림으로도
+    pushToast({ tone: 'success', title: m.cases.picked, ...(caseNumber ? { body: caseNumber } : {}) });
+    void queryClient.invalidateQueries({ queryKey: ['cases'] });
+    return r;
+  });
+  const idle = pick.phase.kind === 'idle';
+  return (
+    <span className="mt-1 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+      {idle && (
+        <button
+          type="button"
+          className="btn btn-primary btn-xs opacity-0 transition-opacity focus:opacity-100 [tr:hover_&]:opacity-100 [tr:focus-within_&]:opacity-100"
+          title={m.cases.quickPickTitle}
+          disabled={pick.busy}
+          onClick={() => void pick.run(null)}
+          data-testid="quick-pick"
+        >
+          {m.cases.quickPick}
+        </button>
+      )}
+      <CommandFeedback command={pick}>{() => <span className="text-xs text-success">{m.cases.picked}</span>}</CommandFeedback>
+    </span>
+  );
+}
 
 /** 맡기 — part 'pick' = 내가 맡기 버튼(다음 할 일 카드 안), 'other' = 다른 사람에게 배정(관리자, 오른쪽 칸) */
 function AssignForm({ c, onDone, part }: { readonly c: Case; readonly onDone: (c: Case) => void; readonly part: 'pick' | 'other' }) {
@@ -950,6 +994,8 @@ export function CaseDetailPage() {
         }
         back={{ to: '/cases', label: m.cases.back }}
       />
+      {/* 보던 목록 순서대로 이전·다음(2026-11-19) */}
+      <QueueNav kind="case" id={caseId} />
       {/* 시스템 번호(ADR-0070 덧붙임) — 장애 문의·로그 대조용, 상세에서만 */}
       <SystemNumbers ids={[{ label: m.cases.title, id: caseId }]} />
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>

@@ -2,6 +2,7 @@
 // - 계정 발급이 진행 중이면 몇 초마다 다시 조회한다(handoff 2026-11-13 §2). 단계는 서버 값만 보인다.
 // - 상태 변경은 X-Expected-Version(직원 version)과 사유를 보낸다. 응답(Employee)이 온 것만 반영한다.
 // - 요청 권한은 상태만 보인다(승인 버튼 없음 — 인사와 권한 분리).
+import { QueueNav } from '../../shared/workQueue';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { useParams } from 'react-router';
@@ -332,6 +333,8 @@ export function EmployeeDetailPage() {
 
   return (
     <section className="max-w-4xl space-y-4">
+      {/* 보던 목록 순서대로 이전·다음(2026-11-19) */}
+      <QueueNav id={operatorId} />
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(e) => (
           <>

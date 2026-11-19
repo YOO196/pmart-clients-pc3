@@ -1,5 +1,6 @@
 // 직원 목록(GET /hr/employees?status&affiliationCode&q&size&cursor). 필터는 URL 쿼리에 둔다.
 // 조회 실패를 빈 목록으로 보이지 않는다(QueryState). 권한이 없으면 서버 403 → "이용할 수 없는 화면".
+import { useRememberQueue } from '../../shared/workQueue';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
@@ -76,6 +77,8 @@ export function EmployeeListPage() {
   });
 
   const items = query.data?.pages.flatMap((p) => p.items) ?? [];
+  // 상세에서 이전·다음으로 넘기도록 지금 목록 순서를 기억(2026-11-19) — 찾기 말(q)은 기억하지 않는다
+  useRememberQueue(query.data ? items.map((e) => e.operatorId) : undefined, `/employees?${params.toString()}`);
   // 미리보기 칸(2026-11-19 — 백오피스 목록과 같음): 줄을 누르면 목록을 떠나지 않고 오른쪽에 요약, 사번 링크는 그대로 상세로
   const pv = usePreview();
   const state: UiState<readonly Employee[]> = query.isPending

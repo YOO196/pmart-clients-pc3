@@ -66,6 +66,20 @@ export const messages = {
     clockTitle: '서울 시각(표시용)',
     roleName: { HR_ADMIN: '인사팀', OPERATOR_ADMIN: '운영 관리자', MD: 'MD', PRODUCT_APPROVER: '상품 승인', DISPLAY_APPROVER: '전시 승인', PRICE_APPROVER: '가격 승인', RIDER_OPS: '라이더 운영', CS_AGENT: '상담원', MFC_SUPERVISOR: '센터 관리자' } as Readonly<Record<string, string>>,
   },
+  /** 목록 순서대로 직원 상세 넘기기(2026-11-19) */
+  queue: {
+    label: '목록 순서대로 넘기기',
+    backToList: '‹ 보던 목록으로',
+    prev: '이전',
+    next: '다음',
+    position: (at: number, total: number) => `${at} / ${total}`,
+  },
+  /** 화면 틀 보탬(2026-11-19) — 인터넷 끊김 띠 */
+  chrome: {
+    offline: '인터넷 연결이 끊겼어요.',
+    offlineHint: '지금 화면의 숫자·목록은 끊기기 전 것이에요. 다시 이어지면 저절로 새로 읽어요.',
+    onlineAgain: '다시 연결됐어요 — 화면을 새로 읽는 중이에요.',
+  },
   nav: {
     group: '인사',
     home: '첫 화면',

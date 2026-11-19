@@ -26,7 +26,8 @@ describe('사건함 새 메시지 점', () => {
     await waitFor(() => expect(view.sent.some((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith('/cases/CASE-MOCK-1/views'))).toBe(true));
     const post = view.sent.find((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith('/views'))!;
     expect(post.headers.get('Idempotency-Key')).toBeNull(); // 멱등 키 필요 없음
-    expect(Object.keys(sessionStorage)).toHaveLength(0); // 탭 저장소는 이제 안 씀
+    // "봤음"은 탭 저장소에 안 남긴다(서버에) — 목록 순서 기억(이전·다음, 2026-11-19)만 따로 쓴다
+    expect(Object.keys(sessionStorage).filter((k) => !k.startsWith('pmart.backoffice.queue.'))).toHaveLength(0);
     cleanup();
 
     renderAt('/cases', as.riderOps);
