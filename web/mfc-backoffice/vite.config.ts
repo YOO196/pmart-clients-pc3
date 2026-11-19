@@ -25,6 +25,8 @@ export default defineConfig(({ mode }) => {
       globals: true,
       setupFiles: ['./src/test/setup.ts'],
       include: ['src/**/*.test.{ts,tsx}'],
+      // 화면 흐름 시험(입력 여러 칸·여러 요청)이 전체를 함께 돌릴 때 5초 기본을 무작위로 넘긴다 — 실패를 숨기지 않게 시간만 넉넉히
+      testTimeout: 15_000,
     },
   };
 });
