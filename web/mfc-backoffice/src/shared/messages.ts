@@ -44,6 +44,20 @@ export const messages = {
     seen: '최근 봄',
     seenTitle: '이 브라우저에서 최근 열어 본 것이에요(최근 8개).',
     toTop: '↑ 맨 위로',
+    taskAlertTitle: '늦음·막힘 작업 수(서버 표시값)',
+  },
+  /** 단축키 안내("?") */
+  shortcuts: {
+    open: '단축키 보기',
+    title: '단축키',
+    close: '닫기',
+    items: [
+      { what: '이 화면의 검색 조건 첫 칸으로', keys: ['/'] },
+      { what: '상세 — 보던 목록의 이전 건·다음 건', keys: ['[', ']'] },
+      { what: '미리보기 — 앞 줄·다음 줄', keys: ['↑', '↓'] },
+      { what: '미리보기 — 상세 열기·닫기', keys: ['Enter', 'Esc'] },
+      { what: '이 안내 열기·닫기', keys: ['?'] },
+    ],
   },
   /** 목록 순서대로 상세 넘기기 */
   queue: {
@@ -154,6 +168,28 @@ export const messages = {
 
   /** 센터 운영판·예외 처리함(features/ops) */
   ops: {
+    /** 홈 보탬 — 작업 흐름 두 줄·작업자 지금·최근 본 것(2026-11-19) */
+    flow: {
+      title: '작업 흐름',
+      note: '끝나지 않은 작업(서버 목록) · 누르면 작업 현황이 그 조건으로',
+      firstCheck: '먼저 확인',
+      first: { late: '늦음', idle: '멈춤', blocked: '막힘', unassigned: '담당 없음' },
+      type: '유형',
+      stage: { before: '선행 대기', wait: '대기', assigned: '배정', doing: '진행' },
+      atLeast: (n: number) => `${n}+`,
+      workersTitle: '작업자 지금',
+      allWorkers: '작업자 전체',
+      workersFailed: '작업자 목록을 못 읽었어요.',
+      noWorkers: '재직 중인 작업자가 없어요.',
+      onBreak: '휴게 중',
+      hasLate: '늦음·멈춤',
+      load: (n: number, doing: number) => `맡은 작업 ${n}(진행 ${doing})`,
+      free: '맡은 일 없음',
+      unknownLoad: '맡은 작업 모름',
+      recentTitle: '최근 본 것',
+      recentEmpty: '이 센터에서 최근 연 상세가 없어요.',
+      recentKind: { task: '작업', worker: '작업자', move: '이동', inboundTask: '입고' } as Readonly<Record<string, string>>,
+    },
     title: '오늘 센터 현황',
     intro: '출하가 늦어지거나 현장에서 막힌 일을 먼저 찾아요. 조치는 각 상세 화면에서 해요.',
     refresh: '지금 새로 고침',
@@ -435,6 +471,8 @@ export const messages = {
     tabs: { decisions: '격리·해제', disposals: '폐기', inspections: '회수품 검수', incidents: '품질 사고' },
     /** 품질 사고(MB-2 1차, quality 0.6.0) */
     incidents: {
+      countsLabel: '품질 사고 상태별 수',
+      countHint: '서버 목록 기준 · 50건까지 셈',
       list: '품질 사고',
       intro: '결품 보고 중 파손은 서버가 자동으로 열고, 현장에서 찾은 문제는 여기서 직접 등록해요. 영향 LOT 을 모두 격리 해제하거나 폐기한 뒤에 닫을 수 있어요.',
       kind: { TEMPERATURE_EXCURSION: '온도 이탈', DAMAGE: '파손', SPOILAGE: '변질', RECALL: '리콜', EXPIRY: '유통기한', CONTAMINATION: '오염', OTHER: '기타' } as Readonly<Record<string, string>>,

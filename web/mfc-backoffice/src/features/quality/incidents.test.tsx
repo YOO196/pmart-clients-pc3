@@ -14,17 +14,22 @@ describe('품질 사고', () => {
     const list = await screen.findByTestId('list-incidents');
     const rows = await within(list).findAllByTestId('list-incidents-row');
     expect(rows).toHaveLength(2);
-    expect(within(list).queryByText('QI-9')).not.toBeInTheDocument();
-    const auto = rows.find((r) => r.textContent?.includes('QI-1'))!;
+    // 목록에는 사고 번호(시스템 ID)를 내지 않는다(ADR-0070 덧붙임) — 종류·경로·시각으로 알아본다
+    expect(list).not.toHaveTextContent('QI-');
+    const auto = rows.find((r) => r.textContent?.includes('자동(결품 보고)'))!;
     expect(auto).toHaveTextContent('파손');
     expect(auto).toHaveTextContent('자동(결품 보고)');
     expect(auto).toHaveTextContent('1개');
-    const manual = rows.find((r) => r.textContent?.includes('QI-2'))!;
+    const manual = rows.find((r) => r.textContent?.includes('직접 등록'))!;
     expect(manual).toHaveTextContent('처리 끝 — 닫기 대기');
     expect(manual).toHaveTextContent('직접 등록');
-    const q = view.gets('/quality-incidents')[0]!;
+    // 목록 요청(숫자 카드는 state 를 보낸다)
+    const q = view.gets('/quality-incidents').find((r) => new URL(r.url).searchParams.getAll('state').length === 0)!;
     expect(new URL(q.url).searchParams.get('mfcId')).toBe('MFC-BSN-01');
     expect(new URL(q.url).searchParams.getAll('state')).toEqual([]);
+    // 상태 숫자 카드(서버 목록으로 셈)
+    expect(await screen.findByTestId('count-OPEN-value')).toHaveTextContent(/1건$/);
+    expect(await screen.findByTestId('count-DECIDED-value')).toHaveTextContent(/1건$/);
   });
 
   it('남은 LOT 이 있으면 닫기 대신 안내, "격리 요청"은 격리·해제 탭에 사고 번호·LOT 을 채워 판정에 잇는다', async () => {
