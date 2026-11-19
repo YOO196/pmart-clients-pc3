@@ -777,6 +777,7 @@
   "@trackRiderLocationAt": { "placeholders": { "time": { "type": "String" } } },
   "trackRiderLocating": "라이더 위치를 확인하고 있어요",
   "trackMapUnavailable": "이 기기에서는 지도를 보여 줄 수 없어요",
+  "trackMapPending": "지도 위치를 확인하고 있어요",
   "etaRemaining": "약 {minutes}분 남았어요",
   "@etaRemaining": {
     "placeholders": {

@@ -41,6 +41,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-19-backend-first-run-consents.md` | BR-59 처음 실행 약관 — ①~④ 모두 회신(`clients/customer-app/2026-11-19-reply-br59-first-run-consents.md`, customer 0.6.0~0.6.1) · 고객앱 반영(목 모드). 질문 답은 아래 문서로 보냄. **남은 것: LAN 실서버 확인 뒤 archive** |
 | `customer-app/2026-11-19-backend-br59-location-service-answer.md` | BR-59 질문 답(좌표→주소 카카오 로컬 서버 경유, 지도 카카오맵 SDK, 휴대폰 위치 Android geolocator — 사용자 승인·고객앱 반영) + Q1 역지오코딩 좌표가 URL 쿼리로 추적 기록에 남는 문제 |
 | `customer-app/2026-11-19-backend-address-receiver-to-checkout.md` | BR-60 — 회신(`clients/customer-app/2026-11-19-reply-br60-address-receiver.md`, customer 0.8.0·order 0.14.0 배포) · 고객앱 반영(목 모드). **남은 것: LAN 에서 주소 저장·주문서 내 연락처 확인 뒤 archive** |
+| `customer-app/2026-11-19-backend-order-shipments-empty.md` | **급함** BR-61 고객 주문 조회 `shipments` 가 늘 빈 배열 → 배송 현황·라이더 지도를 열 수 없음(R1 채우기, R2 시점) |
 | `customer-app/2026-11-19-backend-live-rider-location-done.md` | (delivery PC 5 요청 회신) 배송 현황 라이더 위치를 SSE 로 — 고객앱 반영(목 모드). **남은 것: 실제 배송으로 PC 5 와 지연 재기 뒤 archive** |
 | `customer-app/2026-11-16-backend-review-photos-and-inbox-done.md` | 리뷰 0.2.0(사진)·고객 알림함 0.2.0 반영 확인 — 실서버 확인은 배송 완료·고객 주문 뒤 |
 | `customer-app/2026-11-16-backend-review-edit-delete-done.md` | 리뷰 수정·삭제 화면 반영 확인, 빈 글 수정 질문 1개 — 실서버 확인은 배송 완료 뒤 |

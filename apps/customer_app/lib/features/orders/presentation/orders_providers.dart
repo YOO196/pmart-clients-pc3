@@ -5,6 +5,8 @@ import 'package:pmart_ui/pmart_ui.dart' show toSeoulWallClock;
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/order_status.dart';
 import '../../../shared/providers.dart';
+import '../../address/presentation/map_pick_screen.dart'
+    show GeoPoint, geocodingRepositoryProvider;
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../checkout/data/mock_checkout_repository.dart';
@@ -41,6 +43,23 @@ final etaRefreshIntervalProvider = Provider<Duration>(
 final riderLocationRefreshIntervalProvider = Provider<Duration>(
   (_) => const Duration(seconds: 10),
 );
+
+/// 배송현황 지도의 내 배송지 좌표 — 주문 사본에 핀이 없을 때만, 사본 도로명을 서버 주소 변환(`/address-geocodes`)으로.
+/// 못 찾거나 조회가 실패하면 null(지도 가운데를 지어내지 않는다).
+final trackingHomeProvider = FutureProvider.autoDispose
+    .family<GeoPoint?, String>((ref, road) async {
+      try {
+        final found = await ref
+            .watch(geocodingRepositoryProvider)
+            .geocode(road);
+        return switch (found.firstOrNull) {
+          final c? => (lat: c.lat, lng: c.lng),
+          null => null,
+        };
+      } on PmartFailure {
+        return null;
+      }
+    });
 
 /// 실시간 구독 재연결 대기([attempt] 는 1부터). 1·2·4·…초, 최대 60초.
 final trackingReconnectDelayProvider = Provider<Duration Function(int attempt)>(

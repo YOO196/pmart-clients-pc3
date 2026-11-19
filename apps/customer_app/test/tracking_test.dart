@@ -710,7 +710,7 @@ void main() {
       expect(find.text('10분 남음'), findsOneWidget);
     });
 
-    testWidgets('내 배송지 핀도 없고 위치도 없으면 지도 없이 확인 중이라고만', (t) async {
+    testWidgets('배송지 좌표도 라이더 위치도 없으면 지도 칸에 "확인 중" — 위치를 지어내지 않는다', (t) async {
       final orders = MockOrdersRepository(latency: Duration.zero);
       await openTracking(
         t,
@@ -726,11 +726,13 @@ void main() {
         ),
       );
       await t.pumpAndSettle();
-      expect(key('track-map-mode'), findsNothing);
+      // order-seed-1 은 배송지 사본이 없다(배포 전 주문).
+      expect(key('track-map-mode'), findsOneWidget);
+      expect(key('track-map-pending'), findsOneWidget);
       expect(key('track-rider-locating'), findsOneWidget);
     });
 
-    testWidgets('배달 중인데 위치가 아직 없으면 지도를 그리지 않고 확인 중이라고만', (t) async {
+    testWidgets('배달 중인데 위치가 아직 없어도 지도 화면 — 라이더 마커 없이 확인 중', (t) async {
       final orders = MockOrdersRepository(latency: Duration.zero)
         ..hideRiderLocation = true;
       await openTracking(
@@ -739,12 +741,12 @@ void main() {
         orderId: 'order-seed-1',
         deliveryId: 'dlv-s2',
       );
-      expect(key('track-map-mode'), findsNothing);
+      expect(key('track-map-mode'), findsOneWidget);
       expect(key('track-rider-locating'), findsOneWidget);
       expect(key('track-step-current-delivering'), findsOneWidget);
     });
 
-    testWidgets('픽업 전(위치 없음)에는 지도가 없다', (t) async {
+    testWidgets('픽업 전에도 지도가 바로 뜬다 — 내 배송지 마커만, 라이더 위치 문구 없음', (t) async {
       final orders = MockOrdersRepository(latency: Duration.zero);
       await openTracking(
         t,
@@ -752,8 +754,28 @@ void main() {
         orderId: 'order-seed-4',
         deliveryId: 'dlv-1',
       );
-      expect(key('track-map-mode'), findsNothing);
+      expect(key('track-map-mode'), findsOneWidget);
+      expect(find.byType(TrackingMap), findsOneWidget);
+      expect(map(t).rider, isNull);
+      expect(map(t).home, (lat: 35.1565, lng: 129.0665));
       expect(key('track-rider-locating'), findsNothing);
+      expect(key('track-reserved'), findsOneWidget);
+    });
+
+    testWidgets('사본에 핀이 없으면 배송지 도로명을 주소 변환해 지도 가운데로', (t) async {
+      final orders = MockOrdersRepository(latency: Duration.zero);
+      final o = orders.orderJson('order-seed-4')!;
+      final ship = {...(o['shippingAddress']! as Map<String, Object?>)}
+        ..remove('geo');
+      orders.overrides['order-seed-4'] = {...o, 'shippingAddress': ship};
+      await openTracking(
+        t,
+        orders,
+        orderId: 'order-seed-4',
+        deliveryId: 'dlv-1',
+      );
+      expect(find.byType(TrackingMap), findsOneWidget);
+      expect(map(t).home, isNotNull);
     });
   });
 

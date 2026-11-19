@@ -17,15 +17,15 @@ import '../../address/presentation/map_pick_screen.dart'
 /// - 출발지(MFC)는 고객이 받을 길이 계약에 없어 그리지 않는다(사용자 2026-11-19 "빼고 요청도 안 함").
 /// - 지나온 길은 서버가 주지 않아 그리지 않는다.
 ///
-/// [rider]·[home] 중 하나는 있어야 한다(지도 가운데). 카카오 지도는 실서버·키가 있을 때만([mapAvailableProvider]).
-/// 목·시험·키 없음이면 지도 대신 안내 칸.
+/// 지도 가운데는 [rider] → [home]. 둘 다 아직 없으면(주문·주소 변환을 읽는 중) "지도 위치를 확인하고 있어요" 칸.
+/// 카카오 지도는 실서버·키가 있을 때만([mapAvailableProvider]). 목·시험·키 없음이면 지도 대신 안내 칸.
 class TrackingMap extends ConsumerStatefulWidget {
   const TrackingMap({
     super.key,
     required this.rider,
     this.home,
     this.riderStale = false,
-  }) : assert(rider != null || home != null);
+  });
 
   final GeoPoint? rider;
   final GeoPoint? home;
@@ -43,6 +43,8 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
   kakao.Poi? _riderPoi;
   kakao.PoiStyle? _riderStyle;
   kakao.PoiStyle? _riderDimStyle;
+  kakao.PoiStyle? _homeStyle;
+  kakao.Poi? _homePoi;
   bool? _shownStale;
 
   static kakao.LatLng _ll(GeoPoint p) => kakao.LatLng(p.lat, p.lng);
@@ -70,15 +72,25 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
     const center = kakao.KPoint(0.5, 0.5);
     _riderStyle = kakao.PoiStyle(icon: riderIcon, anchor: center);
     _riderDimStyle = kakao.PoiStyle(icon: riderDimIcon, anchor: center);
-    if (widget.home case final h?) {
-      await map.labelLayer.addPoi(
-        _ll(h),
-        style: kakao.PoiStyle(icon: homeIcon, anchor: center),
-      );
-    }
+    _homeStyle = kakao.PoiStyle(icon: homeIcon, anchor: center);
     _map = map;
+    await _syncHome();
     await _syncRider(animate: false);
     await _fit();
+  }
+
+  /// 내 배송지 마커 — 주문·주소 변환이 늦게 와도 그때 그린다.
+  Future<void> _syncHome() async {
+    final map = _map;
+    final style = _homeStyle;
+    final home = widget.home;
+    if (map == null || style == null || home == null) return;
+    final poi = _homePoi;
+    if (poi == null) {
+      _homePoi = await map.labelLayer.addPoi(_ll(home), style: style);
+    } else {
+      await poi.move(_ll(home));
+    }
   }
 
   /// 라이더 마커를 지금 값에 맞춘다 — 없으면 숨김, 처음이면 만들기, 있으면 미끄러지듯 옮기기, 오래됨이면 흐리게.
@@ -95,7 +107,11 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
     }
     final style = widget.riderStale ? dim : normal;
     if (poi == null) {
-      _riderPoi = await map.labelLayer.addPoi(_ll(rider), style: style, rank: 1);
+      _riderPoi = await map.labelLayer.addPoi(
+        _ll(rider),
+        style: style,
+        rank: 1,
+      );
       _shownStale = widget.riderStale;
       return;
     }
@@ -113,8 +129,8 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
   /// 라이더와 배송지가 함께 보이게 맞춘다(하나만 있으면 그 가운데).
   Future<void> _fit() async {
     final map = _map;
-    if (map == null) return;
     final points = [?widget.rider, ?widget.home];
+    if (map == null || points.isEmpty) return;
     await map.moveCamera(
       points.length == 1
           ? kakao.CameraUpdate.newCenterPosition(
@@ -133,13 +149,32 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
     final moved = old.rider != widget.rider;
     if (moved || old.riderStale != widget.riderStale) {
       _syncRider();
-      // 마커가 나타나거나 사라질 때만 화면을 다시 맞춘다(움직일 때마다 카메라가 흔들리지 않게).
-      if ((old.rider == null) != (widget.rider == null)) _fit();
+    }
+    if (old.home != widget.home) _syncHome();
+    // 마커가 나타나거나 사라질 때만 화면을 다시 맞춘다(움직일 때마다 카메라가 흔들리지 않게).
+    if ((old.rider == null) != (widget.rider == null) ||
+        (old.home == null) != (widget.home == null)) {
+      _fit();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final start = widget.rider ?? widget.home;
+    if (start == null) {
+      // 지도 가운데를 아직 모른다(주문·주소 변환을 읽는 중, 또는 둘 다 없음) — 위치를 지어내지 않는다.
+      final theme = Theme.of(context);
+      return Container(
+        key: const ValueKey('track-map-pending'),
+        color: theme.colorScheme.surfaceContainerHighest,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          AppLocalizations.of(context).trackMapPending,
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
     if (!ref.watch(mapAvailableProvider)) {
       final theme = Theme.of(context);
       return Container(
@@ -155,10 +190,7 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
     }
     return kakao.KakaoMap(
       key: const ValueKey('track-map'),
-      option: kakao.KakaoMapOption(
-        position: _ll((widget.rider ?? widget.home)!),
-        zoomLevel: 16,
-      ),
+      option: kakao.KakaoMapOption(position: _ll(start), zoomLevel: 16),
       onMapReady: _onReady,
     );
   }

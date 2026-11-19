@@ -1404,70 +1404,65 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       null => null,
     };
     final live = _live;
-    // 지도: 배달 중이면. 라이더 위치는 구독 값이 있으면 그것만(null 이면 숨김 — 예전 조회 값으로 채우지 않는다),
-    // 구독이 없으면 조회 값.
+    // 배송현황은 늘 지도 화면이다(사용자 2026-11-19 "지도 바로 뜨게"). 라이더 위치는 배달 중에만 서버가 준다 —
+    // 구독 값이 있으면 그것만(null 이면 숨김 — 예전 조회 값으로 채우지 않는다), 구독이 없으면 조회 값.
     final current = live ?? value.value;
-    final delivering = _isDelivering(current?.stage);
-    final rider = delivering ? current?.riderLocation : null;
+    final rider = _isDelivering(current?.stage) ? current?.riderLocation : null;
     final ship = order?.value?.shippingAddress;
     final home = switch ((ship?.lat, ship?.lng)) {
       (final double lat, final double lng) => (lat: lat, lng: lng),
-      _ => null,
-    };
-    if (current != null && delivering && (rider != null || home != null)) {
-      return _mapScaffold(context, current, rider, home, order);
-    }
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.trackTitle)),
-      body: switch (value) {
-        _ when live != null => _trackBody(live, order),
-        // 조회 실패: "배송 실패"가 아니라 "위치를 불러오지 못함"이다.
-        AsyncError() when !value.hasValue => Center(
-          key: const ValueKey('eta-failed'),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(l10n.etaLoadFailed, textAlign: TextAlign.center),
-              if (_mode == _Live.polling) ...[
-                const SizedBox(height: 8),
-                Text(
-                  l10n.trackLiveFallback,
-                  key: const ValueKey('track-live-fallback'),
-                ),
-              ],
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () => ref.invalidate(provider),
-                child: Text(l10n.checkoutCheckAgain),
-              ),
-            ],
-          ),
-        ),
-        _ => UiStateView<DeliveryEtaView>(
-          state: uiStateOf(value),
-          onRetry: () => ref.invalidate(provider),
-          ready: (context, e) => _trackBody(e, order),
-        ),
+      // 사본에 핀이 없으면 배송지 도로명을 서버 주소 변환으로 찾아 지도 가운데·집 마커로 쓴다.
+      _ => switch (ship?.roadAddress) {
+        final road? => ref.watch(trackingHomeProvider(road)).value,
+        null => null,
       },
-    );
-  }
-
-  Widget _trackBody(DeliveryEtaView eta, AsyncValue<OrderDetail>? order) =>
-      _TrackBody(
-        eta: eta,
+    };
+    final Widget sheet = switch (value) {
+      _ when current != null => _TrackBody(
+        eta: current,
         deliveryId: widget.deliveryId,
         order: order,
         polling: _mode == _Live.polling,
         onVisit: _visit,
-      );
+        sheet: true,
+        rider: rider,
+      ),
+      // 조회 실패: "배송 실패"가 아니라 "위치를 불러오지 못함"이다.
+      AsyncError() => Padding(
+        key: const ValueKey('eta-failed'),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        child: Column(
+          children: [
+            Text(l10n.etaLoadFailed, textAlign: TextAlign.center),
+            if (_mode == _Live.polling) ...[
+              const SizedBox(height: 8),
+              Text(
+                l10n.trackLiveFallback,
+                key: const ValueKey('track-live-fallback'),
+              ),
+            ],
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () => ref.invalidate(provider),
+              child: Text(l10n.checkoutCheckAgain),
+            ),
+          ],
+        ),
+      ),
+      _ => const Padding(
+        padding: EdgeInsets.all(32),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    };
+    return _mapScaffold(context, sheet, rider, home);
+  }
 
   /// 레퍼런스 8-5: 지도 전체 + 아래 끌어 올리는 시트(진행·도착 예상). 위 왼쪽 뒤로, 오른쪽 문의하기.
   Widget _mapScaffold(
     BuildContext context,
-    DeliveryEtaView eta,
+    Widget sheet,
     RiderPosition? rider,
     GeoPoint? home,
-    AsyncValue<OrderDetail>? order,
   ) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
@@ -1500,18 +1495,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                   BoxShadow(blurRadius: 12, color: Color(0x22000000)),
                 ],
               ),
-              child: SingleChildScrollView(
-                controller: scroll,
-                child: _TrackBody(
-                  eta: eta,
-                  deliveryId: widget.deliveryId,
-                  order: order,
-                  polling: _mode == _Live.polling,
-                  onVisit: _visit,
-                  sheet: true,
-                  rider: rider,
-                ),
-              ),
+              child: SingleChildScrollView(controller: scroll, child: sheet),
             ),
           ),
           SafeArea(
@@ -1672,7 +1656,7 @@ class _TrackBody extends StatelessWidget {
               style: theme.textTheme.bodySmall,
             ),
           )
-        else if (rider == null || rider!.stale)
+        else if (_isDelivering(e.stage) && (rider == null || rider!.stale))
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
