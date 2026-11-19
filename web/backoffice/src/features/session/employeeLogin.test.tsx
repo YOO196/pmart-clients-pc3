@@ -314,7 +314,9 @@ describe('화면', () => {
     render(<App memory initialPath="/auth/callback?ticket=TICKET-UI" />);
 
     expect(await screen.findByRole('heading', { name: '내 세션' })).toBeInTheDocument();
-    expect(screen.getByText('내 세션: OP-ea-1')).toBeInTheDocument();
+    // 머리줄 링크: 이름 · 사번(목에 없는 직원이면 "내 세션"만) — 운영자 ID 는 글자로 안 보인다(ADR-0070 덧붙임). 내 세션 화면 본문의 ID 는 상세라 그대로
+    expect(screen.getByTestId('operator')).toHaveTextContent(/^내 세션/);
+    expect(screen.getByTestId('operator')).not.toHaveTextContent('OP-ea-1');
     expect(screen.getByText('PRICE_APPROVER')).toBeInTheDocument();
     expect(await screen.findByText('SES-ea-1')).toBeInTheDocument();
     expect(screen.getByText('backoffice')).toBeInTheDocument();

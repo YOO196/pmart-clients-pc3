@@ -1,3 +1,4 @@
+import { useStaffText } from '../shared/employeeLabels';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppLauncher, QueryState, UiTextProvider } from '@pmart/web-ui';
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
@@ -153,7 +154,7 @@ function ScrollToTopOnNavigate() {
 
 // 화면 틀(2026-11-18 — PC 5 요청 "관리자 형식", 배민 관리자 화면 참고): 진한 왼쪽 메뉴(묶음 제목 + 메뉴), 흰 머리줄(위치 · 로그인 직원·역할), 연회색 본문.
 function Layout() {
-  const { session } = useSession();
+  const { session, signedIn, restoring } = useSession();
   const { pathname } = useLocation();
   const groups = session ? visibleGroups(session.roles) : [];
   // 한 번에 한 묶음만 펼침 — 지금 화면의 묶음이 바뀌면 그 묶음을 연다(대시보드처럼 묶음 밖이면 그대로)
@@ -167,6 +168,9 @@ function Layout() {
   const current = currentMenu(groups, pathname);
   // 메뉴 접기(2026-11-19) — 접으면 묶음 아이콘만(마우스를 올리면 이름, 누르면 그 묶음 첫 화면), 업무 알림 개수는 그대로
   const [collapsed, toggleMenu] = useMenuCollapsed();
+  // 머리줄 내 세션 — 이름 · 사번(OP-… 대신, ADR-0070 덧붙임). 읽는 중·못 읽음은 "내 세션"만
+  const staff = useStaffText(signedIn && !restoring ? session?.subject : null); // 세션 복원이 끝난 뒤에만(복원 중에 부르면 401 → 토큰 갱신이 한 번 더)
+  const myName = staff && staff !== '…' && !staff.startsWith('직원 ·') ? staff : '';
   const navigate = useNavigate();
   return (
     <div className="flex min-h-screen bg-base-200">
@@ -233,7 +237,7 @@ function Layout() {
               <>
                 {/* 로그인 직원 — "내 세션: 직원 ID" 링크(로그인 시험이 이 이름으로 찾는다). 역할은 내 세션 화면에서 본다(머리줄에 두 번 보이지 않게) */}
                 <NavLink to="/session" className="btn btn-ghost btn-xs font-normal" data-testid="operator">
-                  {`${m.nav.session}: ${session.subject}`}
+                  {myName ? `${m.nav.session}: ${myName}` : m.nav.session}
                 </NavLink>
               </>
             ) : (
