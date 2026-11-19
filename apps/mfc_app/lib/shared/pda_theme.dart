@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
 
-/// PDA 전용 테마 — 디자인 시안 `pda-preview.html`(사용자 2026-11-19)의 보라 팔레트.
+/// PDA 전용 테마 — 흰 바탕 + 중립 회색, 보라는 포인트(주 버튼·지금 단계·수량·위치 값)에만
+/// (사용자 2026-11-19 "흰색 기본에 포인트 컬러만 연보라 내지는 보라"). 배치는 시안 `pda-preview.html`.
 /// 공통 `PmartTheme` 은 다른 앱도 쓰므로 건드리지 않고 이 앱에서만 쓴다.
 ///
-/// 시안 값: 글자 #211731 · 보조 글자 #62566F · 선 #E7DFF0 · 바탕 #F9F7FC ·
-/// 진한 보라 #372052 · 기본 보라 #673FA0 · 옅은 보라 #EFE6FA / #E9D9FB.
+/// 글자 #1F1D24 · 보조 글자 #6B6873 · 선 #E9E8EE · 바탕 흰색 · 회색 칸 #F4F4F7 ·
+/// 기본 보라 #6B45B0 · 옅은 보라 #F6F1FD / #ECE2FA(포인트 바탕).
 abstract final class PdaColors {
-  static const ink = Color(0xFF211731);
-  static const muted = Color(0xFF62566F);
-  static const line = Color(0xFFE7DFF0);
-  static const paper = Color(0xFFF9F7FC);
-  static const dark = Color(0xFF372052);
-  static const primary = Color(0xFF673FA0);
-  static const soft = Color(0xFFEFE6FA);
-  static const softer = Color(0xFFF2EBFA);
-  static const lilac = Color(0xFFE9D9FB);
-  static const notice = Color(0xFFFFF2DA);
-  static const onNotice = Color(0xFF724815);
+  static const ink = Color(0xFF1F1D24);
+  static const muted = Color(0xFF6B6873);
+  static const line = Color(0xFFE9E8EE);
+  static const paper = Colors.white;
+  static const dark = Color(0xFF3F2A66);
+  static const primary = Color(0xFF6B45B0);
+
+  /// 중립 회색 칸(아직 안 한 단계·보조 바탕).
+  static const soft = Color(0xFFF4F4F7);
+
+  /// 옅은 보라(포인트 바탕).
+  static const softer = Color(0xFFF6F1FD);
+  static const lilac = Color(0xFFECE2FA);
+  static const notice = Color(0xFFF6F1FD);
+  static const onNotice = Color(0xFF4E3285);
   static const danger = Color(0xFF9B392B);
 }
 
@@ -29,7 +34,7 @@ abstract final class PdaTheme {
         ).copyWith(
           primary: PdaColors.primary,
           onPrimary: Colors.white,
-          primaryContainer: PdaColors.soft,
+          primaryContainer: PdaColors.softer,
           onPrimaryContainer: PdaColors.dark,
           secondaryContainer: PdaColors.lilac,
           onSecondaryContainer: PdaColors.dark,
@@ -38,10 +43,10 @@ abstract final class PdaTheme {
           onSurfaceVariant: PdaColors.muted,
           surfaceContainerLowest: Colors.white,
           surfaceContainerLow: Colors.white,
-          surfaceContainer: PdaColors.softer,
+          surfaceContainer: PdaColors.soft,
           surfaceContainerHigh: PdaColors.soft,
           surfaceContainerHighest: PdaColors.soft,
-          outline: const Color(0xFFB9A8CC),
+          outline: const Color(0xFFC9C7D1),
           outlineVariant: PdaColors.line,
           inverseSurface: PdaColors.dark,
         );
@@ -125,7 +130,7 @@ abstract final class PdaTheme {
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: PdaColors.primary,
-        linearTrackColor: PdaColors.soft,
+        linearTrackColor: PdaColors.lilac,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
