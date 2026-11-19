@@ -69,6 +69,9 @@ base class MockPackingRepository implements PackingRepository {
   /// 다음 랙 올리기 응답을 1회 잃는다(서버는 기록함).
   bool loseNextStageResponse = false;
 
+  /// 목 인계 숫자 6자리(서버는 무작위 — 목은 순번으로 겹치지 않게).
+  static String _code(int seq) => '${(318204 + seq * 7919) % 900000 + 100000}';
+
   Future<void> _wait() => Future<void>.delayed(latency);
 
   /// 출하 — 목에 없는 출하(인계 화면의 다른 포장 등)는 빈 출하로 만든다.
@@ -166,6 +169,7 @@ base class MockPackingRepository implements PackingRepository {
       'version': 1,
       'state': 'SEALED',
       'qrCode': 'PKG:$id:1',
+      'handoverCode': _code(_seq),
       'contents': [
         for (final c in contents)
           {
@@ -250,6 +254,7 @@ base class MockPackingRepository implements PackingRepository {
       'packageVersion': version,
       'state': 'SEALED',
       'qrCode': 'PKG:$id:$version',
+      'handoverCode': _code(_seq),
       'invalidatedReason': null,
     };
     _packagesOf(shipmentId).add(p);
@@ -321,6 +326,7 @@ base class MockPackingRepository implements PackingRepository {
         'packageVersion': version,
         'state': 'SEALED',
         'qrCode': 'PKG:$id:$version',
+        'handoverCode': _code(_seq),
         'invalidatedReason': null,
         'contents': [
           for (final c in g)

@@ -726,11 +726,20 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                                       style: theme.textTheme.titleSmall,
                                     ),
                                   ),
+                                  // 포장 번호 = 라벨의 인계 숫자 6자리(ADR-0070 — QR 원문·포장 ID 대신).
                                   Text(
-                                    p.qrCode ?? '-',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                    ),
+                                    p.handoverCode ?? l10n.packNoHandoverCode,
+                                    key: ValueKey('pkg-code-${p.packageId}'),
+                                    style: p.handoverCode != null
+                                        ? theme.textTheme.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 2,
+                                          )
+                                        : theme.textTheme.bodySmall?.copyWith(
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
                                   ),
                                   const SizedBox(width: 8),
                                 ],

@@ -34,30 +34,32 @@ class StepHeader extends StatelessWidget {
                   color: i == current ? PdaColors.primary : PdaColors.soft,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (i < current)
-                      const Padding(
-                        padding: EdgeInsets.only(right: 2),
-                        child: Icon(
-                          Icons.check,
-                          size: 14,
-                          color: PdaColors.muted,
+                // 좁은 화면(360dp)에 다섯 칸이면 "✓ 장바구니"가 "장바…"로 잘렸다(에뮬레이터 확인 2026-11-20) —
+                // 자르지 않고 칸에 맞게 조금 줄인다.
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (i < current)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 2),
+                          child: Icon(
+                            Icons.check,
+                            size: 14,
+                            color: PdaColors.muted,
+                          ),
                         ),
-                      ),
-                    Flexible(
-                      child: Text(
+                      Text(
                         n,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: i == current ? Colors.white : PdaColors.muted,
                           fontWeight: i == current ? FontWeight.w800 : null,
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

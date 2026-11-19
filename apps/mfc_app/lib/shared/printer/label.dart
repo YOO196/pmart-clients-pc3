@@ -20,10 +20,12 @@ class PackageLabel implements PrintableLabel {
     this.deliveryId,
     this.temperatureZone,
     this.bagCount,
+    this.handoverCode,
   });
 
   factory PackageLabel.of(ShipmentView s, PackageView p) => PackageLabel(
     packageId: p.packageId,
+    handoverCode: p.handoverCode,
     packageVersion: p.packageVersion,
     qrCode: p.qrCode!,
     orderId: s.orderId,
@@ -43,6 +45,9 @@ class PackageLabel implements PrintableLabel {
   /// 계약 값 그대로(CHILLED·FROZEN·AMBIENT).
   final String? temperatureZone;
   final int? bagCount;
+
+  /// 라이더가 QR 대신 넣는 6자리(서버 값). 라벨에 가장 크게 찍는다.
+  final String? handoverCode;
 
   @override
   String zpl() => packageLabelZpl(this);
@@ -132,8 +137,18 @@ String packageLabelZpl(PackageLabel l) {
     '^PW812',
     '^LL609',
     '^FO30,40^BQN,2,9^FH\\^FDQA,${f(l.qrCode)}^FS',
-    text(380, 50, 40, l.packageId),
-    text(380, 100, 30, 'v${l.packageVersion}'),
+    // 인계 숫자(6자리)를 가장 크게 — 라이더가 QR 이 안 읽히면 이 숫자를 넣는다(fulfillment handover-code-authorizations).
+    if (l.handoverCode != null) text(380, 28, 70, l.handoverCode!),
+    // 시스템 포장 ID·버전은 작게(인계 숫자가 없으면 예전처럼 위에).
+    ...l.handoverCode != null
+        ? [
+            text(380, 102, 22, l.packageId),
+            text(380, 126, 22, 'v${l.packageVersion}'),
+          ]
+        : [
+            text(380, 50, 40, l.packageId),
+            text(380, 100, 30, 'v${l.packageVersion}'),
+          ],
     if (l.orderId != null) text(380, 150, 30, 'ORDER ${l.orderId}'),
     if (l.deliveryId != null) text(380, 195, 30, 'DLV ${l.deliveryId}'),
     if (l.temperatureZone != null) text(380, 260, 56, l.temperatureZone!),

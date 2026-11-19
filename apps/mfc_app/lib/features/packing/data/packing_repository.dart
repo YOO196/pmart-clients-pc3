@@ -284,6 +284,7 @@ PackageView packageFromContract(api.Package p) => PackageView(
     _ => PackageState.unknown,
   },
   qrCode: p.qrCode,
+  handoverCode: p.handoverCode,
   contents: [
     for (final c in p.contents ?? const <api.PackageContentLine>[])
       ContentLine(

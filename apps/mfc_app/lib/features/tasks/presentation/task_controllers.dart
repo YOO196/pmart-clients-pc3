@@ -281,6 +281,10 @@ class PickStop {
   final List<String> otherLocations;
 }
 
+/// 칸 하나를 가리키는 값(줄·칸·수량) — 보낸 칸과 지금 칸이 같은지 볼 때.
+String pickStopKey(PickStop s) =>
+    '${s.line.orderLineId}|${s.location}|${s.qty}';
+
 /// 지금 갈 칸: 남은 조각 중 서버 방문 순서(`visitSeq`, 냉장 → 냉동 → 상온, 걷는 거리 최단)가 가장 앞인 것.
 /// 한 줄의 조각이 다른 줄 조각 사이에 끼어 있어도 서버 순서를 따른다(시뮬레이터 바코드 판과 같은 칸).
 /// 방문 순서가 없으면 서버가 준 줄·조각 순서. 접수만 된(확정 대기) 양은 그 줄의 앞 조각에서 뺀다.
@@ -355,6 +359,7 @@ class PickingState {
     this.lastLocScan,
     this.syncing = false,
     this.lastDoneLine,
+    this.sentStop,
   });
 
   /// 장바구니(`CRT-…`). 실행의 toLocation(집품 도착지 — fulfillment 0.8.0).
@@ -372,6 +377,14 @@ class PickingState {
   /// 방금 칸 몫을 다 채워 보낸 줄(orderLineId). 그 상품을 또 찍으면 "칸 먼저"가 아니라 "수량 초과"로 알린다.
   final String? lastDoneLine;
 
+  /// 방금 보낸 칸([pickStopKey]). 보내고 작업 상세를 다시 읽기 전까지는 옛 상세가 같은 칸을 또 가리키므로
+  /// 화면은 그 칸 대신 "보냈어요 — 다음 칸 불러오는 중"을 보인다(에뮬레이터 확인 2026-11-20).
+  final String? sentStop;
+
+  /// 동기화 중이고 지금 칸이 방금 보낸 칸이면 — 옛 상세로 같은 칸을 다시 보이지 않는다.
+  bool waitingAfter(PickStop? stop) =>
+      syncing && stop != null && sentStop == pickStopKey(stop);
+
   int capturedFor(String orderLineId) => captured[orderLineId] ?? 0;
 
   PickingState copyWith({
@@ -382,6 +395,7 @@ class PickingState {
     PickLocScan? Function()? lastLocScan,
     bool? syncing,
     String? Function()? lastDoneLine,
+    String? Function()? sentStop,
   }) => PickingState(
     cart: cart != null ? cart() : this.cart,
     at: at != null ? at() : this.at,
@@ -390,6 +404,7 @@ class PickingState {
     lastLocScan: lastLocScan != null ? lastLocScan() : this.lastLocScan,
     syncing: syncing ?? this.syncing,
     lastDoneLine: lastDoneLine != null ? lastDoneLine() : this.lastDoneLine,
+    sentStop: sentStop != null ? sentStop() : this.sentStop,
   );
 }
 
@@ -571,6 +586,7 @@ class PickingController extends Notifier<PickingState> {
       lastScan: () => null,
       lastLocScan: () => null,
       lastDoneLine: () => shortage == null ? line.orderLineId : null,
+      sentStop: () => pickStopKey(stop),
     );
     await sync();
   }
@@ -588,9 +604,16 @@ class PickingController extends Notifier<PickingState> {
           : repo.execution(item.targetId, item.resultId!),
     );
     if (!ref.mounted) return;
-    state = state.copyWith(syncing: false);
     ref
       ..invalidate(taskQueueProvider(taskId))
       ..invalidate(taskDetailProvider(taskId));
+    // 새 상세를 다 읽은 뒤에 끝낸다 — 그 사이 화면이 옛 상세의 같은 칸을 다시 보이지 않게.
+    try {
+      await ref.read(taskDetailProvider(taskId).future);
+    } catch (_) {
+      // 조회 실패는 상세 화면이 오류로 보인다.
+    }
+    if (!ref.mounted) return;
+    state = state.copyWith(syncing: false);
   }
 }
