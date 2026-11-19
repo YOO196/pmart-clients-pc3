@@ -889,39 +889,59 @@ class _DeliveryScreenState extends ConsumerState<DeliveryScreen> {
               key: const ValueKey('help-status'),
               borderRadius: BorderRadius.circular(8),
               onTap: () => _openHelp(d),
+              // 상태 한 줄만 크게("지원센터에 접수했어요"), 종류·건수는 대화 화면에서 —
+              // 두 줄로 내려가지 않게(사용자 2026-11-19). 대화 보기는 큰 버튼 모양.
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+                padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
                 child: Row(
                   children: [
                     const Icon(
                       Icons.support_agent,
-                      size: 20,
+                      size: 24,
                       color: RiderColors.sub,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        [
-                          helpCategoryText(l10n, last.category),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
                           helpStateLook(l10n, last.state).$1,
-                          if (help.sentCount > 1)
-                            l10n.supportCount(help.sentCount),
-                        ].join(' · '),
-                        style: const TextStyle(fontSize: 14),
+                          key: const ValueKey('help-status-text'),
+                          maxLines: 1,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ),
-                    Text(
-                      l10n.supportOpenThread,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                    const SizedBox(width: 8),
+                    Container(
+                      key: const ValueKey('help-status-open'),
+                      padding: const EdgeInsets.fromLTRB(14, 9, 8, 9),
+                      decoration: BoxDecoration(
                         color: RiderColors.primary,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right,
-                      size: 18,
-                      color: RiderColors.primary,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            l10n.supportOpenThread,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right,
+                            size: 22,
+                            color: Colors.white,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

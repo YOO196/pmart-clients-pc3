@@ -179,6 +179,12 @@ void main() {
     expect(find.byKey(const ValueKey('support-center')), findsNothing);
     expect(find.byKey(const ValueKey('help-status')), findsOneWidget);
     expect(find.textContaining('지원센터가 처리하고 있어요'), findsOneWidget);
+    // 상태 한 줄만(종류 없이) — 두 줄로 내려가지 않는다(사용자 2026-11-19)
+    final statusText = t.widget<Text>(
+      find.byKey(const ValueKey('help-status-text')),
+    );
+    expect(statusText.data, '지원센터가 처리하고 있어요');
+    expect(statusText.maxLines, 1);
     await t.tap(find.byKey(const ValueKey('help-status')));
     await settle();
     expect(find.byKey(const ValueKey('support-center')), findsOneWidget);
