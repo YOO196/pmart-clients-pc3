@@ -1683,14 +1683,34 @@ class ProductReviewsPreview extends ConsumerWidget {
     final provider = productReviewsProvider(productId);
     final value = ref.watch(provider);
     final list = value.value;
+    void openAll() => context.push('/products/$productId/reviews');
+    final hasAny = list != null && list.items.isNotEmpty;
     return Column(
       key: const ValueKey('product-reviews'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(switch (list?.reviewCount) {
-          final int n => l10n.reviewSectionCount(n),
-          null => l10n.reviewSectionTitle,
-        }, style: theme.textTheme.titleMedium),
+        // 머리줄을 누르면 리뷰 전체 화면(리뷰가 있을 때).
+        InkWell(
+          key: const ValueKey('product-reviews-all'),
+          onTap: hasAny ? openAll : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(switch (list?.reviewCount) {
+                    final int n => l10n.reviewSectionCount(n),
+                    null => l10n.reviewSectionTitle,
+                  }, style: theme.textTheme.titleMedium),
+                ),
+                if (hasAny) ...[
+                  Text(l10n.reviewSeeAll, style: theme.textTheme.bodyMedium),
+                  const PmartLineIcon(PmartLineIcons.chevronRight, size: 20),
+                ],
+              ],
+            ),
+          ),
+        ),
         switch (value) {
           AsyncError() when list == null => Row(
             key: const ValueKey('product-reviews-failed'),
@@ -1715,18 +1735,17 @@ class ProductReviewsPreview extends ConsumerWidget {
             l10n.reviewSectionEmpty,
             key: const ValueKey('product-reviews-empty'),
           ),
-          _ => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final r in list.items.take(previewCount))
-                _reviewItem(context, l10n, r),
-              if (list.items.length > previewCount || list.hasMore)
-                TextButton(
-                  key: const ValueKey('product-reviews-all'),
-                  onPressed: () => context.push('/products/$productId/reviews'),
-                  child: Text(l10n.reviewSeeAll),
-                ),
-            ],
+          // 리뷰를 눌러도 전체 화면.
+          _ => InkWell(
+            key: const ValueKey('product-reviews-preview'),
+            onTap: openAll,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final r in list.items.take(previewCount))
+                  _reviewItem(context, l10n, r),
+              ],
+            ),
           ),
         },
       ],
@@ -1750,21 +1769,47 @@ class ProductReviewsScreen extends ConsumerWidget {
         state: uiStateOf(ref.watch(provider), isEmpty: (p) => p.items.isEmpty),
         onRetry: () => ref.invalidate(provider),
         empty: (_) => Center(child: Text(l10n.reviewSectionEmpty)),
-        ready: (context, list) => ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            if (list.reviewCount case final n?)
-              Text(
-                l10n.reviewSectionCount(n),
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            for (final r in list.items) _reviewItem(context, l10n, r),
-            _LoadMoreFooter(
-              list: list,
-              onLoadMore: () => ref.read(provider.notifier).loadMore(),
-            ),
-          ],
-        ),
+        ready: (context, list) {
+          final notifier = ref.read(provider.notifier);
+          // 머리줄 1 + 리뷰 + 꼬리(읽는 중·실패·끝) 1.
+          return ListView.builder(
+            key: const ValueKey('product-reviews-list'),
+            padding: const EdgeInsets.all(16),
+            itemCount: list.items.length + 2,
+            itemBuilder: (context, i) {
+              if (i == 0) {
+                return switch (list.reviewCount) {
+                  final n? => Text(
+                    l10n.reviewSectionCount(n),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  null => const SizedBox.shrink(),
+                };
+              }
+              final at = i - 1;
+              // 끝에서 5개 안쪽이 그려지면 다음 쪽(서버 커서). 실패했으면 자동으로 다시 부르지 않는다(버튼으로).
+              if (at >= list.items.length - 5 &&
+                  list.hasMore &&
+                  !list.loadingMore &&
+                  list.loadMoreFailure == null) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => notifier.loadMore(),
+                );
+              }
+              if (at < list.items.length) {
+                return _reviewItem(context, l10n, list.items[at]);
+              }
+              if (list.loadingMore) {
+                return const Padding(
+                  key: ValueKey('review-loading-more'),
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              return _LoadMoreFooter(list: list, onLoadMore: notifier.loadMore);
+            },
+          );
+        },
       ),
     );
   }

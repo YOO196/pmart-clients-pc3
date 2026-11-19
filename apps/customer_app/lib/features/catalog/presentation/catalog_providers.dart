@@ -178,6 +178,13 @@ final filtersProvider = FutureProvider.autoDispose
           .filters(query, mfcId: ref.watch(currentMfcIdProvider)),
     );
 
+/// 상품 평점 집계(서버 — rating-summary). 상세의 별점·리뷰 수는 이것을 먼저 쓴다(상세 응답 `rating` 이 비어 올 수 있다).
+final productRatingProvider = FutureProvider.autoDispose
+    .family<RatingSummary?, String>(
+      (ref, productId) =>
+          ref.watch(catalogRepositoryProvider).ratingSummary(productId),
+    );
+
 final productDetailProvider = FutureProvider.autoDispose
     .family<ProductDetail, String>(
       (ref, productId) => ref

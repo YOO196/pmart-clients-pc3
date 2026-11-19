@@ -69,7 +69,8 @@
 | BR-59 | 중간 | 고객 | 처음 실행 약관(레퍼런스 2-1): 위치 기반 서비스 약관(필수) 동의 유형이 없고(`consentType` 은 TERMS_OF_SERVICE·PRIVACY_POLICY·AGE_OVER_14·MARKETING 뿐), 로그인 전(비회원·기기) 동의·마케팅 푸시 수신 동의를 기록할 경로가 없음 | RESOLVED(2026-11-19, 요청 `docs/handoff/customer-app/2026-11-19-backend-first-run-consents.md` → 회신 `clients/customer-app/2026-11-19-reply-br59-first-run-consents.md`, customer 0.6.0~0.6.1 LAN 배포). 고객앱 반영(목 모드 확인, 미커밋). 백엔드 질문(현재 위치 → 주소 서비스 이름)은 답 `docs/handoff/customer-app/2026-11-19-backend-br59-location-service-answer.md`(카카오 로컬·카카오맵, 휴대폰 위치는 geolocator — 2026-11-19 승인·반영) + 역지오코딩 좌표 쿼리 로그 질문 1개 |
 | BR-60 | 중간 | 고객 | 레퍼런스 주소 상세에는 받는 분·연락처가 없고 연락처는 주문서 "내 연락처"에 있는데, 계약 `AddressInput` 은 `receiverName`·`receiverPhone` 필수 | **RESOLVED**(회신 `clients/customer-app/2026-11-19-reply-br60-address-receiver.md`, customer 0.8.0·order 0.14.0 LAN 배포 12:51): R1 두 값 선택, R2 주소 → 프로필, 없으면 `CONTACT_REQUIRED`, R3 프로필 저장 + 초안 다시(주소의 옛 번호는 PATCH `receiverPhone:""`), R4 이름 null. 고객앱 반영 2026-11-19(목 모드) |
 | BR-61 | 높음 | 고객 | 고객 주문 조회 `GET /orders/{orderId}` 의 `shipments` 가 늘 빈 배열(`OrdersController` `.shipments(List.of())`) — 고객이 배송 ID 를 알 길이 없어 배송 현황·라이더 지도를 열 수 없음 | OPEN(급함, 요청 `docs/handoff/customer-app/2026-11-19-backend-order-shipments-empty.md` + 묶음 요청 `…/2026-11-19-backend-delivery-status-screen.md` R1) — 이것 때문에 라이더가 지도에 안 뜸 |
-| BR-62 | 중간 | 고객 | 배송 현황 시트의 주문한 센터 이름 — 고객용 센터 이름 경로가 없어 브랜드만 보임(`Order.mfcId` 만) | OPEN(요청 `docs/handoff/customer-app/2026-11-19-backend-delivery-status-screen.md` R2 — 주문 응답 `mfcName` 제안) |
+| BR-62 | 중간 | 고객 | 배송 현황 시트의 주문한 센터 이름 — 고객용 센터 이름 경로가 없어 브랜드만 보임(`Order.mfcId` 만) | **RESOLVED**(회신 `clients/customer-app/2026-11-19-reply-br61-br62-shipments-center-name.md`, order 0.15.0 `mfcName` — LAN 배포 전, 앱 반영 `61079e5`). 원 OPEN(요청 `docs/handoff/customer-app/2026-11-19-backend-delivery-status-screen.md` R2 — 주문 응답 `mfcName` 제안) |
+| BR-63 | 중간 | 고객 | 홈 진열·상품 상세 응답의 `rating`·`reviewCount` 가 null — 같은 상품 rating-summary·리뷰 요약은 480개 | OPEN(요청 `docs/handoff/customer-app/2026-11-19-backend-rating-null-in-cards.md`). 상세는 앱이 rating-summary 로 보임, 카드는 서버 반영 대기 |
 
 ---
 
@@ -445,3 +446,7 @@
 - 계기: 사용자 2026-11-19 "주문 넣은 MFC … 다 떠야지"(레퍼런스 "B마트 부산동래").
 - 공백: 고객은 `Order.mfcId` 만 받는다. 센터 이름은 center-master(직원 전용)·배차/실행 직원 응답 `mfcName` 에만 있다.
 - 요청(`docs/handoff/customer-app/2026-11-19-backend-delivery-status-screen.md` R2): 고객 주문 응답에 `mfcName`. 앱은 그때까지 브랜드만(ID 를 보이지 않음).
+
+## BR-63 홈 진열·상품 상세의 평점이 비어 옴 (고객앱)
+- 계기: 사용자 2026-11-19 "무농약 햇양파 리뷰 480개인데 안 보여". rating-summary·리뷰 요약은 480, 진열 항목·상세 응답 rating 은 null.
+- 요청(`docs/handoff/customer-app/2026-11-19-backend-rating-null-in-cards.md`): 진열·상세 사본을 집계와 같게(기존 리뷰 다시 채우기).

@@ -36,6 +36,10 @@ abstract interface class CatalogRepository {
   Future<List<String>> suggestions(String keyword);
 
   Future<ProductDetail> product(String productId, {String? mfcId});
+
+  /// `GET /product-contents/{id}/rating-summary`(product-content 0.2.1, 비회원 가능) — 리뷰 등록 사건으로 채우는 서버 집계.
+  /// 상세 응답의 `rating` 이 비어 와도(LAN 2026-11-19) 이 값은 있다. 리뷰가 없으면 null. 실패는 [PmartFailure].
+  Future<RatingSummary?> ratingSummary(String productId);
 }
 
 /// 실서버 구현(storefront·product·search·product-content).
@@ -127,6 +131,21 @@ final class ApiCatalogRepository implements CatalogRepository {
       () => _search.getSearchSuggestions(q: keyword),
     );
     return res.data?.keywords ?? const [];
+  }
+
+  @override
+  Future<RatingSummary?> ratingSummary(String productId) async {
+    final res = await pmartGuard(
+      () => _contents.getRatingSummary(productId: productId),
+    );
+    final r = _body(res.data, 'RatingSummary');
+    return switch (r.averageRating) {
+      final num avg when r.reviewCount > 0 => RatingSummary(
+        average: avg.toDouble(),
+        count: r.reviewCount,
+      ),
+      _ => null,
+    };
   }
 
   @override

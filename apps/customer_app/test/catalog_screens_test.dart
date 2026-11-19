@@ -37,6 +37,15 @@ final class _WithContentImages extends MockCatalogRepository {
 }
 
 /// 홈 조회 자체가 실패하는 저장소.
+/// 상세 응답에는 평점이 없고(null) 평점 집계만 있는 서버.
+final class _RatingFromSummary extends MockCatalogRepository {
+  _RatingFromSummary({super.latency});
+
+  @override
+  Future<RatingSummary?> ratingSummary(String productId) async =>
+      const RatingSummary(average: 4.1, count: 480);
+}
+
 final class _HomeDown extends MockCatalogRepository {
   _HomeDown() : super(latency: Duration.zero);
 
@@ -276,6 +285,21 @@ void main() {
         '평점 정보 없음',
       );
       expect(find.textContaining('0.0'), findsNothing);
+    });
+
+    // LAN 2026-11-19: 상세 응답 rating 은 비었는데 rating-summary 는 480개 — 서버 집계를 먼저 쓴다.
+    testWidgets('상세 응답에 평점이 없어도 평점 집계(rating-summary)가 있으면 그것을 보인다', (t) async {
+      await t.pumpWidget(
+        testApp([], catalog: _RatingFromSummary(latency: Duration.zero)),
+      );
+      await t.pumpAndSettle();
+      await tapTile(t, 'P-0006');
+
+      final text = t
+          .widget<Text>(find.byKey(const ValueKey('product-rating')))
+          .data!;
+      expect(text, contains('4.1'));
+      expect(text, contains('480'));
     });
 
     testWidgets('일시품절이면 담기를 열지 않고 품절로 보인다', (t) async {

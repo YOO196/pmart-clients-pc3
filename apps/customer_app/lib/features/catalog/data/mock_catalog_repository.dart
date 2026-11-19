@@ -551,4 +551,11 @@ base class MockCatalogRepository implements CatalogRepository {
     }
     return productFromContract(pc.ProductContent.fromJson(productJson(p)));
   }
+
+  /// 목 평점 집계 — 상세의 평점과 같은 값(시험이 바꿔 끼운다).
+  @override
+  Future<RatingSummary?> ratingSummary(String productId) async {
+    await _wait();
+    return (await product(productId)).rating;
+  }
 }

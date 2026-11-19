@@ -1145,7 +1145,7 @@
   "reviewSectionCount": "리뷰 {count}개",
   "@reviewSectionCount": { "placeholders": { "count": { "type": "int" } } },
   "reviewSectionEmpty": "아직 리뷰가 없어요",
-  "reviewSeeAll": "리뷰 전체 보기",
+  "reviewSeeAll": "전체보기",
   "reviewsTitle": "상품 리뷰",
   "reviewLoadMoreFailed": "다음 리뷰를 불러오지 못했어요",
   "reviewAuthorUnknown": "구매자",

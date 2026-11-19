@@ -983,24 +983,38 @@ void main() {
         find.byKey(const ValueKey('product-review-rv-p2-3')),
         findsNothing,
       );
+      // 머리줄("리뷰 7개 전체보기 >")을 누르면 전체 화면. 스크롤 끝 가까이에서 다음 쪽을 저절로 읽는다(버튼 없음).
       await t.tap(find.byKey(const ValueKey('product-reviews-all')));
       await t.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('product-review-rv-p2-4')),
         findsOneWidget,
       );
-      expect(
-        find.byKey(const ValueKey('product-review-rv-p2-5')),
-        findsNothing,
+      await t.scrollUntilVisible(
+        find.byKey(const ValueKey('product-review-rv-p2-6')),
+        300,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('product-reviews-list')),
+          matching: find.byType(Scrollable),
+        ),
       );
-      await t.tap(find.byKey(const ValueKey('review-load-more')));
-      await t.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('product-review-rv-p2-6')),
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('review-load-more')), findsNothing);
       expect(repo.productCursors, [null, '5']);
+    });
+
+    testWidgets('상품 상세: 리뷰 줄을 눌러도 전체 화면', (t) async {
+      final repo = MockReviewsRepository(latency: Duration.zero);
+      await openProduct(t, repo, 'P-0002');
+      await t.tap(find.byKey(const ValueKey('product-reviews-preview')));
+      await t.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('product-reviews-list')),
+        findsOneWidget,
+      );
     });
 
     testWidgets('상품 상세: 리뷰 조회 실패는 "리뷰를 불러오지 못했어요"(리뷰 없음 아님)', (t) async {

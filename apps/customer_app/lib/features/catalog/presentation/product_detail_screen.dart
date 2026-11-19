@@ -99,7 +99,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       color: theme.colorScheme.onSurfaceVariant,
     );
     final scheme = theme.colorScheme;
-    final hasRating = p.rating?.average != null && p.rating?.count != null;
+    // 평점: 서버 집계(rating-summary)를 먼저, 못 읽었으면 상세 응답 값(둘 다 서버 값 — 앱이 세지 않는다).
+    final rating =
+        ref.watch(productRatingProvider(p.productId)).value ?? p.rating;
+    final hasRating = rating != null;
     // 사진 아래 내용(좌우 여백 16). 구획 띠([PmartSectionGap])만 화면 폭을 채운다.
     final rest = <Widget>[
       const SizedBox(height: 14),
@@ -134,7 +137,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               ],
               Flexible(
                 child: Text(
-                  ratingText(l10n, p.rating?.average, p.rating?.count),
+                  ratingText(l10n, rating?.average, rating?.count),
                   key: const ValueKey('product-rating'),
                   style: theme.textTheme.labelMedium?.copyWith(fontSize: 12),
                 ),
