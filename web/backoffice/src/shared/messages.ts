@@ -49,6 +49,13 @@ export const messages = {
     clockTitle: '서울 시각(표시용)',
     roleName: { OPERATOR_ADMIN: '운영 관리자', MD: 'MD', PRODUCT_APPROVER: '상품 승인', DISPLAY_APPROVER: '전시 승인', PRICE_APPROVER: '가격 승인', RIDER_OPS: '라이더 운영', CS_AGENT: '상담원', MFC_SUPERVISOR: '센터 관리자', HR_ADMIN: '인사팀' } as Readonly<Record<string, string>>,
   },
+  /** 목록 숫자 띠(2026-11-19 관제 형식 2단계) */
+  listStrip: {
+    cases: '접수 건 숫자',
+    approvals: '심사 대기 유형별',
+    pending: '처리 대기 종류별',
+    reviewPending: '심사 대기',
+  },
   nav: {
     session: '내 세션',
     login: '로그인',
