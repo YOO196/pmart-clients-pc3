@@ -161,36 +161,71 @@ class ActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (children.isEmpty) return const SizedBox.shrink();
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: PdaColors.line)),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 20,
-            offset: Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(15, 11, 15, 13),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final (i, c) in children.indexed) ...[
-                if (i > 0) const SizedBox(height: 7),
-                c,
+    // 이 단계를 끝내는 주 단추(채운 보라)가 따로 있으면 스캔 단추는 보조(옅은 보라)로 — 같은 무게의 보라 단추 둘이
+    // 겹쳐 무엇이 주 동작인지 안 보였다(사용자 2026-11-20). 스캐너는 단추를 누르지 않아도 읽는다.
+    // 주 단추가 아직 눌리지 않는 상태(스캔해야 켜짐)면 스캔이 지금 할 일이라 스캔 단추를 그대로 진하게 둔다.
+    final hasCommand = children.any(
+      (c) => switch (c) {
+        CommandButton(:final onPressed, :final busy) =>
+          onPressed != null || busy,
+        FilledButton(:final onPressed) => onPressed != null,
+        _ => false,
+      },
+    );
+    return ActionScope(
+      secondaryScan: hasCommand,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: PdaColors.line)),
+          boxShadow: [
+            BoxShadow(
+              color: Color(0x0A000000),
+              blurRadius: 20,
+              offset: Offset(0, -5),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(15, 11, 15, 13),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (i, c) in children.indexed) ...[
+                  if (i > 0) const SizedBox(height: 8),
+                  c,
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+/// 아래 버튼 칸 안의 정보 — 스캔 단추를 보조 모양으로 그릴지.
+class ActionScope extends InheritedWidget {
+  const ActionScope({
+    super.key,
+    required this.secondaryScan,
+    required super.child,
+  });
+
+  final bool secondaryScan;
+
+  static bool secondaryScanOf(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<ActionScope>()
+          ?.secondaryScan ??
+      false;
+
+  @override
+  bool updateShouldNotify(ActionScope old) =>
+      old.secondaryScan != secondaryScan;
 }
 
 /// 단계 화면 몸통 — 위 내용(좌우 16) + 아래 고정 버튼 칸([ActionBar]).
