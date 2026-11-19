@@ -25,7 +25,7 @@ import { MyInfoPage } from '../features/me/MyInfoPage';
 import { messages as m } from '../shared/messages';
 import { GroupIcon } from './groupIcons';
 import { allMenus, centerPath, isWorkerOnly, navGroups, type MenuItem, type MenuKey } from './nav';
-import { ConnectionBanner, useDocumentTitle, useSlashToSearch } from './PageChrome';
+import { ConnectionBanner, ShortcutHelp, TaskAlertBadge, useDocumentTitle, useSlashToSearch } from './PageChrome';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
 import { DETAIL_BAR_SLOT } from '../shared/StickyTitle';
 
@@ -96,6 +96,7 @@ function Layout() {
                           }
                         >
                           {m.menus[item.key]}
+                          {item.key === 'tasks' && center?.mine && <TaskAlertBadge mfcId={center.mfcId} />}
                         </NavLink>
                       </li>
                     ))}
@@ -128,6 +129,7 @@ function Layout() {
           <div className="ml-auto flex items-center gap-2 text-sm">
             {session && center?.mine && <CenterSwitcher centers={session.centers} current={center.mfcId} segment={segment} />}
             {env.isMock && <span className="badge badge-accent badge-sm">{m.mockBadge}</span>}
+            <ShortcutHelp />
             {session && (
               <NavLink to="/me" className={({ isActive }) => `btn btn-ghost btn-xs font-normal ${isActive ? 'btn-active' : ''}`}>
                 {m.nav.me}

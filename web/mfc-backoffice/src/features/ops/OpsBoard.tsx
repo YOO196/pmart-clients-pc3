@@ -30,6 +30,7 @@ import {
   type PromiseRow,
   type TaskSummary,
 } from './opsRules';
+import { FlowBoard, RecentPanel, WorkerLoad } from './FlowBoard';
 import { OPS_REFRESH_MS, useOpenTasks } from './opsQueries';
 
 const m = messages.ops;
@@ -210,6 +211,12 @@ function OpsBoard({ mfcId }: { readonly mfcId: string }) {
         damages={damages}
         handovers={handovers}
       />
+
+      <FlowBoard mfcId={mfcId} tasks={tasks} />
+      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <WorkerLoad mfcId={mfcId} tasks={tasks} />
+        <RecentPanel mfcId={mfcId} />
+      </div>
     </section>
   );
 }
