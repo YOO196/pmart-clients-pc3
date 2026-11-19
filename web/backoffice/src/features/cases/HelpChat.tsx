@@ -6,6 +6,7 @@
 //   관리자는 메시지를 사유(2~500자)와 함께 가린다(`…/messages/{messageId}/maskings`) — body null·masked, 라이더에게도 가려 보인다. 가리면 받은 대화를 처음부터 다시 읽는다(after 로는 옛 메시지가 안 바뀜).
 //   새 메시지 표시는 bff 사건함(#88) 뒤.
 // - 대화는 화면에만(로그 없음). 입력란에 개인정보 안내.
+import { useNewIds } from '../../shared/motion';
 import { RiderNo } from '../../shared/RefNumber';
 import { StaffName } from '../lookup/parts';
 import { useQuery } from '@tanstack/react-query';
@@ -130,6 +131,9 @@ export function HelpChat({
   useEffect(() => {
     if (caseId && lastRider !== undefined) markSeen(caseId);
   }, [caseId, lastRider, markSeen]);
+  // 열어 둔 동안 새로 온 메시지 — 미끄러져 들어오고, 라이더 것이면 제목 옆 표시가 몇 초 숨쉰다(2026-11-19). 처음 읽은 대화는 새것이 아니다
+  const fresh = useNewIds(query.data?.items.map((x) => String(x.seq)), `${deliveryId}|${requestId}`);
+  const freshRider = query.data?.items.filter((x) => x.senderType === 'RIDER' && fresh.has(String(x.seq))).length ?? 0;
   const [draft, setDraft] = useState('');
   const send = useCommand(async (body: string, key) => {
     const r = await request(
@@ -149,7 +153,14 @@ export function HelpChat({
   const ok = draft.trim().length >= 1 && draft.trim().length <= MAX_BODY;
   return (
     <section className="space-y-2" aria-label={m.title}>
-      <h2 className="font-bold">{m.title}</h2>
+      <h2 className="flex items-center gap-2 font-bold">
+        {m.title}
+        {freshRider > 0 && (
+          <span className="badge badge-sm badge-info breathe" role="status" data-testid="help-new">
+            {m.newFromRider(freshRider)}
+          </span>
+        )}
+      </h2>
       <p className="text-xs text-base-content/60">{m.intro}</p>
       {/* 새로 읽기가 실패해도 받은 대화는 그대로 두고 경고만 — 0건·정상으로 바꾸지 않는다 */}
       {query.data && query.isError && (
@@ -163,7 +174,7 @@ export function HelpChat({
             {r.items.map((x) => {
               const rider = x.senderType === 'RIDER';
               return (
-                <li key={x.seq} className={`flex ${rider ? 'justify-start' : 'justify-end'}`} data-testid="help-message" data-sender={x.senderType}>
+                <li key={x.seq} className={`flex ${rider ? 'justify-start' : 'justify-end'} ${fresh.has(String(x.seq)) ? 'msg-new' : ''}`} data-testid="help-message" data-sender={x.senderType} data-new={fresh.has(String(x.seq)) ? 'true' : undefined}>
                   <div className={`max-w-[80%] space-y-1 rounded-box p-2 ${rider ? 'bg-base-100' : 'bg-primary/10'}`}>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
                       <span className="font-semibold">{rider ? m.rider : m.support}</span>
