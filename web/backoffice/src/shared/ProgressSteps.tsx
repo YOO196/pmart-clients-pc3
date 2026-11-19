@@ -45,6 +45,8 @@ export function ProgressSteps({
               {i > 0 && <span className={`absolute left-0 right-1/2 top-4 -z-0 h-0.5 -translate-y-1/2 ${line}`} aria-hidden="true" />}
               {i < steps.length - 1 && <span className={`absolute left-1/2 right-0 top-4 -z-0 h-0.5 -translate-y-1/2 ${place && i < place.step ? 'bg-success' : 'bg-base-300'}`} aria-hidden="true" />}
               <span className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ${circle}`} aria-hidden="true">
+                {/* 진행 중 표시(2026-11-19) — 지금 단계에서만 고리가 천천히 퍼진다(움직임 줄이기면 없음) */}
+                {state === 'now' && <span className={`step-pulse ${place?.warn ? 'text-warning' : 'text-primary'}`} data-testid="step-pulse" />}
                 {state === 'done' ? '✓' : i + 1}
               </span>
               <span className={`mt-2 text-xs ${state === 'now' ? 'font-bold' : state === 'done' ? 'text-base-content/80' : 'text-base-content/45'}`}>{name}</span>
