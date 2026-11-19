@@ -66,8 +66,9 @@ export const incidentHandlers = [
     if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
     const states = url.searchParams.getAll('state');
     const wanted = states.length ? states : ['OPEN', 'DECIDED'];
+    const kind = url.searchParams.get('kind');
     const items = [...db.incidents.values()]
-      .filter((i) => i.mfcId === mfcId)
+      .filter((i) => i.mfcId === mfcId && (!kind || i.kind === kind))
       .map(view)
       .filter((i) => wanted.includes(i.state ?? ''))
       .sort((a, b) => (a.openedAt ?? '').localeCompare(b.openedAt ?? ''));

@@ -181,6 +181,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (_, state) =>
                     OrderHelpScreen(orderId: state.pathParameters['orderId']!),
               ),
+              // 주문 단위 배송 현황 — 배송 ID 를 몰라도 지도부터 뜬다(BR-61).
+              GoRoute(
+                parentNavigatorKey: rootNavigatorKey,
+                path: 'tracking',
+                builder: (_, state) => OrderTrackingScreen(
+                  orderId: state.pathParameters['orderId']!,
+                ),
+              ),
             ],
           ),
         ],

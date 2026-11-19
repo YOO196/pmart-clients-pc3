@@ -144,7 +144,8 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.text('배송 중이에요'), findsOneWidget);
-    expect(find.textContaining('도착 예정'), findsOneWidget);
+    // 레퍼런스 8-5: "N분 남음" + 도착 시각(서버 값).
+    expect(find.byKey(const ValueKey('track-sheet-remaining')), findsOneWidget);
     expect(find.byKey(const ValueKey('eta-delayed')), findsOneWidget);
 
     orders.etaFails = true;

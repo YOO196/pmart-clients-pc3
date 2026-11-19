@@ -172,7 +172,9 @@ void main() {
       expect(find.text('어떤 주문에 대한 문의인가요?'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('inq-pick-order-seed-1')));
       await t.pumpAndSettle();
-      expect(find.text('주문 order-seed-1'), findsOneWidget);
+      // 시스템 주문 ID 는 보이지 않는다 — 화면용 주문번호, 없으면 "선택한 주문".
+      expect(find.byKey(const ValueKey('inq-order')), findsOneWidget);
+      expect(find.textContaining('order-seed-1'), findsNothing);
       expect(
         t
             .widget<ChoiceChip>(find.byKey(const ValueKey('inq-cat-order')))

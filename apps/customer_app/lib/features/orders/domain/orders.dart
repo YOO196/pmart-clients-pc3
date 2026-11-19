@@ -295,6 +295,12 @@ class RiderPosition {
   /// 서버가 받은 뒤 지난 초(서버 값).
   final int? staleSeconds;
 
+  /// 이보다 오래 지난 위치는 "확인 중"으로 보인다(PC 5 요청 2026-11-19 — 마커를 흐리게).
+  static const staleAfterSeconds = 60;
+
+  /// 서버가 받은 지 [staleAfterSeconds] 초가 넘었다(앱이 꺼졌거나 신호가 끊긴 라이더).
+  bool get stale => (staleSeconds ?? 0) > staleAfterSeconds;
+
   @override
   bool operator ==(Object other) =>
       other is RiderPosition &&

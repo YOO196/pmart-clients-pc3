@@ -24,7 +24,7 @@ export function HandoverChecks({ mfcId }: { readonly mfcId: string }) {
     queryFn: () => request('GET', api.fulfillment.GET('/packages', { params: { query: { mfcId, checkRequired: true } } })),
   });
   return (
-    <div className="space-y-2 rounded-box bg-base-100 p-3 text-sm" data-testid="handover-checks">
+    <div id="handover-checks" className="space-y-2 rounded-box bg-base-100 p-3 text-sm" data-testid="handover-checks">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="font-bold">{m.title}</h2>
         <button type="button" className="btn btn-xs" onClick={() => void query.refetch()} disabled={query.isFetching}>
