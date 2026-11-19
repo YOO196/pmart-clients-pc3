@@ -13,6 +13,8 @@ class MfcApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => MaterialApp.router(
     onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
+    // LAN 앱도 debug 빌드라 오른쪽 위 "DEBUG" 띠가 앱바 버튼을 가렸다.
+    debugShowCheckedModeBanner: false,
     theme: PmartTheme.light(),
     darkTheme: PmartTheme.dark(),
     locale: const Locale('ko'),
