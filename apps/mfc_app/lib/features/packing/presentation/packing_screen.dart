@@ -620,10 +620,39 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                           ),
                         ),
                       ),
+                    if (packing.stageBusy && packing.rackPending != null)
+                      Text(
+                        l10n.packStageBusy(packing.rackPending!),
+                        key: const ValueKey('stage-busy'),
+                      ),
+                    if (packing.stageUnknown)
+                      Text(
+                        l10n.packStageUnknown,
+                        key: const ValueKey('stage-unknown'),
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    if (packing.stageRejectCode case final code?)
+                      Text(
+                        switch (code) {
+                          PackProblemCode.stagingRejected => l10n.packNotRack,
+                          PackProblemCode.invalidState => l10n.packStageInvalid,
+                          _ => l10n.packStageRejected(code),
+                        },
+                        key: const ValueKey('stage-rejected'),
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
                     _scanError(l10n, theme, packing),
                   ]);
                   actions.addAll([
-                    if (packing.rack == null)
+                    // 결과를 모르면 같은 키로 다시 확인(새로 찍지 않는다)
+                    if (packing.stageUnknown)
+                      CommandButton(
+                        key: const ValueKey('stage-recheck'),
+                        busy: packing.stageBusy,
+                        label: l10n.checkAgain,
+                        onPressed: () => ctl.stage(s),
+                      )
+                    else if (packing.rack == null)
                       ScanInput(
                         id: 'rack-scan',
                         testValues: [
@@ -634,13 +663,16 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                         cameraTitle: l10n.packingTitle,
                         continuous: false,
                         autofocus: false,
-                        onScan: (c) => ctl.scanRack(c)
+                        onScan: (c) => ctl.scanRack(c, s)
                             ? const ScanFeedback.ok()
                             : ScanFeedback.error(l10n.packNotRack),
                       ),
                     FilledButton(
                       key: const ValueKey('finish-packing'),
-                      onPressed: packing.rack == null || packing.busy
+                      onPressed:
+                          packing.rack == null ||
+                              packing.busy ||
+                              packing.stageBusy
                           ? null
                           : () => ctl.finish(task, s),
                       child: Text(l10n.finishPacking),

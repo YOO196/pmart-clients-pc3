@@ -63,6 +63,12 @@ base class MockPackingRepository implements PackingRepository {
   /// 다음 배차 요청 응답을 1회 잃는다(서버는 요청을 남김).
   bool loseNextDispatchResponse = false;
 
+  /// 랙 올리기 요청(포장 ID·랙·키) — 시험이 본문·키를 본다.
+  final stageCalls = <({String packageId, String rack, String key})>[];
+
+  /// 다음 랙 올리기 응답을 1회 잃는다(서버는 기록함).
+  bool loseNextStageResponse = false;
+
   Future<void> _wait() => Future<void>.delayed(latency);
 
   /// 출하 — 목에 없는 출하(인계 화면의 다른 포장 등)는 빈 출하로 만든다.
@@ -336,6 +342,46 @@ base class MockPackingRepository implements PackingRepository {
       return const RegroupUnknown();
     }
     return done(ids);
+  }
+
+  @override
+  Future<StageOutcome> stage(
+    String packageId,
+    String stagingLocation, {
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    stageCalls.add((
+      packageId: packageId,
+      rack: stagingLocation,
+      key: key.value,
+    ));
+    final p = _allPackages
+        .where((x) => x['packageId'] == packageId)
+        .firstOrNull;
+    if (p == null || p['state'] != 'SEALED') {
+      return stageFailureToOutcome(
+        const ProblemFailure(
+          Problem(status: 409, code: PackProblemCode.invalidState),
+        ),
+      );
+    }
+    // 랙인지는 서버(inventory 위치 종류)가 판정 — 목은 DSP- 칸만 랙으로 본다.
+    if (!stagingLocation.startsWith('DSP-')) {
+      return stageFailureToOutcome(
+        const ProblemFailure(
+          Problem(status: 422, code: PackProblemCode.stagingRejected),
+        ),
+      );
+    }
+    p['stagingLocation'] = stagingLocation;
+    if (loseNextStageResponse) {
+      loseNextStageResponse = false;
+      return stageFailureToOutcome(
+        UnknownResultFailure(requestId: key.value, httpStatus: 504),
+      );
+    }
+    return StageDone(stagingLocation);
   }
 
   @override

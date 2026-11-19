@@ -23,7 +23,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | 문서 | 기다리는 것 |
 |---|---|
 | `web-common/2026-11-18-backend-csrf-cookie-pileup.md` | 백오피스 CSRF 쿠키(`__Secure-pmart_ea_csrf_{sessionId}`, Path=/·만료 없음)가 같은 호스트에 쌓여 431 — C1 Max-Age 반영 회신(employee-auth 0.12.1, 앱 변경 없음). **남은 것: LAN 배포 뒤 백오피스 사이트 데이터 한 번 지우기 안내, 확인되면 archive** |
-| `mfc-app/2026-11-10-backend-pda-work-areas.md` | BR-52·BR-53 회신(R1~R4 일부·R8~R11·R19-1 은 받음 — 나머지. 다음 차례 R12 → R20) |
+| `mfc-app/2026-11-10-backend-pda-work-areas.md` | BR-52·BR-53 회신(R1~R4 일부·R8~R11·R19-1·**R20 출하대기 랙(2026-11-19 회신, PDA 반영)** 은 받음 — 나머지. 다음 차례 R12) |
 | `mfc-app/2026-11-17-backend-pda-stock-check.md` | PDA 재고 확인 — 작업자 토큰으로 센터 재고·바코드 조회 되는지(Q1·Q2), 상품명(Q4) |
 | `mfc-app/2026-11-17-backend-my-work-history.md` | 작업자 본인 오늘 업무 내역 — 기간 거르기·completedAt(R1·R2), 입고·검사·이동·실사 내 내역(R3) |
 | `mfc-app/2026-11-17-backend-pick-to-cart.md` | P1~P4 모두 수용 회신(`clients/mfc-app/2026-11-17-reply-pick-to-cart.md`, fulfillment 0.8.0·inventory 0.19.0). PDA 반영 #57(main `c6f4930`, 백엔드 반영 전에 먼저 합침 — 사용자 2026-11-17). 백엔드 #91(`d5386b2f`) main·배포됨, PC 1 이 클라이언트 재생성·contracts.lock(백엔드 `2d64e515`). **남은 것: PC 3 실서버 피킹(장바구니) → 포장(패킹대) → 출하대기 확인** |

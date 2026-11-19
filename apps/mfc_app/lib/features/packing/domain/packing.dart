@@ -44,9 +44,13 @@ class PackageView {
     this.qrCode,
     this.bagCount,
     this.temperatureZone,
+    this.stagingLocation,
   });
 
   final String packageId;
+
+  /// 올려 둔 출하대기 랙(fulfillment 0.20.0 `Package.stagingLocation`). null 이면 아직 패킹대.
+  final String? stagingLocation;
 
   /// 재포장마다 오른다. QR 에 들어간다.
   final int packageVersion;
@@ -126,6 +130,30 @@ final class PackRejected extends PackOutcome {
 /// 밀봉됐는지 모른다. 같은 키로만 다시 보낸다(포장을 새로 만들지 않는다).
 final class PackUnknown extends PackOutcome {
   const PackUnknown();
+}
+
+/// 출하대기 랙에 올리기(`POST /packages/{id}/staging`, BR-52 R20) 결과.
+sealed class StageOutcome {
+  const StageOutcome();
+}
+
+/// 서버가 랙 위치를 기록했다(같은 랙 다시 찍기도 그대로).
+final class StageDone extends StageOutcome {
+  const StageDone(this.stagingLocation);
+
+  final String stagingLocation;
+}
+
+/// 409 INVALID_STATE(밀봉 안 됨·이미 인계·무효) · 422 STAGING_REJECTED(랙 아님) 등.
+final class StageRejected extends StageOutcome {
+  const StageRejected(this.code);
+
+  final String code;
+}
+
+/// 올렸는지 모른다(시간 초과·503). 같은 키로만 다시 보낸다.
+final class StageUnknown extends StageOutcome {
+  const StageUnknown();
 }
 
 enum RepackReason { damagedBag, contentChange, labelUnreadable, shortageAdjust }
@@ -239,5 +267,8 @@ final class DispatchUnknown extends DispatchOutcome {
 abstract final class PackProblemCode {
   static const contentMismatch = 'CONTENT_MISMATCH';
   static const invalidState = 'INVALID_STATE';
+
+  /// 랙 올리기 — 찍은 칸이 출하대기 랙이 아님(fulfillment 0.20.0 / inventory 0.29.0).
+  static const stagingRejected = 'STAGING_REJECTED';
   static const orderCancelled = 'ORDER_CANCELLED';
 }
