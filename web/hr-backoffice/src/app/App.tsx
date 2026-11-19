@@ -16,6 +16,7 @@ import { messages as m } from '../shared/messages';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
 import { useMenuCollapsed } from '../shared/sideMenu';
 import { HomePage } from './HomePage';
+import { LiveClock, RoleChips } from './HeaderContext';
 import { QuickFind } from './QuickFind';
 import { ThemeToggle } from './ThemeToggle';
 import { Toasts } from './Toasts';
@@ -64,7 +65,7 @@ function Layout() {
     <div className="flex min-h-screen bg-base-200">
       <ScrollToTopOnNavigate />
       {/* 메뉴는 화면 높이에 고정하고 길면 메뉴만 따로 스크롤(오른쪽 화면을 내려도 메뉴는 그 자리) */}
-      <aside className={`sticky top-0 flex h-screen shrink-0 flex-col self-start overflow-y-auto bg-neutral text-neutral-content transition-[width] ${collapsed ? 'w-16' : 'w-60'}`} data-testid="side-menu" data-collapsed={collapsed}>
+      <aside className={`sticky top-0 flex h-screen shrink-0 flex-col self-start overflow-y-auto bg-neutral text-neutral-content transition-[width] ${collapsed ? 'w-20' : 'w-60'}`} data-testid="side-menu" data-collapsed={collapsed}>
         <div className={`flex h-14 shrink-0 items-center gap-1 border-b border-neutral-content/10 ${collapsed ? 'justify-center px-1' : 'justify-between pl-5 pr-2'}`}>
           {!collapsed && (
             <Link to="/" className="truncate text-base font-bold text-neutral-content" aria-label={m.goHome}>
@@ -82,10 +83,14 @@ function Layout() {
             {nav.map(([to, label]) => {
               const active = current?.[0] === to;
               return (
-                <Link key={to} to={to} aria-label={label} title={label} aria-current={active ? 'page' : undefined} className={`flex h-10 w-10 items-center justify-center rounded-lg ${active ? 'bg-accent/20 text-accent' : 'text-neutral-content/80 hover:bg-neutral-content/10'}`} data-testid={`nav-rail-${to === '/' ? 'home' : to.slice(1).replace('/', '-')}`}>
+                <Link key={to} to={to} aria-label={label} title={label} aria-current={active ? 'page' : undefined} className={`flex w-16 flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10.5px] font-medium leading-tight transition-colors ${active ? 'bg-accent/20 text-accent' : 'text-neutral-content/75 hover:bg-neutral-content/10 hover:text-neutral-content'}`} data-testid={`nav-rail-${to === '/' ? 'home' : to.slice(1).replace('/', '-')}`}>
                   <svg viewBox="0 0 24 24" className="h-5 w-5 fill-none stroke-current" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d={RAIL_ICON[to]} />
                   </svg>
+                  {/* 관제 형식(2026-11-19 — 백오피스와 같게): 아이콘 아래 글자 */}
+                  <span aria-hidden="true" className="line-clamp-2 break-keep text-center">
+                    {label}
+                  </span>
                 </Link>
               );
             })}
@@ -130,8 +135,11 @@ function Layout() {
               </>
             ) : null}
           </p>
+          {/* 맥락 꼬리표(2026-11-19 관제 형식) — 내 역할 */}
+          {session && <RoleChips roles={session.roles} />}
           <div className="flex items-center gap-2 text-sm">
             {/* 직원 바로 찾기(Ctrl+K, 2026-11-19 — 백오피스 번호 찾기 자리) — 로그인했을 때만 */}
+            {session && <LiveClock />}
             {session && <QuickFind />}
             {env.isMock && <span className="badge badge-accent badge-sm">{m.mockBadge}</span>}
             {/* 밝은/어두운 테마(2026-11-18, 백오피스와 같음) */}

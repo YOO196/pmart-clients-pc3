@@ -45,6 +45,11 @@ export const messages = {
     flowTitle: '직원 한 명이 일을 시작하기까지',
     flow: ['직원 등록에서 기본 정보와 요청 권한을 넣어요.', '서버가 사서함 → 로그인 계정 → 안내 메일 순서로 계정을 발급해요(직원 상세에서 진행을 봐요).', '요청 권한은 승인자가 백오피스 승인함에서 승인하면 붙어요.'] as readonly string[],
   },
+  /** 머리줄 맥락 꼬리표(2026-11-19 관제 형식, 백오피스와 같게) */
+  shell: {
+    clockTitle: '서울 시각(표시용)',
+    roleName: { HR_ADMIN: '인사팀', OPERATOR_ADMIN: '운영 관리자', MD: 'MD', PRODUCT_APPROVER: '상품 승인', DISPLAY_APPROVER: '전시 승인', PRICE_APPROVER: '가격 승인', RIDER_OPS: '라이더 운영', CS_AGENT: '상담원', MFC_SUPERVISOR: '센터 관리자' } as Readonly<Record<string, string>>,
+  },
   nav: {
     group: '인사',
     home: '첫 화면',
