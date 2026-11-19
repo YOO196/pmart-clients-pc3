@@ -150,6 +150,35 @@ void main() {
       expect(c.read(packingProvider('task-mock-2')).sealUnknown, isFalse);
     });
 
+    test('재포장 결과를 모르면 같은 사유로 다시 눌러도 같은 키 — 새 포장이 두 번 생기지 않는다', () async {
+      var s = await shipment();
+      ctl.scan(task, s, MockTaskRepository.yogurtBarcode);
+      await ctl.seal(task, s);
+      s = await shipment();
+      final first = s.packages.single;
+      packing.loseNextRepackResponse = true;
+
+      final lost = await ctl.repack(
+        s.shipmentId,
+        first,
+        RepackReason.damagedBag,
+      );
+      expect(lost, isA<PackUnknown>());
+      final again = await ctl.repack(
+        s.shipmentId,
+        first,
+        RepackReason.damagedBag,
+      );
+
+      expect(again, isA<PackDone>());
+      s = await shipment();
+      expect(
+        s.packages.where((p) => p.state == PackageState.sealed),
+        hasLength(1),
+        reason: '재포장 한 번 = 새 포장 하나',
+      );
+    });
+
     test('재포장은 새 버전·새 QR, 옛 라벨은 무효. 인계 중에는 재포장할 수 없다', () async {
       var s = await shipment();
       ctl.scan(task, s, MockTaskRepository.yogurtBarcode);
