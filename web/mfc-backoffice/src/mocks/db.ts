@@ -452,6 +452,10 @@ export interface MockHandling {
   readonly handlingEnabled: boolean;
   readonly version: number;
   readonly skuState: 'ACTIVE' | 'INACTIVE';
+  /** (0.27.0) 본사 판매 상태 사본·꺼진 까닭·상품이 생긴 시각(예전 상품 null) */
+  readonly saleState?: 'ON_SALE' | 'TEMP_OUT' | 'DISCONTINUED' | null;
+  readonly offReason?: 'CENTER' | 'DISCONTINUED' | null;
+  readonly introducedAt?: string | null;
 }
 export interface MockUnshippable {
   readonly mfcId: string;
@@ -497,6 +501,11 @@ function seedHandlings(): MockHandling[] {
     { sku: 'SKU-MILK-1', handlingEnabled: true, version: 2, skuState: 'ACTIVE' },
     { sku: 'SKU-OLD-9', handlingEnabled: false, version: 0, skuState: 'INACTIVE' },
     { sku: 'SKU-RAMEN-5', handlingEnabled: false, version: 0, skuState: 'ACTIVE' },
+    // 본사 단종(0.27.0 R7) — 모든 센터 OFF, 켜기 409 SKU_DISCONTINUED
+    { sku: 'SKU-DISC-3', handlingEnabled: false, version: 3, skuState: 'ACTIVE', saleState: 'DISCONTINUED', offReason: 'DISCONTINUED', introducedAt: '2026-11-01T00:00:00.000Z' },
+    // 신상품(R8) — 이 센터가 아직 정하지 않음
+    { sku: 'SKU-NEW-1', handlingEnabled: false, version: 0, skuState: 'ACTIVE', saleState: 'ON_SALE', introducedAt: '2026-11-19T00:00:00.000Z' },
+    { sku: 'SKU-NEW-2', handlingEnabled: false, version: 0, skuState: 'ACTIVE', saleState: 'ON_SALE', introducedAt: '2026-11-18T03:00:00.000Z' },
   ];
 }
 
@@ -631,8 +640,40 @@ const seedReturnHandovers = (): MockReturnHandover[] => [
   { mfcId: 'MFC-SEL-01', deliveryId: 'DLV-RET-9', deliveryNumber: '30000009-2', purpose: 'MISDELIVERY_RECOVERY', state: 'RETURN_PICKED_UP', riderId: 'RD-39', code: '9999', failedAttempts: 0, locked: false, issuedAt: '2026-11-19T00:00:00.000Z' },
 ];
 
+/** 품질 사고(quality 0.6.0) — 처리 여부는 조회 때 판정·폐기로 다시 맞춘다(qualityHandlers). seedResolved = 시드에서 이미 처리된 LOT → 처리한 ID */
+export interface MockIncident {
+  readonly incidentId: string;
+  readonly mfcId: string;
+  readonly kind: Qual['IncidentKind'];
+  readonly origin: 'AUTO' | 'MANUAL';
+  readonly description: string | null;
+  readonly openedBy: string | null;
+  readonly openedAt: string;
+  readonly sourceEvent: string | null;
+  readonly sourceRef: string | null;
+  readonly affectedLots: ReadonlyArray<{ readonly sku: string | null; readonly lotId: string; readonly qty: number }>;
+  readonly seedResolved: Readonly<Record<string, string>>;
+  readonly closed: { readonly by: string; readonly at: string; readonly reason: string } | null;
+  readonly version: number;
+}
+
+const seedIncidents = (): Array<[string, MockIncident]> => [
+  [
+    'QI-1',
+    { incidentId: 'QI-1', mfcId: 'MFC-BSN-01', kind: 'DAMAGE', origin: 'AUTO', description: null, openedBy: null, openedAt: '2026-11-19T00:10:00.000Z', sourceEvent: 'LineShortageReported', sourceRef: 'EVT-SHORT-1', affectedLots: [{ sku: 'SKU-MILK-1', lotId: 'LOT-MILK-A', qty: 2 }], seedResolved: {}, closed: null, version: 1 },
+  ],
+  [
+    'QI-2',
+    { incidentId: 'QI-2', mfcId: 'MFC-BSN-01', kind: 'CONTAMINATION', origin: 'MANUAL', description: '포장 겉면 오염', openedBy: 'OP-sup-2', openedAt: '2026-11-18T23:00:00.000Z', sourceEvent: null, sourceRef: null, affectedLots: [{ sku: 'SKU-MILK-1', lotId: 'LOT-MILK-B', qty: 5 }], seedResolved: { 'LOT-MILK-B': 'DSP-9' }, closed: null, version: 1 },
+  ],
+  [
+    'QI-9',
+    { incidentId: 'QI-9', mfcId: 'MFC-SEL-01', kind: 'DAMAGE', origin: 'AUTO', description: null, openedBy: null, openedAt: '2026-11-19T00:00:00.000Z', sourceEvent: 'LineShortageReported', sourceRef: 'EVT-SHORT-9', affectedLots: [{ sku: 'SKU-X', lotId: 'LOT-X', qty: 1 }], seedResolved: {}, closed: null, version: 1 },
+  ],
+];
+
 export const db = {
-  returnHandovers: [] as MockReturnHandover[],  restrictions: new Map<string, MockRestriction>(),
+  incidents: new Map<string, MockIncident>(),  returnHandovers: [] as MockReturnHandover[],  restrictions: new Map<string, MockRestriction>(),
   decisions: new Map<string, MockDecision>(),
   disposals: new Map<string, MockDisposal>(),
   inspections: new Map<string, MockInspection>(),
@@ -669,6 +710,7 @@ export const db = {
 };
 
 export function resetDb(): void {
+  db.incidents = new Map(seedIncidents());
   db.returnHandovers = seedReturnHandovers();
   db.grants = new Map(seedGrants());
   db.suspended = new Set();

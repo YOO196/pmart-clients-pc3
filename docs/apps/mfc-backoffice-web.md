@@ -210,3 +210,8 @@
 ### 4-4c. 반납 인증번호 — delivery-execution 0.28.0 `/return-handovers*` (`features/delivery/ReturnHandoverPage.tsx`, 2026-11-19 PC 3)
 - 회수·반납 배송이 MFC 로 올 때 라이더에게 알려 줄 4자리(PDA 반납 인증번호 화면과 같은 API·번호). `GET /return-handovers?mfcId=` 30초마다, 반납이 끝나면 목록에서 빠진다.
 - 5번 틀리면 잠김 → "새 번호 내고 잠김 풀기"(한 번 더 확인, `POST …/{deliveryId}/code-reissues` — 앞 번호는 더 안 맞음, 409 = 이미 끝남). 라이더는 ID 끝 + "라이더 정보 비공개".
+
+### 4-9b. 품질 사고·상품 취급 단종/신상품 — mfc-quality 0.6.0·mfc-inventory 0.27.0 (`features/quality/IncidentPages.tsx`, 2026-11-19 PC 3)
+- 사용자 결정(2026-11-19): 자동(결품 보고 중 파손만) + 센터 관리자 직접 등록, 영향 LOT 을 모두 처리(격리 해제 APPLIED·폐기 승인)한 뒤 관리자가 사유를 적고 닫는다. 고객 영향 case 자동은 백엔드 2차.
+- 품질 > 품질 사고 탭: 목록(기본 처리 중·닫기 대기), 직접 등록(종류·설명·LOT 1~50 — 이 센터에 재고가 남은 LOT 만, 등록은 격리를 걸지 않음), 상세(영향 LOT 별 처리·남은 LOT 수는 서버 값). "격리 요청"은 격리·해제 탭에 사고 번호·LOT 을 채워 판정 본문 `incidentId` 로 잇는다. 닫기는 남은 LOT 0 일 때만 단추(서버도 409 LOTS_NOT_RESOLVED), 사고 `version` 으로.
+- 재고 > 상품 취급: 권한은 지금대로(그 센터 관리자·그 센터 권한 MD). 본사 단종(`offReason` DISCONTINUED)은 "본사 단종" + 켜기 막힘(409 SKU_DISCONTINUED). 신상품(정한 적 없음 `undecided=true`)은 자동으로 켜지 않고 맨 위 배너 "새 상품 n개"(서버 `totalCount`) → "새 상품 보기".

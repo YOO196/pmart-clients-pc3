@@ -71,7 +71,7 @@ export function DisposalList({ mfcId }: { readonly mfcId: string }) {
         request('GET', api.quality.GET('/disposal-approvals', { params: { query: { mfcId, ...arr<DisposalState>(state), ...(cursor ? { cursor } : {}) } } }))
       }
       head={[l.id, l.stateCol, l.requester, l.at, l.reason]}
-      cells={(d) => [<span className="font-mono">{d.disposalApprovalId}</span>, q.disposalState[d.state ?? ''] ?? d.state, d.requesterId ?? messages.none, when(d.requestedAt), d.reason ?? messages.none]}
+      cells={(d) => [<span className="font-mono">{d.disposalApprovalId}</span>, q.disposalState[d.state ?? ''] ?? d.state, <Who id={d.requesterId} />, when(d.requestedAt), d.reason ?? messages.none]}
       rowKey={(d) => d.disposalApprovalId ?? ''}
       onOpen={(d) => d.disposalApprovalId && open(d.disposalApprovalId)}
       emptyText={l.empty}
