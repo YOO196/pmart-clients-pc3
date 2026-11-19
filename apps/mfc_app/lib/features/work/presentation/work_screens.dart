@@ -585,23 +585,138 @@ class AreaHeroCard extends StatelessWidget {
   }
 }
 
-/// 칸 → 큰 카드로 커지는 동안 그리는 모습 — 흰 카드 + 가운데 업무 그림(글자는 크기가 바뀌는 동안 넘치므로 뺀다).
+/// 칸 → 큰 카드로 커지는 동안 그리는 모습. 그림은 칸 자리(가운데 위, 52)에서 카드 자리(오른쪽, 84)로
+/// 크기와 함께 이어서 움직이고, 칸 이름은 흐려지며 카드 제목·설명이 나타난다(사용자 2026-11-19
+/// "픽토그램도 전후 움직임 끊기지 않게"). 돌아갈 때는 같은 길을 거꾸로.
 HeroFlightShuttleBuilder _areaShuttle(WorkArea area) =>
-    (_, animation, _, _, _) => Material(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: PdaColors.lilac, width: 1.5),
-      ),
-      child: Center(
-        child: FittedBox(
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Icon(workAreaIcon(area), size: 40, color: PdaColors.primary),
+    (_, animation, _, _, _) => _AreaFlight(area: area, animation: animation);
+
+class _AreaFlight extends StatelessWidget {
+  const _AreaFlight({required this.area, required this.animation});
+
+  final WorkArea area;
+  final Animation<double> animation;
+
+  // 칸([_AreaTile])과 카드([AreaHeroCard])의 치수 — 두 쪽을 바꾸면 여기도 맞춘다.
+  static const _tileCircle = 52.0;
+  static const _tileIcon = 28.0;
+  static const _tileCircleCenterY = 40.0; // (112 - 84) / 2 + 52 / 2
+  static const _tileLabelTop = 76.0;
+  static const _cardCircle = 84.0;
+  static const _cardIcon = 46.0;
+  static const _cardPad = 15.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        final t = Curves.easeInOutCubic.transform(animation.value);
+        double lerp(double a, double b) => a + (b - a) * t;
+        final tileText = (1 - t * 2).clamp(0.0, 1.0);
+        final cardText = (t * 2 - 1).clamp(0.0, 1.0);
+        return Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(lerp(14, 17)),
+            side: BorderSide(
+              color: Color.lerp(PdaColors.line, PdaColors.lilac, t)!,
+              width: lerp(1, 1.5),
+            ),
           ),
-        ),
-      ),
+          clipBehavior: Clip.antiAlias,
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final w = c.maxWidth;
+              final h = c.maxHeight;
+              final d = lerp(_tileCircle, _cardCircle);
+              final cx = lerp(w / 2, w - _cardPad - _cardCircle / 2);
+              final cy = lerp(_tileCircleCenterY, h / 2);
+              return Stack(
+                children: [
+                  if (tileText > 0)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: _tileLabelTop,
+                      child: Opacity(
+                        opacity: tileText,
+                        child: Text(
+                          workAreaText(l10n, area),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.clip,
+                          style: const TextStyle(
+                            color: PdaColors.ink,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (cardText > 0)
+                    Positioned(
+                      left: _cardPad,
+                      right: d + _cardPad * 2,
+                      top: 0,
+                      bottom: 0,
+                      child: Opacity(
+                        opacity: cardText,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              workAreaText(l10n, area),
+                              maxLines: 1,
+                              overflow: TextOverflow.clip,
+                              softWrap: false,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              workAreaDesc(l10n, area),
+                              maxLines: 2,
+                              overflow: TextOverflow.clip,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: PdaColors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    left: cx - d / 2,
+                    top: cy - d / 2,
+                    width: d,
+                    height: d,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: PdaColors.softer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        workAreaIcon(area),
+                        size: lerp(_tileIcon, _cardIcon),
+                        color: PdaColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
+  }
+}
 
 /// 업무 한 줄 설명(안내 화면 위 카드).
 String workAreaDesc(AppLocalizations l10n, WorkArea a) => switch (a) {
