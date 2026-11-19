@@ -47,8 +47,15 @@ final class KakaoSocialTokenSource implements SocialTokenSource {
 /// 네이버 Client ID(공개 값, 빌드 때 `.secrets` 에서 dart-define 으로). 비면 네이버 버튼은 설정 문제로 알린다.
 const naverClientId = String.fromEnvironment('NAVER_CLIENT_ID');
 
-/// 네이버 로그인 뒤 돌아오는 앱 주소 — 네이버 콘솔 Callback URL 과 build.gradle `appAuthRedirectScheme` 와 같아야 한다.
-const naverRedirectUrl = 'com.pmart.customer://oauth/naver';
+/// 네이버 `redirect_uri` = 콘솔 Callback URL(BR-66, auth 0.5.0). 네이버 콘솔이 앱 주소를 받지 않고 도메인이 없어
+/// LAN 게이트웨이 중계 주소를 쓴다 — 서버가 받은 쿼리 그대로 `com.pmart.customer://oauth/naver` 로 302 하면
+/// flutter_appauth 가 이어 받는다(build.gradle `appAuthRedirectScheme`). 사내 와이파이에서만 닿는다.
+/// 토큰 교환의 redirect_uri 도 이 값 그대로. 다른 주소는 `--dart-define=PMART_NAVER_REDIRECT_URL=…`.
+const naverRedirectUrl = String.fromEnvironment(
+  'PMART_NAVER_REDIRECT_URL',
+  defaultValue:
+      'http://192.168.0.40:8080/api/v1/auth/oauth-callbacks/naver/customer',
+);
 
 /// 네이버 OIDC 공개 설정(https://nid.naver.com/.well-known/openid-configuration, 2026-11-19 확인).
 const _naverOidc = AuthorizationServiceConfiguration(

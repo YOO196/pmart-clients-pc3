@@ -49,8 +49,8 @@ android {
         // 소셜 로그인 키는 빌드 때 `--dart-define-from-file=.secrets/customer.env` 로만 들어온다(저장소에 넣지 않음).
         // 카카오: 로그인 뒤 돌아오는 주소 kakao{앱 키}://oauth.
         manifestPlaceholders["kakaoNativeAppKey"] = dartDefines["KAKAO_NATIVE_APP_KEY"] ?: ""
-        // 네이버 OIDC(flutter_appauth): 로그인 뒤 돌아오는 주소 com.pmart.customer://oauth/naver 의 scheme.
-        // scheme 에 밑줄을 못 써 패키지명과 다르다. 코드의 naverRedirectUrl 과 같아야 한다.
+        // 네이버 OIDC(flutter_appauth): LAN 중계(BR-66)가 302 로 넘기는 앱 주소 com.pmart.customer://oauth/naver 의 scheme.
+        // scheme 에 밑줄을 못 써 패키지명과 다르다. 서버 회신 표의 고객 목적지와 같아야 한다.
         manifestPlaceholders["appAuthRedirectScheme"] = "com.pmart.customer"
     }
 

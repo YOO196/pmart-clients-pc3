@@ -34,6 +34,10 @@
 - 라이더앱(제안): `com.pmart.rider://oauth/naver` — 앱마다 다른 scheme 을 써야 결과가 엉뚱한 앱으로 가지 않는다.
 - **네이버 개발자 콘솔**: 해당 애플리케이션 → API 설정 → 로그인 오픈 API 서비스 환경에 Callback URL 을 넣는 칸이 있어야 한다. 2026-11-19 사용자 확인으로는 **Android 환경만 고르면 Callback URL 칸이 없었다** — 칸이 나오는 환경(PC 웹 등)을 추가해 위 주소를 넣어야 하는지, 네이버가 `http(s)` 가 아닌 앱 주소를 받아 주는지는 **아직 확인 전**. 확인되면 이 문서를 고친다.
 - **2026-11-19 갱신**: 네이버 콘솔이 앱 주소를 받지 않음(사용자 확인), 도메인 없음 → LAN 게이트웨이에 중계 주소를 요청(BR-66, `docs/handoff/customer-app/2026-11-19-backend-naver-oauth-callback-relay.md`). 회신이 오면 Callback URL·앱 redirectUrl 을 그 주소로 바꾼다.
+- **회신(auth 0.5.0, `../pmart-backend/docs/handoff/clients/customer-app/2026-11-19-reply-br66-naver-callback-relay.md`)**: 콘솔 Callback URL = 앱 `redirect_uri`
+  - 고객 `http://192.168.0.40:8080/api/v1/auth/oauth-callbacks/naver/customer` → 302 `com.pmart.customer://oauth/naver?<쿼리 그대로>` (고객앱 반영 2026-11-19)
+  - 라이더 `http://192.168.0.40:8080/api/v1/auth/oauth-callbacks/naver/rider` → 302 `com.pmart.rider://oauth/naver` — 라이더앱 매니페스트에 scheme `com.pmart.rider` 필요(`appAuthRedirectScheme`)
+  - http 인 이유: https 면 폰마다 LAN 사설 CA 설치 필요. 사내 와이파이에서만 닿는다. 네이버 콘솔이 이 주소를 받는지는 사용자 확인 중.
 
 ## 4. 키 두는 곳
 - 키는 저장소에 넣지 않는다. 고객앱은 `apps/customer_app/.secrets/customer.env`(git 제외)를 `--dart-define-from-file` 로 넣고, `build.gradle.kts` 가 dart-define 을 풀어 매니페스트 값으로 쓴다.

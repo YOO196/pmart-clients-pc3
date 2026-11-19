@@ -73,7 +73,7 @@
 | BR-63 | 중간 | 고객 | 홈 진열·상품 상세 응답의 `rating`·`reviewCount` 가 null — 같은 상품 rating-summary·리뷰 요약은 480개 | OPEN(요청 `docs/handoff/customer-app/2026-11-19-backend-rating-null-in-cards.md`). 상세는 앱이 rating-summary 로 보임, 카드는 서버 반영 대기 |
 | BR-64 | 높음 | 고객 | 가입 즉시 휴대폰 본인 인증(옥토모)·한 번호 한 계정·같은 번호 기존 계정 안내(제공자·가입일·가린 이메일)·탈퇴 1달 재가입 금지 — 인증 상태·API·결과 코드 없음 | 일부 — customer 0.9.0 휴대폰 번호 확인(OCTOMO, 회원 스스로) 배포·고객앱 화면 반영. 가입 단계·한 번호 한 계정·기존 계정 안내·탈퇴 1달은 OPEN(요청 `docs/handoff/customer-app/2026-11-19-backend-phone-verification-signup.md` R1~R7, 원 요청 `…-social-login-identity.md`) |
 | BR-65 | 높음 | 고객 | 카카오·네이버 로그인 — auth-service 가 Google 만 검증(501) | OPEN(같은 요청서 BR-65 — 카카오 OIDC ID 토큰, 네이버 Android SDK 액세스 토큰 + 서버 `/v1/nid/me` 확인(콘솔은 Android 만). 앱 SDK 2종 승인됨 2026-11-19, 카카오 콘솔 로그인·OIDC 활성화됨) |
-| BR-66 | 높음 | 고객 | 네이버 로그인 콜백 중계 — 네이버 콘솔이 앱 주소(`com.pmart.customer://oauth/naver`)를 받지 않고 도메인 없음 → LAN 게이트웨이 공개 경로가 받은 쿼리를 앱 주소로 302(고정 목적지, 저장·기록 없음) | OPEN(요청 `docs/handoff/customer-app/2026-11-19-backend-naver-oauth-callback-relay.md` R1~R5) |
+| BR-66 | 높음 | 고객 | 네이버 로그인 콜백 중계 — 네이버 콘솔이 앱 주소(`com.pmart.customer://oauth/naver`)를 받지 않고 도메인 없음 → LAN 게이트웨이 공개 경로가 받은 쿼리를 앱 주소로 302(고정 목적지, 저장·기록 없음) | 회신(auth 0.5.0, `../pmart-backend/docs/handoff/clients/customer-app/2026-11-19-reply-br66-naver-callback-relay.md` — 고객 `http://192.168.0.40:8080/api/v1/auth/oauth-callbacks/naver/customer`), 앱 반영. LAN 배포·콘솔 등록·Client ID 전달 대기 |
 
 ---
 
