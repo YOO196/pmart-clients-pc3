@@ -42,6 +42,14 @@ describe('배정 목록', () => {
     expect(new URL(view.gets('/assignments')[0]!.url).searchParams.get('state')).toBeNull();
   });
 
+  it('작업 유형은 피패킹의 단계로 보인다(피패킹 · 피킹 / 피패킹 · 포장)', async () => {
+    renderAt('/c/MFC-BSN-01/assignments');
+    await waitFor(() => expect(rows()).toHaveLength(3));
+    const text = rows().map((r) => r.textContent ?? '').join('|');
+    expect(text).toContain('피패킹 · 피킹');
+    expect(text).toContain('피패킹 · 포장');
+  });
+
   it('상태(바뀜) 거르기는 URL 쿼리 → 서버로', async () => {
     const view = renderAt('/c/MFC-BSN-01/assignments');
     await waitFor(() => expect(rows()).toHaveLength(3));
@@ -88,9 +96,37 @@ describe('직접 배정', () => {
 
   it('업무에 없는 작업 유형이면 DUTY_NOT_ALLOWED 문구', async () => {
     renderAt('/c/MFC-BSN-01/assignments?tab=manual');
-    const form = await checkAndPick('TASK-PACK-9', 'OP-wkr-2', 'PACK');
+    const form = await checkAndPick('TASK-RET-1', 'OP-wkr-2', 'RETURN');
     await userEvent.click(within(form).getByRole('button', { name: '배정' }));
     expect(await screen.findByText('이 작업자의 업무에 없는 작업 유형이에요.')).toBeInTheDocument();
+  });
+
+  it('피킹·포장은 "피패킹" 하나로 고른다 — 작업을 읽어 포장 단계면 PACK 으로 보내고, 피킹한 사람을 알린다', async () => {
+    const view = renderAt('/c/MFC-BSN-01/assignments?tab=manual');
+    const form = await screen.findByRole('form', { name: '직접 배정' });
+    const types = within(within(form).getByRole('combobox', { name: '작업 유형' })).getAllByRole('option').map((o) => o.textContent);
+    expect(types).toContain('피패킹');
+    expect(types).not.toContain('피킹');
+    expect(types).not.toContain('포장');
+    await checkAndPick('TASK-PACK-1', 'OP-day-1');
+    expect(screen.getByTestId('pick-pack-stage')).toHaveTextContent('이 작업은 피패킹의 포장 단계예요.');
+    expect(await screen.findByTestId('picked-by')).toHaveTextContent('김현장');
+    expect(screen.getByTestId('picker-other')).toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: '피킹한 사람으로' }));
+    expect(within(form).getByRole('combobox', { name: '맡길 작업자' })).toHaveValue('OP-wkr-1');
+    expect(screen.queryByTestId('picker-other')).not.toBeInTheDocument();
+    await userEvent.click(within(form).getByRole('button', { name: '배정' }));
+    await screen.findByText(/OP-wkr-1 에게 배정했어요/);
+    expect(await sentBody(postsTo(view.sent, '/assignments')[0]!)).toEqual({ mfcId: 'MFC-BSN-01', taskId: 'TASK-PACK-1', taskType: 'PACK', workerId: 'OP-wkr-1' });
+  });
+
+  it('"피패킹"으로 골랐는데 피킹·포장 작업이 아니면 알리고 배정하지 않는다', async () => {
+    renderAt('/c/MFC-BSN-01/assignments?tab=manual');
+    const form = await screen.findByRole('form', { name: '직접 배정' });
+    await userEvent.type(within(form).getByRole('textbox', { name: '작업 ID' }), 'TASK-RET-1');
+    await userEvent.click(within(form).getByRole('button', { name: '지금 담당 확인' }));
+    expect(await screen.findByTestId('not-pick-pack')).toHaveTextContent('피패킹 작업이 아니에요(회수)');
+    expect(within(form).getByRole('button', { name: '배정' })).toBeDisabled();
   });
 
   it('확인한 뒤 누가 먼저 바꿨으면 VERSION_CONFLICT 문구', async () => {

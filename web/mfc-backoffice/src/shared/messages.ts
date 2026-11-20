@@ -881,6 +881,15 @@ export const messages = {
     eligibilityNote: '배정 뒤 정지·퇴사·업무 변경이 있어도 배정은 지우지 않아요. 맡을 수 없는 배정은 다시 배정해 주세요(작업 시작 때 거절돼요).',
     warning: { OFF_SHIFT: '근무 밖' } as Readonly<Record<string, string>>,
     reassign: '다시 배정',
+    /** 피패킹 — 피킹·포장은 한 흐름. 작업은 둘이라 단계로 보인다(shared/pickPack) */
+    pickPackStage: { PICK: '피패킹 · 피킹', PACK: '피패킹 · 포장' } as Readonly<Record<string, string>>,
+    pickPackOption: '피패킹',
+    pickPackResolved: (stage: string) => `이 작업은 피패킹의 ${stage} 단계예요.`,
+    notPickPack: (type: string) => `피패킹 작업이 아니에요(${type}). 작업 유형을 다시 골라 주세요.`,
+    pickedByLabel: '이 주문을 피킹한 사람:',
+    pickerOther: '피킹한 사람이 아닌 작업자예요 — 장바구니를 넘겨받았는지 현장에서 확인해 주세요.',
+    choosePicker: '피킹한 사람으로',
+    pickerHint: '피킹한 사람',
     // 직접 배정
     manualHint: '작업 ID 로 지금 담당을 먼저 확인해요. 확인한 담당 버전으로 보내서, 그 사이 누가 바꿨으면 서버가 거절해요.',
     checkCurrent: '지금 담당 확인',

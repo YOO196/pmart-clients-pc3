@@ -80,7 +80,7 @@ describe('작업자 상세', () => {
     await userEvent.type(within(form).getByRole('textbox', { name: '맡은 일(업무) 바꾸기 사유' }), '적치 전담');
     await userEvent.click(within(form).getByRole('button', { name: '저장' }));
     expect(await screen.findByText('바꿨어요.')).toBeInTheDocument();
-    expect(within(screen.getByRole('list', { name: /맞지 않는 진행 중 배정/ })).getByText('피킹 · TASK-PICK-1')).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: /맞지 않는 진행 중 배정/ })).getByText('피패킹 · 피킹 · TASK-PICK-1')).toBeInTheDocument();
     const post = posts(view.sent, '/duty-changes')[0]!;
     expect(post.headers.get('X-Expected-Version')).toBe('1');
     expect(await sentBody(post)).toEqual({ taskTypes: ['PUTAWAY'], reason: '적치 전담' });
@@ -107,7 +107,7 @@ describe('작업자 상세', () => {
     await userEvent.type(within(form).getByRole('textbox', { name: '상태 바꾸기 사유' }), '무단 결근');
     await userEvent.click(within(form).getByRole('button', { name: '저장' }));
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('정지'));
-    expect(screen.getByText('피킹 · TASK-PICK-1')).toBeInTheDocument();
+    expect(screen.getByText('피패킹 · 피킹 · TASK-PICK-1')).toBeInTheDocument();
     expect(screen.getByText('재직 → 정지')).toBeInTheDocument();
   });
 

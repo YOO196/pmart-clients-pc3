@@ -206,6 +206,20 @@ describe('작업 목록 행 조치', () => {
     await waitFor(() => expect(within(rowOf('피킹')).getByText(/이알바|OP-wkr-2/)).toBeInTheDocument());
   });
 
+  it('포장 담당 바꾸기: 그 주문을 피킹한 사람이 맨 위("피킹한 사람")', async () => {
+    renderAt('/c/MFC-BSN-01/tasks');
+    await waitFor(() => expect(rows()).toHaveLength(3));
+    await userEvent.click(within(rowOf('포장')).getByRole('button', { name: '담당 바꾸기' }));
+    const form = await screen.findByRole('form', { name: /담당 바꾸기/ });
+    const box = await within(form).findByRole('combobox', { name: '새 담당' });
+    await userEvent.click(box);
+    const options = within(screen.getByRole('listbox', { name: '새 담당' })).getAllByRole('option').map((o) => o.textContent ?? '');
+    expect(options[0]).toBe('김현장피킹한 사람');
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    expect(box).toHaveValue('김현장');
+    expect(within(form).queryByTestId('picker-other')).not.toBeInTheDocument();
+  });
+
   it('담당 바꾸기: 그 사이 다른 배정(409 VERSION_CONFLICT)이면 거절 안내', async () => {
     server.use(http.post(`${API_BASE}/assignments`, () => problem(409, 'VERSION_CONFLICT')));
     renderAt('/c/MFC-BSN-01/tasks');
