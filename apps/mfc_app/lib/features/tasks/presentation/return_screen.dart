@@ -276,6 +276,7 @@ class ReturnShelfScreen extends ConsumerWidget {
           q.state == QueueItemState.checking,
     );
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(l10n.typeReturn),
         actions: [

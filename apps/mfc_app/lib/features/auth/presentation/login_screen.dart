@@ -67,6 +67,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final scheme = theme.colorScheme;
     // 배치는 다른 앱의 로그인을 따랐다: 고객앱(큰 브랜드 이름 + 한 줄 설명 + 버튼), 백오피스 직원 로그인(카드 안에 버튼·안내·참고 문구).
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       // 기기 설정에서 왔으면 뒤로, 세션이 끝나 바로 왔으면 기기 설정으로 가는 버튼.
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -242,6 +243,7 @@ class _MockSignInPageState extends ConsumerState<MockSignInPage> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         leading: IconButton(
           key: const ValueKey('mock-signin-close'),
@@ -375,6 +377,8 @@ class StartingScreen extends StatelessWidget {
   const StartingScreen({super.key});
 
   @override
-  Widget build(BuildContext context) =>
-      const Scaffold(body: Center(child: CircularProgressIndicator()));
+  Widget build(BuildContext context) => const Scaffold(
+    resizeToAvoidBottomInset: false,
+    body: Center(child: CircularProgressIndicator()),
+  );
 }

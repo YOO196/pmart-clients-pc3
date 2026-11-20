@@ -38,6 +38,7 @@ class InboundReceiveScreen extends ConsumerWidget {
       _ => -1,
     };
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.inboundTitle(trfId))),
       body: SafeArea(
         child: Padding(

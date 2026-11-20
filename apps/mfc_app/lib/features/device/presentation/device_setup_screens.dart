@@ -23,6 +23,7 @@ class DeviceSetupScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final printer = ref.watch(printerSettingsProvider).value;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.setupTitle), actions: []),
       body: SafeArea(
         child: Padding(
@@ -82,6 +83,7 @@ class StartScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.homeTitle), actions: []),
       body: SafeArea(
         child: Padding(
@@ -272,6 +274,7 @@ class _ScannerCheckScreenState extends State<ScannerCheckScreen> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.scannerCheckTitle)),
       body: StepBody(
         actions: [
@@ -417,6 +420,7 @@ class DeviceInfoScreen extends ConsumerWidget {
       fontWeight: FontWeight.w700,
     );
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.deviceInfoTitle)),
       body: SafeArea(
         child: ListView(

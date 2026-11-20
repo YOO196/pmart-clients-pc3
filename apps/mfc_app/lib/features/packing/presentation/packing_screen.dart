@@ -257,6 +257,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
       await printPackageLabel(this.context, ref, PackageLabel.of(s, next));
     });
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.packingTitle)),
       body: UiStateView<TaskDetailView>(
         state: uiStateOf(taskValue),

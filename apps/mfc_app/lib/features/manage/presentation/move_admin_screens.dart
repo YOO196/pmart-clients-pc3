@@ -95,6 +95,7 @@ class _MoveOrdersScreenState extends ConsumerState<MoveOrdersScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(l10n.manageMoves),
         actions: [
@@ -513,6 +514,7 @@ class NewMoveScreen extends ConsumerWidget {
     final ctl = ref.read(newMoveProvider.notifier);
     final error = s.error;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.moveNew)),
       body: ListView(
         padding: const EdgeInsets.all(16),

@@ -241,6 +241,7 @@ class HandoverChecksScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.handoverChecksTitle)),
       // 포장 QR 스캔은 늘 아래 같은 자리(다른 현장 화면과 같다).
       bottomNavigationBar: const ActionBar(children: [_PackageQrScan()]),
@@ -379,6 +380,7 @@ class PackageHandoverScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final provider = handoverProvider(packageId);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.handoverTitle)),
       body: UiStateView<HandoverView>(
         state: uiStateOf(ref.watch(provider)),

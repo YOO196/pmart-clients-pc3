@@ -208,6 +208,7 @@ class PrinterSettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.printerSettingsTitle)),
       body: UiStateView<PrinterSettings>(
         state: uiStateOf(ref.watch(printerSettingsProvider)),

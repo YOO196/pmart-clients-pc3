@@ -198,6 +198,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ? ref.watch(meProvider).value
         : null;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         // 상단바에 "픽PDA" + 직원 이름(사용자 2026-11-20 "직원 명은 픽PDA 문구가 있는 바로"). 이름을 읽기 전에는 픽PDA 만.
         title: _HomeTitle(me: barMe),
@@ -1007,6 +1008,7 @@ class WorkGuideScreen extends StatelessWidget {
       ],
     };
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.guideTitle(workAreaText(l10n, area)))),
       body: SafeArea(
         child: Padding(
@@ -1161,6 +1163,7 @@ class WorkSessionScreen extends ConsumerWidget {
     };
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(workAreaText(l10n, area)),
         automaticallyImplyLeading: false,

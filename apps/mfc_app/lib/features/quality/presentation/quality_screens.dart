@@ -259,6 +259,7 @@ class InspectScreen extends ConsumerWidget {
       InspectPhase.judge => _JudgeStep(taskId: taskId),
     };
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.inspectTitle)),
       body: SafeArea(
         child: Column(
@@ -778,6 +779,7 @@ class ReturnInspectScreen extends ConsumerWidget {
       ),
     };
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.returnTitle)),
       body: SafeArea(
         child: s.phase == ReturnPhase.editing

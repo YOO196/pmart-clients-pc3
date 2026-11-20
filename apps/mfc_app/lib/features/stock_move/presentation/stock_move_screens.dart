@@ -426,6 +426,7 @@ class MoveScreen extends ConsumerWidget {
     };
     final stepped = s.phase == MovePhase.pickUp || s.phase == MovePhase.drop;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(title)),
       body: SafeArea(
         child: Padding(
@@ -736,6 +737,7 @@ class PutawayScreen extends ConsumerWidget {
     };
     final stepped = s.phase == PutawayPhase.editing;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.typePutaway)),
       body: SafeArea(
         child: Padding(

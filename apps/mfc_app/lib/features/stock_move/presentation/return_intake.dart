@@ -194,6 +194,7 @@ class ReturnArrivalsScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.riTitle)),
       body: UiStateView<List<ReturnArrival>>(
         state: uiStateOf(
@@ -283,6 +284,7 @@ class ReturnIntakeScreen extends ConsumerWidget {
     final ctl = ref.read(returnIntakeProvider(arrivalId).notifier);
     if (s.phase == IntakePhase.done) {
       return Scaffold(
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(title: Text(l10n.riTitle)),
         body: Padding(
           padding: const EdgeInsets.all(16),
@@ -298,6 +300,7 @@ class ReturnIntakeScreen extends ConsumerWidget {
       );
     }
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.riTitle)),
       body: UiStateView<List<ReturnArrival>>(
         state: uiStateOf(list),

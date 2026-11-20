@@ -13,6 +13,7 @@ class StartSplashScreen extends StatelessWidget {
   Widget build(BuildContext context) => const AnnotatedRegion(
     value: SystemUiOverlayStyle.dark,
     child: Scaffold(
+      resizeToAvoidBottomInset: false,
       key: ValueKey('start-splash'),
       backgroundColor: background,
       body: SizedBox.expand(

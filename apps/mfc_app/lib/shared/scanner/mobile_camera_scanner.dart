@@ -86,6 +86,7 @@ class _CameraScanPageState extends State<_CameraScanPage> {
     final theme = Theme.of(context);
     final last = _last;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(widget.title),
