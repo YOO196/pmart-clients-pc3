@@ -36,13 +36,29 @@ abstract interface class WorkRepository {
     String workerId, {
     required IdempotencyKey key,
   });
+
+  /// 지금 재고 실사 시간대인가 — `GET /mfcs/{mfcId}/count-windows` 의 `activeNow`(서버 시계, capacity 0.33.0).
+  /// 작업자 토큰으로 조회된다. 화면 시계로 계산하지 않는다(백엔드 지침 2026-11-20).
+  Future<bool> countTimeNow(String mfcId);
 }
 
 final class ApiWorkRepository implements WorkRepository {
   ApiWorkRepository(Dio dio)
-    : _workers = cap.PmartApiMfcCapacity(dio: dio).getWorkersApi();
+    : _workers = cap.PmartApiMfcCapacity(dio: dio).getWorkersApi(),
+      _countWindows = cap.PmartApiMfcCapacity(dio: dio).getCountWindowsApi();
 
   final cap.WorkersApi _workers;
+  final cap.CountWindowsApi _countWindows;
+
+  @override
+  Future<bool> countTimeNow(String mfcId) async {
+    final res = await pmartGuard(
+      () => _countWindows.getCountWindows(mfcId: mfcId),
+    );
+    final w =
+        res.data ?? (throw const ContractViolationFailure('CountWindows 없음'));
+    return w.activeNow;
+  }
 
   @override
   Future<WorkerProfile> me(String mfcId, String workerId) async {

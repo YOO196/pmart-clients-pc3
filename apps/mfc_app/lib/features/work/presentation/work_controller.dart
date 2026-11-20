@@ -51,6 +51,13 @@ final meProvider = FutureProvider.autoDispose<WorkerProfile>(
       .me(ref.watch(currentMfcIdProvider), ref.watch(currentWorkerIdProvider)),
 );
 
+/// 지금 재고 실사 시간대인가(서버 `activeNow`) — 홈 안내 띠에만 쓴다.
+final countTimeProvider = FutureProvider.autoDispose<bool>(
+  (ref) => ref
+      .watch(workRepositoryProvider)
+      .countTimeNow(ref.watch(currentMfcIdProvider)),
+);
+
 enum SessionPhase { pulling, assigned, unavailable, unknown }
 
 @immutable

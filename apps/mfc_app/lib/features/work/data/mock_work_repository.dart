@@ -50,6 +50,9 @@ final class MockWorkRepository implements WorkRepository {
   final Set<String> allowed;
   bool onBreak = false;
 
+  /// 지금 재고 실사 시간대인가(목 — 시험·캡처가 정한다. 기본은 아님).
+  bool countTime = false;
+
   /// 목 센터 관리자 휴게 번호(실서버 번호 아님). null = 미설정.
   String? breakPin = '1234';
 
@@ -403,5 +406,11 @@ final class MockWorkRepository implements WorkRepository {
       );
     }
     onBreak = false;
+  }
+
+  @override
+  Future<bool> countTimeNow(String mfcId) async {
+    await _wait();
+    return countTime;
   }
 }

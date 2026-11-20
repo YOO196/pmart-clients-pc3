@@ -712,6 +712,8 @@ export const db = {
   shifts: new Map<string, MockShift>(),
   /** 센터 휴게 번호(목 — 실서버는 해시만 저장). 키 = mfcId */
   breakPins: new Map<string, { pin: string; updatedAt: string; updatedBy: string }>(),
+  /** (capacity 0.33.0) 센터 실사 시간대 — 없으면 기본값(07–08·20–21, version 0) */
+  countWindows: new Map<string, { windows: { startTime: string; endTime: string }[]; version: number; updatedBy: string; updatedAt: string }>(),
   assignments: [] as MockAssignment[],
   plans: new Map<string, MockPlan>(),
   moves: new Map<string, MockMove>(),
@@ -747,6 +749,7 @@ export function resetDb(): void {
   db.workers = new Map(seedWorkers());
   db.shifts = new Map(seedShifts());
   db.breakPins = new Map();
+  db.countWindows = new Map();
   db.assignments = seedAssignments();
   db.plans = new Map();
   db.tasks = new Map(seedTasks());
