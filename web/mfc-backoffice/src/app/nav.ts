@@ -112,8 +112,8 @@ export const navGroups: readonly MenuGroup[] = [
         key: 'dispatchDelays',
         segment: 'dispatch-delays',
         ready: true,
-        apiReady: ['배차 지연 배송(픽업 전, 지연 안내 난 것)', '배송 번호 묶음 조회'],
-        apiMissing: ['배차 불가로 취소 — 센터 관리자가 주문 행을 읽을 API(요청 mfc-backoffice/2026-11-19-backend-dispatch-cancel-lines)'],
+        apiReady: ['배차 지연 배송(픽업 전, 지연 안내 난 것)', '배송 번호 묶음 조회', '배차 불가로 취소(claim 0.11.0 DC-1)'],
+        apiMissing: [],
       },
       {
         // 반납 인증번호(delivery-execution 0.28.0 — 2026-11-19 PC 3, PDA 와 같은 API)
