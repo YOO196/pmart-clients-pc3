@@ -301,11 +301,31 @@ describe('센터 휴게 번호(capacity 0.20.0)', () => {
     expect(await within(card).findByText('휴게 번호를 정했어요. 5번 틀려 잠긴 작업자도 바로 풀려요.')).toBeInTheDocument();
     // 정한 사람은 이름·사번(hr employee-labels)
     await waitFor(() => expect(within(card).getByTestId('break-pin-status')).toHaveTextContent(/^정해 둠 · 정관리 · E-2026-0101 · /));
-    expect(pin).toHaveValue('');
+    // 정한 뒤에는 입력 칸이 접히고 작은 "바꾸기" 단추만 남는다(사용자 2026-11-20)
+    expect(within(card).queryByLabelText('새 번호(숫자 4자리)')).not.toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: '바꾸기' })).toBeInTheDocument();
     const put = view.sent.find((r) => r.method === 'PUT' && new URL(r.url).pathname.endsWith('/break-pin'))!;
     expect(await sentBody(put)).toEqual({ pin: '1234' });
     expect(put.headers.get('Idempotency-Key')).toBeTruthy();
     expect(db.breakPins.get('MFC-BSN-01')!.pin).toBe('1234');
+  });
+
+  it('정해 둔 번호는 한 줄 + "바꾸기" — 누르면 입력 칸이 열리고 "번호 바꾸기"로 바꾼다, "닫기"로 접는다', async () => {
+    db.breakPins.set('MFC-BSN-01', { pin: '1111', updatedBy: 'OP-sup-1', updatedAt: '2026-11-19T00:00:00.000Z' });
+    renderAt('/c/MFC-BSN-01/workers');
+    const card = await screen.findByTestId('break-pin');
+    await waitFor(() => expect(within(card).getByTestId('break-pin-status')).toHaveTextContent(/^정해 둠/));
+    expect(within(card).queryByLabelText('새 번호(숫자 4자리)')).not.toBeInTheDocument();
+    await userEvent.click(within(card).getByRole('button', { name: '바꾸기' }));
+    await userEvent.type(within(card).getByLabelText('새 번호(숫자 4자리)'), '2468');
+    await userEvent.type(within(card).getByLabelText('한 번 더'), '2468');
+    await userEvent.click(within(card).getByRole('button', { name: '번호 바꾸기' }));
+    expect(await within(card).findByText('휴게 번호를 정했어요. 5번 틀려 잠긴 작업자도 바로 풀려요.')).toBeInTheDocument();
+    await waitFor(() => expect(within(card).queryByLabelText('새 번호(숫자 4자리)')).not.toBeInTheDocument());
+    expect(db.breakPins.get('MFC-BSN-01')!.pin).toBe('2468');
+    await userEvent.click(within(card).getByRole('button', { name: '바꾸기' }));
+    await userEvent.click(within(card).getByRole('button', { name: '닫기' }));
+    expect(within(card).queryByLabelText('새 번호(숫자 4자리)')).not.toBeInTheDocument();
   });
 
   it('센터 관리자가 아니면 서버 403 — 정해지지 않음', async () => {
