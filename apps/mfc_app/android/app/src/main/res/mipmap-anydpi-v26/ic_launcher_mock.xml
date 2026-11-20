@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 목업 앱 적응형 아이콘 — 같은 전경, 주황 배경(실서버 앱은 연보라). build.gradle.kts 가 PMART_ENV=mock 일 때 고른다. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background_mock"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>

@@ -1387,5 +1387,6 @@
   "moveDropReady": "수량을 확인하고 내려놓으세요",
   "putawayFromTitle": "출발 위치로 이동해 주세요",
   "putawayDropTitle": "추천 칸에 적치하세요",
-  "putawayDropReady": "수량을 확인하고 적치하세요"
+  "putawayDropReady": "수량을 확인하고 적치하세요",
+  "mockAppStrip": "목업 앱 · 시험 데이터 — 실서버가 아니에요"
 }
