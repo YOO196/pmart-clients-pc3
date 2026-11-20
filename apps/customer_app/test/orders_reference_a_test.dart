@@ -213,6 +213,52 @@ void main() {
   });
 
   group('같은 상품 담기', () {
+    // 사용자 2026-11-20: 주문상세 줄은 레퍼런스처럼 — 상품 사진, 동그란 ⊕, "미출고 N개"는 보이지 않는다.
+    testWidgets('주문상세 줄: 상품 사진 자리·금액과 수량, 미출고 수량은 보이지 않는다', (t) async {
+      final cart = MockCartRepository(latency: Duration.zero);
+      await openOrders(t, cart: cart);
+      await t.tap(find.byKey(const ValueKey('order-order-seed-4')));
+      await t.pumpAndSettle();
+      // order-seed-4 의 ol-5: 3개 모두 아직 출고 전(unfulfilledQty 3)
+      expect(find.byKey(const ValueKey('line-image-ol-5')), findsOneWidget);
+      expect(find.textContaining('미출고'), findsNothing);
+      expect(find.byKey(const ValueKey('line-notes-ol-5')), findsNothing);
+      final amount = t.widget<Text>(
+        find.byKey(const ValueKey('line-amount-ol-5')),
+      );
+      expect(amount.textSpan!.toPlainText(), contains('3개'));
+
+      // 담은 뒤에도 미출고는 나오지 않는다.
+      await t.tap(find.byKey(const ValueKey('reorder-ol-5')));
+      await t.pumpAndSettle();
+      expect(find.textContaining('미출고'), findsNothing);
+      expect(find.byKey(const ValueKey('reorder-all')), findsOneWidget);
+      expect(find.text('같은 상품 담기'), findsOneWidget);
+    });
+
+    testWidgets('주문내역 카드의 ⊕: 그 상품을 주문 수량만큼 새로 담고 서버 결과를 알린다', (t) async {
+      final cart = MockCartRepository(latency: Duration.zero);
+      await openOrders(t, cart: cart);
+      final sent = cart.changes.length;
+      await t.tap(find.byKey(const ValueKey('order-line-add-ol-5')));
+      await t.pumpAndSettle();
+      expect(
+        cart.changes.sublist(sent).single,
+        isA<AddItem>()
+            .having((c) => c.sku, 'sku', 'E-00000002')
+            .having((c) => c.quantity, 'quantity', 3),
+      );
+      expect(find.text('장바구니에 담았어요'), findsOneWidget);
+
+      // 이미 담긴 상품은 다시 보내지 않고 알린다.
+      await t.pump(const Duration(seconds: 3));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('order-line-add-ol-5')));
+      await t.pumpAndSettle();
+      expect(cart.changes.sublist(sent), hasLength(1));
+      expect(find.text('장바구니에 3개 있어요'), findsOneWidget);
+    });
+
     testWidgets('품목 담기는 현재 조건의 새 담기(AddItem)이고 서버 결과를 그 줄에 보인다', (t) async {
       final cart = MockCartRepository(latency: Duration.zero);
       await openOrders(t, cart: cart);
@@ -236,7 +282,7 @@ void main() {
       // 담긴 줄은 다시 보내지 않는다.
       expect(
         t
-            .widget<TextButton>(find.byKey(const ValueKey('reorder-ol-5')))
+            .widget<IconButton>(find.byKey(const ValueKey('reorder-ol-5')))
             .onPressed,
         isNull,
       );

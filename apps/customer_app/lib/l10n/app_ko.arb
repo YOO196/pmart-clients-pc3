@@ -1199,7 +1199,7 @@
   "orderDeliveryNote": "요청사항",
   "orderOutOfStock": "품절 시",
   "reorderLine": "담기",
-  "reorderAll": "전체 다시 담기",
+  "reorderAll": "같은 상품 담기",
   "reorderNote": "지금 가격·재고로 장바구니에 새로 담아요. 지난 주문의 금액·혜택은 이어지지 않아요.",
   "reorderBusy": "장바구니가 다른 변경을 처리하고 있어요. 잠시 뒤 다시 시도해 주세요.",
   "reorderRunning": "담는 중",

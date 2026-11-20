@@ -285,6 +285,8 @@ class ProductReviewCard extends ConsumerWidget {
     final r = review;
     final origin = ref.watch(imageOriginProvider);
     final urls = [for (final u in r.photoUrls) resolveImageUrl(u, origin)];
+    // 같은 계정이 쓴 리뷰면 여기서 바로 고칠 수 있게 한다(사용자 2026-11-20). 못 읽었으면 단추 없이 — 목록은 그대로.
+    final mine = ref.watch(myWrittenReviewsProvider).value?[r.reviewId];
     return Container(
       key: ValueKey('product-review-${r.reviewId}'),
       decoration: BoxDecoration(
@@ -294,12 +296,40 @@ class ProductReviewCard extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            r.authorMasked ?? l10n.reviewAuthorUnknown,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  r.authorMasked ?? l10n.reviewAuthorUnknown,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (mine != null)
+                TextButton(
+                  key: ValueKey('product-review-edit-${r.reviewId}'),
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 30),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    foregroundColor: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  // 내 리뷰 화면(수정·삭제 — 고칠 수 있는지는 서버 상태·기한대로).
+                  onPressed: () async {
+                    await context.push(
+                      '/reviews/mine/${r.reviewId}',
+                      extra: mine,
+                    );
+                    // 고쳤거나 지웠을 수 있다 — 이 상품의 목록을 서버 기준으로 다시 읽는다.
+                    ref.invalidate(productReviewListProvider);
+                    ref.invalidate(productReviewsProvider(r.productId));
+                    ref.invalidate(myWrittenReviewsProvider);
+                  },
+                  child: Text(l10n.reviewEdit),
+                ),
+            ],
           ),
           const SizedBox(height: 2),
           Row(

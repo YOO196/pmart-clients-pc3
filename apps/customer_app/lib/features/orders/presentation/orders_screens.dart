@@ -31,6 +31,10 @@ import '../../../shared/cart_icon_button.dart';
 import '../../cart/domain/cart.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../cart/presentation/cart_messages.dart';
+import '../../catalog/presentation/catalog_providers.dart'
+    show productDetailProvider;
+import '../../catalog/presentation/widgets/product_tile_card.dart'
+    show ProductImage;
 import '../../checkout/domain/checkout.dart' show OutOfStockPreference;
 import '../data/orders_repository.dart'
     show OrdersRepository, orderNotFinishedCode;
@@ -352,18 +356,23 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
+          // 알약 높이는 줄(목록 높이)이 정한다 — 글자는 가운데에 두고 위아래로 자르지 않는다(사용자 2026-11-20 "글자 깨짐").
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: IconTheme.merge(
-              data: IconThemeData(
-                color: selected ? scheme.surface : scheme.onSurface,
-              ),
-              child: DefaultTextStyle.merge(
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontSize: 15,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Center(
+              widthFactor: 1,
+              child: IconTheme.merge(
+                data: IconThemeData(
                   color: selected ? scheme.surface : scheme.onSurface,
                 ),
-                child: label,
+                child: DefaultTextStyle.merge(
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 15,
+                    height: 1.2,
+                    color: selected ? scheme.surface : scheme.onSurface,
+                  ),
+                  child: label,
+                ),
               ),
             ),
           ),
@@ -378,7 +387,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     final provider = orderListProvider(_query);
     final value = ref.watch(provider);
     final filters = SizedBox(
-      height: 50,
+      height: 56,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -665,30 +674,48 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
           Padding(
             key: ValueKey('order-line-${l.orderLineId}'),
             padding: const EdgeInsets.only(bottom: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text(
-                  [?l.productName, ?l.optionLabel].join(' · '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
-                ),
-                const SizedBox(height: 2),
-                Text.rich(
-                  TextSpan(
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextSpan(
-                        text: formatKrw(l.lineAmount),
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      Text(
+                        [?l.productName, ?l.optionLabel].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontSize: 15,
+                        ),
                       ),
-                      TextSpan(
-                        text: '  ${l10n.cartLineQuantity(l.quantity)}',
-                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      const SizedBox(height: 2),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: formatKrw(l.lineAmount),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            TextSpan(
+                              text: '  ${l10n.cartLineQuantity(l.quantity)}',
+                              style: TextStyle(color: scheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 14,
+                        ),
                       ),
                     ],
                   ),
-                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+                ),
+                // 주문내역에서도 바로 담는다(레퍼런스 9-2 ⊕, 사용자 2026-11-20). 담을 수 있는지는 장바구니 서버가 판정한다.
+                ReorderButton(
+                  key: ValueKey('order-line-add-${l.orderLineId}'),
+                  sku: l.sku,
+                  quantity: l.quantity,
                 ),
               ],
             ),
@@ -1649,34 +1676,26 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                l10n.checkoutItems,
-                style: theme.textTheme.titleMedium,
-              ),
-            ),
-            if (lines.isNotEmpty)
-              TextButton.icon(
-                key: const ValueKey('reorder-all'),
-                icon: const PmartLineIcon(PmartLineIcons.cart, size: 18),
-                label: Text(l10n.reorderAll),
-                onPressed: _running ? null : () => _run(lines),
-              ),
-          ],
-        ),
-        if (lines.isNotEmpty)
-          Text(l10n.reorderNote, style: theme.textTheme.bodySmall),
+        Text(l10n.checkoutItems, style: theme.textTheme.titleMedium),
+        const SizedBox(height: 4),
         for (final l in lines) ...[
           _LineTile(
             line: l,
-            action: TextButton(
+            // 레퍼런스 9-1 3-3: 줄마다 동그란 ⊕(글자 "담기" 아님)
+            action: IconButton.outlined(
               key: ValueKey('reorder-${l.orderLineId}'),
+              tooltip: l10n.reorderLine,
+              constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+              padding: EdgeInsets.zero,
               onPressed: (_running || _settled(_results[l.orderLineId]))
                   ? null
                   : () => _run([l]),
-              child: Text(l10n.reorderLine),
+              icon: PmartLineIcon(
+                _settled(_results[l.orderLineId])
+                    ? PmartLineIcons.check
+                    : PmartLineIcons.plus,
+                size: 18,
+              ),
             ),
           ),
           if (_text(l10n, _results[l.orderLineId]) case final t?)
@@ -1701,47 +1720,191 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
               child: Text(l10n.cartGoToCart),
             ),
           ),
+        // 레퍼런스 9-1 3-3: 목록 아래 넓은 테두리 단추 "같은 상품 담기"
+        if (lines.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          OutlinedButton(
+            key: const ValueKey('reorder-all'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              foregroundColor: theme.colorScheme.onSurface,
+              side: BorderSide(color: theme.colorScheme.onSurface, width: 1.2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              textStyle: theme.textTheme.titleSmall?.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            onPressed: _running ? null : () => _run(lines),
+            child: Text(l10n.reorderAll),
+          ),
+          const SizedBox(height: 6),
+          Text(l10n.reorderNote, style: theme.textTheme.bodySmall),
+        ],
       ],
     );
   }
 }
 
-class _LineTile extends StatelessWidget {
+/// 주문 상품 한 줄(레퍼런스 9-1 3-3): 사진 · 이름 / 옵션 / **금액** 수량 · 오른쪽 ⊕.
+/// 사진은 주문 행에 없어 지금 상품의 대표 사진을 쓴다(상품 조회 — 못 읽으면 자리 그림).
+class _LineTile extends ConsumerWidget {
   const _LineTile({required this.line, this.action});
 
   final OrderLineView line;
   final Widget? action;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final l = line;
-    // 서버가 나눠 준 수량만 보인다(앱에서 빼거나 더하지 않는다).
+    // 서버가 나눠 준 수량만 보인다(앱에서 빼거나 더하지 않는다). 아직 출고 전인 수량("미출고")은 보이지 않는다(사용자 2026-11-20).
     final notes = [
       if ((l.cancelledBeforeShipQty ?? 0) > 0)
         l10n.qtyCancelled(l.cancelledBeforeShipQty!),
       if ((l.deliveredQty ?? 0) > 0) l10n.qtyDelivered(l.deliveredQty!),
       if ((l.returnedQty ?? 0) > 0) l10n.qtyReturned(l.returnedQty!),
-      if ((l.unfulfilledQty ?? 0) > 0) l10n.qtyUnfulfilled(l.unfulfilledQty!),
     ];
-    return ListTile(
+    final imageUrl = switch (l.productId) {
+      final id? => ref.watch(productDetailProvider(id)).value?.mainImageUrl,
+      null => null,
+    };
+    // 금액: 서버 행 금액이 먼저, 없으면 단가(옛 응답).
+    final amount = l.lineAmount ?? l.unitPrice;
+    return Padding(
       key: ValueKey('line-${l.orderLineId}'),
-      contentPadding: EdgeInsets.zero,
-      // 주문 당시 상품명·옵션 사본(BR-35). 없을 때만 sku.
-      title: Text(l.title),
-      subtitle: notes.isEmpty ? null : Text(notes.join(' · ')),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            [
-              if (l.originalQty case final q?) l10n.cartLineQuantity(q),
-              if (l.unitPrice case final p?) formatKrw(p),
-            ].join(' · '),
+          ProductImage(
+            key: ValueKey('line-image-${l.orderLineId}'),
+            url: imageUrl,
+            size: 56,
+            radius: 8,
           ),
-          ?action,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 주문 당시 상품명 사본(BR-35). 없을 때만 sku.
+                Text(
+                  l.productName ?? l.sku,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                ),
+                if (l.productName != null && l.optionLabel != null)
+                  Text(
+                    '• ${l.optionLabel!}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 13,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                const SizedBox(height: 2),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      if (amount != null)
+                        TextSpan(
+                          text: '${formatKrw(amount)}  ',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      if (l.originalQty case final q?)
+                        TextSpan(
+                          text: l10n.cartLineQuantity(q),
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
+                    ],
+                  ),
+                  key: ValueKey('line-amount-${l.orderLineId}'),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+                ),
+                if (notes.isNotEmpty)
+                  Text(
+                    notes.join(' · '),
+                    key: ValueKey('line-notes-${l.orderLineId}'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (action case final a?) ...[const SizedBox(width: 8), a],
         ],
       ),
+    );
+  }
+}
+
+/// 지난 주문의 상품을 장바구니에 다시 담는 동그란 ⊕(주문내역 카드). 이미 담긴 상품은 새로 담지 않고 알린다.
+/// 결과는 알림으로 — 서버가 반영한 뒤에만 "담았어요"라고 한다.
+class ReorderButton extends ConsumerStatefulWidget {
+  const ReorderButton({super.key, required this.sku, required this.quantity});
+
+  final String sku;
+  final int quantity;
+
+  @override
+  ConsumerState<ReorderButton> createState() => _ReorderButtonState();
+}
+
+class _ReorderButtonState extends ConsumerState<ReorderButton> {
+  bool _busy = false;
+
+  Future<void> _add() async {
+    if (_busy) return;
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    String text;
+    try {
+      final cart = await ref.read(cartControllerProvider.future);
+      final inCart = cart.cart.lineForSku(widget.sku);
+      if (inCart != null) {
+        text = l10n.cartInCart(inCart.quantity);
+      } else {
+        final outcome = await ref
+            .read(cartControllerProvider.notifier)
+            .submitWhenReady(
+              AddItem(
+                sku: widget.sku,
+                quantity: widget.quantity < 1 ? 1 : widget.quantity,
+              ),
+            );
+        text = outcome == null
+            ? l10n.reorderBusy
+            : cartOutcomeText(l10n, outcome);
+      }
+    } on PmartFailure {
+      text = l10n.cartUnavailableForAdd;
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    messenger.notice(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return IconButton.outlined(
+      tooltip: l10n.reorderLine,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+      padding: EdgeInsets.zero,
+      onPressed: _busy ? null : _add,
+      icon: _busy
+          ? const SizedBox.square(
+              dimension: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const PmartLineIcon(PmartLineIcons.plus, size: 18),
     );
   }
 }

@@ -15,6 +15,8 @@ import 'package:customer_app/features/claims/presentation/claims_controller.dart
 import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
 import 'package:customer_app/features/reviews/data/reviews_repository.dart';
 import 'package:customer_app/features/reviews/domain/reviews.dart';
+import 'package:customer_app/features/reviews/presentation/reviews_screens.dart'
+    show MyReviewScreen;
 import 'package:customer_app/features/reviews/presentation/reviews_controller.dart';
 import 'package:customer_app/shared/providers.dart' show sourceSystem;
 
@@ -1127,6 +1129,57 @@ void main() {
       expect(find.text('사진리뷰 모아보기'), findsOneWidget);
       expect(find.byKey(const ValueKey('review-photos-grid')), findsOneWidget);
     });
+    // 사용자 2026-11-20: 같은 계정으로 쓴 리뷰는 상품리뷰 전체 보기에서 고칠 수 있게.
+    testWidgets('전체 보기: 내가 쓴 리뷰에만 "수정" — 누르면 내 리뷰 화면, 비회원은 없음', (t) async {
+      final repo = MockReviewsRepository(latency: Duration.zero);
+      await bigScreen(t);
+      await t.pumpWidget(testApp(const [], reviews: repo));
+      await t.pumpAndSettle();
+      Future<void> openAll() async {
+        unawaited(
+          GoRouter.of(t.element(find.byType(NavigationBar)))
+              .push('/products/P-0002/reviews'),
+        );
+        await t.pumpAndSettle();
+      }
+
+      // 비회원: 어느 리뷰에도 수정이 없고, 내 자격 목록을 부르지 않는다.
+      await openAll();
+      expect(
+        find.byKey(const ValueKey('product-review-rv-mine-1')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('product-review-edit-rv-mine-1')),
+        findsNothing,
+      );
+      expect(repo.eligibilityQueries, isEmpty);
+      await t.binding.handlePopRoute();
+      await t.pumpAndSettle();
+
+      await t.tap(find.text('마이페이지').last);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('my-login')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('login-kakao')));
+      await t.pumpAndSettle();
+      await openAll();
+      expect(
+        find.byKey(const ValueKey('product-review-edit-rv-mine-1')),
+        findsOneWidget,
+      );
+      // 남이 쓴 리뷰에는 없다.
+      expect(
+        find.byKey(const ValueKey('product-review-edit-rv-p2-1')),
+        findsNothing,
+      );
+
+      await t.tap(find.byKey(const ValueKey('product-review-edit-rv-mine-1')));
+      await t.pumpAndSettle();
+      expect(find.byType(MyReviewScreen), findsOneWidget);
+      expect(find.byKey(const ValueKey('review-edit')), findsOneWidget);
+    });
+
     testWidgets('상품 상세: 리뷰 줄을 눌러도 전체 화면', (t) async {
       final repo = MockReviewsRepository(latency: Duration.zero);
       await openProduct(t, repo, 'P-0002');

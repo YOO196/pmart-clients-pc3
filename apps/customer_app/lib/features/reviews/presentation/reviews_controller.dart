@@ -298,6 +298,26 @@ final reviewProvider = FutureProvider.autoDispose.family<ReviewView, String>(
   (ref, reviewId) => ref.watch(reviewsRepositoryProvider).get(reviewId),
 );
 
+/// 내가 쓴 리뷰(reviewId → 자격). 상품 리뷰 목록에서 "내 리뷰"를 알아보는 데 쓴다 — 리뷰 응답에는 작성자 식별값이 없어
+/// (가린 이름뿐) 본인 자격 목록의 `reviewId` 로 맞춘다. 비회원이면 빈 맵. 끝없이 읽지 않게 상한을 둔다(넘는 옛 리뷰는
+/// 리뷰관리에서 고친다).
+final myWrittenReviewsProvider =
+    FutureProvider.autoDispose<Map<String, ReviewEligibility>>((ref) async {
+      if (ref.watch(sessionProvider) is! MemberSession) return const {};
+      final repo = ref.watch(reviewsRepositoryProvider);
+      final out = <String, ReviewEligibility>{};
+      String? cursor;
+      for (var i = 0; i < 10; i++) {
+        final page = await repo.eligibilities(cursor: cursor);
+        for (final e in page.items) {
+          if (e.written) out[e.reviewId!] = e;
+        }
+        cursor = page.nextCursor;
+        if (cursor == null) break;
+      }
+      return out;
+    });
+
 /// 주문 하나의 리뷰 자격(주문 상세). 비회원이면 null.
 final orderReviewEligibilitiesProvider = FutureProvider.autoDispose
     .family<List<ReviewEligibility>?, String>((ref, orderId) async {

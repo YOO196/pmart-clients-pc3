@@ -14,6 +14,7 @@ import '../../checkout/domain/checkout.dart'
 class OrderListLine {
   const OrderListLine({
     required this.orderLineId,
+    required this.sku,
     required this.quantity,
     required this.lineAmount,
     this.productName,
@@ -21,6 +22,9 @@ class OrderListLine {
   });
 
   final String orderLineId;
+
+  /// 다시 담을 때 쓰는 SKU(order 0.17.0 `lines[].sku`).
+  final String sku;
   final String? productName;
   final String? optionLabel;
   final int quantity;
@@ -164,7 +168,15 @@ class OrderLineView {
     this.deliveredQty,
     this.returnedQty,
     this.unfulfilledQty,
+    this.productId,
+    this.lineAmount,
   });
+
+  /// 상품 ID(order `productId`). 주문 상세에서 지금 상품의 대표 사진을 찾을 때 쓴다(주문 행에는 사진이 없다). 없으면 null.
+  final String? productId;
+
+  /// 행 금액(단가×수량, 할인 나눔 전 — 서버 값). 없으면 null.
+  final int? lineAmount;
 
   final String orderLineId;
   final String sku;

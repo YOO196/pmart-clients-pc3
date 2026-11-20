@@ -78,6 +78,7 @@
 | BR-68 | 보통 | 고객 | 주문내역 카드 상품 줄·센터 이름 — `GET /orders` 항목에 주문 행 목록(이름·옵션·수량·금액 사본), `mfcName`, (선택) 지금 판매 여부, 조회 기간 `to`. 요청서 `docs/handoff/customer-app/2026-11-20-backend-order-list-lines.md` | 회신(order 0.17.0 — lines 앞 5개·mfcName, 지금 살 수 있는지는 미포함) — 고객 앱 목 모드 반영(2026-11-20), LAN 확인 대기 |
 | BR-69 | 높음 | 고객·라이더 | 네이버 로그인 토큰 교환 — 네이버 토큰 엔드포인트가 client secret 없는 요청을 거절(`invalid_client`, 인증 방식 `client_secret_post` 만). 서버가 인가 코드를 ID 토큰으로 교환해야 함(ADR-0071 전제와 다름). 요청서 `docs/handoff/customer-app/2026-11-20-backend-naver-token-exchange.md` | 회신(auth 0.10.0 `POST /auth/naver-token-exchanges`, ADR-0078, LAN 배포 15:29) — 고객 앱 목 모드 반영, 실기기 확인 대기. 라이더 앱 미반영 |
 | BR-70 | 보통 | 고객·라이더 | 네이버 프로필 사진 — 서버 교환(auth 0.10.0) 뒤 앱에 access token 이 없어 0.8.0 요청(앱이 프로필 API 로 사진 주소 읽기)을 할 수 없음. 서버가 읽거나 교환 응답에 주소를 달라는 질문. 질문서 `docs/handoff/customer-app/2026-11-20-backend-naver-profile-image-after-exchange.md` | 회신 (나)(auth 0.10.1 — 교환 응답에 profileImageUrl) — 고객 앱 목 모드 반영(2026-11-20), LAN 확인 대기 |
+| BR-71 | 보통 | 고객 | 주문 줄의 상품 사진 — `GET /orders` `lines[]`·`GET /orders/{id}` `OrderLine` 에 `imageUrl`(지금 상품 대표 사진, BR-67 과 같은 규칙). 요청서 `docs/handoff/customer-app/2026-11-20-backend-order-line-images.md` | 요청서 보냄, 회신 대기 — 그때까지 주문상세는 상품 조회로, 주문내역 카드는 사진 없이 |
 
 ---
 
@@ -477,3 +478,6 @@
 
 ## BR-70 네이버 프로필 사진 — 서버 교환 뒤 (고객앱·라이더앱)
 - 2026-11-20: 백엔드 요청(auth 0.8.0)은 앱이 네이버 access token 으로 프로필 API 를 불러 `profileImageUrl` 을 넘기라는 것. 그런데 BR-69 회신(auth 0.10.0)으로 서버가 교환하고 id_token 만 돌려줘 앱에 access token 이 없다. (가) 서버가 직접 읽기 (나) 교환 응답에 `profileImageUrl` (다) access token 을 앱에 주기 가운데 정해 달라는 질문서 `docs/handoff/customer-app/2026-11-20-backend-naver-profile-image-after-exchange.md`. 앱 쪽 권고는 (가).
+
+## BR-71 주문 줄의 상품 사진 (고객앱)
+- 2026-11-20 사용자: 주문상세·주문내역 줄에 상품 사진이 안 보임(레퍼런스 9-1 3-3·9-2 1). 주문 줄 계약에 사진이 없다. 주문상세는 `productId` 로 상품 조회(지금 대표 사진)를 해서 그리고, 주문내역 카드는 조회가 너무 많아 사진 없이 둠. 요청서 `docs/handoff/customer-app/2026-11-20-backend-order-line-images.md`(R1 목록 줄·R2 상세 줄에 `imageUrl`).
