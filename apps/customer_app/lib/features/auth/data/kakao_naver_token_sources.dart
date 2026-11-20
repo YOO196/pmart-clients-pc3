@@ -84,6 +84,11 @@ typedef NaverCodeExchange = Future<NaverExchange> Function({
   required IdempotencyKey key,
 });
 
+/// 네이버 인가 요청(`nid.naver.com/oauth2/authorize`)에 덧붙이는 값(사용자 2026-11-20).
+/// `auth_type=reprompt` — 전에 동의했더라도 네이버의 정보 제공 동의 화면을 다시 띄운다(가입을 끝내지 않고 나갔다
+/// 다시 올 때 네이버 쪽 동의가 조용히 넘어가지 않게). 서버의 코드 교환과는 상관없다 — 인가 요청에만 붙는다.
+const naverAuthorizeExtra = {'auth_type': 'reprompt'};
+
 Future<NaverAuthorization?> _authorizeWithAppAuth(String clientId) async {
   try {
     final r = await const FlutterAppAuth().authorize(
@@ -92,6 +97,7 @@ Future<NaverAuthorization?> _authorizeWithAppAuth(String clientId) async {
         naverRedirectUrl,
         scopes: const ['openid'],
         serviceConfiguration: _naverOidc,
+        additionalParameters: naverAuthorizeExtra,
       ),
     );
     final code = r.authorizationCode;

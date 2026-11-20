@@ -110,4 +110,8 @@ void main() {
     );
     expect(asked, isFalse);
   });
+
+  test('인가 요청에 auth_type=reprompt 를 붙인다 — 네이버 동의 화면을 다시 띄운다', () {
+    expect(naverAuthorizeExtra, {'auth_type': 'reprompt'});
+  });
 }
