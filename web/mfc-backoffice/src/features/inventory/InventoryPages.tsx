@@ -25,6 +25,7 @@ import { GuideBox } from '../../shared/listParts';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 import { CountSessionList, StockUnitList } from '../lists/CenterLists';
+import { CountWindowsCard, RotationCountStart } from './CountPlanning';
 
 const m = messages.inventory;
 const mv = messages.moves;
@@ -375,6 +376,9 @@ function CountsTab({ mfcId }: { readonly mfcId: string }) {
   });
   return (
     <div className="max-w-4xl space-y-3 text-sm">
+      {/* 실사 시간대·순환 실사(백엔드 지침 2026-11-20) — 실사 목록 위 */}
+      <CountWindowsCard mfcId={mfcId} />
+      <RotationCountStart mfcId={mfcId} />
       <CountSessionList mfcId={mfcId} />
       <p className="text-xs opacity-70">{m.countsHint}</p>
       <form

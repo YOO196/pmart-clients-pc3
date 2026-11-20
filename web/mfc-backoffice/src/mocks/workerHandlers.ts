@@ -82,6 +82,25 @@ const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.l
 
 const base = `${API_BASE}/mfcs/:mfcId/workers`;
 
+/** 실사 시간대 응답 — 바꾼 적 없으면 기본값 */
+function countWindowsOf(mfcId: string) {
+  const c = db.countWindows.get(mfcId);
+  const windows = c?.windows ?? [
+    { startTime: '07:00', endTime: '08:00' },
+    { startTime: '20:00', endTime: '21:00' },
+  ];
+  const now = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+  return {
+    mfcId,
+    windows,
+    source: c ? ('CENTER' as const) : ('DEFAULT' as const),
+    version: c?.version ?? 0,
+    updatedBy: c?.updatedBy ?? null,
+    updatedAt: c?.updatedAt ?? null,
+    activeNow: windows.some((w) => w.startTime <= now && now < w.endTime),
+  };
+}
+
 export const workerHandlers = [
   http.get(base, ({ request, params }) => {
     if (!operator(request)) return unauthorized();
@@ -322,6 +341,31 @@ export const workerHandlers = [
       const next: MockShift = shift.state === 'CANCELLED' ? shift : { ...shift, state: 'CANCELLED', cancelReason: body.reason };
       db.shifts.set(next.shiftId, next);
       return { status: 200, body: next };
+    });
+  }),
+
+  // (0.33.0) 재고 실사 시간대 — 조회는 그 센터 운영자, 바꾸기는 MFC_SUPERVISOR(목록 통째로, X-Expected-Version). activeNow 는 목 시계(서울)
+  http.get(`${API_BASE}/mfcs/:mfcId/count-windows`, ({ request, params }) => {
+    if (!operator(request)) return unauthorized();
+    const mfcId = String(params.mfcId);
+    if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
+    return HttpResponse.json(countWindowsOf(mfcId));
+  }),
+
+  http.put(`${API_BASE}/mfcs/:mfcId/count-windows`, async ({ request, params }) => {
+    if (!operator(request)) return unauthorized();
+    const mfcId = String(params.mfcId);
+    if (!canAccess(request, mfcId) || !isSupervisor(request)) return problem(403, 'FORBIDDEN');
+    const body = (await request.json()) as { windows?: { startTime: string; endTime: string }[] };
+    return idempotent(request, () => {
+      const current = countWindowsOf(mfcId);
+      if (expectedVersion(request) !== current.version) return problem(409, 'VERSION_CONFLICT');
+      const rows = [...(body.windows ?? [])].sort((a, b) => a.startTime.localeCompare(b.startTime));
+      const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
+      const bad = rows.length > 6 || rows.some((r) => !hhmm.test(r.startTime) || !hhmm.test(r.endTime) || r.startTime >= r.endTime) || rows.some((r, i) => i > 0 && r.startTime < rows[i - 1]!.endTime);
+      if (bad) return problem(400, 'VALIDATION_FAILED', [{ field: 'windows', reason: 'INVALID' }]);
+      db.countWindows.set(mfcId, { windows: rows, version: current.version + 1, updatedBy: operator(request)?.subject ?? '', updatedAt: timestamp() });
+      return { status: 200, body: countWindowsOf(mfcId) };
     });
   }),
 

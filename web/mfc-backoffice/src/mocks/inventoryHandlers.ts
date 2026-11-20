@@ -70,6 +70,55 @@ export const inventoryHandlers = [
     });
   }),
 
+  // (0.42.0) 실사 계획 — locationCodes 없이 rotationSize(없으면 20)면 서버가 칸을 고른다(순환 실사). 목: 그 센터 ACTIVE 칸 중 열린 실사에 없는 칸을 코드 순으로
+  http.post(`${base}/count-plans`, async ({ request, params }) => {
+    const mfcId = gate(request, params);
+    if (mfcId instanceof Response) return mfcId;
+    if (!isSupervisor(request)) return problem(403, 'FORBIDDEN');
+    const body = (await request.json()) as { locationCodes?: string[]; rotationSize?: number; assigneeId?: string | null; reason?: string };
+    return idempotent(request, () => {
+      if (body.locationCodes && body.rotationSize !== undefined) return problem(400, 'VALIDATION_FAILED', [{ field: 'rotationSize', reason: 'CONFLICT' }]);
+      const size = body.rotationSize ?? 20;
+      if (!body.locationCodes && (size < 1 || size > 200)) return problem(400, 'VALIDATION_FAILED', [{ field: 'rotationSize', reason: 'RANGE' }]);
+      const busy = new Set([...db.countSessions.values()].filter((c) => c.mfcId === mfcId && ['COUNTING', 'RECOUNT_REQUIRED', 'PENDING_APPROVAL'].includes(c.state)).flatMap((c) => c.locationCodes ?? []));
+      const codes =
+        body.locationCodes ??
+        [...db.locations.values()]
+          .filter((l) => l.mfcId === mfcId && l.state === 'ACTIVE' && !busy.has(l.locationCode ?? ''))
+          .map((l) => l.locationCode ?? '')
+          .sort()
+          .slice(0, size);
+      if (codes.length === 0) return problem(422, 'NO_COUNT_LOCATIONS');
+      const planId = `PLAN-${nextSeq()}`;
+      const sessions = codes.map((code) => {
+        const s: MockCountSession = {
+          sessionId: `CNT-${nextSeq()}`,
+          mfcId,
+          state: 'COUNTING',
+          locationCodes: [code],
+          reason: body.reason ?? '순환 실사',
+          createdBy: actor(request),
+          firstCounter: null,
+          recounter: null,
+          approverId: null,
+          approvalRef: null,
+          baselineAt: timestamp(),
+          sheet: [],
+          differences: null,
+          commitId: null,
+          version: 1,
+          updatedAt: timestamp(),
+        };
+        db.countSessions.set(s.sessionId, s);
+        return { sessionId: s.sessionId, locationCode: code, state: 'COUNTING' as const, exceptionCount: 0, openExceptionCount: 0 };
+      });
+      return {
+        status: 201,
+        body: { planId, mfcId, state: 'OPEN', reason: body.reason ?? '순환 실사', assigneeId: body.assigneeId ?? null, createdBy: actor(request), createdAt: timestamp(), sessions, lockedLocationCodes: codes },
+      };
+    });
+  }),
+
   http.post(`${base}/count-sessions`, async ({ request, params }) => {
     const mfcId = gate(request, params);
     if (mfcId instanceof Response) return mfcId;

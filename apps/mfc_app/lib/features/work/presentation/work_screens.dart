@@ -340,6 +340,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            // 지금 재고 실사 시간대(서버 activeNow)이고 실사 업무가 있으면 안내 띠(백엔드 지침 2026-11-20 §4).
+                            // 조회가 안 되면 띠만 안 보인다(다음 작업 받기가 순서를 정하므로 업무에는 영향 없음).
+                            if (ref.watch(countTimeProvider).value == true &&
+                                me.can(WorkArea.stockCount))
+                              NoticeBox(
+                                text: l10n.countTimeBand,
+                                textKey: const ValueKey('count-time-band'),
+                              ),
                             Padding(
                               padding: const EdgeInsets.fromLTRB(2, 12, 0, 8),
                               child: Text(

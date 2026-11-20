@@ -113,6 +113,29 @@ void main() {
     }
   });
 
+  testWidgets('재고 실사 시간대(서버 activeNow)이고 실사 업무가 있으면 홈에 안내 띠, 아니면 없다', (
+    t,
+  ) async {
+    work.countTime = true;
+    await pumpApp(t);
+    expect(find.byKey(const ValueKey('count-time-band')), findsOneWidget);
+    expect(find.text('지금은 재고 실사 시간이에요 — 재고 실사 업무를 고르세요'), findsOneWidget);
+    // 다섯 업무 칸은 그대로 다 보인다(띠만큼 칸이 줄어든다)
+    for (final a in WorkArea.values) {
+      expect(find.byKey(ValueKey('area-${a.name}')), findsOneWidget);
+    }
+  });
+
+  testWidgets('실사 시간대가 아니거나 실사 업무가 없으면 띠가 없다', (t) async {
+    work = MockWorkRepository(
+      tasks: tasks,
+      latency: Duration.zero,
+      allowed: {'PICK', 'PACK'},
+    )..countTime = true;
+    await pumpApp(t);
+    expect(find.byKey(const ValueKey('count-time-band')), findsNothing);
+  });
+
   testWidgets('메인은 공통 — 작업 목록 없음, 권한 없는 업무·메뉴는 "권한이 없어요"', (t) async {
     work = MockWorkRepository(
       tasks: tasks,
