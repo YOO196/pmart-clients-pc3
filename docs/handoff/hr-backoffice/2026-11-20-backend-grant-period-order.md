@@ -2,7 +2,7 @@
 
 보낸 앱: hr-backoffice (PC 2)
 받는 백엔드 영역: platform (hr-service)
-항목: BR 번호는 PC 1 이 합칠 때 매겨 주세요.
+항목: BR-75 (PC 1 이 합칠 때 매김)
 
 ## 무엇이 있었나
 

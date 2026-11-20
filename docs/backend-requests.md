@@ -82,6 +82,7 @@
 | BR-72 | 보통 | 고객 | 가입을 끝내지 않고 나간 계정 — 다음 로그인 때 저장된 동의로 동의 화면을 건너뛰고 휴대폰 확인으로 감. 사용자 결정: 회원이 된 적 없으면 동의부터 다시. 요청서 `docs/handoff/customer-app/2026-11-20-backend-signup-consent-restart.md` | 요청서 보냄, 회신 대기 |
 | BR-73 | 보통 | 백오피스 | 상품(SKU)별 결품률 — 결품률(bff 0.20.0·fulfillment 0.19.0)은 날짜·센터·사유까지만, SKU별 피킹 줄·결품 줄 집계 요청(SK-1, 선택 SK-2 bff). 요청서 docs/handoff/backoffice/2026-11-20-backend-shortage-by-sku.md (PR #316 은 BR-69 로 적었으나 겹쳐 PC 1 이 73 으로) | 요청서 보냄, 회신 대기 |
 | BR-74 | 보통 | 고객 | 네이버 로그인마다 정보 제공 동의 화면 다시 — 이미 동의한 앱은 네이버가 다시 묻지 않아 서버가 교환 뒤 네이버 연결을 끊어야 함(secret·access token 은 서버만). 식별값(sub) 유지 확인 필요. 요청서 `docs/handoff/customer-app/2026-11-20-backend-naver-consent-every-login.md` | 요청서 보냄, 회신 대기 — 앱은 `auth_type=reauthenticate`(아이디·비밀번호 매번) 반영 |
+| BR-75 | 보통 | 인사 | 권한·근무 기간 순서 검사 — `RequestedGrant.validFrom·validTo`·직원 등록 `startDate·endDate` 에 종료일<시작일이면 400(지금은 거꾸로 된 기간이 저장·자동 승인됨). 화면은 막아 둠(#331). 요청서 `docs/handoff/hr-backoffice/2026-11-20-backend-grant-period-order.md` | 요청서 보냄, 회신 대기 |
 
 ---
 
