@@ -351,8 +351,13 @@ final class MockPasswordAuthRepository extends MockAuthRepository
   /// LAN 시험 센터 관리자 계정.
   static const supervisorAccount = 'claude-mfc-sup';
 
+  /// 목업 전 업무 시험 작업자(사용자 2026-11-20) — 피패킹·입고·품질검사·재고 이동·재고 실사 모두. 비밀번호는 아무거나.
+  /// 목의 작업자 업무는 계정과 상관없이 전부지만, 시험용임을 알아보기 쉽게 따로 둔다.
+  static const allWorkAccount = 'mfcw-all';
+
   /// 시험 작업자 계정 아이디인지.
   static bool isTestWorker(String loginId) {
+    if (loginId == allWorkAccount) return true;
     final m = _account.firstMatch(loginId);
     if (m == null) return false;
     final n = int.parse(m.group(2)!);

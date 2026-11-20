@@ -725,6 +725,7 @@ void main() {
       }
       expect(MockPasswordAuthRepository.isTestWorker('mfcw-pp-30'), isTrue);
       expect(MockPasswordAuthRepository.isTestWorker('mfcw-rtn-10'), isTrue);
+      expect(MockPasswordAuthRepository.isTestWorker('mfcw-all'), isTrue); // 전 업무 시험 계정
     });
 
     testWidgets('시험용 로그인 화면을 닫으면 실서버(Custom Tab 닫기)처럼 "취소" 안내', (t) async {
