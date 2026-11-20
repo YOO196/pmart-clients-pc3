@@ -14,7 +14,7 @@ abstract final class Pkce {
   }
 
   /// S256: `BASE64URL(SHA-256(ASCII(verifier)))`, 패딩 없음.
-  static String challenge(String verifier) => base64UrlEncode(
-    sha256.convert(ascii.encode(verifier)).bytes,
-  ).replaceAll('=', '');
+  static String challenge(String verifier) =>
+      base64UrlEncode(sha256.convert(ascii.encode(verifier)).bytes)
+          .replaceAll('=', '');
 }

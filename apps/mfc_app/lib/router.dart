@@ -23,6 +23,7 @@ import 'features/work/presentation/work_screens.dart';
 import 'shared/printer/printer_ui.dart';
 import 'features/stock_move/presentation/return_intake.dart';
 import 'shared/start_splash.dart';
+import 'shared/pda_motion.dart';
 
 /// 라우트. 로그인 전에는 시작 메뉴(로그인·기기 설정·재고 확인, 사용자 2026-11-17)로, 세션이 끝나면 로그인 화면으로 보낸다
 /// (직원 로그인 — 백엔드 handoff 2026-11-13).
@@ -273,11 +274,25 @@ final routerProvider = Provider<GoRouter>((ref) {
 /// go_router 기본이 이 앱에서 넘김 없음(0초)으로 잡혀 직접 정한다.
 Page<void> _page(GoRouterState s, Widget child) => CustomTransitionPage<void>(
   key: s.pageKey,
-  transitionDuration: const Duration(milliseconds: 220),
+  transitionDuration: const Duration(milliseconds: 260),
   reverseTransitionDuration: const Duration(milliseconds: 180),
-  transitionsBuilder: (_, animation, _, child) => FadeTransition(
-    opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
-    child: child,
-  ),
+  // 새 화면은 옅게 나타나며 아래에서 살짝(2%) 올라온다 — 나갈 때는 빠르게 옅어지기만(Material 3 강조 감속·가속).
+  transitionsBuilder: (_, animation, _, child) {
+    final enter = CurvedAnimation(
+      parent: animation,
+      curve: PdaMotion.enter,
+      reverseCurve: PdaMotion.exit,
+    );
+    return FadeTransition(
+      opacity: enter,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.02),
+          end: Offset.zero,
+        ).animate(enter),
+        child: child,
+      ),
+    );
+  },
   child: child,
 );

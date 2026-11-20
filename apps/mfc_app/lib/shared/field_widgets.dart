@@ -6,6 +6,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
 import 'location_guide.dart';
+import 'pda_motion.dart';
 import 'pda_theme.dart';
 
 /// 단계 표시 — 시안의 알약 칸(지금 단계 진한 보라·흰 글씨, 끝난 단계 "✓ 이름").
@@ -18,15 +19,19 @@ class StepHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final d = PdaMotion.of(context, PdaMotion.base);
     return Padding(
       padding: const EdgeInsets.only(bottom: 17),
       child: Row(
-        key: ValueKey('step-$current'),
         children: [
+          // 지금 단계 표시(시험·화면이 읽는 자리). 칸은 단계가 바뀌어도 그대로 두어 색이 부드럽게 바뀐다.
+          SizedBox.shrink(key: ValueKey('step-$current')),
           for (final (i, n) in names.indexed) ...[
             if (i > 0) const SizedBox(width: 5),
             Expanded(
-              child: Container(
+              child: AnimatedContainer(
+                duration: d,
+                curve: PdaMotion.standard,
                 height: 32,
                 alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -42,23 +47,25 @@ class StepHeader extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (i < current)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 2),
-                          child: Icon(
-                            Icons.check,
-                            size: 14,
-                            color: PdaColors.muted,
+                        const PopIn(
+                          child: Padding(
+                            padding: EdgeInsets.only(right: 2),
+                            child: Icon(
+                              Icons.check,
+                              size: 14,
+                              color: PdaColors.muted,
+                            ),
                           ),
                         ),
-                      Text(
-                        n,
-                        maxLines: 1,
-                        style: theme.textTheme.labelMedium?.copyWith(
+                      AnimatedDefaultTextStyle(
+                        duration: d,
+                        style: theme.textTheme.labelMedium!.copyWith(
                           color: i == current ? Colors.white : PdaColors.muted,
                           fontWeight: i == current
                               ? FontWeight.w800
                               : FontWeight.w600,
                         ),
+                        child: Text(n, maxLines: 1),
                       ),
                     ],
                   ),
@@ -85,29 +92,34 @@ class ScanPrompt extends StatelessWidget {
     return Padding(
       // 큰 제목 위아래 숨 쉴 틈(사용자 2026-11-20 "글자는 큰데 위아래 간격이 좁아 답답") — 위 6, 아래 16.
       padding: const EdgeInsets.only(top: 8, bottom: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            text,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: -1.2,
-              height: 1.25,
-            ),
-          ),
-          if (detail case final d?)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                d,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: PdaColors.body,
-                  fontWeight: FontWeight.w500,
-                ),
+      // 할 일이 바뀌면 새 제목이 살짝 올라오며 나타난다(같은 제목이면 그대로).
+      child: EnterFade(
+        key: ValueKey(text),
+        offset: 8,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              text,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -1.2,
+                height: 1.25,
               ),
             ),
-        ],
+            if (detail case final d?)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  d,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: PdaColors.body,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -141,10 +153,16 @@ class ProgressLine extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: LinearProgressIndicator(
-            value: total == 0 ? 0 : done / total,
-            minHeight: 9,
-            borderRadius: BorderRadius.circular(5),
+          // 확정될 때마다 막대가 부드럽게 찬다.
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(end: total == 0 ? 0 : done / total),
+            duration: PdaMotion.of(context, PdaMotion.slow),
+            curve: PdaMotion.enter,
+            builder: (_, v, _) => LinearProgressIndicator(
+              value: v,
+              minHeight: 9,
+              borderRadius: BorderRadius.circular(5),
+            ),
           ),
         ),
       ],
@@ -290,14 +308,17 @@ class DoneMark extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 40),
       child: Column(
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: const BoxDecoration(
-              color: PdaColors.lilac,
-              shape: BoxShape.circle,
+          PopIn(
+            haptic: true,
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                color: PdaColors.lilac,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check, size: 36, color: PdaColors.dark),
             ),
-            child: const Icon(Icons.check, size: 36, color: PdaColors.dark),
           ),
           const SizedBox(height: 18),
           Text(
@@ -343,37 +364,40 @@ class NoticeBox extends StatelessWidget {
   final bool warning;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    margin: const EdgeInsets.only(top: 12),
-    padding: const EdgeInsets.all(11),
-    decoration: BoxDecoration(
-      color: warning ? PdaColors.warning : PdaColors.notice,
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (warning)
-          const Padding(
-            padding: EdgeInsets.only(right: 6),
-            child: Icon(
-              Icons.warning_amber_rounded,
-              size: 18,
-              color: PdaColors.onWarning,
+  Widget build(BuildContext context) => EnterFade(
+    offset: 6,
+    child: Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: warning ? PdaColors.warning : PdaColors.notice,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (warning)
+            const Padding(
+              padding: EdgeInsets.only(right: 6),
+              child: Icon(
+                Icons.warning_amber_rounded,
+                size: 18,
+                color: PdaColors.onWarning,
+              ),
+            ),
+          Expanded(
+            child: Text(
+              text,
+              key: textKey,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: warning ? PdaColors.onWarning : PdaColors.onNotice,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-        Expanded(
-          child: Text(
-            text,
-            key: textKey,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: warning ? PdaColors.onWarning : PdaColors.onNotice,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     ),
   );
 }
@@ -388,28 +412,30 @@ class GoBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.primaryContainer,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Icon(Icons.directions_walk, color: scheme.onPrimaryContainer),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  text,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: scheme.onPrimaryContainer,
+    return EnterFade(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: scheme.primaryContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Icon(Icons.directions_walk, color: scheme.onPrimaryContainer),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: scheme.onPrimaryContainer,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -505,7 +531,7 @@ class _TaskDoneViewState extends State<TaskDoneView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Spacer(),
-        const MarkCircle(icon: Icons.check),
+        const PopIn(haptic: true, child: MarkCircle(icon: Icons.check)),
         const SizedBox(height: 12),
         Text(
           widget.title,
@@ -523,38 +549,44 @@ class _TaskDoneViewState extends State<TaskDoneView> {
         ),
         if (widget.rows.isNotEmpty) ...[
           const SizedBox(height: 20),
-          Card(
-            key: const ValueKey('done-summary'),
-            margin: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                children: [
-                  for (final (label, value) in widget.rows)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            width: 72,
-                            child: Text(
-                              label,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: scheme.onSurfaceVariant,
+          EnterFade(
+            index: 2,
+            child: Card(
+              key: const ValueKey('done-summary'),
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Column(
+                  children: [
+                    for (final (label, value) in widget.rows)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              width: 72,
+                              child: Text(
+                                label,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
                               ),
                             ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              value,
-                              style: theme.textTheme.titleMedium,
+                            Expanded(
+                              child: Text(
+                                value,
+                                style: theme.textTheme.titleMedium,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -616,7 +648,11 @@ class ResultView extends StatelessWidget {
       if (busy)
         const Center(child: CircularProgressIndicator())
       else
-        MarkCircle(icon: icon == Icons.check_circle ? Icons.check : icon),
+        PopIn(
+          child: MarkCircle(
+            icon: icon == Icons.check_circle ? Icons.check : icon,
+          ),
+        ),
       const SizedBox(height: 16),
       Text(
         text,
@@ -666,9 +702,18 @@ class TargetLine extends StatelessWidget {
     final theme = Theme.of(context);
     final row = Row(
       children: [
-        Icon(
-          confirmed ? Icons.check_circle : Icons.place_outlined,
-          color: confirmed ? theme.colorScheme.primary : null,
+        // 칸을 찍어 맞으면 위치 그림이 ✓ 로 튀어 바뀐다.
+        AnimatedSwitcher(
+          duration: PdaMotion.of(context, PdaMotion.base),
+          transitionBuilder: (c, a) => ScaleTransition(
+            scale: CurvedAnimation(parent: a, curve: Curves.easeOutBack),
+            child: c,
+          ),
+          child: Icon(
+            confirmed ? Icons.check_circle : Icons.place_outlined,
+            key: ValueKey(confirmed),
+            color: confirmed ? theme.colorScheme.primary : null,
+          ),
         ),
         const SizedBox(width: 8),
         Text(label, style: theme.textTheme.titleMedium),
@@ -752,10 +797,15 @@ class QtyStepper extends StatelessWidget {
               : null,
           child: SizedBox(
             width: 64,
-            child: Text(
-              '$value',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineSmall,
+            child: ClipRect(
+              child: _Counter(
+                value: value,
+                child: Text(
+                  '$value',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineSmall,
+                ),
+              ),
             ),
           ),
         ),
@@ -1015,12 +1065,15 @@ class StatBox extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(color: PdaColors.body),
           ),
           const SizedBox(width: 8),
-          Text(
-            value,
-            key: valueKey,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: strong ? PdaColors.primary : PdaColors.ink,
+          SwapValue(
+            value: value,
+            child: Text(
+              value,
+              key: valueKey,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: strong ? PdaColors.primary : PdaColors.ink,
+              ),
             ),
           ),
         ],
@@ -1041,7 +1094,9 @@ class DoneLine extends StatelessWidget {
     padding: const EdgeInsets.only(top: 4, bottom: 4),
     child: Row(
       children: [
-        const Icon(Icons.check_circle, size: 20, color: PdaColors.ok),
+        const PopIn(
+          child: Icon(Icons.check_circle, size: 20, color: PdaColors.ok),
+        ),
         const SizedBox(width: 6),
         Expanded(
           child: Text(
@@ -1084,4 +1139,29 @@ class MetaPair extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 수량 숫자 — 늘면 아래에서, 줄면 위에서 새 숫자가 들어온다.
+class _Counter extends StatefulWidget {
+  const _Counter({required this.value, required this.child});
+
+  final int value;
+  final Widget child;
+
+  @override
+  State<_Counter> createState() => _CounterState();
+}
+
+class _CounterState extends State<_Counter> {
+  bool _up = true;
+
+  @override
+  void didUpdateWidget(_Counter old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value) _up = widget.value > old.value;
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      SwapValue(value: widget.value, up: _up, child: widget.child);
 }
