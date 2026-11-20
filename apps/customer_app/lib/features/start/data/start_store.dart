@@ -33,4 +33,7 @@ final class StartStore {
       _store.write(_welcomeKey, 'at=${at.toUtc().toIso8601String()}');
 
   Future<void> completeEntry() => _store.write(_entryKey, '1');
+
+  /// 주소 단계에서 뒤로 — 로그인/둘러보기를 다시 고르게 한다.
+  Future<void> reopenEntry() => _store.delete(_entryKey);
 }

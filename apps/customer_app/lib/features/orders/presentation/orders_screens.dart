@@ -39,6 +39,7 @@ import '../domain/tracking.dart';
 import 'tracking_map.dart';
 import 'orders_providers.dart';
 import 'receipt_confirmation.dart';
+import '../../../shared/notice.dart';
 import '../../redelivery/presentation/redelivery_screens.dart'
     show RedeliveryPaymentsSection;
 import '../../reviews/presentation/reviews_screens.dart'
@@ -327,9 +328,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     setState(() => _hiding.remove(o.orderId));
     // 서버 목록이 정본이다. 숨겼든 못 했든 다시 읽는다.
     ref.invalidate(orderListProvider);
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showNotice(context, message);
   }
 
   Widget _pill({
@@ -720,6 +719,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     final filtered = _status != null;
     final narrowed = _q != null || _period != OrderPeriod.months3;
     return UiStateView<OrderPage?>(
+      loading: (_) => const PmartListSkeleton(thumb: true, rows: 4),
       state: uiStateOf(value, isEmpty: (p) => p!.items.isEmpty),
       onRetry: () => ref.invalidate(provider),
       // 조건이 걸려 있으면 "주문 없음"이 아니라 "이 조건의 주문 없음"이다.
@@ -835,6 +835,7 @@ class OrderDetailScreen extends ConsumerWidget {
         actions: const [CartIconButton(), SizedBox(width: 6)],
       ),
       body: UiStateView<OrderDetail>(
+        loading: (_) => const PmartDetailSkeleton(image: false),
         state: uiStateOf(ref.watch(provider)),
         onRetry: () => ref.invalidate(provider),
         ready: (context, o) => RefreshIndicator(

@@ -294,6 +294,80 @@ void main() {
     expect(key('start-welcome'), findsOneWidget);
   });
 
+  testWidgets('예상 못 한 오류(기기 저장소 등)에도 시작하기가 잠긴 채 남지 않는다 — 안내하고 다시 누를 수 있다', (
+    t,
+  ) async {
+    final consents = MockDeviceConsentsRepository()
+      ..failNextChange = StateError('keystore');
+    await t.pumpWidget(
+      testApp(
+        [deviceConsentsRepositoryProvider.overrideWithValue(consents)],
+        startGate: true,
+        secure: MemoryKeyValueStore(),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(key('start-begin'));
+    await t.pumpAndSettle();
+    expect(key('start-consent-error'), findsOneWidget);
+    expect(beginEnabled(t), isTrue);
+
+    await t.tap(key('start-begin'));
+    await t.pumpAndSettle();
+    // 다시 누르면 서버 처리 결과 안내까지 간다.
+    expect(key('start-marketing-result'), findsOneWidget);
+  });
+
+  group('뒤로가기', () {
+    late int left;
+    late void Function() original;
+    setUp(() {
+      left = 0;
+      original = leaveApp;
+      leaveApp = () => left++;
+    });
+    tearDown(() => leaveApp = original);
+
+    Future<void> back(WidgetTester t) async {
+      await t.binding.handlePopRoute();
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('환영·약관 화면: 앱을 나간다', (t) async {
+      await t.pumpWidget(
+        testApp([], startGate: true, secure: MemoryKeyValueStore()),
+      );
+      await t.pumpAndSettle();
+      expect(key('start-welcome'), findsOneWidget);
+      await back(t);
+      expect(left, 1);
+      expect(key('start-welcome'), findsOneWidget);
+    });
+
+    testWidgets('로그인/둘러보기 화면: 앱을 나간다', (t) async {
+      final secure = MemoryKeyValueStore();
+      await secure.write('pmart.start.welcome', 'at=x');
+      await t.pumpWidget(testApp([], startGate: true, secure: secure));
+      await t.pumpAndSettle();
+      expect(key('start-entry'), findsOneWidget);
+      await back(t);
+      expect(left, 1);
+    });
+
+    testWidgets('주소 화면(비회원): 로그인/둘러보기로 돌아간다 — 홈으로는 못 간다', (t) async {
+      final secure = MemoryKeyValueStore();
+      await secure.write('pmart.start.welcome', 'at=x');
+      await secure.write('pmart.start.entry', '1');
+      await t.pumpWidget(testApp([], startGate: true, secure: secure));
+      await t.pumpAndSettle();
+      expect(key('start-address'), findsOneWidget);
+      await back(t);
+      expect(left, 0);
+      expect(key('start-entry'), findsOneWidget);
+      expect(await secure.read('pmart.start.entry'), isNull);
+    });
+  });
+
   group('현재 위치로 찾기', () {
     late MemoryKeyValueStore secure;
     late MockDeviceConsentsRepository consents;

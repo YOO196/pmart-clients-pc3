@@ -18,6 +18,7 @@ import '../../orders/presentation/orders_providers.dart';
 import '../domain/claims.dart';
 import 'claims_controller.dart';
 import 'return_fee_section.dart';
+import '../../../shared/notice.dart';
 
 /// [type] 이 반품이면 진행 중 문구를 반품용으로(회수·검수·환불 — 취소 문구를 쓰지 않는다).
 String claimStateText(AppLocalizations l10n, ClaimState s, {ClaimType? type}) =>
@@ -102,7 +103,7 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
         if (!mounted) return;
         ref.invalidate(orderDetailProvider(widget.orderId));
         if (found != null) {
-          messenger.showSnackBar(SnackBar(content: Text(l10n.cancelDuplicate)));
+          messenger.notice(l10n.cancelDuplicate);
           context.pushReplacement('/claims/${found.claimId}');
           return;
         }

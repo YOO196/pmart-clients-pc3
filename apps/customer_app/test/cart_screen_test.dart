@@ -425,7 +425,7 @@ void main() {
       );
     });
 
-    testWidgets('"상품 추가"는 홈으로 간다', (t) async {
+    testWidgets('"더 담으러 가기"는 홈으로 간다', (t) async {
       t.view
         ..physicalSize = const Size(800, 1400)
         ..devicePixelRatio = 1;

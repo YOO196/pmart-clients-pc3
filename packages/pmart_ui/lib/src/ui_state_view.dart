@@ -35,7 +35,11 @@ class UiStateView<T> extends StatelessWidget {
     this.onRetry,
     this.onCheckAgain,
     this.empty,
+    this.loading,
   });
+
+  /// LOADING 화면을 그 화면 모양의 자리 표시로 바꾸고 싶을 때(예 [PmartGridSkeleton]).
+  final WidgetBuilder? loading;
 
   final UiState<T> state;
   final Widget Function(BuildContext context, T data) ready;
@@ -55,6 +59,10 @@ class UiStateView<T> extends StatelessWidget {
     final reference = PmartStateStyle.of(context);
     final theme = Theme.of(context);
     return switch (state) {
+      UiLoading() when loading != null => KeyedSubtree(
+        key: const ValueKey('ui-loading'),
+        child: loading!(context),
+      ),
       UiLoading() when reference => Center(
         key: const ValueKey('ui-loading'),
         child: Semantics(

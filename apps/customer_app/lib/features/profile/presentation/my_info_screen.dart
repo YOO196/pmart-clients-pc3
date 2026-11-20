@@ -7,6 +7,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../domain/profile.dart';
 import 'profile_avatar.dart';
 import 'profile_controller.dart';
+import '../../../shared/notice.dart';
 
 /// 마이 목록에 보일 한 줄 요약(이름 · 가린 번호). 번호는 등록된 것이 있을 때만 붙인다
 /// (연락처 등록은 서버가 아직 열지 않아 "번호 없음"을 따로 보이지 않는다, 2026-11-03 안내).
@@ -57,7 +58,7 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
     // 바뀐 항목만 보낸다. 번호는 서버가 아직 받지 않으므로 보내지 않는다.
     final nameChanged = name != (current?.nickname?.trim() ?? '');
     if (!nameChanged) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.infoNothingChanged)));
+      messenger.notice(l10n.infoNothingChanged);
       return;
     }
     final outcome = await ref
@@ -66,7 +67,7 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
     if (!mounted) return;
     setState(() => _last = outcome);
     if (outcome is ProfileChangeApplied) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.infoSaved)));
+      messenger.notice(l10n.infoSaved);
       context.pop(true);
     }
   }

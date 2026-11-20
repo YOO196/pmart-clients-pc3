@@ -16,6 +16,7 @@ import '../../push/presentation/push_controller.dart'
     show PushStatus, pushRegistrationProvider;
 import '../domain/notifications.dart';
 import 'notifications_controller.dart';
+import '../../../shared/notice.dart';
 
 /// SCR-NOTICE-001. 알림함(본인만). 알림 문구는 발송 당시 사실이고, 누르면 서버가 준 최신 목적지로 간다.
 /// 푸시 수신은 없다(푸시 토큰 등록 경로 없음, BR-09 — notification 0.2.0 도 앱 알림함만). 그래서 화면을 열 때와
@@ -70,6 +71,7 @@ class _NotificationCenterScreenState
           message: l10n.noticeLoginNeeded,
         ),
         _ => UiStateView<InboxState?>(
+          loading: (_) => const PmartListSkeleton(),
           state: uiStateOf(value, isEmpty: (s) => s!.items.isEmpty),
           onRetry: () => ref.invalidate(inboxProvider),
           empty: (_) => Center(
@@ -486,9 +488,7 @@ class _SettingRow extends ConsumerWidget {
           _ => l10n.noticeSettingRejected,
         },
       };
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(text)));
+      showNotice(context, text);
     }
 
     final Widget trailing = switch (status) {

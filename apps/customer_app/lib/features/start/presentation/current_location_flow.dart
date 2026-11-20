@@ -16,6 +16,7 @@ import '../../profile/presentation/consents_screens.dart'
     show consentsRepositoryProvider, sendConsentChanges;
 import '../data/device_consents_repository.dart';
 import 'start_controller.dart';
+import '../../../shared/notice.dart';
 
 final currentLocationSourceProvider = Provider<CurrentLocationSource>(
   (ref) => switch (ref.watch(envProvider)) {
@@ -33,9 +34,7 @@ Future<PostcodeResult?> findCurrentAddress(
 ) async {
   final l10n = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.of(context);
-  void say(String text) => messenger
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(text)));
+  void say(String text) => messenger.notice(text);
 
   if (!await _ensureLocationConsent(context, ref, say) || !context.mounted) {
     return null;

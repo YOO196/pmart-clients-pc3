@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPage;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -319,9 +320,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/products',
-        builder: (_, state) => ProductListScreen(
-          categoryId: state.uri.queryParameters['categoryId'] ?? '',
-          title: state.uri.queryParameters['title'],
+        // 사용자 요청(2026-11-20): 카테고리를 누르면 오른쪽에서 밀려 들어오고, 뒤로 가면 오른쪽으로 빠진다.
+        pageBuilder: (_, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: ProductListScreen(
+            categoryId: state.uri.queryParameters['categoryId'] ?? '',
+            title: state.uri.queryParameters['title'],
+          ),
         ),
       ),
       // 홈 영역 "전체보기". 영역·홈 구성 버전은 홈에서 넘긴다(없으면 홈으로).
@@ -348,6 +353,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             parentNavigatorKey: rootNavigatorKey,
             path: 'reviews',
             builder: (_, state) => ProductReviewsScreen(
+              productId: state.pathParameters['productId']!,
+            ),
+          ),
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'review-photos',
+            builder: (_, state) => ReviewPhotosScreen(
               productId: state.pathParameters['productId']!,
             ),
           ),

@@ -9,5 +9,6 @@ export 'src/format.dart';
 export 'src/line_icons.dart';
 export 'src/theme.dart';
 export 'src/ui_state.dart';
+export 'src/skeleton.dart';
 export 'src/ui_state_view.dart';
 export 'src/widgets.dart';

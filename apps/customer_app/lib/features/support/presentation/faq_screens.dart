@@ -287,6 +287,7 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
             const PmartSectionGap(height: 8),
             Expanded(
               child: UiStateView<FaqList?>(
+                loading: (_) => const PmartListSkeleton(),
                 state: uiStateOf(value, isEmpty: (l) => l!.items.isEmpty),
                 onRetry: () => ref.invalidate(provider),
                 empty: (_) => Center(

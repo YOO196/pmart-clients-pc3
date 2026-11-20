@@ -4,6 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/choice_sheet.dart';
+import '../../../shared/floating_cart_bar.dart';
+import '../../cart/presentation/cart_controller.dart'
+    show cartControllerProvider;
 import '../../../shared/ui_state_of.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
@@ -52,31 +56,33 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
   /// 정렬 고르기: 아래 시트(지금 정렬에 ✓).
   Future<void> _pickSort() async {
     final l10n = AppLocalizations.of(context);
-    final picked = await showModalBottomSheet<SortKey>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              for (final s in SortKey.values)
-                ListTile(
-                  key: ValueKey('sort-${s.name}'),
-                  title: Text(sortLabel(l10n, s)),
-                  trailing: s == _sort
-                      ? const PmartLineIcon(PmartLineIcons.check, size: 20)
-                      : null,
-                  onTap: () => Navigator.of(context).pop(s),
-                ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
+    final picked = await showChoiceSheet<SortKey>(
+      context,
+      title: l10n.sortTitle,
+      closeKey: const ValueKey('sort-close'),
+      selected: _sort,
+      options: [
+        for (final s in SortKey.values)
+          (s, sortLabel(l10n, s), ValueKey('sort-${s.name}')),
+      ],
     );
     if (picked != null && mounted) setState(() => _sort = picked);
+  }
+
+  /// 목록 위 속성 줄에서 바로 고르기 — 시트와 같은 규칙(단일 선택 속성은 같은 속성의 다른 값을 지운다).
+  void _toggleAttribute(FilterAttribute a, FilterValue v) {
+    final token = a.token(v);
+    setState(() {
+      _filters = _filters.contains(token)
+          ? ({..._filters}..remove(token))
+          : {
+              if (a.multiSelect)
+                ..._filters
+              else
+                ..._filters.where((t) => !t.startsWith('${a.key}.')),
+              token,
+            };
+    });
   }
 
   Future<void> _openFilters() async {
@@ -145,9 +151,16 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
+    final hasCart =
+        ref.watch(cartControllerProvider).value?.cart.lines.isNotEmpty ?? false;
     return Column(
       children: [
         ?correction,
+        _AttributeRows(
+          query: widget.baseQuery,
+          picked: _filters,
+          onToggle: _toggleAttribute,
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
           child: Row(
@@ -170,34 +183,56 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
                 onPressed: _pickSort,
               ),
               const SizedBox(width: 6),
-              pill(
-                key: const ValueKey('open-filters'),
-                icon: PmartLineIcons.filter,
-                label: _filters.isEmpty
-                    ? l10n.filterTitle
-                    : l10n.filterSelectedCount(_filters.length),
-                onPressed: _openFilters,
+              // 고른 필터 수는 알약 오른쪽 위 작은 동그라미(레퍼런스).
+              Badge(
+                key: const ValueKey('filter-count'),
+                isLabelVisible: _filters.isNotEmpty,
+                label: Text('${_filters.length}'),
+                backgroundColor: scheme.onSurface,
+                textColor: scheme.surface,
+                offset: const Offset(-2, -4),
+                child: pill(
+                  key: const ValueKey('open-filters'),
+                  icon: PmartLineIcons.filter,
+                  label: l10n.filterTitle,
+                  onPressed: _openFilters,
+                ),
               ),
             ],
           ),
         ),
         Expanded(
-          child: UiStateView<ProductListState>(
-            state: uiStateOf(value, isEmpty: (s) => s.items.isEmpty),
-            onRetry: () => ref.invalidate(provider),
-            empty: (_) => Center(
-              child: Text(
-                widget.baseQuery.keyword == null
-                    ? l10n.listNoProducts
-                    : l10n.searchNoResult,
+          // 레퍼런스: 목록 위에 떠 있는 장바구니 막대(담긴 게 있을 때만).
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: UiStateView<ProductListState>(
+                  loading: (_) => const PmartGridSkeleton(),
+                  state: uiStateOf(value, isEmpty: (s) => s.items.isEmpty),
+                  onRetry: () => ref.invalidate(provider),
+                  empty: (_) => Center(
+                    child: Text(
+                      widget.baseQuery.keyword == null
+                          ? l10n.listNoProducts
+                          : l10n.searchNoResult,
+                    ),
+                  ),
+                  ready: (context, list) => ProductGrid(
+                    key: const PageStorageKey('product-list'),
+                    list: list,
+                    onLoadMore: () => ref.read(provider.notifier).loadMore(),
+                    autoLoadMore: true,
+                    bottomInset: hasCart ? 90 : 0,
+                  ),
+                ),
               ),
-            ),
-            ready: (context, list) => ProductGrid(
-              key: const PageStorageKey('product-list'),
-              list: list,
-              onLoadMore: () => ref.read(provider.notifier).loadMore(),
-              autoLoadMore: true,
-            ),
+              const Positioned(
+                left: 12,
+                right: 12,
+                bottom: 10,
+                child: FloatingCartBar(),
+              ),
+            ],
           ),
         ),
       ],
@@ -278,7 +313,11 @@ class ProductGrid extends StatelessWidget {
     required this.list,
     required this.onLoadMore,
     this.autoLoadMore = false,
+    this.bottomInset = 0,
   });
+
+  /// 아래 떠 있는 막대에 가리지 않게 끝에 더 띄운다.
+  final double bottomInset;
 
   final ProductListState list;
   final VoidCallback onLoadMore;
@@ -327,7 +366,7 @@ class ProductGrid extends StatelessWidget {
           SliverToBoxAdapter(
             child: LoadMoreFooter(list: list, onLoadMore: onLoadMore),
           ),
-        const SliverToBoxAdapter(child: SizedBox(height: 16)),
+        SliverToBoxAdapter(child: SizedBox(height: 16 + bottomInset)),
       ],
     );
   }
@@ -404,87 +443,328 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final provider = filtersProvider(
       ProductQuery(
         keyword: widget.query.keyword,
         categoryId: widget.query.categoryId,
       ),
     );
-    final state = uiStateOf(ref.watch(provider), isEmpty: (a) => a.isEmpty);
+    final value = ref.watch(provider);
+    final state = uiStateOf(value, isEmpty: (a) => a.isEmpty);
+    final attributes = value.value ?? const <FilterAttribute>[];
+    // 고른 값의 이름(아래 "작은공기 ✕" 줄) — 속성 목록에서 찾는다.
+    final pickedLabels = [
+      for (final a in attributes)
+        for (final v in a.values)
+          if (_picked.contains(a.token(v))) (a, v),
+    ];
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              l10n.filterTitle,
-              style: Theme.of(context).textTheme.titleLarge,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 8, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.filterTitle,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    key: const ValueKey('filter-close'),
+                    tooltip: l10n.filterClose,
+                    icon: const PmartLineIcon(PmartLineIcons.close, size: 24),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 220,
+            Flexible(
               child: UiStateView<List<FilterAttribute>>(
                 state: state,
                 onRetry: () => ref.invalidate(provider),
                 ready: (context, attributes) => ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                   children: [
                     for (final a in attributes) ...[
-                      Text(a.label),
+                      Text(
+                        a.label,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
+                        runSpacing: 8,
                         children: [
                           for (final v in a.values)
-                            FilterChip(
+                            _FilterPill(
                               key: ValueKey('filter-${a.token(v)}'),
+                              label: v.label,
                               selected: _picked.contains(a.token(v)),
-                              label: Text(switch (v.count) {
-                                final int c => l10n.filterValueCount(
-                                  v.label,
-                                  c,
-                                ),
-                                null => v.label,
-                              }),
                               // 현재 조건에서 결과가 0개인 값은 고를 수 없다(이미 고른 값은 해제 가능).
-                              onSelected:
-                                  (v.count == 0 &&
-                                      !_picked.contains(a.token(v)))
-                                  ? null
-                                  : (_) => _toggle(a, v),
+                              enabled:
+                                  v.count != 0 || _picked.contains(a.token(v)),
+                              onTap: () => _toggle(a, v),
                             ),
                         ],
                       ),
+                      const SizedBox(height: 28),
                     ],
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                TextButton(
-                  key: const ValueKey('filter-close'),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text(l10n.filterClose),
+            if (pickedLabels.isNotEmpty) ...[
+              const Divider(height: 1),
+              SizedBox(
+                height: 52,
+                child: ListView(
+                  key: const ValueKey('filter-picked'),
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(16, 9, 16, 9),
+                  children: [
+                    for (final (a, v) in pickedLabels)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: InputChip(
+                          key: ValueKey('filter-picked-${a.token(v)}'),
+                          label: Text(v.label),
+                          labelStyle: theme.textTheme.bodyMedium,
+                          backgroundColor: scheme.surfaceContainer,
+                          side: BorderSide.none,
+                          shape: const StadiumBorder(),
+                          deleteIcon: const PmartLineIcon(
+                            PmartLineIcons.close,
+                            size: 16,
+                          ),
+                          onDeleted: () => _toggle(a, v),
+                        ),
+                      ),
+                  ],
                 ),
-                const Spacer(),
-                TextButton(
-                  key: const ValueKey('filter-reset'),
-                  onPressed: () => setState(() => _picked = {}),
-                  child: Text(l10n.filterReset),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  key: const ValueKey('filter-apply'),
-                  onPressed: () => Navigator.of(context).pop(_picked),
-                  child: Text(l10n.filterApply),
-                ),
-              ],
+              ),
+            ],
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 10, 16, 8),
+              child: Row(
+                children: [
+                  InkWell(
+                    key: const ValueKey('filter-reset'),
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => setState(() => _picked = {}),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const PmartLineIcon(PmartLineIcons.refresh, size: 24),
+                          Text(
+                            l10n.filterReset,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      key: const ValueKey('filter-apply'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        // 테마 글꼴을 잃지 않게 테마 글자 모양에서 바꾼다.
+                        textStyle: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(context).pop(_picked),
+                      child: Text(l10n.filterApply),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 필터 값 알약(레퍼런스): 테두리 알약, 고르면 채움, 고를 수 없으면 흐리게.
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: enabled,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        customBorder: const StadiumBorder(),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          decoration: ShapeDecoration(
+            shape: StadiumBorder(
+              side: BorderSide(
+                color: selected
+                    ? scheme.primary
+                    : scheme.outlineVariant.withValues(
+                        alpha: enabled ? 1 : 0.5,
+                      ),
+              ),
+            ),
+            color: selected ? scheme.primary : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+              color: selected
+                  ? scheme.onPrimary
+                  : enabled
+                  ? scheme.onSurface
+                  : scheme.outline.withValues(alpha: 0.6),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 목록 위 속성 줄(레퍼런스 "즉석밥 크기 | 작은공기 중간공기 큰공기"): 앞 2개 속성을 바로 고른다.
+/// 고르면 곧바로 필터에 반영(시트의 적용과 같은 결과). 결과 0개 값은 흐리게·못 고름.
+class _AttributeRows extends ConsumerWidget {
+  const _AttributeRows({
+    required this.query,
+    required this.picked,
+    required this.onToggle,
+  });
+
+  final ProductQuery query;
+  final Set<String> picked;
+  final void Function(FilterAttribute, FilterValue) onToggle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final attributes = ref
+        .watch(
+          filtersProvider(
+            ProductQuery(keyword: query.keyword, categoryId: query.categoryId),
+          ),
+        )
+        .value;
+    // 읽는 중·실패면 줄을 두지 않는다(필터 버튼에서 다시 시도·실패 표시).
+    if (attributes == null || attributes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      key: const ValueKey('attribute-rows'),
+      children: [
+        for (final a in attributes.take(2)) ...[
+          SizedBox(
+            height: 52,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 112,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: Text(
+                      a.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.only(right: 12),
+                    children: [
+                      for (final v in a.values)
+                        if (v.count != 0 || picked.contains(a.token(v)))
+                          InkWell(
+                            key: ValueKey('attr-${a.token(v)}'),
+                            onTap: () => onToggle(a, v),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  v.label,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: picked.contains(a.token(v))
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                    color: picked.contains(a.token(v))
+                                        ? scheme.primary
+                                        : scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+        ],
+        Container(height: 8, color: scheme.surfaceContainer),
+      ],
     );
   }
 }

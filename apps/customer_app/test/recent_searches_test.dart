@@ -1,7 +1,10 @@
+import 'package:dio/dio.dart' show DioExceptionType;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pmart_core/pmart_core.dart' show NetworkFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
+import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/recent_searches_repository.dart';
 import 'package:customer_app/features/catalog/presentation/catalog_providers.dart';
 
@@ -90,4 +93,74 @@ void main() {
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('recent-우유')), findsOneWidget);
   });
+
+  // 인기 검색어(search 0.5.2 — `GET /search/suggestions` 를 q 없이).
+  testWidgets('인기 검색어: 비회원에게도 서버 순서대로 번호를 붙여 보이고, 누르면 그 검색어로 검색', (t) async {
+    await t.pumpWidget(
+      testApp([recentSearchesRepositoryProvider.overrideWithValue(repo0())]),
+    );
+    await t.pumpAndSettle();
+    await _openSearch(t);
+
+    expect(find.text('인기 검색어'), findsOneWidget);
+    final first = find.byKey(const ValueKey('popular-1'));
+    expect(
+      find.descendant(of: first, matching: find.text('우유')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('popular-2')),
+        matching: find.text('요거트'),
+      ),
+      findsOneWidget,
+    );
+
+    await t.tap(first);
+    await t.pumpAndSettle();
+    expect(find.text('인기 검색어'), findsNothing); // 결과 화면
+    expect(find.byKey(const ValueKey('tile-P-0001')), findsOneWidget);
+  });
+
+  testWidgets('인기 검색어: 집계가 없으면(빈 목록) 구역을 숨긴다', (t) async {
+    await t.pumpWidget(
+      testApp([
+        recentSearchesRepositoryProvider.overrideWithValue(repo0()),
+      ], catalog: _Popular(const [])),
+    );
+    await t.pumpAndSettle();
+    await _openSearch(t);
+    expect(find.byKey(const ValueKey('popular-keywords')), findsNothing);
+    expect(find.text('인기 검색어'), findsNothing);
+  });
+
+  testWidgets('인기 검색어: 못 읽어도 구역만 숨기고 최근 검색어·검색은 그대로', (t) async {
+    await t.pumpWidget(
+      testApp([
+        recentSearchesRepositoryProvider.overrideWithValue(repo0()),
+      ], catalog: _Popular(null)),
+    );
+    await t.pumpAndSettle();
+    await _login(t);
+    await _openSearch(t);
+    expect(find.byKey(const ValueKey('popular-keywords')), findsNothing);
+    expect(find.byKey(const ValueKey('recent-우유')), findsOneWidget);
+
+    await t.enterText(find.byKey(const ValueKey('search-field')), '우유');
+    await t.tap(find.byKey(const ValueKey('search-submit')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('tile-P-0001')), findsOneWidget);
+  });
+}
+
+/// 인기 검색어 응답을 정한다(null = 조회 실패).
+final class _Popular extends MockCatalogRepository {
+  _Popular(this.keywords) : super(latency: Duration.zero);
+
+  final List<String>? keywords;
+
+  @override
+  Future<List<String>> popularKeywords() async =>
+      keywords ??
+      (throw const NetworkFailure(DioExceptionType.connectionTimeout));
 }

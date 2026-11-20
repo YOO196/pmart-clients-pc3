@@ -20,7 +20,13 @@ import '../../catalog/presentation/catalog_providers.dart'
 import '../../claims/presentation/claims_controller.dart'
     show CommandDone, CommandOutcome, CommandRejected, CommandUnknown;
 import '../domain/reviews.dart';
+import '../../checkout/presentation/checkout_controller.dart'
+    show clockProvider;
+import 'product_reviews_screen.dart' show reviewRelativeDate;
 import 'reviews_controller.dart';
+
+export 'product_reviews_screen.dart'
+    show ProductReviewsScreen, ReviewPhotosScreen;
 
 /// 별점 표시(읽기 전용).
 class ReviewStars extends StatelessWidget {
@@ -98,55 +104,31 @@ class ReviewManageScreen extends ConsumerWidget {
         appBar: AppBar(
           title: Text(l10n.reviewManageTitle),
 
-          // 레퍼런스 11-1: 둘로 나눈 회색 상자 — 고른 쪽은 흰 칸
+          // 레퍼런스(사용자 캡처 2026-11-20 "리뷰관리"): 밑줄 탭 — 고른 쪽 굵은 검은 글씨 + 검은 밑줄
           bottom: member
-              ? PreferredSize(
-                  preferredSize: const Size.fromHeight(52),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                    child: Container(
-                      height: 38,
-                      padding: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: TabBar(
-                        dividerHeight: 0,
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        indicator: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surface,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                        ),
-                        labelColor: Theme.of(context).colorScheme.onSurface,
-                        unselectedLabelColor: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant,
-                        labelStyle: Theme.of(context).textTheme.bodyMedium
-                            ?.copyWith(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                        unselectedLabelStyle: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(fontSize: 14),
-                        tabs: [
-                          Tab(
-                            key: const ValueKey('review-tab-write'),
-                            text: l10n.reviewTabWrite,
-                          ),
-                          Tab(
-                            key: const ValueKey('review-tab-mine'),
-                            text: l10n.reviewTabMine,
-                          ),
-                        ],
-                      ),
+              ? TabBar(
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  indicatorColor: Theme.of(context).colorScheme.onSurface,
+                  indicatorWeight: 2.5,
+                  dividerColor: Theme.of(context).colorScheme.outlineVariant,
+                  labelColor: Theme.of(context).colorScheme.onSurface,
+                  unselectedLabelColor: Theme.of(context)
+                      .colorScheme
+                      .onSurfaceVariant,
+                  labelStyle: Theme.of(context).textTheme.bodyLarge
+                      ?.copyWith(fontSize: 16, fontWeight: FontWeight.w700),
+                  unselectedLabelStyle: Theme.of(context).textTheme.bodyLarge
+                      ?.copyWith(fontSize: 16),
+                  tabs: [
+                    Tab(
+                      key: const ValueKey('review-tab-write'),
+                      text: l10n.reviewTabWrite,
                     ),
-                  ),
+                    Tab(
+                      key: const ValueKey('review-tab-mine'),
+                      text: l10n.reviewTabMine,
+                    ),
+                  ],
                 )
               : null,
         ),
@@ -370,49 +352,70 @@ class _MyReviewCard extends ConsumerWidget {
     final id = eligibility.reviewId!;
     final provider = reviewProvider(id);
     final value = ref.watch(provider);
-    return Card(
+    final now = ref.watch(clockProvider)();
+    // 레퍼런스 "리뷰관리": 상자 없이 줄로 나눈 목록 — 상품 이름 >, 별점·상대 날짜, 본문, 사진(크게)
+    return DecoratedBox(
       key: ValueKey('review-mine-$id'),
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: theme.dividerColor)),
+      ),
       child: InkWell(
         key: ValueKey('review-mine-open-$id'),
         // 리뷰 하나 화면(수정·삭제). 작성자 ID 가 응답에 없어 "내가 쓴 리뷰"에서만 연다.
         onTap: () => context.push('/reviews/mine/$id', extra: eligibility),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(4, 20, 4, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _ProductName(
-                productId: eligibility.productId,
-                title: eligibility.productName,
-                style: theme.textTheme.titleMedium,
+              Row(
+                children: [
+                  Flexible(
+                    child: _ProductName(
+                      productId: eligibility.productId,
+                      title: eligibility.productName,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const PmartLineIcon(PmartLineIcons.chevronRight, size: 18),
+                ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               switch (value) {
                 AsyncData(value: final r) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        ReviewStars(rating: r.rating),
-                        const SizedBox(width: 8),
+                        ReviewStars(rating: r.rating, size: 15),
+                        const SizedBox(width: 6),
                         Text(
-                          reviewStateText(l10n, r.state),
-                          style: theme.textTheme.bodySmall,
+                          [
+                            reviewRelativeDate(l10n, r.createdAt, now),
+                            reviewStateText(l10n, r.state),
+                          ].join(', '),
+                          key: ValueKey('review-mine-when-$id'),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
-                    Text(
-                      l10n.reviewWrittenAt(formatSeoulDateTime(r.createdAt)),
-                      style: theme.textTheme.bodySmall,
-                    ),
                     if (r.text case final t? when t.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(t),
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Text(
+                          t,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: 15,
+                            height: 1.45,
+                          ),
+                        ),
                       ),
-                    _ReviewPhotos(review: r),
+                    _ReviewPhotos(review: r, size: 120),
                   ],
                 ),
                 AsyncError() => Row(
@@ -582,6 +585,7 @@ class _MyReviewScreenState extends ConsumerState<MyReviewScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.reviewMineTitle)),
       body: UiStateView<ReviewView>(
+        loading: (_) => const PmartDetailSkeleton(image: false),
         state: uiStateOf(ref.watch(provider)),
         onRetry: () => ref.invalidate(provider),
         ready: (context, r) => ListView(
@@ -1243,26 +1247,7 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
               side: BorderSide.none,
               shape: const StadiumBorder(),
               visualDensity: VisualDensity.compact,
-              onPressed: () => showDialog<void>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text(l10n.reviewPolicyTitle),
-                  content: Text(
-                    [
-                      l10n.reviewPolicyOnePerItem,
-                      l10n.reviewPolicyDeadline,
-                      l10n.reviewPolicyEdit,
-                      l10n.reviewPolicyDelete,
-                    ].map((l) => '• $l').join('\n'),
-                  ),
-                  actions: [
-                    FilledButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(l10n.actionConfirm),
-                    ),
-                  ],
-                ),
-              ),
+              onPressed: () => showReviewPolicyDialog(context),
             ),
           ),
         ],
@@ -1672,9 +1657,10 @@ class _PhotoTile extends ConsumerWidget {
 /// 공개 리뷰에 붙은 사진(서버 `photos[].url` — 게이트웨이 상대 경로 `/api/v1/review-photos/{id}`, 토큰 없이 연다).
 /// 주소를 그릴 수 없으면(목 모드 상대 경로 등) 자리표시만 보인다.
 class _ReviewPhotos extends ConsumerWidget {
-  const _ReviewPhotos({required this.review});
+  const _ReviewPhotos({required this.review, this.size = 72});
 
   final ReviewView review;
+  final double size;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1693,9 +1679,9 @@ class _ReviewPhotos extends ConsumerWidget {
       ),
     );
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
+      padding: EdgeInsets.only(top: size > 72 ? 12 : 6),
       child: SizedBox(
-        height: 72,
+        height: size,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           itemCount: review.photoUrls.length,
@@ -1718,13 +1704,13 @@ class _ReviewPhotos extends ConsumerWidget {
                   key: ValueKey('review-photo-${review.reviewId}-$i'),
                   borderRadius: BorderRadius.circular(8),
                   child: SizedBox.square(
-                    dimension: 72,
+                    dimension: size,
                     child: url == null
                         ? placeholder()
                         : Builder(
                             builder: (context) {
                               final px =
-                                  72 * MediaQuery.devicePixelRatioOf(context);
+                                  size * MediaQuery.devicePixelRatioOf(context);
                               // 썸네일은 축소본(?w=240/480)·그릴 크기로만 디코딩(요청 2026-11-20).
                               return Image.network(
                                 withImageWidth(url, px)!,
@@ -1798,12 +1784,10 @@ class _ReviewPhotoViewerState extends State<ReviewPhotoViewer> {
           tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: widget.urls.length > 1
-            ? Text(
-                '${_index + 1} / ${widget.urls.length}',
-                key: const ValueKey('review-photo-viewer-count'),
-              )
-            : null,
+        title: Text(
+          '${_index + 1} / ${widget.urls.length}',
+          key: const ValueKey('review-photo-viewer-count'),
+        ),
         centerTitle: true,
       ),
       body: PageView.builder(
@@ -1946,68 +1930,6 @@ class ProductReviewsPreview extends ConsumerWidget {
           ),
         },
       ],
-    );
-  }
-}
-
-/// 상품 리뷰 전체(`GET /products/{id}/reviews`, 커서로 더 보기).
-class ProductReviewsScreen extends ConsumerWidget {
-  const ProductReviewsScreen({super.key, required this.productId});
-
-  final String productId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
-    final provider = productReviewsProvider(productId);
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.reviewsTitle)),
-      body: UiStateView<PagedList<ReviewView>>(
-        state: uiStateOf(ref.watch(provider), isEmpty: (p) => p.items.isEmpty),
-        onRetry: () => ref.invalidate(provider),
-        empty: (_) => Center(child: Text(l10n.reviewSectionEmpty)),
-        ready: (context, list) {
-          final notifier = ref.read(provider.notifier);
-          // 머리줄 1 + 리뷰 + 꼬리(읽는 중·실패·끝) 1.
-          return ListView.builder(
-            key: const ValueKey('product-reviews-list'),
-            padding: const EdgeInsets.all(16),
-            itemCount: list.items.length + 2,
-            itemBuilder: (context, i) {
-              if (i == 0) {
-                return switch (list.reviewCount) {
-                  final n? => Text(
-                    l10n.reviewSectionCount(n),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  null => const SizedBox.shrink(),
-                };
-              }
-              final at = i - 1;
-              // 끝에서 5개 안쪽이 그려지면 다음 쪽(서버 커서). 실패했으면 자동으로 다시 부르지 않는다(버튼으로).
-              if (at >= list.items.length - 5 &&
-                  list.hasMore &&
-                  !list.loadingMore &&
-                  list.loadMoreFailure == null) {
-                WidgetsBinding.instance.addPostFrameCallback(
-                  (_) => notifier.loadMore(),
-                );
-              }
-              if (at < list.items.length) {
-                return _reviewItem(context, l10n, list.items[at]);
-              }
-              if (list.loadingMore) {
-                return const Padding(
-                  key: ValueKey('review-loading-more'),
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              return _LoadMoreFooter(list: list, onLoadMore: notifier.loadMore);
-            },
-          );
-        },
-      ),
     );
   }
 }
@@ -2190,4 +2112,29 @@ class _OrderReviewEntryScreenState
       },
     );
   }
+}
+
+/// 리뷰 정책 안내 창(레퍼런스 11-2 [리뷰정책안내]).
+Future<void> showReviewPolicyDialog(BuildContext context) {
+  final l10n = AppLocalizations.of(context);
+  return showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(l10n.reviewPolicyTitle),
+      content: Text(
+        [
+          l10n.reviewPolicyOnePerItem,
+          l10n.reviewPolicyDeadline,
+          l10n.reviewPolicyEdit,
+          l10n.reviewPolicyDelete,
+        ].map((l) => '• $l').join('\n'),
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(l10n.actionConfirm),
+        ),
+      ],
+    ),
+  );
 }

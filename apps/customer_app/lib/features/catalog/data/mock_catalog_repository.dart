@@ -807,6 +807,15 @@ base class MockCatalogRepository implements CatalogRepository {
     ].take(5).toList();
   }
 
+  /// 목 인기 검색어 — 목 상품이 걸리는 검색어만(누르면 결과가 나온다).
+  static const mockPopularKeywords = ['우유', '요거트', '감귤', '토마토', '감자칩', '양파'];
+
+  @override
+  Future<List<String>> popularKeywords() async {
+    await _wait();
+    return mockPopularKeywords;
+  }
+
   static Map<String, Object?> productJson(MockProduct p) => {
     'productId': p.productId,
     'name': p.name,

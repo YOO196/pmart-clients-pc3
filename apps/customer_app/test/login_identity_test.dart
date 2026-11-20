@@ -6,6 +6,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import 'package:customer_app/features/auth/data/mock_auth_repository.dart';
 import 'package:customer_app/features/auth/domain/auth.dart';
 import 'package:customer_app/features/auth/presentation/auth_controller.dart';
+import 'package:pmart_core/pmart_core.dart' show PmartEnv;
 
 import 'support/app_harness.dart';
 
@@ -34,9 +35,9 @@ void main() {
   }
 
   bool member(WidgetTester t) =>
-      ProviderScope.containerOf(
-        t.element(find.byType(Scaffold).first),
-      ).read(sessionProvider) is MemberSession;
+      ProviderScope.containerOf(t.element(find.byType(Scaffold).first))
+              .read(sessionProvider)
+          is MemberSession;
 
   testWidgets('확인 번호가 없는 기존 회원: 번호 → 보낼 문자 안내 → 보냈어요 → 회원', (t) async {
     final auth = MockAuthRepository(latency: Duration.zero)
@@ -127,5 +128,32 @@ void main() {
     await t.tap(find.byKey(const ValueKey('id-sent')));
     await t.pumpAndSettle();
     expect(member(t), isTrue);
+  });
+
+  testWidgets('로그인 화면은 화면 폭 전체를 쓴다(실기기처럼 목 안내가 없어도 왼쪽에 붙지 않는다)', (t) async {
+    t.view
+      ..physicalSize = const Size(800, 1800)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp(
+        const [],
+        env: PmartEnv.local,
+        auth: MockAuthRepository(latency: Duration.zero),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    final scroll = find.descendant(
+      of: find.byType(LayoutBuilder),
+      matching: find.byType(SingleChildScrollView),
+    );
+    final width = t.getSize(scroll.first).width;
+    expect(width, t.view.physicalSize.width / t.view.devicePixelRatio);
+    // 로고가 가운데
+    expect(t.getCenter(find.text('바로픽')).dx, closeTo(width / 2, 1));
   });
 }

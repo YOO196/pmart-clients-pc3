@@ -311,18 +311,36 @@ final orderReviewEligibilitiesProvider = FutureProvider.autoDispose
 
 /// 상품 리뷰 목록(공개). 비회원도 본다.
 final productReviewsProvider = AsyncNotifierProvider.autoDispose
-    .family<ProductReviews, PagedList<ReviewView>, String>(ProductReviews.new);
+    .family<ProductReviews, PagedList<ReviewView>, String>(
+      (id) => ProductReviews((
+        productId: id,
+        sort: ReviewSort.newest,
+        photoOnly: false,
+      )),
+    );
+
+/// 상품 리뷰 전체 화면 — 정렬·사진 리뷰만 조건마다 따로 읽는다(조건을 바꾸면 처음 쪽부터).
+final productReviewListProvider = AsyncNotifierProvider.autoDispose
+    .family<ProductReviews, PagedList<ReviewView>, ProductReviewQuery>(
+      ProductReviews.new,
+    );
 
 class ProductReviews extends AsyncNotifier<PagedList<ReviewView>> {
-  ProductReviews(this.productId);
+  ProductReviews(this.query);
 
-  final String productId;
+  final ProductReviewQuery query;
+
+  String get productId => query.productId;
 
   @override
   Future<PagedList<ReviewView>> build() async {
     final page = await ref
         .watch(reviewsRepositoryProvider)
-        .productReviews(productId);
+        .productReviews(
+          productId,
+          sort: query.sort,
+          withPhotoOnly: query.photoOnly,
+        );
     return PagedList(
       items: page.items,
       nextCursor: page.nextCursor,
@@ -340,7 +358,12 @@ class ProductReviews extends AsyncNotifier<PagedList<ReviewView>> {
     try {
       final page = await ref
           .read(reviewsRepositoryProvider)
-          .productReviews(productId, cursor: current.nextCursor);
+          .productReviews(
+            productId,
+            cursor: current.nextCursor,
+            sort: query.sort,
+            withPhotoOnly: query.photoOnly,
+          );
       if (!ref.mounted) return;
       final seen = {for (final r in current.items) r.reviewId};
       state = AsyncData(

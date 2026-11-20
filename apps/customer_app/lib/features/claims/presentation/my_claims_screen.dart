@@ -24,6 +24,7 @@ class MyClaimsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(l10n.myClaimsTitle)),
       body: UiStateView<MyClaimsState>(
+        loading: (_) => const PmartListSkeleton(),
         state: uiStateOf(value, isEmpty: (s) => s.items.isEmpty),
         onRetry: () => ref.invalidate(myClaimsProvider),
         empty: (_) => Center(

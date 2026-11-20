@@ -23,6 +23,7 @@ import '../../profile/presentation/profile_controller.dart'
 import '../domain/inquiry.dart';
 import 'faq_screens.dart' show SupportFaqBlock;
 import 'inquiry_controller.dart';
+import '../../../shared/notice.dart';
 
 String inquiryCategoryText(AppLocalizations l10n, InquiryCategory? c) =>
     switch (c) {
@@ -252,6 +253,7 @@ class InquiryListScreen extends ConsumerWidget {
       body: switch (value) {
         AsyncData(value: null) => LoginRequired(message: l10n.inqLoginNeeded),
         _ => UiStateView<InquiryListState?>(
+          loading: (_) => const PmartListSkeleton(),
           state: uiStateOf(value, isEmpty: (s) => s!.items.isEmpty),
           onRetry: () => ref.invalidate(inquiryListProvider),
           empty: (_) => Center(
@@ -629,7 +631,7 @@ class _RateBoxState extends ConsumerState<_RateBox> {
     }
     if (!mounted) return;
     setState(() => _busy = false);
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    messenger.notice(message);
   }
 
   @override
@@ -783,7 +785,7 @@ class _CloseButtonState extends ConsumerState<_CloseButton> {
     }
     if (!mounted) return;
     setState(() => _busy = false);
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    messenger.notice(message);
   }
 
   @override
@@ -1135,8 +1137,7 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
     switch (outcome) {
       case InquirySubmitted(:final inquiry):
         ref.invalidate(inquiryListProvider);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(l10n.inqSubmitted)));
+        showNotice(context, l10n.inqSubmitted);
         context.pushReplacement(
           '/support/inquiries/${inquiry.summary.inquiryId}',
         );

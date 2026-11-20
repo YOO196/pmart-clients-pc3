@@ -11,7 +11,8 @@ import '../domain/auth.dart';
 import 'package:pmart_core/pmart_core.dart' show PmartEnv, ProblemCode;
 
 import '../../../shared/providers.dart' show envProvider;
-import '../../start/presentation/start_controller.dart' show startFlagsProvider;
+import '../../start/presentation/start_controller.dart'
+    show leaveApp, startFlagsProvider;
 import 'auth_controller.dart';
 import 'identity_view.dart';
 
@@ -291,7 +292,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final body = LayoutBuilder(
       builder: (context, c) => SingleChildScrollView(
         child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: c.maxHeight),
+          // 폭도 화면 전체로 — 본문이 좁으면(실기기: 목 안내 문장 없음) 왼쪽에 붙던 것(사용자 2026-11-20)
+          constraints: BoxConstraints(
+            minHeight: c.maxHeight,
+            minWidth: c.maxWidth,
+          ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
             child: Column(
@@ -380,6 +385,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (widget.entry) {
       return PopScope(
         canPop: false,
+        // 처음 실행의 로그인/둘러보기 — 돌아갈 곳이 없어 뒤로는 앱을 나간다.
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) leaveApp();
+        },
         child: Scaffold(
           key: const ValueKey('start-entry'),
           body: SafeArea(child: body),

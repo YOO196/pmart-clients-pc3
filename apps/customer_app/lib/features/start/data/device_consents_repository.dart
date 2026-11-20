@@ -219,7 +219,9 @@ final class MockDeviceConsentsRepository implements DeviceConsentsRepository {
   final _state = <String, DeviceConsent>{};
   final _keys = <String>{};
   PmartFailure? failNextTerms;
-  PmartFailure? failNextChange;
+
+  /// 다음 반영을 이 오류로 실패시킨다(예상 못 한 오류 시험은 [PmartFailure] 가 아닌 것도).
+  Object? failNextChange;
 
   static const sender = 'PMart';
   static const _terms = [

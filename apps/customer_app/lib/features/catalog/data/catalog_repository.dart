@@ -35,6 +35,9 @@ abstract interface class CatalogRepository {
   /// 자동완성. 실패해도 직접 검색은 된다(호출자가 빈 제안으로 처리).
   Future<List<String>> suggestions(String keyword);
 
+  /// 검색 첫 화면의 인기 검색어(search 0.5.2 — `GET /search/suggestions` 를 q 없이). 집계가 없으면 빈 목록.
+  Future<List<String>> popularKeywords();
+
   Future<ProductDetail> product(String productId, {String? mfcId});
 
   /// `GET /product-contents/{id}/rating-summary`(product-content 0.2.1, 비회원 가능) — 리뷰 등록 사건으로 채우는 서버 집계.
@@ -136,6 +139,12 @@ final class ApiCatalogRepository implements CatalogRepository {
       () => _search.getSearchSuggestions(q: keyword),
     );
     return res.data?.keywords ?? const [];
+  }
+
+  @override
+  Future<List<String>> popularKeywords() async {
+    final res = await pmartGuard(() => _search.getSearchSuggestions());
+    return res.data?.popular ?? const [];
   }
 
   @override

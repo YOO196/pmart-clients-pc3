@@ -242,6 +242,16 @@ void main() {
     await t.tap(find.byKey(const ValueKey('search-submit')));
     await t.pumpAndSettle();
     await shot('search-results');
+    // 필터 시트(사용자 캡처 2026-11-20 — 테두리 알약·고른 값 줄·초기화 + 상품 보기)
+    await t.tap(find.byKey(const ValueKey('attr-capacity.1l')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('open-filters')));
+    await t.pumpAndSettle();
+    await shot('filter-sheet');
+    await t.tap(find.byKey(const ValueKey('filter-close')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('attr-capacity.1l')));
+    await t.pumpAndSettle();
     // 오타 교정 띠(search 0.4.0) — 목 사전 '우우' → '우유'.
     await t.enterText(find.byKey(const ValueKey('search-field')), '우우');
     await t.tap(find.byKey(const ValueKey('search-submit')));
@@ -260,6 +270,19 @@ void main() {
     await shot('product-detail');
     await scrollDown(600);
     await shot('product-detail-2');
+    // 상품리뷰 전체 보기(사용자 캡처 2026-11-20): 평점·사진 모음·사진리뷰만·정렬 시트·모아보기
+    await go('/products/P-0001/reviews');
+    await shot('product-reviews');
+    await t.tap(find.byKey(const ValueKey('review-sort-open')));
+    await t.pumpAndSettle();
+    await shot('product-reviews-sort');
+    await t.tap(find.byKey(const ValueKey('review-sort-close')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('review-photos-more')));
+    await t.pumpAndSettle();
+    await shot('review-photos');
+    await t.tap(find.byKey(const ValueKey('review-photos-close')));
+    await t.pumpAndSettle();
 
     await go('/cart');
     await shot('cart');
@@ -687,6 +710,32 @@ void main() {
     await shot('chat-order-status');
     await ask('포인트는 언제 생기나요? #근거없음');
     await shot('chat-handoff');
+
+    // 알림(스낵바)은 아래 떠 있는 장바구니 막대·버튼 위에 뜬다(사용자 2026-11-20 "팝업창이 버튼을 가리는데").
+    // 맨 끝에 둔다 — 담기가 앞 장바구니 캡처를 바꾸지 않게.
+    await go('/search');
+    await t.enterText(find.byKey(const ValueKey('search-field')), '우유');
+    await t.tap(find.byKey(const ValueKey('search-submit')));
+    await t.pumpAndSettle();
+    await t.tap(
+      find.byWidgetPredicate((w) {
+        final k = w.key;
+        return k is ValueKey<String> && k.value.startsWith('quick-add-');
+      }).last,
+    );
+    await shot('notice-over-cart-bar');
+    await t.pump(const Duration(seconds: 5));
+    await t.pumpAndSettle();
+    await tapTile(t, 'P-0001');
+    await t.tap(find.byKey(const ValueKey('add-inc')));
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('add-to-cart')));
+    await shot('notice-over-bottom-button');
+    await t.pump(const Duration(seconds: 5));
+    await t.pumpAndSettle();
+    await go('/cart');
+    await t.tap(find.byKey(const ValueKey('cart-order')));
+    await shot('notice-over-cart-order');
     debugDisableShadows = true;
   });
 

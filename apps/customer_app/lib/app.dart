@@ -10,6 +10,7 @@ import 'features/push/presentation/push_controller.dart'
     show pushRegistrationProvider;
 import 'l10n/gen/app_localizations.dart';
 import 'router.dart';
+import 'shared/notice.dart';
 import 'shared/providers.dart';
 
 /// 화면 어디서든 세션 안내(스낵바)를 띄우기 위한 루트 메신저.
@@ -32,32 +33,37 @@ class CustomerApp extends ConsumerWidget {
       final ctx = rootScaffoldMessengerKey.currentContext;
       if (messenger == null || ctx == null) return;
       final l10n = AppLocalizations.of(ctx);
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(switch (notice) {
-        SessionNotice.renewed => SnackBar(
-          key: const ValueKey('session-renewed'),
-          content: Text(l10n.sessionRenewed),
-        ),
-        SessionNotice.expired => SnackBar(
-          key: const ValueKey('session-expired'),
-          content: Text(l10n.sessionExpiredNotice),
-          duration: const Duration(seconds: 8),
-          action: SnackBarAction(
-            label: l10n.sessionExpiredLogin,
-            // 로그인은 현재 화면 위에 열리고, 끝나면 그 화면으로 돌아온다(입력값 유지).
-            onPressed: () => ref.read(routerProvider).push('/login'),
-          ),
-        ),
-        SessionNotice.unreachable => SnackBar(
-          key: const ValueKey('session-unreachable'),
-          content: Text(l10n.sessionUnreachableNotice),
-          duration: const Duration(seconds: 8),
-          action: SnackBarAction(
-            label: l10n.sessionRetry,
-            onPressed: () => ref.read(sessionProvider.notifier).retryRestore(),
-          ),
-        ),
-      });
+      // 다시 로그인·다시 시도는 놓치면 안 되는 안내라 다른 알림보다 조금 길게 둔다(그래도 스스로 닫힌다).
+      const long = Duration(seconds: 5);
+      switch (notice) {
+        case SessionNotice.renewed:
+          messenger.notice(
+            l10n.sessionRenewed,
+            key: const ValueKey('session-renewed'),
+          );
+        case SessionNotice.expired:
+          messenger.notice(
+            l10n.sessionExpiredNotice,
+            key: const ValueKey('session-expired'),
+            duration: long,
+            action: SnackBarAction(
+              label: l10n.sessionExpiredLogin,
+              // 로그인은 현재 화면 위에 열리고, 끝나면 그 화면으로 돌아온다(입력값 유지).
+              onPressed: () => ref.read(routerProvider).push('/login'),
+            ),
+          );
+        case SessionNotice.unreachable:
+          messenger.notice(
+            l10n.sessionUnreachableNotice,
+            key: const ValueKey('session-unreachable'),
+            duration: long,
+            action: SnackBarAction(
+              label: l10n.sessionRetry,
+              onPressed: () =>
+                  ref.read(sessionProvider.notifier).retryRestore(),
+            ),
+          );
+      }
     });
     return _app(ref);
   }

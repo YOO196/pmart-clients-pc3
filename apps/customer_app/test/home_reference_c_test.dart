@@ -476,6 +476,12 @@ void main() {
       await t.pumpAndSettle();
       await openSearch(t, '그릭요거트');
 
+      // 목록 위 속성 줄이 생겨 아래로 밀릴 수 있다 — 보이게 한 뒤 누른다.
+
+      await t.ensureVisible(find.byKey(const ValueKey('quick-add-P-0002')));
+
+      await t.pumpAndSettle();
+
       await t.tap(find.byKey(const ValueKey('quick-add-P-0002')));
       await t.pumpAndSettle();
       expect(cart.adds, ['E-00000002']);
@@ -489,11 +495,20 @@ void main() {
       await openSearch(t, '감자칩');
 
       // 목 장바구니에 감자칩 1개가 담겨 있다.
+      // 목록 위 속성 줄이 생겨 아래로 밀릴 수 있다 — 보이게 한 뒤 누른다.
+      await t.ensureVisible(find.byKey(const ValueKey('quick-add-P-0005')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('quick-add-P-0005')));
       await t.pumpAndSettle();
       expect(cart.adds, isEmpty);
       expect(cart.setQuantities, [2]);
       expect(find.text('장바구니에 2개 있어요'), findsOneWidget);
+
+      // 목록 위 속성 줄이 생겨 아래로 밀릴 수 있다 — 보이게 한 뒤 누른다.
+
+      await t.ensureVisible(find.byKey(const ValueKey('quick-add-P-0005')));
+
+      await t.pumpAndSettle();
 
       await t.tap(find.byKey(const ValueKey('quick-add-P-0005')));
       await t.pumpAndSettle();
@@ -507,7 +522,16 @@ void main() {
       await t.pumpAndSettle();
       await openSearch(t, '그릭요거트');
 
+      // 목록 위 속성 줄이 생겨 아래로 밀릴 수 있다 — 보이게 한 뒤 누른다.
+
+      await t.ensureVisible(find.byKey(const ValueKey('quick-add-P-0002')));
+
+      await t.pumpAndSettle();
+
       await t.tap(find.byKey(const ValueKey('quick-add-P-0002')));
+      await t.pumpAndSettle();
+      // 목록 위 속성 줄이 생겨 아래로 밀릴 수 있다 — 보이게 한 뒤 누른다.
+      await t.ensureVisible(find.byKey(const ValueKey('quick-add-P-0002')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('quick-add-P-0002')));
       await t.pumpAndSettle();
@@ -521,6 +545,12 @@ void main() {
       await t.pumpWidget(testApp(const [], cart: cart));
       await t.pumpAndSettle();
       await openSearch(t, '서울우유');
+
+      // 목록 위 속성 줄이 생겨 아래로 밀릴 수 있다 — 보이게 한 뒤 누른다.
+
+      await t.ensureVisible(find.byKey(const ValueKey('quick-add-P-0001')));
+
+      await t.pumpAndSettle();
 
       await t.tap(find.byKey(const ValueKey('quick-add-P-0001')));
       await t.pumpAndSettle();
@@ -539,6 +569,12 @@ void main() {
       await t.pumpWidget(testApp(const [], cart: cart));
       await t.pumpAndSettle();
       await openSearch(t, '양파');
+
+      // 목록 위 속성 줄이 생겨 아래로 밀릴 수 있다 — 보이게 한 뒤 누른다.
+
+      await t.ensureVisible(find.byKey(const ValueKey('quick-add-P-0007')));
+
+      await t.pumpAndSettle();
 
       await t.tap(find.byKey(const ValueKey('quick-add-P-0007')));
       await t.pumpAndSettle();

@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 
@@ -61,6 +62,12 @@ class StartFlagsController extends AsyncNotifier<StartFlags> {
     await _store.completeEntry();
     if (ref.mounted) state = AsyncData(await _store.read());
   }
+
+  /// 주소 단계에서 뒤로(비회원) — 로그인/둘러보기 화면으로 돌아간다.
+  Future<void> reopenEntry() async {
+    await _store.reopenEntry();
+    if (ref.mounted) state = AsyncData(await _store.read());
+  }
 }
 
 enum StartStep {
@@ -79,6 +86,9 @@ enum StartStep {
   /// 홈으로.
   ready,
 }
+
+/// 처음 실행 단계에서 더 돌아갈 화면이 없을 때 뒤로 — 앱을 나간다(시험에서 바꿔 끼울 수 있게 변수로 둔다).
+void Function() leaveApp = SystemNavigator.pop;
 
 /// 지금 어느 처음 실행 단계인지. 주소록 조회 실패는 "주소 없음"이 아니다 — 막지 않고 홈이 오류를 보인다.
 final startStepProvider = Provider<StartStep>((ref) {

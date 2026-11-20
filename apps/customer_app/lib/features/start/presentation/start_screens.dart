@@ -10,6 +10,8 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../address/domain/address.dart';
+import '../../auth/domain/auth.dart' show MemberSession;
+import '../../auth/presentation/auth_controller.dart' show sessionProvider;
 import '../../address/presentation/address_controller.dart';
 import '../../address/presentation/address_screens.dart'
     show addressOutcomeText, addressSearchProvider;
@@ -19,6 +21,7 @@ import '../../push/presentation/push_controller.dart' show pushSourceProvider;
 import '../data/device_consents_repository.dart';
 import 'current_location_flow.dart';
 import 'start_controller.dart';
+import '../../../shared/notice.dart';
 
 /// 처음 실행 단계를 판단하는 동안(저장소·세션·주소록 읽기) — 바로픽 시작 그림(사용자 지시 2026-11-19).
 /// 배경색은 Android 시작 화면(`splash_background`)과 같아 그림이 뜨기 전에도 이어 보인다.
@@ -99,6 +102,23 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     });
     final key = _key ??= IdempotencyKey.generate();
     final repo = ref.read(deviceConsentsRepositoryProvider);
+    // 예상하지 못한 오류(기기 저장소 등)에도 단추가 잠긴 채 남지 않게 한다 — 실패로 알리고 다시 누를 수 있다.
+    try {
+      await _send(terms, changes, key, repo, l10n);
+    } on Object {
+      if (mounted) setState(() => _error = l10n.startConsentFailed);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _send(
+    ConsentTerms terms,
+    List<ConsentChange> changes,
+    IdempotencyKey key,
+    DeviceConsentsRepository repo,
+    AppLocalizations l10n,
+  ) async {
     DeviceConsents? result;
     String? error;
     if (changes.isEmpty) {
@@ -125,10 +145,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     }
     if (!mounted) return;
     if (result == null) {
-      setState(() {
-        _busy = false;
-        _error = error;
-      });
+      setState(() => _error = error);
       return;
     }
     final marketing = result.of(ConsentWire.marketing);
@@ -146,7 +163,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       if (!mounted) return;
     }
     await ref.read(startFlagsProvider.notifier).completeWelcome();
-    if (mounted) setState(() => _busy = false);
   }
 
   Widget _check({
@@ -238,6 +254,10 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     final terms = termsValue.value;
     return PopScope(
       canPop: false,
+      // 첫 화면이라 돌아갈 곳이 없다 — 뒤로는 앱을 나간다(전에는 아무 일도 없었다).
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) leaveApp();
+      },
       child: Scaffold(
         key: const ValueKey('start-welcome'),
         body: SafeArea(
@@ -367,9 +387,7 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
     }
     if (!mounted) return;
     setState(() => _saving = null);
-    messenger.showSnackBar(
-      SnackBar(content: Text(addressOutcomeText(l10n, outcome))),
-    );
+    messenger.notice(addressOutcomeText(l10n, outcome));
     if (outcome is AddressSaved || outcome is AddressCommandUnknown) {
       context.go('/');
     }
@@ -447,6 +465,15 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
     final muted = theme.colorScheme.onSurfaceVariant;
     return PopScope(
       canPop: false,
+      // 주소 없이 홈으로는 못 간다. 비회원은 로그인/둘러보기 화면으로 돌아가고, 회원은 앱을 나간다.
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (ref.read(sessionProvider) is MemberSession) {
+          leaveApp();
+        } else {
+          ref.read(startFlagsProvider.notifier).reopenEntry();
+        }
+      },
       child: Scaffold(
         key: const ValueKey('start-address'),
         appBar: AppBar(

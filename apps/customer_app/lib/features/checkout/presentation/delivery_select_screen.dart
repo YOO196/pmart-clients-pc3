@@ -7,6 +7,7 @@ import 'package:pmart_core/pmart_core.dart'
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/notice.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../address/domain/address.dart';
 import '../../address/presentation/address_controller.dart';
@@ -700,11 +701,10 @@ Future<void> saveOutOfStockPreference(
     }
   } on PmartFailure {
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        key: const ValueKey('oos-remember-failed'),
-        content: Text(AppLocalizations.of(context).oosRememberFailed),
-      ),
+    showNotice(
+      context,
+      AppLocalizations.of(context).oosRememberFailed,
+      key: const ValueKey('oos-remember-failed'),
     );
   }
 }
@@ -754,29 +754,17 @@ Future<void> proceedToCheckout(BuildContext context, WidgetRef ref) async {
             error is ProblemFailure &&
             error.problem.code == CheckoutProblemCode.insufficientStock;
         if (stock) context.go('/cart');
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              // 버튼이 달린 SnackBar 는 Flutter 기본값으로 자동으로 닫히지 않는다(persist). 알림은 잠시 뒤 닫는다.
-              persist: false,
-              key: const ValueKey('delivery-rejected'),
-              content: Text(rejection?.text ?? l10n.checkoutRejected),
-              action: switch (rejection) {
-                _ when stock => null,
-                (
-                  route: final String route,
-                  action: final String label,
-                  text: _,
-                ) =>
-                  SnackBarAction(
-                    label: label,
-                    onPressed: () => context.go(route),
-                  ),
-                _ => null,
-              },
-            ),
-          );
+        showNotice(
+          context,
+          rejection?.text ?? l10n.checkoutRejected,
+          key: const ValueKey('delivery-rejected'),
+          action: switch (rejection) {
+            _ when stock => null,
+            (route: final String route, action: final String label, text: _) =>
+              SnackBarAction(label: label, onPressed: () => context.go(route)),
+            _ => null,
+          },
+        );
       case CheckoutGate.minOrderUnmet:
         final l10n = AppLocalizations.of(context);
         final shortfall = ref
@@ -785,24 +773,19 @@ Future<void> proceedToCheckout(BuildContext context, WidgetRef ref) async {
             ?.draft
             .quote
             ?.minOrderShortfall;
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              // 버튼이 달린 SnackBar 는 Flutter 기본값으로 자동으로 닫히지 않는다(persist). 알림은 잠시 뒤 닫는다.
-              persist: false,
-              key: const ValueKey('delivery-min-order'),
-              // BR-14: 부족액은 서버 값(minOrderShortfall)만 쓴다. 없으면 금액 없이 안내한다.
-              content: Text(switch (shortfall) {
-                final int n when n > 0 => l10n.minOrderShortfall(formatKrw(n)),
-                _ => l10n.minOrderUnsatisfied,
-              }),
-              action: SnackBarAction(
-                label: l10n.cartGoToCart,
-                onPressed: () => context.go('/cart'),
-              ),
-            ),
-          );
+        showNotice(
+          context,
+          // BR-14: 부족액은 서버 값(minOrderShortfall)만 쓴다. 없으면 금액 없이 안내한다.
+          switch (shortfall) {
+            final int n when n > 0 => l10n.minOrderShortfall(formatKrw(n)),
+            _ => l10n.minOrderUnsatisfied,
+          },
+          key: const ValueKey('delivery-min-order'),
+          action: SnackBarAction(
+            label: l10n.cartGoToCart,
+            onPressed: () => context.go('/cart'),
+          ),
+        );
     }
   } finally {
     if (ref.context.mounted) busy.set(false);

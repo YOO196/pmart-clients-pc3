@@ -284,10 +284,13 @@ void main() {
       await t.tap(find.byKey(const ValueKey('open-filters')));
       await t.pumpAndSettle();
       // 결과가 0개인 값(감자칩 용량)은 고를 수 없다.
-      final zero = t.widget<FilterChip>(
-        find.byKey(const ValueKey('filter-capacity.110g')),
+      final zero = t.widget<InkWell>(
+        find.descendant(
+          of: find.byKey(const ValueKey('filter-capacity.110g')),
+          matching: find.byType(InkWell),
+        ),
       );
-      expect(zero.onSelected, isNull);
+      expect(zero.onTap, isNull);
       await t.tap(find.byKey(const ValueKey('filter-capacity.1l')));
       await t.pump();
       await t.tap(find.byKey(const ValueKey('filter-apply')));
@@ -295,7 +298,30 @@ void main() {
 
       expect(find.byKey(const ValueKey('tile-P-0001')), findsOneWidget);
       expect(find.byKey(const ValueKey('tile-P-0006')), findsNothing);
-      expect(find.text('필터 1'), findsOneWidget);
+      // 고른 수는 필터 알약 위 작은 동그라미.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('filter-count')),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('목록 위 속성 줄: 누르면 바로 거르고, 다시 누르면 푼다. 결과 0개 값은 줄에 없다', (t) async {
+      await t.pumpWidget(testApp([]));
+      await openSearch(t);
+      await _search(t, '우유');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('attribute-rows')), findsOneWidget);
+      expect(find.byKey(const ValueKey('attr-capacity.110g')), findsNothing);
+      await t.tap(find.byKey(const ValueKey('attr-capacity.1l')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('tile-P-0001')), findsOneWidget);
+      expect(find.byKey(const ValueKey('tile-P-0006')), findsNothing);
+      await t.tap(find.byKey(const ValueKey('attr-capacity.1l')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('tile-P-0006')), findsOneWidget);
     });
 
     testWidgets('다음 묶음 실패는 받은 목록을 지우지 않는다', (t) async {

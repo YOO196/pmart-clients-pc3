@@ -10,6 +10,7 @@ import 'package:tosspayments_widget_sdk_flutter/widgets/payment_method.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../data/payment_repository.dart';
 import '../domain/payment.dart';
+import '../../../shared/notice.dart';
 
 /// 토스 결제위젯 결과를 앱 결과로 바꾼다. 인증 성공도 결제 완료가 아니다(서버 승인·주문 확정은 따로).
 ///
@@ -128,9 +129,7 @@ class _TossPaymentPageState extends State<TossPaymentPage> {
     try {
       final agreement = await _agreementControl!.getAgreementStatus();
       if (agreement.agreedRequiredTerms != true) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(l10n.tossAgreementRequired)),
-        );
+        messenger.notice(l10n.tossAgreementRequired);
         return;
       }
       final result = await _widget.requestPayment(

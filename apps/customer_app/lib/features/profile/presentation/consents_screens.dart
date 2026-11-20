@@ -11,6 +11,7 @@ import '../../../shared/ui_state_of.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/consents_repository.dart';
+import '../../../shared/notice.dart';
 
 final consentsRepositoryProvider = Provider<ConsentsRepository>(
   (ref) => switch (ref.watch(envProvider)) {
@@ -350,9 +351,7 @@ class _MarketingConsentTileState extends ConsumerState<MarketingConsentTile> {
     ref.invalidate(myConsentsProvider);
     setState(() => _busy = false);
     if (message != null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(message)));
+      showNotice(context, message);
     }
   }
 

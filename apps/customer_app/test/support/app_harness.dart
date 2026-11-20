@@ -47,6 +47,8 @@ import 'package:customer_app/shared/providers.dart';
 /// 목 모드 앱. 둘러보기는 [catalog](기본: 지연 없는 목)를 쓰고 [overrides] 를 더한다.
 Widget testApp(
   List<Override> overrides, {
+  // 화면이 환경에 따라 다른 것(목 안내 문장 등)을 실기기 환경으로 볼 때.
+  PmartEnv env = PmartEnv.mock,
   CatalogRepository? catalog,
   CartRepository? cart,
   CheckoutRepository? checkout,
@@ -90,7 +92,7 @@ Widget testApp(
   return ProviderScope(
     retry: (_, _) => null,
     overrides: [
-      envProvider.overrideWithValue(PmartEnv.mock),
+      envProvider.overrideWithValue(env),
       onSessionExpiredProvider.overrideWith(
         (ref) => ref.read(sessionExpiryHandlerProvider),
       ),

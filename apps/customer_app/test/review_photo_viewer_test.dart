@@ -48,14 +48,18 @@ void main() {
     expect(find.byKey(const ValueKey('review-photo-viewer')), findsNothing);
   });
 
-  testWidgets('그릴 수 없는 사진은 빈 화면이 아니라 "불러오지 못했어요", 한 장이면 번호 없음', (t) async {
+  testWidgets('그릴 수 없는 사진은 빈 화면이 아니라 "불러오지 못했어요", 한 장이어도 "1 / 1"(레퍼런스)', (
+    t,
+  ) async {
     await t.pumpWidget(host(const [null]));
     await t.tap(find.byKey(const ValueKey('open')));
     await t.pumpAndSettle();
     expect(find.text('사진을 불러오지 못했어요'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('review-photo-viewer-count')),
-      findsNothing,
+      t
+          .widget<Text>(find.byKey(const ValueKey('review-photo-viewer-count')))
+          .data,
+      '1 / 1',
     );
     expect(find.byType(InteractiveViewer), findsOneWidget);
   });

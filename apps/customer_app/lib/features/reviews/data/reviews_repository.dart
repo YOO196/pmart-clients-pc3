@@ -50,7 +50,12 @@ abstract interface class ReviewsRepository {
   Future<void> delete(String reviewId, {required IdempotencyKey key});
 
   /// `GET /products/{productId}/reviews`(최신 순).
-  Future<ProductReviewPage> productReviews(String productId, {String? cursor});
+  Future<ProductReviewPage> productReviews(
+    String productId, {
+    String? cursor,
+    ReviewSort sort = ReviewSort.newest,
+    bool withPhotoOnly = false,
+  });
 }
 
 final class ApiReviewsRepository implements ReviewsRepository {
@@ -186,9 +191,20 @@ final class ApiReviewsRepository implements ReviewsRepository {
   Future<ProductReviewPage> productReviews(
     String productId, {
     String? cursor,
+    ReviewSort sort = ReviewSort.newest,
+    bool withPhotoOnly = false,
   }) async {
     final res = await pmartGuard(
-      () => _reviews.listProductReviews(productId: productId, cursor: cursor),
+      () => _reviews.listProductReviews(
+        productId: productId,
+        cursor: cursor,
+        sort: switch (sort) {
+          ReviewSort.newest => 'NEWEST',
+          ReviewSort.ratingDesc => 'RATING_DESC',
+          ReviewSort.ratingAsc => 'RATING_ASC',
+        },
+        withPhotoOnly: withPhotoOnly,
+      ),
     );
     final body =
         res.data ?? (throw const ContractViolationFailure('리뷰 목록 본문 없음'));

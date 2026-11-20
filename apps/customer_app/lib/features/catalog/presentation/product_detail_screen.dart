@@ -84,6 +84,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               // 응답 전: 카드 값으로 사진·이름·가격(R1). 담기는 응답 뒤에만 열린다(아래 바 없음).
               (AsyncLoading(), final ProductTile t) => _PreviewBody(tile: t),
               _ => UiStateView<ProductDetail>(
+                loading: (_) => const PmartDetailSkeleton(),
                 state: uiStateOf(value),
                 onRetry: () => ref.invalidate(provider),
                 ready: (context, p) => _body(context, l10n, p),

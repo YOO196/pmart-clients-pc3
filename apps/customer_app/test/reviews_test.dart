@@ -754,7 +754,7 @@ void main() {
       );
       await t.pumpAndSettle();
       expect(find.text('꾸덕하고 맛있어요. 다음에도 살게요.'), findsOneWidget);
-      expect(find.text('게시됨'), findsOneWidget);
+      expect(find.textContaining('게시됨'), findsOneWidget);
     });
 
     testWidgets('내가 쓴 리뷰 목록 조회 실패는 "쓴 리뷰 없음"이 아니다', (t) async {
@@ -1012,9 +1012,54 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('review-load-more')), findsNothing);
-      expect(repo.productCursors, [null, '5']);
+      // 미리보기·전체 목록·사진 리뷰 모음(사진 리뷰만)이 각각 첫 쪽, 전체 목록만 다음 쪽.
+      expect(repo.productCursors, [null, null, null, '5']);
+      expect(repo.productQueries.where((q) => q.photoOnly), hasLength(1));
     });
 
+    testWidgets('전체 보기: 정렬(시트 ✓)·사진리뷰만은 서버 조건으로 다시 읽고, 사진 모음 → 모아보기', (
+      t,
+    ) async {
+      final repo = MockReviewsRepository(latency: Duration.zero);
+      repo.reviewJson.first['photos'] = [
+        {'photoId': 'rp-1', 'url': '/api/v1/review-photos/rp-1'},
+      ];
+      expect(repo.reviewJson.first['productId'], 'P-0002');
+      await openProduct(t, repo, 'P-0002');
+      await t.tap(find.byKey(const ValueKey('product-reviews-all')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('review-average')), findsOneWidget);
+      expect(find.byKey(const ValueKey('review-photo-strip')), findsOneWidget);
+
+      await t.tap(find.byKey(const ValueKey('review-sort-open')));
+      await t.pumpAndSettle();
+      expect(find.text('정렬'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('review-sort-ratingAsc')));
+      await t.pumpAndSettle();
+      expect(repo.productQueries.last, (
+        sort: ReviewSort.ratingAsc,
+        photoOnly: false,
+      ));
+      expect(find.text('별점 낮은 순'), findsOneWidget);
+
+      await t.tap(find.byKey(const ValueKey('review-photo-only')));
+      await t.pumpAndSettle();
+      expect(repo.productQueries.last, (
+        sort: ReviewSort.ratingAsc,
+        photoOnly: true,
+      ));
+      expect(
+        find.byKey(
+          ValueKey('product-review-${repo.reviewJson.first['reviewId']}'),
+        ),
+        findsOneWidget,
+      );
+
+      await t.tap(find.byKey(const ValueKey('review-photos-more')));
+      await t.pumpAndSettle();
+      expect(find.text('사진리뷰 모아보기'), findsOneWidget);
+      expect(find.byKey(const ValueKey('review-photos-grid')), findsOneWidget);
+    });
     testWidgets('상품 상세: 리뷰 줄을 눌러도 전체 화면', (t) async {
       final repo = MockReviewsRepository(latency: Duration.zero);
       await openProduct(t, repo, 'P-0002');

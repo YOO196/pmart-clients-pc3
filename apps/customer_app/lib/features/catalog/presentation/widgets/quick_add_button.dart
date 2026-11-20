@@ -13,6 +13,7 @@ import '../../../cart/presentation/cart_controller.dart';
 import '../../../cart/presentation/cart_messages.dart';
 import '../../domain/catalog.dart';
 import '../catalog_providers.dart';
+import '../../../../shared/notice.dart';
 
 /// 상품 카드의 `+` 바로 담기(Commerce §6.11).
 ///
@@ -42,9 +43,7 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
     final productId = widget.tile.productId;
-    void say(String text) => messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(text)));
+    void say(String text) => messenger.notice(text);
 
     setState(() => _busy = true);
     try {

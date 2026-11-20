@@ -436,8 +436,11 @@ final class MockReviewsRepository implements ReviewsRepository {
   Future<ProductReviewPage> productReviews(
     String productId, {
     String? cursor,
+    ReviewSort sort = ReviewSort.newest,
+    bool withPhotoOnly = false,
   }) async {
     calls++;
+    productQueries.add((sort: sort, photoOnly: withPhotoOnly));
     await _wait();
     productCursors.add(cursor);
     if (productFailures.isNotEmpty) throw productFailures.removeFirst();
@@ -445,9 +448,11 @@ final class MockReviewsRepository implements ReviewsRepository {
     final visible = [
       for (final r in reviewJson)
         if (r['productId'] == productId &&
-            (r['state'] == 'PUBLISHED' || r['state'] == 'LOCKED'))
+            (r['state'] == 'PUBLISHED' || r['state'] == 'LOCKED') &&
+            (!withPhotoOnly || ((r['photos'] as List?)?.isNotEmpty ?? false)))
           r,
     ];
+    _sortJson(visible, sort);
     final start = cursor == null ? 0 : int.parse(cursor);
     // 심어 둔 리뷰가 없는 상품은 상품 목(별점·리뷰 수)과 같게 그때그때 만든다 — 상세 위 "★4.8 (1,203)" 과
     // 아래 "리뷰 0개"가 어긋나지 않게(실서버는 같은 집계에서 온다). 요청한 쪽만 만든다.
@@ -458,28 +463,23 @@ final class MockReviewsRepository implements ReviewsRepository {
         synthesizeFromCatalog &&
         product != null &&
         (product.reviewCount ?? 0) > 0) {
-      final total = product.reviewCount!;
+      // 목: 3건마다 1건이 사진 리뷰. 사진 리뷰만이면 그 건들만.
+      final all = product.reviewCount!;
+      final total = withPhotoOnly ? (all / 3).ceil() : all;
+      int at(int i) => withPhotoOnly ? i * 3 : i;
       final avg = product.rating ?? 5;
+      int rate(int n) => (n % 4 == 3 ? avg - 1 : avg).round().clamp(1, 5);
       final end = (start + pageSize).clamp(0, total);
       return productReviewPageFromContract(
         api.ListProductReviews200Response.fromJson({
           'items': [
             for (var i = start; i < end; i++)
-              {
-                'reviewId': 'rv-gen-$productId-$i',
-                'productId': productId,
-                'sku': product.sku,
-                'authorMasked': '${'김이박최정'[i % 5]}**',
-                'rating': (i % 4 == 3 ? avg - 1 : avg).round().clamp(1, 5),
-                'text': '[목] ${product.name} 후기 ${i + 1}',
-                'state': 'PUBLISHED',
-                'version': 1,
-                'createdAt': DateTime.utc(
-                  2026,
-                  10,
-                  20,
-                ).subtract(Duration(hours: i)).toIso8601String(),
-              },
+              _genReview(productId, product.sku, product.name, switch (sort) {
+                // 별점순은 높은(낮은) 것부터 — 목은 번호를 별점 묶음 순으로 다시 센다.
+                ReviewSort.newest => at(i),
+                ReviewSort.ratingDesc => at(i),
+                ReviewSort.ratingAsc => at(total - 1 - i),
+              }, rate),
           ],
           'page': {'nextCursor': end < total ? '$end' : null, 'size': pageSize},
           'summary': {'averageRating': avg, 'reviewCount': total},
@@ -504,4 +504,48 @@ final class MockReviewsRepository implements ReviewsRepository {
       }),
     );
   }
+
+  /// 받은 상품 리뷰 조회 조건(시험용).
+  final productQueries = <({ReviewSort sort, bool photoOnly})>[];
+
+  static void _sortJson(List<Map<String, Object?>> list, ReviewSort sort) {
+    int rating(Map<String, Object?> r) => r['rating'] as int;
+    String at(Map<String, Object?> r) => r['createdAt'] as String;
+    list.sort(
+      (a, b) => switch (sort) {
+        ReviewSort.newest => at(b).compareTo(at(a)),
+        ReviewSort.ratingDesc => rating(b).compareTo(rating(a)),
+        ReviewSort.ratingAsc => rating(a).compareTo(rating(b)),
+      },
+    );
+  }
+
+  Map<String, Object?> _genReview(
+    String productId,
+    String? sku,
+    String name,
+    int i,
+    int Function(int) rate,
+  ) => {
+    'reviewId': 'rv-gen-$productId-$i',
+    'productId': productId,
+    'sku': sku,
+    'authorMasked': '${'김이박최정'[i % 5]}**',
+    'rating': rate(i),
+    'text': '[목] $name 후기 ${i + 1}',
+    if (i % 3 == 0)
+      'photos': [
+        {
+          'photoId': 'rp-gen-$productId-$i',
+          'url': '/api/v1/review-photos/rp-gen-$productId-$i',
+        },
+      ],
+    'state': 'PUBLISHED',
+    'version': 1,
+    'createdAt': DateTime.utc(
+      2026,
+      10,
+      20,
+    ).subtract(Duration(hours: i * 7)).toIso8601String(),
+  };
 }

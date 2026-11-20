@@ -24,6 +24,7 @@ import 'delivery_select_screen.dart'
 import '../../catalog/presentation/widgets/product_tile_card.dart'
     show ProductImage;
 import 'shipping_address_view.dart';
+import '../../../shared/notice.dart';
 
 String _money(AppLocalizations l10n, int? amount) => switch (amount) {
   final int a => formatKrw(a),
@@ -343,8 +344,7 @@ class _SheetState extends ConsumerState<_Sheet> {
     final session = _session;
     if (session != null && !await session.requiredTermsAgreed()) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l10n.tossAgreementRequired)));
+      showNotice(context, l10n.tossAgreementRequired);
       return;
     }
     final draftId = state.draft.draftId;

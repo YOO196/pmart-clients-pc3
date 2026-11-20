@@ -41,6 +41,8 @@ class CategoryScreen extends ConsumerWidget {
         ],
       ),
       body: UiStateView<List<CategoryNode>>(
+        loading: (_) =>
+            const PmartListSkeleton(thumb: true, thumbSize: 44, rows: 8),
         state: uiStateOf(
           ref.watch(categoriesProvider),
           isEmpty: (n) => n.isEmpty,

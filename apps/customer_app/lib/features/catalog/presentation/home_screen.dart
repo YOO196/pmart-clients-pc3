@@ -7,8 +7,8 @@ import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
-import '../../cart/presentation/cart_controller.dart'
-    show cartControllerProvider;
+import '../../../shared/floating_cart_bar.dart';
+import '../../../shared/notice.dart';
 import '../../../shared/providers.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_controller.dart';
@@ -162,93 +162,119 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   children: [
                     RefreshIndicator(
                       onRefresh: _refresh,
-                      child: ListView(
-                        padding: const EdgeInsets.only(bottom: 170),
-                        children: [
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  gray,
-                                  gray,
-                                  Theme.of(context).colorScheme.surface,
-                                ],
-                                stops: const [0, 0.7, 1],
+                      // 사용자 요청(2026-11-20): 아래로 내려도 검색창은 위에 붙어 남는다(배너·배송 안내는 올라간다).
+                      child: CustomScrollView(
+                        key: const ValueKey('home-scroll'),
+                        slivers: [
+                          SliverList.list(
+                            children: [
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      gray,
+                                      gray,
+                                      Theme.of(context).colorScheme.surface,
+                                    ],
+                                    stops: const [0, 0.7, 1],
+                                  ),
+                                ),
+                                child: const Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    SizedBox(height: 4),
+                                    _PendingPaymentBanner(),
+                                    _InProgressOrderCard(),
+                                  ],
+                                ),
                               ),
-                            ),
-                            child: const Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                SizedBox(height: 4),
-                                _PendingPaymentBanner(),
-                                _InProgressOrderCard(),
-                              ],
-                            ),
-                          ),
-                          if (home.tabs.length > 1)
-                            _HomeTabs(
-                              tabs: home.tabs,
-                              selected: tab,
-                              onSelected: (t) => setState(() => _tab = t),
-                            ),
-                          if (tab == HomeTab.home) ...[
-                            // HOME_TOP 배너(가로 넘기기). 없으면 자리를 비운다.
-                            if (home.banners.where((b) => !b.middle).toList()
-                                case final top when top.isNotEmpty)
-                              _BannerPager(
-                                key: const ValueKey('home-banners-top'),
-                                banners: top,
-                                onOpen: (b) => _openBanner(context, b, home),
-                              ),
-                            // 사용자 캡처(2026-11-20 홈): 배너 아래 배송 안내 → 회색 띠 → 검색·카테고리
-                            const _DeliverySummaryCard(),
-                            const PmartSectionGap(height: 8),
-                            const SizedBox(height: 12),
-                            const _HomeSearchBar(),
-                            const _CategoryShortcuts(),
-                            const SizedBox(height: 14),
-                            const PmartSectionGap(height: 10),
-                            // 레퍼런스: 섹션마다 회색 띠(약 8dp)로 나눈다.
-                            for (final (i, s) in home.sections.indexed) ...[
-                              if (i > 0) const PmartSectionGap(height: 8),
-                              // HOME_MIDDLE 배너는 첫 영역 아래(storefront 0.7.0)
-                              if (i == 1)
-                                if (home.banners.where((b) => b.middle).toList()
-                                    case final mid when mid.isNotEmpty)
+                              if (home.tabs.length > 1)
+                                _HomeTabs(
+                                  tabs: home.tabs,
+                                  selected: tab,
+                                  onSelected: (t) => setState(() => _tab = t),
+                                ),
+                              if (tab == HomeTab.home) ...[
+                                // HOME_TOP 배너(가로 넘기기). 없으면 자리를 비운다.
+                                if (home.banners
+                                        .where((b) => !b.middle)
+                                        .toList()
+                                    case final top when top.isNotEmpty)
                                   _BannerPager(
-                                    key: const ValueKey('home-banners-middle'),
-                                    banners: mid,
+                                    key: const ValueKey('home-banners-top'),
+                                    banners: top,
                                     onOpen: (b) =>
                                         _openBanner(context, b, home),
                                   ),
-                              _SectionView(
-                                key: ValueKey('section-${s.sectionId}'),
-                                section: s,
-                                layoutVersion: home.layoutVersion,
-                              ),
+                                // 사용자 캡처(2026-11-20 홈): 배너 아래 배송 안내 → 회색 띠 → 검색·카테고리
+                                const _DeliverySummaryCard(),
+                                const PmartSectionGap(height: 8),
+                              ],
                             ],
-                          ] else
-                            _TabBody(
-                              key: ValueKey('home-tab-body-${tab.name}'),
-                              tab: tab,
+                          ),
+                          if (tab == HomeTab.home)
+                            const SliverPersistentHeader(
+                              pinned: true,
+                              delegate: _PinnedSearchBar(),
                             ),
+                          SliverList.list(
+                            children: [
+                              if (tab == HomeTab.home) ...[
+                                const _CategoryShortcuts(),
+                                const SizedBox(height: 14),
+                                const PmartSectionGap(height: 10),
+                                // 레퍼런스: 섹션마다 회색 띠(약 8dp)로 나눈다.
+                                for (final (i, s) in home.sections.indexed) ...[
+                                  if (i > 0) const PmartSectionGap(height: 8),
+                                  // HOME_MIDDLE 배너는 첫 영역 아래(storefront 0.7.0)
+                                  if (i == 1)
+                                    if (home.banners
+                                            .where((b) => b.middle)
+                                            .toList()
+                                        case final mid when mid.isNotEmpty)
+                                      _BannerPager(
+                                        key: const ValueKey(
+                                          'home-banners-middle',
+                                        ),
+                                        banners: mid,
+                                        onOpen: (b) =>
+                                            _openBanner(context, b, home),
+                                      ),
+                                  _SectionView(
+                                    key: ValueKey('section-${s.sectionId}'),
+                                    section: s,
+                                    layoutVersion: home.layoutVersion,
+                                  ),
+                                ],
+                              ] else
+                                _TabBody(
+                                  key: ValueKey('home-tab-body-${tab.name}'),
+                                  tab: tab,
+                                ),
+                              // 아래 떠 있는 카드·막대가 목록 끝을 가리지 않게
+                              const SizedBox(height: 170),
+                            ],
+                          ),
                         ],
                       ),
-                    ),
-                    // 배달 중 카드 위, 장바구니 막대 아래(사용자 캡처 2026-11-20 홈 — 둘 다 있으면 위아래로)
+                    ), // 배달 중 카드 위, 장바구니 막대 아래(사용자 캡처 2026-11-20 홈 — 둘 다 있으면 위아래로)
                     const Positioned(
                       left: 10,
                       right: 10,
                       bottom: 10,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _InProgressOrderCard(floating: true),
-                          _HomeCartBar(),
-                        ],
+                      // 알림(스낵바)이 배달 중 카드·장바구니 막대를 덮지 않게 위로 띄운다.
+                      child: NoticeClearance(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _InProgressOrderCard(floating: true),
+                            FloatingCartBar(),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -447,11 +473,16 @@ class _BannerCard extends ConsumerWidget {
     );
     final fallback = _fallback(theme, scheme);
     if (image == null) return fallback;
+    // 화면 폭만큼만 디코딩(원본 크기로 풀면 넘길 때 끊긴다 — 사용자 2026-11-20 스크롤 끊김).
+    final px =
+        MediaQuery.sizeOf(context).width *
+        MediaQuery.devicePixelRatioOf(context);
     return Image.network(
       image,
       fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
+      cacheWidth: px.round(),
       semanticLabel: banner.altText,
       errorBuilder: (_, _, _) => fallback,
     );
@@ -511,6 +542,35 @@ class _BannerCard extends ConsumerWidget {
   }
 }
 
+/// 홈 검색창을 위에 붙여 두는 머리(내려도 사라지지 않는다). 흰 바탕이라 아래 내용이 비치지 않는다.
+class _PinnedSearchBar extends SliverPersistentHeaderDelegate {
+  const _PinnedSearchBar();
+
+  static const extent = 66.0;
+
+  @override
+  double get minExtent => extent;
+
+  @override
+  double get maxExtent => extent;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlaps) =>
+      Material(
+        color: Theme.of(context).colorScheme.surface,
+        // 붙어 있을 때(아래 내용 위)만 옅은 그림자로 경계를 보인다.
+        elevation: overlaps ? 1 : 0,
+        shadowColor: Colors.black26,
+        child: const Align(
+          alignment: Alignment.bottomCenter,
+          child: _HomeSearchBar(),
+        ),
+      );
+
+  @override
+  bool shouldRebuild(_PinnedSearchBar oldDelegate) => false;
+}
+
 /// 홈의 검색창(누르면 검색 탭으로).
 class _HomeSearchBar extends StatelessWidget {
   const _HomeSearchBar();
@@ -521,7 +581,7 @@ class _HomeSearchBar extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 2),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
       child: InkWell(
         key: const ValueKey('home-search'),
         borderRadius: BorderRadius.circular(22),
@@ -1153,17 +1213,19 @@ class HomeSkeleton extends StatelessWidget {
   const HomeSkeleton({super.key});
 
   @override
-  Widget build(BuildContext context) => ListView(
-    key: const ValueKey('home-skeleton'),
-    physics: const NeverScrollableScrollPhysics(),
-    padding: const EdgeInsets.symmetric(vertical: 12),
-    children: const [
-      _Block(height: 72),
-      _Block(height: 32, width: 200),
-      _Block(height: 96),
-      _SkeletonRail(),
-      _SkeletonRail(),
-    ],
+  Widget build(BuildContext context) => PmartShimmer(
+    child: ListView(
+      key: const ValueKey('home-skeleton'),
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      children: const [
+        _Block(height: 72),
+        _Block(height: 32, width: 200),
+        _Block(height: 96),
+        _SkeletonRail(),
+        _SkeletonRail(),
+      ],
+    ),
   );
 }
 
@@ -1260,111 +1322,6 @@ class _PendingPaymentBanner extends ConsumerWidget {
           trailing: TextButton(
             onPressed: () => context.push('/payments/${pending.first}'),
             child: Text(l10n.pendingPaymentOpen),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 홈 아래 떠 있는 장바구니 막대(사용자 캡처 2026-11-20 "24,138원 주문 가능 [2 장바구니]").
-/// 서버가 확정한 장바구니에 품목이 있을 때만. 금액은 서버 선택 합계 그대로(없으면 금액 없이).
-class _HomeCartBar extends ConsumerWidget {
-  const _HomeCartBar();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final cart = ref.watch(cartControllerProvider).value?.cart;
-    if (cart == null || cart.lines.isEmpty) return const SizedBox.shrink();
-    final short = cart.minOrderShortfall;
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Material(
-        key: const ValueKey('home-cart-bar'),
-        color: scheme.surface,
-        elevation: 4,
-        shadowColor: Colors.black26,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 10, 10, 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (cart.selectedItemAmount case final a?)
-                      Text(
-                        formatKrw(a),
-                        key: const ValueKey('home-cart-amount'),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    Text(
-                      switch (short) {
-                        final int s when s > 0 => l10n.cartMinOrderShortfall(
-                          formatKrw(s),
-                        ),
-                        _ => l10n.homeCartOrderable,
-                      },
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 13,
-                        color: short != null && short > 0
-                            ? scheme.primary
-                            : scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              FilledButton(
-                key: const ValueKey('home-cart-go'),
-                onPressed: () => context.go('/cart'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 46),
-                  padding: const EdgeInsets.fromLTRB(10, 0, 18, 0),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 26,
-                      height: 26,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '${cart.lines.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      l10n.cartTitle,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
         ),
       ),

@@ -23,6 +23,7 @@ class SectionItemsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(target.section.title)),
       body: UiStateView<ProductListState>(
+        loading: (_) => const PmartGridSkeleton(),
         state: uiStateOf(value, isEmpty: (s) => s.items.isEmpty),
         onRetry: () => ref.invalidate(provider),
         empty: (_) => Center(child: Text(l10n.sectionEmpty)),

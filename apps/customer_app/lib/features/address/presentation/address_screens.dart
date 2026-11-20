@@ -20,6 +20,7 @@ import 'postcode_screen.dart';
 import 'address_controller.dart';
 import '../../auth/domain/auth.dart' show MemberSession;
 import '../../auth/presentation/auth_controller.dart' show sessionProvider;
+import '../../../shared/notice.dart';
 
 String serviceabilityText(AppLocalizations l10n, Serviceability s) =>
     switch (s) {
@@ -166,6 +167,7 @@ class AddressListScreen extends ConsumerWidget {
           ],
           Expanded(
             child: UiStateView<AddressBook?>(
+              loading: (_) => const PmartListSkeleton(rows: 3),
               state: uiStateOf(value),
               onRetry: () => ref.invalidate(addressBookProvider),
               ready: (context, book) => _AddressList(book: book!),
@@ -199,9 +201,7 @@ class _AddressListState extends ConsumerState<_AddressList> {
         .select(addressId);
     if (!mounted) return;
     setState(() => _busy = false);
-    messenger.showSnackBar(
-      SnackBar(content: Text(addressOutcomeText(l10n, outcome))),
-    );
+    messenger.notice(addressOutcomeText(l10n, outcome));
   }
 
   @override
@@ -345,9 +345,7 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
         .remove(a.addressId);
     if (!mounted) return;
     setState(() => _deleting = null);
-    messenger.showSnackBar(
-      SnackBar(content: Text(addressOutcomeText(l10n, outcome))),
-    );
+    messenger.notice(addressOutcomeText(l10n, outcome));
   }
 
   @override
@@ -578,11 +576,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     } on PmartFailure {
       if (!mounted) return;
       setState(() => _loadingEdit = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).addressEditLoadFailed),
-        ),
-      );
+      showNotice(context, AppLocalizations.of(context).addressEditLoadFailed);
       context.pop();
     }
   }
@@ -716,9 +710,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
           ),
         );
     if (!mounted) return;
-    messenger.showSnackBar(
-      SnackBar(content: Text(addressOutcomeText(l10n, outcome))),
-    );
+    messenger.notice(addressOutcomeText(l10n, outcome));
     if (outcome is AddressSaved || outcome is AddressCommandUnknown) {
       context.pop();
     }

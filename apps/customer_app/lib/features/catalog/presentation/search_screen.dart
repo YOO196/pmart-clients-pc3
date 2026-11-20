@@ -10,10 +10,11 @@ import '../../../shared/cart_icon_button.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
 import 'product_list_view.dart';
+import '../../../shared/notice.dart';
 
 /// SCR-SEARCH-001. 자동완성은 실패해도 직접 검색이 된다.
 ///
-/// 검색어 칸이 비어 있으면 회원에게 최근 검색어(`/me/recent-searches`)를 보인다. 기록은 서버가 검색할 때 남긴다.
+/// 검색어 칸이 비어 있으면 회원에게 최근 검색어(`/me/recent-searches`)를, 모두에게 인기 검색어를 보인다. 기록은 서버가 검색할 때 남긴다.
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
@@ -66,7 +67,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _submit(String text, {bool noCorrection = false}) {
     final keyword = text.trim();
-    if (keyword.isEmpty) return;
+    if (keyword.isEmpty) {
+      // 레퍼런스: 빈 검색은 "검색어를 입력해주세요" 알림만(검색하지 않는다).
+      showNotice(
+        context,
+        AppLocalizations.of(context).searchEnterKeyword,
+        key: const ValueKey('search-empty-toast'),
+      );
+      return;
+    }
     _noCorrection = noCorrection;
     _debounce?.cancel();
     _suggestSeq++;
@@ -217,9 +226,7 @@ class _RecentSearchesState extends ConsumerState<_RecentSearches> {
       }
       ref.invalidate(recentSearchesProvider);
     } on PmartFailure {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.searchRecentDeleteFailed)),
-      );
+      messenger.notice(l10n.searchRecentDeleteFailed);
     } finally {
       if (mounted) setState(() => _busy.remove(keyword ?? ''));
     }
@@ -233,9 +240,12 @@ class _RecentSearchesState extends ConsumerState<_RecentSearches> {
     // 다시 읽는 동안에는 앞 목록을 그대로 둔다(깜빡이지 않게).
     final failed = value.hasError && !value.isLoading;
     final loaded = failed ? null : value.value;
-    if (!failed && loaded == null) return const SizedBox.shrink();
+    // 비회원·서버 설정 없음은 최근 검색어 구역을 숨긴다(인기 검색어는 그대로).
+    final showRecent = failed || loaded != null;
     final Widget body;
-    if (loaded == null) {
+    if (!showRecent) {
+      body = const SizedBox.shrink();
+    } else if (loaded == null) {
       body = Row(
         key: const ValueKey('recent-error'),
         children: [
@@ -277,26 +287,114 @@ class _RecentSearchesState extends ConsumerState<_RecentSearches> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                l10n.searchRecentTitle,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+        if (showRecent) ...[
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.searchRecentTitle,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-            ),
-            if (items != null && items.isNotEmpty)
-              TextButton(
-                key: const ValueKey('recent-clear'),
-                onPressed: _busy.contains('') ? null : () => _remove(null),
-                child: Text(l10n.searchRecentClear),
+              if (items != null && items.isNotEmpty)
+                TextButton(
+                  key: const ValueKey('recent-clear'),
+                  onPressed: _busy.contains('') ? null : () => _remove(null),
+                  // 레퍼런스: 오른쪽 회색 작은 글씨
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.onSurfaceVariant,
+                    textStyle: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 14,
+                    ),
+                  ),
+                  child: Text(l10n.searchRecentClear),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          body,
+        ],
+        _PopularKeywords(onPick: widget.onPick, spaceAbove: showRecent),
+      ],
+    );
+  }
+}
+
+/// 인기 검색어(search 0.5.2 — 검색 첫 화면, 비회원도). 서버 순서 그대로 번호를 붙여 두 줄로 보인다.
+/// 집계가 없으면(빈 목록) 구역을 숨긴다. 못 읽어도 숨긴다 — 자동완성처럼 없어도 검색은 되는 보조 칸이라
+/// 실패 안내를 띄우지 않는다("인기 검색어가 없다"고 말하지도 않는다).
+class _PopularKeywords extends ConsumerWidget {
+  const _PopularKeywords({required this.onPick, required this.spaceAbove});
+
+  final ValueChanged<String> onPick;
+  final bool spaceAbove;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final items = ref.watch(popularKeywordsProvider).value;
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
+    // 왼쪽 줄 1…n, 오른쪽 줄 n+1… (세로로 읽는 순위)
+    final half = (items.length + 1) ~/ 2;
+    Widget column(int from, int to) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = from; i < to; i++)
+          InkWell(
+            key: ValueKey('popular-${i + 1}'),
+            onTap: () => onPick(items[i]),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 26,
+                    child: Text(
+                      '${i + 1}',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      items[i],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                    ),
+                  ),
+                ],
               ),
+            ),
+          ),
+      ],
+    );
+    return Column(
+      key: const ValueKey('popular-keywords'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (spaceAbove) const SizedBox(height: 28),
+        Text(
+          l10n.searchPopularTitle,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: column(0, half)),
+            const SizedBox(width: 16),
+            Expanded(child: column(half, items.length)),
           ],
         ),
-        const SizedBox(height: 8),
-        body,
       ],
     );
   }

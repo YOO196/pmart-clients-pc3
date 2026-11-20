@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/notice.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../catalog/domain/catalog.dart' show SaleState;
 import '../../catalog/presentation/widgets/product_tile_card.dart'
@@ -43,6 +44,7 @@ class CartScreen extends ConsumerWidget {
         backgroundColor: scheme.surface,
       ),
       body: UiStateView<CartState>(
+        loading: (_) => const PmartListSkeleton(thumb: true, rows: 4),
         state: uiStateOf(value),
         onRetry: () => ref.invalidate(cartControllerProvider),
         ready: (context, s) => _CartBody(state: s),
@@ -150,7 +152,10 @@ class _CartBody extends ConsumerWidget {
                   ),
                 ),
         ),
-        _CartSummaryBar(cart: cart, state: state),
+        // 알림(스낵바)이 주문 단추를 덮지 않게 이 막대 위로 띄운다.
+        NoticeClearance(
+          child: _CartSummaryBar(cart: cart, state: state),
+        ),
       ],
     );
   }
@@ -269,7 +274,7 @@ String seoulDate(DateTime instant) {
   return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 }
 
-/// "+ 상품 추가" — 쇼핑(홈)으로 돌아간다. 장바구니는 그대로.
+/// "+ 더 담으러 가기"(레퍼런스 — 가운데 브랜드색) — 쇼핑(홈)으로 돌아간다. 장바구니는 그대로.
 class _AddMoreButton extends StatelessWidget {
   const _AddMoreButton();
 
@@ -278,8 +283,8 @@ class _AddMoreButton extends StatelessWidget {
     key: const ValueKey('cart-add-more'),
     style: TextButton.styleFrom(
       minimumSize: const Size.fromHeight(52),
-      foregroundColor: Theme.of(context).colorScheme.onSurface,
-      textStyle: Theme.of(context).textTheme.titleSmall,
+      foregroundColor: Theme.of(context).colorScheme.primary,
+      textStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 15),
       shape: const RoundedRectangleBorder(),
     ),
     icon: const PmartLineIcon(PmartLineIcons.plus, size: 20),
@@ -1057,21 +1062,15 @@ class _AddToCartBarState extends ConsumerState<AddToCartBar> {
     };
     if (outcome is CartChangeApplied) setState(() => _quantity = null);
     if (text == null) return;
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          // 버튼이 달린 SnackBar 는 Flutter 기본값으로 자동으로 닫히지 않는다(persist). 알림은 잠시 뒤 닫는다.
-          persist: false,
-          content: Text(text),
-          action: outcome is CartChangeApplied
-              ? SnackBarAction(
-                  label: l10n.cartGoToCart,
-                  onPressed: () => context.go('/cart'),
-                )
-              : null,
-        ),
-      );
+    messenger.notice(
+      text,
+      action: outcome is CartChangeApplied
+          ? SnackBarAction(
+              label: l10n.cartGoToCart,
+              onPressed: () => context.go('/cart'),
+            )
+          : null,
+    );
   }
 }
 

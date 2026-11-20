@@ -63,6 +63,16 @@ class ReviewEligibility {
       state != ReviewState.eligible;
 }
 
+/// 상품 리뷰 정렬(계약 `sort` — NEWEST·RATING_DESC·RATING_ASC).
+enum ReviewSort { newest, ratingDesc, ratingAsc }
+
+/// 상품 리뷰 목록 조건: 상품·정렬·사진 리뷰만(`withPhotoOnly`).
+typedef ProductReviewQuery = ({
+  String productId,
+  ReviewSort sort,
+  bool photoOnly,
+});
+
 @immutable
 class ReviewView {
   const ReviewView({

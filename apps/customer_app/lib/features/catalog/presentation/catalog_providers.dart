@@ -41,6 +41,11 @@ final recentSearchesProvider = FutureProvider.autoDispose<List<String>?>((
   }
 });
 
+/// 검색 첫 화면의 인기 검색어(search 0.5.2). 서버 사본이 몇 분마다 바뀌어 화면을 열 때마다 읽는다.
+final popularKeywordsProvider = FutureProvider.autoDispose<List<String>>(
+  (ref) => ref.watch(catalogRepositoryProvider).popularKeywords(),
+);
+
 /// 홈이 다시 보일 때(상세에서 뒤로·다른 탭에서 홈으로) 마지막 조회가 이보다 오래됐으면 다시 읽는다.
 /// 홈은 화면을 떠나도 남아 있어, 다시 읽지 않으면 승인·발효된 새 가격이 상세와 다르게 보인다.
 const homeStaleAfter = Duration(minutes: 1);
