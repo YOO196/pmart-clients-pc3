@@ -25,6 +25,8 @@ final class MockProduct {
     this.newness = 0,
     this.bundleSku,
     this.bundlePrice,
+    this.salePrice,
+    this.discountRate,
   });
 
   final String productId;
@@ -41,6 +43,13 @@ final class MockProduct {
   final int newness;
   final String? bundleSku;
   final int? bundlePrice;
+
+  /// 목 기간 할인(ADR-0082 4단계 흉내 — 대표 SKU 개당 할인가·할인율, 서버 값처럼 준다).
+  final int? salePrice;
+  final int? discountRate;
+
+  static const discountName = '[목] 이번 주 할인';
+  static const discountEndsAt = '2026-11-30T14:59:59Z';
 }
 
 const mockProducts = <MockProduct>[
@@ -60,6 +69,8 @@ const mockProducts = <MockProduct>[
   MockProduct(
     productId: 'P-0002',
     name: '그릭요거트 플레인 400g',
+    salePrice: 3990,
+    discountRate: 33,
     sku: 'E-00000002',
     price: 5980,
     categoryId: 'C-YOGURT',
@@ -85,6 +96,8 @@ const mockProducts = <MockProduct>[
   MockProduct(
     productId: 'P-0004',
     name: '친환경 대추방울토마토 500g',
+    salePrice: 4340,
+    discountRate: 33,
     sku: 'E-00000004',
     price: 6480,
     categoryId: 'C-VEG',
@@ -109,6 +122,8 @@ const mockProducts = <MockProduct>[
   MockProduct(
     productId: 'P-0006',
     name: '저지방 우유 900mL',
+    salePrice: 2500,
+    discountRate: 10,
     sku: 'E-00000006',
     price: 2780,
     categoryId: 'C-MILK',
@@ -172,6 +187,12 @@ base class MockCatalogRepository implements CatalogRepository {
     'reviewCount': ?p.reviewCount,
     'badge': p.newness > 0 ? 'NEW' : 'NONE',
     ...?_unitPriceJson(p),
+    if (p.salePrice != null) ...{
+      'salePrice': p.salePrice,
+      'discountRatePercent': p.discountRate,
+      'discountName': MockProduct.discountName,
+      'discountEndsAt': MockProduct.discountEndsAt,
+    },
   };
 
   /// 서버처럼 내용량(용량 문자열)이 있으면 100g/100mL당 가격을 준다(storefront 0.3.0).
@@ -874,7 +895,23 @@ base class MockCatalogRepository implements CatalogRepository {
         o.remove('availability');
       }
     }
-    return productFromContract(pc.ProductContent.fromJson(json));
+    return productFromContract(
+      pc.ProductContent.fromJson(json),
+      // 기간 할인은 pricing `/prices` 가 준다(0.3.0) — 대표 SKU 만 할인.
+      prices: OptionPrices(
+        prices: const {},
+        notSet: const {},
+        discounts: {
+          if (p.salePrice case final s?)
+            p.sku: SaleDiscount(
+              salePrice: s,
+              ratePercent: p.discountRate,
+              name: MockProduct.discountName,
+              endsAt: DateTime.parse(MockProduct.discountEndsAt),
+            ),
+        },
+      ),
+    );
   }
 
   /// 목 평점 집계 — 상세의 평점과 같은 값(시험이 바꿔 끼운다).

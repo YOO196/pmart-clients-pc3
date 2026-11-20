@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../../catalog/domain/catalog.dart' show SaleState;
+import '../../catalog/domain/catalog.dart' show SaleDiscount, SaleState;
 
 /// 장바구니 품목의 현재 센터 가용 사본. 조회 실패는 [unknown] 이지 품절이 아니다.
 enum LineAvailability { available, low, soldOut, notCarried, unknown }
@@ -21,7 +21,11 @@ class CartLine {
     this.imageUrl,
     this.unitPrice,
     this.availableQty,
+    this.discount,
   });
+
+  /// 기간 할인(cart 0.4.0 `display.salePrice` 등). 없으면 정가([unitPrice])만.
+  final SaleDiscount? discount;
 
   final String cartItemId;
   final String sku;
@@ -68,6 +72,7 @@ class CartLine {
     saleState: saleState,
     availability: availability,
     availableQty: availableQty,
+    discount: discount,
   );
 }
 
@@ -80,6 +85,7 @@ class Cart {
     required this.lines,
     this.mfcId,
     this.selectedItemAmount,
+    this.selectedDiscountAmount,
     this.minOrderAmount,
     this.minOrderShortfall,
     this.expiresAt,
@@ -96,6 +102,9 @@ class Cart {
 
   /// 서버가 준 선택 품목 표시 합계(견적 아님). 없으면 null. 앱에서 더하지 않는다.
   final int? selectedItemAmount;
+
+  /// 선택 품목 기간 할인 합계(cart 0.4.0 — [selectedItemAmount] 는 이미 할인 뒤). 없으면 null.
+  final int? selectedDiscountAmount;
 
   /// 최소 주문 금액(cart 0.2.0, 안내용 — 최종 판정은 주문서 견적).
   final int? minOrderAmount;
@@ -138,6 +147,7 @@ class Cart {
       lines: next,
       mfcId: mfcId,
       selectedItemAmount: null,
+      selectedDiscountAmount: null,
       minOrderAmount: minOrderAmount,
       minOrderShortfall: null,
       expiresAt: expiresAt,

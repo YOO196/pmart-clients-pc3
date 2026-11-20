@@ -1124,6 +1124,7 @@
   "@cartExpiresAt": { "placeholders": { "date": { "type": "String" } } },
   "cartFeeInfo": "배달팁·봉투값 안내",
   "cartMinOrderFill": "최소주문금액을 채워주세요",
+  "cartPromotionIncluded": "상품할인(반영됨)",
   "cartFeeTipTitle": "배달팁은 어떻게 결정되나요?",
   "cartFeeTipBody": "배달팁은 배송 방식(한집·알뜰·예약)에 따라 달라요. 상품 금액이 무료배달 기준 이상이거나 첫 구매면 배달팁이 없어요. 상품을 나눠 배송해도 배달팁을 더 받지 않아요.",
   "cartFeeBagTitle": "봉투값은 어떻게 결정되나요?",

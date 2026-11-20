@@ -171,13 +171,13 @@ final class ApiCatalogRepository implements CatalogRepository {
     return productFromContract(content, prices: await _pricesFor(content));
   }
 
-  /// 상세 응답의 옵션 `price` 가 비어 오면(백엔드 product-content 는 가격을 채우지 않는다, BR-36)
-  /// 표시 가격을 `GET /prices?skus=` 로 따로 읽는다. 가격 조회가 실패해도 상세는 보이고,
+  /// 표시 가격·기간 할인을 `GET /prices?skus=` 로 읽는다(pricing 0.3.0 — 할인은 product-content 에 없어 모든 옵션을 묻는다).
+  /// 옵션 `price` 가 있으면 정가는 그 값을 먼저 쓴다(BR-36). 가격 조회가 실패해도 상세는 보이고,
   /// 그 옵션은 "가격 확인 중"으로 남는다(0원·판매 불가로 확정하지 않는다).
   Future<OptionPrices?> _pricesFor(pc.ProductContent c) async {
     final skus = [
       for (final o in c.options ?? const <pc.SaleOption>[])
-        if (o.price?.basePrice == null && o.sku != null) o.sku!,
+        if (o.sku != null) o.sku!,
     ];
     if (skus.isEmpty) return null;
     try {
@@ -192,6 +192,16 @@ final class ApiCatalogRepository implements CatalogRepository {
           for (final p in body.items ?? const <pr.Price>[])
             p.sku: (basePrice: p.basePrice, priceVersion: p.priceVersion),
         },
+        discounts: {
+          for (final p in body.items ?? const <pr.Price>[])
+            if (p.discount case final d?)
+              p.sku: SaleDiscount(
+                salePrice: d.salePrice,
+                ratePercent: d.ratePercent,
+                name: d.name,
+                endsAt: d.endsAt,
+              ),
+        },
         notSet: {...?body.notSet},
       );
     } on PmartFailure {
@@ -202,11 +212,38 @@ final class ApiCatalogRepository implements CatalogRepository {
 
 /// `GET /prices?skus=` 결과. [notSet] 은 유효 가격이 없는 SKU(PRICE_NOT_SET, 판매 불가).
 final class OptionPrices {
-  const OptionPrices({required this.prices, required this.notSet});
+  const OptionPrices({
+    required this.prices,
+    required this.notSet,
+    this.discounts = const {},
+  });
+
+  /// SKU 별 지금 기간 할인(pricing 0.3.0). 할인을 모르면(discountAvailable=false) 없다 — 정가만.
+  final Map<String, SaleDiscount> discounts;
 
   final Map<String, ({int basePrice, int priceVersion})> prices;
   final Set<String> notSet;
 }
+
+/// 카드 할인(서버 값). 할인가가 없거나 정가 이상이면 할인 없음 — 정가만 보인다.
+SaleDiscount? saleDiscountOf({
+  required int? salePrice,
+  required int? basePrice,
+  int? ratePercent,
+  String? name,
+  DateTime? endsAt,
+}) => switch (salePrice) {
+  final int s when basePrice == null || s < basePrice => SaleDiscount(
+    salePrice: s,
+    ratePercent: ratePercent,
+    name: switch (name?.trim()) {
+      null || '' => null,
+      final n => n,
+    },
+    endsAt: endsAt,
+  ),
+  _ => null,
+};
 
 T _body<T>(T? data, String name) =>
     data ?? (throw ContractViolationFailure('$name 본문 없음'));
@@ -261,6 +298,13 @@ ProductTile _tileFromDisplay(sf.DisplayItem i) => ProductTile(
     _ => DisplayBadge.none,
   },
   rank: i.rank,
+  discount: saleDiscountOf(
+    salePrice: i.salePrice,
+    basePrice: i.basePrice,
+    ratePercent: i.discountRatePercent,
+    name: i.discountName,
+    endsAt: i.discountEndsAt,
+  ),
   unitPrice: switch (i.unitPrice) {
     null => null,
     final u => UnitPrice(
@@ -377,6 +421,13 @@ ProductPage searchFromContract(sr.SearchResult r) => ProductPage(
         carried: h.carried,
         rating: h.rating?.toDouble(),
         reviewCount: h.reviewCount,
+        discount: saleDiscountOf(
+          salePrice: h.salePrice,
+          basePrice: h.basePrice,
+          ratePercent: h.discountRatePercent,
+          name: h.discountName,
+          endsAt: h.discountEndsAt,
+        ),
       ),
     ),
   ),
@@ -456,6 +507,7 @@ ProductDetail productFromContract(pc.ProductContent c, {OptionPrices? prices}) {
             priceVersion:
                 o.price?.priceVersion ?? prices?.prices[o.sku]?.priceVersion,
             priceNotSet: prices?.notSet.contains(o.sku) ?? false,
+            discount: prices?.discounts[o.sku],
             carried: o.availability?.carried,
             unitPrice: switch (o.unitPrice) {
               null => null,

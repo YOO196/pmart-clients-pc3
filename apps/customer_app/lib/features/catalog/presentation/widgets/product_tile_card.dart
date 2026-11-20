@@ -6,6 +6,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/providers.dart';
 import '../../domain/catalog.dart';
+import 'discount_price.dart';
 import '../../../wishlist/presentation/wish_heart_button.dart';
 import 'quick_add_button.dart';
 
@@ -260,18 +261,31 @@ class ProductTileCard extends StatelessWidget {
         style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14, height: 1.25),
       ),
       const SizedBox(height: 4),
-      Text(
-        switch (tile.basePrice) {
-          final int p => formatKrw(p),
-          null => l10n.priceUnavailable,
-        },
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
+      // 기간 할인(ADR-0082 4단계): 레퍼런스 TOP 30 카드처럼 빨간 할인율 + 할인가(정가 취소선 없음). 서버 값만.
+      if (tile.discount case final d?)
+        DiscountPriceText(
+          key: ValueKey('tile-discount-${tile.productId}'),
+          price: d.salePrice,
+          ratePercent: d.ratePercent,
+          showBase: false,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        )
+      else
+        Text(
+          switch (tile.basePrice) {
+            final int p => formatKrw(p),
+            null => l10n.priceUnavailable,
+          },
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
         ),
-      ),
       if (tile.unitPrice case final u?)
         Text(
           l10n.unitPriceLine('${u.basis}${u.unitLabel}', formatKrw(u.price)),

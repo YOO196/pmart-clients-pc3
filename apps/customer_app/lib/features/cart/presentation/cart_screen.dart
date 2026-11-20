@@ -9,6 +9,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/notice.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../catalog/domain/catalog.dart' show SaleState;
+import '../../catalog/presentation/widgets/discount_price.dart';
 import '../../catalog/presentation/widgets/product_tile_card.dart'
     show ProductImage;
 import '../domain/cart.dart';
@@ -524,19 +525,35 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
                       const SizedBox(height: 3),
                       // 담은 수량만큼의 금액(단가 × 수량). 서버 합계(selectedItemAmount)와 같은 식이며 표시용이다.
                       // 주문 금액은 견적·주문서의 서버 값으로만 확정한다(사용자 요청 2026-11-03: "개당" 대신 수량 금액).
-                      Text(
-                        switch (line.unitPrice) {
-                          final int p => l10n.cartLineAmount(
-                            formatKrw(p * line.quantity),
+                      // 기간 할인(cart 0.4.0, 레퍼런스 5-1 "33% 5,990원 8,990원"): 할인가·정가 모두 수량만큼.
+                      if (line.discount case final d?)
+                        DiscountPriceText(
+                          key: ValueKey('cart-amount-$id'),
+                          price: d.salePrice * line.quantity,
+                          ratePercent: d.ratePercent,
+                          base: switch (line.unitPrice) {
+                            final int p => p * line.quantity,
+                            null => null,
+                          },
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
                           ),
-                          null => l10n.priceUnavailable,
-                        },
-                        key: ValueKey('cart-amount-$id'),
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                        )
+                      else
+                        Text(
+                          switch (line.unitPrice) {
+                            final int p => l10n.cartLineAmount(
+                              formatKrw(p * line.quantity),
+                            ),
+                            null => l10n.priceUnavailable,
+                          },
+                          key: ValueKey('cart-amount-$id'),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -1228,6 +1245,13 @@ class _AmountSection extends ConsumerWidget {
                   final int a => formatKrw(a),
                   null => l10n.cartAmountUnavailable,
                 }),
+                // 기간 할인(cart 0.4.0 — 상품금액은 이미 할인 뒤). 서버 할인 합계가 있을 때만.
+                if (cart.selectedDiscountAmount case final d? when d > 0)
+                  row(
+                    l10n.cartPromotionIncluded,
+                    formatKrw(d, negative: true),
+                    key: const ValueKey('cart-amount-promotion'),
+                  ),
                 row(
                   l10n.amountTip,
                   switch (tip) {

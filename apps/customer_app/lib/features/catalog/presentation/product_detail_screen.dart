@@ -16,6 +16,7 @@ import '../../reviews/presentation/reviews_screens.dart'
     show ProductReviewsPreview;
 import '../../cart/presentation/cart_screen.dart' show AddToCartBar;
 import 'widgets/content_image.dart';
+import 'widgets/discount_price.dart';
 import 'widgets/product_tile_card.dart';
 
 /// SCR-PRODUCT-001·OPTION-001. 가격·가용은 사본이다. 구매 가능 확정은 장바구니·주문서 서버 판정.
@@ -214,14 +215,27 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       // 큰 가격 + 단위 가격(레퍼런스 4-1) — 고른 옵션의 서버 값
       if (selected != null) ...[
         const SizedBox(height: 12),
-        Text(
-          _priceText(l10n, selected),
-          key: const ValueKey('product-price'),
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
+        // 기간 할인(pricing 0.3.0): 빨간 할인율 + 할인가 + 정가 취소선. 할인을 모르면 정가만(서버 값).
+        if ((selected.discount, selected.priceNotSet) case (final d?, false))
+          DiscountPriceText(
+            key: const ValueKey('product-price'),
+            price: d.salePrice,
+            ratePercent: d.ratePercent,
+            base: selected.basePrice,
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          )
+        else
+          Text(
+            _priceText(l10n, selected),
+            key: const ValueKey('product-price'),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-        ),
         if (selected.unitPrice case final u?)
           Text(
             l10n.unitPriceLine('${u.basis}${u.unitLabel}', formatKrw(u.price)),

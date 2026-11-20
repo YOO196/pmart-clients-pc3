@@ -208,6 +208,14 @@ base class MockCheckoutRepository
     throw ArgumentError(sku);
   }
 
+  /// 목 기간 할인가(대표 SKU 만 — 목 카탈로그와 같은 값). 없으면 null.
+  static int? salePriceOf(String sku) {
+    for (final p in mockProducts) {
+      if (p.sku == sku) return p.salePrice;
+    }
+    return null;
+  }
+
   /// 초안·주문에 고정되는 고객용 상품명 사본(BR-35). 모르는 sku 면 null(서버도 조회 실패면 비운다).
   static String? nameOf(String sku) {
     for (final p in mockProducts) {
@@ -223,9 +231,12 @@ base class MockCheckoutRepository
     DateTime created, {
     int priceDelta = 0,
   }) {
+    // 서버 흉내(order 0.18.0): 정가 합 → 기간 할인 → 상품액(쿠폰 전).
+    var base = priceDelta;
     var items = priceDelta;
     for (final l in r.lines) {
-      items += priceOf(l.sku) * l.quantity;
+      base += priceOf(l.sku) * l.quantity;
+      items += (salePriceOf(l.sku) ?? priceOf(l.sku)) * l.quantity;
     }
     final (tip, reason) = items >= 30000
         ? (0, 'OVER_30000')
@@ -243,8 +254,8 @@ base class MockCheckoutRepository
           .toIso8601String(),
       'priceVersion': version,
       'itemAmount': items,
-      'baseItemAmount': items,
-      'promotionDiscount': 0,
+      'baseItemAmount': base,
+      'promotionDiscount': base - items,
       'couponDiscount': couponDiscount,
       'coupon': coupon?['coupon'],
       'deliveryTip': tip,

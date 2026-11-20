@@ -994,6 +994,53 @@ void main() {
     debugDisableShadows = true;
   });
 
+  // 상품 할인가(ADR-0082 4단계 — 목 요거트·토마토·저지방 우유): 검색 카드·상세·장바구니.
+  testWidgets('discounts', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    debugDisableShadows = false;
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final cart =
+        MockCartRepository(
+            latency: Duration.zero,
+            seeded: false,
+            minOrderAmount: 0,
+          )
+          ..seedLine('E-00000002', 1)
+          ..seedLine('E-00000004', 2)
+          ..seedLine('E-00000001', 1);
+    await t.pumpWidget(testApp(cart: cart, const []));
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await t.pump();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/d-$name.png').uri),
+      );
+    }
+
+    GoRouter router() => GoRouter.of(t.element(find.byType(Scaffold).first));
+    router().go('/search');
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('search-field')), '우유');
+    await t.tap(find.byKey(const ValueKey('search-submit')));
+    await t.pumpAndSettle();
+    await shot('search');
+    router().go('/products/P-0002');
+    await t.pumpAndSettle();
+    await shot('detail');
+    router().go('/cart');
+    await t.pumpAndSettle();
+    await shot('cart');
+    debugDisableShadows = true;
+  });
   // 장바구니 최소주문 막힘·봉투값 줄(사용자 2026-11-21, 레퍼런스 5-1) — 목 장바구니 7,940원(최소 15,000).
   testWidgets('cart-min-order', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

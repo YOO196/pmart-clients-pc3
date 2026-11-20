@@ -4,6 +4,7 @@ import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart' show sourceSystem;
 import '../../catalog/domain/catalog.dart' show SaleState;
+import '../../catalog/data/catalog_repository.dart' show saleDiscountOf;
 import '../domain/cart.dart';
 
 abstract interface class CartRepository {
@@ -151,6 +152,7 @@ Cart cartFromContract(api.Cart c) => Cart(
   isMember: c.ownerType == api.CartOwnerTypeEnum.MEMBER,
   mfcId: c.mfcId,
   selectedItemAmount: c.selectedItemAmount,
+  selectedDiscountAmount: c.selectedDiscountAmount,
   minOrderAmount: c.minOrderAmount,
   minOrderShortfall: c.minOrderShortfall,
   expiresAt: c.expiresAt,
@@ -176,6 +178,12 @@ Cart cartFromContract(api.Cart c) => Cart(
         optionLabel: i.display?.optionLabel,
         imageUrl: i.display?.imageUrl,
         unitPrice: i.display?.unitPrice,
+        discount: saleDiscountOf(
+          salePrice: i.display?.salePrice,
+          basePrice: i.display?.unitPrice,
+          ratePercent: i.display?.discountRatePercent,
+          name: i.display?.discountName,
+        ),
         saleState: switch (i.display?.saleState) {
           api.CartItemDisplaySaleStateEnum.ON_SALE => SaleState.onSale,
           api.CartItemDisplaySaleStateEnum.TEMPORARILY_SOLD_OUT =>

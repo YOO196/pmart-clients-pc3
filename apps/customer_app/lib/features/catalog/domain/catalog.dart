@@ -29,7 +29,11 @@ class ProductTile {
     this.badge = DisplayBadge.none,
     this.rank,
     this.unitPrice,
+    this.discount,
   });
+
+  /// 기간 할인(storefront 0.8.0·search 0.6.0, ADR-0082 4단계). 없으면 정가만 보인다. 결제 금액은 주문서 견적.
+  final SaleDiscount? discount;
 
   /// 카드의 "100g당 999원"(storefront 0.3.0 `unitPrice` — 서버가 계산). 없으면 줄을 그리지 않는다.
   final UnitPrice? unitPrice;
@@ -54,6 +58,25 @@ class ProductTile {
 
   /// 담기 버튼을 보여도 되는지(안내용). 확정은 장바구니 서버 판정.
   bool get canOfferAdd => saleState == SaleState.onSale && carried != false;
+}
+
+/// 표시용 기간 할인(서버 값 — 할인가·할인율을 앱이 계산하지 않는다). 결제 금액은 주문서 견적이 정한다.
+@immutable
+class SaleDiscount {
+  const SaleDiscount({
+    required this.salePrice,
+    this.ratePercent,
+    this.name,
+    this.endsAt,
+  });
+
+  /// 할인가(개당).
+  final int salePrice;
+
+  /// 할인율(내림, %). 없으면 할인율을 적지 않는다.
+  final int? ratePercent;
+  final String? name;
+  final DateTime? endsAt;
 }
 
 /// 단위 가격(서버 계산 — 앱은 표시만). [basis] 100 · [unitLabel] g/ml · [price] 원.
@@ -323,7 +346,11 @@ class SaleOption {
     this.priceNotSet = false,
     this.carried,
     this.unitPrice,
+    this.discount,
   });
+
+  /// 기간 할인(pricing 0.3.0 `discount`). 없거나 모르면(discountAvailable=false) null — 정가만.
+  final SaleDiscount? discount;
 
   /// "100g당 999원"(product-content `unitPrice`, 서버 계산). 없으면 줄을 그리지 않는다.
   final UnitPrice? unitPrice;

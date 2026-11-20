@@ -1,7 +1,8 @@
 import 'package:pmart_api_cart/pmart_api_cart.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
 
-import '../../catalog/data/mock_catalog_repository.dart' show mockProducts;
+import '../../catalog/data/mock_catalog_repository.dart'
+    show MockProduct, mockProducts;
 import '../domain/cart.dart';
 import 'cart_repository.dart';
 
@@ -96,6 +97,8 @@ base class MockCartRepository implements CartRepository {
     String name,
     String label,
     int price,
+    int? sale,
+    int? rate,
     String saleState,
     String availability,
     int units,
@@ -108,6 +111,8 @@ base class MockCartRepository implements CartRepository {
           name: p.name,
           label: '1개',
           price: p.price,
+          sale: p.salePrice,
+          rate: p.discountRate,
           saleState: p.saleState,
           availability: p.availability,
           units: 1,
@@ -119,6 +124,8 @@ base class MockCartRepository implements CartRepository {
           name: p.name,
           label: '2개 묶음',
           price: p.bundlePrice!,
+          sale: null,
+          rate: null,
           saleState: p.saleState,
           availability: 'AVAILABLE',
           units: 2,
@@ -130,6 +137,7 @@ base class MockCartRepository implements CartRepository {
 
   Map<String, Object?> cartJson() {
     var amount = 0;
+    var discount = 0;
     final items = <Map<String, Object?>>[];
     for (final l in _lines) {
       final s = _sku(l.sku)!;
@@ -138,7 +146,11 @@ base class MockCartRepository implements CartRepository {
           s.saleState == 'ON_SALE' &&
           s.availability != 'SOLD_OUT' &&
           !notCarried;
-      if (l.selected && purchasable) amount += s.price * l.quantity;
+      // 서버 흉내(cart 0.4.0): 합계는 기간 할인 뒤 단가 합, 할인 합계는 따로.
+      if (l.selected && purchasable) {
+        amount += (s.sale ?? s.price) * l.quantity;
+        if (s.sale case final v?) discount += (s.price - v) * l.quantity;
+      }
       items.add({
         'cartItemId': l.cartItemId,
         'sku': l.sku,
@@ -150,6 +162,11 @@ base class MockCartRepository implements CartRepository {
           'optionLabel': s.label,
           'unitPrice': s.price,
           'priceVersion': 1,
+          if (s.sale != null) ...{
+            'salePrice': s.sale,
+            'discountRatePercent': s.rate,
+            'discountName': MockProduct.discountName,
+          },
           'saleState': s.saleState,
           'availability': (inventoryDown || noMfc)
               ? 'UNKNOWN'
@@ -170,6 +187,7 @@ base class MockCartRepository implements CartRepository {
       'mfcId': noMfc ? null : 'MFC-BSJ-01',
       'items': items,
       'selectedItemAmount': amount,
+      'selectedDiscountAmount': discount,
       // 서버 흉내(cart 0.2.0): 최소 15,000원, 부족액 = max(0, 최소 − 선택 합계).
       'minOrderAmount': minOrderAmount,
       'minOrderShortfall': (minOrderAmount - amount).clamp(0, minOrderAmount),
