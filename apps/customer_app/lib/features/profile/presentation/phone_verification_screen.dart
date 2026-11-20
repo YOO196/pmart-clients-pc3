@@ -238,7 +238,7 @@ class _PhoneVerificationScreenState
         title: Text(l10n.pvTitle),
         leading: IconButton(
           key: const ValueKey('pv-close'),
-          icon: const Icon(Icons.close),
+          icon: const PmartLineIcon(PmartLineIcons.close),
           tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
           onPressed: _leave,
         ),
@@ -250,7 +250,7 @@ class _PhoneVerificationScreenState
             headline,
             key: ValueKey('pv-title-${_step.name}'),
             style: theme.textTheme.headlineSmall?.copyWith(
-              fontSize: 26,
+              fontSize: 21,
               height: 1.35,
               fontWeight: FontWeight.w800,
             ),
@@ -293,10 +293,11 @@ class _PhoneVerificationScreenState
         hintText: hint,
         floatingLabelBehavior: FloatingLabelBehavior.always,
         suffixIcon: suffix,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        // 레퍼런스 4-1: 칸 높이 약 46dp, 모서리 4dp, 글자 15sp
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 20,
+          horizontal: 14,
+          vertical: 13,
         ),
       );
 
@@ -307,13 +308,13 @@ class _PhoneVerificationScreenState
       autofocus: true,
       keyboardType: TextInputType.phone,
       inputFormatters: const [PhoneNumberFormatter()],
-      style: const TextStyle(fontSize: 18),
+      style: const TextStyle(fontSize: 15),
       decoration: _decoration(
         l10n.pvPhoneLabel,
         hint: l10n.pvPhoneHint,
         suffix: IconButton(
           key: const ValueKey('pv-phone-clear'),
-          icon: const Icon(Icons.cancel),
+          icon: const PmartLineIcon(PmartLineIcons.clearCircle),
           color: Theme.of(context).colorScheme.outline,
           onPressed: () => setState(_phone.clear),
         ),
@@ -407,6 +408,16 @@ class _PhoneVerificationScreenState
   }
 
   List<Widget> _doneBody(AppLocalizations l10n) => [
+    // 레퍼런스: 완료는 가운데 큰 선 체크 원
+    Center(
+      child: PmartLineIcon(
+        PmartLineIcons.checkCircle,
+        size: 72,
+        strokeWidth: 1.6,
+        color: Theme.of(context).colorScheme.primary,
+      ),
+    ),
+    const SizedBox(height: 24),
     InputDecorator(
       decoration: _decoration(l10n.pvPhoneLabel),
       child: Row(
@@ -414,11 +425,11 @@ class _PhoneVerificationScreenState
           Expanded(
             child: Text(
               _verifiedPhone ?? '',
-              style: const TextStyle(fontSize: 18),
+              style: const TextStyle(fontSize: 15),
             ),
           ),
-          Icon(
-            Icons.check_circle,
+          PmartLineIcon(
+            PmartLineIcons.checkCircle,
             key: const ValueKey('pv-verified'),
             color: Theme.of(context).colorScheme.primary,
           ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pmart_ui/pmart_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -27,112 +28,262 @@ class MyScreen extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final member = session is MemberSession;
     final profile = ref.watch(profileProvider).value;
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.navMy)),
-      body: ListView(
-        children: [
-          if (session is MemberSession)
-            ListTile(
-              key: const ValueKey('my-account'),
-              // Google 프로필(이름·이메일·사진)은 서버가 로그인마다 최신으로 바꾼다(ADR-0024). 없으면 제공자 SDK 계정 표시.
-              leading: ProfileAvatar(profile: profile),
-              title: Text(switch (session.provider) {
-                final SocialProvider p => l10n.myLoggedInWith(
-                  providerName(l10n, p),
-                ),
-                null => l10n.myLoggedIn,
-              }),
-              subtitle: Text(
-                providerAccountText(profile) ??
-                    session.accountLabel ??
-                    l10n.myAccountUnknown,
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    // 레퍼런스(사용자 캡처 2026-11-20 "마이배민"): 회색 바탕, 왼쪽 큰 제목 + 오른쪽 고객센터·설정 아이콘,
+    // 가운데 큰 프로필 사진 + 이름(연필), 흰 둥근 카드, 아래 작은 선 아이콘 줄 목록.
+    // 쿠폰·포인트·선물함·찜·배민클럽 같은 1차 제외 기능은 넣지 않는다.
+    Widget row(
+      String text, {
+      Key? key,
+      required PmartLineIcons icon,
+      VoidCallback? onTap,
+      String? sub,
+      Widget? trailing,
+    }) => InkWell(
+      key: key,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+        child: Row(
+          children: [
+            PmartLineIcon(icon, size: 19),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (sub != null)
+                    Text(
+                      sub,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
               ),
             ),
-          if (member)
-            ListTile(
-              key: const ValueKey('my-info'),
-              leading: const Icon(Icons.badge_outlined),
-              title: Text(l10n.infoTitle),
-              subtitle: Text(switch (ref.watch(profileProvider)) {
-                AsyncData(value: final p?) => myInfoSummary(l10n, p),
-                AsyncError() => l10n.infoLoadFailed,
-                _ => l10n.infoLoading,
-              }),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/me/info'),
-            ),
-          ListTile(
-            key: const ValueKey('my-orders'),
-            leading: const Icon(Icons.receipt_long_outlined),
-            title: Text(l10n.ordersTitle),
-            onTap: () => context.push('/orders'),
-          ),
-          // 취소·반품 목록은 회원 본인 것만 서버가 준다(claim 0.6.0).
-          if (member)
-            ListTile(
-              key: const ValueKey('my-claims'),
-              leading: const Icon(Icons.assignment_return_outlined),
-              title: Text(l10n.myClaimsTitle),
-              onTap: () => context.push('/claims'),
-            ),
-          ListTile(
-            key: const ValueKey('my-reviews'),
-            leading: const Icon(Icons.rate_review_outlined),
-            title: Text(l10n.reviewManageTitle),
-            onTap: () => context.push('/reviews'),
-          ),
-          ListTile(
-            key: const ValueKey('my-notifications'),
-            leading: const Icon(Icons.notifications_none),
-            title: Text(l10n.noticeTitle),
-            onTap: () => context.push('/notifications'),
-          ),
-          ListTile(
-            key: const ValueKey('my-notification-settings'),
-            leading: const Icon(Icons.tune),
-            title: Text(l10n.noticeSettingsTitle),
-            onTap: () => context.push('/notifications/settings'),
-          ),
-          ListTile(
-            key: const ValueKey('my-support'),
-            leading: const Icon(Icons.headset_mic_outlined),
-            title: Text(l10n.supportTitle),
-            onTap: () => context.push('/support'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.place_outlined),
-            title: Text(l10n.addressTitle),
-            onTap: () => context.push('/addresses'),
-          ),
-          const Divider(),
-          if (member)
-            ListTile(
-              key: const ValueKey('logout'),
-              leading: const Icon(Icons.logout),
-              title: Text(l10n.logout),
-              // 로그아웃 API(`POST /auth/logouts`)는 아직 붙이지 않았다. 기기의 토큰만 지운다.
-              onTap: () => ref.read(sessionProvider.notifier).signOut(),
-            )
-          else ...[
-            // 저장된 로그인을 서버에 확인하지 못했다(연결 안 됨). 로그아웃된 게 아니다.
-            if (ref.watch(sessionUnverifiedProvider))
-              ListTile(
-                key: const ValueKey('my-session-unverified'),
-                leading: const Icon(Icons.cloud_off_outlined),
-                title: Text(l10n.sessionUnreachableNotice),
-                trailing: TextButton(
-                  onPressed: () =>
-                      ref.read(sessionProvider.notifier).retryRestore(),
-                  child: Text(l10n.sessionRetry),
-                ),
-              ),
-            ListTile(
-              key: const ValueKey('my-login'),
-              leading: const Icon(Icons.login),
-              title: Text(l10n.loginTitle),
-              onTap: () => context.push('/login'),
-            ),
+            trailing ??
+                (onTap == null
+                    ? const SizedBox.shrink()
+                    : PmartLineIcon(
+                        PmartLineIcons.chevronRight,
+                        size: 16,
+                        color: scheme.outline,
+                      )),
           ],
+        ),
+      ),
+    );
+    Widget card(List<Widget> children) => Container(
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(children: children),
+    );
+    return Scaffold(
+      backgroundColor: scheme.surfaceContainer,
+      appBar: AppBar(
+        centerTitle: false,
+        titleSpacing: 18,
+        backgroundColor: scheme.surfaceContainer,
+        title: Text(
+          l10n.navMy,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        actions: [
+          IconButton(
+            key: const ValueKey('my-top-support'),
+            tooltip: l10n.supportTitle,
+            icon: const PmartLineIcon(PmartLineIcons.headset, size: 24),
+            onPressed: () => context.push('/support'),
+          ),
+          IconButton(
+            key: const ValueKey('my-top-settings'),
+            tooltip: l10n.noticeSettingsTitle,
+            icon: const PmartLineIcon(PmartLineIcons.settings, size: 24),
+            onPressed: () => context.push('/notifications/settings'),
+          ),
+          const SizedBox(width: 6),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: 24),
+        children: [
+          // 프로필: 가운데 큰 사진 + 이름(연필 = 내 정보)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+            child: Column(
+              key: member ? const ValueKey('my-account') : null,
+              children: [
+                if (session is MemberSession) ...[
+                  InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => context.push('/me/info'),
+                    // Google 프로필(이름·이메일·사진)은 서버가 로그인마다 최신으로 바꾼다(ADR-0024). 없으면 제공자 SDK 계정 표시.
+                    child: SizedBox.square(
+                      dimension: 96,
+                      child: FittedBox(child: ProfileAvatar(profile: profile)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    key: const ValueKey('my-info'),
+                    onTap: () => context.push('/me/info'),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          switch (ref.watch(profileProvider)) {
+                            AsyncData(value: final p?) => myInfoSummary(
+                              l10n,
+                              p,
+                            ),
+                            AsyncError() => l10n.infoLoadFailed,
+                            _ => l10n.infoLoading,
+                          },
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        PmartLineIcon(
+                          PmartLineIcons.pencil,
+                          size: 15,
+                          color: scheme.outline,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  // 로그인 제공자 · 계정(따로 두 줄 — 시험·화면 낭독기가 따로 읽는다)
+                  Column(
+                    children: [
+                      Text(
+                        switch (session.provider) {
+                          final SocialProvider p => l10n.myLoggedInWith(
+                            providerName(l10n, p),
+                          ),
+                          null => l10n.myLoggedIn,
+                        },
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      Text(
+                        providerAccountText(profile) ??
+                            session.accountLabel ??
+                            l10n.myAccountUnknown,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  // 저장된 로그인을 서버에 확인하지 못했다(연결 안 됨). 로그아웃된 게 아니다.
+                  if (ref.watch(sessionUnverifiedProvider))
+                    ListTile(
+                      key: const ValueKey('my-session-unverified'),
+                      leading: const PmartLineIcon(PmartLineIcons.alert),
+                      title: Text(l10n.sessionUnreachableNotice),
+                      trailing: TextButton(
+                        onPressed: () =>
+                            ref.read(sessionProvider.notifier).retryRestore(),
+                        child: Text(l10n.sessionRetry),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    key: const ValueKey('my-login'),
+                    onPressed: () => context.push('/login'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(l10n.loginTitle),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          card([
+            row(
+              l10n.ordersTitle,
+              key: const ValueKey('my-orders'),
+              icon: PmartLineIcons.receipt,
+              onTap: () => context.push('/orders'),
+            ),
+            // 취소·반품 목록은 회원 본인 것만 서버가 준다(claim 0.6.0).
+            if (member)
+              row(
+                l10n.myClaimsTitle,
+                key: const ValueKey('my-claims'),
+                icon: PmartLineIcons.refresh,
+                onTap: () => context.push('/claims'),
+              ),
+            row(
+              l10n.reviewManageTitle,
+              key: const ValueKey('my-reviews'),
+              icon: PmartLineIcons.pencil,
+              onTap: () => context.push('/reviews'),
+            ),
+            row(
+              l10n.addressTitle,
+              icon: PmartLineIcons.pin,
+              onTap: () => context.push('/addresses'),
+            ),
+            row(
+              l10n.noticeTitle,
+              key: const ValueKey('my-notifications'),
+              icon: PmartLineIcons.bell,
+              onTap: () => context.push('/notifications'),
+            ),
+          ]),
+          card([
+            row(
+              l10n.supportTitle,
+              key: const ValueKey('my-support'),
+              icon: PmartLineIcons.headset,
+              onTap: () => context.push('/support'),
+            ),
+            row(
+              l10n.faqTitle,
+              key: const ValueKey('my-faqs'),
+              icon: PmartLineIcons.info,
+              onTap: () => context.push('/support/faqs'),
+            ),
+            row(
+              l10n.noticeSettingsTitle,
+              key: const ValueKey('my-notification-settings'),
+              icon: PmartLineIcons.settings,
+              onTap: () => context.push('/notifications/settings'),
+            ),
+            if (member)
+              // 로그아웃 API(`POST /auth/logouts`)는 아직 붙이지 않았다. 기기의 토큰만 지운다.
+              row(
+                l10n.logout,
+                key: const ValueKey('logout'),
+                icon: PmartLineIcons.back,
+                onTap: () => ref.read(sessionProvider.notifier).signOut(),
+              ),
+          ]),
         ],
       ),
     );

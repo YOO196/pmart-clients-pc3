@@ -254,7 +254,8 @@ class StartChoiceDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 34, 20, 30),
+            // 레퍼런스 2-5: 창 높이 약 141dp, 글자 14.5sp
+            padding: const EdgeInsets.fromLTRB(20, 26, 20, 24),
             child: Column(
               children: [
                 if (title case final t?) ...[
@@ -272,7 +273,7 @@ class StartChoiceDialog extends StatelessWidget {
                   message,
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    fontSize: 15.5,
+                    fontSize: 14.5,
                     height: 1.45,
                   ),
                 ),

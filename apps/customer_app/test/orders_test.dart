@@ -84,7 +84,7 @@ void main() {
     await openOrders(t, orders: _ListDown());
 
     expect(find.byKey(const ValueKey('orders-empty')), findsNothing);
-    expect(find.text('정보를 불러오지 못했어요'), findsOneWidget);
+    expect(find.text('화면을 불러오지 못했어요'), findsOneWidget);
   });
 
   testWidgets('분할배송 주문은 배송별 상태·품목과 늦은 원천을 보인다', (t) async {
@@ -125,7 +125,7 @@ void main() {
     expect(find.textContaining('올림픽로'), findsNothing);
   });
 
-  testWidgets('취소 주문은 서버가 준 환불 완료 금액을 보인다', (t) async {
+  testWidgets('취소 주문은 서버가 준 총 환불금액을 보인다', (t) async {
     await openOrders(t);
     await t.tap(find.byKey(const ValueKey('order-order-seed-3')));
     await t.pumpAndSettle();
@@ -149,7 +149,11 @@ void main() {
     expect(find.byKey(const ValueKey('eta-delayed')), findsOneWidget);
 
     orders.etaFails = true;
-    await t.tap(find.byType(BackButton));
+    await t.tap(
+      find.byWidgetPredicate(
+        (w) => w is BackButton || w.key == const ValueKey('track-close'),
+      ),
+    );
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('track-dlv-s2')));
     await t.pumpAndSettle();

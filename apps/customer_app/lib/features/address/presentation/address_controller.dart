@@ -149,6 +149,35 @@ class AddressBookController extends AsyncNotifier<AddressBook?> {
 
   /// 회원 주소 삭제. 결과 불명은 같은 키로 다시 보내고, 그래도 모르면 주소록을 다시 읽어 남았는지로 판단한다.
   /// 404(이미 없음)도 지워진 것으로 본다. 현재 쇼핑 주소면 서버가 409 INVALID_STATE 로 거절한다.
+  /// 회원 주소 수정. 같은 키로 한 번 더(결과 불명) 뒤에도 모르면 불명 — 주소록을 다시 읽는다.
+  Future<AddressCommandOutcome> modify(
+    String addressId,
+    AddressDraft draft,
+  ) async {
+    final key = IdempotencyKey.generate();
+    try {
+      await _repo.update(addressId, draft, key: key);
+      await _reload();
+      final saved = state.value?.addresses
+          .where((a) => a.addressId == addressId)
+          .firstOrNull;
+      return saved == null
+          ? const AddressCommandUnknown()
+          : AddressSaved(saved);
+    } on UnknownResultFailure {
+      await _reload();
+      return const AddressCommandUnknown();
+    } on ProblemFailure catch (f) {
+      if (f.problem.code == ProblemCode.versionConflict) {
+        await _reload();
+        return const AddressConflict();
+      }
+      return AddressCommandFailed(f);
+    } on PmartFailure catch (f) {
+      return AddressCommandFailed(f);
+    }
+  }
+
   Future<AddressCommandOutcome> remove(String addressId) async {
     final key = IdempotencyKey.generate();
     final attempts = 1 + ref.read(addressResendAttemptsProvider);

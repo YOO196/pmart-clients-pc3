@@ -63,13 +63,21 @@ void main() {
       expect(orders.listStatuses.last, isNull);
       expect(find.byKey(const ValueKey('order-order-seed-3')), findsOneWidget);
 
+      await t.tap(find.byKey(const ValueKey('orders-status')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('orders-filter-cancelled')));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('orders-sheet-apply')));
       await t.pumpAndSettle();
       expect(orders.listStatuses.last, OrderStatus.cancelled);
       expect(find.byKey(const ValueKey('order-order-seed-3')), findsOneWidget);
       expect(find.byKey(const ValueKey('order-order-seed-1')), findsNothing);
 
+      await t.tap(find.byKey(const ValueKey('orders-status')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('orders-filter-inDelivery')));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('orders-sheet-apply')));
       await t.pumpAndSettle();
       expect(orders.listStatuses.last, OrderStatus.inDelivery);
       expect(
@@ -78,7 +86,11 @@ void main() {
       );
       expect(find.byKey(const ValueKey('orders-empty')), findsNothing);
 
+      await t.tap(find.byKey(const ValueKey('orders-status')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('orders-filter-all')));
+      await t.pump();
+      await t.tap(find.byKey(const ValueKey('orders-sheet-apply')));
       await t.pumpAndSettle();
       expect(orders.listStatuses.last, isNull);
       expect(find.byKey(const ValueKey('order-order-seed-1')), findsOneWidget);

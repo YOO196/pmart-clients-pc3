@@ -12,7 +12,7 @@ import '../../../shared/ui_state_of.dart';
 import '../../checkout/domain/checkout.dart';
 import '../../checkout/presentation/checkout_controller.dart';
 import '../../checkout/presentation/delivery_select_screen.dart'
-    show seoulDate, windowText;
+    show seoulDate, slotDayLabel, windowText;
 import '../../orders/domain/orders.dart';
 import '../../orders/presentation/orders_providers.dart';
 import '../domain/claims.dart';
@@ -129,81 +129,144 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final provider = orderDetailProvider(widget.orderId);
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.cancelTitle)),
-      body: UiStateView<OrderDetail>(
-        state: uiStateOf(ref.watch(provider)),
-        onRetry: () => ref.invalidate(provider),
-        ready: (context, order) {
-          final lines = cancelLinesOf(order);
-          final qtyByLine = {
-            for (final c in lines ?? const <CancelLine>[]) c.orderLineId: c.qty,
-          };
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text(switch (lines) {
-                null => l10n.cancelQtyUnavailable,
-                [] => l10n.cancelNothingLeft,
-                _ => l10n.cancelWholeOrderNote,
-              }, key: const ValueKey('cancel-scope')),
-              for (final l in order.lines)
-                if (qtyByLine[l.orderLineId] case final q?)
-                  ListTile(
-                    key: ValueKey('cancel-line-${l.orderLineId}'),
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(l.title),
-                    trailing: Text(l10n.cancelLineQty(q)),
-                  ),
-              const SizedBox(height: 12),
-              Text(l10n.cancelReason),
-              RadioGroup<CancelReason>(
-                groupValue: _reason,
-                onChanged: (r) => setState(() => _reason = r ?? _reason),
-                child: Column(
-                  children: [
-                    for (final r in CancelReason.values)
-                      RadioListTile<CancelReason>(
-                        value: r,
-                        title: Text(switch (r) {
-                          CancelReason.changeOfMind => l10n.reasonChangeOfMind,
-                          CancelReason.addressError => l10n.reasonAddressError,
-                          CancelReason.lateDelivery => l10n.reasonLateDelivery,
-                          CancelReason.other => l10n.reasonOther,
-                        }),
-                      ),
-                  ],
-                ),
-              ),
-              Text(
-                l10n.cancelNote,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              if (_message case final m?)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    m,
-                    key: const ValueKey('cancel-message'),
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+    // 레퍼런스 9-1 4: 가운데 작은 창 — 제목 "주문을 취소할까요?", 사유(계약 필수), 오른쪽 아래 [아니요][주문취소]
+    return Dialog(
+      key: const ValueKey('cancel-dialog'),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+        ),
+        child: UiStateView<OrderDetail>(
+          state: uiStateOf(ref.watch(provider)),
+          onRetry: () => ref.invalidate(provider),
+          ready: (context, order) {
+            final lines = cancelLinesOf(order);
+            final qtyByLine = {
+              for (final c in lines ?? const <CancelLine>[])
+                c.orderLineId: c.qty,
+            };
+            return SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(22, 24, 18, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    l10n.cancelConfirmTitle,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-              const SizedBox(height: 8),
-              CommandButton(
-                key: const ValueKey('cancel-submit'),
-                // 결과를 모르면 같은 키로 다시 확인한다(새 취소 요청이 아니다).
-                label: _unknown ? l10n.checkoutCheckAgain : l10n.cancelSubmit,
-                onPressed: switch (lines) {
-                  final l? when l.isNotEmpty => () => _submit(order, l),
-                  _ => null,
-                },
+                  const SizedBox(height: 8),
+                  Text(
+                    switch (lines) {
+                      null => l10n.cancelQtyUnavailable,
+                      [] => l10n.cancelNothingLeft,
+                      _ => l10n.cancelWholeOrderNote,
+                    },
+                    key: const ValueKey('cancel-scope'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  for (final l in order.lines)
+                    if (qtyByLine[l.orderLineId] case final q?)
+                      Padding(
+                        key: ValueKey('cancel-line-${l.orderLineId}'),
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                l.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ),
+                            Text(
+                              l10n.cancelLineQty(q),
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                  const SizedBox(height: 12),
+                  Text(
+                    l10n.cancelReason,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  RadioGroup<CancelReason>(
+                    groupValue: _reason,
+                    onChanged: (r) => setState(() => _reason = r ?? _reason),
+                    child: Column(
+                      children: [
+                        for (final r in CancelReason.values)
+                          RadioListTile<CancelReason>(
+                            value: r,
+                            dense: true,
+                            visualDensity: VisualDensity.compact,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(switch (r) {
+                              CancelReason.changeOfMind =>
+                                l10n.reasonChangeOfMind,
+                              CancelReason.addressError =>
+                                l10n.reasonAddressError,
+                              CancelReason.lateDelivery =>
+                                l10n.reasonLateDelivery,
+                              CancelReason.other => l10n.reasonOther,
+                            }, style: theme.textTheme.bodyMedium),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Text(l10n.cancelNote, style: theme.textTheme.bodySmall),
+                  if (_message case final m?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        m,
+                        key: const ValueKey('cancel-message'),
+                        style: TextStyle(color: theme.colorScheme.error),
+                      ),
+                    ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        key: const ValueKey('cancel-dismiss'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: theme.colorScheme.onSurface,
+                          minimumSize: const Size(72, 44),
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(l10n.cancelConfirmNo),
+                      ),
+                      const SizedBox(width: 8),
+                      CommandButton(
+                        key: const ValueKey('cancel-submit'),
+                        // 결과를 모르면 같은 키로 다시 확인한다(새 취소 요청이 아니다).
+                        label: _unknown
+                            ? l10n.checkoutCheckAgain
+                            : l10n.cancelSubmit,
+                        onPressed: switch (lines) {
+                          final l? when l.isNotEmpty => () => _submit(order, l),
+                          _ => null,
+                        },
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -323,8 +386,8 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
                 ListTile(
                   key: const ValueKey('refund'),
                   contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    r.done ? Icons.check_circle_outline : Icons.hourglass_top,
+                  leading: PmartLineIcon(
+                    r.done ? PmartLineIcons.checkCircle : PmartLineIcons.clock,
                   ),
                   title: Text(switch (r) {
                     _ when r.returnFee && r.done => l10n.refundFeeDone,
@@ -451,9 +514,8 @@ class _RescheduleScreenState extends ConsumerState<RescheduleScreen> {
     final l10n = AppLocalizations.of(context);
     final provider = orderDetailProvider(widget.orderId);
     final now = ref.watch(clockProvider)();
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.rescheduleTitle)),
-      body: UiStateView<OrderDetail>(
+    return SafeArea(
+      child: UiStateView<OrderDetail>(
         state: uiStateOf(ref.watch(provider)),
         onRetry: () => ref.invalidate(provider),
         ready: (context, order) {
@@ -472,69 +534,197 @@ class _RescheduleScreenState extends ConsumerState<RescheduleScreen> {
               ? ref.invalidate(slotsProvider(date))
               : ref.invalidate(orderSlotsProvider(slotsArg));
           final busy = _state == RequestState.pending;
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text(
-                l10n.rescheduleCurrent(
-                  order.window == null ? '-' : windowText(order.window!),
-                ),
-                key: const ValueKey('reschedule-current'),
-              ),
-              if (_requested != null && _state != RequestState.confirmed)
-                Text(switch (_state) {
-                  // 거절이면 기존 시간 그대로다(서버가 약속을 바꾸지 않았다).
-                  RequestState.rejected =>
-                    '${l10n.rescheduleRejected(rescheduleReasonText(l10n, _rejectCode))}\n${l10n.rescheduleKept}',
-                  _ => l10n.rescheduleChecking(windowText(_requested!)),
-                }, key: const ValueKey('reschedule-status')),
-              if (_state == RequestState.confirmed)
-                Text(
-                  l10n.rescheduleDone,
-                  key: const ValueKey('reschedule-done'),
-                ),
-              const SizedBox(height: 12),
-              SegmentedButton<bool>(
-                segments: [
-                  ButtonSegment(value: false, label: Text(l10n.slotToday)),
-                  ButtonSegment(value: true, label: Text(l10n.slotTomorrow)),
-                ],
-                selected: {_tomorrow},
-                onSelectionChanged: busy
+          final theme = Theme.of(context);
+          final scheme = theme.colorScheme;
+          Widget dayPill(bool t) {
+            final on = _tomorrow == t;
+            final d = seoulDate(t ? now.add(const Duration(days: 1)) : now);
+            return Expanded(
+              child: OutlinedButton(
+                key: ValueKey(t ? 'rs-day-tomorrow' : 'rs-day-today'),
+                onPressed: busy
                     ? null
-                    : (v) => setState(() {
-                        _tomorrow = v.first;
+                    : () => setState(() {
+                        _tomorrow = t;
                         _picked = null;
                       }),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(42),
+                  shape: const StadiumBorder(),
+                  backgroundColor: on ? scheme.onSurface : scheme.surface,
+                  foregroundColor: on ? scheme.surface : scheme.outline,
+                  side: BorderSide(
+                    color: on ? scheme.onSurface : scheme.outlineVariant,
+                  ),
+                  textStyle: theme.textTheme.titleSmall?.copyWith(
+                    fontSize: 16,
+                    fontWeight: on ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                ),
+                child: Text(slotDayLabel(l10n, d, now: now)),
               ),
-              const SizedBox(height: 8),
-              UiStateView<List<Slot>>(
-                state: uiStateOf(slots),
-                onRetry: retrySlots,
-                ready: (context, list) => Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+            );
+          }
+
+          // 레퍼런스 9-1 4: 아래 시트 — 제목 + ✕, 날짜 알약, 시간 목록, 글머리, [시간 변경]
+          return Column(
+            key: const ValueKey('reschedule-sheet'),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 8, 0),
+                child: Row(
                   children: [
-                    for (final s in list)
-                      ChoiceChip(
-                        key: ValueKey('rs-slot-${s.window.start}'),
-                        selected: _picked == s.window,
-                        label: Text(windowText(s.window)),
-                        onSelected:
-                            (s.selectable && !busy && s.window != order.window)
-                            ? (_) => setState(() => _picked = s.window)
-                            : null,
+                    Expanded(
+                      child: Text(
+                        l10n.slotSheetTitle,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('reschedule-close'),
+                      tooltip: l10n.actionClose,
+                      icon: const PmartLineIcon(PmartLineIcons.close, size: 22),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              CommandButton(
-                key: const ValueKey('reschedule-submit'),
-                label: l10n.rescheduleSubmit,
-                onPressed: (_picked != null && !busy)
-                    ? () => _submit(order)
-                    : null,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
+                child: DefaultTextStyle.merge(
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.rescheduleCurrent(
+                          order.window == null
+                              ? '-'
+                              : windowText(order.window!),
+                        ),
+                        key: const ValueKey('reschedule-current'),
+                      ),
+                      if (_requested != null &&
+                          _state != RequestState.confirmed)
+                        Text(
+                          switch (_state) {
+                            // 거절이면 기존 시간 그대로다(서버가 약속을 바꾸지 않았다).
+                            RequestState.rejected =>
+                              '${l10n.rescheduleRejected(rescheduleReasonText(l10n, _rejectCode))}\n${l10n.rescheduleKept}',
+                            _ => l10n.rescheduleChecking(
+                              windowText(_requested!),
+                            ),
+                          },
+                          key: const ValueKey('reschedule-status'),
+                          style: _state == RequestState.rejected
+                              ? TextStyle(color: scheme.error)
+                              : null,
+                        ),
+                      if (_state == RequestState.confirmed)
+                        Text(
+                          l10n.rescheduleDone,
+                          key: const ValueKey('reschedule-done'),
+                          style: TextStyle(color: scheme.primary),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                child: Row(
+                  children: [
+                    dayPill(false),
+                    const SizedBox(width: 8),
+                    dayPill(true),
+                  ],
+                ),
+              ),
+              // 레퍼런스: 시트는 화면 아래쪽 절반쯤 — 시간 목록은 높이를 묶고 안에서 스크롤
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.3,
+                ),
+                child: UiStateView<List<Slot>>(
+                  state: uiStateOf(slots),
+                  onRetry: retrySlots,
+                  ready: (context, list) => ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      for (final s in list)
+                        Builder(
+                          builder: (context) {
+                            final on =
+                                s.selectable &&
+                                !busy &&
+                                s.window != order.window;
+                            final picked = _picked == s.window;
+                            return Material(
+                              color: picked
+                                  ? scheme.surfaceContainer
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                              child: InkWell(
+                                key: ValueKey('rs-slot-${s.window.start}'),
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: on
+                                    ? () => setState(() => _picked = s.window)
+                                    : null,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 13,
+                                  ),
+                                  child: Text(
+                                    windowText(s.window),
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(
+                                          fontSize: picked ? 19 : 17,
+                                          fontWeight: picked
+                                              ? FontWeight.w700
+                                              : FontWeight.w400,
+                                          color: on
+                                              ? null
+                                              : scheme.outlineVariant,
+                                        ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Text(
+                  '• ${l10n.slotNote}\n• ${l10n.slotChangeNote}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 13,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+                child: CommandButton(
+                  key: const ValueKey('reschedule-submit'),
+                  label: l10n.rescheduleSubmit,
+                  onPressed: (_picked != null && !busy)
+                      ? () => _submit(order)
+                      : null,
+                ),
               ),
             ],
           );

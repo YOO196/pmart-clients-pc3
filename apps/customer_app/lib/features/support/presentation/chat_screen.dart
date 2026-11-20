@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:pmart_core/pmart_core.dart' show PmartEnv;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/providers.dart';
+import '../../checkout/presentation/checkout_controller.dart'
+    show clockProvider;
 import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -81,15 +84,112 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ? LoginRequired(message: l10n.chatLoginNeeded)
           : Column(
               children: [
+                // 레퍼런스 2: 머리 아래 "상담센터 ··· ⟳ 상담종료" 줄
+                Container(
+                  key: const ValueKey('chat-header'),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 4, 4),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      bottom: BorderSide(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 13,
+                        backgroundColor: theme.colorScheme.primaryContainer,
+                        child: PmartLineIcon(
+                          PmartLineIcons.headset,
+                          size: 16,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          l10n.chatCenterName,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      TextButton.icon(
+                        key: const ValueKey('chat-end'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: theme.colorScheme.onSurface,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        onPressed: busy
+                            ? null
+                            : () async {
+                                final ok = await showPmartConfirm(
+                                  context,
+                                  title: l10n.chatEndTitle,
+                                  confirmLabel: l10n.chatEnd,
+                                  cancelLabel: l10n.cancelConfirmNo,
+                                  confirmKey: const ValueKey('chat-end-ok'),
+                                );
+                                if (ok ?? false) {
+                                  ref.invalidate(chatProvider);
+                                  ref.read(chatTopicProvider.notifier).reset();
+                                }
+                              },
+                        icon: const PmartLineIcon(
+                          PmartLineIcons.refresh,
+                          size: 16,
+                        ),
+                        label: Text(l10n.chatEnd),
+                      ),
+                    ],
+                  ),
+                ),
                 Expanded(
                   child: ListView(
                     controller: _scroll,
                     padding: const EdgeInsets.all(16),
                     children: [
+                      // 레퍼런스 2: 가운데 날짜 줄 → "상담센터" 이름표 + 회색 인사 말풍선
+                      Center(
+                        child: Text(
+                          DateFormat('y년 M월 d일', 'ko').format(
+                            toSeoulWallClock(ref.watch(clockProvider)()),
+                          ),
+                          key: const ValueKey('chat-date'),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.outline,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       Text(
-                        l10n.chatIntro,
-                        key: const ValueKey('chat-intro'),
-                        style: theme.textTheme.bodySmall,
+                        l10n.chatCenterName,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 260),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            l10n.chatIntro,
+                            key: const ValueKey('chat-intro'),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
                       ),
                       if (mock)
                         Padding(
@@ -161,23 +261,52 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             maxLength: chatQuestionMax,
                             minLines: 1,
                             maxLines: 4,
+                            // 레퍼런스 2: 둥근 회색 칸(글자 수 숨김) + 동그란 ↑ 보내기
                             decoration: InputDecoration(
                               hintText: canType
                                   ? l10n.chatHint
                                   : l10n.chatChooseTopicHint,
+                              counterText: '',
+                              isDense: true,
+                              filled: true,
+                              fillColor: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainer,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 11,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(22),
+                                borderSide: BorderSide.none,
+                              ),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 22),
-                          child: FilledButton(
-                            key: const ValueKey('chat-send'),
-                            onPressed:
-                                busy || !canType || _input.text.trim().isEmpty
-                                ? null
-                                : _send,
-                            child: Text(l10n.chatSend),
+                        FilledButton(
+                          key: const ValueKey('chat-send'),
+                          style: FilledButton.styleFrom(
+                            shape: const CircleBorder(),
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size.square(40),
+                            fixedSize: const Size.square(40),
+                          ),
+                          onPressed:
+                              busy || !canType || _input.text.trim().isEmpty
+                              ? null
+                              : _send,
+                          child: Semantics(
+                            label: l10n.chatSend,
+                            child: const RotatedBox(
+                              quarterTurns: 1,
+                              child: PmartLineIcon(
+                                PmartLineIcons.back,
+                                size: 20,
+                                strokeWidth: 2.4,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                       ],

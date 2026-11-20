@@ -99,7 +99,7 @@ class _ClaimRow extends StatelessWidget {
             ),
         ],
       ),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: const PmartLineIcon(PmartLineIcons.chevronRight),
       onTap: () => context.push('/claims/${claim.claimId}'),
     );
   }

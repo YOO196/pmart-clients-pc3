@@ -36,6 +36,7 @@ class ContactSheet extends ConsumerStatefulWidget {
 }
 
 class _ContactSheetState extends ConsumerState<ContactSheet> {
+  final _focus = FocusNode();
   late final _phone = TextEditingController(
     text: switch (ref.read(profileProvider).value?.phone) {
       final p? => PhoneNumberFormatter.format(p),
@@ -47,6 +48,7 @@ class _ContactSheetState extends ConsumerState<ContactSheet> {
 
   @override
   void dispose() {
+    _focus.dispose();
     _phone.dispose();
     super.dispose();
   }
@@ -136,7 +138,7 @@ class _ContactSheetState extends ConsumerState<ContactSheet> {
               IconButton(
                 key: const ValueKey('contact-close'),
                 onPressed: _busy ? null : () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
+                icon: const PmartLineIcon(PmartLineIcons.close, size: 24),
                 tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
               ),
             ],
@@ -145,15 +147,47 @@ class _ContactSheetState extends ConsumerState<ContactSheet> {
           TextField(
             key: const ValueKey('contact-phone-input'),
             controller: _phone,
+            focusNode: _focus,
             enabled: !_busy,
             autofocus: true,
             keyboardType: TextInputType.phone,
             inputFormatters: const [PhoneNumberFormatter()],
+            style: theme.textTheme.bodyLarge?.copyWith(fontSize: 17),
             decoration: InputDecoration(
               hintText: l10n.contactHint,
               errorText: _error,
+              contentPadding: const EdgeInsets.fromLTRB(16, 18, 8, 18),
+              // 레퍼런스 6-3: 칸 안 오른쪽 [번호 변경] — 누르면 번호를 지우고 새로 입력
+              suffixIcon: Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: OutlinedButton(
+                  key: const ValueKey('contact-phone-clear'),
+                  onPressed: _busy
+                      ? null
+                      : () {
+                          _phone.clear();
+                          _focus.requestFocus();
+                        },
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 34),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    foregroundColor: theme.colorScheme.onSurface,
+                    side: BorderSide(color: theme.colorScheme.outlineVariant),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  child: Text(l10n.contactChange),
+                ),
+              ),
+              suffixIconConstraints: const BoxConstraints(minHeight: 34),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),

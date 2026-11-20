@@ -162,12 +162,13 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
       key: ValueKey(key),
       onTap: () => onChanged(!value),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        // 레퍼런스 2-1: 줄 높이 약 41dp, 체크 20dp, 글자 14sp
+        padding: const EdgeInsets.symmetric(vertical: 10.5),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox.square(
-              dimension: 22,
+              dimension: 20,
               child: Checkbox(
                 value: value,
                 onChanged: (v) => onChanged(v ?? false),
@@ -186,7 +187,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                 children: [
                   Text(
                     label,
-                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 14),
                   ),
                   if (hint != null)
                     Padding(
@@ -250,7 +251,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                     Text(
                       l10n.startWelcomeTitle,
                       style: theme.textTheme.headlineSmall?.copyWith(
-                        fontSize: 22,
+                        fontSize: 20,
                         height: 1.3,
                         fontWeight: FontWeight.w500,
                       ),
@@ -265,14 +266,12 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                       }),
                       label: l10n.startAgreeAll,
                     ),
-                    const Divider(height: 16),
-                    const SizedBox(height: 8),
+                    const Divider(height: 12),
                     _check(
                       key: 'start-agree-location',
                       value: _location,
                       onChanged: (v) => _choose(() => _location = v),
                       label: l10n.startLocationTerms,
-                      hint: l10n.startLocationTermsHint,
                       onOpen: _opener(terms, ConsentWire.location),
                     ),
                     const SizedBox(height: 8),
@@ -281,8 +280,6 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                       value: _marketing,
                       onChanged: (v) => _choose(() => _marketing = v),
                       label: l10n.startMarketingPush,
-                      hint: l10n.startMarketingPushHint,
-                      onOpen: _opener(terms, ConsentWire.marketing),
                     ),
                     if (termsValue.hasError && !termsValue.isLoading) ...[
                       const SizedBox(height: 16),
@@ -512,7 +509,7 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
                         child: Text(
                           l10n.startAddressSearchHint,
                           style: theme.textTheme.bodyLarge?.copyWith(
-                            fontSize: 16,
+                            fontSize: 15,
                             color: muted,
                           ),
                         ),
@@ -522,7 +519,8 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 18),
+            // 레퍼런스 2-4: 예시 묶음은 검색칸 바로 아래(약 12dp), 제목 13sp 진한 보통 굵기, 예시 12sp
+            const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.only(left: 4),
               child: Column(
@@ -532,8 +530,8 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
                     l10n.startAddressExamplesTitle,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: muted,
+                      fontWeight: FontWeight.w400,
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -547,7 +545,7 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
                       child: Text(
                         '• $e',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 12.5,
+                          fontSize: 12,
                           color: muted,
                         ),
                       ),
@@ -555,7 +553,7 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 27),
             OutlinedButton(
               key: const ValueKey('start-address-locate'),
               onPressed: _locating ? null : _locate,
@@ -612,8 +610,9 @@ class MarketingConsentResultDialog extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final when = DateFormat('y년 M월 d일 H시', 'ko').format(toSeoulWallClock(at));
+    // 레퍼런스 2-1: 제목 15sp 중간 굵기, 본문 14sp
     final line = theme.textTheme.bodyLarge?.copyWith(
-      fontSize: 15,
+      fontSize: 14,
       height: 1.45,
     );
     return Dialog(
@@ -636,8 +635,8 @@ class MarketingConsentResultDialog extends StatelessWidget {
                       ? l10n.startMarketingResultTitleAgreed
                       : l10n.startMarketingResultTitleRefused,
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 18),

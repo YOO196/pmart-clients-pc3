@@ -49,9 +49,11 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('login-kakao')));
     await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const ValueKey('mode-single')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('mode-single')));
     await t.pump();
-    await t.tap(find.byKey(const ValueKey('delivery-next')));
+    await t.tap(find.byKey(const ValueKey('cart-order')));
     await t.pumpAndSettle();
   }
 
@@ -67,21 +69,19 @@ void main() {
     consents.outdated = true;
     await toDeliveryNext(t);
     expect(find.byKey(const ValueKey('reconsent-body')), findsOneWidget);
+    // 아래 시트(레퍼런스 13-9): 필수는 줄마다 [보기]만 있고, [전체 동의하고 계속하기] 한 번으로 모두 동의한다.
     final submit = find.byKey(const ValueKey('reconsent-submit'));
-    expect(t.widget<FilledButton>(submit).onPressed, isNull);
-    expect(
-      find.byKey(const ValueKey('reconsent-${ConsentWire.location}')),
-      findsNothing,
-    );
-
     for (final type in [
       ConsentWire.terms,
       ConsentWire.privacy,
       ConsentWire.age14,
     ]) {
-      await t.tap(find.byKey(ValueKey('reconsent-$type')));
-      await t.pump();
+      expect(find.byKey(ValueKey('reconsent-$type')), findsOneWidget);
     }
+    expect(
+      find.byKey(const ValueKey('reconsent-${ConsentWire.location}')),
+      findsNothing,
+    );
     expect(t.widget<FilledButton>(submit).onPressed, isNotNull);
     await t.tap(submit);
     await t.pumpAndSettle();
@@ -106,24 +106,16 @@ void main() {
   testWidgets('재동의에서 나가면 다음 단계로 넘어가지 않는다', (t) async {
     consents.outdated = true;
     await toDeliveryNext(t);
-    await t.tap(find.byType(BackButton));
+    await t.tap(find.byKey(const ValueKey('reconsent-close')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('delivery-min-order')), findsNothing);
-    expect(find.text('배송 방식 선택'), findsOneWidget);
+    expect(find.byKey(const ValueKey('cart-receive')), findsOneWidget);
   });
 
   testWidgets('결과를 모르면 같은 키로 한 번 더 보낸다', (t) async {
     consents.outdated = true;
     consents.failNextChange = const UnknownResultFailure();
     await toDeliveryNext(t);
-    for (final type in [
-      ConsentWire.terms,
-      ConsentWire.privacy,
-      ConsentWire.age14,
-    ]) {
-      await t.tap(find.byKey(ValueKey('reconsent-$type')));
-      await t.pump();
-    }
     await t.tap(find.byKey(const ValueKey('reconsent-submit')));
     await t.pumpAndSettle();
     expect(consents.changes, hasLength(2));

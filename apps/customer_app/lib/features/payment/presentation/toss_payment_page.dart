@@ -154,7 +154,7 @@ class _TossPaymentPageState extends State<TossPaymentPage> {
         appBar: AppBar(
           title: Text(l10n.tossTitle),
           leading: IconButton(
-            icon: const Icon(Icons.close),
+            icon: const PmartLineIcon(PmartLineIcons.close),
             onPressed: _requesting ? null : () => _close(const PgCancelled()),
           ),
         ),

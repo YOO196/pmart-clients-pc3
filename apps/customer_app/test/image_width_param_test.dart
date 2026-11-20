@@ -21,4 +21,13 @@ void main() {
     expect(withImageWidth('$img?w=480', 300), '$img?w=480');
     expect(withImageWidth(null, 300), isNull);
   });
+
+  // 백엔드 요청 2026-11-20 review-photo-thumbnails(review 0.4.0).
+  test('리뷰 사진도 축소 폭(?w=)을 붙인다 — 썸네일 240/480, 크게 보기 720', () {
+    const photo = '/api/v1/review-photos/RP-1';
+    expect(withImageWidth(photo, 216), '$photo?w=240');
+    expect(withImageWidth(photo, 288), '$photo?w=480');
+    expect(withImageWidth(photo, 720), '$photo?w=720');
+    expect(withImageWidth('$photo?w=240', 720), '$photo?w=240');
+  });
 }

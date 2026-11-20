@@ -103,7 +103,7 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     return SizedBox.square(
-      dimension: 32,
+      dimension: 30,
       child: IconButton.filledTonal(
         key: ValueKey('quick-add-${widget.tile.productId}'),
         tooltip: l10n.quickAddTooltip,
@@ -113,7 +113,7 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
           backgroundColor: scheme.surface,
           elevation: 2,
           shadowColor: Colors.black38,
-          minimumSize: const Size.square(32),
+          minimumSize: const Size.square(30),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
         onPressed: _busy ? null : _onPressed,
@@ -122,7 +122,12 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
                 dimension: 16,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : const PmartLineIcon(PmartLineIcons.plus, size: 18),
+            // 레퍼런스: + 약 13dp, 굵은 선(약 1.7dp)
+            : const PmartLineIcon(
+                PmartLineIcons.plus,
+                size: 20,
+                strokeWidth: 2.4,
+              ),
       ),
     );
   }

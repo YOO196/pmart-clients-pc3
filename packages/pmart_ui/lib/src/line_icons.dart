@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// 고객 앱의 얇은 선 아이콘. 기본 Material 아이콘은 굵고 채워져 있어 레퍼런스(얇은 선)와 인상이 다르다.
@@ -27,6 +29,49 @@ enum PmartLineIcons {
 
   /// 상담(고객앱 배송 현황 "문의하기").
   headset,
+
+  /// 닫기 X.
+  close,
+
+  /// 체크 ✓.
+  check,
+
+  /// 원 안 체크(완료).
+  checkCircle,
+
+  /// 위치 핀(주소).
+  pin,
+
+  /// 설정 톱니.
+  settings,
+
+  /// 원 안 i(안내).
+  info,
+
+  /// 원 안 !(오류·주의).
+  alert,
+
+  /// 휴지통(삭제).
+  trash,
+
+  /// 다시(↻).
+  refresh,
+
+  /// 정렬(⇅).
+  sort,
+
+  /// 필터(가로 막대 + 손잡이).
+  filter,
+
+  /// 영수증(주문).
+  receipt,
+
+  /// 연필(편집).
+  pencil,
+
+  /// 원 안 X(지우기).
+  clearCircle,
+  clock,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -308,8 +353,172 @@ class _LinePainter extends CustomPainter {
             ..quadraticBezierTo(18.8, 20.8, 14, 20.8),
           line,
         );
+      case PmartLineIcons.close:
+        canvas.drawLine(const Offset(6, 6), const Offset(18, 18), line);
+        canvas.drawLine(const Offset(18, 6), const Offset(6, 18), line);
+      case PmartLineIcons.check:
+        canvas.drawPath(
+          Path()
+            ..moveTo(5, 12.5)
+            ..lineTo(10, 17.5)
+            ..lineTo(19, 7),
+          line,
+        );
+      case PmartLineIcons.checkCircle:
+        canvas.drawCircle(const Offset(12, 12), 9, line);
+        canvas.drawPath(
+          Path()
+            ..moveTo(7.8, 12.3)
+            ..lineTo(10.8, 15.2)
+            ..lineTo(16.4, 9.2),
+          line,
+        );
+      case PmartLineIcons.pin:
+        canvas.drawPath(
+          Path()
+            ..moveTo(12, 21)
+            ..cubicTo(12, 21, 5, 14.6, 5, 9.8)
+            ..arcToPoint(
+              const Offset(19, 9.8),
+              radius: const Radius.circular(7),
+            )
+            ..cubicTo(19, 14.6, 12, 21, 12, 21)
+            ..close(),
+          line,
+        );
+        canvas.drawCircle(const Offset(12, 9.8), 2.4, line);
+      case PmartLineIcons.settings:
+        canvas.drawCircle(const Offset(12, 12), 3, line);
+        for (var i = 0; i < 8; i++) {
+          final a = i * 3.14159265 / 4;
+          final c = Offset(12 + 7.2 * _cos(a), 12 + 7.2 * _sin(a));
+          final d = Offset(12 + 9.2 * _cos(a), 12 + 9.2 * _sin(a));
+          canvas.drawLine(c, d, line);
+        }
+        canvas.drawCircle(const Offset(12, 12), 6.8, line);
+      case PmartLineIcons.info:
+        canvas.drawCircle(const Offset(12, 12), 9, line);
+        canvas.drawLine(const Offset(12, 11), const Offset(12, 16.6), line);
+        canvas.drawCircle(const Offset(12, 7.8), 1.1, fill);
+      case PmartLineIcons.alert:
+        canvas.drawCircle(const Offset(12, 12), 9, line);
+        canvas.drawLine(const Offset(12, 7.2), const Offset(12, 13), line);
+        canvas.drawCircle(const Offset(12, 16.4), 1.1, fill);
+      case PmartLineIcons.trash:
+        canvas.drawLine(const Offset(4.5, 6.6), const Offset(19.5, 6.6), line);
+        canvas.drawPath(
+          Path()
+            ..moveTo(9.4, 6.6)
+            ..lineTo(9.4, 4.4)
+            ..lineTo(14.6, 4.4)
+            ..lineTo(14.6, 6.6),
+          line,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(6.4, 6.6)
+            ..lineTo(7.4, 19.6)
+            ..lineTo(16.6, 19.6)
+            ..lineTo(17.6, 6.6),
+          line,
+        );
+      case PmartLineIcons.refresh:
+        canvas.drawArc(
+          Rect.fromCircle(center: const Offset(12, 12), radius: 7.4),
+          -1.2,
+          5.2,
+          false,
+          line,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(15.4, 3.6)
+            ..lineTo(15.6, 6.2)
+            ..lineTo(13, 6.6),
+          line,
+        );
+      case PmartLineIcons.sort:
+        canvas.drawPath(
+          Path()
+            ..moveTo(8, 19)
+            ..lineTo(8, 5)
+            ..moveTo(4.6, 8.4)
+            ..lineTo(8, 5)
+            ..lineTo(11.4, 8.4),
+          line,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(16, 5)
+            ..lineTo(16, 19)
+            ..moveTo(12.6, 15.6)
+            ..lineTo(16, 19)
+            ..lineTo(19.4, 15.6),
+          line,
+        );
+      case PmartLineIcons.filter:
+        canvas.drawLine(const Offset(4, 7), const Offset(20, 7), line);
+        canvas.drawLine(const Offset(4, 17), const Offset(20, 17), line);
+        canvas.drawCircle(const Offset(9, 7), 2.2, line);
+        canvas.drawCircle(const Offset(15, 17), 2.2, line);
+      case PmartLineIcons.receipt:
+        canvas.drawPath(
+          Path()
+            ..moveTo(6, 3.6)
+            ..lineTo(18, 3.6)
+            ..lineTo(18, 20.4)
+            ..lineTo(15.6, 18.8)
+            ..lineTo(13.2, 20.4)
+            ..lineTo(10.8, 18.8)
+            ..lineTo(8.4, 20.4)
+            ..lineTo(6, 18.8)
+            ..close(),
+          line,
+        );
+        canvas.drawLine(const Offset(9, 8.6), const Offset(15, 8.6), line);
+        canvas.drawLine(const Offset(9, 12.4), const Offset(15, 12.4), line);
+      case PmartLineIcons.pencil:
+        canvas.drawPath(
+          Path()
+            ..moveTo(4.6, 19.4)
+            ..lineTo(5.4, 15.4)
+            ..lineTo(15.8, 5)
+            ..lineTo(19, 8.2)
+            ..lineTo(8.6, 18.6)
+            ..close(),
+          line,
+        );
+        canvas.drawLine(
+          const Offset(13.6, 7.2),
+          const Offset(16.8, 10.4),
+          line,
+        );
+      case PmartLineIcons.clearCircle:
+        canvas.drawCircle(const Offset(12, 12), 9, fill);
+        final white = Paint()
+          ..color = const Color(0xFFFFFFFF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = strokeWidth
+          ..strokeCap = StrokeCap.round;
+        canvas.drawLine(
+          const Offset(8.8, 8.8),
+          const Offset(15.2, 15.2),
+          white,
+        );
+        canvas.drawLine(
+          const Offset(15.2, 8.8),
+          const Offset(8.8, 15.2),
+          white,
+        );
+      case PmartLineIcons.clock:
+        canvas.drawCircle(const Offset(12, 12), 8.6, line);
+        canvas.drawLine(const Offset(12, 7.4), const Offset(12, 12), line);
+        canvas.drawLine(const Offset(12, 12), const Offset(15.2, 13.8), line);
     }
   }
+
+  static double _cos(double a) => math.cos(a);
+  static double _sin(double a) => math.sin(a);
 
   @override
   bool shouldRepaint(_LinePainter old) =>

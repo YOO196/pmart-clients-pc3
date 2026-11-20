@@ -32,7 +32,7 @@ Future<void> _openAddresses(WidgetTester t, {bool login = true}) async {
   }
   await t.drag(find.byType(ListView).last, const Offset(0, -300));
   await t.pumpAndSettle();
-  await t.tap(find.text('주소 관리'));
+  await t.tap(find.text('주소 설정'));
   await t.pumpAndSettle();
 }
 
@@ -91,5 +91,34 @@ void main() {
     expect(repo.deleteKeys.toSet().length, 1);
     expect(find.text('주소를 삭제했어요'), findsOneWidget);
     expect(find.byKey(const ValueKey('address-edit-addr-2')), findsNothing);
+  });
+  testWidgets('주소 편집 [수정] → 주소 상세에 지금 값이 채워지고, 고치면 서버(PATCH)에 보내 주소록이 바뀐다', (
+    t,
+  ) async {
+    final repo = (await t.runAsync(_withSecond))!;
+    await t.pumpWidget(testApp(const [], address: repo));
+    await t.pumpAndSettle();
+    await _openAddresses(t);
+    await t.tap(find.byKey(const ValueKey('address-edit')));
+    await t.pumpAndSettle();
+
+    await t.tap(find.byKey(const ValueKey('address-modify-addr-2')));
+    await t.pumpAndSettle();
+    final detail = t.widget<TextFormField>(
+      find.byKey(const ValueKey('f-detail')),
+    );
+    expect(detail.controller!.text, '6층');
+
+    await t.enterText(find.byKey(const ValueKey('f-detail')), '7층');
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('address-save')));
+    await t.pumpAndSettle();
+
+    expect(repo.updated, ['addr-2']);
+    final book = await t.runAsync(repo.book);
+    expect(
+      book!.addresses.singleWhere((a) => a.addressId == 'addr-2').detailAddress,
+      '7층',
+    );
   });
 }

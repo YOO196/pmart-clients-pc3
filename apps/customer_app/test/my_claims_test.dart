@@ -120,7 +120,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('my-claims-empty')), findsNothing);
     expect(find.byKey(const ValueKey('my-claim-c1')), findsNothing);
-    await t.tap(find.text('다시 시도'));
+    await t.tap(find.text('다시 시도하기'));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('my-claim-c1')), findsOneWidget);
   });

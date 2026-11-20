@@ -108,7 +108,13 @@ class ProductListState {
     this.total,
     this.loadingMore = false,
     this.loadMoreFailure,
+    this.correctedQuery,
+    this.suggestedQuery,
   });
+
+  /// 첫 쪽의 오타 교정·제안 검색어(search 0.4.0). 다음 쪽에서도 그대로 둔다.
+  final String? correctedQuery;
+  final String? suggestedQuery;
 
   final List<ProductTile> items;
   final String? nextCursor;
@@ -148,6 +154,8 @@ class ProductListController extends AsyncNotifier<ProductListState> {
       items: page.items,
       nextCursor: page.nextCursor,
       total: page.total,
+      correctedQuery: page.correctedQuery,
+      suggestedQuery: page.suggestedQuery,
     );
   }
 
@@ -160,6 +168,8 @@ class ProductListController extends AsyncNotifier<ProductListState> {
         nextCursor: current.nextCursor,
         total: current.total,
         loadingMore: true,
+        correctedQuery: current.correctedQuery,
+        suggestedQuery: current.suggestedQuery,
       ),
     );
     try {
@@ -181,6 +191,8 @@ class ProductListController extends AsyncNotifier<ProductListState> {
           ],
           nextCursor: page.nextCursor,
           total: page.total ?? current.total,
+          correctedQuery: current.correctedQuery,
+          suggestedQuery: current.suggestedQuery,
         ),
       );
     } on PmartFailure catch (e) {
@@ -191,6 +203,8 @@ class ProductListController extends AsyncNotifier<ProductListState> {
           nextCursor: current.nextCursor,
           total: current.total,
           loadMoreFailure: e,
+          correctedQuery: current.correctedQuery,
+          suggestedQuery: current.suggestedQuery,
         ),
       );
     }

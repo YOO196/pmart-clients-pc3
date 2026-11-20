@@ -71,6 +71,7 @@ void main() {
     await t.tap(key('address-search'));
     await t.pumpAndSettle();
     await t.enterText(key('f-detail'), '1층');
+    await t.pump();
   }
 
   for (final member in [true, false]) {

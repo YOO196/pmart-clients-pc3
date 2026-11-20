@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
+import 'package:intl/intl.dart' show NumberFormat;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart' show ProblemCode;
@@ -8,7 +10,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/providers.dart'
-    show imageOriginProvider, resolveImageUrl;
+    show imageOriginProvider, resolveImageUrl, withImageWidth;
 import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../auth/domain/auth.dart';
@@ -95,18 +97,56 @@ class ReviewManageScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: Text(l10n.reviewManageTitle),
+
+          // 레퍼런스 11-1: 둘로 나눈 회색 상자 — 고른 쪽은 흰 칸
           bottom: member
-              ? TabBar(
-                  tabs: [
-                    Tab(
-                      key: const ValueKey('review-tab-write'),
-                      text: l10n.reviewTabWrite,
+              ? PreferredSize(
+                  preferredSize: const Size.fromHeight(52),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                    child: Container(
+                      height: 38,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: TabBar(
+                        dividerHeight: 0,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        indicator: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
+                        ),
+                        labelColor: Theme.of(context).colorScheme.onSurface,
+                        unselectedLabelColor: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
+                        labelStyle: Theme.of(context).textTheme.bodyMedium
+                            ?.copyWith(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                        unselectedLabelStyle: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(fontSize: 14),
+                        tabs: [
+                          Tab(
+                            key: const ValueKey('review-tab-write'),
+                            text: l10n.reviewTabWrite,
+                          ),
+                          Tab(
+                            key: const ValueKey('review-tab-mine'),
+                            text: l10n.reviewTabMine,
+                          ),
+                        ],
+                      ),
                     ),
-                    Tab(
-                      key: const ValueKey('review-tab-mine'),
-                      text: l10n.reviewTabMine,
-                    ),
-                  ],
+                  ),
                 )
               : null,
         ),
@@ -201,6 +241,11 @@ class _WritableCard extends ConsumerWidget {
     return Card(
       key: ValueKey('review-writable-${e.orderLineId}'),
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -236,13 +281,17 @@ class _WritableCard extends ConsumerWidget {
                     ],
                   ),
                 ),
-                TextButton(
+                // 레퍼런스 11-1: 오른쪽 "리뷰 쓰기" 글자 없이 — 줄을 누르면 쓰기
+                IconButton(
                   key: ValueKey('review-write-${e.orderLineId}'),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                  ),
+                  tooltip: l10n.reviewWrite,
+                  visualDensity: VisualDensity.compact,
                   onPressed: () => open(),
-                  child: Text(l10n.reviewWrite),
+                  icon: PmartLineIcon(
+                    PmartLineIcons.chevronRight,
+                    size: 18,
+                    color: theme.colorScheme.outline,
+                  ),
                 ),
               ],
             ),
@@ -257,8 +306,8 @@ class _WritableCard extends ConsumerWidget {
                   IconButton(
                     key: ValueKey('review-quick-star-${e.orderLineId}-$i'),
                     tooltip: l10n.reviewStar(i),
-                    iconSize: 32,
-                    color: theme.colorScheme.surfaceContainerHighest,
+                    iconSize: 30,
+                    color: theme.colorScheme.outlineVariant,
                     icon: const Icon(Icons.star_rounded),
                     onPressed: () => open(i),
                   ),
@@ -782,7 +831,7 @@ class _ReviewEditScreenState extends ConsumerState<ReviewEditScreen>
         title: Text(l10n.reviewEditTitle),
         leading: IconButton(
           key: const ValueKey('review-edit-close'),
-          icon: const Icon(Icons.close),
+          icon: const PmartLineIcon(PmartLineIcons.close),
           tooltip: l10n.reviewCancel,
           onPressed: () => context.pop(),
         ),
@@ -815,17 +864,52 @@ class _ReviewEditScreenState extends ConsumerState<ReviewEditScreen>
             ],
           ),
           const SizedBox(height: 12),
-          TextField(
-            key: const ValueKey('review-text'),
-            controller: _text,
-            enabled: !locked,
-            minLines: 5,
-            maxLines: 10,
-            maxLength: reviewTextMaxLength,
-            decoration: InputDecoration(
-              hintText: l10n.reviewTextHint,
-              border: const OutlineInputBorder(),
-            ),
+          Stack(
+            children: [
+              TextField(
+                key: const ValueKey('review-text'),
+                controller: _text,
+                enabled: !locked,
+                minLines: 5,
+                maxLines: 10,
+                // 글자 수 칸을 아래에 두지 않으려고 maxLength 대신 입력 제한만(글자 수는 칸 안에 따로).
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(reviewTextMaxLength),
+                ],
+                // 레퍼런스: 회색 채움·테두리 없음, 글자 수는 칸 안 오른쪽 아래 "0 / 1,000"
+                // 글자 수는 칸 안 오른쪽 아래에 따로 그린다(아래 Positioned).
+                buildCounter: (
+                  context, {
+                  required currentLength,
+                  required isFocused,
+                  maxLength,
+                }) => null,
+                decoration: InputDecoration(
+                  hintText: l10n.reviewTextHint,
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainer,
+                  contentPadding: const EdgeInsets.fromLTRB(14, 14, 14, 34),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 14,
+                bottom: 12,
+                child: ListenableBuilder(
+                  listenable: _text,
+                  builder: (context, _) => Text(
+                    '${NumberFormat.decimalPattern('ko').format(_text.text.characters.length)} / ${NumberFormat.decimalPattern('ko').format(reviewTextMaxLength)}',
+                    key: const ValueKey('review-text-count'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           _photoSection(context, locked: locked),
@@ -1143,75 +1227,145 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
         title: Text(l10n.reviewWrite),
         leading: IconButton(
           key: const ValueKey('review-close'),
-          icon: const Icon(Icons.close),
+          icon: const PmartLineIcon(PmartLineIcons.close),
           tooltip: l10n.reviewCancel,
           onPressed: () => context.pop(),
         ),
+        // 레퍼런스 11-2: 오른쪽 위 회색 알약 [리뷰정책안내] → 창
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: ActionChip(
+              key: const ValueKey('review-policy-open'),
+              label: Text(l10n.reviewPolicyShort),
+              labelStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+              backgroundColor: theme.colorScheme.surfaceContainer,
+              side: BorderSide.none,
+              shape: const StadiumBorder(),
+              visualDensity: VisualDensity.compact,
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text(l10n.reviewPolicyTitle),
+                  content: Text(
+                    [
+                      l10n.reviewPolicyOnePerItem,
+                      l10n.reviewPolicyDeadline,
+                      l10n.reviewPolicyEdit,
+                      l10n.reviewPolicyDelete,
+                    ].map((l) => '• $l').join('\n'),
+                  ),
+                  actions: [
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(l10n.actionConfirm),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _ProductName(
-            productId: t.productId,
-            title: t.title,
-            style: theme.textTheme.titleMedium,
-          ),
-          if (t.eligibleUntil case final u?)
-            Text(
-              l10n.reviewDeadline(formatSeoulDateTime(u)),
-              style: theme.textTheme.bodySmall,
+          // 레퍼런스 11-2: 상품 카드(이름 + 노란 별) — 별을 눌러 별점
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
             ),
-          const SizedBox(height: 12),
-          Text(l10n.reviewRatingHint),
-          Row(
-            children: [
-              for (var i = 1; i <= reviewRatingMax; i++)
-                IconButton(
-                  key: ValueKey('review-star-$i'),
-                  tooltip: l10n.reviewStar(i),
-                  iconSize: 36,
-                  color: theme.colorScheme.primary,
-                  icon: Icon(
-                    i <= (_rating ?? 0) ? Icons.star : Icons.star_border,
-                  ),
-                  onPressed: locked ? null : () => setState(() => _rating = i),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ProductName(
+                  productId: t.productId,
+                  title: t.title,
+                  style: theme.textTheme.titleSmall?.copyWith(fontSize: 15),
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            key: const ValueKey('review-text'),
-            controller: _text,
-            enabled: !locked,
-            minLines: 5,
-            maxLines: 10,
-            maxLength: reviewTextMaxLength,
-            decoration: InputDecoration(
-              hintText: l10n.reviewTextHint,
-              border: const OutlineInputBorder(),
+                if (t.eligibleUntil case final u?)
+                  Text(
+                    l10n.reviewDeadline(formatSeoulDateTime(u)),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                Row(
+                  children: [
+                    for (var i = 1; i <= reviewRatingMax; i++)
+                      IconButton(
+                        key: ValueKey('review-star-$i'),
+                        tooltip: l10n.reviewStar(i),
+                        iconSize: 30,
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                        color: i <= (_rating ?? 0)
+                            ? const Color(0xFFFFB300)
+                            : theme.colorScheme.outlineVariant,
+                        icon: const Icon(Icons.star_rounded),
+                        onPressed: locked
+                            ? null
+                            : () => setState(() => _rating = i),
+                      ),
+                  ],
+                ),
+              ],
             ),
+          ),
+          if (_rating == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                l10n.reviewRatingHint,
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+          const SizedBox(height: 14),
+          Stack(
+            children: [
+              TextField(
+                key: const ValueKey('review-text'),
+                controller: _text,
+                enabled: !locked,
+                minLines: 5,
+                maxLines: 10,
+                // 글자 수 칸을 아래에 두지 않으려고 maxLength 대신 입력 제한만(글자 수는 칸 안에 따로).
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(reviewTextMaxLength),
+                ],
+                // 레퍼런스: 회색 채움·테두리 없음, 글자 수는 칸 안 오른쪽 아래 "0 / 1,000"
+                decoration: InputDecoration(
+                  hintText: l10n.reviewTextHint,
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainer,
+                  contentPadding: const EdgeInsets.fromLTRB(14, 14, 14, 34),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 14,
+                bottom: 12,
+                child: ListenableBuilder(
+                  listenable: _text,
+                  builder: (context, _) => Text(
+                    '${NumberFormat.decimalPattern('ko').format(_text.text.characters.length)} / ${NumberFormat.decimalPattern('ko').format(reviewTextMaxLength)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 4),
           _photoSection(context, locked: locked),
           const SizedBox(height: 16),
-          // 정책 문구: Commerce 업무 문서 15장 [확정 정책](품목당 1건, 배송완료 후 14일, 최초 등록 후 3일 수정, 삭제 후 재작성 불가).
-          ExpansionTile(
-            key: const ValueKey('review-policy'),
-            tilePadding: EdgeInsets.zero,
-            title: Text(l10n.reviewPolicyTitle),
-            children: [
-              for (final line in [
-                l10n.reviewPolicyOnePerItem,
-                l10n.reviewPolicyDeadline,
-                l10n.reviewPolicyEdit,
-                l10n.reviewPolicyDelete,
-              ])
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('· $line', style: theme.textTheme.bodySmall),
-                ),
-            ],
-          ),
+          // 정책 문구(Commerce 업무 문서 15장)는 머리줄 [리뷰정책안내] 창으로 옮겼다(레퍼런스 11-2).
           const SizedBox(height: 16),
           switch (outcome) {
             CommandRejected(:final code) => Text(
@@ -1238,17 +1392,40 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
               child: Text(l10n.reviewSubmitting),
             ),
           const SizedBox(height: 8),
+          // 레퍼런스 11-2: 아래 "취소 | 등록하기" 글자 단추 둘(위·가운데 선)
+          const Divider(height: 1),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                    foregroundColor: theme.colorScheme.onSurface,
+                    shape: const RoundedRectangleBorder(),
+                    textStyle: theme.textTheme.titleSmall?.copyWith(
+                      fontSize: 15,
+                    ),
+                  ),
                   onPressed: _busy ? null : () => context.pop(),
                   child: Text(l10n.reviewCancel),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(height: 50, child: VerticalDivider(width: 1)),
               Expanded(
                 child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: theme.colorScheme.primary,
+                    disabledBackgroundColor: Colors.transparent,
+                    disabledForegroundColor: theme.colorScheme.outline,
+                    elevation: 0,
+                    shape: const RoundedRectangleBorder(),
+                    textStyle: theme.textTheme.titleSmall?.copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   key: const ValueKey('review-submit'),
                   // 확인 중에는 새 등록을 막는다("다시 확인"만 같은 키로 보낸다).
                   // 사진이 다 올라가기 전에는 등록하지 않는다.
@@ -1392,10 +1569,17 @@ class _PhotoTile extends ConsumerWidget {
                     )
                   : remote == null
                   ? blank()
-                  : Image.network(
-                      remote,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => blank(),
+                  : Builder(
+                      builder: (context) {
+                        final px = 72 * MediaQuery.devicePixelRatioOf(context);
+                        // 축소본(?w=)으로 받고 그릴 크기로만 디코딩한다(요청 2026-11-20).
+                        return Image.network(
+                          withImageWidth(remote, px)!,
+                          fit: BoxFit.cover,
+                          cacheWidth: px.round(),
+                          errorBuilder: (_, _, _) => blank(),
+                        );
+                      },
                     ),
             ),
           ),
@@ -1470,8 +1654,8 @@ class _PhotoTile extends ConsumerWidget {
                       color: Colors.black54,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
-                      Icons.close,
+                    child: const PmartLineIcon(
+                      PmartLineIcons.close,
                       size: 14,
                       color: Colors.white,
                     ),
@@ -1537,10 +1721,18 @@ class _ReviewPhotos extends ConsumerWidget {
                     dimension: 72,
                     child: url == null
                         ? placeholder()
-                        : Image.network(
-                            url,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => placeholder(),
+                        : Builder(
+                            builder: (context) {
+                              final px =
+                                  72 * MediaQuery.devicePixelRatioOf(context);
+                              // 썸네일은 축소본(?w=240/480)·그릴 크기로만 디코딩(요청 2026-11-20).
+                              return Image.network(
+                                withImageWidth(url, px)!,
+                                fit: BoxFit.cover,
+                                cacheWidth: px.round(),
+                                errorBuilder: (_, _, _) => placeholder(),
+                              );
+                            },
                           ),
                   ),
                 ),
@@ -1602,7 +1794,7 @@ class _ReviewPhotoViewerState extends State<ReviewPhotoViewer> {
         foregroundColor: Colors.white,
         leading: IconButton(
           key: const ValueKey('review-photo-viewer-close'),
-          icon: const Icon(Icons.close),
+          icon: const PmartLineIcon(PmartLineIcons.close),
           tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
           onPressed: () => Navigator.of(context).pop(),
         ),
@@ -1626,10 +1818,15 @@ class _ReviewPhotoViewerState extends State<ReviewPhotoViewer> {
             child: Center(
               child: url == null
                   ? failed()
+                  // 크게 보기는 축소본 720(요청 2026-11-20), 화면 폭만큼만 디코딩.
                   : Image.network(
-                      url,
+                      withImageWidth(url, 720)!,
                       key: ValueKey('review-photo-viewer-$i'),
                       fit: BoxFit.contain,
+                      cacheWidth:
+                          (MediaQuery.sizeOf(context).width *
+                                  MediaQuery.devicePixelRatioOf(context))
+                              .round(),
                       errorBuilder: (_, _, _) => failed(),
                     ),
             ),

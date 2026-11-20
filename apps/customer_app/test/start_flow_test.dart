@@ -37,6 +37,7 @@ void main() {
 
   Future<void> fillAndSave(WidgetTester t) async {
     await t.enterText(key('f-detail'), '101동 202호');
+    await t.pump();
     await t.tap(key('address-save'));
     await t.pumpAndSettle();
   }
@@ -61,7 +62,7 @@ void main() {
 
     // 1) 환영·약관 — 위치 약관은 선택(현재 위치 기능에서만 필수, BR-59 회신)
     expect(key('start-welcome'), findsOneWidget);
-    expect(find.text('위치기반서비스 이용약관 동의 (선택)'), findsOneWidget);
+    expect(find.text('위치 기반 서비스 약관 동의 (선택)'), findsOneWidget);
     expect(beginEnabled(t), isTrue);
     await t.tap(key('start-agree-all'));
     await t.pump();

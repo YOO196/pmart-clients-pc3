@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pmart_ui/pmart_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
@@ -23,7 +24,7 @@ class ProfileAvatar extends ConsumerWidget {
     final fallback = CircleAvatar(
       key: const ValueKey('profile-avatar-default'),
       radius: radius,
-      child: Icon(Icons.person_outline, size: radius),
+      child: PmartLineIcon(PmartLineIcons.user, size: radius),
     );
     return Semantics(
       label: l10n.infoProfileImage,

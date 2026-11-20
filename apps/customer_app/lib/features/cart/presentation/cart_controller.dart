@@ -303,6 +303,37 @@ class CartController extends AsyncNotifier<CartState> {
     return last;
   }
 
+  /// 전체 선택/해제(레퍼런스 5 "☐ 전체 선택"). 일괄 선택 경로가 없어(계약은 품목별 선택만) 바꿀 품목을 하나씩
+  /// [submit]([SetSelected])으로 보낸다. [removeSelected] 와 같이 반영이 아닌 결과가 나오면 거기서 멈춘다.
+  /// 선택하기는 살 수 있는 품목만 고른다(구매 불가 품목을 새로 고르지 않음).
+  Future<CartChangeOutcome?> setAllSelected(bool selected) async {
+    final current = _current;
+    if (current == null || !current.canChange || _bulkRunning) return null;
+    final shortages = ref.read(stockShortageProvider);
+    final ids = [
+      for (final l in current.cart.lines)
+        if (!hiddenAtCurrentAddress(l, shortages) &&
+            l.selected != selected &&
+            (!selected || l.purchasable))
+          l.cartItemId,
+    ];
+    if (ids.isEmpty) return null;
+    _bulkRunning = true;
+    CartChangeOutcome? last;
+    try {
+      for (final id in ids) {
+        final now = _current;
+        if (now == null) break;
+        if (now.cart.lines.every((l) => l.cartItemId != id)) continue;
+        last = await submit(SetSelected(cartItemId: id, selected: selected));
+        if (last is! CartChangeApplied || !ref.mounted) break;
+      }
+    } finally {
+      _bulkRunning = false;
+    }
+    return last;
+  }
+
   /// 다른 화면(주문 상세의 "같은 상품 담기" 등)에서 보내는 변경. 장바구니를 아직 안 읽었으면 읽고, 다른 변경이 진행 중이면
   /// 끝날 때까지 잠깐 기다렸다가 [submit] 한다. 결과 불명인 변경이 걸려 있거나 끝내 바쁘면 null(보내지 않음).
   /// 장바구니 조회 실패는 [PmartFailure] 로 던진다.

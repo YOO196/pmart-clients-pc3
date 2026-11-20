@@ -374,8 +374,127 @@ class LoginFlowController extends Notifier<LoginFlow> {
       state = LoginSettled(waiting.withError(code));
       return;
     }
-    if (outcome is! LoginNeedsConsent) _providerToken = null;
+    if (outcome is! LoginNeedsConsent && outcome is! LoginNeedsIdentity) {
+      _providerToken = null;
+    }
     await _settle(outcome);
+  }
+
+  /// 휴대폰 확인 시작(auth 0.6.0 — BR-64 회신). [phone] 은 숫자 11자리. 결과 불명은 같은 키로 한 번 더.
+  /// 만료된 ID 토큰(401 PROVIDER_REJECTED)은 새 토큰으로 한 번 더(본문이 바뀌어 새 키).
+  Future<void> startIdentity(LoginNeedsIdentity waiting, String phone) async {
+    if (busy) return;
+    final provider = _who?.provider ?? SocialProvider.google;
+    state = LoginWorking(provider);
+    var token = _providerToken ?? await _freshToken(provider);
+    if (!ref.mounted) return;
+    if (token == null) {
+      return _settle(const LoginRejected(AuthProblemCode.providerRejected));
+    }
+    Future<IdentityStart> once(String t, IdempotencyKey key) async {
+      try {
+        return await _repo.startIdentity(
+          waiting.authRequestId,
+          providerToken: t,
+          phone: phone,
+          key: key,
+        );
+      } on UnknownResultFailure {
+        return _repo.startIdentity(
+          waiting.authRequestId,
+          providerToken: t,
+          phone: phone,
+          key: key,
+        );
+      }
+    }
+
+    try {
+      IdentityStart s;
+      try {
+        s = await once(token, IdempotencyKey.generate());
+      } on ProblemFailure catch (f) {
+        if (f.problem.code != AuthProblemCode.providerRejected) rethrow;
+        final fresh = await _freshToken(provider);
+        if (fresh == null) rethrow;
+        _providerToken = token = fresh;
+        s = await once(fresh, IdempotencyKey.generate());
+      }
+      if (!ref.mounted) return;
+      state = LoginSettled(
+        waiting.copyWith(
+          start: () => s,
+          status: () => null,
+          lastError: () => null,
+          conflict: () => null,
+        ),
+      );
+    } on ProblemFailure catch (f) {
+      if (!ref.mounted) return;
+      state = LoginSettled(waiting.copyWith(lastError: () => f.problem.code));
+    } on PmartFailure {
+      if (!ref.mounted) return;
+      state = LoginSettled(
+        waiting.copyWith(lastError: () => ProblemCode.unknownResult),
+      );
+    }
+  }
+
+  /// "보냈어요" — 누를 때만 서버에 묻는다(OCTOMO 월 한도). 회원이면 로그인 마침, 아직이면 남은 횟수,
+  /// 실패·만료면 번호 입력부터, 이미 가입·탈퇴 번호면 안내.
+  Future<void> confirmIdentity(LoginNeedsIdentity waiting) async {
+    final s = waiting.start;
+    if (busy || s == null) return;
+    final provider = _who?.provider ?? SocialProvider.google;
+    state = LoginWorking(provider);
+    final token = _providerToken ?? await _freshToken(provider);
+    if (!ref.mounted) return;
+    if (token == null) {
+      return _settle(const LoginRejected(AuthProblemCode.providerRejected));
+    }
+    final key = IdempotencyKey.generate();
+    var outcome = await _repo.confirmIdentity(
+      waiting.authRequestId,
+      s.verificationId,
+      providerToken: token,
+      key: key,
+    );
+    if (!ref.mounted) return;
+    if (outcome is LoginUnknown) {
+      // 같은 키 재전송은 새 토큰을 준다(응답 유실).
+      outcome = await _repo.confirmIdentity(
+        waiting.authRequestId,
+        s.verificationId,
+        providerToken: token,
+        key: key,
+      );
+      if (!ref.mounted) return;
+    }
+    switch (outcome) {
+      case LoginNeedsIdentity(:final conflict?):
+        _providerToken = null;
+        state = LoginSettled(waiting.copyWith(conflict: () => conflict));
+      case LoginNeedsIdentity(:final status, :final remainingAttempts):
+        final again = status == 'FAILED' || status == 'EXPIRED';
+        state = LoginSettled(
+          waiting.copyWith(
+            start: again ? () => null : null,
+            status: () => status,
+            remainingAttempts: () => remainingAttempts,
+            lastError: () => null,
+          ),
+        );
+      case LoginUnknown():
+        state = LoginSettled(
+          waiting.copyWith(lastError: () => ProblemCode.unknownResult),
+        );
+      case LoginRejected(:final code)
+          when !AuthProblemCode.restartLogin.contains(code):
+        state = LoginSettled(waiting.copyWith(lastError: () => code));
+      default:
+        _providerToken = null;
+        await _settle(outcome);
+    }
   }
 
   Future<LoginOutcome> _complete(

@@ -74,6 +74,8 @@
 | BR-64 | 높음 | 고객 | 가입 즉시 휴대폰 본인 인증(옥토모)·한 번호 한 계정·같은 번호 기존 계정 안내(제공자·가입일·가린 이메일)·탈퇴 1달 재가입 금지 — 인증 상태·API·결과 코드 없음 | 일부 — customer 0.9.0 휴대폰 번호 확인(OCTOMO, 회원 스스로) 배포·고객앱 화면 반영. 가입 단계·한 번호 한 계정·기존 계정 안내·탈퇴 1달은 OPEN(요청 `docs/handoff/customer-app/2026-11-19-backend-phone-verification-signup.md` R1~R7, 원 요청 `…-social-login-identity.md`) |
 | BR-65 | 높음 | 고객 | 카카오·네이버 로그인 — auth-service 가 Google 만 검증(501) | OPEN(같은 요청서 BR-65 — 카카오 OIDC ID 토큰, 네이버 Android SDK 액세스 토큰 + 서버 `/v1/nid/me` 확인(콘솔은 Android 만). 앱 SDK 2종 승인됨 2026-11-19, 카카오 콘솔 로그인·OIDC 활성화됨) |
 | BR-66 | 높음 | 고객 | 네이버 로그인 콜백 중계 — 네이버 콘솔이 앱 주소(`com.pmart.customer://oauth/naver`)를 받지 않고 도메인 없음 → LAN 게이트웨이 공개 경로가 받은 쿼리를 앱 주소로 302(고정 목적지, 저장·기록 없음) | 회신(auth 0.5.0, `../pmart-backend/docs/handoff/clients/customer-app/2026-11-19-reply-br66-naver-callback-relay.md` — 고객 `http://192.168.0.40:8080/api/v1/auth/oauth-callbacks/naver/customer`), 앱 반영. LAN 배포·콘솔 등록·Client ID 전달 대기 |
+| BR-67 | 보통 | 고객 | 리뷰관리 레퍼런스 값 — `/me/review-eligibilities`·`/me/reviews` 전체 개수(total), 품목 대표 사진(imageUrl), 주문 시각·센터 이름(orderedAt·mfcName). 요청서 `docs/handoff/customer-app/2026-11-20-backend-review-eligibility-display.md` | 요청서 보냄, 회신 대기 |
+| BR-68 | 보통 | 고객 | 주문내역 카드 상품 줄·센터 이름 — `GET /orders` 항목에 주문 행 목록(이름·옵션·수량·금액 사본), `mfcName`, (선택) 지금 판매 여부, 조회 기간 `to`. 요청서 `docs/handoff/customer-app/2026-11-20-backend-order-list-lines.md` | 요청서 보냄, 회신 대기 |
 
 ---
 
@@ -461,3 +463,9 @@
 ## BR-65 카카오·네이버 로그인 (고객앱)
 - auth-service 가 Google 만 검증. 카카오 = OIDC ID 토큰 검증, 네이버 = Android SDK 액세스 토큰을 서버가 `/v1/nid/me` 로 확인(사용자 2026-11-19 — 고객앱은 Android 만, PC 웹·Callback·서버 코드 교환 없음). 앱 `kakao_flutter_sdk_user`·`flutter_naver_login` 추가는 사용자 승인 대기.
 - 2026-11-19 진행: 백엔드가 customer 0.9.0 휴대폰 번호 확인(OCTOMO — 고객이 대표번호로 숫자 문자, "보냈어요" 때만 확인)을 만들고 배포. 고객앱 `/me/phone-verification`(레퍼런스 13 모양) 반영. 남은 BR-64(가입 단계·중복 안내·탈퇴 1달·기존 회원) 요청서 `docs/handoff/customer-app/2026-11-19-backend-phone-verification-signup.md`.
+
+## BR-67 리뷰관리 개수·상품 사진·주문 묶음 (고객앱)
+- 레퍼런스 11-1 리뷰관리의 "리뷰 쓰기 N개 | 내가 쓴 리뷰 N개"·품목 사진·주문 날짜/센터 머리가 `GET /me/review-eligibilities`·`GET /me/reviews` 응답에 없음(사용자 2026-11-20 "백엔드에 요청서 쓰기"). 요청서 `docs/handoff/customer-app/2026-11-20-backend-review-eligibility-display.md` — R1 total, R2 imageUrl, R3 orderedAt·mfcName. 앱은 값 없이 모양만 맞춰 둠. 상태: 요청서 작성, 백엔드 회신 대기.
+
+## BR-68 주문내역 카드 상품 줄·센터 이름 (고객앱)
+- 사용자 캡처(2026-11-20) 주문내역 끝난 카드의 상품 줄·센터 이름·같은 상품 담기를 그리려면 `GET /orders` 항목에 주문 행 목록과 `mfcName` 이 필요. 요청서 `docs/handoff/customer-app/2026-11-20-backend-order-list-lines.md`. 상태: 요청서 작성, 회신 대기.

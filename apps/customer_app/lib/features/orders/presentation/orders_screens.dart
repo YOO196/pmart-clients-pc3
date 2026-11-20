@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart'
@@ -26,6 +27,7 @@ import '../../claims/presentation/claims_controller.dart'
 import '../../claims/presentation/claims_screens.dart'
     show claimStateText, claimTypeText;
 import '../../../shared/order_status.dart';
+import '../../../shared/cart_icon_button.dart';
 import '../../cart/domain/cart.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../cart/presentation/cart_messages.dart';
@@ -85,35 +87,182 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     OrderPeriod.all => l10n.ordersPeriodAll,
   };
 
-  Future<void> _pickPeriod(AppLocalizations l10n) async {
-    final picked = await showModalBottomSheet<OrderPeriod>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(
-                l10n.ordersPeriod,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+  /// 레퍼런스(사용자 캡처 2026-11-20 "조회 기간"·"주문 상태·정보" 시트): 제목 + ✕, 회색 묶음 이름,
+  /// 테두리 알약(고르면 검게), 아래 [↻ 초기화][적용]. 고른 값은 [적용]을 눌러야 들어간다.
+  Future<(T,)?> _chipSheet<T>({
+    required String title,
+    String? group,
+    required List<(T, String, String)> options,
+    required T initial,
+    required T reset,
+  }) => showModalBottomSheet<(T,)>(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) {
+      var picked = initial;
+      final l10n = AppLocalizations.of(context);
+      final theme = Theme.of(context);
+      final scheme = theme.colorScheme;
+      return StatefulBuilder(
+        builder: (context, setSheet) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 8, 12),
+            child: Column(
+              key: const ValueKey('orders-sheet'),
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('orders-sheet-close'),
+                      tooltip: l10n.actionClose,
+                      icon: const PmartLineIcon(PmartLineIcons.close, size: 24),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                if (group != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 2),
+                    child: Text(
+                      group,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.outline,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final (value, key, label) in options)
+                        Material(
+                          color: value == picked
+                              ? scheme.onSurface
+                              : scheme.surface,
+                          shape: StadiumBorder(
+                            side: BorderSide(
+                              color: value == picked
+                                  ? scheme.onSurface
+                                  : scheme.outlineVariant,
+                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            key: ValueKey(key),
+                            onTap: () => setSheet(() => picked = value),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                                vertical: 10,
+                              ),
+                              child: Text(
+                                label,
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  fontSize: 15,
+                                  color: value == picked
+                                      ? scheme.surface
+                                      : scheme.onSurface,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Row(
+                    children: [
+                      OutlinedButton.icon(
+                        key: const ValueKey('orders-sheet-reset'),
+                        onPressed: () => setSheet(() => picked = reset),
+                        icon: const PmartLineIcon(
+                          PmartLineIcons.refresh,
+                          size: 18,
+                        ),
+                        label: Text(l10n.ordersReset),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(110, 50),
+                          foregroundColor: scheme.onSurface,
+                          side: BorderSide(color: scheme.outlineVariant),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton(
+                          key: const ValueKey('orders-sheet-apply'),
+                          onPressed: () => Navigator.of(context).pop((picked,)),
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          child: Text(l10n.ordersApply),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            for (final p in OrderPeriod.values)
-              ListTile(
-                key: ValueKey('orders-period-${p.name}'),
-                title: Text(_periodText(l10n, p)),
-                trailing: p == _period ? const Icon(Icons.check) : null,
-                onTap: () => Navigator.of(context).pop(p),
-              ),
-            const SizedBox(height: 8),
-          ],
+          ),
         ),
-      ),
+      );
+    },
+  );
+
+  Future<void> _pickPeriod(AppLocalizations l10n) async {
+    final picked = await _chipSheet<OrderPeriod>(
+      title: l10n.ordersPeriod,
+      options: [
+        for (final p in OrderPeriod.values)
+          (p, 'orders-period-${p.name}', _periodText(l10n, p)),
+      ],
+      initial: _period,
+      reset: OrderPeriod.months3,
     );
-    if (picked != null && picked != _period) setState(() => _period = picked);
+    if (picked != null && mounted) setState(() => _period = picked.$1);
+  }
+
+  Future<void> _pickStatus(AppLocalizations l10n) async {
+    final picked = await _chipSheet<OrderStatus?>(
+      title: l10n.ordersStatusPill,
+      group: l10n.ordersStatusGroup,
+      options: [
+        for (final s in <OrderStatus?>[null, ...orderListFilters])
+          (
+            s,
+            'orders-filter-${s?.name ?? 'all'}',
+            s == null ? l10n.ordersFilterAll : orderStatusText(l10n, s),
+          ),
+      ],
+      initial: _status,
+      reset: null,
+    );
+    if (picked != null && mounted) setState(() => _status = picked.$1);
   }
 
   void _applySearch() {
@@ -199,15 +348,24 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             color: selected ? scheme.onSurface : scheme.outlineVariant,
           ),
         ),
-        color: scheme.surface,
+        // 레퍼런스 9-1: 고른 조건은 검게 채운 알약
+        color: selected ? scheme.onSurface : scheme.surface,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            child: DefaultTextStyle.merge(
-              style: Theme.of(context).textTheme.bodyMedium,
-              child: label,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: IconTheme.merge(
+              data: IconThemeData(
+                color: selected ? scheme.surface : scheme.onSurface,
+              ),
+              child: DefaultTextStyle.merge(
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontSize: 15,
+                  color: selected ? scheme.surface : scheme.onSurface,
+                ),
+                child: label,
+              ),
             ),
           ),
         ),
@@ -226,6 +384,22 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         children: [
+          // 레퍼런스(사용자 캡처): 조건이 걸리면 맨 앞에 ↻ 초기화
+          if (_status != null || _q != null || _period != OrderPeriod.months3)
+            _pill(
+              key: const ValueKey('orders-reset'),
+              selected: false,
+              onTap: () {
+                _searchCtl.clear();
+                setState(() {
+                  _status = null;
+                  _q = null;
+                  _searching = false;
+                  _period = OrderPeriod.months3;
+                });
+              },
+              label: const PmartLineIcon(PmartLineIcons.refresh, size: 18),
+            ),
           _pill(
             key: const ValueKey('orders-search-open'),
             selected: _q != null,
@@ -246,30 +420,43 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             label: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(_periodText(l10n, _period)),
+                Text(
+                  _period == OrderPeriod.months3
+                      ? l10n.ordersPeriod
+                      : _periodText(l10n, _period),
+                ),
                 const SizedBox(width: 2),
-                const Icon(Icons.keyboard_arrow_down, size: 18),
+                const PmartLineIcon(PmartLineIcons.chevronDown, size: 16),
               ],
             ),
           ),
-          for (final s in <OrderStatus?>[null, ...orderListFilters])
-            Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: ChoiceChip(
-                key: ValueKey('orders-filter-${s?.name ?? 'all'}'),
-                label: Text(
-                  s == null ? l10n.ordersFilterAll : orderStatusText(l10n, s),
+          _pill(
+            key: const ValueKey('orders-status'),
+            selected: _status != null,
+            onTap: () => _pickStatus(l10n),
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _status == null
+                      ? l10n.ordersStatusPill
+                      : orderStatusText(l10n, _status!),
                 ),
-                selected: _status == s,
-                onSelected: (_) => setState(() => _status = s),
-              ),
+                const SizedBox(width: 2),
+                const PmartLineIcon(PmartLineIcons.chevronDown, size: 16),
+              ],
             ),
+          ),
         ],
       ),
     );
     return Scaffold(
       appBar: AppBar(
+        // 레퍼런스 9-1: 왼쪽 큰 제목 + 오른쪽 장바구니
+        centerTitle: false,
+        titleSpacing: context.canPop() ? pmartLeftTitleSpacing : 20,
         title: Text(l10n.ordersTitle),
+        actions: const [CartIconButton(), SizedBox(width: 6)],
         // 결제 완료에서 주문 상세로 바로 오면(go) 뒤에 화면이 없다. 그때는 마이로 돌아간다.
         leading: context.canPop()
             ? null
@@ -315,7 +502,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                     ),
                     IconButton(
                       key: const ValueKey('orders-search-close'),
-                      icon: const Icon(Icons.close),
+                      icon: const PmartLineIcon(PmartLineIcons.close),
                       tooltip: MaterialLocalizations.of(context)
                           .closeButtonTooltip,
                       onPressed: _closeSearch,
@@ -355,51 +542,111 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
       (null, _) when o.itemCount != null => l10n.ordersItemCount(o.itemCount!),
       _ => null,
     };
+    final ongoing = !o.canHide;
+    Widget outlined(
+      String key,
+      String label,
+      VoidCallback onTap, {
+      bool strong = false,
+    }) => Expanded(
+      child: OutlinedButton(
+        key: ValueKey(key),
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(46),
+          foregroundColor: scheme.onSurface,
+          side: BorderSide(
+            color: strong ? scheme.onSurface : scheme.outlineVariant,
+            width: strong ? 1.4 : 1,
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          textStyle: theme.textTheme.titleSmall?.copyWith(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        child: Text(label),
+      ),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 레퍼런스 9-1: 방식(굵게) ··· 오른쪽 회색 알약 "주문상세"
         Row(
           children: [
-            if (mode != null)
-              Text(
-                '${modeLabel(l10n, mode)} · ',
-                key: ValueKey('order-mode-${o.orderId}'),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
             Expanded(
               child: Text(
-                orderStatusText(l10n, o.status),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: mode == null ? FontWeight.w800 : FontWeight.w500,
+                mode != null
+                    ? modeLabel(l10n, mode)
+                    : orderStatusText(l10n, o.status),
+                key: mode != null ? ValueKey('order-mode-${o.orderId}') : null,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: scheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Text(
                 l10n.orderDetailTitle,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 11.5,
+                  fontSize: 13,
                   color: scheme.onSurface,
                 ),
               ),
             ),
           ],
         ),
-        if (o.orderedAt case final t?) ...[
-          const SizedBox(height: 10),
+        const SizedBox(height: 10),
+        // 진행 중: 큰 굵은 글씨로 지금 상태, 아래 주문 시각. 끝난 주문: 날짜 · 상태 한 줄.
+        if (ongoing) ...[
           Text(
-            formatSeoulDateTime(t),
-            style: theme.textTheme.titleLarge?.copyWith(fontSize: 19),
+            orderStatusText(l10n, o.status),
+            key: ValueKey('order-status-${o.orderId}'),
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontSize: 23,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-        ],
-        const SizedBox(height: 6),
+          if (o.orderedAt case final t?)
+            Text(
+              l10n.ordersOrderedAt(formatSeoulDateTime(t)),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+        ] else
+          Row(
+            children: [
+              if (o.orderedAt case final t?)
+                Text(
+                  '${formatSeoulDate(t)} · ',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 15,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              Text(
+                orderStatusText(l10n, o.status),
+                key: ValueKey('order-status-${o.orderId}'),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: o.status == OrderStatus.cancelled
+                      ? scheme.error
+                      : scheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        const SizedBox(height: 12),
+        const Divider(height: 1),
+        const SizedBox(height: 12),
         Row(
           children: [
             if (summary != null)
@@ -409,7 +656,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                   key: ValueKey('order-summary-${o.orderId}'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium,
+                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
                 ),
               )
             else
@@ -417,10 +664,32 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             const SizedBox(width: 8),
             Text(
               _money(l10n, o.totalAmount),
-              style: theme.textTheme.titleSmall,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ),
+        if (ongoing) ...[
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              outlined(
+                'order-help-${o.orderId}',
+                l10n.orderHelp,
+                () => context.push('/orders/${o.orderId}/help'),
+              ),
+              const SizedBox(width: 8),
+              outlined(
+                'order-track-${o.orderId}',
+                l10n.ordersTrack,
+                () => context.push('/orders/${o.orderId}/tracking'),
+                strong: true,
+              ),
+            ],
+          ),
+        ],
         if (o.canHide)
           Align(
             alignment: Alignment.centerRight,
@@ -431,6 +700,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 6),
                 minimumSize: const Size(0, 32),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: theme.textTheme.bodySmall,
               ),
               onPressed: _hiding.contains(o.orderId)
                   ? null
@@ -461,12 +731,54 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
               ? 'orders-empty-filtered'
               : 'orders-empty',
         ),
-        child: Text(
-          narrowed
-              ? l10n.ordersEmptySearch
-              : filtered
-              ? l10n.ordersEmptyFiltered
-              : l10n.ordersEmpty,
+        // 레퍼런스 9-1 1: 돋보기 그림 + 굵은 두 줄 + 테두리 알약 [일단 검색! >]
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const PmartLineIcon(
+              PmartLineIcons.search,
+              size: 44,
+              strokeWidth: 2.2,
+            ),
+            const SizedBox(height: 40),
+            Text(
+              narrowed
+                  ? l10n.ordersEmptySearch
+                  : filtered
+                  ? l10n.ordersEmptyFiltered
+                  : l10n.ordersEmpty,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontSize: 16,
+                height: 1.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 18),
+            OutlinedButton(
+              key: const ValueKey('orders-empty-search-go'),
+              onPressed: () => context.go('/search'),
+              style: OutlinedButton.styleFrom(
+                shape: const StadiumBorder(),
+                minimumSize: const Size(0, 44),
+                padding: const EdgeInsets.fromLTRB(18, 0, 12, 0),
+                foregroundColor: Theme.of(context).colorScheme.onSurface,
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                textStyle: Theme.of(context).textTheme.bodyLarge
+                    ?.copyWith(fontSize: 16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(l10n.ordersEmptyGoSearch),
+                  const SizedBox(width: 4),
+                  const PmartLineIcon(PmartLineIcons.chevronRight, size: 18),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
       ready: (context, page) => RefreshIndicator(
@@ -480,7 +792,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                 child: Material(
                   key: ValueKey('order-${o.orderId}'),
                   color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
                     onTap: () async {
@@ -490,10 +802,10 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                     },
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(
+                        20,
                         18,
-                        14,
-                        18,
-                        o.canHide ? 6 : 16,
+                        20,
+                        o.canHide ? 6 : 18,
                       ),
                       child: _orderCard(context, l10n, o),
                     ),
@@ -518,7 +830,10 @@ class OrderDetailScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final provider = orderDetailProvider(orderId);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.orderDetailTitle)),
+      appBar: AppBar(
+        title: Text(l10n.orderDetailTitle),
+        actions: const [CartIconButton(), SizedBox(width: 6)],
+      ),
       body: UiStateView<OrderDetail>(
         state: uiStateOf(ref.watch(provider)),
         onRetry: () => ref.invalidate(provider),
@@ -552,132 +867,388 @@ class _OrderBody extends ConsumerWidget {
       ref.invalidate(orderListProvider);
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _DetailBox(
-          children: [
-            Text(
-              orderStatusText(l10n, o.status),
-              key: const ValueKey('order-status'),
-              style: theme.textTheme.titleLarge,
-            ),
-            if (o.window case final w?)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(windowText(w), style: theme.textTheme.titleSmall),
-              ),
-            const SizedBox(height: 6),
-            Text(
-              l10n.payOrderNumber(o.displayNumber),
-              key: const ValueKey('order-number'),
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
+    final scheme = theme.colorScheme;
+    final mode = switch (o.deliveryMode) {
+      'SINGLE' => l10n.modeSingle,
+      'BUNDLED' => l10n.modeBundled,
+      'SCHEDULED' => l10n.modeScheduled,
+      _ => null,
+    };
+    Widget small(
+      String key,
+      String label,
+      VoidCallback onTap, {
+      PmartLineIcons? lead,
+      bool chevron = false,
+    }) => OutlinedButton(
+      key: ValueKey(key),
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 32),
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        foregroundColor: scheme.onSurface,
+        side: BorderSide(color: scheme.outlineVariant),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        textStyle: theme.textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
         ),
-        // 배송현황(지도) — 결제가 끝나고 배송이 끝나기 전이면 늘 보인다. 배송 ID 를 몰라도 지도부터 뜬다(BR-61).
-        if (_trackable(o.status))
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: FilledButton.icon(
-              key: const ValueKey('order-track'),
-              icon: const PmartLineIcon(PmartLineIcons.locate, size: 20),
-              label: Text(l10n.trackOrder),
-              onPressed: () => visit('/orders/${o.orderId}/tracking'),
-            ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (lead != null) ...[
+            PmartLineIcon(lead, size: 14),
+            const SizedBox(width: 3),
+          ],
+          Text(label),
+          if (chevron)
+            const PmartLineIcon(PmartLineIcons.chevronRight, size: 14),
+        ],
+      ),
+    );
+    Widget wide(
+      String key,
+      String label,
+      VoidCallback onTap, {
+      bool strong = false,
+    }) => Expanded(
+      child: OutlinedButton(
+        key: ValueKey(key),
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size.fromHeight(46),
+          foregroundColor: scheme.onSurface,
+          backgroundColor: scheme.surface,
+          side: BorderSide(
+            color: strong ? scheme.onSurface : scheme.outlineVariant,
+            width: strong ? 1.4 : 1,
           ),
-        // 오배송 다시 배송비 결제(있을 때만). 알림 "결제 필요"(목적지 ORDER)를 열면 이 주문 상세로 온다.
-        RedeliveryPaymentsSection(orderId: o.orderId),
-        for (final s in o.staleSources)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              s.asOf == null
-                  ? l10n.sourceStaleNoTime
-                  : l10n.sourceStale(formatSeoulTime(s.asOf!)),
-              key: ValueKey('stale-${s.system}'),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          textStyle: theme.textTheme.titleSmall?.copyWith(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
           ),
-        if (o.isSplit)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(l10n.splitShipment(o.shipments.length)),
-          ),
-        for (final (i, s) in o.shipments.indexed)
-          Card(
-            key: ValueKey('shipment-${s.shipmentId}'),
-            margin: const EdgeInsets.only(top: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: theme.colorScheme.outlineVariant),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 6, 6, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          o.isSplit
-                              ? l10n.shipmentN(
-                                  i + 1,
-                                  shipmentStateText(l10n, s.state),
-                                )
-                              : shipmentStateText(l10n, s.state),
-                          style: theme.textTheme.titleMedium,
-                        ),
-                      ),
-                      if (s.deliveryId case final id?)
-                        TextButton(
-                          key: ValueKey('track-$id'),
-                          onPressed: () => visit(
-                            '/deliveries/$id?orderId=${Uri.encodeQueryComponent(o.orderId)}',
-                          ),
-                          child: Text(l10n.trackDelivery),
-                        ),
-                    ],
-                  ),
-                  // 주문 당시 상품명·옵션 사본(BR-35). 없을 때만 sku.
-                  for (final sl in s.lines)
-                    Text(
-                      '${byLine[sl.orderLineId]?.title ?? sl.orderLineId} · ${l10n.cartLineQuantity(sl.qty)}',
-                    ),
-                  // "받았어요"(수령 확인): 배송 중인 배송만 도착 예상 단계를 묻는다. 누른 뒤에는 결과를 남긴다.
-                  if (s.deliveryId case final id?
-                      when s.state == ShipmentState.handedOver ||
-                          s.state == ShipmentState.inDelivery ||
-                          ref.watch(
-                            receiptConfirmationProvider((
-                              orderId: o.orderId,
-                              deliveryId: id,
-                            )),
-                          ) is! ReceiptIdle)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ReceiptConfirmation(
-                        orderId: o.orderId,
-                        deliveryId: id,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        const SizedBox(height: 16),
-        // 주문 당시 배송지 사본(BR-37). 주소록을 다시 부르지 않는다.
-        _DetailTitle(l10n.checkoutAddress),
-        _DetailBox(children: [ShippingAddressView(address: o.shippingAddress)]),
-        // 배달 정보: 주문에 남은 요청사항·품절 시 처리(계약 `deliveryNote`·`outOfStockPreference`). 없으면 줄을 두지 않는다.
-        if (o.deliveryNote != null || o.outOfStock != null) ...[
-          const SizedBox(height: 16),
-          _DetailTitle(l10n.orderDeliveryInfo),
+        ),
+        child: Text(label),
+      ),
+    );
+    final itemsKey = GlobalObjectKey('$hashCode-items');
+    final payKey = GlobalObjectKey('$hashCode-pay');
+    final deliveryKey = GlobalObjectKey('$hashCode-delivery');
+    void jump(GlobalKey k) {
+      final c = k.currentContext;
+      if (c != null) {
+        Scrollable.ensureVisible(
+          c,
+          duration: const Duration(milliseconds: 250),
+        );
+      }
+    }
+
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 레퍼런스 9-1 3-2: 요약 카드 — 큰 제목(예약 시간 또는 상태 문장), 방식·주문번호, 카드 안 작은 단추, 센터 줄
           _DetailBox(
             children: [
+              Text(
+                switch (o.window) {
+                  // 레퍼런스 9-1 3-2: "10월 11일 (일)" 줄바꿈 "오전 8:00~오전 9:00 예약"
+                  final w? => l10n.orderHeadlineReserved(
+                    DateFormat(
+                      'M월 d일 (E)',
+                      'ko',
+                    ).format(DateTime.parse(w.date)),
+                    windowText(w),
+                  ),
+                  // 사용자 캡처(2026-11-20 주문상세): "배달이 완료됐어요"처럼 상태 문장
+                  null => orderHeadlineText(l10n, o.status),
+                },
+                key: const ValueKey('order-headline'),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              DefaultTextStyle.merge(
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // "알뜰배달 · 반품 완료"처럼 방식 · 상태 한 줄(상태가 취소·반품이면 빨강)
+                    Wrap(
+                      children: [
+                        if (mode != null) Text('$mode · '),
+                        Text(
+                          orderStatusText(l10n, o.status),
+                          key: const ValueKey('order-status'),
+                          style: o.status == OrderStatus.cancelled
+                              ? TextStyle(color: scheme.error)
+                              : null,
+                        ),
+                      ],
+                    ),
+                    Text(
+                      l10n.payOrderNumber(o.displayNumber),
+                      key: const ValueKey('order-number'),
+                    ),
+                  ],
+                ),
+              ),
+              // 버튼은 요청 진입일 뿐이다. 가능 여부는 서버가 판정한다.
+              if (canRequestCancel(o) || canRequestTimeChange(o)) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    if (canRequestCancel(o))
+                      small(
+                        'cancel-order',
+                        l10n.cancelTitle,
+                        () => visit('/orders/${o.orderId}/cancel'),
+                        lead: PmartLineIcons.clearCircle,
+                      ),
+                    if (canRequestTimeChange(o))
+                      small(
+                        'reschedule',
+                        l10n.rescheduleTitle,
+                        () => visit('/orders/${o.orderId}/reschedule'),
+                        chevron: true,
+                      ),
+                  ],
+                ),
+              ],
+              if (!canRequestCancel(o) && cancelClosedByPreparing(o))
+                // 피킹이 시작되면 앱에서 취소할 수 없다(ADR-0060) — 버튼 대신 안내.
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    l10n.cancelClosedPreparing,
+                    key: const ValueKey('cancel-closed-preparing'),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              if (o.mfcName case final name?) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Text(
+                      name,
+                      key: const ValueKey('order-center'),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          // [문의하기] (+ 배송 중이면 [배달 현황]) — 문의는 접수일 뿐 주문을 바꾸지 않는다.
+          Row(
+            children: [
+              wide(
+                'order-inquiry',
+                l10n.orderInquiry,
+                () => visit('/orders/${o.orderId}/help'),
+              ),
+              // 배송현황(지도) — 결제가 끝나고 배송이 끝나기 전이면 늘 보인다. 배송 ID 를 몰라도 지도부터 뜬다(BR-61).
+              if (_trackable(o.status)) ...[
+                const SizedBox(width: 8),
+                wide(
+                  'order-track',
+                  l10n.ordersTrack,
+                  () => visit('/orders/${o.orderId}/tracking'),
+                  strong: true,
+                ),
+              ],
+            ],
+          ),
+          // 오배송 다시 배송비 결제(있을 때만). 알림 "결제 필요"(목적지 ORDER)를 열면 이 주문 상세로 온다.
+          RedeliveryPaymentsSection(orderId: o.orderId),
+          for (final s in o.staleSources)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                s.asOf == null
+                    ? l10n.sourceStaleNoTime
+                    : l10n.sourceStale(formatSeoulTime(s.asOf!)),
+                key: ValueKey('stale-${s.system}'),
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
+              ),
+            ),
+          const SizedBox(height: 14),
+          // 구획 칩: 누르면 그 구획으로
+          Row(
+            children: [
+              for (final (i, (key, label, target)) in [
+                ('order-tab-items', l10n.orderTabItems, itemsKey),
+                ('order-tab-pay', l10n.orderTabPay, payKey),
+                ('order-tab-delivery', l10n.orderTabDelivery, deliveryKey),
+              ].indexed)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Material(
+                    color: i == 0 ? scheme.onSurface : scheme.surface,
+                    shape: StadiumBorder(
+                      side: BorderSide(
+                        color: i == 0
+                            ? scheme.onSurface
+                            : scheme.outlineVariant,
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      key: ValueKey(key),
+                      onTap: () => jump(target),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        child: Text(
+                          label,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: i == 0 ? scheme.surface : scheme.onSurface,
+                            fontWeight: i == 0 ? FontWeight.w700 : null,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (o.isSplit)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(l10n.splitShipment(o.shipments.length)),
+            ),
+          for (final (i, s) in o.shipments.indexed)
+            Card(
+              key: ValueKey('shipment-${s.shipmentId}'),
+              margin: const EdgeInsets.only(top: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: scheme.outlineVariant),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 6, 6, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            o.isSplit
+                                ? l10n.shipmentN(
+                                    i + 1,
+                                    shipmentStateText(l10n, s.state),
+                                  )
+                                : shipmentStateText(l10n, s.state),
+                            style: theme.textTheme.titleMedium,
+                          ),
+                        ),
+                        if (s.deliveryId case final id?)
+                          TextButton(
+                            key: ValueKey('track-$id'),
+                            onPressed: () => visit(
+                              '/deliveries/$id?orderId=${Uri.encodeQueryComponent(o.orderId)}',
+                            ),
+                            child: Text(l10n.trackDelivery),
+                          ),
+                      ],
+                    ),
+                    // 주문 당시 상품명·옵션 사본(BR-35). 없을 때만 sku.
+                    for (final sl in s.lines)
+                      Text(
+                        '${byLine[sl.orderLineId]?.title ?? sl.orderLineId} · ${l10n.cartLineQuantity(sl.qty)}',
+                      ),
+                    // "받았어요"(수령 확인): 배송 중인 배송만 도착 예상 단계를 묻는다. 누른 뒤에는 결과를 남긴다.
+                    if (s.deliveryId case final id?
+                        when s.state == ShipmentState.handedOver ||
+                            s.state == ShipmentState.inDelivery ||
+                            ref.watch(
+                              receiptConfirmationProvider((
+                                orderId: o.orderId,
+                                deliveryId: id,
+                              )),
+                            ) is! ReceiptIdle)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ReceiptConfirmation(
+                          orderId: o.orderId,
+                          deliveryId: id,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 18),
+          KeyedSubtree(
+            key: itemsKey,
+            child: _OrderLinesSection(order: o),
+          ),
+          const SizedBox(height: 18),
+          _DetailTitle(l10n.orderTabPay, key: payKey),
+          _DetailBox(
+            children: [
+              _Row(l10n.amountItems, _money(l10n, o.quote?.itemAmount)),
+              if (o.quote case final q?)
+                _Row(
+                  '${l10n.amountTip} (${tipReasonText(l10n, q.tipReason)})',
+                  _money(l10n, q.deliveryTip),
+                ),
+              _Row(l10n.amountBag, _money(l10n, o.quote?.bagFee)),
+              Padding(
+                padding: const EdgeInsets.only(top: 10, bottom: 4),
+                child: Divider(
+                  height: 2,
+                  thickness: 1.6,
+                  color: scheme.onSurface,
+                ),
+              ),
+              _Row(
+                (o.refundedAmount ?? 0) > 0
+                    ? l10n.amountTotalInitial
+                    : l10n.amountTotal,
+                _money(l10n, o.quote?.totalAmount),
+                strong: true,
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 6),
+                child: Divider(height: 1),
+              ),
+              _PaymentMethodRow(paymentAttemptId: o.paymentAttemptId),
+              if ((o.refundedAmount ?? 0) > 0)
+                _Row(
+                  l10n.refundedAmount,
+                  formatKrw(o.refundedAmount!),
+                  key: const ValueKey('refunded'),
+                ),
+            ],
+          ),
+          _ClaimsSection(order: o, onVisit: visit),
+          const SizedBox(height: 18),
+          // 배달 정보: 주문 당시 배송지 사본(BR-37, 주소록을 다시 부르지 않는다) + 요청사항·품절 시 처리.
+          _DetailTitle(l10n.orderTabDelivery, key: deliveryKey),
+          _DetailBox(
+            children: [
+              ShippingAddressView(address: o.shippingAddress),
               if (o.deliveryNote case final n?)
                 _Row(
                   l10n.orderDeliveryNote,
@@ -691,84 +1262,21 @@ class _OrderBody extends ConsumerWidget {
                 }, key: const ValueKey('order-oos')),
             ],
           ),
+          // 배송 완료된 배송이 있는 주문만 리뷰 자격을 묻는다(작성 가능 여부는 서버 자격 값으로만 판단).
+          if (o.shipments.any((s) => s.state == ShipmentState.delivered))
+            OrderReviewsSection(
+              orderId: o.orderId,
+              lineTitles: {for (final l in o.lines) l.orderLineId: l.title},
+            ),
         ],
-        const SizedBox(height: 16),
-        _OrderLinesSection(order: o),
-        const SizedBox(height: 16),
-        _DetailTitle(l10n.checkoutAmounts),
-        _DetailBox(
-          children: [
-            _Row(l10n.amountItems, _money(l10n, o.quote?.itemAmount)),
-            if (o.quote case final q?)
-              _Row(
-                '${l10n.amountTip} (${tipReasonText(l10n, q.tipReason)})',
-                _money(l10n, q.deliveryTip),
-              ),
-            _Row(l10n.amountBag, _money(l10n, o.quote?.bagFee)),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Divider(),
-            ),
-            _Row(
-              l10n.amountTotal,
-              _money(l10n, o.quote?.totalAmount),
-              strong: true,
-            ),
-            _PaymentMethodRow(paymentAttemptId: o.paymentAttemptId),
-            if ((o.refundedAmount ?? 0) > 0)
-              _Row(
-                l10n.refundedAmount,
-                formatKrw(o.refundedAmount!),
-                key: const ValueKey('refunded'),
-              ),
-          ],
-        ),
-        _ClaimsSection(order: o, onVisit: visit),
-        // 배송 완료된 배송이 있는 주문만 리뷰 자격을 묻는다(작성 가능 여부는 서버 자격 값으로만 판단).
-        if (o.shipments.any((s) => s.state == ShipmentState.delivered))
-          OrderReviewsSection(
-            orderId: o.orderId,
-            lineTitles: {for (final l in o.lines) l.orderLineId: l.title},
-          ),
-        const SizedBox(height: 16),
-        // 버튼은 요청 진입일 뿐이다. 가능 여부는 서버가 판정한다.
-        if (canRequestTimeChange(o))
-          OutlinedButton(
-            key: const ValueKey('reschedule'),
-            onPressed: () => visit('/orders/${o.orderId}/reschedule'),
-            child: Text(l10n.rescheduleTitle),
-          ),
-        if (canRequestCancel(o))
-          OutlinedButton(
-            key: const ValueKey('cancel-order'),
-            onPressed: () => visit('/orders/${o.orderId}/cancel'),
-            child: Text(l10n.cancelTitle),
-          )
-        else if (cancelClosedByPreparing(o))
-          // 피킹이 시작되면 앱에서 취소할 수 없다(ADR-0060) — 버튼 대신 안내.
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              l10n.cancelClosedPreparing,
-              key: const ValueKey('cancel-closed-preparing'),
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
-        // 고객센터 문의(주문을 고른 상태로). 접수일 뿐 주문을 바꾸지 않는다.
-        OutlinedButton(
-          key: const ValueKey('order-inquiry'),
-          // 무엇을 도와드릴까요?(배송 신고 종류 · 그 외 문의) — 레퍼런스 9-2 3-1.
-          onPressed: () => visit('/orders/${o.orderId}/help'),
-          child: Text(l10n.orderInquiry),
-        ),
-      ],
+      ),
     );
   }
 }
 
 /// 주문 상세의 구획 제목(카드 밖).
 class _DetailTitle extends StatelessWidget {
-  const _DetailTitle(this.text);
+  const _DetailTitle(this.text, {super.key});
 
   final String text;
 
@@ -867,7 +1375,7 @@ class _ClaimsSection extends ConsumerWidget {
           ListTile(
             key: ValueKey('order-claim-${c.claimId}'),
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.assignment_return_outlined),
+            leading: const PmartLineIcon(PmartLineIcons.refresh),
             title: Text(claimTypeText(l10n, c.type)),
             subtitle: Text(
               [
@@ -876,7 +1384,7 @@ class _ClaimsSection extends ConsumerWidget {
                   l10n.claimOpenedAt(formatSeoulDateTime(t)),
               ].join(' · '),
             ),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const PmartLineIcon(PmartLineIcons.chevronRight),
             onTap: () => onVisit('/claims/${c.claimId}'),
           ),
       ],
@@ -1081,7 +1589,7 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
             if (lines.isNotEmpty)
               TextButton.icon(
                 key: const ValueKey('reorder-all'),
-                icon: const Icon(Icons.add_shopping_cart, size: 18),
+                icon: const PmartLineIcon(PmartLineIcons.cart, size: 18),
                 label: Text(l10n.reorderAll),
                 onPressed: _running ? null : () => _run(lines),
               ),
@@ -1497,7 +2005,11 @@ class TrackMapLayout extends StatelessWidget {
     required this.map,
     required this.sheet,
     this.onInquiry,
+    this.sheetFraction = TrackingMap.sheetFraction,
   });
+
+  /// 처음 시트 높이(화면 비율). 레퍼런스 8: 배달 중은 약 절반, 주문 확인·예약은 거의 위까지.
+  final double sheetFraction;
 
   final Widget map;
   final Widget sheet;
@@ -1513,7 +2025,7 @@ class TrackMapLayout extends StatelessWidget {
         children: [
           Positioned.fill(child: map),
           DraggableScrollableSheet(
-            initialChildSize: TrackingMap.sheetFraction,
+            initialChildSize: sheetFraction,
             minChildSize: 0.3,
             maxChildSize: 0.92,
             builder: (context, scroll) => DecoratedBox(
@@ -1538,7 +2050,14 @@ class TrackMapLayout extends StatelessWidget {
                     color: theme.colorScheme.surface,
                     shape: const CircleBorder(),
                     elevation: 2,
-                    child: const BackButton(),
+                    // 레퍼런스 8: 왼쪽 위 ✕
+                    child: IconButton(
+                      key: const ValueKey('track-close'),
+                      tooltip: MaterialLocalizations.of(context)
+                          .closeButtonTooltip,
+                      icon: const PmartLineIcon(PmartLineIcons.close, size: 22),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
                   ),
                   const Spacer(),
                   if (onInquiry case final tap?)
@@ -1555,19 +2074,13 @@ class TrackMapLayout extends StatelessWidget {
                             horizontal: 16,
                             vertical: 10,
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const PmartLineIcon(
-                                PmartLineIcons.headset,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                l10n.orderInquiry,
-                                style: theme.textTheme.titleSmall,
-                              ),
-                            ],
+                          // 레퍼런스: 글자만 있는 흰 알약 "문의하기"
+                          child: Text(
+                            l10n.orderInquiry,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
                       ),
@@ -1689,6 +2202,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
               headline: orderStatusText(l10n, o.status),
               headlineKey: 'order-track-status',
               subtitle: o.window == null ? null : windowText(o.window!),
+              receipt: true,
             ),
             Text(
               l10n.trackRiderNotLinked,
@@ -1719,10 +2233,11 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
         child: Center(child: CircularProgressIndicator()),
       ),
     };
+    // 레퍼런스 8-2·8-4: 배차 전(주문 확인·예약)은 시트를 거의 위까지, 문의하기 알약은 배달 중에만.
     return TrackMapLayout(
       map: TrackingMap(rider: null, home: home),
       sheet: sheet,
-      onInquiry: () => context.push('/orders/$orderId/help'),
+      sheetFraction: 0.85,
     );
   }
 }
@@ -1846,7 +2361,10 @@ class _TrackBody extends StatelessWidget {
         Text(
           l10n.trackReservedWindow(windowText(window)),
           key: const ValueKey('track-reserved'),
-          style: theme.textTheme.headlineSmall,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         if (o != null && canRequestTimeChange(o))
           Padding(
@@ -2060,6 +2578,28 @@ class _TrackSteps extends StatelessWidget {
                               color: theme.colorScheme.outline,
                             ),
                     ),
+                    // 레퍼런스 8-5: 배달 중이면 지금 단계 아래 말풍선 "내 주소로 오는 중"
+                    if (step == current && step == TrackStep.delivering)
+                      Container(
+                        key: const ValueKey('track-step-bubble'),
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          l10n.trackStepComingBubble,
+                          maxLines: 1,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 11,
+                            color: theme.colorScheme.onPrimary,
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -2141,7 +2681,11 @@ class TrackSheetHead extends StatelessWidget {
     this.mode,
     this.time,
     this.subtitle,
+    this.receipt = false,
   });
+
+  /// 배차 전(주문 확인·예약)이면 오른쪽 그림이 영수증(레퍼런스 8-4), 배달 중이면 오토바이(8-5).
+  final bool receipt;
 
   final String? mode;
   final String headline;
@@ -2191,9 +2735,10 @@ class TrackSheetHead extends StatelessWidget {
                       Text(
                         headline,
                         key: ValueKey(headlineKey),
+                        // 레퍼런스 8-5: "14분 남음" 약 20sp 중간 굵기 + 작은 시각
                         style: theme.textTheme.headlineMedium?.copyWith(
-                          fontSize: 27,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       if (time case final t?)
@@ -2202,7 +2747,7 @@ class TrackSheetHead extends StatelessWidget {
                           child: Text(
                             t,
                             style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 17,
+                              fontSize: 15,
                             ),
                           ),
                         ),
@@ -2232,7 +2777,14 @@ class TrackSheetHead extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
-              child: ScooterGlyph(size: 44, color: theme.colorScheme.primary),
+              child: receipt
+                  ? PmartLineIcon(
+                      PmartLineIcons.receipt,
+                      size: 40,
+                      strokeWidth: 1.6,
+                      color: theme.colorScheme.primary,
+                    )
+                  : ScooterGlyph(size: 44, color: theme.colorScheme.primary),
             ),
           ],
         ),
@@ -2412,3 +2964,11 @@ class _OrderSheetDetailsState extends State<OrderSheetDetails> {
     );
   }
 }
+
+/// 주문상세 머리 문장(사용자 캡처 2026-11-20 "배달이 완료됐어요").
+String orderHeadlineText(AppLocalizations l10n, OrderStatus s) => switch (s) {
+  OrderStatus.completed => l10n.orderHeadlineDelivered,
+  OrderStatus.cancelled => l10n.orderHeadlineCancelled,
+  OrderStatus.inDelivery => l10n.orderHeadlineDelivering,
+  _ => l10n.orderHeadlineInProgress,
+};

@@ -18,6 +18,8 @@ import '../../orders/presentation/orders_providers.dart'
 import '../../orders/domain/orders.dart' show OrderListQuery;
 import '../../reviews/presentation/reviews_controller.dart'
     show ReviewPhotoSource, reviewPhotoPickerProvider;
+import '../../profile/presentation/profile_controller.dart'
+    show profileProvider;
 import '../domain/inquiry.dart';
 import 'faq_screens.dart' show SupportFaqBlock;
 import 'inquiry_controller.dart';
@@ -71,30 +73,67 @@ String deliveryIssueText(AppLocalizations l10n, DeliveryIssue i) => switch (i) {
 
 /// 고객센터 메인. 레퍼런스 "문의하기"(큰 제목 + 화살표 줄) 모양을 따른다.
 /// 상담사 실시간 연결은 없다(2026-11-09 결정) — 문의 남기기로 받는다.
-class SupportScreen extends StatelessWidget {
+class SupportScreen extends ConsumerWidget {
   const SupportScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final p = ref.watch(profileProvider).value;
+    final who = [p?.nickname, p?.name]
+        .whereType<String>()
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .firstOrNull;
     return Scaffold(
+      // 레퍼런스 1 고객센터: 가운데 제목
       appBar: AppBar(title: Text(l10n.supportTitle)),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
+        padding: const EdgeInsets.fromLTRB(16, 30, 16, 16),
         children: [
+          // 레퍼런스 1 고객센터: 큰 제목 20sp 보통 굵기
+          // 사용자 캡처(2026-11-20): "냥냥펀치님 / 무엇을 도와드릴까요?" — 이름은 굵게 + 형광펜 밑줄
+          if (who != null)
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: who,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      background: Paint()
+                        ..color = theme.colorScheme.primaryContainer,
+                    ),
+                  ),
+                  TextSpan(text: l10n.supportNameSuffix),
+                ],
+              ),
+              key: const ValueKey('support-name'),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontSize: 22,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
           Text(
             l10n.supportHeadline,
             style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              fontWeight: FontWeight.w400,
             ),
           ),
           const SizedBox(height: 16),
           // 검색칸 · 자주 묻는 질문 · 분류 칩(회원만 — 레퍼런스 고객센터 메인).
           const SupportFaqBlock(),
+          // 묶음 사이 8dp 회색 띠(화면 폭 — 목록 좌우 여백 16 을 넘어 그린다)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: _FullWidthGap(),
+          ),
           SupportRow(
             key: const ValueKey('support-chat'),
             label: l10n.supportChat,
+            description: l10n.supportChatDesc,
             onTap: () => context.push('/support/chat'),
           ),
           SupportRow(
@@ -113,11 +152,36 @@ class SupportScreen extends StatelessWidget {
   }
 }
 
+/// 좌우 여백 16 인 목록 안에서 화면 폭 회색 띠.
+class _FullWidthGap extends StatelessWidget {
+  const _FullWidthGap();
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 8,
+    child: OverflowBox(
+      maxWidth: MediaQuery.sizeOf(context).width,
+      child: const PmartSectionGap(height: 8),
+    ),
+  );
+}
+
 /// 레퍼런스의 화살표 줄(글자 17, 세로 여백 넉넉히, 오른쪽 회색 화살표).
 class SupportRow extends StatelessWidget {
-  const SupportRow({super.key, required this.label, required this.onTap});
+  const SupportRow({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.description,
+    this.bold = false,
+  });
+
+  final bool bold;
 
   final String label;
+
+  /// 굵은 이름 아래 회색 설명(레퍼런스 "채팅 상담").
+  final String? description;
   final VoidCallback onTap;
 
   @override
@@ -130,9 +194,30 @@ class SupportRow extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: Text(
-                label,
-                style: theme.textTheme.bodyLarge?.copyWith(fontSize: 17),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontSize: 17,
+                      fontWeight: description == null && !bold
+                          ? null
+                          : FontWeight.w700,
+                    ),
+                  ),
+                  if (description case final d?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        d,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 13,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             PmartLineIcon(
@@ -598,7 +683,21 @@ class _RateBoxState extends ConsumerState<_RateBox> {
                     ),
                     child: Row(
                       children: [
-                        Icon(_rateIcon(s), size: 20, color: _rateColor(s)),
+                        // 레퍼런스 2-2-2: 색 채운 동그라미 얼굴(16dp)
+                        Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: _rateColor(s),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            _rateIcon(s),
+                            size: 15,
+                            color: Colors.white,
+                          ),
+                        ),
                         const SizedBox(width: 8),
                         Text(rateLabel(l10n, s)),
                       ],
@@ -786,7 +885,7 @@ class _PhotoSlotView extends StatelessWidget {
               ),
               constraints: const BoxConstraints.tightFor(width: 24, height: 24),
               onPressed: onRemove,
-              icon: const Icon(Icons.close),
+              icon: const PmartLineIcon(PmartLineIcons.close),
             ),
           ),
         ],

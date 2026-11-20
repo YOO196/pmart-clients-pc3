@@ -64,9 +64,11 @@ class SupportFaqBlock extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 8),
+        // 레퍼런스: "자주 묻는 질문" 굵게
         SupportRow(
           key: const ValueKey('support-faqs'),
           label: l10n.faqTitle,
+          bold: true,
           onTap: () => context.push('/support/faqs'),
         ),
         switch (value) {
@@ -78,6 +80,16 @@ class SupportFaqBlock extends ConsumerWidget {
                 ActionChip(
                   key: ValueKey('support-faq-cat-${c.category}'),
                   label: Text(c.title),
+                  // 레퍼런스: 회색 채운 알약 약 40dp
+                  backgroundColor: theme.colorScheme.surfaceContainer,
+                  side: BorderSide.none,
+                  labelStyle: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 14,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 6,
+                  ),
                   shape: const StadiumBorder(),
                   onPressed: () => context.push(
                     Uri(
@@ -108,14 +120,21 @@ class SupportFaqBlock extends ConsumerWidget {
           _ => const SizedBox(height: 40),
         },
         const SizedBox(height: 8),
-        const Divider(),
       ],
     );
   }
 }
 
 class _FaqSearchField extends StatefulWidget {
-  const _FaqSearchField({super.key, required this.onSubmitted, this.initial});
+  const _FaqSearchField({
+    super.key,
+    required this.onSubmitted,
+    this.initial,
+    this.filled = false,
+  });
+
+  /// 회색 채움·테두리 없음(사용자 캡처 "자주 묻는 질문" 목록). 아니면 검은 테두리(고객센터 메인).
+  final bool filled;
 
   final ValueChanged<String> onSubmitted;
   final String? initial;
@@ -150,13 +169,19 @@ class _FaqSearchFieldState extends State<_FaqSearchField> {
           horizontal: 20,
           vertical: 14,
         ),
+        filled: widget.filled,
+        fillColor: scheme.surfaceContainer,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(28),
-          borderSide: BorderSide(color: scheme.onSurface),
+          borderSide: widget.filled
+              ? BorderSide.none
+              : BorderSide(color: scheme.onSurface),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(28),
-          borderSide: BorderSide(color: scheme.onSurface),
+          borderSide: widget.filled
+              ? BorderSide.none
+              : BorderSide(color: scheme.onSurface),
         ),
         suffixIcon: IconButton(
           key: const ValueKey('faq-search-go'),
@@ -203,34 +228,63 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: _FaqSearchField(
+                filled: true,
                 initial: _q,
                 onSubmitted: (q) => setState(() => _q = q.isEmpty ? null : q),
               ),
             ),
+            // 사용자 캡처(2026-11-20): 회색 띠 아래 "질문 유형" + 여러 줄 알약(고른 것은 검게)
+            const SizedBox(height: 14),
+            const PmartSectionGap(height: 8),
             if (all != null)
-              SizedBox(
-                height: 52,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (final c in <FaqCategory?>[null, ...all.categories])
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: ChoiceChip(
-                          key: ValueKey('faq-cat-${c?.category ?? 'all'}'),
-                          label: Text(c?.title ?? l10n.ordersFilterAll),
-                          selected: _category == c?.category,
-                          onSelected: (_) =>
-                              setState(() => _category = c?.category),
-                        ),
+                    Text(
+                      l10n.faqTypeLabel,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.outline,
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final c in <FaqCategory?>[null, ...all.categories])
+                          ChoiceChip(
+                            key: ValueKey('faq-cat-${c?.category ?? 'all'}'),
+                            label: Text(c?.title ?? l10n.ordersFilterAll),
+                            selected: _category == c?.category,
+                            showCheckmark: false,
+                            shape: const StadiumBorder(),
+                            selectedColor: theme.colorScheme.onSurface,
+                            backgroundColor: theme.colorScheme.surface,
+                            side: BorderSide(
+                              color: _category == c?.category
+                                  ? theme.colorScheme.onSurface
+                                  : theme.colorScheme.outlineVariant,
+                            ),
+                            labelStyle: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 15,
+                              fontWeight: _category == c?.category
+                                  ? FontWeight.w700
+                                  : null,
+                              color: _category == c?.category
+                                  ? theme.colorScheme.surface
+                                  : theme.colorScheme.onSurface,
+                            ),
+                            onSelected: (_) =>
+                                setState(() => _category = c?.category),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),
+            const PmartSectionGap(height: 8),
             Expanded(
               child: UiStateView<FaqList?>(
                 state: uiStateOf(value, isEmpty: (l) => l!.items.isEmpty),
@@ -257,16 +311,12 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  // 사용자 캡처: "[분류] 질문" 한 줄 제목
                                   Text(
-                                    f.categoryTitle,
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: theme.colorScheme.primary,
+                                    '[${f.categoryTitle}] ${f.question}',
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      fontSize: 16,
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    f.question,
-                                    style: theme.textTheme.bodyLarge,
                                   ),
                                 ],
                               ),

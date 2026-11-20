@@ -56,7 +56,13 @@ void main() {
   Finder dot(String id) => find.byKey(ValueKey('notice-unread-$id'));
 
   Future<void> back(WidgetTester t) async {
-    await t.tap(find.byType(BackButton).last);
+    await t.tap(
+      find
+          .byWidgetPredicate(
+            (w) => w is BackButton || w.key == const ValueKey('track-close'),
+          )
+          .last,
+    );
     await t.pumpAndSettle();
   }
 

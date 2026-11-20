@@ -175,6 +175,8 @@ void main() {
       }
       // 나머지 방식은 화살표로 펼친다.
       expect(find.byKey(const ValueKey('home-delivery-bundled')), findsNothing);
+      await t.ensureVisible(find.byKey(const ValueKey('home-delivery-toggle')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('home-delivery-toggle')));
       await t.pumpAndSettle();
       expect(
@@ -236,7 +238,12 @@ void main() {
       expect(find.text('배송 정보를 불러오지 못했어요'), findsOneWidget);
       expect(find.textContaining('배달팁'), findsNothing);
       expect(find.textContaining('무료'), findsNothing);
-      // 상품 진열은 그대로다.
+      // 상품 진열은 그대로다(배송 안내가 배너 아래로 옮겨 한 화면 아래에 있다).
+      await t.scrollUntilVisible(
+        find.text('지금 많이 사는 상품'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('지금 많이 사는 상품'), findsOneWidget);
     });
 
@@ -267,7 +274,17 @@ void main() {
       await t.tap(find.byKey(const ValueKey('home-tab-ranking')));
       await t.pumpAndSettle();
       expect(find.text('지금 TOP'), findsOneWidget);
-      expect(find.text('1위'), findsOneWidget);
+      // 레퍼런스: 사진 위 굵은 순위 숫자("1")
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is Text &&
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('tile-rank-') &&
+              w.data == '1',
+        ),
+        findsOneWidget,
+      );
       expect(find.text('지금 많이 사는 상품'), findsNothing);
 
       await t.tap(find.byKey(const ValueKey('home-tab-home')));
@@ -311,6 +328,7 @@ void main() {
         200,
         scrollable: find.byType(Scrollable).last,
       );
+      await t.pumpAndSettle();
       await t.ensureVisible(more);
       await t.pumpAndSettle();
       await t.tap(more);
@@ -507,6 +525,12 @@ void main() {
       await t.tap(find.byKey(const ValueKey('quick-add-P-0001')));
       await t.pumpAndSettle();
       expect(cart.adds, isEmpty);
+      await t.scrollUntilVisible(
+        find.byKey(const ValueKey('option-B-00000011')),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('option-B-00000011')), findsOneWidget);
     });
 
@@ -553,4 +577,35 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('지금 많이 사는 상품'), findsOneWidget);
   });
+
+  // 백엔드 요청 2026-11-20 home-banners-themes(storefront 0.7.0).
+  testWidgets(
+    '배너: 위(HOME_TOP)는 넘기기, 중간(HOME_MIDDLE)은 첫 영역 아래, 누르면 영역 전체 보기·카테고리로',
+    (t) async {
+      _tallView(t);
+      await t.pumpWidget(testApp(const []));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('home-banners-top')), findsOneWidget);
+      await t.fling(
+        find.byKey(const ValueKey('banner-BN-1')),
+        const Offset(-600, 0),
+        1500,
+      );
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('banner-BN-2')));
+      await t.pumpAndSettle();
+      expect(find.text('새로 들어왔어요'), findsWidgets);
+      expect(find.byKey(const ValueKey('home-banners-top')), findsNothing);
+      await t.tap(find.byType(BackButton));
+      await t.pumpAndSettle();
+      await t.scrollUntilVisible(
+        find.byKey(const ValueKey('banner-BN-3')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.tap(find.byKey(const ValueKey('banner-BN-3')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('home-banners-top')), findsNothing);
+    },
+  );
 }

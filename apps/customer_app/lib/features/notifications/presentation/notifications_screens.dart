@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart' show Geolocator;
 import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
@@ -9,6 +10,10 @@ import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../profile/presentation/consents_screens.dart'
     show MarketingConsentTile;
+import '../../checkout/presentation/checkout_controller.dart'
+    show clockProvider;
+import '../../push/presentation/push_controller.dart'
+    show PushStatus, pushRegistrationProvider;
 import '../domain/notifications.dart';
 import 'notifications_controller.dart';
 
@@ -41,6 +46,8 @@ class _NotificationCenterScreenState
     super.dispose();
   }
 
+  bool _bandClosed = false;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -52,7 +59,7 @@ class _NotificationCenterScreenState
         actions: [
           IconButton(
             key: const ValueKey('notice-settings'),
-            icon: const Icon(Icons.settings_outlined, size: 23),
+            icon: const PmartLineIcon(PmartLineIcons.settings, size: 23),
             tooltip: l10n.noticeSettingsTitle,
             onPressed: () => context.push('/notifications/settings'),
           ),
@@ -74,6 +81,12 @@ class _NotificationCenterScreenState
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
+                // 레퍼런스 10-1: 알림 권한이 꺼져 있으면 맨 위 흰 띠(✕ 로 닫기, 누르면 기기 설정)
+                if (!_bandClosed &&
+                    ref.watch(pushRegistrationProvider) == PushStatus.denied)
+                  _PushOffBand(
+                    onClose: () => setState(() => _bandClosed = true),
+                  ),
                 for (final n in s!.items)
                   _NoticeCard(
                     notice: n,
@@ -129,16 +142,16 @@ class _MoreFooter extends ConsumerWidget {
   }
 }
 
-IconData _categoryIcon(NoticeCategory c) => switch (c) {
-  NoticeCategory.order => Icons.receipt_long_outlined,
-  NoticeCategory.payment => Icons.credit_card_outlined,
-  NoticeCategory.delivery => Icons.local_shipping_outlined,
-  NoticeCategory.claim => Icons.assignment_return_outlined,
-  NoticeCategory.refund => Icons.currency_exchange,
-  NoticeCategory.dispatch => Icons.two_wheeler_outlined,
-  NoticeCategory.caseFile => Icons.support_agent_outlined,
-  NoticeCategory.marketing => Icons.campaign_outlined,
-  NoticeCategory.system => Icons.info_outline,
+PmartLineIcons _categoryIcon(NoticeCategory c) => switch (c) {
+  NoticeCategory.order => PmartLineIcons.receipt,
+  NoticeCategory.payment => PmartLineIcons.receipt,
+  NoticeCategory.delivery => PmartLineIcons.scooter,
+  NoticeCategory.claim => PmartLineIcons.refresh,
+  NoticeCategory.refund => PmartLineIcons.refresh,
+  NoticeCategory.dispatch => PmartLineIcons.scooter,
+  NoticeCategory.caseFile => PmartLineIcons.headset,
+  NoticeCategory.marketing => PmartLineIcons.bell,
+  NoticeCategory.system => PmartLineIcons.info,
 };
 
 String noticeCategoryText(AppLocalizations l10n, NoticeCategory c) =>
@@ -174,7 +187,7 @@ class _NoticeCard extends ConsumerWidget {
     final n = notice;
     return Card(
       key: ValueKey('notice-${n.notificationId}'),
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       elevation: 1,
       shadowColor: Colors.black26,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -195,7 +208,7 @@ class _NoticeCard extends ConsumerWidget {
               CircleAvatar(
                 radius: 22,
                 backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                child: Icon(_categoryIcon(n.category), size: 21),
+                child: PmartLineIcon(_categoryIcon(n.category), size: 21),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -205,7 +218,7 @@ class _NoticeCard extends ConsumerWidget {
                     Text(
                       n.title,
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 14.5,
+                        fontSize: 15,
                         fontWeight: n.read
                             ? FontWeight.normal
                             : FontWeight.bold,
@@ -214,12 +227,12 @@ class _NoticeCard extends ConsumerWidget {
                     if (n.body case final b?)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          b,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
+                        // 레퍼런스 10-1: 긴 본문은 세 줄 + 가운데 ⌄ 로 펼치기
+                        child: _ExpandableBody(
+                          key: ValueKey('notice-body-${n.notificationId}'),
+                          text: b,
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            fontSize: 12.5,
+                            fontSize: 13,
                           ),
                         ),
                       ),
@@ -227,7 +240,12 @@ class _NoticeCard extends ConsumerWidget {
                     Text(
                       [
                         noticeCategoryText(l10n, n.category),
-                        formatSeoulDateTime(n.createdAt),
+                        // 레퍼런스 10-1: "1분 전"처럼 상대 시각(하루 넘으면 날짜)
+                        relativeTimeText(
+                          l10n,
+                          n.createdAt,
+                          ref.watch(clockProvider)(),
+                        ),
                       ].join(' · '),
                       style: theme.textTheme.bodySmall?.copyWith(
                         fontSize: 11,
@@ -333,7 +351,13 @@ class NotificationSettingsScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final value = ref.watch(noticeSettingsProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.noticeSettingsTitle)),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+      appBar: AppBar(
+        centerTitle: false,
+        titleSpacing: pmartLeftTitleSpacing,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+        title: Text(l10n.noticeSettingsTitle),
+      ),
       body: switch (value) {
         AsyncData(value: null) => LoginRequired(
           message: l10n.noticeSettingsLoginNeeded,
@@ -367,6 +391,28 @@ class _SettingsBody extends ConsumerWidget {
       OsPermission.denied => l10n.noticeValueDenied,
       OsPermission.unknown || null => l10n.noticeValueUnknown,
     };
+    Widget groupTitle(String text) => Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+      child: Text(
+        text,
+        style: theme.textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+    Widget card(List<Widget> children) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Material(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Column(children: children),
+        ),
+      ),
+    );
     return ListView(
       children: [
         if (byCategory.isEmpty)
@@ -375,29 +421,29 @@ class _SettingsBody extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             child: Text(l10n.noticeSettingsEmpty),
           ),
+        // 레퍼런스 10 "환경설정": 회색 바탕 + 회색 묶음 제목 + 흰 둥근 카드
         for (final MapEntry(key: category, value: items)
             in byCategory.entries) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: Text(
-              noticeCategoryText(l10n, category),
-              style: theme.textTheme.titleSmall,
-            ),
-          ),
-          for (final item in items)
-            _SettingRow(
-              item: item,
-              status: state.rows[settingRowKey(item.category, item.channel)],
-            ),
+          groupTitle(noticeCategoryText(l10n, category)),
+          card([
+            for (final item in items)
+              _SettingRow(
+                item: item,
+                status: state.rows[settingRowKey(item.category, item.channel)],
+              ),
+          ]),
         ],
-        const Divider(height: 32),
-        ListTile(
-          key: const ValueKey('settings-os-permission'),
-          title: Text(l10n.noticeOsPermission),
-          trailing: Text(os(settings.osPermission)),
-        ),
-        // 마케팅 동의는 customer 의 내 동의(MARKETING)로 켜고 끈다 — notification 의 값은 아직 UNKNOWN(CU-1 §3).
-        const MarketingConsentTile(),
+        groupTitle(l10n.noticeServiceGroup),
+        card([
+          ListTile(
+            key: const ValueKey('settings-os-permission'),
+            title: Text(l10n.noticeOsPermission),
+            trailing: Text(os(settings.osPermission)),
+          ),
+          // 마케팅 동의는 customer 의 내 동의(MARKETING)로 켜고 끈다 — notification 의 값은 아직 UNKNOWN(CU-1 §3).
+          const MarketingConsentTile(),
+        ]),
+        const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           child: Text(
@@ -478,4 +524,129 @@ class _SettingRow extends ConsumerWidget {
       trailing: trailing,
     );
   }
+}
+
+/// "방금 전·N분 전·N시간 전", 하루가 넘으면 서울 날짜·시각.
+String relativeTimeText(AppLocalizations l10n, DateTime at, DateTime now) {
+  final d = now.difference(at);
+  if (d.isNegative || d.inMinutes < 1) return l10n.timeJustNow;
+  if (d.inMinutes < 60) return l10n.timeMinutesAgo(d.inMinutes);
+  if (d.inHours < 24) return l10n.timeHoursAgo(d.inHours);
+  return formatSeoulDateTime(at);
+}
+
+/// "알림이 꺼져 있어요."(레퍼런스 10-1). 누르면 기기 앱 설정, ✕ 로 이번만 닫는다.
+class _PushOffBand extends StatelessWidget {
+  const _PushOffBand({required this.onClose});
+
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Card(
+      key: const ValueKey('notice-push-off'),
+      margin: const EdgeInsets.fromLTRB(14, 4, 14, 7),
+      elevation: 1,
+      shadowColor: Colors.black26,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      child: InkWell(
+        onTap: () => Geolocator.openAppSettings(),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.noticePushOffTitle,
+                      style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      l10n.noticePushOffBody,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                key: const ValueKey('notice-push-off-close'),
+                tooltip: l10n.actionClose,
+                icon: PmartLineIcon(
+                  PmartLineIcons.close,
+                  size: 20,
+                  color: theme.colorScheme.outline,
+                ),
+                onPressed: onClose,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 세 줄까지 보이고, 넘치면 아래 가운데 ⌄(누르면 전부 / 다시 누르면 접기).
+class _ExpandableBody extends StatefulWidget {
+  const _ExpandableBody({super.key, required this.text, this.style});
+
+  final String text;
+  final TextStyle? style;
+
+  @override
+  State<_ExpandableBody> createState() => _ExpandableBodyState();
+}
+
+class _ExpandableBodyState extends State<_ExpandableBody> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, c) {
+      final painter = TextPainter(
+        text: TextSpan(text: widget.text, style: widget.style),
+        maxLines: 3,
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout(maxWidth: c.maxWidth);
+      final long = painter.didExceedMaxLines;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            widget.text,
+            maxLines: _open ? null : 3,
+            overflow: _open ? null : TextOverflow.ellipsis,
+            style: widget.style,
+          ),
+          if (long)
+            Center(
+              child: InkResponse(
+                key: const ValueKey('notice-body-toggle'),
+                onTap: () => setState(() => _open = !_open),
+                radius: 18,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: PmartLineIcon(
+                    _open
+                        ? PmartLineIcons.chevronUp
+                        : PmartLineIcons.chevronDown,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  );
 }

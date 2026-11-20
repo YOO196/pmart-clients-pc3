@@ -57,6 +57,10 @@ void main() {
     expect(find.byKey(const ValueKey('order-help-notReceived')), findsNothing);
     await t.tap(find.byKey(const ValueKey('order-help-delayed')));
     await t.pumpAndSettle();
+    // 레퍼런스 9-1 5: 먼저 "진행 중인 주문을 확인해주세요" 안내 → "그래도 문의 남기기"
+    expect(find.byKey(const ValueKey('help-delayed-guide')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('help-guide-inquiry')));
+    await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('inq-issue')), findsOneWidget);
     // 종류는 배송으로 고정 — 다른 종류를 고를 수 없다.
@@ -86,6 +90,10 @@ void main() {
     await openHelp(t, 'order-seed-4');
     await t.tap(find.byKey(const ValueKey('order-help-delayed')));
     await t.pumpAndSettle();
+    // 레퍼런스 9-1 5: 먼저 "진행 중인 주문을 확인해주세요" 안내 → "그래도 문의 남기기"
+    expect(find.byKey(const ValueKey('help-delayed-guide')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('help-guide-inquiry')));
+    await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('inq-body')), '늦어요');
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('inq-submit')));
@@ -100,6 +108,10 @@ void main() {
   testWidgets('"그 외 문의"는 배송 신고 없이 주문 문의', (t) async {
     await openHelp(t, 'order-seed-4');
     await t.tap(find.byKey(const ValueKey('order-help-other')));
+    await t.pumpAndSettle();
+    // 레퍼런스 9-1 5 그 외: "다른 도움이 필요하신가요?" → "그래도 문의 남기기"
+    expect(find.byKey(const ValueKey('help-other-guide')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('help-guide-inquiry')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('inq-issue')), findsNothing);
     await t.enterText(find.byKey(const ValueKey('inq-body')), '질문');

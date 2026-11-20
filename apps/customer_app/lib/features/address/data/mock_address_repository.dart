@@ -221,6 +221,48 @@ base class MockAddressRepository implements AddressRepository {
   }
 
   @override
+  Future<AddressDraft> draft(String addressId) async {
+    await _wait();
+    final json = _addresses
+        .where((a) => a['addressId'] == addressId)
+        .firstOrNull;
+    if (json == null) {
+      throw const ProblemFailure(
+        Problem(status: 404, code: ProblemCode.notFound),
+      );
+    }
+    return draftFromContract(api.Address.fromJson(json));
+  }
+
+  /// 수정한 주소 ID(시험 확인용).
+  final updated = <String>[];
+
+  @override
+  Future<void> update(
+    String addressId,
+    AddressDraft draft, {
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    final json = _addresses
+        .where((a) => a['addressId'] == addressId)
+        .firstOrNull;
+    if (json == null) {
+      throw const ProblemFailure(
+        Problem(status: 404, code: ProblemCode.notFound),
+      );
+    }
+    final input = addressInputToContract(draft).toJson()
+      ..remove('receiverName')
+      ..remove('receiverPhone')
+      ..removeWhere((_, v) => v == null);
+    json
+      ..addAll(input)
+      ..['version'] = (json['version']! as int) + 1;
+    updated.add(addressId);
+  }
+
+  @override
   Future<ShoppingContext> context() async {
     await _wait();
     return contextFromContract(api.ShoppingContext.fromJson(_contextJson()));

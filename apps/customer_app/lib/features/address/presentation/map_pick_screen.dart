@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pmart_ui/pmart_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:kakao_map_sdk/kakao_map_sdk.dart' as kakao;
 import 'package:pmart_core/pmart_core.dart';
@@ -130,8 +131,7 @@ class _MapPickScreenState extends ConsumerState<MapPickScreen> {
                 IgnorePointer(
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 40),
-                    child: Icon(
-                      Icons.location_on,
+                    child: PmartLineIcon(PmartLineIcons.pin,
                       size: 40,
                       color: theme.colorScheme.error,
                     ),

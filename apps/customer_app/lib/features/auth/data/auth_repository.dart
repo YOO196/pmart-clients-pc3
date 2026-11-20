@@ -48,6 +48,24 @@ abstract interface class AuthRepository {
     required List<ConsentDecision> consents,
     required IdempotencyKey key,
   });
+
+  /// 휴대폰 확인 시작(auth 0.6.0) — `POST /auth/social-logins/{id}/identity-verifications`.
+  /// 실패는 [PmartFailure](400 PHONE_NOT_SUPPORTED·429 TOO_MANY_VERIFICATIONS·403 등).
+  Future<IdentityStart> startIdentity(
+    String authRequestId, {
+    required String providerToken,
+    required String phone,
+    required IdempotencyKey key,
+  });
+
+  /// "보냈어요" — `…/{verificationId}/confirmations`. 회원이면 [LoginMember], 아직이면 [LoginNeedsIdentity]
+  /// (status PENDING·FAILED·EXPIRED), 이미 가입·탈퇴 번호면 [LoginNeedsIdentity.conflict].
+  Future<LoginOutcome> confirmIdentity(
+    String authRequestId,
+    String verificationId, {
+    required String providerToken,
+    required IdempotencyKey key,
+  });
 }
 
 /// 실서버 구현(auth-service).
@@ -148,12 +166,74 @@ final class ApiAuthRepository implements AuthRepository {
     )).data,
   );
 
-  Future<LoginOutcome> _guard(Future<auth.AuthResult?> Function() call) async {
+  @override
+  Future<IdentityStart> startIdentity(
+    String authRequestId, {
+    required String providerToken,
+    required String phone,
+    required IdempotencyKey key,
+  }) async {
+    final res = await pmartGuard(
+      () async => (await _logins.startSocialLoginIdentityVerification(
+        authRequestId: authRequestId,
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        xDeviceId: await _deviceId.get(),
+        startSocialLoginIdentityVerificationRequest:
+            auth.StartSocialLoginIdentityVerificationRequest(
+              providerToken: providerToken,
+              phone: phone,
+            ),
+        extra: _publicCommand(key),
+      )).data,
+    );
+    final s = res ?? (throw UnknownResultFailure(requestId: key.value));
+    return IdentityStart(
+      verificationId: s.verificationId,
+      sendTo: s.sendTo,
+      text: s.text,
+      expiresAt: s.expiresAt,
+      phoneMasked: s.phoneMasked,
+    );
+  }
+
+  @override
+  Future<LoginOutcome> confirmIdentity(
+    String authRequestId,
+    String verificationId, {
+    required String providerToken,
+    required IdempotencyKey key,
+  }) => _guard(
+    () async => (await _logins.confirmSocialLoginIdentityVerification(
+      authRequestId: authRequestId,
+      verificationId: verificationId,
+      idempotencyKey: key.value,
+      xSourceSystem: sourceSystem,
+      xDeviceId: await _deviceId.get(),
+      confirmSocialLoginIdentityVerificationRequest:
+          auth.ConfirmSocialLoginIdentityVerificationRequest(
+            providerToken: providerToken,
+          ),
+      extra: _publicCommand(key),
+    )).data,
+    authRequestId: authRequestId,
+  );
+
+  Future<LoginOutcome> _guard(
+    Future<auth.AuthResult?> Function() call, {
+    String? authRequestId,
+  }) async {
     try {
       final result = await pmartGuard(call);
       if (result == null) return const LoginUnknown();
       return authResultToOutcome(result);
     } on PmartFailure catch (f) {
+      // 이미 가입·탈퇴 번호(409) — 휴대폰 확인 화면에 안내를 띄운다(R3·R4).
+      if (authRequestId != null) {
+        if (identityConflictOf(f) case final c?) {
+          return LoginNeedsIdentity(authRequestId: authRequestId, conflict: c);
+        }
+      }
       return authFailureToOutcome(f);
     }
   }
@@ -184,6 +264,13 @@ LoginOutcome authResultToOutcome(auth.AuthResult r) => switch (r.state) {
     // 계약: 동의 화면에서 나갔던 가입은 다음 로그인도 newAccount=true. 값이 없으면 신규로 본다.
     newAccount: r.newAccount ?? true,
   ),
+  // 휴대폰 확인 대기(auth 0.6.0). 확인 결과(identityVerification)가 실려 오면 그 상태를 함께.
+  auth.AuthState.AUTH_IDENTITY => LoginNeedsIdentity(
+    authRequestId: r.authRequestId,
+    newAccount: r.newAccount ?? true,
+    status: r.identityVerification?.state.value,
+    remainingAttempts: r.identityVerification?.remainingAttempts,
+  ),
   auth.AuthState.AUTH_RESTRICTED => LoginRestricted(
     retryAfterSeconds: r.retryAfterSeconds,
   ),
@@ -209,3 +296,27 @@ LoginOutcome authFailureToOutcome(PmartFailure f) => switch (f) {
   UnknownResultFailure() => const LoginUnknown(),
   _ => throw f,
 };
+
+/// 409 IDENTITY_ALREADY_REGISTERED·IDENTITY_REJOIN_BLOCKED 의 details(field·reason 쌍)를 읽는다. 그 밖이면 null.
+IdentityConflict? identityConflictOf(PmartFailure f) {
+  if (f is! ProblemFailure) return null;
+  final code = f.problem.code;
+  if (code != 'IDENTITY_ALREADY_REGISTERED' &&
+      code != 'IDENTITY_REJOIN_BLOCKED') {
+    return null;
+  }
+  final d = {for (final x in f.problem.details) x.field: x.reason};
+  return IdentityConflict(
+    code: code,
+    provider: switch (d['provider']) {
+      'KAKAO' => SocialProvider.kakao,
+      'NAVER' => SocialProvider.naver,
+      'GOOGLE' => SocialProvider.google,
+      'APPLE' => SocialProvider.apple,
+      _ => null,
+    },
+    joinedAt: DateTime.tryParse(d['joinedAt'] ?? ''),
+    emailMasked: d['emailMasked'],
+    rejoinAvailableAt: DateTime.tryParse(d['rejoinAvailableAt'] ?? ''),
+  );
+}

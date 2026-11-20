@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pmart_ui/pmart_ui.dart' show keepWords;
+import 'package:pmart_ui/pmart_ui.dart'
+    show PmartLineIcon, PmartLineIcons, keepWords;
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../data/auth_repository.dart' show consentTypeOf;
@@ -12,6 +13,7 @@ import 'package:pmart_core/pmart_core.dart' show PmartEnv, ProblemCode;
 import '../../../shared/providers.dart' show envProvider;
 import '../../start/presentation/start_controller.dart' show startFlagsProvider;
 import 'auth_controller.dart';
+import 'identity_view.dart';
 
 /// SCR-AUTH-001·CONSENT-001. 로그인되면 `true` 로 돌아간다. 취소·실패는 원래 화면을 그대로 둔다.
 class LoginScreen extends ConsumerStatefulWidget {
@@ -38,6 +40,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     SocialProvider.naver => l10n.loginNaver,
     SocialProvider.apple => l10n.loginApple,
     SocialProvider.google => l10n.loginGoogle,
+  };
+
+  String _providerShort(AppLocalizations l10n, SocialProvider p) => switch (p) {
+    SocialProvider.kakao => l10n.loginKakaoShort,
+    SocialProvider.naver => l10n.loginNaverShort,
+    SocialProvider.apple => l10n.loginAppleShort,
+    SocialProvider.google => l10n.loginGoogleShort,
   };
 
   String _consentLabel(AppLocalizations l10n, String item) =>
@@ -92,6 +101,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       LoginSettled(:final outcome) => outcome,
       _ => null,
     };
+
+    // 휴대폰 확인(AUTH_IDENTITY — auth 0.6.0, BR-64 회신): 동의 다음, 회원 전 단계.
+    if (outcome case final LoginNeedsIdentity waiting) {
+      return IdentityView(
+        waiting: waiting,
+        purpose: widget.purpose,
+        providerLabel: (p) => _providerShort(l10n, p),
+        onClose: () {
+          if (context.canPop()) {
+            context.pop(false);
+          } else {
+            ref.invalidate(provider);
+          }
+        },
+      );
+    }
 
     if (outcome case final LoginNeedsConsent waiting) {
       if (_consentFor != waiting.authRequestId) {
@@ -178,97 +203,179 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       LoginUnknown() => l10n.loginUnknown,
       _ => null,
     };
-    final body = ListView(
-      padding: const EdgeInsets.fromLTRB(52, 96, 52, 24),
-      children: [
-        Text(
-          l10n.appTitle,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontSize: 40,
-            fontWeight: FontWeight.w900,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+    final theme = Theme.of(context);
+    // 레퍼런스 2-3: 가운데 로고, 아래 동그란 소셜 단추 가로 한 줄(지름 약 53dp + 이름), 맨 아래 회색 "둘러보기"
+    Widget round(SocialProvider p) {
+      final (bg, fg, glyph, border) = switch (p) {
+        SocialProvider.kakao => (
+          const Color(0xFFFEE500),
+          const Color(0xFF191600),
+          null,
+          false,
         ),
-        const SizedBox(height: 18),
-        Text(
-          // 띄어쓰기에서만 줄바꿈("확인하세 / 요"처럼 끝 글자만 넘어가지 않게)
-          keepWords(
-            widget.purpose == LoginPurpose.checkout
-                ? l10n.loginForCheckout
-                : l10n.loginBody,
-          ),
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium,
+        SocialProvider.naver => (
+          const Color(0xFF03C75A),
+          Colors.white,
+          'N',
+          false,
         ),
-        if (ref.watch(envProvider) == PmartEnv.mock) ...[
-          const SizedBox(height: 8),
-          Text(
-            keepWords(l10n.loginMockNotice),
-            key: const ValueKey('login-mock-notice'),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-        ],
-        const SizedBox(height: 56),
-        if (message != null) ...[
-          Text(
-            message,
-            key: const ValueKey('login-message'),
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-          const SizedBox(height: 12),
-        ],
-        if (outcome is LoginUnknown)
-          OutlinedButton(
-            key: const ValueKey('login-check-again'),
-            onPressed: busy ? null : controller.checkAgain,
-            child: Text(l10n.loginCheckAgain),
-          )
-        else
-          for (final p in ref.watch(loginProvidersProvider))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: FilledButton.tonal(
+        SocialProvider.apple => (Colors.black, Colors.white, '', false),
+        SocialProvider.google => (
+          Colors.white,
+          const Color(0xFF4285F4),
+          'G',
+          true,
+        ),
+      };
+      final working = workingProvider == p;
+      return Semantics(
+        button: true,
+        label: _providerLabel(l10n, p),
+        excludeSemantics: true,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Material(
+              color: bg,
+              shape: CircleBorder(
+                side: border
+                    ? BorderSide(color: theme.colorScheme.outlineVariant)
+                    : BorderSide.none,
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
                 key: ValueKey('login-${p.name}'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(46),
-                  shape: const StadiumBorder(),
-                  backgroundColor: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainer,
-                  foregroundColor: Theme.of(context).colorScheme.onSurface,
-                  textStyle: Theme.of(context).textTheme.bodyMedium,
-                ),
                 // 제한 중에는 다시 누를 수 없다(남은 시간은 서버 값).
-                onPressed: (busy || outcome is LoginRestricted)
+                onTap: (busy || outcome is LoginRestricted)
                     ? null
                     : () => controller.start(p),
-                child: workingProvider == p
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(_providerLabel(l10n, p)),
+                child: SizedBox.square(
+                  dimension: 53,
+                  child: Center(
+                    child: working
+                        ? SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: fg,
+                            ),
+                          )
+                        : glyph == null
+                        // 카카오: 말풍선
+                        ? CustomPaint(
+                            size: const Size(24, 22),
+                            painter: _BubblePainter(fg),
+                          )
+                        : Text(
+                            glyph,
+                            style: TextStyle(
+                              color: fg,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                  ),
+                ),
               ),
             ),
-        if (widget.entry) ...[
-          const SizedBox(height: 20),
-          Center(
-            child: TextButton(
-              key: const ValueKey('login-browse'),
-              style: TextButton.styleFrom(
-                foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              onPressed: busy
-                  ? null
-                  : () => ref.read(startFlagsProvider.notifier).completeEntry(),
-              child: Text(l10n.loginBrowse),
+            const SizedBox(height: 6),
+            Text(
+              _providerShort(l10n, p),
+              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final body = LayoutBuilder(
+      builder: (context, c) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: c.maxHeight),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  l10n.appTitle,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontSize: 40,
+                    fontWeight: FontWeight.w900,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                if (widget.purpose == LoginPurpose.checkout) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    keepWords(l10n.loginForCheckout),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 64),
+                if (message != null) ...[
+                  Text(
+                    message,
+                    key: const ValueKey('login-message'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: theme.colorScheme.error),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (outcome is LoginUnknown)
+                  OutlinedButton(
+                    key: const ValueKey('login-check-again'),
+                    onPressed: busy ? null : controller.checkAgain,
+                    child: Text(l10n.loginCheckAgain),
+                  )
+                else
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      for (final p in ref.watch(loginProvidersProvider))
+                        round(p),
+                    ],
+                  ),
+                if (widget.entry) ...[
+                  const SizedBox(height: 40),
+                  TextButton(
+                    key: const ValueKey('login-browse'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.colorScheme.onSurfaceVariant,
+                      textStyle: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 13,
+                      ),
+                    ),
+                    onPressed: busy
+                        ? null
+                        : () => ref
+                              .read(startFlagsProvider.notifier)
+                              .completeEntry(),
+                    child: Text(l10n.loginBrowse),
+                  ),
+                ],
+                if (ref.watch(envProvider) == PmartEnv.mock) ...[
+                  const SizedBox(height: 24),
+                  Text(
+                    keepWords(l10n.loginMockNotice),
+                    key: const ValueKey('login-mock-notice'),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.outline,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        ],
-      ],
+        ),
+      ),
     );
     if (widget.entry) {
       return PopScope(
@@ -279,9 +386,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       );
     }
+    // 레퍼런스 2-2(우리집 추가 → 로그인): 제목 없이 왼쪽 위 ✕
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.loginTitle)),
+      appBar: AppBar(
+        leading: IconButton(
+          key: const ValueKey('login-close'),
+          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+          icon: const PmartLineIcon(PmartLineIcons.close, size: 24),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+      ),
       body: body,
     );
   }
+}
+
+/// 카카오 말풍선(둥근 말풍선 + 아래 꼬리).
+class _BubblePainter extends CustomPainter {
+  const _BubblePainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = color;
+    final w = size.width;
+    final h = size.height;
+    canvas.drawOval(Rect.fromLTWH(0, 0, w, h * 0.8), p);
+    canvas.drawPath(
+      Path()
+        ..moveTo(w * 0.28, h * 0.6)
+        ..lineTo(w * 0.22, h)
+        ..lineTo(w * 0.5, h * 0.72)
+        ..close(),
+      p,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_BubblePainter old) => old.color != color;
 }

@@ -93,6 +93,92 @@ final class ConsentDecision {
   }
 }
 
+/// 휴대폰 확인 대기(AUTH_IDENTITY — auth 0.6.0, BR-64 회신 2026-11-20). 토큰이 없다.
+/// 순서: 필수 동의 → 휴대폰 확인 → 회원. 새 가입과 확인 번호가 없는 기존 회원(다음 로그인 때)이 온다.
+final class LoginNeedsIdentity extends LoginOutcome {
+  const LoginNeedsIdentity({
+    required this.authRequestId,
+    this.newAccount = true,
+    this.start,
+    this.status,
+    this.remainingAttempts,
+    this.lastError,
+    this.conflict,
+  });
+
+  final String authRequestId;
+  final bool newAccount;
+
+  /// 문자 보내기 단계(번호를 넣고 시작한 뒤). null 이면 번호 입력 단계.
+  final IdentityStart? start;
+
+  /// 직전 "보냈어요" 확인 결과: PENDING(아직)·FAILED·EXPIRED. null 이면 아직 묻지 않음.
+  final String? status;
+  final int? remainingAttempts;
+
+  /// 이 화면에 머무는 사유 코드(번호 형식·횟수 초과·결과 불명 등).
+  final String? lastError;
+
+  /// 이미 가입된 번호(R3)·탈퇴한 번호(R4) — 문자 확인을 통과한 본인에게만 서버가 준다.
+  final IdentityConflict? conflict;
+
+  LoginNeedsIdentity copyWith({
+    IdentityStart? Function()? start,
+    String? Function()? status,
+    int? Function()? remainingAttempts,
+    String? Function()? lastError,
+    IdentityConflict? Function()? conflict,
+  }) => LoginNeedsIdentity(
+    authRequestId: authRequestId,
+    newAccount: newAccount,
+    start: start == null ? this.start : start(),
+    status: status == null ? this.status : status(),
+    remainingAttempts: remainingAttempts == null
+        ? this.remainingAttempts
+        : remainingAttempts(),
+    lastError: lastError == null ? this.lastError : lastError(),
+    conflict: conflict == null ? this.conflict : conflict(),
+  );
+}
+
+/// 문자 보내기 안내(서버 값): "{sendTo}로 {text}를 문자로 보내 주세요".
+@immutable
+final class IdentityStart {
+  const IdentityStart({
+    required this.verificationId,
+    required this.sendTo,
+    required this.text,
+    required this.expiresAt,
+    required this.phoneMasked,
+  });
+
+  final String verificationId;
+  final String sendTo;
+  final String text;
+  final DateTime expiresAt;
+  final String phoneMasked;
+}
+
+/// 409 IDENTITY_ALREADY_REGISTERED(기존 계정 안내)·IDENTITY_REJOIN_BLOCKED(탈퇴 번호) 의 details.
+@immutable
+final class IdentityConflict {
+  const IdentityConflict({
+    required this.code,
+    this.provider,
+    this.joinedAt,
+    this.emailMasked,
+    this.rejoinAvailableAt,
+  });
+
+  final String code;
+  final SocialProvider? provider;
+  final DateTime? joinedAt;
+  final String? emailMasked;
+  final DateTime? rejoinAvailableAt;
+
+  bool get alreadyRegistered => code == 'IDENTITY_ALREADY_REGISTERED';
+}
+
 /// 실패가 잦아 잠시 제한됨(423 AUTH_RESTRICTED). 남은 시간은 서버 값.
 final class LoginRestricted extends LoginOutcome {
   const LoginRestricted({this.retryAfterSeconds});

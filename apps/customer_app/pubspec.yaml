@@ -95,6 +95,8 @@ flutter:
   # 바로픽 시작 그림(원본 branding/splash.png, 사용자 지시 2026-11-19).
   assets:
     - assets/images/splash.jpg
+    # 카테고리 그림(사용자 제공 2026-11-20)
+    - assets/images/categories/
   # Pretendard (SIL OFL 1.1, assets/fonts/Pretendard-LICENSE.txt). 사용자 지시 2026-11-11.
   fonts:
     - family: Pretendard

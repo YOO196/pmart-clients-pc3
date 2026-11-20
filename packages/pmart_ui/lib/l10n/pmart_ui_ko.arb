@@ -5,6 +5,8 @@
   "stateEmpty": "표시할 내용이 없어요",
   "statePartial": "일부 정보를 불러오지 못했어요",
   "stateErrorTitle": "정보를 불러오지 못했어요",
+  "stateScreenLoadFailed": "화면을 불러오지 못했어요",
+  "actionRetryScreen": "다시 시도하기",
   "stateErrorBody": "잠시 후 다시 시도해 주세요. 지금 보이는 내용은 최신이 아닐 수 있어요.",
   "stateForbiddenTitle": "이용할 수 없는 화면이에요",
   "stateForbiddenBody": "권한이 없거나 이용 조건을 충족하지 않아요.",

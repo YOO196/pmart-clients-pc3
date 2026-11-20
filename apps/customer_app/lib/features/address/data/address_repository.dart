@@ -43,6 +43,17 @@ abstract interface class AddressRepository {
     String addressId, {
     required IdempotencyKey key,
   });
+
+  /// 회원 주소 하나를 입력값 그대로(출입 메모·핀 포함) 읽는다 — 주소 수정 화면을 채울 때.
+  Future<AddressDraft> draft(String addressId);
+
+  /// 주소 수정(레퍼런스 3-1 2-4). `GET` 으로 지금 버전을 읽고 `PATCH /me/addresses/{id}`(전체 교체, X-Expected-Version).
+  /// 받는 분·연락처는 화면에 없으니 저장된 값을 그대로 둔다. 결과 불명은 같은 [key] 재전송으로 해소한다.
+  Future<void> update(
+    String addressId,
+    AddressDraft draft, {
+    required IdempotencyKey key,
+  });
 }
 
 final class ApiAddressRepository implements AddressRepository {
@@ -142,6 +153,58 @@ final class ApiAddressRepository implements AddressRepository {
       await send();
     }
     return true;
+  }
+
+  @override
+  Future<AddressDraft> draft(String addressId) async {
+    final res = await pmartGuard(
+      () => _addresses.getMyAddress(addressId: addressId),
+    );
+    return draftFromContract(
+      res.data ?? (throw const ContractViolationFailure('주소 본문 없음')),
+    );
+  }
+
+  @override
+  Future<void> update(
+    String addressId,
+    AddressDraft draft, {
+    required IdempotencyKey key,
+  }) async {
+    final res = await pmartGuard(
+      () => _addresses.getMyAddress(addressId: addressId),
+    );
+    final now = res.data ?? (throw const ContractViolationFailure('주소 본문 없음'));
+    final kept = draftFromContract(now);
+    final input = addressInputToContract(
+      AddressDraft(
+        label: draft.label ?? kept.label,
+        roadAddress: draft.roadAddress,
+        detailAddress: draft.detailAddress,
+        receiverName: kept.receiverName,
+        receiverPhone: kept.receiverPhone,
+        entranceMethod: draft.entranceMethod,
+        entranceNote: draft.entranceNote,
+        geo: draft.geo ?? kept.geo,
+        postalCode: draft.postalCode ?? kept.postalCode,
+      ),
+    );
+    final version = now.version;
+    Future<void> send() => pmartGuard(
+      () => _addresses.updateMyAddress(
+        addressId: addressId,
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        xExpectedVersion: version,
+        addressInput: input,
+        extra: commandOptions(key, expectedVersion: version).extra,
+      ),
+    );
+    try {
+      await send();
+    } on UnknownResultFailure {
+      await send();
+    }
   }
 
   @override

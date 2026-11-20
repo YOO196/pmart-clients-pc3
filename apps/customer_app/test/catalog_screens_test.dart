@@ -129,7 +129,15 @@ void main() {
 
   group('홈', () {
     testWidgets('실패한 영역만 실패로 보이고, 그 영역만 다시 불러온다', (t) async {
-      await t.pumpWidget(testApp([]));
+      await t.pumpWidget(
+        testApp(
+          [],
+          catalog: MockCatalogRepository(
+            latency: Duration.zero,
+            unavailableSectionIds: const {'S-WEEKLY'},
+          ),
+        ),
+      );
       await t.pumpAndSettle();
 
       // 첫 진열 영역은 배송 카드·배너·검색창·카테고리 아래에 있다.
@@ -173,12 +181,53 @@ void main() {
       await t.pumpWidget(testApp(const [], catalog: _HomeDown()));
       await t.pumpAndSettle();
 
-      expect(find.text('정보를 불러오지 못했어요'), findsOneWidget);
+      expect(find.text('화면을 불러오지 못했어요'), findsOneWidget);
       expect(find.byKey(const ValueKey('ui-empty')), findsNothing);
     });
   });
 
   group('검색', () {
+    // 백엔드 요청 2026-11-20 search-correction-text(search 0.4.0~0.5.1).
+    testWidgets('0건이라 서버가 고친 검색어로 찾았으면 "○○ 검색 결과예요" + 원래 검색어로 검색하기(교정 끔)', (
+      t,
+    ) async {
+      await t.pumpWidget(testApp([]));
+      await t.pumpAndSettle();
+      await t.tap(find.text('검색').last);
+      await t.pumpAndSettle();
+      await _search(t, '우우');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('search-corrected')), findsOneWidget);
+      expect(find.textContaining('검색 결과예요'), findsOneWidget);
+      expect(find.byKey(const ValueKey('tile-P-0001')), findsWidgets);
+
+      await t.tap(find.byKey(const ValueKey('search-use-original')));
+      await t.pumpAndSettle();
+      // 교정 없이 원래 검색어 — 결과 0건, 띠 없음.
+      expect(find.byKey(const ValueKey('search-corrected')), findsNothing);
+      expect(find.text('검색 결과가 없어요'), findsOneWidget);
+    });
+
+    testWidgets('결과가 적으면 "혹시 ○○를 찾으셨나요?" — 누르면 그 검색어로 새로 찾는다', (t) async {
+      await t.pumpWidget(testApp([]));
+      await t.pumpAndSettle();
+      await t.tap(find.text('검색').last);
+      await t.pumpAndSettle();
+      await _search(t, '서울우유');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('search-suggested')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('search-suggested')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('search-suggested')), findsNothing);
+      expect(
+        t
+            .widget<TextField>(find.byKey(const ValueKey('search-field')))
+            .controller!
+            .text,
+        '우유',
+      );
+    });
+
     Future<void> openSearch(WidgetTester t) async {
       await t.pumpAndSettle();
       await t.tap(find.text('검색').last);
@@ -254,9 +303,9 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('카테고리').last);
       await t.pumpAndSettle();
-      await t.tap(find.text('과일·채소'));
+      await t.tap(find.text('과일·채소·샐러드'));
       await t.pumpAndSettle();
-      await t.tap(find.text('과일·채소 전체'));
+      await t.tap(find.text('과일·채소·샐러드 전체'));
       await t.pumpAndSettle();
 
       expect(find.byType(ProductTileCard), findsNWidgets(2));
@@ -266,6 +315,7 @@ void main() {
         200,
         scrollable: find.byType(Scrollable).last,
       );
+      await t.pumpAndSettle();
       await t.ensureVisible(find.byKey(const ValueKey('load-more')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('load-more')));
@@ -282,9 +332,9 @@ void main() {
         await t.pumpAndSettle();
         await t.tap(find.text('카테고리').last);
         await t.pumpAndSettle();
-        await t.tap(find.text('과일·채소'));
+        await t.tap(find.text('과일·채소·샐러드'));
         await t.pumpAndSettle();
-        await t.tap(find.text('과일·채소 전체'));
+        await t.tap(find.text('과일·채소·샐러드 전체'));
         await t.pumpAndSettle();
         return find.byType(ProductTileCard).evaluate().length;
       }
@@ -345,7 +395,10 @@ void main() {
 
       expect(find.text('저지방 우유 900mL'), findsOneWidget);
       expect(
-        t.widget<Text>(find.byKey(const ValueKey('product-rating'))).data,
+        t
+            .widget<Text>(find.byKey(const ValueKey('product-rating')))
+            .textSpan!
+            .toPlainText(),
         '평점 정보 없음',
       );
       expect(find.textContaining('0.0'), findsNothing);
@@ -361,7 +414,8 @@ void main() {
 
       final text = t
           .widget<Text>(find.byKey(const ValueKey('product-rating')))
-          .data!;
+          .textSpan!
+          .toPlainText();
       expect(text, contains('4.1'));
       expect(text, contains('480'));
     });
@@ -418,6 +472,13 @@ void main() {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();
       await tapTile(t, 'P-0001');
+      // 큰 가격·단위 가격 줄 아래라 옵션이 화면 밖일 수 있다.
+      await t.scrollUntilVisible(
+        find.byKey(const ValueKey('option-B-00000011')),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await t.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('option-E-00000001')), findsOneWidget);
       expect(find.byKey(const ValueKey('option-B-00000011')), findsOneWidget);

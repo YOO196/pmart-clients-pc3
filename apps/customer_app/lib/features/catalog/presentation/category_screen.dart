@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/cart_icon_button.dart';
 import '../../../shared/ui_state_of.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
@@ -17,7 +18,28 @@ class CategoryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.categoryTitle)),
+      // 레퍼런스 3-3: ← 제목 + 오른쪽 홈·검색·장바구니
+      appBar: AppBar(
+        centerTitle: false,
+        titleSpacing: pmartLeftTitleSpacing,
+        title: Text(l10n.categoryTitle),
+        actions: [
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: l10n.navHome,
+            icon: const PmartLineIcon(PmartLineIcons.home, size: 23),
+            onPressed: () => context.go('/'),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: l10n.searchTitle,
+            icon: const PmartLineIcon(PmartLineIcons.search, size: 23),
+            onPressed: () => context.go('/search'),
+          ),
+          const CartIconButton(),
+          const SizedBox(width: 6),
+        ],
+      ),
       body: UiStateView<List<CategoryNode>>(
         state: uiStateOf(
           ref.watch(categoriesProvider),
@@ -26,37 +48,69 @@ class CategoryScreen extends ConsumerWidget {
         onRetry: () => ref.invalidate(categoriesProvider),
         ready: (context, nodes) {
           final roots = nodes.where((n) => n.depth == 1).toList();
-          return GridView.builder(
-            padding: const EdgeInsets.fromLTRB(15, 10, 15, 24),
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 8,
-              mainAxisExtent: MediaQuery.textScalerOf(context).scale(19) + 30,
-            ),
-            itemCount: roots.length,
-            itemBuilder: (context, i) {
-              final root = roots[i];
-              final theme = Theme.of(context);
-              return InkWell(
-                key: ValueKey('category-${root.categoryId}'),
-                borderRadius: BorderRadius.circular(14),
-                onTap: () => _showChildren(context, l10n, root, nodes),
-                child: Row(
-                  children: [
-                    CategoryArt(name: root.name, size: 36, radius: 11),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Text(
-                        root.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium,
+          // 서버 순서를 지키며 section 별로 묶는다(처음 나온 순서). section 이 없으면 제목 없는 한 묶음.
+          final groups = <String?, List<CategoryNode>>{};
+          for (final r in roots) {
+            (groups[r.section] ??= []).add(r);
+          }
+          final theme = Theme.of(context);
+          // 레퍼런스(사용자 제공 카테고리 그림 2026-11-20): 줄 간격 약 46dp, 그림 32dp, 글자 15sp
+          final rowHeight = MediaQuery.textScalerOf(context).scale(20) + 26;
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 24),
+            children: [
+              for (final (i, MapEntry(key: section, value: items))
+                  in groups.entries.indexed) ...[
+                if (i > 0) const PmartSectionGap(height: 8),
+                if (section != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(15, 18, 15, 4),
+                    child: Text(
+                      section,
+                      key: ValueKey('category-section-$section'),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ],
+                  ),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 8,
+                    mainAxisExtent: rowHeight,
+                  ),
+                  itemCount: items.length,
+                  itemBuilder: (context, j) {
+                    final root = items[j];
+                    return InkWell(
+                      key: ValueKey('category-${root.categoryId}'),
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => _showChildren(context, l10n, root, nodes),
+                      child: Row(
+                        children: [
+                          CategoryArt(name: root.name, size: 32, radius: 10),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              root.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ],
+            ],
           );
         },
       ),
@@ -87,7 +141,10 @@ class CategoryScreen extends ConsumerWidget {
             ),
             ListTile(
               title: Text(l10n.categoryAll(root.name)),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: const PmartLineIcon(
+                PmartLineIcons.chevronRight,
+                size: 18,
+              ),
               onTap: () {
                 Navigator.of(sheet).pop();
                 _open(context, root);
@@ -97,7 +154,10 @@ class CategoryScreen extends ConsumerWidget {
               ListTile(
                 key: ValueKey('category-${child.categoryId}'),
                 title: Text(child.name),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const PmartLineIcon(
+                  PmartLineIcons.chevronRight,
+                  size: 18,
+                ),
                 onTap: () {
                   Navigator.of(sheet).pop();
                   _open(context, child);

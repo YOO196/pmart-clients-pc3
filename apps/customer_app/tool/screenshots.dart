@@ -46,6 +46,7 @@ import 'package:pmart_core/pmart_core.dart'
 import '../test/support/app_harness.dart';
 
 const _dir = String.fromEnvironment('SHOT_DIR');
+const _scrollShots = bool.fromEnvironment('SHOT_SCROLL');
 
 Future<void> _font(String family, List<String> paths) async {
   final loader = FontLoader(family);
@@ -166,9 +167,54 @@ void main() {
     var n = 0;
     Future<void> shot(String name) async {
       await t.pumpAndSettle();
+      // 그림 파일(Image.asset — 카테고리 그림)은 진짜 비동기로 풀린다. 찍기 전에 잠깐 기다린다.
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await t.pump();
       n += 1;
       final file = File('$_dir/${n.toString().padLeft(2, '0')}-$name.png');
       await expectLater(find.byType(CustomerApp), matchesGoldenFile(file.uri));
+      // SHOT_SCROLL=true: 아래로 내릴 수 있는 화면은 끝까지 내려가며 더 찍는다(-down1, -down2 …) — 그 뒤 맨 위로.
+      if (!_scrollShots) return;
+      ScrollableState? main;
+      for (final e in find.byType(Scrollable).evaluate()) {
+        final s = (e as StatefulElement).state as ScrollableState;
+        final p = s.position;
+        if (s.axisDirection != AxisDirection.down || !p.hasContentDimensions) {
+          continue;
+        }
+        if (p.maxScrollExtent <= 1) continue;
+        if (main == null ||
+            p.viewportDimension > main.position.viewportDimension) {
+          main = s;
+        }
+      }
+      if (main == null) return;
+      final pos = main.position;
+      final start = pos.pixels;
+      for (var k = 1; k <= 6 && pos.pixels < pos.maxScrollExtent - 1; k++) {
+        pos.jumpTo(
+          (pos.pixels + pos.viewportDimension * 0.85).clamp(
+            0,
+            pos.maxScrollExtent,
+          ),
+        );
+        await t.pump();
+        await t.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 120)),
+        );
+        await t.pump();
+        final down = File(
+          '$_dir/${n.toString().padLeft(2, '0')}-$name-down$k.png',
+        );
+        await expectLater(
+          find.byType(CustomerApp),
+          matchesGoldenFile(down.uri),
+        );
+      }
+      pos.jumpTo(start);
+      await t.pumpAndSettle();
     }
 
     GoRouter router() => GoRouter.of(t.element(find.byType(Scaffold).first));
@@ -196,6 +242,16 @@ void main() {
     await t.tap(find.byKey(const ValueKey('search-submit')));
     await t.pumpAndSettle();
     await shot('search-results');
+    // 오타 교정 띠(search 0.4.0) — 목 사전 '우우' → '우유'.
+    await t.enterText(find.byKey(const ValueKey('search-field')), '우우');
+    await t.tap(find.byKey(const ValueKey('search-submit')));
+    await t.pumpAndSettle();
+    await shot('search-typo');
+    await t.tap(find.byKey(const ValueKey('sort')));
+    await t.pumpAndSettle();
+    await shot('search-sort-sheet');
+    await t.tap(find.byKey(const ValueKey('sort-relevance')));
+    await t.pumpAndSettle();
     await go('/products?categoryId=C-10&title=유제품');
     await shot('product-list');
 
@@ -207,15 +263,35 @@ void main() {
 
     await go('/cart');
     await shot('cart');
+    await t.tap(find.byKey(const ValueKey('cart-fee-info')));
+    await t.pumpAndSettle();
+    await shot('cart-fee-dialog');
+    await t.tap(find.byKey(const ValueKey('cart-fee-ok')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('cart-order')));
     await t.pumpAndSettle();
     await shot('login');
     await t.tap(find.byKey(const ValueKey('login-kakao')));
     await t.pumpAndSettle();
-    await shot('delivery-select');
+    // 로그인 뒤 장바구니로 돌아와 수령방법을 고른다(사용자 결정 2026-11-20).
+    await t.scrollUntilVisible(
+      find.byKey(const ValueKey('mode-single')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await t.pumpAndSettle();
+    await shot('cart-receive');
     await t.tap(find.byKey(const ValueKey('mode-single')));
     await t.pump();
-    await shot('delivery-select-picked');
+    await shot('cart-receive-picked');
+    // 예약배달을 누르면 도착 시간 시트(레퍼런스 5-4).
+    await t.tap(find.byKey(const ValueKey('mode-scheduled')));
+    await t.pumpAndSettle();
+    await shot('slot-sheet');
+    await t.tap(find.byKey(const ValueKey('slot-sheet-close')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('mode-single')));
+    await t.pump();
     // 주문하기가 재고 부족(422 INSUFFICIENT_STOCK, order 0.8.0)으로 막혀 장바구니로 돌아온 모습.
     checkout
       ..rejectNextDraft = CheckoutProblemCode.insufficientStock
@@ -226,7 +302,7 @@ void main() {
         ),
         ProblemDetail(field: 'E-00000005', reason: 'NOT_HANDLED'),
       ];
-    await t.tap(find.byKey(const ValueKey('delivery-next')));
+    await t.tap(find.byKey(const ValueKey('cart-order')));
     await t.pumpAndSettle();
     await shot('cart-stock-shortage');
     // 테스트 시계는 저절로 흐르지 않아 알림이 다음 캡처까지 남는다 — 지운다.
@@ -236,6 +312,12 @@ void main() {
     unawaited(router().push('/checkout'));
     await t.pumpAndSettle();
     await shot('order-sheet');
+    // 뒤로 → "주문을 취소할까요?"(레퍼런스 6-0)
+    await t.tap(find.byType(BackButton).last);
+    await t.pumpAndSettle();
+    await shot('order-sheet-leave');
+    await t.tap(find.text('아니요'));
+    await t.pumpAndSettle();
     // 레퍼런스 6-3 "내 연락처"(BR-60) — 주문서 칸과 번호 변경 창.
     await t.ensureVisible(find.byKey(const ValueKey('contact-change')));
     await t.pumpAndSettle();
@@ -252,6 +334,17 @@ void main() {
     await shot('my');
     await go('/orders');
     await shot('orders');
+    // 사용자 캡처(2026-11-20) 조회 기간·주문 상태·정보 시트
+    await t.tap(find.byKey(const ValueKey('orders-period')));
+    await t.pumpAndSettle();
+    await shot('orders-period-sheet');
+    await t.tap(find.byKey(const ValueKey('orders-sheet-close')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('orders-status')));
+    await t.pumpAndSettle();
+    await shot('orders-status-sheet');
+    await t.tap(find.byKey(const ValueKey('orders-sheet-close')));
+    await t.pumpAndSettle();
     await t.tap(
       find
           .byWidgetPredicate(
@@ -267,6 +360,8 @@ void main() {
     await scrollDown(650);
     await shot('order-detail-2');
     // 배송현황 — 배달 중 라이더 지도(레퍼런스 8-5). 목 모드는 카카오 지도 대신 안내 칸이 그려진다.
+    await go('/');
+    await shot('home-ordering');
     await go('/deliveries/dlv-s2?orderId=order-seed-1');
     await shot('tracking-map');
     // 받은 지 60초 넘은 라이더 위치 — 마커 흐리게 + "라이더 위치를 확인하고 있어요"(PC 5 요청 2026-11-19).
@@ -311,7 +406,21 @@ void main() {
     await t.pumpAndSettle();
     await shot('return-fee-paid');
     // 예약 시간 변경 — 결과가 거절(LOT_EXPIRY_NOT_MET)이면 원인 + 기존 시간 그대로.
+    await go('/orders/order-seed-4/cancel');
+    await shot('cancel-dialog');
     await go('/orders/order-seed-4/reschedule');
+    await shot('reschedule-sheet');
+    await t.scrollUntilVisible(
+      find.byKey(const ValueKey('rs-slot-20:00')),
+      120,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('reschedule-sheet')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('rs-slot-20:00')));
     await t.pump();
     await t.tap(find.byKey(const ValueKey('reschedule-submit')));
@@ -404,6 +513,46 @@ void main() {
       n += 1;
       final file = File('$_dir/${n.toString().padLeft(2, '0')}-$name.png');
       await expectLater(find.byType(CustomerApp), matchesGoldenFile(file.uri));
+      // SHOT_SCROLL=true: 아래로 내릴 수 있는 화면은 끝까지 내려가며 더 찍는다(-down1, -down2 …) — 그 뒤 맨 위로.
+      if (!_scrollShots) return;
+      ScrollableState? main;
+      for (final e in find.byType(Scrollable).evaluate()) {
+        final s = (e as StatefulElement).state as ScrollableState;
+        final p = s.position;
+        if (s.axisDirection != AxisDirection.down || !p.hasContentDimensions) {
+          continue;
+        }
+        if (p.maxScrollExtent <= 1) continue;
+        if (main == null ||
+            p.viewportDimension > main.position.viewportDimension) {
+          main = s;
+        }
+      }
+      if (main == null) return;
+      final pos = main.position;
+      final start = pos.pixels;
+      for (var k = 1; k <= 6 && pos.pixels < pos.maxScrollExtent - 1; k++) {
+        pos.jumpTo(
+          (pos.pixels + pos.viewportDimension * 0.85).clamp(
+            0,
+            pos.maxScrollExtent,
+          ),
+        );
+        await t.pump();
+        await t.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 120)),
+        );
+        await t.pump();
+        final down = File(
+          '$_dir/${n.toString().padLeft(2, '0')}-$name-down$k.png',
+        );
+        await expectLater(
+          find.byType(CustomerApp),
+          matchesGoldenFile(down.uri),
+        );
+      }
+      pos.jumpTo(start);
+      await t.pumpAndSettle();
     }
 
     await go('/me/phone-verification');
@@ -480,7 +629,16 @@ void main() {
     await shot('order-help');
     await t.tap(find.byKey(const ValueKey('order-help-delayed')));
     await t.pumpAndSettle();
+    await shot('help-delayed-guide');
+    await t.tap(find.byKey(const ValueKey('help-guide-inquiry')));
+    await t.pumpAndSettle();
     await shot('inquiry-delivery-issue');
+    await go('/orders/order-seed-4/help');
+    await t.tap(find.byKey(const ValueKey('order-help-other')));
+    await t.pumpAndSettle();
+    await shot('help-other-guide');
+    await t.tap(find.byKey(const ValueKey('help-guide-inquiry')));
+    await t.pumpAndSettle();
     // 자주 묻는 질문(customer-assistant 0.2.0) — 목록 · 답(마크다운)
     await go('/support/faqs');
     await shot('faq-list');
@@ -489,6 +647,8 @@ void main() {
     // 로그인해 있는 고객의 재동의(CU-1 §3)
     await go('/me/consents/reconsent');
     await shot('reconsent');
+    await t.tap(find.byKey(const ValueKey('reconsent-close')));
+    await t.pumpAndSettle();
     // 상담 종류 고르기(레퍼런스 고객센터 2-1) → 주문 건 문의의 최근 주문(2-4)
     await go('/support/chat');
     await shot('chat');

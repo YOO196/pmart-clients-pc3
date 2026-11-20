@@ -1,0 +1,131 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:pmart_ui/pmart_ui.dart';
+
+import 'package:customer_app/features/auth/data/mock_auth_repository.dart';
+import 'package:customer_app/features/auth/domain/auth.dart';
+import 'package:customer_app/features/auth/presentation/auth_controller.dart';
+
+import 'support/app_harness.dart';
+
+/// 로그인 중 휴대폰 확인(AUTH_IDENTITY — auth 0.6.0, 백엔드 회신 2026-11-20 reply-br64-phone-identity).
+void main() {
+  setUpAll(initPmartFormatting);
+
+  Future<void> openLogin(WidgetTester t, MockAuthRepository auth) async {
+    t.view
+      ..physicalSize = const Size(800, 1800)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const [], auth: auth));
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+  }
+
+  Future<void> enterPhone(WidgetTester t) async {
+    await t.enterText(find.byKey(const ValueKey('id-phone')), '01012345678');
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('id-next')));
+    await t.pumpAndSettle();
+  }
+
+  bool member(WidgetTester t) =>
+      ProviderScope.containerOf(
+        t.element(find.byType(Scaffold).first),
+      ).read(sessionProvider) is MemberSession;
+
+  testWidgets('확인 번호가 없는 기존 회원: 번호 → 보낼 문자 안내 → 보냈어요 → 회원', (t) async {
+    final auth = MockAuthRepository(latency: Duration.zero)
+      ..requireIdentity = true;
+    await openLogin(t, auth);
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('login-identity')), findsOneWidget);
+    expect(member(t), isFalse);
+    await enterPhone(t);
+    expect(auth.identityStarts, ['01012345678']);
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('id-send-to'))).data,
+      '1666-3538',
+    );
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('id-send-text'))).data,
+      '482913',
+    );
+
+    await t.tap(find.byKey(const ValueKey('id-sent')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('login-identity')), findsNothing);
+    expect(member(t), isTrue);
+  });
+
+  testWidgets('아직 문자가 확인되지 않으면 남은 횟수를 보이고 그 단계에 남는다', (t) async {
+    final auth = MockAuthRepository(latency: Duration.zero)
+      ..requireIdentity = true
+      ..identityPendingNext = true;
+    await openLogin(t, auth);
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    await enterPhone(t);
+    await t.tap(find.byKey(const ValueKey('id-sent')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('id-pending')), findsOneWidget);
+    expect(find.byKey(const ValueKey('id-sent')), findsOneWidget);
+    expect(member(t), isFalse);
+  });
+
+  testWidgets('이미 가입된 번호(R3): 제공자·가입일·가린 이메일 안내 + 그 제공자로 로그인', (t) async {
+    final auth = MockAuthRepository(latency: Duration.zero)
+      ..requireIdentity = true
+      ..identityConflictNext = 'IDENTITY_ALREADY_REGISTERED';
+    await openLogin(t, auth);
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    await enterPhone(t);
+    await t.tap(find.byKey(const ValueKey('id-sent')));
+    await t.pumpAndSettle();
+    expect(find.textContaining('카카오'), findsWidgets);
+    expect(find.textContaining('h***@k***'), findsOneWidget);
+    expect(find.byKey(const ValueKey('id-login-with')), findsOneWidget);
+    expect(member(t), isFalse);
+  });
+
+  testWidgets('탈퇴한 번호(R4): 다시 가입할 수 있는 날짜를 보인다', (t) async {
+    final auth = MockAuthRepository(latency: Duration.zero)
+      ..requireIdentity = true
+      ..identityConflictNext = 'IDENTITY_REJOIN_BLOCKED';
+    await openLogin(t, auth);
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    await enterPhone(t);
+    await t.tap(find.byKey(const ValueKey('id-sent')));
+    await t.pumpAndSettle();
+    expect(find.textContaining('2026년 12월 10일'), findsOneWidget);
+    expect(member(t), isFalse);
+  });
+
+  testWidgets('새 가입(R1): 필수 동의 → 휴대폰 확인 → 회원', (t) async {
+    final auth = MockAuthRepository(latency: Duration.zero)
+      ..requireIdentity = true;
+    await openLogin(t, auth);
+    await t.tap(find.byKey(const ValueKey('login-naver')));
+    await t.pumpAndSettle();
+    for (final c in MockAuthRepository.requiredConsents) {
+      await t.tap(find.byKey(ValueKey('consent-$c')));
+      await t.pump();
+    }
+    await t.tap(find.byKey(const ValueKey('consent-submit')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('login-identity')), findsOneWidget);
+    expect(find.text('가입하려면 휴대폰 번호를\n확인해 주세요'), findsOneWidget);
+    await enterPhone(t);
+    await t.tap(find.byKey(const ValueKey('id-sent')));
+    await t.pumpAndSettle();
+    expect(member(t), isTrue);
+  });
+}

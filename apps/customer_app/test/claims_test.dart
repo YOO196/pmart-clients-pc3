@@ -522,8 +522,8 @@ void main() {
       await openOrder(t, 'order-seed-4');
       await t.tap(find.byKey(const ValueKey('reschedule')));
       await t.pumpAndSettle();
-      expect(find.text('오늘'), findsOneWidget);
-      await t.tap(find.text('내일'));
+      expect(find.byKey(const ValueKey('rs-day-today')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('rs-day-tomorrow')));
       await t.pumpAndSettle();
       // 목 슬롯은 날짜마다 같은 시각 목록 — 내일로 바꾸면 고른 시간이 풀린다.
       expect(find.byKey(const ValueKey('rs-slot-20:00')), findsOneWidget);

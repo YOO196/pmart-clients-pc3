@@ -84,6 +84,25 @@ base class MockAuthRepository implements AuthRepository {
   ];
   static const optionalConsents = ['MARKETING:2026-11-17'];
 
+  /// 로그인(카카오)·동의 완료(네이버) 뒤 휴대폰 확인(AUTH_IDENTITY)을 받는다 — auth 0.6.0 스위치 켠 서버 흉내.
+  bool requireIdentity = false;
+
+  /// 다음 "보냈어요"를 이 코드로 막는다(IDENTITY_ALREADY_REGISTERED·IDENTITY_REJOIN_BLOCKED).
+  String? identityConflictNext;
+
+  /// 다음 "보냈어요"는 아직 문자가 안 왔다(PENDING).
+  bool identityPendingNext = false;
+
+  /// 시작한 휴대폰 확인(시험용): 보낸 번호.
+  final identityStarts = <String>[];
+
+  Map<String, Object?> _identity(String id, {bool newAccount = true}) => {
+    'authRequestId': id,
+    'state': 'AUTH_IDENTITY',
+    'newAccount': newAccount,
+    'nextAction': 'VERIFY_IDENTITY',
+  };
+
   /// 다음 동의 대기를 기존 회원의 재동의(newAccount=false)로 만든다.
   bool reconsentNext = false;
 
@@ -149,6 +168,12 @@ base class MockAuthRepository implements AuthRepository {
     }
     switch (provider) {
       case SocialProvider.kakao:
+        if (requireIdentity) {
+          // 확인 번호가 없는 기존 회원은 다음 로그인 때 확인(R5 — newAccount=false)
+          final json = _identity(id, newAccount: false);
+          _byRequest[id] = json;
+          return _out(_byKey[key.value] = json);
+        }
         return _out(_byKey[key.value] = _member(id, merge: merge));
       case SocialProvider.naver:
         final reconsent = reconsentNext;
@@ -217,10 +242,86 @@ base class MockAuthRepository implements AuthRepository {
         ),
       );
     }
-    final json = _member(
-      authRequestId,
-      newAccount: waiting['newAccount'] == true,
+    // 필수 동의 → 휴대폰 확인 → 회원(R1)
+    final json = requireIdentity
+        ? _identity(authRequestId, newAccount: waiting['newAccount'] == true)
+        : _member(authRequestId, newAccount: waiting['newAccount'] == true);
+    _byRequest[authRequestId] = json;
+    return _out(json);
+  }
+
+  @override
+  Future<IdentityStart> startIdentity(
+    String authRequestId, {
+    required String providerToken,
+    required String phone,
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    if (!RegExp(r'^010\d{8}$').hasMatch(phone)) {
+      throw const ProblemFailure(
+        Problem(status: 400, code: 'PHONE_NOT_SUPPORTED'),
+      );
+    }
+    identityStarts.add(phone);
+    return IdentityStart(
+      verificationId: 'iv-${identityStarts.length}',
+      sendTo: '1666-3538',
+      text: '482913',
+      expiresAt: DateTime.now().toUtc().add(const Duration(minutes: 5)),
+      phoneMasked: '010-****-${phone.substring(7)}',
     );
+  }
+
+  @override
+  Future<LoginOutcome> confirmIdentity(
+    String authRequestId,
+    String verificationId, {
+    required String providerToken,
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    if (identityConflictNext case final code?) {
+      identityConflictNext = null;
+      final f = ProblemFailure(
+        Problem(
+          status: 409,
+          code: code,
+          details: code == 'IDENTITY_ALREADY_REGISTERED'
+              ? const [
+                  ProblemDetail(field: 'provider', reason: 'KAKAO'),
+                  ProblemDetail(
+                    field: 'joinedAt',
+                    reason: '2025-03-02T01:00:00Z',
+                  ),
+                  ProblemDetail(field: 'emailMasked', reason: 'h***@k***'),
+                ]
+              : const [
+                  ProblemDetail(
+                    field: 'rejoinAvailableAt',
+                    reason: '2026-12-10T00:00:00Z',
+                  ),
+                ],
+        ),
+      );
+      return LoginNeedsIdentity(
+        authRequestId: authRequestId,
+        conflict: identityConflictOf(f),
+      );
+    }
+    if (identityPendingNext) {
+      identityPendingNext = false;
+      return _out({
+        ..._identity(authRequestId),
+        'identityVerification': {
+          'verificationId': verificationId,
+          'state': 'PENDING',
+          'remainingAttempts': 4,
+          'expiresAt': '2026-11-20T10:00:00Z',
+        },
+      });
+    }
+    final json = _member(authRequestId, newAccount: true);
     _byRequest[authRequestId] = json;
     return _out(json);
   }

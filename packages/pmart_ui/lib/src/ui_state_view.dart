@@ -4,6 +4,26 @@ import 'package:pmart_core/pmart_core.dart';
 import '../l10n/gen/pmart_ui_localizations.dart';
 import 'ui_state.dart';
 
+/// 고객 앱이 상태 화면을 레퍼런스 모양으로 그리게 하는 테마 값(라이더·MFC 앱은 없음 → 지금 모양 그대로).
+/// 레퍼런스(2026-11-20 비교, 5-2 네트워크 오류·로딩 아이콘): 불러오는 중은 작은 원형만, 오류는 아이콘 없이
+/// "화면을 불러오지 못했어요" + 테두리 알약 "다시 시도하기".
+@immutable
+class PmartStateStyle extends ThemeExtension<PmartStateStyle> {
+  const PmartStateStyle({this.reference = false});
+
+  final bool reference;
+
+  static bool of(BuildContext context) =>
+      Theme.of(context).extension<PmartStateStyle>()?.reference ?? false;
+
+  @override
+  PmartStateStyle copyWith({bool? reference}) =>
+      PmartStateStyle(reference: reference ?? this.reference);
+
+  @override
+  PmartStateStyle lerp(PmartStateStyle? other, double t) => other ?? this;
+}
+
 /// [UiState] 7종을 서로 다른 모습으로 그린다.
 ///
 /// READY·PARTIAL 의 본문은 [ready] 가 그린다. PARTIAL 이면 위에 안내 띠를 붙인다.
@@ -32,7 +52,49 @@ class UiStateView<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = PmartUiLocalizations.of(context);
+    final reference = PmartStateStyle.of(context);
+    final theme = Theme.of(context);
     return switch (state) {
+      UiLoading() when reference => Center(
+        key: const ValueKey('ui-loading'),
+        child: Semantics(
+          label: l10n.stateLoading,
+          child: const SizedBox.square(
+            dimension: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.6),
+          ),
+        ),
+      ),
+      UiError(:final failure) when reference => _Centered(
+        key: const ValueKey('ui-error'),
+        children: [
+          Text(
+            failure is SessionExpiredFailure
+                ? l10n.stateSessionExpired
+                : _isConfigRequired(failure)
+                ? l10n.stateConfigRequired
+                : l10n.stateScreenLoadFailed,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(fontSize: 16),
+          ),
+          _RequestId(failure.requestId),
+          if (onRetry != null) ...[
+            const SizedBox(height: 14),
+            OutlinedButton(
+              onPressed: onRetry,
+              style: OutlinedButton.styleFrom(
+                shape: const StadiumBorder(),
+                minimumSize: const Size(104, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                side: BorderSide(color: theme.colorScheme.outlineVariant),
+                foregroundColor: theme.colorScheme.onSurface,
+                textStyle: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+              ),
+              child: Text(l10n.actionRetryScreen),
+            ),
+          ],
+        ],
+      ),
       UiLoading() => _Centered(
         key: const ValueKey('ui-loading'),
         children: [

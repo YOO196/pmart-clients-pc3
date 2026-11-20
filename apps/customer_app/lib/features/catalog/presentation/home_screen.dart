@@ -7,6 +7,8 @@ import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../cart/presentation/cart_controller.dart'
+    show cartControllerProvider;
 import '../../../shared/providers.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_controller.dart';
@@ -155,60 +157,101 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onRetry: () => ref.invalidate(homeProvider),
               ready: (context, home) {
                 final tab = home.tabs.contains(_tab) ? _tab : HomeTab.home;
-                return RefreshIndicator(
-                  onRefresh: _refresh,
-                  child: ListView(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    children: [
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              gray,
-                              gray,
-                              Theme.of(context).colorScheme.surface,
+                // 진행 중 주문은 화면 아래에 떠 있는 카드(레퍼런스 3-1 배달중). 목록 끝이 가리지 않게 아래 여백을 둔다.
+                return Stack(
+                  children: [
+                    RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: ListView(
+                        padding: const EdgeInsets.only(bottom: 170),
+                        children: [
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  gray,
+                                  gray,
+                                  Theme.of(context).colorScheme.surface,
+                                ],
+                                stops: const [0, 0.7, 1],
+                              ),
+                            ),
+                            child: const Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                SizedBox(height: 4),
+                                _PendingPaymentBanner(),
+                                _InProgressOrderCard(),
+                              ],
+                            ),
+                          ),
+                          if (home.tabs.length > 1)
+                            _HomeTabs(
+                              tabs: home.tabs,
+                              selected: tab,
+                              onSelected: (t) => setState(() => _tab = t),
+                            ),
+                          if (tab == HomeTab.home) ...[
+                            // HOME_TOP 배너(가로 넘기기). 없으면 자리를 비운다.
+                            if (home.banners.where((b) => !b.middle).toList()
+                                case final top when top.isNotEmpty)
+                              _BannerPager(
+                                key: const ValueKey('home-banners-top'),
+                                banners: top,
+                                onOpen: (b) => _openBanner(context, b, home),
+                              ),
+                            // 사용자 캡처(2026-11-20 홈): 배너 아래 배송 안내 → 회색 띠 → 검색·카테고리
+                            const _DeliverySummaryCard(),
+                            const PmartSectionGap(height: 8),
+                            const SizedBox(height: 12),
+                            const _HomeSearchBar(),
+                            const _CategoryShortcuts(),
+                            const SizedBox(height: 14),
+                            const PmartSectionGap(height: 10),
+                            // 레퍼런스: 섹션마다 회색 띠(약 8dp)로 나눈다.
+                            for (final (i, s) in home.sections.indexed) ...[
+                              if (i > 0) const PmartSectionGap(height: 8),
+                              // HOME_MIDDLE 배너는 첫 영역 아래(storefront 0.7.0)
+                              if (i == 1)
+                                if (home.banners.where((b) => b.middle).toList()
+                                    case final mid when mid.isNotEmpty)
+                                  _BannerPager(
+                                    key: const ValueKey('home-banners-middle'),
+                                    banners: mid,
+                                    onOpen: (b) =>
+                                        _openBanner(context, b, home),
+                                  ),
+                              _SectionView(
+                                key: ValueKey('section-${s.sectionId}'),
+                                section: s,
+                                layoutVersion: home.layoutVersion,
+                              ),
                             ],
-                            stops: const [0, 0.7, 1],
-                          ),
-                        ),
-                        child: const Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            SizedBox(height: 4),
-                            _PendingPaymentBanner(),
-                            _InProgressOrderCard(),
-                            _DeliverySummaryCard(),
-                          ],
-                        ),
+                          ] else
+                            _TabBody(
+                              key: ValueKey('home-tab-body-${tab.name}'),
+                              tab: tab,
+                            ),
+                        ],
                       ),
-                      if (home.tabs.length > 1)
-                        _HomeTabs(
-                          tabs: home.tabs,
-                          selected: tab,
-                          onSelected: (t) => setState(() => _tab = t),
-                        ),
-                      if (tab == HomeTab.home) ...[
-                        if (home.banners.isNotEmpty)
-                          _BannerPager(banners: home.banners),
-                        const _HomeSearchBar(),
-                        const _CategoryShortcuts(),
-                        const SizedBox(height: 14),
-                        const PmartSectionGap(height: 10),
-                        for (final s in home.sections)
-                          _SectionView(
-                            key: ValueKey('section-${s.sectionId}'),
-                            section: s,
-                            layoutVersion: home.layoutVersion,
-                          ),
-                      ] else
-                        _TabBody(
-                          key: ValueKey('home-tab-body-${tab.name}'),
-                          tab: tab,
-                        ),
-                    ],
-                  ),
+                    ),
+                    // 배달 중 카드 위, 장바구니 막대 아래(사용자 캡처 2026-11-20 홈 — 둘 다 있으면 위아래로)
+                    const Positioned(
+                      left: 10,
+                      right: 10,
+                      bottom: 10,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _InProgressOrderCard(floating: true),
+                          _HomeCartBar(),
+                        ],
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -323,9 +366,10 @@ class _TabBody extends ConsumerWidget {
 
 /// 넘겨 보는 배너. 오른쪽 아래에 `1 / N`.
 class _BannerPager extends StatefulWidget {
-  const _BannerPager({required this.banners});
+  const _BannerPager({super.key, required this.banners, required this.onOpen});
 
   final List<HomeBanner> banners;
+  final void Function(HomeBanner) onOpen;
 
   @override
   State<_BannerPager> createState() => _BannerPagerState();
@@ -338,18 +382,25 @@ class _BannerPagerState extends State<_BannerPager> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final banners = widget.banners;
+    // 사용자 캡처(2026-11-20 홈): 화면 폭을 꽉 채운 배너(약 3:1). 서버 배너 그림은 1984×793.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 2),
+      padding: const EdgeInsets.only(bottom: 2),
       child: SizedBox(
-        height: 112,
+        height: MediaQuery.sizeOf(context).width / 2.8,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.zero,
           child: Stack(
             children: [
               PageView.builder(
                 itemCount: banners.length,
                 onPageChanged: (i) => setState(() => _page = i),
-                itemBuilder: (context, i) => _BannerCard(banners[i]),
+                itemBuilder: (context, i) => GestureDetector(
+                  key: ValueKey('banner-${banners[i].bannerId}'),
+                  onTap: banners[i].link == BannerLink.none
+                      ? null
+                      : () => widget.onOpen(banners[i]),
+                  child: _BannerCard(banners[i]),
+                ),
               ),
               if (banners.length > 1)
                 Positioned(
@@ -542,7 +593,8 @@ class _CategoryShortcuts extends ConsumerWidget {
             ),
             child: Column(
               children: [
-                CategoryArt(name: c.name, size: 48, radius: 16),
+                // 사용자 캡처(2026-11-20 홈): 동그란 그림 약 44dp
+                CategoryArt(name: c.name, size: 46, radius: 23),
                 const SizedBox(height: 5),
                 Text(
                   c.name,
@@ -603,6 +655,10 @@ class _SectionView extends ConsumerWidget {
       AsyncData(:final value) => value,
       _ => section,
     };
+    // 순위 진열은 사진 위 숫자 줄만큼 칸이 높다.
+    final hasRank = shown.items.any(
+      (t) => t.badge == DisplayBadge.rank && t.rank != null,
+    );
     final Widget body;
     if (shown.available) {
       body = shown.items.isEmpty
@@ -623,6 +679,7 @@ class _SectionView extends ConsumerWidget {
                       height: ProductTileCard.heightFor(
                         context,
                         ProductTileCard.gridWidthOf(context),
+                        rank: hasRank,
                       ),
                       child: ProductTileCard(
                         rail: true,
@@ -640,6 +697,7 @@ class _SectionView extends ConsumerWidget {
               height: ProductTileCard.heightFor(
                 context,
                 ProductTileCard.railWidthOf(context),
+                rank: hasRank,
               ),
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
@@ -666,7 +724,7 @@ class _SectionView extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            const Icon(Icons.error_outline),
+            const PmartLineIcon(PmartLineIcons.alert, size: 22),
             const SizedBox(width: 8),
             Expanded(child: Text(l10n.sectionUnavailable)),
             TextButton(
@@ -688,7 +746,7 @@ class _SectionView extends ConsumerWidget {
     }
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.only(top: 6, bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -740,7 +798,7 @@ class _InlineFailure extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, size: 20),
+          const PmartLineIcon(PmartLineIcons.alert, size: 20),
           const SizedBox(width: 8),
           Expanded(child: Text(text)),
           TextButton(onPressed: onRetry, child: Text(l10n.checkoutCheckAgain)),
@@ -753,28 +811,86 @@ class _InlineFailure extends StatelessWidget {
 /// 진행 중 주문(회원만). 상태·도착 예상은 서버 값만 보인다.
 /// 조회 실패는 "주문 없음"이 아니라 실패 한 줄로 보인다. 비회원·진행 중 주문 없음은 그리지 않는다.
 class _InProgressOrderCard extends ConsumerWidget {
-  const _InProgressOrderCard();
+  /// [floating] 이면 화면 아래 떠 있는 카드만(레퍼런스 3-1 "B마트 홈 - 배달중"), 아니면 목록 안 실패 한 줄만.
+  const _InProgressOrderCard({this.floating = false});
+
+  final bool floating;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     return switch (ref.watch(homeInProgressOrderProvider)) {
-      AsyncData(value: final order?) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Card(
-          key: const ValueKey('home-order-card'),
-          child: ListTile(
-            leading: const Icon(Icons.delivery_dining_outlined),
-            title: Text(orderStatusText(l10n, order.status)),
-            subtitle: homeOrderHasEta(order.status)
-                ? _OrderEtaLine(orderId: order.orderId)
-                : null,
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/orders/${order.orderId}'),
+      AsyncData(value: final order?) when floating => Material(
+        key: const ValueKey('home-order-card'),
+        color: const Color(0xF2232428),
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        elevation: 3,
+        child: InkWell(
+          onTap: () => context.push('/orders/${order.orderId}'),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 14, 14),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              orderStatusText(l10n, order.status),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const PmartLineIcon(
+                            PmartLineIcons.chevronRight,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                        ],
+                      ),
+                      if (homeOrderHasEta(order.status))
+                        DefaultTextStyle.merge(
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 14,
+                            color: const Color(0xFFB9A8FF),
+                          ),
+                          child: _OrderEtaLine(orderId: order.orderId),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const PmartLineIcon(
+                    PmartLineIcons.scooter,
+                    size: 34,
+                    color: Color(0xFFB9A8FF),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-      AsyncError() => _InlineFailure(
+      AsyncError() when !floating => _InlineFailure(
         key: const ValueKey('home-order-failed'),
         text: l10n.homeOrderFailed,
         onRetry: () => ref.invalidate(homeInProgressOrderProvider),
@@ -864,36 +980,22 @@ class _DeliverySummaryState extends State<_DeliverySummary> {
     final first =
         rows.where((o) => o.available).firstOrNull ?? rows.firstOrNull;
     final shown = _open ? rows : [?first];
+    // 사용자 캡처(2026-11-20 홈): 테두리 없이 굵은 한 줄 제목("지금은 예약배달만 가능해요") + 오른쪽 회색 알약 [배달안내],
+    // 아래 회색 둥근 줄(방식·시간·배달팁 — 서버 값). 알약을 누르면 방식 전부를 펼친다.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
       child: Container(
         key: const ValueKey('home-delivery-card'),
         clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
+        decoration: const BoxDecoration(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 머리 띠(주 색)
-            Container(
+            Padding(
               key: night ? const ValueKey('home-night-notice') : null,
-              color: PmartBrand.violet,
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+              padding: const EdgeInsets.fromLTRB(4, 0, 0, 10),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Icon(
-                      night ? Icons.nightlight_round : Icons.bolt_rounded,
-                      size: 13,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -902,9 +1004,8 @@ class _DeliverySummaryState extends State<_DeliverySummary> {
                           night
                               ? l10n.homeNightNotice
                               : l10n.homeDeliveryHeadline,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: Colors.white,
-                            fontSize: 12,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontSize: 17,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -912,44 +1013,62 @@ class _DeliverySummaryState extends State<_DeliverySummary> {
                           Text(
                             l10n.optionEarliestSlot(windowText(earliest)),
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white.withValues(alpha: 0.88),
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                       ],
                     ),
                   ),
+                  if (rows.length > 1)
+                    ActionChip(
+                      key: const ValueKey('home-delivery-guide'),
+                      label: Text(l10n.homeDeliveryGuide),
+                      labelStyle: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 13,
+                      ),
+                      backgroundColor: scheme.surfaceContainer,
+                      side: BorderSide.none,
+                      shape: const StadiumBorder(),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => setState(() => _open = !_open),
+                    ),
                 ],
               ),
             ),
-            InkWell(
-              key: const ValueKey('home-delivery-toggle'),
-              onTap: rows.length > 1
-                  ? () => setState(() => _open = !_open)
-                  : null,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 16, 20, 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          for (final (i, o) in shown.indexed)
-                            Padding(
-                              key: ValueKey('home-delivery-${o.mode.name}'),
-                              padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
-                              child: _DeliveryRow(option: o),
-                            ),
-                        ],
+            Material(
+              color: scheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(12),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                key: const ValueKey('home-delivery-toggle'),
+                onTap: rows.length > 1
+                    ? () => setState(() => _open = !_open)
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          children: [
+                            for (final (i, o) in shown.indexed)
+                              Padding(
+                                key: ValueKey('home-delivery-${o.mode.name}'),
+                                padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
+                                child: _DeliveryRow(option: o),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                    if (rows.length > 1)
-                      PmartLineIcon(
-                        _open
-                            ? PmartLineIcons.chevronUp
-                            : PmartLineIcons.chevronDown,
-                        size: 20,
-                      ),
-                  ],
+                      if (rows.length > 1)
+                        PmartLineIcon(
+                          _open
+                              ? PmartLineIcons.chevronUp
+                              : PmartLineIcons.chevronRight,
+                          size: 18,
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1107,12 +1226,6 @@ class _AddressChip extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.place_rounded,
-            size: 17,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const SizedBox(width: 3),
           Flexible(
             child: Text(
               text,
@@ -1142,7 +1255,7 @@ class _PendingPaymentBanner extends ConsumerWidget {
       child: Card(
         key: const ValueKey('pending-payment'),
         child: ListTile(
-          leading: const Icon(Icons.payment),
+          leading: const PmartLineIcon(PmartLineIcons.receipt),
           title: Text(l10n.pendingPaymentBanner),
           trailing: TextButton(
             onPressed: () => context.push('/payments/${pending.first}'),
@@ -1151,5 +1264,136 @@ class _PendingPaymentBanner extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+/// 홈 아래 떠 있는 장바구니 막대(사용자 캡처 2026-11-20 "24,138원 주문 가능 [2 장바구니]").
+/// 서버가 확정한 장바구니에 품목이 있을 때만. 금액은 서버 선택 합계 그대로(없으면 금액 없이).
+class _HomeCartBar extends ConsumerWidget {
+  const _HomeCartBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final cart = ref.watch(cartControllerProvider).value?.cart;
+    if (cart == null || cart.lines.isEmpty) return const SizedBox.shrink();
+    final short = cart.minOrderShortfall;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Material(
+        key: const ValueKey('home-cart-bar'),
+        color: scheme.surface,
+        elevation: 4,
+        shadowColor: Colors.black26,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 10, 10, 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (cart.selectedItemAmount case final a?)
+                      Text(
+                        formatKrw(a),
+                        key: const ValueKey('home-cart-amount'),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    Text(
+                      switch (short) {
+                        final int s when s > 0 => l10n.cartMinOrderShortfall(
+                          formatKrw(s),
+                        ),
+                        _ => l10n.homeCartOrderable,
+                      },
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 13,
+                        color: short != null && short > 0
+                            ? scheme.primary
+                            : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              FilledButton(
+                key: const ValueKey('home-cart-go'),
+                onPressed: () => context.go('/cart'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 46),
+                  padding: const EdgeInsets.fromLTRB(10, 0, 18, 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 26,
+                      height: 26,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: Colors.black,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '${cart.lines.length}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      l10n.cartTitle,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 배너 누르기(storefront 0.7.0): 영역 → 그 영역 전체 보기, 상품 → 상세, 카테고리 → 그 카테고리 목록.
+void _openBanner(BuildContext context, HomeBanner b, HomeView home) {
+  final ref = b.linkRef;
+  if (ref == null || ref.isEmpty) return;
+  switch (b.link) {
+    case BannerLink.section:
+      final section = home.sections
+          .where((s) => s.sectionId == ref)
+          .firstOrNull;
+      if (section != null) {
+        context.push(
+          '/sections/${section.sectionId}',
+          extra: SectionRef(section, home.layoutVersion),
+        );
+      }
+    case BannerLink.product:
+      context.push('/products/$ref');
+    case BannerLink.category:
+      context.push(
+        Uri(path: '/products', queryParameters: {'categoryId': ref}).toString(),
+      );
+    case BannerLink.none:
+      break;
   }
 }

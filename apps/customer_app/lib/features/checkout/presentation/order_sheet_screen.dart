@@ -19,7 +19,10 @@ import '../domain/checkout.dart';
 import 'checkout_controller.dart';
 import '../../address/presentation/phone_number_formatter.dart';
 import 'contact_sheet.dart';
-import 'delivery_select_screen.dart' show modeLabel, windowText;
+import 'delivery_select_screen.dart'
+    show modeLabel, saveOutOfStockPreference, slotDayLabel, windowText;
+import '../../catalog/presentation/widgets/product_tile_card.dart'
+    show ProductImage;
 import 'shipping_address_view.dart';
 
 String _money(AppLocalizations l10n, int? amount) => switch (amount) {
@@ -196,6 +199,19 @@ class _OrderSheetScreenState extends ConsumerState<OrderSheetScreen> {
       appBar: AppBar(
         title: Text(l10n.checkoutTitle),
         centerTitle: true,
+        // 레퍼런스 6-0: 뒤로 가면 "주문을 취소할까요?"
+        leading: BackButton(
+          onPressed: () async {
+            final ok = await showPmartConfirm(
+              context,
+              title: l10n.checkoutLeaveTitle,
+              confirmLabel: l10n.checkoutLeaveOk,
+              cancelLabel: l10n.checkoutLeaveCancel,
+              confirmKey: const ValueKey('checkout-leave-ok'),
+            );
+            if ((ok ?? false) && context.mounted) context.pop();
+          },
+        ),
         backgroundColor: surfaces.surfaceContainer,
       ),
       body: blocked != null
@@ -369,13 +385,13 @@ class _SheetState extends ConsumerState<_Sheet> {
           flow.failureCode != draft.checkoutFailure?.code)
         _Banner(
           key: const ValueKey('pg-failed'),
-          icon: Icons.error_outline,
+          icon: PmartLineIcons.alert,
           text: paymentPhaseText(l10n, flow),
         ),
       if (draft.next == DraftNext.wait)
         _Banner(
           key: const ValueKey('draft-waiting'),
-          icon: Icons.hourglass_top,
+          icon: PmartLineIcons.refresh,
           text: l10n.checkoutPreparing,
           action: TextButton(
             onPressed: ctl.refresh,
@@ -385,7 +401,7 @@ class _SheetState extends ConsumerState<_Sheet> {
       if (draft.expired)
         _Banner(
           key: const ValueKey('draft-expired'),
-          icon: Icons.timer_off_outlined,
+          icon: PmartLineIcons.clock,
           text: l10n.draftExpired,
           action: TextButton(
             onPressed: ctl.recreate,
@@ -396,7 +412,7 @@ class _SheetState extends ConsumerState<_Sheet> {
           draft.blockers.contains(DraftBlocker.minOrderAmount))
         _Banner(
           key: const ValueKey('min-order'),
-          icon: Icons.info_outline,
+          icon: PmartLineIcons.info,
           text: minOrderText(l10n, draft.quote),
           action: TextButton(
             onPressed: () => context.go('/cart'),
@@ -408,7 +424,7 @@ class _SheetState extends ConsumerState<_Sheet> {
         if (b != DraftBlocker.minOrderAmount)
           _Banner(
             key: ValueKey('blocker-${b.name}'),
-            icon: Icons.block,
+            icon: PmartLineIcons.alert,
             text: blockerText(l10n, b),
             action: b == DraftBlocker.contactRequired
                 ? TextButton(
@@ -424,7 +440,7 @@ class _SheetState extends ConsumerState<_Sheet> {
       if (state.checkoutUnknown)
         _Banner(
           key: const ValueKey('checkout-unknown'),
-          icon: Icons.hourglass_top,
+          icon: PmartLineIcons.refresh,
           text: l10n.checkoutUnknown,
           action: TextButton(
             onPressed: ctl.refresh,
@@ -434,7 +450,7 @@ class _SheetState extends ConsumerState<_Sheet> {
       if (state.lastStart is CheckoutAccepted)
         _Banner(
           key: const ValueKey('checkout-accepted'),
-          icon: Icons.payment,
+          icon: PmartLineIcons.receipt,
           text: l10n.checkoutAccepted,
         ),
       // 지난 결제 진입이 자원 확보·결제에서 실패했다. 서버가 확보분을 풀었고, 견적이 유효하면 다시 결제할 수 있다.
@@ -442,13 +458,13 @@ class _SheetState extends ConsumerState<_Sheet> {
           when state.lastStart is! CheckoutAccepted)
         _Banner(
           key: const ValueKey('checkout-failure'),
-          icon: Icons.error_outline,
+          icon: PmartLineIcons.alert,
           text: checkoutFailureText(l10n, f.code),
         ),
       if (state.lastStart case CheckoutRejected(:final code))
         _Banner(
           key: const ValueKey('checkout-rejected'),
-          icon: Icons.error_outline,
+          icon: PmartLineIcons.alert,
           text: switch (code) {
             CheckoutProblemCode.unsupported => l10n.checkoutNotYetSupported,
             CheckoutProblemCode.checkoutBlocked => l10n.checkoutBlocked,
@@ -472,14 +488,56 @@ class _SheetState extends ConsumerState<_Sheet> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // 레퍼런스 6-1: 맨 위(카드 밖) "알뜰배달로 받을게요" + ⏰ 시간 — 누르면 배송 방식 다시 고르기
+                InkWell(
+                  key: const ValueKey('change-delivery'),
+                  onTap: () => context.pop(),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(6, 8, 6, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.checkoutReceiveBy(modeLabel(l10n, req.mode)),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (req.window case final w?)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Row(
+                              children: [
+                                const PmartLineIcon(
+                                  PmartLineIcons.clock,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  l10n.checkoutWindowReserved(
+                                    slotDayLabel(l10n, w.date, now: now),
+                                    windowText(w),
+                                  ),
+                                  style: theme.textTheme.bodyMedium,
+                                ),
+                              ],
+                            ),
+                          ),
+                        if ((quote?.plannedShipments ?? 1) > 1)
+                          Text(l10n.splitShipment(quote!.plannedShipments!)),
+                      ],
+                    ),
+                  ),
+                ),
                 ...banners,
                 if (expiry != null && draft.awaitingCheckout)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(6, 10, 6, 2),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.schedule,
+                        PmartLineIcon(
+                          PmartLineIcons.clock,
                           size: 18,
                           color: theme.colorScheme.primary,
                         ),
@@ -496,76 +554,116 @@ class _SheetState extends ConsumerState<_Sheet> {
                       ],
                     ),
                   ),
+                // 담은 상품: 사진 가로 줄 + "총 N건 상품 자세히 보기 ⌄"
                 _Section(
                   title: l10n.checkoutItems,
                   children: [
-                    for (final l in req.lines)
-                      Text(
-                        '${orderSheetLineTitle(draft, cart, l)} · ${l10n.cartLineQuantity(l.quantity)}',
-                      ),
+                    _ItemsPreview(draft: draft, cart: cart, lines: req.lines),
                   ],
                 ),
-                _Section(
-                  title: l10n.checkoutDelivery,
-                  trailing: TextButton(
-                    key: const ValueKey('change-delivery'),
-                    onPressed: () => context.pop(),
-                    child: Text(l10n.checkoutChange),
-                  ),
+                // 배달주소 / 라이더 요청사항(한 카드, 줄 사이 선)
+                _Card(
                   children: [
-                    Text(
-                      [
-                        modeLabel(l10n, req.mode),
-                        if (req.window case final w?) windowText(w),
-                      ].join(' · '),
+                    _Row(
+                      title: l10n.checkoutAddress,
+                      child: switch (draft.shippingAddress) {
+                        // 초안에 고정된 배송지 사본(BR-37). 사본이 없는 옛 초안만 초안을 만든 현재 쇼핑 주소를 보인다.
+                        final a? => ShippingAddressView(
+                          address: a,
+                          showPhone: false,
+                        ),
+                        null when address != null => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(address.label ?? address.roadAddress),
+                            Text(
+                              '${address.roadAddress} ${address.detailAddress}',
+                            ),
+                          ],
+                        ),
+                        _ => null,
+                      },
                     ),
-                    if ((quote?.plannedShipments ?? 1) > 1)
-                      Text(l10n.splitShipment(quote!.plannedShipments!)),
-                  ],
-                ),
-                _Section(
-                  title: l10n.checkoutAddress,
-                  children: [
-                    // 초안에 고정된 배송지 사본(BR-37). 사본이 없는 옛 초안만 초안을 만든 현재 쇼핑 주소를 보인다.
-                    if (draft.shippingAddress case final a?)
-                      ShippingAddressView(address: a, showPhone: false)
-                    else if (address != null) ...[
-                      Text(address.label ?? address.roadAddress),
-                      Text('${address.roadAddress} ${address.detailAddress}'),
-                    ],
+                    _Row(
+                      key: const ValueKey('change-note'),
+                      title: l10n.deliveryNoteTitle,
+                      onTap: () => _editNote(context, ref),
+                      child: Text(
+                        req.deliveryNote ?? l10n.deliveryNoteEmpty,
+                        style: req.deliveryNote == null
+                            ? TextStyle(color: theme.colorScheme.outline)
+                            : null,
+                      ),
+                    ),
                   ],
                 ),
                 // 레퍼런스 6-3 "내 연락처" — 초안 사본의 연락처(서버 값). 바꾸면 프로필에 저장하고 초안을 다시 만든다(BR-60 R3).
-                _Section(
-                  title: l10n.contactTitle,
-                  trailing: TextButton(
-                    key: const ValueKey('contact-change'),
-                    onPressed: () => editMyContact(context, ref),
-                    child: Text(
-                      draft.shippingAddress?.receiverPhone == null
-                          ? l10n.contactEnter
-                          : l10n.contactChange,
+                _Card(
+                  children: [
+                    _Row(
+                      key: const ValueKey('contact-change'),
+                      title: l10n.contactTitle,
+                      onTap: () => editMyContact(context, ref),
+                      child: Text(
+                        switch (draft.shippingAddress?.receiverPhone) {
+                          final p? => PhoneNumberFormatter.format(p),
+                          null => l10n.contactNone,
+                        },
+                        key: const ValueKey('contact-phone'),
+                      ),
                     ),
-                  ),
+                  ],
+                ),
+                // 품절 시 요청사항: 드롭다운 모양 상자(바꾸기는 배송 방식 화면에서)
+                _Section(
+                  title: l10n.oosTitle,
                   children: [
-                    Text(switch (draft.shippingAddress?.receiverPhone) {
-                      final p? => PhoneNumberFormatter.format(p),
-                      null => l10n.contactNone,
-                    }, key: const ValueKey('contact-phone')),
+                    InkWell(
+                      key: const ValueKey('change-oos'),
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () => _editOutOfStock(context, ref),
+                      child: Container(
+                        height: 48,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: theme.colorScheme.outlineVariant,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(switch (req.outOfStock) {
+                                OutOfStockPreference.cancelOutOfStockOnly =>
+                                  l10n.oosOnly,
+                                OutOfStockPreference.cancelAll => l10n.oosAll,
+                              }, style: theme.textTheme.bodyLarge),
+                            ),
+                            const PmartLineIcon(
+                              PmartLineIcons.chevronDown,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 _Section(
-                  title: l10n.checkoutOptions,
+                  title: l10n.payMethods,
                   children: [
-                    Text(switch (req.outOfStock) {
-                      OutOfStockPreference.cancelOutOfStockOnly => l10n.oosOnly,
-                      OutOfStockPreference.cancelAll => l10n.oosAll,
-                    }),
-                    if (req.deliveryNote case final n?) Text(n),
+                    _PaymentWidgetArea(
+                      config: config,
+                      session: session,
+                      amount: quote?.totalAmount,
+                    ),
                   ],
                 ),
-                _Section(
-                  title: l10n.checkoutAmounts,
+                // 금액(레퍼런스 6-1 아래): 상품금액·배달팁·봉투값 / 굵은 선 / 결제금액
+                _Card(
+                  padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+                  divided: false,
                   children: [
                     _AmountRow(
                       l10n.amountItems,
@@ -583,10 +681,17 @@ class _SheetState extends ConsumerState<_Sheet> {
                             ? l10n.firstPurchaseExpected
                             : l10n.firstPurchaseChecking,
                         key: const ValueKey('first-purchase'),
-                        style: theme.textTheme.bodySmall,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
                       ),
                     _AmountRow(l10n.amountBag, _money(l10n, quote?.bagFee)),
-                    const Divider(),
+                    const SizedBox(height: 10),
+                    Divider(
+                      height: 2,
+                      thickness: 1.6,
+                      color: theme.colorScheme.onSurface,
+                    ),
                     _AmountRow(
                       l10n.amountTotal,
                       _money(l10n, quote?.totalAmount),
@@ -609,16 +714,6 @@ class _SheetState extends ConsumerState<_Sheet> {
                         key: const ValueKey('stock-hold'),
                         style: theme.textTheme.bodySmall,
                       ),
-                  ],
-                ),
-                _Section(
-                  title: l10n.payMethods,
-                  children: [
-                    _PaymentWidgetArea(
-                      config: config,
-                      session: session,
-                      amount: quote?.totalAmount,
-                    ),
                   ],
                 ),
               ],
@@ -734,7 +829,7 @@ class _PaymentWidgetArea extends ConsumerWidget {
       // 422 CONFIG_REQUIRED(서버에 키 없음)·조회 실패 모두 결제를 열지 않는다. 다시 받을 수 있다.
       AsyncError() => _Banner(
         key: const ValueKey('pg-config-failed'),
-        icon: Icons.error_outline,
+        icon: PmartLineIcons.alert,
         text: l10n.payConfigRequired,
         action: TextButton(
           onPressed: () => ref.invalidate(paymentWidgetConfigProvider),
@@ -798,7 +893,7 @@ class _Banner extends StatelessWidget {
     this.action,
   });
 
-  final IconData icon;
+  final PmartLineIcons icon;
   final String text;
   final Widget? action;
 
@@ -810,7 +905,7 @@ class _Banner extends StatelessWidget {
       color: scheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ListTile(
-        leading: Icon(icon, color: scheme.primary),
+        leading: PmartLineIcon(icon, color: scheme.primary),
         title: Text(text),
         trailing: action,
       ),
@@ -819,11 +914,10 @@ class _Banner extends StatelessWidget {
 }
 
 class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.children, this.trailing});
+  const _Section({required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
-  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -844,10 +938,10 @@ class _Section extends StatelessWidget {
               Expanded(
                 child: Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontSize: 17, fontWeight: FontWeight.w700),
                 ),
               ),
-              ?trailing,
             ],
           ),
         ),
@@ -876,7 +970,10 @@ class _AmountRow extends StatelessWidget {
             child: Text(
               label,
               style: strong
-                  ? theme.textTheme.titleMedium
+                  ? theme.textTheme.titleMedium?.copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    )
                   : theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -886,7 +983,8 @@ class _AmountRow extends StatelessWidget {
             value,
             style: strong
                 ? theme.textTheme.headlineSmall?.copyWith(
-                    color: theme.colorScheme.primary,
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
                   )
                 : theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
@@ -896,4 +994,333 @@ class _AmountRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 흰 둥근 카드 — 줄 여럿이면 사이에 선(레퍼런스 6-1 "배달주소 / 라이더 요청사항").
+class _Card extends StatelessWidget {
+  const _Card({
+    required this.children,
+    this.padding = EdgeInsets.zero,
+    this.divided = true,
+  });
+
+  final List<Widget> children;
+  final EdgeInsets padding;
+  final bool divided;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(top: 10),
+    padding: padding,
+    clipBehavior: Clip.antiAlias,
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (i, c) in children.indexed) ...[
+          if (divided && i > 0) const Divider(height: 1),
+          c,
+        ],
+      ],
+    ),
+  );
+}
+
+/// 카드 안 한 줄: 굵은 제목 + 아래 내용, 누를 수 있으면 오른쪽 ›.
+class _Row extends StatelessWidget {
+  const _Row({super.key, required this.title, this.child, this.onTap});
+
+  final String title;
+  final Widget? child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (child case final c?) ...[
+                    const SizedBox(height: 4),
+                    DefaultTextStyle.merge(
+                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+                      child: c,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (onTap != null)
+              const PmartLineIcon(PmartLineIcons.chevronRight, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 담은 상품: 사진 가로 줄 + 회색 알약 "총 N건 상품 자세히 보기 ⌄"(누르면 이름·수량 목록을 펼친다).
+class _ItemsPreview extends StatefulWidget {
+  const _ItemsPreview({
+    required this.draft,
+    required this.cart,
+    required this.lines,
+  });
+
+  final OrderDraft draft;
+  final Cart? cart;
+  final List<DraftLine> lines;
+
+  @override
+  State<_ItemsPreview> createState() => _ItemsPreviewState();
+}
+
+class _ItemsPreviewState extends State<_ItemsPreview> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final cart = widget.cart;
+    String? imageOf(String sku) =>
+        cart?.lines.where((c) => c.sku == sku).firstOrNull?.imageUrl;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 58,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: widget.lines.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, i) => ProductImage(
+              url: imageOf(widget.lines[i].sku),
+              size: 58,
+              radius: 8,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Material(
+          color: theme.colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(8),
+          child: InkWell(
+            key: const ValueKey('checkout-items-toggle'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => setState(() => _open = !_open),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    l10n.checkoutItemsMore(widget.lines.length),
+                    style: theme.textTheme.bodySmall?.copyWith(fontSize: 13),
+                  ),
+                  const SizedBox(width: 2),
+                  PmartLineIcon(
+                    _open
+                        ? PmartLineIcons.chevronUp
+                        : PmartLineIcons.chevronDown,
+                    size: 15,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // 목록은 펼치지 않아도 화면에 있어야 한다(접힌 동안은 0 높이). 시험·화면 낭독기가 읽을 수 있게 Offstage 대신 높이만 줄인다.
+        AnimatedSize(
+          duration: const Duration(milliseconds: 160),
+          child: _open
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final l in widget.lines)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Text(
+                            '${orderSheetLineTitle(widget.draft, cart, l)} · ${l10n.cartLineQuantity(l.quantity)}',
+                          ),
+                        ),
+                    ],
+                  ),
+                )
+              : const SizedBox(width: double.infinity),
+        ),
+      ],
+    );
+  }
+}
+
+/// 라이더 요청사항 바꾸기(아래 시트). 바꾸면 새 주문 의도로 초안을 다시 만든다(같은 의도는 예전 초안이 돌아온다).
+Future<void> _editNote(BuildContext context, WidgetRef ref) async {
+  final l10n = AppLocalizations.of(context);
+  final ctl = TextEditingController(
+    text: ref.read(checkoutSetupProvider).deliveryNote,
+  );
+  final saved = await showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) {
+      final theme = Theme.of(context);
+      return Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          20,
+          20,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          key: const ValueKey('note-sheet'),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.deliveryNoteTitle,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontSize: 19,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              key: const ValueKey('note-input'),
+              controller: ctl,
+              autofocus: true,
+              maxLength: 200,
+              decoration: InputDecoration(
+                hintText: l10n.deliveryNote,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            FilledButton(
+              key: const ValueKey('note-done'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+              ),
+              onPressed: () => Navigator.of(context).pop(ctl.text.trim()),
+              child: Text(l10n.contactDone),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+  ctl.dispose();
+  if (saved == null || !context.mounted) return;
+  ref.read(checkoutSetupProvider.notifier)
+    ..setNote(saved)
+    ..renewIntent();
+  await ref.read(draftControllerProvider.notifier).recreate();
+}
+
+/// 품절 시 요청사항 바꾸기(레퍼런스 6-4 시트: 라디오 둘 + 다음에도 적용 + [완료]).
+Future<void> _editOutOfStock(BuildContext context, WidgetRef ref) async {
+  final l10n = AppLocalizations.of(context);
+  final setup = ref.read(checkoutSetupProvider);
+  var pick = setup.outOfStock;
+  var remember = setup.rememberOutOfStock;
+  final done = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) => StatefulBuilder(
+      builder: (context, setSheet) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 20, 12, 12),
+            child: Column(
+              key: const ValueKey('oos-sheet'),
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 8, bottom: 8),
+                  child: Text(
+                    l10n.oosTitle,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                RadioGroup<OutOfStockPreference>(
+                  groupValue: pick,
+                  onChanged: (p) => setSheet(() => pick = p ?? pick),
+                  child: Column(
+                    children: [
+                      RadioListTile(
+                        key: const ValueKey('oos-sheet-only'),
+                        value: OutOfStockPreference.cancelOutOfStockOnly,
+                        title: Text(l10n.oosOnly),
+                      ),
+                      RadioListTile(
+                        key: const ValueKey('oos-sheet-all'),
+                        value: OutOfStockPreference.cancelAll,
+                        title: Text(l10n.oosAll),
+                      ),
+                    ],
+                  ),
+                ),
+                CheckboxListTile(
+                  key: const ValueKey('oos-remember'),
+                  value: remember,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  title: Text(l10n.oosRemember),
+                  onChanged: (v) => setSheet(() => remember = v ?? false),
+                ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  key: const ValueKey('oos-done'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text(l10n.contactDone),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ),
+  );
+  if (done != true || !context.mounted) return;
+  final setupCtl = ref.read(checkoutSetupProvider.notifier)
+    ..setOutOfStock(pick)
+    ..setRememberOutOfStock(remember);
+  if (remember) await saveOutOfStockPreference(context, ref, pick);
+  if (!context.mounted) return;
+  setupCtl.renewIntent();
+  await ref.read(draftControllerProvider.notifier).recreate();
 }

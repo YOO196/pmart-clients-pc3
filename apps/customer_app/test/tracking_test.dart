@@ -390,7 +390,11 @@ void main() {
       await t.tap(key('track-reschedule'));
       await t.pumpAndSettle();
       expect(orders.openTrackCount, 0);
-      await t.tap(find.byType(BackButton));
+      await t.tap(
+        find.byWidgetPredicate(
+          (w) => w is BackButton || w.key == const ValueKey('track-close'),
+        ),
+      );
       await t.pumpAndSettle();
       expect(orders.openTrackCount, 1);
     });
@@ -519,7 +523,11 @@ void main() {
       await t.pumpAndSettle();
       expect(orders.openTrackCount, 1);
 
-      await t.tap(find.byType(BackButton));
+      await t.tap(
+        find.byWidgetPredicate(
+          (w) => w is BackButton || w.key == const ValueKey('track-close'),
+        ),
+      );
       await t.pumpAndSettle();
       expect(find.byType(TrackingScreen), findsNothing);
       expect(orders.openTrackCount, 0);
@@ -607,7 +615,11 @@ void main() {
       await t.pumpAndSettle();
       expect(map(t).rider, isNot(second));
       // 화면을 닫으면 구독(과 목 타이머)도 닫힌다.
-      await t.tap(find.byType(BackButton));
+      await t.tap(
+        find.byWidgetPredicate(
+          (w) => w is BackButton || w.key == const ValueKey('track-close'),
+        ),
+      );
       await t.pumpAndSettle();
       expect(orders.openTrackCount, 0);
     });
@@ -653,7 +665,11 @@ void main() {
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await t.pumpAndSettle();
       expect(orders.openTrackCount, 1);
-      await t.tap(find.byType(BackButton));
+      await t.tap(
+        find.byWidgetPredicate(
+          (w) => w is BackButton || w.key == const ValueKey('track-close'),
+        ),
+      );
       await t.pumpAndSettle();
     });
 
@@ -823,7 +839,13 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byType(TrackingScreen), findsOneWidget);
       expect(orders.openTrackCount, 1);
-      await t.tap(find.byType(BackButton).first);
+      await t.tap(
+        find
+            .byWidgetPredicate(
+              (w) => w is BackButton || w.key == const ValueKey('track-close'),
+            )
+            .first,
+      );
       await t.pumpAndSettle();
     });
 
@@ -843,7 +865,13 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byType(TrackingScreen), findsOneWidget);
       expect(orders.openTrackCount, 1);
-      await t.tap(find.byType(BackButton).first);
+      await t.tap(
+        find
+            .byWidgetPredicate(
+              (w) => w is BackButton || w.key == const ValueKey('track-close'),
+            )
+            .first,
+      );
       await t.pumpAndSettle();
     });
 

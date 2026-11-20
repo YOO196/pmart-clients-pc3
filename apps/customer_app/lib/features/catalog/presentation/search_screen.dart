@@ -6,6 +6,7 @@ import 'package:pmart_core/pmart_core.dart' show IdempotencyKey, PmartFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/cart_icon_button.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
 import 'product_list_view.dart';
@@ -26,6 +27,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   int _suggestSeq = 0;
   List<String> _suggestions = const [];
   String? _submitted;
+
+  /// "원래 검색어로 다시 찾기" — 서버 오타 교정을 끈다(search 0.4.0 noCorrection).
+  bool _noCorrection = false;
 
   @override
   void dispose() {
@@ -60,9 +64,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
-  void _submit(String text) {
+  void _submit(String text, {bool noCorrection = false}) {
     final keyword = text.trim();
     if (keyword.isEmpty) return;
+    _noCorrection = noCorrection;
     _debounce?.cancel();
     _suggestSeq++;
     _controller.text = keyword;
@@ -93,6 +98,28 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             decoration: InputDecoration(
               hintText: l10n.searchHint,
               counterText: '',
+              // 레퍼런스 3-4: 칸 안 오른쪽 회색 ⓧ 로 지우기
+              suffixIcon: ListenableBuilder(
+                listenable: _controller,
+                builder: (context, _) => _controller.text.isEmpty
+                    ? const SizedBox.shrink()
+                    : IconButton(
+                        key: const ValueKey('search-clear'),
+                        tooltip: l10n.searchClear,
+                        icon: const PmartLineIcon(
+                          PmartLineIcons.clearCircle,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          _controller.clear();
+                          _onChanged('');
+                        },
+                      ),
+              ),
+              suffixIconConstraints: const BoxConstraints(
+                minWidth: 40,
+                minHeight: 40,
+              ),
               isDense: true,
               filled: true,
               fillColor: Theme.of(context).colorScheme.surfaceContainer,
@@ -124,13 +151,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             icon: const PmartLineIcon(PmartLineIcons.search, size: 23),
             onPressed: () => _submit(_controller.text),
           ),
+          const CartIconButton(),
           const SizedBox(width: 6),
         ],
       ),
       body: Stack(
         children: [
           if (submitted != null)
-            ProductListView(baseQuery: ProductQuery(keyword: submitted))
+            ProductListView(
+              baseQuery: ProductQuery(
+                keyword: submitted,
+                noCorrection: _noCorrection,
+              ),
+              onKeyword: _submit,
+            )
           else
             _RecentSearches(onPick: _submit),
           if (_suggestions.isNotEmpty)
@@ -141,7 +175,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 children: [
                   for (final s in _suggestions)
                     ListTile(
-                      leading: const Icon(Icons.search),
+                      leading: const PmartLineIcon(PmartLineIcons.search),
                       title: Text(s),
                       onTap: () => _submit(s),
                     ),

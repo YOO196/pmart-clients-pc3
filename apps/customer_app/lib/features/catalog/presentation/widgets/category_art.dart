@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// 카테고리·배너 그림. 그림 파일 없이 코드로 직접 그린다(사용자 지시 2026-11-11).
+/// 카테고리·배너 그림. 카테고리는 사용자가 준 그림 파일(2026-11-20)을 쓰고, 맞는 파일이 없거나 배너면 코드로 그린다(2026-11-11).
 /// 카테고리 그림은 계약에 없어서 **이름에 든 낱말**로 고른다 — 맞는 낱말이 없으면 장바구니 그림.
 enum CategoryArtKind {
   fruit,
@@ -66,6 +66,47 @@ CategoryArtKind categoryArtFor(String name) {
   return CategoryArtKind.basket;
 }
 
+/// 이름 → 카테고리 그림 파일(사용자 제공 그림, 2026-11-20 — 레퍼런스 카테고리 화면과 같게).
+/// 앞에 있는 규칙이 먼저다. 맞는 파일이 없으면 null(코드 그림으로).
+String? categoryImageFor(String name) {
+  const rules = <(List<String>, String)>[
+    (['아이스', '빙과'], 'icecream'),
+    (['우유', '유제품', '요거트', '치즈'], 'milk'),
+    (['과일', '채소', '샐러드', '야채'], 'fruitveg'),
+    (['라면', '면'], 'noodle'),
+    (['과자', '초콜릿', '시리얼', '스낵', '간식'], 'snack'),
+    (['정육', '수산', '계란'], 'meatfish'),
+    (['음료', '커피', '생수'], 'drink'),
+    (['빵', '떡', '잼'], 'bread'),
+    (['쌀', '잡곡', '견과'], 'grain'),
+    (['양념', '장류', '오일'], 'sauce'),
+    (['밥', '도시락'], 'rice'),
+    (['국', '탕', '찌개'], 'soup'),
+    (['요리', '반찬'], 'sidedish'),
+    (['분식', '야식'], 'snackfood'),
+    (['햄', '어묵', '통조림'], 'ham'),
+    (['식단'], 'diet'),
+    (['유기농', '친환경'], 'organic'),
+    (['헤어', '바디', '쉐이빙'], 'hair'),
+    (['세제', '방향', '탈취'], 'detergent'),
+    (['화장지', '생리대', '휴지'], 'tissue'),
+    (['뷰티', '클렌징', '선케어', '화장품'], 'beauty'),
+    (['청소', '욕실'], 'cleaning'),
+    (['주방', '일회용'], 'kitchen'),
+    (['문구', '사무'], 'stationery'),
+    (['가전', '게임', '전기'], 'digital'),
+    (['반려'], 'pet'),
+    (['유아', '아동'], 'baby'),
+    (['의료'], 'medical'),
+    (['인테리어'], 'interior'),
+    (['생활', '잡화', '패션', '리빙'], 'living'),
+  ];
+  for (final (words, file) in rules) {
+    if (words.any(name.contains)) return 'assets/images/categories/$file.png';
+  }
+  return null;
+}
+
 /// 둥근 네모 바탕 위의 카테고리 그림.
 class CategoryArt extends StatelessWidget {
   const CategoryArt({
@@ -82,6 +123,20 @@ class CategoryArt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final r = BorderRadius.circular(radius ?? size / 3);
+    // 그림 파일이 있으면 그것(바탕까지 그림에 들어 있다), 없으면 코드 그림.
+    if (categoryImageFor(name) case final asset?) {
+      return ClipRRect(
+        borderRadius: r,
+        child: Image.asset(
+          asset,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          filterQuality: FilterQuality.medium,
+        ),
+      );
+    }
     return Container(
       width: size,
       height: size,
@@ -504,7 +559,7 @@ class _CategoryPainter extends CustomPainter {
             ..lineTo(15, 41)
             ..quadraticBezierTo(13, 41, 12.5, 39)
             ..close(),
-          _f(0xFF7459E8),
+          _f(0xFF6A4EE0),
         );
         c.drawRRect(_rr(8, 20.5, 32, 4, 2), _f(0xFF5A43C9));
         for (final x in const [18.0, 24.0, 30.0]) {
@@ -583,7 +638,7 @@ class _BannerPainter extends CustomPainter {
         ..lineTo(36, 102)
         ..quadraticBezierTo(31.5, 102, 31, 98)
         ..close(),
-      _f(0xFF7459E8),
+      _f(0xFF6A4EE0),
     );
     c.drawPath(
       Path()

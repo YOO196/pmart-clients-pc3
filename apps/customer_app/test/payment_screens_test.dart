@@ -42,9 +42,11 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('login-kakao')));
     await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const ValueKey('mode-single')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('mode-single')));
     await t.pump();
-    await t.tap(find.byKey(const ValueKey('delivery-next')));
+    await t.tap(find.byKey(const ValueKey('cart-order')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('pay')));
     await t.pump();
@@ -111,8 +113,10 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
-    await t.tap(find.byType(BackButton));
+    // 주문서 뒤로가기는 "주문을 취소할까요?"를 묻는다(레퍼런스 6-0).
+    await t.tap(find.byKey(const ValueKey('checkout-leave-ok')));
     await t.pumpAndSettle();
+    // 배송 방식 화면이 장바구니에 합쳐져 주문서 뒤는 바로 장바구니다.
     await t.tap(find.text('홈').last);
     await t.pumpAndSettle();
 
@@ -134,14 +138,14 @@ void main() {
     await t.tap(find.byKey(const ValueKey('go-order')));
     await t.pumpAndSettle();
 
-    expect(find.text('주문 상세'), findsOneWidget);
+    expect(find.text('주문상세'), findsOneWidget);
     expect(find.text('주문 확인'), findsOneWidget);
     expect(find.textContaining('서울우유 1L'), findsWidgets);
 
     // 상세 → 주문 내역 → (뒤에 화면이 없으니) 마이로 돌아갈 수 있다.
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
-    expect(find.text('주문 내역'), findsOneWidget);
+    expect(find.text('주문내역'), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('orders-back')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('my-orders')), findsOneWidget);

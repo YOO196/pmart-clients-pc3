@@ -5,6 +5,7 @@ import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../start/presentation/start_controller.dart' show StartRoutes;
 import '../../../shared/providers.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../auth/domain/auth.dart';
@@ -125,7 +126,7 @@ class _ReconsentScreenState extends ConsumerState<ReconsentScreen> {
     if (!mounted) return;
     ref.invalidate(myConsentsProvider);
     if (done) {
-      context.pop(true);
+      context.canPop() ? context.pop(true) : context.go('/');
       return;
     }
     setState(() {
@@ -137,68 +138,182 @@ class _ReconsentScreenState extends ConsumerState<ReconsentScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     final value = ref.watch(myConsentsProvider);
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.consentTitle)),
-      body: UiStateView<MyConsents?>(
-        state: uiStateOf(value),
-        onRetry: () => ref.invalidate(myConsentsProvider),
-        ready: (context, c) {
-          if (c == null) return const SizedBox.shrink();
-          if (!_seeded) {
-            _seeded = true;
-            _agreed
-              ..clear()
-              ..addAll([
-                for (final i in c.items)
-                  if (!i.required && i.current) i.type,
-              ]);
-          }
-          final required = c.items.where((i) => i.required).toList();
-          final optional = c.items
-              .where((i) => !i.required && i.requiredFor == null)
-              .toList();
-          final allAgreed = required.every((i) => _agreed.contains(i.type));
-          Widget box(MyConsent i, String title) => CheckboxListTile(
-            key: ValueKey('reconsent-${i.type}'),
-            value: _agreed.contains(i.type),
-            title: Text(title),
-            onChanged: _busy
-                ? null
-                : (v) => setState(
-                    () => (v ?? false)
-                        ? _agreed.add(i.type)
-                        : _agreed.remove(i.type),
+    // 레퍼런스 13-9(약관 시트): 굵은 2줄 제목 + ✕, 묶음 제목, 줄마다 [보기], 아래 [전체 동의하고 계속하기].
+    // 필수는 하나씩 체크하지 않고 아래 단추 한 번으로 모두 동의한다(사용자 결정 2026-11-20). 선택은 체크로 고른다.
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+        ),
+        child: UiStateView<MyConsents?>(
+          state: uiStateOf(value),
+          onRetry: () => ref.invalidate(myConsentsProvider),
+          ready: (context, c) {
+            if (c == null) return const SizedBox.shrink();
+            if (!_seeded) {
+              _seeded = true;
+              _agreed
+                ..clear()
+                ..addAll([
+                  for (final i in c.items)
+                    if (!i.required && i.current) i.type,
+                ]);
+            }
+            final required = c.items.where((i) => i.required).toList();
+            final optional = c.items
+                .where((i) => !i.required && i.requiredFor == null)
+                .toList();
+            Widget view(MyConsent i) => ActionChip(
+              key: ValueKey('reconsent-view-${i.type}'),
+              label: Text(l10n.consentView),
+              labelStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 13),
+              backgroundColor: theme.colorScheme.surfaceContainer,
+              side: BorderSide.none,
+              shape: const StadiumBorder(),
+              visualDensity: VisualDensity.compact,
+              onPressed: () =>
+                  context.push(StartRoutes.terms(i.type, i.latestVersion)),
+            );
+            Widget row(MyConsent i, String title, {Widget? lead}) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  lead ??
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 10, 0),
+                        child: Container(
+                          width: 4,
+                          height: 4,
+                          color: theme.colorScheme.outline,
+                        ),
+                      ),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontSize: 15,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
-          );
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text(
-                l10n.consentReconsentBody,
-                key: const ValueKey('reconsent-body'),
+                  view(i),
+                ],
               ),
-              for (final i in required)
-                box(i, l10n.consentRequired(consentTypeLabel(l10n, i.type))),
-              for (final i in optional)
-                box(i, l10n.consentOptional(consentTypeLabel(l10n, i.type))),
-              if (_error case final e?) ...[
-                const SizedBox(height: 8),
-                Text(
-                  e,
-                  key: const ValueKey('reconsent-error'),
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+            );
+            Widget group(String text) => Padding(
+              padding: const EdgeInsets.only(top: 18, bottom: 6),
+              child: Text(
+                text,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-              const SizedBox(height: 16),
-              FilledButton(
-                key: const ValueKey('reconsent-submit'),
-                onPressed: allAgreed && !_busy ? () => _submit(c) : null,
-                child: Text(l10n.consentSubmit),
               ),
-            ],
-          );
-        },
+            );
+            return SingleChildScrollView(
+              key: const ValueKey('reconsent-sheet'),
+              padding: const EdgeInsets.fromLTRB(20, 22, 12, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.consentReconsentTitle,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontSize: 20,
+                            height: 1.35,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('reconsent-close'),
+                        tooltip: l10n.actionClose,
+                        icon: const PmartLineIcon(
+                          PmartLineIcons.close,
+                          size: 24,
+                        ),
+                        onPressed: _busy
+                            ? null
+                            // 바로 열린 경우(뒤에 화면 없음)는 홈으로.
+                            : () => context.canPop()
+                                  ? context.pop(false)
+                                  : context.go('/'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.consentReconsentBody,
+                    key: const ValueKey('reconsent-body'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (required.isNotEmpty) group(l10n.consentGroupRequired),
+                  for (final i in required)
+                    KeyedSubtree(
+                      key: ValueKey('reconsent-${i.type}'),
+                      child: row(
+                        i,
+                        l10n.consentRequired(consentTypeLabel(l10n, i.type)),
+                      ),
+                    ),
+                  if (optional.isNotEmpty) group(l10n.consentGroupOptional),
+                  for (final i in optional)
+                    row(
+                      i,
+                      l10n.consentOptional(consentTypeLabel(l10n, i.type)),
+                      lead: SizedBox(
+                        width: 32,
+                        child: Checkbox(
+                          key: ValueKey('reconsent-${i.type}'),
+                          value: _agreed.contains(i.type),
+                          visualDensity: VisualDensity.compact,
+                          onChanged: _busy
+                              ? null
+                              : (v) => setState(
+                                  () => (v ?? false)
+                                      ? _agreed.add(i.type)
+                                      : _agreed.remove(i.type),
+                                ),
+                        ),
+                      ),
+                    ),
+                  if (_error case final e?) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      e,
+                      key: const ValueKey('reconsent-error'),
+                      style: TextStyle(color: theme.colorScheme.error),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: FilledButton(
+                      key: const ValueKey('reconsent-submit'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: _busy ? null : () => _submit(c),
+                      child: Text(l10n.consentAgreeAllContinue),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

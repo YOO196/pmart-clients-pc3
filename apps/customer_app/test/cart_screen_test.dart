@@ -55,7 +55,7 @@ void main() {
     await _openCartTab(t);
 
     expect(find.byKey(const ValueKey('cart-empty')), findsNothing);
-    expect(find.text('정보를 불러오지 못했어요'), findsOneWidget);
+    expect(find.text('화면을 불러오지 못했어요'), findsOneWidget);
   });
 
   testWidgets('수량 +는 서버 반영 뒤에만 숫자가 바뀐다', (t) async {
@@ -67,7 +67,7 @@ void main() {
 
     expect(
       t.widget<Text>(find.byKey(const ValueKey('cart-qty-ci-1'))).data,
-      '3개',
+      '3',
     );
     expect(
       t.widget<Text>(find.byKey(const ValueKey('cart-amount-ci-1'))).data,
@@ -102,7 +102,7 @@ void main() {
     }
     expect(
       t.widget<Text>(find.byKey(const ValueKey('cart-qty-ci-1'))).data,
-      '4개',
+      '4',
     );
     expect(cart.changes.length, sent);
 
@@ -115,7 +115,7 @@ void main() {
     );
     expect(
       t.widget<Text>(find.byKey(const ValueKey('cart-qty-ci-1'))).data,
-      '4개',
+      '4',
     );
     expect(
       t.widget<Text>(find.byKey(const ValueKey('cart-amount-ci-1'))).data,
@@ -134,7 +134,7 @@ void main() {
 
     expect(
       t.widget<Text>(find.byKey(const ValueKey('cart-qty-ci-1'))).data,
-      '3개',
+      '3',
     );
     expect(
       t.widget<Text>(find.byKey(const ValueKey('cart-total'))).data,
@@ -159,7 +159,7 @@ void main() {
 
     // 변경 응답(APPLIED)만으로 수량·줄 금액이 바뀌고 다른 변경도 바로 할 수 있다. 합계는 아직 "확인 중".
     final qty = t.widget<Text>(find.byKey(const ValueKey('cart-qty-ci-1')));
-    expect(qty.data, '3개');
+    expect(qty.data, '3');
     expect(qty.style?.color, isNull);
     expect(
       t.widget<Text>(find.byKey(const ValueKey('cart-amount-ci-1'))).data,
@@ -287,7 +287,7 @@ void main() {
     expect(find.byKey(const ValueKey('cart-change-unknown')), findsNothing);
     expect(
       t.widget<Text>(find.byKey(const ValueKey('cart-qty-ci-1'))).data,
-      '3개',
+      '3',
     );
   });
 
@@ -333,14 +333,8 @@ void main() {
       await t.pumpWidget(testApp(const [], cart: cart));
       await _openCartTab(t);
 
-      Icon iconOf(String key) => t.widget<Icon>(
-        find.descendant(
-          of: find.byKey(ValueKey(key)),
-          matching: find.byType(Icon),
-        ),
-      );
-      expect(iconOf('cart-dec-ci-2').icon, Icons.delete_outline);
-      expect(iconOf('cart-dec-ci-1').icon, Icons.remove);
+      expect(find.byKey(const ValueKey('cart-dec-trash-ci-2')), findsOneWidget);
+      expect(find.byKey(const ValueKey('cart-dec-minus-ci-1')), findsOneWidget);
 
       await t.ensureVisible(find.byKey(const ValueKey('cart-dec-ci-2')));
       await t.pumpAndSettle();
@@ -355,8 +349,13 @@ void main() {
 
       expect(
         t.widget<Text>(find.byKey(const ValueKey('cart-order-label'))).data,
-        '2개 · 7,940원 주문하기',
+        '주문하기',
       );
+      expect(
+        t.widget<Text>(find.byKey(const ValueKey('cart-total'))).data,
+        '7,940원',
+      );
+      expect(find.byKey(const ValueKey('cart-order-count')), findsOneWidget);
       // expiresAt 2026-11-23T06:00Z → 서울 2026-11-23.
       expect(
         t.widget<Text>(find.byKey(const ValueKey('cart-expires'))).data,
@@ -442,7 +441,7 @@ void main() {
       expect(find.byType(HomeScreen), findsOneWidget);
     });
 
-    testWidgets('배달팁·봉투값 안내는 아래 시트로 정적 문구를 보인다(금액 숫자 없음)', (t) async {
+    testWidgets('배달팁·봉투값 안내는 가운데 창으로 정적 문구를 보인다(금액 숫자 없음)', (t) async {
       await t.pumpWidget(testApp(const [], cart: cart));
       await _openCartTab(t);
 

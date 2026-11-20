@@ -31,6 +31,7 @@ void main() {
     await t.tap(find.byKey(const ValueKey('address-search')));
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('f-detail')), '101동');
+    await t.pump();
     await t.tap(find.byKey(const ValueKey('address-save')));
     await t.pumpAndSettle();
 
@@ -91,10 +92,9 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.textContaining('10분 뒤'), findsOneWidget);
-    final kakao = t.widget<FilledButton>(
-      find.byKey(const ValueKey('login-kakao')),
-    );
-    expect(kakao.onPressed, isNull);
+    // 레퍼런스 2-3: 동그란 소셜 단추(InkWell)
+    final kakao = t.widget<InkWell>(find.byKey(const ValueKey('login-kakao')));
+    expect(kakao.onTap, isNull);
   });
 
   testWidgets('제공자 화면에서 취소하면 원래 화면으로 돌아간다', (t) async {
@@ -280,13 +280,18 @@ void main() {
 
     await t.tap(find.byKey(const ValueKey('address-add')));
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('address-save')));
-    await t.pumpAndSettle();
-    expect(find.text('입력해 주세요'), findsWidgets);
+    // 상세주소가 비어 있으면 [주소 등록]이 꺼져 있다(레퍼런스 2-7-1, 사용자 결정 2026-11-20).
+    expect(
+      t
+          .widget<CommandButton>(find.byKey(const ValueKey('address-save')))
+          .onPressed,
+      isNull,
+    );
 
     await t.tap(find.byKey(const ValueKey('address-search')));
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('f-detail')), '1층');
+    await t.pump();
     await t.tap(find.byKey(const ValueKey('address-save')));
     await t.pumpAndSettle();
 

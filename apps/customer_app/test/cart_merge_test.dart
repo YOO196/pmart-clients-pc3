@@ -52,7 +52,8 @@ void main() {
     await t.pumpAndSettle();
   }
 
-  bool onDelivery() => key('delivery-next').evaluate().isNotEmpty;
+  // 로그인(·병합) 뒤에는 장바구니로 돌아와 수령방법을 고른다(사용자 결정 2026-11-20 — 배송 방식 화면을 장바구니에 합침).
+  bool onDelivery() => key('cart-receive').evaluate().isNotEmpty;
 
   testWidgets('비회원 장바구니가 비어 있으면 병합 화면 없이 바로 주문서', (t) async {
     guest = MockCartRepository(latency: Duration.zero, seeded: false);

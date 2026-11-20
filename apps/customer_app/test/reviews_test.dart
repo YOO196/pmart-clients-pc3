@@ -519,7 +519,7 @@ void main() {
       expect(find.byKey(const ValueKey('review-writable-empty')), findsNothing);
       expect(repo.eligibilityQueries.single.state, ReviewState.eligible);
 
-      await t.tap(find.text('다시 시도').first);
+      await t.tap(find.text('다시 시도하기').first);
       await t.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('review-writable-ol-1')),
@@ -540,7 +540,16 @@ void main() {
       await t.tap(find.byKey(const ValueKey('review-quick-star-ol-1-4')));
       await t.pumpAndSettle();
       // 별 4개가 미리 골라져 있다. 사진 칸은 "사진 0/5".
-      expect(find.byIcon(Icons.star), findsNWidgets(4));
+      // 고른 별은 노란 별(레퍼런스 11-2)
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is IconButton &&
+              w.key.toString().contains('review-star-') &&
+              w.color == const Color(0xFFFFB300),
+        ),
+        findsNWidgets(4),
+      );
       expect(find.text('사진 0/5'), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('review-text')), '신선해요');
       await t.tap(find.byKey(const ValueKey('review-submit')));
@@ -667,7 +676,7 @@ void main() {
         );
       await openManage(t, repo);
       // 목록 조회가 위 실패를 먼저 쓴다 → 다시 시도 뒤 시험할 실패를 다시 넣는다.
-      await t.tap(find.text('다시 시도').first);
+      await t.tap(find.text('다시 시도하기').first);
       await t.pumpAndSettle();
       repo.eligibilityFailures.add(
         const NetworkFailure(DioExceptionType.connectionError),

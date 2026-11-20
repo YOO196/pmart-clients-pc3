@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pmart_ui/pmart_ui.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
@@ -71,7 +72,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     };
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.payTitle),
+        // 레퍼런스 7-4: 끝나면 제목 "주문완료"(뒤로 없음)
+        title: Text(
+          s.phase == PaymentPhase.done ? l10n.payDoneTitle : l10n.payTitle,
+        ),
         automaticallyImplyLeading: s.phase != PaymentPhase.done,
       ),
       body: Center(
@@ -80,9 +84,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (working) const CircularProgressIndicator(),
+              // 레퍼런스 7-3·7-4: 가운데 작은 원형 로딩
+              if (working)
+                const SizedBox.square(
+                  dimension: 30,
+                  child: CircularProgressIndicator(strokeWidth: 3.5),
+                ),
               if (s.phase == PaymentPhase.done)
-                const Icon(Icons.check_circle_outline, size: 64),
+                PmartLineIcon(
+                  PmartLineIcons.checkCircle,
+                  size: 64,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               const SizedBox(height: 16),
               Text(
                 paymentPhaseText(l10n, s),

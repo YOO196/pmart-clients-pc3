@@ -27,7 +27,7 @@ void main() {
     () => orders = MockOrdersRepository(latency: Duration.zero, now: () => now),
   );
 
-  Future<void> openOrders(WidgetTester t) async {
+  Future<void> openOrders(WidgetTester t, {bool failList = false}) async {
     t.view
       ..physicalSize = const Size(800, 2000)
       ..devicePixelRatio = 1;
@@ -42,6 +42,8 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('login-kakao')));
     await t.pumpAndSettle();
+    // 홈의 진행 중 주문 카드도 목록을 읽으므로, 실패는 주문내역을 열기 바로 전에 건다.
+    if (failList) orders.failNextList = true;
     await t.tap(find.byKey(const ValueKey('my-orders')));
     await t.pumpAndSettle();
   }
@@ -62,7 +64,7 @@ void main() {
       t
           .widget<Text>(find.byKey(const ValueKey('order-mode-order-seed-4')))
           .data,
-      '예약배달 · ',
+      '예약배달',
     );
     expect(
       t
@@ -83,6 +85,8 @@ void main() {
     await t.tap(find.byKey(const ValueKey('orders-period')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('orders-period-months6')));
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('orders-sheet-apply')));
     await t.pumpAndSettle();
     // 서울 2026-10-24 기준 6개월 전
     expect(orders.listQueries.last.from, '2026-04-24');
@@ -106,8 +110,7 @@ void main() {
   });
 
   testWidgets('조회 실패는 "주문 없음"이 아니라 오류', (t) async {
-    orders.failNextList = true;
-    await openOrders(t);
+    await openOrders(t, failList: true);
     expect(find.byKey(const ValueKey('orders-empty')), findsNothing);
     expect(find.byKey(const ValueKey('order-order-seed-4')), findsNothing);
   });

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'line_icons.dart';
+import 'ui_state_view.dart' show PmartStateStyle;
 
 /// 고객 앱 브랜드 색(연보라, 사용자 결정 2026-11-11).
 ///
@@ -8,7 +9,7 @@ import 'line_icons.dart';
 /// 화면에서는 되도록 `Theme.of(context).colorScheme` 을 쓰고, 여기 값은 테마를 만드는 데만 쓴다.
 abstract final class PmartBrand {
   /// 주 색. 흰 글자를 올리는 버튼·선택 표시(명암비 4.5:1 이상).
-  static const violet = Color(0xFF7459E8);
+  static const violet = Color(0xFF6A4EE0);
 
   /// 연보라(브랜드 바탕). 배너·선택된 칩·강조 바탕.
   static const lavender = Color(0xFFE9E3FF);
@@ -111,6 +112,8 @@ abstract final class PmartCustomerTheme {
     );
 
     return base.copyWith(
+      // 상태 화면(불러오는 중·오류)을 레퍼런스 모양으로(고객 앱만)
+      extensions: const [PmartStateStyle(reference: true)],
       textTheme: text,
       scaffoldBackgroundColor: scheme.surface,
       visualDensity: VisualDensity.standard,
@@ -132,9 +135,15 @@ abstract final class PmartCustomerTheme {
         scrolledUnderElevation: 0.5,
         shadowColor: scheme.outlineVariant,
         surfaceTintColor: Colors.transparent,
+        // 레퍼런스(2026-11-20, 머리줄 150장 모아 봄): 대부분 가운데 제목(고객센터·장바구니·주문하기·주문상세·리뷰관리 등),
+        // 높이 약 56dp, ← 가운데 약 23dp. 왼쪽 정렬인 화면(주소·환경설정·문의하기·주문내역)은 centerTitle: false + titleSpacing: pmartLeftTitleSpacing 로 덮는다.
         centerTitle: true,
-        toolbarHeight: 46,
-        titleTextStyle: text.titleMedium?.copyWith(fontSize: 16),
+        toolbarHeight: 56,
+        leadingWidth: 46,
+        titleTextStyle: text.titleMedium?.copyWith(
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
+        ),
       ),
       cardTheme: CardThemeData(
         elevation: 0,
@@ -271,10 +280,18 @@ abstract final class PmartCustomerTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(PmartRadius.xl - 4),
+        // 레퍼런스 확인 창(9-1 주문취소·5-3 배달팁): 모서리 약 20dp, 폭 280dp, 제목 19sp 굵게, 본문 14sp(2026-11-20 나란히 비교)
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40),
+        titleTextStyle: text.titleMedium?.copyWith(
+          fontSize: 19,
+          fontWeight: FontWeight.w700,
         ),
-        titleTextStyle: text.titleLarge,
+        contentTextStyle: text.bodyMedium?.copyWith(
+          fontSize: 14,
+          color: scheme.onSurfaceVariant,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,

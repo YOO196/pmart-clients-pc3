@@ -108,6 +108,7 @@ final class ApiCatalogRepository implements CatalogRepository {
         filters: query.filters.isEmpty ? null : query.filters.toList(),
         cursor: cursor,
         size: searchPageSize,
+        noCorrection: query.noCorrection ? true : null,
         cancelToken: cancelToken,
       ),
     );
@@ -251,6 +252,14 @@ ProductTile _tileFromDisplay(sf.DisplayItem i) => ProductTile(
     _ => DisplayBadge.none,
   },
   rank: i.rank,
+  unitPrice: switch (i.unitPrice) {
+    null => null,
+    final u => UnitPrice(
+      basis: u.basis,
+      unitLabel: u.unit.value == 'ML' ? 'ml' : 'g',
+      price: u.price,
+    ),
+  },
 );
 
 SectionKind _kind(sf.SectionKindEnum? k) => switch (k) {
@@ -268,11 +277,22 @@ HomeView homeFromContract(sf.HomeLayout h) => HomeView(
   layoutVersion: h.layoutVersion,
   tabs: [for (final t in h.tabs ?? const <sf.TabKey>[]) _tabFromContract(t)],
   banners: [
-    for (final b in h.banners ?? const <sf.Banner>[])
+    // sortOrder 순(storefront 0.7.0 — HOME_TOP 가로 넘기기 순서)
+    for (final b in [
+      ...?h.banners,
+    ]..sort((a, b) => (a.sortOrder ?? 0).compareTo(b.sortOrder ?? 0)))
       HomeBanner(
         bannerId: _required(b.bannerId, 'Banner.bannerId'),
         imageUrl: b.imageUrl,
         altText: b.altText,
+        placement: b.placement,
+        link: switch (b.linkType?.value) {
+          'SECTION' => BannerLink.section,
+          'PRODUCT' => BannerLink.product,
+          'CATEGORY' => BannerLink.category,
+          _ => BannerLink.none,
+        },
+        linkRef: b.linkRef,
       ),
   ],
   sections: [
@@ -327,6 +347,10 @@ List<CategoryNode> categoriesFromContract(pd.GetCategoryTree200Response r) {
           pd.CategoryLevel.CHIP2 => 4,
         },
         name: n.name,
+        section: switch (n.section?.trim()) {
+          final s? when s.isNotEmpty => s,
+          _ => null,
+        },
       ),
   ];
 }
@@ -349,6 +373,14 @@ ProductPage searchFromContract(sr.SearchResult r) => ProductPage(
   ),
   nextCursor: r.page.nextCursor,
   total: r.total,
+  correctedQuery: switch (r.correctedQuery?.trim()) {
+    final q? when q.isNotEmpty => q,
+    _ => null,
+  },
+  suggestedQuery: switch (r.suggestedQuery?.trim()) {
+    final q? when q.isNotEmpty => q,
+    _ => null,
+  },
 );
 
 List<FilterAttribute> filtersFromContract(sr.GetSearchFilters200Response r) => [
@@ -416,6 +448,14 @@ ProductDetail productFromContract(pc.ProductContent c, {OptionPrices? prices}) {
                 o.price?.priceVersion ?? prices?.prices[o.sku]?.priceVersion,
             priceNotSet: prices?.notSet.contains(o.sku) ?? false,
             carried: o.availability?.carried,
+            unitPrice: switch (o.unitPrice) {
+              null => null,
+              final u => UnitPrice(
+                basis: u.basis,
+                unitLabel: u.unit.value == 'ML' ? 'ml' : 'g',
+                price: u.price,
+              ),
+            },
             availability:
                 _saleState(o.saleState) == SaleState.temporarilySoldOut
                 ? Availability.soldOut

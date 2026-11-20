@@ -9,6 +9,8 @@ import 'package:pmart_core/pmart_core.dart'
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../start/presentation/current_location_flow.dart'
+    show findCurrentAddress;
 import '../../../shared/ui_state_of.dart';
 import '../data/geocoding_repository.dart';
 import '../domain/address.dart';
@@ -81,31 +83,95 @@ class AddressListScreen extends ConsumerWidget {
     final canEdit =
         ref.watch(sessionProvider) is MemberSession &&
         (value.value?.addresses.isNotEmpty ?? false);
+    final theme = Theme.of(context);
+    final muted = theme.colorScheme.onSurfaceVariant;
+    // 레퍼런스 3-1 2-1 "주소 설정": 왼쪽 제목 + 오른쪽 위 연필, 검색칸 + 현재 위치로 찾기, 회색 띠 아래 주소 목록
     return Scaffold(
       appBar: AppBar(
+        centerTitle: false,
+        titleSpacing: pmartLeftTitleSpacing,
         title: Text(l10n.addressTitle),
         actions: [
           if (canEdit)
-            TextButton(
+            IconButton(
               key: const ValueKey('address-edit'),
+              tooltip: l10n.addressEdit,
               onPressed: () => context.push('/addresses/edit'),
-              child: Text(l10n.addressEdit),
+              icon: const PmartLineIcon(PmartLineIcons.pencil, size: 22),
             ),
+          const SizedBox(width: 6),
         ],
       ),
-      floatingActionButton: value.value == null
-          ? null
-          : FloatingActionButton.extended(
-              key: const ValueKey('address-add'),
-              onPressed: () => context.push('/addresses/new'),
-              icon: const Icon(Icons.add),
-              label: Text(l10n.addressAdd),
-            ),
       // 비회원도 배송지를 등록한다(업무 문서: 비회원 배송지). 비회원 배송지는 이 기기에서만 보인다.
-      body: UiStateView<AddressBook?>(
-        state: uiStateOf(value),
-        onRetry: () => ref.invalidate(addressBookProvider),
-        ready: (context, book) => _AddressList(book: book!),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (value.value != null) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+              child: Material(
+                color: theme.colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  key: const ValueKey('address-add'),
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => context.push('/addresses/new'),
+                  child: SizedBox(
+                    height: 46,
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 14),
+                        PmartLineIcon(
+                          PmartLineIcons.search,
+                          size: 20,
+                          color: muted,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          l10n.startAddressSearchHint,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: 15,
+                            color: muted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+              child: OutlinedButton.icon(
+                key: const ValueKey('address-locate'),
+                onPressed: () async {
+                  final picked = await findCurrentAddress(context, ref);
+                  if (picked != null && context.mounted) {
+                    await context.push('/addresses/new', extra: picked);
+                  }
+                },
+                icon: const PmartLineIcon(PmartLineIcons.locate, size: 18),
+                label: Text(l10n.startAddressLocate),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(44),
+                  foregroundColor: theme.colorScheme.onSurface,
+                  side: BorderSide(color: theme.colorScheme.outlineVariant),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+            const PmartSectionGap(height: 8),
+          ],
+          Expanded(
+            child: UiStateView<AddressBook?>(
+              state: uiStateOf(value),
+              onRetry: () => ref.invalidate(addressBookProvider),
+              ready: (context, book) => _AddressList(book: book!),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -145,44 +211,96 @@ class _AddressListState extends ConsumerState<_AddressList> {
     if (book.addresses.isEmpty) {
       return Center(child: Text(l10n.addressEmpty));
     }
-    return RadioGroup<String>(
-      groupValue: book.context.shoppingAddressId,
-      onChanged: (id) {
-        if (id != null && !_busy) _select(id);
-      },
-      child: ListView(
-        children: [
-          if (_busy) const LinearProgressIndicator(),
-          for (final a in book.addresses)
-            RadioListTile<String>(
-              key: ValueKey('address-${a.addressId}'),
-              value: a.addressId,
-              enabled: !_busy,
-              // 레퍼런스: 왼쪽 위치 표시, 오른쪽 선택 표시.
-              controlAffinity: ListTileControlAffinity.trailing,
-              secondary: const Icon(Icons.place, size: 22),
-              title: Text(
-                a.label ?? a.roadAddress,
-                style: Theme.of(context).textTheme.titleSmall
-                    ?.copyWith(fontSize: 15.5, fontWeight: FontWeight.w600),
-              ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  [
-                    '${a.roadAddress} ${a.detailAddress}',
-                    serviceabilityText(l10n, a.serviceability),
-                  ].join('\n'),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+    final theme = Theme.of(context);
+    return ListView(
+      children: [
+        if (_busy) const LinearProgressIndicator(),
+        for (final a in book.addresses)
+          Builder(
+            builder: (context) {
+              final selected = a.addressId == book.context.shoppingAddressId;
+              return InkWell(
+                key: ValueKey('address-${a.addressId}'),
+                onTap: _busy || selected ? null : () => _select(a.addressId),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 1, right: 12),
+                        child: PmartLineIcon(PmartLineIcons.pin, size: 20),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 레퍼런스 3-1 2-1: 굵은 이름 옆 작은 "현재 설정된 주소" 칩
+                            Wrap(
+                              spacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  a.label ?? a.roadAddress,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                if (selected)
+                                  Container(
+                                    key: const ValueKey('address-selected'),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: 1,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      l10n.addressCurrent,
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                            fontSize: 10.5,
+                                            color: theme.colorScheme.primary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              [
+                                '${a.roadAddress} ${a.detailAddress}',
+                                serviceabilityText(l10n, a.serviceability),
+                              ].join('\n'),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: 13.5,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (selected)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8, top: 2),
+                          child: PmartLineIcon(
+                            PmartLineIcons.check,
+                            size: 22,
+                            strokeWidth: 2.4,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-              ),
-              isThreeLine: true,
-            ),
-        ],
-      ),
+              );
+            },
+          ),
+      ],
     );
   }
 }
@@ -238,7 +356,11 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
     final theme = Theme.of(context);
     final value = ref.watch(addressBookProvider);
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.addressEditTitle)),
+      appBar: AppBar(
+        centerTitle: false,
+        titleSpacing: pmartLeftTitleSpacing,
+        title: Text(l10n.addressEditTitle),
+      ),
       body: UiStateView<AddressBook?>(
         state: uiStateOf(value),
         onRetry: () => ref.invalidate(addressBookProvider),
@@ -260,7 +382,7 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                   children: [
                     const Padding(
                       padding: EdgeInsets.only(top: 2, right: 14),
-                      child: Icon(Icons.place, size: 22),
+                      child: PmartLineIcon(PmartLineIcons.pin, size: 22),
                     ),
                     Expanded(
                       child: Column(
@@ -271,19 +393,20 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                             runSpacing: 4,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
+                              // 레퍼런스 3-1 2-3: 제목 15sp 보통, 표시 칩 작게, 둘째 줄 13.5sp 진하게
                               Text(
                                 a.label ?? a.roadAddress,
                                 style: theme.textTheme.titleSmall?.copyWith(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w400,
                                 ),
                               ),
                               if (current)
                                 Container(
                                   key: const ValueKey('address-current-badge'),
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 2,
+                                    horizontal: 5,
+                                    vertical: 1,
                                   ),
                                   decoration: BoxDecoration(
                                     color: theme.colorScheme.primaryContainer,
@@ -292,6 +415,7 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                                   child: Text(
                                     l10n.addressCurrent,
                                     style: theme.textTheme.labelSmall?.copyWith(
+                                      fontSize: 10.5,
                                       color: theme.colorScheme.primary,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -303,31 +427,52 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                           Text(
                             '${a.roadAddress} ${a.detailAddress}',
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 13,
-                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 13.5,
+                              color: theme.colorScheme.onSurface,
                             ),
                           ),
-                          if (!current) ...[
-                            const SizedBox(height: 10),
-                            OutlinedButton(
-                              key: ValueKey('address-delete-${a.addressId}'),
-                              onPressed: _deleting == null
-                                  ? () => _delete(a)
-                                  : null,
-                              style: OutlinedButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                minimumSize: const Size(0, 34),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 6,
+                            children: [
+                              // 레퍼런스 3-1 2-3: 모든 주소에 작은 [수정] → 주소 상세(값 채움)
+                              OutlinedButton(
+                                key: ValueKey('address-modify-${a.addressId}'),
+                                onPressed: _deleting == null
+                                    ? () => context.push(
+                                        '/addresses/edit/${a.addressId}',
+                                      )
+                                    : null,
+                                style: OutlinedButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  minimumSize: const Size(0, 34),
+                                ),
+                                child: Text(l10n.addressModify),
                               ),
-                              child: _deleting == a.addressId
-                                  ? const SizedBox.square(
-                                      dimension: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : Text(l10n.addressDelete),
-                            ),
-                          ],
+                              if (!current) ...[
+                                OutlinedButton(
+                                  key: ValueKey(
+                                    'address-delete-${a.addressId}',
+                                  ),
+                                  onPressed: _deleting == null
+                                      ? () => _delete(a)
+                                      : null,
+                                  style: OutlinedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    minimumSize: const Size(0, 34),
+                                  ),
+                                  child: _deleting == a.addressId
+                                      ? const SizedBox.square(
+                                          dimension: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : Text(l10n.addressDelete),
+                                ),
+                              ],
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -379,7 +524,10 @@ enum _PinState { none, picking, preview, picked, notFound, failed }
 /// 고르면 서버 좌표 변환으로 지도 미리보기를 보이고, "지도에서 위치 확인"으로 큰 지도에서 핀을 맞춘다(7-2).
 
 class AddressFormScreen extends ConsumerStatefulWidget {
-  const AddressFormScreen({super.key, this.initial});
+  const AddressFormScreen({super.key, this.initial, this.editAddressId});
+
+  /// 있으면 그 회원 주소를 고친다(레퍼런스 3-1 2-4 "수정" → 주소 상세, 값 채움).
+  final String? editAddressId;
 
   /// 이미 고른 주소 검색 결과(처음 실행 주소 화면). 있으면 도로명을 채우고 바로 지도 핀으로 간다.
   final PostcodeResult? initial;
@@ -404,9 +552,49 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   String? _postalCode;
   _PinState _pin = _PinState.none;
 
+  /// 고칠 주소를 읽는 중(값을 채우기 전에는 저장하지 않는다).
+  bool _loadingEdit = false;
+
+  Future<void> _loadEdit(String id) async {
+    setState(() => _loadingEdit = true);
+    try {
+      final d = await ref.read(addressRepositoryProvider).draft(id);
+      if (!mounted) return;
+      setState(() {
+        _road.text = d.roadAddress;
+        _detail.text = d.detailAddress;
+        _postalCode = d.postalCode;
+        _geo = d.geo;
+        _preview = d.geo;
+        if (d.geo != null) _pin = _PinState.picked;
+        // 출입 메모는 한 칸으로 저장돼 있다 — 비밀번호 방식이면 비밀번호 칸에, 아니면 찾아오는 길 칸에 그대로.
+        if (d.entranceMethod == EntranceMethod.password) {
+          _password.text = d.entranceNote ?? '';
+        } else {
+          _directions.text = d.entranceNote ?? '';
+        }
+        _loadingEdit = false;
+      });
+    } on PmartFailure {
+      if (!mounted) return;
+      setState(() => _loadingEdit = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).addressEditLoadFailed),
+        ),
+      );
+      context.pop();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    if (widget.editAddressId case final id?) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadEdit(id);
+      });
+    }
     final initial = widget.initial;
     if (initial != null) {
       _road.text = initial.roadAddress;
@@ -511,9 +699,12 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final entrance = _entrance();
-    final outcome = await ref
-        .read(addressBookProvider.notifier)
-        .add(
+    final notifier = ref.read(addressBookProvider.notifier);
+    final editId = widget.editAddressId;
+    final outcome =
+        await (editId == null
+            ? notifier.add
+            : (AddressDraft d) => notifier.modify(editId, d))(
           AddressDraft(
             roadAddress: _road.text.trim(),
             detailAddress: _detail.text.trim(),
@@ -546,8 +737,9 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     FormFieldValidator<String>? validator,
   }) {
     final theme = Theme.of(context);
+    // 레퍼런스 2-7-1: 칸 높이 약 45dp, 칸 사이 19dp, 모서리 10dp
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 19),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -574,12 +766,17 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
             decoration: InputDecoration(
               // 칸 이름은 위에 따로 둔다 — 칸 안에는 예시만.
               hintText: hint ?? label,
+              isDense: true,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 15,
-                vertical: 14,
+                vertical: 13,
               ),
             ),
             validator: validator ?? (required ? _required : null),
@@ -628,8 +825,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                   road,
                   key: const ValueKey('f-road'),
                   style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 if (_jibun case final j?) ...[
@@ -637,16 +834,21 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                   Text(
                     j,
                     key: const ValueKey('address-jibun'),
-                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 14.5),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontSize: 14,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ],
             ),
           ),
-          TextButton(
+          // 레퍼런스: "변경" 글자 없이 — 도로명 줄 오른쪽 돋보기로 다시 찾기
+          IconButton(
             key: const ValueKey('address-search'),
+            tooltip: l10n.addressChange,
             onPressed: _search,
-            child: Text(l10n.addressChange),
+            icon: const PmartLineIcon(PmartLineIcons.search, size: 22),
           ),
         ],
       ),
@@ -663,7 +865,11 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
       color: theme.colorScheme.onSurfaceVariant,
     );
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.addressDetailTitle)),
+      appBar: AppBar(
+        centerTitle: false,
+        titleSpacing: pmartLeftTitleSpacing,
+        title: Text(l10n.addressDetailTitle),
+      ),
       body: Form(
         key: _form,
         child: ListView(
@@ -755,10 +961,18 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: CommandButton(
-              key: const ValueKey('address-save'),
-              label: l10n.addressRegister,
-              onPressed: _save,
+            // 레퍼런스 2-7-1: 상세주소가 비어 있으면 [주소 등록]을 끈다(사용자 결정 2026-11-20).
+            child: ListenableBuilder(
+              listenable: _detail,
+              builder: (context, _) => CommandButton(
+                key: const ValueKey('address-save'),
+                label: widget.editAddressId == null
+                    ? l10n.addressRegister
+                    : l10n.addressModifySave,
+                onPressed: _detail.text.trim().isEmpty || _loadingEdit
+                    ? null
+                    : _save,
+              ),
             ),
           ),
         ),

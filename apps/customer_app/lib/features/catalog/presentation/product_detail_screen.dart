@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +7,7 @@ import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/cart_icon_button.dart';
 import '../../../shared/ui_state_of.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
@@ -71,13 +74,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             icon: const PmartLineIcon(PmartLineIcons.search, size: 23),
             onPressed: () => context.go('/search'),
           ),
-          IconButton(
-            key: const ValueKey('detail-cart'),
-            visualDensity: VisualDensity.compact,
-            tooltip: l10n.cartTitle,
-            icon: const PmartLineIcon(PmartLineIcons.cart, size: 23),
-            onPressed: () => context.go('/cart'),
-          ),
+          const CartIconButton(key: ValueKey('detail-cart')),
           const SizedBox(width: 6),
         ],
       ),
@@ -135,37 +132,89 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         ),
       ),
       const SizedBox(height: 10),
-      // 평점 알약
+      // 평점 알약(레퍼런스 4-1): "★ 4.9 리뷰 12,569개 >" — 누르면 리뷰 전체
       Align(
         alignment: Alignment.centerLeft,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: scheme.outlineVariant, width: 1.2),
+        child: Material(
+          color: scheme.surface,
+          shape: StadiumBorder(
+            side: BorderSide(color: scheme.outlineVariant, width: 1.2),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (hasRating) ...[
-                const Icon(
-                  Icons.star_rounded,
-                  size: 14,
-                  color: Color(0xFFFFB300),
-                ),
-                const SizedBox(width: 3),
-              ],
-              Flexible(
-                child: Text(
-                  ratingText(l10n, rating?.average, rating?.count),
-                  key: const ValueKey('product-rating'),
-                  style: theme.textTheme.labelMedium?.copyWith(fontSize: 12),
-                ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: const ValueKey('product-rating-pill'),
+            onTap: hasRating
+                ? () => context.push('/products/${p.productId}/reviews')
+                : null,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasRating) ...[
+                    const Icon(
+                      Icons.star_rounded,
+                      size: 16,
+                      color: Color(0xFFFFB300),
+                    ),
+                    const SizedBox(width: 3),
+                  ],
+                  Flexible(
+                    child: Text.rich(
+                      hasRating
+                          ? TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: rating.average.toStringAsFixed(1),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text:
+                                      ' ${l10n.reviewSectionCount(rating.count)}',
+                                ),
+                              ],
+                            )
+                          : TextSpan(text: l10n.ratingUnavailable),
+                      key: const ValueKey('product-rating'),
+                      semanticsLabel: ratingText(
+                        l10n,
+                        rating?.average,
+                        rating?.count,
+                      ),
+                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+                    ),
+                  ),
+                  if (hasRating)
+                    const PmartLineIcon(PmartLineIcons.chevronRight, size: 16),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
+      // 큰 가격 + 단위 가격(레퍼런스 4-1) — 고른 옵션의 서버 값
+      if (selected != null) ...[
+        const SizedBox(height: 12),
+        Text(
+          _priceText(l10n, selected),
+          key: const ValueKey('product-price'),
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        if (selected.unitPrice case final u?)
+          Text(
+            l10n.unitPriceLine('${u.basis}${u.unitLabel}', formatKrw(u.price)),
+            key: const ValueKey('product-unit-price'),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 15,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+      ],
       const SizedBox(height: 16),
       // 옵션이 하나뿐이면 고를 것이 없으니 가격·재고만 보이고, 둘 이상일 때만 옵션 선택을 연다.
       if (p.options case [final only])
@@ -230,19 +279,43 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       ],
     ];
     // 위 사진 + 나머지 줄. 화면에 들어올 때 만든다(설명 이미지 여러 장을 처음에 다 만들지 않게 — 백엔드 요청 2026-11-19).
+    // 담을 수 있는 옵션이 하나도 없으면 사진을 어둡게 덮고 "다 팔렸어요"(레퍼런스 4-1)
+    final soldOut =
+        p.options.isNotEmpty && p.options.every((o) => !o.canOfferAdd);
     Widget item(int i) {
       if (i == 0) {
         return LayoutBuilder(
-          builder: (context, c) {
-            final byHeight = MediaQuery.sizeOf(context).height * 0.5;
-            return ProductImage(
-              url: p.mainImageUrl,
-              size: c.maxWidth,
-              height: c.maxWidth < byHeight ? c.maxWidth : byHeight,
-
-              radius: 0,
-            );
-          },
+          // 레퍼런스: 화면 폭 정사각형(360dp)
+          builder: (context, c) => Stack(
+            children: [
+              ProductImage(
+                url: p.mainImageUrl,
+                size: c.maxWidth,
+                // 넓은 화면에서 사진이 내용을 다 밀어내지 않게 화면 높이 절반까지만
+                height: math.min(
+                  c.maxWidth,
+                  MediaQuery.sizeOf(context).height * 0.5,
+                ),
+                radius: 0,
+              ),
+              if (soldOut)
+                Positioned.fill(
+                  child: ColoredBox(
+                    key: const ValueKey('product-sold-out-cover'),
+                    color: Colors.black.withValues(alpha: 0.42),
+                    child: Center(
+                      child: Text(
+                        l10n.productSoldOutCover,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         );
       }
       final w = rest[i - 1];
@@ -301,11 +374,7 @@ class _SingleOptionSummary extends StatelessWidget {
       key: ValueKey('option-${option.sku}'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          _priceText(l10n, option),
-          key: const ValueKey('product-price'),
-          style: theme.textTheme.headlineMedium,
-        ),
+        // 가격은 위 큰 가격 줄에 있다(레퍼런스 4-1). 여기는 재고·용량 보조 문구만.
         if (notes.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 2),

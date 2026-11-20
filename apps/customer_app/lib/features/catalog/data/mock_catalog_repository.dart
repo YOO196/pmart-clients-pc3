@@ -143,13 +143,15 @@ const mockProducts = <MockProduct>[
 base class MockCatalogRepository implements CatalogRepository {
   MockCatalogRepository({
     this.latency = const Duration(milliseconds: 300),
-    this.unavailableSectionIds = const {'S-WEEKLY'},
+    // 앱(목 모드)에서는 모든 영역을 정상으로 보인다(사용자 2026-11-20 "이번 주 장보기도 고쳐").
+    // 부분 실패는 시험에서 이 값을 넘겨 확인한다.
+    this.unavailableSectionIds = const {},
     this.pageSize = 6,
   });
 
   final Duration latency;
 
-  /// 홈에서 UNAVAILABLE 로 내려줄 영역(부분 실패 시연). 재조회하면 성공한다.
+  /// 홈에서 UNAVAILABLE 로 내려줄 영역(부분 실패 시험용). 재조회하면 성공한다.
   final Set<String> unavailableSectionIds;
   final int pageSize;
 
@@ -169,7 +171,31 @@ base class MockCatalogRepository implements CatalogRepository {
     'rating': ?p.rating,
     'reviewCount': ?p.reviewCount,
     'badge': p.newness > 0 ? 'NEW' : 'NONE',
+    ...?_unitPriceJson(p),
   };
+
+  /// 서버처럼 내용량(용량 문자열)이 있으면 100g/100mL당 가격을 준다(storefront 0.3.0).
+  static Map<String, Object?>? _unitPriceJson(MockProduct p) {
+    final m = RegExp(r'^([\d.]+)\s*(kg|g|l|ml)$')
+        .firstMatch(p.capacity.toLowerCase());
+    if (m == null) return null;
+    final n = double.parse(m.group(1)!);
+    final (amount, unit) = switch (m.group(2)) {
+      'kg' => ((n * 1000).round(), 'G'),
+      'g' => (n.round(), 'G'),
+      'l' => ((n * 1000).round(), 'ML'),
+      _ => (n.round(), 'ML'),
+    };
+    if (amount <= 0) return null;
+    return {
+      'netContent': {'amount': amount, 'unit': unit},
+      'unitPrice': {
+        'basis': 100,
+        'unit': unit,
+        'price': (p.price * 100 / amount).round(),
+      },
+    };
+  }
 
   static const _sections = [
     ('S-RANK', 'RANKING', '지금 많이 사는 상품'),
@@ -195,6 +221,23 @@ base class MockCatalogRepository implements CatalogRepository {
         'placement': 'HOME_TOP',
         'altText': '신선식품 30분 배달',
         'linkType': 'NONE',
+        'sortOrder': 1,
+      },
+      // storefront 0.7.0: 누르면 영역·상품·카테고리로(백엔드 요청 2026-11-20 home-banners-themes)
+      {
+        'bannerId': 'BN-2',
+        'placement': 'HOME_TOP',
+        'altText': '새로 들어왔어요',
+        'linkType': 'SECTION',
+        'linkRef': 'S-NEW',
+        'sortOrder': 2,
+      },
+      {
+        'bannerId': 'BN-3',
+        'placement': 'HOME_MIDDLE',
+        'altText': '과일·채소 모아 보기',
+        'linkType': 'CATEGORY',
+        'linkRef': 'C-FV',
         'sortOrder': 1,
       },
     ],
@@ -297,14 +340,56 @@ base class MockCatalogRepository implements CatalogRepository {
     );
   }
 
+  /// 레퍼런스 카테고리 화면(2026-11-20 사용자 제공 그림)과 같은 상위 카테고리·묶음. 상품은 과일·우유·과자에만 있다.
   static const categoryTreeJson = <String, Object?>{
-    'version': 3,
+    'version': 4,
     'nodes': [
+      {
+        'categoryId': 'C-RICE',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '밥·도시락',
+        'sortOrder': 1,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-NOODLE',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '라면·면',
+        'sortOrder': 2,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-SOUP',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '국·탕·찌개',
+        'sortOrder': 3,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-SIDE',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '요리·반찬',
+        'sortOrder': 4,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-BUNSIK',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '분식·야식',
+        'sortOrder': 5,
+        'exposed': true,
+      },
       {
         'categoryId': 'C-FV',
         'level': 'TOP',
-        'name': '과일·채소',
-        'sortOrder': 1,
+        'section': '맛있는것',
+        'name': '과일·채소·샐러드',
+        'sortOrder': 6,
         'exposed': true,
       },
       {
@@ -324,10 +409,75 @@ base class MockCatalogRepository implements CatalogRepository {
         'exposed': true,
       },
       {
+        'categoryId': 'C-GRAIN',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '쌀·잡곡·견과',
+        'sortOrder': 7,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-MEAT',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '정육·수산·계란',
+        'sortOrder': 8,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-DRINK',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '음료·커피·생수',
+        'sortOrder': 9,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-SNACK',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '과자·초콜릿·시리얼',
+        'sortOrder': 10,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C',
+        'parentId': 'C-SNACK',
+        'level': 'SUB',
+        'name': '-',
+        'sortOrder': 1,
+        'exposed': true,
+      },
+      {
+        'categoryId': '스',
+        'parentId': 'C-SNACK',
+        'level': 'SUB',
+        'name': '낵',
+        'sortOrder': 2,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-BREAD',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '빵·떡·잼',
+        'sortOrder': 11,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-ICE',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '아이스크림',
+        'sortOrder': 12,
+        'exposed': true,
+      },
+      {
         'categoryId': 'C-DAIRY',
         'level': 'TOP',
+        'section': '맛있는것',
         'name': '우유·유제품',
-        'sortOrder': 2,
+        'sortOrder': 13,
         'exposed': true,
       },
       {
@@ -347,25 +497,146 @@ base class MockCatalogRepository implements CatalogRepository {
         'exposed': true,
       },
       {
-        'categoryId': 'C-SNACK',
+        'categoryId': 'C-SAUCE',
         'level': 'TOP',
-        'name': '과자·간식',
-        'sortOrder': 3,
+        'section': '맛있는것',
+        'name': '양념·장류·오일',
+        'sortOrder': 14,
         'exposed': true,
       },
       {
-        'categoryId': 'C-CHIPS',
-        'parentId': 'C-SNACK',
-        'level': 'SUB',
-        'name': '스낵',
-        'sortOrder': 1,
+        'categoryId': 'C-HAM',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '햄·어묵·통조림',
+        'sortOrder': 15,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-DIET',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '건강·식단관리',
+        'sortOrder': 16,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-ORGANIC',
+        'level': 'TOP',
+        'section': '맛있는것',
+        'name': '유기농·친환경',
+        'sortOrder': 17,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-HAIR',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '헤어·바디·쉐이빙',
+        'sortOrder': 18,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-DETERGENT',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '세제·방향·탈취',
+        'sortOrder': 19,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-TISSUE',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '화장지·생리대',
+        'sortOrder': 20,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-BEAUTY',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '뷰티·클렌징·선케어',
+        'sortOrder': 21,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-CLEAN',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '청소·욕실',
+        'sortOrder': 22,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-LIVING',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '생활잡화·패션',
+        'sortOrder': 23,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-KITCHEN',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '주방·일회용품',
+        'sortOrder': 24,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-STATIONERY',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '문구·사무용품',
+        'sortOrder': 25,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-DIGITAL',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '가전·게임·전기용품',
+        'sortOrder': 26,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-PET',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '반려동물',
+        'sortOrder': 27,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-BABY',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '유아·아동',
+        'sortOrder': 28,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-MEDICAL',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '건강·의료용품',
+        'sortOrder': 29,
+        'exposed': true,
+      },
+      {
+        'categoryId': 'C-INTERIOR',
+        'level': 'TOP',
+        'section': '편리한것',
+        'name': '홈인테리어',
+        'sortOrder': 30,
         'exposed': true,
       },
       {
         'categoryId': 'C-HIDDEN',
         'level': 'TOP',
         'name': '숨김',
-        'sortOrder': 9,
+        'sortOrder': 99,
         'exposed': false,
       },
     ],
@@ -386,6 +657,12 @@ base class MockCatalogRepository implements CatalogRepository {
     'C-YOGURT': 'C-DAIRY',
     'C-CHIPS': 'C-SNACK',
   };
+
+  /// 목 오타 사전(교정어).
+  static const _typos = {'우우': '우유', '감굴': '감귤', '양퍄': '양파'};
+
+  /// 목 제안어(결과가 적을 때).
+  static const _hints = {'서울우유': '우유'};
 
   Iterable<MockProduct> _match(ProductQuery q) => mockProducts.where((p) {
     final keyword = q.keyword?.trim();
@@ -411,7 +688,29 @@ base class MockCatalogRepository implements CatalogRepository {
   }) async {
     await _wait();
     if (cancelToken?.isCancelled ?? false) throw const CancelledFailure();
-    final all = _match(query).toList();
+    var all = _match(query).toList();
+    // 서버 오타 교정 흉내(search 0.4.0): 0건이고 교정어가 있으면 그 검색어로 찾은 결과를 준다.
+    String? corrected;
+    String? suggested;
+    final typo = _typos[query.keyword?.trim()];
+    if (all.isEmpty && !query.noCorrection && typo != null) {
+      corrected = typo;
+      all = _match(
+        ProductQuery(
+          keyword: typo,
+          categoryId: query.categoryId,
+          filters: query.filters,
+        ),
+      ).toList();
+    }
+    // 결과가 적고(3건 이하) 제안어가 더 많이 찾으면 제안만(결과는 원래 검색어 것) — search 0.4.0.
+    final hint = _hints[query.keyword?.trim()];
+    if (corrected == null &&
+        !query.noCorrection &&
+        hint != null &&
+        all.length <= 3) {
+      suggested = hint;
+    }
     switch (query.sort) {
       case SortKey.relevance:
         break;
@@ -436,7 +735,11 @@ base class MockCatalogRepository implements CatalogRepository {
         'items': [
           for (final p in all.sublist(start, end))
             {
-              ...displayItemJson(p)..remove('badge'),
+              // 검색 결과 계약에는 배지·단위 가격이 없다.
+              ...displayItemJson(p)
+                ..remove('badge')
+                ..remove('unitPrice')
+                ..remove('netContent'),
               'categoryPath': [?_parents[p.categoryId], p.categoryId],
             },
         ],
@@ -446,6 +749,8 @@ base class MockCatalogRepository implements CatalogRepository {
           'size': pageSize,
         },
         'appliedSort': _sortWire(query.sort),
+        'correctedQuery': ?corrected,
+        'suggestedQuery': ?suggested,
         'appliedFilters': query.filters.toList(),
       }),
     );
@@ -525,6 +830,7 @@ base class MockCatalogRepository implements CatalogRepository {
         'saleState': p.saleState,
         'price': {'basePrice': p.price, 'priceVersion': 1},
         'availability': {'carried': true, 'state': p.availability},
+        ...?_unitPriceJson(p),
       },
       if (p.bundleSku != null)
         {

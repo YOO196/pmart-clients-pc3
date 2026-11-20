@@ -73,11 +73,13 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('login-kakao')));
     await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const ValueKey('mode-single')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('mode-single')));
     await t.pump();
-    await t.tap(find.byKey(const ValueKey('delivery-next')));
+    await t.tap(find.byKey(const ValueKey('cart-order')));
     await t.pumpAndSettle();
-    expect(find.text('주문서'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, '주문하기'), findsOneWidget);
   }
 
   VoidCallback? payOnPressed(WidgetTester t) => t
@@ -163,6 +165,9 @@ void main() {
       (draft.json['lines'] as List).cast<Map<String, Object?>>().first,
       containsPair('productName', '서울우유 1L'),
     );
+    // 레퍼런스 6-1: 이름 목록은 "총 N건 상품 자세히 보기"를 눌러야 펼쳐진다.
+    await t.tap(find.byKey(const ValueKey('checkout-items-toggle')));
+    await t.pumpAndSettle();
     expect(find.text('서울우유 1L · 5개'), findsOneWidget);
     expect(find.text('감자칩 오리지널 110g · 1개'), findsOneWidget);
     expect(find.textContaining('E-0000'), findsNothing);
@@ -218,7 +223,7 @@ void main() {
     await t.pumpAndSettle();
 
     // 결제 화면으로 가지 않고 주문서에 남는다.
-    expect(find.text('주문서'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, '주문하기'), findsOneWidget);
     expect(find.byKey(const ValueKey('pg-failed')), findsOneWidget);
     expect(find.text('결제를 취소했어요'), findsOneWidget);
     expect(find.byKey(const ValueKey('order-id')), findsNothing);
@@ -252,7 +257,7 @@ void main() {
     expect(find.byKey(const ValueKey('checkout-rejected')), findsOneWidget);
     expect(find.text('지금은 이 계정으로 주문할 수 없어요. 고객센터로 문의해 주세요'), findsOneWidget);
     expect(pg.launches, 0);
-    expect(find.text('주문서'), findsOneWidget);
+    expect(find.widgetWithText(AppBar, '주문하기'), findsOneWidget);
   });
 
   testWidgets('결제 진행 중에는 주문서 위에 진행 상태를 보이고 결제 버튼을 잠근다', (t) async {

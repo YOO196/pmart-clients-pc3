@@ -55,9 +55,12 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(key('login-kakao'));
     await t.pumpAndSettle();
+    // 로그인 뒤 장바구니로 돌아와 수령방법을 고르고 [주문하기](사용자 결정 2026-11-20 — 배송 방식 화면을 장바구니에 합침)
+    await t.ensureVisible(key('mode-single'));
+    await t.pumpAndSettle();
     await t.tap(key('mode-single'));
     await t.pump();
-    await t.tap(key('delivery-next'));
+    await t.tap(key('cart-order'));
     await t.pumpAndSettle();
   }
 

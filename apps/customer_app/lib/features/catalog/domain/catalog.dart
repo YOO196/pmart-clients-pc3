@@ -23,7 +23,11 @@ class ProductTile {
     this.reviewCount,
     this.badge = DisplayBadge.none,
     this.rank,
+    this.unitPrice,
   });
+
+  /// 카드의 "100g당 999원"(storefront 0.3.0 `unitPrice` — 서버가 계산). 없으면 줄을 그리지 않는다.
+  final UnitPrice? unitPrice;
 
   final String productId;
   final String name;
@@ -45,6 +49,20 @@ class ProductTile {
 
   /// 담기 버튼을 보여도 되는지(안내용). 확정은 장바구니 서버 판정.
   bool get canOfferAdd => saleState == SaleState.onSale && carried != false;
+}
+
+/// 단위 가격(서버 계산 — 앱은 표시만). [basis] 100 · [unitLabel] g/ml · [price] 원.
+@immutable
+class UnitPrice {
+  const UnitPrice({
+    required this.basis,
+    required this.unitLabel,
+    required this.price,
+  });
+
+  final int basis;
+  final String unitLabel;
+  final int price;
 }
 
 /// 판매중지는 빼고 일시품절은 뒤로 보낸다(C 1068). 나머지 순서는 서버 순서 그대로.
@@ -100,9 +118,28 @@ class HomeSection {
 
 enum HomeTab { home, ranking, isNew }
 
+/// 배너를 눌렀을 때 갈 곳(storefront 0.7.0 `linkType`). NONE·NOTICE 는 누를 수 없다.
+enum BannerLink { section, product, category, none }
+
 @immutable
 class HomeBanner {
-  const HomeBanner({required this.bannerId, this.imageUrl, this.altText});
+  const HomeBanner({
+    required this.bannerId,
+    this.imageUrl,
+    this.altText,
+    this.placement,
+    this.link = BannerLink.none,
+    this.linkRef,
+  });
+
+  /// HOME_TOP(위 넘기기)·HOME_MIDDLE(첫 테마 영역 아래). 없으면 위로 본다.
+  final String? placement;
+  final BannerLink link;
+
+  /// SECTION → sectionId, PRODUCT → 상품 ID, CATEGORY → 카테고리 ID.
+  final String? linkRef;
+
+  bool get middle => placement == 'HOME_MIDDLE';
 
   final String bannerId;
   final String? imageUrl;
@@ -142,7 +179,11 @@ class CategoryNode {
     required this.name,
     required this.depth,
     this.parentId,
+    this.section,
   });
+
+  /// 상위 카테고리 묶음 이름("맛있는것"·"편리한것", 계약 section). 없으면 묶지 않는다.
+  final String? section;
 
   final String categoryId;
   final String? parentId;
@@ -172,7 +213,11 @@ class ProductQuery {
     this.categoryId,
     this.sort = SortKey.relevance,
     this.filters = const {},
+    this.noCorrection = false,
   });
+
+  /// 오타 교정 없이 원래 검색어로(search 0.4.0 `noCorrection`) — "원래 검색어로 찾기".
+  final bool noCorrection;
 
   final String? keyword;
   final String? categoryId;
@@ -186,6 +231,7 @@ class ProductQuery {
     categoryId: categoryId,
     sort: sort ?? this.sort,
     filters: filters ?? this.filters,
+    noCorrection: noCorrection,
   );
 
   @override
@@ -194,16 +240,34 @@ class ProductQuery {
       other.keyword == keyword &&
       other.categoryId == categoryId &&
       other.sort == sort &&
+      other.noCorrection == noCorrection &&
       setEquals(other.filters, filters);
 
   @override
-  int get hashCode =>
-      Object.hash(keyword, categoryId, sort, Object.hashAllUnordered(filters));
+  int get hashCode => Object.hash(
+    keyword,
+    categoryId,
+    sort,
+    noCorrection,
+    Object.hashAllUnordered(filters),
+  );
 }
 
 @immutable
 class ProductPage {
-  const ProductPage({required this.items, this.nextCursor, this.total});
+  const ProductPage({
+    required this.items,
+    this.nextCursor,
+    this.total,
+    this.correctedQuery,
+    this.suggestedQuery,
+  });
+
+  /// 원래 검색어가 0건이라 서버가 이 검색어로 고쳐 찾은 결과다(search 0.4.0).
+  final String? correctedQuery;
+
+  /// 결과가 적어 서버가 제안하는 검색어(결과는 원래 검색어 것).
+  final String? suggestedQuery;
 
   final List<ProductTile> items;
   final String? nextCursor;
@@ -253,7 +317,11 @@ class SaleOption {
     this.priceVersion,
     this.priceNotSet = false,
     this.carried,
+    this.unitPrice,
   });
+
+  /// "100g당 999원"(product-content `unitPrice`, 서버 계산). 없으면 줄을 그리지 않는다.
+  final UnitPrice? unitPrice;
 
   final String sku;
 

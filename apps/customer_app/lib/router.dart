@@ -160,14 +160,24 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 parentNavigatorKey: rootNavigatorKey,
                 path: 'cancel',
-                builder: (_, state) =>
-                    CancelScreen(orderId: state.pathParameters['orderId']!),
+                // 레퍼런스 9-1 4: 가운데 창 "주문을 취소할까요?"
+                pageBuilder: (_, state) => PmartDialogPage<void>(
+                  key: state.pageKey,
+                  child: CancelScreen(
+                    orderId: state.pathParameters['orderId']!,
+                  ),
+                ),
               ),
               GoRoute(
                 parentNavigatorKey: rootNavigatorKey,
                 path: 'reschedule',
-                builder: (_, state) =>
-                    RescheduleScreen(orderId: state.pathParameters['orderId']!),
+                // 레퍼런스 9-1 4: 예약시간 변경은 아래 시트
+                pageBuilder: (_, state) => PmartSheetPage<void>(
+                  key: state.pageKey,
+                  child: RescheduleScreen(
+                    orderId: state.pathParameters['orderId']!,
+                  ),
+                ),
               ),
               // 리뷰 요청 알림(REVIEW_REQUESTED) → 그 주문의 리뷰 쓰기(하나면 바로, 여럿이면 고르기).
               GoRoute(
@@ -268,7 +278,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/me/consents/reconsent',
-        builder: (_, _) => const ReconsentScreen(),
+        // 레퍼런스 13-9: 아래 시트(사용자 결정 2026-11-20)
+        pageBuilder: (_, state) => PmartSheetPage<bool>(
+          key: state.pageKey,
+          child: const ReconsentScreen(),
+        ),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
@@ -289,6 +303,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             parentNavigatorKey: rootNavigatorKey,
             path: 'edit',
             builder: (_, _) => const AddressEditScreen(),
+            routes: [
+              // 레퍼런스 3-1 2-4: 주소 편집의 [수정] → 주소 상세(값 채움)
+              GoRoute(
+                parentNavigatorKey: rootNavigatorKey,
+                path: ':addressId',
+                builder: (_, state) => AddressFormScreen(
+                  editAddressId: state.pathParameters['addressId'],
+                ),
+              ),
+            ],
           ),
         ],
       ),

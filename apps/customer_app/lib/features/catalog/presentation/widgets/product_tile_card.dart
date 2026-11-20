@@ -87,13 +87,16 @@ class RatingLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final text = Text(
-      ratingText(l10n, rating, count),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: theme.textTheme.bodySmall?.copyWith(fontSize: 11.5),
-    );
-    if (rating == null || count == null) return text;
+    final small = theme.textTheme.bodySmall?.copyWith(fontSize: 12);
+    if (rating == null || count == null) {
+      return Text(
+        ratingText(l10n, rating, count),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: small,
+      );
+    }
+    // 레퍼런스: 작은 노란 별 + 굵은 검정 점수 + 회색 "(개수)"
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -102,8 +105,29 @@ class RatingLine extends StatelessWidget {
           size: MediaQuery.textScalerOf(context).scale(13),
           color: const Color(0xFFFFB300),
         ),
-        const SizedBox(width: 2),
-        Flexible(child: text),
+        const SizedBox(width: 1),
+        Flexible(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: rating!.toStringAsFixed(1),
+                  style: small?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                TextSpan(
+                  text: ' (${NumberFormat.decimalPattern('ko').format(count)})',
+                ),
+              ],
+            ),
+            semanticsLabel: ratingText(l10n, rating, count),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: small,
+          ),
+        ),
       ],
     );
   }
@@ -139,10 +163,16 @@ class ProductTileCard extends StatelessWidget {
 
   /// 칸 폭 [width] 인 카드 한 장의 높이. 사진 + 이름 2줄·가격·평점·상태 문구가 들어가는 높이에
   /// 기기 글자 크기 설정을 반영한다.
-  static double heightFor(BuildContext context, double width) =>
+  /// [rank] 면 사진 위 순위 숫자 줄만큼 더한다.
+  static double heightFor(
+    BuildContext context,
+    double width, {
+    bool rank = false,
+  }) =>
       width +
       8 +
-      MediaQuery.textScalerOf(context).scale(102).clamp(102, 240).toDouble();
+      (rank ? 22 : 0) +
+      MediaQuery.textScalerOf(context).scale(122).clamp(122, 270).toDouble();
 
   @override
   Widget build(BuildContext context) {
@@ -157,7 +187,8 @@ class ProductTileCard extends StatelessWidget {
     };
     final badge = switch (tile.badge) {
       DisplayBadge.isNew => _CornerBadge(l10n.badgeNew),
-      DisplayBadge.rank when tile.rank != null => _CornerBadge(
+      // 가로 진열은 순위를 사진 위 숫자로 그린다. 세로 목록만 모서리 꼬리표.
+      DisplayBadge.rank when tile.rank != null && !rail => _CornerBadge(
         l10n.badgeRank(tile.rank!),
       ),
       _ => null,
@@ -208,12 +239,13 @@ class ProductTileCard extends StatelessWidget {
           Positioned(right: 5, bottom: 5, child: QuickAddButton(tile: tile)),
       ],
     );
+    // 레퍼런스(3-2 TOP 30·신상품 카드): 이름 14sp 2줄 → 가격 14sp 굵게 → 회색 "100g당 999원" → 별점
     final info = <Widget>[
       Text(
         tile.name,
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13, height: 1.3),
+        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14, height: 1.25),
       ),
       const SizedBox(height: 4),
       Text(
@@ -224,10 +256,18 @@ class ProductTileCard extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: theme.textTheme.titleMedium?.copyWith(
-          fontSize: 14.5,
-          fontWeight: FontWeight.w800,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
         ),
       ),
+      if (tile.unitPrice case final u?)
+        Text(
+          l10n.unitPriceLine('${u.basis}${u.unitLabel}', formatKrw(u.price)),
+          key: ValueKey('tile-unit-price-${tile.productId}'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+        ),
       const SizedBox(height: 2),
       RatingLine(rating: tile.rating, count: tile.reviewCount),
       // 세로 목록(높이 고정 아님)만 아래 줄에 상태를 적는다. 칸 카드는 사진 위에 적었다.
@@ -243,17 +283,32 @@ class ProductTileCard extends StatelessWidget {
         ),
       ],
     ];
+    // 레퍼런스: 품절은 사진만 어둡게 덮고(위 imageOf) 이름·가격 글자는 그대로 진하다. 세로 목록만 살짝 흐리게.
     return InkWell(
       key: ValueKey('tile-${tile.productId}'),
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Opacity(
-        opacity: dimmed ? 0.55 : 1,
+        opacity: dimmed && !rail ? 0.55 : 1,
         child: rail
             ? LayoutBuilder(
                 builder: (context, c) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // 순위 진열은 사진 위에 굵은 숫자(레퍼런스 TOP 30)
+                    if (tile.badge == DisplayBadge.rank && tile.rank != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          '${tile.rank}',
+                          key: ValueKey('tile-rank-${tile.productId}'),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
                     imageOf(c.maxWidth),
                     const SizedBox(height: 8),
                     ...info,
