@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../address/presentation/logout_flow.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../profile/domain/profile.dart';
@@ -322,7 +323,8 @@ class MyScreen extends ConsumerWidget {
                 l10n.logout,
                 key: const ValueKey('logout'),
                 icon: PmartLineIcons.back,
-                onTap: () => ref.read(sessionProvider.notifier).signOut(),
+                // 쇼핑 주소가 있으면 "지금 주소로 계속 둘러볼까요?"(customer 0.14.0)
+                onTap: () => logoutKeepingAddress(context, ref),
               ),
           ]),
         ],

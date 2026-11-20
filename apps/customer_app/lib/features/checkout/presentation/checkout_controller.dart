@@ -256,6 +256,19 @@ enum CheckoutGate {
   rejected,
 }
 
+/// 주문서를 그대로 둔 채 새 초안을 받는 중(라이더 요청사항·품절 시 요청사항을 바꿨을 때). 그동안 주문서는 누를 수 없다.
+final draftRenewingProvider = NotifierProvider<DraftRenewing, bool>(
+  DraftRenewing.new,
+);
+
+class DraftRenewing extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  // ignore: use_setters_to_change_properties
+  void set(bool value) => state = value;
+}
+
 final draftControllerProvider =
     AsyncNotifierProvider<DraftController, DraftState?>(DraftController.new);
 
@@ -315,7 +328,7 @@ class DraftController extends AsyncNotifier<DraftState?> {
 
   /// 주문서 진입. 조건·장바구니가 그대로면 기존 초안을 다시 조회하고(타이머를 새로 시작하지 않는다),
   /// 바뀌었으면 새 초안을 만든다.
-  Future<void> enter() async {
+  Future<void> enter({bool keepVisible = false}) async {
     final justPrepared = _justPrepared;
     _justPrepared = false;
     final setup = ref.read(checkoutSetupProvider);
@@ -335,7 +348,8 @@ class DraftController extends AsyncNotifier<DraftState?> {
       ref.read(checkoutSetupProvider.notifier).renewIntent();
     }
     final setupNow = ref.read(checkoutSetupProvider);
-    state = const AsyncLoading();
+    // 주문서를 그대로 두고 바꾸는 중이면 로딩 화면으로 바꾸지 않는다(화면 전체가 다시 그려지지 않게).
+    if (!keepVisible || current == null) state = const AsyncLoading();
     try {
       final request = _request(setupNow);
       final draft = await _createWithResend(request);
@@ -503,6 +517,19 @@ class DraftController extends AsyncNotifier<DraftState?> {
     }
     state = const AsyncData(null);
     await enter();
+  }
+
+  /// 주문서의 요청사항(라이더·품절 시)을 바꿨다 — 새 의도로 초안을 다시 만들되 **주문서는 그대로 둔다**(사용자 2026-11-20:
+  /// "라이더 요청사항을 바꾸면 화면 전체가 다시 그려진다"). 받는 동안 [draftRenewingProvider] 로 주문서를 막는다.
+  /// 새 초안이 오면 그 값(서버 확정)으로 바뀐다. 초안이 없거나 만료면 [recreate] 와 같다.
+  Future<void> renewInPlace() async {
+    if (_current == null || _current!.draft.expired) return recreate();
+    final busy = ref.read(draftRenewingProvider.notifier)..set(true);
+    try {
+      await enter(keepVisible: true);
+    } finally {
+      if (ref.mounted) busy.set(false);
+    }
   }
 
   /// 내 연락처를 바꿨다 — 연락처는 초안을 만들 때 사본으로 고정되므로(BR-37) 새 의도로 초안을 다시 만든다.

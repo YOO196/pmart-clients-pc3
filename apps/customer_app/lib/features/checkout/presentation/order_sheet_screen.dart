@@ -760,36 +760,48 @@ class _SheetState extends ConsumerState<_Sheet> {
         ),
       ],
     );
-    if (!_working(flow)) return body;
-    // 결제 진행 중(진입 대기·결제창·결과 확인). 이 화면 위에서 진행하고, 뒤로가기·재탭을 막는다.
+    // 요청사항을 바꿔 새 초안을 받는 중이면 주문서는 그대로 두고(다시 그리지 않게 같은 자리에 둔다) 위에 얇은 진행 막대만,
+    // 누르기는 막는다. 결제 진행 중(진입 대기·결제창·결과 확인)이면 이 화면 위에서 진행하고, 뒤로가기·재탭을 막는다.
+    final renewing = ref.watch(draftRenewingProvider);
+    final working = _working(flow);
     return Stack(
+      fit: StackFit.expand,
       children: [
-        body,
-        const ModalBarrier(dismissible: false, color: Colors.black38),
-        Center(
-          child: Card(
-            key: const ValueKey('pay-progress'),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 16),
-                  Text(
-                    paymentPhaseText(l10n, flow),
-                    key: const ValueKey('pay-phase-inline'),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  if (flow.phase == PaymentPhase.confirming) ...[
-                    const SizedBox(height: 8),
-                    Text(l10n.payDoNotRetry, textAlign: TextAlign.center),
+        AbsorbPointer(absorbing: renewing, child: body),
+        if (renewing)
+          const Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: LinearProgressIndicator(key: ValueKey('draft-renewing')),
+          ),
+        if (working) ...[
+          const ModalBarrier(dismissible: false, color: Colors.black38),
+          Center(
+            child: Card(
+              key: const ValueKey('pay-progress'),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(
+                      paymentPhaseText(l10n, flow),
+                      key: const ValueKey('pay-phase-inline'),
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    if (flow.phase == PaymentPhase.confirming) ...[
+                      const SizedBox(height: 8),
+                      Text(l10n.payDoNotRetry, textAlign: TextAlign.center),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -1175,70 +1187,90 @@ class _ItemsPreviewState extends State<_ItemsPreview> {
 
 /// 라이더 요청사항 바꾸기(아래 시트). 바꾸면 새 주문 의도로 초안을 다시 만든다(같은 의도는 예전 초안이 돌아온다).
 Future<void> _editNote(BuildContext context, WidgetRef ref) async {
-  final l10n = AppLocalizations.of(context);
-  final ctl = TextEditingController(
-    text: ref.read(checkoutSetupProvider).deliveryNote,
-  );
+  final initial = ref.read(checkoutSetupProvider).deliveryNote;
   final saved = await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (context) {
-      final theme = Theme.of(context);
-      return Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          20,
-          20,
-          16 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Column(
-          key: const ValueKey('note-sheet'),
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              l10n.deliveryNoteTitle,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              key: const ValueKey('note-input'),
-              controller: ctl,
-              autofocus: true,
-              maxLength: 200,
-              decoration: InputDecoration(
-                hintText: l10n.deliveryNote,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            FilledButton(
-              key: const ValueKey('note-done'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-              ),
-              onPressed: () => Navigator.of(context).pop(ctl.text.trim()),
-              child: Text(l10n.contactDone),
-            ),
-          ],
-        ),
-      );
-    },
+    // 입력칸은 시트가 가지고 시트와 함께 정리한다(닫히는 동안에도 쓰인다 — 먼저 정리하면 오류).
+    builder: (context) => _NoteSheet(initial: initial),
   );
-  ctl.dispose();
   if (saved == null || !context.mounted) return;
   ref.read(checkoutSetupProvider.notifier)
     ..setNote(saved)
     ..renewIntent();
-  await ref.read(draftControllerProvider.notifier).recreate();
+  await ref.read(draftControllerProvider.notifier).renewInPlace();
+}
+
+class _NoteSheet extends StatefulWidget {
+  const _NoteSheet({required this.initial});
+
+  final String initial;
+
+  @override
+  State<_NoteSheet> createState() => _NoteSheetState();
+}
+
+class _NoteSheetState extends State<_NoteSheet> {
+  late final ctl = TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    ctl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        16 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        key: const ValueKey('note-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            l10n.deliveryNoteTitle,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 19,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            key: const ValueKey('note-input'),
+            controller: ctl,
+            autofocus: true,
+            maxLength: 200,
+            decoration: InputDecoration(
+              hintText: l10n.deliveryNote,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            key: const ValueKey('note-done'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+            ),
+            onPressed: () => Navigator.of(context).pop(ctl.text.trim()),
+            child: Text(l10n.contactDone),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// 품절 시 요청사항 바꾸기(레퍼런스 6-4 시트: 라디오 둘 + 다음에도 적용 + [완료]).
@@ -1322,5 +1354,5 @@ Future<void> _editOutOfStock(BuildContext context, WidgetRef ref) async {
   if (remember) await saveOutOfStockPreference(context, ref, pick);
   if (!context.mounted) return;
   setupCtl.renewIntent();
-  await ref.read(draftControllerProvider.notifier).recreate();
+  await ref.read(draftControllerProvider.notifier).renewInPlace();
 }

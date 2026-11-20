@@ -379,6 +379,22 @@ void main() {
     await shot('orders-status-sheet');
     await t.tap(find.byKey(const ValueKey('orders-sheet-close')));
     await t.pumpAndSettle();
+    // 끝난 주문 카드의 [같은 상품 담기](레퍼런스 9-2 1, 2026-11-20)
+    final reorderAll = find.byWidgetPredicate(
+      (w) =>
+          w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('order-reorder-all-'),
+    );
+    for (var i = 0; i < 8 && reorderAll.evaluate().isEmpty; i++) {
+      await t.drag(find.byType(Scrollable).last, const Offset(0, -500));
+      await t.pumpAndSettle();
+    }
+    if (reorderAll.evaluate().isNotEmpty) {
+      await t.ensureVisible(reorderAll.first);
+      await t.pumpAndSettle();
+      await shot('orders-reorder-all');
+      await go('/orders');
+    }
     await t.tap(
       find
           .byWidgetPredicate(

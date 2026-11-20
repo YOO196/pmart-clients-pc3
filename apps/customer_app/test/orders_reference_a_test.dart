@@ -259,6 +259,59 @@ void main() {
       expect(find.text('장바구니에 3개 있어요'), findsOneWidget);
     });
 
+    testWidgets(
+      '끝난 주문 카드의 [같은 상품 담기]: 카드의 상품을 차례로 새로 담고 담은 개수를 알린다(레퍼런스 9-2)',
+      (t) async {
+        final cart = MockCartRepository(latency: Duration.zero);
+        await openOrders(t, cart: cart);
+        final button = find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith(
+                'order-reorder-all-',
+              ),
+        );
+        expect(button, findsWidgets);
+        final orderId = (t.widget(button.first).key! as ValueKey<String>).value
+            .substring('order-reorder-all-'.length);
+        final lines = find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith(
+                'order-line-add-',
+              ) &&
+              find
+                  .ancestor(
+                    of: find.byWidget(w),
+                    matching: find.byKey(ValueKey('order-card-$orderId')),
+                  )
+                  .evaluate()
+                  .isNotEmpty,
+        );
+        final sent = cart.changes.length;
+        await t.ensureVisible(button.first);
+        await t.pumpAndSettle();
+        await t.tap(button.first);
+        await t.pumpAndSettle();
+        final added = cart.changes.sublist(sent);
+        expect(added, isNotEmpty);
+        expect(added, everyElement(isA<AddItem>()));
+        expect(find.text('${added.length}개 상품을 장바구니에 담았어요'), findsOneWidget);
+        // 카드 줄 수보다 많이 보내지 않는다(줄 찾기가 안 되면 건너뜀).
+        if (lines.evaluate().isNotEmpty) {
+          expect(added.length, lessThanOrEqualTo(lines.evaluate().length));
+        }
+
+        // 다시 누르면 이미 담긴 상품은 보내지 않는다.
+        await t.pump(const Duration(seconds: 3));
+        await t.pumpAndSettle();
+        await t.tap(button.first);
+        await t.pumpAndSettle();
+        expect(cart.changes.sublist(sent), hasLength(added.length));
+        expect(find.text('이미 장바구니에 있어요'), findsOneWidget);
+      },
+    );
+
     testWidgets('품목 담기는 현재 조건의 새 담기(AddItem)이고 서버 결과를 그 줄에 보인다', (t) async {
       final cart = MockCartRepository(latency: Duration.zero);
       await openOrders(t, cart: cart);

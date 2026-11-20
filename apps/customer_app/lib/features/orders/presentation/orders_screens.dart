@@ -786,6 +786,22 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             ],
           ),
         ],
+        // 끝난 주문: 카드 아래 넓은 [같은 상품 담기](레퍼런스 9-2 1, 사용자 2026-11-20). 카드에 안 보인 상품이
+        // 있으면(서버가 앞 5개만 줌) 전부 담을 수 있는 주문상세로 간다.
+        if (!ongoing && o.lines.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          o.moreQty == null
+              ? ReorderAllButton(
+                  key: ValueKey('order-reorder-all-${o.orderId}'),
+                  lines: [
+                    for (final l in o.lines) (sku: l.sku, quantity: l.quantity),
+                  ],
+                )
+              : ReorderAllButton.goDetail(
+                  key: ValueKey('order-reorder-all-${o.orderId}'),
+                  onPressed: () => context.push('/orders/${o.orderId}'),
+                ),
+        ],
         if (o.canHide)
           Align(
             alignment: Alignment.centerRight,
@@ -1860,6 +1876,96 @@ class _LineTile extends ConsumerWidget {
           if (action case final a?) ...[const SizedBox(width: 8), a],
         ],
       ),
+    );
+  }
+}
+
+/// 주문내역 카드의 넓은 [같은 상품 담기](레퍼런스 9-2 1). 줄마다 차례로 담는다 — 이미 담긴 상품은 건너뛰고,
+/// 거절되면 그 줄은 넘어가며, 결과 불명·장바구니 바쁨·조회 실패면 멈춘다(같은 키 재전송은 장바구니 컨트롤러가 한다).
+/// 결과는 서버가 반영한 것만 센다.
+class ReorderAllButton extends ConsumerStatefulWidget {
+  const ReorderAllButton({super.key, required this.lines}) : onPressed = null;
+
+  /// 카드에 다 보이지 않는 주문 — 주문상세로 보낸다.
+  const ReorderAllButton.goDetail({super.key, required this.onPressed})
+    : lines = const [];
+
+  final List<({String sku, int quantity})> lines;
+  final VoidCallback? onPressed;
+
+  @override
+  ConsumerState<ReorderAllButton> createState() => _ReorderAllButtonState();
+}
+
+class _ReorderAllButtonState extends ConsumerState<ReorderAllButton> {
+  bool _busy = false;
+
+  Future<void> _run() async {
+    if (_busy) return;
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    var added = 0;
+    String? stop;
+    String? rejected;
+    try {
+      for (final line in widget.lines) {
+        final cart = await ref.read(cartControllerProvider.future);
+        if (cart.cart.lineForSku(line.sku) != null) {
+          continue;
+        }
+        final outcome = await ref
+            .read(cartControllerProvider.notifier)
+            .submitWhenReady(
+              AddItem(
+                sku: line.sku,
+                quantity: line.quantity < 1 ? 1 : line.quantity,
+              ),
+            );
+        switch (outcome) {
+          case null:
+            stop = l10n.reorderBusy;
+          case CartChangeApplied():
+            added++;
+          case CartChangeRejected():
+            rejected ??= cartOutcomeText(l10n, outcome);
+          default:
+            stop = cartOutcomeText(l10n, outcome);
+        }
+        if (stop != null) break;
+      }
+    } on PmartFailure {
+      stop = l10n.cartUnavailableForAdd;
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    messenger.notice(
+      stop ??
+          rejected ??
+          (added > 0 ? l10n.reorderAllAdded(added) : l10n.reorderAllInCart),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return FilledButton(
+      style: FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(48),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        textStyle: theme.textTheme.titleSmall?.copyWith(
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      onPressed: _busy ? null : (widget.onPressed ?? _run),
+      child: _busy
+          ? const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Text(l10n.reorderAll),
     );
   }
 }

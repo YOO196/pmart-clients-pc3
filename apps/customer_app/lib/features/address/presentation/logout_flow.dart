@@ -1,0 +1,78 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pmart_core/pmart_core.dart';
+import 'package:pmart_ui/pmart_ui.dart';
+
+import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/notice.dart';
+import '../../auth/presentation/auth_controller.dart';
+import '../domain/address.dart';
+import 'address_controller.dart';
+
+/// 로그아웃(customer 0.14.0 — 백엔드 요청 2026-11-20 logout-keep-browsing-address).
+///
+/// 이 기기에 비회원 배송지가 없고 회원의 쇼핑 주소가 있으면 "지금 주소로 계속 둘러볼까요?"를 묻는다.
+/// - [예]: 로그아웃한 뒤 그 주소의 **도로명·우편번호·좌표만** 비회원 배송지로 만든다(상세 주소·받는 분·연락처·출입 메모는
+///   옮기지 않는다 — 공용 기기에 개인정보를 남기지 않기). 만든 배송지를 이 기기에 기억하고 고른다.
+/// - [아니요]: 지금처럼 로그아웃만(다음 화면에서 주소를 고른다).
+/// - 창을 닫으면 로그아웃하지 않는다.
+/// 이미 비회원 배송지가 있으면 묻지 않고 로그아웃한다(그 주소를 그대로 쓴다).
+Future<void> logoutKeepingAddress(BuildContext context, WidgetRef ref) async {
+  final l10n = AppLocalizations.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final session = ref.read(sessionProvider.notifier);
+  final store = ref.read(guestAddressStoreProvider);
+  final repo = ref.read(addressRepositoryProvider);
+  final shopping = ref.read(addressBookProvider).value?.shoppingAddress;
+
+  if (shopping == null || (await store.ids()).isNotEmpty) {
+    await session.signOut();
+    return;
+  }
+  if (!context.mounted) return;
+  final keep = await showPmartConfirm(
+    context,
+    title: l10n.logoutKeepAddressTitle,
+    body: l10n.logoutKeepAddressBody(shopping.roadAddress),
+    confirmLabel: l10n.logoutKeepAddressYes,
+    cancelLabel: l10n.logoutKeepAddressNo,
+    confirmKey: const ValueKey('logout-keep-address-yes'),
+    cancelKey: const ValueKey('logout-keep-address-no'),
+  );
+  if (keep == null) return; // 창을 닫음 — 로그아웃하지 않는다.
+
+  // 좌표·우편번호는 회원 토큰이 있을 때 읽어 둔다(로그아웃 뒤에는 읽을 수 없다). 못 읽으면 도로명만으로.
+  AddressDraft? saved;
+  if (keep) {
+    try {
+      saved = await repo.draft(shopping.addressId);
+    } on PmartFailure {
+      saved = null;
+    }
+  }
+  await session.signOut();
+  if (!keep) return;
+
+  final draft = AddressDraft(
+    roadAddress: shopping.roadAddress,
+    // 상세 주소는 옮기지 않는다(비회원 배송지는 선택 — 0.14.0).
+    detailAddress: '',
+    postalCode: saved?.postalCode,
+    geo: saved?.geo,
+  );
+  final key = IdempotencyKey.generate();
+  try {
+    Address guest;
+    try {
+      guest = await repo.addGuest(draft, key: key);
+    } on UnknownResultFailure {
+      guest = await repo.addGuest(draft, key: key);
+    }
+    await store.add(guest.addressId);
+    await store.select(guest.addressId);
+    ref.invalidate(addressBookProvider);
+  } on PmartFailure {
+    // 로그아웃은 끝났다 — 주소만 못 옮겼다. 다음 화면에서 주소를 고르게 된다.
+    messenger.notice(l10n.logoutKeepAddressFailed);
+  }
+}

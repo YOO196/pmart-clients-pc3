@@ -122,7 +122,9 @@ final loginGuestAddressesProvider = FutureProvider.autoDispose<List<Address>>((
   final found = <Address>[];
   for (final id in await store.ids()) {
     try {
-      found.add(await repo.guest(id));
+      final a = await repo.guest(id);
+      // 상세 주소 없는 둘러보기 배송지(로그아웃 때 옮긴 것)는 회원 주소록으로 옮길 수 없다(회원은 상세 주소 필수) — 묻지 않는다.
+      if (a.detailAddress.trim().isNotEmpty) found.add(a);
     } on ProblemFailure catch (f) {
       if (f.problem.code != ProblemCode.notFound) rethrow;
     }

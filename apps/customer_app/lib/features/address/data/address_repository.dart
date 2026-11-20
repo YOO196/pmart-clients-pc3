@@ -286,7 +286,8 @@ final class ApiAddressRepository implements AddressRepository {
 api.AddressInput addressInputToContract(AddressDraft draft) => api.AddressInput(
   label: draft.label,
   roadAddress: draft.roadAddress,
-  detailAddress: draft.detailAddress,
+  // 비회원 배송지는 상세 주소 없이도 된다(0.14.0 — 로그아웃 뒤 둘러보기). 비었으면 보내지 않는다.
+  detailAddress: draft.detailAddress.isEmpty ? null : draft.detailAddress,
   postalCode: draft.postalCode,
   receiverName: draft.receiverName,
   receiverPhone: draft.receiverPhone,
@@ -310,7 +311,8 @@ Address addressFromContract(api.Address a) => Address(
   version: a.version ?? 0,
   label: a.label,
   roadAddress: a.roadAddress,
-  detailAddress: a.detailAddress,
+  // 비회원 둘러보기 배송지는 상세 주소가 없을 수 있다(0.14.0).
+  detailAddress: a.detailAddress ?? '',
   receiverName: a.receiverName,
   entranceMethod: switch (a.entranceMethod) {
     api.AddressEntranceMethodEnum.FREE => EntranceMethod.free,
@@ -331,7 +333,8 @@ Address addressFromContract(api.Address a) => Address(
 AddressDraft draftFromContract(api.Address a) => AddressDraft(
   label: a.label,
   roadAddress: a.roadAddress,
-  detailAddress: a.detailAddress,
+  // 비회원 둘러보기 배송지는 상세 주소가 없을 수 있다(0.14.0).
+  detailAddress: a.detailAddress ?? '',
   receiverName: a.receiverName,
   receiverPhone: a.receiverPhone,
   postalCode: a.postalCode,
