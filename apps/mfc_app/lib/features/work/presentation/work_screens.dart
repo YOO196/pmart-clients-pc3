@@ -11,7 +11,6 @@ import '../../auth/presentation/auth_controller.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/field_widgets.dart' show NoticeBox, StepCaption;
 import '../../../shared/pda_theme.dart';
-import '../../../shared/providers.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../my_work/presentation/my_work.dart';
 import '../../tasks/presentation/task_controllers.dart';
@@ -194,20 +193,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final mock = ref.watch(envProvider) == PmartEnv.mock;
+    // 상단바 이름·상태 — 근무 센터가 하나일 때만 읽는다(센터가 없으면 업무 API 를 부르지 않는다).
+    final barMe = ref.watch(centerScopeProvider) is SingleCenter
+        ? ref.watch(meProvider).value
+        : null;
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.homeTitle),
-        // 오늘 업무 내역 칩(사용자 2026-11-17). 근무 센터가 정해졌을 때만(내역 조회에 센터가 필요).
+        // 상단바에 "픽PDA" + 직원 이름(사용자 2026-11-20 "직원 명은 픽PDA 문구가 있는 바로"). 이름을 읽기 전에는 픽PDA 만.
+        title: _HomeTitle(me: barMe),
+        // 오늘 업무 내역 칩 — 이름 바로 아래 줄(사용자 2026-11-17·2026-11-20). 근무 센터가 정해졌을 때만(내역 조회에 센터가 필요).
         bottom: ref.watch(centerScopeProvider) is SingleCenter
             ? const MyWorkBar()
             : null,
         actions: [
-          if (mock)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Chip(label: Text(l10n.mockModeBadge)),
-            ),
+          // 목업 표시는 화면 맨 위 주황 띠가 한다 — 홈 상단바는 이름 자리를 남긴다.
+          if (barMe case final me?) _StatusChip(onBreak: me.onBreak),
           IconButton(
             key: const ValueKey('logout'),
             tooltip: l10n.logout,
@@ -333,74 +333,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  l10n.homeHello(me.displayName ?? me.workerId),
-                                  style: theme.textTheme.headlineSmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: -1.2,
-                                      ),
-                                ),
-                              ),
-                              // 근무 상태 — 작은 회색 글씨 대신 칩(휴게 중은 노랑).
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: me.onBreak
-                                      ? PdaColors.warning
-                                      : PdaColors.lilac,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  me.onBreak
-                                      ? l10n.statusOnBreak
-                                      : l10n.statusReady,
-                                  key: const ValueKey('worker-status'),
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: me.onBreak
-                                        ? PdaColors.onWarning
-                                        : PdaColors.onNotice,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(2, 18, 0, 8),
-                            child: Text(
-                              l10n.chooseWork,
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: PdaColors.muted,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          // 업무는 한 줄에 하나, 가로로 긴 칸(사용자 2026-11-20 "1열로 가로로 긴 버튼") —
-                          // 그림·이름·한 줄 설명. 고르면 그 칸이 커지며 안내 화면 위 카드가 된다.
-                          for (final (i, a) in areas.indexed)
+                      // 업무 칸은 스크롤하지 않는다(사용자 2026-11-20) — 다섯 칸이 남은 높이에 맞게 줄어든다(최대 80).
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                             Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: EnterFade(
-                                index: i,
-                                child: _AreaTile(
-                                  area: a,
-                                  allowed: me.can(a),
-                                  onTap: () => openArea(a),
+                              padding: const EdgeInsets.fromLTRB(2, 12, 0, 8),
+                              child: Text(
+                                l10n.chooseWork,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: PdaColors.muted,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
                             ),
-                        ],
+                            // 업무는 한 줄에 하나, 가로로 긴 칸(사용자 2026-11-20 "1열로 가로로 긴 버튼") —
+                            // 그림·이름·한 줄 설명. 고르면 그 칸이 커지며 안내 화면 위 카드가 된다.
+                            Expanded(
+                              child: LayoutBuilder(
+                                builder: (context, c) {
+                                  const gap = 10.0;
+                                  final h =
+                                      ((c.maxHeight -
+                                                  gap * (areas.length - 1)) /
+                                              areas.length)
+                                          .clamp(44.0, _AreaFlight._tileHeight);
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      for (final (i, a) in areas.indexed) ...[
+                                        if (i > 0) const SizedBox(height: gap),
+                                        EnterFade(
+                                          index: i,
+                                          child: _AreaTile(
+                                            area: a,
+                                            allowed: me.can(a),
+                                            height: h,
+                                            onTap: () => openArea(a),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     // 도구 줄은 기종과 상관없이 화면 맨 아래(사용자 2026-11-19) — 아래 시스템 막대 위로 띄운다.
@@ -737,11 +719,15 @@ class _AreaTile extends StatelessWidget {
     required this.area,
     required this.allowed,
     required this.onTap,
+    this.height = _AreaFlight._tileHeight,
   });
 
   final WorkArea area;
   final bool allowed;
   final VoidCallback onTap;
+
+  /// 칸 높이 — 홈은 남은 높이에 맞춰 줄인다(스크롤 없음). 낮으면(68 미만) 설명 줄을 숨긴다.
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -765,7 +751,7 @@ class _AreaTile extends StatelessWidget {
               key: ValueKey('area-${area.name}'),
               onTap: onTap,
               child: SizedBox(
-                height: _AreaFlight._tileHeight,
+                height: height,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: _AreaFlight._tilePad,
@@ -787,7 +773,11 @@ class _AreaTile extends StatelessWidget {
                       ),
                       const SizedBox(width: _AreaFlight._tileGap),
                       Expanded(
-                        child: _AreaTileText(area: area, allowed: allowed),
+                        child: _AreaTileText(
+                          area: area,
+                          allowed: allowed,
+                          showDesc: height >= 68,
+                        ),
                       ),
                       Icon(
                         allowed ? Icons.chevron_right : Icons.lock_outline,
@@ -807,10 +797,15 @@ class _AreaTile extends StatelessWidget {
 
 /// 가로 칸의 글 — 이름(18·800) + 한 줄 설명. 날아가는 동안([_AreaFlight])에도 같은 모양으로 그린다.
 class _AreaTileText extends StatelessWidget {
-  const _AreaTileText({required this.area, this.allowed = true});
+  const _AreaTileText({
+    required this.area,
+    this.allowed = true,
+    this.showDesc = true,
+  });
 
   final WorkArea area;
   final bool allowed;
+  final bool showDesc;
 
   @override
   Widget build(BuildContext context) {
@@ -832,14 +827,16 @@ class _AreaTileText extends StatelessWidget {
             letterSpacing: -0.3,
           ),
         ),
-        const SizedBox(height: 2),
-        Text(
-          workAreaDesc(l10n, area),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          softWrap: false,
-          style: theme.textTheme.bodySmall?.copyWith(color: PdaColors.muted),
-        ),
+        if (showDesc) ...[
+          const SizedBox(height: 2),
+          Text(
+            workAreaDesc(l10n, area),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            softWrap: false,
+            style: theme.textTheme.bodySmall?.copyWith(color: PdaColors.muted),
+          ),
+        ],
       ],
     );
   }
@@ -1567,6 +1564,76 @@ class _BreakPinDialogState extends State<BreakPinDialog> {
           child: Text(l10n.breakPinOk),
         ),
       ],
+    );
+  }
+}
+
+/// 홈 상단바 제목 — "픽PDA" 작게(흰색 70%) + 직원 이름 크게(흰색).
+class _HomeTitle extends StatelessWidget {
+  const _HomeTitle({required this.me});
+
+  final WorkerProfile? me;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final who = me;
+    return Text.rich(
+      key: const ValueKey('home-title'),
+      TextSpan(
+        children: [
+          TextSpan(
+            text: l10n.homeTitle,
+            style: const TextStyle(
+              color: PdaColors.onBarMuted,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (who != null) ...[
+            const TextSpan(text: '   '),
+            TextSpan(
+              text: l10n.homeHello(who.displayName ?? who.workerId),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
+        ],
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+}
+
+/// 근무 상태 칩(상단바 오른쪽) — 작업 대기는 옅은 보라, 휴게 중은 노랑.
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.onBreak});
+
+  final bool onBreak;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      margin: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: onBreak ? PdaColors.warning : PdaColors.lilac,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        onBreak ? l10n.statusOnBreak : l10n.statusReady,
+        key: const ValueKey('worker-status'),
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: onBreak ? PdaColors.onWarning : PdaColors.onNotice,
+        ),
+      ),
     );
   }
 }

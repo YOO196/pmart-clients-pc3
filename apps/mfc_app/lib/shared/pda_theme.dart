@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// PDA 전용 테마 — 흰 바탕 + 중립 회색, 보라는 포인트(주 버튼·지금 단계·수량·위치 값)에만
 /// (사용자 2026-11-19 "흰색 기본에 포인트 컬러만 연보라 내지는 보라"). 배치는 시안 `pda-preview.html`.
@@ -40,6 +41,12 @@ abstract final class PdaColors {
 
   /// 거절·오류 칩 바탕(옅은 빨강).
   static const dangerSoft = Color(0xFFFBE6E3);
+
+  /// 상단바 — 채도 낮은 어두운 회색에 보라를 조금(사용자 2026-11-20). 글자·그림은 흰색.
+  static const bar = Color(0xFF37333F);
+
+  /// 상단바 위 보조 글씨(흰색 70%).
+  static const onBarMuted = Color(0xB3FFFFFF);
 }
 
 abstract final class PdaTheme {
@@ -113,20 +120,23 @@ abstract final class PdaTheme {
       textTheme: base,
       scaffoldBackgroundColor: PdaColors.paper,
       visualDensity: VisualDensity.standard,
+      // 상단바: 보라빛 어두운 회색 바탕 + 흰 글자·그림, 상태 표시줄 그림도 흰색(사용자 2026-11-20).
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: PdaColors.ink,
+        backgroundColor: PdaColors.bar,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actionsIconTheme: const IconThemeData(color: Colors.white),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         titleTextStyle: base.titleMedium!.copyWith(
-          color: PdaColors.ink,
+          color: Colors.white,
           fontSize: 17,
           fontWeight: FontWeight.w800,
           letterSpacing: -0.3,
         ),
-        shape: const Border(bottom: BorderSide(color: PdaColors.line)),
       ),
       cardTheme: CardThemeData(
         color: Colors.white,

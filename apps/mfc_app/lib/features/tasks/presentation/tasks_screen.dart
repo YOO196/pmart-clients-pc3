@@ -347,7 +347,13 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.pickingTitle, style: theme.textTheme.labelMedium),
+            Text(
+              l10n.pickingTitle,
+              // 어두운 상단바 위 보조 글씨(흰색 70%).
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: PdaColors.onBarMuted,
+              ),
+            ),
             Text(stepTitle, key: const ValueKey('pick-step-title')),
           ],
         ),
@@ -361,7 +367,12 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.shopping_cart_outlined, size: 20),
-                  Text(cart, style: theme.textTheme.labelSmall),
+                  Text(
+                    cart,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
                 ],
               ),
             ),
