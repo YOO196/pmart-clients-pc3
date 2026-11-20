@@ -21,7 +21,8 @@ import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
-import { GuideBox, SearchBar, StatCard, StatStrip } from '../../shared/listParts';
+import { SearchBar, StatCard, StatStrip } from '../../shared/listParts';
+import { Pager, usePage } from '../../shared/Pager';
 import { useOperatorLabel, WhoAt } from '../../shared/OperatorLabel';
 import { assignTaskName } from '../../shared/pickPack';
 import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
@@ -93,6 +94,9 @@ const todayText = (w: Worker) => (w.employmentType !== 'DAILY' ? messages.none :
 
 // ---------------------------------------------------------------- 목록
 
+/** 작업자 목록 한 쪽 줄 수(사용자 2026-11-20) */
+const WORKER_PAGE_SIZE = 15;
+
 function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
   const [params, setParams] = useSearchParams();
@@ -114,20 +118,22 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
     const next = new URLSearchParams(params);
     if (v) next.set('state', v);
     else next.delete('state');
+    next.delete('page'); // 거르기가 바뀌면 1쪽부터
     setParams(next, { replace: true });
   };
   const seen = useSeenIds('worker', mfcId);
+  // 한 쪽 15명, 목록 위·아래에 쪽 넘김(사용자 2026-11-20) — 서버는 쪽 나눔 없이 전부 준다
+  const paging = usePage(query.data?.length ?? 0, WORKER_PAGE_SIZE);
   const ids = (query.data ?? []).map((w) => w.workerId ?? '').filter(Boolean);
   useRememberQueue('worker', mfcId, query.data ? ids : undefined, `${pathname}${search}`);
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1>{messages.menus.workers}</h1>
+      {/* 쪽 제목 "작업자"·안내 상자는 두지 않는다(사용자 2026-11-20) — 위 경로 줄이 메뉴 이름을 보인다 */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Link to={workersPath(mfcId, 'new')} className="btn btn-sm btn-primary">
           {m.register}
         </Link>
       </div>
-      <GuideBox title={m.ui.guideTitle} storeKey="workers" items={[m.intro, m.ui.countNote]} />
       <StatStrip label={m.ui.countsLabel} testId="worker-counts">
         <StatCard testId="count-ACTIVE" label={m.state.ACTIVE} value={cell((w) => w.state === 'ACTIVE')} tone="info" active={state === 'ACTIVE'} onClick={() => setState(state === 'ACTIVE' ? '' : 'ACTIVE')} />
         <StatCard
@@ -141,8 +147,11 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
         <StatCard testId="count-break" label={m.onBreak} value={cell((w) => !!w.onBreak)} hint={m.ui.breakHint} />
         <StatCard testId="count-daily" label={m.ui.dailyNotEnrolled} value={cell((w) => w.employmentType === 'DAILY' && !w.todayEnrollment)} hint={m.ui.dailyHint} />
       </StatStrip>
-      <BreakPinCard mfcId={mfcId} />
-      <SearchBar summary={[[m.stateFilter, state ? (m.state[state] ?? state) : m.defaultFilter]]} startOpen={!state}>
+      <SavedViews listKey={`workers.${mfcId}`} />
+      {/* 목록 묶음 — 휴게 번호(정해 두었으면 왼쪽 위 작은 "관리자 번호 변경"만) → 검색 → 쪽 넘김 → 표 → 쪽 넘김을 붙여서 */}
+      <div className="space-y-2" data-testid="worker-list">
+        <BreakPinCard mfcId={mfcId} compact />
+        <SearchBar summary={[[m.stateFilter, state ? (m.state[state] ?? state) : m.defaultFilter]]} startOpen={!state}>
         <label className="flex flex-col gap-1">
           {m.stateFilter}
           <select className="select select-sm w-44" value={state ?? ''} onChange={(e) => setState(e.target.value)}>
@@ -155,9 +164,10 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
           </select>
         </label>
       </SearchBar>
-      <SavedViews listKey={`workers.${mfcId}`} />
-      <QueryState state={toUiState(query, (rows) => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.empty}>
+        <QueryState state={toUiState(query, (rows) => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.empty}>
         {(rows) => (
+          <>
+          <Pager testId="worker-pager-top" page={paging.page} pageCount={paging.pageCount} total={rows.length} from={paging.from} to={paging.to} onChange={paging.set} />
           <table className="table table-sm rounded-box bg-base-100">
             <thead>
               <tr>
@@ -171,7 +181,7 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((w) => (
+              {rows.slice(paging.from, paging.to).map((w) => (
                 <tr key={w.workerId} data-testid="worker-row">
                   <td>
                     {/* 직원 표기 = 이름 · 사번(ADR-0070) — 운영자 ID 는 상세의 시스템 번호 칸에만 */}
@@ -192,8 +202,11 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
               ))}
             </tbody>
           </table>
+          <Pager testId="worker-pager-bottom" page={paging.page} pageCount={paging.pageCount} total={rows.length} from={paging.from} to={paging.to} onChange={paging.set} />
+          </>
         )}
-      </QueryState>
+        </QueryState>
+      </div>
     </section>
   );
 }

@@ -13,7 +13,11 @@ import { Who } from '../../shared/OperatorLabel';
 const m = messages.workers;
 
 /** 작업자가 PDA 로 휴게를 켤 때 넣는 4자리. 서버는 정했는지·언제만 준다 — 번호는 화면에도 다시 보이지 않는다. */
-export function BreakPinCard({ mfcId, canEdit = true }: { readonly mfcId: string; readonly canEdit?: boolean }) {
+/**
+ * [compact] 면(작업자 목록 위) 정해 두었을 때 카드 대신 작은 "관리자 번호 변경" 단추만 — 누르면 입력 칸(사용자 2026-11-20).
+ * 아직 안 정했으면 어느 쪽이든 카드 전체.
+ */
+export function BreakPinCard({ mfcId, canEdit = true, compact = false }: { readonly mfcId: string; readonly canEdit?: boolean; readonly compact?: boolean }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const bp = m.breakPin;
@@ -38,6 +42,28 @@ export function BreakPinCard({ mfcId, canEdit = true }: { readonly mfcId: string
   const isSet = query.data?.set === true;
   // 아직 안 정했으면(또는 조회 전·실패) 입력 칸을 그대로 보인다 — 정해 두었을 때만 접는다.
   const showForm = canEdit && (!isSet || editing);
+  if (compact && isSet && canEdit && !editing)
+    return (
+      <div className="flex items-center gap-2" data-testid="break-pin">
+        <button
+          type="button"
+          className="btn btn-xs"
+          onClick={() => {
+            setEditing(true);
+            if (save.phase.kind !== 'idle' && save.phase.kind !== 'running') save.reset();
+          }}
+        >
+          {bp.adminChange}
+        </button>
+        <CommandFeedback command={save}>
+          {() => (
+            <p role="status" className="text-xs">
+              {bp.saved}
+            </p>
+          )}
+        </CommandFeedback>
+      </div>
+    );
   return (
     <div className="space-y-2 rounded-box bg-base-100 p-3 text-sm" data-testid="break-pin">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
