@@ -325,6 +325,26 @@ OrderPage orderPageFromContract(api.ListOrders200Response r) => OrderPage(
           _ => null,
         },
         representativeQty: o.representativeItem?.quantity,
+        mfcName: switch (o.mfcName?.trim()) {
+          final n? when n.isNotEmpty => n,
+          _ => null,
+        },
+        lines: [
+          for (final l in o.lines ?? const <api.OrderSummaryLine>[])
+            OrderListLine(
+              orderLineId: l.orderLineId,
+              productName: switch (l.productName?.trim()) {
+                final n? when n.isNotEmpty => n,
+                _ => null,
+              },
+              optionLabel: switch (l.optionLabel?.trim()) {
+                final n? when n.isNotEmpty => n,
+                _ => null,
+              },
+              quantity: l.quantity,
+              lineAmount: l.lineAmount,
+            ),
+        ],
       ),
   ],
   nextCursor: r.page?.nextCursor,

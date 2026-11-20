@@ -123,6 +123,35 @@ class MyScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
+          // 탈퇴 처리 대기(계정 상태 WITHDRAW_PENDING — customer 0.12.0): 맨 위 띠, 누르면 상태 화면.
+          if (member && (profile?.withdrawPending ?? false))
+            Material(
+              color: scheme.errorContainer,
+              child: InkWell(
+                key: const ValueKey('my-withdraw-pending'),
+                onTap: () => context.push('/me/withdrawal'),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.wdPendingBandBody,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: scheme.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                      PmartLineIcon(
+                        PmartLineIcons.chevronRight,
+                        size: 18,
+                        color: scheme.onErrorContainer,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           // 프로필: 가운데 큰 사진 + 이름(연필 = 내 정보)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),

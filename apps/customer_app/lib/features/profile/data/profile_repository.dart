@@ -5,6 +5,7 @@ import 'package:pmart_api_customer/pmart_api_customer.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart' show sourceSystem;
+import '../../auth/domain/auth.dart' show SocialProvider;
 import '../domain/profile.dart';
 
 /// 본인 프로필·연락처 변경(customer-service profile 태그).
@@ -131,5 +132,13 @@ Profile profileFromContract(api.Profile p) {
     email: text(p.email),
     emailVerified: p.emailVerified,
     profileImageUrl: text(p.profileImageUrl),
+    withdrawPending: p.status == api.AccountStatus.WITHDRAW_PENDING,
+    socialProvider: switch (p.socialProvider) {
+      api.ProfileSocialProviderEnum.KAKAO => SocialProvider.kakao,
+      api.ProfileSocialProviderEnum.NAVER => SocialProvider.naver,
+      api.ProfileSocialProviderEnum.GOOGLE => SocialProvider.google,
+      api.ProfileSocialProviderEnum.APPLE => SocialProvider.apple,
+      _ => null,
+    },
   );
 }

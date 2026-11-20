@@ -9,6 +9,24 @@ import '../../checkout/domain/checkout.dart'
         Quote,
         ShippingAddress;
 
+/// 주문 목록 카드의 상품 줄(주문 당시 사본 — order 0.17.0). 금액은 서버 값(단가×수량, 할인 나눔 전).
+@immutable
+class OrderListLine {
+  const OrderListLine({
+    required this.orderLineId,
+    required this.quantity,
+    required this.lineAmount,
+    this.productName,
+    this.optionLabel,
+  });
+
+  final String orderLineId;
+  final String? productName;
+  final String? optionLabel;
+  final int quantity;
+  final int lineAmount;
+}
+
 @immutable
 class OrderListItem {
   const OrderListItem({
@@ -21,7 +39,25 @@ class OrderListItem {
     this.deliveryMode,
     this.representativeName,
     this.representativeQty,
+    this.mfcName,
+    this.lines = const [],
   });
+
+  /// 주문 담당 센터 이름(order 0.17.0 — 상세와 같은 값). 모르면 null.
+  final String? mfcName;
+
+  /// 앞 주문 행(서버가 5개까지 — order 0.17.0, BR-68). 전체 수량은 [itemCount]. 예전 서버·모름은 빈 목록.
+  final List<OrderListLine> lines;
+
+  /// [lines] 에 안 실린 나머지 수량 합(`itemCount` − 실린 행의 수량 합). 모르거나 없으면 null.
+  int? get moreQty => switch (itemCount) {
+    final int all when lines.isNotEmpty => switch (all -
+        lines.fold<int>(0, (a, l) => a + l.quantity)) {
+      final int rest when rest > 0 => rest,
+      _ => null,
+    },
+    _ => null,
+  };
 
   final String orderId;
 

@@ -97,6 +97,9 @@ final class MockReviewsRepository implements ReviewsRepository {
       'eligibleUntil': '2026-11-07T02:30:00Z',
       'state': 'REV_ELIGIBLE',
       'reviewId': null,
+      'orderedAt': '2026-10-24T01:10:00Z',
+      'mfcName': '바로픽 부산동래',
+      'optionLabel': '1개',
     },
     {
       'orderId': 'order-seed-2',
@@ -107,6 +110,8 @@ final class MockReviewsRepository implements ReviewsRepository {
       'eligibleUntil': '2026-11-05T08:00:00Z',
       'state': 'PUBLISHED',
       'reviewId': 'rv-mine-1',
+      'orderedAt': '2026-10-22T06:40:00Z',
+      'mfcName': '바로픽 부산동래',
     },
   ];
 
@@ -156,6 +161,13 @@ final class MockReviewsRepository implements ReviewsRepository {
                 reviewStateFromWire(e['state'] as String?) == state))
           e,
     ];
+    // 탭 머리 숫자: 상태 거르기와 상관없이, 주문 거르기는 따른다(review 0.5.0).
+    final inOrder = [
+      for (final e in eligibilityJson)
+        if (orderId == null || e['orderId'] == orderId) e,
+    ];
+    bool isState(Map<String, dynamic> e, ReviewState s) =>
+        reviewStateFromWire(e['state'] as String?) == s;
     final start = cursor == null ? 0 : int.parse(cursor);
     final end = (start + pageSize).clamp(0, matched.length);
     return eligibilityPageFromContract(
@@ -164,6 +176,23 @@ final class MockReviewsRepository implements ReviewsRepository {
         'page': {
           'nextCursor': end < matched.length ? '$end' : null,
           'size': pageSize,
+        },
+        'total': matched.length,
+        'counts': {
+          'writable': inOrder
+              .where(
+                (e) =>
+                    isState(e, ReviewState.eligible) && e['reviewId'] == null,
+              )
+              .length,
+          'written': inOrder
+              .where(
+                (e) =>
+                    e['reviewId'] != null &&
+                    !isState(e, ReviewState.deleted) &&
+                    !isState(e, ReviewState.eligible),
+              )
+              .length,
         },
       }),
     );

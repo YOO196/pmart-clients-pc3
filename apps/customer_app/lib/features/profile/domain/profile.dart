@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../auth/domain/auth.dart' show SocialProvider;
+
 /// 본인 프로필(계약 `Profile`). 이름은 nickname, 연락처는 서버가 가린 값만 받는다.
 /// Google 프로필(이름·이메일·사진)은 로그인마다 서버가 최신으로 바꾸고 앱은 표시만 한다(ADR-0024, 백엔드 안내 2026-10-31).
 @immutable
@@ -15,7 +17,15 @@ class Profile {
     this.email,
     this.emailVerified,
     this.profileImageUrl,
+    this.withdrawPending = false,
+    this.socialProvider,
   });
+
+  /// 탈퇴 처리 대기(계정 상태 `WITHDRAW_PENDING`, customer 0.12.0). 로그인은 되고 새 주문만 막힌다.
+  final bool withdrawPending;
+
+  /// 가입한 소셜(서버 값). 탈퇴·철회 재인증에 쓴다. 모르면 null.
+  final SocialProvider? socialProvider;
 
   final String accountId;
   final int version;

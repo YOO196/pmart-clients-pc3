@@ -8,6 +8,7 @@ import 'features/address/presentation/address_screens.dart';
 import 'features/address/presentation/postcode_screen.dart' show PostcodeResult;
 import 'features/cart/presentation/cart_merge_screen.dart';
 import 'features/start/presentation/start_controller.dart';
+import 'features/withdrawal/presentation/withdrawal_screen.dart';
 import 'features/start/presentation/start_screens.dart';
 import 'features/auth/domain/auth.dart';
 import 'features/auth/presentation/login_screen.dart';
@@ -274,6 +275,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/me/info',
         builder: (_, state) =>
             MyInfoScreen(signup: state.uri.queryParameters['from'] == 'signup'),
+      ),
+      // 회원 탈퇴(customer 0.12.0, ADR-0077): 안내·재인증·접수, 대기 중이면 상태·철회.
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/me/withdrawal',
+        builder: (_, _) => const WithdrawalScreen(),
       ),
       // 로그인해 있는 고객의 재동의(CU-1 §3 — 주문 전 확인). 동의하면 true 로 돌아간다.
       GoRoute(

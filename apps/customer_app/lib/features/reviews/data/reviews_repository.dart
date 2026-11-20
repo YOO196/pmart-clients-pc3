@@ -216,7 +216,7 @@ EligibilityPage eligibilityPageFromContract(
   api.ListMyReviewEligibilities200Response body,
 ) => EligibilityPage(
   items: [
-    for (final e in body.items ?? const <api.Eligibility>[])
+    for (final e in body.items)
       // 주문·품목 식별이 없으면 작성 대상으로 쓸 수 없다. 추측해 채우지 않고 뺀다.
       if ((e.orderId, e.orderLineId) case (final String o, final String l))
         ReviewEligibility(
@@ -232,10 +232,20 @@ EligibilityPage eligibilityPageFromContract(
           eligibleUntil: e.eligibleUntil,
           state: reviewStateFromWire(e.state?.value),
           reviewId: e.reviewId,
+          orderedAt: e.orderedAt,
+          mfcName: _text(e.mfcName),
+          imageUrl: _text(e.imageUrl),
+          optionLabel: _text(e.optionLabel),
         ),
   ],
-  nextCursor: body.page?.nextCursor,
+  nextCursor: body.page.nextCursor,
+  counts: ReviewCounts(
+    writable: body.counts.writable,
+    written: body.counts.written,
+  ),
 );
+
+String? _text(String? v) => (v == null || v.trim().isEmpty) ? null : v;
 
 ProductReviewPage productReviewPageFromContract(
   api.ListProductReviews200Response body,

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LengthLimitingTextInputFormatter;
-import 'package:intl/intl.dart' show NumberFormat;
+import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart' show ProblemCode;
@@ -15,6 +15,8 @@ import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../catalog/presentation/widgets/product_tile_card.dart'
+    show ProductImage;
 import '../../catalog/presentation/catalog_providers.dart'
     show productDetailProvider;
 import '../../claims/presentation/claims_controller.dart'
@@ -98,6 +100,24 @@ class ReviewManageScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final member = ref.watch(sessionProvider) is MemberSession;
+    // 탭 머리 숫자(review 0.5.0 counts — 서버 값). 처음 열리는 "리뷰 쓰기" 목록의 첫 쪽에 딸려 온 값을 쓴다
+    // (숫자만 보려고 "내가 쓴 리뷰"를 미리 부르지 않는다). 못 받았으면 숫자 없이.
+    final counts = member
+        ? ref.watch(writableReviewsProvider).value?.counts
+        : null;
+    Widget tabLabel(String label, int? count) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label),
+        if (count != null) ...[
+          const SizedBox(width: 5),
+          Text(
+            l10n.reviewTabCount(count),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+          ),
+        ],
+      ],
+    );
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -122,11 +142,11 @@ class ReviewManageScreen extends ConsumerWidget {
                   tabs: [
                     Tab(
                       key: const ValueKey('review-tab-write'),
-                      text: l10n.reviewTabWrite,
+                      child: tabLabel(l10n.reviewTabWrite, counts?.writable),
                     ),
                     Tab(
                       key: const ValueKey('review-tab-mine'),
-                      text: l10n.reviewTabMine,
+                      child: tabLabel(l10n.reviewTabMine, counts?.written),
                     ),
                   ],
                 )
@@ -191,7 +211,13 @@ class _WritableTab extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(12),
           children: [
-            for (final e in list!.items) _WritableCard(eligibility: e),
+            // 주문 묶음 머리(레퍼런스 11-1): 주문이 바뀌는 자리에 센터 이름·주문 날짜. 둘 다 모르면 머리 없이.
+            for (final (i, e) in list!.items.indexed) ...[
+              if ((i == 0 || list.items[i - 1].orderId != e.orderId) &&
+                  (e.mfcName != null || e.orderedAt != null))
+                _OrderHead(eligibility: e),
+              _WritableCard(eligibility: e),
+            ],
             _LoadMoreFooter(
               list: list,
               onLoadMore: () =>
@@ -199,6 +225,46 @@ class _WritableTab extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// 주문 묶음 머리: 센터 이름(굵게) + "2026. 10. 10 주문". 서버가 준 값만 — 없는 쪽은 그리지 않는다.
+class _OrderHead extends StatelessWidget {
+  const _OrderHead({required this.eligibility});
+
+  final ReviewEligibility eligibility;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final e = eligibility;
+    return Padding(
+      key: ValueKey('review-order-head-${e.orderId}'),
+      padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (e.mfcName case final n?)
+            Text(
+              n,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          if (e.orderedAt case final t?)
+            Text(
+              l10n.reviewOrderedOn(
+                DateFormat('y. M. d', 'ko').format(toSeoulWallClock(t)),
+              ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -236,6 +302,14 @@ class _WritableCard extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 지금 상품의 대표 사진(review 0.5.0). 없으면(게시 안 됨·모름) 자리 그림.
+                ProductImage(
+                  key: ValueKey('review-writable-image-${e.orderLineId}'),
+                  url: e.imageUrl,
+                  size: 56,
+                  radius: 8,
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -248,6 +322,17 @@ class _WritableCard extends ConsumerWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      if (e.optionLabel case final o?)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            o,
+                            key: ValueKey('review-option-${e.orderLineId}'),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 3),
                       Text(
                         [

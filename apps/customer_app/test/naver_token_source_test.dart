@@ -31,6 +31,17 @@ void main() {
     expect(repo.naverExchangeKeys, hasLength(1));
   });
 
+  test('교환 응답의 프로필 사진 주소를 같이 넘긴다 — 없으면(null) 없이', () async {
+    final repo = repo0();
+    final c = await source(repo).obtain(SocialProvider.naver);
+    expect(c?.profileImageUrl, 'https://phinf.pstatic.net/mock/profile.jpg');
+
+    repo.naverProfileImageUrl = null;
+    final none = await source(repo).obtain(SocialProvider.naver);
+    expect(none?.token, 'mock-naver-id-token');
+    expect(none?.profileImageUrl, isNull);
+  });
+
   test('고객이 네이버 화면을 닫으면 취소(null) — 서버에 보내지 않는다', () async {
     final repo = repo0();
     final c = await source(

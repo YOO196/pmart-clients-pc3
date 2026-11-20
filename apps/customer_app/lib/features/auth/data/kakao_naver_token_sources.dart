@@ -77,7 +77,7 @@ typedef NaverAuthorization = ({String code, String codeVerifier});
 typedef NaverAuthorize = Future<NaverAuthorization?> Function(String clientId);
 
 /// 서버가 인가 코드를 ID 토큰으로 바꾼다(`POST /auth/naver-token-exchanges`, auth 0.10.0).
-typedef NaverCodeExchange = Future<String> Function({
+typedef NaverCodeExchange = Future<NaverExchange> Function({
   required String authorizationCode,
   required String codeVerifier,
   required String redirectUri,
@@ -134,20 +134,20 @@ final class NaverSocialTokenSource implements SocialTokenSource {
     if (granted == null) return null;
     // 인가 코드는 한 번만 쓸 수 있다 — 결과를 모르면 같은 키로 한 번 더(서버가 두 번 교환하지 않는다).
     final key = IdempotencyKey.generate();
-    Future<String> once() => exchange(
+    Future<NaverExchange> once() => exchange(
       authorizationCode: granted!.code,
       codeVerifier: granted.codeVerifier,
       redirectUri: naverRedirectUrl,
       key: key,
     );
     try {
-      final String idToken;
+      NaverExchange r;
       try {
-        idToken = await once();
+        r = await once();
       } on UnknownResultFailure {
-        return SocialCredential(await once());
+        r = await once();
       }
-      return SocialCredential(idToken);
+      return SocialCredential(r.idToken, profileImageUrl: r.profileImageUrl);
     } on ProblemFailure catch (f) {
       // 서버에 네이버 secret 이 없다 — 설정 문제로 알린다.
       if (f.problem.code == ProblemCode.configRequired) {

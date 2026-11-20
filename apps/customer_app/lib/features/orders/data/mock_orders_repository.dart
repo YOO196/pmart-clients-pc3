@@ -435,6 +435,22 @@ base class MockOrdersRepository implements OrdersRepository {
                     (l as Map)['originalQty'] as int? ?? 0,
                 ].fold<int>(0, (a, b) => a + b),
                 'deliveryMode': e.value['deliveryMode'],
+                // order 0.17.0: 센터 이름 + 앞 주문 행 5개(금액 = 단가×수량)
+                'mfcName': e.value['mfcName'],
+                'lines': [
+                  for (final l in (e.value['lines']! as List).take(5))
+                    {
+                      'orderLineId': (l as Map)['orderLineId'],
+                      'productId': l['productId'],
+                      'sku': l['sku'],
+                      'productName': l['productName'],
+                      'optionLabel': l['optionLabel'],
+                      'quantity': l['originalQty'] as int? ?? 0,
+                      'lineAmount':
+                          (l['unitPrice'] as int? ?? 0) *
+                          (l['originalQty'] as int? ?? 0),
+                    },
+                ],
                 if ((e.value['lines']! as List).firstOrNull
                     case final Map<String, Object?> first)
                   'representativeItem': {

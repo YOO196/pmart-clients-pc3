@@ -91,10 +91,14 @@ void main() {
                     {'orderLineId': 'ol-x'}, // 주문 식별이 없으면 뺀다
                   ],
                   'page': {'nextCursor': null},
+                  'total': 0,
+                  'counts': {'writable': 0, 'written': 0},
                 }
               : {
                   'items': <Object?>[],
                   'page': {'nextCursor': null},
+                  'total': 0,
+                  'counts': {'writable': 0, 'written': 0},
                 },
         ),
       );
@@ -191,6 +195,8 @@ void main() {
               },
             ],
             'page': {'nextCursor': null},
+            'total': 0,
+            'counts': {'writable': 0, 'written': 0},
           },
         ),
       );
@@ -532,6 +538,67 @@ void main() {
       );
       expect(deadline.data, contains('11월 7일'));
       expect(deadline.data, contains('까지 쓸 수 있어요'));
+    });
+
+    // BR-67 회신(review 0.5.0): 탭 머리 숫자·주문 묶음 머리·옵션 표시는 서버 값만.
+    testWidgets('리뷰관리: 탭 머리 숫자(서버 counts), 주문 묶음 머리(센터·주문 날짜), 옵션 표시', (
+      t,
+    ) async {
+      final repo = MockReviewsRepository(latency: Duration.zero);
+      await openManage(t, repo);
+      Finder inTab(String key, String text) => find.descendant(
+        of: find.byKey(ValueKey(key)),
+        matching: find.text(text),
+      );
+      expect(inTab('review-tab-write', '리뷰 쓰기'), findsOneWidget);
+      expect(inTab('review-tab-write', '1개'), findsOneWidget);
+      expect(inTab('review-tab-mine', '1개'), findsOneWidget);
+
+      final head = find.byKey(const ValueKey('review-order-head-order-seed-1'));
+      expect(
+        find.descendant(of: head, matching: find.text('바로픽 부산동래')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: head, matching: find.text('2026. 10. 24 주문')),
+        findsOneWidget,
+      );
+      expect(
+        t.widget<Text>(find.byKey(const ValueKey('review-option-ol-1'))).data,
+        '1개',
+      );
+      expect(
+        find.byKey(const ValueKey('review-writable-image-ol-1')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('리뷰관리: 서버가 센터·주문 날짜·옵션을 안 주면 그 자리를 그리지 않는다(지어내지 않음)', (
+      t,
+    ) async {
+      final repo = MockReviewsRepository(
+        latency: Duration.zero,
+        eligibilities: [
+          {
+            'orderId': 'order-x',
+            'orderLineId': 'ol-x',
+            'productId': 'P-0001',
+            'productName': '서울우유 1L',
+            'state': 'REV_ELIGIBLE',
+            'reviewId': null,
+          },
+        ],
+      );
+      await openManage(t, repo);
+      expect(
+        find.byKey(const ValueKey('review-writable-ol-x')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('review-order-head-order-x')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('review-option-ol-x')), findsNothing);
     });
 
     testWidgets('별을 눌러 작성 → 등록 확정 뒤에만 완료, 목록이 서버 기준으로 바뀐다', (t) async {

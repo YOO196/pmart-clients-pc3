@@ -17,6 +17,9 @@ final class MockProfileRepository implements ProfileRepository {
   /// 번호 확인(OCTOMO)됨 — 번호를 바꾸면 다시 false.
   bool phoneVerified = false;
 
+  /// 탈퇴 처리 대기(계정 상태 WITHDRAW_PENDING).
+  bool withdrawPending = false;
+
   /// 다음 연락처 저장을 400(옛 서버처럼)으로 만든다.
   bool rejectPhone = false;
 
@@ -59,6 +62,7 @@ final class MockProfileRepository implements ProfileRepository {
       email: email,
       emailVerified: emailVerified,
       profileImageUrl: profileImageUrl,
+      withdrawPending: withdrawPending,
     );
   }
 

@@ -601,6 +601,19 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             ),
           ],
         ),
+        // 담당 센터 이름(order 0.17.0 — 레퍼런스 9-2 카드 머리). 모르면 줄 없이.
+        if (o.mfcName case final name?)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              name,
+              key: ValueKey('order-mfc-${o.orderId}'),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 13,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
         const SizedBox(height: 10),
         // 진행 중: 큰 굵은 글씨로 지금 상태, 아래 주문 시각. 끝난 주문: 날짜 · 상태 한 줄.
         if (ongoing) ...[
@@ -646,9 +659,66 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         const SizedBox(height: 12),
         const Divider(height: 1),
         const SizedBox(height: 12),
+        // 상품 줄(order 0.17.0 — 레퍼런스 9-2): 이름 / 금액·수량. 사진은 계약에 없어 그리지 않는다.
+        // 서버가 앞 5개만 준다 — 나머지는 "외 N개"(전체 수량 − 보인 수량).
+        for (final l in o.lines)
+          Padding(
+            key: ValueKey('order-line-${l.orderLineId}'),
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  [?l.productName, ?l.optionLabel].join(' · '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                ),
+                const SizedBox(height: 2),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: formatKrw(l.lineAmount),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      TextSpan(
+                        text: '  ${l10n.cartLineQuantity(l.quantity)}',
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        if (o.moreQty case final more?)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              l10n.ordersMoreQty(more),
+              key: ValueKey('order-more-${o.orderId}'),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        if (o.lines.isNotEmpty) ...[
+          const Divider(height: 1),
+          const SizedBox(height: 12),
+        ],
         Row(
           children: [
-            if (summary != null)
+            // 상품 줄이 있으면 왼쪽은 "결제금액", 없으면(예전 서버·사본 없음) 대표 상품 요약.
+            if (o.lines.isNotEmpty)
+              Expanded(
+                child: Text(
+                  l10n.amountTotal,
+                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                ),
+              )
+            else if (summary != null)
               Expanded(
                 child: Text(
                   summary,

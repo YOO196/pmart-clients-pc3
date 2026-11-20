@@ -26,6 +26,7 @@ base class _RejectingAuth extends MockAuthRepository {
     String providerToken, {
     required LoginPurpose purpose,
     required IdempotencyKey key,
+    String? profileImageUrl,
   }) async => LoginRejected(code);
 }
 

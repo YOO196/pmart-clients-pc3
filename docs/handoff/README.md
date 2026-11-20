@@ -43,7 +43,10 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-19-backend-first-run-consents.md` | BR-59 처음 실행 약관 — ①~④ 모두 회신(`clients/customer-app/2026-11-19-reply-br59-first-run-consents.md`, customer 0.6.0~0.6.1) · 고객앱 반영(목 모드). 질문 답은 아래 문서로 보냄. **남은 것: LAN 실서버 확인 뒤 archive** |
 | `customer-app/2026-11-19-backend-br59-location-service-answer.md` | BR-59 질문 답(좌표→주소 카카오 로컬 서버 경유, 지도 카카오맵 SDK, 휴대폰 위치 Android geolocator — 사용자 승인·고객앱 반영) + Q1 역지오코딩 좌표가 URL 쿼리로 추적 기록에 남는 문제 |
 | `customer-app/2026-11-20-backend-review-eligibility-display.md` | BR-67 리뷰관리 개수(total)·품목 사진·주문 시각/센터 이름 — 보냄, 회신 대기 |
-$1$1| `customer-app/2026-11-20-backend-naver-profile-image-after-exchange.md` | BR-70 네이버 프로필 사진 — 서버 교환(0.10.0) 뒤 앱에 access token 이 없어 0.8.0 요청을 할 수 없음, (가) 서버가 읽기·(나) 교환 응답에 주소·(다) 토큰 주기 가운데 정해 달라 — 보냄, 회신 대기 |
+| `customer-app/2026-11-20-backend-order-list-lines.md` | BR-68 주문내역 카드 상품 줄·센터 이름(·판매 여부·기간 끝) — 회신 받음(order 0.17.0), 앱 반영(2026-11-20) |
+| `customer-app/2026-11-20-backend-naver-token-exchange.md` | BR-69 네이버 로그인 토큰 교환 — 네이버가 client secret 없는 교환을 거절(`invalid_client`), 서버가 인가 코드를 교환해 달라(R1~R5) — 회신 받음(auth 0.10.0, LAN 배포), 고객 앱 목 모드 반영, 실기기 확인 대기 |
+| `customer-app/2026-11-20-backend-naver-profile-image-after-exchange.md` | BR-70 네이버 프로필 사진 — 서버 교환(0.10.0) 뒤 앱에 access token 이 없어 0.8.0 요청을 할 수 없음, (가) 서버가 읽기·(나) 교환 응답에 주소·(다) 토큰 주기 가운데 정해 달라 — 회신 받음((나) — auth 0.10.1), 앱 반영(2026-11-20) |
+| `customer-app/2026-11-20-backend-br67-68-70-withdrawal-applied.md` | BR-67(리뷰관리 값)·BR-68(주문내역 상품 줄)·BR-70(네이버 프로필 사진) 회신과 회원 탈퇴 요청(customer 0.12.0) 목 모드 반영 알림 + Q1(탈퇴 대기 중 주문 거절 문구) — LAN 확인 대기 |
 | `customer-app/2026-11-20-backend-availability-display-applied.md` | "다 팔렸어요" 오표시(요청 availability-display §1) 목 모드 반영 알림 — 주소 없음·재고 조회 실패·배달 안 함을 품절과 구분, §2 목록 품절 표시는 계약 대기 |
 | `customer-app/2026-11-20-backend-handoff-replies-applied.md` | 11-20 백엔드 요청·회신 4건(검색 교정 문구·리뷰 사진 축소본·홈 배너·BR-64 로그인 휴대폰 확인) 목 모드 반영 알림 + Q1(details 읽는 법) — LAN 확인 대기 |
 | `customer-app/2026-11-19-backend-address-receiver-to-checkout.md` | BR-60 — 회신(`clients/customer-app/2026-11-19-reply-br60-address-receiver.md`, customer 0.8.0·order 0.14.0 배포) · 고객앱 반영(목 모드). **남은 것: LAN 에서 주소 저장·주문서 내 연락처 확인 뒤 archive** |

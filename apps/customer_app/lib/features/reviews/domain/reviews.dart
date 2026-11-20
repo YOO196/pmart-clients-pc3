@@ -39,7 +39,19 @@ class ReviewEligibility {
     this.deliveredAt,
     this.eligibleUntil,
     this.reviewId,
+    this.orderedAt,
+    this.mfcName,
+    this.imageUrl,
+    this.optionLabel,
   });
+
+  /// 주문 확정 시각·담당 센터 이름(review 0.5.0 — BR-67). 모르면 null(지어내지 않는다) — 주문 묶음 머리에 쓴다.
+  final DateTime? orderedAt;
+  final String? mfcName;
+
+  /// 지금 상품의 대표 사진(주문 당시 사본 아님, 게시 안 된 상품은 null)·지금 그 SKU 의 옵션 표시.
+  final String? imageUrl;
+  final String? optionLabel;
 
   final String orderId;
   final String orderLineId;
@@ -132,10 +144,22 @@ class ReviewPhotoRef {
 
 @immutable
 class EligibilityPage {
-  const EligibilityPage({required this.items, this.nextCursor});
+  const EligibilityPage({required this.items, this.nextCursor, this.counts});
 
   final List<ReviewEligibility> items;
   final String? nextCursor;
+
+  /// 탭 머리 숫자(review 0.5.0). 서버 값만 — 받은 쪽을 세어 만들지 않는다.
+  final ReviewCounts? counts;
+}
+
+/// 리뷰관리 탭 머리 숫자: 쓸 수 있는 품목 수·쓴 리뷰 수(삭제 제외). 상태 거르기와 상관없는 전체 값.
+@immutable
+class ReviewCounts {
+  const ReviewCounts({required this.writable, required this.written});
+
+  final int writable;
+  final int written;
 }
 
 @immutable

@@ -163,6 +163,26 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
                     onPressed: () => context.pop(false),
                     child: Text(l10n.infoLater),
                   ),
+                // 회원 탈퇴(customer 0.12.0) — 가입 직후 정보 입력 단계에서는 보이지 않는다.
+                if (!widget.signup)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      key: const ValueKey('info-withdraw'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
+                        textStyle: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      onPressed: () => context.push('/me/withdrawal'),
+                      child: Text(
+                        profile.withdrawPending
+                            ? l10n.wdPendingBand
+                            : l10n.wdTitle,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

@@ -66,13 +66,27 @@ void main() {
           .data,
       '예약배달',
     );
+    // order 0.17.0(BR-68): 상품 줄(이름 / 금액·수량)과 센터 이름 — 서버 값 그대로. 줄이 있으면 요약 한 줄은 그리지 않는다.
+    final line = find.byKey(const ValueKey('order-line-ol-5'));
     expect(
-      t
-          .widget<Text>(
-            find.byKey(const ValueKey('order-summary-order-seed-4')),
-          )
-          .data,
-      '그릭요거트 플레인 400g 3개',
+      find.descendant(of: line, matching: find.text('그릭요거트 플레인 400g')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: line, matching: find.textContaining('17,940원')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: line, matching: find.textContaining('3개')),
+      findsOneWidget,
+    );
+    expect(
+      t.widget<Text>(find.byKey(const ValueKey('order-mfc-order-seed-4'))).data,
+      '부산진구점',
+    );
+    expect(
+      find.byKey(const ValueKey('order-summary-order-seed-4')),
+      findsNothing,
     );
     // 기본 조회는 기간·검색 없이(서버 기본 최근 3개월).
     expect(orders.listQueries.first, (from: null, q: null));
@@ -138,6 +152,51 @@ void main() {
     expect(orders.hideKeys.keys, ['order-seed-3']);
     expect(find.text('주문 내역에서 삭제했어요'), findsOneWidget);
     expect(find.byKey(const ValueKey('order-order-seed-3')), findsNothing);
+  });
+
+  test('계약 → 앱: 상품 줄(앞 5개)·센터 이름, 나머지는 "외 N개"(전체 수량 − 보인 수량)', () {
+    final page = orderPageFromContract(
+      api.ListOrders200Response.fromJson({
+        'items': [
+          {
+            'orderId': 'o-1',
+            'status': 'COMPLETED',
+            'itemCount': 9,
+            'mfcName': '바로픽 부산동래',
+            'lines': [
+              {
+                'orderLineId': 'l-1',
+                'sku': 'S-1',
+                'productName': '우유',
+                'optionLabel': '1L',
+                'quantity': 2,
+                'lineAmount': 5960,
+              },
+              {
+                'orderLineId': 'l-2',
+                'sku': 'S-2',
+                'productName': ' ',
+                'optionLabel': null,
+                'quantity': 3,
+                'lineAmount': 9000,
+              },
+            ],
+          },
+          // 예전 서버·모름: 줄·센터 없이 온다 — 빈 목록·null(지어내지 않음)
+          {'orderId': 'o-2', 'status': 'COMPLETED', 'itemCount': 3},
+        ],
+      }),
+    );
+    final o = page.items[0];
+    expect(o.mfcName, '바로픽 부산동래');
+    expect(o.lines.map((l) => l.orderLineId), ['l-1', 'l-2']);
+    expect(o.lines[0].optionLabel, '1L');
+    expect(o.lines[0].lineAmount, 5960);
+    expect(o.lines[1].productName, isNull);
+    expect(o.moreQty, 4); // 9 − (2 + 3)
+    expect(page.items[1].lines, isEmpty);
+    expect(page.items[1].mfcName, isNull);
+    expect(page.items[1].moreQty, isNull);
   });
 
   test('계약 → 앱: 대표 상품 이름 없음(2026-11-02 전)·모르는 배송 방식은 null', () {

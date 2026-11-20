@@ -68,11 +68,17 @@ base class MockAuthRepository implements AuthRepository {
   /// 네이버 코드 교환 기록(키) — 시험이 같은 키 재전송을 확인한다.
   final naverExchangeKeys = <String>[];
 
+  /// 교환 응답의 프로필 사진 주소(없으면 null — 콘솔에서 제공 정보를 안 켠 경우).
+  String? naverProfileImageUrl = 'https://phinf.pstatic.net/mock/profile.jpg';
+
+  /// 로그인·동의 완료·휴대폰 확인에 실려 온 프로필 사진 주소(시험 확인용).
+  final profileImageUrls = <String?>[];
+
   /// 다음 교환을 이 오류로 실패시킨다.
   PmartFailure? failNextNaverExchange;
 
   @override
-  Future<String> exchangeNaverCode({
+  Future<NaverExchange> exchangeNaverCode({
     required String authorizationCode,
     required String codeVerifier,
     required String redirectUri,
@@ -84,7 +90,10 @@ base class MockAuthRepository implements AuthRepository {
       failNextNaverExchange = null;
       throw f;
     }
-    return 'mock-naver-id-token';
+    return (
+      idToken: 'mock-naver-id-token',
+      profileImageUrl: naverProfileImageUrl,
+    );
   }
 
   @override
@@ -170,7 +179,9 @@ base class MockAuthRepository implements AuthRepository {
     String providerToken, {
     required LoginPurpose purpose,
     required IdempotencyKey key,
+    String? profileImageUrl,
   }) async {
+    profileImageUrls.add(profileImageUrl);
     await _wait();
     loginKeys.add(key.value);
     final previous = _byKey[key.value];
@@ -235,7 +246,9 @@ base class MockAuthRepository implements AuthRepository {
     required String providerToken,
     required List<ConsentDecision> consents,
     required IdempotencyKey key,
+    String? profileImageUrl,
   }) async {
+    profileImageUrls.add(profileImageUrl);
     await _wait();
     completions.add((providerToken: providerToken, consents: consents));
     if (rejectNextCompletion case final code?) {
@@ -301,7 +314,9 @@ base class MockAuthRepository implements AuthRepository {
     String verificationId, {
     required String providerToken,
     required IdempotencyKey key,
+    String? profileImageUrl,
   }) async {
+    profileImageUrls.add(profileImageUrl);
     await _wait();
     if (identityConflictNext case final code?) {
       identityConflictNext = null;

@@ -23,11 +23,14 @@ final class SocialProviderDown implements Exception {
 
 abstract interface class AuthRepository {
   /// `POST /auth/social-logins`. 같은 [key] 재전송은 원인증 결과를 돌려준다.
+  /// [profileImageUrl] 은 네이버만(auth 0.8.0·0.10.1 — 교환 응답으로 받은 사진 주소, 서버가 `*.pstatic.net` 만 쓴다).
+  /// 동의 완료·휴대폰 확인("보냈어요")에도 같은 값을 다시 보낸다(회원 정보가 넘어가는 시점이 셋).
   Future<LoginOutcome> login(
     SocialProvider provider,
     String providerToken, {
     required LoginPurpose purpose,
     required IdempotencyKey key,
+    String? profileImageUrl,
   });
 
   /// `GET /auth/social-logins/{authRequestId}`.
@@ -36,7 +39,7 @@ abstract interface class AuthRepository {
   /// 네이버 인가 코드 → ID 토큰(`POST /auth/naver-token-exchanges`, auth 0.10.0 — BR-69). 서버가 client secret 으로
   /// 대신 교환한다. 같은 [key] 재전송은 처음 결과를 준다(코드를 두 번 교환하지 않음). 실패는 [PmartFailure]
   /// (401 PROVIDER_REJECTED·503 PROVIDER_UNAVAILABLE·422 CONFIG_REQUIRED). 코드·verifier·토큰은 로그 금지.
-  Future<String> exchangeNaverCode({
+  Future<NaverExchange> exchangeNaverCode({
     required String authorizationCode,
     required String codeVerifier,
     required String redirectUri,
@@ -57,6 +60,7 @@ abstract interface class AuthRepository {
     required String providerToken,
     required List<ConsentDecision> consents,
     required IdempotencyKey key,
+    String? profileImageUrl,
   });
 
   /// 휴대폰 확인 시작(auth 0.6.0) — `POST /auth/social-logins/{id}/identity-verifications`.
@@ -75,6 +79,7 @@ abstract interface class AuthRepository {
     String verificationId, {
     required String providerToken,
     required IdempotencyKey key,
+    String? profileImageUrl,
   });
 }
 
@@ -99,6 +104,7 @@ final class ApiAuthRepository implements AuthRepository {
     String providerToken, {
     required LoginPurpose purpose,
     required IdempotencyKey key,
+    String? profileImageUrl,
   }) => _guard(
     () async => (await _logins.socialLogin(
       idempotencyKey: key.value,
@@ -112,6 +118,7 @@ final class ApiAuthRepository implements AuthRepository {
           SocialProvider.google => auth.Provider.GOOGLE,
         },
         providerToken: providerToken,
+        profileImageUrl: profileImageUrl,
         purpose: switch (purpose) {
           LoginPurpose.general => auth.SocialLoginRequestPurposeEnum.GENERAL,
           LoginPurpose.checkout => auth.SocialLoginRequestPurposeEnum.CHECKOUT,
@@ -131,7 +138,7 @@ final class ApiAuthRepository implements AuthRepository {
   );
 
   @override
-  Future<String> exchangeNaverCode({
+  Future<NaverExchange> exchangeNaverCode({
     required String authorizationCode,
     required String codeVerifier,
     required String redirectUri,
@@ -150,8 +157,15 @@ final class ApiAuthRepository implements AuthRepository {
       ),
     );
     // 본문이 없으면 교환됐는지 모른다 — 같은 키로 다시 물을 수 있게 결과 불명으로.
-    return res.data?.idToken ??
-        (throw UnknownResultFailure(requestId: key.value));
+    final body = res.data ?? (throw UnknownResultFailure(requestId: key.value));
+    return (
+      idToken: body.idToken,
+      // 없으면 null(빠지지 않고 null 로 온다 — 같게 다룬다)
+      profileImageUrl: switch (body.profileImageUrl?.trim()) {
+        null || '' => null,
+        final u => u,
+      },
+    );
   }
 
   @override
@@ -178,6 +192,7 @@ final class ApiAuthRepository implements AuthRepository {
     required String providerToken,
     required List<ConsentDecision> consents,
     required IdempotencyKey key,
+    String? profileImageUrl,
   }) => _guard(
     // BR-20 회신(2026-11-17): 동의는 completions 본문으로 보낸다 — customer `/me/consent-changes` 를 먼저 부르지 않는다.
     () async => (await _logins.completeSocialLogin(
@@ -187,6 +202,7 @@ final class ApiAuthRepository implements AuthRepository {
       xDeviceId: await _deviceId.get(),
       completeSocialLoginRequest: auth.CompleteSocialLoginRequest(
         providerToken: providerToken,
+        profileImageUrl: profileImageUrl,
         consents: [
           for (final c in consents)
             auth.CompleteSocialLoginRequestConsentsInner(
@@ -237,6 +253,7 @@ final class ApiAuthRepository implements AuthRepository {
     String verificationId, {
     required String providerToken,
     required IdempotencyKey key,
+    String? profileImageUrl,
   }) => _guard(
     () async => (await _logins.confirmSocialLoginIdentityVerification(
       authRequestId: authRequestId,
@@ -247,6 +264,7 @@ final class ApiAuthRepository implements AuthRepository {
       confirmSocialLoginIdentityVerificationRequest:
           auth.ConfirmSocialLoginIdentityVerificationRequest(
             providerToken: providerToken,
+            profileImageUrl: profileImageUrl,
           ),
       extra: _publicCommand(key),
     )).data,

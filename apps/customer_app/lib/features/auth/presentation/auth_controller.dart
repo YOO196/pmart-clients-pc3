@@ -197,6 +197,22 @@ class SessionController extends Notifier<Session> {
     await restore();
   }
 
+  /// 탈퇴가 끝났다 — 서버가 이미 세션을 끊고 토큰을 막았다. 서버에 더 묻지 않고(푸시 토큰 지우기·조용한 재로그인 없음 —
+  /// 다시 로그인하면 새 계정이 생긴다) 이 기기의 로그인 정보만 지운다.
+  Future<void> forgetLocalSession() async {
+    await ref.read(tokenStoreProvider).clear();
+    final source = ref.read(socialTokenSourceProvider);
+    if (source is GoogleSocialTokenSource) {
+      try {
+        await source.signOut();
+      } on Object {
+        // Google 쪽 선택 해제 실패는 막지 않는다.
+      }
+    }
+    ref.read(sessionUnverifiedProvider.notifier).set(false);
+    state = const GuestSession();
+  }
+
   Future<void> signOut() async {
     // 회원 토큰을 지우기 전에 서버에서 이 단말의 푸시 토큰을 지운다(지운 뒤에는 부를 수 없다).
     try {
@@ -260,6 +276,9 @@ class LoginFlowController extends Notifier<LoginFlow> {
   /// 이번 로그인에서 받은 제공자 ID 토큰 — 동의 완료(auth 0.2.0)에 다시 보낸다. 메모리에만, 로그 금지.
   String? _providerToken;
 
+  /// 네이버 프로필 사진 주소(auth 0.10.1) — 로그인·동의 완료·휴대폰 확인에 같이 보낸다. 메모리에만.
+  String? _profileImageUrl;
+
   /// 결과를 모르는 동의 완료의 키 — 다시 누르면 같은 키로 보낸다(서버가 새 토큰을 준다, 두 번 가입되지 않음).
   IdempotencyKey? _completionKey;
 
@@ -287,6 +306,7 @@ class LoginFlowController extends Notifier<LoginFlow> {
     if (credential == null) return _settle(const LoginCancelled());
     _who = (provider: provider, label: credential.accountLabel);
     _providerToken = credential.token;
+    _profileImageUrl = credential.profileImageUrl;
     _completionKey = null;
     final key = IdempotencyKey.generate();
     final outcome = await _repo.login(
@@ -294,6 +314,7 @@ class LoginFlowController extends Notifier<LoginFlow> {
       credential.token,
       purpose: purpose,
       key: key,
+      profileImageUrl: credential.profileImageUrl,
     );
     if (!ref.mounted) return;
     if (outcome is LoginUnknown) {
@@ -326,6 +347,7 @@ class LoginFlowController extends Notifier<LoginFlow> {
               unknown.credential.token,
               purpose: purpose,
               key: unknown.key,
+              profileImageUrl: unknown.credential.profileImageUrl,
             );
       if (!ref.mounted) return;
     }
@@ -461,6 +483,7 @@ class LoginFlowController extends Notifier<LoginFlow> {
       s.verificationId,
       providerToken: token,
       key: key,
+      profileImageUrl: _profileImageUrl,
     );
     if (!ref.mounted) return;
     if (outcome is LoginUnknown) {
@@ -470,6 +493,7 @@ class LoginFlowController extends Notifier<LoginFlow> {
         s.verificationId,
         providerToken: token,
         key: key,
+        profileImageUrl: _profileImageUrl,
       );
       if (!ref.mounted) return;
     }
@@ -514,6 +538,7 @@ class LoginFlowController extends Notifier<LoginFlow> {
         providerToken: token,
         consents: consents,
         key: key,
+        profileImageUrl: _profileImageUrl,
       );
       if (!ref.mounted) return outcome;
     }

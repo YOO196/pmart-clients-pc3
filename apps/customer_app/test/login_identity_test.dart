@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
+import 'package:customer_app/features/auth/data/auth_repository.dart'
+    show SocialTokenSource;
 import 'package:customer_app/features/auth/data/mock_auth_repository.dart';
 import 'package:customer_app/features/auth/domain/auth.dart';
 import 'package:customer_app/features/auth/presentation/auth_controller.dart';
@@ -156,4 +158,53 @@ void main() {
     // 로고가 가운데
     expect(t.getCenter(find.text('바로픽')).dx, closeTo(width / 2, 1));
   });
+  // 네이버 프로필 사진(auth 0.8.0·0.10.1, BR-70): 교환 응답으로 받은 주소를 로그인·동의 완료·휴대폰 확인 세 곳에 실어 보낸다.
+  testWidgets('네이버 프로필 사진 주소를 로그인·동의 완료·휴대폰 확인("보냈어요") 세 곳에 같이 보낸다', (t) async {
+    const photo = 'https://phinf.pstatic.net/mock/profile.jpg';
+    final auth = MockAuthRepository(latency: Duration.zero)
+      ..requireIdentity = true;
+    t.view
+      ..physicalSize = const Size(800, 1800)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp([
+        socialTokenSourceProvider.overrideWithValue(const _WithPhoto(photo)),
+      ], auth: auth),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-naver')));
+    await t.pumpAndSettle();
+    for (final c in MockAuthRepository.requiredConsents) {
+      await t.tap(find.byKey(ValueKey('consent-$c')));
+      await t.pump();
+    }
+    await t.tap(find.byKey(const ValueKey('consent-submit')));
+    await t.pumpAndSettle();
+    await enterPhone(t);
+    await t.tap(find.byKey(const ValueKey('id-sent')));
+    await t.pumpAndSettle();
+    expect(member(t), isTrue);
+    // 로그인 → 동의 완료 → "보냈어요" — 셋 다 같은 주소
+    expect(auth.profileImageUrls, [photo, photo, photo]);
+  });
+}
+
+/// 프로필 사진 주소가 딸린 제공자 응답(네이버 교환 결과처럼).
+final class _WithPhoto implements SocialTokenSource {
+  const _WithPhoto(this.photo);
+
+  final String photo;
+
+  @override
+  Future<SocialCredential?> obtain(SocialProvider provider) async =>
+      SocialCredential('token-${provider.name}', profileImageUrl: photo);
+
+  @override
+  Future<SocialCredential?> obtainSilently(SocialProvider provider) async =>
+      null;
 }

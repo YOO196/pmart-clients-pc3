@@ -257,12 +257,18 @@ final class MemberSession extends Session {
 /// 제공자 SDK 결과: 서버에 보낼 토큰과 화면 표시용 계정 이름.
 @immutable
 final class SocialCredential {
-  const SocialCredential(this.token, {this.accountLabel});
+  const SocialCredential(this.token, {this.accountLabel, this.profileImageUrl});
 
   final String token;
   final String? accountLabel;
+
+  /// 네이버만(auth 0.10.1) — 서버가 코드 교환 때 읽어 준 프로필 사진 주소. 로그인 본문에 그대로 실어 보낸다.
+  final String? profileImageUrl;
 
   /// 토큰·계정 값을 로그에 남기지 않는다.
   @override
   String toString() => 'SocialCredential(***)';
 }
+
+/// 네이버 인가 코드 교환 결과(`POST /auth/naver-token-exchanges`). 토큰은 로그 금지.
+typedef NaverExchange = ({String idToken, String? profileImageUrl});

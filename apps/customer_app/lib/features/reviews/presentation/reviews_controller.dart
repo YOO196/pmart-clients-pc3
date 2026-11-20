@@ -181,7 +181,11 @@ class PagedList<T> {
     this.loadMoreFailure,
     this.averageRating,
     this.reviewCount,
+    this.counts,
   });
+
+  /// 리뷰관리 탭 머리 숫자(자격 목록에서만 — 첫 쪽의 서버 값).
+  final ReviewCounts? counts;
 
   final List<T> items;
   final String? nextCursor;
@@ -206,6 +210,7 @@ class PagedList<T> {
     loadMoreFailure: loadMoreFailure,
     averageRating: averageRating,
     reviewCount: reviewCount,
+    counts: counts,
   );
 }
 
@@ -224,6 +229,7 @@ abstract class _EligibilityList
     return PagedList(
       items: page.items.where(keep).toList(),
       nextCursor: page.nextCursor,
+      counts: page.counts,
     );
   }
 

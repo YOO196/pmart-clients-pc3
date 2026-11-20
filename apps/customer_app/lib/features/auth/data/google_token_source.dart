@@ -94,8 +94,11 @@ final class GoogleSocialTokenSource implements SocialTokenSource {
   /// 결과와 상관없이 로그인은 지금처럼 ID 토큰으로 계속한다.
   Future<void> _probeServerAuthCode(GoogleSignInAccount account) async {
     try {
-      final server = await account.authorizationClient
-          .authorizeServer(const ['openid', 'email', 'profile']);
+      final server = await account.authorizationClient.authorizeServer(const [
+        'openid',
+        'email',
+        'profile',
+      ]);
       final code = server?.serverAuthCode;
       debugPrint(
         '[server-auth-test] serverAuthCode='

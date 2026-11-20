@@ -14,6 +14,8 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:customer_app/app.dart';
+import 'package:customer_app/features/withdrawal/data/withdrawal_repository.dart';
+import 'package:customer_app/features/withdrawal/presentation/withdrawal_screen.dart';
 import 'package:customer_app/shared/shopping_context.dart'
     show currentMfcIdProvider;
 import 'package:customer_app/features/address/data/current_location.dart';
@@ -157,6 +159,13 @@ void main() {
             (_, max) async => samplePhotos.take(max).toList(),
           ),
           clockProvider.overrideWithValue(() => now),
+          // 회원 탈퇴 캡처: 진행 중 주문이 있어 "탈퇴 처리 대기"가 되는 경우
+          withdrawalRepositoryProvider.overrideWithValue(
+            MockWithdrawalRepository(latency: Duration.zero, now: () => now)
+              ..obligationsNext = [
+                {'kind': 'ORDER_IN_PROGRESS', 'ref': 'order-seed-4'},
+              ],
+          ),
           draftPollPolicyProvider.overrideWithValue((
             interval: Duration.zero,
             attempts: 3,
@@ -738,6 +747,24 @@ void main() {
     await go('/cart');
     await t.tap(find.byKey(const ValueKey('cart-order')));
     await shot('notice-over-cart-order');
+    await t.pump(const Duration(seconds: 5));
+    await t.pumpAndSettle();
+
+    // 회원 탈퇴(customer 0.12.0): 안내·사유 → 재인증 → 탈퇴 처리 대기 → 철회(다른 캡처에 영향 없게 되돌린다).
+    await go('/me/withdrawal');
+    await shot('withdrawal');
+    // 확인 칸은 화면 아래에 있다 — 내려서 만든 뒤 누른다.
+    await t.drag(find.byKey(const ValueKey('wd-form')), const Offset(0, -900));
+    await t.pumpAndSettle();
+    await shot('withdrawal-2');
+    await t.tap(find.byKey(const ValueKey('wd-agree')));
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('wd-submit')));
+    await shot('withdrawal-blocked');
+    await t.tap(find.byKey(const ValueKey('wd-revoke')));
+    await t.pumpAndSettle();
+    await t.pump(const Duration(seconds: 3));
+    await t.pumpAndSettle();
     debugDisableShadows = true;
   });
 
