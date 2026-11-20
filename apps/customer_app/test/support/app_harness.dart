@@ -32,6 +32,8 @@ import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
 import 'package:customer_app/features/orders/data/orders_repository.dart';
 import 'package:customer_app/features/orders/presentation/orders_providers.dart';
 import 'package:customer_app/features/payment/presentation/payment_controller.dart';
+import 'package:customer_app/features/wishlist/data/wishlist_repository.dart';
+import 'package:customer_app/features/wishlist/presentation/wishlist_controller.dart';
 import 'package:customer_app/features/profile/data/mock_profile_repository.dart';
 import 'package:customer_app/features/redelivery/data/mock_redelivery_payments_repository.dart';
 import 'package:customer_app/features/redelivery/data/redelivery_payments_repository.dart';
@@ -56,6 +58,9 @@ Widget testApp(
   ClaimsRepository? claims,
   MockAuthRepository? auth,
   ProfileRepository? profile,
+
+  /// 찜(기본: 지연 없는 목 — 카드·상세의 하트가 로그인 뒤 찜 ID 를 읽는다).
+  WishlistRepository? wishlist,
   NotificationsRepository? notifications,
   ReviewsRepository? reviews,
   FakeAddressPicker? addressPicker,
@@ -131,6 +136,9 @@ Widget testApp(
       ),
       profileRepositoryProvider.overrideWithValue(
         profile ?? MockProfileRepository(latency: Duration.zero),
+      ),
+      wishlistRepositoryProvider.overrideWithValue(
+        wishlist ?? MockWishlistRepository(latency: Duration.zero),
       ),
       notificationsRepositoryProvider.overrideWithValue(
         notifications ?? MockNotificationsRepository(latency: Duration.zero),

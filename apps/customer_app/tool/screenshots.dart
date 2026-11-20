@@ -750,6 +750,10 @@ void main() {
     await t.pump(const Duration(seconds: 5));
     await t.pumpAndSettle();
 
+    // 찜한 상품(customer 0.13.0)
+    await go('/me/wishlist');
+    await shot('wishlist');
+
     // 회원 탈퇴(customer 0.12.0): 안내·사유 → 재인증 → 탈퇴 처리 대기 → 철회(다른 캡처에 영향 없게 되돌린다).
     await go('/me/withdrawal');
     await shot('withdrawal');

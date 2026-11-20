@@ -8,6 +8,7 @@ import 'features/address/presentation/address_screens.dart';
 import 'features/address/presentation/postcode_screen.dart' show PostcodeResult;
 import 'features/cart/presentation/cart_merge_screen.dart';
 import 'features/start/presentation/start_controller.dart';
+import 'features/wishlist/presentation/wishlist_screens.dart';
 import 'features/withdrawal/presentation/withdrawal_screen.dart';
 import 'features/start/presentation/start_screens.dart';
 import 'features/auth/domain/auth.dart';
@@ -275,6 +276,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/me/info',
         builder: (_, state) =>
             MyInfoScreen(signup: state.uri.queryParameters['from'] == 'signup'),
+      ),
+      // 찜한 상품(customer 0.13.0, ADR-0081)
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/me/wishlist',
+        builder: (_, _) => const WishlistScreen(),
       ),
       // 회원 탈퇴(customer 0.12.0, ADR-0077): 안내·재인증·접수, 대기 중이면 상태·철회.
       GoRoute(

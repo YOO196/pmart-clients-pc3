@@ -9,6 +9,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/cart_icon_button.dart';
 import '../../../shared/ui_state_of.dart';
+import '../../wishlist/presentation/wish_heart_button.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
 import '../../reviews/presentation/reviews_screens.dart'
@@ -97,6 +98,12 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             return AddToCartBar(
               sku: selected?.sku,
               enabled: selected?.canOfferAdd ?? false,
+              // 찜 하트(customer 0.13.0 — 레퍼런스 4-1 아래 막대 왼쪽)
+              leading: WishHeartButton(
+                key: const ValueKey('detail-wish'),
+                productId: p.productId,
+                size: 26,
+              ),
             );
           },
         ),

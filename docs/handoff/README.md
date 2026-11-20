@@ -49,6 +49,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-20-backend-br67-68-70-withdrawal-applied.md` | BR-67(리뷰관리 값)·BR-68(주문내역 상품 줄)·BR-70(네이버 프로필 사진) 회신과 회원 탈퇴 요청(customer 0.12.0) 목 모드 반영 알림 + Q1(탈퇴 대기 중 주문 거절 문구) — LAN 확인 대기 |
 | `customer-app/2026-11-20-backend-order-line-images.md` | BR-71 주문 줄의 상품 사진 — `GET /orders` `lines[]`·`GET /orders/{id}` `OrderLine` 에 `imageUrl`(R1·R2) — 보냄, 회신 대기 |
 | `customer-app/2026-11-20-backend-signup-consent-restart.md` | BR-72 가입을 끝내지 않고 나갔으면 다음 로그인 때 동의부터 다시(R1~R4) — 보냄, 회신 대기 |
+| `customer-app/2026-11-20-backend-wishlist-applied.md` | 찜(하트 — customer 0.13.0) 목 모드 반영 알림 + Q1(422 details 읽는 법) — LAN 확인 대기 |
 | `customer-app/2026-11-20-backend-availability-display-applied.md` | "다 팔렸어요" 오표시(요청 availability-display §1) 목 모드 반영 알림 — 주소 없음·재고 조회 실패·배달 안 함을 품절과 구분, §2 목록 품절 표시는 계약 대기 |
 | `customer-app/2026-11-20-backend-handoff-replies-applied.md` | 11-20 백엔드 요청·회신 4건(검색 교정 문구·리뷰 사진 축소본·홈 배너·BR-64 로그인 휴대폰 확인) 목 모드 반영 알림 + Q1(details 읽는 법) — LAN 확인 대기 |
 | `customer-app/2026-11-19-backend-address-receiver-to-checkout.md` | BR-60 — 회신(`clients/customer-app/2026-11-19-reply-br60-address-receiver.md`, customer 0.8.0·order 0.14.0 배포) · 고객앱 반영(목 모드). **남은 것: LAN 에서 주소 저장·주문서 내 연락처 확인 뒤 archive** |

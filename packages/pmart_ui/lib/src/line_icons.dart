@@ -72,6 +72,12 @@ enum PmartLineIcons {
   /// 원 안 X(지우기).
   clearCircle,
   clock,
+
+  /// 찜(하트 — 선). 찜한 상태는 [heartFilled].
+  heart,
+
+  /// 찜한 하트(채움).
+  heartFilled,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -246,6 +252,19 @@ class _LinePainter extends CustomPainter {
             ..lineTo(20, 12),
           line,
         );
+      case PmartLineIcons.heart:
+      case PmartLineIcons.heartFilled:
+        final heart = Path()
+          ..moveTo(12, 20)
+          ..cubicTo(5.2, 15.4, 3, 12.2, 3, 8.9)
+          ..cubicTo(3, 6.2, 5.1, 4.2, 7.6, 4.2)
+          ..cubicTo(9.4, 4.2, 11, 5.1, 12, 6.6)
+          ..cubicTo(13, 5.1, 14.6, 4.2, 16.4, 4.2)
+          ..cubicTo(18.9, 4.2, 21, 6.2, 21, 8.9)
+          ..cubicTo(21, 12.2, 18.8, 15.4, 12, 20)
+          ..close();
+        if (icon == PmartLineIcons.heartFilled) canvas.drawPath(heart, fill);
+        canvas.drawPath(heart, line);
       case PmartLineIcons.plus:
         canvas.drawLine(const Offset(12, 5), const Offset(12, 19), line);
         canvas.drawLine(const Offset(5, 12), const Offset(19, 12), line);

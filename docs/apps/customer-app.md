@@ -1,7 +1,7 @@
 # 고객앱 (customer_app, Flutter)
 
 근거: `../pmart-backend/docs/business/Commerce-business-logic.md`(C), `OMS-business-logic.md`(O), `flows/order-checkout-saga.md`, `cancel-vs-handover.md`, `return-exchange-refund.md`, 계약 `contracts/openapi/*.yaml`. 숫자는 대략적인 줄 번호. 화면 ID 전체 색인은 C 부록 I.1(≈3510).
-Commerce 문서의 PPC = MFC. 1차 제외: 쿠폰·프로모션·할인 배너·찜·재입고 알림·공유·AI 상담. (2026-10-24 레퍼런스 검토 후 유지 확정. 포인트 적립·1+1·증정 배지도 프로모션에 포함해 제외. `customer-app-design-review.md`)
+Commerce 문서의 PPC = MFC. 1차 제외: 쿠폰·프로모션·할인 배너·재입고 알림·공유·AI 상담. 찜은 2026-11-20 사용자 결정으로 넣었다(customer 0.13.0, 백엔드 ADR-0081 — 회원만·상품 단위·최대 200개, 재입고 알림은 여전히 없음). (2026-10-24 레퍼런스 검토 후 유지 확정. 포인트 적립·1+1·증정 배지도 프로모션에 포함해 제외. `customer-app-design-review.md`)
 
 ## 1. 화면과 API
 

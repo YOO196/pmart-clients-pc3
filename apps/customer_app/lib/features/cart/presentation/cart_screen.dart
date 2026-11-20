@@ -944,7 +944,15 @@ Future<void> _showFeeInfo(BuildContext context) {
 
 /// 상품 상세 하단의 담기 막대. 수량은 절대값이다(이미 담겼으면 그 수량에서 시작).
 class AddToCartBar extends ConsumerStatefulWidget {
-  const AddToCartBar({super.key, required this.sku, required this.enabled});
+  const AddToCartBar({
+    super.key,
+    required this.sku,
+    required this.enabled,
+    this.leading,
+  });
+
+  /// 수량 칸 앞에 두는 것(상품 상세의 찜 하트 — 레퍼런스 4-1 아래 막대 왼쪽).
+  final Widget? leading;
 
   final String? sku;
 
@@ -1003,6 +1011,7 @@ class _AddToCartBarState extends ConsumerState<AddToCartBar> {
                 ),
               Row(
                 children: [
+                  ?widget.leading,
                   IconButton(
                     key: const ValueKey('add-dec'),
                     tooltip: l10n.cartDecrease,

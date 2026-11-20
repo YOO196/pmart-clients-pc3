@@ -6,6 +6,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../../l10n/gen/app_localizations.dart';
 import '../../../../shared/providers.dart';
 import '../../domain/catalog.dart';
+import '../../../wishlist/presentation/wish_heart_button.dart';
 import 'quick_add_button.dart';
 
 /// 상품 이미지. 주소가 없거나 받지 못하면 자리표시를 그린다.
@@ -235,6 +236,17 @@ class ProductTileCard extends StatelessWidget {
             ),
           ),
         if (badge != null) Positioned(left: 0, top: 0, child: badge),
+        // 찜 하트(customer 0.13.0) — 카드(상세 이동)와 따로 눌린다.
+        Positioned(
+          right: 5,
+          top: 5,
+          child: WishHeartButton(
+            key: ValueKey('tile-wish-${tile.productId}'),
+            productId: tile.productId,
+            size: 16,
+            onImage: true,
+          ),
+        ),
         if (quickAdd && QuickAddButton.offeredFor(tile))
           Positioned(right: 5, bottom: 5, child: QuickAddButton(tile: tile)),
       ],

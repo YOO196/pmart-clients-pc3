@@ -268,6 +268,12 @@ class MyScreen extends ConsumerWidget {
                 onTap: () => context.push('/claims'),
               ),
             row(
+              l10n.wishTitle,
+              key: const ValueKey('my-wishlist'),
+              icon: PmartLineIcons.heart,
+              onTap: () => context.push('/me/wishlist'),
+            ),
+            row(
               l10n.reviewManageTitle,
               key: const ValueKey('my-reviews'),
               icon: PmartLineIcons.pencil,
