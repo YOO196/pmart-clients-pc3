@@ -76,6 +76,157 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
   /// 숨기기 진행 중인 주문(버튼 비활성).
   final _hiding = <String>{};
 
+  /// [더보기]를 누른 주문(카드에 나머지 줄을 그린다).
+  final _expanded = <String>{};
+
+  /// 카드의 상품 한 줄: 사진 / 이름 / 금액·수량 / ⊕.
+  Widget _cardLine(
+    ThemeData theme,
+    AppLocalizations l10n, {
+    required String id,
+    required String? productId,
+    required String sku,
+    required String name,
+    required int? amount,
+    required int quantity,
+  }) {
+    final scheme = theme.colorScheme;
+    return Padding(
+      key: ValueKey('order-line-$id'),
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          _ListLineImage(
+            key: ValueKey('order-line-image-$id'),
+            productId: productId,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                ),
+                const SizedBox(height: 2),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: amount == null ? '' : formatKrw(amount),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      TextSpan(
+                        text: '  ${l10n.cartLineQuantity(quantity)}',
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          // 주문내역에서도 바로 담는다(레퍼런스 9-2 ⊕, 사용자 2026-11-20). 담을 수 있는지는 장바구니 서버가 판정한다.
+          ReorderButton(
+            key: ValueKey('order-line-add-$id'),
+            sku: sku,
+            quantity: quantity,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 앞 5줄 뒤: 접혀 있으면 [더보기], 펼치면 주문 상세의 나머지 줄 + [접기].
+  List<Widget> _moreLines(
+    ThemeData theme,
+    AppLocalizations l10n,
+    OrderListItem o,
+  ) {
+    final scheme = theme.colorScheme;
+    Widget toggle(String key, String label, PmartLineIcons icon) => Center(
+      child: TextButton(
+        key: ValueKey('$key-${o.orderId}'),
+        style: TextButton.styleFrom(
+          foregroundColor: scheme.onSurface,
+          textStyle: theme.textTheme.bodyMedium?.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        onPressed: () => setState(() {
+          if (!_expanded.remove(o.orderId)) _expanded.add(o.orderId);
+        }),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label),
+            const SizedBox(width: 4),
+            PmartLineIcon(icon, size: 16),
+          ],
+        ),
+      ),
+    );
+    if (!_expanded.contains(o.orderId)) {
+      return [
+        toggle('order-more', l10n.ordersMore, PmartLineIcons.chevronDown),
+      ];
+    }
+    final shown = {for (final l in o.lines) l.orderLineId};
+    final detail = ref.watch(orderDetailProvider(o.orderId));
+    return [
+      switch (detail) {
+        AsyncData(:final value) => Column(
+          key: ValueKey('order-more-lines-${o.orderId}'),
+          children: [
+            for (final l in value.lines)
+              if (!shown.contains(l.orderLineId))
+                _cardLine(
+                  theme,
+                  l10n,
+                  id: l.orderLineId,
+                  productId: l.productId,
+                  sku: l.sku,
+                  name: l.title,
+                  // 주문상세 줄과 같이: 서버 줄 금액, 없으면(옛 응답) 단가
+                  amount: l.lineAmount ?? l.unitPrice,
+                  quantity: l.originalQty ?? 0,
+                ),
+          ],
+        ),
+        AsyncError() => Row(
+          key: ValueKey('order-more-failed-${o.orderId}'),
+          children: [
+            Expanded(
+              child: Text(
+                l10n.ordersMoreFailed,
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
+              ),
+            ),
+            TextButton(
+              onPressed: () => ref.invalidate(orderDetailProvider(o.orderId)),
+              child: Text(l10n.faqRetry),
+            ),
+          ],
+        ),
+        _ => const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Center(
+            child: SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        ),
+      },
+      toggle('order-less', l10n.ordersLess, PmartLineIcons.chevronUp),
+    ];
+  }
+
   OrderListQuery get _query =>
       OrderListQuery(status: _status, period: _period, q: _q);
 
@@ -670,73 +821,20 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         const SizedBox(height: 12),
         // 상품 줄(order 0.17.0 — 레퍼런스 9-2): 사진 / 이름 / 금액·수량. 사진은 줄에 주소가 없어(BR-71) 상품 상세의
         // 대표 사진을 쓴다(주문상세 줄과 같은 방식, 사용자 2026-11-20). 못 받으면 빈 사진 자리.
-        // 서버가 앞 5개만 준다 — 나머지는 "외 N개"(전체 수량 − 보인 수량).
+        // 서버가 앞 5개만 준다 — 더 있으면(전체 수량 > 보인 수량) [더보기]로 주문 상세를 받아 나머지 줄을 이어 그린다
+        // (사용자 2026-11-20 "더보기로 바꿔줘"). 받는 중·실패는 그 자리에 보이고, 실패를 빈 목록으로 두지 않는다.
         for (final l in o.lines)
-          Padding(
-            key: ValueKey('order-line-${l.orderLineId}'),
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Row(
-              children: [
-                _ListLineImage(
-                  key: ValueKey('order-line-image-${l.orderLineId}'),
-                  productId: l.productId,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        [?l.productName, ?l.optionLabel].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontSize: 15,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: formatKrw(l.lineAmount),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            TextSpan(
-                              text: '  ${l10n.cartLineQuantity(l.quantity)}',
-                              style: TextStyle(color: scheme.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                // 주문내역에서도 바로 담는다(레퍼런스 9-2 ⊕, 사용자 2026-11-20). 담을 수 있는지는 장바구니 서버가 판정한다.
-                ReorderButton(
-                  key: ValueKey('order-line-add-${l.orderLineId}'),
-                  sku: l.sku,
-                  quantity: l.quantity,
-                ),
-              ],
-            ),
+          _cardLine(
+            theme,
+            l10n,
+            id: l.orderLineId,
+            productId: l.productId,
+            sku: l.sku,
+            name: [?l.productName, ?l.optionLabel].join(' · '),
+            amount: l.lineAmount,
+            quantity: l.quantity,
           ),
-        if (o.moreQty case final more?)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Text(
-              l10n.ordersMoreQty(more),
-              key: ValueKey('order-more-${o.orderId}'),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ),
+        if (o.moreQty != null) ..._moreLines(theme, l10n, o),
         if (o.lines.isNotEmpty) ...[
           const Divider(height: 1),
           const SizedBox(height: 12),

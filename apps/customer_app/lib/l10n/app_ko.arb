@@ -1198,6 +1198,9 @@
   "ordersPeriod1y": "최근 1년",
   "ordersPeriodAll": "전체 기간",
   "ordersMoreQty": "외 {count}개",
+  "ordersMore": "더보기",
+  "ordersLess": "접기",
+  "ordersMoreFailed": "나머지 상품을 불러오지 못했어요",
   "@ordersMoreQty": { "placeholders": { "count": { "type": "int" } } },
   "ordersRepresentative": "{name} 외 {count}개",
   "@ordersRepresentative": {

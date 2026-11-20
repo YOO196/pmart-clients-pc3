@@ -129,6 +129,31 @@ void main() {
     final orders = MockOrdersRepository(latency: Duration.zero, now: () => now)
       ..rejectNextTimeChange = true
       ..rejectReason = 'LOT_EXPIRY_NOT_MET';
+    // 상품 6줄인 끝난 주문 — 카드의 [더보기](2026-11-20)
+    orders.overrides['order-six'] = {
+      ...orders.orderJson('order-seed-2')!,
+      'orderId': 'order-six',
+      'lines': [
+        for (final (i, name) in const [
+          (1, '서울우유 1L'),
+          (2, '그릭요거트 플레인 400g'),
+          (3, '제주 감귤 1kg'),
+          (4, '친환경 대추방울토마토 500g'),
+          (5, '감자칩 오리지널 110g'),
+          (6, '저지방 우유 900mL'),
+        ])
+          {
+            'orderLineId': 'ol-6$i',
+            'productId': 'P-000$i',
+            'sku': 'E-0000000$i',
+            'productName': name,
+            'unitPrice': 2980,
+            'originalQty': 1,
+            'deliveredQty': 1,
+          },
+      ],
+      'shipments': <Object?>[],
+    };
     // 반품 회수비 결제(고객센터가 접수한 고객 사유 반품 — order-seed-1).
     final claims = MockClaimsRepository(
       orders: orders,
@@ -393,6 +418,21 @@ void main() {
       await t.ensureVisible(reorderAll.first);
       await t.pumpAndSettle();
       await shot('orders-reorder-all');
+    }
+    final moreSix = find.byKey(const ValueKey('order-more-order-six'));
+    for (var i = 0; i < 10 && moreSix.evaluate().isEmpty; i++) {
+      await t.drag(find.byType(Scrollable).last, const Offset(0, -500));
+      await t.pumpAndSettle();
+    }
+    if (moreSix.evaluate().isNotEmpty) {
+      await t.ensureVisible(moreSix);
+      await t.pumpAndSettle();
+      await shot('orders-more');
+      await t.tap(moreSix);
+      await t.pumpAndSettle();
+      await t.ensureVisible(find.byKey(const ValueKey('order-less-order-six')));
+      await t.pumpAndSettle();
+      await shot('orders-more-open');
       await go('/orders');
     }
     await t.tap(

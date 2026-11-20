@@ -250,6 +250,56 @@ void main() {
       );
     });
 
+    testWidgets('상품이 5줄 넘는 주문: 앞 5줄 뒤 [더보기] → 주문 상세의 나머지 줄, [접기]로 다시 접는다', (
+      t,
+    ) async {
+      // 상품 6줄인 끝난 주문(서버는 목록에 앞 5줄만 준다)
+      final orders = MockOrdersRepository(latency: Duration.zero);
+      final base = orders.orderJson('order-seed-2')!;
+      orders.overrides['order-six'] = {
+        ...base,
+        'orderId': 'order-six',
+        'lines': [
+          for (var i = 1; i <= 6; i++)
+            {
+              'orderLineId': 'ol-5$i',
+              'productId': 'P-000$i',
+              'sku': 'E-0000000$i',
+              'productName': '상품 $i',
+              'unitPrice': 1000,
+              'originalQty': 1,
+              'deliveredQty': 1,
+            },
+        ],
+        'shipments': <Object?>[],
+      };
+      await openOrders(t, orders: orders);
+      final more = find.byKey(const ValueKey('order-more-order-six'));
+      await t.scrollUntilVisible(
+        more,
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await t.pumpAndSettle();
+      // 앞 5줄만, 여섯째 줄은 아직 없다.
+      expect(find.byKey(const ValueKey('order-line-ol-55')), findsOneWidget);
+      expect(find.byKey(const ValueKey('order-line-ol-56')), findsNothing);
+      expect(find.text('더보기'), findsWidgets);
+
+      await t.tap(more);
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('order-line-ol-56')), findsOneWidget);
+      // 이미 보인 줄을 두 번 그리지 않는다.
+      expect(find.byKey(const ValueKey('order-line-ol-51')), findsOneWidget);
+
+      final less = find.byKey(const ValueKey('order-less-order-six'));
+      await t.ensureVisible(less);
+      await t.pumpAndSettle();
+      await t.tap(less);
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('order-line-ol-56')), findsNothing);
+    });
+
     testWidgets('주문내역 카드의 ⊕: 그 상품을 주문 수량만큼 새로 담고 서버 결과를 알린다', (t) async {
       final cart = MockCartRepository(latency: Duration.zero);
       await openOrders(t, cart: cart);
