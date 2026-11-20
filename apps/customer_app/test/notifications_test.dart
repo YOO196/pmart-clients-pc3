@@ -13,6 +13,8 @@ import 'package:customer_app/features/notifications/presentation/notifications_s
 import 'package:customer_app/features/orders/presentation/orders_screens.dart';
 import 'package:customer_app/shared/providers.dart' show sourceSystem;
 
+import 'package:customer_app/features/push/domain/push_route.dart';
+
 import 'support/app_harness.dart';
 
 /// 알림함·알림 이동·수신 설정(고객앱 레퍼런스 반영 B, 2026-11-04).
@@ -89,6 +91,37 @@ void main() {
       expect(r(NoticeDestinationType.order, null), isNull);
       expect(r(NoticeDestinationType.order, ''), isNull);
       expect(noticeRoute(null), isNull);
+    });
+
+    test('쿠폰 도착 알림(가입 축하·지정·보상)은 목적지와 상관없이 쿠폰함', () {
+      for (final key in ['COUPON_SIGNUP', 'COUPON_ISSUED']) {
+        expect(
+          noticeRoute(
+            const NoticeDestination(type: NoticeDestinationType.none),
+            templateKey: key,
+          ),
+          '/me/coupons',
+        );
+      }
+      // 보상은 서버 목적지가 취소된 주문이지만 문구가 "쿠폰함에서 확인"이라 쿠폰함으로.
+      expect(
+        noticeRoute(
+          const NoticeDestination(
+            type: NoticeDestinationType.order,
+            ref: 'o-1',
+          ),
+          templateKey: 'COUPON_COMPENSATION',
+        ),
+        '/me/coupons',
+      );
+      expect(
+        pushRoute({
+          'notificationId': 'n-1',
+          'templateKey': 'COUPON_SIGNUP',
+          'destinationType': 'NONE',
+        }),
+        '/me/coupons',
+      );
     });
   });
 

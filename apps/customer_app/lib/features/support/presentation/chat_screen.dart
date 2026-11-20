@@ -120,6 +120,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         style: TextButton.styleFrom(
                           foregroundColor: theme.colorScheme.onSurface,
                           visualDensity: VisualDensity.compact,
+                          // 레퍼런스 고객센터 2-1: "상담종료"는 보통 굵기(테마 labelLarge 는 w600).
+                          textStyle: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w400,
+                          ),
                         ),
                         onPressed: busy
                             ? null

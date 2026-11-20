@@ -113,7 +113,12 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
-    // 주문서 뒤로가기는 "주문을 취소할까요?"를 묻는다(레퍼런스 6-0).
+    // 주문서 뒤로가기는 "주문을 취소할까요?"를 묻는다(레퍼런스 6-0 — 굵은 제목 없이 보통 글씨 본문 하나).
+    final leaveBody = t.widget<Text>(
+      find.byKey(const ValueKey('checkout-leave-body')),
+    );
+    expect(leaveBody.data, '주문을 취소할까요? 적용한 쿠폰은 주문할 때 다시 적용해 주세요.');
+    expect(leaveBody.style?.fontWeight, isNot(FontWeight.w700));
     await t.tap(find.byKey(const ValueKey('checkout-leave-ok')));
     await t.pumpAndSettle();
     // 배송 방식 화면이 장바구니에 합쳐져 주문서 뒤는 바로 장바구니다.

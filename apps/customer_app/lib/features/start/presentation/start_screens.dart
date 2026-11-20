@@ -724,9 +724,10 @@ class MarketingConsentResultDialog extends StatelessWidget {
               child: Center(
                 child: Text(
                   l10n.startConfirm,
+                  // 레퍼런스 2-1·2-2: 안내 창 "확인"은 중간 굵기.
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),

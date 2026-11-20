@@ -91,4 +91,40 @@ void main() {
     expect(find.text('지금 주소로 계속 둘러볼까요?'), findsNothing);
     expect(member(t), isFalse);
   });
+  // 사용자 2026-11-21: "로그아웃하고 나서 비회원 주소 저장이 안 돼서 주소 입력창이 뜸" — 로그아웃 직후 주소록이
+  // 잠깐 비는 사이 처음 실행 단계가 주소 입력으로 보냈다. 처음 실행 단계를 켠 채로 확인한다.
+  testWidgets('[예]: 옮기는 동안에도 주소 입력 화면으로 가지 않는다(처음 실행 단계 켬)', (t) async {
+    t.view
+      ..physicalSize = const Size(800, 2000)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final secure = MemoryKeyValueStore();
+    await secure.write('pmart.start.welcome', 'at=x');
+    // 느린 서버 — 로그아웃과 비회원 배송지 만들기 사이에 틈이 생긴다.
+    final address = MockAddressRepository(
+      latency: const Duration(milliseconds: 200),
+    );
+    await t.pumpWidget(
+      testApp(const [], startGate: true, secure: secure, address: address),
+    );
+    await t.pumpAndSettle();
+    await t.tap(key('login-kakao'));
+    await t.pumpAndSettle();
+    expect(key('start-address'), findsNothing);
+
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.ensureVisible(key('logout'));
+    await t.tap(key('logout'));
+    await t.pumpAndSettle();
+    await t.tap(key('logout-keep-address-yes'));
+    for (var i = 0; i < 30; i++) {
+      await t.pump(const Duration(milliseconds: 50));
+      expect(key('start-address'), findsNothing, reason: '${i * 50}ms');
+    }
+    await t.pumpAndSettle();
+    expect(member(t), isFalse);
+    expect(key('start-address'), findsNothing);
+    expect(await GuestAddressStore(secure).ids(), hasLength(1));
+  });
 }

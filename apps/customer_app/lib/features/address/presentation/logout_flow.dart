@@ -7,6 +7,10 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/notice.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../domain/address.dart';
+import '../../start/presentation/start_controller.dart'
+    show logoutKeepingAddressProvider;
+import '../data/address_repository.dart' show AddressRepository;
+import '../data/guest_address_store.dart' show GuestAddressStore;
 import 'address_controller.dart';
 
 /// 로그아웃(customer 0.14.0 — 백엔드 요청 2026-11-20 logout-keep-browsing-address).
@@ -20,6 +24,8 @@ import 'address_controller.dart';
 Future<void> logoutKeepingAddress(BuildContext context, WidgetRef ref) async {
   final l10n = AppLocalizations.of(context);
   final messenger = ScaffoldMessenger.of(context);
+  // 로그아웃 뒤에는 이 화면이 사라질 수 있어 앱 전체 컨테이너로 이어 간다.
+  final container = ProviderScope.containerOf(context, listen: false);
   final session = ref.read(sessionProvider.notifier);
   final store = ref.read(guestAddressStoreProvider);
   final repo = ref.read(addressRepositoryProvider);
@@ -42,17 +48,43 @@ Future<void> logoutKeepingAddress(BuildContext context, WidgetRef ref) async {
   if (keep == null) return; // 창을 닫음 — 로그아웃하지 않는다.
 
   // 좌표·우편번호는 회원 토큰이 있을 때 읽어 둔다(로그아웃 뒤에는 읽을 수 없다). 못 읽으면 도로명만으로.
-  AddressDraft? saved;
-  if (keep) {
-    try {
-      saved = await repo.draft(shopping.addressId);
-    } on PmartFailure {
-      saved = null;
-    }
+  if (!keep) {
+    await session.signOut();
+    return;
   }
-  await session.signOut();
-  if (!keep) return;
+  AddressDraft? saved;
+  try {
+    saved = await repo.draft(shopping.addressId);
+  } on PmartFailure {
+    saved = null;
+  }
+  // 옮기기가 끝날 때까지 주소 입력 화면으로 보내지 않는다(로그아웃 직후 주소록이 잠깐 비어도).
+  final hold = container.read(logoutKeepingAddressProvider.notifier)..set(true);
+  try {
+    await session.signOut();
+    await _keepAsGuest(
+      container,
+      store,
+      repo,
+      shopping,
+      saved,
+      messenger,
+      l10n,
+    );
+  } finally {
+    hold.set(false);
+  }
+}
 
+Future<void> _keepAsGuest(
+  ProviderContainer container,
+  GuestAddressStore store,
+  AddressRepository repo,
+  Address shopping,
+  AddressDraft? saved,
+  ScaffoldMessengerState messenger,
+  AppLocalizations l10n,
+) async {
   final draft = AddressDraft(
     roadAddress: shopping.roadAddress,
     // 상세 주소는 옮기지 않는다(비회원 배송지는 선택 — 0.14.0).
@@ -70,7 +102,13 @@ Future<void> logoutKeepingAddress(BuildContext context, WidgetRef ref) async {
     }
     await store.add(guest.addressId);
     await store.select(guest.addressId);
-    ref.invalidate(addressBookProvider);
+    container.invalidate(addressBookProvider);
+    // 새 비회원 주소록을 받은 뒤에 막기를 푼다(빈 주소록으로 한 번 더 판단하지 않게). 못 읽어도 막기는 푼다.
+    try {
+      await container.read(addressBookProvider.future);
+    } on Object {
+      // 주소록 화면이 실패를 보인다.
+    }
   } on PmartFailure {
     // 로그아웃은 끝났다 — 주소만 못 옮겼다. 다음 화면에서 주소를 고르게 된다.
     messenger.notice(l10n.logoutKeepAddressFailed);

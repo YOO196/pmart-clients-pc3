@@ -243,7 +243,11 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
                       TextButton(
                         key: const ValueKey('cancel-dismiss'),
                         style: TextButton.styleFrom(
-                          textStyle: const TextStyle(fontSize: 16),
+                          // 테마 글꼴을 잃지 않게 테마 글자 모양에서(그냥 TextStyle 이면 글꼴이 빠져 □ 로 그려졌다).
+                          textStyle: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                          ),
                           foregroundColor: theme.colorScheme.onSurface,
                           minimumSize: const Size(72, 44),
                         ),

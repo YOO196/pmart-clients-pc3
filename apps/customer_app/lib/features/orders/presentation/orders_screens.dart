@@ -621,7 +621,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         centerTitle: false,
         titleSpacing: context.canPop() ? pmartLeftTitleSpacing : 20,
         titleTextStyle: Theme.of(context).appBarTheme.titleTextStyle
-            ?.copyWith(fontSize: 18),
+            ?.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
         title: Text(l10n.ordersTitle),
         actions: const [CartIconButton(), SizedBox(width: 6)],
         // 결제 완료에서 주문 상세로 바로 오면(go) 뒤에 화면이 없다. 그때는 마이로 돌아간다.
@@ -1060,7 +1060,7 @@ class OrderDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         titleTextStyle: Theme.of(context).appBarTheme.titleTextStyle
-            ?.copyWith(fontSize: 18),
+            ?.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
         title: Text(l10n.orderDetailTitle),
         actions: const [CartIconButton(), SizedBox(width: 6)],
       ),
@@ -3116,9 +3116,10 @@ class _TrackSteps extends StatelessWidget {
                       ),
                       textAlign: TextAlign.center,
                       style: step == current
+                          // 레퍼런스 8: 지금 단계는 진한 색일 뿐 보통 굵기.
                           ? theme.textTheme.titleSmall?.copyWith(
                               fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w400,
                             )
                           : theme.textTheme.bodyMedium?.copyWith(
                               fontSize: 12,
@@ -3271,7 +3272,7 @@ class TrackSheetHead extends StatelessWidget {
                         key: const ValueKey('track-mode'),
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ),
@@ -3282,10 +3283,10 @@ class TrackSheetHead extends StatelessWidget {
                       Text(
                         headline,
                         key: ValueKey(headlineKey),
-                        // 레퍼런스 8-5: "14분 남음" 약 20sp 중간 굵기 + 작은 시각
+                        // 레퍼런스 8-5: "14분 남음" 약 20sp 보통 굵기(크기만 큼) + 작은 시각
                         style: theme.textTheme.headlineMedium?.copyWith(
                           fontSize: 19,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                       if (time case final t?)
@@ -3295,6 +3296,7 @@ class TrackSheetHead extends StatelessWidget {
                             t,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontSize: 11.5,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
                         ),
@@ -3447,7 +3449,7 @@ class _OrderSheetDetailsState extends State<OrderSheetDetails> {
                 key: const ValueKey('track-store'),
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ),

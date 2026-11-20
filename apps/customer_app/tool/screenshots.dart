@@ -689,6 +689,20 @@ void main() {
     await shot('addresses');
     await go('/addresses/edit');
     await shot('address-edit');
+    // 주소 편집 [수정] → 주소 상세(별칭 칸, 레퍼런스 3-1 2-4 와 비교)
+    await t.tap(
+      find
+          .byWidgetPredicate(
+            (w) =>
+                w.key is ValueKey<String> &&
+                (w.key! as ValueKey<String>).value.startsWith(
+                  'address-modify-',
+                ),
+          )
+          .first,
+    );
+    await t.pumpAndSettle();
+    await shot('address-modify-form');
     // 마이 "취소·반품 내역"(BR-33) — 환불 완료 줄 하나를 더 보인다.
     claims.claims['claim-demo-done'] = {
       'claimId': 'claim-demo-done',

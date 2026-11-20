@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 
 import 'line_icons.dart';
@@ -100,6 +101,14 @@ abstract final class PmartCustomerTheme {
       colorScheme: scheme,
       useMaterial3: true,
       fontFamily: fontFamily,
+      // 화면 전환은 상품상세처럼 오른쪽에서 밀려 들어오고 뒤로 가면 오른쪽으로 빠진다(사용자 2026-11-21).
+      // 전체 화면 창(fullscreenDialog — 결제창 등)은 아래에서 올라온다. 아래 탭바 전환·가운데 창·시트는 그대로.
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
     );
     final text = _text(base.textTheme, scheme);
     const buttonShape = RoundedRectangleBorder(
@@ -140,9 +149,10 @@ abstract final class PmartCustomerTheme {
         centerTitle: true,
         toolbarHeight: 56,
         leadingWidth: 46,
+        // 레퍼런스 머리줄 제목(장바구니·카테고리 목록 등)은 보통 굵기(2026-11-21 비교). 주문·고객센터처럼 굵은 화면은 그 화면에서 굵게.
         titleTextStyle: text.titleMedium?.copyWith(
           fontSize: 16,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w400,
         ),
       ),
       cardTheme: CardThemeData(

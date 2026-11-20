@@ -205,7 +205,7 @@ class _OrderSheetScreenState extends ConsumerState<OrderSheetScreen> {
       backgroundColor: surfaces.surfaceContainer,
       appBar: AppBar(
         titleTextStyle: Theme.of(context).appBarTheme.titleTextStyle
-            ?.copyWith(fontSize: 18),
+            ?.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
         title: Text(l10n.checkoutTitle),
         centerTitle: true,
         // 레퍼런스 6-0: 뒤로 가면 "주문을 취소할까요?"
@@ -213,7 +213,13 @@ class _OrderSheetScreenState extends ConsumerState<OrderSheetScreen> {
           onPressed: () async {
             final ok = await showPmartConfirm(
               context,
-              title: l10n.checkoutLeaveTitle,
+              // 레퍼런스 6-0: 굵은 제목 없이 보통 글씨 본문 한 덩어리(약 17sp, 검정).
+              content: Text(
+                l10n.checkoutLeaveBody,
+                key: const ValueKey('checkout-leave-body'),
+                style: Theme.of(context).textTheme.bodyLarge
+                    ?.copyWith(fontSize: 17, height: 1.25),
+              ),
               confirmLabel: l10n.checkoutLeaveOk,
               cancelLabel: l10n.checkoutLeaveCancel,
               confirmKey: const ValueKey('checkout-leave-ok'),
@@ -1196,8 +1202,9 @@ class _AmountRow extends StatelessWidget {
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                   )
+                // 레퍼런스 6-1 금액 줄 오른쪽은 보통 굵기(결제금액만 굵게).
                 : theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w400,
                     color: discount ? theme.colorScheme.primary : null,
                   ),
           ),

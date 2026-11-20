@@ -250,9 +250,10 @@ class _OrderHead extends StatelessWidget {
           if (e.mfcName case final n?)
             Text(
               n,
+              // 레퍼런스 11: 주문 머리줄 가게 이름은 보통 굵기.
               style: theme.textTheme.titleSmall?.copyWith(
                 fontSize: 12.5,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w400,
               ),
             ),
           if (e.orderedAt case final t?)
@@ -320,7 +321,7 @@ class _WritableCard extends ConsumerWidget {
                         title: e.productName,
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       if (e.optionLabel case final o?)
@@ -1357,7 +1358,11 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
                 _ProductName(
                   productId: t.productId,
                   title: t.title,
-                  style: theme.textTheme.titleSmall?.copyWith(fontSize: 12),
+                  // 레퍼런스 11: 리뷰 쓰기 위 상품 이름은 보통 굵기(titleSmall 은 테마 w700).
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
                 if (t.eligibleUntil case final u?)
                   Text(
@@ -1479,8 +1484,10 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
                     minimumSize: const Size.fromHeight(50),
                     foregroundColor: theme.colorScheme.onSurface,
                     shape: const RoundedRectangleBorder(),
+                    // 레퍼런스 11: 아래 "취소 | 등록하기"는 중간 굵기.
                     textStyle: theme.textTheme.titleSmall?.copyWith(
                       fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   onPressed: _busy ? null : () => context.pop(),
@@ -1500,7 +1507,7 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
                     shape: const RoundedRectangleBorder(),
                     textStyle: theme.textTheme.titleSmall?.copyWith(
                       fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   key: const ValueKey('review-submit'),

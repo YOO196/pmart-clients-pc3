@@ -139,8 +139,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/checkout/coupons',
-        builder: (_, state) => CouponPickScreen(
-          selected: state.extra is String ? state.extra! as String : null,
+        // 레퍼런스 6-5 는 X 로 닫는 창 — 아래에서 올라오고 아래로 내려간다.
+        pageBuilder: (_, state) => CupertinoPage<CouponPick>(
+          key: state.pageKey,
+          fullscreenDialog: true,
+          child: CouponPickScreen(
+            selected: state.extra is String ? state.extra! as String : null,
+          ),
         ),
       ),
       GoRoute(

@@ -86,6 +86,15 @@ class NoticePage {
 /// 리뷰 요청 알림 종류(배송 완료 1시간 뒤, 알림함만 — notification 0.4.2·0.4.4).
 const reviewRequestedTemplate = 'REVIEW_REQUESTED';
 
+/// 쿠폰 도착 알림 종류(notification 2026-11-21, ADR-0082 5단계) — 가입 축하·직원 지정·배차 불가 보상.
+/// 서버 목적지는 없거나(NONE) 취소된 주문이지만 문구가 "쿠폰함에서 확인해 주세요"라 앱이 쿠폰함을 연다
+/// (백엔드 회신 2026-11-21 reply-coupons-questions — 앱이 templateKey 로 열어도 된다).
+const couponTemplates = {
+  'COUPON_SIGNUP',
+  'COUPON_ISSUED',
+  'COUPON_COMPENSATION',
+};
+
 /// 알림을 눌렀을 때 갈 앱 경로. 앱에 화면이 없는 목적지(공지 등)나 참조가 없으면 null(알림 상세에 머문다).
 ///
 /// - REFUND: `ref` 는 claimId 다(notification-service 0.1.1 `Destination.ref`). 환불은 클레임 아래에서 보므로
@@ -93,6 +102,7 @@ const reviewRequestedTemplate = 'REVIEW_REQUESTED';
 /// - INQUIRY: `ref` 는 inquiryId 다(notification 0.2.0 — 고객센터 답변 알림). 내 문의 상세로 간다.
 /// - DISPATCH_OFFER·CASE: 라이더·운영자용 목적지다.
 String? noticeRoute(NoticeDestination? d, {String? templateKey}) {
+  if (couponTemplates.contains(templateKey)) return '/me/coupons';
   final ref = d?.ref;
   if (d == null || ref == null || ref.isEmpty) return null;
   final id = Uri.encodeComponent(ref);

@@ -244,9 +244,10 @@ class _AddressListState extends ConsumerState<_AddressList> {
                               children: [
                                 Text(
                                   a.label ?? a.roadAddress,
+                                  // 레퍼런스 3-1 2-1: 주소 첫 줄은 보통 굵기.
                                   style: theme.textTheme.titleSmall?.copyWith(
                                     fontSize: 15,
-                                    fontWeight: FontWeight.w700,
+                                    fontWeight: FontWeight.w400,
                                   ),
                                 ),
                                 if (selected)
@@ -446,6 +447,12 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                                 style: OutlinedButton.styleFrom(
                                   visualDensity: VisualDensity.compact,
                                   minimumSize: const Size(0, 34),
+                                  // 레퍼런스 3-1 2-3: 작은 [수정]·[삭제]는 보통 굵기(테마 테두리 버튼은 굵다).
+                                  textStyle: theme.textTheme.labelLarge
+                                      ?.copyWith(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w400,
+                                      ),
                                 ),
                                 child: Text(l10n.addressModify),
                               ),
@@ -460,6 +467,11 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                                   style: OutlinedButton.styleFrom(
                                     visualDensity: VisualDensity.compact,
                                     minimumSize: const Size(0, 34),
+                                    textStyle: theme.textTheme.labelLarge
+                                        ?.copyWith(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w400,
+                                        ),
                                   ),
                                   child: _deleting == a.addressId
                                       ? const SizedBox.square(
@@ -543,6 +555,14 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   final _password = TextEditingController();
   final _directions = TextEditingController();
 
+  /// 주소 별칭(회원이 주소를 고칠 때만 — 사용자 2026-11-21 "주소 상세 화면에서 주소 별칭 입력 추가",
+  /// "비회원은 안 되고 회원만"). 계약 `label` 20자.
+  final _label = TextEditingController();
+
+  bool get _aliasEnabled =>
+      widget.editAddressId != null &&
+      ref.read(sessionProvider) is MemberSession;
+
   /// 고객이 큰 지도에서 확인한 배달 위치(보낼 `geo`). 확인 전에는 null — 서버가 도로명으로 채운다.
   GeoPoint? _geo;
 
@@ -563,6 +583,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
       setState(() {
         _road.text = d.roadAddress;
         _detail.text = d.detailAddress;
+        _label.text = d.label ?? '';
         _postalCode = d.postalCode;
         _geo = d.geo;
         _preview = d.geo;
@@ -657,7 +678,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
 
   @override
   void dispose() {
-    for (final c in [_road, _detail, _password, _directions]) {
+    for (final c in [_road, _detail, _password, _directions, _label]) {
       c.dispose();
     }
     super.dispose();
@@ -702,6 +723,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
             ? notifier.add
             : (AddressDraft d) => notifier.modify(editId, d))(
           AddressDraft(
+            // 고칠 때는 지금 칸 값 그대로(비우면 빈 글 — 별칭 지우기). 새 주소는 별칭을 묻지 않는다.
+            label: _aliasEnabled ? _label.text.trim() : null,
             roadAddress: _road.text.trim(),
             detailAddress: _detail.text.trim(),
             // 받는 분·연락처는 보내지 않는다 — 주문 초안이 회원 프로필 값을 쓴다(BR-60 R1·R2).
@@ -818,9 +841,10 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                 Text(
                   road,
                   key: const ValueKey('f-road'),
+                  // 레퍼런스 2-4: 크기는 같고 굵기는 조금 더 굵다(2026-11-21 비교).
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontSize: 15.5,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 if (_jibun case final j?) ...[
@@ -898,6 +922,16 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               hint: l10n.addressDetailHint,
               max: AddressLimits.detailAddress,
             ),
+            // 별칭은 회원 주소만(사용자 2026-11-21 "비회원은 안 되고 회원만").
+            if (_aliasEnabled)
+              _field(
+                'f-label',
+                _label,
+                label: l10n.addressLabelTitle,
+                hint: l10n.addressLabelHint,
+                max: AddressLimits.label,
+                required: false,
+              ),
             _field(
               'f-entrance-password',
               _password,
@@ -958,14 +992,31 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
             // 레퍼런스 2-7-1: 상세주소가 비어 있으면 [주소 등록]을 끈다(사용자 결정 2026-11-20).
             child: ListenableBuilder(
               listenable: _detail,
-              builder: (context, _) => CommandButton(
-                key: const ValueKey('address-save'),
-                label: widget.editAddressId == null
-                    ? l10n.addressRegister
-                    : l10n.addressModifySave,
-                onPressed: _detail.text.trim().isEmpty || _loadingEdit
-                    ? null
-                    : _save,
+              // 레퍼런스 2-4 "주소 등록": 글자 약 14·조금 굵게(w600), 높이 약 47dp(2026-11-21 측정).
+              builder: (context, _) => FilledButtonTheme(
+                data: FilledButtonThemeData(
+                  style: (theme.filledButtonTheme.style ?? const ButtonStyle())
+                      .copyWith(
+                        minimumSize: const WidgetStatePropertyAll(
+                          Size.fromHeight(47),
+                        ),
+                        textStyle: WidgetStatePropertyAll(
+                          theme.textTheme.labelLarge?.copyWith(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                ),
+                child: CommandButton(
+                  key: const ValueKey('address-save'),
+                  label: widget.editAddressId == null
+                      ? l10n.addressRegister
+                      : l10n.addressModifySave,
+                  onPressed: _detail.text.trim().isEmpty || _loadingEdit
+                      ? null
+                      : _save,
+                ),
               ),
             ),
           ),

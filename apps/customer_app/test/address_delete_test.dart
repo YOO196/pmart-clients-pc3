@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
@@ -120,5 +123,55 @@ void main() {
       book!.addresses.singleWhere((a) => a.addressId == 'addr-2').detailAddress,
       '7층',
     );
+  });
+  testWidgets('주소 상세(고치기)에 별칭 칸 — 지금 별칭이 채워지고, 바꾸면 서버에 보내 목록 제목이 바뀐다', (
+    t,
+  ) async {
+    final repo = (await t.runAsync(_withSecond))!;
+    await t.pumpWidget(testApp(const [], address: repo));
+    await t.pumpAndSettle();
+    await _openAddresses(t);
+    await t.tap(find.byKey(const ValueKey('address-edit')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('address-modify-addr-2')));
+    await t.pumpAndSettle();
+
+    final label = find.byKey(const ValueKey('f-label'));
+    expect(label, findsOneWidget);
+    final before = (await t.runAsync(repo.book))!.addresses
+        .singleWhere((a) => a.addressId == 'addr-2')
+        .label;
+    expect(t.widget<TextFormField>(label).controller!.text, before ?? '');
+
+    await t.enterText(label, '회사');
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('address-save')));
+    await t.pumpAndSettle();
+    final book = await t.runAsync(repo.book);
+    expect(
+      book!.addresses.singleWhere((a) => a.addressId == 'addr-2').label,
+      '회사',
+    );
+  });
+
+  testWidgets('새 주소 등록에는 별칭 칸이 없다', (t) async {
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    unawaited(router.push('/addresses/new'));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('f-label')), findsNothing);
+  });
+  testWidgets('비회원은 주소 상세 경로로 바로 와도 별칭 칸이 없다(회원만)', (t) async {
+    await t.pumpWidget(
+      testApp(const [], address: (await t.runAsync(_withSecond))!),
+    );
+    await t.pumpAndSettle();
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    unawaited(router.push('/addresses/addr-2'));
+    await t.pump();
+    expect(find.byKey(const ValueKey('f-label')), findsNothing);
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('f-label')), findsNothing);
   });
 }

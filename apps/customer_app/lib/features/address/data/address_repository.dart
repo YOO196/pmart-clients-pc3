@@ -309,7 +309,11 @@ Address addressFromContract(api.Address a) => Address(
   addressId:
       a.addressId ?? (throw const ContractViolationFailure('addressId 없음')),
   version: a.version ?? 0,
-  label: a.label,
+  // 별칭을 지우면 빈 글로 저장된다 — 없음으로 본다(도로명을 대신 보인다).
+  label: switch (a.label?.trim()) {
+    null || '' => null,
+    final l => l,
+  },
   roadAddress: a.roadAddress,
   // 비회원 둘러보기 배송지는 상세 주소가 없을 수 있다(0.14.0).
   detailAddress: a.detailAddress ?? '',
@@ -331,7 +335,11 @@ Address addressFromContract(api.Address a) => Address(
 
 /// 저장된 배송지를 다시 등록할 입력값으로(서버 판정·ID·버전은 빼고 고객이 넣은 값만).
 AddressDraft draftFromContract(api.Address a) => AddressDraft(
-  label: a.label,
+  // 별칭을 지우면 빈 글로 저장된다 — 없음으로 본다(도로명을 대신 보인다).
+  label: switch (a.label?.trim()) {
+    null || '' => null,
+    final l => l,
+  },
   roadAddress: a.roadAddress,
   // 비회원 둘러보기 배송지는 상세 주소가 없을 수 있다(0.14.0).
   detailAddress: a.detailAddress ?? '',

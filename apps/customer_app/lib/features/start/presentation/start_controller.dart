@@ -91,6 +91,19 @@ enum StartStep {
 void Function() leaveApp = SystemNavigator.pop;
 
 /// 지금 어느 처음 실행 단계인지. 주소록 조회 실패는 "주소 없음"이 아니다 — 막지 않고 홈이 오류를 보인다.
+/// 로그아웃하면서 지금 주소를 비회원 배송지로 옮기는 중("지금 주소로 계속 둘러볼까요?" [예]). 그동안은 주소록이 잠깐 비어도
+/// 주소 입력 화면으로 보내지 않는다 — 전에는 로그아웃 직후 빈 주소록을 보고 주소 입력창이 먼저 떴다(사용자 2026-11-21).
+final logoutKeepingAddressProvider =
+    NotifierProvider<LogoutKeepingAddress, bool>(LogoutKeepingAddress.new);
+
+class LogoutKeepingAddress extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  // ignore: use_setters_to_change_properties
+  void set(bool value) => state = value;
+}
+
 final startStepProvider = Provider<StartStep>((ref) {
   if (!ref.watch(startGateEnabledProvider)) return StartStep.ready;
   final flags = ref.watch(startFlagsProvider);
@@ -102,6 +115,8 @@ final startStepProvider = Provider<StartStep>((ref) {
   if (ref.watch(sessionUnverifiedProvider)) return StartStep.ready;
   final member = ref.watch(sessionProvider) is MemberSession;
   if (!member && !f.entryDone) return StartStep.entry;
+  // 로그아웃 중 주소 옮기기가 끝날 때까지는 지금 화면에 둔다.
+  if (ref.watch(logoutKeepingAddressProvider)) return StartStep.ready;
   final book = ref.watch(addressBookProvider);
   if (book.isLoading) return StartStep.loading;
   final b = book.value;

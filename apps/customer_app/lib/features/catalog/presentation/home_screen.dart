@@ -443,8 +443,10 @@ class _BannerPagerState extends State<_BannerPager> {
                     ),
                     child: Text(
                       '${_page + 1} / ${banners.length}',
+                      // 레퍼런스 배너 쪽 번호는 보통 굵기(labelSmall 은 테마 w600).
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: Colors.white,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ),
@@ -1293,7 +1295,9 @@ class _AddressChip extends ConsumerWidget {
             child: Text(
               text,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleMedium,
+              // 레퍼런스 홈 주소 줄은 보통~중간 굵기(titleMedium 은 테마 w700).
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w500),
             ),
           ),
           const SizedBox(width: 2),
