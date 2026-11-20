@@ -85,15 +85,52 @@ class CustomerApp extends ConsumerWidget {
     routerConfig: ref.watch(routerProvider),
     // 목 모드는 화면 모서리에 띠를 둔다(실서버와 헷갈리지 않게: 목 로그인은 Google 창 없이 항상 성공한다).
     builder: (context, child) => _RestoreOnResume(
-      child: ref.watch(envProvider) == PmartEnv.mock
-          ? Banner(
-              message: AppLocalizations.of(context).mockBanner,
-              location: BannerLocation.topStart,
-              child: child ?? const SizedBox.shrink(),
-            )
-          : child ?? const SizedBox.shrink(),
+      child: AboveSystemNavBar(
+        child: ref.watch(envProvider) == PmartEnv.mock
+            ? Banner(
+                message: AppLocalizations.of(context).mockBanner,
+                location: BannerLocation.topStart,
+                child: child ?? const SizedBox.shrink(),
+              )
+            : child ?? const SizedBox.shrink(),
+      ),
     ),
   );
+}
+
+/// 앱 화면을 폰 아래 시스템 막대(홈·뒤로 버튼) **위까지만** 그린다(사용자 2026-11-20).
+///
+/// 안드로이드 15 이상은 앱이 시스템 막대 밑까지 그려지게 한다(edge-to-edge 강제) — 그 높이만큼 아래를 비우고
+/// 앱 바탕색으로 칠한다. 안쪽 화면들은 아래 여백이 없는 것으로 보게 해(이중 여백 없음) 키보드 높이도 그만큼 줄여 준다.
+class AboveSystemNavBar extends StatelessWidget {
+  const AboveSystemNavBar({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final bar = media.viewPadding.bottom;
+    if (bar <= 0) return child;
+    final theme = Theme.of(context);
+    return ColoredBox(
+      color: theme.colorScheme.surface,
+      child: Padding(
+        padding: EdgeInsets.only(bottom: bar),
+        child: MediaQuery(
+          data: media.copyWith(
+            padding: media.padding.copyWith(bottom: 0),
+            viewPadding: media.viewPadding.copyWith(bottom: 0),
+            // 키보드는 화면 맨 아래부터 잰 높이라, 비운 막대 높이만큼 빼야 겹치지 않는다.
+            viewInsets: media.viewInsets.copyWith(
+              bottom: (media.viewInsets.bottom - bar).clamp(0, double.infinity),
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
 }
 
 /// 저장된 세션을 확인하지 못한 채라면(연결 안 됨) 앱이 다시 앞으로 올 때 다시 확인한다.
