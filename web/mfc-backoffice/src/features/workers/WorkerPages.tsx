@@ -21,7 +21,7 @@ import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
-import { SearchBar, StatCard, StatStrip } from '../../shared/listParts';
+import { SearchBar, StatCard } from '../../shared/listParts';
 import { Pager, usePage } from '../../shared/Pager';
 import { useOperatorLabel, WhoAt } from '../../shared/OperatorLabel';
 import { assignTaskName } from '../../shared/pickPack';
@@ -128,13 +128,15 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
   useRememberQueue('worker', mfcId, query.data ? ids : undefined, `${pathname}${search}`);
   return (
     <section className="space-y-4">
-      {/* 쪽 제목 "작업자"·안내 상자는 두지 않는다(사용자 2026-11-20) — 위 경로 줄이 메뉴 이름을 보인다 */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      {/* 쪽 제목은 "작업자 목록"(사용자 2026-11-20), 안내 상자는 두지 않는다 */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1>{messages.menus.workers}</h1>
         <Link to={workersPath(mfcId, 'new')} className="btn btn-sm btn-primary">
           {m.register}
         </Link>
       </div>
-      <StatStrip label={m.ui.countsLabel} testId="worker-counts">
+      {/* 숫자 칸 넷이 아래 표 너비를 꽉 채우게 4칸 격자(사용자 2026-11-20 — 공용 StatStrip 은 한 줄 5칸이라 오른쪽이 비었다) */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4" role="group" aria-label={m.ui.countsLabel} data-testid="worker-counts">
         <StatCard testId="count-ACTIVE" label={m.state.ACTIVE} value={cell((w) => w.state === 'ACTIVE')} tone="info" active={state === 'ACTIVE'} onClick={() => setState(state === 'ACTIVE' ? '' : 'ACTIVE')} />
         <StatCard
           testId="count-SUSPENDED"
@@ -146,7 +148,7 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
         />
         <StatCard testId="count-break" label={m.onBreak} value={cell((w) => !!w.onBreak)} hint={m.ui.breakHint} />
         <StatCard testId="count-daily" label={m.ui.dailyNotEnrolled} value={cell((w) => w.employmentType === 'DAILY' && !w.todayEnrollment)} hint={m.ui.dailyHint} />
-      </StatStrip>
+      </div>
       <SavedViews listKey={`workers.${mfcId}`} />
       {/* 목록 묶음 — 휴게 번호(정해 두었으면 왼쪽 위 작은 "관리자 번호 변경"만) → 검색 → 쪽 넘김 → 표 → 쪽 넘김을 붙여서 */}
       <div className="space-y-2" data-testid="worker-list">
