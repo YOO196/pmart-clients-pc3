@@ -206,6 +206,73 @@ void main() {
       expect(p.options.single.availability, Availability.unknown);
       expect(p.options.single.canOfferAdd, isFalse);
     });
+
+    test('재고가 붙지 않았으면(센터 모름) 품절이 아니라 "주소 없음" — 담기는 막는다', () {
+      final p = productFromContract(
+        pc.ProductContent.fromJson({
+          'productId': 'x',
+          'name': 'x',
+          'options': [
+            {'sku': 'E-00000098', 'saleState': 'ON_SALE'},
+          ],
+        }),
+      );
+      expect(p.options.single.availability, Availability.noCenter);
+      expect(p.options.single.canOfferAdd, isFalse);
+      expect(p.cannotBuyReason, CannotBuyReason.noCenter);
+    });
+
+    test('담을 수 없는 까닭: 조회 실패·배달 안 함·품절을 가른다, 담을 옵션이 있으면 없음', () {
+      ProductDetail of(List<Map<String, Object?>> availabilities) =>
+          productFromContract(
+            pc.ProductContent.fromJson({
+              'productId': 'x',
+              'name': 'x',
+              'options': [
+                for (final (i, a) in availabilities.indexed)
+                  {
+                    'sku': 'E-0000010$i',
+                    'saleState': 'ON_SALE',
+                    'availability': a,
+                  },
+              ],
+            }),
+          );
+      expect(
+        of([
+          {'carried': true, 'state': 'UNKNOWN'},
+        ]).cannotBuyReason,
+        CannotBuyReason.stockUnknown,
+      );
+      expect(
+        of([
+          {'carried': false, 'state': 'UNKNOWN'},
+        ]).cannotBuyReason,
+        CannotBuyReason.notCarried,
+      );
+      expect(
+        of([
+          {'carried': true, 'state': 'SOLD_OUT'},
+          {'carried': true, 'state': 'SOLD_OUT'},
+        ]).cannotBuyReason,
+        CannotBuyReason.soldOut,
+      );
+      // 하나는 품절, 하나는 조회 실패 — 다 팔렸다고 하지 않는다.
+      expect(
+        of([
+          {'carried': true, 'state': 'SOLD_OUT'},
+          {'carried': true, 'state': 'UNKNOWN'},
+        ]).cannotBuyReason,
+        CannotBuyReason.stockUnknown,
+      );
+      expect(
+        of([
+          {'carried': true, 'state': 'SOLD_OUT'},
+          {'carried': true, 'state': 'AVAILABLE'},
+        ]).cannotBuyReason,
+        isNull,
+      );
+    });
   });
 
   group('실서버 상세 가격 (BR-36)', () {

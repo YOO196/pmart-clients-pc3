@@ -37,3 +37,7 @@
 
 ## 상태
 - 2026-11-20: 요청. 회신 대기.
+- 2026-11-20(오후): 백엔드가 계약으로 답함 — auth 0.10.0 `POST /auth/naver-token-exchanges`(ADR-0078, ce942c94·d3ffb065). 회신 문서는 아직 없음.
+- 2026-11-20(오후): **고객 앱 반영(목 모드)** — flutter_appauth `authorize`(인가 코드·code_verifier 까지만) → `exchangeNaverCode`(코드·verifier·redirectUri, `Idempotency-Key`) → 받은 `idToken` 을 지금처럼 `providerToken` 으로. 결과 불명은 같은 키로 한 번 더, 422 `CONFIG_REQUIRED` 는 설정 문제 문구, 401·503 은 "로그인 서비스가 원활하지 않아요". `state` 는 보내지 않는다(선택 항목 — flutter_appauth 가 돌려주지 않음). flutter test 608 통과.
+- **LAN 확인 대기**: 15:3x 게이트웨이 `POST /api/v1/auth/naver-token-exchanges` 가 아직 401 UNAUTHENTICATED(공개 경로 안 열림 = 배포 전). 배포·secret 설정되면 알려 달라 — 실기기로 확인한다.
+- 라이더 앱(rider-auth 0.3.0)은 아직 손대지 않음.

@@ -65,6 +65,28 @@ base class MockAuthRepository implements AuthRepository {
   /// 세션 확인이 서버에 닿지 못한다(다른 망 등). 시험용.
   bool unreachable = false;
 
+  /// 네이버 코드 교환 기록(키) — 시험이 같은 키 재전송을 확인한다.
+  final naverExchangeKeys = <String>[];
+
+  /// 다음 교환을 이 오류로 실패시킨다.
+  PmartFailure? failNextNaverExchange;
+
+  @override
+  Future<String> exchangeNaverCode({
+    required String authorizationCode,
+    required String codeVerifier,
+    required String redirectUri,
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    naverExchangeKeys.add(key.value);
+    if (failNextNaverExchange case final f?) {
+      failNextNaverExchange = null;
+      throw f;
+    }
+    return 'mock-naver-id-token';
+  }
+
   @override
   Future<String?> currentAccountId() async {
     await _wait();

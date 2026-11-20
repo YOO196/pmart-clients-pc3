@@ -1,6 +1,13 @@
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
+import 'package:pmart_core/pmart_core.dart'
+    show
+        IdempotencyKey,
+        PmartFailure,
+        ProblemCode,
+        ProblemFailure,
+        UnknownResultFailure;
 
 import '../domain/auth.dart';
 import 'auth_repository.dart';
@@ -63,37 +70,91 @@ const _naverOidc = AuthorizationServiceConfiguration(
   tokenEndpoint: 'https://nid.naver.com/oauth2/token',
 );
 
-/// 네이버 로그인(BR-65, auth 0.4.0·ADR-0071): OpenID Connect 인가 코드 + PKCE(scope `openid`, client secret 없음 —
-/// 토큰 엔드포인트 인증 none)로 받은 **id_token** 을 `providerToken` 으로 넘긴다. 네이버 SDK 는 액세스 토큰만 줘서 쓰지 않는다.
-/// 토큰은 로그에 남기지 않는다.
-final class NaverSocialTokenSource implements SocialTokenSource {
-  const NaverSocialTokenSource({this.clientId = naverClientId});
+/// 네이버 인가 요청으로 받은 것(메모리에만 — 로그 금지).
+typedef NaverAuthorization = ({String code, String codeVerifier});
 
-  static const _appAuth = FlutterAppAuth();
+/// 네이버 인가 화면을 띄워 코드를 받는다. 고객이 닫으면 null. 실패는 [PlatformException].
+typedef NaverAuthorize = Future<NaverAuthorization?> Function(String clientId);
+
+/// 서버가 인가 코드를 ID 토큰으로 바꾼다(`POST /auth/naver-token-exchanges`, auth 0.10.0).
+typedef NaverCodeExchange = Future<String> Function({
+  required String authorizationCode,
+  required String codeVerifier,
+  required String redirectUri,
+  required IdempotencyKey key,
+});
+
+Future<NaverAuthorization?> _authorizeWithAppAuth(String clientId) async {
+  try {
+    final r = await const FlutterAppAuth().authorize(
+      AuthorizationRequest(
+        clientId,
+        naverRedirectUrl,
+        scopes: const ['openid'],
+        serviceConfiguration: _naverOidc,
+      ),
+    );
+    final code = r.authorizationCode;
+    final verifier = r.codeVerifier;
+    if (code == null || code.isEmpty || verifier == null || verifier.isEmpty) {
+      throw const SocialProviderDown();
+    }
+    return (code: code, codeVerifier: verifier);
+  } on FlutterAppAuthUserCancelledException {
+    return null; // 고객이 로그인 화면을 닫음
+  }
+}
+
+/// 네이버 로그인(BR-65·BR-69, auth 0.10.0·ADR-0078): OpenID Connect 인가 코드 + PKCE(scope `openid`).
+/// 네이버 토큰 엔드포인트는 client secret 없는 교환을 받지 않아(`invalid_client`), 앱은 **인가 코드까지만** 받고
+/// 서버가 secret 으로 교환해 준 **id_token** 을 `providerToken` 으로 쓴다. secret 은 앱에 두지 않는다.
+/// 코드·verifier·토큰은 로그에 남기지 않는다.
+final class NaverSocialTokenSource implements SocialTokenSource {
+  const NaverSocialTokenSource({
+    required this.exchange,
+    this.clientId = naverClientId,
+    this.authorize = _authorizeWithAppAuth,
+  });
+
+  final NaverCodeExchange exchange;
   final String clientId;
+  final NaverAuthorize authorize;
 
   @override
   Future<SocialCredential?> obtain(SocialProvider provider) async {
     if (provider != SocialProvider.naver) throw const SocialProviderDown();
     if (clientId.isEmpty) throw const SocialProviderMisconfigured();
+    final NaverAuthorization? granted;
     try {
-      final result = await _appAuth.authorizeAndExchangeCode(
-        AuthorizationTokenRequest(
-          clientId,
-          naverRedirectUrl,
-          scopes: const ['openid'],
-          serviceConfiguration: _naverOidc,
-        ),
-      );
-      final idToken = result.idToken;
-      if (idToken == null || idToken.isEmpty) {
-        throw const SocialProviderMisconfigured();
-      }
-      return SocialCredential(idToken);
-    } on FlutterAppAuthUserCancelledException {
-      return null; // 고객이 로그인 화면을 닫음
+      granted = await authorize(clientId);
     } on PlatformException {
       // 콘솔에 Callback URL 이 없거나 네이버가 거절 — 상세는 화면에 쓰지 않는다.
+      throw const SocialProviderDown();
+    }
+    if (granted == null) return null;
+    // 인가 코드는 한 번만 쓸 수 있다 — 결과를 모르면 같은 키로 한 번 더(서버가 두 번 교환하지 않는다).
+    final key = IdempotencyKey.generate();
+    Future<String> once() => exchange(
+      authorizationCode: granted!.code,
+      codeVerifier: granted.codeVerifier,
+      redirectUri: naverRedirectUrl,
+      key: key,
+    );
+    try {
+      final String idToken;
+      try {
+        idToken = await once();
+      } on UnknownResultFailure {
+        return SocialCredential(await once());
+      }
+      return SocialCredential(idToken);
+    } on ProblemFailure catch (f) {
+      // 서버에 네이버 secret 이 없다 — 설정 문제로 알린다.
+      if (f.problem.code == ProblemCode.configRequired) {
+        throw const SocialProviderMisconfigured();
+      }
+      throw const SocialProviderDown();
+    } on PmartFailure {
       throw const SocialProviderDown();
     }
   }
@@ -108,7 +169,7 @@ final class RoutingSocialTokenSource implements SocialTokenSource {
   const RoutingSocialTokenSource({
     required this.google,
     this.kakao = const KakaoSocialTokenSource(),
-    this.naver = const NaverSocialTokenSource(),
+    required this.naver,
   });
 
   final SocialTokenSource google;

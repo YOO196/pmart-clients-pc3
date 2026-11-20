@@ -4,7 +4,12 @@ import 'package:flutter/foundation.dart';
 enum SaleState { onSale, temporarilySoldOut, saleStopped, unknown }
 
 /// 현재 센터의 가용 사본. 조회 실패는 [unknown] 이지 품절·0개가 아니다.
-enum Availability { available, low, soldOut, unknown }
+/// 옵션의 재고 상태. [noCenter] 는 서버가 재고를 붙이지 않은 것(배달 주소·담당 센터를 모름) — 품절이 아니다.
+/// [unknown] 은 재고 조회 실패 — 역시 품절이 아니다(백엔드 요청 2026-11-20 availability-display).
+enum Availability { available, low, soldOut, unknown, noCenter }
+
+/// 상품의 어느 옵션도 담을 수 없을 때 그 까닭(안내 문구를 고른다). 담기 막기는 같다.
+enum CannotBuyReason { noCenter, stockUnknown, notCarried, soldOut }
 
 enum DisplayBadge { none, isNew, rank }
 
@@ -342,7 +347,8 @@ class SaleOption {
       !priceNotSet &&
       carried != false &&
       availability != Availability.soldOut &&
-      availability != Availability.unknown;
+      availability != Availability.unknown &&
+      availability != Availability.noCenter;
 }
 
 @immutable
@@ -369,6 +375,29 @@ class ProductDetail {
     this.categoryPath = const [],
     this.rating,
   });
+
+  /// 담을 수 있는 옵션이 하나도 없을 때의 까닭. 담을 수 있는 옵션이 있거나 까닭이 재고·취급이 아니면(가격 미설정 등) null.
+  /// "다 팔렸어요"는 [CannotBuyReason.soldOut] 일 때만 쓴다.
+  CannotBuyReason? get cannotBuyReason {
+    if (options.isEmpty || options.any((o) => o.canOfferAdd)) return null;
+    if (options.any((o) => o.availability == Availability.noCenter)) {
+      return CannotBuyReason.noCenter;
+    }
+    if (options.every((o) => o.carried == false)) {
+      return CannotBuyReason.notCarried;
+    }
+    if (options.any(
+      (o) => o.carried != false && o.availability == Availability.unknown,
+    )) {
+      return CannotBuyReason.stockUnknown;
+    }
+    if (options.every(
+      (o) => o.carried == false || o.availability == Availability.soldOut,
+    )) {
+      return CannotBuyReason.soldOut;
+    }
+    return null;
+  }
 
   final String productId;
   final String name;

@@ -867,7 +867,14 @@ base class MockCatalogRepository implements CatalogRepository {
     if (p == null || p.saleState == 'SALE_STOPPED') {
       throw const ProblemFailure(Problem(status: 404, code: 'NOT_FOUND'));
     }
-    return productFromContract(pc.ProductContent.fromJson(productJson(p)));
+    final json = productJson(p);
+    // 실서버처럼: 센터를 모르면(mfcId 없음) 옵션에 재고를 붙이지 않는다.
+    if (mfcId == null) {
+      for (final o in (json['options']! as List).cast<Map<String, Object?>>()) {
+        o.remove('availability');
+      }
+    }
+    return productFromContract(pc.ProductContent.fromJson(json));
   }
 
   /// 목 평점 집계 — 상세의 평점과 같은 값(시험이 바꿔 끼운다).

@@ -10,6 +10,10 @@ import 'package:customer_app/features/cart/presentation/cart_screen.dart'
     show AddToCartBar;
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/domain/catalog.dart';
+import 'package:customer_app/features/address/presentation/address_screens.dart'
+    show AddressListScreen;
+import 'package:customer_app/shared/shopping_context.dart'
+    show currentMfcIdProvider;
 import 'package:customer_app/features/catalog/presentation/widgets/product_tile_card.dart';
 
 import 'support/app_harness.dart';
@@ -474,6 +478,32 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('product-preview')), findsNothing);
       expect(find.byKey(const ValueKey('product-rating')), findsOneWidget);
+    });
+
+    testWidgets('배달 주소(센터)가 없으면 "다 팔렸어요"가 아니라 주소 안내 — 담기는 막고, 누르면 주소 화면', (
+      t,
+    ) async {
+      await t.pumpWidget(
+        testApp([currentMfcIdProvider.overrideWithValue(null)]),
+      );
+      await t.pumpAndSettle();
+      await tapTile(t, 'P-0001');
+
+      expect(
+        find.byKey(const ValueKey('product-sold-out-cover')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('product-cannot-buy-noCenter')),
+        findsOneWidget,
+      );
+      expect(find.text('배달 주소를 정하면 살 수 있어요'), findsOneWidget);
+      final add = t.widget<AddToCartBar>(find.byType(AddToCartBar));
+      expect(add.enabled, isFalse);
+
+      await t.tap(find.byKey(const ValueKey('product-cannot-buy-action')));
+      await t.pumpAndSettle();
+      expect(find.byType(AddressListScreen), findsOneWidget);
     });
 
     testWidgets('일시품절이면 담기를 열지 않고 품절로 보인다', (t) async {

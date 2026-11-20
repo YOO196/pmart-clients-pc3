@@ -468,6 +468,9 @@ ProductDetail productFromContract(pc.ProductContent c, {OptionPrices? prices}) {
             availability:
                 _saleState(o.saleState) == SaleState.temporarilySoldOut
                 ? Availability.soldOut
+                // 재고가 붙지 않았다 = 서버가 센터를 모른다(mfcId 없이 부름). 0·품절이 아니다.
+                : o.availability == null
+                ? Availability.noCenter
                 : switch (o.availability?.state) {
                     pc.SaleOptionAvailabilityStateEnum.AVAILABLE =>
                       Availability.available,

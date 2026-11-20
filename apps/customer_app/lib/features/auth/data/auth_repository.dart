@@ -33,6 +33,16 @@ abstract interface class AuthRepository {
   /// `GET /auth/social-logins/{authRequestId}`.
   Future<LoginOutcome> lookup(String authRequestId);
 
+  /// 네이버 인가 코드 → ID 토큰(`POST /auth/naver-token-exchanges`, auth 0.10.0 — BR-69). 서버가 client secret 으로
+  /// 대신 교환한다. 같은 [key] 재전송은 처음 결과를 준다(코드를 두 번 교환하지 않음). 실패는 [PmartFailure]
+  /// (401 PROVIDER_REJECTED·503 PROVIDER_UNAVAILABLE·422 CONFIG_REQUIRED). 코드·verifier·토큰은 로그 금지.
+  Future<String> exchangeNaverCode({
+    required String authorizationCode,
+    required String codeVerifier,
+    required String redirectUri,
+    required IdempotencyKey key,
+  });
+
   /// 저장된 세션의 계정(`GET /auth/sessions/current`. 401 이면 인터셉터가 refresh 회전 후 다시 보낸다).
   /// 세션이 끝났거나 고객 세션이 아니면 null(토큰은 인터셉터가 지운다).
   /// 서버에 닿지 못했으면(연결 오류·타임아웃·결과 불명·5xx) [PmartFailure] 를 던진다 — 세션이 끝난 게 아니다.
@@ -119,6 +129,30 @@ final class ApiAuthRepository implements AuthRepository {
       extra: {PmartExtra.public: true},
     )).data,
   );
+
+  @override
+  Future<String> exchangeNaverCode({
+    required String authorizationCode,
+    required String codeVerifier,
+    required String redirectUri,
+    required IdempotencyKey key,
+  }) async {
+    final res = await pmartGuard(
+      () => _logins.exchangeNaverCode(
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        exchangeNaverCodeRequest: auth.ExchangeNaverCodeRequest(
+          authorizationCode: authorizationCode,
+          codeVerifier: codeVerifier,
+          redirectUri: redirectUri,
+        ),
+        extra: _publicCommand(key),
+      ),
+    );
+    // 본문이 없으면 교환됐는지 모른다 — 같은 키로 다시 물을 수 있게 결과 불명으로.
+    return res.data?.idToken ??
+        (throw UnknownResultFailure(requestId: key.value));
+  }
 
   @override
   Future<String?> currentAccountId() async {

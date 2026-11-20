@@ -14,6 +14,8 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:customer_app/app.dart';
+import 'package:customer_app/shared/shopping_context.dart'
+    show currentMfcIdProvider;
 import 'package:customer_app/features/address/data/current_location.dart';
 import 'package:customer_app/features/address/domain/address.dart';
 import 'package:customer_app/features/address/data/mock_address_repository.dart';
@@ -899,6 +901,28 @@ void main() {
     await expectLater(
       find.byType(CustomerApp),
       matchesGoldenFile(File('$_dir/g-guest-address.png').uri),
+    );
+  });
+  // 배달 주소(센터)를 모를 때의 상품 상세 — "다 팔렸어요"가 아니라 주소 안내(백엔드 요청 2026-11-20 availability-display).
+  testWidgets('no-center-detail', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp([currentMfcIdProvider.overrideWithValue(null)]));
+    await t.pumpAndSettle();
+    await tapTile(t, 'P-0001');
+    await t.pumpAndSettle();
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 150)),
+    );
+    await t.pump();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/h-no-center-detail.png').uri),
     );
   });
 }

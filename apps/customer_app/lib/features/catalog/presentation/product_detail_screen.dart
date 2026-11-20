@@ -122,7 +122,16 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
     final hasRating = rating != null;
     // 사진 아래 내용(좌우 여백 16). 구획 띠([PmartSectionGap])만 화면 폭을 채운다.
+    final reason = p.cannotBuyReason;
     final rest = <Widget>[
+      if (reason != null && reason != CannotBuyReason.soldOut) ...[
+        const SizedBox(height: 14),
+        _CannotBuyNotice(
+          reason: reason,
+          onRetry: () =>
+              ref.invalidate(productDetailProvider(widget.productId)),
+        ),
+      ],
       const SizedBox(height: 14),
       Text(
         p.name,
@@ -280,9 +289,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       ],
     ];
     // 위 사진 + 나머지 줄. 화면에 들어올 때 만든다(설명 이미지 여러 장을 처음에 다 만들지 않게 — 백엔드 요청 2026-11-19).
-    // 담을 수 있는 옵션이 하나도 없으면 사진을 어둡게 덮고 "다 팔렸어요"(레퍼런스 4-1)
-    final soldOut =
-        p.options.isNotEmpty && p.options.every((o) => !o.canOfferAdd);
+    // 정말 다 팔렸을 때만 사진을 어둡게 덮고 "다 팔렸어요"(레퍼런스 4-1). 주소 없음·재고 조회 실패·배달 안 함은
+    // 품절이 아니라 위 안내 줄로 알린다(백엔드 요청 2026-11-20 availability-display).
+    final soldOut = reason == CannotBuyReason.soldOut;
     Widget item(int i) {
       if (i == 0) {
         return LayoutBuilder(
@@ -336,6 +345,63 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   }
 }
 
+/// 담을 수 없는 까닭 안내(품절이 아닌 것): 배달 주소 없음 → 주소 정하기, 재고 조회 실패 → 다시 시도, 이 주소로 배달하지 않음.
+class _CannotBuyNotice extends StatelessWidget {
+  const _CannotBuyNotice({required this.reason, required this.onRetry});
+
+  final CannotBuyReason reason;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final (text, action, onPressed) = switch (reason) {
+      CannotBuyReason.noCenter => (
+        l10n.productNeedAddress,
+        l10n.productSetAddress,
+        () => context.push('/addresses'),
+      ),
+      CannotBuyReason.stockUnknown => (
+        l10n.productStockUnknown,
+        l10n.startRetry,
+        onRetry,
+      ),
+      _ => (l10n.productNotDelivered, null, null),
+    };
+    return Container(
+      key: ValueKey('product-cannot-buy-${reason.name}'),
+      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          PmartLineIcon(
+            PmartLineIcons.alert,
+            size: 18,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Text(text, style: theme.textTheme.bodyMedium),
+            ),
+          ),
+          if (action != null)
+            TextButton(
+              key: const ValueKey('product-cannot-buy-action'),
+              onPressed: onPressed,
+              child: Text(action),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// 묶음·용량·재고 상태 보조 문구. [withCapacity] 가 false 면 용량은 제목에서 이미 보인 것이다.
 Iterable<String> _optionNotes(
   AppLocalizations l10n,
@@ -349,7 +415,9 @@ Iterable<String> _optionNotes(
     _ when o.carried == false => l10n.notCarried,
     Availability.soldOut => l10n.soldOutTemporarily,
     Availability.low => l10n.availabilityLow,
-    Availability.unknown => l10n.saleStateUnknown,
+    Availability.unknown => l10n.productStockUnknownShort,
+    // 주소가 없어 모르는 것 — 화면 위 안내 줄 하나로 알린다(옵션마다 되풀이하지 않는다).
+    Availability.noCenter => null,
     Availability.available => null,
   },
 ].nonNulls;

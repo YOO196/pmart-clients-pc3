@@ -22,9 +22,12 @@ final authRepositoryProvider = Provider<AuthRepository>(
 final socialTokenSourceProvider = Provider<SocialTokenSource>(
   (ref) => switch (ref.watch(envProvider)) {
     PmartEnv.mock => MockSocialTokenSource(),
-    // 제공자마다 SDK — Google(ID 토큰), 카카오(OIDC ID 토큰), 네이버(액세스 토큰) — BR-65.
+    // 제공자마다 SDK — Google(ID 토큰), 카카오(OIDC ID 토큰), 네이버(인가 코드 → 서버가 ID 토큰으로 교환, BR-69).
     PmartEnv.local => RoutingSocialTokenSource(
       google: GoogleSocialTokenSource(),
+      naver: NaverSocialTokenSource(
+        exchange: ref.watch(authRepositoryProvider).exchangeNaverCode,
+      ),
     ),
   },
 );
