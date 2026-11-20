@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
+import 'package:customer_app/features/catalog/presentation/product_detail_screen.dart';
 import 'package:customer_app/features/catalog/presentation/product_list_screen.dart';
 
 import 'support/app_harness.dart';
@@ -46,6 +47,30 @@ void main() {
     expect(t.getTopLeft(find.byType(ProductListScreen)).dx, greaterThan(0));
     await t.pumpAndSettle();
     expect(find.byType(ProductListScreen), findsNothing);
+  });
+
+  testWidgets('상품 상세: 상품을 누르면 오른쪽에서 밀려 들어오고, 뒤로 가면 오른쪽으로 빠진다', (t) async {
+    tall(t);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await t.tap(find.text('검색').last);
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('search-field')), '우유');
+    await t.tap(find.byKey(const ValueKey('search-submit')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('tile-P-0001')));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 120));
+    expect(t.getTopLeft(find.byType(ProductDetailScreen)).dx, greaterThan(0));
+    await t.pumpAndSettle();
+    expect(t.getTopLeft(find.byType(ProductDetailScreen)).dx, 0);
+
+    await t.binding.handlePopRoute();
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 120));
+    expect(t.getTopLeft(find.byType(ProductDetailScreen)).dx, greaterThan(0));
+    await t.pumpAndSettle();
+    expect(find.byType(ProductDetailScreen), findsNothing);
   });
 
   testWidgets('홈을 아래로 내려도 검색창은 위에 붙어 남는다', (t) async {

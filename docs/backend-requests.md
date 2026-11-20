@@ -75,7 +75,7 @@
 | BR-65 | 높음 | 고객 | 카카오·네이버 로그인 — auth-service 가 Google 만 검증(501) | OPEN(같은 요청서 BR-65 — 카카오 OIDC ID 토큰, 네이버 Android SDK 액세스 토큰 + 서버 `/v1/nid/me` 확인(콘솔은 Android 만). 앱 SDK 2종 승인됨 2026-11-19, 카카오 콘솔 로그인·OIDC 활성화됨) |
 | BR-66 | 높음 | 고객 | 네이버 로그인 콜백 중계 — 네이버 콘솔이 앱 주소(`com.pmart.customer://oauth/naver`)를 받지 않고 도메인 없음 → LAN 게이트웨이 공개 경로가 받은 쿼리를 앱 주소로 302(고정 목적지, 저장·기록 없음) | 회신(auth 0.5.0, `../pmart-backend/docs/handoff/clients/customer-app/2026-11-19-reply-br66-naver-callback-relay.md` — 고객 `http://192.168.0.40:8080/api/v1/auth/oauth-callbacks/naver/customer`), 앱 반영. LAN 배포·콘솔 등록·Client ID 전달 대기 |
 | BR-67 | 보통 | 고객 | 리뷰관리 레퍼런스 값 — `/me/review-eligibilities`·`/me/reviews` 전체 개수(total), 품목 대표 사진(imageUrl), 주문 시각·센터 이름(orderedAt·mfcName). 요청서 `docs/handoff/customer-app/2026-11-20-backend-review-eligibility-display.md` | 요청서 보냄, 회신 대기 |
-| BR-68 | 보통 | 고객 | 주문내역 카드 상품 줄·센터 이름 — `GET /orders` 항목에 주문 행 목록(이름·옵션·수량·금액 사본), `mfcName`, (선택) 지금 판매 여부, 조회 기간 `to`. 요청서 `docs/handoff/customer-app/2026-11-20-backend-order-list-lines.md` | 요청서 보냄, 회신 대기 |
+$1| BR-69 | 높음 | 고객·라이더 | 네이버 로그인 토큰 교환 — 네이버 토큰 엔드포인트가 client secret 없는 요청을 거절(`invalid_client`, 인증 방식 `client_secret_post` 만). 서버가 인가 코드를 ID 토큰으로 교환해야 함(ADR-0071 전제와 다름). 요청서 `docs/handoff/customer-app/2026-11-20-backend-naver-token-exchange.md` | 요청서 보냄, 회신 대기 |
 
 ---
 
@@ -469,3 +469,6 @@
 
 ## BR-68 주문내역 카드 상품 줄·센터 이름 (고객앱)
 - 사용자 캡처(2026-11-20) 주문내역 끝난 카드의 상품 줄·센터 이름·같은 상품 담기를 그리려면 `GET /orders` 항목에 주문 행 목록과 `mfcName` 이 필요. 요청서 `docs/handoff/customer-app/2026-11-20-backend-order-list-lines.md`. 상태: 요청서 작성, 회신 대기.
+
+## BR-69 네이버 로그인 토큰 교환 (고객앱·라이더앱)
+- 2026-11-20 실기기: taskAffinity 수정 뒤 네이버 동의 → 앱으로는 돌아오지만 "로그인 서비스가 원활하지 않아요". 원인은 토큰 교환 — 네이버 discovery `token_endpoint_auth_methods_supported: [client_secret_post]`, secret 없이 `POST /oauth2/token` 은 401 `invalid_client`(직접 확인). 앱에 secret 을 둘 수 없어 서버 교환이 필요. 요청서 `docs/handoff/customer-app/2026-11-20-backend-naver-token-exchange.md`(R1 코드 받기·R2 뒤 단계의 id_token·R3 멱등·R4 오류 코드·R5 라이더).

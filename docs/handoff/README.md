@@ -44,7 +44,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-19-backend-first-run-consents.md` | BR-59 처음 실행 약관 — ①~④ 모두 회신(`clients/customer-app/2026-11-19-reply-br59-first-run-consents.md`, customer 0.6.0~0.6.1) · 고객앱 반영(목 모드). 질문 답은 아래 문서로 보냄. **남은 것: LAN 실서버 확인 뒤 archive** |
 | `customer-app/2026-11-19-backend-br59-location-service-answer.md` | BR-59 질문 답(좌표→주소 카카오 로컬 서버 경유, 지도 카카오맵 SDK, 휴대폰 위치 Android geolocator — 사용자 승인·고객앱 반영) + Q1 역지오코딩 좌표가 URL 쿼리로 추적 기록에 남는 문제 |
 | `customer-app/2026-11-20-backend-review-eligibility-display.md` | BR-67 리뷰관리 개수(total)·품목 사진·주문 시각/센터 이름 — 보냄, 회신 대기 |
-| `customer-app/2026-11-20-backend-order-list-lines.md` | BR-68 주문내역 카드 상품 줄·센터 이름(·판매 여부·기간 끝) — 보냄, 회신 대기 |
+$1| `customer-app/2026-11-20-backend-naver-token-exchange.md` | BR-69 네이버 로그인 토큰 교환 — 네이버가 client secret 없는 교환을 거절(`invalid_client`), 서버가 인가 코드를 교환해 달라(R1~R5) — 보냄, 회신 대기 |
 | `customer-app/2026-11-20-backend-handoff-replies-applied.md` | 11-20 백엔드 요청·회신 4건(검색 교정 문구·리뷰 사진 축소본·홈 배너·BR-64 로그인 휴대폰 확인) 목 모드 반영 알림 + Q1(details 읽는 법) — LAN 확인 대기 |
 | `customer-app/2026-11-19-backend-address-receiver-to-checkout.md` | BR-60 — 회신(`clients/customer-app/2026-11-19-reply-br60-address-receiver.md`, customer 0.8.0·order 0.14.0 배포) · 고객앱 반영(목 모드). **남은 것: LAN 에서 주소 저장·주문서 내 연락처 확인 뒤 archive** |
 | `customer-app/2026-11-19-backend-phone-verification-signup.md` | BR-64 나머지 — 0.9.0 휴대폰 확인 화면 반영 알림 + 가입 단계 확인(R1)·한 번호 한 계정(R2)·기존 계정 안내(R3)·탈퇴 1달(R4)·기존 회원(R5)·주문 연락처(R6)·처리방침(R7) |

@@ -341,12 +341,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         path: '/products/:productId',
         // 카드에서 오면 카드 값(이름·사진·가격)을 넘겨 상세 첫 프레임에 바로 그린다(백엔드 요청 2026-11-19 상세 속도 R1).
-        builder: (_, state) => ProductDetailScreen(
-          productId: state.pathParameters['productId']!,
-          preview: switch (state.extra) {
-            final ProductTile t => t,
-            _ => null,
-          },
+        // 사용자 요청(2026-11-20): 상품을 누르면 카테고리 목록처럼 오른쪽에서 밀려 들어오고, 뒤로 가면 오른쪽으로 빠진다.
+        pageBuilder: (_, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: ProductDetailScreen(
+            productId: state.pathParameters['productId']!,
+            preview: switch (state.extra) {
+              final ProductTile t => t,
+              _ => null,
+            },
+          ),
         ),
         routes: [
           GoRoute(

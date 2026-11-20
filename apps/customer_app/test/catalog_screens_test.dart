@@ -455,8 +455,21 @@ void main() {
       await t.pumpAndSettle();
       await tapTileNoSettle(t, 'P-0006');
       await t.pump();
+      // 밀려 들어오는 화면(CupertinoPage)은 첫 프레임에 만들어지되 한 프레임 가려져 있다 — 다음 프레임부터 보인다.
+      expect(
+        find.byKey(const ValueKey('product-preview'), skipOffstage: false),
+        findsOneWidget,
+      );
+      await t.pump(const Duration(milliseconds: 16));
       expect(find.byKey(const ValueKey('product-preview')), findsOneWidget);
-      expect(find.text('저지방 우유 900mL'), findsOneWidget);
+      // 밀려 들어오는 동안에는 뒤의 홈 카드도 보인다 — 상세(미리 보기) 안의 이름만 본다.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('product-preview')),
+          matching: find.text('저지방 우유 900mL'),
+        ),
+        findsOneWidget,
+      );
       catalog.release.complete();
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('product-preview')), findsNothing);
