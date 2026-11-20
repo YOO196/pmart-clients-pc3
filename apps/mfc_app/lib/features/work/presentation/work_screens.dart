@@ -386,28 +386,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                             ),
                           ),
-                          // 업무는 모두 같은 크기(사용자 2026-11-19) — 2열, 고르면 그 칸이 커지며 안내 화면 위 카드가 된다.
-                          for (var r = 0; r < areas.length; r += 2)
+                          // 업무는 한 줄에 하나, 가로로 긴 칸(사용자 2026-11-20 "1열로 가로로 긴 버튼") —
+                          // 그림·이름·한 줄 설명. 고르면 그 칸이 커지며 안내 화면 위 카드가 된다.
+                          for (final (i, a) in areas.indexed)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 10),
-                              child: Row(
-                                children: [
-                                  for (var c = r; c < r + 2; c++) ...[
-                                    if (c > r) const SizedBox(width: 8),
-                                    Expanded(
-                                      child: c < areas.length
-                                          ? EnterFade(
-                                              index: c,
-                                              child: _AreaTile(
-                                                area: areas[c],
-                                                allowed: me.can(areas[c]),
-                                                onTap: () => openArea(areas[c]),
-                                              ),
-                                            )
-                                          : const SizedBox.shrink(),
-                                    ),
-                                  ],
-                                ],
+                              child: EnterFade(
+                                index: i,
+                                child: _AreaTile(
+                                  area: a,
+                                  allowed: me.can(a),
+                                  onTap: () => openArea(a),
+                                ),
                               ),
                             ),
                         ],
@@ -602,7 +592,7 @@ class AreaHeroCard extends StatelessWidget {
   }
 }
 
-/// 칸 → 큰 카드로 커지는 동안 그리는 모습. 그림은 칸 자리(가운데 위, 52)에서 카드 자리(오른쪽, 84)로
+/// 칸 → 큰 카드로 커지는 동안 그리는 모습. 그림은 칸 자리(왼쪽, 52)에서 카드 자리(오른쪽, 84)로
 /// 크기와 함께 이어서 움직이고, 칸 이름은 흐려지며 카드 제목·설명이 나타난다(사용자 2026-11-19
 /// "픽토그램도 전후 움직임 끊기지 않게"). 돌아갈 때는 같은 길을 거꾸로.
 HeroFlightShuttleBuilder _areaShuttle(WorkArea area) =>
@@ -614,11 +604,12 @@ class _AreaFlight extends StatelessWidget {
   final WorkArea area;
   final Animation<double> animation;
 
-  // 칸([_AreaTile])과 카드([AreaHeroCard])의 치수 — 두 쪽을 바꾸면 여기도 맞춘다.
+  // 칸([_AreaTile] — 가로로 긴 한 줄)과 카드([AreaHeroCard])의 치수 — 두 쪽을 바꾸면 여기도 맞춘다.
+  static const _tileHeight = 80.0;
+  static const _tilePad = 16.0;
+  static const _tileGap = 14.0;
   static const _tileCircle = 52.0;
   static const _tileIcon = 28.0;
-  static const _tileCircleCenterY = 40.0; // (112 - 84) / 2 + 52 / 2
-  static const _tileLabelTop = 76.0;
   static const _cardCircle = 84.0;
   static const _cardIcon = 46.0;
   static const _cardPad = 15.0;
@@ -649,28 +640,23 @@ class _AreaFlight extends StatelessWidget {
               final w = c.maxWidth;
               final h = c.maxHeight;
               final d = lerp(_tileCircle, _cardCircle);
-              final cx = lerp(w / 2, w - _cardPad - _cardCircle / 2);
-              final cy = lerp(_tileCircleCenterY, h / 2);
+              // 그림은 칸 왼쪽에서 카드 오른쪽으로, 세로는 늘 가운데.
+              final cx = lerp(
+                _tilePad + _tileCircle / 2,
+                w - _cardPad - _cardCircle / 2,
+              );
+              final cy = h / 2;
               return Stack(
                 children: [
                   if (tileText > 0)
                     Positioned(
-                      left: 0,
-                      right: 0,
-                      top: _tileLabelTop,
+                      left: _tilePad + _tileCircle + _tileGap,
+                      right: _tilePad + 24,
+                      top: 0,
+                      bottom: 0,
                       child: Opacity(
                         opacity: tileText,
-                        child: Text(
-                          workAreaText(l10n, area),
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          overflow: TextOverflow.clip,
-                          style: const TextStyle(
-                            color: PdaColors.ink,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
+                        child: _AreaTileText(area: area),
                       ),
                     ),
                   if (cardText > 0)
@@ -759,7 +745,6 @@ class _AreaTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     return Pressable(
       child: Hero(
         tag: 'area-card-${area.name}',
@@ -780,41 +765,82 @@ class _AreaTile extends StatelessWidget {
               key: ValueKey('area-${area.name}'),
               onTap: onTap,
               child: SizedBox(
-                height: 112,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: const BoxDecoration(
-                        color: PdaColors.softer,
-                        shape: BoxShape.circle,
+                height: _AreaFlight._tileHeight,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: _AreaFlight._tilePad,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: _AreaFlight._tileCircle,
+                        height: _AreaFlight._tileCircle,
+                        decoration: const BoxDecoration(
+                          color: PdaColors.softer,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          allowed ? workAreaIcon(area) : Icons.lock_outline,
+                          size: _AreaFlight._tileIcon,
+                          color: allowed ? PdaColors.primary : PdaColors.muted,
+                        ),
                       ),
-                      child: Icon(
-                        allowed ? workAreaIcon(area) : Icons.lock_outline,
-                        size: 28,
-                        color: allowed ? PdaColors.primary : PdaColors.muted,
+                      const SizedBox(width: _AreaFlight._tileGap),
+                      Expanded(
+                        child: _AreaTileText(area: area, allowed: allowed),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      workAreaText(l10n, area),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: PdaColors.ink,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
+                      Icon(
+                        allowed ? Icons.chevron_right : Icons.lock_outline,
+                        color: PdaColors.muted,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 가로 칸의 글 — 이름(18·800) + 한 줄 설명. 날아가는 동안([_AreaFlight])에도 같은 모양으로 그린다.
+class _AreaTileText extends StatelessWidget {
+  const _AreaTileText({required this.area, this.allowed = true});
+
+  final WorkArea area;
+  final bool allowed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          workAreaText(l10n, area),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          softWrap: false,
+          style: TextStyle(
+            color: allowed ? PdaColors.ink : PdaColors.muted,
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          workAreaDesc(l10n, area),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          softWrap: false,
+          style: theme.textTheme.bodySmall?.copyWith(color: PdaColors.muted),
+        ),
+      ],
     );
   }
 }
