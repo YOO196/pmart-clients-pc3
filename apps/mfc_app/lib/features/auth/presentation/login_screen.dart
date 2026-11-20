@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pmart_core/pmart_core.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
-import '../../../shared/providers.dart';
 import '../data/auth_repository.dart' show TemporaryPasswordLogin;
 import '../domain/employee_auth.dart';
 import 'auth_controller.dart';
@@ -66,7 +64,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final theme = Theme.of(context);
     final auth = ref.watch(authControllerProvider);
     final ended = auth is AuthSignedOut ? auth.ended : null;
-    final mock = ref.watch(envProvider) == PmartEnv.mock;
     final scheme = theme.colorScheme;
     // 배치는 다른 앱의 로그인을 따랐다: 고객앱(큰 브랜드 이름 + 한 줄 설명 + 버튼), 백오피스 직원 로그인(카드 안에 버튼·안내·참고 문구).
     return Scaffold(
@@ -126,13 +123,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             color: scheme.onSurfaceVariant,
                           ),
                         ),
-                        if (mock) ...[
-                          const SizedBox(height: 14),
-                          Chip(
-                            key: const ValueKey('login-mock-badge'),
-                            label: Text(l10n.mockModeBadge),
-                          ),
-                        ],
                       ],
                     ),
                   ),

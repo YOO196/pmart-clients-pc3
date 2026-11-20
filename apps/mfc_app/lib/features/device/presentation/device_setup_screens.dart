@@ -21,19 +21,9 @@ class DeviceSetupScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final mock = ref.watch(envProvider) == PmartEnv.mock;
     final printer = ref.watch(printerSettingsProvider).value;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.setupTitle),
-        actions: [
-          if (mock)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Chip(label: Text(l10n.mockModeBadge)),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: Text(l10n.setupTitle), actions: []),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -91,18 +81,8 @@ class StartScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final mock = ref.watch(envProvider) == PmartEnv.mock;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.homeTitle),
-        actions: [
-          if (mock)
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Chip(label: Text(l10n.mockModeBadge)),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: Text(l10n.homeTitle), actions: []),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
