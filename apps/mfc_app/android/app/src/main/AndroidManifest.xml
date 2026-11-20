@@ -2,9 +2,9 @@
     <!-- API·네트워크 라벨 프린터(RAW 9100). 디버그·프로파일 매니페스트에만 있어 릴리스에서 빠져 있었다. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="픽PDA"
+        android:label="${appLabel}"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="${appIcon}">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -28,7 +28,8 @@
             </intent-filter>
         </activity>
         <!-- 직원 로그인 복귀(pmart-mfc://login?ticket=…). Custom Tab 에서 돌아오는 주소를 flutter_web_auth_2 가 받는다.
-             복귀 주소는 백엔드 허용 목록의 이 값 하나다(employee-auth-service 앱 mfc). -->
+             복귀 주소는 백엔드 허용 목록의 이 값 하나다(employee-auth-service 앱 mfc).
+             목업 빌드는 pmart-mfc-mock(실서버 로그인을 하지 않는다 — 두 앱이 같은 주소를 받아 고르기 창이 뜨지 않게, build.gradle.kts). -->
         <activity
             android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
             android:exported="true"
@@ -37,7 +38,7 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="pmart-mfc" android:host="login"/>
+                <data android:scheme="${loginScheme}" android:host="login"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
