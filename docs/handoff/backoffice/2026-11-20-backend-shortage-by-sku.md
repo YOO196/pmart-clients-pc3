@@ -2,7 +2,7 @@
 
 보낸 앱: backoffice (PC 2)
 받는 백엔드 영역: mfc (mfc-fulfillment-service — 원천 피킹 줄), platform (backoffice-bff — 지표 조회로 묶을 때). 담당이 다르면 알려 주세요.
-항목: BR-69
+항목: BR-73 (처음 BR-69 로 적었으나 고객앱 네이버 토큰 교환과 겹쳐 PC 1 이 합칠 때 73 으로)
 
 - 근거: 사용자가 2026-11-20 "상품별 SKU 결손률"을 물었다(대시보드 매출·통계 탭 지표).
 - 지금 받는 것: bff 0.20.0 `GET /views/metrics?metric=SHORTAGE_RATE`(원천 mfc-fulfillment 0.19.0 `GET /metrics/picking-lines`, 요청 F-10).

@@ -80,6 +80,7 @@
 | BR-70 | 보통 | 고객·라이더 | 네이버 프로필 사진 — 서버 교환(auth 0.10.0) 뒤 앱에 access token 이 없어 0.8.0 요청(앱이 프로필 API 로 사진 주소 읽기)을 할 수 없음. 서버가 읽거나 교환 응답에 주소를 달라는 질문. 질문서 `docs/handoff/customer-app/2026-11-20-backend-naver-profile-image-after-exchange.md` | 회신 (나)(auth 0.10.1 — 교환 응답에 profileImageUrl) — 고객 앱 목 모드 반영(2026-11-20), LAN 확인 대기 |
 | BR-71 | 보통 | 고객 | 주문 줄의 상품 사진 — `GET /orders` `lines[]`·`GET /orders/{id}` `OrderLine` 에 `imageUrl`(지금 상품 대표 사진, BR-67 과 같은 규칙). 요청서 `docs/handoff/customer-app/2026-11-20-backend-order-line-images.md` | 요청서 보냄, 회신 대기 — 그때까지 주문상세는 상품 조회로, 주문내역 카드는 사진 없이 |
 | BR-72 | 보통 | 고객 | 가입을 끝내지 않고 나간 계정 — 다음 로그인 때 저장된 동의로 동의 화면을 건너뛰고 휴대폰 확인으로 감. 사용자 결정: 회원이 된 적 없으면 동의부터 다시. 요청서 `docs/handoff/customer-app/2026-11-20-backend-signup-consent-restart.md` | 요청서 보냄, 회신 대기 |
+| BR-73 | 보통 | 백오피스 | 상품(SKU)별 결품률 — 결품률(bff 0.20.0·fulfillment 0.19.0)은 날짜·센터·사유까지만, SKU별 피킹 줄·결품 줄 집계 요청(SK-1, 선택 SK-2 bff). 요청서 docs/handoff/backoffice/2026-11-20-backend-shortage-by-sku.md (PR #316 은 BR-69 로 적었으나 겹쳐 PC 1 이 73 으로) | 요청서 보냄, 회신 대기 |
 
 ---
 
