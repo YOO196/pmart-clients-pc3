@@ -2,8 +2,7 @@
 // 원문 Delivery §3.6 "배차 지연 시간이 기준을 넘으면 MFC 관리자·고객센터에 안내"). 지연 안내(DispatchDelayed)가 난 픽업 전 배송, 약속이 이른 것부터.
 // - 배송 번호(ADR-0070)는 delivery-execution `GET /deliveries?deliveryIds=&mfcId=`(0.31.0 묶음, 50개씩)로 붙인다. 못 읽으면 "번호 확인 불가"(번호 없음과 구분).
 // - "약속 대비" = 지금 − promisedAt(표시만 — 판정은 서버가 이미 지연 안내로 했다). 약속 시각이 없으면 "약속 없음".
-// - "배차 불가로 취소"(claim CL-5, 0.7.0)는 주문의 모든 행 × 미이행 수량을 보내야 하는데, 센터 관리자는 주문 행을 읽을 API 가 없다
-//   (order `GET /orders/lookups/{id}` 는 OPERATOR_ADMIN·CS_AGENT·RIDER_OPS 만). 단추는 막아 두고 이유를 보인다 — 요청 handoff mfc-backoffice/2026-11-19-backend-dispatch-cancel-lines.
+// - "배차 불가로 취소"(claim 0.11.0 DC-1 — lines 생략, 서버가 주문 행을 채움)는 DispatchCancel.tsx.
 // - 30초마다 다시 읽는다(목록은 서버가 픽업되면 뺀다).
 import { useQuery } from '@tanstack/react-query';
 
@@ -15,6 +14,7 @@ import { DisplayNumber, RiderLabel, SystemNumbers } from '../../shared/displayNu
 import { AllDone, GuideBox } from '../../shared/listParts';
 import { messages } from '../../shared/messages';
 import { useNow } from '../../shared/motion';
+import { DispatchCancelButton } from './DispatchCancel';
 
 const m = messages.dispatchDelays;
 const REFRESH_MS = 30_000;
@@ -109,9 +109,7 @@ export function DispatchDelaysMenu({ mfcId }: { readonly mfcId: string }) {
                       </td>
                       <td>{formatSeoul(d.delayAlertedAt)}</td>
                       <td>
-                        <button type="button" className="btn btn-xs" disabled title={m.cancelBlocked}>
-                          {m.cancel}
-                        </button>
+                        <DispatchCancelButton orderId={d.orderId} label={numbers.data?.get(d.deliveryId) ?? d.deliveryId} />
                       </td>
                     </tr>
                   );
@@ -122,9 +120,6 @@ export function DispatchDelaysMenu({ mfcId }: { readonly mfcId: string }) {
           )
         }
       </QueryState>
-      <p className="text-xs text-base-content/60" data-testid="cancel-blocked">
-        {m.cancelBlocked}
-      </p>
     </section>
   );
 }

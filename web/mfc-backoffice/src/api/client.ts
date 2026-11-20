@@ -7,6 +7,7 @@ import type { paths as ApprovalPaths } from './generated/approval';
 import type { paths as BffPaths } from './generated/backoffice-bff';
 import type { paths as CasePaths } from './generated/case';
 import type { paths as CenterPaths } from './generated/center-master';
+import type { paths as ClaimPaths } from './generated/claim';
 import type { paths as DispatchPaths } from './generated/delivery-dispatch';
 import type { paths as ExecutionPaths } from './generated/delivery-execution';
 import type { paths as HrPaths } from './generated/hr';
@@ -48,6 +49,8 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     execution: createClient<ExecutionPaths>(options),
     // 배차 지연 목록(delivery-dispatch 0.12.0)
     dispatch: createClient<DispatchPaths>(options),
+    // 배차 불가로 취소(claim 0.11.0 DC-1 — 회사 사유 전체 취소는 lines 생략)
+    claims: createClient<ClaimPaths>(options),
     // 라이더 화면 표기 묶음 조회(rider 0.18.0 RS-MFC — "김*수 · 482913")
     rider: createClient<RiderPaths>(options),
   };

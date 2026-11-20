@@ -1,4 +1,5 @@
 // 배차 지연 목(delivery-dispatch 0.12.0 `GET /dispatch-delays?mfcId=` — 그 센터 운영자만, 픽업 전·약속 이른 순)
+// + 배차 불가로 취소(claim 0.11.0 `POST /claims` — 회사 사유 전체 취소는 lines 생략, 남의 센터 주문 404, 픽업 뒤 422 ORDER_NOT_CANCELLABLE, 진행 중이면 422 DUPLICATE_CLAIM)
 // + 배송 번호 묶음 조회(delivery-execution 0.31.0 `GET /deliveries?deliveryIds=&mfcId=` — 권한 밖 센터·없는 ID 는 빠짐, 51개 넘으면 400).
 import { http, HttpResponse } from 'msw';
 
@@ -29,8 +30,12 @@ function seedDispatchDelays(): MockDelay[] {
   ];
 }
 
-// 바꾸는 명령이 없어 시험마다 되돌릴 것이 없다(시각만 불러올 때 기준).
+// 시각은 불러올 때 기준. 취소 접수한 주문은 시험마다 비운다(resetDispatchCancels).
 const delays = seedDispatchDelays();
+const cancelled = new Map<string, { readonly claimId: string; readonly key: string }>();
+export function resetDispatchCancels() {
+  cancelled.clear();
+}
 
 export const dispatchDelayHandlers = [
   http.get(`${API_BASE}/dispatch-delays`, ({ request }) => {
@@ -59,5 +64,21 @@ export const dispatchDelayHandlers = [
       .filter((d) => d.mfcId === mfcId && ids.includes(d.deliveryId))
       .map((d) => ({ deliveryId: d.deliveryId, deliveryNumber: d.deliveryNumber, orderId: d.orderId, mfcId: d.mfcId, riderId: d.riderId, type: 'FORWARD', createdAt: d.createdAt }));
     return HttpResponse.json({ items, page: { size: items.length, nextCursor: null } });
+  }),
+  http.post(`${API_BASE}/claims`, async ({ request }) => {
+    const who = operator(request);
+    if (!who) return unauthorized();
+    const key = request.headers.get('Idempotency-Key') ?? '';
+    const body = (await request.json()) as { orderId?: string; type?: string; reason?: string; channel?: string; lines?: unknown[]; reasonDetail?: string };
+    if (!body.orderId || body.type !== 'CANCEL' || !body.reason) return problem(400, 'VALIDATION_FAILED');
+    if (!body.lines && body.reason !== 'DISPATCH_UNAVAILABLE' && body.reason !== 'OPERATOR_DECISION') return problem(400, 'VALIDATION_FAILED');
+    const d = delays.find((x) => x.orderId === body.orderId);
+    if (!d || !who.centers.includes(d.mfcId)) return problem(404, 'NOT_FOUND');
+    const prior = cancelled.get(d.orderId);
+    const claim = (claimId: string) => ({ claimId, orderId: d.orderId, type: 'CANCEL', reason: body.reason, channel: 'OPERATOR', state: 'STOP_PENDING', lines: [{ orderLineId: `${d.orderId}-L1`, requestedQty: 1 }] });
+    if (prior) return prior.key === key ? HttpResponse.json(claim(prior.claimId), { status: 201 }) : problem(422, 'DUPLICATE_CLAIM');
+    const claimId = `CLM-${d.orderId}`;
+    cancelled.set(d.orderId, { claimId, key });
+    return HttpResponse.json(claim(claimId), { status: 201 });
   }),
 ];

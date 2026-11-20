@@ -1,5 +1,6 @@
 // 배차 지연(우리 센터) — delivery-dispatch 0.12.0 `GET /dispatch-delays` + 배송 번호 묶음(delivery-execution 0.31.0). 목(MSW) 기준.
 import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 
@@ -8,6 +9,7 @@ import { renderAt } from '../../test/render';
 import { server } from '../../test/server';
 
 const rows = () => screen.getAllByTestId('dispatch-delay-row');
+const posts = (sent: Request[]) => sent.filter((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith('/claims'));
 
 describe('배차 지연', () => {
   it('우리 센터 것만, 약속 이른 순 — 배송 번호(묶음 조회), 라이더 없음, 약속 대비 지난 분', async () => {
@@ -26,11 +28,35 @@ describe('배차 지연', () => {
     expect([n.get('mfcId'), n.get('deliveryIds')]).toEqual(['MFC-BSN-01', 'DLV-DD-1,DLV-DD-2']);
   });
 
-  it('배차 불가로 취소는 막혀 있고 이유를 보인다(센터 관리자가 주문 행을 읽을 API 없음)', async () => {
+  it('배차 불가로 취소 — 확인 상자에서 "취소하기"를 눌러야 보낸다: lines 없이 {orderId, CANCEL, DISPATCH_UNAVAILABLE, OPERATOR}', async () => {
+    const view = renderAt('/c/MFC-BSN-01/dispatch-delays');
+    await waitFor(() => expect(rows()).toHaveLength(2));
+    await userEvent.click(within(rows()[0]!).getByRole('button', { name: '배차 불가로 취소' }));
+    const dialog = screen.getByTestId('dispatch-cancel-confirm');
+    expect(dialog).toHaveTextContent('2,000원 쿠폰');
+    expect(dialog).not.toHaveTextContent('즉시');
+    await userEvent.click(within(dialog).getByRole('button', { name: '그만두기' }));
+    expect(screen.queryByTestId('dispatch-cancel-confirm')).not.toBeInTheDocument();
+    expect(posts(view.sent)).toHaveLength(0);
+
+    await userEvent.click(within(rows()[0]!).getByRole('button', { name: '배차 불가로 취소' }));
+    await userEvent.type(within(screen.getByTestId('dispatch-cancel-confirm')).getByLabelText('메모(선택)'), '근처 라이더 없음');
+    await userEvent.click(within(screen.getByTestId('dispatch-cancel-confirm')).getByRole('button', { name: '취소하기' }));
+    expect(await within(rows()[0]!).findByTestId('dispatch-cancel-done')).toHaveTextContent('취소를 접수했어요(출고 멈추는 중)');
+    const post = posts(view.sent)[0]!;
+    expect(await post.clone().json()).toEqual({ orderId: 'ORD-DD-1', type: 'CANCEL', reason: 'DISPATCH_UNAVAILABLE', channel: 'OPERATOR', reasonDetail: '근처 라이더 없음' });
+    expect(post.headers.get('Idempotency-Key')).toBeTruthy();
+    expect(post.headers.get('X-Source-System')).toBe('mfc-backoffice-web');
+  });
+
+  it('이미 라이더에게 넘겼으면(422 ORDER_NOT_CANCELLABLE) 반품 안내', async () => {
+    server.use(http.post(`${API_BASE}/claims`, () => HttpResponse.json({ status: 422, code: 'ORDER_NOT_CANCELLABLE', type: 'about:blank' }, { status: 422, headers: { 'content-type': 'application/problem+json' } })));
     renderAt('/c/MFC-BSN-01/dispatch-delays');
     await waitFor(() => expect(rows()).toHaveLength(2));
-    expect(within(rows()[0]!).getByRole('button', { name: '배차 불가로 취소' })).toBeDisabled();
-    expect(screen.getByTestId('cancel-blocked')).toHaveTextContent('백엔드에 요청');
+    await userEvent.click(within(rows()[0]!).getByRole('button', { name: '배차 불가로 취소' }));
+    await userEvent.click(within(screen.getByTestId('dispatch-cancel-confirm')).getByRole('button', { name: '취소하기' }));
+    expect(await within(rows()[0]!).findByText(/반품으로 안내/)).toBeInTheDocument();
+    expect(within(rows()[0]!).queryByTestId('dispatch-cancel-done')).not.toBeInTheDocument();
   });
 
   it('번호 조회가 실패하면 "번호 확인 불가"(번호 없음과 구분), 목록 실패는 빈 목록이 아니라 오류', async () => {
