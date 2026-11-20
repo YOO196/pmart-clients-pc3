@@ -305,6 +305,12 @@ class MyScreen extends ConsumerWidget {
               onTap: () => context.push('/support/faqs'),
             ),
             row(
+              l10n.termsTitle,
+              key: const ValueKey('my-terms'),
+              icon: PmartLineIcons.receipt,
+              onTap: () => context.push('/me/terms'),
+            ),
+            row(
               l10n.noticeSettingsTitle,
               key: const ValueKey('my-notification-settings'),
               icon: PmartLineIcons.settings,

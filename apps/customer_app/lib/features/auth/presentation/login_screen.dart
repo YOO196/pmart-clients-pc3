@@ -12,7 +12,7 @@ import 'package:pmart_core/pmart_core.dart' show PmartEnv, ProblemCode;
 
 import '../../../shared/providers.dart' show envProvider;
 import '../../start/presentation/start_controller.dart'
-    show leaveApp, startFlagsProvider;
+    show StartRoutes, leaveApp, startFlagsProvider;
 import 'auth_controller.dart';
 import 'identity_view.dart';
 
@@ -96,6 +96,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     });
 
+    // 동의·휴대폰 확인 단계를 그만둔다. 처음 실행(entry)은 이 화면이 맨 아래 단계라 화면을 닫으면 시작 그림만 남는다
+    // (사용자 2026-11-20 "뒤로 → 로딩 화면에서 못 벗어남") — 로그인 버튼 화면으로 되돌린다. 그 밖에는 로그인 화면을 닫는다.
+    void leaveStep() {
+      if (!widget.entry && context.canPop()) {
+        context.pop(false);
+      } else {
+        ref.invalidate(provider);
+      }
+    }
+
+    // 처음 실행에서는 뒤로(폰 버튼)도 같은 일을 한다 — 라우트를 빼면 시작 그림만 남는다.
+    Widget guard(Widget child) => widget.entry
+        ? PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop) leaveStep();
+            },
+            child: child,
+          )
+        : child;
+
     final busy = flow is LoginWorking;
     final workingProvider = flow is LoginWorking ? flow.provider : null;
     final outcome = switch (flow) {
@@ -105,17 +126,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     // 휴대폰 확인(AUTH_IDENTITY — auth 0.6.0, BR-64 회신): 동의 다음, 회원 전 단계.
     if (outcome case final LoginNeedsIdentity waiting) {
-      return IdentityView(
-        waiting: waiting,
-        purpose: widget.purpose,
-        providerLabel: (p) => _providerShort(l10n, p),
-        onClose: () {
-          if (context.canPop()) {
-            context.pop(false);
-          } else {
-            ref.invalidate(provider);
-          }
-        },
+      return guard(
+        IdentityView(
+          waiting: waiting,
+          purpose: widget.purpose,
+          providerLabel: (p) => _providerShort(l10n, p),
+          onClose: leaveStep,
+        ),
       );
     }
 
@@ -125,59 +142,77 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _agreed.clear();
       }
       final allAgreed = waiting.requiredConsents.every(_agreed.contains);
-      Widget box(String c, String title) => CheckboxListTile(
-        key: ValueKey('consent-$c'),
-        value: _agreed.contains(c),
-        title: Text(title),
-        onChanged: busy
-            ? null
-            : (v) => setState(
-                () => (v ?? false) ? _agreed.add(c) : _agreed.remove(c),
-              ),
-      );
+      // 항목마다 [보기] — 동의하기 전에 본문을 읽을 수 있게(사용자 2026-11-20 "약관 볼 수 있게").
+      // 항목은 `TYPE:version` — 그 버전의 본문(`/consent-terms/{항목}/{버전}`)을 연다.
+      Widget box(String c, String title) {
+        final d = ConsentDecision(c, agreed: true);
+        return CheckboxListTile(
+          key: ValueKey('consent-$c'),
+          value: _agreed.contains(c),
+          title: Text(title),
+          secondary: d.version.isEmpty
+              ? null
+              : TextButton(
+                  key: ValueKey('consent-view-${d.type}'),
+                  onPressed: () =>
+                      context.push(StartRoutes.terms(d.type, d.version)),
+                  child: Text(l10n.consentView),
+                ),
+          onChanged: busy
+              ? null
+              : (v) => setState(
+                  () => (v ?? false) ? _agreed.add(c) : _agreed.remove(c),
+                ),
+        );
+      }
+
       final error = switch (waiting.lastError) {
         null => null,
         AuthProblemCode.requiredConsentMissing => l10n.consentMissing,
         ProblemCode.unknownResult => l10n.consentUnknown,
         _ => l10n.loginRejected,
       };
-      return Scaffold(
-        appBar: AppBar(title: Text(l10n.consentTitle)),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // 기존 회원(newAccount=false)은 약관이 바뀌어 다시 묻는 것이다.
-            Text(
-              waiting.newAccount ? l10n.consentBody : l10n.consentReconsentBody,
-              key: const ValueKey('consent-body'),
-            ),
-            for (final c in waiting.requiredConsents)
-              box(c, l10n.consentRequired(_consentLabel(l10n, c))),
-            for (final c in waiting.optionalConsents)
-              box(c, l10n.consentOptional(_consentLabel(l10n, c))),
-            if (error != null) ...[
-              const SizedBox(height: 8),
+      return guard(
+        Scaffold(
+          appBar: AppBar(title: Text(l10n.consentTitle)),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // 기존 회원(newAccount=false)은 약관이 바뀌어 다시 묻는 것이다.
               Text(
-                error,
-                key: const ValueKey('consent-error'),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+                waiting.newAccount
+                    ? l10n.consentBody
+                    : l10n.consentReconsentBody,
+                key: const ValueKey('consent-body'),
+              ),
+              for (final c in waiting.requiredConsents)
+                box(c, l10n.consentRequired(_consentLabel(l10n, c))),
+              for (final c in waiting.optionalConsents)
+                box(c, l10n.consentOptional(_consentLabel(l10n, c))),
+              if (error != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  error,
+                  key: const ValueKey('consent-error'),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+              const SizedBox(height: 16),
+              FilledButton(
+                key: const ValueKey('consent-submit'),
+                onPressed: (allAgreed && !busy)
+                    ? () => controller.submitConsents(waiting, [
+                        for (final c in waiting.requiredConsents)
+                          ConsentDecision(c, agreed: true),
+                        // 선택 항목은 끈 것도 false 로 보낸다(거부로 기록돼 다시 묻지 않는다)
+                        for (final c in waiting.optionalConsents)
+                          ConsentDecision(c, agreed: _agreed.contains(c)),
+                      ])
+                    : null,
+                child: Text(l10n.consentSubmit),
               ),
             ],
-            const SizedBox(height: 16),
-            FilledButton(
-              key: const ValueKey('consent-submit'),
-              onPressed: (allAgreed && !busy)
-                  ? () => controller.submitConsents(waiting, [
-                      for (final c in waiting.requiredConsents)
-                        ConsentDecision(c, agreed: true),
-                      // 선택 항목은 끈 것도 false 로 보낸다(거부로 기록돼 다시 묻지 않는다)
-                      for (final c in waiting.optionalConsents)
-                        ConsentDecision(c, agreed: _agreed.contains(c)),
-                    ])
-                  : null,
-              child: Text(l10n.consentSubmit),
-            ),
-          ],
+          ),
         ),
       );
     }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart';
 
+import 'package:customer_app/features/auth/data/mock_auth_repository.dart';
 import 'package:customer_app/features/address/data/guest_address_store.dart';
 import 'package:customer_app/features/address/data/geocoding_repository.dart';
 import 'package:customer_app/features/address/data/mock_address_repository.dart';
@@ -352,6 +353,45 @@ void main() {
       expect(key('start-entry'), findsOneWidget);
       await back(t);
       expect(left, 1);
+    });
+
+    // 사용자 2026-11-20 (나): 처음 실행 로그인에서 네이버 → 동의 화면에서 뒤로 → 시작 그림(로딩)에서 못 벗어났다.
+    testWidgets('로그인 동의·휴대폰 확인 화면에서 뒤로: 로그인 버튼 화면으로 — 시작 그림에 머물지 않는다', (
+      t,
+    ) async {
+      final secure = MemoryKeyValueStore();
+      await secure.write('pmart.start.welcome', 'at=x');
+      final auth = MockAuthRepository(latency: Duration.zero);
+      await t.pumpWidget(
+        testApp([], startGate: true, secure: secure, auth: auth),
+      );
+      await t.pumpAndSettle();
+      await t.tap(key('login-naver'));
+      await t.pumpAndSettle();
+      expect(key('consent-submit'), findsOneWidget);
+
+      await back(t);
+      expect(left, 0);
+      expect(key('start-splash'), findsNothing);
+      expect(key('start-entry'), findsOneWidget);
+      expect(key('login-naver'), findsOneWidget);
+
+      // 휴대폰 확인 화면의 닫기(X)·뒤로도 같다.
+      auth.requireIdentity = true;
+      await t.tap(key('login-kakao'));
+      await t.pumpAndSettle();
+      expect(key('login-identity'), findsOneWidget);
+      await t.tap(key('id-cancel'));
+      await t.pumpAndSettle();
+      expect(key('start-splash'), findsNothing);
+      expect(key('login-kakao'), findsOneWidget);
+
+      await t.tap(key('login-kakao'));
+      await t.pumpAndSettle();
+      await back(t);
+      expect(left, 0);
+      expect(key('start-splash'), findsNothing);
+      expect(key('login-kakao'), findsOneWidget);
     });
 
     testWidgets('주소 화면(비회원): 로그인/둘러보기로 돌아간다 — 홈으로는 못 간다', (t) async {

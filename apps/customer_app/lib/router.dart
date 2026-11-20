@@ -11,6 +11,7 @@ import 'features/start/presentation/start_controller.dart';
 import 'features/wishlist/presentation/wishlist_screens.dart';
 import 'features/withdrawal/presentation/withdrawal_screen.dart';
 import 'features/start/presentation/start_screens.dart';
+import 'features/start/presentation/terms_list_screen.dart';
 import 'features/auth/domain/auth.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cart/presentation/cart_screen.dart';
@@ -276,6 +277,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/me/info',
         builder: (_, state) =>
             MyInfoScreen(signup: state.uri.queryParameters['from'] == 'signup'),
+      ),
+      // 약관 및 정책(로그인하지 않아도) — 본문은 /terms/{항목}/{버전}
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/me/terms',
+        builder: (_, _) => const TermsListScreen(),
       ),
       // 찜한 상품(customer 0.13.0, ADR-0081)
       GoRoute(

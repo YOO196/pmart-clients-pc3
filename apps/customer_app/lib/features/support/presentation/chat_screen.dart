@@ -133,6 +133,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                 );
                                 if (ok ?? false) {
                                   ref.invalidate(chatProvider);
+                                  // 고른 상담 종류 기록("일반 문의" 등)도 비운다 — 안 비우면 종료 뒤에도 남는다(사용자 2026-11-20).
+                                  ref.invalidate(chatTopicLogProvider);
                                   ref.read(chatTopicProvider.notifier).reset();
                                 }
                               },

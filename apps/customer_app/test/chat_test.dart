@@ -349,6 +349,33 @@ void main() {
       );
     });
 
+    // 사용자 2026-11-20: "일반 문의"를 고른 뒤 상담종료를 눌러도 "일반 문의" 칸이 남았다.
+    testWidgets('상담종료: 대화와 고른 상담 종류 기록을 모두 비우고 처음 선택으로', (t) async {
+      await open(t, mock(), general: false);
+      await t.tap(find.byKey(const ValueKey('chat-topic-general')));
+      await t.pumpAndSettle();
+      await ask(t, '배송비가 얼마예요?');
+      expect(
+        find.byKey(const ValueKey('chat-topic-general-chosen')),
+        findsOneWidget,
+      );
+
+      await t.tap(find.byKey(const ValueKey('chat-end')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('chat-end-ok')));
+      await t.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('chat-topic-general-chosen')),
+        findsNothing,
+      );
+      expect(find.text('배송비가 얼마예요?'), findsNothing);
+      expect(find.byKey(const ValueKey('chat-topic-general')), findsOneWidget);
+      expect(
+        t.widget<TextField>(find.byKey(const ValueKey('chat-input'))).enabled,
+        isFalse,
+      );
+    });
+
     testWidgets('주문 건 문의: 최근 주문을 고르면 그 뒤 질문마다 orderId 를 붙인다(레퍼런스 2-4)', (
       t,
     ) async {

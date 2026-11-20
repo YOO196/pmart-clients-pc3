@@ -25,14 +25,32 @@ import '../../../shared/notice.dart';
 
 /// 처음 실행 단계를 판단하는 동안(저장소·세션·주소록 읽기) — 바로픽 시작 그림(사용자 지시 2026-11-19).
 /// 배경색은 Android 시작 화면(`splash_background`)과 같아 그림이 뜨기 전에도 이어 보인다.
-class StartSplashScreen extends StatelessWidget {
+class StartSplashScreen extends ConsumerWidget {
   const StartSplashScreen({super.key});
 
   static const background = Color(0xFF7E24E6);
   static const image = 'assets/images/splash.jpg';
 
   @override
-  Widget build(BuildContext context) => const AnnotatedRegion(
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 판단이 끝났는데 이 그림이 보이면(뒤로 가기로 아래 단계가 빠진 경우 등 — 라우터의 redirect 는 뒤로 가기에서
+    // 다시 돌지 않는다) 지금 단계의 화면으로 보낸다. 판단 중(loading)이면 그대로 기다린다.
+    final step = ref.watch(startStepProvider);
+    final target = startRedirect(step, StartRoutes.splash, resolved: true);
+    if (target != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        final router = GoRouter.of(context);
+        if (router.routerDelegate.currentConfiguration.uri.path ==
+            StartRoutes.splash) {
+          router.go(target);
+        }
+      });
+    }
+    return _splash;
+  }
+
+  static const Widget _splash = AnnotatedRegion(
     value: SystemUiOverlayStyle.light,
     child: Scaffold(
       key: ValueKey('start-splash'),
@@ -300,6 +318,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                       value: _marketing,
                       onChanged: (v) => _choose(() => _marketing = v),
                       label: l10n.startMarketingPush,
+                      onOpen: _opener(terms, ConsentWire.marketing),
                     ),
                     if (termsValue.hasError && !termsValue.isLoading) ...[
                       const SizedBox(height: 16),
