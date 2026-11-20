@@ -81,6 +81,7 @@
 | BR-71 | 보통 | 고객 | 주문 줄의 상품 사진 — `GET /orders` `lines[]`·`GET /orders/{id}` `OrderLine` 에 `imageUrl`(지금 상품 대표 사진, BR-67 과 같은 규칙). 요청서 `docs/handoff/customer-app/2026-11-20-backend-order-line-images.md` | 요청서 보냄, 회신 대기 — 그때까지 주문상세는 상품 조회로, 주문내역 카드는 사진 없이 |
 | BR-72 | 보통 | 고객 | 가입을 끝내지 않고 나간 계정 — 다음 로그인 때 저장된 동의로 동의 화면을 건너뛰고 휴대폰 확인으로 감. 사용자 결정: 회원이 된 적 없으면 동의부터 다시. 요청서 `docs/handoff/customer-app/2026-11-20-backend-signup-consent-restart.md` | 요청서 보냄, 회신 대기 |
 | BR-73 | 보통 | 백오피스 | 상품(SKU)별 결품률 — 결품률(bff 0.20.0·fulfillment 0.19.0)은 날짜·센터·사유까지만, SKU별 피킹 줄·결품 줄 집계 요청(SK-1, 선택 SK-2 bff). 요청서 docs/handoff/backoffice/2026-11-20-backend-shortage-by-sku.md (PR #316 은 BR-69 로 적었으나 겹쳐 PC 1 이 73 으로) | 요청서 보냄, 회신 대기 |
+| BR-74 | 보통 | 고객 | 네이버 로그인마다 정보 제공 동의 화면 다시 — 이미 동의한 앱은 네이버가 다시 묻지 않아 서버가 교환 뒤 네이버 연결을 끊어야 함(secret·access token 은 서버만). 식별값(sub) 유지 확인 필요. 요청서 `docs/handoff/customer-app/2026-11-20-backend-naver-consent-every-login.md` | 요청서 보냄, 회신 대기 — 앱은 `auth_type=reauthenticate`(아이디·비밀번호 매번) 반영 |
 
 ---
 
@@ -486,3 +487,6 @@
 
 ## BR-72 가입 중 나간 계정 — 동의부터 다시 (고객앱)
 - 2026-11-20 사용자: 네이버 가입이 끝나지 않았는데 지난번 동의가 남아 동의 화면을 건너뜀 → "처음부터 다시 받고 싶어". 서버가 가입 중 계정·동의를 남겨 두고 다음 로그인에 `AUTH_IDENTITY` 로 바로 보낸다(auth-service 코드 확인). 요청서 `docs/handoff/customer-app/2026-11-20-backend-signup-consent-restart.md`(R1 동의부터·R2 옛 동의 기록·R3 기기 동의·R4 진행 중 휴대폰 확인). 앱은 바꿀 것 없음.
+
+## BR-74 네이버 로그인마다 동의 화면 다시 (고객앱)
+- 2026-11-20 사용자: "네이버 아이디, 비밀번호를 매번 다시 입력하게 하고 권한 선택 화면 다시 보이게". 앱은 인가 요청 `auth_type=reauthenticate`(앞서 `reprompt` 는 바로 로그인됨 — 거부한 항목만 다시 묻는 값으로 앎, 문서 미확인). 동의 화면은 네이버 연결을 끊어야 다시 나와 서버에 요청 — 요청서 `docs/handoff/customer-app/2026-11-20-backend-naver-consent-every-login.md`(R1 교환 뒤 끊기·R2 sub 유지 확인·R3 매번/가입 중만·R4 탈퇴·R5 토큰 로그 금지).

@@ -1,6 +1,10 @@
 <component name="ProjectRunConfigurationManager">
+  <!-- LAN 게이트웨이(실서버, HTTPS 8443). profile 빌드 — Run(▶)의 기본인 debug 빌드는 시작·스크롤이 느려 실제 속도를 볼 수 없다.
+       profile 은 hot reload·중단점이 안 된다. 그것이 필요하면 "고객앱 LAN 서버 (debug)" 를 쓴다.
+       사설 CA 는 release 가 아닌 빌드가 앱 안에서 믿는다(pmart_core trustPmartLanRootCa).
+       Android Studio 를 apps/customer_app 폴더로 열면 이 파일을 읽는다(저장소 맨 위 .run/ 의 같은 이름 파일은 맨 위 폴더로 열 때). -->
   <configuration default="false" name="고객앱 LAN 서버" type="FlutterRunConfigurationType" factoryName="Flutter">
-    <option name="additionalArgs" value="--dart-define=PMART_ENV=local --dart-define=PMART_API_BASE_URL=http://192.168.0.40:8080/api/v1 --dart-define-from-file=.secrets/customer.env" />
+    <option name="additionalArgs" value="--profile --dart-define=PMART_ENV=local --dart-define=PMART_API_BASE_URL=https://192.168.0.40:8443/api/v1 --dart-define-from-file=.secrets/customer.env" />
     <option name="filePath" value="$PROJECT_DIR$/lib/main.dart" />
     <method v="2" />
   </configuration>

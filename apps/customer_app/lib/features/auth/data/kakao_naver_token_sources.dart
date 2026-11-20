@@ -85,9 +85,11 @@ typedef NaverCodeExchange = Future<NaverExchange> Function({
 });
 
 /// 네이버 인가 요청(`nid.naver.com/oauth2/authorize`)에 덧붙이는 값(사용자 2026-11-20).
-/// `auth_type=reprompt` — 전에 동의했더라도 네이버의 정보 제공 동의 화면을 다시 띄운다(가입을 끝내지 않고 나갔다
-/// 다시 올 때 네이버 쪽 동의가 조용히 넘어가지 않게). 서버의 코드 교환과는 상관없다 — 인가 요청에만 붙는다.
-const naverAuthorizeExtra = {'auth_type': 'reprompt'};
+/// `auth_type=reauthenticate` — 브라우저에 네이버 로그인이 남아 있어도 아이디·비밀번호를 매번 다시 받는다(사용자 2026-11-20).
+/// (앞서 쓴 `reprompt` 는 전에 거부한 항목만 다시 묻는 값이라 바로 로그인됐다.) 정보 제공 동의 화면을 다시 띄우는 것은
+/// 인가 요청 값으로는 안 되고 네이버 쪽 연결을 끊어야 한다 — 서버 요청 BR-74.
+/// 서버의 코드 교환과는 상관없다 — 인가 요청에만 붙는다.
+const naverAuthorizeExtra = {'auth_type': 'reauthenticate'};
 
 Future<NaverAuthorization?> _authorizeWithAppAuth(String clientId) async {
   try {
