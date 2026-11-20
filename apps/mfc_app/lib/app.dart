@@ -8,6 +8,8 @@ import 'l10n/gen/app_localizations.dart';
 import 'router.dart';
 import 'shared/pda_theme.dart';
 
+/// 키패드가 올라와도 화면을 밀어 올리지 않는다(사용자 2026-11-20) — 모든 화면의 Scaffold 에 `resizeToAvoidBottomInset: false`.
+/// 대화상자는 그대로 키패드를 피해 올라간다(입력 칸이 가려지지 않게).
 class MfcApp extends ConsumerWidget {
   const MfcApp({super.key});
 

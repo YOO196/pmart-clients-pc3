@@ -104,11 +104,13 @@ class _TaskRunScreenState extends ConsumerState<TaskRunScreen> {
     // (에뮬레이터 확인 2026-11-20).
     if (detail.isLoading && !detail.hasValue) {
       return Scaffold(
+        resizeToAvoidBottomInset: false,
         appBar: AppBar(title: Text(l10n.taskStarting)),
         body: _startingWait(l10n),
       );
     }
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.taskStarting)),
       body: UiStateView<TaskDetailView>(
         state: uiStateOf(detail),
@@ -342,6 +344,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
         ? l10n.pickTitleLocation
         : l10n.pickTitleItem;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         // 위치 스캔 화면 구성(사용자 2026-11-16 참고 화면): 제목은 지금 단계, 위에 작업 이름.
         title: Column(

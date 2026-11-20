@@ -88,6 +88,7 @@ class MyWorkScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.myWorkTitle)),
       body: SafeArea(
         child: UiStateView<WorkActivities>(

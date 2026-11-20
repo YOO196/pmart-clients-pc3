@@ -405,6 +405,7 @@ class CountScreen extends ConsumerWidget {
       _ => false,
     };
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.areaStockCount)),
       body: SafeArea(
         child: stepped

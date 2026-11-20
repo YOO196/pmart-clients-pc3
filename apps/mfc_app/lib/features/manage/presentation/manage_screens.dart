@@ -61,6 +61,7 @@ class _CenterTasksScreenState extends ConsumerState<CenterTasksScreen> {
     final theme = Theme.of(context);
     final list = ref.watch(centerTasksProvider(_filter));
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(l10n.manageTasks),
         actions: [
@@ -222,6 +223,7 @@ class CenterWorkersScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(l10n.manageWorkers),
         actions: [

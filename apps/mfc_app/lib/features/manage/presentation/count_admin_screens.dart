@@ -73,6 +73,7 @@ class CountAdminScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final recent = ref.watch(recentCountsProvider);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.manageCounts)),
       floatingActionButton: FloatingActionButton.extended(
         key: const ValueKey('new-count'),
@@ -210,6 +211,7 @@ class _StartCountScreenState extends ConsumerState<StartCountScreen> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.countStartTitle)),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -349,6 +351,7 @@ class _CountSessionAdminScreenState
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(widget.sessionId),
         actions: [

@@ -69,6 +69,7 @@ class ReturnHandoversScreen extends ConsumerWidget {
       ),
     );
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.rhTitle)),
       body: UiStateView<List<ReturnHandoverView>>(
         state: uiStateOf(

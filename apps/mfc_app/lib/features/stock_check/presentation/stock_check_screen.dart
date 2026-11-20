@@ -73,6 +73,7 @@ class _StockCheckScreenState extends ConsumerState<StockCheckScreen> {
     final theme = Theme.of(context);
     final code = _code;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(title: Text(l10n.stockCheckTitle)),
       // 스캔 칸은 아래 고정(다른 현장 화면과 같은 자리).
       bottomNavigationBar: ActionBar(
