@@ -220,6 +220,7 @@ class _MockSignInPageState extends ConsumerState<MockSignInPage> {
       _busy = true;
       _bad = false;
     });
+    var closing = false;
     try {
       await ref
           .read(authControllerProvider.notifier)
@@ -227,15 +228,21 @@ class _MockSignInPageState extends ConsumerState<MockSignInPage> {
             loginId: _loginId.text.trim(),
             password: _password.text,
           );
-      if (mounted) Navigator.of(context).pop(true);
+      // 키보드를 먼저 내리고 닫는다 — 열린 채 닫으면 다음 화면(메인)의 아래 줄이 키보드 높이만큼 떴다가 내려앉았다.
+      // 비밀번호는 닫히는 화면에서 지우지 않는다(지우면 닫히는 동안 "빈 칸·로그인 꺼짐"이 실패처럼 비쳤다,
+      // 에뮬레이터 확인 2026-11-20). 화면이 닫히면 입력칸째 사라진다.
+      if (mounted) {
+        closing = true;
+        FocusScope.of(context).unfocus();
+        Navigator.of(context).pop(true);
+      }
     } on LoginFailure {
-      if (mounted) setState(() => _bad = true);
-    } finally {
-      // 맞든 틀리든 입력한 비밀번호는 지운다.
       if (mounted) {
         _password.clear();
-        setState(() => _busy = false);
+        setState(() => _bad = true);
       }
+    } finally {
+      if (mounted && !closing) setState(() => _busy = false);
     }
   }
 

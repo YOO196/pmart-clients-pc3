@@ -150,6 +150,23 @@ void main() {
       expect(c.read(packingProvider('task-mock-2')).sealUnknown, isFalse);
     });
 
+    test('이미 올린 같은 랙을 또 찍어도 다시 보내지 않고 그대로 — 패킹 끝 단추가 꺼지지 않는다', () async {
+      var s = await shipment();
+      ctl.scan(task, s, MockTaskRepository.yogurtBarcode);
+      await ctl.seal(task, s);
+      s = await shipment();
+      expect(ctl.scanRack('DSP-A-01', s), isTrue);
+      await pumpEventQueue();
+      expect(c.read(packingProvider('task-mock-2')).rack, 'DSP-A-01');
+      final calls = packing.stageCalls.length;
+
+      expect(ctl.scanRack('DSP-A-01', await shipment()), isTrue);
+      final st = c.read(packingProvider('task-mock-2'));
+      expect(st.rack, 'DSP-A-01');
+      expect(st.stageBusy, isFalse);
+      expect(packing.stageCalls.length, calls);
+    });
+
     test('재포장 결과를 모르면 같은 사유로 다시 눌러도 같은 키 — 새 포장이 두 번 생기지 않는다', () async {
       var s = await shipment();
       ctl.scan(task, s, MockTaskRepository.yogurtBarcode);

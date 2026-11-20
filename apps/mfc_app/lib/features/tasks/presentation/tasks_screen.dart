@@ -100,6 +100,14 @@ class _TaskRunScreenState extends ConsumerState<TaskRunScreen> {
         _ => PickingScreen(taskId: id),
       };
     }
+    // 상세를 읽는 동안도 "작업을 시작하고 있어요" 한 가지로 — "불러오는 중이에요"에서 바뀌며 두 번 깜빡였다
+    // (에뮬레이터 확인 2026-11-20).
+    if (detail.isLoading && !detail.hasValue) {
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.taskStarting)),
+        body: _startingWait(l10n),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: Text(l10n.taskStarting)),
       body: UiStateView<TaskDetailView>(
@@ -126,21 +134,7 @@ class _TaskRunScreenState extends ConsumerState<TaskRunScreen> {
             _ when t.state == TaskState.inProgress => l10n.startAlreadyStarted,
             _ => null,
           };
-          if (message == null) {
-            // 시작 판정을 기다리는 동안 — 상세 읽기("불러오는 중")에서 글자 없는 빙글이로 바뀌어 깜빡여 보였다
-            // (에뮬레이터 확인 2026-11-20). 무엇을 기다리는지 글로 보인다.
-            return Center(
-              key: const ValueKey('task-starting'),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 16),
-                  Text(l10n.taskStartingWait),
-                ],
-              ),
-            );
-          }
+          if (message == null) return _startingWait(l10n);
           final retry =
               flow.phase == StartPhase.unknown ||
               flow.phase == StartPhase.notStarted;
@@ -940,3 +934,16 @@ class _RejectedNotice extends ConsumerWidget {
     );
   }
 }
+
+/// 작업 시작을 기다리는 화면(상세 읽기·시작 판정 동안 같은 모양).
+Widget _startingWait(AppLocalizations l10n) => Center(
+  key: const ValueKey('task-starting'),
+  child: Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      const CircularProgressIndicator(),
+      const SizedBox(height: 16),
+      Text(l10n.taskStartingWait),
+    ],
+  ),
+);
