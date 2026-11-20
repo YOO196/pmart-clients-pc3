@@ -1223,6 +1223,24 @@ class _AssignedView extends StatelessWidget {
               separatorBuilder: (_, _) => const Divider(),
               itemBuilder: (_, i) {
                 final l = task.lines[i];
+                // 실사처럼 상품 없이 칸만 있는 줄은 칸을 제목으로("-" 제목이 떴다, 에뮬레이터 확인 2026-11-20).
+                if (l.productName == null &&
+                    l.sku == null &&
+                    l.fromLocation != null &&
+                    l.qty == null &&
+                    l.boxes == null) {
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(
+                      Icons.place_outlined,
+                      color: PdaColors.primary,
+                    ),
+                    title: Text(
+                      l.fromLocation!,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  );
+                }
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(

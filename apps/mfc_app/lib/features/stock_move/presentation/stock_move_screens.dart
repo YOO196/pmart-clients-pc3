@@ -175,7 +175,9 @@ class MoveScreen extends ConsumerWidget {
         rows: [
           if (m != null) ...[
             (l10n.moveDoneProduct, ctl.productName ?? m.sku),
-            (l10n.moveDoneLot, [m.sku, l10n.lot(m.lotId)].join(' · ')),
+            // SKU·LOT 를 한 줄에 이으면 꺾였다 — 두 줄로(에뮬레이터 확인 2026-11-20).
+            (l10n.metaSku, m.sku),
+            (l10n.metaLot, m.lotId),
             (l10n.moveDoneQty, l10n.moveDoneQtyValue(m.droppedQty, m.qty)),
             (l10n.moveFrom, m.fromLocation),
             (l10n.moveTo, m.toLocation),
@@ -482,7 +484,8 @@ class PutawayScreen extends ConsumerWidget {
         rows: [
           if (s.task case final t?) ...[
             (l10n.moveDoneProduct, t.productName ?? t.sku),
-            (l10n.moveDoneLot, '${t.sku} · ${l10n.lot(t.lotId)}'),
+            (l10n.metaSku, t.sku),
+            (l10n.metaLot, t.lotId),
             (l10n.moveFrom, t.locationCode),
             if (s.to case final to?) (l10n.moveTo, to),
           ],

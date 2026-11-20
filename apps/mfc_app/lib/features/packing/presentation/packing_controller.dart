@@ -274,6 +274,9 @@ class PackingController extends Notifier<PackingState> {
       if (!ok) state = state.copyWith(stepError: () => PackStepError.notRack);
       return ok;
     }
+    // 이미 올린 같은 랙을 또 찍으면(스캐너 두 번 읽기 등) 그대로 둔다 — 지우고 다시 보내면 "패킹 끝내기"가
+    // 꺼졌다 켜지며 깜빡였다(에뮬레이터 확인 2026-11-20).
+    if (c == state.rack) return true;
     state = state.copyWith(
       rack: () => null,
       rackPending: () => c,
