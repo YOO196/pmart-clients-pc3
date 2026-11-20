@@ -161,7 +161,7 @@ export const messages = {
   },
   menus: {
     ops: '홈',
-    workers: '작업자',
+    workers: '작업자 목록',
     assignments: '배정',
     tasks: '작업 현황',
     moves: '이동·보충',
@@ -1077,6 +1077,16 @@ export const messages = {
     },
   },
 
+  /** 쪽 넘김(shared/Pager) */
+  pager: {
+    label: '쪽 넘김',
+    prev: '이전',
+    next: '다음',
+    goTo: (p: number) => `${p}쪽`,
+    range: (from: number, to: number, total: number) => `${total}명 중 ${from}–${to}`,
+    none: '0명',
+  },
+
   /** 작업자 — mfc-capacity-service 0.14.0 workers */
   workers: {
     /** 통합 백오피스와 같은 목록·상세 부품(2026-11-19 PC 2 요청) */
@@ -1233,6 +1243,7 @@ export const messages = {
       mismatch: '두 번호가 같지 않아요.',
       save: '번호 정하기',
       change: '바꾸기',
+      adminChange: '관리자 번호 변경',
       cancelChange: '닫기',
       saveChange: '번호 바꾸기',
       saved: '휴게 번호를 정했어요. 5번 틀려 잠긴 작업자도 바로 풀려요.',
