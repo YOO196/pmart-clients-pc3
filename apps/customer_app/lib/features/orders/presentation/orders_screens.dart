@@ -668,7 +668,8 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         const SizedBox(height: 12),
         const Divider(height: 1),
         const SizedBox(height: 12),
-        // 상품 줄(order 0.17.0 — 레퍼런스 9-2): 이름 / 금액·수량. 사진은 계약에 없어 그리지 않는다.
+        // 상품 줄(order 0.17.0 — 레퍼런스 9-2): 사진 / 이름 / 금액·수량. 사진은 줄에 주소가 없어(BR-71) 상품 상세의
+        // 대표 사진을 쓴다(주문상세 줄과 같은 방식, 사용자 2026-11-20). 못 받으면 빈 사진 자리.
         // 서버가 앞 5개만 준다 — 나머지는 "외 N개"(전체 수량 − 보인 수량).
         for (final l in o.lines)
           Padding(
@@ -676,6 +677,11 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             padding: const EdgeInsets.only(bottom: 10),
             child: Row(
               children: [
+                _ListLineImage(
+                  key: ValueKey('order-line-image-${l.orderLineId}'),
+                  productId: l.productId,
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1878,6 +1884,23 @@ class _LineTile extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// 주문내역 카드 상품 줄의 대표 사진(레퍼런스 9-2 약 56dp 둥근 네모). 상품 ID 가 없거나 못 받으면 빈 자리.
+class _ListLineImage extends ConsumerWidget {
+  const _ListLineImage({super.key, required this.productId});
+
+  final String? productId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ProductImage(
+    url: switch (productId) {
+      final id? => ref.watch(productDetailProvider(id)).value?.mainImageUrl,
+      null => null,
+    },
+    size: 56,
+    radius: 8,
+  );
 }
 
 /// 주문내역 카드의 넓은 [같은 상품 담기](레퍼런스 9-2 1). 줄마다 차례로 담는다 — 이미 담긴 상품은 건너뛰고,

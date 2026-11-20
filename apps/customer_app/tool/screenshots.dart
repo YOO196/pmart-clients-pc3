@@ -696,6 +696,14 @@ void main() {
     // 자주 묻는 질문(customer-assistant 0.2.0) — 목록 · 답(마크다운)
     await go('/support/faqs');
     await shot('faq-list');
+    // 질문 유형을 고른 뒤 목록까지 한 화면으로 내려간다(2026-11-20 스크롤 고침)
+    await t.tap(find.byKey(const ValueKey('faq-cat-CANCEL')));
+    await t.pumpAndSettle();
+    await t.drag(
+      find.byKey(const ValueKey('faq-scroll')),
+      const Offset(0, -300),
+    );
+    await shot('faq-list-category');
     await go('/support/faqs/faq-cancel-1');
     await shot('faq-detail');
     // 로그인해 있는 고객의 재동의(CU-1 §3)

@@ -61,6 +61,41 @@ void main() {
     expect(find.textContaining('**'), findsNothing);
   });
 
+  testWidgets('폰 크기 화면: 질문 유형을 고른 뒤 질문 목록이 화면 전체와 같이 내려간다(좁은 칸에 갇히지 않음)', (
+    t,
+  ) async {
+    await openSupport(t);
+    // 360x640dp 폰(질문 유형 알약이 여러 줄)
+    t.view
+      ..physicalSize = const Size(360, 640)
+      ..devicePixelRatio = 1;
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('support-faqs')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('faq-cat-CANCEL')));
+    await t.pumpAndSettle();
+    // 질문 유형·목록이 한 스크롤이다 — 목록의 첫 질문까지 내려 볼 수 있다.
+    final first = find.byKey(const ValueKey('faq-faq-cancel-1'));
+    await t.scrollUntilVisible(
+      first,
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('faq-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await t.pumpAndSettle();
+    final r = t.getRect(first);
+    expect(r.top, greaterThanOrEqualTo(0));
+    expect(r.bottom, lessThanOrEqualTo(640));
+    expect(r.height, greaterThan(30)); // 줄이 잘리지 않고 다 보인다
+    await t.tap(first);
+    await t.pumpAndSettle();
+    expect(find.byType(MarkdownBody), findsOneWidget);
+  });
+
   testWidgets('검색칸: 검색어를 q 로 묻고, 결과가 없으면 "찾는 질문이 없어요"', (t) async {
     await openSupport(t);
     await t.enterText(find.byKey(const ValueKey('faq-search-field')), '포인트');

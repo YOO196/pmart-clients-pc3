@@ -236,6 +236,20 @@ void main() {
       expect(find.text('같은 상품 담기'), findsOneWidget);
     });
 
+    testWidgets('주문내역 카드 상품 줄에 대표 사진 자리가 있다(상품 상세의 대표 사진, 레퍼런스 9-2)', (
+      t,
+    ) async {
+      await openOrders(t);
+      final image = find.byKey(const ValueKey('order-line-image-ol-5'));
+      expect(image, findsOneWidget);
+      expect(t.getSize(image), const Size(56, 56));
+      // 사진은 줄 이름 왼쪽
+      expect(
+        t.getRect(image).right,
+        lessThan(t.getRect(find.text('그릭요거트 플레인 400g').first).left),
+      );
+    });
+
     testWidgets('주문내역 카드의 ⊕: 그 상품을 주문 수량만큼 새로 담고 서버 결과를 알린다', (t) async {
       final cart = MockCartRepository(latency: Duration.zero);
       await openOrders(t, cart: cart);

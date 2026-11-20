@@ -83,6 +83,7 @@ base class MockOrdersRepository implements OrdersRepository {
       'lines': [
         {
           'orderLineId': 'ol-5',
+          'productId': 'P-0002',
           'sku': 'E-00000002',
           'productName': '그릭요거트 플레인 400g',
           'unitPrice': 5980,
@@ -130,6 +131,7 @@ base class MockOrdersRepository implements OrdersRepository {
       'lines': [
         {
           'orderLineId': 'ol-1',
+          'productId': 'P-0001',
           'sku': 'E-00000001',
           'productName': '서울우유 1L',
           'unitsPerSku': 1,
@@ -143,6 +145,7 @@ base class MockOrdersRepository implements OrdersRepository {
         },
         {
           'orderLineId': 'ol-2',
+          'productId': 'P-0005',
           'sku': 'E-00000005',
           'productName': '감자칩 오리지널 110g',
           'unitsPerSku': 1,
@@ -209,6 +212,7 @@ base class MockOrdersRepository implements OrdersRepository {
       'lines': [
         {
           'orderLineId': 'ol-3',
+          'productId': 'P-0002',
           'sku': 'E-00000002',
           'productName': '그릭요거트 플레인 400g',
           'unitPrice': 5980,
@@ -257,6 +261,7 @@ base class MockOrdersRepository implements OrdersRepository {
       'lines': [
         {
           'orderLineId': 'ol-4',
+          'productId': 'P-0003',
           'sku': 'E-00000003',
           'productName': '제주 감귤 1kg',
           'unitPrice': 7900,

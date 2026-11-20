@@ -17,11 +17,16 @@ class OrderListLine {
     required this.sku,
     required this.quantity,
     required this.lineAmount,
+    this.productId,
     this.productName,
     this.optionLabel,
   });
 
   final String orderLineId;
+
+  /// 대표 사진을 찾는 상품 ID(order 0.17.0 `lines[].productId`, 없을 수 있음). 줄에 사진 주소가 없어(BR-71)
+  /// 상품 상세의 대표 사진을 쓴다 — 주문상세 줄과 같은 방식.
+  final String? productId;
 
   /// 다시 담을 때 쓰는 SKU(order 0.17.0 `lines[].sku`).
   final String sku;

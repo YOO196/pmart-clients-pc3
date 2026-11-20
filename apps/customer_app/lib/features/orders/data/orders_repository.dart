@@ -333,6 +333,7 @@ OrderPage orderPageFromContract(api.ListOrders200Response r) => OrderPage(
           for (final l in o.lines ?? const <api.OrderSummaryLine>[])
             OrderListLine(
               orderLineId: l.orderLineId,
+              productId: l.productId,
               sku: l.sku,
               productName: switch (l.productName?.trim()) {
                 final n? when n.isNotEmpty => n,

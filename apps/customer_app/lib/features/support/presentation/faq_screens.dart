@@ -222,81 +222,91 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
       appBar: AppBar(title: Text(l10n.faqTitle)),
       body: switch (value) {
         AsyncData(value: null) => LoginRequired(message: l10n.faqLoginNeeded),
-        _ => Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: _FaqSearchField(
-                filled: true,
-                initial: _q,
-                onSubmitted: (q) => setState(() => _q = q.isEmpty ? null : q),
-              ),
-            ),
-            // 사용자 캡처(2026-11-20): 회색 띠 아래 "질문 유형" + 여러 줄 알약(고른 것은 검게)
-            const SizedBox(height: 14),
-            const PmartSectionGap(height: 8),
-            if (all != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.faqTypeLabel,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.outline,
+        // 검색칸·질문 유형·질문 목록이 한 화면으로 같이 내려간다(사용자 2026-11-20: 질문 유형을 누르면 아래 목록이
+        // 좁은 칸에 갇혀 안 보였다 — 알약이 여러 줄이면 고정된 위쪽이 화면을 다 차지했다).
+        _ => CustomScrollView(
+          key: const ValueKey('faq-scroll'),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: _FaqSearchField(
+                      filled: true,
+                      initial: _q,
+                      onSubmitted: (q) =>
+                          setState(() => _q = q.isEmpty ? null : q),
+                    ),
+                  ),
+                  // 사용자 캡처(2026-11-20): 회색 띠 아래 "질문 유형" + 여러 줄 알약(고른 것은 검게)
+                  const SizedBox(height: 14),
+                  const PmartSectionGap(height: 8),
+                  if (all != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.faqTypeLabel,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.outline,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final c in <FaqCategory?>[
+                                null,
+                                ...all.categories,
+                              ])
+                                ChoiceChip(
+                                  key: ValueKey(
+                                    'faq-cat-${c?.category ?? 'all'}',
+                                  ),
+                                  label: Text(c?.title ?? l10n.ordersFilterAll),
+                                  selected: _category == c?.category,
+                                  showCheckmark: false,
+                                  shape: const StadiumBorder(),
+                                  selectedColor: theme.colorScheme.onSurface,
+                                  backgroundColor: theme.colorScheme.surface,
+                                  side: BorderSide(
+                                    color: _category == c?.category
+                                        ? theme.colorScheme.onSurface
+                                        : theme.colorScheme.outlineVariant,
+                                  ),
+                                  labelStyle: theme.textTheme.bodyMedium
+                                      ?.copyWith(
+                                        fontSize: 15,
+                                        fontWeight: _category == c?.category
+                                            ? FontWeight.w700
+                                            : null,
+                                        color: _category == c?.category
+                                            ? theme.colorScheme.surface
+                                            : theme.colorScheme.onSurface,
+                                      ),
+                                  onSelected: (_) =>
+                                      setState(() => _category = c?.category),
+                                ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final c in <FaqCategory?>[null, ...all.categories])
-                          ChoiceChip(
-                            key: ValueKey('faq-cat-${c?.category ?? 'all'}'),
-                            label: Text(c?.title ?? l10n.ordersFilterAll),
-                            selected: _category == c?.category,
-                            showCheckmark: false,
-                            shape: const StadiumBorder(),
-                            selectedColor: theme.colorScheme.onSurface,
-                            backgroundColor: theme.colorScheme.surface,
-                            side: BorderSide(
-                              color: _category == c?.category
-                                  ? theme.colorScheme.onSurface
-                                  : theme.colorScheme.outlineVariant,
-                            ),
-                            labelStyle: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 15,
-                              fontWeight: _category == c?.category
-                                  ? FontWeight.w700
-                                  : null,
-                              color: _category == c?.category
-                                  ? theme.colorScheme.surface
-                                  : theme.colorScheme.onSurface,
-                            ),
-                            onSelected: (_) =>
-                                setState(() => _category = c?.category),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
+                  const PmartSectionGap(height: 8),
+                ],
               ),
-            const PmartSectionGap(height: 8),
-            Expanded(
-              child: UiStateView<FaqList?>(
-                loading: (_) => const PmartListSkeleton(),
-                state: uiStateOf(value, isEmpty: (l) => l!.items.isEmpty),
-                onRetry: () => ref.invalidate(provider),
-                empty: (_) => Center(
-                  key: const ValueKey('faq-empty'),
-                  child: Text(l10n.faqEmpty),
-                ),
-                ready: (context, list) => ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                  itemCount: list!.items.length,
+            ),
+            if (value case AsyncData(value: final FaqList list)
+                when list.items.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                sliver: SliverList.separated(
+                  itemCount: list.items.length,
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, i) {
                     final f = list.items[i];
@@ -333,8 +343,21 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
                     );
                   },
                 ),
+              )
+            else
+              // 불러오는 중·없음·실패는 남은 자리에(조회 실패를 빈 목록으로 보이지 않는다).
+              SliverFillRemaining(
+                child: UiStateView<FaqList?>(
+                  loading: (_) => const PmartListSkeleton(),
+                  state: uiStateOf(value, isEmpty: (l) => l!.items.isEmpty),
+                  onRetry: () => ref.invalidate(provider),
+                  empty: (_) => Center(
+                    key: const ValueKey('faq-empty'),
+                    child: Text(l10n.faqEmpty),
+                  ),
+                  ready: (_, _) => const SizedBox.shrink(),
+                ),
               ),
-            ),
           ],
         ),
       },
