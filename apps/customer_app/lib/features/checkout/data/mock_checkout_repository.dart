@@ -91,6 +91,9 @@ base class MockCheckoutRepository
   /// reason = `requestedQty=2;availableQty=1` 또는 `NOT_HANDLED`, order 0.8.0).
   List<ProblemDetail> rejectNextDraftDetails = const [];
 
+  /// 쿠폰(계약 `Coupon` JSON)을 어디서 찾을지 — 목 쿠폰함과 잇는다(order 0.18.0 `couponId`). null 이면 쿠폰을 모른다(NOT_FOUND).
+  Map<String, Object?>? Function(String couponId)? couponOf;
+
   /// 다음 결제 진입을 이 코드로 거절한다(422, 사가 시작 없음. 예: ACCOUNT_NOT_PURCHASABLE).
   String? rejectNextCheckout;
 
@@ -230,6 +233,8 @@ base class MockCheckoutRepository
         ? (0, 'FIRST_PURCHASE')
         : (r.mode == DeliveryMode.single ? 4000 : 3000, 'STANDARD');
     const minOrder = 15000;
+    final coupon = _couponQuote(r.couponId, items);
+    final couponDiscount = coupon?['discount'] as int? ?? 0;
     return {
       'quoteVersion': version,
       'quoteExpiresAt': created
@@ -238,10 +243,14 @@ base class MockCheckoutRepository
           .toIso8601String(),
       'priceVersion': version,
       'itemAmount': items,
+      'baseItemAmount': items,
+      'promotionDiscount': 0,
+      'couponDiscount': couponDiscount,
+      'coupon': coupon?['coupon'],
       'deliveryTip': tip,
       'deliveryTipReason': reason,
       'bagFee': 100,
-      'totalAmount': items + tip + 100,
+      'totalAmount': items - couponDiscount + tip + 100,
       'minOrderSatisfied': items >= minOrder,
       'minOrderAmount': minOrder,
       'minOrderShortfall': items >= minOrder ? 0 : minOrder - items,
@@ -249,6 +258,46 @@ base class MockCheckoutRepository
       'firstPurchaseBenefit': firstPurchase ? 'EXPECTED' : 'NOT_ELIGIBLE',
       'weightG': 3000,
       'plannedShipments': 1,
+    };
+  }
+
+  /// 쿠폰 판정·할인 흉내(서버 규칙: 최소 주문금액은 쿠폰 전 상품액, 정률은 원 미만 버림·최대 할인액, 상품액 넘지 않음).
+  Map<String, Object?>? _couponQuote(String? couponId, int items) {
+    if (couponId == null) return null;
+    Map<String, Object?> no(String reason, [String? name]) => {
+      'discount': 0,
+      'coupon': {
+        'couponId': couponId,
+        'applicable': false,
+        'reason': reason,
+        'name': name,
+      },
+    };
+    final c = couponOf?.call(couponId);
+    if (c == null) return no('NOT_FOUND');
+    final name = c['name'] as String?;
+    switch (c['status']) {
+      case 'USED':
+        return no('USED', name);
+      case 'EXPIRED':
+        return no('EXPIRED', name);
+    }
+    if (items < (c['minOrderAmount']! as int)) {
+      return no('MIN_ORDER_NOT_MET', name);
+    }
+    final d = c['discount']! as Map<String, Object?>;
+    final value = d['value']! as int;
+    var amount = d['type'] == 'RATE' ? items * value ~/ 100 : value;
+    if (d['maxAmount'] case final int max when amount > max) amount = max;
+    if (amount > items) amount = items;
+    return {
+      'discount': amount,
+      'coupon': {
+        'couponId': couponId,
+        'applicable': true,
+        'reason': null,
+        'name': name,
+      },
     };
   }
 
@@ -321,6 +370,11 @@ base class MockCheckoutRepository
           if (_quote(request, 1, created)['minOrderSatisfied'] != true)
             {'code': 'MIN_ORDER_AMOUNT'},
           if (phone == null) {'code': 'CONTACT_REQUIRED'},
+          if (_quote(request, 1, created)['coupon'] case {
+            'applicable': false,
+            'reason': final reason,
+          })
+            {'code': 'COUPON_NOT_APPLICABLE', 'detail': reason},
         ],
         'resources': {
           'inventoryReservation': 'NOT_REQUESTED',

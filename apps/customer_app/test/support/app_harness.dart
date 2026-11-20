@@ -20,6 +20,8 @@ import 'package:customer_app/features/checkout/data/checkout_repository.dart';
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
 import 'package:customer_app/features/claims/data/claims_repository.dart';
+import 'package:customer_app/features/coupons/data/coupon_repository.dart';
+import 'package:customer_app/features/coupons/presentation/coupon_controller.dart';
 import 'package:customer_app/features/claims/data/mock_claims_repository.dart';
 import 'package:customer_app/features/claims/presentation/claims_controller.dart';
 import 'package:customer_app/features/catalog/data/catalog_repository.dart';
@@ -61,6 +63,9 @@ Widget testApp(
 
   /// 찜(기본: 지연 없는 목 — 카드·상세의 하트가 로그인 뒤 찜 ID 를 읽는다).
   WishlistRepository? wishlist,
+
+  /// 쿠폰(기본: 지연 없는 목). 목 주문서(checkout 목)가 이 쿠폰함으로 할인을 흉내 낸다.
+  CouponRepository? coupons,
   NotificationsRepository? notifications,
   ReviewsRepository? reviews,
   FakeAddressPicker? addressPicker,
@@ -94,6 +99,12 @@ Widget testApp(
   )) {
     c.externals.add(r);
   }
+  final couponRepo = coupons ?? MockCouponRepository(latency: Duration.zero);
+  if ((checkoutRepo, couponRepo)
+      case (final MockCheckoutRepository c, final MockCouponRepository m)
+      when c.couponOf == null) {
+    c.couponOf = m.couponJsonOf;
+  }
   return ProviderScope(
     retry: (_, _) => null,
     overrides: [
@@ -105,7 +116,10 @@ Widget testApp(
         catalog ?? MockCatalogRepository(latency: Duration.zero),
       ),
       cartRepositoryProvider.overrideWithValue(
-        cart ?? MockCartRepository(latency: Duration.zero),
+        cart ??
+            // 장바구니 최소주문 막힘(사용자 2026-11-21)은 cart_min_order_test 에서 본다. 다른 시험은 주문 흐름을 보려고
+            // 장바구니 쪽 최소 금액만 끈다(주문서 초안의 최소주문 판정은 그대로 15,000).
+            MockCartRepository(latency: Duration.zero, minOrderAmount: 0),
       ),
       cartStepperDelayProvider.overrideWithValue(stepperDelay),
       authRepositoryProvider.overrideWithValue(
@@ -140,6 +154,7 @@ Widget testApp(
       wishlistRepositoryProvider.overrideWithValue(
         wishlist ?? MockWishlistRepository(latency: Duration.zero),
       ),
+      couponRepositoryProvider.overrideWithValue(couponRepo),
       notificationsRepositoryProvider.overrideWithValue(
         notifications ?? MockNotificationsRepository(latency: Duration.zero),
       ),

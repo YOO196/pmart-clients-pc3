@@ -11,6 +11,10 @@ import '../../../shared/ui_state_of.dart';
 import '../../address/presentation/address_controller.dart';
 import '../../cart/domain/cart.dart' show Cart;
 import '../../cart/presentation/cart_controller.dart';
+import '../../coupons/presentation/coupon_controller.dart'
+    show availableCouponsProvider;
+import '../../coupons/presentation/coupon_screens.dart'
+    show CouponPick, couponReasonText;
 import '../../payment/domain/payment.dart';
 import '../../payment/presentation/payment_controller.dart';
 import '../../payment/presentation/payment_screen.dart' show paymentPhaseText;
@@ -58,6 +62,7 @@ String blockerText(AppLocalizations l10n, DraftBlocker b) => switch (b) {
   DraftBlocker.slotRequired => l10n.blockerSlotRequired,
   DraftBlocker.slotUnavailable => l10n.blockerSlotUnavailable,
   DraftBlocker.contactRequired => l10n.blockerContactRequired,
+  DraftBlocker.couponNotApplicable => l10n.blockerCouponNotApplicable,
   DraftBlocker.unknown => l10n.blockerUnknown,
 };
 
@@ -198,6 +203,8 @@ class _OrderSheetScreenState extends ConsumerState<OrderSheetScreen> {
     return Scaffold(
       backgroundColor: surfaces.surfaceContainer,
       appBar: AppBar(
+        titleTextStyle: Theme.of(context).appBarTheme.titleTextStyle
+            ?.copyWith(fontSize: 18),
         title: Text(l10n.checkoutTitle),
         centerTitle: true,
         // 레퍼런스 6-0: 뒤로 가면 "주문을 취소할까요?"
@@ -426,7 +433,13 @@ class _SheetState extends ConsumerState<_Sheet> {
             key: ValueKey('blocker-${b.name}'),
             icon: PmartLineIcons.alert,
             text: blockerText(l10n, b),
-            action: b == DraftBlocker.contactRequired
+            action: b == DraftBlocker.couponNotApplicable
+                ? TextButton(
+                    key: const ValueKey('coupon-remove-blocker'),
+                    onPressed: () => ctl.changeCoupon(null),
+                    child: Text(l10n.couponRemove),
+                  )
+                : b == DraftBlocker.contactRequired
                 ? TextButton(
                     key: const ValueKey('contact-enter'),
                     onPressed: () => editMyContact(context, ref),
@@ -471,8 +484,18 @@ class _SheetState extends ConsumerState<_Sheet> {
             // 초안 뒤 계정이 구매 불가로 바뀜(결제 진입 때 다시 확인, BR-37 회신 4).
             CheckoutProblemCode.accountNotPurchasable =>
               l10n.draftAccountNotPurchasable,
+            // 결제 진입 때 쿠폰 점유 실패(order 0.18.0) — 쿠폰을 빼고 주문서를 다시 만든다.
+            CheckoutProblemCode.couponNotApplicable =>
+              l10n.checkoutCouponRejected,
             _ => l10n.checkoutRejected,
           },
+          action: code == CheckoutProblemCode.couponNotApplicable
+              ? TextButton(
+                  key: const ValueKey('coupon-remove-rejected'),
+                  onPressed: () => ctl.changeCoupon(null),
+                  child: Text(l10n.couponRemove),
+                )
+              : null,
         ),
       if (state.needsReconsent) _ReQuoteCard(state: state),
     ];
@@ -500,7 +523,7 @@ class _SheetState extends ConsumerState<_Sheet> {
                         Text(
                           l10n.checkoutReceiveBy(modeLabel(l10n, req.mode)),
                           style: theme.textTheme.titleMedium?.copyWith(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -634,11 +657,16 @@ class _SheetState extends ConsumerState<_Sheet> {
                         child: Row(
                           children: [
                             Expanded(
-                              child: Text(switch (req.outOfStock) {
-                                OutOfStockPreference.cancelOutOfStockOnly =>
-                                  l10n.oosOnly,
-                                OutOfStockPreference.cancelAll => l10n.oosAll,
-                              }, style: theme.textTheme.bodyLarge),
+                              child: Text(
+                                switch (req.outOfStock) {
+                                  OutOfStockPreference.cancelOutOfStockOnly =>
+                                    l10n.oosOnly,
+                                  OutOfStockPreference.cancelAll => l10n.oosAll,
+                                },
+                                style: theme.textTheme.bodyLarge?.copyWith(
+                                  fontSize: 16,
+                                ),
+                              ),
                             ),
                             const PmartLineIcon(
                               PmartLineIcons.chevronDown,
@@ -660,6 +688,8 @@ class _SheetState extends ConsumerState<_Sheet> {
                     ),
                   ],
                 ),
+                // 할인쿠폰(레퍼런스 6-1 결제수단 아래): N개 보유 / 적용된 할인(서버 견적) — 누르면 고르기
+                _CouponSection(draft: draft),
                 // 금액(레퍼런스 6-1 아래): 상품금액·배달팁·봉투값 / 굵은 선 / 결제금액
                 _Card(
                   padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
@@ -667,7 +697,7 @@ class _SheetState extends ConsumerState<_Sheet> {
                   children: [
                     _AmountRow(
                       l10n.amountItems,
-                      _money(l10n, quote?.itemAmount),
+                      _money(l10n, quote?.listItemAmount),
                     ),
                     _AmountRow(
                       '${l10n.amountTip} (${tipReasonText(l10n, quote?.tipReason ?? TipReason.unknown)})',
@@ -686,6 +716,21 @@ class _SheetState extends ConsumerState<_Sheet> {
                         ),
                       ),
                     _AmountRow(l10n.amountBag, _money(l10n, quote?.bagFee)),
+                    // 할인(order 0.18.0 — 서버 값만, 0 이면 줄을 두지 않는다)
+                    if (quote?.promotionDiscount case final d? when d > 0)
+                      _AmountRow(
+                        l10n.amountPromotion,
+                        formatKrw(d, negative: true),
+                        key: const ValueKey('amount-promotion'),
+                        discount: true,
+                      ),
+                    if (quote?.couponDiscount case final d? when d > 0)
+                      _AmountRow(
+                        quote?.coupon?.name ?? l10n.amountCoupon,
+                        formatKrw(d, negative: true),
+                        key: const ValueKey('amount-coupon'),
+                        discount: true,
+                      ),
                     const SizedBox(height: 10),
                     Divider(
                       height: 2,
@@ -803,6 +848,145 @@ class _SheetState extends ConsumerState<_Sheet> {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// 주문서 "할인쿠폰"(레퍼런스 6-1): 제목 + 오른쪽 "N개 보유", 아래 상자 — 적용된 할인(서버 견적 couponDiscount)·
+/// 쓸 수 없는 사유(견적 coupon.reason)·"쿠폰 선택". 누르면 고르기 화면, 고른 결과로 주문서를 다시 만든다(order 0.18.0).
+class _CouponSection extends ConsumerWidget {
+  const _CouponSection({required this.draft});
+
+  final OrderDraft draft;
+
+  Future<void> _pick(BuildContext context, WidgetRef ref) async {
+    final current = ref.read(checkoutSetupProvider).couponId;
+    final pick = await context.push<CouponPick>(
+      '/checkout/coupons',
+      extra: current,
+    );
+    if (pick == null) return;
+    await ref
+        .read(draftControllerProvider.notifier)
+        .changeCoupon(pick.couponId);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final chosen = ref.watch(checkoutSetupProvider.select((s) => s.couponId));
+    final owned = ref.watch(availableCouponsProvider);
+    final quote = draft.quote;
+    final result = quote?.coupon;
+    // 고른 쿠폰이 이 초안에 반영된 결과만 보인다(다시 만드는 중이면 "확인 중").
+    final applied = chosen != null && result?.couponId == chosen
+        ? result
+        : null;
+    final Widget label = switch ((chosen, applied)) {
+      (null, _) => Text(
+        owned.value?.isEmpty ?? false
+            ? l10n.couponNoneAvailable
+            : l10n.couponSelect,
+        style: TextStyle(color: scheme.onSurfaceVariant),
+      ),
+      (_, null) => Text(
+        l10n.couponCheckingDiscount,
+        style: TextStyle(color: scheme.onSurfaceVariant),
+      ),
+      (_, final QuoteCoupon c) when c.applicable => Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: formatKrw(quote?.couponDiscount ?? 0),
+              style: TextStyle(
+                color: scheme.primary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            TextSpan(text: l10n.couponAppliedSuffix),
+          ],
+        ),
+      ),
+      (_, final QuoteCoupon c) => Text(
+        couponReasonText(l10n, c.reason),
+        key: const ValueKey('coupon-reason'),
+        style: TextStyle(color: scheme.error),
+      ),
+    };
+    return Container(
+      key: const ValueKey('coupon-section'),
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 32),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.couponTitle,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                // 보유 수 — 조회 실패·읽는 중이면 0 으로 보이지 않고 비운다.
+                if (owned.value case final list?)
+                  Text(
+                    l10n.couponOwned(list.length),
+                    key: const ValueKey('coupon-owned'),
+                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          InkWell(
+            key: const ValueKey('coupon-open'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => _pick(context, ref),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 48),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: scheme.outlineVariant),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DefaultTextStyle.merge(
+                      style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16),
+                      child: label,
+                    ),
+                  ),
+                  const PmartLineIcon(PmartLineIcons.chevronRight, size: 20),
+                ],
+              ),
+            ),
+          ),
+          if (applied case final c? when !c.applicable)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                key: const ValueKey('coupon-remove'),
+                onPressed: () => ref
+                    .read(draftControllerProvider.notifier)
+                    .changeCoupon(null),
+                child: Text(l10n.couponRemove),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -951,7 +1135,7 @@ class _Section extends StatelessWidget {
                 child: Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium
-                      ?.copyWith(fontSize: 17, fontWeight: FontWeight.w700),
+                      ?.copyWith(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -965,11 +1149,20 @@ class _Section extends StatelessWidget {
 }
 
 class _AmountRow extends StatelessWidget {
-  const _AmountRow(this.label, this.value, {super.key, this.strong = false});
+  const _AmountRow(
+    this.label,
+    this.value, {
+    super.key,
+    this.strong = false,
+    this.discount = false,
+  });
 
   final String label;
   final String value;
   final bool strong;
+
+  /// 할인 줄(브랜드색).
+  final bool discount;
 
   @override
   Widget build(BuildContext context) {
@@ -983,11 +1176,13 @@ class _AmountRow extends StatelessWidget {
               label,
               style: strong
                   ? theme.textTheme.titleMedium?.copyWith(
-                      fontSize: 17,
+                      fontSize: 16,
                       fontWeight: FontWeight.w700,
                     )
                   : theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                      color: discount
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurfaceVariant,
                     ),
             ),
           ),
@@ -995,11 +1190,12 @@ class _AmountRow extends StatelessWidget {
             value,
             style: strong
                 ? theme.textTheme.headlineSmall?.copyWith(
-                    fontSize: 21,
+                    fontSize: 20,
                     fontWeight: FontWeight.w800,
                   )
                 : theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
+                    color: discount ? theme.colorScheme.primary : null,
                   ),
           ),
         ],
@@ -1065,7 +1261,7 @@ class _Row extends StatelessWidget {
                   Text(
                     title,
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontSize: 17,
+                      fontSize: 16,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -1145,7 +1341,7 @@ class _ItemsPreviewState extends State<_ItemsPreview> {
                 children: [
                   Text(
                     l10n.checkoutItemsMore(widget.lines.length),
-                    style: theme.textTheme.bodySmall?.copyWith(fontSize: 13),
+                    style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
                   ),
                   const SizedBox(width: 2),
                   PmartLineIcon(

@@ -38,7 +38,7 @@ extension NoticeMessenger on ScaffoldMessengerState {
           ),
           // 버튼이 조금 길어도 글 옆에 둔다(기본은 폭의 1/4 을 넘으면 아랫줄로 내려 알림이 두 배로 커진다).
           actionOverflowThreshold: 0.5,
-          content: Text(text),
+          content: Text(text, style: const TextStyle(fontSize: 12)),
           action: action,
         ),
       );

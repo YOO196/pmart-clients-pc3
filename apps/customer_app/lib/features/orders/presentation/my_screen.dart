@@ -274,6 +274,14 @@ class MyScreen extends ConsumerWidget {
               icon: PmartLineIcons.heart,
               onTap: () => context.push('/me/wishlist'),
             ),
+            // 쿠폰함은 회원만(promotion 0.2.0 고객 경로).
+            if (member)
+              row(
+                l10n.couponBoxTitle,
+                key: const ValueKey('my-coupons'),
+                icon: PmartLineIcons.receipt,
+                onTap: () => context.push('/me/coupons'),
+              ),
             row(
               l10n.reviewManageTitle,
               key: const ValueKey('my-reviews'),

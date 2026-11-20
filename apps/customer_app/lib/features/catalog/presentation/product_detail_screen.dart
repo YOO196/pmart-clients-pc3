@@ -143,7 +143,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       Text(
         p.name,
         style: theme.textTheme.titleLarge?.copyWith(
-          fontSize: 17,
+          fontSize: 15,
           height: 1.35,
           fontWeight: FontWeight.w400,
         ),
@@ -200,7 +200,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         rating?.average,
                         rating?.count,
                       ),
-                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12),
                     ),
                   ),
                   if (hasRating)
@@ -218,7 +218,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           _priceText(l10n, selected),
           key: const ValueKey('product-price'),
           style: theme.textTheme.headlineMedium?.copyWith(
-            fontSize: 24,
+            fontSize: 20,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -227,7 +227,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             l10n.unitPriceLine('${u.basis}${u.unitLabel}', formatKrw(u.price)),
             key: const ValueKey('product-unit-price'),
             style: theme.textTheme.bodyMedium?.copyWith(
-              fontSize: 15,
+              fontSize: 11.5,
               color: scheme.onSurfaceVariant,
             ),
           ),

@@ -251,7 +251,7 @@ class _OrderHead extends StatelessWidget {
             Text(
               n,
               style: theme.textTheme.titleSmall?.copyWith(
-                fontSize: 15,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -261,6 +261,7 @@ class _OrderHead extends StatelessWidget {
                 DateFormat('y. M. d', 'ko').format(toSeoulWallClock(t)),
               ),
               style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 10,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
@@ -318,7 +319,7 @@ class _WritableCard extends ConsumerWidget {
                         productId: e.productId,
                         title: e.productName,
                         style: theme.textTheme.titleSmall?.copyWith(
-                          fontSize: 14.5,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -329,6 +330,7 @@ class _WritableCard extends ConsumerWidget {
                             o,
                             key: ValueKey('review-option-${e.orderLineId}'),
                             style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 10.5,
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
@@ -343,7 +345,9 @@ class _WritableCard extends ConsumerWidget {
                             l10n.reviewDeadline(formatSeoulDateTime(t)),
                         ].join(' · '),
                         key: ValueKey('review-deadline-${e.orderLineId}'),
-                        style: theme.textTheme.bodySmall,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 10.5,
+                        ),
                       ),
                     ],
                   ),
@@ -1327,7 +1331,7 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
             child: ActionChip(
               key: const ValueKey('review-policy-open'),
               label: Text(l10n.reviewPolicyShort),
-              labelStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+              labelStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 9.5),
               backgroundColor: theme.colorScheme.surfaceContainer,
               side: BorderSide.none,
               shape: const StadiumBorder(),
@@ -1353,7 +1357,7 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
                 _ProductName(
                   productId: t.productId,
                   title: t.title,
-                  style: theme.textTheme.titleSmall?.copyWith(fontSize: 15),
+                  style: theme.textTheme.titleSmall?.copyWith(fontSize: 12),
                 ),
                 if (t.eligibleUntil case final u?)
                   Text(
@@ -1408,6 +1412,9 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
                 // 레퍼런스: 회색 채움·테두리 없음, 글자 수는 칸 안 오른쪽 아래 "0 / 1,000"
                 decoration: InputDecoration(
                   hintText: l10n.reviewTextHint,
+                  hintStyle: theme.inputDecorationTheme.hintStyle?.copyWith(
+                    fontSize: 12,
+                  ),
                   filled: true,
                   fillColor: theme.colorScheme.surfaceContainer,
                   contentPadding: const EdgeInsets.fromLTRB(14, 14, 14, 34),
@@ -1473,7 +1480,7 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
                     foregroundColor: theme.colorScheme.onSurface,
                     shape: const RoundedRectangleBorder(),
                     textStyle: theme.textTheme.titleSmall?.copyWith(
-                      fontSize: 15,
+                      fontSize: 14,
                     ),
                   ),
                   onPressed: _busy ? null : () => context.pop(),
@@ -1492,7 +1499,7 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
                     elevation: 0,
                     shape: const RoundedRectangleBorder(),
                     textStyle: theme.textTheme.titleSmall?.copyWith(
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -1569,7 +1576,9 @@ class _PhotoRow extends StatelessWidget {
                   ExcludeSemantics(
                     child: Text(
                       l10n.reviewPhotoAdd(photos.length, reviewPhotoMax),
-                      style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 11.5,
+                      ),
                     ),
                   ),
                 ],

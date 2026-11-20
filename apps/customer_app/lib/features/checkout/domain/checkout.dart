@@ -133,9 +133,28 @@ class Quote {
     this.minOrderShortfall,
     this.deliveryTipBase,
     this.firstPurchase = FirstPurchaseBenefit.unknown,
+    this.baseItemAmount,
+    this.promotionDiscount,
+    this.couponDiscount,
+    this.coupon,
   });
 
   final int version;
+
+  /// 정가 상품액(기간 할인 전, order 0.18.0). 옛 견적은 null.
+  final int? baseItemAmount;
+
+  /// 기간 할인 합(0.18.0).
+  final int? promotionDiscount;
+
+  /// 쿠폰 할인(0.18.0 — totalAmount 에서 이미 뺐다).
+  final int? couponDiscount;
+
+  /// 고른 쿠폰 결과(고르지 않았으면 null).
+  final QuoteCoupon? coupon;
+
+  /// "상품금액" 줄 — 정가가 있으면 정가, 없으면(옛 견적) 상품액.
+  int? get listItemAmount => baseItemAmount ?? itemAmount;
 
   /// 가격 동결 만료(초안 생성 + 10분). 재고 예약 만료와 별개다.
   final DateTime? expiresAt;
@@ -162,6 +181,25 @@ class Quote {
   final FirstPurchaseBenefit firstPurchase;
 }
 
+/// 견적의 쿠폰 결과(order 0.18.0 `Quote.coupon`). 쓸 수 없으면 [applicable]=false 와 [reason]
+/// (NOT_FOUND·NOT_OWNER·EXPIRED·NOT_STARTED·HELD·USED·MIN_ORDER_NOT_MET — 서버 값 그대로).
+@immutable
+class QuoteCoupon {
+  const QuoteCoupon({
+    required this.couponId,
+    required this.applicable,
+    this.reason,
+    this.name,
+  });
+
+  final String couponId;
+  final bool applicable;
+  final String? reason;
+
+  /// 주문서 견적에만 온다(주문 조회는 couponId·applicable 만).
+  final String? name;
+}
+
 /// 첫 구매 무료배달 상태. 초안 단계는 EXPECTED 까지(확정은 결제 진입 때 서버가 한다).
 enum FirstPurchaseBenefit {
   expected,
@@ -180,6 +218,9 @@ enum DraftBlocker {
 
   /// 받는 분 연락처가 없다(주소에도 프로필에도) — "내 연락처"를 받아 프로필에 저장하고 초안을 다시 만든다(BR-60 R2).
   contactRequired,
+
+  /// 고른 쿠폰을 쓸 수 없다(order 0.18.0) — 쿠폰을 빼고 주문서를 다시 만든다. 사유는 견적 `coupon.reason`.
+  couponNotApplicable,
   unknown,
 }
 
@@ -375,7 +416,11 @@ class DraftRequest {
     this.expectedMfcId,
     this.window,
     this.deliveryNote,
+    this.couponId,
   });
+
+  /// 장바구니 쿠폰 1장(order 0.18.0). 바꾸면 주문서를 다시 만든다.
+  final String? couponId;
 
   /// 같은 주문 의도 식별. "주문하기" 한 번에 하나.
   final String purchaseIntentId;
@@ -440,6 +485,9 @@ abstract final class CheckoutProblemCode {
   static const capacityExceeded = 'CAPACITY_EXCEEDED';
   static const slotNotSelectable = 'SLOT_NOT_SELECTABLE';
   static const resourceExpired = 'RESOURCE_EXPIRED';
+
+  /// 결제 진입 422(order 0.18.0) — 그 사이 쿠폰을 쓸 수 없게 됐다. 쿠폰을 빼고 주문서를 다시 만든다.
+  static const couponNotApplicable = 'COUPON_NOT_APPLICABLE';
 
   /// 초안 생성 거절(422·409 MFC_CHANGED). 같은 조건으로 다시 보내도 안 되므로 주문서로 넘어가지 않는다.
   static const draftRejections = {

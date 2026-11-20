@@ -25,7 +25,7 @@ void main() {
   late MockCartMergeRepository merges;
 
   setUp(() {
-    member = MockCartRepository(latency: Duration.zero);
+    member = MockCartRepository(latency: Duration.zero, minOrderAmount: 0);
     guest = MockCartRepository(latency: Duration.zero, seeded: false)
       ..seedLine('E-00000002', 1) // ci-1
       ..seedLine('E-00000003', 2); // ci-2

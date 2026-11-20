@@ -221,7 +221,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                 children: [
                   Text(
                     label,
-                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 14),
+                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 12),
                   ),
                   if (hint != null)
                     Padding(
@@ -289,7 +289,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                     Text(
                       l10n.startWelcomeTitle,
                       style: theme.textTheme.headlineSmall?.copyWith(
-                        fontSize: 20,
+                        fontSize: 18,
                         height: 1.3,
                         fontWeight: FontWeight.w500,
                       ),
@@ -506,7 +506,7 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
             Text(
               l10n.startAddressTitle,
               style: theme.textTheme.headlineSmall?.copyWith(
-                fontSize: 22,
+                fontSize: 19.5,
                 height: 1.35,
                 fontWeight: FontWeight.w500,
               ),
@@ -555,7 +555,7 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
                         child: Text(
                           l10n.startAddressSearchHint,
                           style: theme.textTheme.bodyLarge?.copyWith(
-                            fontSize: 15,
+                            fontSize: 14,
                             color: muted,
                           ),
                         ),
@@ -575,7 +575,7 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
                   Text(
                     l10n.startAddressExamplesTitle,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: 13,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w400,
                       color: theme.colorScheme.onSurface,
                     ),
@@ -591,7 +591,7 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
                       child: Text(
                         '• $e',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 12,
+                          fontSize: 10,
                           color: muted,
                         ),
                       ),
@@ -611,7 +611,7 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 textStyle: theme.textTheme.titleMedium?.copyWith(
-                  fontSize: 16.5,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
               ),

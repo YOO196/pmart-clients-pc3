@@ -30,7 +30,10 @@ void main() {
   setUpAll(initPmartFormatting);
 
   late MockCartRepository cart;
-  setUp(() => cart = MockCartRepository(latency: Duration.zero));
+  // 최소주문 막힘은 cart_min_order_test 에서 본다 — 여기는 장바구니 쪽 최소 금액을 끈다.
+  setUp(
+    () => cart = MockCartRepository(latency: Duration.zero, minOrderAmount: 0),
+  );
 
   testWidgets('장바구니는 서버 합계를 그대로 보인다', (t) async {
     await t.pumpWidget(testApp(const [], cart: cart));
@@ -441,11 +444,32 @@ void main() {
       expect(find.byType(HomeScreen), findsOneWidget);
     });
 
-    testWidgets('배달팁·봉투값 안내는 가운데 창으로 정적 문구를 보인다(금액 숫자 없음)', (t) async {
+    testWidgets('아래 창에 결제금액·배달팁/봉투값 안내 문구가 없다(사용자 2026-11-21)', (t) async {
       await t.pumpWidget(testApp(const [], cart: cart));
       await _openCartTab(t);
+      expect(find.byKey(const ValueKey('cart-fee-info')), findsNothing);
+      expect(find.text('결제 금액은 주문서에서 확인해요'), findsNothing);
+    });
 
-      await t.tap(find.byKey(const ValueKey('cart-fee-info')));
+    testWidgets('회원 결제금액: 봉투값은 정책값 100원, 자세히는 가운데 창(정적 문구)', (t) async {
+      await t.pumpWidget(testApp(const [], cart: cart));
+      await _openCartTab(t);
+      await t.tap(find.text('마이페이지').last);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('my-login')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('login-kakao')));
+      await t.pumpAndSettle();
+      await _openCartTab(t);
+      final bag = find.byKey(const ValueKey('cart-amount-bag'));
+      await t.scrollUntilVisible(
+        bag,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.pumpAndSettle();
+      expect(t.widget<Text>(bag).data, '100원');
+      await t.tap(find.byKey(const ValueKey('cart-fee-detail')).first);
       await t.pumpAndSettle();
       final sheet = find.byKey(const ValueKey('cart-fee-sheet'));
       expect(sheet, findsOneWidget);
@@ -453,12 +477,7 @@ void main() {
         find.descendant(of: sheet, matching: find.textContaining('주문마다 한 번만')),
         findsOneWidget,
       );
-      expect(
-        find.descendant(of: sheet, matching: find.textContaining('원')),
-        findsNothing,
-      );
     });
-
     testWidgets('첫 구매 무료배달은 회원·서버 사유 FIRST_PURCHASE 일 때만 "예정"으로 보인다', (
       t,
     ) async {

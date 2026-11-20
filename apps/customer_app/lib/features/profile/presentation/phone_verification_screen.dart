@@ -250,7 +250,7 @@ class _PhoneVerificationScreenState
             headline,
             key: ValueKey('pv-title-${_step.name}'),
             style: theme.textTheme.headlineSmall?.copyWith(
-              fontSize: 21,
+              fontSize: 22,
               height: 1.35,
               fontWeight: FontWeight.w800,
             ),

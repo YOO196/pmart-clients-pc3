@@ -213,7 +213,8 @@ class RiderMarker extends StatelessWidget {
   final Color color;
   final bool stale;
 
-  static const size = Size(64, 64);
+  // 레퍼런스 8-5: 라이더 그림 약 25×30dp(1080px 캡처에서 75×90px) — 후광 포함 34dp.
+  static const size = Size(34, 34);
 
   @override
   Widget build(BuildContext context) => Opacity(
@@ -224,30 +225,30 @@ class RiderMarker extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Container(
-            width: 62,
-            height: 62,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.18),
               shape: BoxShape.circle,
             ),
           ),
           Container(
-            width: 44,
-            height: 44,
+            width: 25,
+            height: 25,
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
-              border: Border.all(color: color, width: 2.5),
+              border: Border.all(color: color, width: 1.6),
               boxShadow: const [
                 BoxShadow(
-                  blurRadius: 8,
+                  blurRadius: 4,
                   offset: Offset(0, 2),
                   color: Color(0x33000000),
                 ),
               ],
             ),
             alignment: Alignment.center,
-            child: ScooterGlyph(size: 28, color: color),
+            child: ScooterGlyph(size: 16, color: color),
           ),
         ],
       ),
@@ -259,7 +260,8 @@ class RiderMarker extends StatelessWidget {
 class HomeMarker extends StatelessWidget {
   const HomeMarker({super.key});
 
-  static const size = Size(48, 60);
+  // 라이더 마커와 같은 눈높이(약 28×35dp). 그림은 48×60 판에 그리고 줄인다.
+  static const size = Size(28, 35);
 
   @override
   Widget build(BuildContext context) => SizedBox.fromSize(
@@ -271,8 +273,9 @@ class HomeMarker extends StatelessWidget {
 class _HomePinPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
+    canvas.scale(size.width / 48, size.height / 60);
+    const w = 48.0;
+    const h = 60.0;
     // 땅 그림자
     canvas.drawOval(
       Rect.fromCenter(center: Offset(w / 2, h - 3), width: 16, height: 5),

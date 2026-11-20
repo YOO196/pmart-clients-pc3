@@ -21,6 +21,7 @@ base class MockCartRepository implements CartRepository {
   MockCartRepository({
     this.latency = const Duration(milliseconds: 300),
     bool seeded = true,
+    this.minOrderAmount = 15000,
   }) {
     if (seeded) {
       _lines
@@ -31,6 +32,9 @@ base class MockCartRepository implements CartRepository {
   }
 
   final Duration latency;
+
+  /// 서버 최소 주문 금액 흉내(BR-14 15,000). 시험이 장바구니 막힘 없이 주문 흐름을 볼 때만 낮춘다.
+  final int minOrderAmount;
 
   /// 시험용: 담을 수 없는 상태(품절 등)가 된 품목을 이미 담겨 선택된 채로 둔다(담기 검사를 거치지 않음).
   void seedLine(String sku, int quantity, {bool selected = true}) {
@@ -167,8 +171,8 @@ base class MockCartRepository implements CartRepository {
       'items': items,
       'selectedItemAmount': amount,
       // 서버 흉내(cart 0.2.0): 최소 15,000원, 부족액 = max(0, 최소 − 선택 합계).
-      'minOrderAmount': 15000,
-      'minOrderShortfall': (15000 - amount).clamp(0, 15000),
+      'minOrderAmount': minOrderAmount,
+      'minOrderShortfall': (minOrderAmount - amount).clamp(0, minOrderAmount),
       'lastChangedAt': '2026-10-24T06:00:00Z',
       'expiresAt': '2026-11-23T06:00:00Z',
       'sources': [

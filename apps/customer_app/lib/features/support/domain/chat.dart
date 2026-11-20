@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-/// 고객센터 AI 상담(customer-assistant-service 0.1.0, 백엔드 요청 2026-11-09 customer-chat-assistant).
+/// 고객센터 AI 상담(customer-assistant-service 0.3.0, 백엔드 요청 2026-11-09 customer-chat-assistant).
 /// 회원만. 질문 하나씩 답한다(앞 질문을 기억하지 않는다). AI 상담은 취소·환불을 실행하지 않는다.
 /// 답변·근거는 서버 값 그대로 보인다 — 앱이 지어내지 않는다.
 
@@ -13,6 +13,9 @@ enum ChatAnswerState {
   noGrounding,
   realtimeDataRequired,
   orderStatus,
+
+  /// 상품 가격·판매 여부 답(0.3.0, ADR-0083 — 여러 줄 답 문장만, 근거 문서 없음). ANSWERED 처럼 답을 그대로 보인다.
+  productInfo,
   outOfScope,
   processing;
 
@@ -22,6 +25,7 @@ enum ChatAnswerState {
     'NO_GROUNDING' => noGrounding,
     'REALTIME_DATA_REQUIRED' => realtimeDataRequired,
     'ORDER_STATUS' => orderStatus,
+    'PRODUCT_INFO' => productInfo,
     'OUT_OF_SCOPE' => outOfScope,
     'PROCESSING' => processing,
     _ => null,

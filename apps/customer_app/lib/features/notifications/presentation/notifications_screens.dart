@@ -220,7 +220,7 @@ class _NoticeCard extends ConsumerWidget {
                     Text(
                       n.title,
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: n.read
                             ? FontWeight.normal
                             : FontWeight.bold,
@@ -250,7 +250,7 @@ class _NoticeCard extends ConsumerWidget {
                         ),
                       ].join(' · '),
                       style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 11,
+                        fontSize: 10,
                         color: theme.colorScheme.outline,
                       ),
                     ),
@@ -398,7 +398,7 @@ class _SettingsBody extends ConsumerWidget {
       child: Text(
         text,
         style: theme.textTheme.bodySmall?.copyWith(
-          fontSize: 13,
+          fontSize: 12,
           color: theme.colorScheme.onSurfaceVariant,
         ),
       ),
@@ -512,6 +512,10 @@ class _SettingRow extends ConsumerWidget {
     };
     return ListTile(
       key: ValueKey('setting-$id'),
+      titleTextStyle: Theme.of(context).textTheme.bodyLarge
+          ?.copyWith(fontSize: 13.5),
+      subtitleTextStyle: Theme.of(context).textTheme.bodySmall
+          ?.copyWith(fontSize: 12),
       title: Text(noticeChannelText(l10n, item.channel)),
       subtitle: switch ((status, item.locked)) {
         (SettingRowStatus.checking, _) => Text(

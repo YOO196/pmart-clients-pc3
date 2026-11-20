@@ -8,6 +8,9 @@ import '../../../shared/shopping_context.dart';
 import '../../address/presentation/address_controller.dart';
 import '../../cart/domain/cart.dart';
 import '../../cart/presentation/cart_controller.dart';
+import '../../coupons/data/coupon_repository.dart' show MockCouponRepository;
+import '../../coupons/presentation/coupon_controller.dart'
+    show couponRepositoryProvider;
 import '../data/checkout_repository.dart';
 import '../data/mock_checkout_repository.dart';
 import '../data/order_preferences_repository.dart';
@@ -15,7 +18,13 @@ import '../domain/checkout.dart';
 
 final checkoutRepositoryProvider = Provider<CheckoutRepository>(
   (ref) => switch (ref.watch(envProvider)) {
-    PmartEnv.mock => MockCheckoutRepository(),
+    // 목 주문서는 목 쿠폰함의 쿠폰으로 할인을 흉내 낸다(실서버는 order 가 promotion 에 묻는다).
+    PmartEnv.mock =>
+      MockCheckoutRepository()
+        ..couponOf = switch (ref.watch(couponRepositoryProvider)) {
+          final MockCouponRepository m => m.couponJsonOf,
+          _ => null,
+        },
     PmartEnv.local => ApiCheckoutRepository(ref.watch(dioProvider)),
   },
 );
@@ -47,6 +56,7 @@ class CheckoutSetup {
     this.revision = 0,
     this.outOfStockChosen = false,
     this.rememberOutOfStock = false,
+    this.couponId,
   });
 
   final String? purchaseIntentId;
@@ -62,6 +72,9 @@ class CheckoutSetup {
   /// "다음에도 적용"(customer 0.4.0) — 다음 단계로 넘어갈 때 서버에 저장한다.
   final bool rememberOutOfStock;
 
+  /// 고른 장바구니 쿠폰(order 0.18.0). 바꾸면 [revision] 이 올라 주문서를 다시 만든다.
+  final String? couponId;
+
   /// 예약은 슬롯을 골라야 끝난다.
   bool get complete =>
       mode != null && (mode != DeliveryMode.scheduled || window != null);
@@ -74,6 +87,7 @@ class CheckoutSetup {
     String? deliveryNote,
     bool? outOfStockChosen,
     bool? rememberOutOfStock,
+    String? Function()? couponId,
   }) => CheckoutSetup(
     purchaseIntentId: purchaseIntentId ?? this.purchaseIntentId,
     mode: mode ?? this.mode,
@@ -83,6 +97,7 @@ class CheckoutSetup {
     revision: revision + 1,
     outOfStockChosen: outOfStockChosen ?? this.outOfStockChosen,
     rememberOutOfStock: rememberOutOfStock ?? this.rememberOutOfStock,
+    couponId: couponId != null ? couponId() : this.couponId,
   );
 }
 
@@ -98,8 +113,11 @@ class CheckoutSetupController extends Notifier<CheckoutSetup> {
   /// 장바구니 "주문하기". 누를 때마다 새 주문 의도를 연다(이전 선택은 유지한다).
   /// 같은 의도로 다시 보내면 서버는 견적 만료 전까지 예전 초안을 그대로 돌려준다 — 장바구니를 바꾼 뒤에도
   /// 최소 주문 미달 초안이 돌아와 넘어가지 못했다(백엔드 안내 2026-10-31 주문서 §3: 진입 1회마다 새 값).
-  void begin() =>
-      state = state.copyWith(purchaseIntentId: IdempotencyKey.generate().value);
+  /// 쿠폰은 주문서마다 새로 고른다(지난 주문에 쓴 쿠폰이 남아 막히지 않게).
+  void begin() => state = state.copyWith(
+    purchaseIntentId: IdempotencyKey.generate().value,
+    couponId: () => null,
+  );
 
   /// 만료된 초안을 다시 만들 때 새 주문 의도를 연다(같은 의도로 보내면 만료 초안이 돌아온다).
   void renewIntent() =>
@@ -127,6 +145,12 @@ class CheckoutSetupController extends Notifier<CheckoutSetup> {
       state = state.copyWith(rememberOutOfStock: v);
 
   void setNote(String note) => state = state.copyWith(deliveryNote: note);
+
+  /// 쿠폰 고르기·빼기(null). 같은 값이면 그대로 둔다(주문서를 다시 만들지 않는다).
+  void setCoupon(String? couponId) {
+    if (state.couponId == couponId) return;
+    state = state.copyWith(couponId: () => couponId);
+  }
 
   /// 주문이 확정되면 다음 주문을 위해 비운다.
   void finish() => state = const CheckoutSetup();
@@ -323,6 +347,7 @@ class DraftController extends AsyncNotifier<DraftState?> {
       deliveryNote: setup.deliveryNote.trim().isEmpty
           ? null
           : setup.deliveryNote.trim(),
+      couponId: setup.couponId,
     );
   }
 
@@ -530,6 +555,15 @@ class DraftController extends AsyncNotifier<DraftState?> {
     } finally {
       if (ref.mounted) busy.set(false);
     }
+  }
+
+  /// 쿠폰을 고르거나(couponId) 뺐다(null) — 주문서를 그대로 둔 채 새 초안을 받는다(배송 방식 바꿀 때와 같음, order 0.18.0).
+  /// 할인액·쓸 수 있는지는 새 초안 견적(서버)으로만 보인다.
+  Future<void> changeCoupon(String? couponId) async {
+    final setup = ref.read(checkoutSetupProvider.notifier);
+    if (ref.read(checkoutSetupProvider).couponId == couponId) return;
+    setup.setCoupon(couponId);
+    await renewInPlace();
   }
 
   /// 내 연락처를 바꿨다 — 연락처는 초안을 만들 때 사본으로 고정되므로(BR-37) 새 의도로 초안을 다시 만든다.

@@ -278,7 +278,7 @@ class ProductTileCard extends StatelessWidget {
           key: ValueKey('tile-unit-price-${tile.productId}'),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+          style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
         ),
       const SizedBox(height: 2),
       RatingLine(rating: tile.rating, count: tile.reviewCount),

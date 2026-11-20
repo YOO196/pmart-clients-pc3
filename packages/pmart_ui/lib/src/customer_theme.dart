@@ -141,7 +141,7 @@ abstract final class PmartCustomerTheme {
         toolbarHeight: 56,
         leadingWidth: 46,
         titleTextStyle: text.titleMedium?.copyWith(
-          fontSize: 17,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -280,11 +280,11 @@ abstract final class PmartCustomerTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
-        // 레퍼런스 확인 창(9-1 주문취소·5-3 배달팁): 모서리 약 20dp, 폭 280dp, 제목 19sp 굵게, 본문 14sp(2026-11-20 나란히 비교)
+        // 레퍼런스 확인 창(9-1 주문취소·5-3 배달팁): 모서리 약 20dp, 폭 280dp, 제목 18sp 굵게, 본문 14sp(2026-11-21 글자 폭으로 다시 잼)
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 40),
         titleTextStyle: text.titleMedium?.copyWith(
-          fontSize: 19,
+          fontSize: 18,
           fontWeight: FontWeight.w700,
         ),
         contentTextStyle: text.bodyMedium?.copyWith(
@@ -333,7 +333,8 @@ abstract final class PmartCustomerTheme {
       titleMedium: s(t.titleMedium, 15.5, FontWeight.w700),
       titleSmall: s(t.titleSmall, 14, FontWeight.w700),
       bodyLarge: s(t.bodyLarge, 15, FontWeight.w400, height: 1.45),
-      bodyMedium: s(t.bodyMedium, 13.5, FontWeight.w400, height: 1.45),
+      // 레퍼런스와 같은 글자로 재면 14sp(2026-11-21)
+      bodyMedium: s(t.bodyMedium, 14, FontWeight.w400, height: 1.45),
       bodySmall: s(
         t.bodySmall,
         12,

@@ -8,6 +8,7 @@ import 'features/address/presentation/address_screens.dart';
 import 'features/address/presentation/postcode_screen.dart' show PostcodeResult;
 import 'features/cart/presentation/cart_merge_screen.dart';
 import 'features/start/presentation/start_controller.dart';
+import 'features/coupons/presentation/coupon_screens.dart';
 import 'features/wishlist/presentation/wishlist_screens.dart';
 import 'features/withdrawal/presentation/withdrawal_screen.dart';
 import 'features/start/presentation/start_screens.dart';
@@ -133,6 +134,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         path: '/checkout',
         builder: (_, _) => const OrderSheetScreen(),
+      ),
+      // 주문서 → 할인쿠폰 고르기(order 0.18.0). 지금 고른 쿠폰 ID 를 넘겨 받고, 고른 결과(CouponPick)를 돌려준다.
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/checkout/coupons',
+        builder: (_, state) => CouponPickScreen(
+          selected: state.extra is String ? state.extra! as String : null,
+        ),
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
@@ -289,6 +298,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         path: '/me/wishlist',
         builder: (_, _) => const WishlistScreen(),
+      ),
+      // 쿠폰함(promotion 0.2.0 — 쿠폰 받기·사용 가능·지난 쿠폰, ADR-0082).
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/me/coupons',
+        builder: (_, _) => const CouponBoxScreen(),
       ),
       // 회원 탈퇴(customer 0.12.0, ADR-0077): 안내·재인증·접수, 대기 중이면 상태·철회.
       GoRoute(

@@ -360,7 +360,7 @@ class DeliveryOptionCard extends ConsumerWidget {
                           Text(
                             modeLabel(l10n, o.mode),
                             style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.w700,
                               color: fg,
                             ),
@@ -383,7 +383,7 @@ class DeliveryOptionCard extends ConsumerWidget {
                             line,
                             key: ValueKey('mode-line-${o.mode.name}'),
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 14,
+                              fontSize: 12,
                               color: on ? scheme.onSurface : scheme.outline,
                             ),
                           ),
@@ -406,7 +406,7 @@ class DeliveryOptionCard extends ConsumerWidget {
                     formatKrw(shown),
                     key: ValueKey('mode-tip-${o.mode.name}'),
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontSize: 17,
+                      fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -511,7 +511,7 @@ class _SlotSheetState extends ConsumerState<_SlotSheet> {
                     child: Text(
                       l10n.slotSheetTitle,
                       style: theme.textTheme.titleLarge?.copyWith(
-                        fontSize: 19,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -572,7 +572,7 @@ class _SlotSheetState extends ConsumerState<_SlotSheet> {
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               child: DefaultTextStyle.merge(
                 style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
+                  fontSize: 12,
                   color: scheme.onSurfaceVariant,
                 ),
                 child: Column(
@@ -650,7 +650,7 @@ class _SlotRow extends StatelessWidget {
               Text(
                 windowText(s.window),
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontSize: picked ? 19 : 17,
+                  fontSize: picked ? 18.5 : 16,
                   fontWeight: picked ? FontWeight.w700 : FontWeight.w400,
                   color: onTap == null ? scheme.outlineVariant : null,
                 ),

@@ -201,7 +201,7 @@ class _CartHeader extends ConsumerWidget {
               children: [
                 Text(
                   l10n.cartSelectAll,
-                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16),
+                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 14),
                 ),
                 if (state.cart.expiresAt case final at?)
                   Text(
@@ -225,7 +225,7 @@ class _CartHeader extends ConsumerWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(4),
               ),
-              textStyle: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+              textStyle: theme.textTheme.bodyMedium?.copyWith(fontSize: 12),
             ),
             onPressed: (state.canChange && selected > 0)
                 ? () => _confirmRemoveSelected(context, ref, selected)
@@ -584,8 +584,8 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
                         l10n.cartStepperQuantity(_pending ?? line.quantity),
                         key: ValueKey('cart-qty-$id'),
                         style: pendingLook
-                            ? TextStyle(color: scheme.outline, fontSize: 15)
-                            : const TextStyle(fontSize: 15),
+                            ? TextStyle(color: scheme.outline, fontSize: 14)
+                            : const TextStyle(fontSize: 14),
                       ),
                     ),
                   ),
@@ -640,6 +640,10 @@ class _CartSummaryBar extends ConsumerWidget {
               !hiddenAtCurrentAddress(l, shortages),
         )
         .length;
+    // 서버가 부족액(>0)을 주면 주문 버튼을 막는다(레퍼런스 5-1 "최소주문금액을 채워주세요", 사용자 2026-11-21).
+    // 부족액을 모르면(null) 막지 않는다 — 최종 판정은 주문서 견적.
+    final minOrderShort =
+        cart.hasSelectedPurchasable && (cart.minOrderShortfall ?? 0) > 0;
     return Material(
       color: theme.colorScheme.surface,
       elevation: 12,
@@ -662,36 +666,13 @@ class _CartSummaryBar extends ConsumerWidget {
                     case (final int min, final int short) when short > 0)
                   _MinOrderBar(min: min, shortfall: short),
               if (cart.hasSelectedPurchasable) const _FirstPurchaseHint(),
-              // 회원은 결제금액 구역(자세히)에서 안내한다 — 막대는 레퍼런스처럼 짧게. 비회원만 안내 두 줄.
-              if (!member) ...[
+              // 결제금액·배달팁/봉투값 안내 문구는 두지 않는다(사용자 2026-11-21). 변경 반영 중 안내만 남긴다.
+              if (!member && state.sync == CartSync.pending)
                 Text(
-                  l10n.cartSelectedAmountNote,
+                  l10n.cartChangePending,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                  style: theme.textTheme.bodySmall,
                 ),
-                if (state.sync == CartSync.pending)
-                  Text(
-                    l10n.cartChangePending,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                Center(
-                  child: TextButton(
-                    key: const ValueKey('cart-fee-info'),
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      foregroundColor: theme.colorScheme.onSurfaceVariant,
-                      textStyle: theme.textTheme.bodySmall?.copyWith(
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                    onPressed: () => _showFeeInfo(context),
-                    child: Text(l10n.cartFeeInfo),
-                  ),
-                ),
-              ],
               // 레퍼런스 5: 큰 단추 = [개수 동그라미] 문구 [금액]. 금액은 서버 합계 그대로(앱에서 더하지 않는다).
               FilledButton(
                 key: const ValueKey('cart-order'),
@@ -711,6 +692,7 @@ class _CartSummaryBar extends ConsumerWidget {
                     (state.canChange &&
                         cart.hasSelectedPurchasable &&
                         !preparing &&
+                        !minOrderShort &&
                         (!member || setup.complete))
                     ? () => _order(context, ref)
                     : null,
@@ -720,7 +702,8 @@ class _CartSummaryBar extends ConsumerWidget {
                       width: 72,
                       child: Align(
                         alignment: Alignment.centerLeft,
-                        child: purchasable > 0
+                        // 막혔을 때는 레퍼런스 5-1 처럼 문구만(개수·금액 없음).
+                        child: purchasable > 0 && !minOrderShort
                             ? Container(
                                 key: const ValueKey('cart-order-count'),
                                 width: 26,
@@ -734,7 +717,7 @@ class _CartSummaryBar extends ConsumerWidget {
                                   '$purchasable',
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 13,
+                                    fontSize: 12,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -748,6 +731,7 @@ class _CartSummaryBar extends ConsumerWidget {
                         child: Text(
                           // 회원: 수령방법을 고르기 전엔 "수령방법을 선택해주세요", 고르면 "예약배달 주문하기"처럼
                           switch ((member, setup.mode)) {
+                            _ when minOrderShort => l10n.cartMinOrderFill,
                             (true, null) => l10n.deliveryPickTitle,
                             (true, final m?) => l10n.cartOrderWithMode(
                               modeLabel(l10n, m),
@@ -768,6 +752,7 @@ class _CartSummaryBar extends ConsumerWidget {
                         child: Text(
                           // 변경 확정 뒤 다시 읽는 동안은 "확인 중", 없으면 0원이 아니라 "확인할 수 없어요".
                           switch (cart.selectedItemAmount) {
+                            _ when minOrderShort => '',
                             final int a => formatKrw(a),
                             null when state.amountStale =>
                               l10n.cartAmountChecking,
@@ -775,7 +760,7 @@ class _CartSummaryBar extends ConsumerWidget {
                           },
                           key: const ValueKey('cart-total'),
                           style: const TextStyle(
-                            fontSize: 15,
+                            fontSize: 14,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -1126,7 +1111,7 @@ class _ReceiveSection extends ConsumerWidget {
             child: Text(
               l10n.cartReceiveTitle,
               style: theme.textTheme.titleMedium?.copyWith(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1159,6 +1144,10 @@ class _ReceiveSection extends ConsumerWidget {
   }
 }
 
+/// 봉투값 확정 정책(주문 1건 100원 — 봉투를 안 받아도 청구, order 계약 `bagOptOut`). 장바구니 계약에는 값이 없어 표시만 이 값으로 한다.
+/// 실제 청구액은 주문서 견적 `bagFee`(서버)다.
+const cartBagFeePolicy = 100;
+
 /// 장바구니 안 "결제금액": 서버 값만(상품금액 = 선택 합계, 배달팁 = 고른 방식의 서버 팁).
 /// 봉투값·결제예정금액은 주문서 견적에서 확정된다 — 앱이 더해 만들지 않는다.
 class _AmountSection extends ConsumerWidget {
@@ -1185,14 +1174,14 @@ class _AmountSection extends ConsumerWidget {
             children: [
               Text(
                 label,
-                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
+                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
               ),
               ?extra,
               const Spacer(),
               Text(
                 value,
                 key: key,
-                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
+                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
               ),
             ],
           ),
@@ -1202,7 +1191,7 @@ class _AmountSection extends ConsumerWidget {
       child: ActionChip(
         key: const ValueKey('cart-fee-detail'),
         label: Text(l10n.cartFeeDetail),
-        labelStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
+        labelStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
         backgroundColor: scheme.surfaceContainer,
         side: BorderSide.none,
         shape: const StadiumBorder(),
@@ -1222,7 +1211,7 @@ class _AmountSection extends ConsumerWidget {
             child: Text(
               l10n.cartAmountsTitle,
               style: theme.textTheme.titleMedium?.copyWith(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1248,7 +1237,13 @@ class _AmountSection extends ConsumerWidget {
                   key: const ValueKey('cart-amount-tip'),
                   extra: detail(),
                 ),
-                row(l10n.amountBag, l10n.cartAmountInSheet, extra: detail()),
+                // 봉투값은 확정 정책 고정값(100원)을 보인다(사용자 2026-11-21 — 장바구니 계약에 값이 없다). 청구액은 주문서 견적.
+                row(
+                  l10n.amountBag,
+                  formatKrw(cartBagFeePolicy),
+                  key: const ValueKey('cart-amount-bag'),
+                  extra: detail(),
+                ),
                 const SizedBox(height: 8),
                 Divider(height: 2, thickness: 1.6, color: scheme.onSurface),
                 const SizedBox(height: 8),
@@ -1257,7 +1252,7 @@ class _AmountSection extends ConsumerWidget {
                     Text(
                       l10n.cartAmountExpected,
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 17,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

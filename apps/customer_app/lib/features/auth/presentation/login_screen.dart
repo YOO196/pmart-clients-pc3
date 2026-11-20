@@ -414,7 +414,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             const SizedBox(height: 6),
             Text(
               _providerShort(l10n, p),
-              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12),
             ),
           ],
         ),
@@ -486,7 +486,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     style: TextButton.styleFrom(
                       foregroundColor: theme.colorScheme.onSurfaceVariant,
                       textStyle: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 13,
+                        fontSize: 12,
                       ),
                     ),
                     onPressed: busy

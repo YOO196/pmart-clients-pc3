@@ -157,7 +157,7 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
                   Text(
                     l10n.cancelConfirmTitle,
                     style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: 19,
+                      fontSize: 18,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -243,6 +243,7 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
                       TextButton(
                         key: const ValueKey('cancel-dismiss'),
                         style: TextButton.styleFrom(
+                          textStyle: const TextStyle(fontSize: 16),
                           foregroundColor: theme.colorScheme.onSurface,
                           minimumSize: const Size(72, 44),
                         ),
@@ -712,7 +713,7 @@ class _RescheduleScreenState extends ConsumerState<RescheduleScreen> {
                 child: Text(
                   '• ${l10n.slotNote}\n• ${l10n.slotChangeNote}',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: 13,
+                    fontSize: 12,
                     color: scheme.onSurfaceVariant,
                   ),
                 ),

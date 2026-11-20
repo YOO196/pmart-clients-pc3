@@ -131,7 +131,7 @@ class AddressListScreen extends ConsumerWidget {
                         Text(
                           l10n.startAddressSearchHint,
                           style: theme.textTheme.bodyLarge?.copyWith(
-                            fontSize: 15,
+                            fontSize: 14,
                             color: muted,
                           ),
                         ),
@@ -155,6 +155,8 @@ class AddressListScreen extends ConsumerWidget {
                 label: Text(l10n.startAddressLocate),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(44),
+                  textStyle: Theme.of(context).textTheme.bodyMedium
+                      ?.copyWith(fontSize: 14),
                   foregroundColor: theme.colorScheme.onSurface,
                   side: BorderSide(color: theme.colorScheme.outlineVariant),
                   shape: RoundedRectangleBorder(
@@ -262,7 +264,7 @@ class _AddressListState extends ConsumerState<_AddressList> {
                                       l10n.addressCurrent,
                                       style: theme.textTheme.labelSmall
                                           ?.copyWith(
-                                            fontSize: 10.5,
+                                            fontSize: 9,
                                             color: theme.colorScheme.primary,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -277,7 +279,7 @@ class _AddressListState extends ConsumerState<_AddressList> {
                                 serviceabilityText(l10n, a.serviceability),
                               ].join('\n'),
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                fontSize: 13.5,
+                                fontSize: 12,
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
@@ -413,7 +415,7 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                                   child: Text(
                                     l10n.addressCurrent,
                                     style: theme.textTheme.labelSmall?.copyWith(
-                                      fontSize: 10.5,
+                                      fontSize: 9,
                                       color: theme.colorScheme.primary,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -425,7 +427,7 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                           Text(
                             '${a.roadAddress} ${a.detailAddress}',
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 13.5,
+                              fontSize: 12,
                               color: theme.colorScheme.onSurface,
                             ),
                           ),
@@ -741,7 +743,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               child: Text(
                 label,
                 style: theme.textTheme.bodyLarge?.copyWith(
-                  fontSize: 13.5,
+                  fontSize: 12,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -817,7 +819,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                   road,
                   key: const ValueKey('f-road'),
                   style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 17,
+                    fontSize: 15.5,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -853,7 +855,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     final theme = Theme.of(context);
     final chosen = _road.text.trim().isNotEmpty;
     final small = theme.textTheme.bodySmall?.copyWith(
-      fontSize: 11,
+      fontSize: 9,
       color: theme.colorScheme.onSurfaceVariant,
     );
     return Scaffold(

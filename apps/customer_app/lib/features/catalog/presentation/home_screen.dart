@@ -599,7 +599,7 @@ class _HomeSearchBar extends StatelessWidget {
                 child: Text(
                   l10n.searchHint,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontSize: 13,
+                    fontSize: 14,
                     color: scheme.onSurfaceVariant,
                   ),
                 ),
@@ -818,7 +818,8 @@ class _SectionView extends ConsumerWidget {
                     key: ValueKey('section-view-all-${section.sectionId}'),
                     style: TextButton.styleFrom(
                       foregroundColor: scheme.onSurface,
-                      textStyle: Theme.of(context).textTheme.bodyMedium,
+                      textStyle: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(fontSize: 14),
                     ),
                     onPressed: () => context.push(
                       '/sections/${shown.sectionId}',
@@ -1167,7 +1168,7 @@ class _DeliveryRow extends StatelessWidget {
       final int base => l10n.homeTipBase(formatKrw(base)),
       null => null,
     };
-    final strong = theme.textTheme.titleSmall?.copyWith(fontSize: 13.5);
+    final strong = theme.textTheme.titleSmall?.copyWith(fontSize: 14);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1175,7 +1176,7 @@ class _DeliveryRow extends StatelessWidget {
           width: 70,
           child: Text(
             modeLabel(l10n, o.mode),
-            style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13.5),
+            style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
           ),
         ),
         Expanded(

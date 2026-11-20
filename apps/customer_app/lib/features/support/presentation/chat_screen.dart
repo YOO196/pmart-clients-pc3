@@ -160,6 +160,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                           ),
                           key: const ValueKey('chat-date'),
                           style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 10.5,
                             color: theme.colorScheme.outline,
                           ),
                         ),
@@ -188,7 +189,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             l10n.chatIntro,
                             key: const ValueKey('chat-intro'),
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 14,
+                              fontSize: 16,
                             ),
                           ),
                         ),
@@ -265,6 +266,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             maxLines: 4,
                             // 레퍼런스 2: 둥근 회색 칸(글자 수 숨김) + 동그란 ↑ 보내기
                             decoration: InputDecoration(
+                              hintStyle: Theme.of(context)
+                                  .inputDecorationTheme
+                                  .hintStyle
+                                  ?.copyWith(fontSize: 15.5),
                               hintText: canType
                                   ? l10n.chatHint
                                   : l10n.chatChooseTopicHint,
@@ -662,7 +667,11 @@ class _Bubble extends StatelessWidget {
       color: color,
       borderRadius: BorderRadius.circular(14),
     ),
-    child: child,
+    // 레퍼런스 고객센터 2: 말풍선 글자 약 16sp
+    child: DefaultTextStyle.merge(
+      style: const TextStyle(fontSize: 16),
+      child: child,
+    ),
   );
 }
 

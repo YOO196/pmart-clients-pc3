@@ -322,11 +322,6 @@ void main() {
 
     await go('/cart');
     await shot('cart');
-    await t.tap(find.byKey(const ValueKey('cart-fee-info')));
-    await t.pumpAndSettle();
-    await shot('cart-fee-dialog');
-    await t.tap(find.byKey(const ValueKey('cart-fee-ok')));
-    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('cart-order')));
     await t.pumpAndSettle();
     await shot('login');
@@ -388,9 +383,38 @@ void main() {
     await t.pumpAndSettle();
     await scrollDown(700);
     await shot('order-sheet-2');
+    // 할인쿠폰(order 0.18.0·promotion 0.2.0, 레퍼런스 6-5) — 고르기 → 주문서 할인 → 다시 빼 둔다.
+    Future<void> openCoupons() async {
+      await t.ensureVisible(find.byKey(const ValueKey('coupon-open')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('coupon-open')));
+      await t.pumpAndSettle();
+    }
+
+    await openCoupons();
+    await t.tap(find.byKey(const ValueKey('coupon-CPN-MOCK-1')));
+    await t.pump();
+    await shot('coupon-pick');
+    await t.tap(find.byKey(const ValueKey('coupon-pick-use')));
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const ValueKey('coupon-section')));
+    await t.pumpAndSettle();
+    await shot('order-sheet-coupon');
+    await openCoupons();
+    await t.tap(find.byKey(const ValueKey('coupon-CPN-MOCK-1')));
+    await t.tap(find.byKey(const ValueKey('coupon-pick-use')));
+    await t.pumpAndSettle();
 
     await go('/my');
     await shot('my');
+    await go('/me/coupons');
+    await shot('coupon-box');
+    await t.tap(find.byKey(const ValueKey('coupon-tab-available')));
+    await t.pumpAndSettle();
+    await shot('coupon-box-available');
+    await t.tap(find.byKey(const ValueKey('coupon-tab-past')));
+    await t.pumpAndSettle();
+    await shot('coupon-box-past');
     await go('/orders');
     await shot('orders');
     // 사용자 캡처(2026-11-20) 조회 기간·주문 상태·정보 시트
@@ -936,7 +960,10 @@ void main() {
       ..physicalSize = const Size(1080, 2180)
       ..devicePixelRatio = 3;
     addTearDown(t.view.reset);
-    final member = MockCartRepository(latency: Duration.zero);
+    final member = MockCartRepository(
+      latency: Duration.zero,
+      minOrderAmount: 0,
+    );
     final guest = MockCartRepository(latency: Duration.zero, seeded: false)
       ..seedLine('E-00000002', 1)
       ..seedLine('E-00000003', 2);
@@ -967,6 +994,46 @@ void main() {
     debugDisableShadows = true;
   });
 
+  // 장바구니 최소주문 막힘·봉투값 줄(사용자 2026-11-21, 레퍼런스 5-1) — 목 장바구니 7,940원(최소 15,000).
+  testWidgets('cart-min-order', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    debugDisableShadows = false;
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp(cart: MockCartRepository(latency: Duration.zero), const []),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/c-$name.png').uri),
+      );
+    }
+
+    await t.tap(find.text('장바구니').last);
+    await t.pumpAndSettle();
+    await shot('guest');
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('장바구니').last);
+    await t.pumpAndSettle();
+    await t.scrollUntilVisible(
+      find.byKey(const ValueKey('cart-amount-bag')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await shot('member-amounts');
+    debugDisableShadows = true;
+  });
   // 비회원으로 주소를 넣었던 사람이 로그인 → 회원 주소록이 비면 그 주소를 저장할지 묻는다.
   testWidgets('guest-address', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

@@ -9,6 +9,7 @@ enum MockChatScenario {
   noGrounding,
   realtime,
   outOfScope,
+  productInfo,
 
   /// 첫 전송만 202 처리 중. 같은 키로 다시 보내면 완료.
   processingOnce,
@@ -36,6 +37,7 @@ final class MockChatRepository implements ChatRepository {
     '#근거없음': MockChatScenario.noGrounding,
     '#주문': MockChatScenario.realtime,
     '#취소': MockChatScenario.outOfScope,
+    '#상품': MockChatScenario.productInfo,
     '#처리중': MockChatScenario.processingOnce,
     '#응답유실': MockChatScenario.lostOnce,
     '#제한': MockChatScenario.rateLimited,
@@ -172,6 +174,12 @@ final class MockChatRepository implements ChatRepository {
           state: ChatAnswerState.outOfScope,
           answer: '[목] AI 상담은 취소·환불을 직접 처리하지 않아요.',
           handoff: _handoff,
+        ),
+        // 0.3.0 PRODUCT_INFO — 여러 줄 문장, 근거 없음, handoff 없음.
+        MockChatScenario.productInfo => ChatAnswer(
+          answerId: id,
+          state: ChatAnswerState.productInfo,
+          answer: '[목] 찾으신 상품이에요.\n- [목] 국산콩 두부 · 2,500원 · 판매 중\n- [목] 부침 두부 · 1,900원 · 품절',
         ),
         _ => ChatAnswer(
           answerId: id,

@@ -89,7 +89,11 @@ class SupportScreen extends ConsumerWidget {
         .firstOrNull;
     return Scaffold(
       // 레퍼런스 1 고객센터: 가운데 제목
-      appBar: AppBar(title: Text(l10n.supportTitle)),
+      appBar: AppBar(
+        titleTextStyle: Theme.of(context).appBarTheme.titleTextStyle
+            ?.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
+        title: Text(l10n.supportTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 30, 16, 16),
         children: [
@@ -112,14 +116,14 @@ class SupportScreen extends ConsumerWidget {
               ),
               key: const ValueKey('support-name'),
               style: theme.textTheme.headlineSmall?.copyWith(
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: FontWeight.w400,
               ),
             ),
           Text(
             l10n.supportHeadline,
             style: theme.textTheme.headlineSmall?.copyWith(
-              fontSize: 22,
+              fontSize: 20,
               fontWeight: FontWeight.w400,
             ),
           ),
@@ -201,7 +205,7 @@ class SupportRow extends StatelessWidget {
                   Text(
                     label,
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      fontSize: 17,
+                      fontSize: 16,
                       fontWeight: description == null && !bold
                           ? null
                           : FontWeight.w700,
@@ -213,7 +217,7 @@ class SupportRow extends StatelessWidget {
                       child: Text(
                         d,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 13,
+                          fontSize: 14,
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),

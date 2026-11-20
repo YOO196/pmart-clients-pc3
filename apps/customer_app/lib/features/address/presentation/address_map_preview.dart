@@ -70,7 +70,7 @@ class AddressMapPreview extends ConsumerWidget {
                       AppLocalizations.of(context).addressMapCheck,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.white,
-                        fontSize: 11.5,
+                        fontSize: 9,
                         fontWeight: FontWeight.w500,
                       ),
                     ),

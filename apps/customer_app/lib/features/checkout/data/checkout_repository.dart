@@ -268,6 +268,7 @@ api.CreateDraftRequest draftRequestToContract(DraftRequest r) =>
           api.CreateDraftRequestOutOfStockPreferenceEnum.CANCEL_ALL,
       },
       deliveryNote: r.deliveryNote,
+      couponId: r.couponId,
     );
 
 HoldState _hold(String? wire) => switch (wire) {
@@ -377,6 +378,8 @@ OrderDraft draftFromContract(api.OrderDraft d) {
             DraftBlocker.slotUnavailable,
           api.DraftBlockerCodeEnum.CONTACT_REQUIRED =>
             DraftBlocker.contactRequired,
+          api.DraftBlockerCodeEnum.COUPON_NOT_APPLICABLE =>
+            DraftBlocker.couponNotApplicable,
         },
     ],
     resources: r == null
@@ -403,6 +406,21 @@ Quote quoteFromContract(api.Quote q) => Quote(
   version: q.quoteVersion ?? 0,
   expiresAt: q.quoteExpiresAt,
   itemAmount: q.itemAmount,
+  baseItemAmount: q.baseItemAmount,
+  promotionDiscount: q.promotionDiscount,
+  couponDiscount: q.couponDiscount,
+  coupon: switch (q.coupon) {
+    final c? => QuoteCoupon(
+      couponId: c.couponId,
+      applicable: c.applicable,
+      reason: c.reason,
+      name: switch (c.name?.trim()) {
+        null || '' => null,
+        final n => n,
+      },
+    ),
+    null => null,
+  },
   deliveryTip: q.deliveryTip,
   tipReason: switch (q.deliveryTipReason) {
     api.QuoteDeliveryTipReasonEnum.STANDARD => TipReason.standard,

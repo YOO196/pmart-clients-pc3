@@ -71,7 +71,7 @@ class CategoryScreen extends ConsumerWidget {
                       section,
                       key: ValueKey('category-section-$section'),
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 17,
+                        fontSize: 14.5,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -102,7 +102,7 @@ class CategoryScreen extends ConsumerWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                fontSize: 14,
+                                fontSize: 12.5,
                               ),
                             ),
                           ),

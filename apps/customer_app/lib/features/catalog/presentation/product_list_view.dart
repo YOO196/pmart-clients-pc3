@@ -147,7 +147,7 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
         padding: const EdgeInsets.symmetric(horizontal: 12),
         side: BorderSide(color: scheme.outlineVariant),
         foregroundColor: scheme.onSurface,
-        textStyle: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+        textStyle: theme.textTheme.bodyMedium?.copyWith(fontSize: 10.5),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
@@ -719,7 +719,7 @@ class _AttributeRows extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontSize: 15,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -743,7 +743,7 @@ class _AttributeRows extends ConsumerWidget {
                                 child: Text(
                                   v.label,
                                   style: TextStyle(
-                                    fontSize: 15,
+                                    fontSize: 12.5,
                                     fontWeight: picked.contains(a.token(v))
                                         ? FontWeight.w700
                                         : FontWeight.w400,

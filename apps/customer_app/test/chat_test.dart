@@ -94,6 +94,25 @@ void main() {
       expect(a.recentOrders, isEmpty);
       expect(a.handoff, isNull);
     });
+
+    test('상품 답(0.3.0 PRODUCT_INFO): 오류로 막지 않고 여러 줄 답을 그대로 옮긴다', () {
+      const text = '찾으신 상품이에요.\n- 국산콩 두부 · 2,500원 · 판매 중';
+      final a = chatAnswerFromContract(
+        api.CustomerAnswer.fromJson(
+          base({
+            'state': 'PRODUCT_INFO',
+            'answerMode': 'PRODUCT_TEMPLATE',
+            'answer': text,
+            'handoff': null,
+          }),
+        ),
+      );
+      expect(a.state, ChatAnswerState.productInfo);
+      expect(a.answer, text);
+      expect(a.citations, isEmpty);
+      expect(a.handoff, isNull);
+      expect(a.extractive, isFalse);
+    });
   });
 
   group('대화', () {
@@ -240,6 +259,23 @@ void main() {
       expect(find.byKey(const ValueKey('chat-citations')), findsNothing);
       expect(find.textContaining('[목 근거]'), findsNothing);
       expect(find.textContaining('근거 보기'), findsNothing);
+      expect(find.byKey(const ValueKey('chat-handoff')), findsNothing);
+    });
+
+    testWidgets('상품 답(PRODUCT_INFO): 여러 줄 답을 줄바꿈 그대로, 근거·문의 연결 없이', (t) async {
+      await open(t, mock(MockChatScenario.productInfo));
+      await ask(t, '두부 있어요?');
+      expect(
+        find.byKey(const ValueKey('chat-answer-productInfo')),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          '[목] 찾으신 상품이에요.\n- [목] 국산콩 두부 · 2,500원 · 판매 중\n- [목] 부침 두부 · 1,900원 · 품절',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('chat-citations')), findsNothing);
       expect(find.byKey(const ValueKey('chat-handoff')), findsNothing);
     });
 

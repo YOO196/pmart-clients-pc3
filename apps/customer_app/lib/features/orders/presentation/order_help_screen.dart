@@ -47,6 +47,8 @@ class OrderHelpScreen extends ConsumerWidget {
       appBar: AppBar(
         centerTitle: false,
         titleSpacing: pmartLeftTitleSpacing,
+        titleTextStyle: Theme.of(context).appBarTheme.titleTextStyle
+            ?.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
         title: Text(l10n.orderInquiry),
       ),
       body: UiStateView<OrderDetail>(
@@ -87,7 +89,7 @@ class OrderHelpScreen extends ConsumerWidget {
                 child: Text(
                   l10n.orderHelpTitle,
                   style: theme.textTheme.headlineSmall?.copyWith(
-                    fontSize: 23,
+                    fontSize: 21.5,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -188,7 +190,7 @@ class _DelayedGuide extends StatelessWidget {
           Text(
             l10n.helpDelayedTitle,
             style: theme.textTheme.headlineSmall?.copyWith(
-              fontSize: 21,
+              fontSize: 22,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -251,6 +253,7 @@ class _DelayedGuide extends StatelessWidget {
                       style: TextButton.styleFrom(
                         foregroundColor: theme.colorScheme.onSurfaceVariant,
                         textStyle: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 14,
                           decoration: TextDecoration.underline,
                         ),
                       ),
@@ -265,6 +268,7 @@ class _DelayedGuide extends StatelessWidget {
                     style: TextButton.styleFrom(
                       foregroundColor: theme.colorScheme.onSurfaceVariant,
                       textStyle: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 14,
                         decoration: TextDecoration.underline,
                       ),
                     ),
@@ -313,7 +317,7 @@ class _OtherHelpGuide extends StatelessWidget {
             l10n.helpOtherTitle,
             textAlign: TextAlign.center,
             style: theme.textTheme.headlineSmall?.copyWith(
-              fontSize: 21,
+              fontSize: 22,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -351,6 +355,7 @@ class _OtherHelpGuide extends StatelessWidget {
                 style: TextButton.styleFrom(
                   foregroundColor: theme.colorScheme.onSurfaceVariant,
                   textStyle: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 14,
                     decoration: TextDecoration.underline,
                   ),
                 ),

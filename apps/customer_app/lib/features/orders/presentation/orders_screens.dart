@@ -109,7 +109,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 14),
                 ),
                 const SizedBox(height: 2),
                 Text.rich(
@@ -494,7 +494,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
   }) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.only(right: 5),
       child: Material(
         key: key,
         shape: StadiumBorder(
@@ -517,8 +517,9 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                   color: selected ? scheme.surface : scheme.onSurface,
                 ),
                 child: DefaultTextStyle.merge(
+                  // 레퍼런스 9-1 을 1080px 로 재면 "조회 기간" 153px ≈ 14sp, 알약 높이 98px ≈ 33dp.
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontSize: 15,
+                    fontSize: 14,
                     height: 1.2,
                     color: selected ? scheme.surface : scheme.onSurface,
                   ),
@@ -538,10 +539,10 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     final provider = orderListProvider(_query);
     final value = ref.watch(provider);
     final filters = SizedBox(
-      height: 56,
+      height: 53,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(15, 10, 15, 10),
         children: [
           // 레퍼런스(사용자 캡처): 조건이 걸리면 맨 앞에 ↻ 초기화
           if (_status != null || _q != null || _period != OrderPeriod.months3)
@@ -614,6 +615,8 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         // 레퍼런스 9-1: 왼쪽 큰 제목 + 오른쪽 장바구니
         centerTitle: false,
         titleSpacing: context.canPop() ? pmartLeftTitleSpacing : 20,
+        titleTextStyle: Theme.of(context).appBarTheme.titleTextStyle
+            ?.copyWith(fontSize: 18),
         title: Text(l10n.ordersTitle),
         actions: const [CartIconButton(), SizedBox(width: 6)],
         // 결제 완료에서 주문 상세로 바로 오면(go) 뒤에 화면이 없다. 그때는 마이로 돌아간다.
@@ -740,21 +743,23 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                     : orderStatusText(l10n, o.status),
                 key: mode != null ? ValueKey('order-mode-${o.orderId}') : null,
                 style: theme.textTheme.titleSmall?.copyWith(
-                  fontSize: 15,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ),
+            // 레퍼런스 9-1 1: 알약 58px ≈ 19dp, 글자 112px ≈ 11sp
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: scheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 l10n.orderDetailTitle,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
+                  fontSize: 11,
+                  height: 1.2,
                   color: scheme.onSurface,
                 ),
               ),
@@ -781,7 +786,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             orderStatusText(l10n, o.status),
             key: ValueKey('order-status-${o.orderId}'),
             style: theme.textTheme.headlineSmall?.copyWith(
-              fontSize: 23,
+              fontSize: 21.5,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -799,7 +804,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                 Text(
                   '${formatSeoulDate(t)} · ',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontSize: 15,
+                    fontSize: 12,
                     color: scheme.onSurfaceVariant,
                   ),
                 ),
@@ -807,7 +812,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                 orderStatusText(l10n, o.status),
                 key: ValueKey('order-status-${o.orderId}'),
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: 15,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: o.status == OrderStatus.cancelled
                       ? scheme.error
@@ -846,7 +851,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
               Expanded(
                 child: Text(
                   l10n.amountTotal,
-                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 14.5),
                 ),
               )
             else if (summary != null)
@@ -865,7 +870,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             Text(
               _money(l10n, o.totalAmount),
               style: theme.textTheme.bodyLarge?.copyWith(
-                fontSize: 15,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -1048,6 +1053,8 @@ class OrderDetailScreen extends ConsumerWidget {
     final provider = orderDetailProvider(orderId);
     return Scaffold(
       appBar: AppBar(
+        titleTextStyle: Theme.of(context).appBarTheme.titleTextStyle
+            ?.copyWith(fontSize: 18),
         title: Text(l10n.orderDetailTitle),
         actions: const [CartIconButton(), SizedBox(width: 6)],
       ),
@@ -1189,7 +1196,7 @@ class _OrderBody extends ConsumerWidget {
                 },
                 key: const ValueKey('order-headline'),
                 style: theme.textTheme.titleLarge?.copyWith(
-                  fontSize: 20,
+                  fontSize: 18,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -1425,13 +1432,18 @@ class _OrderBody extends ConsumerWidget {
           _DetailTitle(l10n.orderTabPay, key: payKey),
           _DetailBox(
             children: [
-              _Row(l10n.amountItems, _money(l10n, o.quote?.itemAmount)),
+              _Row(l10n.amountItems, _money(l10n, o.quote?.listItemAmount)),
               if (o.quote case final q?)
                 _Row(
                   '${l10n.amountTip} (${tipReasonText(l10n, q.tipReason)})',
                   _money(l10n, q.deliveryTip),
                 ),
               _Row(l10n.amountBag, _money(l10n, o.quote?.bagFee)),
+              // 할인(order 0.18.0 — 서버 값만, 0 이면 줄을 두지 않는다). 주문 조회의 쿠폰은 이름이 없다.
+              if (o.quote?.promotionDiscount case final d? when d > 0)
+                _Row(l10n.amountPromotion, formatKrw(d, negative: true)),
+              if (o.quote?.couponDiscount case final d? when d > 0)
+                _Row(l10n.amountCoupon, formatKrw(d, negative: true)),
               Padding(
                 padding: const EdgeInsets.only(top: 10, bottom: 4),
                 child: Divider(
@@ -1503,7 +1515,7 @@ class _DetailTitle extends StatelessWidget {
     padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
     child: Text(
       text,
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 14.5),
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 16),
     ),
   );
 }
@@ -1809,13 +1821,12 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
           _LineTile(
             line: l,
             // 레퍼런스 9-1 3-3: 줄마다 동그란 ⊕(글자 "담기" 아님)
-            action: IconButton.outlined(
+            // 레퍼런스 9-1 3-3: 원 72px ≈ 24dp
+            action: reorderCircle(
+              context: context,
               key: ValueKey('reorder-${l.orderLineId}'),
+              size: 24,
               tooltip: l10n.reorderLine,
-              // 레퍼런스 9-1 3-3·9-2: 검은 테두리 동그라미(눌리는 칸은 36dp 그대로)
-              style: reorderCircleStyle(Theme.of(context).colorScheme),
-              constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-              padding: EdgeInsets.zero,
               onPressed: (_running || _settled(_results[l.orderLineId]))
                   ? null
                   : () => _run([l]),
@@ -1823,7 +1834,7 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
                 _settled(_results[l.orderLineId])
                     ? PmartLineIcons.check
                     : PmartLineIcons.plus,
-                size: 18,
+                size: 20,
               ),
             ),
           ),
@@ -1858,11 +1869,12 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
           OutlinedButton(
             key: const ValueKey('reorder-all'),
             style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
+              // 레퍼런스 9-1 3-3: 139px ≈ 46dp, 모서리 8dp
+              minimumSize: const Size.fromHeight(46),
               foregroundColor: theme.colorScheme.onSurface,
               side: BorderSide(color: theme.colorScheme.onSurface, width: 1.2),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
               textStyle: theme.textTheme.titleSmall?.copyWith(
                 fontSize: 16,
@@ -1931,7 +1943,7 @@ class _LineTile extends ConsumerWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    fontSize: 15,
+                    fontSize: 14,
                     height: 1.4,
                   ),
                 ),
@@ -2071,12 +2083,15 @@ class _ReorderAllButtonState extends ConsumerState<ReorderAllButton> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    // 레퍼런스 9-1 2 주문내역: 105px ≈ 35dp, 글자 234px ≈ 14sp 굵게
     return FilledButton(
       style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        minimumSize: const Size.fromHeight(35),
+        padding: EdgeInsets.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         textStyle: theme.textTheme.titleSmall?.copyWith(
-          fontSize: 16,
+          fontSize: 14,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -2141,19 +2156,19 @@ class _ReorderButtonState extends ConsumerState<ReorderButton> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return IconButton.outlined(
+    // 레퍼런스 9-1 2 주문내역: 원 88px ≈ 29dp, + 약 14dp
+    return reorderCircle(
+      context: context,
+      size: 29,
+      lightOutline: true,
       tooltip: l10n.reorderLine,
-      // 레퍼런스 9-1 3-3·9-2: 검은 테두리 동그라미(눌리는 칸은 36dp 그대로)
-      style: reorderCircleStyle(Theme.of(context).colorScheme),
-      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-      padding: EdgeInsets.zero,
       onPressed: _busy ? null : _add,
       icon: _busy
           ? const SizedBox.square(
-              dimension: 14,
+              dimension: 12,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : const PmartLineIcon(PmartLineIcons.plus, size: 18),
+          : const PmartLineIcon(PmartLineIcons.plus, size: 24),
     );
   }
 }
@@ -2178,7 +2193,8 @@ class _Row extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(label, style: style)),
-          Text(value, style: style),
+          // 레퍼런스 9-1 3-1: 결제금액 값은 이름보다 크다(약 18.5sp).
+          Text(value, style: strong ? style?.copyWith(fontSize: 18.5) : style),
         ],
       ),
     );
@@ -3053,11 +3069,11 @@ class _TrackSteps extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: step == current
                           ? theme.textTheme.titleSmall?.copyWith(
-                              fontSize: 15,
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                             )
                           : theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 14,
+                              fontSize: 12,
                               color: theme.colorScheme.outline,
                             ),
                     ),
@@ -3078,7 +3094,7 @@ class _TrackSteps extends StatelessWidget {
                           l10n.trackStepComingBubble,
                           maxLines: 1,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 11,
+                            fontSize: 10.5,
                             color: theme.colorScheme.onPrimary,
                           ),
                         ),
@@ -3206,7 +3222,7 @@ class TrackSheetHead extends StatelessWidget {
                         m,
                         key: const ValueKey('track-mode'),
                         style: theme.textTheme.titleSmall?.copyWith(
-                          fontSize: 15,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -3220,7 +3236,7 @@ class TrackSheetHead extends StatelessWidget {
                         key: ValueKey(headlineKey),
                         // 레퍼런스 8-5: "14분 남음" 약 20sp 중간 굵기 + 작은 시각
                         style: theme.textTheme.headlineMedium?.copyWith(
-                          fontSize: 21,
+                          fontSize: 19,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -3230,7 +3246,7 @@ class TrackSheetHead extends StatelessWidget {
                           child: Text(
                             t,
                             style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 15,
+                              fontSize: 11.5,
                             ),
                           ),
                         ),
@@ -3243,7 +3259,7 @@ class TrackSheetHead extends StatelessWidget {
                         sub,
                         key: const ValueKey('eta-stage'),
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          fontSize: 16,
+                          fontSize: 12,
                         ),
                       ),
                     ),
@@ -3464,3 +3480,42 @@ ButtonStyle reorderCircleStyle(ColorScheme scheme) => IconButton.styleFrom(
   disabledForegroundColor: scheme.outline,
   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
 );
+
+/// 다시 담기 ⊕. 보이는 원은 레퍼런스 크기([size] — 주문내역 29dp·주문상세 24dp)지만 손가락 칸은 40dp 다.
+/// 원의 오른쪽 끝은 줄 끝에 그대로 맞춘다(넓힌 칸은 왼쪽·위아래로만).
+Widget reorderCircle({
+  required BuildContext context,
+  Key? key,
+  required double size,
+  required String tooltip,
+  required VoidCallback? onPressed,
+  required Widget icon,
+  bool lightOutline = false,
+}) {
+  const hit = 40.0;
+  final scheme = Theme.of(context).colorScheme;
+  final pad = (hit - size) / 2;
+  return GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: onPressed,
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(pad * 2, pad, 0, pad),
+      child: IconButton.outlined(
+        key: key,
+        tooltip: tooltip,
+        // 레퍼런스 9-1 2 주문내역은 원 둘레가 옅은 회색(+ 는 검정), 주문상세 3-3 은 검정.
+        style: lightOutline
+            ? reorderCircleStyle(scheme).copyWith(
+                side: WidgetStatePropertyAll(
+                  BorderSide(color: scheme.outlineVariant, width: 1.5),
+                ),
+              )
+            : reorderCircleStyle(scheme),
+        constraints: BoxConstraints.tightFor(width: size, height: size),
+        padding: EdgeInsets.zero,
+        onPressed: onPressed,
+        icon: icon,
+      ),
+    ),
+  );
+}

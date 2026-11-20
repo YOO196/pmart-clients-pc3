@@ -30,7 +30,9 @@ void main() {
     await t.pumpAndSettle();
   }
 
-  testWidgets('서버 부족액으로 "15,000원부터 / N원 더" + 바, 주문 버튼은 막지 않는다', (t) async {
+  testWidgets('서버 부족액으로 "15,000원부터 / N원 더" + 바, 주문 버튼은 막힌다(레퍼런스 5-1)', (
+    t,
+  ) async {
     // 목 장바구니 선택 합계 7,940원 → 부족 7,060원
     await openCart(t, MockCartRepository(latency: Duration.zero));
     expect(find.text('15,000원부터 배달 가능해요'), findsOneWidget);
@@ -48,13 +50,29 @@ void main() {
       t
           .widget<FilledButton>(find.byKey(const ValueKey('cart-order')))
           .onPressed,
-      isNotNull,
+      isNull,
     );
+    expect(find.text('최소주문금액을 채워주세요'), findsOneWidget);
   });
 
   testWidgets('부족액이 null 이면 바를 숨긴다(0 으로 보이지 않는다)', (t) async {
     await openCart(t, _ShortfallUnknown());
     expect(find.byKey(const ValueKey('cart-min-order')), findsNothing);
+  });
+
+  testWidgets('최소금액을 채우면 버튼이 다시 열린다(서버 부족액 0)', (t) async {
+    await openCart(t, MockCartRepository(latency: Duration.zero));
+    for (var i = 0; i < 3; i++) {
+      await t.tap(find.byKey(const ValueKey('cart-inc-ci-1')));
+      await t.pumpAndSettle();
+    }
+    expect(find.byKey(const ValueKey('cart-min-order')), findsNothing);
+    expect(
+      t
+          .widget<FilledButton>(find.byKey(const ValueKey('cart-order')))
+          .onPressed,
+      isNotNull,
+    );
   });
 
   test('계약 → 앱: minOrderAmount·minOrderShortfall 그대로, 없으면 null', () {

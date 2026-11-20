@@ -130,7 +130,7 @@ class _ContactSheetState extends ConsumerState<ContactSheet> {
                 child: Text(
                   l10n.contactTitle,
                   style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -169,6 +169,9 @@ class _ContactSheetState extends ConsumerState<ContactSheet> {
                           _focus.requestFocus();
                         },
                   style: OutlinedButton.styleFrom(
+                    textStyle: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 12,
+                    ),
                     minimumSize: const Size(0, 34),
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
