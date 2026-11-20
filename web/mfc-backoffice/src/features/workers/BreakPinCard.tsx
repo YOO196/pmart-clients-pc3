@@ -21,6 +21,8 @@ export function BreakPinCard({ mfcId, canEdit = true }: { readonly mfcId: string
     queryKey: ['break-pin', mfcId],
     queryFn: () => request('GET', api.capacity.GET('/mfcs/{mfcId}/break-pin', { params: { path: { mfcId } } })),
   });
+  // 번호를 한 번 정하면 카드는 한 줄 + 작은 "바꾸기" 단추만(사용자 2026-11-20). 누르면 입력 칸이 열린다.
+  const [editing, setEditing] = useState(false);
   const [pin, setPin] = useState('');
   const [again, setAgain] = useState('');
   const digits = (v: string) => v.replace(/\D/g, '').slice(0, 4);
@@ -29,30 +31,51 @@ export function BreakPinCard({ mfcId, canEdit = true }: { readonly mfcId: string
     const r = await request('PUT', api.capacity.PUT('/mfcs/{mfcId}/break-pin', { ...commandParams(key, { path: { mfcId } }), body: { pin: value } }));
     setPin('');
     setAgain('');
+    setEditing(false);
     await queryClient.invalidateQueries({ queryKey: ['break-pin', mfcId] });
     return r;
   });
+  const isSet = query.data?.set === true;
+  // 아직 안 정했으면(또는 조회 전·실패) 입력 칸을 그대로 보인다 — 정해 두었을 때만 접는다.
+  const showForm = canEdit && (!isSet || editing);
   return (
     <div className="space-y-2 rounded-box bg-base-100 p-3 text-sm" data-testid="break-pin">
-      <h2 className="font-bold">{bp.title}</h2>
-      <p className="text-xs opacity-70">{bp.intro}</p>
-      <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
-        {(s) => (
-          <p data-testid="break-pin-status">
-            {s.set ? (
-              <>
-                {`${bp.set} · `}
-                <Who id={s.updatedBy} />
-                {` · ${s.updatedAt ? formatSeoul(s.updatedAt) : messages.none}`}
-              </>
-            ) : (
-              bp.notSet
-            )}
-          </p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h2 className="font-bold">{bp.title}</h2>
+        <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
+          {(s) => (
+            <p data-testid="break-pin-status">
+              {s.set ? (
+                <>
+                  {`${bp.set} · `}
+                  <Who id={s.updatedBy} />
+                  {` · ${s.updatedAt ? formatSeoul(s.updatedAt) : messages.none}`}
+                </>
+              ) : (
+                bp.notSet
+              )}
+            </p>
+          )}
+        </QueryState>
+        {canEdit && isSet && (
+          <button
+            type="button"
+            className="btn btn-xs"
+            aria-expanded={editing}
+            onClick={() => {
+              setEditing((v) => !v);
+              setPin('');
+              setAgain('');
+              if (save.phase.kind !== 'idle' && save.phase.kind !== 'running') save.reset();
+            }}
+          >
+            {editing ? bp.cancelChange : bp.change}
+          </button>
         )}
-      </QueryState>
-      {canEdit ? (
+      </div>
+      {showForm && (
         <>
+          <p className="text-xs opacity-70">{bp.intro}</p>
           <form
             className="flex flex-wrap items-end gap-2"
             aria-label={bp.save}
@@ -88,7 +111,7 @@ export function BreakPinCard({ mfcId, canEdit = true }: { readonly mfcId: string
               />
             </label>
             <button type="submit" className="btn btn-sm btn-primary" disabled={!valid || save.busy}>
-              {bp.save}
+              {isSet ? bp.saveChange : bp.save}
             </button>
             {pin.length === 4 && again.length === 4 && pin !== again && (
               <p role="alert" className="w-full text-xs text-error">
@@ -97,11 +120,10 @@ export function BreakPinCard({ mfcId, canEdit = true }: { readonly mfcId: string
             )}
           </form>
           <p className="text-xs opacity-70">{bp.lockNote}</p>
-          <CommandFeedback command={save}>{() => <p role="status">{bp.saved}</p>}</CommandFeedback>
         </>
-      ) : (
-        <p className="text-xs opacity-70">{bp.supervisorOnly}</p>
       )}
+      {canEdit && <CommandFeedback command={save}>{() => <p role="status">{bp.saved}</p>}</CommandFeedback>}
+      {!canEdit && !isSet && <p className="text-xs opacity-70">{bp.supervisorOnly}</p>}
     </div>
   );
 }
