@@ -199,6 +199,45 @@ void main() {
     expect(page.items[1].moreQty, isNull);
   });
 
+  test('계약 → 앱: 줄 사진(order 0.19.0 BR-71) — 있으면 그대로, 빈 값·없으면 null', () {
+    final page = orderPageFromContract(
+      api.ListOrders200Response.fromJson({
+        'items': [
+          {
+            'orderId': 'o-1',
+            'status': 'COMPLETED',
+            'lines': [
+              {
+                'orderLineId': 'l-1',
+                'sku': 'S-1',
+                'quantity': 1,
+                'lineAmount': 1000,
+                'imageUrl': 'https://img/p1.jpg',
+              },
+              {
+                'orderLineId': 'l-2',
+                'sku': 'S-2',
+                'quantity': 1,
+                'lineAmount': 1000,
+                'imageUrl': ' ',
+              },
+              {
+                'orderLineId': 'l-3',
+                'sku': 'S-3',
+                'quantity': 1,
+                'lineAmount': 1000,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(page.items.single.lines.map((l) => l.imageUrl), [
+      'https://img/p1.jpg',
+      null,
+      null,
+    ]);
+  });
   test('계약 → 앱: 대표 상품 이름 없음(2026-11-02 전)·모르는 배송 방식은 null', () {
     final page = orderPageFromContract(
       api.ListOrders200Response.fromJson({

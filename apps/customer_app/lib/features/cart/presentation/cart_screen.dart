@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/big_button_text.dart';
 import '../../../shared/notice.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../catalog/domain/catalog.dart' show SaleState;
@@ -699,8 +700,9 @@ class _CartSummaryBar extends ConsumerWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
+                  // 레퍼런스 5-1 아래 버튼 글자 18(2026-11-21 측정).
                   textStyle: theme.textTheme.titleMedium?.copyWith(
-                    fontSize: 17,
+                    fontSize: 18,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -715,33 +717,35 @@ class _CartSummaryBar extends ConsumerWidget {
                     : null,
                 child: Row(
                   children: [
-                    SizedBox(
-                      width: 72,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        // 막혔을 때는 레퍼런스 5-1 처럼 문구만(개수·금액 없음).
-                        child: purchasable > 0 && !minOrderShort
-                            ? Container(
-                                key: const ValueKey('cart-order-count'),
-                                width: 26,
-                                height: 26,
-                                alignment: Alignment.center,
-                                decoration: const BoxDecoration(
-                                  color: Colors.black,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Text(
-                                  '$purchasable',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
+                    // 막혔을 때는 문구만 가운데(양옆 자리 없이 — 글자가 줄어들지 않게).
+                    if (!minOrderShort)
+                      SizedBox(
+                        width: 72,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          // 막혔을 때는 레퍼런스 5-1 처럼 문구만(개수·금액 없음).
+                          child: purchasable > 0 && !minOrderShort
+                              ? Container(
+                                  key: const ValueKey('cart-order-count'),
+                                  width: 26,
+                                  height: 26,
+                                  alignment: Alignment.center,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black,
+                                    shape: BoxShape.circle,
                                   ),
-                                ),
-                              )
-                            : null,
+                                  child: Text(
+                                    '$purchasable',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                )
+                              : null,
+                        ),
                       ),
-                    ),
                     Expanded(
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
@@ -761,28 +765,30 @@ class _CartSummaryBar extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    SizedBox(
-                      width: 72,
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          // 변경 확정 뒤 다시 읽는 동안은 "확인 중", 없으면 0원이 아니라 "확인할 수 없어요".
-                          switch (cart.selectedItemAmount) {
-                            _ when minOrderShort => '',
-                            final int a => formatKrw(a),
-                            null when state.amountStale =>
-                              l10n.cartAmountChecking,
-                            null => l10n.cartAmountUnavailable,
-                          },
-                          key: const ValueKey('cart-total'),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
+                    // 막혔을 때는 문구만 가운데(양옆 자리 없이 — 글자가 줄어들지 않게).
+                    if (!minOrderShort)
+                      SizedBox(
+                        width: 72,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            // 변경 확정 뒤 다시 읽는 동안은 "확인 중", 없으면 0원이 아니라 "확인할 수 없어요".
+                            switch (cart.selectedItemAmount) {
+                              _ when minOrderShort => '',
+                              final int a => formatKrw(a),
+                              null when state.amountStale =>
+                                l10n.cartAmountChecking,
+                              null => l10n.cartAmountUnavailable,
+                            },
+                            key: const ValueKey('cart-total'),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -1034,14 +1040,16 @@ class _AddToCartBarState extends ConsumerState<AddToCartBar> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: CommandButton(
-                      key: const ValueKey('add-to-cart'),
-                      label: inCart == null
-                          ? l10n.cartAdd
-                          : l10n.cartUpdateQuantity,
-                      onPressed: canSubmit
-                          ? () => _submit(sku, quantity, inCart)
-                          : null,
+                    child: BigButtonText(
+                      child: CommandButton(
+                        key: const ValueKey('add-to-cart'),
+                        label: inCart == null
+                            ? l10n.cartAdd
+                            : l10n.cartUpdateQuantity,
+                        onPressed: canSubmit
+                            ? () => _submit(sku, quantity, inCart)
+                            : null,
+                      ),
                     ),
                   ),
                 ],

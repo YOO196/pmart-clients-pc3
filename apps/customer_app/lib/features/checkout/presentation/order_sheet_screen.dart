@@ -28,6 +28,7 @@ import 'delivery_select_screen.dart'
 import '../../catalog/presentation/widgets/product_tile_card.dart'
     show ProductImage;
 import 'shipping_address_view.dart';
+import '../../../shared/big_button_text.dart';
 import '../../../shared/notice.dart';
 
 String _money(AppLocalizations l10n, int? amount) => switch (amount) {
@@ -781,22 +782,24 @@ class _SheetState extends ConsumerState<_Sheet> {
                 height: 58,
                 child: ValueListenableBuilder<bool>(
                   valueListenable: session?.ready ?? _neverReady,
-                  builder: (context, widgetReady, _) => CommandButton(
-                    key: const ValueKey('pay'),
-                    busy: state.paying || _working(flow),
-                    // 막는 사유가 있으면 주버튼에 첫 사유를 쓴다(DraftBlocker 설명의 순서).
-                    label: switch ((
-                      draft.blockers.firstOrNull,
-                      quote?.totalAmount,
-                    )) {
-                      (final DraftBlocker b, _) => blockerText(l10n, b),
-                      (null, final int t) => l10n.payButton(formatKrw(t)),
-                      (null, null) => l10n.payButtonNoAmount,
-                    },
-                    // 결제위젯이 그려져야 연다(설정 실패·비회원이면 열지 않는다).
-                    onPressed: state.canPay && widgetReady
-                        ? () => _pay(context, l10n)
-                        : null,
+                  builder: (context, widgetReady, _) => BigButtonText(
+                    child: CommandButton(
+                      key: const ValueKey('pay'),
+                      busy: state.paying || _working(flow),
+                      // 막는 사유가 있으면 주버튼에 첫 사유를 쓴다(DraftBlocker 설명의 순서).
+                      label: switch ((
+                        draft.blockers.firstOrNull,
+                        quote?.totalAmount,
+                      )) {
+                        (final DraftBlocker b, _) => blockerText(l10n, b),
+                        (null, final int t) => l10n.payButton(formatKrw(t)),
+                        (null, null) => l10n.payButtonNoAmount,
+                      },
+                      // 결제위젯이 그려져야 연다(설정 실패·비회원이면 열지 않는다).
+                      onPressed: state.canPay && widgetReady
+                          ? () => _pay(context, l10n)
+                          : null,
+                    ),
                   ),
                 ),
               ),

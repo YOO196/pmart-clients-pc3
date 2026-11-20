@@ -193,6 +193,33 @@ void main() {
       expect(o.deliveryNote, isNull);
     });
 
+    test('변환: 주문상세 줄 사진·할인 몫, 견적 쿠폰 이름(order 0.19.0)', () {
+      final o = orderFromContract(
+        api.Order.fromJson({
+          'orderId': 'o-1',
+          'quote': {
+            'quoteVersion': 1,
+            'couponDiscount': 3000,
+            'coupon': {
+              'couponId': 'C-1',
+              'applicable': true,
+              'name': '첫 주문 3천원',
+            },
+          },
+          'lines': [
+            {
+              'orderLineId': 'l-1',
+              'sku': 'S-1',
+              'imageUrl': 'https://img/p1.jpg',
+              'discountShare': 3000,
+            },
+          ],
+        }),
+      );
+      expect(o.lines.single.imageUrl, 'https://img/p1.jpg');
+      expect(o.lines.single.discountShare, 3000);
+      expect(o.quote!.coupon!.name, '첫 주문 3천원');
+    });
     test('API: 결제 수단은 GET /payments/{paymentAttemptId} 의 method', () async {
       final adapter = FakeAdapter(
         (_, _) async => const FakeReply(

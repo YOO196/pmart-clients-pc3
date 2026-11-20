@@ -33,6 +33,8 @@ import '../../cart/presentation/cart_controller.dart';
 import '../../cart/presentation/cart_messages.dart';
 import '../../catalog/presentation/catalog_providers.dart'
     show productDetailProvider;
+import '../../catalog/presentation/widgets/discount_price.dart'
+    show discountRateColor;
 import '../../catalog/presentation/widgets/product_tile_card.dart'
     show ProductImage;
 import '../../checkout/domain/checkout.dart' show OutOfStockPreference;
@@ -85,6 +87,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     AppLocalizations l10n, {
     required String id,
     required String? productId,
+    required String? imageUrl,
     required String sku,
     required String name,
     required int? amount,
@@ -99,6 +102,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
           _ListLineImage(
             key: ValueKey('order-line-image-$id'),
             productId: productId,
+            imageUrl: imageUrl,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -190,6 +194,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                   l10n,
                   id: l.orderLineId,
                   productId: l.productId,
+                  imageUrl: l.imageUrl,
                   sku: l.sku,
                   name: l.title,
                   // 주문상세 줄과 같이: 서버 줄 금액, 없으면(옛 응답) 단가
@@ -834,6 +839,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             l10n,
             id: l.orderLineId,
             productId: l.productId,
+            imageUrl: l.imageUrl,
             sku: l.sku,
             name: [?l.productName, ?l.optionLabel].join(' · '),
             amount: l.lineAmount,
@@ -1439,11 +1445,15 @@ class _OrderBody extends ConsumerWidget {
                   _money(l10n, q.deliveryTip),
                 ),
               _Row(l10n.amountBag, _money(l10n, o.quote?.bagFee)),
-              // 할인(order 0.18.0 — 서버 값만, 0 이면 줄을 두지 않는다). 주문 조회의 쿠폰은 이름이 없다.
+              // 할인(order 0.18.0 — 서버 값만, 0 이면 줄을 두지 않는다).
               if (o.quote?.promotionDiscount case final d? when d > 0)
                 _Row(l10n.amountPromotion, formatKrw(d, negative: true)),
               if (o.quote?.couponDiscount case final d? when d > 0)
-                _Row(l10n.amountCoupon, formatKrw(d, negative: true)),
+                _Row(
+                  // 주문 조회도 쿠폰 이름을 준다(order 0.19.0). 없으면 "쿠폰 할인".
+                  o.quote?.coupon?.name ?? l10n.amountCoupon,
+                  formatKrw(d, negative: true),
+                ),
               Padding(
                 padding: const EdgeInsets.only(top: 10, bottom: 4),
                 child: Divider(
@@ -1913,10 +1923,16 @@ class _LineTile extends ConsumerWidget {
       if ((l.deliveredQty ?? 0) > 0) l10n.qtyDelivered(l.deliveredQty!),
       if ((l.returnedQty ?? 0) > 0) l10n.qtyReturned(l.returnedQty!),
     ];
-    final imageUrl = switch (l.productId) {
-      final id? => ref.watch(productDetailProvider(id)).value?.mainImageUrl,
+    final product = switch (l.productId) {
+      final id? => ref.watch(productDetailProvider(id)).value,
       null => null,
     };
+    // 사진은 서버 줄 값(order 0.19.0 BR-71)이 먼저, 없으면(옛 응답·조회 실패) 상품 조회의 대표 사진.
+    final imageUrl = l.imageUrl ?? product?.mainImageUrl;
+    // 레퍼런스 9-1 "지금 더 할인 중" — 그 옵션이 지금 기간 할인 중일 때(pricing 서버 값). 못 읽으면 없음.
+    final nowOnSale =
+        product?.options.where((o) => o.sku == l.sku).firstOrNull?.discount !=
+        null;
     // 금액: 서버 행 금액이 먼저, 없으면 단가(옛 응답).
     final amount = l.lineAmount ?? l.unitPrice;
     return Padding(
@@ -1937,6 +1953,19 @@ class _LineTile extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (nowOnSale)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 2),
+                    child: Text(
+                      l10n.orderLineNowOnSale,
+                      key: ValueKey('line-now-sale-${l.orderLineId}'),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: discountRateColor,
+                      ),
+                    ),
+                  ),
                 // 주문 당시 상품명 사본(BR-35). 없을 때만 sku.
                 Text(
                   l.productName ?? l.sku,
@@ -1978,6 +2007,16 @@ class _LineTile extends ConsumerWidget {
                   key: ValueKey('line-amount-${l.orderLineId}'),
                   style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
                 ),
+                // 이 줄에 나눠 넣은 할인(order 0.18.0 `discountShare` — 기간 할인 + 쿠폰). 서버 값만, 0 이면 없음.
+                if (l.discountShare case final d? when d > 0)
+                  Text(
+                    l10n.orderLineDiscount(formatKrw(d, negative: true)),
+                    key: ValueKey('line-discount-${l.orderLineId}'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 13,
+                      color: scheme.primary,
+                    ),
+                  ),
                 if (notes.isNotEmpty)
                   Text(
                     notes.join(' · '),
@@ -1998,15 +2037,24 @@ class _LineTile extends ConsumerWidget {
 
 /// 주문내역 카드 상품 줄의 대표 사진(레퍼런스 9-2 약 56dp 둥근 네모). 상품 ID 가 없거나 못 받으면 빈 자리.
 class _ListLineImage extends ConsumerWidget {
-  const _ListLineImage({super.key, required this.productId});
+  const _ListLineImage({
+    super.key,
+    required this.productId,
+    required this.imageUrl,
+  });
 
   final String? productId;
 
+  /// 서버가 준 사진(order 0.19.0). 있으면 상품을 따로 조회하지 않는다.
+  final String? imageUrl;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) => ProductImage(
-    url: switch (productId) {
-      final id? => ref.watch(productDetailProvider(id)).value?.mainImageUrl,
-      null => null,
+    url: switch ((imageUrl, productId)) {
+      (final u?, _) => u,
+      (null, final id?) =>
+        ref.watch(productDetailProvider(id)).value?.mainImageUrl,
+      _ => null,
     },
     size: 56,
     radius: 8,

@@ -334,6 +334,10 @@ OrderPage orderPageFromContract(api.ListOrders200Response r) => OrderPage(
             OrderListLine(
               orderLineId: l.orderLineId,
               productId: l.productId,
+              imageUrl: switch (l.imageUrl?.trim()) {
+                final u? when u.isNotEmpty => u,
+                _ => null,
+              },
               sku: l.sku,
               productName: switch (l.productName?.trim()) {
                 final n? when n.isNotEmpty => n,
@@ -385,6 +389,11 @@ OrderDetail orderFromContract(api.Order o) => OrderDetail(
         unfulfilledQty: l.unfulfilledQty,
         productId: l.productId,
         lineAmount: l.lineAmount,
+        discountShare: l.discountShare,
+        imageUrl: switch (l.imageUrl?.trim()) {
+          final u? when u.isNotEmpty => u,
+          _ => null,
+        },
       ),
   ],
   shipments: [

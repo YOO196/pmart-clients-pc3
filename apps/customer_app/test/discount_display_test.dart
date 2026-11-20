@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pmart_api_cart/pmart_api_cart.dart' as ca;
 import 'package:pmart_api_product_content/pmart_api_product_content.dart' as pc;
 import 'package:pmart_api_search/pmart_api_search.dart' as sr;
@@ -151,5 +154,32 @@ void main() {
           .toPlainText(),
       '33% 3,990원 5,980원',
     );
+  });
+  testWidgets('주문상세 줄: 나눠 넣은 할인(discountShare)과 "지금 더 할인 중"(지금 할인 상품만)', (
+    t,
+  ) async {
+    t.view
+      ..physicalSize = const Size(800, 2400)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    unawaited(router.push('/orders/order-seed-2'));
+    await t.pumpAndSettle();
+    final discount = find.byKey(const ValueKey('line-discount-ol-3'));
+    await t.scrollUntilVisible(
+      discount,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(t.widget<Text>(discount).data, '할인 -3,980원');
+    expect(find.byKey(const ValueKey('line-now-sale-ol-3')), findsOneWidget);
+
+    // 할인 없는 주문·상품(서울우유)은 둘 다 없다.
+    unawaited(router.push('/orders/order-seed-1'));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('line-discount-ol-1')), findsNothing);
+    expect(find.byKey(const ValueKey('line-now-sale-ol-1')), findsNothing);
   });
 }

@@ -66,8 +66,9 @@ class PmartConfirmDialog extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 6),
                 child: Text(
                   t,
+                  // 확인 창 제목 18(테마 dialog 제목과 같게 — 2026-11-21 측정).
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontSize: 19,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -99,6 +100,10 @@ class PmartConfirmDialog extends StatelessWidget {
                     style: TextButton.styleFrom(
                       foregroundColor: theme.colorScheme.onSurfaceVariant,
                       minimumSize: const Size(64, 40),
+                      // 레퍼런스 6-0 "아니요"·"주문 취소" 16(2026-11-21 측정).
+                      textStyle: theme.textTheme.labelLarge?.copyWith(
+                        fontSize: 16,
+                      ),
                     ),
                     onPressed: () => Navigator.of(context).pop(false),
                     child: Text(c),
@@ -109,7 +114,9 @@ class PmartConfirmDialog extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(72, 40),
                     padding: const EdgeInsets.symmetric(horizontal: 18),
-                    textStyle: theme.textTheme.labelLarge,
+                    textStyle: theme.textTheme.labelLarge?.copyWith(
+                      fontSize: 16,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(6),
                     ),

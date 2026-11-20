@@ -1039,6 +1039,16 @@ void main() {
     router().go('/cart');
     await t.pumpAndSettle();
     await shot('cart');
+    // 주문상세 줄: 나눠 넣은 할인·지금 더 할인 중(레퍼런스 9-1)
+    router().go('/orders/order-seed-2');
+    await t.pumpAndSettle();
+    await t.scrollUntilVisible(
+      find.byKey(const ValueKey('line-discount-ol-3')),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await t.drag(find.byType(Scrollable).last, const Offset(0, -200));
+    await shot('order-detail');
     debugDisableShadows = true;
   });
   // 장바구니 최소주문 막힘·봉투값 줄(사용자 2026-11-21, 레퍼런스 5-1) — 목 장바구니 7,940원(최소 15,000).

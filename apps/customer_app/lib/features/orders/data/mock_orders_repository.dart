@@ -203,6 +203,9 @@ base class MockOrdersRepository implements OrdersRepository {
       'deliveryMode': 'BUNDLED',
       'quote': {
         ..._quoteSeed,
+        // 기간 할인 받은 주문(order 0.18.0 흉내 — 요거트 2개 3,980원 할인).
+        'baseItemAmount': 20860,
+        'promotionDiscount': 3980,
         'itemAmount': 16880,
         'deliveryTip': 3000,
         'deliveryTipReason': 'STANDARD',
@@ -216,6 +219,8 @@ base class MockOrdersRepository implements OrdersRepository {
           'sku': 'E-00000002',
           'productName': '그릭요거트 플레인 400g',
           'unitPrice': 5980,
+          'lineAmount': 11960,
+          'discountShare': 3980,
           'originalQty': 2,
           'deliveredQty': 2,
         },

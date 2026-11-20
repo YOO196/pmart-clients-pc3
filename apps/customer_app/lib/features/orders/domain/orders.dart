@@ -20,12 +20,15 @@ class OrderListLine {
     this.productId,
     this.productName,
     this.optionLabel,
+    this.imageUrl,
   });
 
   final String orderLineId;
 
-  /// 대표 사진을 찾는 상품 ID(order 0.17.0 `lines[].productId`, 없을 수 있음). 줄에 사진 주소가 없어(BR-71)
-  /// 상품 상세의 대표 사진을 쓴다 — 주문상세 줄과 같은 방식.
+  /// 지금 상품의 대표 사진(order 0.19.0 BR-71 `lines[].imageUrl`). null 이면(게시 안 됨·조회 실패·옛 응답) 상품 조회로 찾는다.
+  final String? imageUrl;
+
+  /// 상품 ID(order 0.17.0 `lines[].productId`, 없을 수 있음). 줄 사진([imageUrl])이 없을 때 상품 상세의 대표 사진을 찾는다.
   final String? productId;
 
   /// 다시 담을 때 쓰는 SKU(order 0.17.0 `lines[].sku`).
@@ -175,9 +178,17 @@ class OrderLineView {
     this.unfulfilledQty,
     this.productId,
     this.lineAmount,
+    this.discountShare,
+    this.imageUrl,
   });
 
-  /// 상품 ID(order `productId`). 주문 상세에서 지금 상품의 대표 사진을 찾을 때 쓴다(주문 행에는 사진이 없다). 없으면 null.
+  /// 지금 상품의 대표 사진(order 0.19.0 BR-71). null 이면 상품 조회로 찾는다.
+  final String? imageUrl;
+
+  /// 이 줄에 나눠 넣은 할인(order 0.18.0 — 기간 할인 + 쿠폰 안분, 서버 값). 0·없으면 표시하지 않는다.
+  final int? discountShare;
+
+  /// 상품 ID(order `productId`). 줄 사진이 없을 때 대표 사진을, "지금 더 할인 중"에 지금 할인을 찾는다. 없으면 null.
   final String? productId;
 
   /// 행 금액(단가×수량, 할인 나눔 전 — 서버 값). 없으면 null.
