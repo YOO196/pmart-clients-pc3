@@ -20,7 +20,10 @@ final class KakaoSocialTokenSource implements SocialTokenSource {
   const KakaoSocialTokenSource();
 
   @override
-  Future<SocialCredential?> obtain(SocialProvider provider) async {
+  Future<SocialCredential?> obtain(
+    SocialProvider provider, {
+    bool withdrawal = false,
+  }) async {
     if (provider != SocialProvider.kakao) throw const SocialProviderDown();
     try {
       final token = await isKakaoTalkInstalled()
@@ -82,6 +85,7 @@ typedef NaverCodeExchange = Future<NaverExchange> Function({
   required String codeVerifier,
   required String redirectUri,
   required IdempotencyKey key,
+  bool withdrawal,
 });
 
 /// 네이버 인가 요청(`nid.naver.com/oauth2/authorize`)에 덧붙이는 값(사용자 2026-11-20).
@@ -129,7 +133,10 @@ final class NaverSocialTokenSource implements SocialTokenSource {
   final NaverAuthorize authorize;
 
   @override
-  Future<SocialCredential?> obtain(SocialProvider provider) async {
+  Future<SocialCredential?> obtain(
+    SocialProvider provider, {
+    bool withdrawal = false,
+  }) async {
     if (provider != SocialProvider.naver) throw const SocialProviderDown();
     if (clientId.isEmpty) throw const SocialProviderMisconfigured();
     final NaverAuthorization? granted;
@@ -147,6 +154,8 @@ final class NaverSocialTokenSource implements SocialTokenSource {
       codeVerifier: granted.codeVerifier,
       redirectUri: naverRedirectUrl,
       key: key,
+      // 탈퇴 재인증이면 서버가 교환 뒤 네이버 앱 연결을 끊는다(auth 0.11.0, BR-74).
+      withdrawal: withdrawal,
     );
     try {
       NaverExchange r;
@@ -191,8 +200,10 @@ final class RoutingSocialTokenSource implements SocialTokenSource {
   };
 
   @override
-  Future<SocialCredential?> obtain(SocialProvider provider) =>
-      _of(provider).obtain(provider);
+  Future<SocialCredential?> obtain(
+    SocialProvider provider, {
+    bool withdrawal = false,
+  }) => _of(provider).obtain(provider, withdrawal: withdrawal);
 
   @override
   Future<SocialCredential?> obtainSilently(SocialProvider provider) =>

@@ -201,7 +201,10 @@ final class _WithPhoto implements SocialTokenSource {
   final String photo;
 
   @override
-  Future<SocialCredential?> obtain(SocialProvider provider) async =>
+  Future<SocialCredential?> obtain(
+    SocialProvider provider, {
+    bool withdrawal = false,
+  }) async =>
       SocialCredential('token-${provider.name}', profileImageUrl: photo);
 
   @override

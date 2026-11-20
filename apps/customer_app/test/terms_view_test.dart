@@ -33,8 +33,8 @@ void main() {
     await t.tap(key('login-naver'));
     await t.pumpAndSettle();
     expect(key('consent-submit'), findsOneWidget);
-    // 고른 것은 본문을 보고 와도 남는다.
-    await t.tap(key('consent-${MockAuthRepository.requiredConsents.first}'));
+    // 고른 선택 항목은 본문을 보고 와도 남는다.
+    await t.tap(key('consent-${MockAuthRepository.optionalConsents.first}'));
     await t.pump();
 
     for (final type in ['TERMS_OF_SERVICE', 'PRIVACY_POLICY', 'MARKETING']) {
@@ -49,10 +49,10 @@ void main() {
     await t.pumpAndSettle();
     expect(key('consent-term'), findsNothing);
     expect(key('consent-submit'), findsOneWidget);
-    final first = t.widget<CheckboxListTile>(
-      key('consent-${MockAuthRepository.requiredConsents.first}'),
+    final marketing = t.widget<Checkbox>(
+      key('consent-${MockAuthRepository.optionalConsents.first}'),
     );
-    expect(first.value, isTrue);
+    expect(marketing.value, isTrue);
   });
 
   testWidgets('마이 → 약관 및 정책: 비회원도 목록·본문을 보고, 뒤로 가면 목록', (t) async {

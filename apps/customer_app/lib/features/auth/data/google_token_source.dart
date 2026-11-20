@@ -46,7 +46,10 @@ final class GoogleSocialTokenSource implements SocialTokenSource {
   Future<void>? _initialized;
 
   @override
-  Future<SocialCredential?> obtain(SocialProvider provider) async {
+  Future<SocialCredential?> obtain(
+    SocialProvider provider, {
+    bool withdrawal = false,
+  }) async {
     // 서버는 Google 만 지원한다(ADR-0019). 화면도 Google 버튼만 보인다.
     if (provider != SocialProvider.google) throw const SocialProviderDown();
     try {

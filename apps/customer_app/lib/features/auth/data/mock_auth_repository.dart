@@ -21,7 +21,10 @@ final class MockSocialTokenSource implements SocialTokenSource {
   int silentAttempts = 0;
 
   @override
-  Future<SocialCredential?> obtain(SocialProvider provider) async {
+  Future<SocialCredential?> obtain(
+    SocialProvider provider, {
+    bool withdrawal = false,
+  }) async {
     if (down.contains(provider)) throw const SocialProviderDown();
     if (cancelled.contains(provider)) return null;
     // 목은 제공자 창 없이 바로 성공한다. 실제 계정이 아님을 이름으로 드러낸다.
@@ -68,6 +71,9 @@ base class MockAuthRepository implements AuthRepository {
   /// 네이버 코드 교환 기록(키) — 시험이 같은 키 재전송을 확인한다.
   final naverExchangeKeys = <String>[];
 
+  /// 교환마다 탈퇴 재인증(purpose WITHDRAWAL)이었는지.
+  final naverExchangeWithdrawals = <bool>[];
+
   /// 교환 응답의 프로필 사진 주소(없으면 null — 콘솔에서 제공 정보를 안 켠 경우).
   String? naverProfileImageUrl = 'https://phinf.pstatic.net/mock/profile.jpg';
 
@@ -83,9 +89,11 @@ base class MockAuthRepository implements AuthRepository {
     required String codeVerifier,
     required String redirectUri,
     required IdempotencyKey key,
+    bool withdrawal = false,
   }) async {
     await _wait();
     naverExchangeKeys.add(key.value);
+    naverExchangeWithdrawals.add(withdrawal);
     if (failNextNaverExchange case final f?) {
       failNextNaverExchange = null;
       throw f;

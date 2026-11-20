@@ -393,6 +393,10 @@ void main() {
     await shot('order-detail');
     await scrollDown(650);
     await shot('order-detail-2');
+    // 상품이 여럿인 주문(order-seed-1)의 상품 줄 — 레퍼런스 9-1 3-3 과 간격 비교용
+    await go('/orders/order-seed-1');
+    await scrollDown(500);
+    await shot('order-detail-lines');
     // 배송현황 — 배달 중 라이더 지도(레퍼런스 8-5). 목 모드는 카카오 지도 대신 안내 칸이 그려진다.
     await go('/');
     await shot('home-ordering');

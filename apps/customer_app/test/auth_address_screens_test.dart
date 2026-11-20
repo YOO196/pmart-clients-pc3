@@ -138,25 +138,13 @@ void main() {
     expect(find.text('[선택] 마케팅 정보 수신'), findsOneWidget);
     expect(
       t
-          .widget<CheckboxListTile>(
-            find.byKey(const ValueKey('consent-$marketing')),
-          )
+          .widget<Checkbox>(find.byKey(const ValueKey('consent-$marketing')))
           .value,
       isFalse,
     );
-    // 선택만 고르면 시작할 수 없다(필수가 먼저).
     await t.tap(find.byKey(const ValueKey('consent-$marketing')));
     await t.pump();
-    expect(
-      t
-          .widget<FilledButton>(find.byKey(const ValueKey('consent-submit')))
-          .onPressed,
-      isNull,
-    );
-    for (final c in MockAuthRepository.requiredConsents) {
-      await t.tap(find.byKey(ValueKey('consent-$c')));
-      await t.pump();
-    }
+    // 필수는 아래 [전체 동의하고 계속하기] 한 번으로 모두 동의한다(레퍼런스 13-9 — 재동의 시트와 같다).
     await t.tap(find.byKey(const ValueKey('consent-submit')));
     await t.pumpAndSettle();
 
@@ -165,7 +153,7 @@ void main() {
     expect(sent.where((d) => d.agreed), hasLength(4));
   });
 
-  testWidgets('필수 동의를 모두 골라야 시작할 수 있다', (t) async {
+  testWidgets('필수는 [전체 동의하고 계속하기] 한 번으로 동의, 선택은 고른 값 그대로(끄면 false)', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
     await t.tap(find.text('마이페이지').last);
@@ -177,12 +165,18 @@ void main() {
 
     FilledButton submit() =>
         t.widget<FilledButton>(find.byKey(const ValueKey('consent-submit')));
-    expect(submit().onPressed, isNull);
-    for (final c in MockAuthRepository.requiredConsents) {
-      await t.tap(find.byKey(ValueKey('consent-$c')));
-      await t.pump();
-    }
+    // 필수를 하나씩 체크하지 않는다 — 단추가 처음부터 눌린다.
     expect(submit().onPressed, isNotNull);
+    for (final c in MockAuthRepository.requiredConsents) {
+      expect(find.byKey(ValueKey('consent-$c')), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(ValueKey('consent-$c')),
+          matching: find.byType(Checkbox),
+        ),
+        findsNothing,
+      );
+    }
 
     await t.tap(find.byKey(const ValueKey('consent-submit')));
     await t.pumpAndSettle();

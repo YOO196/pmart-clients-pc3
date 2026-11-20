@@ -401,6 +401,7 @@
   "loginUnknown": "로그인 결과를 확인하는 중이에요",
   "loginCheckAgain": "다시 확인",
   "consentReconsentTitle": "바뀐 약관을 확인하고\n동의해 주세요",
+  "consentSignupTitle": "서비스 이용을 위해\n약관에 동의해 주세요",
   "consentGroupRequired": "필수 약관",
   "consentGroupOptional": "선택 약관",
   "consentView": "보기",

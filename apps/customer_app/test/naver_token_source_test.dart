@@ -114,4 +114,11 @@ void main() {
   test('인가 요청에 auth_type=reauthenticate 를 붙인다 — 네이버 아이디·비밀번호를 매번 다시 받는다', () {
     expect(naverAuthorizeExtra, {'auth_type': 'reauthenticate'});
   });
+
+  test('탈퇴 재인증이면 교환에 WITHDRAWAL 을 붙인다(서버가 네이버 연결을 끊음), 로그인은 아님', () async {
+    final repo = repo0();
+    await source(repo).obtain(SocialProvider.naver);
+    await source(repo).obtain(SocialProvider.naver, withdrawal: true);
+    expect(repo.naverExchangeWithdrawals, [false, true]);
+  });
 }

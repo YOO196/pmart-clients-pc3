@@ -93,7 +93,11 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
     try {
       final token =
           _token ??
-          (await ref.read(socialTokenSourceProvider).obtain(provider))?.token;
+          (await ref
+                  .read(socialTokenSourceProvider)
+                  // 네이버는 서버가 교환 뒤 앱 연결을 끊는다(auth 0.11.0, BR-74).
+                  .obtain(provider, withdrawal: true))
+              ?.token;
       if (token == null) return null; // 로그인 화면을 닫음
       _token = token;
       final key = _key ??= IdempotencyKey.generate();

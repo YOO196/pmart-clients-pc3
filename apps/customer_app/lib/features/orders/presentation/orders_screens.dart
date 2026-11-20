@@ -1678,13 +1678,22 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
       children: [
         Text(l10n.checkoutItems, style: theme.textTheme.titleMedium),
         const SizedBox(height: 4),
-        for (final l in lines) ...[
+        for (final (i, l) in lines.indexed) ...[
+          // 레퍼런스 9-1 3-3: 줄과 줄 사이 옅은 선
+          if (i > 0)
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+            ),
           _LineTile(
             line: l,
             // 레퍼런스 9-1 3-3: 줄마다 동그란 ⊕(글자 "담기" 아님)
             action: IconButton.outlined(
               key: ValueKey('reorder-${l.orderLineId}'),
               tooltip: l10n.reorderLine,
+              // 레퍼런스 9-1 3-3·9-2: 검은 테두리 동그라미(눌리는 칸은 36dp 그대로)
+              style: reorderCircleStyle(Theme.of(context).colorScheme),
               constraints: const BoxConstraints.tightFor(width: 36, height: 36),
               padding: EdgeInsets.zero,
               onPressed: (_running || _settled(_results[l.orderLineId]))
@@ -1699,15 +1708,18 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
             ),
           ),
           if (_text(l10n, _results[l.orderLineId]) case final t?)
-            Text(
-              t,
-              key: ValueKey('reorder-result-${l.orderLineId}'),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color:
-                    (_settled(_results[l.orderLineId]) ||
-                        _results[l.orderLineId] is _ReorderRunning)
-                    ? null
-                    : theme.colorScheme.error,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                t,
+                key: ValueKey('reorder-result-${l.orderLineId}'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color:
+                      (_settled(_results[l.orderLineId]) ||
+                          _results[l.orderLineId] is _ReorderRunning)
+                      ? null
+                      : theme.colorScheme.error,
+                ),
               ),
             ),
         ],
@@ -1777,7 +1789,8 @@ class _LineTile extends ConsumerWidget {
     final amount = l.lineAmount ?? l.unitPrice;
     return Padding(
       key: ValueKey('line-${l.orderLineId}'),
-      padding: const EdgeInsets.symmetric(vertical: 10),
+      // 레퍼런스 9-1 3-3: 줄 사이를 넉넉히(위아래 약 18dp) — 전에는 10dp 라 다닥다닥 붙어 보였다(사용자 2026-11-20).
+      padding: const EdgeInsets.symmetric(vertical: 18),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1797,17 +1810,24 @@ class _LineTile extends ConsumerWidget {
                   l.productName ?? l.sku,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
                 ),
                 if (l.productName != null && l.optionLabel != null)
-                  Text(
-                    '• ${l.optionLabel!}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 13,
-                      color: scheme.onSurfaceVariant,
+                  Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text(
+                      '• ${l.optionLabel!}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 6),
                 Text.rich(
                   TextSpan(
                     children: [
@@ -1896,6 +1916,8 @@ class _ReorderButtonState extends ConsumerState<ReorderButton> {
     final l10n = AppLocalizations.of(context);
     return IconButton.outlined(
       tooltip: l10n.reorderLine,
+      // 레퍼런스 9-1 3-3·9-2: 검은 테두리 동그라미(눌리는 칸은 36dp 그대로)
+      style: reorderCircleStyle(Theme.of(context).colorScheme),
       constraints: const BoxConstraints.tightFor(width: 36, height: 36),
       padding: EdgeInsets.zero,
       onPressed: _busy ? null : _add,
@@ -3206,3 +3228,12 @@ String orderHeadlineText(AppLocalizations l10n, OrderStatus s) => switch (s) {
   OrderStatus.inDelivery => l10n.orderHeadlineDelivering,
   _ => l10n.orderHeadlineInProgress,
 };
+
+/// 다시 담기 ⊕ 모양(레퍼런스 9-1 3-3·9-2 — 검은 1.5dp 테두리, 흰 바탕). 담은 뒤(누를 수 없음)는 옅게.
+ButtonStyle reorderCircleStyle(ColorScheme scheme) => IconButton.styleFrom(
+  foregroundColor: scheme.onSurface,
+  backgroundColor: scheme.surface,
+  side: BorderSide(color: scheme.onSurface, width: 1.5),
+  disabledForegroundColor: scheme.outline,
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+);

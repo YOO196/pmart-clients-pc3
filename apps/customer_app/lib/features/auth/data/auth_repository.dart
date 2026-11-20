@@ -10,7 +10,11 @@ import '../domain/auth.dart';
 /// 실제 SDK(카카오 등)는 앱 키 결정 뒤 붙인다(`[결정 필요]` 카카오 키). 토큰은 로그에 남기지 않는다.
 abstract interface class SocialTokenSource {
   /// 제공자 장애면 [SocialProviderDown] 을 던진다.
-  Future<SocialCredential?> obtain(SocialProvider provider);
+  /// [withdrawal] = 회원 탈퇴·철회 재인증(auth 0.11.0 BR-74) — 네이버는 서버가 교환 뒤 앱 연결을 끊는다.
+  Future<SocialCredential?> obtain(
+    SocialProvider provider, {
+    bool withdrawal = false,
+  });
 
   /// 조용한 재로그인(화면 없이). 세션이 끝났을 때 먼저 시도한다(백엔드 요청 2026-11-02 세션 만료 §3-2).
   /// 못 받으면 null — 던지지 않는다.
@@ -44,6 +48,7 @@ abstract interface class AuthRepository {
     required String codeVerifier,
     required String redirectUri,
     required IdempotencyKey key,
+    bool withdrawal = false,
   });
 
   /// 저장된 세션의 계정(`GET /auth/sessions/current`. 401 이면 인터셉터가 refresh 회전 후 다시 보낸다).
@@ -143,6 +148,7 @@ final class ApiAuthRepository implements AuthRepository {
     required String codeVerifier,
     required String redirectUri,
     required IdempotencyKey key,
+    bool withdrawal = false,
   }) async {
     final res = await pmartGuard(
       () => _logins.exchangeNaverCode(
@@ -152,6 +158,10 @@ final class ApiAuthRepository implements AuthRepository {
           authorizationCode: authorizationCode,
           codeVerifier: codeVerifier,
           redirectUri: redirectUri,
+          // 탈퇴 재인증이면 서버가 교환 뒤 네이버 앱 연결을 끊는다(auth 0.11.0, BR-74).
+          purpose: withdrawal
+              ? auth.ExchangeNaverCodeRequestPurposeEnum.WITHDRAWAL
+              : auth.ExchangeNaverCodeRequestPurposeEnum.LOGIN,
         ),
         extra: _publicCommand(key),
       ),

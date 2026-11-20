@@ -273,8 +273,10 @@ final class _CancelAfterFirst implements SocialTokenSource {
   int _calls = 0;
 
   @override
-  Future<SocialCredential?> obtain(SocialProvider provider) async =>
-      _calls++ == 0 ? SocialCredential('token-${provider.name}') : null;
+  Future<SocialCredential?> obtain(
+    SocialProvider provider, {
+    bool withdrawal = false,
+  }) async => _calls++ == 0 ? SocialCredential('token-${provider.name}') : null;
 
   @override
   Future<SocialCredential?> obtainSilently(SocialProvider provider) async =>

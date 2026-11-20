@@ -141,77 +141,174 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _consentFor = waiting.authRequestId;
         _agreed.clear();
       }
-      final allAgreed = waiting.requiredConsents.every(_agreed.contains);
-      // 항목마다 [보기] — 동의하기 전에 본문을 읽을 수 있게(사용자 2026-11-20 "약관 볼 수 있게").
-      // 항목은 `TYPE:version` — 그 버전의 본문(`/consent-terms/{항목}/{버전}`)을 연다.
-      Widget box(String c, String title) {
-        final d = ConsentDecision(c, agreed: true);
-        return CheckboxListTile(
-          key: ValueKey('consent-$c'),
-          value: _agreed.contains(c),
-          title: Text(title),
-          secondary: d.version.isEmpty
-              ? null
-              : TextButton(
-                  key: ValueKey('consent-view-${d.type}'),
-                  onPressed: () =>
-                      context.push(StartRoutes.terms(d.type, d.version)),
-                  child: Text(l10n.consentView),
-                ),
-          onChanged: busy
-              ? null
-              : (v) => setState(
-                  () => (v ?? false) ? _agreed.add(c) : _agreed.remove(c),
-                ),
-        );
-      }
-
+      final theme = Theme.of(context);
+      final scheme = theme.colorScheme;
       final error = switch (waiting.lastError) {
         null => null,
         AuthProblemCode.requiredConsentMissing => l10n.consentMissing,
         ProblemCode.unknownResult => l10n.consentUnknown,
         _ => l10n.loginRejected,
       };
+      // 레퍼런스 13-9(약관 시트)와 같은 모양 — 재동의 시트(consents_screens)와 맞춘다(사용자 2026-11-20 "레퍼런스 참고해"):
+      // 굵은 2줄 제목 + ✕, 묶음 제목, 줄마다 회색 알약 [보기], 아래 [전체 동의하고 계속하기].
+      // 필수는 하나씩 체크하지 않고 아래 단추 한 번으로 모두 동의한다(재동의 시트와 같은 결정). 선택은 체크로 고른다.
+      // 항목은 `TYPE:version` — [보기]는 그 버전 본문(`/consent-terms/{항목}/{버전}`).
+      Widget view(String c) {
+        final d = ConsentDecision(c, agreed: true);
+        if (d.version.isEmpty) return const SizedBox.shrink();
+        return ActionChip(
+          key: ValueKey('consent-view-${d.type}'),
+          label: Text(l10n.consentView),
+          labelStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 13),
+          backgroundColor: scheme.surfaceContainer,
+          side: BorderSide.none,
+          shape: const StadiumBorder(),
+          visualDensity: VisualDensity.compact,
+          onPressed: () => context.push(StartRoutes.terms(d.type, d.version)),
+        );
+      }
+
+      Widget row(String c, String title, {Widget? lead}) => Padding(
+        key: lead == null ? ValueKey('consent-$c') : null,
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          children: [
+            lead ??
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 0, 10, 0),
+                  child: Container(width: 4, height: 4, color: scheme.outline),
+                ),
+            Expanded(
+              child: Text(
+                title,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontSize: 15,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            view(c),
+          ],
+        ),
+      );
+      Widget group(String text) => Padding(
+        padding: const EdgeInsets.only(top: 18, bottom: 6),
+        child: Text(
+          text,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
       return guard(
         Scaffold(
-          appBar: AppBar(title: Text(l10n.consentTitle)),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              // 기존 회원(newAccount=false)은 약관이 바뀌어 다시 묻는 것이다.
-              Text(
-                waiting.newAccount
-                    ? l10n.consentBody
-                    : l10n.consentReconsentBody,
-                key: const ValueKey('consent-body'),
-              ),
-              for (final c in waiting.requiredConsents)
-                box(c, l10n.consentRequired(_consentLabel(l10n, c))),
-              for (final c in waiting.optionalConsents)
-                box(c, l10n.consentOptional(_consentLabel(l10n, c))),
-              if (error != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  error,
-                  key: const ValueKey('consent-error'),
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+          body: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 22, 12, 16),
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              // 기존 회원(newAccount=false)은 약관이 바뀌어 다시 묻는 것이다.
+                              waiting.newAccount
+                                  ? l10n.consentSignupTitle
+                                  : l10n.consentReconsentTitle,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontSize: 20,
+                                height: 1.35,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            key: const ValueKey('consent-close'),
+                            tooltip: l10n.actionClose,
+                            icon: const PmartLineIcon(
+                              PmartLineIcons.close,
+                              size: 24,
+                            ),
+                            onPressed: busy ? null : leaveStep,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        waiting.newAccount
+                            ? l10n.consentBody
+                            : l10n.consentReconsentBody,
+                        key: const ValueKey('consent-body'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      if (waiting.requiredConsents.isNotEmpty)
+                        group(l10n.consentGroupRequired),
+                      for (final c in waiting.requiredConsents)
+                        row(c, l10n.consentRequired(_consentLabel(l10n, c))),
+                      if (waiting.optionalConsents.isNotEmpty)
+                        group(l10n.consentGroupOptional),
+                      for (final c in waiting.optionalConsents)
+                        row(
+                          c,
+                          l10n.consentOptional(_consentLabel(l10n, c)),
+                          lead: SizedBox(
+                            width: 32,
+                            child: Checkbox(
+                              key: ValueKey('consent-$c'),
+                              value: _agreed.contains(c),
+                              visualDensity: VisualDensity.compact,
+                              onChanged: busy
+                                  ? null
+                                  : (v) => setState(
+                                      () => (v ?? false)
+                                          ? _agreed.add(c)
+                                          : _agreed.remove(c),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      if (error != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          error,
+                          key: const ValueKey('consent-error'),
+                          style: TextStyle(color: scheme.error),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                  child: FilledButton(
+                    key: const ValueKey('consent-submit'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: busy
+                        ? null
+                        : () => controller.submitConsents(waiting, [
+                            for (final c in waiting.requiredConsents)
+                              ConsentDecision(c, agreed: true),
+                            // 선택 항목은 끈 것도 false 로 보낸다(거부로 기록돼 다시 묻지 않는다)
+                            for (final c in waiting.optionalConsents)
+                              ConsentDecision(c, agreed: _agreed.contains(c)),
+                          ]),
+                    child: Text(l10n.consentAgreeAllContinue),
+                  ),
                 ),
               ],
-              const SizedBox(height: 16),
-              FilledButton(
-                key: const ValueKey('consent-submit'),
-                onPressed: (allAgreed && !busy)
-                    ? () => controller.submitConsents(waiting, [
-                        for (final c in waiting.requiredConsents)
-                          ConsentDecision(c, agreed: true),
-                        // 선택 항목은 끈 것도 false 로 보낸다(거부로 기록돼 다시 묻지 않는다)
-                        for (final c in waiting.optionalConsents)
-                          ConsentDecision(c, agreed: _agreed.contains(c)),
-                      ])
-                    : null,
-                child: Text(l10n.consentSubmit),
-              ),
-            ],
+            ),
           ),
         ),
       );
