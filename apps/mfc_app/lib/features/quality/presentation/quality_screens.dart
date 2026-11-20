@@ -128,22 +128,44 @@ class InspectScreen extends ConsumerWidget {
         action: l10n.nextTask,
         onAction: () => _next(context),
       ),
-      InspectPhase.applied => ListView(
-        children: [
-          ResultView(
-            key: const ValueKey('inspect-applied'),
-            icon: Icons.check_circle,
-            text: switch (s.result?.createdTaskIds.length ?? 0) {
-              0 => l10n.inspectAppliedAllQuarantined,
-              final n => l10n.inspectApplied(n),
-            },
-            action: l10n.nextTask,
-            onAction: () => _next(context),
+      // 끝 화면: 위 = 반영 확인(짧은 제목 + 한 줄), 가운데 = LOT 라벨 출력(적치 전에 붙여야 한다),
+      // 아래 고정 칸 = 다음 작업. 예전엔 "다음 작업"이 라벨 위에 있어 라벨을 건너뛰기 쉬웠다(에뮬레이터 확인 2026-11-20).
+      InspectPhase.applied => StepBody(
+        actions: [
+          FilledButton(
+            key: const ValueKey('result-action'),
+            onPressed: () => _next(context),
+            child: Text(l10n.nextTask),
           ),
-          // 나뉜 정상 LOT 마다 라벨(적치 작업 수량만큼) — 백엔드 회신 2026-11-17 §2. 격리분은 적치 작업이 없어 대상 아님.
-          if (s.result?.createdTaskIds case final ids? when ids.isNotEmpty)
-            LotLabelButtons(taskIds: ids),
         ],
+        child: ListView(
+          key: const ValueKey('inspect-applied'),
+          padding: const EdgeInsets.only(top: 24),
+          children: [
+            const Center(child: MarkCircle(icon: Icons.check)),
+            const SizedBox(height: 14),
+            Text(
+              l10n.inspectAppliedTitle,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              switch (s.result?.createdTaskIds.length ?? 0) {
+                0 => l10n.inspectAppliedNone,
+                final n => l10n.inspectAppliedTasks(n),
+              },
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleSmall
+                  ?.copyWith(color: PdaColors.primary),
+            ),
+            const SizedBox(height: 20),
+            // 나뉜 정상 LOT 마다 라벨(적치 작업 수량만큼) — 백엔드 회신 2026-11-17 §2. 격리분은 적치 작업이 없어 대상 아님.
+            if (s.result?.createdTaskIds case final ids? when ids.isNotEmpty)
+              LotLabelButtons(taskIds: ids),
+          ],
+        ),
       ),
       InspectPhase.locate => StepBody(
         actions: [
@@ -498,9 +520,12 @@ class _JudgeRow extends ConsumerWidget {
                   ),
               ],
             ),
-            Row(
+            const SizedBox(height: 12),
+            // 날짜 두 칸은 한 줄씩(반쪽 칸에서는 "2026-11-3 / 0"으로 꺾였다, 에뮬레이터 확인 2026-11-20).
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
+                SizedBox(
                   child: _DateField(
                     key: ValueKey('exp-$index'),
                     label: l10n.inspectExpiry,
@@ -511,8 +536,8 @@ class _JudgeRow extends ConsumerWidget {
                     onPicked: (v) => set(row.copyWith(expiry: v)),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
+                const SizedBox(height: 10),
+                SizedBox(
                   child: _DateField(
                     key: ValueKey('mfg-$index'),
                     label: c.needsManufacture
@@ -539,17 +564,13 @@ class _JudgeRow extends ConsumerWidget {
               key: ValueKey('verdict-$index'),
               emptySelectionAllowed: true,
               segments: [
+                // 아이콘을 늘 두면 "✓ 정상"이 고른 것처럼 보였다(에뮬레이터 확인 2026-11-20) — 고른 쪽에만 체크(기본).
                 ButtonSegment(
                   value: false,
                   enabled: canNormal,
                   label: Text(l10n.qtyNormal),
-                  icon: const Icon(Icons.check),
                 ),
-                ButtonSegment(
-                  value: true,
-                  label: Text(l10n.qtyQuarantined),
-                  icon: const Icon(Icons.block),
-                ),
+                ButtonSegment(value: true, label: Text(l10n.qtyQuarantined)),
               ],
               selected: {?row.quarantined},
               onSelectionChanged: (v) {
@@ -644,7 +665,8 @@ class _JudgeRow extends ConsumerWidget {
                 ),
               ],
             ],
-            for (final i in rowIssues.difference({InspectIssue.needVerdict}))
+            // 정상·격리를 안 골랐으면 그것도 알린다 — 등록 단추가 왜 꺼져 있는지 보이게.
+            for (final i in rowIssues)
               Text(
                 inspectIssueText(l10n, i),
                 style: TextStyle(color: theme.colorScheme.error),

@@ -168,7 +168,13 @@ void main() {
   }
 
   Future<void> tapKey(WidgetTester t, String key) async {
+    // 가운데로 — 아래 고정 줄("합계") 밑에 숨지 않게.
     await t.ensureVisible(find.byKey(ValueKey(key)));
+    await Scrollable.ensureVisible(
+      t.element(find.byKey(ValueKey(key))),
+      alignment: 0.5,
+    );
+    await t.pumpAndSettle();
     await t.tap(find.byKey(ValueKey(key)));
     await t.pumpAndSettle();
   }

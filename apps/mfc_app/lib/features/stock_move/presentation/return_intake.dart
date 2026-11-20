@@ -531,6 +531,9 @@ class ReturnIntakeScreen extends ConsumerWidget {
               busy: s.phase == IntakePhase.sending,
               label: !located
                   ? l10n.riNeedLocationBtn
+                  : total == 0
+                  // "0개 반입"으로 보이지 않게(에뮬레이터 확인 2026-11-20).
+                  ? l10n.riNeedItemsBtn
                   : s.phase == IntakePhase.unknown
                   ? l10n.checkAgain
                   : l10n.riSubmit(total),
