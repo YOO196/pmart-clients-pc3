@@ -23,6 +23,7 @@ import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
 import { GuideBox, SearchBar, StatCard, StatStrip } from '../../shared/listParts';
 import { useOperatorLabel, WhoAt } from '../../shared/OperatorLabel';
+import { assignTaskName } from '../../shared/pickPack';
 import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
 import { SavedViews } from '../../shared/SavedViews';
 import { SeenMark } from '../../shared/SeenMark';
@@ -403,7 +404,7 @@ function WorkerDetailPage({ mfcId }: { readonly mfcId: string }) {
                 <p className="font-semibold">{m.affected}</p>
                 <ul className="list-disc pl-5" aria-label={m.affected}>
                   {notice.affected.map((a) => (
-                    <li key={a.assignmentId}>{m.affectedTask(m.task[a.taskType ?? ''] ?? a.taskType ?? '', a.taskId ?? '')}</li>
+                    <li key={a.assignmentId}>{m.affectedTask(assignTaskName(a.taskType), a.taskId ?? '')}</li>
                   ))}
                 </ul>
               </div>

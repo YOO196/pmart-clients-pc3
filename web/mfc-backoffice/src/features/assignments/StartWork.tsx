@@ -15,10 +15,10 @@ import { useApi } from '../../app/ApiContext';
 import { AllDone } from '../../shared/listParts';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
+import { assignTaskName } from '../../shared/pickPack';
 import { ReassignForm } from '../tasks/TaskActions';
 
 const m = messages.assignments.start;
-const taskName = messages.workers.task;
 type Plan = components['schemas']['AssignmentPlan'];
 
 const HORIZONS = [30, 60, 120, 240] as const;
@@ -98,7 +98,7 @@ function StartResult({ plan }: { readonly plan: Plan }) {
       <ul className="space-y-0.5 text-xs">
         {made.map((a) => (
           <li key={a.assignmentId ?? a.taskId}>
-            {`${taskName[a.taskType ?? ''] ?? a.taskType} → `}
+            {`${assignTaskName(a.taskType)} → `}
             <Who id={a.workerId} />
           </li>
         ))}
@@ -150,7 +150,7 @@ export function UnassignedTasks({ mfcId }: { readonly mfcId: string }) {
                   {(r.items ?? []).map((task) => (
                     <Fragment key={task.taskId}>
                       <tr data-testid="unassigned-row">
-                        <td>{t.taskType[task.taskType ?? ''] ?? task.taskType}</td>
+                        <td>{assignTaskName(task.taskType)}</td>
                         <td>{t.headline(task.headline?.productName, task.headline?.otherLineCount ?? 0)}</td>
                         <td>{t.qty(task.plannedQty ?? 0, task.completedQty ?? 0, task.remainingQty ?? 0)}</td>
                         <td>{task.promisedReadyAt ? formatSeoul(task.promisedReadyAt) : messages.none}</td>

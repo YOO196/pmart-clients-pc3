@@ -23,6 +23,7 @@ function summary(t: MockTask) {
     shipmentId: t.shipmentId,
     // 주문 화면 번호(계약 TaskSummary.orderNumber) — 목은 출고에서
     orderNumber: (t.shipmentId ? db.shipments.get(t.shipmentId)?.orderNumber : null) ?? null,
+    pickedBy: t.pickedBy ?? null,
     assignment: t.assignment,
     lineCount: t.lineCount,
     plannedQty: t.plannedQty,

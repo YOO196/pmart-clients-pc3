@@ -20,6 +20,7 @@ import { SearchSelect } from '../../shared/SearchSelect';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
 import { Who } from '../../shared/OperatorLabel';
+import { assignTaskName, isPickPack } from '../../shared/pickPack';
 import { PlanList } from '../lists/CenterLists';
 import { StartWork, UnassignedTasks } from './StartWork';
 
@@ -46,6 +47,10 @@ const STATES: readonly AssignmentState[] = ['ACTIVE', 'SUPERSEDED', 'RELEASED'];
 const TASK_TYPES: readonly TaskType[] = ['PICK', 'PACK', 'RETURN', 'DISPATCH', 'RECEIVE', 'INSPECT', 'PUTAWAY', 'REPLENISH', 'MOVE'];
 const isState = (v: string | null): v is AssignmentState => !!v && (STATES as readonly string[]).includes(v);
 const isTaskType = (v: string | null): v is TaskType => !!v && (TASK_TYPES as readonly string[]).includes(v);
+/** 직접 배정의 유형 고르기 — 피킹·포장은 "피패킹" 하나(실제 PICK/PACK 은 작업을 읽어 정한다) */
+type TypeChoice = 'PICK_PACK' | Exclude<TaskType, 'PICK' | 'PACK'>;
+const TYPE_CHOICES: readonly TypeChoice[] = ['PICK_PACK', ...TASK_TYPES.filter((t): t is Exclude<TaskType, 'PICK' | 'PACK'> => !isPickPack(t))];
+const toChoice = (v: string | null): TypeChoice => (isPickPack(v) || !isTaskType(v) ? 'PICK_PACK' : (v as TypeChoice));
 type Tab = 'list' | 'unassigned' | 'manual' | 'plan';
 
 const assignmentsPath = (mfcId: string, rest = '') => centerPath(mfcId, rest ? `assignments/${rest}` : 'assignments');
@@ -191,7 +196,7 @@ function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonl
                   <td>
                     <TaskLink mfcId={mfcId} taskId={a.taskId} taskType={a.taskType} />
                   </td>
-                  <td>{taskName[a.taskType ?? ''] ?? a.taskType}</td>
+                  <td>{assignTaskName(a.taskType)}</td>
                   <td>
                     <Who id={a.workerId} />
                   </td>
@@ -225,21 +230,43 @@ function ManualAssign({ mfcId, initialTaskId, initialTaskType }: { readonly mfcI
   const api = useApi();
   const queryClient = useQueryClient();
   const [taskId, setTaskId] = useState(initialTaskId);
-  const [taskType, setTaskType] = useState<TaskType>(isTaskType(initialTaskType) ? initialTaskType : 'PICK');
+  const [choice, setChoice] = useState<TypeChoice>(toChoice(initialTaskType));
   const [workerId, setWorkerId] = useState('');
   const [reason, setReason] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
-  /** 확인한 지금 담당(이 작업 ID 의) — 이 버전으로 보낸다 */
-  const [checked, setChecked] = useState<{ readonly taskId: string; readonly workerId: string | null; readonly version: number } | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  /** 확인한 지금 담당(이 작업 ID 의) — 이 버전으로 보낸다. 피패킹이면 작업을 읽어 실제 유형(PICK/PACK)과 피킹한 사람도 */
+  const [checked, setChecked] = useState<{
+    readonly taskId: string;
+    readonly choice: TypeChoice;
+    readonly taskType: TaskType;
+    readonly pickedBy: string | null;
+    readonly workerId: string | null;
+    readonly version: number;
+  } | null>(null);
   const workers = useQuery({
     queryKey: ['workers', mfcId, 'ACTIVE'],
     queryFn: async () => (await request('GET', api.capacity.GET('/mfcs/{mfcId}/workers', { params: { path: { mfcId }, query: { state: 'ACTIVE' } } }))).items ?? [],
   });
   const check = useCommand(async (id: string) => {
     setNotice(null);
+    setProblem(null);
+    let taskType: TaskType;
+    let pickedBy: string | null = null;
+    if (choice === 'PICK_PACK') {
+      // 피킹 작업인지 포장 작업인지는 작업 정본(fulfillment)이 안다 — 화면이 고르게 하지 않는다
+      const task = await request('GET', api.fulfillment.GET('/tasks/{taskId}', { params: { path: { taskId: id } } }));
+      if (!isPickPack(task.taskType)) {
+        setChecked(null);
+        setProblem(m.notPickPack(taskName[task.taskType ?? ''] ?? task.taskType ?? ''));
+        return task;
+      }
+      taskType = task.taskType;
+      pickedBy = task.taskType === 'PACK' ? (task.pickedBy ?? null) : null;
+    } else taskType = choice;
     const r = await request('GET', api.capacity.GET('/assignments', { params: { query: { mfcId, taskId: id } } }));
     const active = (r.items ?? [])[0];
-    setChecked({ taskId: id, workerId: active?.workerId ?? null, version: active?.assignmentVersion ?? 0 });
+    setChecked({ taskId: id, choice, taskType, pickedBy, workerId: active?.workerId ?? null, version: active?.assignmentVersion ?? 0 });
     return r;
   });
   const assign = useCommand(async (_: null, key) => {
@@ -249,7 +276,7 @@ function ManualAssign({ mfcId, initialTaskId, initialTaskType }: { readonly mfcI
       'POST',
       api.capacity.POST('/assignments', {
         ...commandParams(key, { version }),
-        body: { mfcId, taskId, taskType, workerId, ...(reason.trim() ? { reason: reason.trim() } : {}) },
+        body: { mfcId, taskId, taskType: checked!.taskType, workerId, ...(reason.trim() ? { reason: reason.trim() } : {}) },
       }),
     );
     const notes = [r.assignmentVersion === version ? m.unchanged : m.assigned(r.workerId ?? '', r.assignmentVersion ?? 0)];
@@ -287,10 +314,18 @@ function ManualAssign({ mfcId, initialTaskId, initialTaskType }: { readonly mfcI
         </label>
         <label className="flex flex-col gap-1">
           {m.fields.taskType}
-          <select className="select select-sm w-32" value={taskType} onChange={(e) => setTaskType(e.target.value as TaskType)}>
-            {TASK_TYPES.map((t) => (
+          <select
+            className="select select-sm w-32"
+            value={choice}
+            onChange={(e) => {
+              setChoice(e.target.value as TypeChoice);
+              setChecked(null);
+              setProblem(null);
+            }}
+          >
+            {TYPE_CHOICES.map((t) => (
               <option key={t} value={t}>
-                {taskName[t]}
+                {t === 'PICK_PACK' ? m.pickPackOption : taskName[t]}
               </option>
             ))}
           </select>
@@ -308,8 +343,32 @@ function ManualAssign({ mfcId, initialTaskId, initialTaskType }: { readonly mfcI
         </button>
       </div>
       {check.phase.kind === 'rejected' && <CommandFeedback command={check} />}
+      {problem && (
+        <p role="alert" className="text-warning" data-testid="not-pick-pack">
+          {problem}
+        </p>
+      )}
       {checked && checked.taskId === taskId && (
-        <p data-testid="current-assignee">{checked.workerId ? m.current(checked.workerId, checked.version) : m.currentNone}</p>
+        <div className="space-y-1">
+          {checked.choice === 'PICK_PACK' && <p data-testid="pick-pack-stage">{m.pickPackResolved(taskName[checked.taskType] ?? checked.taskType)}</p>}
+          <p data-testid="current-assignee">{checked.workerId ? m.current(checked.workerId, checked.version) : m.currentNone}</p>
+          {checked.pickedBy && (
+            <p className="flex flex-wrap items-center gap-2" data-testid="picked-by">
+              <span>{m.pickedByLabel}</span>
+              <Who id={checked.pickedBy} />
+              {workerId !== checked.pickedBy && (
+                <button type="button" className="btn btn-xs" onClick={() => setWorkerId(checked.pickedBy ?? '')}>
+                  {m.choosePicker}
+                </button>
+              )}
+            </p>
+          )}
+          {checked.pickedBy && workerId && workerId !== checked.pickedBy && (
+            <p className="text-xs text-warning" data-testid="picker-other">
+              {m.pickerOther}
+            </p>
+          )}
+        </div>
       )}
       <div className="flex flex-wrap items-end gap-2">
         {workers.isError ? (
@@ -480,7 +539,7 @@ function PlanView({ mfcId, plan }: { readonly mfcId: string; readonly plan: Plan
                   <td>
                     <TaskLink mfcId={mfcId} taskId={i.taskId} taskType={i.taskType} />
                   </td>
-                  <td>{taskName[i.taskType ?? ''] ?? i.taskType}</td>
+                  <td>{assignTaskName(i.taskType)}</td>
                   <td>
                     <Who id={i.workerId} />
                   </td>
@@ -496,7 +555,7 @@ function PlanView({ mfcId, plan }: { readonly mfcId: string; readonly plan: Plan
             <h3 className="mt-3 mb-1 font-semibold">{m.unassigned}</h3>
             <ul className="list-disc pl-5">
               {(plan.unassigned ?? []).map((u) => (
-                <li key={u.taskId}>{`${u.taskId ?? ''} · ${taskName[u.taskType ?? ''] ?? u.taskType ?? ''} · ${m.unassignedReason[u.reason ?? ''] ?? u.reason ?? ''}`}</li>
+                <li key={u.taskId}>{`${u.taskId ?? ''} · ${assignTaskName(u.taskType)} · ${m.unassignedReason[u.reason ?? ''] ?? u.reason ?? ''}`}</li>
               ))}
             </ul>
           </>

@@ -241,7 +241,7 @@ function task(taskId: string, extra: Partial<MockTask>): [string, MockTask] {
 function seedTasks(): Array<[string, MockTask]> {
   return [
     task('TASK-PICK-1', { state: 'IN_PROGRESS', idle: true, lastActivityAt: '2026-11-16T00:45:00.000Z', routeMethod: 'ROUTING' }),
-    task('TASK-PACK-1', { taskType: 'PACK', assignment: { workerId: 'OP-wkr-2', assignmentVersion: 1 }, createdAt: '2026-11-16T00:41:00.000Z', packingLocations: ['PAK-C-01'] }),
+    task('TASK-PACK-1', { taskType: 'PACK', pickedBy: 'OP-wkr-1', assignment: { workerId: 'OP-wkr-2', assignmentVersion: 1 }, createdAt: '2026-11-16T00:41:00.000Z', packingLocations: ['PAK-C-01'] }),
     task('TASK-PICK-2', { state: 'READY', assignment: { workerId: null, assignmentVersion: 0 }, createdAt: '2026-11-16T00:50:00.000Z', shipmentId: 'SHP-2' }),
     task('TASK-PICK-3', { state: 'BLOCKED', blockReason: '결품 보고 — 신라면 5입', createdAt: '2026-11-16T00:30:00.000Z', shipmentId: 'SHP-3' }),
     task('TASK-PICK-4', { state: 'COMPLETED', createdAt: '2026-11-15T23:00:00.000Z', shipmentId: 'SHP-4' }),

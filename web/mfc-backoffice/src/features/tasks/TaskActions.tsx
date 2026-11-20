@@ -60,6 +60,8 @@ export function ReassignForm({ mfcId, task, onClose }: { readonly mfcId: string;
   const taskId = task.taskId ?? '';
   const current = task.assignment?.workerId ?? null;
   const version = task.assignment?.assignmentVersion ?? 0;
+  // 피패킹 — 포장은 그 주문을 피킹한 사람(장바구니를 든 사람)이 이어서 한다. 고르기 맨 위에 두고, 다른 사람이면 알린다
+  const picker = task.taskType === 'PACK' ? (task.pickedBy ?? null) : null;
   const [workerId, setWorkerId] = useState('');
   const [reason, setReason] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
@@ -106,7 +108,9 @@ export function ReassignForm({ mfcId, task, onClose }: { readonly mfcId: string;
       )}
       <QueryState state={toUiState(workers)} onRetry={() => void workers.refetch()}>
         {(list) => {
-          const fit = list.filter((w) => w.workerId && w.workerId !== current && (w.effectiveTaskTypes ?? []).includes(task.taskType as never));
+          const fit = list
+            .filter((w) => w.workerId && w.workerId !== current && (w.effectiveTaskTypes ?? []).includes(task.taskType as never))
+            .sort((a, b) => Number(b.workerId === picker) - Number(a.workerId === picker));
           return fit.length === 0 ? (
             <p className="text-xs opacity-70">{m.noWorkers}</p>
           ) : (
@@ -120,7 +124,10 @@ export function ReassignForm({ mfcId, task, onClose }: { readonly mfcId: string;
                   onChange={setWorkerId}
                   placeholder={m.chooseWorker}
                   className="w-64"
-                  options={fit.map((w) => ({ value: w.workerId ?? '', label: w.displayName ?? m.noName, ...(w.onBreak ? { hint: m.onBreak } : {}), keywords: w.workerId ?? '' }))}
+                  options={fit.map((w) => {
+                    const hint = [w.workerId === picker ? messages.assignments.pickerHint : '', w.onBreak ? m.onBreak : ''].filter(Boolean).join(' · ');
+                    return { value: w.workerId ?? '', label: w.displayName ?? m.noName, ...(hint ? { hint } : {}), keywords: w.workerId ?? '' };
+                  })}
                 />
               </div>
               <label className="flex flex-col gap-1">
@@ -137,6 +144,11 @@ export function ReassignForm({ mfcId, task, onClose }: { readonly mfcId: string;
           );
         }}
       </QueryState>
+      {picker && workerId && workerId !== picker && (
+        <p className="text-xs text-warning" data-testid="picker-other">
+          {messages.assignments.pickerOther}
+        </p>
+      )}
       {notice && (
         <p role="status" className="text-success">
           {notice}
