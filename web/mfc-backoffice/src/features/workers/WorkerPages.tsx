@@ -46,7 +46,27 @@ const EMPLOYMENT: readonly EmploymentType[] = ['REGULAR', 'PART_TIME', 'DAILY'];
 const isState = (v: string | null): v is WorkerState => !!v && (STATES as readonly string[]).includes(v);
 
 const workersPath = (mfcId: string, rest = '') => centerPath(mfcId, rest ? `workers/${rest}` : 'workers');
-const tasks = (t: readonly string[] | undefined) => (t?.length ? t.map((x) => m.task[x] ?? x).join(', ') : messages.none);
+/**
+ * 피킹·포장은 한 사람이 이어서 하는 일(포장은 피킹한 사람이 받는다, 사용자 2026-11-20 "업무 분리 불필요") —
+ * 화면에서는 "피패킹" 한 칸으로 고르고 보이며, 서버에는 계약 그대로 PICK·PACK 둘을 함께 보낸다.
+ */
+const PICK_PACK: readonly TaskType[] = ['PICK', 'PACK'];
+const PICKER: readonly { readonly key: string; readonly types: readonly TaskType[] }[] = [
+  { key: 'PICK_PACK', types: PICK_PACK },
+  ...TASK_TYPES.filter((t) => !PICK_PACK.includes(t)).map((t) => ({ key: t, types: [t] })),
+];
+/** 작업 유형 목록 → 화면 글. PICK·PACK 이 함께 있으면 "피패킹" 하나로(예전 데이터처럼 하나만 있으면 그 이름 그대로) */
+const taskLabels = (t: readonly string[]): string[] => {
+  const both = PICK_PACK.every((x) => t.includes(x));
+  const out: string[] = [];
+  for (const x of t) {
+    if (both && (PICK_PACK as readonly string[]).includes(x)) {
+      if (!out.includes(m.pickPack)) out.push(m.pickPack);
+    } else out.push(m.task[x] ?? x);
+  }
+  return out;
+};
+const tasks = (t: readonly string[] | undefined) => (t?.length ? taskLabels(t).join(', ') : messages.none);
 /** 화면 입력(datetime-local, 한국 시간) → 계약 date-time */
 const seoulInput = (v: string) => `${v}:00+09:00`;
 
@@ -200,15 +220,18 @@ function TaskTypePicker({ label, value, onChange, hint }: { readonly label: stri
     <fieldset className="space-y-1">
       <legend className="mb-1">{label}</legend>
       <div className="flex flex-wrap gap-3">
-        {TASK_TYPES.map((t) => (
-          <label key={t} className="flex items-center gap-1">
+        {PICKER.map((o) => (
+          <label key={o.key} className="flex items-center gap-1">
             <input
               type="checkbox"
               className="checkbox checkbox-xs"
-              checked={value.includes(t)}
-              onChange={(e) => onChange(e.target.checked ? [...value, t] : value.filter((x) => x !== t))}
+              checked={o.types.every((t) => value.includes(t))}
+              onChange={(e) => {
+                const rest = value.filter((x) => !o.types.includes(x));
+                onChange(e.target.checked ? [...rest, ...o.types] : rest);
+              }}
             />
-            {m.task[t]}
+            {o.key === 'PICK_PACK' ? m.pickPack : m.task[o.key]}
           </label>
         ))}
       </div>
@@ -436,7 +459,7 @@ function PreviewWarning({ list, text }: { readonly list: readonly TaskType[]; re
   if (list.length === 0) return null;
   return (
     <div className="text-xs" data-testid="preview-warning">
-      <p className="text-warning">{text(list.map((t) => m.task[t] ?? t).join(', '))}</p>
+      <p className="text-warning">{text(taskLabels(list).join(', '))}</p>
       <p className="opacity-70">{m.previewNote}</p>
     </div>
   );
