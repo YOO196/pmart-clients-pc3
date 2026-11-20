@@ -32,7 +32,7 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = if (isMockBuild) "com.pmart.mfc_app.mock" else "com.pmart.mfc_app"
-        manifestPlaceholders["appLabel"] = if (isMockBuild) "픽PDA 목업" else "픽PDA"
+        manifestPlaceholders["appLabel"] = if (isMockBuild) "픽PDA 목업" else "픽PDA 실서버"
         manifestPlaceholders["appIcon"] = if (isMockBuild) "@mipmap/ic_launcher_mock" else "@mipmap/ic_launcher"
         manifestPlaceholders["loginScheme"] = if (isMockBuild) "pmart-mfc-mock" else "pmart-mfc"
         // You can update the following values to match your application needs.
