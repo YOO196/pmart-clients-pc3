@@ -49,6 +49,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-20-backend-br67-68-70-withdrawal-applied.md` | BR-67(리뷰관리 값)·BR-68(주문내역 상품 줄)·BR-70(네이버 프로필 사진) 회신과 회원 탈퇴 요청(customer 0.12.0) 목 모드 반영 알림 + Q1(탈퇴 대기 중 주문 거절 문구) — LAN 확인 대기 |
 | `customer-app/2026-11-20-backend-order-line-images.md` | BR-71 주문 줄의 상품 사진 — `GET /orders` `lines[]`·`GET /orders/{id}` `OrderLine` 에 `imageUrl`(R1·R2) — 보냄, 회신 대기 |
 | `customer-app/2026-11-20-backend-signup-consent-restart.md` | BR-72 가입을 끝내지 않고 나갔으면 다음 로그인 때 동의부터 다시(R1~R4) — 보냄, 회신 대기 |
+| `customer-app/2026-11-21-backend-coupons-applied-and-open-questions.md` | 쿠폰·할인가(ADR-0082 1~7번)·AI 상담 상품 답(rag 0.3.0) 목 모드 반영 알림 + 회신 부탁 R1(BR-71 재촉)·Q1~Q3(찜·BR-64 details 읽는 법, 탈퇴 대기 거절 문구)·스위치 상태 — 보냄, 회신 대기 |
 | `customer-app/2026-11-20-backend-wishlist-applied.md` | 찜(하트 — customer 0.13.0) 목 모드 반영 알림 + Q1(422 details 읽는 법) — LAN 확인 대기 |
 | `customer-app/2026-11-20-backend-naver-consent-every-login.md` | BR-74 네이버 로그인마다 동의 화면 다시 — 교환 뒤 네이버 연결 끊기(R1~R5, sub 유지 확인) — 보냄, 회신 대기 |
 | `customer-app/2026-11-20-backend-availability-display-applied.md` | "다 팔렸어요" 오표시(요청 availability-display §1) 목 모드 반영 알림 — 주소 없음·재고 조회 실패·배달 안 함을 품절과 구분, §2 목록 품절 표시는 계약 대기 |
