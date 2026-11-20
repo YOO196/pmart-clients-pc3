@@ -1029,20 +1029,32 @@ class _OrderCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Spacer(),
-                Text(
-                  l10n.packReadyAtLabel,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: PdaColors.onNotice,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  t,
-                  key: const ValueKey('pack-ready-at'),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: PdaColors.primary,
+                const SizedBox(width: 10),
+                // 시각이 "오후 12:05"처럼 길면 4px 넘쳤다(시험 시각에 따라) — 좁으면 줄여 한 줄에.
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          l10n.packReadyAtLabel,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: PdaColors.onNotice,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          t,
+                          key: const ValueKey('pack-ready-at'),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: PdaColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
