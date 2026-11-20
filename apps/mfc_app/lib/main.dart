@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +15,9 @@ Future<void> main() async {
   // PDA 는 세로로만(사용자 2026-11-19 "가로모드 말고 세로모드 고정") — 매니페스트 screenOrientation 과 같이.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   await initPmartFormatting();
+  // LAN HTTPS 게이트웨이(사설 CA, ADR-0057)를 믿는다 — 운영(release) 빌드에는 넣지 않는다(T6). 고객앱·라이더앱과 같다.
+  // 이 줄이 없어 실서버 앱(https://192.168.0.40:8443)이 인증서 오류로 서버에 붙지 못했다(2026-11-20).
+  if (!kReleaseMode) trustPmartLanRootCa();
   runApp(
     ProviderScope(
       // Riverpod 3 의 자동 재시도를 끈다. 재시도 규칙은 pmart_core(429·retryable)만 따른다.
