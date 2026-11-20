@@ -10,6 +10,7 @@ import '../printer/reprint.dart';
 import '../pda_theme.dart';
 import '../providers.dart';
 import 'scanner.dart';
+import '../pda_motion.dart';
 
 /// 테스트용 일괄 동작(목 모드 전용) — 예: 남은 박스 전부 스캔. 동작 안에서도 실제 스캔과 같은 처리를 부른다.
 @immutable
@@ -88,6 +89,7 @@ class _ScanInputState extends ConsumerState<ScanInput> {
     // 하드웨어 스캐너(키보드 웨지)가 다음 입력을 계속 받게 한다.
     _focus.requestFocus();
     if (code.isEmpty) return;
+    PdaHaptics.scanned();
     widget.onScan(code);
   }
 
@@ -222,56 +224,58 @@ class _ScanButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme.labelLarge;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          if (ready)
-            BoxShadow(
-              color: secondary
-                  ? PdaColors.primary.withValues(alpha: 0.35)
-                  : PdaColors.lilac,
-              spreadRadius: secondary ? 1.5 : 3,
-            )
-          else if (!secondary)
-            BoxShadow(
-              color: PdaColors.primary.withValues(alpha: 0.28),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-        ],
-      ),
-      child: Material(
-        color: secondary ? PdaColors.lilac : PdaColors.primary,
-        borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // 스캐너(총) 그림 대신 바코드 그림(사용자 2026-11-20).
-              BarcodeIcon(
-                size: 30,
-                color: secondary ? PdaColors.primary : Colors.white,
+    return Pressable(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            if (ready)
+              BoxShadow(
+                color: secondary
+                    ? PdaColors.primary.withValues(alpha: 0.35)
+                    : PdaColors.lilac,
+                spreadRadius: secondary ? 1.5 : 3,
+              )
+            else if (!secondary)
+              BoxShadow(
+                color: PdaColors.primary.withValues(alpha: 0.28),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: text?.copyWith(
-                    color: secondary ? PdaColors.dark : Colors.white,
-                    fontSize: secondary ? 21 : 20,
-                    // 옅은 바탕은 대비가 약해 같은 크기도 작아 보인다 — 조금 크고 굵게(사용자 2026-11-20).
-                    fontWeight: secondary ? FontWeight.w800 : FontWeight.w700,
-                    letterSpacing: -0.2,
+          ],
+        ),
+        child: Material(
+          color: secondary ? PdaColors.lilac : PdaColors.primary,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 스캐너(총) 그림 대신 바코드 그림(사용자 2026-11-20).
+                BarcodeIcon(
+                  size: 30,
+                  color: secondary ? PdaColors.primary : Colors.white,
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: text?.copyWith(
+                      color: secondary ? PdaColors.dark : Colors.white,
+                      fontSize: secondary ? 21 : 20,
+                      // 옅은 바탕은 대비가 약해 같은 크기도 작아 보인다 — 조금 크고 굵게(사용자 2026-11-20).
+                      fontWeight: secondary ? FontWeight.w800 : FontWeight.w700,
+                      letterSpacing: -0.2,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

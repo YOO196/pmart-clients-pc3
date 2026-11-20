@@ -17,6 +17,7 @@ import '../../my_work/presentation/my_work.dart';
 import '../../tasks/presentation/task_controllers.dart';
 import '../domain/work.dart';
 import 'work_controller.dart';
+import '../../../shared/pda_motion.dart';
 
 String workAreaText(AppLocalizations l10n, WorkArea a) => switch (a) {
   WorkArea.inbound => l10n.areaInbound,
@@ -395,10 +396,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     if (c > r) const SizedBox(width: 8),
                                     Expanded(
                                       child: c < areas.length
-                                          ? _AreaTile(
-                                              area: areas[c],
-                                              allowed: me.can(areas[c]),
-                                              onTap: () => openArea(areas[c]),
+                                          ? EnterFade(
+                                              index: c,
+                                              child: _AreaTile(
+                                                area: areas[c],
+                                                allowed: me.can(areas[c]),
+                                                onTap: () => openArea(areas[c]),
+                                              ),
                                             )
                                           : const SizedBox.shrink(),
                                     ),
@@ -756,49 +760,57 @@ class _AreaTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Hero(
-      tag: 'area-card-${area.name}',
-      flightShuttleBuilder: _areaShuttle(area),
-      child: Material(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: PdaColors.line),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: ValueKey('area-${area.name}'),
-          onTap: onTap,
-          child: SizedBox(
-            height: 112,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: const BoxDecoration(
-                    color: PdaColors.softer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    allowed ? workAreaIcon(area) : Icons.lock_outline,
-                    size: 28,
-                    color: allowed ? PdaColors.primary : PdaColors.muted,
-                  ),
+    return Pressable(
+      child: Hero(
+        tag: 'area-card-${area.name}',
+        flightShuttleBuilder: _areaShuttle(area),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: PdaShadows.sm,
+          ),
+          child: Material(
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: PdaColors.line),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              key: ValueKey('area-${area.name}'),
+              onTap: onTap,
+              child: SizedBox(
+                height: 112,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: const BoxDecoration(
+                        color: PdaColors.softer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        allowed ? workAreaIcon(area) : Icons.lock_outline,
+                        size: 28,
+                        color: allowed ? PdaColors.primary : PdaColors.muted,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      workAreaText(l10n, area),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: PdaColors.ink,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  workAreaText(l10n, area),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: PdaColors.ink,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -815,44 +827,47 @@ class _Tile extends StatelessWidget {
   final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.white,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
-      side: const BorderSide(color: PdaColors.line),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 62),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: PdaColors.softer,
-                  borderRadius: BorderRadius.circular(10),
+  Widget build(BuildContext context) => Pressable(
+    enabled: onTap != null,
+    child: Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: PdaColors.line),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 62),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: PdaColors.softer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: PdaColors.primary),
                 ),
-                child: Icon(icon, color: PdaColors.primary),
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    height: 1.25,
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      height: 1.25,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
