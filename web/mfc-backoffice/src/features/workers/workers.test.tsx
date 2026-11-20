@@ -20,7 +20,7 @@ describe('작업자 목록', () => {
     const view = renderAt('/c/MFC-BSN-01/workers');
     await waitFor(() => expect(names()).toEqual(['김현장', '박일일', '이알바', '최정지']));
     const [kim, park, lee] = rows();
-    expect(within(kim!).getByText('피킹, 포장')).toBeInTheDocument();
+    expect(within(kim!).getByText('피패킹')).toBeInTheDocument();
     expect(within(park!).getByText('출근 전')).toBeInTheDocument();
     expect(within(lee!).getByText('휴게 중')).toBeInTheDocument();
     expect(new URL(view.gets('/workers')[0]!.url).searchParams.get('state')).toBeNull();
@@ -48,12 +48,15 @@ describe('작업자 등록', () => {
     await userEvent.type(await screen.findByRole('textbox', { name: /운영자 ID/ }), 'OP-new-1');
     await userEvent.type(screen.getByRole('textbox', { name: '이름' }), '한신입');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '고용 형태' }), 'PART_TIME');
-    await userEvent.click(screen.getByRole('checkbox', { name: '피킹' }));
+    // 피킹·포장은 한 사람 일 — "피패킹" 하나로 고르고 서버엔 둘 다(사용자 2026-11-20)
+    expect(screen.queryByRole('checkbox', { name: '피킹' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: '포장' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('checkbox', { name: '피패킹' }));
     await userEvent.click(screen.getByRole('button', { name: '작업자 등록' }));
     expect(await screen.findByText('작업자를 등록했어요.')).toBeInTheDocument();
     expect(await heading()).toHaveTextContent('한신입');
     const post = posts(view.sent, '/workers')[0]!;
-    expect(await sentBody(post)).toEqual({ workerId: 'OP-new-1', displayName: '한신입', employmentType: 'PART_TIME', duty: { taskTypes: ['PICK'] } });
+    expect(await sentBody(post)).toEqual({ workerId: 'OP-new-1', displayName: '한신입', employmentType: 'PART_TIME', duty: { taskTypes: ['PICK', 'PACK'] } });
     expect(post.headers.get('Idempotency-Key')).toBeTruthy();
   });
 
@@ -61,7 +64,7 @@ describe('작업자 등록', () => {
     renderAt('/c/MFC-BSN-01/workers/new');
     await userEvent.type(await screen.findByRole('textbox', { name: /운영자 ID/ }), 'OP-wkr-9');
     await userEvent.type(screen.getByRole('textbox', { name: '이름' }), '정퇴사');
-    await userEvent.click(screen.getByRole('checkbox', { name: '피킹' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: '피패킹' }));
     await userEvent.click(screen.getByRole('button', { name: '작업자 등록' }));
     expect(await screen.findByText(/이미 등록된 작업자예요/)).toBeInTheDocument();
   });
@@ -72,14 +75,15 @@ describe('작업자 상세', () => {
     const view = renderAt('/c/MFC-BSN-01/workers/OP-wkr-1');
     expect(await heading()).toHaveTextContent('김현장');
     const form = screen.getByRole('form', { name: '맡은 일(업무) 바꾸기' });
-    await userEvent.click(within(form).getByRole('checkbox', { name: '피킹' }));
-    await userEvent.type(within(form).getByRole('textbox', { name: '맡은 일(업무) 바꾸기 사유' }), '포장 전담');
+    await userEvent.click(within(form).getByRole('checkbox', { name: '피패킹' }));
+    await userEvent.click(within(form).getByRole('checkbox', { name: '적치' }));
+    await userEvent.type(within(form).getByRole('textbox', { name: '맡은 일(업무) 바꾸기 사유' }), '적치 전담');
     await userEvent.click(within(form).getByRole('button', { name: '저장' }));
     expect(await screen.findByText('바꿨어요.')).toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: /맞지 않는 진행 중 배정/ })).getByText('피킹 · TASK-PICK-1')).toBeInTheDocument();
     const post = posts(view.sent, '/duty-changes')[0]!;
     expect(post.headers.get('X-Expected-Version')).toBe('1');
-    expect(await sentBody(post)).toEqual({ taskTypes: ['PACK'], reason: '포장 전담' });
+    expect(await sentBody(post)).toEqual({ taskTypes: ['PUTAWAY'], reason: '적치 전담' });
     expect(db.assignments.find((a) => a.assignmentId === 'ASG-1')?.state).toBe('ACTIVE');
   });
 
@@ -234,10 +238,10 @@ describe('작업자 상세', () => {
     expect(within(duty).queryByTestId('preview-warning')).not.toBeInTheDocument();
     await userEvent.click(within(duty).getByRole('checkbox', { name: '검사' }));
     expect(within(duty).getByTestId('preview-warning')).toHaveTextContent('할 수 있는 일(자격)에 없어 배정되지 않아요: 검사');
-    // 자격에서 맡은 일(포장)을 빼면 배정에서 빠진다고 미리 알린다
+    // 자격에서 맡은 일(피패킹)을 빼면 배정에서 빠진다고 미리 알린다 — 피킹·포장이 함께 빠진다
     const qual = screen.getByRole('form', { name: '할 수 있는 일(자격) 바꾸기' });
-    await userEvent.click(within(qual).getByRole('checkbox', { name: '포장' }));
-    expect(within(qual).getByTestId('preview-warning')).toHaveTextContent('맡은 일(업무)이지만 배정에서 빠져요: 포장');
+    await userEvent.click(within(qual).getByRole('checkbox', { name: '피패킹' }));
+    expect(within(qual).getByTestId('preview-warning')).toHaveTextContent('맡은 일(업무)이지만 배정에서 빠져요: 피패킹');
   });
 });
 

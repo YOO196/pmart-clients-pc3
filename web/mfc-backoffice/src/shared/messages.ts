@@ -1117,6 +1117,8 @@ export const messages = {
       REPLENISH: '보충',
       MOVE: '재고 이동',
     } as Readonly<Record<string, string>>,
+    /** 피킹·포장을 한 일로 — 작업자 업무·자격에서 PICK·PACK 을 묶어 부르는 이름 */
+    pickPack: '피패킹',
     area: { INBOUND: '입고', INSPECTION: '품질검사', STOCK_MOVE: '재고 이동', STOCK_COUNT: '재고 실사', PICK_PACK: '피패킹' } as Readonly<Record<string, string>>,
     onBreak: '휴게 중',
     enrolled: '출근 등록됨',
@@ -1129,7 +1131,7 @@ export const messages = {
     workerIdHint: '인사팀이 발급한 직원 계정의 운영자 ID(OP-…). 등록 뒤 바꿀 수 없어요. 계정이 있는지는 서버가 확인하지 않고 기록만 해요.',
     dutyHint: '맡길 일(작업 유형). 할 수 있는 일(자격) 안에서만 배정돼요.',
     qualificationOwn: '할 수 있는 일(자격)을 따로 정하기',
-    qualificationDefault: '비우면 정규직·알바는 업무와 같게, 일일크루는 피킹·포장으로 정해져요.',
+    qualificationDefault: '비우면 정규직·알바는 업무와 같게, 일일크루는 피패킹으로 정해져요.',
     expiresHint: '비우면 만료 없음',
     created: '작업자를 등록했어요.',
     // 상세 동작
