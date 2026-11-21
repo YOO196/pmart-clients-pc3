@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
@@ -8,6 +10,7 @@ import '../../address/presentation/address_controller.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../data/device_consents_repository.dart';
+import '../data/splash_promo.dart';
 import '../data/start_store.dart';
 
 /// 처음 실행 단계(환영·약관 → 로그인/둘러보기 → 주소)를 쓸지. 다른 화면 시험은 끈다.
@@ -104,8 +107,69 @@ class LogoutKeepingAddress extends Notifier<bool> {
   void set(bool value) => state = value;
 }
 
+/// 처음 로딩 화면 프로모션(storefront 0.9.0 SPLASH, 백엔드 요청서 2026-11-21 ①).
+final splashBannerSourceProvider = Provider<SplashBannerSource>(
+  (ref) => switch (ref.watch(envProvider)) {
+    PmartEnv.mock => MockSplashBannerSource(),
+    PmartEnv.local => ApiSplashBannerSource(
+      ref.watch(dioProvider),
+      resolveUrl: (u) => resolveImageUrl(u, ref.read(imageOriginProvider)),
+    ),
+  },
+);
+
+final splashPromoStoreProvider = Provider<SplashPromoStore>(
+  (ref) => switch (ref.watch(envProvider)) {
+    PmartEnv.mock => MemorySplashPromoStore(),
+    PmartEnv.local => FileSplashPromoStore(),
+  },
+);
+
+/// 프로모션 이미지가 있으면 적어도 이만큼 보인다(사용자 결정 2026-11-21 "최소 1.5초", 누르면 바로 넘어간다).
+const splashPromoMinDuration = Duration(milliseconds: 1500);
+
+/// 이번 실행의 로딩 화면 이미지 — 지난 실행에 받아 둔 것(사용자 결정 2026-11-21 "다음 실행부터").
+/// 읽고 나면 뒤에서 서버의 지금 SPLASH 배너에 맞춰 둔다(다음 실행에 보인다). 못 읽으면 지금 로딩 화면.
+final splashPromoProvider = FutureProvider<SplashPromo?>((ref) async {
+  final store = ref.watch(splashPromoStoreProvider);
+  final source = ref.watch(splashBannerSourceProvider);
+  SplashPromo? kept;
+  try {
+    kept = await store.read().timeout(const Duration(milliseconds: 500));
+  } on Object {
+    kept = null;
+  }
+  unawaited(Future.microtask(() => refreshSplashPromo(source, store)));
+  return kept;
+});
+
+/// 프로모션 로딩 화면을 붙잡아 두는 중인지(true 면 처음 실행 단계는 아직 loading).
+final splashHoldProvider = NotifierProvider<SplashHold, bool>(SplashHold.new);
+
+class SplashHold extends Notifier<bool> {
+  bool _released = false;
+
+  @override
+  bool build() {
+    final promo = ref.watch(splashPromoProvider).value;
+    if (promo == null || _released) return false;
+    final timer = Timer(splashPromoMinDuration, release);
+    ref.onDispose(timer.cancel);
+    return true;
+  }
+
+  /// 시간이 다 됐거나 화면을 눌렀다 — 다음 화면으로.
+  void release() {
+    _released = true;
+    state = false;
+  }
+}
+
 final startStepProvider = Provider<StartStep>((ref) {
   if (!ref.watch(startGateEnabledProvider)) return StartStep.ready;
+  // 로딩 화면 이미지를 읽는 동안·프로모션을 보이는 동안(최소 1.5초)은 로딩 화면에 둔다.
+  if (ref.watch(splashPromoProvider).isLoading) return StartStep.loading;
+  if (ref.watch(splashHoldProvider)) return StartStep.loading;
   final flags = ref.watch(startFlagsProvider);
   final f = flags.value;
   if (f == null) return flags.hasError ? StartStep.ready : StartStep.loading;

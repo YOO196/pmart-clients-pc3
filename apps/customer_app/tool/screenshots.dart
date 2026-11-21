@@ -25,6 +25,9 @@ import 'package:customer_app/features/address/data/guest_address_store.dart';
 import 'package:customer_app/features/auth/data/mock_auth_repository.dart';
 import 'package:customer_app/features/cart/data/cart_merge_repository.dart';
 import 'package:customer_app/features/cart/data/mock_cart_repository.dart';
+import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
+import 'package:customer_app/features/catalog/presentation/catalog_providers.dart'
+    show homeClockProvider;
 import 'package:customer_app/features/cart/presentation/cart_merge_screen.dart';
 import 'package:customer_app/features/start/presentation/current_location_flow.dart';
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
@@ -52,6 +55,9 @@ import 'package:pmart_core/pmart_core.dart'
         UnknownResultFailure;
 
 import 'package:customer_app/shared/providers.dart' show imageOriginProvider;
+import 'package:customer_app/features/start/data/splash_promo.dart';
+import 'package:customer_app/features/start/presentation/start_controller.dart'
+    show splashPromoStoreProvider;
 
 import '../test/support/app_harness.dart';
 
@@ -1020,6 +1026,103 @@ void main() {
     debugDisableShadows = true;
   });
 
+  // 타이머 테마(storefront 0.9.0 showTimer): 제목 옆 남은 시간 알약.
+  testWidgets('section-timer', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final now = DateTime.utc(2026, 11, 21, 3);
+    final catalog = MockCatalogRepository(latency: Duration.zero)
+      ..timedSections['S-NEW'] = now.add(
+        const Duration(hours: 2, minutes: 13, seconds: 5),
+      );
+    await t.pumpWidget(
+      testApp([
+        homeClockProvider.overrideWithValue(() => now),
+      ], catalog: catalog),
+    );
+    await t.pumpAndSettle();
+    await t.drag(find.byType(CustomScrollView).first, const Offset(0, -700));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/section-timer.png').uri),
+    );
+  });
+  // 홈 팝업(storefront POPUP, 사용자 결정 A 가운데 카드): 목은 이미지가 없어 대체 문구로 그려진다.
+  testWidgets('home-popup', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final catalog = MockCatalogRepository(latency: Duration.zero)
+      ..placementBannersJson['POPUP'] = [
+        {
+          'bannerId': 'PU-1',
+          'placement': 'POPUP',
+          'altText': '이번 주 제철 과일 모아 보기',
+          'linkType': 'CATEGORY',
+          'linkRef': 'C-FV',
+          'sortOrder': 1,
+        },
+        {
+          'bannerId': 'PU-2',
+          'placement': 'POPUP',
+          'altText': '둘째 팝업',
+          'linkType': 'NONE',
+          'sortOrder': 2,
+        },
+      ];
+    await t.pumpWidget(testApp(const [], catalog: catalog));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/home-popup.png').uri),
+    );
+  });
+  // 처음 로딩 화면 프로모션(storefront SPLASH): 받아 둔 이미지를 화면 가득(캡처는 그림 에셋으로 대신).
+  testWidgets('splash-promo', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final bytes = File('assets/images/categories/fruitveg.png')
+        .readAsBytesSync();
+    final secure = MemoryKeyValueStore();
+    await secure.write('pmart.start.welcome', 'at=2026-11-20T00:00:00Z');
+    await secure.write('pmart.start.entry', '1');
+    await t.pumpWidget(
+      testApp(
+        [
+          splashPromoStoreProvider.overrideWithValue(
+            MemorySplashPromoStore(SplashPromo(bannerId: 'BN-1', bytes: bytes)),
+          ),
+        ],
+        startGate: true,
+        secure: secure,
+      ),
+    );
+    await t.pump();
+    await t.pump();
+    await t.runAsync(() async {
+      final e = find.byType(Image).evaluate().first;
+      await precacheImage((e.widget as Image).image, e);
+    });
+    await t.pump();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/splash-promo.png').uri),
+    );
+    await t.pump(const Duration(seconds: 2));
+    await t.pumpAndSettle();
+  });
   // 상품 리뷰 새 레퍼런스(2026-11-21 "4. 상품리뷰 전체 보기 - …"): 위쪽·카드·필터·사진 후기.
   // 사진을 누를 수 있게 출처를 준다(캡처에선 사진이 자리표시로 그려진다).
   testWidgets('reviews-new', (t) async {

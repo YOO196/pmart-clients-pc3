@@ -12,6 +12,9 @@ import '../domain/catalog.dart';
 abstract interface class CatalogRepository {
   Future<HomeView> home({String? mfcId, HomeTab? tab});
 
+  /// 자리별 배너(storefront 0.9.0 `GET /storefront/banners?placement=` — POPUP 홈 팝업). sortOrder 순.
+  Future<List<HomeBanner>> banners({required String placement});
+
   /// 영역 하나만 다시 조회한다(UNAVAILABLE 영역 재시도·전체보기). [cursor] 는 다음 묶음.
   /// 홈 구성이 바뀌었으면 `LAYOUT_VERSION_CHANGED` [ProblemFailure].
   Future<HomeSection> section(
@@ -66,6 +69,19 @@ final class ApiCatalogRepository implements CatalogRepository {
       () => _storefront.getHome(mfcId: mfcId, tab: _tabToContract(tab)),
     );
     return homeFromContract(_body(res.data, 'HomeLayout'));
+  }
+
+  @override
+  Future<List<HomeBanner>> banners({required String placement}) async {
+    final res = await pmartGuard(
+      () => _storefront.listBanners(placement: placement),
+    );
+    return [
+      for (final b in [
+        ...?res.data?.items,
+      ]..sort((a, b) => (a.sortOrder ?? 0).compareTo(b.sortOrder ?? 0)))
+        homeBannerFromContract(b),
+    ];
   }
 
   @override
@@ -323,8 +339,24 @@ SectionKind _kind(sf.SectionKindEnum? k) => switch (k) {
   sf.SectionKindEnum.RANKING => SectionKind.ranking,
   sf.SectionKindEnum.HIGH_RATING => SectionKind.highRating,
   sf.SectionKindEnum.IN_PROGRESS_ORDER => SectionKind.inProgressOrder,
-  null => SectionKind.unknown,
+  // storefront 0.10.0 배너 묶음 영역(HOME_INLINE) — 아직 그리지 않는다(homeFromContract 에서 뺀다).
+  sf.SectionKindEnum.BANNER || null => SectionKind.unknown,
 };
+
+/// 배너(storefront Banner) → 화면 모델.
+HomeBanner homeBannerFromContract(sf.Banner b) => HomeBanner(
+  bannerId: _required(b.bannerId, 'Banner.bannerId'),
+  imageUrl: b.imageUrl,
+  altText: b.altText,
+  placement: b.placement,
+  link: switch (b.linkType?.value) {
+    'SECTION' => BannerLink.section,
+    'PRODUCT' => BannerLink.product,
+    'CATEGORY' => BannerLink.category,
+    _ => BannerLink.none,
+  },
+  linkRef: b.linkRef,
+);
 
 HomeView homeFromContract(sf.HomeLayout h) => HomeView(
   layoutVersion: h.layoutVersion,
@@ -334,35 +366,27 @@ HomeView homeFromContract(sf.HomeLayout h) => HomeView(
     for (final b in [
       ...?h.banners,
     ]..sort((a, b) => (a.sortOrder ?? 0).compareTo(b.sortOrder ?? 0)))
-      HomeBanner(
-        bannerId: _required(b.bannerId, 'Banner.bannerId'),
-        imageUrl: b.imageUrl,
-        altText: b.altText,
-        placement: b.placement,
-        link: switch (b.linkType?.value) {
-          'SECTION' => BannerLink.section,
-          'PRODUCT' => BannerLink.product,
-          'CATEGORY' => BannerLink.category,
-          _ => BannerLink.none,
-        },
-        linkRef: b.linkRef,
-      ),
+      homeBannerFromContract(b),
   ],
   sections: [
     for (final s in h.sections)
-      HomeSection(
-        sectionId: _required(s.sectionId, 'Section.sectionId'),
-        kind: _kind(s.kind),
-        title: s.title ?? '',
-        subtitle: s.subtitle,
-        // state 가 없으면 성공으로 보지 않는다. 영역 하나만 실패로 표시한다.
-        available: s.state == sf.SectionStateEnum.OK,
-        items: arrangeForDisplay(
-          (s.items ?? const <sf.DisplayItem>[]).map(_tileFromDisplay),
+      // 0.10.0 배너 묶음(kind BANNER, items 비움)은 아직 그리지 않는다 — 맨 위 배너(banners)는 그대로 온다.
+      if (s.kind != sf.SectionKindEnum.BANNER)
+        HomeSection(
+          sectionId: _required(s.sectionId, 'Section.sectionId'),
+          kind: _kind(s.kind),
+          title: s.title ?? '',
+          subtitle: s.subtitle,
+          // state 가 없으면 성공으로 보지 않는다. 영역 하나만 실패로 표시한다.
+          available: s.state == sf.SectionStateEnum.OK,
+          items: arrangeForDisplay(
+            (s.items ?? const <sf.DisplayItem>[]).map(_tileFromDisplay),
+          ),
+          nextCursor: s.nextCursor,
+          viewAllRef: s.viewAllRef,
+          endsAt: s.endsAt,
+          showTimer: (s.showTimer ?? false) && s.endsAt != null,
         ),
-        nextCursor: s.nextCursor,
-        viewAllRef: s.viewAllRef,
-      ),
   ],
 );
 
@@ -380,6 +404,8 @@ HomeSection sectionItemsFromContract(
   ),
   nextCursor: r.page?.nextCursor,
   viewAllRef: base.viewAllRef,
+  endsAt: base.endsAt,
+  showTimer: base.showTimer,
 );
 
 List<CategoryNode> categoriesFromContract(pd.GetCategoryTree200Response r) {

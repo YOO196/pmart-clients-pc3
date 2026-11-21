@@ -166,6 +166,12 @@ base class MockCatalogRepository implements CatalogRepository {
 
   final Duration latency;
 
+  /// 자리별 배너(storefront 0.9.0 — POPUP 등). 기본은 없음(목 앱에 팝업이 뜨지 않게). 시험·캡처가 넣는다.
+  final placementBannersJson = <String, List<Map<String, Object?>>>{};
+
+  /// 타이머 테마(storefront 0.9.0 showTimer): 영역 ID → 끝 시각. 기본은 없음. 시험·캡처가 넣는다.
+  final timedSections = <String, DateTime>{};
+
   /// 홈에서 UNAVAILABLE 로 내려줄 영역(부분 실패 시험용). 재조회하면 성공한다.
   final Set<String> unavailableSectionIds;
   final int pageSize;
@@ -276,6 +282,10 @@ base class MockCatalogRepository implements CatalogRepository {
                 'kind': kind,
                 'title': title,
                 'state': 'OK',
+                if (timedSections[id] case final end?) ...{
+                  'endsAt': end.toUtc().toIso8601String(),
+                  'showTimer': true,
+                },
                 'items': [
                   for (final p in _sectionProducts(id)) displayItemJson(p),
                 ],
@@ -326,6 +336,20 @@ base class MockCatalogRepository implements CatalogRepository {
         tab == null || tab == HomeTab.home ? homeJson() : tabJson(tab),
       ),
     );
+  }
+
+  @override
+  Future<List<HomeBanner>> banners({required String placement}) async {
+    await _wait();
+    return [
+      for (final b in [
+        for (final j
+            in placementBannersJson[placement] ??
+                const <Map<String, Object?>>[])
+          sf.Banner.fromJson(j),
+      ]..sort((a, b) => (a.sortOrder ?? 0).compareTo(b.sortOrder ?? 0)))
+        homeBannerFromContract(b),
+    ];
   }
 
   @override

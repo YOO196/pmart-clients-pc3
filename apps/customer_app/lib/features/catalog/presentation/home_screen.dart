@@ -22,6 +22,7 @@ import '../../orders/presentation/orders_providers.dart' show orderStatusText;
 import '../../payment/presentation/payment_controller.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
+import 'home_popup.dart';
 import 'home_providers.dart';
 import 'widgets/category_art.dart';
 import 'widgets/product_tile_card.dart';
@@ -50,6 +51,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ref.listenManual(homeProvider, (_, next) {
       if (next.isLoading) return;
       _loadedAt = ref.read(homeClockProvider)();
+    }, fireImmediately: true);
+    // 홈 팝업(storefront POPUP): 이번 실행에 한 번, 홈이 맨 위일 때만.
+    ref.listenManual(homePopupProvider, (_, next) {
+      final banners = next.value;
+      if (banners == null || banners.isEmpty) return;
+      if (ref.read(popupSessionProvider).shown) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _path != '/' || ref.read(popupSessionProvider).shown) {
+          return;
+        }
+        showHomePopup(
+          context,
+          ref,
+          banners,
+          onOpen: (b) {
+            final home = ref.read(homeProvider).value;
+            if (home != null && mounted) _openBanner(context, b, home);
+          },
+        ).ignore();
+      });
     }, fireImmediately: true);
   }
 
@@ -807,7 +828,8 @@ class _SectionView extends ConsumerWidget {
       );
     }
     final scheme = Theme.of(context).colorScheme;
-    return Padding(
+    final endsAt = section.showTimer ? section.endsAt : null;
+    final view = Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -815,6 +837,13 @@ class _SectionView extends ConsumerWidget {
           PmartSectionHeader(
             title: section.title,
             subtitle: section.subtitle,
+            // 타이머 테마(storefront 0.9.0 showTimer): 제목 옆 남은 시간
+            titleSuffix: endsAt == null
+                ? null
+                : SectionCountdown(
+                    key: ValueKey('section-timer-${section.sectionId}'),
+                    endsAt: endsAt,
+                  ),
             trailing: shown.hasViewAll
                 ? TextButton(
                     key: ValueKey('section-view-all-${section.sectionId}'),
@@ -844,6 +873,8 @@ class _SectionView extends ConsumerWidget {
         ],
       ),
     );
+    // 끝 시각이 지나면 영역을 숨긴다(다음 홈 조회부터는 서버도 뺀다).
+    return endsAt == null ? view : SectionExpiry(endsAt: endsAt, child: view);
   }
 }
 
@@ -1358,4 +1389,127 @@ void _openBanner(BuildContext context, HomeBanner b, HomeView home) {
     case BannerLink.none:
       break;
   }
+}
+
+/// 남은 시간 "HH:MM:SS"(시간은 24 를 넘을 수 있다). 음수는 0.
+String remainingClock(Duration d) {
+  final s = d.isNegative ? 0 : d.inSeconds;
+  String two(int n) => n.toString().padLeft(2, '0');
+  return '${two(s ~/ 3600)}:${two(s % 3600 ~/ 60)}:${two(s % 60)}';
+}
+
+/// 타이머 테마의 남은 시간 알약(레퍼런스 "일일 특가" 빨간 시계 알약). 1초마다 줄어든다.
+class SectionCountdown extends ConsumerStatefulWidget {
+  const SectionCountdown({super.key, required this.endsAt});
+
+  final DateTime endsAt;
+
+  @override
+  ConsumerState<SectionCountdown> createState() => _SectionCountdownState();
+}
+
+class _SectionCountdownState extends ConsumerState<SectionCountdown> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final left = widget.endsAt.difference(ref.read(homeClockProvider)());
+    return Container(
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: sectionTimerColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const PmartLineIcon(
+            PmartLineIcons.clock,
+            size: 14,
+            color: Colors.white,
+            strokeWidth: 2,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            l10n.sectionTimeLeft(remainingClock(left)),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 타이머 알약 바탕(레퍼런스 "일일 특가" 빨강).
+const sectionTimerColor = Color(0xFFF2383B);
+
+/// [endsAt] 이 지나면 [child] 를 숨긴다(이미 지났으면 처음부터 숨김).
+class SectionExpiry extends ConsumerStatefulWidget {
+  const SectionExpiry({super.key, required this.endsAt, required this.child});
+
+  final DateTime endsAt;
+  final Widget child;
+
+  @override
+  ConsumerState<SectionExpiry> createState() => _SectionExpiryState();
+}
+
+class _SectionExpiryState extends ConsumerState<SectionExpiry> {
+  Timer? _timer;
+  bool _expired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(SectionExpiry old) {
+    super.didUpdateWidget(old);
+    if (old.endsAt != widget.endsAt) _schedule();
+  }
+
+  void _schedule() {
+    _timer?.cancel();
+    final left = widget.endsAt.difference(ref.read(homeClockProvider)());
+    _expired = left <= Duration.zero;
+    if (!_expired) {
+      _timer = Timer(left, () {
+        if (mounted) setState(() => _expired = true);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      _expired ? const SizedBox.shrink() : widget.child;
 }

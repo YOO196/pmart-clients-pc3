@@ -47,7 +47,35 @@ class StartSplashScreen extends ConsumerWidget {
         }
       });
     }
-    return _splash;
+    // 지난 실행에 받아 둔 프로모션 이미지(storefront SPLASH)가 있으면 그것을 화면 가득(레퍼런스 "로딩 화면 (프로모션)").
+    // 누르면 최소 시간(1.5초)을 기다리지 않고 넘어간다. 이미지를 그리지 못하면 지금 그림.
+    final promo = ref.watch(splashPromoProvider).value;
+    if (promo == null) return _splash;
+    return AnnotatedRegion(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        key: const ValueKey('start-splash-promo'),
+        backgroundColor: Colors.black,
+        body: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => ref.read(splashHoldProvider.notifier).release(),
+          child: SizedBox.expand(
+            child: Image.memory(
+              promo.bytes,
+              key: ValueKey('start-splash-promo-${promo.bannerId}'),
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (_, _, _) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => ref.read(splashHoldProvider.notifier).release(),
+                );
+                return _splash;
+              },
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   static const Widget _splash = AnnotatedRegion(

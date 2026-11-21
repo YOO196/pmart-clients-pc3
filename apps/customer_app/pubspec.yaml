@@ -85,6 +85,7 @@ dependencies:
   kakao_flutter_sdk_user: ^2.1.0
   # 네이버 로그인: OIDC(인가 코드+PKCE)로 id_token — 서버 auth 0.4.0(ADR-0071). 사용자 승인 2026-11-19.
   flutter_appauth: ^13.0.0
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

@@ -38,6 +38,7 @@ class PmartSectionHeader extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.trailing,
+    this.titleSuffix,
     this.padding = const EdgeInsets.fromLTRB(
       PmartSpace.page,
       PmartSpace.sm,
@@ -49,6 +50,9 @@ class PmartSectionHeader extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Widget? trailing;
+
+  /// 제목 바로 옆(예: 남은 시간 알약).
+  final Widget? titleSuffix;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -62,9 +66,21 @@ class PmartSectionHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: theme.textTheme.titleLarge?.copyWith(fontSize: 20),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontSize: 20,
+                        ),
+                      ),
+                    ),
+                    if (titleSuffix case final s?) ...[
+                      const SizedBox(width: 8),
+                      s,
+                    ],
+                  ],
                 ),
                 if (subtitle case final s? when s.isNotEmpty)
                   Padding(

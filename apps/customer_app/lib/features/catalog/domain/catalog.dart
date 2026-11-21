@@ -124,6 +124,8 @@ class HomeSection {
     this.subtitle,
     this.nextCursor,
     this.viewAllRef,
+    this.endsAt,
+    this.showTimer = false,
   });
 
   final String sectionId;
@@ -138,6 +140,12 @@ class HomeSection {
 
   /// 서버가 준 "전체보기" 연결(계약 `Section.viewAllRef`). 형식은 계약에 정해져 있지 않아 있는지만 본다.
   final String? viewAllRef;
+
+  /// storefront 0.9.0 편성 테마의 끝 시각(지나면 서버가 뺀다).
+  final DateTime? endsAt;
+
+  /// true 면 제목 옆에 [endsAt] 까지 남은 시간을 보이고, 0 이 되면 영역을 숨긴다(백엔드 요청서 2026-11-21 ③).
+  final bool showTimer;
 
   /// 전체보기를 보여도 되는지. 서버가 연결을 주었거나 다음 묶음이 있을 때만(앱이 임의로 만들지 않는다).
   bool get hasViewAll =>
