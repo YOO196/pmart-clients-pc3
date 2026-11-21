@@ -14,6 +14,11 @@ function sized(el: HTMLElement) {
   el.setPointerCapture = () => {};
   return el;
 }
+/** 목 모드 기본은 주문 그래프 — 피킹 줄로 바꾼다 */
+async function openPicked() {
+  await userEvent.click(await screen.findByRole('button', { name: '피킹 줄' }));
+  await screen.findByTestId('chart-picked');
+}
 const drag = (plot: HTMLElement, x0: number, x1: number) => {
   fireEvent.pointerDown(plot, { button: 0, clientX: x0, pointerId: 1 });
   fireEvent.pointerMove(plot, { clientX: x1, pointerId: 1 });
@@ -36,7 +41,7 @@ describe('추이 그래프 기간', () => {
 
   it('빠른 단추 30일 → 30칸, 정시율은 31일 상한이라 나눠 읽는다(90일 = 3번)', async () => {
     const view = renderAt('/c/MFC-BSN-01/dashboard');
-    await screen.findByTestId('chart-picked');
+    await openPicked();
     const bar = screen.getByTestId('range-bar');
     await userEvent.click(within(bar).getByRole('button', { name: '30일' }));
     await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(30));
@@ -63,7 +68,7 @@ describe('추이 그래프 기간', () => {
 
   it('그래프를 끌면 그 구간(첫 칸~끝 칸)으로 확대, Ctrl+Z 면 앞 상태가 아니라 한 단계 넓게', async () => {
     renderAt('/c/MFC-BSN-01/dashboard');
-    await screen.findByTestId('chart-picked');
+    await openPicked();
     // 14칸, 칸 폭 600/14 ≈ 42.9px — 2번째 칸(50px)부터 6번째 칸(250px)까지 = 5일
     drag(sized(screen.getByTestId('chart-picked-plot')), 50, 250);
     await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(5));
@@ -81,7 +86,7 @@ describe('추이 그래프 기간', () => {
 
   it('한 칸만 누르면(끌지 않으면) 기간은 그대로', async () => {
     renderAt('/c/MFC-BSN-01/dashboard');
-    await screen.findByTestId('chart-picked');
+    await openPicked();
     drag(sized(screen.getByTestId('chart-picked-plot')), 50, 54);
     expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(14);
   });
@@ -104,7 +109,7 @@ describe('추이 그래프 기간', () => {
     expect(Array.from({ length: 15 }, (_, h) => hourShare(40, h, 14)).reduce((a, b) => a + b, 0)).toBe(40);
 
     renderAt('/c/MFC-BSN-01/dashboard');
-    await screen.findByTestId('chart-picked');
+    await openPicked();
     const bar = screen.getByTestId('range-bar');
     await userEvent.click(within(bar).getByRole('button', { name: '1년' }));
     // 1년 = 11달 전 1일부터 → 월 12칸
@@ -127,7 +132,7 @@ describe('추이 그래프 기간', () => {
 
   it('하루 칸 안을 끌면 그날 시간별', async () => {
     renderAt('/c/MFC-BSN-01/dashboard');
-    await screen.findByTestId('chart-picked');
+    await openPicked();
     // 14칸 중 마지막 칸(오늘) 안에서 10px 끌기
     drag(sized(screen.getByTestId('chart-picked-plot')), 580, 592);
     await waitFor(() => expect(screen.getByRole('heading', { name: /\(1일 · 시간별\)/ })).toBeInTheDocument());
@@ -136,6 +141,7 @@ describe('추이 그래프 기간', () => {
 
   it('주소의 기간(?from=&to=)으로 열고, 맞지 않는 기간이면 기본 14일', async () => {
     renderAt(`/c/MFC-BSN-01/dashboard?from=${addDays(today(), -6)}&to=${today()}`);
+    await openPicked();
     await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(7));
   });
 });

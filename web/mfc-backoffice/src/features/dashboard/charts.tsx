@@ -2,7 +2,7 @@
 // - 얇은 막대·끝 둥글게(4px)·막대 사이 2px, 격자·축은 흐리게. 값 글자는 글자색(계열 색 아님).
 // - 막대마다 마우스·키보드 초점에 말풍선(tip). 값이 없는 날(분모 0 — 비율을 낼 수 없음)은 막대 없이 "—" 표시(0 과 구분).
 // - 그림 아래 "표로 보기"(같은 숫자 표).
-import { useState, type PointerEvent } from 'react';
+import { Fragment, useState, type PointerEvent } from 'react';
 
 import { messages } from '../../shared/messages';
 
@@ -117,6 +117,13 @@ function axisText(format: (v: number) => string, v: number) {
   return v >= 10_000 ? full.replace(/[\d,.]+/, compact.format(v)) : full;
 }
 
+/** 쌓은 막대 계열(예: 결품 사유) — 색은 테마 변수, 범례를 늘 함께 */
+export interface StackSeries {
+  readonly key: string;
+  readonly name: string;
+  readonly color: string;
+}
+
 export function AreaChart({
   title,
   columns,
@@ -124,6 +131,7 @@ export function AreaChart({
   testId,
   fixedMax,
   onRange,
+  stack,
 }: {
   readonly title: string;
   readonly columns: readonly Column[];
@@ -133,6 +141,8 @@ export function AreaChart({
   readonly fixedMax?: number;
   /** 끌어서 고른 구간(첫·끝 칸의 key) — 주면 그래프를 끌어 확대할 수 있다 */
   readonly onRange?: (fromKey: string, toKey: string) => void;
+  /** 주면 영역 대신 쌓은 막대(칸마다 계열 값, 합 = column.value) — 드문 사건(결품)처럼 선보다 "몇 건"이 읽히는 값 */
+  readonly stack?: { readonly series: readonly StackSeries[]; readonly values: readonly (readonly number[])[] };
 }) {
   const [hover, setHover] = useState<number | null>(null);
   // 끌기: 누른 자리(a)부터 지금 자리(b)까지 — 판 폭 비율(0–1)로 따라가 띠가 픽셀 단위로 부드럽게 움직이고, 놓을 때 칸에 맞춘다
@@ -175,7 +185,19 @@ export function AreaChart({
   const ticks = new Set([0, Math.floor((n - 1) / 2), n - 1]);
   return (
     <figure className="space-y-2" data-testid={testId}>
-      <div className="flex items-baseline justify-end text-xs text-base-content/55">
+      <div className="flex items-baseline justify-between gap-2 text-xs text-base-content/55">
+        {stack ? (
+          <span className="flex flex-wrap gap-x-3 gap-y-0.5" data-testid={`${testId}-legend`}>
+            {stack.series.map((sr) => (
+              <span key={sr.key} className="inline-flex items-center gap-1">
+                <span className="h-2 w-2 rounded-[2px]" style={{ background: sr.color }} aria-hidden="true" />
+                {sr.name}
+              </span>
+            ))}
+          </span>
+        ) : (
+          <span />
+        )}
         <span className="min-h-4 tabular-nums text-base-content/85" aria-live="polite" data-testid={`${testId}-tip`}>
           {dragging ? (lo === hi ? m.zoomOne(columns[lo]!.label) : m.zoomTip(columns[lo]!.label, columns[hi]!.label, hi - lo + 1)) : shown ? shown.tip : ''}
         </span>
@@ -225,13 +247,39 @@ export function AreaChart({
           <line x1="0" x2={W} y1={H} y2={H} className="stroke-base-content/25" strokeWidth="1" vectorEffect="non-scaling-stroke" />
           {/* 처음 그릴 때·기간을 바꿀 때: 가로축에 납작하게 붙었다가 위로 차오른다(움직임 줄이기면 바로) */}
           <g className="pm-chart-rise">
-          {parts.map((p, k) => (
+          {stack &&
+            stack.values.map((vals, i) => {
+              const slot = W / n;
+              const gap = Math.min(slot * 0.18, 4);
+              let acc = 0;
+              return (
+                <g key={`b${i}`} opacity={hover !== null && hover !== i ? 0.5 : 1}>
+                  {vals.map((v, k) => {
+                    if (v <= 0) return null;
+                    const y0 = y(acc);
+                    acc += v;
+                    return <rect
+                        key={k}
+                        x={i * slot + gap / 2}
+                        width={slot - gap}
+                        y={y(acc)}
+                        height={Math.max(0, y0 - y(acc))}
+                        style={{ fill: stack.series[k]?.color }}
+                        className="stroke-base-100"
+                        strokeWidth="1.5"
+                        vectorEffect="non-scaling-stroke"
+                      />;
+                  })}
+                </g>
+              );
+            })}
+          {!stack && parts.map((p, k) => (
             <path key={`a${k}`} d={area(p)} fill={`url(#${gid})`} className="pm-chart-fill" />
           ))}
-          {parts.map((p, k) => (
+          {!stack && parts.map((p, k) => (
             <path key={`g${k}`} d={line(p)} fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="6" vectorEffect="non-scaling-stroke" />
           ))}
-          {parts.map((p, k) => (
+          {!stack && parts.map((p, k) => (
             <path key={`l${k}`} d={line(p)} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           ))}
           </g>
@@ -252,7 +300,7 @@ export function AreaChart({
           </>
         )}
         {/* 십자선·점(HTML — 늘어난 SVG 위에서도 둥글게) */}
-        {!dragging && shown && shown.value !== null && hover !== null && (
+        {!stack && !dragging && shown && shown.value !== null && hover !== null && (
           <>
             <span className="pointer-events-none absolute inset-y-0 w-px border-l border-dashed border-primary/60" style={{ left: `${((hover + 0.5) / n) * 100}%` }} />
             <span
@@ -294,6 +342,74 @@ export function AreaChart({
         <ul className="mt-1 space-y-0.5 tabular-nums text-base-content/75">
           {columns.map((c) => (
             <li key={c.key}>{c.tip}</li>
+          ))}
+        </ul>
+      </details>
+    </figure>
+  );
+}
+
+/**
+ * 요일 × 시간 열지도(7 × 24) — "언제 잘 팔리나". 한 색(primary)의 진하기 = 값(밝은 쪽 = 적음).
+ * 칸마다 마우스·키보드 초점에 말풍선, 가장 많은 때를 글로, 아래 "표로 보기".
+ */
+export function Heatmap({
+  title,
+  cells,
+  format,
+  testId,
+}: {
+  readonly title: string;
+  /** [요일 월0…일6][시 0…23] */
+  readonly cells: readonly (readonly number[])[];
+  readonly format: (v: number) => string;
+  readonly testId: string;
+}) {
+  const [hover, setHover] = useState<readonly [number, number] | null>(null);
+  const max = Math.max(0, ...cells.flat());
+  let peak: readonly [number, number] = [0, 0];
+  cells.forEach((row, d) => row.forEach((v, h) => (v > (cells[peak[0]]?.[peak[1]] ?? 0) ? (peak = [d, h]) : null)));
+  const tip = (d: number, h: number) => m.heat.tip(m.heat.days[d]!, h, format(cells[d]?.[h] ?? 0));
+  return (
+    <figure className="space-y-1.5" data-testid={testId}>
+      <div className="flex items-baseline justify-between gap-2 text-xs">
+        <span className="font-semibold text-base-content/80">{title}</span>
+        <span className="min-h-4 tabular-nums text-base-content/75" aria-live="polite" data-testid={`${testId}-tip`}>
+          {hover ? tip(hover[0], hover[1]) : max > 0 ? m.heat.peak(m.heat.days[peak[0]]!, peak[1]) : ''}
+        </span>
+      </div>
+      <div className="grid grid-cols-[1.5rem_repeat(24,minmax(0,1fr))] gap-[2px]" role="img" aria-label={title} onMouseLeave={() => setHover(null)}>
+        {cells.map((row, d) => (
+          <Fragment key={d}>
+            <span className="pr-1 text-right text-[10.5px] leading-[14px] text-base-content/50">{m.heat.days[d]}</span>
+            {row.map((v, h) => (
+              <button
+                key={h}
+                type="button"
+                aria-label={tip(d, h)}
+                className="pm-heat-cell h-3.5 rounded-[3px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                style={{ background: `color-mix(in oklab, var(--color-primary) ${max > 0 ? Math.round((v / max) * 88) : 0}%, var(--color-base-200))` }}
+                onMouseEnter={() => setHover([d, h])}
+                onFocus={() => setHover([d, h])}
+                data-testid={`${testId}-cell`}
+              />
+            ))}
+          </Fragment>
+        ))}
+        <span />
+        {Array.from({ length: 24 }, (_, h) => (
+          <span key={h} className="pm-mono text-center text-[10px] text-base-content/45">
+            {h % 6 === 0 ? h : ''}
+          </span>
+        ))}
+      </div>
+      <details className="text-xs">
+        <summary className="cursor-pointer text-base-content/60">{m.asTable}</summary>
+        <ul className="mt-1 space-y-0.5 tabular-nums text-base-content/75">
+          {cells.map((row, d) => (
+            <li key={d}>
+              {m.heat.days[d]} · {row.map((v, h) => `${h}시 ${format(v)}`).join(' · ')}
+            </li>
           ))}
         </ul>
       </details>
