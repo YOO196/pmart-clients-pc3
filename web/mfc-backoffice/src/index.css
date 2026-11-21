@@ -295,3 +295,14 @@ html[data-theme='pmart-dark'] [data-testid='side-menu'] nav ul a > span:first-ch
   color: #b99cf8;
   font-weight: 800;
 }
+
+/* 실사 잠김 칸 숨쉬기(구역 칸 지도) */
+.pm-pulse {
+  animation: pm-pulse 2.4s ease-in-out infinite;
+}
+@keyframes pm-pulse {
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pm-pulse { animation: none; }
+}

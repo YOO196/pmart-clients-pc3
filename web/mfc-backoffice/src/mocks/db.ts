@@ -792,3 +792,38 @@ resetDb();
 
 export const nextSeq = () => (db.seq += 1);
 export const timestamp = () => new Date().toISOString();
+
+/**
+ * 브라우저 목 시연용 칸(2026-11-21 대시보드 구역 칸 지도 B안) — 시험(test/setup)에서는 부르지 않는다(시험 데이터는 위 6칸 그대로).
+ * MFC-BSN-01 에 구역·온도대별로 칸을 채우고 상태(실사 잠김·닫힘·고회전)를 섞는다. ⚠ 실제 센터 도면이 아니다.
+ */
+export function seedDemoFloor() {
+  const add = (code: string, zone: MockLocation['zone'], temp: MockLocation['temperatureZone'], extra: Partial<MockLocation> = {}) => {
+    const id = `LOC-D-${code}`;
+    if (![...db.locations.values()].some((l) => l.locationCode === code)) {
+      const [k, v] = location(id, 'MFC-BSN-01', code, zone, temp, extra);
+      db.locations.set(k, v);
+    }
+  };
+  const shelf = (t: 'A' | 'C' | 'F', area: string, zone: 'PICKING' | 'STORAGE', racks: number, levels: number, slots: number, tweak: (code: string, i: number) => Partial<MockLocation> = () => ({})) => {
+    const temp = t === 'A' ? 'AMBIENT' : t === 'C' ? 'CHILLED' : 'FROZEN';
+    let i = 0;
+    for (let r = 1; r <= racks; r++)
+      for (let lv = 1; lv <= levels; lv++)
+        for (let s = 1; s <= slots; s++) {
+          const code = `${t}-${area}-${String(r).padStart(2, '0')}-${lv}-${String(s).padStart(2, '0')}`;
+          add(code, zone, temp, { ...(zone === 'PICKING' ? { pickSequence: i + 1 } : {}), ...tweak(code, i) });
+          i += 1;
+        }
+  };
+  shelf('A', 'P1', 'PICKING', 4, 2, 3, (_, i) => (i % 7 === 0 ? { highTurnover: true } : i === 10 ? { state: 'COUNT_LOCKED', stateReason: '순환 실사' } : {}));
+  shelf('C', 'P2', 'PICKING', 3, 2, 3, (_, i) => (i === 4 || i === 5 ? { state: 'COUNT_LOCKED', stateReason: '순환 실사' } : i % 6 === 0 ? { highTurnover: true } : {}));
+  shelf('C', 'S1', 'STORAGE', 3, 2, 2);
+  shelf('F', 'S2', 'STORAGE', 3, 2, 2, (_, i) => (i === 7 ? { state: 'CLOSED', stateReason: '냉동고 점검' } : {}));
+  shelf('A', 'S3', 'STORAGE', 2, 2, 3, (_, i) => (i === 3 ? { state: 'RETIRED', stateReason: '폐지' } : {}));
+  ['RCV-A-01', 'RCV-C-02'].forEach((c) => add(c, 'RECEIVING', c.includes('-C-') ? 'CHILLED' : 'AMBIENT'));
+  ['PAK-A-01', 'PAK-A-02', 'PAK-A-03', 'PAK-C-04'].forEach((c, i) => add(c, 'PACKING', c.includes('-C-') ? 'CHILLED' : 'AMBIENT', i === 2 ? { state: 'CLOSED', stateReason: '포장대 수리' } : {}));
+  ['DSP-A-01', 'DSP-A-02', 'DSP-C-03'].forEach((c) => add(c, 'DISPATCH_STAGING', c.includes('-C-') ? 'CHILLED' : 'AMBIENT'));
+  add('RTN-A-01', 'RETURN', 'AMBIENT');
+  add('DSL-A-01', 'DISPOSAL', 'AMBIENT');
+}
