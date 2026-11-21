@@ -34,6 +34,14 @@ export const navGroups: readonly MenuGroup[] = [
         apiReady: ['출하 약속 초과·임박(작업 promisedReadyAt)', '결품·파손 줄 수(fulfillment 결품 지표)', '피킹 파손 품질 사고', '인계 확인 필요 포장'],
         apiMissing: ['결품(SHORT) 건별 센터 목록', '출하 약속 임박·초과 서버 건수'],
       },
+      {
+        // 센터 대시보드(2026-11-21 사용자) — 오늘 숫자·14일 추이(기존 지표 API 만)
+        key: 'dashboard',
+        segment: 'dashboard',
+        ready: true,
+        apiReady: ['피킹 줄·결품 지표(fulfillment)', '결품 많은 상품(by-sku)', '정시 배송 지표(dispatch DD-4)', '끝나지 않은 작업', '작업자', '배송 현황(bff)'],
+        apiMissing: [],
+      },
     ],
   },
   {

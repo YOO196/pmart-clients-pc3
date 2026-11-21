@@ -79,6 +79,16 @@ const pickingLines: Readonly<Record<string, { readonly pickedLines: number; read
   'MFC-BSN-01': { pickedLines: 40, SHORT: 2, DAMAGED: 1, SPOILED: 1, BLOCKED: 0 },
 };
 
+const pastDays = (today: string, n: number) => {
+  const base = Date.parse(`${today}T00:00:00Z`);
+  return Array.from({ length: n }, (_, i) => new Date(base - (n - 1 - i) * 86_400_000).toISOString().slice(0, 10));
+};
+function pastPicking(date: string) {
+  const day = Number(date.slice(8, 10));
+  if (new Date(`${date}T00:00:00Z`).getUTCDay() === 0) return null;
+  return { pickedLines: 120 + ((day * 37) % 90), SHORT: 2 + (day % 5), DAMAGED: day % 3 === 0 ? 1 : 0, SPOILED: day % 7 === 0 ? 1 : 0, BLOCKED: 0 };
+}
+
 export const taskHandlers = [
   http.get(`${API_BASE}/metrics/picking-lines`, ({ request }) => {
     if (!operator(request)) return unauthorized();
@@ -89,10 +99,9 @@ export const taskHandlers = [
     const from = q.get('from') ?? '';
     const to = q.get('to') ?? '';
     const v = pickingLines[mfcId];
-    const items =
-      v && from <= today && today <= to
-        ? [{ date: today, mfcId, pickedLines: v.pickedLines, shortLines: v.SHORT + v.DAMAGED + v.SPOILED + v.BLOCKED, shortLinesByReason: { SHORT: v.SHORT, DAMAGED: v.DAMAGED, SPOILED: v.SPOILED, BLOCKED: v.BLOCKED } }]
-        : [];
+    const row = (date: string, x: (typeof pickingLines)[string]) => ({ date, mfcId, pickedLines: x.pickedLines, shortLines: x.SHORT + x.DAMAGED + x.SPOILED + x.BLOCKED, shortLinesByReason: { SHORT: x.SHORT, DAMAGED: x.DAMAGED, SPOILED: x.SPOILED, BLOCKED: x.BLOCKED } });
+    // 대시보드 14일 추이용 지난 날(오늘 값은 위 표 그대로). 일요일은 0건 → 줄 없음(계약).
+    const items = v ? pastDays(today, 30).filter((d) => from <= d && d <= to).flatMap((d) => (d === today ? [row(d, v)] : pastPicking(d) ? [row(d, pastPicking(d)!)] : [])) : [];
     return HttpResponse.json({ items, asOf: new Date().toISOString() });
   }),
 
