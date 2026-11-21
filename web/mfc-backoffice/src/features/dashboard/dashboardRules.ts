@@ -146,3 +146,21 @@ export function presetFrom(n: number, today: string): string {
   const [yy, mm] = mo <= 0 ? [y - 1, mo + 12] : [y, mo];
   return `${yy}-${String(mm).padStart(2, '0')}-01`;
 }
+
+/**
+ * 한 단계 넓게(Ctrl+Z) — 지금 기간보다 큰 다음 단계(1일 → 7일 → 30일 → 90일 → 1년), 지금 기간 가운데를 중심으로.
+ * 끝이 오늘을 넘으면 오늘에 붙인다(1년이 오늘에 붙으면 빠른 단추 1년과 같게). 이미 1년 단추만큼 넓으면 null.
+ */
+export function zoomOut(r: Range, today: string): Range | null {
+  // 1년 단추(11달 전 1일부터 ≈ 334~365일)보다 길면 끝
+  if (spanDays(r) >= spanDays({ from: presetFrom(365, today), to: today })) return null;
+  const n = RANGE_PRESETS.find((p) => p > spanDays(r)) ?? 365;
+  const mid = addDays(r.from, Math.floor((spanDays(r) - 1) / 2));
+  let from = addDays(mid, -Math.floor((n - 1) / 2));
+  let to = addDays(from, n - 1);
+  if (to >= today) {
+    to = today;
+    from = presetFrom(n, today);
+  }
+  return { from, to };
+}

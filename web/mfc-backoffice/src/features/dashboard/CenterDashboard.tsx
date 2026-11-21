@@ -6,7 +6,7 @@
 // - 작업·인력: 홈과 같은 끝나지 않은 작업·작업자. 배송 상태: bff live-delivery 50건(넘으면 안내).
 // - 추이 패널(그래프·결품 많은 상품)은 고른 기간(URL ?from=&to=, 기본 14일, 최대 92일 — 정시 배송은 31일씩 나눠 읽음). 지표 칸은 늘 오늘·14일.
 //   칸 단위: 시간(7일까지 — 서버 지표가 없어 목 모드에서만 하루 합계를 하루 수요 곡선으로 나눠 그림)·일·주·월(일 합계를 더함). 최대 1년, 피킹은 92일씩 나눠 읽음.
-//   그래프를 끌면 그 구간으로 확대, Ctrl+Z 는 바로 전 기간으로(브라우저 메모리 — 새로고침하면 처음부터).
+//   그래프를 끌면 그 구간으로 확대, Ctrl+Z 는 한 단계 넓게(1일 → 7일 → 30일 → 90일 → 1년, 지금 기간 가운데 중심).
 // - 알림 피드·우선 확인: 홈 원천(useOps — 출하 약속·인계 확인·피킹 파손 사고)과 배차 지연(useDispatchDelays) — 같은 쿼리 키라 두 번 읽지 않는다.
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -29,6 +29,7 @@ import {
   addDays,
   buckets,
   presetFrom,
+  zoomOut,
   chunks,
   DAYS,
   defaultUnit,
@@ -142,7 +143,6 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const askedUnit = params.get('unit') as Unit | null;
   const unit: Unit = askedUnit && allowed.includes(askedUnit) ? askedUnit : defaultUnit(span, hourOk);
   type View = Range & { readonly unit: Unit };
-  const [history, setHistory] = useState<readonly View[]>([]);
   const setRange = (next: View) =>
     setParams(
       (p) => {
@@ -158,24 +158,22 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const applyRange = (r: Range, u?: Unit) => {
     const next: View = { ...r, unit: u ?? defaultUnit(spanDays(r), hourOk) };
     if (next.from === range.from && next.to === range.to && next.unit === unit) return;
-    setHistory((h) => [...h, { ...range, unit }].slice(-30));
     setRange(next);
   };
-  const back = () => {
-    const prev = history.at(-1);
-    if (!prev) return;
-    setHistory((h) => h.slice(0, -1));
-    setRange(prev);
+  // 한 단계 넓게(1일 → 7일 → 30일 → 90일 → 1년, 지금 기간 가운데 중심) — 앞 상태로 되돌리기가 아니다(사용자 2026-11-21)
+  const wider = zoomOut(range, today);
+  const widen = () => {
+    if (wider) applyRange(wider);
   };
-  // Ctrl+Z(⌘Z) — 입력칸에서 누른 것은 입력칸 되돌리기로 둔다
+  // Ctrl+Z(⌘Z) = 한 단계 넓게 — 입력칸에서 누른 것은 입력칸 되돌리기로 둔다
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;
       const t = e.target as HTMLElement | null;
       if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return;
-      if (history.length === 0) return;
+      if (!wider) return;
       e.preventDefault();
-      back();
+      widen();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -392,7 +390,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           {...(chart === 'onTime' ? { help: m.chart.onTimeHelp } : {})}
           q={chart === 'onTime' ? trend.onTime : trend.picking}
           toolbar={
-            <RangeBar range={range} unit={unit} units={allowed} hourOk={hourOk} today={today} canBack={history.length > 0} onChange={applyRange} onBack={back} />
+            <RangeBar range={range} unit={unit} units={allowed} hourOk={hourOk} today={today} canBack={wider !== null} onChange={applyRange} onBack={widen} />
           }
           aside={
             <div className="pm-seg" role="group" aria-label={m.chart.pickToggle}>
@@ -717,7 +715,7 @@ function RangeBar({
           <p className="truncate text-[11px] text-base-content/45">{r.hint}</p>
         )}
         <button type="button" className="btn btn-xs btn-ghost shrink-0" disabled={!canBack} onClick={onBack} title={r.backHint} data-testid="range-back">
-          ↶ {r.back}
+          ⤢ {r.back}
         </button>
       </div>
     </div>
