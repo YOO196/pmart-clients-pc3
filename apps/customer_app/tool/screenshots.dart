@@ -36,6 +36,10 @@ import 'package:customer_app/features/profile/presentation/profile_controller.da
     show profileProvider;
 import 'package:customer_app/features/redelivery/data/mock_redelivery_payments_repository.dart';
 import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
+import 'package:customer_app/features/support/presentation/faq_screens.dart'
+    show faqRepositoryProvider;
+import 'package:customer_app/features/support/data/mock_faq_repository.dart';
+import 'package:customer_app/features/support/domain/faq.dart';
 import 'package:customer_app/features/reviews/domain/reviews.dart';
 import 'package:customer_app/features/reviews/presentation/reviews_controller.dart';
 import 'package:customer_app/features/checkout/domain/checkout.dart'
@@ -1014,6 +1018,65 @@ void main() {
     debugDisableShadows = true;
   });
 
+  // 자주 묻는 질문 > 질문 유형(사용자 2026-11-21): 4줄 + [더보기], 고른 것 검정 — 분류가 많은 목.
+  testWidgets('faq-types', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final faqs = MockFaqRepository(
+      latency: Duration.zero,
+      extraCategories: [
+        for (final (i, title) in const [
+          '반품·교환',
+          '결제',
+          '회원 정보',
+          '쿠폰·할인',
+          '주문 변경',
+          '배송지',
+          '상품 문의',
+          '품절·결품',
+          '오배송',
+          '파손',
+          '영수증',
+          '리뷰',
+          '찜',
+          '알림',
+          '탈퇴',
+          '앱 사용',
+        ].indexed)
+          FaqCategory(category: 'X$i', title: title, count: 0),
+      ],
+    );
+    await t.pumpWidget(
+      testApp([faqRepositoryProvider.overrideWithValue(faqs)]),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/f-$name.png').uri),
+      );
+    }
+
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/support/faqs'),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('faq-cat-CANCEL')));
+    await shot('closed');
+    await t.tap(find.byKey(const ValueKey('faq-types-more')));
+    await shot('open');
+  });
   // 상품 할인가(ADR-0082 4단계 — 목 요거트·토마토·저지방 우유): 검색 카드·상세·장바구니.
   testWidgets('discounts', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

@@ -5,9 +5,15 @@ import 'faq_repository.dart';
 
 /// ⚠ 화면 개발·시험용 목. 실제 FAQ 원문이 아니다(서버는 고객 AI 상담의 안내 문서에서 만든다).
 final class MockFaqRepository implements FaqRepository {
-  MockFaqRepository({this.latency = const Duration(milliseconds: 200)});
+  MockFaqRepository({
+    this.latency = const Duration(milliseconds: 200),
+    this.extraCategories = const [],
+  });
 
   final Duration latency;
+
+  /// 질문 없이 분류만 더 둔다(시험·캡처 — 질문 유형이 여러 줄일 때).
+  final List<FaqCategory> extraCategories;
 
   /// 조회에 쓴 조건(순서대로).
   final queries = <({String? q, String? category})>[];
@@ -80,7 +86,10 @@ final class MockFaqRepository implements FaqRepository {
         count: (c?.count ?? 0) + 1,
       );
     }
-    return FaqList(items: hits, categories: cats.values.toList());
+    return FaqList(
+      items: hits,
+      categories: [...cats.values, ...extraCategories],
+    );
   }
 
   @override

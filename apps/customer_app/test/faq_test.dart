@@ -8,6 +8,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:customer_app/features/support/data/faq_repository.dart';
 import 'package:customer_app/features/support/data/mock_faq_repository.dart';
+import 'package:customer_app/features/support/domain/faq.dart';
 import 'package:customer_app/features/support/presentation/faq_screens.dart';
 import 'package:customer_app/shared/providers.dart' show sourceSystem;
 
@@ -96,6 +97,100 @@ void main() {
     expect(find.byType(MarkdownBody), findsOneWidget);
   });
 
+  group('질문 유형(사용자 2026-11-21 — 4줄 넘으면 더보기, 고른 것 검정)', () {
+    final many = [
+      for (final (i, t) in const [
+        '반품·교환',
+        '결제',
+        '회원 정보',
+        '쿠폰·할인',
+        '주문 변경',
+        '배송지',
+        '상품 문의',
+        '품절·결품',
+        '오배송',
+        '파손',
+        '영수증',
+        '리뷰',
+        '찜',
+        '알림',
+        '탈퇴',
+        '앱 사용',
+        '개인정보',
+        '기타',
+      ].indexed)
+        FaqCategory(category: 'X$i', title: t, count: 0),
+    ];
+
+    Future<void> openList(WidgetTester t) async {
+      faqs = MockFaqRepository(latency: Duration.zero, extraCategories: many);
+      await openSupport(t);
+      t.view
+        ..physicalSize = const Size(360, 1400)
+        ..devicePixelRatio = 1;
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('support-faqs')));
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('4줄까지만 보이고 [더보기]로 전부, [접기]로 다시', (t) async {
+      await openList(t);
+      final last = find.byKey(const ValueKey('faq-cat-X17'));
+      expect(last, findsNothing);
+      expect(find.text('더보기'), findsOneWidget);
+      // 보이는 알약은 4줄 안
+      final tops = {
+        for (final e
+            in find
+                .byWidgetPredicate(
+                  (w) =>
+                      w.key is ValueKey<String> &&
+                      (w.key! as ValueKey<String>).value.startsWith('faq-cat-'),
+                )
+                .evaluate())
+          t.getTopLeft(find.byWidget(e.widget)).dy.round(),
+      };
+      expect(tops.length, lessThanOrEqualTo(4));
+      await t.tap(find.byKey(const ValueKey('faq-types-more')));
+      await t.pumpAndSettle();
+      expect(last, findsOneWidget);
+      expect(find.text('접기'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('faq-types-more')));
+      await t.pumpAndSettle();
+      expect(last, findsNothing);
+    });
+
+    testWidgets('고른 유형은 검정 바탕, 4줄 밖 유형을 골랐으면 펼친 채로', (t) async {
+      await openList(t);
+      await t.tap(find.byKey(const ValueKey('faq-types-more')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('faq-cat-X17')));
+      await t.pumpAndSettle();
+      expect(faqs.queries.last.category, 'X17');
+      // 접기를 눌러도 고른 것이 4줄 밖이면 펼친 채로 둔다
+      await t.tap(find.byKey(const ValueKey('faq-types-more')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('faq-cat-X17')), findsOneWidget);
+      final box = t.widget<Container>(
+        find.descendant(
+          of: find.byKey(const ValueKey('faq-cat-X17')),
+          matching: find.byType(Container),
+        ),
+      );
+      final scheme = Theme.of(
+        t.element(find.byKey(const ValueKey('faq-cat-X17'))),
+      ).colorScheme;
+      expect((box.decoration! as BoxDecoration).color, scheme.onSurface);
+    });
+
+    test('줄 계산: 폭이 넉넉하면 전부, 좁으면 4줄까지만', () {
+      final labels = [for (var i = 0; i < 30; i++) '유형$i'];
+      expect(chipsFitInLines(labels, 100000, null, lines: 4), 30);
+      final n = chipsFitInLines(labels, 200, null, lines: 4);
+      expect(n, lessThan(30));
+      expect(n, greaterThan(0));
+    });
+  });
   testWidgets('검색칸: 검색어를 q 로 묻고, 결과가 없으면 "찾는 질문이 없어요"', (t) async {
     await openSupport(t);
     await t.enterText(find.byKey(const ValueKey('faq-search-field')), '포인트');

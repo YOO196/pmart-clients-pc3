@@ -80,9 +80,9 @@ class SupportFaqBlock extends ConsumerWidget {
                 ActionChip(
                   key: ValueKey('support-faq-cat-${c.category}'),
                   label: Text(c.title),
-                  // 레퍼런스: 회색 채운 알약 약 40dp
+                  // 레퍼런스: 회색 채운 알약 + 얇은 회색 테두리
                   backgroundColor: theme.colorScheme.surfaceContainer,
-                  side: BorderSide.none,
+                  side: BorderSide(color: theme.colorScheme.outlineVariant),
                   labelStyle: theme.textTheme.bodyMedium?.copyWith(
                     fontSize: 14,
                   ),
@@ -240,62 +240,14 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
                           setState(() => _q = q.isEmpty ? null : q),
                     ),
                   ),
-                  // 사용자 캡처(2026-11-20): 회색 띠 아래 "질문 유형" + 여러 줄 알약(고른 것은 검게)
+                  // 레퍼런스 고객센터 메인 "자주 묻는 질문" 알약 모양 + 고른 것은 검게(사용자 2026-11-21), 4줄 넘으면 [더보기].
                   const SizedBox(height: 14),
                   const PmartSectionGap(height: 8),
                   if (all != null)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            l10n.faqTypeLabel,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.outline,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              for (final c in <FaqCategory?>[
-                                null,
-                                ...all.categories,
-                              ])
-                                ChoiceChip(
-                                  key: ValueKey(
-                                    'faq-cat-${c?.category ?? 'all'}',
-                                  ),
-                                  label: Text(c?.title ?? l10n.ordersFilterAll),
-                                  selected: _category == c?.category,
-                                  showCheckmark: false,
-                                  shape: const StadiumBorder(),
-                                  selectedColor: theme.colorScheme.onSurface,
-                                  backgroundColor: theme.colorScheme.surface,
-                                  side: BorderSide(
-                                    color: _category == c?.category
-                                        ? theme.colorScheme.onSurface
-                                        : theme.colorScheme.outlineVariant,
-                                  ),
-                                  labelStyle: theme.textTheme.bodyMedium
-                                      ?.copyWith(
-                                        fontSize: 15,
-                                        fontWeight: _category == c?.category
-                                            ? FontWeight.w700
-                                            : null,
-                                        color: _category == c?.category
-                                            ? theme.colorScheme.surface
-                                            : theme.colorScheme.onSurface,
-                                      ),
-                                  onSelected: (_) =>
-                                      setState(() => _category = c?.category),
-                                ),
-                            ],
-                          ),
-                        ],
-                      ),
+                    FaqTypeChips(
+                      categories: all.categories,
+                      selected: _category,
+                      onSelected: (c) => setState(() => _category = c),
                     ),
                   const PmartSectionGap(height: 8),
                 ],
@@ -420,4 +372,182 @@ class FaqDetailScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// 자주 묻는 질문 "질문 유형"(사용자 2026-11-21): 굵은 구역 제목 + 레퍼런스 알약(회색 채움·얇은 테두리, 14 보통,
+/// 높이 약 33dp, 사이 10·줄 사이 15). 고른 것은 검정 바탕·흰 글자. 4줄을 넘으면 4줄까지만 + [더보기 ⌄]
+/// (펼치면 [접기 ⌃]). 4줄 밖의 유형을 고른 채로 열리면 펼쳐 보인다.
+class FaqTypeChips extends StatefulWidget {
+  const FaqTypeChips({
+    super.key,
+    required this.categories,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<FaqCategory> categories;
+
+  /// 고른 분류(null = 전체).
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+
+  static const maxLines = 4;
+
+  @override
+  State<FaqTypeChips> createState() => _FaqTypeChipsState();
+}
+
+class _FaqTypeChipsState extends State<FaqTypeChips> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final style = theme.textTheme.bodyMedium?.copyWith(fontSize: 14);
+    final entries = <(String?, String)>[
+      (null, l10n.ordersFilterAll),
+      for (final c in widget.categories) (c.category, c.title),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.faqTypeLabel,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, c) {
+              final fit = chipsFitInLines(
+                [for (final e in entries) e.$2],
+                c.maxWidth,
+                style,
+                lines: FaqTypeChips.maxLines,
+              );
+              final selectedAt = entries.indexWhere(
+                (e) => e.$1 == widget.selected,
+              );
+              final more = fit < entries.length;
+              final open = _expanded || selectedAt >= fit;
+              final shown = open ? entries.length : fit;
+              return Column(
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 15,
+                      children: [
+                        for (final (value, label) in entries.take(shown))
+                          _chip(theme, scheme, style, value, label),
+                      ],
+                    ),
+                  ),
+                  if (more)
+                    TextButton(
+                      key: const ValueKey('faq-types-more'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: scheme.onSurfaceVariant,
+                        textStyle: style,
+                      ),
+                      onPressed: () => setState(() => _expanded = !open),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(open ? l10n.faqTypesLess : l10n.faqTypesMore),
+                          const SizedBox(width: 2),
+                          PmartLineIcon(
+                            open
+                                ? PmartLineIcons.chevronUp
+                                : PmartLineIcons.chevronDown,
+                            size: 16,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    const SizedBox(height: 12),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(
+    ThemeData theme,
+    ColorScheme scheme,
+    TextStyle? style,
+    String? value,
+    String label,
+  ) {
+    final on = widget.selected == value;
+    return Semantics(
+      button: true,
+      selected: on,
+      child: InkWell(
+        key: ValueKey('faq-cat-${value ?? 'all'}'),
+        borderRadius: BorderRadius.circular(17),
+        onTap: () => widget.onSelected(value),
+        child: Container(
+          height: 33,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: on ? scheme.onSurface : scheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(
+              color: on ? scheme.onSurface : scheme.outlineVariant,
+            ),
+          ),
+          child: Center(
+            widthFactor: 1,
+            child: Text(
+              label,
+              style: style?.copyWith(
+                color: on ? scheme.surface : scheme.onSurface,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// [labels] 알약(글자 폭 + 안쪽 여백 28 + 테두리 2, 사이 10)을 [maxWidth] 폭 Wrap 에 놓을 때 [lines] 줄 안에 드는 개수.
+int chipsFitInLines(
+  List<String> labels,
+  double maxWidth,
+  TextStyle? style, {
+  required int lines,
+}) {
+  var line = 1;
+  var x = 0.0;
+  for (final (i, label) in labels.indexed) {
+    final tp = TextPainter(
+      text: TextSpan(text: label, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final w = tp.width + 28 + 2;
+    tp.dispose();
+    final next = x == 0 ? w : x + 10 + w;
+    if (next > maxWidth && x > 0) {
+      line++;
+      if (line > lines) return i;
+      x = w;
+    } else {
+      x = next;
+    }
+  }
+  return labels.length;
 }

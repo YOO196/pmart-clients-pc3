@@ -1456,6 +1456,8 @@
   "homeCartOrderable": "주문 가능",
   "homeDeliveryGuide": "배달안내",
   "faqTypeLabel": "질문 유형",
+  "faqTypesMore": "더보기",
+  "faqTypesLess": "접기",
   "supportNameSuffix": "님",
   "supportHeadline": "무엇을 도와드릴까요?",
   "supportChat": "AI 채팅 상담",
