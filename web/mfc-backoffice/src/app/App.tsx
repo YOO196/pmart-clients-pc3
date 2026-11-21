@@ -29,6 +29,7 @@ import { messages as m } from '../shared/messages';
 import { allMenus, centerPath, isWorkerOnly, navGroups, type MenuItem, type MenuKey } from './nav';
 import { ConnectionBanner, ShortcutHelp, TaskAlertBadge, useDocumentTitle, useSlashToSearch } from './PageChrome';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
+import { groupIcon, useMenuCollapsed } from './sideMenu';
 import { ThemeToggle } from './ThemeToggle';
 import { DETAIL_BAR_SLOT } from '../shared/StickyTitle';
 
@@ -47,6 +48,7 @@ function Layout() {
   const { session } = useSession();
   const center = useCenter();
   const { pathname } = useLocation();
+  const [collapsed, toggleMenu] = useMenuCollapsed();
   const target = center?.mine ? center.mfcId : session?.centers[0];
   // 지금 메뉴(`/c/:mfcId/<segment>/…`) — 센터를 바꾸면 같은 메뉴로 간다
   const segment = pathname.split('/')[3] ?? allMenus[0]!.segment;
@@ -61,6 +63,7 @@ function Layout() {
         id: g.key,
         // 홈 묶음은 제목 없이 맨 위(전과 같음)
         label: g.key === 'overview' ? '' : m.groups[g.key],
+        ...(groupIcon[g.key] ? { icon: groupIcon[g.key] } : {}),
         items: g.items.map((item) => ({
           to: centerPath(target, item.segment),
           label: m.menus[item.key],
@@ -74,7 +77,12 @@ function Layout() {
       title={m.appTitle}
       homeLabel={m.goHome}
       groups={groups}
-      collapsed={false}
+      rail="groups"
+      activePath={pathname}
+      collapsed={collapsed}
+      onToggleMenu={toggleMenu}
+      expandLabel={m.nav.expand}
+      collapseLabel={m.nav.collapse}
       navLabel={m.nav.menu}
       location={
         <ConsoleBreadcrumb
@@ -99,15 +107,18 @@ function Layout() {
       tools={
         <>
           {session && center?.mine && <CenterSwitcher centers={session.centers} current={center.mfcId} segment={segment} />}
-          {env.isMock && <span className="badge badge-accent badge-sm">{m.mockBadge}</span>}
-          <ShortcutHelp />
-          <ThemeToggle />
+          {/* 좁은 화면에서는 목 표시·단축키 도움·밝기 바꾸기·내 정보를 숨겨 머리줄이 넘치지 않게(2026-11-21) */}
+          {env.isMock && <span className="badge badge-accent badge-sm hidden sm:inline-flex">{m.mockBadge}</span>}
+          <span className="hidden sm:contents">
+            <ShortcutHelp />
+            <ThemeToggle />
+          </span>
           {session && (
-            <NavLink to="/me" className={({ isActive }) => `btn btn-ghost btn-xs font-normal ${isActive ? 'btn-active' : ''}`}>
+            <NavLink to="/me" className={({ isActive }) => `btn btn-ghost btn-xs hidden shrink-0 font-normal sm:inline-flex ${isActive ? 'btn-active' : ''}`}>
               {m.nav.me}
             </NavLink>
           )}
-          <NavLink to={session ? '/session' : '/login'} className={({ isActive }) => `btn btn-ghost btn-xs font-normal ${isActive ? 'btn-active' : ''}`}>
+          <NavLink to={session ? '/session' : '/login'} className={({ isActive }) => `btn btn-ghost btn-xs shrink-0 font-normal ${isActive ? 'btn-active' : ''}`}>
             {session ? m.nav.session : m.nav.login}
           </NavLink>
           {/* 직원 웹 앱 바꾸기 — 머리줄 맨 오른쪽, 통합·인사팀 백오피스와 같게 */}

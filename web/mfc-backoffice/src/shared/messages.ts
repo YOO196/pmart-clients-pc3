@@ -43,6 +43,8 @@ export const messages = {
     login: '로그인',
     me: '내 정보',
     menu: '메뉴',
+    collapse: '메뉴 접기',
+    expand: '메뉴 펴기',
   },
   /** 머리줄 역할 칩 */
   roleChip: { supervisor: '센터 관리자' },
