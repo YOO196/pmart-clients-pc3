@@ -130,28 +130,34 @@ void main() {
 
       await t.tap(find.byKey(const ValueKey('my-info')));
       await t.pumpAndSettle();
-      final card = find.byKey(const ValueKey('info-google'));
-      expect(
-        find.descendant(of: card, matching: find.text('홍길동')),
-        findsOneWidget,
-      );
+      // 내 정보 F안(2026-11-21): 가운데 로그인 계정 사진, 이메일 줄(읽기만), 로그인 계정 카드.
       expect(
         find.descendant(
-          of: card,
-          matching: find.text('hong@example.com (확인된 이메일)'),
+          of: find.byKey(const ValueKey('info-avatar')),
+          matching: find.byKey(const ValueKey('profile-avatar-image')),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
-          of: card,
-          matching: find.byKey(const ValueKey('profile-avatar-image')),
+          of: find.byKey(const ValueKey('info-email-row')),
+          matching: find.text('hong@example.com'),
         ),
         findsOneWidget,
       );
       // 같은 v 는 다시 받지 않는다(캐시).
       expect(profile.imageReads, 1);
-      // 이름 입력 칸은 nickname(내 정보 이름)이고 Google 이름으로 덮지 않는다.
+      // 이름 줄은 nickname(내 정보 이름)이고 Google 이름으로 덮지 않는다.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('info-name-row')),
+          matching: find.text('김피마'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('홍길동'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('info-name-row')));
+      await t.pumpAndSettle();
       expect(
         t
             .widget<TextFormField>(find.byKey(const ValueKey('info-name')))
@@ -189,13 +195,25 @@ void main() {
 
       await t.tap(find.byKey(const ValueKey('my-info')));
       await t.pumpAndSettle();
-      final card = find.byKey(const ValueKey('info-google'));
       expect(
-        find.descendant(of: card, matching: find.text('이름 정보 없음')),
+        find.descendant(
+          of: find.byKey(const ValueKey('info-email-row')),
+          matching: find.text('이메일 정보 없음'),
+        ),
         findsOneWidget,
       );
       expect(
-        find.descendant(of: card, matching: find.text('이메일 정보 없음')),
+        find.descendant(
+          of: find.byKey(const ValueKey('info-avatar')),
+          matching: find.byKey(const ValueKey('profile-avatar-default')),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('info-google')),
+          matching: find.text('카카오'),
+        ),
         findsOneWidget,
       );
     });
@@ -225,7 +243,7 @@ void main() {
       // 확인되지 않은 이메일은 꼬리표 없이 이메일만
       expect(
         find.descendant(
-          of: find.byKey(const ValueKey('info-google')),
+          of: find.byKey(const ValueKey('info-email-row')),
           matching: find.text('hong@example.com'),
         ),
         findsOneWidget,

@@ -39,12 +39,36 @@ class _IdentityViewState extends ConsumerState<IdentityView> {
   final _phone = TextEditingController();
   String? _info;
 
+  /// [문자 앱 열기]로 문자 앱에 다녀오는 중. 앱으로 돌아오면(resumed) [보냈어요]를 한 번 대신 누른다
+  /// (사용자 2026-11-21 — 문자를 보냈는지 앱은 알 수 없어 자동으로 돌아오게는 못 함). 확인 조회는 OCTOMO 월 한도를
+  /// 쓰므로 문자 앱을 연 번마다 한 번만 묻는다.
+  bool _awaySms = false;
+  late final AppLifecycleListener _life = AppLifecycleListener(
+    onResume: _checkAfterSms,
+  );
+
   static final _mobile010 = RegExp(r'^010\d{8}$');
 
   @override
+  void initState() {
+    super.initState();
+    _life; // 생성(구독)
+  }
+
+  @override
   void dispose() {
+    _life.dispose();
     _phone.dispose();
     super.dispose();
+  }
+
+  void _checkAfterSms() {
+    if (!_awaySms || !mounted) return;
+    _awaySms = false;
+    final w = widget.waiting;
+    if (w.start == null) return;
+    if (ref.read(loginFlowProvider(widget.purpose)) is LoginWorking) return;
+    _ctl.confirmIdentity(w);
   }
 
   LoginFlowController get _ctl =>
@@ -127,10 +151,12 @@ class _IdentityViewState extends ConsumerState<IdentityView> {
               child: OutlinedButton(
                 key: const ValueKey('id-open-sms'),
                 onPressed: () async {
+                  _awaySms = true;
                   final ok = await ref.read(smsComposerProvider)(
                     s.sendTo,
                     s.text,
                   );
+                  if (!ok) _awaySms = false;
                   if (!ok && mounted) {
                     setState(() => _info = l10n.pvNoSmsApp);
                   }

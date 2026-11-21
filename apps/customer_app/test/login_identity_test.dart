@@ -10,6 +10,8 @@ import 'package:customer_app/features/auth/domain/auth.dart';
 import 'package:customer_app/features/auth/presentation/auth_controller.dart';
 import 'package:pmart_core/pmart_core.dart' show PmartEnv;
 
+import 'package:customer_app/shared/sms_composer.dart';
+
 import 'support/app_harness.dart';
 
 /// 로그인 중 휴대폰 확인(AUTH_IDENTITY — auth 0.6.0, 백엔드 회신 2026-11-20 reply-br64-phone-identity).
@@ -62,6 +64,60 @@ void main() {
     );
 
     await t.tap(find.byKey(const ValueKey('id-sent')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('login-identity')), findsNothing);
+    expect(member(t), isTrue);
+  });
+
+  // 앱을 떠났다 돌아온다(생명주기 순서대로 — AppLifecycleListener 는 건너뛴 전환을 받지 않는다).
+  void awayAndBack(WidgetTester t) {
+    for (final s in const [
+      AppLifecycleState.inactive,
+      AppLifecycleState.hidden,
+      AppLifecycleState.paused,
+      AppLifecycleState.hidden,
+      AppLifecycleState.inactive,
+      AppLifecycleState.resumed,
+    ]) {
+      t.binding.handleAppLifecycleStateChanged(s);
+    }
+  }
+
+  testWidgets('문자 앱에 다녀와 앱으로 돌아오면 [보냈어요]를 한 번 대신 누른다(문자 앱을 열지 않았으면 묻지 않음)', (
+    t,
+  ) async {
+    final auth = MockAuthRepository(latency: Duration.zero)
+      ..requireIdentity = true;
+    t.view
+      ..physicalSize = const Size(800, 1800)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    var opened = 0;
+    await t.pumpWidget(
+      testApp([
+        smsComposerProvider.overrideWithValue((to, body) async {
+          opened++;
+          return true;
+        }),
+      ], auth: auth),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    await enterPhone(t);
+    // 문자 앱을 열지 않고 앱을 떠났다 오면 묻지 않는다.
+    awayAndBack(t);
+    await t.pumpAndSettle();
+    expect(member(t), isFalse);
+
+    await t.tap(find.byKey(const ValueKey('id-open-sms')));
+    await t.pumpAndSettle();
+    expect(opened, 1);
+    awayAndBack(t);
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('login-identity')), findsNothing);
     expect(member(t), isTrue);

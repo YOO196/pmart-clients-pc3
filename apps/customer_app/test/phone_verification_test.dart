@@ -97,6 +97,43 @@ void main() {
     expect(find.text('확인됨'), findsOneWidget);
   });
 
+  testWidgets('문자 앱에 다녀와 돌아오면 [보냈어요]를 한 번 대신 누른다(문자 앱을 열지 않았으면 묻지 않음)', (
+    t,
+  ) async {
+    void awayAndBack() {
+      for (final s in const [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        t.binding.handleAppLifecycleStateChanged(s);
+      }
+    }
+
+    await openScreen(t);
+    await t.enterText(key('pv-phone'), '01012345678');
+    await t.pump();
+    await t.tap(key('pv-next'));
+    await settle(t);
+    awayAndBack();
+    await settle(t);
+    expect(pv.confirms, 0, reason: '문자 앱을 열지 않았다');
+    await t.tap(key('pv-open-sms'));
+    await t.pump();
+    awayAndBack();
+    await settle(t);
+    expect(pv.confirms, 1);
+    expect(key('pv-title-done'), findsOneWidget);
+    awayAndBack();
+    await settle(t);
+    expect(pv.confirms, 1, reason: '문자 앱을 연 번마다 한 번만');
+    await t.tap(key('pv-done'));
+    await t.pumpAndSettle();
+  });
+
   testWidgets('아직 문자가 안 왔으면 남은 횟수 안내 — 자동으로 다시 묻지 않는다', (t) async {
     pv.arriveAfter = 2;
     await openScreen(t);

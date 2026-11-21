@@ -39,11 +39,29 @@ class _PhoneVerificationScreenState
   Timer? _tick;
   String? _verifiedPhone;
 
+  /// [문자 앱 열기]로 문자 앱에 다녀오는 중 — 앱으로 돌아오면 [보냈어요]를 한 번 대신 누른다(사용자 2026-11-21,
+  /// 가입 중 휴대폰 확인과 같다). 확인 조회는 OCTOMO 월 한도를 쓰므로 문자 앱을 연 번마다 한 번만.
+  bool _awaySms = false;
+  late final AppLifecycleListener _life = AppLifecycleListener(
+    onResume: () {
+      if (!_awaySms || !mounted || _started == null) return;
+      _awaySms = false;
+      _sent();
+    },
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _life; // 생성(구독)
+  }
+
   /// 010 11자리만 확인할 수 있다(서버 PHONE_NOT_SUPPORTED 와 같게).
   static final _mobile010 = RegExp(r'^010\d{8}$');
 
   @override
   void dispose() {
+    _life.dispose();
     _phone.dispose();
     _tick?.cancel();
     super.dispose();
@@ -145,7 +163,9 @@ class _PhoneVerificationScreenState
   Future<void> _openSms() async {
     final s = _started;
     if (s == null) return;
+    _awaySms = true;
     final opened = await ref.read(smsComposerProvider)(s.sendTo, s.text);
+    if (!opened) _awaySms = false;
     if (!opened && mounted) {
       setState(() => _info = AppLocalizations.of(context).pvNoSmsApp);
     }

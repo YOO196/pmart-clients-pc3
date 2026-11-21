@@ -985,6 +985,44 @@ void main() {
     await shot('5-my-info');
   });
 
+  // 마이 > 내 정보 F안(사용자 2026-11-21): 번호 확인 전 / 이름 바꾸기 시트.
+  testWidgets('my-info', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp(
+        const [],
+        profile: MockProfileRepository(latency: Duration.zero)
+          ..nickname = '김피마'
+          ..email = 'pmart.user@gmail.com',
+      ),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/i-$name.png').uri),
+      );
+    }
+
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-info')));
+    await shot('1-list');
+    await t.tap(find.byKey(const ValueKey('info-name-row')));
+    await shot('2-name-sheet');
+  });
+
   // 처음 실행(레퍼런스 2): 환영·약관 → 로그인/둘러보기 → 주소 검색.
   testWidgets('start', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

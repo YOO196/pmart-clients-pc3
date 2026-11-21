@@ -226,10 +226,20 @@ void main() {
     await t.pumpAndSettle();
     // 마이의 내 정보는 가입 단계 표시가 없다.
     expect(find.byKey(const ValueKey('signup-steps-3')), findsNothing);
+    // 내 정보 F안: 이름 줄 › → 시트에서 고친다. 서버가 확정하면 시트가 닫히고 줄에 새 이름.
+    await t.tap(find.byKey(const ValueKey('info-name-row')));
+    await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('info-name')), '박피마');
     await t.tap(find.byKey(const ValueKey('info-save')));
     await t.pumpAndSettle();
-    expect(find.text('박피마'), findsOneWidget);
+    expect(find.byKey(const ValueKey('info-save')), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('info-name-row')),
+        matching: find.text('박피마'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('가입 직후 내 정보 저장을 서버가 아직 제공하지 않으면(501) 나중에 하기로 가입을 마친다', (t) async {
