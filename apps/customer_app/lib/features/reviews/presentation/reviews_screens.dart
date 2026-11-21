@@ -59,23 +59,32 @@ class ReviewStars extends StatelessWidget {
 
 /// 상품 이름. 주문 당시 사본([title])이 있으면 그것을, 없으면 상품 정보를 조회한다. 실패는 실패 문구로 보인다.
 class _ProductName extends ConsumerWidget {
-  const _ProductName({this.productId, this.title, this.style});
+  const _ProductName({this.productId, this.title, this.style, this.maxLines});
 
   final String? productId;
   final String? title;
   final TextStyle? style;
 
+  /// 줄 수 제한(넘치면 …). 없으면 제한 없음.
+  final int? maxLines;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    if (title case final t?) return Text(t, style: style);
+    Text text(String t) => Text(
+      t,
+      style: style,
+      maxLines: maxLines,
+      overflow: maxLines == null ? null : TextOverflow.ellipsis,
+    );
+    if (title case final t?) return text(t);
     final id = productId;
-    if (id == null) return Text(l10n.reviewProductFailed, style: style);
-    return Text(switch (ref.watch(productDetailProvider(id))) {
+    if (id == null) return text(l10n.reviewProductFailed);
+    return text(switch (ref.watch(productDetailProvider(id))) {
       AsyncData(:final value) => value.name,
       AsyncError() => l10n.reviewProductFailed,
       _ => l10n.reviewProductLoading,
-    }, style: style);
+    });
   }
 }
 
@@ -113,7 +122,7 @@ class ReviewManageScreen extends ConsumerWidget {
           const SizedBox(width: 5),
           Text(
             l10n.reviewTabCount(count),
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400),
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w400),
           ),
         ],
       ],
@@ -124,31 +133,31 @@ class ReviewManageScreen extends ConsumerWidget {
         appBar: AppBar(
           title: Text(l10n.reviewManageTitle),
 
-          // 레퍼런스(사용자 캡처 2026-11-20 "리뷰관리"): 밑줄 탭 — 고른 쪽 굵은 검은 글씨 + 검은 밑줄
+          // 레퍼런스 11 "리뷰관리": 회색 바탕 두 칸 — 고른 칸은 흰 바탕·테두리·검은 글씨(16), 안 고른 칸은 회색.
+          // (위의 "배달·픽업 | 장보기·쇼핑" 밑줄 탭은 우리 앱에 없다.) 사용자 2026-11-21 "이 목록 너무 구려".
           bottom: member
-              ? TabBar(
-                  indicatorSize: TabBarIndicatorSize.tab,
-                  indicatorColor: Theme.of(context).colorScheme.onSurface,
-                  indicatorWeight: 2.5,
-                  dividerColor: Theme.of(context).colorScheme.outlineVariant,
-                  labelColor: Theme.of(context).colorScheme.onSurface,
-                  unselectedLabelColor: Theme.of(context)
-                      .colorScheme
-                      .onSurfaceVariant,
-                  labelStyle: Theme.of(context).textTheme.bodyLarge
-                      ?.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
-                  unselectedLabelStyle: Theme.of(context).textTheme.bodyLarge
-                      ?.copyWith(fontSize: 15),
-                  tabs: [
-                    Tab(
-                      key: const ValueKey('review-tab-write'),
-                      child: tabLabel(l10n.reviewTabWrite, counts?.writable),
+              ? PreferredSize(
+                  preferredSize: const Size.fromHeight(47),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                    child: _SegmentTabs(
+                      tabs: [
+                        Tab(
+                          key: const ValueKey('review-tab-write'),
+                          height: 35,
+                          child: tabLabel(
+                            l10n.reviewTabWrite,
+                            counts?.writable,
+                          ),
+                        ),
+                        Tab(
+                          key: const ValueKey('review-tab-mine'),
+                          height: 35,
+                          child: tabLabel(l10n.reviewTabMine, counts?.written),
+                        ),
+                      ],
                     ),
-                    Tab(
-                      key: const ValueKey('review-tab-mine'),
-                      child: tabLabel(l10n.reviewTabMine, counts?.written),
-                    ),
-                  ],
+                  ),
                 )
               : null,
         ),
@@ -156,6 +165,46 @@ class ReviewManageScreen extends ConsumerWidget {
         body: member
             ? const TabBarView(children: [_WritableTab(), _MineTab()])
             : LoginRequired(message: l10n.reviewLoginNeeded),
+      ),
+    );
+  }
+}
+
+/// 회색 바탕 두 칸 탭(레퍼런스 11): 높이 35, 둥근 모서리 10, 고른 칸 흰 바탕 + 옅은 테두리.
+class _SegmentTabs extends StatelessWidget {
+  const _SegmentTabs({required this.tabs});
+  final List<Widget> tabs;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      height: 35,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: TabBar(
+        tabs: tabs,
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerHeight: 0,
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        indicator: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: scheme.outlineVariant),
+        ),
+        labelColor: scheme.onSurface,
+        unselectedLabelColor: scheme.onSurfaceVariant,
+        labelStyle: theme.textTheme.bodyLarge?.copyWith(
+          fontSize: 14.5,
+          fontWeight: FontWeight.w500,
+        ),
+        unselectedLabelStyle: theme.textTheme.bodyLarge?.copyWith(
+          fontSize: 14.5,
+        ),
       ),
     );
   }
@@ -209,7 +258,7 @@ class _WritableTab extends ConsumerWidget {
       ready: (context, list) => RefreshIndicator(
         onRefresh: () => ref.refresh(writableReviewsProvider.future),
         child: ListView(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(15, 2, 15, 16),
           children: [
             // 주문 묶음 머리(레퍼런스 11-1): 주문이 바뀌는 자리에 센터 이름·주문 날짜. 둘 다 모르면 머리 없이.
             for (final (i, e) in list!.items.indexed) ...[
@@ -243,7 +292,7 @@ class _OrderHead extends StatelessWidget {
     final e = eligibility;
     return Padding(
       key: ValueKey('review-order-head-${e.orderId}'),
-      padding: const EdgeInsets.fromLTRB(2, 6, 2, 10),
+      padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -252,7 +301,7 @@ class _OrderHead extends StatelessWidget {
               n,
               // 레퍼런스 11: 주문 머리줄 가게 이름은 보통 굵기.
               style: theme.textTheme.titleSmall?.copyWith(
-                fontSize: 12.5,
+                fontSize: 15.5,
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -262,7 +311,7 @@ class _OrderHead extends StatelessWidget {
                 DateFormat('y. M. d', 'ko').format(toSeoulWallClock(t)),
               ),
               style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: 10,
+                fontSize: 13,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
@@ -272,7 +321,9 @@ class _OrderHead extends StatelessWidget {
   }
 }
 
-/// 작성 가능 품목 카드. 별을 누르면 그 별점으로 작성 화면을 연다(레퍼런스의 흐름).
+/// 작성 가능 품목 카드(레퍼런스 11 "리뷰 쓰기"): 둥근 테두리 상자 — 위 칸 사진 56·상품 이름 17·옵션 15(회색)·
+/// 쓸 수 있는 기한(서버 eligibleUntil 날짜 그대로, 15 회색), 아래 칸 회색 별 5개(누르면 그 별점으로 쓰기).
+/// 레퍼런스의 "배민포인트 적립"은 1차 제외, "N일 남음"은 앱이 세지 않고 기한 날짜로 보인다.
 class _WritableCard extends ConsumerWidget {
   const _WritableCard({required this.eligibility});
 
@@ -282,95 +333,89 @@ class _WritableCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final e = eligibility;
     Future<void> open([int? rating]) async {
       final target = ReviewTarget.of(e, initialRating: rating);
       await openReviewWrite(context, target);
     }
 
-    return Card(
+    return Container(
       key: ValueKey('review-writable-${e.orderLineId}'),
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      margin: const EdgeInsets.only(bottom: 10),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 4, 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 지금 상품의 대표 사진(review 0.5.0). 없으면(게시 안 됨·모름) 자리 그림.
-                ProductImage(
-                  key: ValueKey('review-writable-image-${e.orderLineId}'),
-                  url: e.imageUrl,
-                  size: 56,
-                  radius: 8,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _ProductName(
-                        productId: e.productId,
-                        title: e.productName,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (e.optionLabel case final o?)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            o,
-                            key: ValueKey('review-option-${e.orderLineId}'),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 10.5,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+          // 줄을 누르면 쓰기(레퍼런스: 오른쪽 글자·화살표 없음).
+          InkWell(
+            key: ValueKey('review-write-${e.orderLineId}'),
+            onTap: () => open(),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(7, 7, 12, 7),
+              child: Row(
+                children: [
+                  // 지금 상품의 대표 사진(review 0.5.0). 없으면(게시 안 됨·모름) 자리 그림.
+                  ProductImage(
+                    key: ValueKey('review-writable-image-${e.orderLineId}'),
+                    url: e.imageUrl,
+                    size: 56,
+                    radius: 8,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _ProductName(
+                          productId: e.productId,
+                          title: e.productName,
+                          maxLines: 1,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
-                      const SizedBox(height: 3),
-                      Text(
-                        [
-                          if (e.deliveredAt case final t?)
-                            l10n.reviewDeliveredAt(formatSeoulDateTime(t)),
-                          // 기한은 서버 eligibleUntil 을 그대로 보인다(남은 일수를 앱이 세지 않는다).
-                          if (e.eligibleUntil case final t?)
-                            l10n.reviewDeadline(formatSeoulDateTime(t)),
-                        ].join(' · '),
-                        key: ValueKey('review-deadline-${e.orderLineId}'),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 10.5,
-                        ),
-                      ),
-                    ],
+                        if (e.optionLabel case final o?)
+                          Text(
+                            o,
+                            key: ValueKey('review-option-${e.orderLineId}'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 13.5,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        // 기한은 서버 eligibleUntil 을 그대로 보인다(남은 일수를 앱이 세지 않는다).
+                        if (e.eligibleUntil case final t?)
+                          Text(
+                            l10n.reviewDeadlineShort(
+                              DateFormat(
+                                'M월 d일 (E)',
+                                'ko',
+                              ).format(toSeoulWallClock(t)),
+                            ),
+                            key: ValueKey('review-deadline-${e.orderLineId}'),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 13.5,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                // 레퍼런스 11-1: 오른쪽 "리뷰 쓰기" 글자 없이 — 줄을 누르면 쓰기
-                IconButton(
-                  key: ValueKey('review-write-${e.orderLineId}'),
-                  tooltip: l10n.reviewWrite,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => open(),
-                  icon: PmartLineIcon(
-                    PmartLineIcons.chevronRight,
-                    size: 18,
-                    color: theme.colorScheme.outline,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-          const Divider(),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
+          Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
+          SizedBox(
+            height: 52,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -378,8 +423,13 @@ class _WritableCard extends ConsumerWidget {
                   IconButton(
                     key: ValueKey('review-quick-star-${e.orderLineId}-$i'),
                     tooltip: l10n.reviewStar(i),
-                    iconSize: 30,
-                    color: theme.colorScheme.outlineVariant,
+                    iconSize: 32,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 49,
+                      height: 49,
+                    ),
+                    color: scheme.outlineVariant,
                     icon: const Icon(Icons.star_rounded),
                     onPressed: () => open(i),
                   ),
@@ -408,15 +458,22 @@ class _MineTab extends ConsumerWidget {
       ),
       ready: (context, list) => RefreshIndicator(
         onRefresh: () => ref.refresh(myReviewsProvider.future),
-        child: ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
-            for (final e in list!.items) _MyReviewCard(eligibility: e),
-            _LoadMoreFooter(
-              list: list,
-              onLoadMore: () => ref.read(myReviewsProvider.notifier).loadMore(),
-            ),
-          ],
+        // 레퍼런스: 목록은 흰 바탕, 그 아래 빈 곳은 옅은 회색. 리뷰 사이는 회색 띠(8).
+        child: ColoredBox(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          child: ListView(
+            children: [
+              for (final (i, e) in list!.items.indexed) ...[
+                if (i > 0) const SizedBox(height: 8),
+                _MyReviewCard(eligibility: e),
+              ],
+              _LoadMoreFooter(
+                list: list,
+                onLoadMore: () =>
+                    ref.read(myReviewsProvider.notifier).loadMore(),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -430,6 +487,9 @@ String reviewStateText(AppLocalizations l10n, ReviewState s) => switch (s) {
   _ => l10n.reviewStateOther,
 };
 
+/// 내가 쓴 리뷰 한 건(레퍼런스 11 "리뷰관리 - 내가 쓴 리뷰", 사용자 2026-11-21 "이 목록 너무 구려"):
+/// 왼쪽 상품 사진 75 · 센터 이름(회색 15) · 상품 이름 17 · 별점 + 상대 날짜(회색 15), 오른쪽 위 ⋮,
+/// 그 아래 사진(140) · 본문 17. 게시 전·잠김 같은 상태는 날짜 옆에 붙인다(게시됨은 붙이지 않는다).
 class _MyReviewCard extends ConsumerWidget {
   const _MyReviewCard({required this.eligibility});
 
@@ -439,107 +499,158 @@ class _MyReviewCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final id = eligibility.reviewId!;
+    final scheme = theme.colorScheme;
+    final e = eligibility;
+    final id = e.reviewId!;
     final provider = reviewProvider(id);
     final value = ref.watch(provider);
     final now = ref.watch(clockProvider)();
-    // 레퍼런스 "리뷰관리": 상자 없이 줄로 나눈 목록 — 상품 이름 >, 별점·상대 날짜, 본문, 사진(크게)
-    return DecoratedBox(
+    final grey = theme.textTheme.bodyMedium?.copyWith(
+      fontSize: 13.5,
+      color: scheme.onSurfaceVariant,
+    );
+    // 리뷰 하나 화면(수정·삭제). 작성자 ID 가 응답에 없어 "내가 쓴 리뷰"에서만 연다.
+    void open() => context.push('/reviews/mine/$id', extra: e);
+    return ColoredBox(
       key: ValueKey('review-mine-$id'),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor)),
-      ),
+      color: scheme.surface,
       child: InkWell(
         key: ValueKey('review-mine-open-$id'),
-        // 리뷰 하나 화면(수정·삭제). 작성자 ID 가 응답에 없어 "내가 쓴 리뷰"에서만 연다.
-        onTap: () => context.push('/reviews/mine/$id', extra: eligibility),
+        onTap: open,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(4, 20, 4, 20),
+          padding: const EdgeInsets.fromLTRB(15, 22, 4, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Flexible(
-                    child: _ProductName(
-                      productId: eligibility.productId,
-                      title: eligibility.productName,
-                      // 새 레퍼런스 11/1. 리뷰관리 - 내가 쓴 리뷰(사진만 크게): 상품 이름 16 보통 굵기
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w400,
+                  ProductImage(
+                    key: ValueKey('review-mine-image-$id'),
+                    url: e.imageUrl,
+                    size: 75,
+                    radius: 8,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (e.mfcName case final n?)
+                            Text(
+                              n,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: grey,
+                            ),
+                          _ProductName(
+                            productId: e.productId,
+                            title: e.productName,
+                            maxLines: 2,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          switch (value) {
+                            AsyncData(value: final r) => Row(
+                              children: [
+                                ReviewStars(rating: r.rating, size: 16),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    [
+                                      reviewRelativeDate(
+                                        l10n,
+                                        r.createdAt,
+                                        now,
+                                      ),
+                                      if (r.state != ReviewState.published)
+                                        reviewStateText(l10n, r.state),
+                                    ].join(', '),
+                                    key: ValueKey('review-mine-when-$id'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            AsyncError() => const SizedBox.shrink(),
+                            _ => PmartShimmer(
+                              key: ValueKey('review-mine-loading-$id'),
+                              child: const PmartBone(width: 150, height: 16),
+                            ),
+                          },
+                        ],
                       ),
                     ),
                   ),
-                  const PmartLineIcon(PmartLineIcons.chevronRight, size: 18),
+                  IconButton(
+                    key: ValueKey('review-mine-more-$id'),
+                    tooltip: l10n.reviewMore,
+                    visualDensity: VisualDensity.compact,
+                    onPressed: open,
+                    icon: PmartLineIcon(
+                      PmartLineIcons.moreVertical,
+                      size: 20,
+                      color: scheme.onSurface,
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 6),
-              switch (value) {
-                AsyncData(value: final r) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        ReviewStars(rating: r.rating, size: 16),
-                        const SizedBox(width: 6),
-                        Text(
-                          [
-                            reviewRelativeDate(l10n, r.createdAt, now),
-                            reviewStateText(l10n, r.state),
-                          ].join(', '),
-                          key: ValueKey('review-mine-when-$id'),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 15,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (r.text case final t? when t.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: Text(
-                          t,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            fontSize: 16,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    _ReviewPhotos(review: r, size: 140),
-                  ],
-                ),
-                AsyncError() => Row(
-                  key: ValueKey('review-mine-failed-$id'),
-                  children: [
-                    Expanded(
-                      child: Text(
-                        l10n.reviewLoadFailed,
-                        style: TextStyle(color: theme.colorScheme.error),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => ref.invalidate(provider),
-                      child: Text(l10n.reviewRetry),
-                    ),
-                  ],
-                ),
-                // 사용자 2026-11-21 "리뷰관리 로딩 별로" — 보라 진행 막대 대신 별점·본문·사진 자리 표시
-                _ => PmartShimmer(
-                  key: ValueKey('review-mine-loading-$id'),
-                  child: const Column(
+              Padding(
+                padding: const EdgeInsets.only(right: 11),
+                child: switch (value) {
+                  AsyncData(value: final r) => Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      PmartBone(width: 150, height: 16),
-                      SizedBox(height: 12),
-                      PmartBone(width: 230, height: 15),
-                      SizedBox(height: 12),
-                      PmartBone(width: 140, height: 140, radius: 8),
+                      _ReviewPhotos(review: r, size: 140),
+                      if (r.text case final t? when t.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            t,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontSize: 15.5,
+                              height: 1.45,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
-                ),
-              },
+                  AsyncError() => Row(
+                    key: ValueKey('review-mine-failed-$id'),
+                    children: [
+                      Expanded(
+                        child: Text(
+                          l10n.reviewLoadFailed,
+                          style: TextStyle(color: scheme.error),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => ref.invalidate(provider),
+                        child: Text(l10n.reviewRetry),
+                      ),
+                    ],
+                  ),
+                  // 사용자 2026-11-21 "리뷰관리 로딩 별로" — 보라 진행 막대 대신 사진·본문 자리 표시
+                  _ => PmartShimmer(
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: 12),
+                        PmartBone(width: 140, height: 140, radius: 8),
+                        SizedBox(height: 12),
+                        PmartBone(width: 230, height: 17),
+                      ],
+                    ),
+                  ),
+                },
+              ),
             ],
           ),
         ),

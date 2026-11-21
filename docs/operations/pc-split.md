@@ -106,6 +106,10 @@ contracts.lock · CLAUDE.md · .claude/rules/   # 공통(§6)
 | `node_modules` | `npm install`(루트), `npm install --prefix tools/web-tools` |
 | 웹 빌드(`web/*/dist`) | `npm run build:lan -w web/<앱>` — 올리는 것은 PC 1(§1) |
 | 고객앱 레퍼런스 캡처 `docs/customer-app-design/` | git 제외 — **PC 1 에만 있다.** 고객앱 화면 작업은 이 폴더가 있어야 한다(다른 PC 가 맡으면 사용자가 복사) |
+| 고객앱 키 `apps/customer_app/.secrets/customer.env` | git 제외 — PC 1 에 있다(사용자가 복사). 키 4개 `TOSS_CLIENT_KEY`·`KAKAO_NATIVE_APP_KEY`·`NAVER_CLIENT_ID`·`NAVER_CLIENT_SECRET`. 없어도 빌드는 되지만 결제·카카오 지도·카카오/네이버 로그인이 안 된다. LAN APK 는 `--dart-define-from-file=.secrets/customer.env` 로 넣는다 |
+| 푸시 설정 `apps/customer_app/android/app/google-services.json`·`apps/rider_app/android/app/google-services.json` | git 제외 — 사용자가 복사. 고객앱은 없으면 FCM 을 건너뛰고 빌드된다. **라이더앱은 플러그인을 늘 켜서 없으면 빌드가 실패한다** |
+| 디버그 서명 키 `%USERPROFILE%\.android\debug.keystore` | PC 마다 다르게 저절로 만들어진다. 구글·카카오·네이버 콘솔에는 PC 1 키의 지문(SHA-1·키 해시)이 등록돼 있어 **다른 PC 에서 빌드한 디버그 APK 는 소셜 로그인이 실패한다** — PC 1 의 파일을 복사하거나 그 PC 지문을 콘솔에 더 등록한다 |
+| 키·설정 파일 옮기는 법 | GitHub·메신저·메일로 보내지 않는다. USB·공유 폴더로 직접 복사해 같은 위치에 둔다(`.gitignore` 에 있어 커밋되지 않는다) |
 | LAN 시험 계정 비밀번호 | 백엔드 `deploy/lan/.secrets/` 에 필요한 파일만(사용자가 복사). 저장소 루트에 두지 않고, 이 저장소에는 절대 넣지 않는다. `keycloak-admin-password` 는 PC 1 밖으로 옮기지 않는다 |
 | LAN 루트 CA | PC 2~5 Windows 에는 설치돼 있다. PDA·폰은 `../pmart-backend/deploy/lan/tls/pmart-lan-root-ca.crt` 를 기기에 설치해야 직원 로그인 화면(브라우저)이 열린다. **Flutter 앱의 API 호출(Dio·`Image.network`)은 기기에 설치한 CA·안드로이드 `network_security_config` 를 쓰지 않는다** — `https://192.168.0.40:8443` 을 쓰려면 앱 `main` 에서 `if (!kReleaseMode) trustPmartLanRootCa();`(`pmart_core`, 2026-11-16, ADR-0057 T6 — 운영 빌드 제외)를 부른다. 고객앱은 넣었다. **mfc_app(PC 3)·rider_app(PC 5)은 아직 `http://…:8080` — HTTPS 로 옮길 때 이 한 줄을 넣는다** |
 

@@ -141,6 +141,23 @@ void main() {
     expect(key('product-review-helpful-mine-rv-mine-1'), findsOneWidget);
   });
 
+  testWidgets('내 리뷰인지 알아내는 동안 도움돼요 칸은 비우고, 알아낸 뒤에도 카드 높이가 같다', (t) async {
+    final gate = Completer<void>();
+    final repo = MockReviewsRepository(latency: Duration.zero)
+      ..eligibilityGate = gate.future;
+    await open(t, repo, 'P-0002', login: true);
+    final card = key('product-review-rv-mine-1');
+    // 아직 모름: 버튼도 "N명에게 도움이 됐어요"도 없다(버튼을 그렸다가 바꾸지 않는다).
+    expect(key('product-review-helpful-rv-mine-1'), findsNothing);
+    expect(key('product-review-helpful-mine-rv-mine-1'), findsNothing);
+    final before = t.getSize(card);
+    gate.complete();
+    await t.pumpAndSettle();
+    expect(key('product-review-helpful-mine-rv-mine-1'), findsOneWidget);
+    expect(key('product-review-edit-rv-mine-1'), findsOneWidget);
+    expect(t.getSize(card), before);
+  });
+
   testWidgets('도움돼요: 결과를 모르면 같은 키로 한 번 더', (t) async {
     final repo = MockReviewsRepository(latency: Duration.zero)
       ..helpfulFailures.add(const UnknownResultFailure(requestId: 'x'));

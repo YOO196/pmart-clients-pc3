@@ -111,8 +111,8 @@ void main() {
     expect(asked, isFalse);
   });
 
-  test('인가 요청에 auth_type=reauthenticate 를 붙인다 — 네이버 아이디·비밀번호를 매번 다시 받는다', () {
-    expect(naverAuthorizeExtra, {'auth_type': 'reauthenticate'});
+  test('인가 요청에 덧붙이는 값이 없다 — 비밀번호를 매번 다시 받지 않는다(2026-11-21 되돌림)', () {
+    expect(naverAuthorizeExtra, isEmpty);
   });
 
   test('탈퇴 재인증이면 교환에 WITHDRAWAL 을 붙인다(서버가 네이버 연결을 끊음), 로그인은 아님', () async {

@@ -823,7 +823,12 @@ void main() {
       );
       await t.pumpAndSettle();
       expect(find.text('꾸덕하고 맛있어요. 다음에도 살게요.'), findsOneWidget);
-      expect(find.textContaining('게시됨'), findsOneWidget);
+      // 레퍼런스 11: 게시된 리뷰는 별점 + 상대 날짜만(게시 전·잠김일 때만 상태를 붙인다).
+      expect(
+        find.byKey(const ValueKey('review-mine-when-rv-mine-1')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('게시됨'), findsNothing);
     });
 
     testWidgets('내가 쓴 리뷰 목록 조회 실패는 "쓴 리뷰 없음"이 아니다', (t) async {

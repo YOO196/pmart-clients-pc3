@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
@@ -283,8 +285,19 @@ class LoginFlowController extends Notifier<LoginFlow> {
   /// 결과를 모르는 동의 완료의 키 — 다시 누르면 같은 키로 보낸다(서버가 새 토큰을 준다, 두 번 가입되지 않음).
   IdempotencyKey? _completionKey;
 
+  /// 제공자 동의는 됐고 우리 가입(약관 동의·휴대폰 확인)이 진행 중인 제공자. 회원이 되거나 다른 결과면 null.
+  SocialProvider? _signupPending;
+
   @override
-  LoginFlow build() => const LoginIdle();
+  LoginFlow build() {
+    final source = ref.read(socialTokenSourceProvider);
+    // 가입 단계에서 로그인 화면을 떠나면(닫기·뒤로·처음 실행의 되돌리기) 제공자 연결을 끊어 다음에 동의를 다시 묻게 한다
+    // (사용자 2026-11-21). 화면이 사라질 때 한 번 — 결과를 기다리지 않는다.
+    ref.onDispose(() {
+      if (_signupPending case final p?) unawaited(source.abandonSignup(p));
+    });
+    return const LoginIdle();
+  }
 
   AuthRepository get _repo => ref.read(authRepositoryProvider);
 
@@ -559,6 +572,10 @@ class LoginFlowController extends Notifier<LoginFlow> {
   }
 
   Future<void> _settle(LoginOutcome outcome) async {
+    _signupPending =
+        outcome is LoginNeedsConsent || outcome is LoginNeedsIdentity
+        ? _who?.provider
+        : null;
     if (outcome is LoginMember) {
       await ref
           .read(sessionProvider.notifier)

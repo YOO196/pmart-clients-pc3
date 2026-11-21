@@ -93,7 +93,9 @@ void main() {
     await t.tap(find.byKey(const ValueKey('mode-single')));
     await t.pump();
     // 배송 선택 단계를 건너뛰고 주문서로 바로 들어온 경우(뒤로 가기·딥링크 등)
-    final router = GoRouter.of(t.element(find.byKey(const ValueKey('cart-receive'))));
+    final router = GoRouter.of(
+      t.element(find.byKey(const ValueKey('cart-receive'))),
+    );
     unawaited(router.push('/checkout'));
     await t.pumpAndSettle();
 

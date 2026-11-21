@@ -25,6 +25,12 @@ abstract interface class SocialTokenSource {
   /// (백엔드 요청 2026-11-21 request-google-revoke-on-withdrawal — 카카오·네이버는 서버가 끊고 구글만 앱이 끊는다).
   /// 실패는 던지지 않는다(로그아웃·탈퇴 흐름을 막지 않는다). 토큰·이메일을 로그에 남기지 않는다.
   Future<void> forget(SocialProvider provider, {bool revoke = false});
+
+  /// 제공자 동의는 했지만 우리 가입(약관 동의·휴대폰 확인)을 끝내지 않고 그만뒀다 — 다음 로그인 때 제공자 동의 화면이
+  /// 다시 뜨게 제공자와의 앱 연결을 끊는다(사용자 2026-11-21 "아직 동의만 하고 가입한 것도 아닌데 왜 못 물어").
+  /// 앱이 끊을 수 있는 제공자만(카카오 SDK `unlink`, 구글 `disconnect`). 네이버는 앱에 토큰이 없어 서버 몫(BR-79).
+  /// 실패는 던지지 않는다. 토큰을 로그에 남기지 않는다.
+  Future<void> abandonSignup(SocialProvider provider);
 }
 
 final class SocialProviderDown implements Exception {

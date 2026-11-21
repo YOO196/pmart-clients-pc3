@@ -318,6 +318,9 @@ void main() {
 
 /// 첫 번째(로그인)는 되고 그 뒤(재인증)는 고객이 닫는 제공자.
 final class _CancelAfterFirst implements SocialTokenSource {
+  @override
+  Future<void> abandonSignup(SocialProvider provider) async {}
+
   int _calls = 0;
 
   @override

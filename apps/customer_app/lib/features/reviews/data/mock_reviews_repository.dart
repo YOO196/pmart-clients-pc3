@@ -34,6 +34,9 @@ final class MockReviewsRepository implements ReviewsRepository {
   /// 다음 자격 조회에서 던질 실패(앞에서부터 하나씩).
   final eligibilityFailures = Queue<PmartFailure>();
 
+  /// 있으면 [eligibilities] 가 이것이 끝날 때까지 기다린다(첫 로딩 중 화면을 보는 시험).
+  Future<void>? eligibilityGate;
+
   /// 다음 작성에서 던질 실패. [createFailureApplies] 면 서버는 반영한 뒤 응답만 잃은 것처럼 한다.
   final createFailures = Queue<PmartFailure>();
   bool createFailureApplies = false;
@@ -152,6 +155,7 @@ final class MockReviewsRepository implements ReviewsRepository {
   }) async {
     calls++;
     await _wait();
+    if (eligibilityGate case final g?) await g;
     eligibilityQueries.add((orderId: orderId, state: state));
     if (eligibilityFailures.isNotEmpty) throw eligibilityFailures.removeFirst();
     final matched = [

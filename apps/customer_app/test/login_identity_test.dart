@@ -196,6 +196,9 @@ void main() {
 
 /// 프로필 사진 주소가 딸린 제공자 응답(네이버 교환 결과처럼).
 final class _WithPhoto implements SocialTokenSource {
+  @override
+  Future<void> abandonSignup(SocialProvider provider) async {}
+
   const _WithPhoto(this.photo);
 
   final String photo;

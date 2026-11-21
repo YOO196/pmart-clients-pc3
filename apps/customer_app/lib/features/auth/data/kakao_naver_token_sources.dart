@@ -1,5 +1,5 @@
 import 'package:flutter/services.dart' show PlatformException;
-import 'package:flutter_appauth/flutter_appauth.dart' hide Prompt;
+import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'package:pmart_core/pmart_core.dart'
     show
@@ -13,33 +13,39 @@ import '../domain/auth.dart';
 import 'auth_repository.dart';
 import 'google_token_source.dart' show SocialProviderMisconfigured;
 
-/// 카카오 로그인 요청의 prompt(백엔드 요청 2026-11-21 "로그인 버튼마다 계정 고르기·다시 로그인").
-/// `login` — 카카오계정에 로그인돼 있어도 매번 로그인 화면을 띄워 다른 계정으로 바꿀 수 있게(OIDC `prompt=login`).
-/// 동의 화면은 처음 가입 때만 뜬다(이미 동의한 계정이면 다시 묻지 않는다).
-const kakaoLoginPrompts = [Prompt.login];
-
-Future<OAuthToken> _kakaoAccountLogin() =>
-    UserApi.instance.loginWithKakaoAccount(prompts: kakaoLoginPrompts);
+/// 카카오톡이 있으면 카카오톡, 없으면 카카오계정(웹) 로그인. 매번 로그인 화면을 띄우던 것(`prompt=login`,
+/// 백엔드 요청 2026-11-21)은 사용자 결정으로 되돌림(2026-11-21 "로그인 바뀐 게 더 별로" → "예전처럼").
+Future<OAuthToken> _kakaoLogin() async => await isKakaoTalkInstalled()
+    ? await UserApi.instance.loginWithKakaoTalk()
+    : await UserApi.instance.loginWithKakaoAccount();
 
 Future<void> _kakaoLogout() async {
   await UserApi.instance.logout();
 }
 
-/// 카카오 로그인(BR-65): 카카오계정 로그인 화면으로 로그인해 **OIDC ID 토큰**을 `providerToken` 으로 넘긴다
+Future<void> _kakaoUnlink() async {
+  await UserApi.instance.unlink();
+}
+
+/// 카카오 로그인(BR-65): 카카오톡(없으면 카카오계정)으로 로그인해 **OIDC ID 토큰**을 `providerToken` 으로 넘긴다
 /// (서버가 카카오 JWKS 로 검증 — Google 과 같은 방식, ADR-0055). 콘솔에서 OpenID Connect 를 켜야 ID 토큰이 온다
 /// (사용자 2026-11-19 활성화). 토큰은 로그에 남기지 않는다.
-/// 2026-11-21 백엔드 요청: 카카오톡 앱 자동 로그인(바로 들어가 계정을 못 바꿈) 대신 카카오계정 로그인 화면 + [kakaoLoginPrompts].
+/// 앱 로그아웃·탈퇴 때 카카오 SDK `logout()` 은 그대로 한다(이 기기 토큰 정리).
 final class KakaoSocialTokenSource implements SocialTokenSource {
   const KakaoSocialTokenSource({
-    this.login = _kakaoAccountLogin,
+    this.login = _kakaoLogin,
     this.logout = _kakaoLogout,
+    this.unlink = _kakaoUnlink,
   });
 
-  /// 카카오계정 로그인 화면(시험에서 바꿔 끼운다).
+  /// 카카오 로그인(시험에서 바꿔 끼운다).
   final Future<OAuthToken> Function() login;
 
   /// 카카오 SDK 로그아웃 — 이 기기에 저장된 카카오 토큰을 지운다(시험에서 바꿔 끼운다).
   final Future<void> Function() logout;
+
+  /// 카카오 SDK 앱 연결 끊기 — 다음 로그인 때 동의 화면이 다시 뜬다(시험에서 바꿔 끼운다).
+  final Future<void> Function() unlink;
 
   @override
   Future<SocialCredential?> obtain(
@@ -81,7 +87,19 @@ final class KakaoSocialTokenSource implements SocialTokenSource {
     try {
       await logout();
     } on Object {
-      // 이 기기 토큰 정리 실패 — 다음 로그인은 prompt=login 이라 그대로 로그인 화면이 뜬다.
+      // 이 기기 토큰 정리 실패 — 흐름은 막지 않는다.
+    }
+  }
+
+  /// 카카오 동의 뒤 우리 가입을 그만뒀다 — 카카오 앱 연결을 끊어 다음 로그인 때 동의 화면(프로필 사진·이메일)이 다시
+  /// 뜨게 한다. 방금 로그인해 이 기기에 카카오 토큰이 있다. 가입을 마친 회원·탈퇴는 여기로 오지 않는다(탈퇴는 서버가 끊음).
+  @override
+  Future<void> abandonSignup(SocialProvider provider) async {
+    if (provider != SocialProvider.kakao) return;
+    try {
+      await unlink();
+    } on Object {
+      // 끊기 실패(오프라인 등) — 다음 로그인은 동의 없이 이어진다. 흐름은 막지 않는다.
     }
   }
 }
@@ -120,12 +138,10 @@ typedef NaverCodeExchange = Future<NaverExchange> Function({
   bool withdrawal,
 });
 
-/// 네이버 인가 요청(`nid.naver.com/oauth2/authorize`)에 덧붙이는 값(사용자 2026-11-20).
-/// `auth_type=reauthenticate` — 브라우저에 네이버 로그인이 남아 있어도 아이디·비밀번호를 매번 다시 받는다(사용자 2026-11-20).
-/// (앞서 쓴 `reprompt` 는 전에 거부한 항목만 다시 묻는 값이라 바로 로그인됐다.) 정보 제공 동의 화면을 다시 띄우는 것은
-/// 인가 요청 값으로는 안 되고 네이버 쪽 연결을 끊어야 한다 — 서버 요청 BR-74.
-/// 서버의 코드 교환과는 상관없다 — 인가 요청에만 붙는다.
-const naverAuthorizeExtra = {'auth_type': 'reauthenticate'};
+/// 네이버 인가 요청(`nid.naver.com/oauth2/authorize`)에 덧붙이는 값. 비워 둔다 — 브라우저에 네이버 로그인이 남아 있으면
+/// 비밀번호를 다시 받지 않는다. 매번 다시 받던 `auth_type=reauthenticate`(2026-11-20)는 사용자 결정으로 되돌림
+/// (2026-11-21 "로그인 바뀐 게 더 별로" → "예전처럼"). 서버의 코드 교환과는 상관없다.
+const naverAuthorizeExtra = <String, String>{};
 
 Future<NaverAuthorization?> _authorizeWithAppAuth(String clientId) async {
   try {
@@ -216,6 +232,10 @@ final class NaverSocialTokenSource implements SocialTokenSource {
   /// 인가 요청마다 [naverAuthorizeExtra] 로 다시 로그인하게 해 — 앱은 할 일 없음.
   @override
   Future<void> forget(SocialProvider provider, {bool revoke = false}) async {}
+
+  /// 네이버 연결 끊기는 네이버 토큰을 가진 서버만 할 수 있다 — 가입 중단 때 끊기는 서버 요청(BR-79). 앱은 할 일 없음.
+  @override
+  Future<void> abandonSignup(SocialProvider provider) async {}
 }
 
 /// 제공자마다 맞는 SDK 로 보낸다.
@@ -249,4 +269,8 @@ final class RoutingSocialTokenSource implements SocialTokenSource {
   @override
   Future<void> forget(SocialProvider provider, {bool revoke = false}) =>
       _of(provider).forget(provider, revoke: revoke);
+
+  @override
+  Future<void> abandonSignup(SocialProvider provider) =>
+      _of(provider).abandonSignup(provider);
 }

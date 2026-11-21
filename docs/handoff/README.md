@@ -74,3 +74,4 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-18-backend-gap-a-applied.md` | 고객앱 갭 A 8가지 + CU-1 주문 전 재동의·마케팅 앱 반영(목 모드). R1(알림함 `templateKey`) 답 받아 반영(2026-11-18). **남은 것: 실서버 확인(할 일 43) 뒤 CU-1 스위치 켜기 알림** |
 | `customer-app/2026-11-18-backend-customer-push-fcm-reply.md` | 고객앱 휴대폰 푸시 회신 — 앱 반영 끝(토큰 등록 `7cbe1f2`, 누르면 목적지 화면). Q6·Q8 은 11-18 답 받음(앱 고칠 것 없음). **남은 것: 실기기 확인, `pmart-123` json 교체 — 결과 덧붙이면 archive** |
 | `customer-app/2026-11-15-backend-support-chat-inquiry.md` | 고객앱 문의·AI 상담 반영 알림 — LAN 고객 토큰으로 실제 확인, 질문 3개 |
+| `customer-app/2026-11-21-backend-naver-unlink-on-signup-abandon.md` | BR-79 네이버 동의 뒤 가입 중단이면 서버가 네이버 연결 끊기(카카오는 앱이 함), LAN `unlink-after-exchange` 켜짐 여부 질문 |

@@ -86,6 +86,7 @@
 | BR-76 | 보통 | 고객 | 상품 리뷰 추천순 정렬(R1)·옵션(sku) 필터(R2)·도움돼요 누르기/취소(회원만, R3)·리뷰 `helpfulCount`/`helpedByMe`(R4) — review 0.5.0 목록에 없음. 요청서 `docs/handoff/customer-app/2026-11-21-backend-review-sort-option-helpful.md` | **RESOLVED**(회신 `../pmart-backend/docs/handoff/clients/customer-app/2026-11-21-reply-br76-review-sort-option-helpful.md`, review 0.6.0 LAN 배포) — 고객앱 실서버 연결(2026-11-21), 실기기 확인 대기 |
 | BR-77 | 보통 | 고객 | **RESOLVED 2026-11-21**(회신 `clients/customer-app/2026-11-21-reply-br77-naver-email.md` — 서버가 교환 때 받은 이메일을 로그인 때 싣기, 앱·계약 변경 없음, 사용자: 네이버 콘솔 이메일 주소 켜기) 네이버 로그인 계정에도 이메일 — 네이버 ID 토큰엔 email 이 없음(OIDC claims 확인). 서버가 교환 때 이미 부르는 `/v1/nid/me` 의 email 을 서버가 직접 받은 값으로 계정 이메일에(R1), 없거나 실패면 로그인은 그대로(R2), 기존 계정(R3), 로그 금지(R4). 요청서 `docs/handoff/customer-app/2026-11-21-backend-naver-email.md` | 요청 |
 | BR-78 | 보통 | 고객 | 고객 FAQ·AI 상담 안내 문서(`docs/business/customer-faq/12-account.md`)가 "Google 로그인만"(11-09) — 카카오·네이버 로그인, 가입 휴대폰 확인·한 번호 한 계정·탈퇴 30일 재가입 제한, 앱 탈퇴 반영(R1), 다른 문서 훑기(R2), 재색인(R3). 요청서 `docs/handoff/customer-app/2026-11-21-backend-faq-login-policy.md` | 요청 |
+| BR-79 | 보통 | 고객 | 네이버 동의 뒤 우리 가입을 끝내지 않고 그만두면 네이버 연결 끊기(다음 로그인 때 동의 다시) — 앱은 네이버 토큰이 없어 서버만. 카카오는 앱이 SDK `unlink` 로 함. 요청서 `docs/handoff/customer-app/2026-11-21-backend-naver-unlink-on-signup-abandon.md` | **RESOLVED**(회신 `../pmart-backend/docs/handoff/clients/customer-app/2026-11-21-reply-br79-naver-unlink-on-signup-abandon.md`, main 14515b53, auth 0.11.1 모양 그대로·앱 변경 없음) — LAN 배포 대기, 실기기 확인 대기(가입 뒤 같은 계정) |
 
 ---
 

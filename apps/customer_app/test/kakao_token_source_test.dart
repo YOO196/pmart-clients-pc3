@@ -6,7 +6,7 @@ import 'package:customer_app/features/auth/data/auth_repository.dart';
 import 'package:customer_app/features/auth/data/kakao_naver_token_sources.dart';
 import 'package:customer_app/features/auth/domain/auth.dart';
 
-/// 백엔드 요청 2026-11-21 "로그인 버튼마다 계정 고르기·다시 로그인" R2: 카카오계정 로그인 화면 + prompt=login,
+/// 카카오 로그인(카카오톡이 있으면 카카오톡 — 매번 로그인 화면은 2026-11-21 사용자 결정으로 되돌림),
 /// 앱 로그아웃 때 카카오 SDK logout. 앱 연결 끊기는 서버가 한다(앱은 끊지 않는다).
 void main() {
   OAuthToken token(String? idToken) => OAuthToken(
@@ -17,10 +17,6 @@ void main() {
     null,
     idToken: idToken,
   );
-
-  test('로그인은 매번 다시 로그인 화면(prompt=login) — 동의 다시 묻기(consent)가 아니다', () {
-    expect(kakaoLoginPrompts, [Prompt.login]);
-  });
 
   test('로그인 버튼마다 카카오계정 로그인을 부르고 ID 토큰을 넘긴다', () async {
     var calls = 0;

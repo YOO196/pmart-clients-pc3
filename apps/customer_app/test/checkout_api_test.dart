@@ -220,57 +220,63 @@ void main() {
     expect(draft.quote?.firstPurchase, FirstPurchaseBenefit.expected);
   });
 
-  test('초안의 배송지 사본(delivery.shippingAddress)을 옮기고, 없으면 null 이다(BR-37)', () async {
-    final withCopy = await repo(
-      (_) => const FakeReply(
-        200,
-        body: {
-          'draftId': 'd-1',
-          'version': 1,
-          'status': 'DRAFT',
-          'nextAction': 'REVIEW',
-          'delivery': {
-            'deliveryMode': 'SINGLE',
-            'shoppingAddressId': 'addr-1',
-            'shippingAddress': {
-              'roadAddress': '부산광역시 부산진구 중앙대로 708',
-              'detailAddress': '101동 1001호',
-              'postalCode': '47296',
-              'receiverName': '홍길동',
-              'receiverPhone': '01012345678',
-              'entranceMethod': 'PASSWORD',
-              'entranceNote': '#1234',
-              'geo': {'lat': 35.1577, 'lng': 129.0599},
-              'capturedAt': '2026-11-02T07:10:00Z',
+  test(
+    '초안의 배송지 사본(delivery.shippingAddress)을 옮기고, 없으면 null 이다(BR-37)',
+    () async {
+      final withCopy = await repo(
+        (_) => const FakeReply(
+          200,
+          body: {
+            'draftId': 'd-1',
+            'version': 1,
+            'status': 'DRAFT',
+            'nextAction': 'REVIEW',
+            'delivery': {
+              'deliveryMode': 'SINGLE',
+              'shoppingAddressId': 'addr-1',
+              'shippingAddress': {
+                'roadAddress': '부산광역시 부산진구 중앙대로 708',
+                'detailAddress': '101동 1001호',
+                'postalCode': '47296',
+                'receiverName': '홍길동',
+                'receiverPhone': '01012345678',
+                'entranceMethod': 'PASSWORD',
+                'entranceNote': '#1234',
+                'geo': {'lat': 35.1577, 'lng': 129.0599},
+                'capturedAt': '2026-11-02T07:10:00Z',
+              },
             },
           },
-        },
-      ),
-    ).getDraft('d-1');
+        ),
+      ).getDraft('d-1');
 
-    final a = withCopy.shippingAddress!;
-    expect(a.roadAddress, '부산광역시 부산진구 중앙대로 708');
-    expect(a.receiverName, '홍길동');
-    expect(a.receiverPhone, '01012345678');
-    expect(a.entranceMethod, EntranceMethod.password);
-    expect(a.entranceNote, '#1234');
-    expect(a.lat, 35.1577);
-    expect(a.capturedAt, DateTime.utc(2026, 11, 2, 7, 10));
+      final a = withCopy.shippingAddress!;
+      expect(a.roadAddress, '부산광역시 부산진구 중앙대로 708');
+      expect(a.receiverName, '홍길동');
+      expect(a.receiverPhone, '01012345678');
+      expect(a.entranceMethod, EntranceMethod.password);
+      expect(a.entranceNote, '#1234');
+      expect(a.lat, 35.1577);
+      expect(a.capturedAt, DateTime.utc(2026, 11, 2, 7, 10));
 
-    final without = await repo(
-      (_) => const FakeReply(
-        200,
-        body: {
-          'draftId': 'd-0',
-          'version': 1,
-          'status': 'DRAFT',
-          'nextAction': 'REVIEW',
-          'delivery': {'shoppingAddressId': 'addr-1', 'shippingAddress': null},
-        },
-      ),
-    ).getDraft('d-0');
-    expect(without.shippingAddress, isNull);
-  });
+      final without = await repo(
+        (_) => const FakeReply(
+          200,
+          body: {
+            'draftId': 'd-0',
+            'version': 1,
+            'status': 'DRAFT',
+            'nextAction': 'REVIEW',
+            'delivery': {
+              'shoppingAddressId': 'addr-1',
+              'shippingAddress': null,
+            },
+          },
+        ),
+      ).getDraft('d-0');
+      expect(without.shippingAddress, isNull);
+    },
+  );
 
   test('결제위젯 설정 GET /payment-widget-config 를 옮기고, 422 CONFIG_REQUIRED 는 오류다(BR-34)', () async {
     ApiPaymentRepository payments(FakeReply reply) {

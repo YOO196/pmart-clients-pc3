@@ -157,13 +157,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.watch(homeProvider),
       isEmpty: (h) => h.sections.isEmpty && h.banners.isEmpty,
     );
-    final gray = Theme.of(context).colorScheme.surfaceContainer;
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       // 사용자 2026-11-21 "주소가 왼쪽으로", 검색은 하단 탭과 겹쳐 뺌, 장바구니는 머리줄에만(하단 탭은 주문내역).
-      // 레퍼런스 3-1 "1. 배민 홈": 왼쪽 주소 ▾, 오른쪽 알림·장바구니(조금 큰 아이콘).
+      // 홈 상단바 D안(사용자 2026-11-21 확정, 초안 `../고객앱 ui/01_홈_상단바` — 색은 앱 팔레트): 흰 바탕 + 아래 얇은 선,
+      // 높이 58, 주소 위에 작은 배송 상태 줄(서버 배송 방식 값 — 없으면 줄 없음), 오른쪽 알림·장바구니.
       appBar: AppBar(
-        backgroundColor: gray,
-        toolbarHeight: 48,
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        shape: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+        toolbarHeight: 58,
         centerTitle: false,
         titleSpacing: 16,
         title: const _AddressChip(),
@@ -212,28 +216,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         slivers: [
                           SliverList.list(
                             children: [
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      gray,
-                                      gray,
-                                      Theme.of(context).colorScheme.surface,
-                                    ],
-                                    stops: const [0, 0.7, 1],
-                                  ),
-                                ),
-                                child: const Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    SizedBox(height: 4),
-                                    _PendingPaymentBanner(),
-                                    _InProgressOrderCard(),
-                                  ],
-                                ),
+                              // 상단바가 흰 바탕이 되어(D안) 그 아래 회색 번짐을 뺐다.
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  SizedBox(height: 4),
+                                  _PendingPaymentBanner(),
+                                  _InProgressOrderCard(),
+                                ],
                               ),
                               if (home.tabs.length > 1 || customs.isNotEmpty)
                                 _HomeTabs(
@@ -1686,20 +1676,100 @@ class _AddressChip extends ConsumerWidget {
     return InkWell(
       key: const ValueKey('home-address'),
       onTap: () => context.push('/addresses'),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 배송지를 고르기 전에는 배송 상태를 말하지 않는다(어느 주소로 가능한지 모름).
+          if (book?.shoppingAddress != null) const _DeliveryStatusLine(),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  text,
+                  overflow: TextOverflow.ellipsis,
+                  // D안: 주소 16.5 굵게.
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontSize: 16.5, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 2),
+              const PmartLineIcon(PmartLineIcons.chevronDown, size: 17),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 주소 위 작은 배송 상태 줄(D안 "● 배송 가능 · 약 30분 도착"). 서버 배송 방식(`GET /delivery-options`) 값만 쓴다:
+/// 바로 받는 방식(단독·묶음)이 가능하면 "배송 가능 · 예상 시간", 예약만 가능하면 "예약배달 가능",
+/// 서버가 모두 불가라고 하면 "지금은 배송할 수 없어요"(회색). 불러오는 중·실패·주소 없음·미설정(CONFIG_REQUIRED)·
+/// 모름(UNKNOWN)은 줄을 그리지 않는다 — 실패를 "불가"로 보이지 않는다(실패 안내는 아래 배송 안내 칸이 한다).
+class _DeliveryStatusLine extends ConsumerWidget {
+  const _DeliveryStatusLine();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final options = ref.watch(homeDeliveryOptionsProvider).value;
+    if (options == null || options.isEmpty) return const SizedBox.shrink();
+    String? etaOf(DeliveryOption o) => switch (o.eta) {
+      final e? when !e.notSet => switch ((e.minMinutes, e.maxMinutes)) {
+        (final int a, final int b) => l10n.optionEta(a, b),
+        _ => null,
+      },
+      _ => null,
+    };
+    final now = options
+        .where((o) => o.available && o.mode != DeliveryMode.scheduled)
+        .toList();
+    final (String text, bool ok) = switch (now) {
+      [final o, ...] => switch (etaOf(o)) {
+        final eta? => (l10n.homeTopDeliverableEta(eta), true),
+        null => (l10n.homeTopDeliverable, true),
+      },
+      []
+          when options.any(
+            (o) => o.available && o.mode == DeliveryMode.scheduled,
+          ) =>
+        (l10n.homeTopScheduledOnly, true),
+      []
+          when options.every(
+            (o) => o.availability == OptionAvailability.unavailable,
+          ) =>
+        (l10n.homeTopUndeliverable, false),
+      _ => ('', false),
+    };
+    if (text.isEmpty) return const SizedBox.shrink();
+    final color = ok ? scheme.primary : scheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 1),
       child: Row(
+        key: const ValueKey('home-delivery-status'),
         mainAxisSize: MainAxisSize.min,
         children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 4),
           Flexible(
             child: Text(
               text,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              // 레퍼런스 홈 주소 줄(3-1 "1. 배민 홈"): 약 16, 보통~중간 굵기(titleMedium 은 테마 w700).
-              style: Theme.of(context).textTheme.titleMedium
-                  ?.copyWith(fontSize: 16, fontWeight: FontWeight.w500),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
             ),
           ),
-          const SizedBox(width: 2),
-          const PmartLineIcon(PmartLineIcons.chevronDown, size: 17),
         ],
       ),
     );

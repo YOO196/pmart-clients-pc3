@@ -114,6 +114,15 @@ final class GoogleSocialTokenSource implements SocialTokenSource {
     }
   }
 
+  /// 구글 동의 뒤 우리 가입을 그만뒀다 — 탈퇴와 같이 `disconnect`(revokeAccess) + `signOut` 으로 앱 연결을 끊어 다음
+  /// 구글 로그인 때 정보 공유 동의 화면이 다시 뜨게 한다(사용자 2026-11-21 "그 구조 구글도"). 방금 이 실행에서 로그인해
+  /// 그 계정이 잡혀 있다 — 가입 중 앱을 완전히 껐다 켜면 잡힌 계정이 없어 끊지 못할 수 있다. 실패는 던지지 않는다.
+  @override
+  Future<void> abandonSignup(SocialProvider provider) async {
+    if (provider != SocialProvider.google) return;
+    await forget(provider, revoke: true);
+  }
+
   @override
   Future<void> forget(SocialProvider provider, {bool revoke = false}) async {
     if (provider != SocialProvider.google) return;

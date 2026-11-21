@@ -17,7 +17,10 @@ import 'support/app_harness.dart';
 void main() {
   setUpAll(initPmartFormatting);
 
-  Future<ProviderContainer> loginAsMember(WidgetTester t, List<Override> overrides) async {
+  Future<ProviderContainer> loginAsMember(
+    WidgetTester t,
+    List<Override> overrides,
+  ) async {
     await t.pumpWidget(testApp(overrides));
     await t.pumpAndSettle();
     await t.tap(find.text('마이페이지').last);
@@ -26,7 +29,9 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('login-kakao')));
     await t.pumpAndSettle();
-    final container = ProviderScope.containerOf(t.element(find.byType(CustomerApp)));
+    final container = ProviderScope.containerOf(
+      t.element(find.byType(CustomerApp)),
+    );
     expect(container.read(sessionProvider), isA<MemberSession>());
     return container;
   }
@@ -55,7 +60,9 @@ void main() {
   });
 
   testWidgets('조용한 재로그인이 안 되면 비회원으로 바꾸고 "다시 로그인" 안내 → 로그인 화면', (t) async {
-    final source = MockSocialTokenSource(silentUnavailable: {SocialProvider.kakao});
+    final source = MockSocialTokenSource(
+      silentUnavailable: {SocialProvider.kakao},
+    );
     final container = await loginAsMember(t, [
       socialTokenSourceProvider.overrideWithValue(source),
     ]);
@@ -91,9 +98,13 @@ void main() {
 
   testWidgets('비회원일 때 만료 알림이 와도 아무것도 하지 않는다', (t) async {
     final source = MockSocialTokenSource();
-    await t.pumpWidget(testApp([socialTokenSourceProvider.overrideWithValue(source)]));
+    await t.pumpWidget(
+      testApp([socialTokenSourceProvider.overrideWithValue(source)]),
+    );
     await t.pumpAndSettle();
-    final container = ProviderScope.containerOf(t.element(find.byType(CustomerApp)));
+    final container = ProviderScope.containerOf(
+      t.element(find.byType(CustomerApp)),
+    );
 
     await settle(t, container.read(sessionProvider.notifier).expired());
 

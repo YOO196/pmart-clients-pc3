@@ -90,6 +90,9 @@ enum PmartLineIcons {
 
   /// 크게 보기(↙↗ 대각선 양쪽 화살표 — 고객앱 배달 완료 사진, 레퍼런스 9-2 3-3).
   expand,
+
+  /// 세로 점 세 개(⋮ 더보기 — 고객앱 리뷰관리 내가 쓴 리뷰, 레퍼런스 11).
+  moreVertical,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -503,6 +506,10 @@ class _LinePainter extends CustomPainter {
           line,
         );
         canvas.drawCircle(const Offset(12, 16.2), 1.05, fill);
+      case PmartLineIcons.moreVertical:
+        for (final y in const [5.5, 12.0, 18.5]) {
+          canvas.drawCircle(Offset(12, y), 1.7, fill);
+        }
       case PmartLineIcons.trash:
         canvas.drawLine(const Offset(4.5, 6.6), const Offset(19.5, 6.6), line);
         canvas.drawPath(

@@ -437,7 +437,11 @@ class ProductReviewCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final r = review;
     // 같은 계정이 쓴 리뷰면 여기서 바로 고칠 수 있게 한다(사용자 2026-11-20). 못 읽었으면 단추 없이 — 목록은 그대로.
-    final mine = ref.watch(myWrittenReviewsProvider).value?[r.reviewId];
+    // 내 리뷰인지 알기 전(첫 로딩)에는 도움돼요 칸을 비워 둔다 — 버튼을 그렸다가 "N명에게 도움이 됐어요"로
+    // 바뀌며 카드 높이가 흔들리던 것(사용자 2026-11-21). 칸 높이는 늘 같다(_ReviewFooter 35).
+    final written = ref.watch(myWrittenReviewsProvider);
+    final mineKnown = written.hasValue || written.hasError;
+    final mine = written.value?[r.reviewId];
     return Container(
       key: ValueKey('product-review-${r.reviewId}'),
       decoration: BoxDecoration(
@@ -454,9 +458,11 @@ class ProductReviewCard extends ConsumerWidget {
               if (mine != null)
                 TextButton(
                   key: ValueKey('product-review-edit-${r.reviewId}'),
+                  // 이름 줄 높이를 늘리지 않게 글자 높이만큼(내 리뷰를 알아낸 뒤 카드가 커지지 않게).
                   style: TextButton.styleFrom(
-                    minimumSize: const Size(0, 30),
+                    minimumSize: const Size(0, 22),
                     padding: const EdgeInsets.symmetric(horizontal: 8),
+                    visualDensity: VisualDensity.compact,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     foregroundColor: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -485,7 +491,12 @@ class ProductReviewCard extends ConsumerWidget {
             _ReviewBody(text: t),
           ],
           const SizedBox(height: 14),
-          _ReviewFooter(review: r, query: query, mine: mine != null),
+          _ReviewFooter(
+            review: r,
+            query: query,
+            mine: mine != null,
+            mineKnown: mineKnown,
+          ),
         ],
       ),
     );
@@ -571,41 +582,48 @@ class _ReviewFooter extends StatelessWidget {
     required this.review,
     required this.query,
     required this.mine,
+    this.mineKnown = true,
   });
   final ReviewView review;
   final ProductReviewQuery? query;
   final bool mine;
+
+  /// 내 리뷰인지 알아냈는지. 모르는 동안은 도움돼요 자리를 비워 둔다(높이는 같다).
+  final bool mineKnown;
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final grey = theme.colorScheme.onSurfaceVariant;
     final r = review;
-    return Row(
-      children: [
-        Text(
-          reviewDate(r.createdAt),
-          key: ValueKey('product-review-date-${r.reviewId}'),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontSize: 14,
-            color: grey,
+    return SizedBox(
+      height: 35,
+      child: Row(
+        children: [
+          Text(
+            reviewDate(r.createdAt),
+            key: ValueKey('product-review-date-${r.reviewId}'),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 14,
+              color: grey,
+            ),
           ),
-        ),
-        const Spacer(),
-        if ((query, r.helpfulCount) case (final q?, final int count))
-          mine
-              ? Text(
-                  l10n.reviewHelpfulMine(count),
-                  key: ValueKey('product-review-helpful-mine-${r.reviewId}'),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontSize: 14,
-                    color: grey,
-                  ),
-                )
-              : _HelpfulButton(review: r, query: q, count: count)
-        else
-          const SizedBox(height: 34),
-      ],
+          const Spacer(),
+          if (!mineKnown)
+            const SizedBox.shrink()
+          else if ((query, r.helpfulCount) case (final q?, final int count))
+            mine
+                ? Text(
+                    l10n.reviewHelpfulMine(count),
+                    key: ValueKey('product-review-helpful-mine-${r.reviewId}'),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 14,
+                      color: grey,
+                    ),
+                  )
+                : _HelpfulButton(review: r, query: q, count: count),
+        ],
+      ),
     );
   }
 }
@@ -821,7 +839,9 @@ class _ReviewPhotoDetailScreenState
           null => null,
         } ??
         widget.review;
-    final mine = ref.watch(myWrittenReviewsProvider).value?[r.reviewId] != null;
+    final written = ref.watch(myWrittenReviewsProvider);
+    final mine = written.value?[r.reviewId] != null;
+    final mineKnown = written.hasValue || written.hasError;
     final origin = ref.watch(imageOriginProvider);
     final urls = [for (final u in r.photoUrls) resolveImageUrl(u, origin)];
     final width = MediaQuery.sizeOf(context).width;
@@ -889,7 +909,12 @@ class _ReviewPhotoDetailScreenState
                   _ReviewBody(text: t),
                 ],
                 const SizedBox(height: 14),
-                _ReviewFooter(review: r, query: q, mine: mine),
+                _ReviewFooter(
+                  review: r,
+                  query: q,
+                  mine: mine,
+                  mineKnown: mineKnown,
+                ),
               ],
             ),
           ),

@@ -52,6 +52,13 @@ final class MockSocialTokenSource implements SocialTokenSource {
   @override
   Future<void> forget(SocialProvider provider, {bool revoke = false}) async =>
       forgotten.add((provider, revoke));
+
+  /// 가입을 그만둔 제공자(순서대로).
+  final abandoned = <SocialProvider>[];
+
+  @override
+  Future<void> abandonSignup(SocialProvider provider) async =>
+      abandoned.add(provider);
 }
 
 /// 목 구현. 제공자별로 다른 결과를 낸다(계약 AuthResult JSON → 생성 모델 → 같은 변환).
