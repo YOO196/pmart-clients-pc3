@@ -16,6 +16,7 @@ import { InventoryMenu } from '../features/inventory/InventoryPages';
 import { LocationsMenu } from '../features/locations/LocationPages';
 import { MovesMenu } from '../features/moves/MovePages';
 import { OpsMenu } from '../features/ops/OpsBoard';
+import { DashboardMenu } from '../features/dashboard/CenterDashboard';
 import { QualityMenu } from '../features/quality/QualityPages';
 import { RestrictionsMenu } from '../features/restrictions/RestrictionPages';
 import { TasksMenu } from '../features/tasks/TaskPages';
@@ -161,6 +162,7 @@ function CenterScope({ menu }: { readonly menu: MenuItem }) {
 /** 만든 메뉴 화면(nav.ts `ready`). 아직이면 "준비 중" */
 const menuPages: Partial<Record<MenuKey, ComponentType<{ readonly mfcId: string }>>> = {
   ops: OpsMenu,
+  dashboard: DashboardMenu,
   locations: LocationsMenu,
   moves: MovesMenu,
   workers: WorkersMenu,
