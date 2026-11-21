@@ -20,6 +20,7 @@ import { useOps } from '../ops/OpsBoard';
 import { OPS_REFRESH_MS } from '../ops/opsQueries';
 import { minutesText, promiseRows, seoulToday } from '../ops/opsRules';
 import { AreaChart, BarList, type Column } from './charts';
+import { ZoneMap } from './ZoneMap';
 import { DAYS, lastDays, rate, rateText, shortDate } from './dashboardRules';
 
 const m = messages.dashboard;
@@ -76,7 +77,7 @@ export function DashboardMenu({ mfcId }: { readonly mfcId: string }) {
   return <Dashboard key={mfcId} mfcId={mfcId} />;
 }
 
-type ChartKind = 'picked' | 'shortRate';
+type ChartKind = 'picked' | 'shortRate' | 'onTime';
 
 function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const { nowMs, today, days, picking, bySku, onTime, workers, live, ops, delays } = useDashboard(mfcId);
@@ -240,22 +241,28 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
         />
 
         {/* 추이 — 피킹 줄·결품률은 한 패널에서 골라 보기(축 하나), 정시 배송은 옆 패널 */}
+        <Panel className="@5xl:col-span-7" title={m.zoneMap.title} sub={m.zoneMap.sub} q={{ isPending: false, isError: false }}>
+          <ZoneMap mfcId={mfcId} />
+        </Panel>
         <Panel
-          className="@5xl:col-span-7"
-          title={chart === 'picked' ? m.chart.picked(DAYS) : m.chart.shortRate(DAYS)}
-          sub={m.chart.pickSub}
-          q={picking}
+          className="@5xl:col-span-5"
+          title={m.chart.trend(DAYS)}
+          sub={chart === 'onTime' ? m.chart.onTimeNote : m.chart.pickSub}
+          {...(chart === 'onTime' ? { help: m.chart.onTimeHelp } : {})}
+          q={chart === 'onTime' ? onTime : picking}
           aside={
             <div className="pm-seg" role="group" aria-label={m.chart.pickToggle}>
-              {(['picked', 'shortRate'] as const).map((k) => (
+              {(['picked', 'shortRate', 'onTime'] as const).map((k) => (
                 <button key={k} type="button" aria-pressed={chart === k} onClick={() => setChart(k)}>
-                  {k === 'picked' ? m.chart.pickedShort : m.chart.shortRateShort}
+                  {k === 'picked' ? m.chart.pickedShort : k === 'shortRate' ? m.chart.shortRateShort : m.chart.onTimeShort}
                 </button>
               ))}
             </div>
           }
         >
-          {chart === 'picked' ? (
+          {chart === 'onTime' ? (
+            <AreaChart title={m.chart.onTime(DAYS)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} />
+          ) : chart === 'picked' ? (
             <AreaChart title={m.chart.picked(DAYS)} columns={pickedCols} format={(v) => m.lines(v)} testId="chart-picked" />
           ) : (
             <AreaChart title={m.chart.shortRate(DAYS)} columns={shortCols} format={(v) => rateText(v)} testId="chart-short-rate" />
@@ -266,17 +273,9 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
             ) : (
               <BarList
                 testId="top-short"
-                cols={2}
                 rows={(bySku.data?.items ?? []).map((s) => ({ key: s.sku, label: s.productName ?? s.sku, value: s.shortLines, text: m.shortOf(s.shortLines, s.pickedLines) }))}
               />
             )}
-          </SubList>
-        </Panel>
-        <Panel className="@5xl:col-span-5" title={m.chart.onTime(DAYS)} sub={m.chart.onTimeNote} help={m.chart.onTimeHelp} q={onTime}>
-          <AreaChart title={m.chart.onTime(DAYS)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} />
-          <SubList title={m.chart.deliveries} q={live} link={{ to: centerPath(mfcId, 'deliveries'), text: m.toDeliveries }}>
-            {stateRows.length === 0 ? <p className="text-sm text-base-content/55">{m.noDeliveries}</p> : <BarList testId="delivery-states" cols={2} rows={stateRows} />}
-            {live.data?.truncated && <p className="mt-1 text-xs text-warning">{m.liveTruncated(LIVE_SIZE)}</p>}
           </SubList>
         </Panel>
 
@@ -348,6 +347,11 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
               <Stat label={m.people.idle} value={workers.data ? idle : null} />
             </dl>
           )}
+          <SubList title={m.chart.deliveries} q={live} link={{ to: centerPath(mfcId, 'deliveries'), text: m.toDeliveries }}>
+            {stateRows.length === 0 ? <p className="text-sm text-base-content/55">{m.noDeliveries}</p> : <BarList testId="delivery-states" rows={stateRows} />}
+            {live.data?.truncated && <p className="mt-1 text-xs text-warning">{m.liveTruncated(LIVE_SIZE)}</p>}
+          </SubList>
+
         </Panel>
 
       </div>
