@@ -1026,6 +1026,43 @@ void main() {
     debugDisableShadows = true;
   });
 
+  // 주소 상세 별칭(새 레퍼런스 3-1/2-5): [우리집][회사][추가], [추가]를 누르면 아래 입력칸.
+  testWidgets('address-alias', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final address = MockAddressRepository(latency: Duration.zero);
+    await t.pumpWidget(testApp(const [], address: address));
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    final id = (await t.runAsync(address.book))!.addresses.first.addressId;
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first))
+          .push('/addresses/edit/$id'),
+    );
+    await t.pumpAndSettle();
+    // 레퍼런스처럼 [추가]를 고르고 빈 입력칸(목 주소 별칭 "집"은 지운다).
+    await t.tap(find.byKey(const ValueKey('address-alias-home')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('address-alias-custom')));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('f-label')), '');
+    await t.pumpAndSettle();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/address-alias.png').uri),
+    );
+  });
   // MD 탭(storefront 0.9.0 customTabs): 고정 탭 뒤, 타이머 탭은 이름 위 남은 시간.
   testWidgets('custom-tabs', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

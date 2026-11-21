@@ -124,10 +124,7 @@ void main() {
       '7층',
     );
   });
-  testWidgets('주소 상세(고치기)에 별칭 칸 — 지금 별칭이 채워지고, 바꾸면 서버에 보내 목록 제목이 바뀐다', (
-    t,
-  ) async {
-    final repo = (await t.runAsync(_withSecond))!;
+  Future<void> openEdit(WidgetTester t, MockAddressRepository repo) async {
     await t.pumpWidget(testApp(const [], address: repo));
     await t.pumpAndSettle();
     await _openAddresses(t);
@@ -135,25 +132,89 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('address-modify-addr-2')));
     await t.pumpAndSettle();
+  }
 
-    final label = find.byKey(const ValueKey('f-label'));
-    expect(label, findsOneWidget);
-    final before = (await t.runAsync(repo.book))!.addresses
-        .singleWhere((a) => a.addressId == 'addr-2')
-        .label;
-    expect(t.widget<TextFormField>(label).controller!.text, before ?? '');
+  Future<String?> labelOf(WidgetTester t, MockAddressRepository repo) async =>
+      (await t.runAsync(repo.book))!.addresses
+          .singleWhere((a) => a.addressId == 'addr-2')
+          .label;
 
-    await t.enterText(label, '회사');
+  bool selected(WidgetTester t, String alias) => t
+      .widget<Semantics>(
+        find.descendant(
+          of: find.byKey(ValueKey('address-alias-$alias')),
+          matching: find.byWidgetPredicate(
+            (w) => w is Semantics && w.properties.selected != null,
+          ),
+        ),
+      )
+      .properties
+      .selected!;
+
+  // 새 레퍼런스 3-1/2-5(사용자 2026-11-21): [우리집][회사][추가], [추가]를 누르면 아래 별칭 입력칸.
+  testWidgets('주소 상세(고치기): 지금 별칭 "회사"면 [회사]가 골라져 있고 입력칸은 없다', (t) async {
+    final repo = (await t.runAsync(_withSecond))!;
+    await openEdit(t, repo);
+    expect(selected(t, 'work'), isTrue);
+    expect(selected(t, 'home'), isFalse);
+    expect(find.byKey(const ValueKey('f-label')), findsNothing);
+  });
+
+  testWidgets('[우리집]을 고르면 "우리집"으로 저장, 목록 제목이 바뀐다', (t) async {
+    final repo = (await t.runAsync(_withSecond))!;
+    await openEdit(t, repo);
+    await t.tap(find.byKey(const ValueKey('address-alias-home')));
+    await t.pump();
+    expect(selected(t, 'home'), isTrue);
+    expect(selected(t, 'work'), isFalse);
+    await t.tap(find.byKey(const ValueKey('address-save')));
+    await t.pumpAndSettle();
+    expect(await labelOf(t, repo), '우리집');
+  });
+
+  testWidgets('[추가]를 누르면 아래에 입력칸 — 적은 별칭으로 저장', (t) async {
+    final repo = (await t.runAsync(_withSecond))!;
+    await openEdit(t, repo);
+    expect(find.byKey(const ValueKey('f-label')), findsNothing);
+    await t.tap(find.byKey(const ValueKey('address-alias-custom')));
+    await t.pump();
+    final field = find.byKey(const ValueKey('f-label'));
+    expect(field, findsOneWidget);
+    // 입력칸은 알약 줄 아래
+    expect(
+      t.getTopLeft(field).dy,
+      greaterThan(
+        t.getBottomLeft(find.byKey(const ValueKey('address-alias-custom'))).dy,
+      ),
+    );
+    await t.enterText(field, '부모님 댁');
     await t.pump();
     await t.tap(find.byKey(const ValueKey('address-save')));
     await t.pumpAndSettle();
-    final book = await t.runAsync(repo.book);
-    expect(
-      book!.addresses.singleWhere((a) => a.addressId == 'addr-2').label,
-      '회사',
-    );
+    expect(await labelOf(t, repo), '부모님 댁');
   });
 
+  testWidgets('[추가]를 고르고 비워 두면 저장하지 않고 입력하라고 한다', (t) async {
+    final repo = (await t.runAsync(_withSecond))!;
+    await openEdit(t, repo);
+    await t.tap(find.byKey(const ValueKey('address-alias-custom')));
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('address-save')));
+    await t.pumpAndSettle();
+    expect(repo.updated, isEmpty);
+    expect(await labelOf(t, repo), '회사');
+  });
+
+  testWidgets('고른 알약을 다시 누르면 풀린다 — 별칭 없이 저장', (t) async {
+    final repo = (await t.runAsync(_withSecond))!;
+    await openEdit(t, repo);
+    await t.tap(find.byKey(const ValueKey('address-alias-work')));
+    await t.pump();
+    expect(selected(t, 'work'), isFalse);
+    await t.tap(find.byKey(const ValueKey('address-save')));
+    await t.pumpAndSettle();
+    expect(await labelOf(t, repo), isNull);
+  });
   testWidgets('새 주소 등록에는 별칭 칸이 없다', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
@@ -161,6 +222,7 @@ void main() {
     unawaited(router.push('/addresses/new'));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('f-label')), findsNothing);
+    expect(find.byKey(const ValueKey('address-alias-home')), findsNothing);
   });
   testWidgets('비회원은 주소 상세 경로로 바로 와도 별칭 칸이 없다(회원만)', (t) async {
     await t.pumpWidget(
@@ -168,10 +230,13 @@ void main() {
     );
     await t.pumpAndSettle();
     final router = GoRouter.of(t.element(find.byType(Scaffold).first));
-    unawaited(router.push('/addresses/addr-2'));
+    unawaited(router.push('/addresses/edit/addr-2'));
     await t.pump();
     expect(find.byKey(const ValueKey('f-label')), findsNothing);
     await t.pumpAndSettle();
+    // 주소 상세가 열렸다(경로가 틀려 오류 화면만 보고 통과하지 않게)
+    expect(find.byKey(const ValueKey('f-detail')), findsOneWidget);
     expect(find.byKey(const ValueKey('f-label')), findsNothing);
+    expect(find.byKey(const ValueKey('address-alias-home')), findsNothing);
   });
 }

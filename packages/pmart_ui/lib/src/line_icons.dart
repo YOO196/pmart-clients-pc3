@@ -81,6 +81,9 @@ enum PmartLineIcons {
 
   /// 엄지(도움돼요 — 고객앱 리뷰, 레퍼런스 4. 상품리뷰).
   thumbUp,
+
+  /// 건물(회사 — 고객앱 주소 별칭, 레퍼런스 3-1/2-5).
+  building,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -136,6 +139,18 @@ class _LinePainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
     final fill = Paint()..color = color;
     switch (icon) {
+      case PmartLineIcons.building:
+        canvas.drawRRect(
+          RRect.fromLTRBR(5, 3.5, 19, 20.5, const Radius.circular(1)),
+          line,
+        );
+        for (final y in [8.0, 12.0]) {
+          canvas.drawLine(Offset(8.5, y), Offset(10.5, y), line);
+          canvas.drawLine(Offset(13.5, y), Offset(15.5, y), line);
+        }
+        canvas.drawLine(const Offset(10, 20.5), const Offset(10, 16), line);
+        canvas.drawLine(const Offset(10, 16), const Offset(14, 16), line);
+        canvas.drawLine(const Offset(14, 16), const Offset(14, 20.5), line);
       case PmartLineIcons.thumbUp:
         canvas.drawRRect(
           RRect.fromLTRBR(3, 10, 7, 20.5, const Radius.circular(1)),

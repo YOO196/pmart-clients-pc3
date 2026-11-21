@@ -559,6 +559,9 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   /// "비회원은 안 되고 회원만"). 계약 `label` 20자.
   final _label = TextEditingController();
 
+  /// 고른 별칭 알약(새 레퍼런스 3-1/2-5 [우리집][회사][추가], 사용자 2026-11-21 "[추가]를 누르면 아래 입력칸").
+  _Alias _alias = _Alias.none;
+
   bool get _aliasEnabled =>
       widget.editAddressId != null &&
       ref.read(sessionProvider) is MemberSession;
@@ -583,7 +586,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
       setState(() {
         _road.text = d.roadAddress;
         _detail.text = d.detailAddress;
-        _label.text = d.label ?? '';
+        _setAlias(d.label);
         _postalCode = d.postalCode;
         _geo = d.geo;
         _preview = d.geo;
@@ -723,8 +726,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
             ? notifier.add
             : (AddressDraft d) => notifier.modify(editId, d))(
           AddressDraft(
-            // 고칠 때는 지금 칸 값 그대로(비우면 빈 글 — 별칭 지우기). 새 주소는 별칭을 묻지 않는다.
-            label: _aliasEnabled ? _label.text.trim() : null,
+            // 고칠 때는 고른 알약 값(고르지 않았으면 빈 글 — 별칭 지우기). 새 주소는 별칭을 묻지 않는다.
+            label: _aliasEnabled ? _aliasText(l10n) : null,
             roadAddress: _road.text.trim(),
             detailAddress: _detail.text.trim(),
             // 받는 분·연락처는 보내지 않는다 — 주문 초안이 회원 프로필 값을 쓴다(BR-60 R1·R2).
@@ -749,6 +752,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     String? hint,
     required int max,
     bool required = true,
+    double gap = 19,
+    bool autofocus = false,
     TextInputType? keyboard,
     List<TextInputFormatter>? formatters,
     FormFieldValidator<String>? validator,
@@ -756,7 +761,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     final theme = Theme.of(context);
     // 레퍼런스 2-7-1: 칸 높이 약 45dp, 칸 사이 19dp, 모서리 10dp
     return Padding(
-      padding: const EdgeInsets.only(bottom: 19),
+      padding: EdgeInsets.only(bottom: gap),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -774,6 +779,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
           TextFormField(
             key: ValueKey(key),
             controller: c,
+            autofocus: autofocus,
             keyboardType: keyboard,
             inputFormatters: [
               LengthLimitingTextInputFormatter(max),
@@ -873,6 +879,92 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     );
   }
 
+  /// [추가]를 눌러 입력칸을 열었을 때만 바로 입력하게 한다(고칠 주소를 읽어 채울 때는 아님).
+  bool _labelAutofocus = false;
+
+  /// 지금 별칭 → 알약(우리집·회사는 그 알약, 그 밖의 글은 [추가] + 입력칸).
+  void _setAlias(String? label) {
+    final l10n = AppLocalizations.of(context);
+    final v = label?.trim() ?? '';
+    if (v.isEmpty) {
+      _alias = _Alias.none;
+    } else if (v == l10n.addressAliasHome) {
+      _alias = _Alias.home;
+    } else if (v == l10n.addressAliasWork) {
+      _alias = _Alias.work;
+    } else {
+      _alias = _Alias.custom;
+      _label.text = v;
+    }
+  }
+
+  /// 보낼 별칭(계약 `label` 20자). 고르지 않았으면 빈 글(저장소가 없음으로 보낸다).
+  String _aliasText(AppLocalizations l10n) => switch (_alias) {
+    _Alias.none => '',
+    _Alias.home => l10n.addressAliasHome,
+    _Alias.work => l10n.addressAliasWork,
+    _Alias.custom => _label.text.trim(),
+  };
+
+  /// [우리집][회사][추가] 알약(레퍼런스 3-1/2-5: 높이 35, 모서리 10, 사이 8, 글 13, 고른 것은 진한 테두리).
+  /// 고른 알약을 다시 누르면 풀린다.
+  Widget _aliasChips(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    Widget chip(_Alias a, PmartLineIcons icon, String text) {
+      final on = _alias == a;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: InkWell(
+          key: ValueKey('address-alias-${a.name}'),
+          borderRadius: BorderRadius.circular(10),
+          onTap: () => setState(() {
+            _alias = on ? _Alias.none : a;
+            _labelAutofocus = _alias == _Alias.custom;
+          }),
+          child: Semantics(
+            selected: on,
+            button: true,
+            child: Container(
+              height: 35,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: on ? scheme.onSurface : scheme.outlineVariant,
+                  width: on ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  PmartLineIcon(icon, size: 18, color: scheme.onSurface),
+                  const SizedBox(width: 6),
+                  Text(
+                    text,
+                    // 레퍼런스 3-1/2-5 를 재어 보니 입력칸 글(15)보다 작다
+                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          chip(_Alias.home, PmartLineIcons.home, l10n.addressAliasHome),
+          chip(_Alias.work, PmartLineIcons.building, l10n.addressAliasWork),
+          chip(_Alias.custom, PmartLineIcons.pin, l10n.addressAliasCustom),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -921,17 +1013,21 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               _detail,
               hint: l10n.addressDetailHint,
               max: AddressLimits.detailAddress,
+              // 레퍼런스 3-1/2-5: 상세 주소 칸과 별칭 알약 사이 약 10dp
+              gap: _aliasEnabled ? 10 : 19,
             ),
             // 별칭은 회원 주소만(사용자 2026-11-21 "비회원은 안 되고 회원만").
-            if (_aliasEnabled)
-              _field(
-                'f-label',
-                _label,
-                label: l10n.addressLabelTitle,
-                hint: l10n.addressLabelHint,
-                max: AddressLimits.label,
-                required: false,
-              ),
+            if (_aliasEnabled) ...[
+              _aliasChips(l10n),
+              if (_alias == _Alias.custom)
+                _field(
+                  'f-label',
+                  _label,
+                  hint: l10n.addressLabelHint,
+                  max: AddressLimits.label,
+                  autofocus: _labelAutofocus,
+                ),
+            ],
             _field(
               'f-entrance-password',
               _password,
@@ -1025,3 +1121,6 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     );
   }
 }
+
+/// 주소 별칭 알약.
+enum _Alias { none, home, work, custom }
