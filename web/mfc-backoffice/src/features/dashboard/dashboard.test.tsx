@@ -26,10 +26,14 @@ describe('센터 대시보드', () => {
 
   it('14일 막대 — 날짜마다 한 칸, 줄 없는 날은 정시율 "—"(0% 아님), 마우스를 올리면 말풍선', async () => {
     renderAt('/c/MFC-BSN-01/dashboard');
+    // B안: 추이 패널에서 정시율을 골라 본다
+    await screen.findByTestId('chart-picked');
+    await userEvent.click(screen.getByRole('button', { name: '정시율' }));
     const chart = await screen.findByTestId('chart-on-time');
     expect(within(chart).getAllByTestId('chart-on-time-col')).toHaveLength(14);
     // 목은 일요일 줄이 없다 → 14일 중 일요일 2번
     expect(within(chart).getAllByText('—')).toHaveLength(2);
+    await userEvent.click(screen.getByRole('button', { name: '피킹 줄' }));
     await userEvent.hover(within(await screen.findByTestId('chart-picked')).getAllByTestId('chart-picked-col').at(-1)!);
     expect(screen.getByTestId('chart-picked-tip')).toHaveTextContent('피킹 40줄 · 결품 4줄');
   });
@@ -76,6 +80,15 @@ describe('센터 대시보드', () => {
     await userEvent.click(screen.getByRole('button', { name: '결품률' }));
     expect(await screen.findByTestId('chart-short-rate')).toBeInTheDocument();
     expect(screen.queryByTestId('chart-picked')).not.toBeInTheDocument();
+  });
+
+  it('구역 칸 지도(B안) — 위치 서버 상태로 칸을 칠하고, 칸은 그 칸 상세로', async () => {
+    renderAt('/c/MFC-BSN-01/dashboard');
+    const map = await screen.findByTestId('zone-map');
+    expect(within(map).getAllByTestId('zone-block').length).toBeGreaterThan(1);
+    expect(within(map).getByText('닫힘 2칸')).toBeInTheDocument();
+    const closed = map.querySelector('[data-state="CLOSED"]')!;
+    expect(closed.getAttribute('href')).toMatch(/^\/c\/MFC-BSN-01\/locations\//);
   });
 
   it('메뉴에 있고 누르면 대시보드', async () => {
