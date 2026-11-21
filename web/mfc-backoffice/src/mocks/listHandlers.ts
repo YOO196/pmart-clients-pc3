@@ -73,7 +73,8 @@ export const listHandlers = [
     const match = (k: string, v: string) => !q.get(k) || q.get(k) === v;
     const rows = db.stockUnits
       .filter((u) => u.mfcId === mfcId && match('sku', u.sku) && match('lotId', u.lotId) && match('locationCode', u.locationCode) && match('qualityState', u.qualityState) && match('workState', u.workState))
-      .map((u) => ({ sku: u.sku, productName: null, lotId: u.lotId, lotNo: null, locationCode: u.locationCode, qty: u.qty, qualityState: u.qualityState, workState: u.workState, expiryDate: null }));
+      .filter((u) => !q.get('locationPrefix') || u.locationCode.startsWith(q.get('locationPrefix') ?? ''))
+      .map((u) => ({ sku: u.sku, productName: u.productName ?? null, lotId: u.lotId, lotNo: null, locationCode: u.locationCode, qty: u.qty, qualityState: u.qualityState, workState: u.workState, expiryDate: null }));
     return listPage(request, mfcId, rows);
   }),
 ];

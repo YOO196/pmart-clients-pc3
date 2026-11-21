@@ -400,7 +400,7 @@ function seedInitialLoads(): MockInitialLoad[] {
 export type MockMove = Required<InboundSchemas['schemas']['MoveOrder']>;
 
 /** 위치·LOT 별 재고 단위 행(mfc-inventory CenterStock.units + 센터·상품) */
-export type MockStockUnit = Required<InventorySchemas['schemas']['CenterStock']['units'][number]> & { readonly mfcId: string; readonly sku: string };
+export type MockStockUnit = Required<InventorySchemas['schemas']['CenterStock']['units'][number]> & { readonly mfcId: string; readonly sku: string; readonly productName?: string };
 
 function move(moveId: string, extra: Partial<MockMove>): [string, MockMove] {
   return [
@@ -841,4 +841,19 @@ export function seedDemoFloor() {
     ['OP-demo-10', '조휴게', { taskTypes: ['PICK'], onBreak: true }],
   ];
   for (const [id, name, extra] of demo) if (!db.workers.has(id)) db.workers.set(...worker(id, name, extra));
+  // 시연 칸마다 상품(센터 도면 랙 → 칸별 상품) — 온도대에 맞는 상품, 다섯 칸 중 하나는 비움
+  const goods: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
+    A: [['SKU-RAMEN-5', '신라면 5입'], ['SKU-WATER-2L', '생수 2L'], ['SKU-RICE-3', '즉석밥 3입'], ['SKU-SNACK-1', '새우깡'], ['SKU-TISSUE', '각티슈 3입'], ['SKU-COFFEE', '캔커피 6입']],
+    C: [['SKU-MILK-1', '서울우유 1L'], ['SKU-TOFU', '국산콩 두부 300g'], ['SKU-EGG-30', '특란 30구'], ['SKU-YOGURT', '플레인 요거트'], ['SKU-KIMCHI', '포기김치 1kg']],
+    F: [['SKU-DUMPLING', '왕만두 1kg'], ['SKU-ICE', '바닐라 아이스크림'], ['SKU-PIZZA', '냉동 피자'], ['SKU-CHICKEN', '냉동 닭가슴살']],
+  };
+  let n = 0;
+  for (const l of db.locations.values()) {
+    if (l.mfcId !== 'MFC-BSN-01' || !l.locationId.startsWith('LOC-D-') || l.state === 'RETIRED') continue;
+    const list = goods[l.locationCode.charAt(0)];
+    n += 1;
+    if (!list || n % 5 === 0) continue;
+    const [sku, productName] = list[n % list.length]!;
+    db.stockUnits.push({ mfcId: 'MFC-BSN-01', sku, productName, locationCode: l.locationCode, lotId: `LOT-${sku.slice(4)}-${(n % 3) + 1}`, qualityState: 'NORMAL', workState: 'STORED', qty: 4 + ((n * 7) % 20) });
+  }
 }

@@ -17,6 +17,7 @@ import { LocationsMenu } from '../features/locations/LocationPages';
 import { MovesMenu } from '../features/moves/MovePages';
 import { OpsMenu } from '../features/ops/OpsBoard';
 import { DashboardMenu } from '../features/dashboard/CenterDashboard';
+import { FloorMenu } from '../features/floor/FloorPage';
 import { QualityMenu } from '../features/quality/QualityPages';
 import { RestrictionsMenu } from '../features/restrictions/RestrictionPages';
 import { TasksMenu } from '../features/tasks/TaskPages';
@@ -175,6 +176,7 @@ function CenterScope({ menu }: { readonly menu: MenuItem }) {
 const menuPages: Partial<Record<MenuKey, ComponentType<{ readonly mfcId: string }>>> = {
   ops: OpsMenu,
   dashboard: DashboardMenu,
+  floor: FloorMenu,
   locations: LocationsMenu,
   moves: MovesMenu,
   workers: WorkersMenu,

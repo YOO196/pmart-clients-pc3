@@ -5,7 +5,7 @@
 //   목 모드(env.isMock)에서만 시뮬레이션으로 그린다 — 작업자(재직)·휴게·맡은 작업 종류(서버 값)로 역할을 정하고 통로를 따라 걷게 한다.
 //   실서버에서는 점을 그리지 않고 "위치 API 없음"을 보인다(추측한 위치를 실제처럼 보이지 않게).
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
 
 import { request } from '@pmart/web-core';
@@ -166,7 +166,25 @@ function useWorkerDots(mfcId: string, enabled: boolean) {
   return { workers, dots: enabled ? dots.list : [] };
 }
 
-export function FloorMap({ mfcId }: { readonly mfcId: string }) {
+/** 도면에서 고른 것 — 랙(칸 코드 앞부분) 또는 작업자 */
+export type FloorPick = { readonly kind: 'rack'; readonly code: string; readonly temp: string } | { readonly kind: 'worker'; readonly id: string; readonly name: string; readonly role: Role };
+
+/**
+ * preview(대시보드) = 도면 전체가 센터 도면 화면으로 가는 링크, 칸·점은 누를 수 없다.
+ * full(센터 도면 화면) = 랙·작업자 점을 눌러 고른다(onPick), 고른 것은 밝게.
+ */
+export function FloorMap({
+  mfcId,
+  mode = 'preview',
+  picked = null,
+  onPick,
+}: {
+  readonly mfcId: string;
+  readonly mode?: 'preview' | 'full';
+  readonly picked?: FloorPick | null;
+  readonly onPick?: (p: FloorPick) => void;
+}) {
+  const full = mode === 'full';
   const api = useApi();
   const simulate = env.isMock;
   const { workers, dots } = useWorkerDots(mfcId, simulate);
@@ -196,11 +214,17 @@ export function FloorMap({ mfcId }: { readonly mfcId: string }) {
           </>
         )}
         <span className="ml-auto min-h-4 truncate text-base-content/70" aria-live="polite" data-testid="floor-tip">
-          {hovered ? m.tip(hovered.name, m.role[hovered.role]) : m.hint}
+          {hovered ? m.tip(hovered.name, m.role[hovered.role]) : full ? m.hintFull : m.hint}
         </span>
       </div>
-      <div className="relative overflow-hidden rounded-field border border-base-300 bg-base-200/80">
-        <svg viewBox={`-0.6 -0.6 ${FLOOR.width + 1.2} ${FLOOR.buildingDepth + 3.8}`} className="block h-[min(46vh,420px)] w-full" preserveAspectRatio="xMidYMid meet" role="img" aria-label={m.aria}>
+      <Frame mfcId={mfcId} full={full}>
+        <svg
+          viewBox={`-0.6 -0.6 ${FLOOR.width + 1.2} ${FLOOR.buildingDepth + 3.8}`}
+          className={`block w-full ${full ? 'h-[min(72vh,680px)]' : 'h-[min(46vh,420px)]'}`}
+          preserveAspectRatio="xMidYMid meet"
+          role={full ? 'group' : 'img'}
+          aria-label={m.aria}
+        >
           <defs>
             <pattern id="pm-floor-grid" width="1" height="1" patternUnits="userSpaceOnUse">
               <path d="M1 0H0V1" fill="none" className="stroke-base-content/6" strokeWidth="0.03" />
@@ -217,17 +241,39 @@ export function FloorMap({ mfcId }: { readonly mfcId: string }) {
                 </text>
               </g>
             ))}
-          {FLOOR.racks.map((r, i) => (
-            <rect
-              key={i}
-              x={r.cx - (r.along === 'x' ? 0.6 : 0.22)}
-              y={r.cz - (r.along === 'z' ? 0.6 : 0.22)}
-              width={r.along === 'x' ? 1.2 : 0.44}
-              height={r.along === 'z' ? 1.2 : 0.44}
-              rx="0.05"
-              className="fill-base-content/18"
-            />
-          ))}
+          {FLOOR.racks.map((r, i) => {
+            const on = picked?.kind === 'rack' && picked.code === r.code;
+            return (
+              <rect
+                key={i}
+                x={r.cx - (r.along === 'x' ? 0.6 : 0.22)}
+                y={r.cz - (r.along === 'z' ? 0.6 : 0.22)}
+                width={r.along === 'x' ? 1.2 : 0.44}
+                height={r.along === 'z' ? 1.2 : 0.44}
+                rx="0.05"
+                className={on ? 'fill-primary stroke-primary' : full ? 'pm-floor-rack fill-base-content/18' : 'fill-base-content/18'}
+                strokeWidth={on ? 0.12 : 0}
+                {...(full
+                  ? {
+                      role: 'button',
+                      tabIndex: 0,
+                      'aria-label': m.rackAria(r.code),
+                      'data-testid': 'floor-rack',
+                      'data-code': r.code,
+                      onClick: () => onPick?.({ kind: 'rack', code: r.code, temp: r.temp }),
+                      onKeyDown: (e: KeyboardEvent) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onPick?.({ kind: 'rack', code: r.code, temp: r.temp });
+                        }
+                      },
+                    }
+                  : {})}
+              >
+                {full && <title>{m.rackAria(r.code)}</title>}
+              </rect>
+            );
+          })}
           {FLOOR.stations.map((s, i) => (
             <rect key={i} x={s.x - 0.8} y={s.z + (s.z < 24 ? -1.6 : 0.8)} width="1.6" height="0.8" rx="0.1" className="fill-base-content/25" />
           ))}
@@ -236,7 +282,7 @@ export function FloorMap({ mfcId }: { readonly mfcId: string }) {
           ))}
           {/* 서버 position 이 있는 칸 — 상태색 */}
           {placed.map((l) => (
-            <Link key={l.locationId ?? l.locationCode} to={centerPath(mfcId, `locations/${encodeURIComponent(l.locationId ?? '')}`)}>
+            <g key={l.locationId ?? l.locationCode}>
               <rect
                 x={l.position!.xM - 0.35}
                 y={l.position!.zM - 0.35}
@@ -247,10 +293,13 @@ export function FloorMap({ mfcId }: { readonly mfcId: string }) {
               >
                 <title>{`${l.locationCode} · ${m.state[l.state ?? ''] ?? l.state ?? ''}`}</title>
               </rect>
-            </Link>
+            </g>
           ))}
           {/* 작업자 점 */}
-          {dots.map((d) => (
+          {dots.map((d) => {
+            const on = picked?.kind === 'worker' && picked.id === d.id;
+            const choose = () => onPick?.({ kind: 'worker', id: d.id, name: d.name, role: d.role });
+            return (
             <g
               key={d.id}
               className="pm-floor-dot"
@@ -259,15 +308,32 @@ export function FloorMap({ mfcId }: { readonly mfcId: string }) {
               onMouseLeave={() => setHover(null)}
               data-testid="floor-worker"
               data-role={d.role}
+              {...(full
+                ? {
+                    role: 'button',
+                    tabIndex: 0,
+                    'aria-label': m.tip(d.name, m.role[d.role]),
+                    onClick: choose,
+                    onKeyDown: (e: KeyboardEvent) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        choose();
+                      }
+                    },
+                  }
+                : {})}
             >
+              {on && <circle r="1.5" className="fill-none stroke-base-content" strokeWidth="0.16" />}
               <circle r="0.95" style={{ fill: ROLE_COLOR[d.role] }} opacity="0.22" />
               <circle r="0.48" style={{ fill: ROLE_COLOR[d.role] }} className="stroke-base-100" strokeWidth="0.14" />
               <title>{m.tip(d.name, m.role[d.role])}</title>
             </g>
-          ))}
+            );
+          })}
         </svg>
         <span className="pm-mono pointer-events-none absolute right-2 bottom-1.5 text-[10px] text-base-content/40">{m.scale}</span>
-      </div>
+        {!full && <span className="pointer-events-none absolute top-2 right-2 badge badge-sm badge-primary opacity-0 transition-opacity group-hover:opacity-100">{m.openFull}</span>}
+      </Frame>
       <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/65">
         {simulate &&
           ROLES.map((r) => (
@@ -280,5 +346,17 @@ export function FloorMap({ mfcId }: { readonly mfcId: string }) {
         <span className="ml-auto text-base-content/45">{m.layoutNote}</span>
       </p>
     </div>
+  );
+}
+
+/** 도면 틀 — preview 면 센터 도면 화면으로 가는 링크 */
+function Frame({ mfcId, full, children }: { readonly mfcId: string; readonly full: boolean; readonly children: ReactNode }) {
+  const cls = 'relative overflow-hidden rounded-field border border-base-300 bg-base-200/80';
+  return full ? (
+    <div className={cls}>{children}</div>
+  ) : (
+    <Link to={centerPath(mfcId, 'floor')} className={`group block transition-colors hover:border-primary/60 ${cls}`} aria-label={m.openFull} data-testid="floor-open">
+      {children}
+    </Link>
   );
 }
