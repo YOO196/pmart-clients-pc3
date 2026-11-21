@@ -23,21 +23,22 @@ export function FloorMenu({ mfcId }: { readonly mfcId: string }) {
   const worker = params.get('worker');
   const picked: FloorPick | null = rack ? { kind: 'rack', code: rack, temp: '' } : worker ? { kind: 'worker', id: worker, name: '', role: 'idle' } : null;
   const pick = (p: FloorPick) => setParams(p.kind === 'rack' ? { rack: p.code } : { worker: p.id }, { replace: true });
+  const close = () => setParams({}, { replace: true });
   return (
-    <section className="@container space-y-3">
-      <div>
-        <h1>{messages.menus.floor}</h1>
-        <p className="mt-1 text-sm text-base-content/60">{m.intro}</p>
-      </div>
-      <div className="grid grid-cols-12 gap-3">
-        <section className="col-span-12 min-w-0 rounded-box border border-base-300 bg-base-100 p-4 @5xl:col-span-8" aria-label={messages.menus.floor}>
-          <FloorMap mfcId={mfcId} mode="full" picked={picked} onPick={pick} />
-        </section>
-        <aside className="col-span-12 min-w-0 rounded-box border border-base-300 bg-base-100 p-4 @5xl:col-span-4" aria-label={m.sideAria} data-testid="floor-side">
+    // 본문 여백을 걷어 내고 머리줄·위치 줄 아래 전체를 도면으로(왼쪽 메뉴만 남김)
+    <section className="@container relative -mx-6 -mt-1 -mb-6 h-[calc(100dvh-5.25rem)] min-h-[520px] overflow-hidden bg-base-200" aria-label={messages.menus.floor}>
+      <h1 className="sr-only">{messages.menus.floor}</h1>
+      <FloorMap mfcId={mfcId} mode="full" picked={picked} onPick={pick} />
+      <aside
+        className="absolute top-3 right-3 bottom-3 z-[2] flex w-[300px] max-w-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-box border border-base-300 bg-base-100/92 shadow-xl backdrop-blur"
+        aria-label={m.sideAria}
+        data-testid="floor-side"
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
           {rack ? (
-            <RackPanel mfcId={mfcId} code={rack} onClose={() => setParams({}, { replace: true })} />
+            <RackPanel mfcId={mfcId} code={rack} onClose={close} />
           ) : worker ? (
-            <WorkerPanel mfcId={mfcId} workerId={worker} onClose={() => setParams({}, { replace: true })} />
+            <WorkerPanel mfcId={mfcId} workerId={worker} onClose={close} />
           ) : (
             <div className="space-y-2 text-sm text-base-content/70">
               <p className="font-bold text-base-content">{m.emptyTitle}</p>
@@ -45,9 +46,44 @@ export function FloorMenu({ mfcId }: { readonly mfcId: string }) {
               <p>{m.emptyWorker}</p>
             </div>
           )}
-        </aside>
-      </div>
+        </div>
+        <Actions mfcId={mfcId} rack={rack} worker={worker} />
+      </aside>
     </section>
+  );
+}
+
+/** 고른 것에 할 수 있는 일 — 지금 있는 화면으로 가는 길(새 명령은 만들지 않는다) */
+function Actions({ mfcId, rack, worker }: { readonly mfcId: string; readonly rack: string | null; readonly worker: string | null }) {
+  const temp = rack ? ({ A: 'AMBIENT', C: 'CHILLED', F: 'FROZEN' } as Readonly<Record<string, string>>)[rack.charAt(0)] : null;
+  const links: ReadonlyArray<readonly [string, string]> = rack
+    ? [
+        [m.act.rackLocations, `${centerPath(mfcId, 'locations')}${temp ? `?temperatureZone=${temp}` : ''}`],
+        [m.act.count, `${centerPath(mfcId, 'inventory')}?tab=counts`],
+        [m.act.move, centerPath(mfcId, 'moves')],
+      ]
+    : worker
+      ? [
+          [m.act.workerDetail, centerPath(mfcId, `workers/${encodeURIComponent(worker)}`)],
+          [m.act.workerAssignments, `${centerPath(mfcId, 'assignments')}?workerId=${encodeURIComponent(worker)}`],
+          [m.act.assign, `${centerPath(mfcId, 'assignments')}?tab=manual`],
+        ]
+      : [
+          [m.act.tasks, centerPath(mfcId, 'tasks')],
+          [m.act.assignments, centerPath(mfcId, 'assignments')],
+          [m.act.count, `${centerPath(mfcId, 'inventory')}?tab=counts`],
+        ];
+  return (
+    <div className="border-t border-base-300 p-3" data-testid="floor-actions">
+      <p className="mb-2 text-xs font-bold text-base-content/55">{m.act.title}</p>
+      <div className="grid gap-1.5">
+        {links.map(([label, to]) => (
+          <Link key={label} to={to} className="btn btn-sm pm-action justify-start">
+            {label}
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -55,7 +91,7 @@ function PanelHead({ title, sub, onClose }: { readonly title: string; readonly s
   return (
     <div className="mb-3 flex items-start justify-between gap-2">
       <div className="min-w-0">
-        <h2 className="truncate text-lg font-bold tracking-tight">{title}</h2>
+        <h2 className="truncate text-base font-bold tracking-tight">{title}</h2>
         <p className="text-xs text-base-content/55">{sub}</p>
       </div>
       <button type="button" className="btn btn-ghost btn-xs" onClick={onClose} aria-label={m.close}>
@@ -182,9 +218,6 @@ function WorkerPanel({ mfcId, workerId, onClose }: { readonly mfcId: string; rea
           </dl>
           <TaskList title={m.running} empty={m.noRunning} list={running} mfcId={mfcId} failed={tasks.isError} testId="worker-running" />
           <TaskList title={m.planned} empty={m.noPlanned} list={planned} mfcId={mfcId} failed={tasks.isError} testId="worker-planned" />
-          <Link to={centerPath(mfcId, `workers/${encodeURIComponent(workerId)}`)} className="btn btn-sm pm-action mt-4 w-full">
-            {m.toWorker}
-          </Link>
         </>
       )}
     </div>

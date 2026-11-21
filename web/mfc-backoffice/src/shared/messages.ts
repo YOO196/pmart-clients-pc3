@@ -219,6 +219,17 @@ export const messages = {
     order: (no: string) => `주문 ${no}`,
     promise: (t: string) => `약속 ${t}`,
     toWorker: '작업자 상세로',
+    act: {
+      title: '할 수 있는 일',
+      rackLocations: '이 온도대 칸 목록',
+      count: '순환 실사',
+      move: '이동·보충 지시',
+      workerDetail: '작업자 상세로',
+      workerAssignments: '이 작업자 배정 내역',
+      assign: '작업 직접 배정',
+      tasks: '작업 현황',
+      assignments: '배정',
+    },
   },
 
   /** 센터 대시보드(features/dashboard, 2026-11-21) — 숫자·14일 추이, 기존 지표 API 만 */
