@@ -4,10 +4,12 @@
 // - 피킹 줄·결품률 14일: mfc-fulfillment `GET /metrics/picking-lines`(0건 날짜 줄 없음 = 0줄). 결품률 = shortLines ÷ pickedLines, 분모 0 은 "—".
 // - 결품 많은 상품: `/metrics/picking-lines/by-sku?sort=shortLines&limit=5`. 정시 배송률: delivery-dispatch `/metrics/on-time-deliveries`(onTime ÷ due).
 // - 작업·인력: 홈과 같은 끝나지 않은 작업·작업자. 배송 상태: bff live-delivery 50건(넘으면 안내).
+// - 추이 패널(그래프·결품 많은 상품)은 고른 기간(URL ?from=&to=, 기본 14일, 최대 92일 — 정시 배송은 31일씩 나눠 읽음). 지표 칸은 늘 오늘·14일.
+//   그래프를 끌면 그 구간으로 확대, Ctrl+Z 는 바로 전 기간으로(브라우저 메모리 — 새로고침하면 처음부터).
 // - 알림 피드·우선 확인: 홈 원천(useOps — 출하 약속·인계 확인·피킹 파손 사고)과 배차 지연(useDispatchDelays) — 같은 쿼리 키라 두 번 읽지 않는다.
 import { useQuery } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
 import { formatSeoul } from '@pmart/web-ui';
@@ -21,7 +23,7 @@ import { OPS_REFRESH_MS } from '../ops/opsQueries';
 import { minutesText, promiseRows, seoulToday } from '../ops/opsRules';
 import { AreaChart, BarList, type Column } from './charts';
 import { FloorMap } from './FloorMap';
-import { DAYS, lastDays, rate, rateText, shortDate } from './dashboardRules';
+import { addDays, chunks, DAYS, daysIn, lastDays, MAX_RANGE, ON_TIME_CHUNK, RANGE_PRESETS, rate, rateText, shortDate, spanDays, validRange, type Range } from './dashboardRules';
 
 const m = messages.dashboard;
 const LIVE_SIZE = 50;
@@ -34,6 +36,33 @@ const shortAt = (iso: string, today: string) => {
   const day = seoulToday(t);
   return day === today ? hm.format(t) : `${md.format(t).replace(/\.\s?/g, '/').replace(/\/$/, '')} ${hm.format(t)}`;
 };
+
+type Api = ReturnType<typeof useApi>;
+/** 정시 배송 — 계약 상한 31일이라 나눠 읽고 합친다(asOf 는 가장 이른 것) */
+async function fetchOnTime(api: Api, mfcId: string, r: Range) {
+  const parts = await Promise.all(
+    chunks(r, ON_TIME_CHUNK).map((c) => request('GET', api.dispatch.GET('/metrics/on-time-deliveries', { params: { query: { from: c.from, to: c.to, mfcId } } }))),
+  );
+  return { items: parts.flatMap((x) => x.items ?? []), asOf: parts.map((x) => x.asOf).sort()[0] };
+}
+
+/** 추이 패널 — 고른 기간 */
+function useTrend(mfcId: string, r: Range) {
+  const api = useApi();
+  const common = { refetchInterval: OPS_REFRESH_MS } as const;
+  const picking = useQuery({
+    ...common,
+    queryKey: ['dashboard', mfcId, 'picking-lines', r.from, r.to],
+    queryFn: () => request('GET', api.fulfillment.GET('/metrics/picking-lines', { params: { query: { from: r.from, to: r.to, mfcId } } })),
+  });
+  const bySku = useQuery({
+    ...common,
+    queryKey: ['dashboard', mfcId, 'by-sku', r.from, r.to],
+    queryFn: () => request('GET', api.fulfillment.GET('/metrics/picking-lines/by-sku', { params: { query: { from: r.from, to: r.to, mfcId, sort: 'shortLines', limit: 5 } } })),
+  });
+  const onTime = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'on-time', r.from, r.to], queryFn: () => fetchOnTime(api, mfcId, r) });
+  return { picking, bySku, onTime };
+}
 
 function useDashboard(mfcId: string) {
   const api = useApi();
@@ -48,16 +77,7 @@ function useDashboard(mfcId: string) {
     queryKey: ['dashboard', mfcId, 'picking-lines', from, today],
     queryFn: () => request('GET', api.fulfillment.GET('/metrics/picking-lines', { params: { query: { from, to: today, mfcId } } })),
   });
-  const bySku = useQuery({
-    ...common,
-    queryKey: ['dashboard', mfcId, 'by-sku', from, today],
-    queryFn: () => request('GET', api.fulfillment.GET('/metrics/picking-lines/by-sku', { params: { query: { from, to: today, mfcId, sort: 'shortLines', limit: 5 } } })),
-  });
-  const onTime = useQuery({
-    ...common,
-    queryKey: ['dashboard', mfcId, 'on-time', from, today],
-    queryFn: () => request('GET', api.dispatch.GET('/metrics/on-time-deliveries', { params: { query: { from, to: today, mfcId } } })),
-  });
+  const onTime = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'on-time', from, today], queryFn: () => fetchOnTime(api, mfcId, { from, to: today }) });
   const workers = useQuery({
     ...common,
     queryKey: ['dashboard', mfcId, 'workers'],
@@ -70,7 +90,7 @@ function useDashboard(mfcId: string) {
   });
   const ops = useOps(mfcId);
   const delays = useDispatchDelays(mfcId);
-  return { nowMs, today, days, picking, bySku, onTime, workers, live, ops, delays };
+  return { nowMs, today, days, picking, onTime, workers, live, ops, delays };
 }
 
 export function DashboardMenu({ mfcId }: { readonly mfcId: string }) {
@@ -80,9 +100,53 @@ export function DashboardMenu({ mfcId }: { readonly mfcId: string }) {
 type ChartKind = 'picked' | 'shortRate' | 'onTime';
 
 function Dashboard({ mfcId }: { readonly mfcId: string }) {
-  const { nowMs, today, days, picking, bySku, onTime, workers, live, ops, delays } = useDashboard(mfcId);
+  const { nowMs, today, days, picking, onTime, workers, live, ops, delays } = useDashboard(mfcId);
   const { tasks, damages, handovers } = ops;
   const [chart, setChart] = useState<ChartKind>('picked');
+
+  // 추이 기간 — URL(?from=&to=), 맞지 않으면 기본 14일. 바꿀 때마다 앞 기간을 쌓아 Ctrl+Z 로 되돌린다
+  const [params, setParams] = useSearchParams();
+  const range: Range = validRange(params.get('from'), params.get('to'), today) ?? { from: days[0] ?? today, to: today };
+  const span = spanDays(range);
+  const [history, setHistory] = useState<readonly Range[]>([]);
+  const setRange = (next: Range) =>
+    setParams(
+      (p) => {
+        const q = new URLSearchParams(p);
+        q.set('from', next.from);
+        q.set('to', next.to);
+        return q;
+      },
+      { replace: true },
+    );
+  const applyRange = (next: Range) => {
+    if (next.from === range.from && next.to === range.to) return;
+    setHistory((h) => [...h, range].slice(-30));
+    setRange(next);
+  };
+  const back = () => {
+    const prev = history.at(-1);
+    if (!prev) return;
+    setHistory((h) => h.slice(0, -1));
+    setRange(prev);
+  };
+  // Ctrl+Z(⌘Z) — 입력칸에서 누른 것은 입력칸 되돌리기로 둔다
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== 'z') return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return;
+      if (history.length === 0) return;
+      e.preventDefault();
+      back();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+  const trend = useTrend(mfcId, range);
+  const tDays = daysIn(range);
+  const tPick = new Map((trend.picking.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [i.date, i]));
+  const tOnTime = new Map((trend.onTime.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [i.date, i]));
 
   // 날짜별 — 피킹은 줄이 없으면 0줄(계약), 정시 배송은 줄이 없으면 due 0(비율 "—")
   const pickRow = new Map((picking.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [i.date, i]));
@@ -91,16 +155,26 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
     const r = pickRow.get(d);
     return { key: d, label: shortDate(d), value: r?.pickedLines ?? 0, tip: m.pickTip(shortDate(d), r?.pickedLines ?? 0, r?.shortLines ?? 0) };
   });
-  const shortCols: Column[] = days.map((d) => {
+  const shortKpi = days.map((d) => {
     const r = pickRow.get(d);
+    return rate(r?.shortLines ?? 0, r?.pickedLines ?? 0) ?? 0;
+  });
+  const tPickedCols: Column[] = tDays.map((d) => {
+    const r = tPick.get(d);
+    return { key: d, label: shortDate(d), value: r?.pickedLines ?? 0, tip: m.pickTip(shortDate(d), r?.pickedLines ?? 0, r?.shortLines ?? 0) };
+  });
+  const shortCols: Column[] = tDays.map((d) => {
+    const r = tPick.get(d);
     const v = rate(r?.shortLines ?? 0, r?.pickedLines ?? 0);
     return { key: d, label: shortDate(d), value: v, tip: m.shortTip(shortDate(d), rateText(v), r?.shortLines ?? 0, r?.pickedLines ?? 0) };
   });
-  const onTimeCols: Column[] = days.map((d) => {
-    const r = onTimeRow.get(d);
+  const onTimeCols: Column[] = tDays.map((d) => {
+    const r = tOnTime.get(d);
     const v = rate(r?.onTime ?? 0, r?.due ?? 0);
     return { key: d, label: shortDate(d), value: v, tip: m.onTimeTip(shortDate(d), rateText(v), r?.onTime ?? 0, r?.due ?? 0, r?.late ?? 0) };
   });
+
+  const zoom = (from: string, to: string) => applyRange({ from, to });
 
   const todayPick = pickRow.get(today);
   const todayOnTime = onTimeRow.get(today);
@@ -177,7 +251,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const feedPartial = tasks.isError || delays.isError || handovers.isError || damages.isError;
 
   const asOf = picking.data?.asOf ?? tasks.data?.asOf ?? null;
-  const refetchAll = () => [picking, bySku, onTime, workers, live, tasks, damages, handovers, delays].forEach((q) => void q.refetch());
+  const refetchAll = () => [picking, trend.picking, trend.bySku, trend.onTime, onTime, workers, live, tasks, damages, handovers, delays].forEach((q) => void q.refetch());
 
   return (
     <section className="@container space-y-3">
@@ -218,7 +292,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           q={picking}
           value={rateText(rate(todayPick?.shortLines ?? 0, todayPick?.pickedLines ?? 0))}
           foot={m.kpi.periodRate(DAYS, rateText(rate(periodPick.short, periodPick.picked)))}
-          trend={shortCols.map((c) => c.value ?? 0)}
+          trend={shortKpi}
         />
         <Kpi
           testId="kpi-on-time"
@@ -256,10 +330,11 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
         </Panel>
         <Panel
           className="@5xl:col-span-5"
-          title={m.chart.trend(DAYS)}
+          title={m.chart.trend(shortDate(range.from), shortDate(range.to), span)}
           sub={chart === 'onTime' ? m.chart.onTimeNote : m.chart.pickSub}
           {...(chart === 'onTime' ? { help: m.chart.onTimeHelp } : {})}
-          q={chart === 'onTime' ? onTime : picking}
+          q={chart === 'onTime' ? trend.onTime : trend.picking}
+          toolbar={<RangeBar range={range} today={today} canBack={history.length > 0} onChange={applyRange} onBack={back} />}
           aside={
             <div className="pm-seg" role="group" aria-label={m.chart.pickToggle}>
               {(['picked', 'shortRate', 'onTime'] as const).map((k) => (
@@ -270,20 +345,21 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
             </div>
           }
         >
+          {/* key 에 기간 — 기간이 바뀌면 새로 그려 가로축에서 다시 차오른다 */}
           {chart === 'onTime' ? (
-            <AreaChart title={m.chart.onTime(DAYS)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} />
+            <AreaChart key={`o-${range.from}-${range.to}`} title={m.chart.onTime(span)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} onRange={zoom} />
           ) : chart === 'picked' ? (
-            <AreaChart title={m.chart.picked(DAYS)} columns={pickedCols} format={(v) => m.lines(v)} testId="chart-picked" />
+            <AreaChart key={`p-${range.from}-${range.to}`} title={m.chart.picked(span)} columns={tPickedCols} format={(v) => m.lines(v)} testId="chart-picked" onRange={zoom} />
           ) : (
-            <AreaChart title={m.chart.shortRate(DAYS)} columns={shortCols} format={(v) => rateText(v)} testId="chart-short-rate" />
+            <AreaChart key={`s-${range.from}-${range.to}`} title={m.chart.shortRate(span)} columns={shortCols} format={(v) => rateText(v)} testId="chart-short-rate" onRange={zoom} />
           )}
-          <SubList title={m.chart.topShort(DAYS)} q={bySku} link={{ to: centerPath(mfcId, 'inventory'), text: m.toInventory }}>
-            {(bySku.data?.items ?? []).length === 0 ? (
+          <SubList title={m.chart.topShort(span)} q={trend.bySku} link={{ to: centerPath(mfcId, 'inventory'), text: m.toInventory }}>
+            {(trend.bySku.data?.items ?? []).length === 0 ? (
               <p className="text-sm text-base-content/55">{m.noShort}</p>
             ) : (
               <BarList
                 testId="top-short"
-                rows={(bySku.data?.items ?? []).map((s) => ({ key: s.sku, label: s.productName ?? s.sku, value: s.shortLines, text: m.shortOf(s.shortLines, s.pickedLines) }))}
+                rows={(trend.bySku.data?.items ?? []).map((s) => ({ key: s.sku, label: s.productName ?? s.sku, value: s.shortLines, text: m.shortOf(s.shortLines, s.pickedLines) }))}
               />
             )}
           </SubList>
@@ -494,6 +570,80 @@ function Kpi({
 }
 
 /** 패널 — 머리(제목·작은 설명·오른쪽 조작) + 본문. 기본은 12칸 전체, 넓으면 className 의 칸 수 */
+/** 추이 기간 바 — 빠른 단추(오늘까지 n일)·시작일·끝일·이전 기간 */
+function RangeBar({
+  range,
+  today,
+  canBack,
+  onChange,
+  onBack,
+}: {
+  readonly range: Range;
+  readonly today: string;
+  readonly canBack: boolean;
+  readonly onChange: (r: Range) => void;
+  readonly onBack: () => void;
+}) {
+  const r = m.range;
+  const [error, setError] = useState<string | null>(null);
+  const pick = (from: string, to: string) => {
+    const ok = validRange(from, to, today);
+    if (!ok) {
+      setError(from && to && from <= to && to <= today ? r.tooLong(MAX_RANGE) : r.bad);
+      return;
+    }
+    setError(null);
+    onChange(ok);
+  };
+  return (
+    <div className="mb-2 space-y-1" data-testid="range-bar">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <div className="pm-seg" role="group" aria-label={r.label}>
+          {RANGE_PRESETS.map((n) => (
+            <button key={n} type="button" aria-pressed={range.to === today && spanDays(range) === n} onClick={() => pick(addDays(today, -(n - 1)), today)}>
+              {r.days(n)}
+            </button>
+          ))}
+        </div>
+        <input
+          type="date"
+          className="input input-xs pm-mono w-[8.6rem]"
+          aria-label={r.from}
+          value={range.from}
+          max={range.to}
+          onChange={(e) => {
+            if (e.target.value) pick(e.target.value, range.to);
+          }}
+        />
+        <span className="text-xs text-base-content/45">–</span>
+        <input
+          type="date"
+          className="input input-xs pm-mono w-[8.6rem]"
+          aria-label={r.to}
+          value={range.to}
+          min={range.from}
+          max={today}
+          onChange={(e) => {
+            if (e.target.value) pick(range.from, e.target.value);
+          }}
+        />
+      </div>
+      <div className="flex min-h-6 items-center justify-between gap-2">
+        {error ? (
+          <p role="alert" className="text-xs text-error">
+            {error}
+          </p>
+        ) : (
+          <p className="truncate text-[11px] text-base-content/45">{r.hint}</p>
+        )}
+        <button type="button" className="btn btn-xs btn-ghost shrink-0" disabled={!canBack} onClick={onBack} title={r.backHint} data-testid="range-back">
+          ↶ {r.back}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Panel({
   title,
   sub,
@@ -502,8 +652,11 @@ function Panel({
   help,
   className = '',
   flush = false,
+  toolbar,
   children,
 }: {
+  /** 머리 아래, 읽는 중·실패와 상관없이 늘 보이는 줄(예: 기간 바) */
+  readonly toolbar?: ReactNode;
   readonly title: string;
   readonly sub?: string;
   /** 설명 전체(마우스를 올리면) — 머리에는 짧은 sub 만 */
@@ -528,6 +681,7 @@ function Panel({
         </div>
         {aside && <div className="shrink-0">{aside}</div>}
       </header>
+      {toolbar && <div className="px-4">{toolbar}</div>}
       <div className={flush ? 'pb-1' : 'px-4 pb-4'}>
         {q.isPending ? (
           <p className={`text-sm text-base-content/40 ${flush ? 'px-4 pb-3' : ''}`}>…</p>
