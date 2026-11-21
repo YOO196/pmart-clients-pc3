@@ -22,7 +22,8 @@ import { useDispatchDelays } from '../delivery/DispatchDelayPage';
 import { useOps } from '../ops/OpsBoard';
 import { OPS_REFRESH_MS } from '../ops/opsQueries';
 import { minutesText, promiseRows, seoulToday } from '../ops/opsRules';
-import { AreaChart, BarList, type Column } from './charts';
+import { AreaChart, BarList, Heatmap, type Column, type StackSeries } from './charts';
+import { SIM_CATEGORIES, SIM_PRODUCTS, simAt } from './orderSim';
 import { FloorMap } from './FloorMap';
 import { env } from '../../env';
 import {
@@ -52,6 +53,13 @@ import {
 } from './dashboardRules';
 
 const m = messages.dashboard;
+/** 결품 사유 색 — 범주 색 4개(index.css --pm-cat-1~4, 색약 구분 검사 통과), 상태색(빨강·초록)은 쓰지 않는다 */
+const REASON_COLOR = {
+  SHORT: 'var(--pm-cat-1)',
+  DAMAGED: 'var(--pm-cat-2)',
+  SPOILED: 'var(--pm-cat-3)',
+  BLOCKED: 'var(--pm-cat-4)',
+} as const;
 const LIVE_SIZE = 50;
 const FEED_ROWS = 5;
 const hm = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
@@ -127,12 +135,14 @@ export function DashboardMenu({ mfcId }: { readonly mfcId: string }) {
   return <Dashboard key={mfcId} mfcId={mfcId} />;
 }
 
-type ChartKind = 'picked' | 'shortRate' | 'onTime';
+type ChartKind = 'orders' | 'sales' | 'picked' | 'shortRate' | 'onTime';
+const KINDS: readonly ChartKind[] = ['orders', 'sales', 'picked', 'shortRate', 'onTime'];
 
 function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const { nowMs, today, days, picking, onTime, workers, live, ops, delays } = useDashboard(mfcId);
   const { tasks, damages, handovers } = ops;
-  const [chart, setChart] = useState<ChartKind>('picked');
+  // 주문·매출은 목에서만(시뮬레이션) — 실서버 기본은 피킹 줄
+  const [chart, setChart] = useState<ChartKind>(env.isMock ? 'orders' : 'picked');
 
   // 추이 기간·칸 단위 — URL(?from=&to=&unit=), 맞지 않으면 기본 14일·일. 바꿀 때마다 앞 상태를 쌓아 Ctrl+Z 로 되돌린다
   const [params, setParams] = useSearchParams();
@@ -215,10 +225,99 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const sums = tBuckets.map((b) => ({ b, t: sumOf(b) }));
   const tipLabel = (b: Bucket) => (b.hour !== undefined ? `${shortDate(b.from)} ${b.hour}시` : b.from === b.to ? shortDate(b.from) : `${b.label} (${shortDate(b.from)}–${shortDate(b.to)})`);
   const tPickedCols: Column[] = sums.map(({ b, t }) => ({ key: b.key, label: b.label, value: t.picked, tip: m.pickTip(tipLabel(b), t.picked, t.short) }));
-  const shortCols: Column[] = sums.map(({ b, t }) => {
-    const v = rate(t.short, t.picked);
-    return { key: b.key, label: b.label, value: v, tip: m.shortTip(tipLabel(b), rateText(v), t.short, t.picked) };
+  // 결품 — 사유별 쌓은 막대(드문 사건이라 비율 선보다 "몇 줄·왜"). 사유 합은 결품 줄보다 클 수 있다(계약)
+  const REASONS = ['SHORT', 'DAMAGED', 'SPOILED', 'BLOCKED'] as const;
+  const reasonSeries: StackSeries[] = REASONS.map((k) => ({ key: k, name: m.chart.reason[k], color: REASON_COLOR[k] }));
+  const reasonVals = tBuckets.map((b) =>
+    REASONS.map((k) => {
+      let v = 0;
+      for (let d = b.from; d <= b.to; d = addDays(d, 1)) {
+        const n = tPick.get(d)?.shortLinesByReason[k] ?? 0;
+        v += b.hour === undefined ? n : hourShare(n, b.hour, d === today ? nowHour : 23);
+      }
+      return v;
+    }),
+  );
+  const shortBarCols: Column[] = tBuckets.map((b, i) => {
+    const vals = reasonVals[i]!;
+    const total = vals.reduce((a, c) => a + c, 0);
+    const parts = REASONS.map((k, j) => (vals[j]! > 0 ? `${m.chart.reason[k]} ${vals[j]}` : '')).filter(Boolean).join(' · ');
+    return { key: b.key, label: b.label, value: total, tip: m.chart.shortBarTip(tipLabel(b), parts, total) };
   });
+  const periodShort = sums.reduce((a, { t }) => ({ s: a.s + t.short, p: a.p + t.picked }), { s: 0, p: 0 });
+
+  // 주문·매출(목 시뮬레이션) — 카테고리·상품 거르기는 URL(?cat=&sku=)
+  const cat = params.get('cat');
+  const sku = params.get('sku');
+  const product = SIM_PRODUCTS.find((x) => x.sku === sku) ?? null;
+  const filter = { category: product ? null : cat, sku: product?.sku ?? null };
+  const setFilter = (next: { readonly cat?: string | null; readonly sku?: string | null }) =>
+    setParams(
+      (p) => {
+        const q = new URLSearchParams(p);
+        for (const [k, v] of Object.entries(next)) {
+          if (v) q.set(k, v);
+          else q.delete(k);
+        }
+        return q;
+      },
+      { replace: true },
+    );
+  const ordersView = chart === 'orders' || chart === 'sales';
+  const simOn = hourOk && ordersView;
+  const simSum = (b: Bucket) => {
+    const acc = { orders: 0, amount: 0 };
+    for (let d = b.from; d <= b.to; d = addDays(d, 1)) {
+      const hours = b.hour !== undefined ? [b.hour] : Array.from({ length: d === today ? nowHour + 1 : 24 }, (_, h) => h);
+      for (const h of hours) {
+        const v = simAt(d, h, filter);
+        acc.orders += v.orders;
+        acc.amount += v.amount;
+      }
+    }
+    return acc;
+  };
+  const simCols: Column[] = simOn
+    ? tBuckets.map((b) => {
+        const v = simSum(b);
+        return chart === 'sales'
+          ? { key: b.key, label: b.label, value: v.amount, tip: m.chart.salesTip(tipLabel(b), v.amount) }
+          : { key: b.key, label: b.label, value: v.orders, tip: product ? m.chart.qtyTip(tipLabel(b), v.orders) : m.chart.orderTip(tipLabel(b), v.orders) };
+      })
+    : [];
+  // 요일 × 시간 평균(그 기간에 그 요일이 몇 번 있었나로 나눔)
+  const heat = (() => {
+    if (!simOn) return null;
+    const sum = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+    const seen = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+    for (let d = range.from; d <= range.to; d = addDays(d, 1)) {
+      const wd = (new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7;
+      for (let h = 0; h < (d === today ? nowHour + 1 : 24); h++) {
+        const v = simAt(d, h, filter);
+        sum[wd]![h]! += chart === 'sales' ? v.amount : v.orders;
+        seen[wd]![h]! += 1;
+      }
+    }
+    return sum.map((row, wd) => row.map((v, h) => (seen[wd]![h]! > 0 ? Math.round(v / seen[wd]![h]!) : 0)));
+  })();
+  const topSold = simOn
+    ? SIM_PRODUCTS.filter((x) => !cat || x.category === cat)
+        .map((x) => {
+          let qty = 0;
+          let amount = 0;
+          for (let d = range.from; d <= range.to; d = addDays(d, 1))
+            for (let h = 0; h < (d === today ? nowHour + 1 : 24); h++) {
+              const v = simAt(d, h, { sku: x.sku });
+              qty += v.orders;
+              amount += v.amount;
+            }
+          return { x, qty, amount };
+        })
+        .sort((a, b) => (chart === 'sales' ? b.amount - a.amount : b.qty - a.qty))
+        .slice(0, 5)
+    : [];
+  const won = (v: number) => (v >= 10_000 ? `${Math.round(v / 10_000).toLocaleString('ko-KR')}만원` : `${v.toLocaleString('ko-KR')}원`);
+
   const onTimeCols: Column[] = sums.map(({ b, t }) => {
     const v = rate(t.onTime, t.due);
     return { key: b.key, label: b.label, value: v, tip: m.onTimeTip(tipLabel(b), rateText(v), t.onTime, t.due, t.late) };
@@ -386,30 +485,126 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
         <Panel
           className="@5xl:col-span-5"
           title={m.chart.trend(shortDate(range.from), shortDate(range.to), span, m.range.unit[unit])}
-          sub={chart === 'onTime' ? m.chart.onTimeNote : m.chart.pickSub}
+          sub={
+            chart === 'onTime'
+              ? m.chart.onTimeNote
+              : ordersView
+                ? m.chart.ordersSub
+                : chart === 'shortRate'
+                  ? m.chart.shortSub(rateText(rate(periodShort.s, periodShort.p)))
+                  : m.chart.pickSub
+          }
           {...(chart === 'onTime' ? { help: m.chart.onTimeHelp } : {})}
-          q={chart === 'onTime' ? trend.onTime : trend.picking}
+          q={chart === 'onTime' ? trend.onTime : ordersView ? { isPending: false, isError: false } : trend.picking}
           toolbar={
             <RangeBar range={range} unit={unit} units={allowed} hourOk={hourOk} today={today} canBack={wider !== null} onChange={applyRange} onBack={widen} />
           }
           aside={
             <div className="pm-seg" role="group" aria-label={m.chart.pickToggle}>
-              {(['picked', 'shortRate', 'onTime'] as const).map((k) => (
+              {KINDS.map((k) => (
                 <button key={k} type="button" aria-pressed={chart === k} onClick={() => setChart(k)}>
-                  {k === 'picked' ? m.chart.pickedShort : k === 'shortRate' ? m.chart.shortRateShort : m.chart.onTimeShort}
+                  {
+                    {
+                      orders: m.chart.ordersShort,
+                      sales: m.chart.salesShort,
+                      picked: m.chart.pickedShort,
+                      shortRate: m.chart.shortRateShort,
+                      onTime: m.chart.onTimeShort,
+                    }[k]
+                  }
                 </button>
               ))}
             </div>
           }
         >
           {/* key 에 기간 — 기간이 바뀌면 새로 그려 가로축에서 다시 차오른다 */}
-          {chart === 'onTime' ? (
+          {ordersView ? (
+            !simOn ? (
+              <p role="status" className="rounded-field border border-dashed border-base-300 p-4 text-sm text-base-content/65" data-testid="orders-no-api">
+                {m.chart.ordersNoApi}
+              </p>
+            ) : (
+              <>
+                <div className="mb-2 flex flex-wrap items-center gap-1.5" data-testid="orders-filter">
+                  <span className="badge badge-accent badge-sm">{m.chart.simBadge}</span>
+                  <select
+                    className="select select-xs w-auto"
+                    aria-label={m.chart.category}
+                    value={product ? product.category : (cat ?? '')}
+                    onChange={(e) => setFilter({ cat: e.target.value || null, sku: null })}
+                  >
+                    <option value="">{m.chart.allCategories}</option>
+                    {SIM_CATEGORIES.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select className="select select-xs w-auto max-w-[11rem]" aria-label={m.chart.product} value={sku ?? ''} onChange={(e) => setFilter({ sku: e.target.value || null })}>
+                    <option value="">{m.chart.allProducts}</option>
+                    {SIM_PRODUCTS.filter((x) => !(product ? product.category : cat) || x.category === (product ? product.category : cat)).map((x) => (
+                      <option key={x.sku} value={x.sku}>
+                        {x.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <AreaChart
+                  key={`${chart}-${range.from}-${range.to}-${unit}-${cat ?? ''}-${sku ?? ''}`}
+                  title={chart === 'sales' ? m.chart.sales(span) : m.chart.orders(span)}
+                  columns={simCols}
+                  format={(v) => (chart === 'sales' ? won(v) : product ? `${v.toLocaleString('ko-KR')}개` : m.count(v))}
+                  testId={chart === 'sales' ? 'chart-sales' : 'chart-orders'}
+                  onRange={zoom}
+                />
+              </>
+            )
+          ) : chart === 'onTime' ? (
             <AreaChart key={`o-${range.from}-${range.to}-${unit}`} title={m.chart.onTime(span)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} onRange={zoom} />
           ) : chart === 'picked' ? (
             <AreaChart key={`p-${range.from}-${range.to}-${unit}`} title={m.chart.picked(span)} columns={tPickedCols} format={(v) => m.lines(v)} testId="chart-picked" onRange={zoom} />
           ) : (
-            <AreaChart key={`s-${range.from}-${range.to}-${unit}`} title={m.chart.shortRate(span)} columns={shortCols} format={(v) => rateText(v)} testId="chart-short-rate" onRange={zoom} />
+            <AreaChart
+              key={`s-${range.from}-${range.to}-${unit}`}
+              title={m.chart.shortBars(span)}
+              columns={shortBarCols}
+              format={(v) => m.lines(Math.round(v))}
+              testId="chart-short"
+              onRange={zoom}
+              stack={{ series: reasonSeries, values: reasonVals }}
+            />
           )}
+          {ordersView ? (
+            heat && (
+              <div className="mt-4 space-y-4 border-t border-base-300 pt-3">
+                <Heatmap title={m.chart.heatTitle(chart === 'sales' ? m.chart.salesShort : m.chart.ordersShort)} cells={heat} format={(v) => (chart === 'sales' ? won(v) : m.count(v))} testId="order-heat" />
+                <div>
+                  <p className="mb-1.5 flex items-baseline justify-between text-xs">
+                    <span className="font-semibold text-base-content/80">{m.chart.topSold(span)}</span>
+                    <span className="text-base-content/45">{m.chart.topSoldHint}</span>
+                  </p>
+                  <ul className="space-y-1" data-testid="top-sold">
+                    {topSold.map(({ x, qty, amount }) => (
+                      <li key={x.sku}>
+                        <button
+                          type="button"
+                          className={`grid w-full grid-cols-[1fr_auto] items-center gap-2 rounded-field px-1.5 py-0.5 text-left text-sm transition-colors hover:bg-primary/8 ${sku === x.sku ? 'bg-primary/12' : ''}`}
+                          aria-pressed={sku === x.sku}
+                          onClick={() => setFilter({ sku: sku === x.sku ? null : x.sku, cat: null })}
+                          data-testid="top-sold-row"
+                        >
+                          <span className="truncate">{x.name}</span>
+                          <span className="pm-mono text-xs text-base-content/70">
+                            {qty.toLocaleString('ko-KR')}개 · {won(amount)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )
+          ) : (
           <SubList title={m.chart.topShort(spanDays(skuRangeOf(range)))} q={trend.bySku} link={{ to: centerPath(mfcId, 'inventory'), text: m.toInventory }}>
             {(trend.bySku.data?.items ?? []).length === 0 ? (
               <p className="text-sm text-base-content/55">{m.noShort}</p>
@@ -420,6 +615,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
               />
             )}
           </SubList>
+          )}
         </Panel>
 
         {/* 알림 피드 · 지금 작업과 인력 */}

@@ -372,3 +372,18 @@ html[data-theme='pmart-dark'] [data-testid='side-menu'] nav ul a > span:first-ch
 @media (prefers-reduced-motion: reduce) {
   .pm-brush-snap { transition: none; }
 }
+
+/* 범주 색(쌓은 막대 등 — 결품 사유) — dataviz 기준 팔레트 앞 4칸(파랑·주황·청록·노랑), 밝은/어두운 따로 골라 검사(validate_palette: 어두운 면 #131722 모두 통과,
+   밝은 면은 청록·노랑 대비 3:1 미만 → 범례·표로 보기를 늘 함께). 상태색(성공·경고·오류)과 섞지 않는다 */
+:root {
+  --pm-cat-1: #2a78d6;
+  --pm-cat-2: #eb6834;
+  --pm-cat-3: #1baf7a;
+  --pm-cat-4: #eda100;
+}
+html[data-theme='pmart-dark'] {
+  --pm-cat-1: #3987e5;
+  --pm-cat-2: #d95926;
+  --pm-cat-3: #199e70;
+  --pm-cat-4: #c98500;
+}
