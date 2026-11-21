@@ -826,4 +826,18 @@ export function seedDemoFloor() {
   ['DSP-A-01', 'DSP-A-02', 'DSP-C-03'].forEach((c) => add(c, 'DISPATCH_STAGING', c.includes('-C-') ? 'CHILLED' : 'AMBIENT'));
   add('RTN-A-01', 'RETURN', 'AMBIENT');
   add('DSL-A-01', 'DISPOSAL', 'AMBIENT');
+  // 도면 위 작업자 점(시뮬레이션)이 비어 보이지 않게 시연 작업자 — 업무만 다르게
+  const demo: Array<[string, string, Partial<MockWorker> & { taskTypes?: readonly TaskType[] }]> = [
+    ['OP-demo-1', '강피커', { taskTypes: ['PICK', 'PACK'] }],
+    ['OP-demo-2', '윤피커', { taskTypes: ['PICK'] }],
+    ['OP-demo-3', '임피커', { taskTypes: ['PICK', 'PACK'] }],
+    ['OP-demo-4', '한피커', { taskTypes: ['PICK'] }],
+    ['OP-demo-5', '오피커', { taskTypes: ['PICK', 'PACK'] }],
+    ['OP-demo-6', '서포장', { taskTypes: ['PACK'] }],
+    ['OP-demo-7', '권포장', { taskTypes: ['PACK'] }],
+    ['OP-demo-8', '황입고', { taskTypes: ['PUTAWAY'] }],
+    ['OP-demo-9', '안입고', { taskTypes: ['PUTAWAY'] }],
+    ['OP-demo-10', '조휴게', { taskTypes: ['PICK'], onBreak: true }],
+  ];
+  for (const [id, name, extra] of demo) if (!db.workers.has(id)) db.workers.set(...worker(id, name, extra));
 }
