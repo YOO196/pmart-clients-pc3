@@ -2,7 +2,7 @@
 // - 얇은 막대·끝 둥글게(4px)·막대 사이 2px, 격자·축은 흐리게. 값 글자는 글자색(계열 색 아님).
 // - 막대마다 마우스·키보드 초점에 말풍선(tip). 값이 없는 날(분모 0 — 비율을 낼 수 없음)은 막대 없이 "—" 표시(0 과 구분).
 // - 그림 아래 "표로 보기"(같은 숫자 표).
-import { useState } from 'react';
+import { useState, type PointerEvent } from 'react';
 
 import { messages } from '../../shared/messages';
 
@@ -116,6 +116,7 @@ export function AreaChart({
   format,
   testId,
   fixedMax,
+  onRange,
 }: {
   readonly title: string;
   readonly columns: readonly Column[];
@@ -123,9 +124,21 @@ export function AreaChart({
   readonly testId: string;
   /** 비율처럼 축 끝이 정해진 값(예 1 = 100%) */
   readonly fixedMax?: number;
+  /** 끌어서 고른 구간(첫·끝 칸의 key) — 주면 그래프를 끌어 확대할 수 있다 */
+  readonly onRange?: (fromKey: string, toKey: string) => void;
 }) {
   const [hover, setHover] = useState<number | null>(null);
+  // 끌기: 누른 칸(a)부터 지금 칸(b)까지
+  const [drag, setDrag] = useState<{ readonly a: number; readonly b: number } | null>(null);
   const n = columns.length;
+  const canDrag = !!onRange && n > 2;
+  const colAt = (e: PointerEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return Math.min(n - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * n)));
+  };
+  const lo = drag ? Math.min(drag.a, drag.b) : 0;
+  const hi = drag ? Math.max(drag.a, drag.b) : 0;
+  const dragging = drag !== null && hi > lo;
   const max = Math.max(0, ...columns.map((c) => c.value ?? 0));
   // 눈금 끝은 보기 좋은 수(1·2·2.5·5 × 10ⁿ)로 올림 — 비율은 fixedMax(1 = 100%)
   const nice = (v: number) => {
@@ -153,10 +166,35 @@ export function AreaChart({
     <figure className="space-y-2" data-testid={testId}>
       <div className="flex items-baseline justify-end text-xs text-base-content/55">
         <span className="min-h-4 tabular-nums text-base-content/85" aria-live="polite" data-testid={`${testId}-tip`}>
-          {shown ? shown.tip : ''}
+          {dragging ? m.zoomTip(columns[lo]!.label, columns[hi]!.label, hi - lo + 1) : shown ? shown.tip : ''}
         </span>
       </div>
-      <div className="relative ml-12 h-32" onMouseLeave={() => setHover(null)}>
+      <div
+        className={`relative ml-12 h-32 ${canDrag ? 'cursor-crosshair touch-none select-none' : ''}`}
+        onMouseLeave={() => setHover(null)}
+        {...(canDrag
+          ? {
+              onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
+                if (e.button !== 0) return;
+                e.currentTarget.setPointerCapture(e.pointerId);
+                const i = colAt(e);
+                setDrag({ a: i, b: i });
+              },
+              onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
+                if (!drag) return;
+                const i = colAt(e);
+                setHover(i);
+                if (i !== drag.b) setDrag({ a: drag.a, b: i });
+              },
+              onPointerUp: () => {
+                if (dragging) onRange?.(columns[lo]!.key, columns[hi]!.key);
+                setDrag(null);
+              },
+              onPointerCancel: () => setDrag(null),
+            }
+          : {})}
+        data-testid={`${testId}-plot`}
+      >
         {/* 세로 눈금(0 · 중간 · 끝) */}
         {[0, 0.5, 1].map((g) => (
           <span key={g} className="pm-mono pointer-events-none absolute -left-12 w-11 -translate-y-1/2 truncate text-right text-[10.5px] text-base-content/45" style={{ top: `${(1 - g) * 100}%` }}>
@@ -174,8 +212,10 @@ export function AreaChart({
             <line key={g} x1="0" x2={W} y1={H * g} y2={H * g} className="stroke-base-content/10" strokeWidth="1" vectorEffect="non-scaling-stroke" />
           ))}
           <line x1="0" x2={W} y1={H} y2={H} className="stroke-base-content/25" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          {/* 처음 그릴 때·기간을 바꿀 때: 가로축에 납작하게 붙었다가 위로 차오른다(움직임 줄이기면 바로) */}
+          <g className="pm-chart-rise">
           {parts.map((p, k) => (
-            <path key={`a${k}`} d={area(p)} fill={`url(#${gid})`} />
+            <path key={`a${k}`} d={area(p)} fill={`url(#${gid})`} className="pm-chart-fill" />
           ))}
           {parts.map((p, k) => (
             <path key={`g${k}`} d={line(p)} fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="6" vectorEffect="non-scaling-stroke" />
@@ -183,9 +223,18 @@ export function AreaChart({
           {parts.map((p, k) => (
             <path key={`l${k}`} d={line(p)} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           ))}
+          </g>
         </svg>
+        {/* 끌어서 고르는 구간 */}
+        {dragging && (
+          <span
+            className="pointer-events-none absolute inset-y-0 border-x border-primary/70 bg-primary/15"
+            style={{ left: `${(lo / n) * 100}%`, width: `${((hi - lo + 1) / n) * 100}%` }}
+            data-testid={`${testId}-brush`}
+          />
+        )}
         {/* 십자선·점(HTML — 늘어난 SVG 위에서도 둥글게) */}
-        {shown && shown.value !== null && hover !== null && (
+        {!dragging && shown && shown.value !== null && hover !== null && (
           <>
             <span className="pointer-events-none absolute inset-y-0 w-px border-l border-dashed border-primary/60" style={{ left: `${((hover + 0.5) / n) * 100}%` }} />
             <span
@@ -211,10 +260,14 @@ export function AreaChart({
           ))}
         </div>
       </div>
-      <div className="pm-mono ml-12 flex text-[11px] text-base-content/50">
-        {columns.map((c, i) => (
-          <span key={c.key} className="min-w-0 flex-1 text-center">
-            {ticks.has(i) ? c.label : ''}
+      <div className="pm-mono relative ml-12 h-4 text-[11px] text-base-content/50">
+        {[...ticks].map((i) => (
+          <span
+            key={i}
+            className={`absolute top-0 whitespace-nowrap ${i === 0 ? '' : i === n - 1 ? '-translate-x-full' : '-translate-x-1/2'}`}
+            style={{ left: i === 0 ? 0 : i === n - 1 ? '100%' : `${((i + 0.5) / n) * 100}%` }}
+          >
+            {columns[i]?.label}
           </span>
         ))}
       </div>
