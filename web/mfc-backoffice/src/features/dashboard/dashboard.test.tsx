@@ -82,13 +82,13 @@ describe('센터 대시보드', () => {
     expect(screen.queryByTestId('chart-picked')).not.toBeInTheDocument();
   });
 
-  it('구역 칸 지도(B안) — 위치 서버 상태로 칸을 칠하고, 칸은 그 칸 상세로', async () => {
+  it('센터 도면(B안) — 목 모드면 재직 작업자마다 점(휴게는 휴게 역할), 실서버면 점 없이 "위치 API 없음"', async () => {
     renderAt('/c/MFC-BSN-01/dashboard');
-    const map = await screen.findByTestId('zone-map');
-    expect(within(map).getAllByTestId('zone-block').length).toBeGreaterThan(1);
+    const map = await screen.findByTestId('floor-map');
+    await waitFor(() => expect(within(map).getAllByTestId('floor-worker')).toHaveLength(3));
+    expect(within(map).getAllByTestId('floor-worker').filter((d) => d.getAttribute('data-role') === 'break')).toHaveLength(1);
+    expect(within(map).getByText('작업자 위치 시뮬레이션(목)')).toBeInTheDocument();
     expect(within(map).getByText('닫힘 2칸')).toBeInTheDocument();
-    const closed = map.querySelector('[data-state="CLOSED"]')!;
-    expect(closed.getAttribute('href')).toMatch(/^\/c\/MFC-BSN-01\/locations\//);
   });
 
   it('메뉴에 있고 누르면 대시보드', async () => {
