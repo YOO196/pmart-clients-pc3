@@ -202,8 +202,8 @@ export function FloorMap({
   const hovered = dots.find((d) => d.id === hover);
 
   return (
-    <div data-testid="floor-map">
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+    <div data-testid="floor-map" className={full ? 'relative h-full' : ''}>
+      <div className={full ? 'pointer-events-none absolute top-3 left-4 z-[1] flex flex-wrap items-center gap-2 text-xs [&>*]:pointer-events-auto' : 'mb-2 flex flex-wrap items-center gap-2 text-xs'}>
         {simulate ? <span className="badge badge-primary badge-sm">{m.simBadge}</span> : <span className="badge badge-ghost badge-sm">{m.noPositionApi}</span>}
         {locations.isError ? (
           <span className="badge badge-ghost badge-sm">{m.locFailed}</span>
@@ -213,14 +213,14 @@ export function FloorMap({
             {closed > 0 && <span className="badge badge-warning badge-sm">{m.closed(closed)}</span>}
           </>
         )}
-        <span className="ml-auto min-h-4 truncate text-base-content/70" aria-live="polite" data-testid="floor-tip">
+        <span className={`min-h-4 truncate text-base-content/70 ${full ? 'rounded-full bg-base-100/80 px-2.5 py-0.5 backdrop-blur' : 'ml-auto'}`} aria-live="polite" data-testid="floor-tip">
           {hovered ? m.tip(hovered.name, m.role[hovered.role]) : full ? m.hintFull : m.hint}
         </span>
       </div>
       <Frame mfcId={mfcId} full={full}>
         <svg
           viewBox={`-0.6 -0.6 ${FLOOR.width + 1.2} ${FLOOR.buildingDepth + 3.8}`}
-          className={`block w-full ${full ? 'h-[min(72vh,680px)]' : 'h-[min(46vh,420px)]'}`}
+          className={`block w-full ${full ? 'h-full' : 'h-[min(46vh,420px)]'}`}
           preserveAspectRatio="xMidYMid meet"
           role={full ? 'group' : 'img'}
           aria-label={m.aria}
@@ -323,9 +323,9 @@ export function FloorMap({
                   }
                 : {})}
             >
-              {on && <circle r="1.5" className="fill-none stroke-base-content" strokeWidth="0.16" />}
-              <circle r="0.95" style={{ fill: ROLE_COLOR[d.role] }} opacity="0.22" />
-              <circle r="0.48" style={{ fill: ROLE_COLOR[d.role] }} className="stroke-base-100" strokeWidth="0.14" />
+              {on && <circle r="0.95" className="fill-none stroke-base-content" strokeWidth="0.1" />}
+              <circle r="0.6" style={{ fill: ROLE_COLOR[d.role] }} opacity="0.22" />
+              <circle r="0.3" style={{ fill: ROLE_COLOR[d.role] }} className="stroke-base-100" strokeWidth="0.09" />
               <title>{m.tip(d.name, m.role[d.role])}</title>
             </g>
             );
@@ -334,7 +334,7 @@ export function FloorMap({
         <span className="pm-mono pointer-events-none absolute right-2 bottom-1.5 text-[10px] text-base-content/40">{m.scale}</span>
         {!full && <span className="pointer-events-none absolute top-2 right-2 badge badge-sm badge-primary opacity-0 transition-opacity group-hover:opacity-100">{m.openFull}</span>}
       </Frame>
-      <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/65">
+      <p className={full ? 'absolute bottom-3 left-4 z-[1] flex flex-wrap items-center gap-x-4 gap-y-1 rounded-field bg-base-100/80 px-3 py-1.5 text-xs text-base-content/70 backdrop-blur' : 'mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/65'}>
         {simulate &&
           ROLES.map((r) => (
             <span key={r} className="inline-flex items-center gap-1.5">
@@ -343,7 +343,7 @@ export function FloorMap({
             </span>
           ))}
         {simulate && workers.isError && <span className="text-error">{m.workersFailed}</span>}
-        <span className="ml-auto text-base-content/45">{m.layoutNote}</span>
+        <span className={full ? 'text-base-content/45' : 'ml-auto text-base-content/45'}>{m.layoutNote}</span>
       </p>
     </div>
   );
@@ -352,8 +352,9 @@ export function FloorMap({
 /** 도면 틀 — preview 면 센터 도면 화면으로 가는 링크 */
 function Frame({ mfcId, full, children }: { readonly mfcId: string; readonly full: boolean; readonly children: ReactNode }) {
   const cls = 'relative overflow-hidden rounded-field border border-base-300 bg-base-200/80';
+  // full: 위(배지)·아래(범례)·오른쪽(떠 있는 패널 300px) 자리를 비우고 나머지를 도면으로
   return full ? (
-    <div className={cls}>{children}</div>
+    <div className="absolute inset-0 pt-11 pr-3 pb-12 pl-3 @3xl:pr-[318px]">{children}</div>
   ) : (
     <Link to={centerPath(mfcId, 'floor')} className={`group block transition-colors hover:border-primary/60 ${cls}`} aria-label={m.openFull} data-testid="floor-open">
       {children}
