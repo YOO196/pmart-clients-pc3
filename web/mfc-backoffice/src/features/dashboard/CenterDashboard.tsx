@@ -19,7 +19,7 @@ import { useDispatchDelays } from '../delivery/DispatchDelayPage';
 import { useOps } from '../ops/OpsBoard';
 import { OPS_REFRESH_MS } from '../ops/opsQueries';
 import { minutesText, promiseRows, seoulToday } from '../ops/opsRules';
-import { BarList, ColumnChart, type Column } from './charts';
+import { AreaChart, BarList, type Column } from './charts';
 import { DAYS, lastDays, rate, rateText, shortDate } from './dashboardRules';
 
 const m = messages.dashboard;
@@ -234,9 +234,9 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           sub={m.chart.pickSub}
           q={picking}
           aside={
-            <div className="join" role="group" aria-label={m.chart.pickToggle}>
+            <div className="pm-seg" role="group" aria-label={m.chart.pickToggle}>
               {(['picked', 'shortRate'] as const).map((k) => (
-                <button key={k} type="button" className={`btn join-item btn-xs ${chart === k ? 'btn-active' : ''}`} aria-pressed={chart === k} onClick={() => setChart(k)}>
+                <button key={k} type="button" aria-pressed={chart === k} onClick={() => setChart(k)}>
                   {k === 'picked' ? m.chart.pickedShort : m.chart.shortRateShort}
                 </button>
               ))}
@@ -244,13 +244,13 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           }
         >
           {chart === 'picked' ? (
-            <ColumnChart title={m.chart.picked(DAYS)} columns={pickedCols} format={(v) => m.lines(v)} testId="chart-picked" />
+            <AreaChart title={m.chart.picked(DAYS)} columns={pickedCols} format={(v) => m.lines(v)} testId="chart-picked" />
           ) : (
-            <ColumnChart title={m.chart.shortRate(DAYS)} columns={shortCols} format={(v) => rateText(v)} testId="chart-short-rate" />
+            <AreaChart title={m.chart.shortRate(DAYS)} columns={shortCols} format={(v) => rateText(v)} testId="chart-short-rate" />
           )}
         </Panel>
         <Panel className="@5xl:col-span-5" title={m.chart.onTime(DAYS)} sub={m.chart.onTimeNote} q={onTime}>
-          <ColumnChart title={m.chart.onTime(DAYS)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" />
+          <AreaChart title={m.chart.onTime(DAYS)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" />
         </Panel>
 
         {/* 알림 피드 · 지금 작업과 인력 */}
@@ -272,14 +272,14 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           ) : (
             <ul data-testid="alert-feed">
               {feed.slice(0, 6).map((f) => (
-                <li key={f.key} className="grid grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-2 border-t border-base-300 px-4 py-2" data-testid="alert-feed-row">
-                  <span className={`badge badge-sm ${f.tone === 'error' ? 'badge-error' : 'badge-warning'}`}>{f.tone === 'error' ? m.feed.urgent : m.feed.caution}</span>
+                <li key={f.key} className="grid min-h-14 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 border-t border-base-300 px-4 py-2 transition-colors hover:bg-primary/5" data-testid="alert-feed-row">
+                  <span className={`badge ${f.tone === 'error' ? 'badge-error' : 'badge-warning'}`}>{f.tone === 'error' ? m.feed.urgent : m.feed.caution}</span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{f.title}</p>
                     <p className="truncate text-xs text-base-content/60">{f.where}</p>
                   </div>
-                  <time className="hidden text-xs text-base-content/55 tabular-nums @lg:block">{f.at ? formatSeoul(f.at) : ''}</time>
-                  <Link to={f.to} className="btn btn-xs">
+                  <time className="pm-mono hidden text-xs text-base-content/55 @lg:block">{f.at ? formatSeoul(f.at) : ''}</time>
+                  <Link to={f.to} className="btn btn-xs pm-action">
                     {m.feed.action}
                   </Link>
                 </li>
@@ -391,7 +391,7 @@ function PriorityChip({ to, label, n, failed, tone }: { readonly to: string; rea
   return (
     <Link to={to} className="btn btn-sm gap-2 font-normal" data-testid="priority-chip">
       {label}
-      <span className={`badge badge-sm ${cls}`}>{failed ? m.failedShort : n === undefined ? '…' : m.count(n)}</span>
+      <span className={`badge badge-sm pm-mono ${cls}`}>{failed ? m.failedShort : n === undefined ? '…' : m.count(n)}</span>
     </Link>
   );
 }
@@ -417,11 +417,13 @@ function Kpi({
   readonly track?: number | null;
 }) {
   const max = Math.max(0, ...(trend ?? []));
+  // 숫자와 단위를 나눠 단위는 작게(레퍼런스 "428 UPH") — 글자 전체는 그대로
+  const [, num = value, unit = ''] = /^([\d.,—-]+)(.*)$/.exec(value) ?? [];
   return (
-    <article className="col-span-12 flex min-h-32 flex-col rounded-box border border-base-300 bg-base-100 px-4 py-3 @md:col-span-6 @5xl:col-span-3" data-testid={testId}>
+    <article className="col-span-12 flex min-h-36 flex-col rounded-box border border-base-300 bg-base-100 px-4 pt-3.5 pb-3 @md:col-span-6 @5xl:col-span-3" data-testid={testId}>
       <p className="flex items-center justify-between gap-2 text-sm font-semibold text-base-content/80">
         <span className="truncate">{label}</span>
-        <span className="grid h-7 w-7 place-items-center rounded-field border border-primary/25 bg-primary/10 text-primary">{ic}</span>
+        <span className="grid h-8 w-8 place-items-center rounded-field border border-primary/25 bg-primary/15 text-primary">{ic}</span>
       </p>
       {q.isPending ? (
         <p className="mt-1 text-2xl font-bold text-base-content/40">…</p>
@@ -431,20 +433,21 @@ function Kpi({
         </p>
       ) : (
         <>
-          <p data-testid={`${testId}-value`} className="mt-1 text-[30px] font-extrabold leading-tight tracking-tight tabular-nums">
-            {value}
+          <p data-testid={`${testId}-value`} className="mt-1 flex items-baseline gap-1.5 text-[34px] leading-tight font-extrabold tracking-[-0.045em] tabular-nums">
+            {num}
+            {unit && <span className="text-sm font-semibold tracking-normal text-base-content/55">{unit}</span>}
           </p>
           <p className="truncate text-xs text-base-content/60">{foot}</p>
           {trend && max > 0 && (
             <span className="mt-auto flex h-6 items-end gap-0.5 pt-1" aria-hidden="true">
               {trend.map((v, i) => (
-                <i key={i} className={`max-w-3 flex-1 rounded-t-sm ${i === trend.length - 1 ? 'bg-primary' : 'bg-primary/35'}`} style={{ height: `${v > 0 ? Math.max(8, (v / max) * 100) : 0}%` }} />
+                <i key={i} className={`max-w-3.5 flex-1 rounded-t-sm ${i === trend.length - 1 ? 'bg-primary shadow-[0_0_8px] shadow-primary/50' : 'bg-primary/35'}`} style={{ height: `${v > 0 ? Math.max(8, (v / max) * 100) : 0}%` }} />
               ))}
             </span>
           )}
           {track !== undefined && track !== null && (
-            <span className="mt-auto block h-1.5 overflow-hidden rounded-full bg-base-300" aria-hidden="true">
-              <b className="block h-full rounded-full bg-primary" style={{ width: `${Math.round(Math.max(0, Math.min(1, track)) * 100)}%` }} />
+            <span className="pm-meter-track mt-auto block h-1.5 overflow-hidden rounded-full" aria-hidden="true">
+              <b className="pm-meter-fill block h-full rounded-full" style={{ width: `${Math.round(Math.max(0, Math.min(1, track)) * 100)}%` }} />
             </span>
           )}
         </>
@@ -476,7 +479,7 @@ function Panel({
     <section className={`col-span-12 min-w-0 rounded-box border border-base-300 bg-base-100 ${className}`} aria-label={title}>
       <header className="flex min-h-14 items-center justify-between gap-2 px-4 py-2.5">
         <div className="min-w-0">
-          <h2 className="truncate font-bold tracking-tight">{title}</h2>
+          <h2 className="truncate text-base font-bold tracking-[-0.025em]">{title}</h2>
           {sub && <p className="mt-0.5 line-clamp-2 text-xs text-base-content/55">{sub}</p>}
         </div>
         {aside && <div className="shrink-0">{aside}</div>}

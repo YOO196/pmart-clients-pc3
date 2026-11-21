@@ -156,12 +156,11 @@ export const messages = {
 
   /** 메뉴 묶음·하위 메뉴(handoff 2026-11-15 §2 — 이름·순서는 클라이언트가 정해도 된다) */
   groups: {
-    overview: '운영',
-    people: '작업자 관리', // '인력' 에서 바꿈(사용자 2026-11-16)
-    work: '작업',
-    stock: '재고·품질',
-    center: '센터',
-    delivery: '배송',
+    // 2026-11-21 사용자 "레퍼런스(corap/mfc-admin) 구조 따오기" — 업무 흐름 묶음(예전: 운영·작업자 관리·작업·배송·재고·품질·센터)
+    overview: '실시간 관제',
+    outbound: '출고 운영',
+    inbound: '입고·재고',
+    people: '인력·센터',
   },
   menus: {
     ops: '홈',

@@ -29,6 +29,7 @@ import { messages as m } from '../shared/messages';
 import { allMenus, centerPath, isWorkerOnly, navGroups, type MenuItem, type MenuKey } from './nav';
 import { ConnectionBanner, ShortcutHelp, TaskAlertBadge, useDocumentTitle, useSlashToSearch } from './PageChrome';
 import { RequireSession, SessionProvider, useSession } from './SessionContext';
+import { LiveClock } from './LiveClock';
 import { groupIcon, useMenuCollapsed } from './sideMenu';
 import { ThemeToggle } from './ThemeToggle';
 import { DETAIL_BAR_SLOT } from '../shared/StickyTitle';
@@ -61,8 +62,7 @@ function Layout() {
   const groups: ConsoleNavGroup[] = showMenus
     ? navGroups.map((g) => ({
         id: g.key,
-        // 홈 묶음은 제목 없이 맨 위(전과 같음)
-        label: g.key === 'overview' ? '' : m.groups[g.key],
+        label: m.groups[g.key],
         ...(groupIcon[g.key] ? { icon: groupIcon[g.key] } : {}),
         items: g.items.map((item) => ({
           to: centerPath(target, item.segment),
@@ -106,6 +106,7 @@ function Layout() {
       }
       tools={
         <>
+          <LiveClock />
           {session && center?.mine && <CenterSwitcher centers={session.centers} current={center.mfcId} segment={segment} />}
           {/* 좁은 화면에서는 목 표시·단축키 도움·밝기 바꾸기·내 정보를 숨겨 머리줄이 넘치지 않게(2026-11-21) */}
           {env.isMock && <span className="badge badge-accent badge-sm hidden sm:inline-flex">{m.mockBadge}</span>}
