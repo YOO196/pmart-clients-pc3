@@ -172,6 +172,21 @@ base class MockCatalogRepository implements CatalogRepository {
   /// 타이머 테마(storefront 0.9.0 showTimer): 영역 ID → 끝 시각. 기본은 없음. 시험·캡처가 넣는다.
   final timedSections = <String, DateTime>{};
 
+  /// MD 탭(storefront 0.9.0 customTabs): 탭 키(X-…) → 이름·기간·타이머·넣은 영역. 기본은 없음. 시험·캡처가 넣는다.
+  /// [goneTabs] 에 넣은 탭은 홈에는 남아 있어도 내용 조회가 404 TAB_NOT_FOUND(기간이 지난 탭 흉내).
+  final customTabs =
+      <
+        String,
+        ({
+          String title,
+          DateTime? endsAt,
+          bool showTimer,
+          List<(String, String, String)> sections,
+        })
+      >{};
+  final goneTabs = <String>{};
+  int customTabCalls = 0;
+
   /// 홈에서 UNAVAILABLE 로 내려줄 영역(부분 실패 시험용). 재조회하면 성공한다.
   final Set<String> unavailableSectionIds;
   final int pageSize;
@@ -268,6 +283,15 @@ base class MockCatalogRepository implements CatalogRepository {
         'sortOrder': 1,
       },
     ],
+    'customTabs': [
+      for (final e in customTabs.entries)
+        {
+          'tabKey': e.key,
+          'title': e.value.title,
+          'endsAt': e.value.endsAt?.toUtc().toIso8601String(),
+          'showTimer': e.value.showTimer,
+        },
+    ],
     'sections': [
       for (final (id, kind, title) in _sections)
         unavailableSectionIds.contains(id)
@@ -358,6 +382,40 @@ base class MockCatalogRepository implements CatalogRepository {
       ]..sort((a, b) => (a.sortOrder ?? 0).compareTo(b.sortOrder ?? 0)))
         homeBannerFromContract(b),
     ];
+  }
+
+  @override
+  Future<HomeView> customTab(String tabKey, {String? mfcId}) async {
+    await _wait();
+    customTabCalls++;
+    final tab = customTabs[tabKey];
+    if (tab == null || goneTabs.contains(tabKey)) {
+      throw const ProblemFailure(Problem(status: 404, code: 'TAB_NOT_FOUND'));
+    }
+    return customTabFromContract(
+      sf.CustomTabLayout.fromJson({
+        'layoutVersion': 7,
+        'tab': {
+          'tabKey': tabKey,
+          'title': tab.title,
+          'endsAt': tab.endsAt?.toUtc().toIso8601String(),
+          'showTimer': tab.showTimer,
+        },
+        'sections': [
+          for (final (id, kind, title) in tab.sections)
+            {
+              'sectionId': id,
+              'kind': kind,
+              'title': title,
+              'state': 'OK',
+              'items': [
+                for (final p in _sectionProducts(id)) displayItemJson(p),
+              ],
+              'nextCursor': null,
+            },
+        ],
+      }),
+    );
   }
 
   @override

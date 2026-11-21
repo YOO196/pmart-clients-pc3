@@ -39,6 +39,12 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   HomeTab _tab = HomeTab.home;
 
+  /// 고른 MD 탭(storefront 0.9.0 customTabs). null 이면 고정 탭([_tab]).
+  String? _customTab;
+
+  /// 기간이 끝나 지운 MD 탭(시각이 지났거나 서버가 404 TAB_NOT_FOUND).
+  final _goneTabs = <String>{};
+
   GoRouter? _router;
   String? _lastPath;
 
@@ -120,8 +126,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ..invalidate(homeInProgressOrderProvider)
       // 다시 불러온 영역도 새 홈 응답으로 바꾼다(남겨 두면 그 영역만 옛 가격이다)
       ..invalidate(sectionRetryProvider);
-    if (_tab != HomeTab.home) ref.invalidate(homeTabProvider(_tab));
+    if (_customTab case final k?) {
+      ref.invalidate(customTabProvider(k));
+    } else if (_tab != HomeTab.home) {
+      ref.invalidate(homeTabProvider(_tab));
+    }
     return ref.refresh(homeProvider.future);
+  }
+
+  /// MD 탭의 기간이 끝났다(시각이 지났거나 서버가 404 TAB_NOT_FOUND) — 탭을 지우고, 보던 탭이면 홈으로.
+  void _dropCustomTab(String tabKey) {
+    if (!mounted || _goneTabs.contains(tabKey)) return;
+    setState(() {
+      _goneTabs.add(tabKey);
+      if (_customTab == tabKey) {
+        _customTab = null;
+        _tab = HomeTab.home;
+      }
+    });
   }
 
   @override
@@ -177,7 +199,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               state: state,
               onRetry: () => ref.invalidate(homeProvider),
               ready: (context, home) {
+                final now = ref.read(homeClockProvider)();
+                final customs = [
+                  for (final c in home.customTabs)
+                    if (!_goneTabs.contains(c.tabKey) &&
+                        (c.endsAt == null || c.endsAt!.isAfter(now)))
+                      c,
+                ];
+                final custom = customs
+                    .where((c) => c.tabKey == _customTab)
+                    .firstOrNull;
                 final tab = home.tabs.contains(_tab) ? _tab : HomeTab.home;
+                final isHome = custom == null && tab == HomeTab.home;
                 // 진행 중 주문은 화면 아래에 떠 있는 카드(레퍼런스 3-1 배달중). 목록 끝이 가리지 않게 아래 여백을 둔다.
                 return Stack(
                   children: [
@@ -212,13 +245,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   ],
                                 ),
                               ),
-                              if (home.tabs.length > 1)
+                              if (home.tabs.length > 1 || customs.isNotEmpty)
                                 _HomeTabs(
                                   tabs: home.tabs,
-                                  selected: tab,
-                                  onSelected: (t) => setState(() => _tab = t),
+                                  selected: custom == null ? tab : null,
+                                  onSelected: (t) => setState(() {
+                                    _tab = t;
+                                    _customTab = null;
+                                  }),
+                                  customTabs: customs,
+                                  selectedCustom: custom?.tabKey,
+                                  onSelectedCustom: (k) =>
+                                      setState(() => _customTab = k),
+                                  onCustomGone: _dropCustomTab,
                                 ),
-                              if (tab == HomeTab.home) ...[
+                              if (isHome) ...[
                                 // HOME_TOP 배너(가로 넘기기). 없으면 자리를 비운다.
                                 if (home.banners
                                         .where((b) => !b.middle)
@@ -236,14 +277,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ],
                             ],
                           ),
-                          if (tab == HomeTab.home)
+                          if (isHome)
                             const SliverPersistentHeader(
                               pinned: true,
                               delegate: _PinnedSearchBar(),
                             ),
                           SliverList.list(
                             children: [
-                              if (tab == HomeTab.home) ...[
+                              if (isHome) ...[
                                 const _CategoryShortcuts(),
                                 const SizedBox(height: 14),
                                 const PmartSectionGap(height: 10),
@@ -270,7 +311,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     layoutVersion: home.layoutVersion,
                                   ),
                                 ],
-                              ] else
+                              ] else if (custom != null)
+                                _CustomTabBody(
+                                  key: ValueKey(
+                                    'home-tab-body-${custom.tabKey}',
+                                  ),
+                                  tabKey: custom.tabKey,
+                                  onGone: _dropCustomTab,
+                                )
+                              else
                                 _TabBody(
                                   key: ValueKey('home-tab-body-${tab.name}'),
                                   tab: tab,
@@ -312,23 +361,70 @@ String homeTabLabel(AppLocalizations l10n, HomeTab t) => switch (t) {
   HomeTab.isNew => l10n.tabNew,
 };
 
-/// 서버가 준 고정 탭(`HomeLayout.tabs`). 할인 탭(DEAL)은 1차 제외라 계약에 없다.
+/// 서버가 준 고정 탭(`HomeLayout.tabs`) 뒤에 MD 탭(storefront 0.9.0 `customTabs`, 서버 순서).
+/// 할인 탭(DEAL)은 1차 제외라 계약에 없다. MD 탭에 타이머가 있으면 이름 위에 남은 시간(레퍼런스 "오늘만특가" 자리),
+/// 기간이 끝나면 [onCustomGone].
 class _HomeTabs extends StatelessWidget {
   const _HomeTabs({
     required this.tabs,
     required this.selected,
     required this.onSelected,
+    this.customTabs = const [],
+    this.selectedCustom,
+    this.onSelectedCustom,
+    this.onCustomGone,
   });
 
   final List<HomeTab> tabs;
-  final HomeTab selected;
+
+  /// 고른 고정 탭(MD 탭을 골랐으면 null).
+  final HomeTab? selected;
   final ValueChanged<HomeTab> onSelected;
+  final List<CustomTab> customTabs;
+  final String? selectedCustom;
+  final ValueChanged<String>? onSelectedCustom;
+  final ValueChanged<String>? onCustomGone;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    Widget tab({
+      required Key key,
+      required String label,
+      required bool on,
+      required VoidCallback onTap,
+      Widget? above,
+    }) => InkWell(
+      key: key,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(11, 4, 11, 10),
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              width: 2.5,
+              color: on ? scheme.onSurface : Colors.transparent,
+            ),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ?above,
+            Text(
+              label,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontSize: 16,
+                fontWeight: on ? FontWeight.w800 : FontWeight.w400,
+                color: scheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
     return DecoratedBox(
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
@@ -337,39 +433,171 @@ class _HomeTabs extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Row(
+          // 타이머가 붙은 탭만 위로 높다 — 이름은 아래 줄에 맞춘다(레퍼런스 탭 줄).
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             for (final t in tabs)
-              InkWell(
+              tab(
                 key: ValueKey('home-tab-${t.name}'),
+                label: homeTabLabel(l10n, t),
+                on: t == selected,
                 onTap: () => onSelected(t),
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      bottom: BorderSide(
-                        width: 2.5,
-                        color: t == selected
-                            ? scheme.onSurface
-                            : Colors.transparent,
-                      ),
-                    ),
-                  ),
-                  child: Text(
-                    homeTabLabel(l10n, t),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontSize: 16,
-                      fontWeight: t == selected
-                          ? FontWeight.w800
-                          : FontWeight.w400,
-                      color: scheme.onSurface,
-                    ),
-                  ),
+              ),
+            for (final c in customTabs)
+              _TabExpiry(
+                key: ValueKey('home-tab-expiry-${c.tabKey}'),
+                endsAt: c.endsAt,
+                onExpired: () => onCustomGone?.call(c.tabKey),
+                child: tab(
+                  key: ValueKey('home-tab-${c.tabKey}'),
+                  label: c.title,
+                  on: c.tabKey == selectedCustom,
+                  onTap: () => onSelectedCustom?.call(c.tabKey),
+                  above: c.showTimer && c.endsAt != null
+                      ? _TabCountdown(
+                          key: ValueKey('home-tab-timer-${c.tabKey}'),
+                          endsAt: c.endsAt!,
+                        )
+                      : null,
                 ),
               ),
           ],
         ),
       ),
     );
+  }
+}
+
+/// MD 탭 이름 위 남은 시간(작은 빨간 글, 1초마다).
+class _TabCountdown extends ConsumerStatefulWidget {
+  const _TabCountdown({super.key, required this.endsAt});
+
+  final DateTime endsAt;
+
+  @override
+  ConsumerState<_TabCountdown> createState() => _TabCountdownState();
+}
+
+class _TabCountdownState extends ConsumerState<_TabCountdown> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final left = widget.endsAt.difference(ref.read(homeClockProvider)());
+    return Text(
+      remainingClock(left),
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        fontSize: 11,
+        height: 1.2,
+        fontWeight: FontWeight.w600,
+        color: sectionTimerColor,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+  }
+}
+
+/// [endsAt] 이 되면 [onExpired] 를 한 번 부른다(없으면 아무것도 하지 않는다).
+class _TabExpiry extends ConsumerStatefulWidget {
+  const _TabExpiry({
+    super.key,
+    required this.endsAt,
+    required this.onExpired,
+    required this.child,
+  });
+
+  final DateTime? endsAt;
+  final VoidCallback onExpired;
+  final Widget child;
+
+  @override
+  ConsumerState<_TabExpiry> createState() => _TabExpiryState();
+}
+
+class _TabExpiryState extends ConsumerState<_TabExpiry> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    final end = widget.endsAt;
+    if (end != null) {
+      final left = end.difference(ref.read(homeClockProvider)());
+      _timer = Timer(
+        left.isNegative ? Duration.zero : left,
+        () => widget.onExpired(),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// MD 탭 본문(`GET /storefront/custom-tabs/{tabKey}`, 영역 모양은 랭킹·신상품 탭과 같다).
+/// 기간이 지나 404 TAB_NOT_FOUND 면 [onGone](탭을 지우고 홈으로). 그 밖의 실패는 이 탭만 오류.
+class _CustomTabBody extends ConsumerWidget {
+  const _CustomTabBody({super.key, required this.tabKey, required this.onGone});
+
+  final String tabKey;
+  final ValueChanged<String> onGone;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final provider = customTabProvider(tabKey);
+    final value = ref.watch(provider);
+    if (value case AsyncError(
+      error: ProblemFailure(problem: Problem(code: 'TAB_NOT_FOUND')),
+    )) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => onGone(tabKey));
+      return const SizedBox.shrink();
+    }
+    return switch (value) {
+      AsyncData(:final value) when value.sections.isEmpty => Padding(
+        key: const ValueKey('home-tab-empty'),
+        padding: const EdgeInsets.all(16),
+        child: Text(l10n.sectionEmpty),
+      ),
+      AsyncData(:final value) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final s in value.sections)
+            _SectionView(
+              key: ValueKey('section-${s.sectionId}'),
+              section: s,
+              layoutVersion: value.layoutVersion,
+              vertical: true,
+            ),
+        ],
+      ),
+      AsyncError() => _InlineFailure(
+        key: const ValueKey('home-tab-failed'),
+        text: l10n.sectionUnavailable,
+        onRetry: () => ref.invalidate(provider),
+      ),
+      _ => const _SkeletonRail(),
+    };
   }
 }
 

@@ -191,6 +191,27 @@ class HomeBanner {
   final String? altText;
 }
 
+/// MD 탭(storefront 0.9.0, 백엔드 요청서 2026-11-21 ⑤). 내용은 `GET /storefront/custom-tabs/{tabKey}`.
+@immutable
+class CustomTab {
+  const CustomTab({
+    required this.tabKey,
+    required this.title,
+    this.endsAt,
+    this.showTimer = false,
+  });
+
+  /// `X-…`
+  final String tabKey;
+  final String title;
+
+  /// 기간 끝(지나면 탭을 지운다 — 서버도 404 TAB_NOT_FOUND).
+  final DateTime? endsAt;
+
+  /// true 면 탭 이름 위에 남은 시간.
+  final bool showTimer;
+}
+
 @immutable
 class HomeView {
   const HomeView({
@@ -198,10 +219,14 @@ class HomeView {
     required this.tabs,
     required this.banners,
     required this.sections,
+    this.customTabs = const [],
   });
 
   final int layoutVersion;
   final List<HomeTab> tabs;
+
+  /// MD 탭(storefront 0.9.0 `customTabs`) — 고정 탭 뒤에 서버 순서로 붙인다.
+  final List<CustomTab> customTabs;
   final List<HomeBanner> banners;
   final List<HomeSection> sections;
 
@@ -214,6 +239,7 @@ class HomeView {
     sections: [
       for (final s in sections) s.sectionId == section.sectionId ? section : s,
     ],
+    customTabs: customTabs,
   );
 }
 

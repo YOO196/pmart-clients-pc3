@@ -1026,6 +1026,45 @@ void main() {
     debugDisableShadows = true;
   });
 
+  // MD 탭(storefront 0.9.0 customTabs): 고정 탭 뒤, 타이머 탭은 이름 위 남은 시간.
+  testWidgets('custom-tabs', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final now = DateTime.utc(2026, 11, 21, 3);
+    final catalog = MockCatalogRepository(latency: Duration.zero)
+      ..customTabs['X-DEAL'] = (
+        title: '오일장',
+        endsAt: now.add(const Duration(hours: 5, minutes: 12, seconds: 40)),
+        showTimer: true,
+        sections: [('S-WEEKLY', 'THEME', '오일장 특가')],
+      )
+      ..customTabs['X-AUTUMN'] = (
+        title: '가을 나들이',
+        endsAt: null,
+        showTimer: false,
+        sections: [('S-NEW', 'THEME', '가을 나들이 필수템')],
+      );
+    await t.pumpWidget(
+      testApp([
+        homeClockProvider.overrideWithValue(() => now),
+      ], catalog: catalog),
+    );
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/custom-tabs-home.png').uri),
+    );
+    await t.tap(find.byKey(const ValueKey('home-tab-X-DEAL')));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/custom-tabs-deal.png').uri),
+    );
+  });
   // 자동 랭킹 테마(storefront 0.9.0 RANKING_AUTO → 홈 영역 kind RANKING, 항목 rank·badge RANK)와 랭킹 탭.
   testWidgets('ranking-theme', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

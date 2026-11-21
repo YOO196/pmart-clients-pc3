@@ -15,6 +15,9 @@ abstract interface class CatalogRepository {
   /// 자리별 배너(storefront 0.9.0 `GET /storefront/banners?placement=` — POPUP 홈 팝업). sortOrder 순.
   Future<List<HomeBanner>> banners({required String placement});
 
+  /// MD 탭 내용(storefront 0.9.0 `GET /storefront/custom-tabs/{tabKey}`). 기간이 지나면 404 TAB_NOT_FOUND.
+  Future<HomeView> customTab(String tabKey, {String? mfcId});
+
   /// 영역 하나만 다시 조회한다(UNAVAILABLE 영역 재시도·전체보기). [cursor] 는 다음 묶음.
   /// 홈 구성이 바뀌었으면 `LAYOUT_VERSION_CHANGED` [ProblemFailure].
   Future<HomeSection> section(
@@ -69,6 +72,14 @@ final class ApiCatalogRepository implements CatalogRepository {
       () => _storefront.getHome(mfcId: mfcId, tab: _tabToContract(tab)),
     );
     return homeFromContract(_body(res.data, 'HomeLayout'));
+  }
+
+  @override
+  Future<HomeView> customTab(String tabKey, {String? mfcId}) async {
+    final res = await pmartGuard(
+      () => _storefront.getCustomTab(tabKey: tabKey, mfcId: mfcId),
+    );
+    return customTabFromContract(res.data!);
   }
 
   @override
@@ -368,26 +379,48 @@ HomeView homeFromContract(sf.HomeLayout h) => HomeView(
     ]..sort((a, b) => (a.sortOrder ?? 0).compareTo(b.sortOrder ?? 0)))
       homeBannerFromContract(b),
   ],
-  sections: [
-    for (final s in h.sections)
-      // 0.10.0 배너 묶음(kind BANNER, items 비움)은 아직 그리지 않는다 — 맨 위 배너(banners)는 그대로 온다.
-      if (s.kind != sf.SectionKindEnum.BANNER)
-        HomeSection(
-          sectionId: _required(s.sectionId, 'Section.sectionId'),
-          kind: _kind(s.kind),
-          title: s.title ?? '',
-          subtitle: s.subtitle,
-          // state 가 없으면 성공으로 보지 않는다. 영역 하나만 실패로 표시한다.
-          available: s.state == sf.SectionStateEnum.OK,
-          items: arrangeForDisplay(
-            (s.items ?? const <sf.DisplayItem>[]).map(_tileFromDisplay),
-          ),
-          nextCursor: s.nextCursor,
-          viewAllRef: s.viewAllRef,
-          endsAt: s.endsAt,
-          showTimer: (s.showTimer ?? false) && s.endsAt != null,
-        ),
+  sections: sectionsFromContract(h.sections),
+  customTabs: [
+    for (final c in h.customTabs ?? const <sf.CustomTab>[]) customTabFromTab(c),
   ],
+);
+
+/// 진열 영역(storefront Section) → 화면 모델.
+List<HomeSection> sectionsFromContract(Iterable<sf.Section> sections) => [
+  for (final s in sections)
+    // 0.10.0 배너 묶음(kind BANNER, items 비움)은 아직 그리지 않는다 — 맨 위 배너(banners)는 그대로 온다.
+    if (s.kind != sf.SectionKindEnum.BANNER)
+      HomeSection(
+        sectionId: _required(s.sectionId, 'Section.sectionId'),
+        kind: _kind(s.kind),
+        title: s.title ?? '',
+        subtitle: s.subtitle,
+        // state 가 없으면 성공으로 보지 않는다. 영역 하나만 실패로 표시한다.
+        available: s.state == sf.SectionStateEnum.OK,
+        items: arrangeForDisplay(
+          (s.items ?? const <sf.DisplayItem>[]).map(_tileFromDisplay),
+        ),
+        nextCursor: s.nextCursor,
+        viewAllRef: s.viewAllRef,
+        endsAt: s.endsAt,
+        showTimer: (s.showTimer ?? false) && s.endsAt != null,
+      ),
+];
+
+/// MD 탭 이름표.
+CustomTab customTabFromTab(sf.CustomTab c) => CustomTab(
+  tabKey: c.tabKey,
+  title: c.title,
+  endsAt: c.endsAt,
+  showTimer: (c.showTimer ?? false) && c.endsAt != null,
+);
+
+/// MD 탭 내용 — 영역 모양은 홈과 같다.
+HomeView customTabFromContract(sf.CustomTabLayout l) => HomeView(
+  layoutVersion: l.layoutVersion,
+  tabs: const [],
+  banners: const [],
+  sections: sectionsFromContract(l.sections),
 );
 
 HomeSection sectionItemsFromContract(

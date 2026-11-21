@@ -60,6 +60,13 @@ final homeProvider = FutureProvider<HomeView>(
       .home(mfcId: ref.watch(currentMfcIdProvider)),
 );
 
+/// MD 탭 내용(storefront 0.9.0). 기간이 지났으면 404 TAB_NOT_FOUND(화면이 탭을 지우고 홈으로).
+final customTabProvider = FutureProvider.autoDispose.family<HomeView, String>(
+  (ref, tabKey) => ref
+      .watch(catalogRepositoryProvider)
+      .customTab(tabKey, mfcId: ref.watch(currentMfcIdProvider)),
+);
+
 /// UNAVAILABLE 영역 하나의 재조회 상태. null 이면 아직 재시도하지 않았다.
 final sectionRetryProvider = NotifierProvider.autoDispose
     .family<SectionRetry, AsyncValue<HomeSection>?, String>(SectionRetry.new);
