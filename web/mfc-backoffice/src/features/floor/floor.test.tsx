@@ -36,7 +36,9 @@ describe('센터 도면', () => {
     const panel = await screen.findByTestId('worker-panel');
     expect(panel).toHaveTextContent('김현장');
     await waitFor(() => expect(within(screen.getByTestId('worker-running')).getAllByRole('link').length).toBeGreaterThan(0));
-    expect(within(panel).getByRole('link', { name: '작업자 상세로' })).toHaveAttribute('href', '/c/MFC-BSN-01/workers/OP-wkr-1');
+    const actions = screen.getByTestId('floor-actions');
+    expect(within(actions).getByRole('link', { name: '작업자 상세로' })).toHaveAttribute('href', '/c/MFC-BSN-01/workers/OP-wkr-1');
+    expect(within(actions).getByRole('link', { name: '이 작업자 배정 내역' })).toHaveAttribute('href', '/c/MFC-BSN-01/assignments?workerId=OP-wkr-1');
   });
 
   it('대시보드 도면을 누르면 센터 도면으로', async () => {
