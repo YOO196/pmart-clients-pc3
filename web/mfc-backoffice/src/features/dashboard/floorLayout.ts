@@ -22,6 +22,12 @@ export interface FloorRack {
   readonly cx: number;
   readonly cz: number;
   readonly along: 'x' | 'z';
+  readonly temp: 'FROZEN' | 'CHILLED' | 'AMBIENT';
+  /**
+   * 실제 칸 코드의 랙 앞부분(`{온도대}-{구역}-{랙 2자리}`, 예 `C-P2-03`) — ⚠ 가정 연결.
+   * 칸에 도면 좌표(position)가 거의 없어, 온도대 안 랙 순서대로 구역(피킹 먼저, 그다음 보관)·랙 번호를 붙인다.
+   */
+  readonly code: string;
 }
 
 /** 작업자가 걷는 통로 — along 축으로 [from, to] 사이를 오간다. cross = 통로 중심 좌표 */
@@ -77,7 +83,7 @@ function fill(area: Rect, along: 'x' | 'z', zone: Aisle['zone'], crossAisleAt?: 
       const n = Math.floor((a1 - a0) / RACK_LEN);
       for (let i = 0; i < n; i++) {
         const a = a0 + RACK_LEN * (i + 0.5);
-        racks.push(along === 'z' ? { cx: r, cz: a, along } : { cx: a, cz: r, along });
+        racks.push(along === 'z' ? { cx: r, cz: a, along, temp: zone, code: '' } : { cx: a, cz: r, along, temp: zone, code: '' });
       }
     }
   return { racks, aisles: aisles.filter((a) => a.cross < crossMax + 0.4) };
@@ -138,6 +144,17 @@ export function buildFloor(): Floor {
   const chilled = fill({ x0: 13.2, z0: 1.0, x1: 22.2, z1: 25.6 }, 'z', 'CHILLED', 13);
   const ambient = fill({ x0: 24.0, z0: 0.8, x1: 36.4, z1: 14.6 }, 'x', 'AMBIENT');
 
+  // 랙 → 칸 코드(가정): 온도대마다 앞쪽 절반은 피킹 구역, 뒤쪽은 보관 구역, 구역 안 랙 번호 01부터
+  const AREAS: Readonly<Record<FloorRack['temp'], readonly [string, string]>> = { FROZEN: ['F-P3', 'F-S2'], CHILLED: ['C-P2', 'C-S1'], AMBIENT: ['A-P1', 'A-S3'] };
+  const coded = (list: readonly FloorRack[]): FloorRack[] => {
+    const half = Math.ceil(list.length / 2);
+    return list.map((r, i) => {
+      const [p, st] = AREAS[r.temp];
+      const area = i < half ? p : st;
+      const no = (i < half ? i : i - half) + 1;
+      return { ...r, code: `${area}-${String(no).padStart(2, '0')}` };
+    });
+  };
   const stations = Array.from({ length: 8 }, (_, i) => ({ x: 25.9 + (i % 4) * 2.0, z: i < 4 ? 22.35 : 26.65 }));
   return {
     width: W,
@@ -145,7 +162,7 @@ export function buildFloor(): Floor {
     buildingDepth: BD,
     zones,
     walls,
-    racks: [...frozen.racks, ...chilled.racks, ...ambient.racks],
+    racks: [...coded(frozen.racks), ...coded(chilled.racks), ...coded(ambient.racks)],
     aisles: [...frozen.aisles, ...chilled.aisles, ...ambient.aisles],
     stations,
     points: {
