@@ -75,18 +75,19 @@ class ReviewEligibility {
       state != ReviewState.eligible;
 }
 
-/// 상품 리뷰 정렬(계약 `sort` — NEWEST·RATING_DESC·RATING_ASC). [recommended] 는 계약에 없다(BR-76) — 목 모드만.
+/// 상품 리뷰 정렬(계약 `sort` — RECOMMENDED(review 0.6.0, 도움돼요 많은 순)·NEWEST·RATING_DESC·RATING_ASC).
 enum ReviewSort { recommended, newest, ratingDesc, ratingAsc }
 
-/// 도움돼요 누르기에서 서버가 거절하는 code(BR-76 제안 — 계약 전, 목만).
+/// 도움돼요 누르기에서 서버가 거절하는 code(review 0.6.0).
 abstract final class ReviewHelpfulProblemCode {
   static const ownReview = 'HELPFUL_OWN_REVIEW';
+  static const notPublished = 'REVIEW_NOT_PUBLISHED';
 }
 
 /// 도움돼요를 누른 뒤 서버가 준 값(앱이 +1 하지 않는다).
 typedef HelpfulResult = ({int count, bool helped});
 
-/// 상품 리뷰 목록 조건: 상품·정렬·사진 리뷰만(`withPhotoOnly`)·옵션 [sku](BR-76 — 목만, 없으면 전체).
+/// 상품 리뷰 목록 조건: 상품·정렬·사진 리뷰만(`withPhotoOnly`)·옵션 [sku](review 0.6.0, 없으면 전체).
 typedef ProductReviewQuery = ({
   String productId,
   ReviewSort sort,
@@ -113,7 +114,7 @@ class ReviewView {
     this.helpedByMe,
   });
 
-  /// 도움돼요 수·내가 눌렀는지(BR-76 — 계약 전, 목만). 모르면 null — 0·안 누름으로 바꾸지 않는다.
+  /// 도움돼요 수·내가 눌렀는지(review 0.6.0 — 내가 눌렀는지는 회원 토큰이 있을 때만). 모르면 null — 0·안 누름으로 바꾸지 않는다.
   final int? helpfulCount;
   final bool? helpedByMe;
 

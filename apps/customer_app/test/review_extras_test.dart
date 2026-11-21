@@ -1,19 +1,21 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
+import 'package:pmart_core/testing.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
 import 'package:customer_app/features/reviews/data/reviews_repository.dart';
 import 'package:customer_app/features/reviews/domain/reviews.dart';
 
+import 'package:customer_app/shared/providers.dart' show sourceSystem;
+
 import 'support/app_harness.dart';
 
-/// 상품 리뷰 추천순·옵션 필터·도움돼요(BR-76 — 계약 전, 목 모드만).
+/// 상품 리뷰 추천순·옵션 필터·도움돼요(review 0.6.0, BR-76).
 void main() {
   setUpAll(initPmartFormatting);
   Finder key(String k) => find.byKey(ValueKey(k));
@@ -53,26 +55,6 @@ void main() {
     await t.pumpAndSettle();
     expect(key('review-sort-recommended'), findsOneWidget);
     expect(find.text('최근 등록순'), findsOneWidget);
-  });
-
-  testWidgets('실서버 모드: 추천순·옵션·도움돼요가 없다(계약 전)', (t) async {
-    final repo = MockReviewsRepository(latency: Duration.zero);
-    await open(t, repo, 'P-0001', env: PmartEnv.local);
-    expect(repo.productQueries.first.sort, ReviewSort.newest);
-    expect(key('review-option-open'), findsNothing);
-    expect(
-      find.byWidgetPredicate(
-        (w) =>
-            w.key is ValueKey<String> &&
-            (w.key! as ValueKey<String>).value.startsWith(
-              'product-review-helpful-',
-            ),
-      ),
-      findsNothing,
-    );
-    await t.tap(key('review-sort-open'));
-    await t.pumpAndSettle();
-    expect(key('review-sort-recommended'), findsNothing);
   });
 
   testWidgets('옵션이 2개 이상인 상품만 옵션 필터 — 고르면 그 SKU 로 묻는다', (t) async {
@@ -161,20 +143,102 @@ void main() {
     expect(repo.helped, contains('rv-p2-1'));
   });
 
-  test('API 저장소는 계약 전 조건·도움돼요를 실서버에 보내지 않는다', () async {
-    final repo = ApiReviewsRepository(Dio());
-    expect(
-      () => repo.setHelpful('r-1', on: true, key: IdempotencyKey.generate()),
-      throwsUnsupportedError,
+  group('API 저장소(review 0.6.0)', () {
+    late FakeAdapter adapter;
+    ApiReviewsRepository api(FakeReply Function(int i) reply) {
+      adapter = FakeAdapter((_, i) async => reply(i));
+      return ApiReviewsRepository(
+        createPmartDio(
+          baseUrl: 'http://test.invalid/api/v1',
+          sourceSystem: sourceSystem,
+          tokens: TokenStore(MemoryKeyValueStore()),
+          refresher: (_) async => null,
+          adapter: adapter,
+          delay: (_) async {},
+        ),
+      );
+    }
+
+    test(
+      '목록: sort=RECOMMENDED·sku 를 보내고 helpfulCount·helpedByMe 를 옮긴다',
+      () async {
+        final page = await api(
+          (_) => const FakeReply(
+            200,
+            body: {
+              'items': [
+                {
+                  'reviewId': 'rv-1',
+                  'productId': 'P-1',
+                  'rating': 5,
+                  'state': 'PUBLISHED',
+                  'createdAt': '2026-11-20T03:00:00Z',
+                  'helpfulCount': 7,
+                  'helpedByMe': null,
+                },
+              ],
+              'page': {'size': 20},
+              'summary': {'averageRating': 4.5, 'reviewCount': 1},
+            },
+          ),
+        ).productReviews('P-1', sort: ReviewSort.recommended, sku: 'S-2');
+        final q = adapter.requests.single.uri.queryParameters;
+        expect(q['sort'], 'RECOMMENDED');
+        expect(q['sku'], 'S-2');
+        expect(page.items.single.helpfulCount, 7);
+        expect(page.items.single.helpedByMe, isNull);
+        expect(page.reviewCount, 1);
+      },
     );
-    expect(
-      () => repo.productReviews('P-1', sku: 'S-1'),
-      throwsUnsupportedError,
+
+    test(
+      '도움돼요: 누르기 PUT·취소 DELETE /reviews/{id}/helpful, 멱등 키·출처, 서버 값',
+      () async {
+        final key = IdempotencyKey.generate();
+        final repo = api(
+          (i) => FakeReply(
+            200,
+            body: {
+              'reviewId': 'rv-1',
+              'helpfulCount': i == 0 ? 8 : 7,
+              'helpedByMe': i == 0,
+            },
+          ),
+        );
+        final on = await repo.setHelpful('rv-1', on: true, key: key);
+        final off = await repo.setHelpful(
+          'rv-1',
+          on: false,
+          key: IdempotencyKey.generate(),
+        );
+        expect(adapter.requests[0].method, 'PUT');
+        expect(adapter.requests[0].uri.path, '/api/v1/reviews/rv-1/helpful');
+        expect(adapter.requests[0].headers['Idempotency-Key'], key.value);
+        expect(adapter.requests[0].headers['X-Source-System'], sourceSystem);
+        expect(adapter.requests[1].method, 'DELETE');
+        expect(on, (count: 8, helped: true));
+        expect(off, (count: 7, helped: false));
+      },
     );
-    expect(
-      () => repo.productReviews('P-1', sort: ReviewSort.recommended),
-      throwsUnsupportedError,
-    );
+
+    test('도움돼요: 삭제된 리뷰 409 REVIEW_NOT_PUBLISHED 는 code 로 받는다', () async {
+      final repo = api(
+        (_) => const FakeReply(
+          409,
+          body: {'code': 'REVIEW_NOT_PUBLISHED', 'status': 409},
+        ),
+      );
+      await expectLater(
+        repo.setHelpful('rv-1', on: true, key: IdempotencyKey.generate()),
+        throwsA(
+          isA<ProblemFailure>().having(
+            (f) => f.problem.code,
+            'code',
+            ReviewHelpfulProblemCode.notPublished,
+          ),
+        ),
+      );
+    });
   });
   testWidgets('상세 → 리뷰 전체(옵션 이름을 같이 봄) → 같은 상품 상세를 다시 열어도 오류 없이 열린다', (
     t,

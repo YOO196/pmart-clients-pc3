@@ -49,7 +49,7 @@ abstract interface class ReviewsRepository {
   /// `DELETE /reviews/{reviewId}`. 204(이미 삭제여도 204 — 멱등). 삭제 뒤 같은 품목은 다시 쓸 수 없다.
   Future<void> delete(String reviewId, {required IdempotencyKey key});
 
-  /// `GET /products/{productId}/reviews`(최신 순). [sku] 옵션 조건·추천순은 계약에 없다(BR-76) — 목만.
+  /// `GET /products/{productId}/reviews`. [sku] 옵션 하나로 거르기·추천순(review 0.6.0, BR-76).
   Future<ProductReviewPage> productReviews(
     String productId, {
     String? cursor,
@@ -58,7 +58,8 @@ abstract interface class ReviewsRepository {
     String? sku,
   });
 
-  /// 도움돼요 누르기([on] true)·취소(false) — 회원만, 같은 [key] 는 같은 결과(BR-76 R3 제안, 계약 전 — 목만).
+  /// 도움돼요 누르기([on] true — `PUT /reviews/{id}/helpful`)·취소(`DELETE`) — 회원만, 같은 [key] 는 같은 결과(review 0.6.0).
+  /// 내 리뷰 422 `HELPFUL_OWN_REVIEW`, 삭제된 리뷰 409 `REVIEW_NOT_PUBLISHED`.
   Future<HelpfulResult> setHelpful(
     String reviewId, {
     required bool on,
@@ -203,20 +204,18 @@ final class ApiReviewsRepository implements ReviewsRepository {
     bool withPhotoOnly = false,
     String? sku,
   }) async {
-    // 계약에 없는 조건은 실서버에 보내지 않는다(BR-76 — 화면이 목 모드에서만 연다).
-    if (sku != null || sort == ReviewSort.recommended) {
-      throw UnsupportedError('BR-76: 옵션 조건·추천순은 계약 전');
-    }
     final res = await pmartGuard(
       () => _reviews.listProductReviews(
         productId: productId,
         cursor: cursor,
         sort: switch (sort) {
-          ReviewSort.newest || ReviewSort.recommended => 'NEWEST',
+          ReviewSort.recommended => 'RECOMMENDED',
+          ReviewSort.newest => 'NEWEST',
           ReviewSort.ratingDesc => 'RATING_DESC',
           ReviewSort.ratingAsc => 'RATING_ASC',
         },
         withPhotoOnly: withPhotoOnly,
+        sku: sku,
       ),
     );
     final body =
@@ -229,9 +228,26 @@ final class ApiReviewsRepository implements ReviewsRepository {
     String reviewId, {
     required bool on,
     required IdempotencyKey key,
-  }) =>
-      // 계약 전(BR-76) — 실서버에 경로를 지어 부르지 않는다.
-      throw UnsupportedError('BR-76: 도움돼요는 계약 전');
+  }) async {
+    final res = await pmartGuard(
+      () => on
+          ? _reviews.markReviewHelpful(
+              reviewId: reviewId,
+              idempotencyKey: key.value,
+              xSourceSystem: sourceSystem,
+              extra: commandOptions(key).extra,
+            )
+          : _reviews.unmarkReviewHelpful(
+              reviewId: reviewId,
+              idempotencyKey: key.value,
+              xSourceSystem: sourceSystem,
+              extra: commandOptions(key).extra,
+            ),
+    );
+    // 2xx 인데 본문이 없으면 반영됐는지 모른다 — 같은 키로 다시 보내 확인한다.
+    final r = res.data ?? (throw UnknownResultFailure(requestId: key.value));
+    return (count: r.helpfulCount, helped: r.helpedByMe);
+  }
 }
 
 EligibilityPage eligibilityPageFromContract(
@@ -297,4 +313,7 @@ ReviewView reviewFromContract(api.Review r) => ReviewView(
   createdAt: r.createdAt,
   editableUntil: r.editableUntil,
   updatedAt: r.updatedAt,
+  // review 0.6.0(BR-76): 도움돼요 수·내가 눌렀는지(회원 토큰이 있을 때만 — 비회원은 null).
+  helpfulCount: r.helpfulCount,
+  helpedByMe: r.helpedByMe,
 );

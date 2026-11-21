@@ -25,8 +25,8 @@ import 'reviews_screens.dart'
     show ReviewStars, openReviewPhotoViewer, showReviewPolicyDialog;
 
 /// 상품 리뷰 전체(레퍼런스 "상품리뷰 전체 보기"): 평점, 사진 리뷰 모음(2줄 + 모아보기), 리뷰 수·정책 안내,
-/// 사진리뷰만·정렬(최근 등록·별점 높은·별점 낮은 — 계약 sort), 리뷰 카드(옵션 줄). 추천순·옵션 필터·도움돼요는 계약 전(BR-76)이라
-/// 목 모드에서만([reviewExtrasProvider]). 신고·프로필 그림은 두지 않는다.
+/// 사진리뷰만·정렬(추천·최근 등록·별점 높은·별점 낮은 — 계약 sort), 옵션 필터(sku), 리뷰 카드(옵션 줄·도움돼요 — review 0.6.0).
+/// 신고·프로필 그림은 계약에 없어 두지 않는다.
 class ProductReviewsScreen extends ConsumerStatefulWidget {
   const ProductReviewsScreen({super.key, required this.productId});
 
@@ -38,20 +38,18 @@ class ProductReviewsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
-  // 추천순이 되면(BR-76 목) 기본은 추천순, 아니면 최근 등록순 — 그리기 전에(initState) 정한다.
+  // 기본은 추천순(review 0.6.0 RECOMMENDED — 서버 기본은 NEWEST 라 늘 보낸다).
   late ReviewSort _sort;
 
   @override
   void initState() {
     super.initState();
-    _sort = ref.read(reviewExtrasProvider)
-        ? ReviewSort.recommended
-        : ReviewSort.newest;
+    _sort = ReviewSort.recommended;
   }
 
   bool _photoOnly = false;
 
-  /// 고른 옵션(BR-76 목만). null = 옵션 전체.
+  /// 고른 옵션(review 0.6.0 sku). null = 옵션 전체.
   String? _sku;
 
   ProductReviewQuery get _query => (
@@ -89,8 +87,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
       selected: _sort,
       options: [
         for (final s in ReviewSort.values)
-          if (s != ReviewSort.recommended || ref.read(reviewExtrasProvider))
-            (s, reviewSortLabel(l10n, s), ValueKey('review-sort-${s.name}')),
+          (s, reviewSortLabel(l10n, s), ValueKey('review-sort-${s.name}')),
       ],
     );
     if (picked != null && mounted) setState(() => _sort = picked);
@@ -104,11 +101,10 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
     final value = ref.watch(provider);
     final list = value.value;
     final now = ref.watch(clockProvider)();
-    // 옵션 필터(BR-76 목만): 옵션이 2개 이상인 상품에만.
-    final options = ref.watch(reviewExtrasProvider)
-        ? (ref.watch(productDetailProvider(widget.productId)).value?.options ??
-              const <SaleOption>[])
-        : const <SaleOption>[];
+    // 옵션 필터(review 0.6.0 sku): 옵션이 2개 이상인 상품에만.
+    final options =
+        ref.watch(productDetailProvider(widget.productId)).value?.options ??
+        const <SaleOption>[];
 
     final header = <Widget>[
       if (list?.averageRating case final avg?)
@@ -492,9 +488,8 @@ class ProductReviewCard extends ConsumerWidget {
               ),
             ),
           ],
-          // 도움돼요(BR-76 목만): 서버 값이 있을 때만. 내 리뷰는 수만, 남의 리뷰는 회원만 누른다.
-          if ((query, r.helpfulCount) case (final q?, final int count)
-              when ref.watch(reviewExtrasProvider)) ...[
+          // 도움돼요(review 0.6.0): 서버 값이 있을 때만. 내 리뷰는 수만, 남의 리뷰는 회원만 누른다.
+          if ((query, r.helpfulCount) case (final q?, final int count)) ...[
             const SizedBox(height: 12),
             if (mine != null)
               Text(
@@ -514,7 +509,7 @@ class ProductReviewCard extends ConsumerWidget {
   }
 }
 
-/// 도움돼요 버튼(BR-76 — 계약 전, 목만). 회원만 누른다 — 비회원은 로그인 안내. 누른 상태·수는 서버가 준 값.
+/// 도움돼요 버튼(review 0.6.0, BR-76). 회원만 누른다 — 비회원은 로그인 안내. 누른 상태·수는 서버가 준 값.
 class _HelpfulButton extends ConsumerStatefulWidget {
   const _HelpfulButton({
     required this.review,
@@ -552,11 +547,11 @@ class _HelpfulButtonState extends ConsumerState<_HelpfulButton> {
           .read(productReviewListProvider(widget.query).notifier)
           .toggleHelpful(widget.review.reviewId);
     } on ProblemFailure catch (f) {
-      messenger.notice(
-        f.problem.code == ReviewHelpfulProblemCode.ownReview
-            ? l10n.reviewHelpfulOwn
-            : l10n.reviewHelpfulFailed,
-      );
+      messenger.notice(switch (f.problem.code) {
+        ReviewHelpfulProblemCode.ownReview => l10n.reviewHelpfulOwn,
+        ReviewHelpfulProblemCode.notPublished => l10n.reviewHelpfulNotPublished,
+        _ => l10n.reviewHelpfulFailed,
+      });
     } on PmartFailure {
       messenger.notice(l10n.reviewHelpfulFailed);
     } finally {
