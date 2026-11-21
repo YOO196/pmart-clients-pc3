@@ -12,6 +12,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
+import 'package:customer_app/features/profile/domain/profile.dart'
+    show ProfilePhotoSource;
+import 'package:customer_app/features/profile/presentation/profile_photo.dart';
+import 'package:customer_app/l10n/gen/app_localizations.dart';
 
 import 'package:customer_app/app.dart';
 import 'package:customer_app/features/withdrawal/data/withdrawal_repository.dart';
@@ -999,7 +1003,9 @@ void main() {
         const [],
         profile: MockProfileRepository(latency: Duration.zero)
           ..nickname = '김피마'
-          ..email = 'pmart.user@gmail.com',
+          ..email = 'pmart.user@gmail.com'
+          // 사진 시트 4항목이 다 보이게 직접 올린 사진 상태로 둔다.
+          ..photoSource = ProfilePhotoSource.custom,
       ),
     );
     await t.pumpAndSettle();
@@ -1021,6 +1027,57 @@ void main() {
     await shot('1-list');
     await t.tap(find.byKey(const ValueKey('info-name-row')));
     await shot('2-name-sheet');
+    await t.tap(find.byKey(const ValueKey('info-name-close')));
+    await t.pumpAndSettle();
+    // 사진 바꾸기 시트(G-1, BR-80).
+    await t.tap(find.byKey(const ValueKey('info-photo-edit')));
+    await shot('3-photo-sheet');
+  });
+
+  // 사진 맞추기(G-2, BR-80) — 팔레트 색 그라데이션을 사진 대신 쓴다.
+  testWidgets('photo-crop', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final bytes = await t.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawRect(
+        const Rect.fromLTWH(0, 0, 600, 800),
+        Paint()
+          ..shader = ui.Gradient.linear(
+            Offset.zero,
+            const Offset(600, 800),
+            const [PmartBrand.lavender, PmartBrand.violet],
+          ),
+      );
+      final img = await recorder.endRecording().toImage(600, 800);
+      final data = await img.toByteData(format: ui.ImageByteFormat.png);
+      return data!.buffer.asUint8List();
+    });
+    await t.pumpWidget(
+      MaterialApp(
+        theme: PmartCustomerTheme.light(fontFamily: 'Pretendard'),
+        debugShowCheckedModeBanner: false,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('ko'),
+        home: ProfilePhotoCropScreen(bytes: bytes!),
+      ),
+    );
+    await t.pump(const Duration(milliseconds: 300));
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 300)),
+    );
+    await t.pump();
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(ProfilePhotoCropScreen),
+      matchesGoldenFile(File('$_dir/i-4-photo-crop.png').uri),
+    );
   });
 
   // 처음 실행(레퍼런스 2): 환영·약관 → 로그인/둘러보기 → 주소 검색.
@@ -1430,7 +1487,12 @@ void main() {
       ], catalog: catalog),
     );
     await t.pumpAndSettle();
-    await t.drag(find.byType(CustomScrollView).first, const Offset(0, -700));
+    await t.scrollUntilVisible(
+      find.byKey(const ValueKey('section-timer-S-NEW')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await t.drag(find.byType(CustomScrollView).first, const Offset(0, 250));
     await t.pumpAndSettle();
     await expectLater(
       find.byType(CustomerApp),

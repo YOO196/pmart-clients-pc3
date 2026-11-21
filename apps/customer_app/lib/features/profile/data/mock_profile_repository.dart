@@ -34,6 +34,19 @@ final class MockProfileRepository implements ProfileRepository {
 
   /// `GET /me/profile-image` 가 돌려줄 사진. null 이면 사본 없음(404).
   Uint8List? imageBytes;
+
+  /// 사진 출처(BR-80). 기본은 로그인 계정 사진.
+  ProfilePhotoSource photoSource = ProfilePhotoSource.provider;
+
+  /// 로그인 계정 사진(되돌리기 때 다시 쓴다). null 이면 제공자가 사진을 준 적 없음.
+  Uint8List? providerImageBytes;
+
+  /// 다음 사진 바꾸기를 이 실패로 끝낸다(한 번).
+  PmartFailure? photoFailure;
+
+  final photoKeys = <String>[];
+  final photoChanges = <ProfilePhotoChange>[];
+  int _photoVersion = 1;
   int imageReads = 0;
   int _version = 1;
 
@@ -63,6 +76,7 @@ final class MockProfileRepository implements ProfileRepository {
       emailVerified: emailVerified,
       profileImageUrl: profileImageUrl,
       withdrawPending: withdrawPending,
+      photoSource: photoSource,
     );
   }
 
@@ -100,6 +114,42 @@ final class MockProfileRepository implements ProfileRepository {
     }
     if (nickname != null) this.nickname = nickname;
     _version++;
+    return const ProfileChangeApplied();
+  }
+
+  @override
+  Future<ProfileChangeOutcome> changePhoto(
+    ProfilePhotoChange change, {
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    photoKeys.add(key.value);
+    photoChanges.add(change);
+    if (photoFailure case final f?) {
+      photoFailure = null;
+      return profileChangeFailure(f);
+    }
+    if (withdrawPending) {
+      return const ProfileChangeRejected(ProblemCode.invalidState);
+    }
+    _photoVersion++;
+    switch (change) {
+      case ProfilePhotoUpload(:final bytes):
+        if (bytes.lengthInBytes > 2 * 1024 * 1024) {
+          return const ProfileChangeRejected(ProblemCode.validationFailed);
+        }
+        photoSource = ProfilePhotoSource.custom;
+        imageBytes = bytes;
+      case ProfilePhotoClear():
+        photoSource = ProfilePhotoSource.none;
+        imageBytes = null;
+      case ProfilePhotoRestore():
+        photoSource = ProfilePhotoSource.provider;
+        imageBytes = providerImageBytes;
+    }
+    profileImageUrl = imageBytes == null
+        ? null
+        : '/api/v1/me/profile-image?v=m$_photoVersion';
     return const ProfileChangeApplied();
   }
 

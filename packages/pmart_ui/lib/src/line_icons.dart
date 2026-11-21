@@ -93,6 +93,12 @@ enum PmartLineIcons {
 
   /// 세로 점 세 개(⋮ 더보기 — 고객앱 리뷰관리 내가 쓴 리뷰, 레퍼런스 11).
   moreVertical,
+
+  /// 사진첩(앨범에서 고르기 — 액자 + 산 + 해).
+  image,
+
+  /// 되돌리기(↶ — 꺾인 화살표).
+  undo,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -526,6 +532,40 @@ class _LinePainter extends CustomPainter {
             ..lineTo(7.4, 19.6)
             ..lineTo(16.6, 19.6)
             ..lineTo(17.6, 6.6),
+          line,
+        );
+      case PmartLineIcons.image:
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            const Rect.fromLTWH(4, 5, 16, 14),
+            const Radius.circular(2),
+          ),
+          line,
+        );
+        canvas.drawCircle(const Offset(9, 10), 1.6, line);
+        canvas.drawPath(
+          Path()
+            ..moveTo(5, 17)
+            ..lineTo(9.5, 12.5)
+            ..lineTo(12.5, 15.5)
+            ..lineTo(15, 13)
+            ..lineTo(19, 17),
+          line,
+        );
+      case PmartLineIcons.undo:
+        canvas.drawPath(
+          Path()
+            ..moveTo(9, 7)
+            ..lineTo(5, 11)
+            ..lineTo(9, 15),
+          line,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(5, 11)
+            ..lineTo(14, 11)
+            ..arcToPoint(const Offset(14, 21), radius: const Radius.circular(5))
+            ..lineTo(12, 21),
           line,
         );
       case PmartLineIcons.refresh:

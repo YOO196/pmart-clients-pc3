@@ -19,7 +19,11 @@ class Profile {
     this.profileImageUrl,
     this.withdrawPending = false,
     this.socialProvider,
+    this.photoSource,
   });
+
+  /// 사진 출처(customer 0.15.0 BR-80). 모르면 null(옛 서버).
+  final ProfilePhotoSource? photoSource;
 
   /// 탈퇴 처리 대기(계정 상태 `WITHDRAW_PENDING`, customer 0.12.0). 로그인은 되고 새 주문만 막힌다.
   final bool withdrawPending;
@@ -61,6 +65,42 @@ class Profile {
 
   @override
   String toString() => 'Profile($accountId, v$version)';
+}
+
+/// 프로필 사진 출처(customer 0.15.0 `Profile.photoSource`). 직접 올림·기본을 고르면 로그인해도 제공자 사진으로 덮지 않는다.
+enum ProfilePhotoSource {
+  /// 로그인 계정 사진(로그인마다 최신).
+  provider,
+
+  /// 고객이 직접 올린 사진.
+  custom,
+
+  /// 기본 이미지(사진 없음).
+  none,
+}
+
+/// 프로필 사진 바꾸기(BR-80) — 셋 다 본인 토큰·Idempotency-Key, 결과 CommandResponse.
+@immutable
+sealed class ProfilePhotoChange {
+  const ProfilePhotoChange();
+}
+
+/// `PUT /me/profile-image` — 앱이 정사각형으로 자르고 줄인 사진(2MB 이하, JPEG·PNG·WebP).
+final class ProfilePhotoUpload extends ProfilePhotoChange {
+  const ProfilePhotoUpload(this.bytes, {this.filename = 'profile.png'});
+
+  final Uint8List bytes;
+  final String filename;
+}
+
+/// `DELETE /me/profile-image` — 기본 이미지로.
+final class ProfilePhotoClear extends ProfilePhotoChange {
+  const ProfilePhotoClear();
+}
+
+/// `POST /me/profile-image/provider-restorations` — 로그인 계정 사진으로 되돌리기.
+final class ProfilePhotoRestore extends ProfilePhotoChange {
+  const ProfilePhotoRestore();
 }
 
 /// 휴대폰 번호 입력 규칙(화면 검증용, 서버가 최종 검증). 숫자만 남겨 010·011·016~019 로 시작하는 10~11자리.

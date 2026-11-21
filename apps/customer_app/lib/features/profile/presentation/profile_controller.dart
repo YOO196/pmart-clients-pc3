@@ -108,4 +108,31 @@ class ProfileController extends AsyncNotifier<Profile?> {
     }
     return outcome;
   }
+
+  /// 프로필 사진 바꾸기(BR-80). 한 번 누름 = 키 하나, 결과 불명은 같은 키로 한 번 더 보낸다.
+  /// 결과와 상관없이(거절 제외) 프로필을 다시 읽어 서버 값으로만 사진을 보인다.
+  /// 되돌리기는 서버가 응답 뒤 사본을 받아 두므로(계약) 사진 주소가 비어 있으면 잠시 뒤 몇 번 더 읽는다.
+  Future<ProfileChangeOutcome> changePhoto(ProfilePhotoChange change) async {
+    final key = IdempotencyKey.generate();
+    var outcome = await _repo.changePhoto(change, key: key);
+    if (outcome is ProfileChangeUnknown) {
+      outcome = await _repo.changePhoto(change, key: key);
+    }
+    if (outcome is ProfileChangeRejected ||
+        outcome is ProfileChangeUnsupported) {
+      return outcome;
+    }
+    await _reload();
+    if (outcome is ProfileChangeApplied && change is ProfilePhotoRestore) {
+      final policy = ref.read(profilePollPolicyProvider);
+      for (var i = 0; i < policy.attempts; i++) {
+        final p = state.value;
+        if (p == null || p.hasProfileImage) break;
+        await Future<void>.delayed(policy.interval);
+        if (!ref.mounted) break;
+        await _reload();
+      }
+    }
+    return outcome;
+  }
 }

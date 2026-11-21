@@ -8,6 +8,7 @@ import '../../auth/domain/auth.dart' show MemberSession, SocialProvider;
 import '../../auth/presentation/auth_controller.dart' show sessionProvider;
 import '../domain/profile.dart';
 import 'profile_avatar.dart';
+import 'profile_photo.dart';
 import 'profile_controller.dart';
 import '../../../shared/notice.dart';
 import '../../auth/presentation/signup_steps.dart';
@@ -300,6 +301,18 @@ class _MyInfoView extends ConsumerWidget {
         ),
       ),
     );
+    // 서버 프로필의 로그인 제공자, 없으면 이 기기 세션의 제공자.
+    final providerLabel = switch (profile?.socialProvider ??
+        switch (ref.watch(sessionProvider)) {
+          MemberSession(:final provider) => provider,
+          _ => null,
+        }) {
+      SocialProvider.kakao => l10n.loginKakaoShort,
+      SocialProvider.naver => l10n.loginNaverShort,
+      SocialProvider.apple => l10n.loginAppleShort,
+      SocialProvider.google => l10n.loginGoogleShort,
+      null => null,
+    };
     return Scaffold(
       appBar: AppBar(title: Text(l10n.infoTitle)),
       body: switch (value) {
@@ -312,10 +325,11 @@ class _MyInfoView extends ConsumerWidget {
         _ => ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
+            // 사진 + 카메라 표시 → 사진 바꾸기 시트(G안, customer 0.15.0 BR-80).
             Center(
-              child: KeyedSubtree(
-                key: const ValueKey('info-avatar'),
-                child: ProfileAvatar(profile: profile, radius: 44),
+              child: ProfilePhotoEditor(
+                profile: profile,
+                providerLabel: providerLabel,
               ),
             ),
             const SizedBox(height: 20),
@@ -447,18 +461,7 @@ class _MyInfoView extends ConsumerWidget {
                   ),
                   const SizedBox(width: 12),
                   // 서버 프로필의 로그인 제공자, 없으면 이 기기 세션의 제공자.
-                  if (switch (profile.socialProvider ??
-                          switch (ref.watch(sessionProvider)) {
-                            MemberSession(:final provider) => provider,
-                            _ => null,
-                          }) {
-                        SocialProvider.kakao => l10n.loginKakaoShort,
-                        SocialProvider.naver => l10n.loginNaverShort,
-                        SocialProvider.apple => l10n.loginAppleShort,
-                        SocialProvider.google => l10n.loginGoogleShort,
-                        null => null,
-                      }
-                      case final p?)
+                  if (providerLabel case final p?)
                     Text(
                       p,
                       key: const ValueKey('info-login-provider'),

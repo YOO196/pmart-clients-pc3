@@ -28,6 +28,12 @@ abstract interface class ProfileRepository {
   /// `GET /me/profile-image` — 로그인 제공자 사진의 서버 사본(본인 토큰 필요, ADR-0024).
   /// 사본이 아직 없으면(404) null. 그 밖의 실패는 [PmartFailure] 로 던진다.
   Future<Uint8List?> profileImage();
+
+  /// 프로필 사진 바꾸기(customer 0.15.0 BR-80). 결과 불명은 같은 [key] 로 다시 보낸다(같은 키 = 처음 결과).
+  Future<ProfileChangeOutcome> changePhoto(
+    ProfilePhotoChange change, {
+    required IdempotencyKey key,
+  });
 }
 
 final class ApiProfileRepository implements ProfileRepository {
@@ -76,6 +82,40 @@ final class ApiProfileRepository implements ProfileRepository {
           ),
           extra: commandOptions(key, expectedVersion: expectedVersion).extra,
         ),
+      );
+      return profileChangeFromContract(res.data, key.value);
+    } on PmartFailure catch (f) {
+      return profileChangeFailure(f);
+    }
+  }
+
+  @override
+  Future<ProfileChangeOutcome> changePhoto(
+    ProfilePhotoChange change, {
+    required IdempotencyKey key,
+  }) async {
+    final extra = commandOptions(key).extra;
+    try {
+      final res = await pmartGuard(
+        () => switch (change) {
+          ProfilePhotoUpload(:final bytes, :final filename) =>
+            _api.uploadMyProfileImage(
+              idempotencyKey: key.value,
+              xSourceSystem: sourceSystem,
+              file: MultipartFile.fromBytes(bytes, filename: filename),
+              extra: extra,
+            ),
+          ProfilePhotoClear() => _api.clearMyProfileImage(
+            idempotencyKey: key.value,
+            xSourceSystem: sourceSystem,
+            extra: extra,
+          ),
+          ProfilePhotoRestore() => _api.restoreMyProviderProfileImage(
+            idempotencyKey: key.value,
+            xSourceSystem: sourceSystem,
+            extra: extra,
+          ),
+        },
       );
       return profileChangeFromContract(res.data, key.value);
     } on PmartFailure catch (f) {
@@ -138,6 +178,12 @@ Profile profileFromContract(api.Profile p) {
       api.ProfileSocialProviderEnum.NAVER => SocialProvider.naver,
       api.ProfileSocialProviderEnum.GOOGLE => SocialProvider.google,
       api.ProfileSocialProviderEnum.APPLE => SocialProvider.apple,
+      _ => null,
+    },
+    photoSource: switch (p.photoSource) {
+      api.ProfilePhotoSourceEnum.PROVIDER => ProfilePhotoSource.provider,
+      api.ProfilePhotoSourceEnum.CUSTOM => ProfilePhotoSource.custom,
+      api.ProfilePhotoSourceEnum.NONE => ProfilePhotoSource.none,
       _ => null,
     },
   );
