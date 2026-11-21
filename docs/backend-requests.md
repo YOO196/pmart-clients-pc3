@@ -84,7 +84,8 @@
 | BR-74 | 보통 | 고객 | 네이버 로그인마다 정보 제공 동의 화면 다시 — 이미 동의한 앱은 네이버가 다시 묻지 않아 서버가 교환 뒤 네이버 연결을 끊어야 함(secret·access token 은 서버만). 식별값(sub) 유지 확인 필요. 요청서 `docs/handoff/customer-app/2026-11-20-backend-naver-consent-every-login.md` | 요청서 보냄, 회신 대기 — 앱은 `auth_type=reauthenticate`(아이디·비밀번호 매번) 반영 |
 | BR-75 | 보통 | 인사 | 권한·근무 기간 순서 검사 — `RequestedGrant.validFrom·validTo`·직원 등록 `startDate·endDate` 에 종료일<시작일이면 400(지금은 거꾸로 된 기간이 저장·자동 승인됨). 화면은 막아 둠(#331). 요청서 `docs/handoff/hr-backoffice/2026-11-20-backend-grant-period-order.md` | 요청서 보냄, 회신 대기 |
 | BR-76 | 보통 | 고객 | 상품 리뷰 추천순 정렬(R1)·옵션(sku) 필터(R2)·도움돼요 누르기/취소(회원만, R3)·리뷰 `helpfulCount`/`helpedByMe`(R4) — review 0.5.0 목록에 없음. 요청서 `docs/handoff/customer-app/2026-11-21-backend-review-sort-option-helpful.md` | **RESOLVED**(회신 `../pmart-backend/docs/handoff/clients/customer-app/2026-11-21-reply-br76-review-sort-option-helpful.md`, review 0.6.0 LAN 배포) — 고객앱 실서버 연결(2026-11-21), 실기기 확인 대기 |
-| BR-77 | 보통 | 고객 | 네이버 로그인 계정에도 이메일 — 네이버 ID 토큰엔 email 이 없음(OIDC claims 확인). 서버가 교환 때 이미 부르는 `/v1/nid/me` 의 email 을 서버가 직접 받은 값으로 계정 이메일에(R1), 없거나 실패면 로그인은 그대로(R2), 기존 계정(R3), 로그 금지(R4). 요청서 `docs/handoff/customer-app/2026-11-21-backend-naver-email.md` | 요청 |
+| BR-77 | 보통 | 고객 | **RESOLVED 2026-11-21**(회신 `clients/customer-app/2026-11-21-reply-br77-naver-email.md` — 서버가 교환 때 받은 이메일을 로그인 때 싣기, 앱·계약 변경 없음, 사용자: 네이버 콘솔 이메일 주소 켜기) 네이버 로그인 계정에도 이메일 — 네이버 ID 토큰엔 email 이 없음(OIDC claims 확인). 서버가 교환 때 이미 부르는 `/v1/nid/me` 의 email 을 서버가 직접 받은 값으로 계정 이메일에(R1), 없거나 실패면 로그인은 그대로(R2), 기존 계정(R3), 로그 금지(R4). 요청서 `docs/handoff/customer-app/2026-11-21-backend-naver-email.md` | 요청 |
+| BR-78 | 보통 | 고객 | 고객 FAQ·AI 상담 안내 문서(`docs/business/customer-faq/12-account.md`)가 "Google 로그인만"(11-09) — 카카오·네이버 로그인, 가입 휴대폰 확인·한 번호 한 계정·탈퇴 30일 재가입 제한, 앱 탈퇴 반영(R1), 다른 문서 훑기(R2), 재색인(R3). 요청서 `docs/handoff/customer-app/2026-11-21-backend-faq-login-policy.md` | 요청 |
 
 ---
 
@@ -496,3 +497,6 @@
 
 ## BR-77 네이버 로그인 계정 이메일 (고객앱)
 - 2026-11-21 사용자 실기기: 로그인 이메일이 구글만 보임. 서버는 ID 토큰 `email` 만 저장하는데 네이버 OIDC 는 scopes openid·profile, claims 에 email 이 없다(discovery 직접 확인). 서버가 교환 때 이미 부르는 프로필 API(`/v1/nid/me`, BR-70)의 email 을 써 달라는 요청서 `docs/handoff/customer-app/2026-11-21-backend-naver-email.md`. 카카오는 콘솔 비즈 앱 전환 + 동의항목(사용자 작업)이라 서버 변경 없음.
+
+## BR-78 고객 FAQ 로그인·가입·탈퇴 정책 (고객앱)
+- 2026-11-21 사용자 실기기: 자주 묻는 질문이 "Google 로그인만"이라고 나옴. FAQ·AI 상담은 백엔드 `docs/business/customer-faq/` 색인에서 오는데 `12-account.md` 가 11-09 승인본 그대로. 요청서 `docs/handoff/customer-app/2026-11-21-backend-faq-login-policy.md`. 앱 변경 없음.

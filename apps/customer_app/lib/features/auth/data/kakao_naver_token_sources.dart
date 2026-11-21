@@ -52,6 +52,10 @@ final class KakaoSocialTokenSource implements SocialTokenSource {
   @override
   Future<SocialCredential?> obtainSilently(SocialProvider provider) async =>
       null;
+
+  /// 서버가 끊는다(카카오: 탈퇴 반영 뒤 Admin 키, 네이버: 탈퇴 재인증 교환 때) — 앱은 할 일 없음.
+  @override
+  Future<void> forget(SocialProvider provider, {bool revoke = false}) async {}
 }
 
 /// 네이버 Client ID(공개 값, 빌드 때 `.secrets` 에서 dart-define 으로). 비면 네이버 버튼은 설정 문제로 알린다.
@@ -179,6 +183,10 @@ final class NaverSocialTokenSource implements SocialTokenSource {
   @override
   Future<SocialCredential?> obtainSilently(SocialProvider provider) async =>
       null;
+
+  /// 서버가 끊는다(카카오: 탈퇴 반영 뒤 Admin 키, 네이버: 탈퇴 재인증 교환 때) — 앱은 할 일 없음.
+  @override
+  Future<void> forget(SocialProvider provider, {bool revoke = false}) async {}
 }
 
 /// 제공자마다 맞는 SDK 로 보낸다.
@@ -208,4 +216,8 @@ final class RoutingSocialTokenSource implements SocialTokenSource {
   @override
   Future<SocialCredential?> obtainSilently(SocialProvider provider) =>
       _of(provider).obtainSilently(provider);
+
+  @override
+  Future<void> forget(SocialProvider provider, {bool revoke = false}) =>
+      _of(provider).forget(provider, revoke: revoke);
 }

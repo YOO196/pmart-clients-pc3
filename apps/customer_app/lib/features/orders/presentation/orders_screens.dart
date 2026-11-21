@@ -46,6 +46,8 @@ import 'tracking_map.dart';
 import 'orders_providers.dart';
 import 'receipt_confirmation.dart';
 import '../../../shared/notice.dart';
+import '../../support/domain/inquiry.dart' show InquiryCategory;
+import '../../support/presentation/inquiry_screens.dart' show InquiryFormArgs;
 import '../../redelivery/presentation/redelivery_screens.dart'
     show RedeliveryPaymentsSection;
 import '../../reviews/presentation/reviews_screens.dart'
@@ -707,6 +709,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
       String label,
       VoidCallback onTap, {
       bool strong = false,
+      PmartLineIcons? lead,
     }) => Expanded(
       child: OutlinedButton(
         key: ValueKey(key),
@@ -1082,8 +1085,8 @@ class _OrderBody extends ConsumerWidget {
     final byLine = {for (final l in o.lines) l.orderLineId: l};
 
     /// 취소·변경·처리 내역 화면에 다녀오면 주문이 바뀌었을 수 있다. 돌아올 때 상세·목록을 다시 읽는다.
-    Future<void> visit(String location) async {
-      await context.push(location);
+    Future<void> visit(String location, {Object? extra}) async {
+      await context.push(location, extra: extra);
       if (!context.mounted) return;
       ref.invalidate(orderDetailProvider(o.orderId));
       ref.invalidate(orderClaimsProvider(o.orderId));
@@ -1136,6 +1139,7 @@ class _OrderBody extends ConsumerWidget {
       String label,
       VoidCallback onTap, {
       bool strong = false,
+      PmartLineIcons? lead,
     }) => Expanded(
       child: OutlinedButton(
         key: ValueKey(key),
@@ -1154,7 +1158,16 @@ class _OrderBody extends ConsumerWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
-        child: Text(label),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (lead != null) ...[
+              PmartLineIcon(lead, size: 19, strokeWidth: 1.8),
+              const SizedBox(width: 5),
+            ],
+            Flexible(child: Text(label)),
+          ],
+        ),
       ),
     );
     final itemsKey = GlobalObjectKey('$hashCode-items');
@@ -1172,7 +1185,8 @@ class _OrderBody extends ConsumerWidget {
 
     return SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      // 사용자 2026-11-21 "주문상세 너무 다닥다닥" — 레퍼런스 9-1 3-1 간격(블록 사이 16~24, 구획 사이 32, 카드 안 18).
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1278,27 +1292,50 @@ class _OrderBody extends ConsumerWidget {
               ],
             ],
           ),
-          const SizedBox(height: 10),
-          // [문의하기] (+ 배송 중이면 [배달 현황]) — 문의는 접수일 뿐 주문을 바꾸지 않는다.
-          Row(
-            children: [
-              wide(
-                'order-inquiry',
-                l10n.orderInquiry,
-                () => visit('/orders/${o.orderId}/help'),
-              ),
-              // 배송현황(지도) — 결제가 끝나고 배송이 끝나기 전이면 늘 보인다. 배송 ID 를 몰라도 지도부터 뜬다(BR-61).
-              if (_trackable(o.status)) ...[
-                const SizedBox(width: 8),
-                wide(
-                  'order-track',
-                  l10n.ordersTrack,
-                  () => visit('/orders/${o.orderId}/tracking'),
-                  strong: true,
-                ),
+          // 주문 상태마다 버튼이 다르다(레퍼런스 9-1·9-2, 사용자 2026-11-21) — 문의는 접수일 뿐 주문을 바꾸지 않는다.
+          //  · 취소된 주문: 버튼 없음(9-1 3-1)
+          //  · 배송 완료: [반품·교환] [문의하기](9-2 2) — 반품 접수는 고객센터만이라(claim 0.2.0) 환불 문의로 잇는다
+          //  · 예약 확정(준비 전): [문의하기](9-1 3-2)
+          //  · 준비~배달 중: [문의하기] [배달 현황] — 배송 ID 를 몰라도 지도부터 뜬다(BR-61)
+          if (switch (orderDetailActions(o)) {
+                final actions when actions.isNotEmpty => actions,
+                _ => null,
+              }
+              case final actions?) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                for (final (i, a) in actions.indexed) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  switch (a) {
+                    OrderDetailAction.returnExchange => wide(
+                      'order-return-exchange',
+                      l10n.orderReturnExchange,
+                      () => visit(
+                        '/support/inquiries/new',
+                        extra: InquiryFormArgs(
+                          orderId: o.orderId,
+                          category: InquiryCategory.refund,
+                        ),
+                      ),
+                    ),
+                    OrderDetailAction.inquiry => wide(
+                      'order-inquiry',
+                      l10n.orderInquiry,
+                      () => visit('/orders/${o.orderId}/help'),
+                      lead: PmartLineIcons.questionBubble,
+                    ),
+                    OrderDetailAction.track => wide(
+                      'order-track',
+                      l10n.ordersTrack,
+                      () => visit('/orders/${o.orderId}/tracking'),
+                      strong: true,
+                    ),
+                  },
+                ],
               ],
-            ],
-          ),
+            ),
+          ],
           // 오배송 다시 배송비 결제(있을 때만). 알림 "결제 필요"(목적지 ORDER)를 열면 이 주문 상세로 온다.
           RedeliveryPaymentsSection(orderId: o.orderId),
           for (final s in o.staleSources)
@@ -1312,7 +1349,7 @@ class _OrderBody extends ConsumerWidget {
                 style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
               ),
             ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 24),
           // 구획 칩: 누르면 그 구획으로
           Row(
             children: [
@@ -1362,7 +1399,7 @@ class _OrderBody extends ConsumerWidget {
           for (final (i, s) in o.shipments.indexed)
             Card(
               key: ValueKey('shipment-${s.shipmentId}'),
-              margin: const EdgeInsets.only(top: 10),
+              margin: const EdgeInsets.only(top: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
                 side: BorderSide(color: scheme.outlineVariant),
@@ -1421,12 +1458,12 @@ class _OrderBody extends ConsumerWidget {
                 ),
               ),
             ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 32),
           KeyedSubtree(
             key: itemsKey,
             child: _OrderLinesSection(order: o),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 32),
           _DetailTitle(l10n.orderTabPay, key: payKey),
           _DetailBox(
             children: [
@@ -1475,25 +1512,10 @@ class _OrderBody extends ConsumerWidget {
             ],
           ),
           _ClaimsSection(order: o, onVisit: visit),
-          const SizedBox(height: 18),
+          const SizedBox(height: 32),
           // 배달 정보: 주문 당시 배송지 사본(BR-37, 주소록을 다시 부르지 않는다) + 요청사항·품절 시 처리.
           _DetailTitle(l10n.orderTabDelivery, key: deliveryKey),
-          _DetailBox(
-            children: [
-              ShippingAddressView(address: o.shippingAddress),
-              if (o.deliveryNote case final n?)
-                _Row(
-                  l10n.orderDeliveryNote,
-                  n,
-                  key: const ValueKey('order-note'),
-                ),
-              if (o.outOfStock case final p?)
-                _Row(l10n.orderOutOfStock, switch (p) {
-                  OutOfStockPreference.cancelOutOfStockOnly => l10n.oosOnly,
-                  OutOfStockPreference.cancelAll => l10n.oosAll,
-                }, key: const ValueKey('order-oos')),
-            ],
-          ),
+          _DeliveryInfoBox(order: o),
           // 배송 완료된 배송이 있는 주문만 리뷰 자격을 묻는다(작성 가능 여부는 서버 자격 값으로만 판단).
           if (o.shipments.any((s) => s.state == ShipmentState.delivered))
             OrderReviewsSection(
@@ -1514,7 +1536,8 @@ class _DetailTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+    // 레퍼런스 9-1 3-1: 제목은 카드보다 조금 안쪽, 카드까지 약 14
+    padding: const EdgeInsets.fromLTRB(6, 0, 6, 14),
     child: Text(
       text,
       style: Theme.of(context).textTheme.titleSmall?.copyWith(fontSize: 16),
@@ -1531,9 +1554,10 @@ class _DetailBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     width: double.infinity,
-    padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+    // 레퍼런스 9-1 3-1: 카드 안 좌우 약 18, 모서리 16
+    padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
     decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Column(
@@ -1807,88 +1831,97 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
     final anyAdded = _results.values.any(
       (r) => r is _ReorderDone && r.outcome is CartChangeApplied,
     );
+    // 레퍼런스 9-1 3-1: "주문 상품" 제목 + 테두리 카드 안에 줄·같은 상품 담기(사용자 2026-11-21 "다닥다닥").
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.checkoutItems, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 4),
-        for (final (i, l) in lines.indexed) ...[
-          // 레퍼런스 9-1 3-3: 줄과 줄 사이 옅은 선
-          if (i > 0)
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
-            ),
-          _LineTile(
-            line: l,
-            // 레퍼런스 9-1 3-3: 줄마다 동그란 ⊕(글자 "담기" 아님)
-            // 레퍼런스 9-1 3-3: 원 72px ≈ 24dp
-            action: reorderCircle(
-              context: context,
-              key: ValueKey('reorder-${l.orderLineId}'),
-              size: 24,
-              tooltip: l10n.reorderLine,
-              onPressed: (_running || _settled(_results[l.orderLineId]))
-                  ? null
-                  : () => _run([l]),
-              icon: PmartLineIcon(
-                _settled(_results[l.orderLineId])
-                    ? PmartLineIcons.check
-                    : PmartLineIcons.plus,
-                size: 20,
-              ),
-            ),
-          ),
-          if (_text(l10n, _results[l.orderLineId]) case final t?)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                t,
-                key: ValueKey('reorder-result-${l.orderLineId}'),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color:
-                      (_settled(_results[l.orderLineId]) ||
-                          _results[l.orderLineId] is _ReorderRunning)
+        _DetailTitle(l10n.orderTabItems),
+        _DetailBox(
+          children: [
+            for (final (i, l) in lines.indexed) ...[
+              // 레퍼런스 9-1 3-3: 줄과 줄 사이 옅은 선
+              if (i > 0)
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.6,
+                  ),
+                ),
+              _LineTile(
+                line: l,
+                // 레퍼런스 9-1 3-3: 줄마다 동그란 ⊕(글자 "담기" 아님)
+                // 레퍼런스 9-1 3-3: 원 72px ≈ 24dp
+                action: reorderCircle(
+                  context: context,
+                  key: ValueKey('reorder-${l.orderLineId}'),
+                  size: 24,
+                  tooltip: l10n.reorderLine,
+                  onPressed: (_running || _settled(_results[l.orderLineId]))
                       ? null
-                      : theme.colorScheme.error,
+                      : () => _run([l]),
+                  icon: PmartLineIcon(
+                    _settled(_results[l.orderLineId])
+                        ? PmartLineIcons.check
+                        : PmartLineIcons.plus,
+                    size: 20,
+                  ),
                 ),
               ),
-            ),
-        ],
-        if (anyAdded)
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              key: const ValueKey('reorder-go-cart'),
-              onPressed: () => context.push('/cart'),
-              child: Text(l10n.cartGoToCart),
-            ),
-          ),
-        // 레퍼런스 9-1 3-3: 목록 아래 넓은 테두리 단추 "같은 상품 담기"
-        if (lines.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          OutlinedButton(
-            key: const ValueKey('reorder-all'),
-            style: OutlinedButton.styleFrom(
-              // 레퍼런스 9-1 3-3: 139px ≈ 46dp, 모서리 8dp
-              minimumSize: const Size.fromHeight(46),
-              foregroundColor: theme.colorScheme.onSurface,
-              side: BorderSide(color: theme.colorScheme.onSurface, width: 1.2),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+              if (_text(l10n, _results[l.orderLineId]) case final t?)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    t,
+                    key: ValueKey('reorder-result-${l.orderLineId}'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color:
+                          (_settled(_results[l.orderLineId]) ||
+                              _results[l.orderLineId] is _ReorderRunning)
+                          ? null
+                          : theme.colorScheme.error,
+                    ),
+                  ),
+                ),
+            ],
+            if (anyAdded)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  key: const ValueKey('reorder-go-cart'),
+                  onPressed: () => context.push('/cart'),
+                  child: Text(l10n.cartGoToCart),
+                ),
               ),
-              textStyle: theme.textTheme.titleSmall?.copyWith(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+            // 레퍼런스 9-1 3-3: 목록 아래 넓은 테두리 단추 "같은 상품 담기"
+            if (lines.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              OutlinedButton(
+                key: const ValueKey('reorder-all'),
+                style: OutlinedButton.styleFrom(
+                  // 레퍼런스 9-1 3-3: 139px ≈ 46dp, 모서리 8dp
+                  minimumSize: const Size.fromHeight(46),
+                  foregroundColor: theme.colorScheme.onSurface,
+                  side: BorderSide(
+                    color: theme.colorScheme.onSurface,
+                    width: 1.2,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  textStyle: theme.textTheme.titleSmall?.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                onPressed: _running ? null : () => _run(lines),
+                child: Text(l10n.reorderAll),
               ),
-            ),
-            onPressed: _running ? null : () => _run(lines),
-            child: Text(l10n.reorderAll),
-          ),
-          const SizedBox(height: 6),
-          Text(l10n.reorderNote, style: theme.textTheme.bodySmall),
-        ],
+              const SizedBox(height: 8),
+              Text(l10n.reorderNote, style: theme.textTheme.bodySmall),
+            ],
+          ],
+        ),
       ],
     );
   }
@@ -1908,13 +1941,8 @@ class _LineTile extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l = line;
-    // 서버가 나눠 준 수량만 보인다(앱에서 빼거나 더하지 않는다). 아직 출고 전인 수량("미출고")은 보이지 않는다(사용자 2026-11-20).
-    final notes = [
-      if ((l.cancelledBeforeShipQty ?? 0) > 0)
-        l10n.qtyCancelled(l.cancelledBeforeShipQty!),
-      if ((l.deliveredQty ?? 0) > 0) l10n.qtyDelivered(l.deliveredQty!),
-      if ((l.returnedQty ?? 0) > 0) l10n.qtyReturned(l.returnedQty!),
-    ];
+    // "전달 N개·취소 N개·반품 N개" 줄은 두지 않는다(사용자 2026-11-21 "제발 없애라고", 앞서 2026-11-20 "미출고"도 뺌).
+    // 취소·반품은 아래 "처리 내역"과 결제 정보의 환불 금액에서 서버 값으로 보인다.
     final product = switch (l.productId) {
       final id? => ref.watch(productDetailProvider(id)).value,
       null => null,
@@ -2007,14 +2035,6 @@ class _LineTile extends ConsumerWidget {
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontSize: 13,
                       color: scheme.primary,
-                    ),
-                  ),
-                if (notes.isNotEmpty)
-                  Text(
-                    notes.join(' · '),
-                    key: ValueKey('line-notes-${l.orderLineId}'),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
                     ),
                   ),
               ],
@@ -2780,16 +2800,6 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     );
   }
 }
-
-/// 주문 상세에 "배송현황 보기"를 보일 주문 상태 — 결제 확정 뒤 ~ 배달이 끝나기 전.
-bool _trackable(OrderStatus s) => switch (s) {
-  OrderStatus.confirmed ||
-  OrderStatus.preparing ||
-  OrderStatus.partiallyHandedOver ||
-  OrderStatus.inDelivery ||
-  OrderStatus.partiallyDelivered => true,
-  _ => false,
-};
 
 /// 배달 중(라이더가 내 상품을 받은 뒤 ~ 끝나기 전) — 서버가 고객에게 라이더 위치를 주는 단계(tracking 0.6.0).
 bool _isDelivering(DeliveryStage? s) =>
@@ -3560,4 +3570,103 @@ Widget reorderCircle({
       ),
     ),
   );
+}
+
+/// 주문상세 "배달 정보"(레퍼런스 9-1 3-1, 사용자 2026-11-21 "박스 안도 띄워놔야지"): 항목마다 제목 줄 + 회색 값 줄,
+/// 항목 사이는 선과 위아래 여백. 배송지는 주문 당시 사본(BR-37) — 없으면 "배송지 정보 없음"(현재 주소로 대신하지 않는다).
+class _DeliveryInfoBox extends StatelessWidget {
+  const _DeliveryInfoBox({required this.order});
+
+  final OrderDetail order;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final a = order.shippingAddress;
+    Widget block(String label, List<Widget> values, {Key? key}) => Padding(
+      key: key,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16)),
+          const SizedBox(height: 6),
+          DefaultTextStyle.merge(
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 15,
+              height: 1.45,
+              color: scheme.onSurfaceVariant,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: values,
+            ),
+          ),
+        ],
+      ),
+    );
+    final entrance = a == null
+        ? ''
+        : [
+            if (a.entranceMethod case final m?) entranceMethodText(l10n, m),
+            ?a.entranceNote,
+          ].join(' · ');
+    final blocks = <Widget>[
+      if (a == null)
+        block(l10n.orderInfoAddress, [
+          Text(
+            l10n.shippingAddressUnavailable,
+            key: const ValueKey('shipping-address-none'),
+          ),
+        ])
+      else ...[
+        block(l10n.orderInfoAddress, [
+          Text(
+            '${a.roadAddress} ${a.detailAddress}'.trim(),
+            key: const ValueKey('shipping-address'),
+          ),
+        ]),
+        // 받는 분·연락처는 없을 수 있다(BR-60) — 있는 것만.
+        if ([?a.receiverName, ?a.receiverPhone] case final parts
+            when parts.isNotEmpty)
+          block(l10n.orderInfoReceiver, [Text(parts.join(' · '))]),
+        if (entrance.isNotEmpty)
+          block(l10n.orderInfoEntrance, [Text(entrance)]),
+      ],
+      if (order.deliveryNote case final n?)
+        block(l10n.orderInfoRider, [
+          Text(n),
+        ], key: const ValueKey('order-note')),
+      if (order.outOfStock case final p?)
+        block(l10n.orderInfoOos, [
+          Text(switch (p) {
+            OutOfStockPreference.cancelOutOfStockOnly => l10n.oosOnly,
+            OutOfStockPreference.cancelAll => l10n.oosAll,
+          }),
+        ], key: const ValueKey('order-oos')),
+    ];
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, b) in blocks.indexed) ...[
+            if (i > 0)
+              Divider(
+                height: 1,
+                color: scheme.outlineVariant.withValues(alpha: 0.6),
+              ),
+            b,
+          ],
+        ],
+      ),
+    );
+  }
 }

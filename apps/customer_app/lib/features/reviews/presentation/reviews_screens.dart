@@ -525,7 +525,20 @@ class _MyReviewCard extends ConsumerWidget {
                     ),
                   ],
                 ),
-                _ => const LinearProgressIndicator(),
+                // 사용자 2026-11-21 "리뷰관리 로딩 별로" — 보라 진행 막대 대신 별점·본문·사진 자리 표시
+                _ => PmartShimmer(
+                  key: ValueKey('review-mine-loading-$id'),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      PmartBone(width: 150, height: 16),
+                      SizedBox(height: 12),
+                      PmartBone(width: 230, height: 15),
+                      SizedBox(height: 12),
+                      PmartBone(width: 140, height: 140, radius: 8),
+                    ],
+                  ),
+                ),
               },
             ],
           ),

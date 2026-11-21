@@ -1027,6 +1027,123 @@ void main() {
     debugDisableShadows = true;
   });
 
+  // 주문상세 배달 정보(사용자 2026-11-21 "박스 안도 띄워놔야지") — 회원 주문 상세에서 [배달 정보]로.
+  testWidgets('order-detail-delivery', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('주문내역').last);
+    await t.pumpAndSettle();
+    final status = find.byWidgetPredicate(
+      (w) =>
+          w.key is ValueKey<String> &&
+          (w.key! as ValueKey<String>).value.startsWith('order-status-'),
+    );
+    final id = (t.widget(status.first).key! as ValueKey<String>).value
+        .substring('order-status-'.length);
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/orders/$id'),
+    );
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/od-top.png').uri),
+    );
+    await t.tap(find.byKey(const ValueKey('order-tab-delivery')));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/od-delivery.png').uri),
+    );
+  });
+  // 주문 상태별 버튼(레퍼런스 9-1·9-2, 사용자 2026-11-21) — 예약 확정·배달 중·배송 완료·취소, 예약시간 변경 시트.
+  testWidgets('order-detail-actions', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    for (final (id, name) in [
+      ('order-seed-4', 'oda-scheduled'),
+      ('order-seed-1', 'oda-delivering'),
+      ('order-seed-2', 'oda-completed'),
+      ('order-seed-3', 'oda-cancelled'),
+    ]) {
+      unawaited(router.push('/orders/$id'));
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/$name.png').uri),
+      );
+      if (id == 'order-seed-4') {
+        await t.tap(find.byKey(const ValueKey('reschedule')));
+        await t.pumpAndSettle();
+        await expectLater(
+          find.byType(CustomerApp),
+          matchesGoldenFile(File('$_dir/oda-reschedule.png').uri),
+        );
+        router.pop();
+        await t.pumpAndSettle();
+      }
+      router.pop();
+      await t.pumpAndSettle();
+    }
+  });
+  // 로딩 모양(사용자 2026-11-21 "로딩 별로"): 리뷰관리 — 가운데 동그라미 대신 회색 자리 표시.
+  testWidgets('loading-skeleton', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp(
+        const [],
+        reviews: MockReviewsRepository(latency: const Duration(seconds: 3)),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pump(const Duration(seconds: 4));
+    await t.pumpAndSettle();
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/reviews'),
+    );
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 700));
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/loading-reviews.png').uri),
+    );
+    await t.pump(const Duration(seconds: 5));
+    await t.pumpAndSettle();
+  });
   // 홈 머리줄·하단 탭(사용자 2026-11-21): 주소 왼쪽, 알림·장바구니, 하단 탭 주문내역.
   testWidgets('home-topbar', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

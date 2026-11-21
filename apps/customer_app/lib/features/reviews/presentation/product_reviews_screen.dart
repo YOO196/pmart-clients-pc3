@@ -379,9 +379,14 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
   }
 }
 
-/// 정렬 시트에 두는 것(사용자 2026-11-21): 최신순(기본)·도움돼요 많은순(계약 RECOMMENDED = 도움돼요 많은 순 → 최근 등록순).
-/// 별점 높은·낮은 순은 계약에 있지만 두지 않는다.
-const reviewSortChoices = [ReviewSort.newest, ReviewSort.recommended];
+/// 정렬 시트(사용자 2026-11-21): 최신순(기본)·도움돼요 많은순(계약 RECOMMENDED = 도움돼요 많은 순 → 최근 등록순)·
+/// 별점 높은 순·별점 낮은 순(오후에 다시 넣음 — "원래 정렬 더 많았는데").
+const reviewSortChoices = [
+  ReviewSort.newest,
+  ReviewSort.recommended,
+  ReviewSort.ratingDesc,
+  ReviewSort.ratingAsc,
+];
 
 String reviewSortLabel(AppLocalizations l10n, ReviewSort s) => switch (s) {
   ReviewSort.recommended => l10n.reviewSortRecommended,

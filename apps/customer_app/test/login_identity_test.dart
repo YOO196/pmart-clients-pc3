@@ -210,4 +210,7 @@ final class _WithPhoto implements SocialTokenSource {
   @override
   Future<SocialCredential?> obtainSilently(SocialProvider provider) async =>
       null;
+
+  @override
+  Future<void> forget(SocialProvider provider, {bool revoke = false}) async {}
 }

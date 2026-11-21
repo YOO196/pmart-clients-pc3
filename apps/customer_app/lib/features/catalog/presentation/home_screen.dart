@@ -258,6 +258,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   _BannerPager(
                                     key: const ValueKey('home-banners-top'),
                                     banners: top,
+                                    intervalSeconds: home.bannerIntervalSeconds,
                                     onOpen: (b) =>
                                         _openBanner(context, b, home),
                                   ),
@@ -292,14 +293,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           'home-banners-middle',
                                         ),
                                         banners: mid,
+                                        intervalSeconds:
+                                            home.bannerIntervalSeconds,
                                         onOpen: (b) =>
                                             _openBanner(context, b, home),
                                       ),
-                                  _SectionView(
-                                    key: ValueKey('section-${s.sectionId}'),
-                                    section: s,
-                                    layoutVersion: home.layoutVersion,
-                                  ),
+                                  // 배너 묶음(storefront 0.10.0 kind BANNER) — 받은 순서 그대로 이 자리에서 넘겨 보기
+                                  if (s.kind == SectionKind.banner)
+                                    _BannerPager(
+                                      key: ValueKey('section-${s.sectionId}'),
+                                      banners: s.banners,
+                                      intervalSeconds:
+                                          s.intervalSeconds ??
+                                          home.bannerIntervalSeconds,
+                                      onOpen: (b) =>
+                                          _openBanner(context, b, home),
+                                    )
+                                  else
+                                    _SectionView(
+                                      key: ValueKey('section-${s.sectionId}'),
+                                      section: s,
+                                      layoutVersion: home.layoutVersion,
+                                    ),
                                 ],
                               ] else if (custom != null)
                                 _CustomTabBody(
@@ -573,12 +588,20 @@ class _CustomTabBody extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final s in value.sections)
-            _SectionView(
-              key: ValueKey('section-${s.sectionId}'),
-              section: s,
-              layoutVersion: value.layoutVersion,
-              vertical: true,
-            ),
+            if (s.kind == SectionKind.banner)
+              _BannerPager(
+                key: ValueKey('section-${s.sectionId}'),
+                banners: s.banners,
+                intervalSeconds: s.intervalSeconds,
+                onOpen: (b) => _openBanner(context, b, value),
+              )
+            else
+              _SectionView(
+                key: ValueKey('section-${s.sectionId}'),
+                section: s,
+                layoutVersion: value.layoutVersion,
+                vertical: true,
+              ),
         ],
       ),
       AsyncError() => _InlineFailure(
@@ -611,12 +634,20 @@ class _TabBody extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final s in value.sections)
-            _SectionView(
-              key: ValueKey('section-${s.sectionId}'),
-              section: s,
-              layoutVersion: value.layoutVersion,
-              vertical: true,
-            ),
+            if (s.kind == SectionKind.banner)
+              _BannerPager(
+                key: ValueKey('section-${s.sectionId}'),
+                banners: s.banners,
+                intervalSeconds: s.intervalSeconds,
+                onOpen: (b) => _openBanner(context, b, value),
+              )
+            else
+              _SectionView(
+                key: ValueKey('section-${s.sectionId}'),
+                section: s,
+                layoutVersion: value.layoutVersion,
+                vertical: true,
+              ),
         ],
       ),
       AsyncError() => _InlineFailure(
@@ -629,24 +660,88 @@ class _TabBody extends ConsumerWidget {
   }
 }
 
+/// 배너 자동 넘김 앱 기본 간격(서버 값이 없을 때, 백엔드 요청서 7번 "예 4초").
+const bannerDefaultInterval = Duration(seconds: 4);
+
 /// 넘겨 보는 배너. 오른쪽 아래에 `1 / N`.
+/// storefront 0.10.0(백엔드 요청서 7번): 2개 이상이면 [interval](서버 값, 없으면 4초)마다 다음 장으로 — 마지막 다음은 첫 장으로
+/// 이어진다. 손으로 넘기거나 누르고 있는 동안은 멈추고, 손을 떼면 그때부터 다시 센다. 1개면 넘기지 않는다.
 class _BannerPager extends StatefulWidget {
-  const _BannerPager({super.key, required this.banners, required this.onOpen});
+  const _BannerPager({
+    super.key,
+    required this.banners,
+    required this.onOpen,
+    this.intervalSeconds,
+  });
 
   final List<HomeBanner> banners;
   final void Function(HomeBanner) onOpen;
+
+  /// 서버가 준 넘김 간격(초). null 이면 [bannerDefaultInterval].
+  final int? intervalSeconds;
 
   @override
   State<_BannerPager> createState() => _BannerPagerState();
 }
 
 class _BannerPagerState extends State<_BannerPager> {
-  int _page = 0;
+  /// 끝없이 넘기려고 가운데쯤에서 시작한다(쪽 번호는 배너 수로 나눈 나머지).
+  static const _loopStart = 10000;
+
+  late final PageController _controller = PageController(
+    initialPage: widget.banners.length > 1 ? _loopStart : 0,
+  );
+  late int _index = _controller.initialPage;
+  Timer? _timer;
+  bool _touching = false;
+
+  int get _count => widget.banners.length;
+
+  Duration get _interval => switch (widget.intervalSeconds) {
+    final s? when s > 0 => Duration(seconds: s),
+    _ => bannerDefaultInterval,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(_BannerPager old) {
+    super.didUpdateWidget(old);
+    if (old.intervalSeconds != widget.intervalSeconds ||
+        old.banners.length != widget.banners.length) {
+      _schedule();
+    }
+  }
+
+  void _schedule() {
+    _timer?.cancel();
+    if (_count < 2 || _touching) return;
+    _timer = Timer(_interval, () {
+      if (!mounted || !_controller.hasClients) return;
+      _controller.animateToPage(
+        _index + 1,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final banners = widget.banners;
+    final page = _count == 0 ? 0 : _index % _count;
     // 사용자 캡처(2026-11-20 홈): 화면 폭을 꽉 채운 배너(약 3:1). 서버 배너 그림은 1984×793.
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
@@ -656,18 +751,38 @@ class _BannerPagerState extends State<_BannerPager> {
           borderRadius: BorderRadius.zero,
           child: Stack(
             children: [
-              PageView.builder(
-                itemCount: banners.length,
-                onPageChanged: (i) => setState(() => _page = i),
-                itemBuilder: (context, i) => GestureDetector(
-                  key: ValueKey('banner-${banners[i].bannerId}'),
-                  onTap: banners[i].link == BannerLink.none
-                      ? null
-                      : () => widget.onOpen(banners[i]),
-                  child: _BannerCard(banners[i]),
+              NotificationListener<ScrollNotification>(
+                onNotification: (n) {
+                  // 손으로 끌기 시작하면 멈추고, 끝나면 그때부터 다시 센다.
+                  if (n is ScrollStartNotification && n.dragDetails != null) {
+                    _touching = true;
+                    _timer?.cancel();
+                  } else if (n is ScrollEndNotification && _touching) {
+                    _touching = false;
+                    _schedule();
+                  }
+                  return false;
+                },
+                child: PageView.builder(
+                  controller: _controller,
+                  itemCount: _count > 1 ? null : _count,
+                  onPageChanged: (i) {
+                    setState(() => _index = i);
+                    _schedule();
+                  },
+                  itemBuilder: (context, i) {
+                    final b = banners[i % _count];
+                    return GestureDetector(
+                      key: ValueKey('banner-${b.bannerId}'),
+                      onTap: b.link == BannerLink.none
+                          ? null
+                          : () => widget.onOpen(b),
+                      child: _BannerCard(b),
+                    );
+                  },
                 ),
               ),
-              if (banners.length > 1)
+              if (_count > 1)
                 Positioned(
                   right: 12,
                   bottom: 10,
@@ -681,7 +796,8 @@ class _BannerPagerState extends State<_BannerPager> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      '${_page + 1} / ${banners.length}',
+                      '${page + 1} / $_count',
+                      key: const ValueKey('banner-page'),
                       // 레퍼런스 배너 쪽 번호는 보통 굵기(labelSmall 은 테마 w600).
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: Colors.white,

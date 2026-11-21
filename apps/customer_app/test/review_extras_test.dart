@@ -56,7 +56,7 @@ void main() {
     await t.pumpAndSettle();
   }
 
-  testWidgets('정렬: 기본 최신순, 시트에는 최신순·도움돼요 많은순 둘만(사용자 2026-11-21)', (t) async {
+  testWidgets('정렬: 기본 최신순, 시트에는 최신순·도움돼요 많은순·별점 높은 순·별점 낮은 순', (t) async {
     final repo = MockReviewsRepository(latency: Duration.zero);
     await open(t, repo, 'P-0002');
     expect(repo.productQueries.first.sort, ReviewSort.newest);
@@ -65,8 +65,8 @@ void main() {
     await t.pumpAndSettle();
     expect(key('review-sort-newest'), findsOneWidget);
     expect(key('review-sort-recommended'), findsOneWidget);
-    expect(key('review-sort-ratingDesc'), findsNothing);
-    expect(key('review-sort-ratingAsc'), findsNothing);
+    expect(key('review-sort-ratingDesc'), findsOneWidget);
+    expect(key('review-sort-ratingAsc'), findsOneWidget);
     await t.tap(key('review-sort-recommended'));
     await t.pumpAndSettle();
     expect(repo.productQueries.last.sort, ReviewSort.recommended);

@@ -82,6 +82,32 @@ bool canRequestTimeChange(OrderDetail o) =>
 /// 피킹이 시작되면(PREPARING~) 422 ORDER_NOT_CANCELLABLE(claim 계약, ADR-0060). 가능 여부는 서버가 최종 판정한다.
 bool canRequestCancel(OrderDetail o) => o.status == OrderStatus.confirmed;
 
+/// 주문상세 요약 카드 아래 버튼(레퍼런스 9-1·9-2, 사용자 2026-11-21 "주문상태마다 버튼이 다름").
+enum OrderDetailAction { returnExchange, inquiry, track }
+
+/// 상태별 버튼: 취소 → 없음, 배송 완료 → [반품·교환][문의하기], 예약 확정(준비 전) → [문의하기],
+/// 준비~배달 중(바로배달 확정 포함) → [문의하기][배달 현황], 그 밖(결제 대기·실패·알 수 없음) → [문의하기].
+/// 반품·교환 가능 여부(기한 7일/24h)는 앱이 계산하지 않는다 — 문의로 받고 고객센터가 판정한다(claim 0.2.0).
+List<OrderDetailAction> orderDetailActions(OrderDetail o) => switch (o.status) {
+  OrderStatus.cancelled => const [],
+  OrderStatus.completed => const [
+    OrderDetailAction.returnExchange,
+    OrderDetailAction.inquiry,
+  ],
+  OrderStatus.confirmed when o.deliveryMode == 'SCHEDULED' => const [
+    OrderDetailAction.inquiry,
+  ],
+  OrderStatus.confirmed ||
+  OrderStatus.preparing ||
+  OrderStatus.partiallyHandedOver ||
+  OrderStatus.inDelivery ||
+  OrderStatus.partiallyDelivered => const [
+    OrderDetailAction.inquiry,
+    OrderDetailAction.track,
+  ],
+  _ => const [OrderDetailAction.inquiry],
+};
+
 /// 상품 준비가 시작돼 앱에서 취소할 수 없는 주문(받은 뒤 고객센터 반품 안내를 보인다).
 bool cancelClosedByPreparing(OrderDetail o) => switch (o.status) {
   OrderStatus.preparing || OrderStatus.partiallyHandedOver => true,

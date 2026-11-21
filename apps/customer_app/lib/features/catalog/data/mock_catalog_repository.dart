@@ -185,6 +185,10 @@ base class MockCatalogRepository implements CatalogRepository {
         })
       >{};
   final goneTabs = <String>{};
+
+  /// storefront 0.10.0: 맨 위 배너 넘김 간격(초, null = 앱 기본값)과 테마 사이 배너 묶음(영역 순번 → 배너 JSON). 기본은 없음.
+  int? bannerIntervalSeconds;
+  final inlineBannerGroups = <int, List<Map<String, Object?>>>{};
   int customTabCalls = 0;
 
   /// 홈에서 UNAVAILABLE 로 내려줄 영역(부분 실패 시험용). 재조회하면 성공한다.
@@ -292,8 +296,19 @@ base class MockCatalogRepository implements CatalogRepository {
           'showTimer': e.value.showTimer,
         },
     ],
+    'bannerIntervalSeconds': bannerIntervalSeconds,
     'sections': [
-      for (final (id, kind, title) in _sections)
+      for (final (i, (id, kind, title)) in _sections.indexed) ...[
+        if (inlineBannerGroups[i] case final group?)
+          {
+            'sectionId': 'G-$i',
+            'kind': 'BANNER',
+            'title': '',
+            'state': 'OK',
+            'banners': group,
+            'intervalSeconds': null,
+            'items': const <Object?>[],
+          },
         unavailableSectionIds.contains(id)
             ? {
                 'sectionId': id,
@@ -324,6 +339,7 @@ base class MockCatalogRepository implements CatalogRepository {
                 'nextCursor': null,
                 if (kind != 'RANKING') 'viewAllRef': id,
               },
+      ],
     ],
   };
 

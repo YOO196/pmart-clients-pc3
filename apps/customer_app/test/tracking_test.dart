@@ -792,8 +792,10 @@ void main() {
 
     testWidgets('배송 ID 가 없는 주문도 "배송현황 보기" → 지도(내 배송지)·주문 단계', (t) async {
       final orders = MockOrdersRepository(latency: Duration.zero);
+      // 예약 주문은 상품 준비 전이면 [배달 현황]을 두지 않는다(레퍼런스 9-1 3-2, 사용자 2026-11-21) — 바로배달로.
       orders.overrides['order-seed-4'] = {
         ...orders.orderJson('order-seed-4')!,
+        'deliveryMode': 'SINGLE',
         'shipments': <Object?>[],
       };
       await openOrder(t, orders, 'order-seed-4');
@@ -825,7 +827,11 @@ void main() {
 
     testWidgets('배차 전에 열어 두면 배송이 생기는 대로(10초마다 주문 확인) 실시간 화면으로 넘어간다', (t) async {
       final orders = MockOrdersRepository(latency: Duration.zero);
-      final o = orders.orderJson('order-seed-4')!;
+      // 예약 주문은 준비 전 [배달 현황]이 없다(레퍼런스 9-1 3-2) — 바로배달로.
+      final o = {
+        ...orders.orderJson('order-seed-4')!,
+        'deliveryMode': 'SINGLE',
+      };
       orders.overrides['order-seed-4'] = {...o, 'shipments': <Object?>[]};
       await openOrder(t, orders, 'order-seed-4');
       await t.tap(key('order-track'));
@@ -851,7 +857,11 @@ void main() {
 
     testWidgets('배차 전에 열어 두면 배송이 생기는 대로(10초마다 주문 확인) 실시간 화면으로 넘어간다', (t) async {
       final orders = MockOrdersRepository(latency: Duration.zero);
-      final o = orders.orderJson('order-seed-4')!;
+      // 예약 주문은 준비 전 [배달 현황]이 없다(레퍼런스 9-1 3-2) — 바로배달로.
+      final o = {
+        ...orders.orderJson('order-seed-4')!,
+        'deliveryMode': 'SINGLE',
+      };
       orders.overrides['order-seed-4'] = {...o, 'shipments': <Object?>[]};
       await openOrder(t, orders, 'order-seed-4');
       await t.tap(key('order-track'));
@@ -877,6 +887,11 @@ void main() {
 
     testWidgets('배송 ID 가 있으면 "배송현황 보기"가 실시간 화면으로', (t) async {
       final orders = MockOrdersRepository(latency: Duration.zero);
+      // 예약 주문은 준비 전 [배달 현황]이 없다(레퍼런스 9-1 3-2) — 바로배달로.
+      orders.overrides['order-seed-4'] = {
+        ...orders.orderJson('order-seed-4')!,
+        'deliveryMode': 'SINGLE',
+      };
       await openOrder(t, orders, 'order-seed-4');
       await t.tap(key('order-track'));
       await t.pumpAndSettle();

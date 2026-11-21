@@ -350,8 +350,9 @@ SectionKind _kind(sf.SectionKindEnum? k) => switch (k) {
   sf.SectionKindEnum.RANKING => SectionKind.ranking,
   sf.SectionKindEnum.HIGH_RATING => SectionKind.highRating,
   sf.SectionKindEnum.IN_PROGRESS_ORDER => SectionKind.inProgressOrder,
-  // storefront 0.10.0 배너 묶음 영역(HOME_INLINE) — 아직 그리지 않는다(homeFromContract 에서 뺀다).
-  sf.SectionKindEnum.BANNER || null => SectionKind.unknown,
+  // storefront 0.10.0 배너 묶음 영역(HOME_INLINE) — 테마 사이에 넘겨 보는 배너로 그린다.
+  sf.SectionKindEnum.BANNER => SectionKind.banner,
+  null => SectionKind.unknown,
 };
 
 /// 배너(storefront Banner) → 화면 모델.
@@ -383,13 +384,31 @@ HomeView homeFromContract(sf.HomeLayout h) => HomeView(
   customTabs: [
     for (final c in h.customTabs ?? const <sf.CustomTab>[]) customTabFromTab(c),
   ],
+  bannerIntervalSeconds: h.bannerIntervalSeconds,
 );
 
 /// 진열 영역(storefront Section) → 화면 모델.
 List<HomeSection> sectionsFromContract(Iterable<sf.Section> sections) => [
   for (final s in sections)
-    // 0.10.0 배너 묶음(kind BANNER, items 비움)은 아직 그리지 않는다 — 맨 위 배너(banners)는 그대로 온다.
-    if (s.kind != sf.SectionKindEnum.BANNER)
+    // 0.10.0 배너 묶음(kind BANNER, items 비움, 백엔드 요청서 8번): 받은 순서 그대로 테마 사이에 — 배너가 없으면 뺀다.
+    if (s.kind == sf.SectionKindEnum.BANNER)
+      if ([
+            for (final b in s.banners ?? const <sf.Banner>[])
+              homeBannerFromContract(b),
+          ]
+          case final banners when banners.isNotEmpty)
+        HomeSection(
+          sectionId: _required(s.sectionId, 'Section.sectionId'),
+          kind: SectionKind.banner,
+          title: s.title ?? '',
+          available: true,
+          items: const [],
+          banners: banners,
+          intervalSeconds: s.intervalSeconds,
+        )
+      else
+        ...[]
+    else
       HomeSection(
         sectionId: _required(s.sectionId, 'Section.sectionId'),
         kind: _kind(s.kind),

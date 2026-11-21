@@ -19,6 +19,12 @@ abstract interface class SocialTokenSource {
   /// 조용한 재로그인(화면 없이). 세션이 끝났을 때 먼저 시도한다(백엔드 요청 2026-11-02 세션 만료 §3-2).
   /// 못 받으면 null — 던지지 않는다.
   Future<SocialCredential?> obtainSilently(SocialProvider provider);
+
+  /// 이 기기의 제공자 로그인 흔적을 지운다(앱 로그아웃 — 다음에 계정을 다시 고르게).
+  /// [revoke] 면 제공자와의 앱 연결(정보 제공 동의)까지 끊는다 — 탈퇴가 받아들여진 뒤, 다시 가입할 때 동의 화면이 다시 뜨게
+  /// (백엔드 요청 2026-11-21 request-google-revoke-on-withdrawal — 카카오·네이버는 서버가 끊고 구글만 앱이 끊는다).
+  /// 실패는 던지지 않는다(로그아웃·탈퇴 흐름을 막지 않는다). 토큰·이메일을 로그에 남기지 않는다.
+  Future<void> forget(SocialProvider provider, {bool revoke = false});
 }
 
 final class SocialProviderDown implements Exception {

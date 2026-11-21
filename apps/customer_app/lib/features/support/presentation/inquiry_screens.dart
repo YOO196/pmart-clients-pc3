@@ -53,9 +53,13 @@ class InquiryFormArgs {
     this.origin = InquiryOrigin.inquiryPage,
     this.deliveryIssue,
     this.deliveryId,
+    this.category,
   });
 
   final String? orderId;
+
+  /// 처음 고를 종류(고객이 바꿀 수 있다). 주문상세 [반품·교환]은 환불(사용자 2026-11-21, 반품 접수는 고객센터만 — claim 0.2.0).
+  final InquiryCategory? category;
 
   /// 본문 초안(AI 상담에서 넘어올 때 고객이 한 질문 — 고칠 수 있다).
   final String? bodyDraft;
@@ -1020,6 +1024,8 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
     // 주문에서 들어오면 종류를 비워 두지 않는다(고객이 바꿀 수 있다). 배송 신고는 배송으로 고정한다(계약).
     if (widget.args.deliveryIssue != null) {
       _category = InquiryCategory.delivery;
+    } else if (widget.args.category case final c?) {
+      _category = c;
     } else if (_orderId != null) {
       _category = InquiryCategory.order;
     }

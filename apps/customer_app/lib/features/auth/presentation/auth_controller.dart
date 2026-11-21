@@ -200,14 +200,14 @@ class SessionController extends Notifier<Session> {
   /// 탈퇴가 끝났다 — 서버가 이미 세션을 끊고 토큰을 막았다. 서버에 더 묻지 않고(푸시 토큰 지우기·조용한 재로그인 없음 —
   /// 다시 로그인하면 새 계정이 생긴다) 이 기기의 로그인 정보만 지운다.
   Future<void> forgetLocalSession() async {
+    final provider = switch (state) {
+      MemberSession(:final provider) => provider,
+      _ => null,
+    };
     await ref.read(tokenStoreProvider).clear();
-    final source = ref.read(socialTokenSourceProvider);
-    if (source is GoogleSocialTokenSource) {
-      try {
-        await source.signOut();
-      } on Object {
-        // Google 쪽 선택 해제 실패는 막지 않는다.
-      }
+    // 제공자 쪽 계정 선택만 지운다(연결 끊기는 탈퇴 화면이 탈퇴가 받아들여질 때 이미 했다).
+    if (provider != null) {
+      await ref.read(socialTokenSourceProvider).forget(provider);
     }
     ref.read(sessionUnverifiedProvider.notifier).set(false);
     state = const GuestSession();
@@ -220,14 +220,15 @@ class SessionController extends Notifier<Session> {
     } on Object {
       // 못 지워도 로그아웃은 끝낸다.
     }
+    final provider = switch (state) {
+      MemberSession(:final provider) => provider,
+      _ => null,
+    };
     await ref.read(tokenStoreProvider).clear();
-    final source = ref.read(socialTokenSourceProvider);
-    if (source is GoogleSocialTokenSource) {
-      try {
-        await source.signOut();
-      } on Object {
-        // Google 쪽 선택 해제 실패는 앱 로그아웃을 막지 않는다.
-      }
+    // 제공자 쪽 계정 선택을 지운다(다음 로그인 때 계정을 다시 고르게). 전에는 실서버 묶음(RoutingSocialTokenSource)이
+    // GoogleSocialTokenSource 가 아니라서 이 줄이 한 번도 돌지 않았다(2026-11-21). 실패는 로그아웃을 막지 않는다.
+    if (provider != null) {
+      await ref.read(socialTokenSourceProvider).forget(provider);
     }
     state = const GuestSession();
   }

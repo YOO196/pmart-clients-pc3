@@ -32,6 +32,7 @@ void main() {
     MockWithdrawalRepository? repo,
     MockProfileRepository? profile0,
     SocialTokenSource? source,
+    String loginKey = 'login-kakao',
   }) async {
     t.view
       ..physicalSize = const Size(800, 2400)
@@ -55,7 +56,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(key('my-login'));
     await t.pumpAndSettle();
-    await t.tap(key('login-kakao'));
+    await t.tap(key(loginKey));
     await t.pumpAndSettle();
     return (repo: r, profile: profile);
   }
@@ -65,8 +66,9 @@ void main() {
     WidgetTester t, {
     MockWithdrawalRepository? repo,
     SocialTokenSource? source,
+    String loginKey = 'login-kakao',
   }) async {
-    final r = await login(t, repo: repo, source: source);
+    final r = await login(t, repo: repo, source: source, loginKey: loginKey);
     await t.tap(key('my-info'));
     await t.pumpAndSettle();
     await t.ensureVisible(key('info-withdraw'));
@@ -109,6 +111,52 @@ void main() {
     expect(find.text('탈퇴가 완료됐어요'), findsOneWidget);
   });
 
+  group('제공자 연결 끊기(백엔드 요청 2026-11-21 — 동의는 처음 가입 때만)', () {
+    testWidgets('탈퇴가 받아들여지면 로그인 제공자에 연결 끊기를 부른다', (t) async {
+      final source = MockSocialTokenSource();
+      await open(t, source: source);
+      await t.tap(key('wd-agree'));
+      await t.pump();
+      await t.tap(key('wd-submit'));
+      await t.pumpAndSettle();
+      expect(source.forgotten, contains((SocialProvider.kakao, true)));
+    });
+
+    testWidgets('재인증을 닫으면(탈퇴 안 보냄) 끊지 않는다', (t) async {
+      final source = _CancelAfterFirst();
+      await open(t, source: source);
+      await t.tap(key('wd-agree'));
+      await t.pump();
+      await t.tap(key('wd-submit'));
+      await t.pumpAndSettle();
+      expect(source.revoked, isFalse);
+    });
+
+    testWidgets('서버가 거절하면(다른 계정 403) 끊지 않는다', (t) async {
+      final source = MockSocialTokenSource();
+      final repo = MockWithdrawalRepository(latency: Duration.zero)
+        ..failNext = const ProblemFailure(
+          Problem(status: 403, code: 'REAUTHENTICATION_MISMATCH'),
+        );
+      await open(t, repo: repo, source: source);
+      await t.tap(key('wd-agree'));
+      await t.pump();
+      await t.tap(key('wd-submit'));
+      await t.pumpAndSettle();
+      expect(source.forgotten.where((f) => f.$2), isEmpty);
+    });
+
+    testWidgets('로그아웃은 연결을 끊지 않고 계정 선택만 지운다', (t) async {
+      final source = MockSocialTokenSource();
+      await login(t, source: source);
+      final container = ProviderScope.containerOf(
+        t.element(find.byType(Scaffold).first),
+      );
+      await container.read(sessionProvider.notifier).signOut();
+      await t.pumpAndSettle();
+      expect(source.forgotten, [(SocialProvider.kakao, false)]);
+    });
+  });
   testWidgets('재인증 화면을 닫으면 아무것도 보내지 않는다', (t) async {
     // 로그인(첫 번째)은 되고, 탈퇴 재인증(두 번째)은 고객이 닫는다.
     final (:repo, profile: _) = await open(t, source: _CancelAfterFirst());
@@ -281,4 +329,11 @@ final class _CancelAfterFirst implements SocialTokenSource {
   @override
   Future<SocialCredential?> obtainSilently(SocialProvider provider) async =>
       null;
+
+  bool revoked = false;
+
+  @override
+  Future<void> forget(SocialProvider provider, {bool revoke = false}) async {
+    if (revoke) revoked = true;
+  }
 }

@@ -114,9 +114,17 @@ final class GoogleSocialTokenSource implements SocialTokenSource {
     }
   }
 
-  /// 다음 로그인 때 계정을 다시 고를 수 있게 Google 쪽 선택을 지운다(앱 로그아웃 시).
-  Future<void> signOut() async {
-    if (_initialized == null) return;
-    await _signIn.signOut();
+  @override
+  Future<void> forget(SocialProvider provider, {bool revoke = false}) async {
+    if (provider != SocialProvider.google) return;
+    try {
+      await (_initialized ??= _signIn.initialize(
+        serverClientId: serverClientId,
+      ));
+      // disconnect = Google 쪽 앱 연결(동의) 끊기(google_sign_in 7, Android revokeAccess 에 해당).
+      revoke ? await _signIn.disconnect() : await _signIn.signOut();
+    } on Object {
+      // 오프라인 등 — 흐름을 막지 않는다.
+    }
   }
 }

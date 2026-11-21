@@ -137,15 +137,20 @@ class PmartListSkeleton extends StatelessWidget {
     this.rows = 6,
     this.thumb = false,
     this.thumbSize = 64,
+    this.shrinkWrap = false,
   });
 
   final int rows;
   final bool thumb;
   final double thumbSize;
 
+  /// 높이가 정해지지 않은 곳(스크롤 안쪽 등)에 넣을 때 — 줄 수만큼만 차지한다.
+  final bool shrinkWrap;
+
   @override
   Widget build(BuildContext context) => PmartShimmer(
     child: ListView.separated(
+      shrinkWrap: shrinkWrap,
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       itemCount: rows,

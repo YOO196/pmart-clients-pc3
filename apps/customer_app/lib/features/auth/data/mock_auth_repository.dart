@@ -20,6 +20,9 @@ final class MockSocialTokenSource implements SocialTokenSource {
   final Set<SocialProvider> silentUnavailable;
   int silentAttempts = 0;
 
+  /// 지운 로그인 흔적(제공자, 연결까지 끊었는지) — 시험용.
+  final forgotten = <(SocialProvider, bool)>[];
+
   @override
   Future<SocialCredential?> obtain(
     SocialProvider provider, {
@@ -45,6 +48,10 @@ final class MockSocialTokenSource implements SocialTokenSource {
       accountLabel: 'mock-${provider.name}@pmart.invalid',
     );
   }
+
+  @override
+  Future<void> forget(SocialProvider provider, {bool revoke = false}) async =>
+      forgotten.add((provider, revoke));
 }
 
 /// 목 구현. 제공자별로 다른 결과를 낸다(계약 AuthResult JSON → 생성 모델 → 같은 변환).

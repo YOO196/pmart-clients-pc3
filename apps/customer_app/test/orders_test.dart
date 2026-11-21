@@ -132,7 +132,8 @@ void main() {
 
     expect(find.text('주문 취소'), findsOneWidget);
     expect(find.byKey(const ValueKey('refunded')), findsOneWidget);
-    expect(find.textContaining('취소 2개'), findsOneWidget);
+    // 줄마다 "취소 N개" 문구는 두지 않는다(사용자 2026-11-21) — 환불 금액·처리 내역으로 보인다.
+    expect(find.textContaining('취소 2개'), findsNothing);
   });
 
   testWidgets('배송 조회: 도착 예정·지연은 서버 값, 위치 실패는 배송 실패가 아니다', (t) async {

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+
+
 import 'package:pmart_core/pmart_core.dart';
 
 import '../l10n/gen/pmart_ui_localizations.dart';
+import 'skeleton.dart';
 import 'ui_state.dart';
 
 /// 고객 앱이 상태 화면을 레퍼런스 모양으로 그리게 하는 테마 값(라이더·MFC 앱은 없음 → 지금 모양 그대로).
@@ -63,14 +66,15 @@ class UiStateView<T> extends StatelessWidget {
         key: const ValueKey('ui-loading'),
         child: loading!(context),
       ),
-      UiLoading() when reference => Center(
+      // 사용자 2026-11-21 "로딩 모양이 별로" — 가운데 동그라미 대신 목록 모양 자리 표시(홈처럼 회색 뼈대가 반짝임).
+      // 높이가 정해진 곳은 화면을 채우고, 스크롤 안쪽처럼 정해지지 않은 곳은 세 줄만.
+      UiLoading() when reference => Semantics(
         key: const ValueKey('ui-loading'),
-        child: Semantics(
-          label: l10n.stateLoading,
-          child: const SizedBox.square(
-            dimension: 28,
-            child: CircularProgressIndicator(strokeWidth: 2.6),
-          ),
+        label: l10n.stateLoading,
+        child: LayoutBuilder(
+          builder: (context, c) => c.hasBoundedHeight
+              ? const PmartListSkeleton()
+              : const PmartListSkeleton(rows: 3, shrinkWrap: true),
         ),
       ),
       UiError(:final failure) when reference => _Centered(

@@ -110,6 +110,8 @@ enum SectionKind {
   ranking,
   highRating,
   inProgressOrder,
+  /// storefront 0.10.0 배너 묶음(HOME_INLINE) — 상품 대신 [HomeSection.banners].
+  banner,
   unknown,
 }
 
@@ -126,6 +128,8 @@ class HomeSection {
     this.viewAllRef,
     this.endsAt,
     this.showTimer = false,
+    this.banners = const [],
+    this.intervalSeconds,
   });
 
   final String sectionId;
@@ -146,6 +150,12 @@ class HomeSection {
 
   /// true 면 제목 옆에 [endsAt] 까지 남은 시간을 보이고, 0 이 되면 영역을 숨긴다(백엔드 요청서 2026-11-21 ③).
   final bool showTimer;
+
+  /// storefront 0.10.0 배너 묶음 영역(kind BANNER, HOME_INLINE): 이 자리에서 넘겨 보는 배너(서버 순서).
+  final List<HomeBanner> banners;
+
+  /// 배너 묶음의 자동 넘김 간격(초). null 이면 홈 `bannerIntervalSeconds` → 앱 기본값.
+  final int? intervalSeconds;
 
   /// 순위 진열(랭킹 탭·자동 랭킹 테마 — 항목마다 badge RANK·rank). 홈에서는 순위 숫자를 단 3칸 격자로 그린다.
   bool get ranked =>
@@ -220,6 +230,7 @@ class HomeView {
     required this.banners,
     required this.sections,
     this.customTabs = const [],
+    this.bannerIntervalSeconds,
   });
 
   final int layoutVersion;
@@ -227,6 +238,9 @@ class HomeView {
 
   /// MD 탭(storefront 0.9.0 `customTabs`) — 고정 탭 뒤에 서버 순서로 붙인다.
   final List<CustomTab> customTabs;
+
+  /// storefront 0.10.0 맨 위 배너 자동 넘김 간격(초). null 이면 앱 기본값. 배너가 1개면 넘기지 않는다.
+  final int? bannerIntervalSeconds;
   final List<HomeBanner> banners;
   final List<HomeSection> sections;
 
@@ -240,6 +254,7 @@ class HomeView {
       for (final s in sections) s.sectionId == section.sectionId ? section : s,
     ],
     customTabs: customTabs,
+    bannerIntervalSeconds: bannerIntervalSeconds,
   );
 }
 

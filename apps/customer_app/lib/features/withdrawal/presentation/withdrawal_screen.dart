@@ -144,6 +144,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
     final text = _text.text.trim();
+    final provider = _provider();
     final w = await _reauthAndSend(
       (provider, token, key) => ref
           .read(withdrawalRepositoryProvider)
@@ -156,6 +157,13 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
           ),
     );
     if (w == null || !mounted) return;
+    // 서버가 탈퇴를 받아들였다 — 로그인 제공자와의 앱 연결(동의)을 끊어 다시 가입할 때 동의 화면이 다시 뜨게
+    // (백엔드 요청 2026-11-21: 동의는 처음 가입 때만, 카카오·네이버는 서버가 끊고 구글만 앱이). 실패·취소면 여기까지 오지 않는다.
+    // 끊기 실패는 탈퇴 흐름을 막지 않는다(forget 은 던지지 않는다).
+    if (provider != null && w.state != WithdrawalState.revoked) {
+      await ref.read(socialTokenSourceProvider).forget(provider, revoke: true);
+      if (!mounted) return;
+    }
     if (w.state.done) {
       // 서버가 세션을 끊었다 — 이 기기의 로그인 정보만 지운다(서버에 더 묻지 않는다).
       await ref.read(sessionProvider.notifier).forgetLocalSession();

@@ -1120,21 +1120,21 @@ void main() {
       await t.tap(find.byKey(const ValueKey('review-sort-open')));
       await t.pumpAndSettle();
       expect(find.text('정렬'), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('review-sort-recommended')));
+      await t.tap(find.byKey(const ValueKey('review-sort-ratingAsc')));
       await t.pumpAndSettle();
       expect(repo.productQueries.last, (
-        sort: ReviewSort.recommended,
+        sort: ReviewSort.ratingAsc,
         photoOnly: false,
         sku: null,
       ));
-      expect(find.text('도움돼요 많은순'), findsOneWidget);
+      expect(find.text('별점 낮은 순'), findsOneWidget);
 
       await t.tap(find.byKey(const ValueKey('review-filter-open')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('review-filter-photo')));
       await t.pumpAndSettle();
       expect(repo.productQueries.last, (
-        sort: ReviewSort.recommended,
+        sort: ReviewSort.ratingAsc,
         photoOnly: true,
         sku: null,
       ));
