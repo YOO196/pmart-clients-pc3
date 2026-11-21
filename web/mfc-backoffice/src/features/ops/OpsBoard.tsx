@@ -44,7 +44,8 @@ type Incident = QualitySchemas['schemas']['QualityIncident'];
 
 // ---------------------------------------------------------------- 읽기
 
-function useOps(mfcId: string) {
+/** 홈 원천 묶음(대시보드 알림 피드도 같은 쿼리 키로 나눠 쓴다 — 두 번 읽지 않음) */
+export function useOps(mfcId: string) {
   const api = useApi();
   const common = { refetchInterval: OPS_REFRESH_MS } as const;
   const tasks = useOpenTasks(mfcId);
