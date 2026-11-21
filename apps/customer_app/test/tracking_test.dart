@@ -357,7 +357,10 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('my-orders')));
       await t.pumpAndSettle();
-      await t.tap(find.byKey(ValueKey('order-$orderId')));
+      await t.tapAt(
+        t.getTopLeft(find.byKey(ValueKey('order-$orderId'))) +
+            const Offset(24, 24),
+      );
       await t.pumpAndSettle();
       await t.ensureVisible(find.byKey(ValueKey('track-$deliveryId')));
       await t.tap(find.byKey(ValueKey('track-$deliveryId')));
@@ -787,7 +790,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(key('my-orders'));
       await t.pumpAndSettle();
-      await t.tap(key('order-$id'));
+      await t.tapAt(t.getTopLeft(key('order-$id')) + const Offset(24, 24));
       await t.pumpAndSettle();
     }
 

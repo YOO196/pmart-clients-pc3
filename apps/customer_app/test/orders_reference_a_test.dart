@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart' show Dio;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:customer_app/features/catalog/presentation/product_detail_screen.dart'
+    show ProductDetailScreen;
 import 'package:pmart_api_order/pmart_api_order.dart' as api;
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_core/testing.dart';
@@ -124,7 +126,10 @@ void main() {
   group('주문 상세 결제 수단·배달 정보', () {
     testWidgets('결제 수단(서버 값)·요청사항·품절 시 처리를 보인다', (t) async {
       await openOrders(t);
-      await t.tap(find.byKey(const ValueKey('order-order-seed-4')));
+      await t.tapAt(
+        t.getTopLeft(find.byKey(const ValueKey('order-order-seed-4'))) +
+            const Offset(24, 24),
+      );
       await t.pumpAndSettle();
 
       expect(
@@ -146,7 +151,10 @@ void main() {
 
     testWidgets('요청사항·품절 처리가 없는 주문은 그 줄을 두지 않는다', (t) async {
       await openOrders(t);
-      await t.tap(find.byKey(const ValueKey('order-order-seed-1')));
+      await t.tapAt(
+        t.getTopLeft(find.byKey(const ValueKey('order-order-seed-1'))) +
+            const Offset(24, 24),
+      );
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('order-note')), findsNothing);
       expect(find.byKey(const ValueKey('order-oos')), findsNothing);
@@ -165,7 +173,10 @@ void main() {
           latency: Duration.zero,
         ),
       );
-      await t.tap(find.byKey(const ValueKey('order-order-seed-4')));
+      await t.tapAt(
+        t.getTopLeft(find.byKey(const ValueKey('order-order-seed-4'))) +
+            const Offset(24, 24),
+      );
       await t.pumpAndSettle();
 
       final failed = find.byKey(const ValueKey('order-payment-method-failed'));
@@ -244,7 +255,10 @@ void main() {
     testWidgets('주문상세 줄: 상품 사진 자리·금액과 수량, 미출고 수량은 보이지 않는다', (t) async {
       final cart = MockCartRepository(latency: Duration.zero);
       await openOrders(t, cart: cart);
-      await t.tap(find.byKey(const ValueKey('order-order-seed-4')));
+      await t.tapAt(
+        t.getTopLeft(find.byKey(const ValueKey('order-order-seed-4'))) +
+            const Offset(24, 24),
+      );
       await t.pumpAndSettle();
       // order-seed-4 의 ol-5: 3개 모두 아직 출고 전(unfulfilledQty 3)
       expect(find.byKey(const ValueKey('line-image-ol-5')), findsOneWidget);
@@ -275,6 +289,13 @@ void main() {
         t.getRect(image).right,
         lessThan(t.getRect(find.text('그릭요거트 플레인 400g').first).left),
       );
+    });
+
+    testWidgets('주문내역 상품 줄의 사진·이름을 누르면 상품 상세(카드 다른 곳은 주문 상세)', (t) async {
+      await openOrders(t);
+      await t.tap(find.byKey(const ValueKey('order-line-open-ol-5')));
+      await t.pumpAndSettle();
+      expect(find.byType(ProductDetailScreen), findsOneWidget);
     });
 
     testWidgets('상품이 5줄 넘는 주문: 앞 5줄 뒤 [더보기] → 주문 상세의 나머지 줄, [접기]로 다시 접는다', (
@@ -406,7 +427,10 @@ void main() {
     testWidgets('품목 담기는 현재 조건의 새 담기(AddItem)이고 서버 결과를 그 줄에 보인다', (t) async {
       final cart = MockCartRepository(latency: Duration.zero);
       await openOrders(t, cart: cart);
-      await t.tap(find.byKey(const ValueKey('order-order-seed-4')));
+      await t.tapAt(
+        t.getTopLeft(find.byKey(const ValueKey('order-order-seed-4'))) +
+            const Offset(24, 24),
+      );
       await t.pumpAndSettle();
       final sent = cart.changes.length;
 
@@ -463,7 +487,10 @@ void main() {
         'shipments': <Object?>[],
       };
       await openOrders(t, cart: cart, orders: orders);
-      await t.tap(find.byKey(const ValueKey('order-order-mix')));
+      await t.tapAt(
+        t.getTopLeft(find.byKey(const ValueKey('order-order-mix'))) +
+            const Offset(24, 24),
+      );
       await t.pumpAndSettle();
       final sent = cart.changes.length;
 
@@ -503,7 +530,10 @@ void main() {
         'shipments': <Object?>[],
       };
       await openOrders(t, cart: cart, orders: orders);
-      await t.tap(find.byKey(const ValueKey('order-order-two')));
+      await t.tapAt(
+        t.getTopLeft(find.byKey(const ValueKey('order-order-two'))) +
+            const Offset(24, 24),
+      );
       await t.pumpAndSettle();
       final sent = cart.changes.length;
 

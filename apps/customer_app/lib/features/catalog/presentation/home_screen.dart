@@ -1164,8 +1164,9 @@ class _SectionView extends ConsumerWidget {
           PmartSectionHeader(
             title: section.title,
             subtitle: section.subtitle,
-            // 타이머 테마(storefront 0.9.0 showTimer): 제목 옆 남은 시간
-            titleSuffix: endsAt == null
+            // 타이머 테마(storefront 0.9.0 showTimer): 남은 시간 알약은 제목 위 줄에 — 옆에 두면 긴 제목이 좁은
+            // 칸에 여러 줄로 꺾였다(사용자 2026-11-21 "테마 이름이 너무 좁게 잡혀").
+            titleTop: endsAt == null
                 ? null
                 : SectionCountdown(
                     key: ValueKey('section-timer-${section.sectionId}'),

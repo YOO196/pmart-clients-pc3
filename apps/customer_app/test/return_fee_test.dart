@@ -69,7 +69,10 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-orders')));
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('order-order-seed-1')));
+    await t.tapAt(
+      t.getTopLeft(find.byKey(const ValueKey('order-order-seed-1'))) +
+          const Offset(24, 24),
+    );
     await t.pumpAndSettle();
     await t.ensureVisible(find.byKey(ValueKey('order-claim-$claimId')));
     await t.tap(find.byKey(ValueKey('order-claim-$claimId')));

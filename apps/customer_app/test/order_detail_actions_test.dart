@@ -27,7 +27,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(key('my-orders'));
     await t.pumpAndSettle();
-    await t.tap(key('order-$orderId'));
+    await t.tapAt(t.getTopLeft(key('order-$orderId')) + const Offset(24, 24));
     await t.pumpAndSettle();
   }
 

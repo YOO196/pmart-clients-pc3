@@ -293,7 +293,10 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('my-orders')));
       await t.pumpAndSettle();
-      await t.tap(find.byKey(ValueKey('order-$orderId')));
+      await t.tapAt(
+        t.getTopLeft(find.byKey(ValueKey('order-$orderId'))) +
+            const Offset(24, 24),
+      );
       await t.pumpAndSettle();
     }
 

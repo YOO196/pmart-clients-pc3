@@ -444,7 +444,6 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
     final id = line.cartItemId;
     final shown = _pending ?? line.quantity;
     final scheme = theme.colorScheme;
-    final pendingLook = _pending != null || busy;
     // 레퍼런스 5: [☐ 굵은 이름] / [사진 | 회색 이름·옵션, 빨간 재고 문구, 굵은 금액] / 오른쪽 [− N +] 상자 하나
     final stepIcon = scheme.onSurface;
     final VoidCallback? openProduct = switch (line.productId) {
@@ -609,16 +608,15 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
                     ),
                     onPressed: widget.unknown ? null : () => _bump(-1),
                   ),
-                  // 모아 보내는 중·서버 반영 중에는 목표 수량을 흐리게 + 진행 표시. 확정되면 보통 글씨.
+                  // 누른 수량은 바로 보통 글씨로 보인다(사용자 2026-11-21 "바로 반영이 아니라 로딩시간이 있어" — 흐린
+                  // 글씨가 로딩처럼 보였다). 수량은 고객이 고른 입력값이고, 금액·합계는 서버가 확정한 값만 바뀐다.
                   SizedBox(
                     width: 28,
                     child: Center(
                       child: Text(
                         l10n.cartStepperQuantity(_pending ?? line.quantity),
                         key: ValueKey('cart-qty-$id'),
-                        style: pendingLook
-                            ? TextStyle(color: scheme.outline, fontSize: 14)
-                            : const TextStyle(fontSize: 14),
+                        style: const TextStyle(fontSize: 14),
                       ),
                     ),
                   ),

@@ -100,39 +100,63 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(
         children: [
-          _ListLineImage(
-            key: ValueKey('order-line-image-$id'),
-            productId: productId,
-            imageUrl: imageUrl,
-          ),
-          const SizedBox(width: 12),
+          // 사진·이름을 누르면 상품 상세(사용자 2026-11-21). 상품 ID 가 없는 옛 주문 줄은 누를 수 없다.
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyLarge?.copyWith(fontSize: 14),
-                ),
-                const SizedBox(height: 2),
-                Text.rich(
-                  TextSpan(
-                    children: [
-                      TextSpan(
-                        text: amount == null ? '' : formatKrw(amount),
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      TextSpan(
-                        text: '  ${l10n.cartLineQuantity(quantity)}',
-                        style: TextStyle(color: scheme.onSurfaceVariant),
-                      ),
-                    ],
+            child: InkWell(
+              key: ValueKey('order-line-open-$id'),
+              borderRadius: BorderRadius.circular(8),
+              onTap: productId == null
+                  ? null
+                  : () => context.push(
+                      '/products/${Uri.encodeComponent(productId)}',
+                    ),
+              child: Row(
+                children: [
+                  _ListLineImage(
+                    key: ValueKey('order-line-image-$id'),
+                    productId: productId,
+                    imageUrl: imageUrl,
                   ),
-                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: amount == null ? '' : formatKrw(amount),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              TextSpan(
+                                text: '  ${l10n.cartLineQuantity(quantity)}',
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           // 주문내역에서도 바로 담는다(레퍼런스 9-2 ⊕, 사용자 2026-11-20). 담을 수 있는지는 장바구니 서버가 판정한다.

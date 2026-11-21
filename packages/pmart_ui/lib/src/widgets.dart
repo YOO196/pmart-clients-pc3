@@ -39,6 +39,7 @@ class PmartSectionHeader extends StatelessWidget {
     this.subtitle,
     this.trailing,
     this.titleSuffix,
+    this.titleTop,
     this.padding = const EdgeInsets.fromLTRB(
       PmartSpace.page,
       PmartSpace.sm,
@@ -53,6 +54,9 @@ class PmartSectionHeader extends StatelessWidget {
 
   /// 제목 바로 옆(예: 남은 시간 알약).
   final Widget? titleSuffix;
+
+  /// 제목 위 한 줄(예: 남은 시간 알약). 제목이 길 때 옆에 두면 제목 칸이 좁아져 여러 줄로 꺾이므로 위에 둔다.
+  final Widget? titleTop;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -66,6 +70,7 @@ class PmartSectionHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (titleTop case final t?) ...[t, const SizedBox(height: 6)],
                 Row(
                   children: [
                     Flexible(

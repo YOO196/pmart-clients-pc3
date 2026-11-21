@@ -368,6 +368,23 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
         ready: (context, book) {
           final addresses = book?.addresses ?? const <Address>[];
           if (addresses.isEmpty) return Center(child: Text(l10n.addressEmpty));
+          // 레퍼런스 3-1 2-3 의 작은 [수정]·[삭제]: 높이 약 24, 모서리 8, 진한 회색 테두리, 13.5 중간 굵기, 검은 글자
+          // (사용자 2026-11-21 "버튼들 너무 기본형" — 테마 기본 테두리 버튼 모양이 그대로였다).
+          final smallButton = OutlinedButton.styleFrom(
+            foregroundColor: theme.colorScheme.onSurface,
+            minimumSize: const Size(0, 30),
+            padding: const EdgeInsets.symmetric(horizontal: 9),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+            side: BorderSide(color: theme.colorScheme.outline, width: 1.2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            textStyle: theme.textTheme.labelLarge?.copyWith(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+            ),
+          );
           return ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             itemCount: addresses.length,
@@ -394,12 +411,12 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                             runSpacing: 4,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              // 레퍼런스 3-1 2-3: 제목 15sp 보통, 표시 칩 작게, 둘째 줄 13.5sp 진하게
+                              // 레퍼런스 3-1 2-3: 제목 15sp 굵게, 표시 칩 작게, 둘째 줄 진하게
                               Text(
                                 a.label ?? a.roadAddress,
                                 style: theme.textTheme.titleSmall?.copyWith(
                                   fontSize: 15,
-                                  fontWeight: FontWeight.w400,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                               if (current)
@@ -444,16 +461,7 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                                         '/addresses/edit/${a.addressId}',
                                       )
                                     : null,
-                                style: OutlinedButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                  minimumSize: const Size(0, 34),
-                                  // 레퍼런스 3-1 2-3: 작은 [수정]·[삭제]는 보통 굵기(테마 테두리 버튼은 굵다).
-                                  textStyle: theme.textTheme.labelLarge
-                                      ?.copyWith(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                ),
+                                style: smallButton,
                                 child: Text(l10n.addressModify),
                               ),
                               if (!current) ...[
@@ -464,15 +472,7 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                                   onPressed: _deleting == null
                                       ? () => _delete(a)
                                       : null,
-                                  style: OutlinedButton.styleFrom(
-                                    visualDensity: VisualDensity.compact,
-                                    minimumSize: const Size(0, 34),
-                                    textStyle: theme.textTheme.labelLarge
-                                        ?.copyWith(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w400,
-                                        ),
-                                  ),
+                                  style: smallButton,
                                   child: _deleting == a.addressId
                                       ? const SizedBox.square(
                                           dimension: 16,

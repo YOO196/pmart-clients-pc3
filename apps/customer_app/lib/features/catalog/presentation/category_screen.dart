@@ -57,7 +57,7 @@ class CategoryScreen extends ConsumerWidget {
           }
           final theme = Theme.of(context);
           // 레퍼런스(사용자 제공 카테고리 그림 2026-11-20): 줄 간격 약 46dp, 그림 32dp, 글자 15sp
-          final rowHeight = MediaQuery.textScalerOf(context).scale(20) + 26;
+          final rowHeight = MediaQuery.textScalerOf(context).scale(20) + 30;
           return ListView(
             padding: const EdgeInsets.only(bottom: 24),
             children: [
@@ -66,13 +66,14 @@ class CategoryScreen extends ConsumerWidget {
                 if (i > 0) const PmartSectionGap(height: 8),
                 if (section != null)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(15, 18, 15, 4),
+                    padding: const EdgeInsets.fromLTRB(15, 22, 15, 6),
+                    // 레퍼런스 3-3: 구역 제목("맛있는것")은 굵지 않은 조금 큰 글자(사용자 2026-11-21 "레퍼런스 참고").
                     child: Text(
                       section,
                       key: ValueKey('category-section-$section'),
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ),
@@ -94,7 +95,8 @@ class CategoryScreen extends ConsumerWidget {
                       onTap: () => _showChildren(context, l10n, root, nodes),
                       child: Row(
                         children: [
-                          CategoryArt(name: root.name, size: 32, radius: 10),
+                          // 레퍼런스 3-3: 동그란 그림 칸.
+                          CategoryArt(name: root.name, size: 34, radius: 17),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(

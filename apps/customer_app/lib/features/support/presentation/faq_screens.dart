@@ -88,8 +88,11 @@ class SupportFaqBlock extends ConsumerWidget {
                   ),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 6,
-                    vertical: 6,
+                    vertical: 4,
                   ),
+                  // 줄 사이를 좁게(사용자 2026-11-21 "세로 간격 조금 좁히기") — 칩마다 붙던 48 터치 여백을 뺀다.
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
                   shape: const StadiumBorder(),
                   onPressed: () => context.push(
                     Uri(
@@ -375,7 +378,7 @@ class FaqDetailScreen extends ConsumerWidget {
 }
 
 /// 자주 묻는 질문 "질문 유형"(사용자 2026-11-21): 굵은 구역 제목 + 레퍼런스 알약(회색 채움·얇은 테두리, 14 보통,
-/// 높이 약 33dp, 사이 10·줄 사이 15). 고른 것은 검정 바탕·흰 글자. 4줄을 넘으면 4줄까지만 + [더보기 ⌄]
+/// 높이 약 33dp, 사이 10·줄 사이 10 — 레퍼런스 15 에서 좁힘, 사용자 2026-11-21). 고른 것은 검정 바탕·흰 글자. 4줄을 넘으면 4줄까지만 + [더보기 ⌄]
 /// (펼치면 [접기 ⌃]). 4줄 밖의 유형을 고른 채로 열리면 펼쳐 보인다.
 class FaqTypeChips extends StatefulWidget {
   const FaqTypeChips({
@@ -443,7 +446,8 @@ class _FaqTypeChipsState extends State<FaqTypeChips> {
                     alignment: Alignment.centerLeft,
                     child: Wrap(
                       spacing: 10,
-                      runSpacing: 15,
+                      // 줄 사이 15 → 10(사용자 2026-11-21 "세로 간격 조금 좁히기").
+                      runSpacing: 10,
                       children: [
                         for (final (value, label) in entries.take(shown))
                           _chip(theme, scheme, style, value, label),

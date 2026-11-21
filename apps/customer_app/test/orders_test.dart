@@ -92,7 +92,10 @@ void main() {
     expect(find.byKey(const ValueKey('order-order-seed-1')), findsOneWidget);
     expect(find.text('일부 전달'), findsOneWidget);
 
-    await t.tap(find.byKey(const ValueKey('order-order-seed-1')));
+    await t.tapAt(
+      t.getTopLeft(find.byKey(const ValueKey('order-order-seed-1'))) +
+          const Offset(24, 24),
+    );
     await t.pumpAndSettle();
 
     // 배송 완료된 배송 칸은 그리지 않는다(사용자 2026-11-21). 배송 중인 칸만.
@@ -111,7 +114,10 @@ void main() {
   ) async {
     await openOrders(t);
     // 진행 중(부분 전달) 주문: 버튼 없음
-    await t.tap(find.byKey(const ValueKey('order-order-seed-1')));
+    await t.tapAt(
+      t.getTopLeft(find.byKey(const ValueKey('order-order-seed-1'))) +
+          const Offset(24, 24),
+    );
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('order-detail-hide')), findsNothing);
     await t.binding.handlePopRoute();
@@ -122,7 +128,10 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    await t.tap(find.byKey(const ValueKey('order-order-seed-2')));
+    await t.tapAt(
+      t.getTopLeft(find.byKey(const ValueKey('order-order-seed-2'))) +
+          const Offset(24, 24),
+    );
     await t.pumpAndSettle();
     await t.scrollUntilVisible(
       find.byKey(const ValueKey('order-detail-hide')),
@@ -139,7 +148,10 @@ void main() {
 
   testWidgets('주문 상세의 받는 곳은 주문 당시 배송지 사본이다(BR-37)', (t) async {
     await openOrders(t);
-    await t.tap(find.byKey(const ValueKey('order-order-seed-4')));
+    await t.tapAt(
+      t.getTopLeft(find.byKey(const ValueKey('order-order-seed-4'))) +
+          const Offset(24, 24),
+    );
     await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('shipping-address')), findsOneWidget);
@@ -149,7 +161,10 @@ void main() {
 
   testWidgets('사본이 없는 주문(배포 전)은 "배송지 정보 없음"이고 현재 주소로 대신하지 않는다', (t) async {
     await openOrders(t);
-    await t.tap(find.byKey(const ValueKey('order-order-seed-1')));
+    await t.tapAt(
+      t.getTopLeft(find.byKey(const ValueKey('order-order-seed-1'))) +
+          const Offset(24, 24),
+    );
     await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('shipping-address-none')), findsOneWidget);
@@ -159,7 +174,10 @@ void main() {
 
   testWidgets('취소 주문은 서버가 준 총 환불금액을 보인다', (t) async {
     await openOrders(t);
-    await t.tap(find.byKey(const ValueKey('order-order-seed-3')));
+    await t.tapAt(
+      t.getTopLeft(find.byKey(const ValueKey('order-order-seed-3'))) +
+          const Offset(24, 24),
+    );
     await t.pumpAndSettle();
 
     expect(find.text('주문 취소'), findsOneWidget);
@@ -171,7 +189,10 @@ void main() {
   testWidgets('배송 조회: 도착 예정·지연은 서버 값, 위치 실패는 배송 실패가 아니다', (t) async {
     final orders = MockOrdersRepository(latency: Duration.zero);
     await openOrders(t, orders: orders);
-    await t.tap(find.byKey(const ValueKey('order-order-seed-1')));
+    await t.tapAt(
+      t.getTopLeft(find.byKey(const ValueKey('order-order-seed-1'))) +
+          const Offset(24, 24),
+    );
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('track-dlv-s2')));
     await t.pumpAndSettle();
