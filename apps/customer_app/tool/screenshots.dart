@@ -314,6 +314,12 @@ void main() {
     await shot('product-reviews-sort');
     await t.tap(find.byKey(const ValueKey('review-sort-close')));
     await t.pumpAndSettle();
+    // 옵션 필터(BR-76 목만 — 서울우유 1개·2개 묶음)
+    await t.tap(find.byKey(const ValueKey('review-option-open')));
+    await t.pumpAndSettle();
+    await shot('product-reviews-option');
+    await t.tap(find.byKey(const ValueKey('review-option-close')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('review-photos-more')));
     await t.pumpAndSettle();
     await shot('review-photos');

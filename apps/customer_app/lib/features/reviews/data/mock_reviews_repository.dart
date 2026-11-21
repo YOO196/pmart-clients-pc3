@@ -467,9 +467,10 @@ final class MockReviewsRepository implements ReviewsRepository {
     String? cursor,
     ReviewSort sort = ReviewSort.newest,
     bool withPhotoOnly = false,
+    String? sku,
   }) async {
     calls++;
-    productQueries.add((sort: sort, photoOnly: withPhotoOnly));
+    productQueries.add((sort: sort, photoOnly: withPhotoOnly, sku: sku));
     await _wait();
     productCursors.add(cursor);
     if (productFailures.isNotEmpty) throw productFailures.removeFirst();
@@ -478,6 +479,7 @@ final class MockReviewsRepository implements ReviewsRepository {
       for (final r in reviewJson)
         if (r['productId'] == productId &&
             (r['state'] == 'PUBLISHED' || r['state'] == 'LOCKED') &&
+            (sku == null || r['sku'] == sku) &&
             (!withPhotoOnly || ((r['photos'] as List?)?.isNotEmpty ?? false)))
           r,
     ];
@@ -488,9 +490,11 @@ final class MockReviewsRepository implements ReviewsRepository {
     final product = mockProducts
         .where((p) => p.productId == productId)
         .firstOrNull;
+    // 옵션 조건이 대표 SKU 가 아니면(묶음 등) 만든 리뷰가 없다 — 빈 목록.
     if (visible.isEmpty &&
         synthesizeFromCatalog &&
         product != null &&
+        (sku == null || sku == product.sku) &&
         (product.reviewCount ?? 0) > 0) {
       // 목: 3건마다 1건이 사진 리뷰. 사진 리뷰만이면 그 건들만.
       final all = product.reviewCount!;
@@ -499,43 +503,108 @@ final class MockReviewsRepository implements ReviewsRepository {
       final avg = product.rating ?? 5;
       int rate(int n) => (n % 4 == 3 ? avg - 1 : avg).round().clamp(1, 5);
       final end = (start + pageSize).clamp(0, total);
-      return productReviewPageFromContract(
-        api.ListProductReviews200Response.fromJson({
-          'items': [
-            for (var i = start; i < end; i++)
-              _genReview(productId, product.sku, product.name, switch (sort) {
-                // 별점순은 높은(낮은) 것부터 — 목은 번호를 별점 묶음 순으로 다시 센다.
-                ReviewSort.newest => at(i),
-                ReviewSort.ratingDesc => at(i),
-                ReviewSort.ratingAsc => at(total - 1 - i),
-              }, rate),
-          ],
-          'page': {'nextCursor': end < total ? '$end' : null, 'size': pageSize},
-          'summary': {'averageRating': avg, 'reviewCount': total},
-        }),
+      return _withHelpful(
+        productReviewPageFromContract(
+          api.ListProductReviews200Response.fromJson({
+            'items': [
+              for (var i = start; i < end; i++)
+                _genReview(productId, product.sku, product.name, switch (sort) {
+                  // 별점순은 높은(낮은) 것부터 — 목은 번호를 별점 묶음 순으로 다시 센다.
+                  // 추천순: 만든 리뷰는 앞 번호일수록 도움돼요가 많다(목) — 최근 등록순과 같은 차례.
+                  ReviewSort.newest || ReviewSort.recommended => at(i),
+                  ReviewSort.ratingDesc => at(i),
+                  ReviewSort.ratingAsc => at(total - 1 - i),
+                }, rate),
+            ],
+            'page': {
+              'nextCursor': end < total ? '$end' : null,
+              'size': pageSize,
+            },
+            'summary': {'averageRating': avg, 'reviewCount': total},
+          }),
+        ),
       );
     }
     final end = (start + pageSize).clamp(0, visible.length);
     final ratings = [for (final r in visible) r['rating'] as int];
-    return productReviewPageFromContract(
-      api.ListProductReviews200Response.fromJson({
-        'items': visible.sublist(start, end),
-        'page': {
-          'nextCursor': end < visible.length ? '$end' : null,
-          'size': pageSize,
-        },
-        'summary': {
-          'averageRating': ratings.isEmpty
-              ? null
-              : ratings.reduce((a, b) => a + b) / ratings.length,
-          'reviewCount': visible.length,
-        },
-      }),
+    return _withHelpful(
+      productReviewPageFromContract(
+        api.ListProductReviews200Response.fromJson({
+          'items': visible.sublist(start, end),
+          'page': {
+            'nextCursor': end < visible.length ? '$end' : null,
+            'size': pageSize,
+          },
+          'summary': {
+            'averageRating': ratings.isEmpty
+                ? null
+                : ratings.reduce((a, b) => a + b) / ratings.length,
+            'reviewCount': visible.length,
+          },
+        }),
+      ),
     );
   }
 
   /// 받은 상품 리뷰 조회 조건(시험용).
-  final productQueries = <({ReviewSort sort, bool photoOnly})>[];
+  final productQueries = <({ReviewSort sort, bool photoOnly, String? sku})>[];
+
+  // ── 도움돼요(BR-76 제안 — 계약 전, 목만) ──
+
+  /// 내가 도움돼요를 누른 리뷰.
+  final helped = <String>{};
+
+  /// 보낸 도움돼요 요청 키(시험용 — 같은 행위는 같은 키).
+  final helpfulKeys = <String>[];
+
+  /// 다음 도움돼요 요청을 실패시킨다.
+  final helpfulFailures = Queue<PmartFailure>();
+  final _helpfulByKey = <String, HelpfulResult>{};
+
+  /// 목의 다른 사람 도움돼요 수(리뷰 ID 로 정한 값). 만든 리뷰는 앞 번호일수록 많다.
+  static int _baseHelpful(String reviewId) {
+    final gen = RegExp(r'^rv-gen-.+-(\d+)$').firstMatch(reviewId);
+    if (gen != null) return (30 - int.parse(gen.group(1)!)).clamp(0, 30);
+    return reviewId.codeUnits.fold(0, (a, c) => a + c) % 15;
+  }
+
+  int _helpfulCount(String reviewId) =>
+      _baseHelpful(reviewId) + (helped.contains(reviewId) ? 1 : 0);
+
+  ProductReviewPage _withHelpful(ProductReviewPage p) => ProductReviewPage(
+    items: [
+      for (final r in p.items)
+        r.withHelpful((
+          count: _helpfulCount(r.reviewId),
+          helped: helped.contains(r.reviewId),
+        )),
+    ],
+    nextCursor: p.nextCursor,
+    averageRating: p.averageRating,
+    reviewCount: p.reviewCount,
+  );
+
+  @override
+  Future<HelpfulResult> setHelpful(
+    String reviewId, {
+    required bool on,
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    helpfulKeys.add(key.value);
+    if (_helpfulByKey[key.value] case final r?) return r;
+    if (helpfulFailures.isNotEmpty) throw helpfulFailures.removeFirst();
+    // 내 리뷰는 누를 수 없다(목: 내가 쓴 리뷰는 rv-mine-*).
+    if (reviewId.startsWith('rv-mine')) {
+      throw const ProblemFailure(
+        Problem(status: 422, code: ReviewHelpfulProblemCode.ownReview),
+      );
+    }
+    on ? helped.add(reviewId) : helped.remove(reviewId);
+    final r = (count: _helpfulCount(reviewId), helped: on);
+    _helpfulByKey[key.value] = r;
+    return r;
+  }
 
   static void _sortJson(List<Map<String, Object?>> list, ReviewSort sort) {
     int rating(Map<String, Object?> r) => r['rating'] as int;
@@ -543,6 +612,12 @@ final class MockReviewsRepository implements ReviewsRepository {
     list.sort(
       (a, b) => switch (sort) {
         ReviewSort.newest => at(b).compareTo(at(a)),
+        // 추천순(목): 도움돼요 많은 순, 같으면 최근 등록순.
+        ReviewSort.recommended => switch (_baseHelpful(b['reviewId']! as String)
+            .compareTo(_baseHelpful(a['reviewId']! as String))) {
+          0 => at(b).compareTo(at(a)),
+          final c => c,
+        },
         ReviewSort.ratingDesc => rating(b).compareTo(rating(a)),
         ReviewSort.ratingAsc => rating(a).compareTo(rating(b)),
       },

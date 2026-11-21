@@ -342,6 +342,7 @@ final productReviewsProvider = AsyncNotifierProvider.autoDispose
         productId: id,
         sort: ReviewSort.newest,
         photoOnly: false,
+        sku: null,
       )),
     );
 
@@ -366,6 +367,7 @@ class ProductReviews extends AsyncNotifier<PagedList<ReviewView>> {
           productId,
           sort: query.sort,
           withPhotoOnly: query.photoOnly,
+          sku: query.sku,
         );
     return PagedList(
       items: page.items,
@@ -389,6 +391,7 @@ class ProductReviews extends AsyncNotifier<PagedList<ReviewView>> {
             cursor: current.nextCursor,
             sort: query.sort,
             withPhotoOnly: query.photoOnly,
+            sku: query.sku,
           );
       if (!ref.mounted) return;
       final seen = {for (final r in current.items) r.reviewId};
@@ -408,7 +411,44 @@ class ProductReviews extends AsyncNotifier<PagedList<ReviewView>> {
       );
     }
   }
+
+  /// 도움돼요 누르기·취소(BR-76 — 목만). 서버가 준 수·눌림으로만 바꾼다(앱이 +1 하지 않는다).
+  /// 결과를 모르면 같은 키로 한 번 더 보낸다. 실패는 그대로 던진다(화면이 안내).
+  Future<void> toggleHelpful(String reviewId) async {
+    final current = state.value;
+    final review = current?.items
+        .where((r) => r.reviewId == reviewId)
+        .firstOrNull;
+    if (current == null || review == null) return;
+    final repo = ref.read(reviewsRepositoryProvider);
+    final on = !(review.helpedByMe ?? false);
+    final key = IdempotencyKey.generate();
+    HelpfulResult result;
+    try {
+      result = await repo.setHelpful(reviewId, on: on, key: key);
+    } on UnknownResultFailure {
+      result = await repo.setHelpful(reviewId, on: on, key: key);
+    }
+    if (!ref.mounted) return;
+    final now = state.value ?? current;
+    state = AsyncData(
+      now.copyWith(
+        nextCursor: now.nextCursor,
+        loadingMore: now.loadingMore,
+        loadMoreFailure: now.loadMoreFailure,
+        items: [
+          for (final r in now.items)
+            r.reviewId == reviewId ? r.withHelpful(result) : r,
+        ],
+      ),
+    );
+  }
 }
+
+/// 상품 리뷰 추천순·옵션 필터·도움돼요(BR-76)를 켤지 — 계약 전이라 목 모드만.
+final reviewExtrasProvider = Provider<bool>(
+  (ref) => ref.watch(envProvider) == PmartEnv.mock,
+);
 
 /// 리뷰 작성. 한 번 누르면 한 번만 보낸다.
 /// - 결과를 모르면(5xx·타임아웃) 다시 보내지 않고 이 주문의 자격을 조회해 `reviewId` 가 생겼는지 확인한다.

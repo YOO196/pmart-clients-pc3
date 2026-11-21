@@ -75,14 +75,23 @@ class ReviewEligibility {
       state != ReviewState.eligible;
 }
 
-/// 상품 리뷰 정렬(계약 `sort` — NEWEST·RATING_DESC·RATING_ASC).
-enum ReviewSort { newest, ratingDesc, ratingAsc }
+/// 상품 리뷰 정렬(계약 `sort` — NEWEST·RATING_DESC·RATING_ASC). [recommended] 는 계약에 없다(BR-76) — 목 모드만.
+enum ReviewSort { recommended, newest, ratingDesc, ratingAsc }
 
-/// 상품 리뷰 목록 조건: 상품·정렬·사진 리뷰만(`withPhotoOnly`).
+/// 도움돼요 누르기에서 서버가 거절하는 code(BR-76 제안 — 계약 전, 목만).
+abstract final class ReviewHelpfulProblemCode {
+  static const ownReview = 'HELPFUL_OWN_REVIEW';
+}
+
+/// 도움돼요를 누른 뒤 서버가 준 값(앱이 +1 하지 않는다).
+typedef HelpfulResult = ({int count, bool helped});
+
+/// 상품 리뷰 목록 조건: 상품·정렬·사진 리뷰만(`withPhotoOnly`)·옵션 [sku](BR-76 — 목만, 없으면 전체).
 typedef ProductReviewQuery = ({
   String productId,
   ReviewSort sort,
   bool photoOnly,
+  String? sku,
 });
 
 @immutable
@@ -100,7 +109,13 @@ class ReviewView {
     this.version,
     this.editableUntil,
     this.updatedAt,
+    this.helpfulCount,
+    this.helpedByMe,
   });
+
+  /// 도움돼요 수·내가 눌렀는지(BR-76 — 계약 전, 목만). 모르면 null — 0·안 누름으로 바꾸지 않는다.
+  final int? helpfulCount;
+  final bool? helpedByMe;
 
   final String reviewId;
   final String productId;
@@ -122,6 +137,24 @@ class ReviewView {
   final DateTime? updatedAt;
 
   List<String> get photoUrls => [for (final p in photos) ?p.url];
+
+  /// 서버가 준 도움돼요 값으로 바꾼 사본.
+  ReviewView withHelpful(HelpfulResult r) => ReviewView(
+    reviewId: reviewId,
+    productId: productId,
+    rating: rating,
+    state: state,
+    createdAt: createdAt,
+    sku: sku,
+    authorMasked: authorMasked,
+    text: text,
+    photos: photos,
+    version: version,
+    editableUntil: editableUntil,
+    updatedAt: updatedAt,
+    helpfulCount: r.count,
+    helpedByMe: r.helped,
+  );
 
   /// 고칠 수 있다 — 서버 상태 `PUBLISHED` 일 때만(등록 후 3일이 지나면 서버가 `LOCKED` 로 준다).
   bool get editable => state == ReviewState.published && version != null;

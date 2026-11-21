@@ -1108,6 +1108,7 @@ void main() {
       expect(repo.productQueries.last, (
         sort: ReviewSort.ratingAsc,
         photoOnly: false,
+        sku: null,
       ));
       expect(find.text('별점 낮은 순'), findsOneWidget);
 
@@ -1116,6 +1117,7 @@ void main() {
       expect(repo.productQueries.last, (
         sort: ReviewSort.ratingAsc,
         photoOnly: true,
+        sku: null,
       ));
       expect(
         find.byKey(

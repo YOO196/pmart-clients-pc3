@@ -2,14 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' show DateFormat;
+import 'package:pmart_core/pmart_core.dart' show PmartFailure, ProblemFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/cart_icon_button.dart';
 import '../../../shared/choice_sheet.dart';
+import '../../../shared/notice.dart';
 import '../../../shared/providers.dart'
     show imageOriginProvider, resolveImageUrl, withImageWidth;
 import '../../../shared/ui_state_of.dart';
+import '../../auth/domain/auth.dart' show MemberSession;
+import '../../auth/presentation/auth_controller.dart' show sessionProvider;
+import '../../catalog/domain/catalog.dart' show SaleOption;
+import '../../catalog/presentation/catalog_providers.dart'
+    show productDetailProvider;
 import '../../checkout/presentation/checkout_controller.dart'
     show clockProvider;
 import '../domain/reviews.dart';
@@ -18,7 +25,8 @@ import 'reviews_screens.dart'
     show ReviewStars, openReviewPhotoViewer, showReviewPolicyDialog;
 
 /// 상품 리뷰 전체(레퍼런스 "상품리뷰 전체 보기"): 평점, 사진 리뷰 모음(2줄 + 모아보기), 리뷰 수·정책 안내,
-/// 사진리뷰만·정렬(최신·별점 높은·별점 낮은 — 계약 sort), 리뷰 카드. 도움돼요·신고·프로필 그림은 계약에 없어 두지 않는다.
+/// 사진리뷰만·정렬(최근 등록·별점 높은·별점 낮은 — 계약 sort), 리뷰 카드(옵션 줄). 추천순·옵션 필터·도움돼요는 계약 전(BR-76)이라
+/// 목 모드에서만([reviewExtrasProvider]). 신고·프로필 그림은 두지 않는다.
 class ProductReviewsScreen extends ConsumerStatefulWidget {
   const ProductReviewsScreen({super.key, required this.productId});
 
@@ -30,11 +38,47 @@ class ProductReviewsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
-  ReviewSort _sort = ReviewSort.newest;
+  // 추천순이 되면(BR-76 목) 기본은 추천순, 아니면 최근 등록순 — 그리기 전에(initState) 정한다.
+  late ReviewSort _sort;
+
+  @override
+  void initState() {
+    super.initState();
+    _sort = ref.read(reviewExtrasProvider)
+        ? ReviewSort.recommended
+        : ReviewSort.newest;
+  }
+
   bool _photoOnly = false;
 
-  ProductReviewQuery get _query =>
-      (productId: widget.productId, sort: _sort, photoOnly: _photoOnly);
+  /// 고른 옵션(BR-76 목만). null = 옵션 전체.
+  String? _sku;
+
+  ProductReviewQuery get _query => (
+    productId: widget.productId,
+    sort: _sort,
+    photoOnly: _photoOnly,
+    sku: _sku,
+  );
+
+  Future<void> _pickOption(List<SaleOption> options) async {
+    final l10n = AppLocalizations.of(context);
+    // 옵션 전체는 빈 글로 나타낸다(시트 값은 null 을 고를 수 없다).
+    final picked = await showChoiceSheet<String>(
+      context,
+      title: l10n.reviewOptionTitle,
+      closeKey: const ValueKey('review-option-close'),
+      selected: _sku ?? '',
+      options: [
+        ('', l10n.reviewOptionAll, const ValueKey('review-option-all')),
+        for (final o in options)
+          (o.sku, o.label ?? o.sku, ValueKey('review-option-${o.sku}')),
+      ],
+    );
+    if (picked != null && mounted) {
+      setState(() => _sku = picked.isEmpty ? null : picked);
+    }
+  }
 
   Future<void> _pickSort() async {
     final l10n = AppLocalizations.of(context);
@@ -45,7 +89,8 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
       selected: _sort,
       options: [
         for (final s in ReviewSort.values)
-          (s, reviewSortLabel(l10n, s), ValueKey('review-sort-${s.name}')),
+          if (s != ReviewSort.recommended || ref.read(reviewExtrasProvider))
+            (s, reviewSortLabel(l10n, s), ValueKey('review-sort-${s.name}')),
       ],
     );
     if (picked != null && mounted) setState(() => _sort = picked);
@@ -59,6 +104,11 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
     final value = ref.watch(provider);
     final list = value.value;
     final now = ref.watch(clockProvider)();
+    // 옵션 필터(BR-76 목만): 옵션이 2개 이상인 상품에만.
+    final options = ref.watch(reviewExtrasProvider)
+        ? (ref.watch(productDetailProvider(widget.productId)).value?.options ??
+              const <SaleOption>[])
+        : const <SaleOption>[];
 
     final header = <Widget>[
       if (list?.averageRating case final avg?)
@@ -148,6 +198,42 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
           ],
         ),
       ),
+      if (options.length >= 2)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: InkWell(
+              key: const ValueKey('review-option-open'),
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => _pickOption(options),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      switch (_sku) {
+                        null => l10n.reviewOptionAll,
+                        final s =>
+                          options.where((o) => o.sku == s).firstOrNull?.label ??
+                              s,
+                      },
+                      key: const ValueKey('review-option-label'),
+                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+                    ),
+                    const SizedBox(width: 2),
+                    const PmartLineIcon(PmartLineIcons.chevronDown, size: 16),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       const Divider(height: 1),
     ];
 
@@ -187,7 +273,11 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
             );
           }
           if (i < list.items.length) {
-            return ProductReviewCard(review: list.items[i], now: now);
+            return ProductReviewCard(
+              review: list.items[i],
+              now: now,
+              query: _query,
+            );
           }
           if (list.loadingMore) {
             return const Padding(
@@ -250,6 +340,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
 }
 
 String reviewSortLabel(AppLocalizations l10n, ReviewSort s) => switch (s) {
+  ReviewSort.recommended => l10n.reviewSortRecommended,
   ReviewSort.newest => l10n.reviewSortNewest,
   ReviewSort.ratingDesc => l10n.reviewSortRatingDesc,
   ReviewSort.ratingAsc => l10n.reviewSortRatingAsc,
@@ -273,10 +364,18 @@ String reviewRelativeDate(AppLocalizations l10n, DateTime at, DateTime now) {
 
 /// 리뷰 카드(레퍼런스): 작성자(서버가 가린 값)·별점·날짜, 사진(크게), 본문.
 class ProductReviewCard extends ConsumerWidget {
-  const ProductReviewCard({super.key, required this.review, required this.now});
+  const ProductReviewCard({
+    super.key,
+    required this.review,
+    required this.now,
+    this.query,
+  });
 
   final ReviewView review;
   final DateTime now;
+
+  /// 이 카드가 있는 목록(도움돼요를 누르면 그 목록의 값을 서버 값으로 바꾼다). 없으면 도움돼요를 두지 않는다.
+  final ProductReviewQuery? query;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -287,6 +386,13 @@ class ProductReviewCard extends ConsumerWidget {
     final urls = [for (final u in r.photoUrls) resolveImageUrl(u, origin)];
     // 같은 계정이 쓴 리뷰면 여기서 바로 고칠 수 있게 한다(사용자 2026-11-20). 못 읽었으면 단추 없이 — 목록은 그대로.
     final mine = ref.watch(myWrittenReviewsProvider).value?[r.reviewId];
+    // 옵션 줄: 리뷰의 SKU → 지금 상품 옵션 이름(옵션이 2개 이상일 때만). 못 찾으면 줄 없음.
+    final options =
+        ref.watch(productDetailProvider(r.productId)).value?.options ??
+        const <SaleOption>[];
+    final optionLabel = options.length >= 2
+        ? options.where((o) => o.sku == r.sku).firstOrNull?.label
+        : null;
     return Container(
       key: ValueKey('product-review-${r.reviewId}'),
       decoration: BoxDecoration(
@@ -365,6 +471,17 @@ class ProductReviewCard extends ConsumerWidget {
               ),
             ),
           ],
+          if (optionLabel case final o?) ...[
+            const SizedBox(height: 6),
+            Text(
+              l10n.reviewOptionLine(o),
+              key: ValueKey('product-review-option-${r.reviewId}'),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 13,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
           if (r.text case final t? when t.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text(
@@ -375,7 +492,108 @@ class ProductReviewCard extends ConsumerWidget {
               ),
             ),
           ],
+          // 도움돼요(BR-76 목만): 서버 값이 있을 때만. 내 리뷰는 수만, 남의 리뷰는 회원만 누른다.
+          if ((query, r.helpfulCount) case (final q?, final int count)
+              when ref.watch(reviewExtrasProvider)) ...[
+            const SizedBox(height: 12),
+            if (mine != null)
+              Text(
+                l10n.reviewHelpfulMine(count),
+                key: ValueKey('product-review-helpful-mine-${r.reviewId}'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 13,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              )
+            else
+              _HelpfulButton(review: r, query: q, count: count),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// 도움돼요 버튼(BR-76 — 계약 전, 목만). 회원만 누른다 — 비회원은 로그인 안내. 누른 상태·수는 서버가 준 값.
+class _HelpfulButton extends ConsumerStatefulWidget {
+  const _HelpfulButton({
+    required this.review,
+    required this.query,
+    required this.count,
+  });
+
+  final ReviewView review;
+  final ProductReviewQuery query;
+  final int count;
+
+  @override
+  ConsumerState<_HelpfulButton> createState() => _HelpfulButtonState();
+}
+
+class _HelpfulButtonState extends ConsumerState<_HelpfulButton> {
+  bool _busy = false;
+
+  Future<void> _tap() async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    if (ref.read(sessionProvider) is! MemberSession) {
+      messenger.notice(
+        l10n.reviewHelpfulLoginNeeded,
+        action: SnackBarAction(
+          label: l10n.loginTitle,
+          onPressed: () => context.push('/login'),
+        ),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(productReviewListProvider(widget.query).notifier)
+          .toggleHelpful(widget.review.reviewId);
+    } on ProblemFailure catch (f) {
+      messenger.notice(
+        f.problem.code == ReviewHelpfulProblemCode.ownReview
+            ? l10n.reviewHelpfulOwn
+            : l10n.reviewHelpfulFailed,
+      );
+    } on PmartFailure {
+      messenger.notice(l10n.reviewHelpfulFailed);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final on = widget.review.helpedByMe ?? false;
+    return Semantics(
+      button: true,
+      selected: on,
+      child: InkWell(
+        key: ValueKey('product-review-helpful-${widget.review.reviewId}'),
+        borderRadius: BorderRadius.circular(16),
+        onTap: _busy ? null : _tap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: on ? scheme.primaryContainer : null,
+            border: Border.all(
+              color: on ? scheme.primary : scheme.outlineVariant,
+            ),
+          ),
+          child: Text(
+            l10n.reviewHelpful(widget.count),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 13,
+              color: on ? scheme.primary : scheme.onSurface,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -397,6 +615,7 @@ class _PhotoStrip extends ConsumerWidget {
       productId: productId,
       sort: ReviewSort.newest,
       photoOnly: true,
+      sku: null,
     ));
     final value = ref.watch(provider);
     final list = value.value;
@@ -511,6 +730,7 @@ class ReviewPhotosScreen extends ConsumerWidget {
       productId: productId,
       sort: ReviewSort.newest,
       photoOnly: true,
+      sku: null,
     ));
     final origin = ref.watch(imageOriginProvider);
     return Scaffold(

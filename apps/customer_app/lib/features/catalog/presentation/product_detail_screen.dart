@@ -41,7 +41,11 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     super.initState();
     // 몇 분 붙잡아 둔 상세가 있으면 그것을 바로 보이고, 가격·재고는 뒤에서 다시 읽는다(R2).
     final provider = productDetailProvider(widget.productId);
-    if (ref.read(provider).hasValue) ref.invalidate(provider);
+    if (!ref.read(provider).hasValue) return;
+    // 그리는 중에 다시 읽기를 걸면 다른 화면(리뷰 목록 — 옵션 이름)도 같은 값을 보고 있을 때 오류가 난다 — 첫 그림 뒤에.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.invalidate(provider);
+    });
   }
 
   @override

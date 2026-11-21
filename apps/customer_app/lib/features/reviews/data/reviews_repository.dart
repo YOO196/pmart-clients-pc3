@@ -49,12 +49,20 @@ abstract interface class ReviewsRepository {
   /// `DELETE /reviews/{reviewId}`. 204(이미 삭제여도 204 — 멱등). 삭제 뒤 같은 품목은 다시 쓸 수 없다.
   Future<void> delete(String reviewId, {required IdempotencyKey key});
 
-  /// `GET /products/{productId}/reviews`(최신 순).
+  /// `GET /products/{productId}/reviews`(최신 순). [sku] 옵션 조건·추천순은 계약에 없다(BR-76) — 목만.
   Future<ProductReviewPage> productReviews(
     String productId, {
     String? cursor,
     ReviewSort sort = ReviewSort.newest,
     bool withPhotoOnly = false,
+    String? sku,
+  });
+
+  /// 도움돼요 누르기([on] true)·취소(false) — 회원만, 같은 [key] 는 같은 결과(BR-76 R3 제안, 계약 전 — 목만).
+  Future<HelpfulResult> setHelpful(
+    String reviewId, {
+    required bool on,
+    required IdempotencyKey key,
   });
 }
 
@@ -193,13 +201,18 @@ final class ApiReviewsRepository implements ReviewsRepository {
     String? cursor,
     ReviewSort sort = ReviewSort.newest,
     bool withPhotoOnly = false,
+    String? sku,
   }) async {
+    // 계약에 없는 조건은 실서버에 보내지 않는다(BR-76 — 화면이 목 모드에서만 연다).
+    if (sku != null || sort == ReviewSort.recommended) {
+      throw UnsupportedError('BR-76: 옵션 조건·추천순은 계약 전');
+    }
     final res = await pmartGuard(
       () => _reviews.listProductReviews(
         productId: productId,
         cursor: cursor,
         sort: switch (sort) {
-          ReviewSort.newest => 'NEWEST',
+          ReviewSort.newest || ReviewSort.recommended => 'NEWEST',
           ReviewSort.ratingDesc => 'RATING_DESC',
           ReviewSort.ratingAsc => 'RATING_ASC',
         },
@@ -210,6 +223,15 @@ final class ApiReviewsRepository implements ReviewsRepository {
         res.data ?? (throw const ContractViolationFailure('리뷰 목록 본문 없음'));
     return productReviewPageFromContract(body);
   }
+
+  @override
+  Future<HelpfulResult> setHelpful(
+    String reviewId, {
+    required bool on,
+    required IdempotencyKey key,
+  }) =>
+      // 계약 전(BR-76) — 실서버에 경로를 지어 부르지 않는다.
+      throw UnsupportedError('BR-76: 도움돼요는 계약 전');
 }
 
 EligibilityPage eligibilityPageFromContract(
