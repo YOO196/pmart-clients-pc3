@@ -16,14 +16,15 @@ import { centerPath } from '../../app/nav';
 import { env } from '../../env';
 import { messages } from '../../shared/messages';
 import { OPS_REFRESH_MS, useOpenTasks } from '../ops/opsQueries';
-import { buildFloor, type Aisle, type FloorZoneKind } from './floorLayout';
+import { buildFloor, type FloorZoneKind } from './floorLayout';
+import { NavGrid, type P } from './navGrid';
 
 const m = messages.dashboard.floor;
 type Worker = Cap['schemas']['Worker'];
 type Location = Loc['schemas']['Location'];
 type Role = 'pick' | 'pack' | 'inbound' | 'idle' | 'break';
 const ROLES: readonly Role[] = ['pick', 'pack', 'inbound', 'idle', 'break'];
-const TICK_MS = 1400;
+const TICK_MS = 800;
 
 const FLOOR = buildFloor();
 
@@ -55,14 +56,23 @@ interface Dot {
   readonly role: Role;
   readonly x: number;
   readonly z: number;
-  /** 걷는 통로(피킹) — 목표 along 좌표 */
-  readonly aisle?: number;
-  readonly target?: number;
+  /** 남은 길(꺾이는 점들) — 한 번에 다음 꺾이는 점까지만 가므로 모서리를 가로지르지 않는다 */
+  readonly path: readonly P[];
+  /** 도착 뒤 머무는 횟수 */
+  readonly dwell: number;
+  /** 피커가 일하는 온도대 */
+  readonly temp: 'FROZEN' | 'CHILLED' | 'AMBIENT';
+  readonly seed: number;
 }
 
+/** 한 번(TICK)에 걷는 거리(m) */
+const STRIDE = 1.5;
 const hash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
 const pick = <T,>(list: readonly T[], n: number) => list[n % list.length]!;
-const at = (a: Aisle, along: number) => (a.along === 'z' ? { x: a.cross, z: along } : { x: along, z: a.cross });
+const nextSeed = (n: number) => (Math.imul(n, 1103515245) + 12345) >>> 0;
+let navCache: NavGrid | null = null;
+const nav = () => (navCache ??= new NavGrid(FLOOR));
+const TEMPS = ['FROZEN', 'CHILLED', 'AMBIENT'] as const;
 
 /** 역할 — 서버 값(휴게·맡은 작업 종류·업무)으로만. 맡은 작업이 없으면 업무로 시뮬레이션 역할을 정한다 */
 function roleOf(w: Worker, taskTypes: ReadonlySet<string>): Role {
@@ -76,63 +86,55 @@ function roleOf(w: Worker, taskTypes: ReadonlySet<string>): Role {
   return 'idle';
 }
 
-function place(id: string, name: string, role: Role, i: number): Dot {
-  const h = hash(id);
-  switch (role) {
+/** 다음 갈 곳 — 피커: 같은 온도대 통로의 선반 앞(가끔 포장 대기), 포장: 내 포장대(가끔 포장 대기), 입고: 하차 칸·보충 팔레트, 대기·휴게: 제자리 근처 */
+function goalOf(d: Dot, index: number): P {
+  const r = d.seed % 1000;
+  switch (d.role) {
     case 'pick': {
-      // 피커는 통로에 고르게 — 순번으로 통로를 나눠 갖고, 통로 안 자리는 해시로
-      const aisle = (i * 5 + (h % 3)) % FLOOR.aisles.length;
-      const a = FLOOR.aisles[aisle]!;
-      const along = a.from + (((h * 2654435761) >>> 0) % 100) / 100 * (a.to - a.from);
-      return { id, name, role, ...at(a, along), aisle, target: along };
+      if (r < 120) return FLOOR.points.packQueue;
+      const aisles = FLOOR.aisles.filter((a) => a.zone === d.temp);
+      const a = pick(aisles, r);
+      const along = a.from + 0.6 + ((d.seed >>> 10) % 1000) / 1000 * (a.to - a.from - 1.2);
+      return a.along === 'z' ? { x: a.cross, z: along } : { x: along, z: a.cross };
     }
-    case 'pack': {
-      const s = pick(FLOOR.stations, i);
-      return { id, name, role, x: s.x, z: s.z };
-    }
-    case 'inbound': {
-      const p = pick(FLOOR.points.dock, h);
-      return { id, name, role, x: p.x, z: p.z };
-    }
-    case 'break': {
-      const p = pick(FLOOR.points.lounge, h);
-      return { id, name, role, x: p.x, z: p.z };
-    }
-    default: {
-      const p = pick(FLOOR.points.idle, i);
-      return { id, name, role, x: p.x, z: p.z };
-    }
+    case 'pack':
+      return r < 150 ? FLOOR.points.packQueue : pick(FLOOR.stations, index);
+    case 'inbound':
+      return r < 500 ? pick(FLOOR.points.dock, r) : pick(FLOOR.reserves, r);
+    case 'break':
+      return pick(FLOOR.points.lounge, index + (r < 200 ? 1 : 0));
+    default:
+      return pick(FLOOR.points.idle, index + (r < 300 ? 1 : 0));
   }
 }
 
-/** 한 걸음 — 피커는 통로를 따라 다음 선반으로(가끔 다른 통로·포장 대기), 포장은 포장대 앞, 입고는 하차 칸 사이 */
-function step(d: Dot, n: number): Dot {
-  const r = (hash(d.id) + n * 7919) % 1000;
-  if (d.role === 'pick' && d.aisle !== undefined) {
-    let a = FLOOR.aisles[d.aisle]!;
-    let aisle = d.aisle;
-    let target = d.target ?? a.from;
-    const cur = a.along === 'z' ? d.z : d.x;
-    if (Math.abs(target - cur) < 0.3) {
-      // 다음 선반 — 30% 는 같은 온도대 다른 통로로, 10% 는 포장 대기에 장바구니를 두러
-      if (r < 100) return { ...d, x: FLOOR.points.packQueue.x, z: FLOOR.points.packQueue.z, target: -1 };
-      if (r < 400) {
-        const same = FLOOR.aisles.map((x, i) => [x, i] as const).filter(([x]) => x.zone === a.zone);
-        [a, aisle] = [...pick(same, r)];
-      }
-      target = a.from + (r % 97) / 97 * (a.to - a.from);
-    }
-    if (target === -1) target = a.from + (r % 97) / 97 * (a.to - a.from);
-    const from = Math.abs((a.along === 'z' ? d.x : d.z) - a.cross) > 0.3 ? (a.along === 'z' ? d.z : d.x) : cur;
-    const next = from + Math.sign(target - from) * Math.min(3.2, Math.abs(target - from));
-    return { ...d, ...at(a, Math.min(a.to, Math.max(a.from, next))), aisle, target };
+function place(id: string, name: string, role: Role, i: number): Dot {
+  const h = hash(id);
+  const base: Dot = { id, name, role, x: 0, z: 0, path: [], dwell: 0, temp: TEMPS[(i + (h % 3)) % 3]!, seed: h };
+  const at = nav().snapPoint(goalOf(base, i));
+  return { ...base, ...at, dwell: 1 + (h % 3) };
+}
+
+/** 한 걸음 — 머무는 중이면 기다리고, 길이 없으면 다음 갈 곳까지 길을 찾고, 있으면 다음 꺾이는 점 쪽으로 STRIDE 만큼 */
+function step(d: Dot, index: number): Dot {
+  if (d.dwell > 0) return { ...d, dwell: d.dwell - 1 };
+  if (d.path.length === 0) {
+    const seed = nextSeed(d.seed);
+    const goal = goalOf({ ...d, seed }, index);
+    const path = nav().findPath(d, goal) ?? [];
+    return { ...d, seed, path, dwell: path.length === 0 ? 2 : 0 };
   }
-  if (d.role === 'pack') return { ...d, x: d.x + ((r % 5) - 2) * 0.08, z: d.z + ((r % 3) - 1) * 0.06 };
-  if (d.role === 'inbound') {
-    const p = pick(FLOOR.points.dock, r);
-    return r % 3 === 0 ? { ...d, x: p.x, z: p.z } : d;
+  const [next, ...rest] = d.path as [P, ...P[]];
+  const dx = next.x - d.x;
+  const dz = next.z - d.z;
+  const dist = Math.hypot(dx, dz);
+  if (dist <= STRIDE) {
+    // 도착 — 일하는 자리면 잠깐 머문다(피킹 2~3번, 포장 4~6번)
+    const done = rest.length === 0;
+    const stay = !done ? 0 : d.role === 'pick' ? 2 + (d.seed % 2) : d.role === 'pack' ? 4 + (d.seed % 3) : 3;
+    return { ...d, x: next.x, z: next.z, path: rest, dwell: stay };
   }
-  return d;
+  return { ...d, x: d.x + (dx / dist) * STRIDE, z: d.z + (dz / dist) * STRIDE };
 }
 
 function useWorkerDots(mfcId: string, enabled: boolean) {
@@ -156,10 +158,8 @@ function useWorkerDots(mfcId: string, enabled: boolean) {
   if (dots.seed !== seed) setDots({ seed, list: seed });
   useEffect(() => {
     if (!enabled) return;
-    let n = 0;
     const t = setInterval(() => {
-      n += 1;
-      setDots((cur) => ({ ...cur, list: cur.list.map((d) => step(d, n)) }));
+      setDots((cur) => ({ ...cur, list: cur.list.map((d, i) => step(d, i)) }));
     }, TICK_MS);
     return () => clearInterval(t);
   }, [enabled]);
@@ -234,12 +234,7 @@ export function FloorMap({
           {FLOOR.zones
             .filter((z) => z.kind !== 'PARKING')
             .map((z) => (
-              <g key={z.id}>
-                <rect x={z.rect.x0} y={z.rect.z0} width={z.rect.x1 - z.rect.x0} height={z.rect.z1 - z.rect.z0} rx="0.3" style={{ fill: ZONE_FILL[z.kind] }} />
-                <text x={z.rect.x0 + 0.5} y={z.rect.z0 + 1.15} className="fill-base-content/70" style={{ fontSize: 0.78, fontWeight: 700 }}>
-                  {z.label}
-                </text>
-              </g>
+              <rect key={z.id} x={z.rect.x0} y={z.rect.z0} width={z.rect.x1 - z.rect.x0} height={z.rect.z1 - z.rect.z0} rx="0.3" style={{ fill: ZONE_FILL[z.kind] }} />
             ))}
           {FLOOR.racks.map((r, i) => {
             const on = picked?.kind === 'rack' && picked.code === r.code;
@@ -251,7 +246,8 @@ export function FloorMap({
                 width={r.along === 'x' ? 1.2 : 0.44}
                 height={r.along === 'z' ? 1.2 : 0.44}
                 rx="0.05"
-                className={on ? 'fill-primary stroke-primary' : full ? 'pm-floor-rack fill-base-content/18' : 'fill-base-content/18'}
+                className={on ? 'fill-primary stroke-primary' : full ? 'pm-floor-rack' : ''}
+                style={on || full ? undefined : { fill: 'var(--pm-floor-rack)' }}
                 strokeWidth={on ? 0.12 : 0}
                 {...(full
                   ? {
@@ -275,11 +271,26 @@ export function FloorMap({
             );
           })}
           {FLOOR.stations.map((s, i) => (
-            <rect key={i} x={s.x - 0.8} y={s.z + (s.z < 24 ? -1.6 : 0.8)} width="1.6" height="0.8" rx="0.1" className="fill-base-content/25" />
+            <rect key={i} x={s.x - 0.8} y={s.z + (s.z < 24 ? -1.6 : 0.8)} width="1.6" height="0.8" rx="0.1" style={{ fill: 'var(--pm-floor-table)' }} />
           ))}
           {FLOOR.walls.map((w, i) => (
-            <rect key={i} x={w.x0} y={w.z0} width={w.x1 - w.x0} height={w.z1 - w.z0} className="fill-base-content/45" />
+            <rect key={i} x={w.x0} y={w.z0} width={w.x1 - w.x0} height={w.z1 - w.z0} style={{ fill: 'var(--pm-floor-wall)' }} />
           ))}
+          {/* 구역 이름 — 랙·벽이 없는 자리에, 불투명 바탕(벽·랙 위에 그려도 겹쳐 보이지 않게) */}
+          {FLOOR.zones
+            .filter((z) => z.kind !== 'PARKING')
+            .map((z) => {
+              const fs = z.kind === 'QUARANTINE' ? 0.62 : 0.78;
+              const w = [...z.label].length * fs * 0.98 + 0.8;
+              return (
+                <g key={`l-${z.id}`} className="pointer-events-none">
+                  <rect x={z.at.x - w / 2} y={z.at.z - fs * 0.85} width={w} height={fs * 1.7} rx={fs * 0.5} style={{ fill: 'var(--pm-floor-label-bg)' }} />
+                  <text x={z.at.x} y={z.at.z + fs * 0.33} textAnchor="middle" className="fill-base-content/80" style={{ fontSize: fs, fontWeight: 700 }}>
+                    {z.label}
+                  </text>
+                </g>
+              );
+            })}
           {/* 서버 position 이 있는 칸 — 상태색 */}
           {placed.map((l) => (
             <g key={l.locationId ?? l.locationCode}>

@@ -16,6 +16,8 @@ export interface FloorZone {
   readonly kind: FloorZoneKind;
   readonly label: string;
   readonly rect: Rect;
+  /** 이름을 둘 자리(가운데 기준) — 랙·벽이 없는 곳(횡단 통로·빈 바닥) */
+  readonly at: { readonly x: number; readonly z: number };
 }
 
 export interface FloorRack {
@@ -48,6 +50,10 @@ export interface Floor {
   readonly racks: readonly FloorRack[];
   readonly aisles: readonly Aisle[];
   readonly stations: ReadonlyArray<{ readonly x: number; readonly z: number }>;
+  /** 포장대 탁자(걷지 못하는 곳) */
+  readonly tables: readonly Rect[];
+  /** 입고창고 보충 팔레트 앞(입고 작업자가 오가는 곳) */
+  readonly reserves: ReadonlyArray<{ readonly x: number; readonly z: number }>;
   readonly points: {
     readonly packQueue: { readonly x: number; readonly z: number };
     readonly dock: ReadonlyArray<{ readonly x: number; readonly z: number }>;
@@ -91,18 +97,18 @@ function fill(area: Rect, along: 'x' | 'z', zone: Aisle['zone'], crossAisleAt?: 
 
 export function buildFloor(): Floor {
   const zones: FloorZone[] = [
-    { id: 'A', kind: 'FROZEN', label: '냉동 A', rect: { x0: 0, z0: 0, x1: 12, z1: 30 } },
-    { id: 'B', kind: 'CHILLED', label: '냉장 B', rect: { x0: 12.2, z0: 0, x1: 23, z1: 30 } },
-    { id: 'C-H', kind: 'AMBIENT', label: '상온 C~H', rect: { x0: 23.2, z0: 0, x1: 37, z1: 15.4 } },
-    { id: 'WH', kind: 'INBOUND_STORE', label: '입고창고', rect: { x0: 37.2, z0: 0, x1: 48, z1: 16.5 } },
-    { id: 'RCV', kind: 'RECEIVING', label: '입고·검수', rect: { x0: 37.2, z0: 16.7, x1: 48, z1: 23 } },
-    { id: 'OFF', kind: 'OFFICE', label: '휴게·사무', rect: { x0: 37.2, z0: 23.2, x1: 48, z1: 28.6 } },
-    { id: 'PK', kind: 'PACKING', label: '패킹', rect: { x0: 25, z0: 20.5, x1: 35, z1: 28.5 } },
-    { id: 'AQ', kind: 'QUARANTINE', label: '냉동 격리', rect: { x0: 0.2, z0: 26.6, x1: 3.8, z1: 29.8 } },
-    { id: 'BQ', kind: 'QUARANTINE', label: '냉장 격리', rect: { x0: 12.4, z0: 26.6, x1: 16, z1: 29.8 } },
-    { id: 'CQ', kind: 'QUARANTINE', label: '상온 격리', rect: { x0: 44.4, z0: 12.9, x1: 47.8, z1: 16.3 } },
-    { id: 'SHIP', kind: 'SHIPPING', label: '출하대기', rect: { x0: 27, z0: 32.4, x1: 33, z1: 35 } },
-    { id: 'PARK', kind: 'PARKING', label: '라이더 대기', rect: { x0: 24, z0: 36.5, x1: 36, z1: 39.6 } },
+    { id: 'A', kind: 'FROZEN', label: '냉동 A', rect: { x0: 0, z0: 0, x1: 12, z1: 30 }, at: { x: 6.1, z: 13 } },
+    { id: 'B', kind: 'CHILLED', label: '냉장 B', rect: { x0: 12.2, z0: 0, x1: 23, z1: 30 }, at: { x: 17.7, z: 13 } },
+    { id: 'C-H', kind: 'AMBIENT', label: '상온 C~H', rect: { x0: 23.2, z0: 0, x1: 37, z1: 15.4 }, at: { x: 30.2, z: 16.4 } },
+    { id: 'WH', kind: 'INBOUND_STORE', label: '입고창고', rect: { x0: 37.2, z0: 0, x1: 48, z1: 16.5 }, at: { x: 42.6, z: 11.6 } },
+    { id: 'RCV', kind: 'RECEIVING', label: '입고·검수', rect: { x0: 37.2, z0: 16.7, x1: 48, z1: 23 }, at: { x: 42.6, z: 19.8 } },
+    { id: 'OFF', kind: 'OFFICE', label: '휴게·사무', rect: { x0: 37.2, z0: 23.2, x1: 48, z1: 28.6 }, at: { x: 42.6, z: 27.75 } },
+    { id: 'PK', kind: 'PACKING', label: '패킹', rect: { x0: 25, z0: 20.5, x1: 35, z1: 28.5 }, at: { x: 29.8, z: 24.5 } },
+    { id: 'AQ', kind: 'QUARANTINE', label: '냉동 격리', rect: { x0: 0.2, z0: 26.6, x1: 3.8, z1: 29.8 }, at: { x: 2, z: 28.2 } },
+    { id: 'BQ', kind: 'QUARANTINE', label: '냉장 격리', rect: { x0: 12.4, z0: 26.6, x1: 16, z1: 29.8 }, at: { x: 14.2, z: 28.2 } },
+    { id: 'CQ', kind: 'QUARANTINE', label: '상온 격리', rect: { x0: 44.4, z0: 12.9, x1: 47.8, z1: 16.3 }, at: { x: 46.1, z: 14.6 } },
+    { id: 'SHIP', kind: 'SHIPPING', label: '출하대기', rect: { x0: 27, z0: 32.4, x1: 33, z1: 35 }, at: { x: 30, z: 33.7 } },
+    { id: 'PARK', kind: 'PARKING', label: '라이더 대기', rect: { x0: 24, z0: 36.5, x1: 36, z1: 39.6 }, at: { x: 30, z: 38 } },
   ];
   const T = 0.2;
   const walls: Rect[] = [];
@@ -165,11 +171,16 @@ export function buildFloor(): Floor {
     racks: [...coded(frozen.racks), ...coded(chilled.racks), ...coded(ambient.racks)],
     aisles: [...frozen.aisles, ...chilled.aisles, ...ambient.aisles],
     stations,
+    tables: stations.map((s) => {
+      const tz = s.z < 24 ? 21.15 : 27.85;
+      return { x0: s.x - 0.8, z0: tz - 0.4, x1: s.x + 0.8, z1: tz + 0.4 };
+    }),
+    reserves: Array.from({ length: 12 }, (_, i) => ({ x: 39.15 + (i % 6) * 1.5, z: 2.65 + Math.floor(i / 6) * 5.4 })),
     points: {
       packQueue: { x: 33.9, z: 19.4 },
       dock: Array.from({ length: 6 }, (_, i) => ({ x: 39.5 + (i % 3) * 2.6, z: 18.4 + Math.floor(i / 3) * 3.0 })),
-      idle: Array.from({ length: 12 }, (_, i) => ({ x: 24.6 + (i % 6) * 1.6, z: 16.6 + Math.floor(i / 6) * 1.2 })),
-      lounge: Array.from({ length: 6 }, (_, i) => ({ x: 39 + (i % 3) * 2.8, z: 24.8 + Math.floor(i / 3) * 2.2 })),
+      idle: Array.from({ length: 12 }, (_, i) => ({ x: 24.6 + (i % 6) * 1.6, z: 17.8 + Math.floor(i / 6) * 1.1 })),
+      lounge: Array.from({ length: 6 }, (_, i) => ({ x: 39 + (i % 3) * 2.8, z: 24.5 + Math.floor(i / 3) * 1.4 })),
     },
   };
 }
