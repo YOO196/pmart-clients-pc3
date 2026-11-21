@@ -42,6 +42,14 @@ export const navGroups: readonly MenuGroup[] = [
         apiReady: ['피킹 줄·결품 지표(fulfillment)', '결품 많은 상품(by-sku)', '정시 배송 지표(dispatch DD-4)', '끝나지 않은 작업', '작업자', '배송 현황(bff)'],
         apiMissing: [],
       },
+      {
+        // 센터 도면(2026-11-21 사용자) — 위에서 본 도면, 랙 → 칸별 상품, 작업자 → 정보·진행 중·예정 작업
+        key: 'floor',
+        segment: 'floor',
+        ready: true,
+        apiReady: ['칸 목록(상태·카테고리)', '칸별 재고(stock-units locationPrefix 0.33.0)', '작업자', '끝나지 않은 작업'],
+        apiMissing: ['작업자 현재 위치(요청 mfc-backoffice/2026-11-21-backend-worker-floor-positions)', '칸 도면 좌표 대부분 미등록'],
+      },
     ],
   },
   {

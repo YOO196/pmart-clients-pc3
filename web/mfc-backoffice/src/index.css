@@ -323,3 +323,13 @@ html[data-theme='pmart-dark'] [data-testid='side-menu'] nav ul a > span:first-ch
 @media (prefers-reduced-motion: reduce) {
   .pm-floor-dot { transition: none; }
 }
+/* 센터 도면 — 누를 수 있는 랙 */
+.pm-floor-rack {
+  cursor: pointer;
+  transition: fill 0.15s;
+}
+.pm-floor-rack:hover,
+.pm-floor-rack:focus-visible {
+  fill: color-mix(in oklab, var(--color-primary) 70%, transparent);
+  outline: none;
+}

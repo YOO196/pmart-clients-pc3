@@ -241,7 +241,17 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
         />
 
         {/* 추이 — 피킹 줄·결품률은 한 패널에서 골라 보기(축 하나), 정시 배송은 옆 패널 */}
-        <Panel className="@5xl:col-span-7" title={m.floor.title} sub={m.floor.sub} q={{ isPending: false, isError: false }}>
+        <Panel
+          className="@5xl:col-span-7"
+          title={m.floor.title}
+          sub={m.floor.sub}
+          q={{ isPending: false, isError: false }}
+          aside={
+            <Link to={centerPath(mfcId, 'floor')} className="link text-xs">
+              {m.floor.openFull}
+            </Link>
+          }
+        >
           <FloorMap mfcId={mfcId} />
         </Panel>
         <Panel
