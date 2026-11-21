@@ -14,7 +14,7 @@ import { formatSeoul, QueryState, toUiState } from '@pmart/web-ui';
 import type { paths } from '../../api/generated/backoffice-bff';
 import { useApi } from '../../app/ApiContext';
 import { DisplayNumber, RiderLabel, SystemNumbers } from '../../shared/displayNumber';
-import { GuideBox, SearchBar } from '../../shared/listParts';
+import { SearchBar } from '../../shared/listParts';
 import { SavedViews } from '../../shared/SavedViews';
 import { messages } from '../../shared/messages';
 
@@ -63,7 +63,6 @@ export function PackingHandoverMenu({ mfcId }: { readonly mfcId: string }) {
   return (
     <section className="space-y-4">
       <h1>{m.title}</h1>
-      <GuideBox title={messages.listParts.guideOf(messages.menus.packingHandover)} storeKey="packing-handover" items={[m.intro]} />
       <SearchBar
         summary={[[m.state, state ? name(m.shipmentState, state) : m.activeStates]]}
         startOpen={!state}

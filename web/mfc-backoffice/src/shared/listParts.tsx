@@ -1,5 +1,5 @@
 // 목록 공통 부품(2026-11-19 PC 2 요청 "통합 백오피스 UI·UX 를 MFC 백오피스에도", 쿠팡 윙 참고).
-// 2026-11-20: StatStrip·GuideBox·AllDone 은 공용 @pmart/web-ui 를 쓴다(알림 handoff/all/2026-11-19-notice-web-ui-shared-parts).
+// 2026-11-21: 화면 맨 위 안내 상자(GuideBox)는 실사용에 쓸모없어 뺐다(사용자). 2026-11-20: StatStrip·AllDone 은 공용 @pmart/web-ui 를 쓴다(알림 handoff/all/2026-11-19-notice-web-ui-shared-parts).
 // 이 앱에 남긴 것: StatCard·countCell(공용 알림대로 앱 사본 — 이 앱은 주소 쿼리 대신 거르기 함수 onClick),
 // SearchBar(이 앱 목록은 고르는 즉시 거른다 — 공용 SearchPanel 은 조회·초기화 단추가 늘 붙어 회신에서 "단추 없음"·startOpen 을 부탁함).
 // - 숫자 카드: 서버가 센 수만. 읽는 중 "…", 못 읽으면 "?"(0 이 아님), 한 쪽에 다 못 세면 "N건 이상".
@@ -8,7 +8,7 @@
 // - 검색 조건: 조건을 건 뒤에는 한 줄 칩으로 접고 "검색 열기"로 펼친다. '/' 키는 이 칸의 첫 입력으로 간다(app/PageChrome).
 import { type ComponentProps, type ReactNode, useState } from 'react';
 
-import { AllDone as UiAllDone, GuideBox as UiGuideBox } from '@pmart/web-ui';
+import { AllDone as UiAllDone } from '@pmart/web-ui';
 
 import { messages } from './messages';
 import { useStatChange } from './motion';
@@ -67,11 +67,6 @@ export function StatCard({
 
 /** 숫자 띠 — 공용 콘솔(@pmart/web-ui/console StatStrip, 2026-11-20): 한 상자·칸 사이 머리카락 선, 고른 칸(aria-pressed)은 아래 파란 줄 */
 export { StatStrip } from '@pmart/web-ui/console';
-
-/** 안내 상자 — 공용(@pmart/web-ui GuideBox, tone info·warning). 이 앱 시험이 찾는 testId 기본값만 둔다 */
-export function GuideBox(props: ComponentProps<typeof UiGuideBox>) {
-  return <UiGuideBox testId="guide-box" {...props} />;
-}
 
 /** 다 끝났어요 띠 — 공용(@pmart/web-ui AllDone). 서버가 0건이라고 확인했을 때만 부른다. 제목 기본값만 이 앱 문구 */
 export function AllDone({ title = m.allDone, ...rest }: Omit<ComponentProps<typeof UiAllDone>, 'title'> & { readonly title?: string }) {

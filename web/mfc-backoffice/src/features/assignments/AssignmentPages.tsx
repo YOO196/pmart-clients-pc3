@@ -14,7 +14,7 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-capacity';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
-import { GuideBox, SearchBar } from '../../shared/listParts';
+import { SearchBar } from '../../shared/listParts';
 import { SavedViews } from '../../shared/SavedViews';
 import { SearchSelect } from '../../shared/SearchSelect';
 import { messages } from '../../shared/messages';
@@ -73,7 +73,6 @@ function AssignmentsHome({ mfcId }: { readonly mfcId: string }) {
   return (
     <section className="space-y-4">
       <h1>{messages.menus.assignments}</h1>
-      <GuideBox title={messages.listParts.guideOf(messages.menus.assignments)} storeKey="assignments" items={[m.intro]} />
       {/* 작업 시작(capacity 0.22.0) — 누르면 추천대로 바로 배정. 바꾸기는 아래 목록·담당 없는 작업·직접 배정에서 */}
       <StartWork mfcId={mfcId} />
       <div role="tablist" className="tabs tabs-box w-fit">

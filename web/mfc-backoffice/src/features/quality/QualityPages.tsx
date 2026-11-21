@@ -21,7 +21,7 @@ import { DecisionList, DisposalList, InspectionList, ReturnReceiptList } from '.
 import { IncidentsTab } from './IncidentPages';
 import { LotLabel } from '../../shared/LotLabel';
 import { SystemNumbers } from '../../shared/displayNumber';
-import { GuideBox } from '../../shared/listParts';
+
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 
@@ -66,7 +66,6 @@ export function QualityMenu({ mfcId }: { readonly mfcId: string }) {
   return (
     <section className="space-y-4">
       <h1>{messages.menus.quality}</h1>
-      <GuideBox title={messages.listParts.guideOf(messages.menus.quality)} storeKey="quality" items={[m.intro]} />
       <div role="tablist" className="tabs tabs-box w-fit">
         {TABS.map((t) => (
           <button

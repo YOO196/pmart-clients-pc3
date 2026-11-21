@@ -1,4 +1,4 @@
-// 나머지 메뉴도 같은 틀(2026-11-19) — 안내 상자, 검색 칩 접기·내 보기, 위치 최근 봄·이전/다음, 센터 목록 건수.
+// 나머지 메뉴도 같은 틀(2026-11-19) — 안내 상자 없음(2026-11-21), 검색 칩 접기·내 보기, 위치 최근 봄·이전/다음, 센터 목록 건수.
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -6,23 +6,16 @@ import { describe, expect, it } from 'vitest';
 import { renderAt } from '../test/render';
 
 describe('나머지 메뉴도 같은 틀', () => {
-  it.each([
-    ['assignments', '배정 안내'],
-    ['deliveries', '배송 현황 안내'],
-    ['packing-handover', '포장 인계 안내'],
-    ['return-handovers', '반납 인증번호 안내'],
-    ['inbound', '입고 안내'],
-    ['inventory', '재고 안내'],
-    ['locations', '위치(칸) 안내'],
-    ['quality', '품질 안내'],
-    ['restrictions', '운영 제한 안내'],
-  ])('%s: 안내 상자(접으면 이 브라우저에 기억)', async (segment, title) => {
-    renderAt(`/c/MFC-BSN-01/${segment}`);
-    const box = await screen.findByTestId('guide-box');
-    expect(box).toHaveTextContent(title);
-    await userEvent.click(within(box).getByRole('button', { name: (n: string) => n.includes(title) }));
-    expect(within(box).getByRole('button', { name: (n: string) => n.includes(title) })).toHaveAttribute('aria-expanded', 'false');
-  });
+  it.each(['assignments', 'deliveries', 'packing-handover', 'return-handovers', 'inbound', 'inventory', 'locations', 'quality', 'restrictions', 'moves', 'tasks', 'dispatch-delays'])(
+    '%s: 맨 위 안내 상자는 없다(2026-11-21 사용자 — 실사용에 쓸모없음)',
+    async (segment) => {
+      renderAt(`/c/MFC-BSN-01/${segment}`);
+      await screen.findByRole('heading', { level: 1 });
+      expect(screen.queryByTestId('guide-box')).not.toBeInTheDocument();
+      // 안내 상자는 "… 안내" 제목 단추로 접고 폈다
+      expect(screen.queryByRole('button', { name: /안내/ })).not.toBeInTheDocument();
+    },
+  );
 
   it('배송 현황: 상태를 고르면 칩으로 접히고 내 보기로 저장할 수 있다', async () => {
     renderAt('/c/MFC-BSN-01/deliveries?state=ASSIGNED');

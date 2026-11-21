@@ -21,7 +21,7 @@ import { centerPath } from '../../app/nav';
 import { ApprovalAwareFeedback, ApprovalRefInput, approvalRequired } from '../../shared/approval';
 import { LotLabel } from '../../shared/LotLabel';
 import { SystemNumbers } from '../../shared/displayNumber';
-import { GuideBox } from '../../shared/listParts';
+
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 import { CountSessionList, StockUnitList } from '../lists/CenterLists';
@@ -53,7 +53,6 @@ export function InventoryMenu({ mfcId }: { readonly mfcId: string }) {
   return (
     <section className="space-y-4">
       <h1>{messages.menus.inventory}</h1>
-      <GuideBox title={messages.listParts.guideOf(messages.menus.inventory)} storeKey="inventory" items={[m.intro]} />
       <div role="tablist" className="tabs tabs-box w-fit">
         {TABS.map((t) => (
           <button
