@@ -1448,6 +1448,7 @@
   "reviewStatePending": "게시 준비 중",
   "reviewStateLocked": "게시됨 · 수정 기간 지남",
   "reviewStateOther": "상태 확인 중",
+  "reviewStateEditClosed": "수정 기간 지남",
   "reviewLoadFailed": "리뷰를 불러오지 못했어요",
   "reviewRetry": "다시 시도",
   "reviewSectionTitle": "리뷰",

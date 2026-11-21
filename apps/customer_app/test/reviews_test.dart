@@ -802,6 +802,48 @@ void main() {
       expect(find.byKey(const ValueKey('review-result-done')), findsNothing);
     });
 
+    testWidgets(
+      '내가 쓴 리뷰 B안: 상품 회색 띠, 사진 3칸(4장이면 +1), 글 3줄 넘으면 더보기 → 리뷰 하나 화면',
+      (t) async {
+        final repo = MockReviewsRepository(latency: Duration.zero);
+        final mine = repo.reviewJson.firstWhere(
+          (r) => r['reviewId'] == 'rv-mine-1',
+        );
+        mine['photos'] = [
+          for (var i = 1; i <= 4; i++)
+            {'photoId': 'rp-$i', 'url': '/api/v1/review-photos/rp-$i'},
+        ];
+        mine['text'] = List.filled(12, '꾸덕하고 맛있어요. 다음에도 살게요.').join(' ');
+        await openManage(t, repo);
+        await t.tap(find.byKey(const ValueKey('review-tab-mine')));
+        await t.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('review-mine-product-rv-mine-1')),
+          findsOneWidget,
+        );
+        for (var i = 0; i < 3; i++) {
+          expect(
+            find.byKey(ValueKey('review-photo-rv-mine-1-$i')),
+            findsOneWidget,
+          );
+        }
+        expect(
+          find.byKey(const ValueKey('review-photo-rv-mine-1-3')),
+          findsNothing,
+        );
+        expect(find.text('+1'), findsOneWidget);
+        await t.tap(
+          find.byKey(const ValueKey('review-mine-readmore-rv-mine-1')),
+        );
+        await t.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('review-mine-readmore-rv-mine-1')),
+          findsNothing,
+        );
+        expect(find.text('내 리뷰'), findsWidgets);
+      },
+    );
+
     testWidgets('내가 쓴 리뷰: 본문 조회 실패는 그 카드에 실패 + 다시 시도', (t) async {
       final repo = MockReviewsRepository(latency: Duration.zero)
         ..getFailures.add(
