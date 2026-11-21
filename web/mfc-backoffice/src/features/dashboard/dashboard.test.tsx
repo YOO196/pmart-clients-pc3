@@ -51,6 +51,33 @@ describe('센터 대시보드', () => {
     expect(screen.queryByTestId('kpi-on-time-value')).not.toBeInTheDocument();
   });
 
+  it('우선 확인 칩 — 서버 값으로 센 급한 일, 누르면 그 화면으로', async () => {
+    renderAt('/c/MFC-BSN-01/dashboard');
+    const bar = await screen.findByTestId('priority-bar');
+    await waitFor(() => expect(within(bar).getByRole('link', { name: /출하 약속 초과/ })).toHaveTextContent('3건'));
+    await waitFor(() => expect(within(bar).getByRole('link', { name: /배차 지연/ })).toHaveTextContent('2건'));
+    expect(within(bar).getByRole('link', { name: /배차 지연/ })).toHaveAttribute('href', '/c/MFC-BSN-01/dispatch-delays');
+    expect(within(bar).getByRole('link', { name: /막힌 작업/ })).toHaveAttribute('href', '/c/MFC-BSN-01/tasks?state=BLOCKED');
+  });
+
+  it('알림 피드 — 긴급(약속 초과·지난 배차 지연)이 먼저, 6줄까지 + 나머지 건수', async () => {
+    renderAt('/c/MFC-BSN-01/dashboard');
+    await waitFor(() => expect(screen.getAllByTestId('alert-feed-row').length).toBe(6));
+    const rows = screen.getAllByTestId('alert-feed-row');
+    expect(rows[0]).toHaveTextContent('긴급');
+    expect(rows.at(-1)).toHaveTextContent('주의');
+    expect(within(rows[0]!).getByRole('link', { name: '조치 보기' })).toBeInTheDocument();
+    expect(screen.getByText(/건 더 — 홈 예외 처리함/)).toBeInTheDocument();
+  });
+
+  it('피킹 그림은 피킹 줄·결품률을 골라 본다(축 하나)', async () => {
+    renderAt('/c/MFC-BSN-01/dashboard');
+    await screen.findByTestId('chart-picked');
+    await userEvent.click(screen.getByRole('button', { name: '결품률' }));
+    expect(await screen.findByTestId('chart-short-rate')).toBeInTheDocument();
+    expect(screen.queryByTestId('chart-picked')).not.toBeInTheDocument();
+  });
+
   it('메뉴에 있고 누르면 대시보드', async () => {
     renderAt('/c/MFC-BSN-01/ops');
     await userEvent.click(await screen.findByRole('link', { name: '센터 대시보드' }));
