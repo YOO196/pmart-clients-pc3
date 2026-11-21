@@ -17,10 +17,20 @@ describe('센터 도면', () => {
     const panel = await screen.findByTestId('rack-panel');
     expect(panel).toHaveTextContent('랙 A-P1-01');
     await waitFor(() => expect(within(panel).getAllByTestId('rack-cell')).toHaveLength(1));
-    expect(within(panel).getByText('A-P1-01-1-01')).toBeInTheDocument();
-    expect(within(panel).getByText(/12개/)).toBeInTheDocument();
+    const cell = within(panel).getByTestId('rack-cell');
+    expect(cell).toHaveAttribute('data-code', 'A-P1-01-1-01');
+    expect(cell).toHaveTextContent('01번 칸');
+    expect(cell).toHaveTextContent(/12개/);
+    // 요약: 칸 수 · 상품 있는 칸 · 재고 합
+    expect(within(panel).getByTestId('rack-summary')).toHaveTextContent('1칸');
+    expect(within(panel).getByTestId('rack-summary')).toHaveTextContent('1 / 1');
+    // 고른 랙은 눌린 상태(보라) — 큰 흰 테두리가 아니라 aria-pressed 로 칠한다
+    expect(rack).toHaveAttribute('aria-pressed', 'true');
     const q = new URL(view.gets('/stock-units').at(-1)!.url).searchParams;
     expect(q.get('locationPrefix')).toBe('A-P1-01-');
+    // 칸 목록은 랙 온도대로 좁혀 읽는다(칸이 수천 개)
+    const lq = view.gets('/locations').map((r) => new URL(r.url).searchParams);
+    expect(lq.some((x) => x.get('temperatureZone') === 'AMBIENT')).toBe(true);
   });
 
   it('등록된 칸이 없는 랙은 빈 랙으로 꾸미지 않고 그렇게 말한다', async () => {

@@ -17,6 +17,7 @@ import { env } from '../../env';
 import { messages } from '../../shared/messages';
 import { OPS_REFRESH_MS, useOpenTasks } from '../ops/opsQueries';
 import { buildFloor, type FloorZoneKind } from './floorLayout';
+import { fetchAllLocations } from './floorQueries';
 import { NavGrid, type P } from './navGrid';
 
 const m = messages.dashboard.floor;
@@ -193,11 +194,14 @@ export function FloorMap({
     refetchInterval: OPS_REFRESH_MS,
     queryFn: async () => (await request('GET', api.location.GET('/locations', { params: { query: { mfcId, size: 200 } } }))).items ?? [],
   });
+  // 실사 잠김·닫힘 칸 수 — 상태로 걸러 끝까지(칸이 수천 개라 첫 쪽만 세면 모자란다)
+  const lockedQ = useQuery({ queryKey: ['dashboard', mfcId, 'locations', 'COUNT_LOCKED'], refetchInterval: OPS_REFRESH_MS, queryFn: () => fetchAllLocations(api, mfcId, { state: 'COUNT_LOCKED' }) });
+  const closedQ = useQuery({ queryKey: ['dashboard', mfcId, 'locations', 'CLOSED'], refetchInterval: OPS_REFRESH_MS, queryFn: () => fetchAllLocations(api, mfcId, { state: 'CLOSED' }) });
   const [hover, setHover] = useState<string | null>(null);
   const items: readonly Location[] = locations.data ?? [];
   const placed = items.filter((l) => l.position);
-  const counting = items.filter((l) => l.state === 'COUNT_LOCKED').length;
-  const closed = items.filter((l) => l.state === 'CLOSED').length;
+  const counting = lockedQ.data?.length ?? 0;
+  const closed = closedQ.data?.length ?? 0;
   const count = (r: Role) => dots.filter((d) => d.role === r).length;
   const hovered = dots.find((d) => d.id === hover);
 
@@ -246,9 +250,9 @@ export function FloorMap({
                 width={r.along === 'x' ? 1.2 : 0.44}
                 height={r.along === 'z' ? 1.2 : 0.44}
                 rx="0.05"
-                className={on ? 'fill-primary stroke-primary' : full ? 'pm-floor-rack' : ''}
-                style={on || full ? undefined : { fill: 'var(--pm-floor-rack)' }}
-                strokeWidth={on ? 0.12 : 0}
+                className={full ? 'pm-floor-rack' : ''}
+                style={full ? undefined : { fill: 'var(--pm-floor-rack)' }}
+                {...(full ? { 'aria-pressed': on } : {})}
                 {...(full
                   ? {
                       role: 'button',

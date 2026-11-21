@@ -12,8 +12,11 @@ import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
 import { FloorMap, type FloorPick } from '../dashboard/FloorMap';
+import { fetchAllLocations, type Location } from '../dashboard/floorQueries';
+import { useNow } from '../../shared/motion';
 import { OPS_REFRESH_MS, useOpenTasks } from '../ops/opsQueries';
 
+const TEMP_OF: Readonly<Record<string, Location['temperatureZone']>> = { A: 'AMBIENT', C: 'CHILLED', F: 'FROZEN' };
 const m = messages.floorPage;
 
 export function FloorMenu({ mfcId }: { readonly mfcId: string }) {
@@ -36,7 +39,7 @@ export function FloorMenu({ mfcId }: { readonly mfcId: string }) {
       >
         <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
           {rack ? (
-            <RackPanel mfcId={mfcId} code={rack} onClose={close} />
+            <RackPanel mfcId={mfcId} code={rack} temp={TEMP_OF[rack.charAt(0)] ?? null} onClose={close} />
           ) : worker ? (
             <WorkerPanel mfcId={mfcId} workerId={worker} onClose={close} />
           ) : (
@@ -101,28 +104,35 @@ function PanelHead({ title, sub, onClose }: { readonly title: string; readonly s
   );
 }
 
-/** 랙 — 단(위가 높은 단)·칸별 지금 놓인 상품 */
-function RackPanel({ mfcId, code, onClose }: { readonly mfcId: string; readonly code: string; readonly onClose: () => void }) {
+/** 랙 — 칸 수 요약, 단(위가 높은 단)마다 칸 카드: 지금 놓인 상품·수량·LOT 번호·유통기한 */
+function RackPanel({ mfcId, code, temp, onClose }: { readonly mfcId: string; readonly code: string; readonly temp: Location['temperatureZone'] | null; readonly onClose: () => void }) {
   const api = useApi();
   const prefix = `${code}-`;
+  const now = useNow(OPS_REFRESH_MS);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(now);
   const units = useQuery({
     queryKey: ['floor', mfcId, 'stock-units', prefix],
     refetchInterval: OPS_REFRESH_MS,
     queryFn: () => request('GET', api.inventory.GET('/mfcs/{mfcId}/stock-units', { params: { path: { mfcId }, query: { locationPrefix: prefix, size: 200 } } })),
   });
+  // 칸 목록은 이 랙 온도대만 끝까지 읽어(칸이 수천 개) 랙 코드로 거른다
   const locations = useQuery({
-    queryKey: ['dashboard', mfcId, 'locations'],
+    queryKey: ['floor', mfcId, 'locations', temp ?? 'ALL'],
     refetchInterval: OPS_REFRESH_MS,
-    queryFn: async () => (await request('GET', api.location.GET('/locations', { params: { query: { mfcId, size: 200 } } }))).items ?? [],
+    queryFn: () => fetchAllLocations(api, mfcId, temp ? { temperatureZone: temp } : {}),
   });
-  const cells = (locations.data ?? []).filter((l) => l.locationCode.startsWith(prefix)).sort((a, b) => b.locationCode.localeCompare(a.locationCode));
-  // 단(높은 단 위) → 칸
+  const cells = (locations.data ?? []).filter((l) => l.locationCode.startsWith(prefix));
   const levels = new Map<string, typeof cells>();
   for (const c of cells) {
     const [, , , level = '?'] = c.locationCode.split('-');
-    levels.set(level, [...(levels.get(level) ?? []), c].sort((a, b) => a.locationCode.localeCompare(b.locationCode)));
+    levels.set(level, [...(levels.get(level) ?? []), c].sort((x, y) => x.locationCode.localeCompare(y.locationCode)));
   }
-  const unitsOf = (locationCode: string) => (units.data?.items ?? []).filter((u) => u.locationCode === locationCode);
+  const levelList = [...levels.entries()].sort((x, y) => y[0].localeCompare(x[0]));
+  const all = units.data?.items ?? [];
+  const unitsOf = (locationCode: string) => all.filter((u) => u.locationCode === locationCode);
+  const filled = cells.filter((c) => unitsOf(c.locationCode).length > 0).length;
+  const totalQty = all.reduce((n, u) => n + u.qty, 0);
+  const daysLeft = (d: string | null | undefined) => (d ? Math.round((Date.parse(`${d}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000) : null);
   return (
     <div data-testid="rack-panel">
       <PanelHead title={m.rackTitle(code)} sub={m.rackSub} onClose={onClose} />
@@ -137,44 +147,86 @@ function RackPanel({ mfcId, code, onClose }: { readonly mfcId: string; readonly 
           {m.noCells(code)}
         </p>
       ) : (
-        <ol className="space-y-3">
-          {[...levels.entries()].map(([level, list]) => (
-            <li key={level}>
-              <p className="mb-1 text-xs font-bold text-base-content/60">{m.level(level)}</p>
-              <ul className="grid gap-1.5">
-                {list.map((c) => {
-                  const here = unitsOf(c.locationCode);
-                  return (
-                    <li key={c.locationCode} className="rounded-field border border-base-300 bg-base-200/50 px-3 py-2" data-testid="rack-cell">
-                      <p className="flex items-center justify-between gap-2 text-xs">
-                        <Link to={centerPath(mfcId, `locations/${encodeURIComponent(c.locationId ?? '')}`)} className="pm-mono link font-semibold">
-                          {c.locationCode}
-                        </Link>
-                        <span className="flex gap-1">
-                          {c.highTurnover && <span className="badge badge-primary badge-xs">{m.highTurnover}</span>}
-                          {c.state !== 'ACTIVE' && <span className={`badge badge-xs ${c.state === 'CLOSED' ? 'badge-warning' : c.state === 'COUNT_LOCKED' ? 'badge-info' : 'badge-ghost'}`}>{m.state[c.state ?? ''] ?? c.state}</span>}
-                        </span>
-                      </p>
-                      {here.length === 0 ? (
-                        <p className="mt-1 text-sm text-base-content/45">{m.emptyCell}</p>
-                      ) : (
-                        here.map((u) => (
-                          <p key={`${u.lotId}-${u.sku}`} className="mt-1 flex items-baseline justify-between gap-2 text-sm">
-                            <span className="min-w-0 truncate font-semibold">{u.productName ?? u.sku}</span>
-                            <span className="shrink-0 text-xs text-base-content/60 tabular-nums">
-                              {m.qty(u.qty)} · {u.lotNo ?? u.lotId}
-                              {u.qualityState !== 'NORMAL' && <span className="badge badge-warning badge-xs ml-1">{m.quality[u.qualityState] ?? u.qualityState}</span>}
+        <>
+          <dl className="mb-3 grid grid-cols-3 gap-1.5 text-center" data-testid="rack-summary">
+            {(
+              [
+                [m.sumCells, m.cellsN(cells.length)],
+                [m.sumFilled, `${filled} / ${cells.length}`],
+                [m.sumQty, m.qty(totalQty)],
+              ] as const
+            ).map(([k, v]) => (
+              <div key={k} className="rounded-field bg-base-200/70 px-1 py-1.5">
+                <dt className="text-[11px] text-base-content/55">{k}</dt>
+                <dd className="pm-mono text-sm font-bold">{v}</dd>
+              </div>
+            ))}
+          </dl>
+          <ol className="space-y-2.5">
+            {levelList.map(([level, list]) => (
+              <li key={level}>
+                <p className="mb-1 text-xs font-bold text-base-content/60">{m.level(level)}</p>
+                <ul className="grid grid-cols-2 gap-1.5">
+                  {list.map((c) => {
+                    const here = unitsOf(c.locationCode);
+                    const slot = c.locationCode.split('-')[4] ?? c.locationCode;
+                    const qty = here.reduce((n, u) => n + u.qty, 0);
+                    const first = here[0];
+                    return (
+                      <li key={c.locationCode} data-testid="rack-cell" data-code={c.locationCode}>
+                        <Link
+                          to={centerPath(mfcId, `locations/${encodeURIComponent(c.locationId ?? '')}`)}
+                          title={c.locationCode}
+                          className={`block h-full rounded-field border px-2 py-1.5 transition-colors hover:border-primary/60 ${here.length === 0 ? 'border-dashed border-base-300' : 'border-base-300 bg-base-200/60'}`}
+                        >
+                          <span className="flex items-center justify-between gap-1 text-[11px] text-base-content/55">
+                            <span className="pm-mono">{m.slot(slot)}</span>
+                            <span className="flex gap-0.5">
+                              {c.highTurnover && <span className="badge badge-primary badge-xs">{m.highTurnover}</span>}
+                              {c.state !== 'ACTIVE' && (
+                                <span className={`badge badge-xs ${c.state === 'CLOSED' ? 'badge-warning' : c.state === 'COUNT_LOCKED' ? 'badge-info' : 'badge-ghost'}`}>{m.state[c.state ?? ''] ?? c.state}</span>
+                              )}
                             </span>
-                          </p>
-                        ))
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </li>
-          ))}
-        </ol>
+                          </span>
+                          {!first ? (
+                            <span className="mt-0.5 block text-xs text-base-content/40">{m.emptyCell}</span>
+                          ) : (
+                            <>
+                              <span className="mt-0.5 block truncate text-[13px] font-semibold" data-testid="rack-cell-product">
+                                {first.productName ?? first.sku}
+                              </span>
+                              <span className="pm-mono block text-xs text-base-content/80">
+                                {m.qty(qty)}
+                                {here.length > 1 && <span className="ml-1 text-base-content/50">{m.lots(here.length)}</span>}
+                              </span>
+                              {here.map((u) => {
+                                const left = daysLeft(u.expiryDate);
+                                return (
+                                  <span key={u.lotId} className="mt-0.5 flex items-center justify-between gap-1 text-[10.5px] text-base-content/55" data-testid="rack-cell-lot">
+                                    <span className="pm-mono truncate">{u.lotNo ?? u.lotId}</span>
+                                    <span className="shrink-0">
+                                      {u.qualityState !== 'NORMAL' ? (
+                                        <span className="badge badge-warning badge-xs">{m.quality[u.qualityState] ?? u.qualityState}</span>
+                                      ) : left === null ? (
+                                        ''
+                                      ) : (
+                                        <span className={left <= 3 ? 'font-bold text-warning' : ''}>{m.expiry(left)}</span>
+                                      )}
+                                    </span>
+                                  </span>
+                                );
+                              })}
+                            </>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </li>
+            ))}
+          </ol>
+        </>
       )}
       <p className="mt-3 text-xs text-base-content/45">{m.mappingNote}</p>
     </div>
@@ -215,7 +267,18 @@ function WorkerPanel({ mfcId, workerId, onClose }: { readonly mfcId: string; rea
             <dd>{w.onBreak ? <span className="badge badge-warning badge-sm">{m.onBreak}</span> : running.length > 0 ? <span className="badge badge-primary badge-sm">{m.working}</span> : <span className="badge badge-ghost badge-sm">{m.idle}</span>}</dd>
             <dt className="text-base-content/55">{m.areas}</dt>
             <dd>{(w.workAreas ?? []).map((a) => messages.workers.area[a] ?? a).join(' · ') || messages.none}</dd>
+            <dt className="text-base-content/55">{m.duties}</dt>
+            <dd>{(w.effectiveTaskTypes ?? []).map((t) => messages.tasks.taskType[t] ?? t).join(' · ') || messages.none}</dd>
+            <dt className="text-base-content/55">{m.speed}</dt>
+            <dd className="pm-mono">{w.speedFactor !== undefined ? `× ${w.speedFactor}` : messages.none}</dd>
+            <dt className="text-base-content/55">{m.workerId}</dt>
+            <dd className="pm-mono text-xs leading-5">{w.workerId}</dd>
           </dl>
+          {mine.length > 0 && (
+            <p className="mt-3 rounded-field bg-base-200/70 px-3 py-2 text-xs text-base-content/70" data-testid="worker-load">
+              {m.load(mine.length, mine.reduce((n, t) => n + (t.remainingQty ?? 0), 0))}
+            </p>
+          )}
           <TaskList title={m.running} empty={m.noRunning} list={running} mfcId={mfcId} failed={tasks.isError} testId="worker-running" />
           <TaskList title={m.planned} empty={m.noPlanned} list={planned} mfcId={mfcId} failed={tasks.isError} testId="worker-planned" />
         </>
@@ -241,8 +304,16 @@ function TaskList({ title, empty, list, mfcId, failed, testId }: { readonly titl
             <li key={t.taskId}>
               <Link to={centerPath(mfcId, `tasks/${encodeURIComponent(t.taskId ?? '')}`)} className="flex items-center justify-between gap-2 rounded-field border border-base-300 bg-base-200/50 px-3 py-2 text-sm transition-colors hover:border-primary/50">
                 <span className="min-w-0">
-                  <b>{messages.tasks.taskType[t.taskType ?? ''] ?? t.taskType}</b>
-                  <span className="ml-1.5 text-xs text-base-content/60">{t.orderNumber ? m.order(t.orderNumber) : ''}</span>
+                  <span className="block">
+                    <b>{messages.tasks.taskType[t.taskType ?? ''] ?? t.taskType}</b>
+                    <span className="ml-1.5 text-xs text-base-content/60">{t.orderNumber ? m.order(t.orderNumber) : ''}</span>
+                  </span>
+                  {t.headline?.productName && (
+                    <span className="block truncate text-xs text-base-content/60">
+                      {m.headline(t.headline.productName, t.headline.otherLineCount ?? 0)}
+                      {t.plannedQty ? <span className="pm-mono ml-1.5">{m.progress(t.completedQty ?? 0, t.plannedQty)}</span> : null}
+                    </span>
+                  )}
                 </span>
                 <span className="shrink-0 text-xs text-base-content/60">
                   {t.state === 'BLOCKED' ? <span className="badge badge-error badge-xs">{messages.tasks.taskState.BLOCKED}</span> : t.promisedReadyAt ? m.promise(formatSeoul(t.promisedReadyAt)) : (messages.tasks.taskState[t.state ?? ''] ?? '')}
