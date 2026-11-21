@@ -27,7 +27,7 @@ describe('센터 대시보드', () => {
   it('14일 막대 — 날짜마다 한 칸, 줄 없는 날은 정시율 "—"(0% 아님), 마우스를 올리면 말풍선', async () => {
     renderAt('/c/MFC-BSN-01/dashboard');
     // B안: 추이 패널에서 정시율을 골라 본다
-    await screen.findByTestId('chart-picked');
+    await screen.findByTestId('chart-orders');
     await userEvent.click(screen.getByRole('button', { name: '정시율' }));
     const chart = await screen.findByTestId('chart-on-time');
     expect(within(chart).getAllByTestId('chart-on-time-col')).toHaveLength(14);
@@ -40,6 +40,7 @@ describe('센터 대시보드', () => {
 
   it('결품 많은 상품 상위 5 — sort=shortLines·limit=5', async () => {
     const view = renderAt('/c/MFC-BSN-01/dashboard');
+    await userEvent.click(await screen.findByRole('button', { name: '결품' }));
     const rows = await screen.findAllByTestId('top-short-row');
     expect(rows).toHaveLength(5);
     expect(rows[0]).toHaveTextContent('서울우유 1L');
@@ -74,12 +75,17 @@ describe('센터 대시보드', () => {
     expect(screen.getByText(/건 더 — 홈 예외 처리함/)).toBeInTheDocument();
   });
 
-  it('피킹 그림은 피킹 줄·결품률을 골라 본다(축 하나)', async () => {
+  it('결품은 비율 선이 아니라 사유별 쌓은 막대(서버 shortLinesByReason) + 범례, 기간 결품률은 한 숫자', async () => {
     renderAt('/c/MFC-BSN-01/dashboard');
-    await screen.findByTestId('chart-picked');
-    await userEvent.click(screen.getByRole('button', { name: '결품률' }));
-    expect(await screen.findByTestId('chart-short-rate')).toBeInTheDocument();
-    expect(screen.queryByTestId('chart-picked')).not.toBeInTheDocument();
+    await screen.findByTestId('chart-orders');
+    await userEvent.click(screen.getByRole('button', { name: '결품' }));
+    const chart = await screen.findByTestId('chart-short');
+    expect(within(chart).getByTestId('chart-short-legend')).toHaveTextContent('재고 없음파손변질막힘');
+    expect(screen.getByText(/기간 결품률 \d+\.\d%/)).toBeInTheDocument();
+    // 오늘 칸 말풍선에 사유별 줄
+    await userEvent.hover(within(chart).getAllByTestId('chart-short-col').at(-1)!);
+    expect(screen.getByTestId('chart-short-tip')).toHaveTextContent(/결품 \d+줄 \(재고 없음 \d+/);
+    expect(await screen.findByTestId('top-short')).toBeInTheDocument();
   });
 
   it('센터 도면(B안) — 목 모드면 재직 작업자마다 점(휴게는 휴게 역할), 실서버면 점 없이 "위치 API 없음"', async () => {
@@ -89,6 +95,31 @@ describe('센터 대시보드', () => {
     expect(within(map).getAllByTestId('floor-worker').filter((d) => d.getAttribute('data-role') === 'break')).toHaveLength(1);
     expect(within(map).getByText('작업자 위치 시뮬레이션(목)')).toBeInTheDocument();
     expect(within(map).getByText('닫힘 2칸')).toBeInTheDocument();
+  });
+
+  it('주문·매출(목 시뮬레이션) — 카테고리·상품 거르기(URL), 요일×시간 열지도, 많이 팔린 상품을 누르면 그 상품 추이', async () => {
+    renderAt('/c/MFC-BSN-01/dashboard');
+    const chart = await screen.findByTestId('chart-orders');
+    expect(screen.getByText('주문 시뮬레이션(목)')).toBeInTheDocument();
+    expect(within(chart).getAllByTestId('chart-orders-col')).toHaveLength(14);
+    const heat = screen.getByTestId('order-heat');
+    expect(within(heat).getAllByTestId('order-heat-cell')).toHaveLength(7 * 24);
+    expect(within(heat).getByTestId('order-heat-tip')).toHaveTextContent(/가장 많은 때 [월화수목금토일] \d+시/);
+    // 카테고리 → 상품 목록도 그 카테고리만
+    await userEvent.selectOptions(screen.getByLabelText('카테고리'), 'DAIRY');
+    const opts = within(screen.getByLabelText('상품')).getAllByRole('option').map((o) => o.textContent);
+    expect(opts).toEqual(['전체 상품', '서울우유 1L', '플레인 요거트 4입', '국산콩 두부 300g']);
+    // 많이 팔린 상품 누르면 그 상품 판매 수량 추이
+    const rows = screen.getAllByTestId('top-sold-row');
+    expect(rows.length).toBeGreaterThan(0);
+    await userEvent.click(rows[0]!);
+    expect(rows[0]).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.hover(within(screen.getByTestId('chart-orders')).getAllByTestId('chart-orders-col').at(-2)!);
+    expect(screen.getByTestId('chart-orders-tip')).toHaveTextContent(/판매 [\d,]+개/);
+    // 매출로 바꾸면 원
+    await userEvent.click(screen.getByRole('button', { name: '매출' }));
+    await userEvent.hover(within(await screen.findByTestId('chart-sales')).getAllByTestId('chart-sales-col').at(-2)!);
+    expect(screen.getByTestId('chart-sales-tip')).toHaveTextContent(/매출 [\d,]+원/);
   });
 
   it('메뉴에 있고 누르면 대시보드', async () => {
