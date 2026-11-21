@@ -337,10 +337,20 @@ html[data-theme='pmart-dark'] [data-testid='side-menu'] nav ul a > span:first-ch
   cursor: pointer;
   transition: fill 0.15s;
 }
-.pm-floor-rack:hover,
-.pm-floor-rack:focus-visible {
-  fill: color-mix(in oklab, var(--color-primary) 70%, transparent);
+.pm-floor-rack:hover {
+  fill: color-mix(in oklab, var(--color-primary) 55%, var(--pm-floor-rack));
+}
+/* 누른 뒤 남던 브라우저 포커스 테두리(큰 흰 사각형)는 없애고, 누르는 동안만 랙 둘레에 흰 테두리 · 고른 랙은 보라(2026-11-21 사용자) */
+.pm-floor-rack:focus {
   outline: none;
+}
+.pm-floor-rack:active,
+.pm-floor-rack:focus-visible {
+  stroke: #fff;
+  stroke-width: 0.08;
+}
+.pm-floor-rack[aria-pressed='true'] {
+  fill: var(--color-primary);
 }
 
 /* 추이 그래프 차오르기(2026-11-21 사용자 "가로선에 일자로 붙어있다가 등고선 생기며 그래프 완성") —

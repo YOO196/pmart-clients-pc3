@@ -1,5 +1,6 @@
 // 목 서버 상태(메모리). 테스트마다 resetDb() 로 되돌린다.
 import type { components as CapacitySchemas } from '../api/generated/mfc-capacity';
+import { buildFloor } from '../features/dashboard/floorLayout';
 import type { components as FulfillmentSchemas } from '../api/generated/mfc-fulfillment';
 import type { components as InboundSchemas } from '../api/generated/mfc-inbound';
 import type { components as InventorySchemas } from '../api/generated/mfc-inventory';
@@ -400,7 +401,14 @@ function seedInitialLoads(): MockInitialLoad[] {
 export type MockMove = Required<InboundSchemas['schemas']['MoveOrder']>;
 
 /** 위치·LOT 별 재고 단위 행(mfc-inventory CenterStock.units + 센터·상품) */
-export type MockStockUnit = Required<InventorySchemas['schemas']['CenterStock']['units'][number]> & { readonly mfcId: string; readonly sku: string; readonly productName?: string };
+export type MockStockUnit = Required<InventorySchemas['schemas']['CenterStock']['units'][number]> & {
+  readonly mfcId: string;
+  readonly sku: string;
+  readonly productName?: string;
+  /** LOT 번호(GS1 10)·유통기한 — 목 시연 칸에만 */
+  readonly lotNo?: string;
+  readonly expiryDate?: string;
+};
 
 function move(moveId: string, extra: Partial<MockMove>): [string, MockMove] {
   return [
@@ -841,19 +849,116 @@ export function seedDemoFloor() {
     ['OP-demo-10', '조휴게', { taskTypes: ['PICK'], onBreak: true }],
   ];
   for (const [id, name, extra] of demo) if (!db.workers.has(id)) db.workers.set(...worker(id, name, extra));
-  // 시연 칸마다 상품(센터 도면 랙 → 칸별 상품) — 온도대에 맞는 상품, 다섯 칸 중 하나는 비움
-  const goods: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
-    A: [['SKU-RAMEN-5', '신라면 5입'], ['SKU-WATER-2L', '생수 2L'], ['SKU-RICE-3', '즉석밥 3입'], ['SKU-SNACK-1', '새우깡'], ['SKU-TISSUE', '각티슈 3입'], ['SKU-COFFEE', '캔커피 6입']],
-    C: [['SKU-MILK-1', '서울우유 1L'], ['SKU-TOFU', '국산콩 두부 300g'], ['SKU-EGG-30', '특란 30구'], ['SKU-YOGURT', '플레인 요거트'], ['SKU-KIMCHI', '포기김치 1kg']],
-    F: [['SKU-DUMPLING', '왕만두 1kg'], ['SKU-ICE', '바닐라 아이스크림'], ['SKU-PIZZA', '냉동 피자'], ['SKU-CHICKEN', '냉동 닭가슴살']],
+  // 도면의 모든 랙(가정 코드 F-P3-01 …)에 3단 × 2칸 — 랙을 누르면 칸이 보이게(위 시연 칸은 그대로 두고 없는 코드만)
+  buildFloor().racks.forEach((r, i) => {
+    const t = r.code.charAt(0) as 'A' | 'C' | 'F';
+    const temp = t === 'A' ? 'AMBIENT' : t === 'C' ? 'CHILLED' : 'FROZEN';
+    const zone = r.code.split('-')[1]!.startsWith('P') ? 'PICKING' : 'STORAGE';
+    for (let lv = 1; lv <= 3; lv++)
+      for (let s = 1; s <= 2; s++) add(`${r.code}-${lv}-${String(s).padStart(2, '0')}`, zone, temp, i % 9 === 0 && lv === 1 ? { highTurnover: true } : {});
+  });
+  // 시연 칸마다 상품 — 온도대에 맞는 상품, 여섯 칸 중 하나는 비움, 다섯 칸 중 하나는 LOT 둘(먼저 들어온 것 + 새로 들어온 것)
+  const goods: Readonly<Record<string, ReadonlyArray<readonly [string, string, number]>>> = {
+    A: [['SKU-RAMEN-5', '신라면 5입', 240], ['SKU-WATER-2L', '생수 2L', 365], ['SKU-RICE-3', '즉석밥 3입', 270], ['SKU-SNACK-1', '새우깡', 180], ['SKU-TISSUE', '각티슈 3입', 0], ['SKU-COFFEE', '캔커피 6입', 300]],
+    C: [['SKU-MILK-1', '서울우유 1L', 9], ['SKU-TOFU', '국산콩 두부 300g', 7], ['SKU-EGG-30', '특란 30구', 18], ['SKU-YOGURT', '플레인 요거트', 14], ['SKU-KIMCHI', '포기김치 1kg', 30]],
+    F: [['SKU-DUMPLING', '왕만두 1kg', 270], ['SKU-ICE', '바닐라 아이스크림', 365], ['SKU-PIZZA', '냉동 피자', 180], ['SKU-CHICKEN', '냉동 닭가슴살', 240]],
   };
+  const day0 = Date.parse(`${new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date())}T00:00:00Z`);
+  const ymd = (offset: number) => new Date(day0 + offset * 86_400_000).toISOString().slice(0, 10);
   let n = 0;
   for (const l of db.locations.values()) {
     if (l.mfcId !== 'MFC-BSN-01' || !l.locationId.startsWith('LOC-D-') || l.state === 'RETIRED') continue;
     const list = goods[l.locationCode.charAt(0)];
     n += 1;
-    if (!list || n % 5 === 0) continue;
-    const [sku, productName] = list[n % list.length]!;
-    db.stockUnits.push({ mfcId: 'MFC-BSN-01', sku, productName, locationCode: l.locationCode, lotId: `LOT-${sku.slice(4)}-${(n % 3) + 1}`, qualityState: 'NORMAL', workState: 'STORED', qty: 4 + ((n * 7) % 20) });
+    if (!list || n % 6 === 0) continue;
+    // 같은 랙의 칸은 같은 상품군이 이어지게(랙 번호로 고름)
+    const rackNo = Number(l.locationCode.split('-')[2] ?? n);
+    const [sku, productName, shelfLife] = list[(rackNo + Math.floor(n / 7)) % list.length]!;
+    const lots = n % 5 === 0 ? 2 : 1;
+    for (let k = 0; k < lots; k++) {
+      const age = k === 0 && lots === 2 ? 6 : (n * 3) % 5; // 먼저 들어온 LOT 는 며칠 더 묵음
+      const exp = shelfLife > 0 ? ymd(Math.max(1, shelfLife - age - ((n * 11) % Math.max(2, Math.floor(shelfLife / 3))))) : undefined;
+      db.stockUnits.push({
+        mfcId: 'MFC-BSN-01',
+        sku,
+        productName,
+        locationCode: l.locationCode,
+        lotId: `LOT-${sku.slice(4)}-${n}-${k + 1}`,
+        lotNo: `L${ymd(-age).slice(2).replace(/-/g, '')}-${String((n * 7 + k) % 100).padStart(2, '0')}`,
+        ...(exp ? { expiryDate: exp } : {}),
+        qualityState: n % 47 === 0 ? 'QUARANTINED' : 'NORMAL',
+        workState: 'STORED',
+        qty: k === 0 && lots === 2 ? 1 + (n % 4) : 4 + ((n * 7) % 20),
+      });
+    }
   }
+  seedDemoTasks();
+}
+
+/** 시연 작업자마다 진행 중·예정 작업(센터 도면 작업자 패널) — 약속은 지금부터 20~110분 뒤라 "약속 초과" 알림은 안 만든다 */
+function seedDemoTasks() {
+  const now = Date.now();
+  const at = (min: number) => new Date(now + min * 60_000).toISOString();
+  const base = db.shipments.get('SHP-1');
+  const goods = [
+    ['서울우유 1L', 'SKU-MILK-1', 'C-P2-03-1-01'],
+    ['신라면 5입', 'SKU-RAMEN-5', 'A-P1-05-2-02'],
+    ['특란 30구', 'SKU-EGG-30', 'C-P2-11-1-02'],
+    ['왕만두 1kg', 'SKU-DUMPLING', 'F-P3-07-2-01'],
+    ['생수 2L', 'SKU-WATER-2L', 'A-P1-12-1-01'],
+    ['국산콩 두부 300g', 'SKU-TOFU', 'C-P2-08-3-02'],
+    ['바닐라 아이스크림', 'SKU-ICE', 'F-P3-15-1-02'],
+    ['즉석밥 3입', 'SKU-RICE-3', 'A-P1-21-2-01'],
+  ] as const;
+  const plan: ReadonlyArray<readonly [string, 'PICK' | 'PACK', 'IN_PROGRESS' | 'ASSIGNED', number]> = [
+    ['OP-demo-1', 'PICK', 'IN_PROGRESS', 0], ['OP-demo-1', 'PACK', 'ASSIGNED', 1],
+    ['OP-demo-2', 'PICK', 'IN_PROGRESS', 2], ['OP-demo-2', 'PICK', 'ASSIGNED', 3], ['OP-demo-2', 'PICK', 'ASSIGNED', 4],
+    ['OP-demo-3', 'PICK', 'IN_PROGRESS', 5],
+    ['OP-demo-4', 'PICK', 'IN_PROGRESS', 6], ['OP-demo-4', 'PICK', 'ASSIGNED', 7],
+    ['OP-demo-5', 'PACK', 'IN_PROGRESS', 1],
+    ['OP-demo-6', 'PACK', 'IN_PROGRESS', 3], ['OP-demo-6', 'PACK', 'ASSIGNED', 6],
+    ['OP-demo-7', 'PACK', 'ASSIGNED', 0],
+    ['OP-demo-10', 'PICK', 'ASSIGNED', 2],
+  ];
+  plan.forEach(([workerId, taskType, state, g], i) => {
+    const taskId = `TASK-DEMO-${i + 1}`;
+    if (db.tasks.has(taskId)) return;
+    const shipmentId = `SHP-DEMO-${i + 1}`;
+    if (base && !db.shipments.has(shipmentId)) db.shipments.set(shipmentId, { ...base, shipmentId, orderId: `ORD-DEMO-${i + 1}`, orderNumber: String(20001100 + i) });
+    const lineN = 2 + (i % 4);
+    const lines = Array.from({ length: lineN }, (_, k) => {
+      const [productName, sku, locationId] = goods[(g + k) % goods.length]!;
+      const planned = 1 + ((i + k) % 3);
+      const done = state === 'IN_PROGRESS' && k < Math.ceil(lineN / 2) ? planned : 0;
+      return {
+        taskLineId: `${taskId}-L${k + 1}`,
+        orderLineId: `OL-${taskId}-${k + 1}`,
+        sku,
+        productName,
+        barcode: null,
+        locationId,
+        lotId: null,
+        expiresOn: null,
+        picks: [],
+        plannedQty: planned,
+        completedQty: done,
+        cancelledQty: 0,
+        remainingQty: planned - done,
+        pendingQty: 0,
+      };
+    });
+    const [id, t] = task(taskId, {
+      taskType,
+      state,
+      shipmentId,
+      fulfillmentId: `FUL-DEMO-${i + 1}`,
+      assignment: { workerId, assignmentVersion: 1, asOf: { asOf: at(-5), freshness: 'CURRENT' } },
+      lines,
+      createdAt: at(-15 - i),
+      promisedReadyAt: at(20 + i * 7),
+      lastActivityAt: state === 'IN_PROGRESS' ? at(-2) : null,
+      ...(taskType === 'PACK' ? { packingLocations: [`PAK-A-0${1 + (i % 2)}`] } : {}),
+    });
+    db.tasks.set(id, t);
+  });
 }
