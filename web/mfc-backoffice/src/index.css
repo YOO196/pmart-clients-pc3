@@ -9,3 +9,137 @@
 
 /* 2026-11-20 웹 백오피스 맞추기 3단계: 쿠팡 윙(wing.css)·자체 테마·윙 덧붙임 대신 공용 콘솔(AWS 모양) 테마·겉모습 — 통합 백오피스와 같다 */
 @import '../../ui/src/console.css';
+
+/* ---- MFC 관제실(Control Tower) 겉모습 — 2026-11-21 사용자 "corap/mfc-control-tower.html 참고해서 리디자인 · 바 비례만 백오피스와 같게, 나머진 나은 방향으로" ----
+   왼쪽 메뉴 폭(220/80px)·머리줄 높이는 공용 콘솔 틀(@pmart/web-ui ConsoleShell) 그대로 — 통합 백오피스와 같은 비례.
+   바꾸는 것은 MFC 의 어두운 테마(기본)만: 남색 바탕 · 보라 강조 · 둥근 패널 · 굵은 숫자. 밝은 테마는 통합 백오피스 그대로.
+   공용 틀(web-ui)은 고치지 않고 이 앱에서 덮는다(같은 이름 테마 변수를 더 구체적인 선택자로). */
+html[data-theme='pmart-dark'] {
+  color-scheme: dark;
+  --color-base-100: #131722; /* 패널 */
+  --color-base-200: #0b0d14; /* 바탕 */
+  --color-base-300: #262b3d; /* 테두리 */
+  --color-base-content: #eef0f8;
+  --color-primary: #a78bfa; /* 글자·링크·그림(보라 연한) */
+  --color-primary-content: #140d26;
+  --color-accent: #7c3aed; /* 로고·강조 채움(보라 진한) */
+  --color-accent-content: #ffffff;
+  --color-neutral: #0f121c;
+  --color-neutral-content: #d8dcea;
+  --color-info: #7dd3fc;
+  --color-info-content: #06131d;
+  --color-success: #34d399;
+  --color-success-content: #04140e;
+  --color-warning: #fbbf24;
+  --color-warning-content: #1a1203;
+  --color-error: #f87171;
+  --color-error-content: #1d0606;
+  --radius-box: 0.6875rem;
+  --radius-field: 0.4375rem;
+  --radius-selector: 0.375rem;
+  --pm-btn-main: #7c3aed;
+  --pm-btn-main-fg: #ffffff;
+  --pm-btn-border: #353c53;
+  --pm-btn-fg: #dfe3f0;
+  --pm-row-line: #1f2433;
+  --pm-chart-1: #a78bfa;
+  --pm-chart-1-soft: color-mix(in oklab, #a78bfa 28%, #131722);
+  --pm-tower-side: #0f121c;
+  --pm-tower-top: #10131d;
+  --pm-tower-edge: #41345c; /* 패널 윗선 — 보라 기운 */
+  --pm-tower-active: #241b3c;
+  --pm-tower-active-edge: #3b2a5f;
+  --pm-tower-active-ink: #dccbff;
+  --pm-tower-head: #171c29; /* 표 머리 */
+  --pm-tower-hover: #1b2030;
+  --pm-tower-muted: #a0a9bf;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 바(왼쪽 메뉴·머리줄): 크기는 그대로, 색과 고른 메뉴 모양만 */
+html[data-theme='pmart-dark'] [data-testid='side-menu'] {
+  background: var(--pm-tower-side);
+  border-color: var(--color-base-300);
+}
+html[data-theme='pmart-dark'] #root div:has(> div > [data-testid='side-menu']) > header {
+  background: var(--pm-tower-top);
+  border-color: var(--color-base-300);
+}
+html[data-theme='pmart-dark'] #root header > a:first-child > span:first-child {
+  background: linear-gradient(145deg, #a16dff, #672bdd);
+  box-shadow: 0 0 14px #7c3aed66;
+  border-radius: 0.4rem;
+  font-weight: 900;
+}
+html[data-theme='pmart-dark'] [data-testid='side-menu'] nav a {
+  margin-inline: 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  transition: background-color 0.18s, color 0.18s, border-color 0.18s;
+}
+html[data-theme='pmart-dark'] [data-testid='side-menu'] nav ul a {
+  padding-left: 1.25rem;
+}
+html[data-theme='pmart-dark'] [data-testid='side-menu'] nav a:hover {
+  background: #1d2131;
+  color: #ffffff;
+}
+html[data-theme='pmart-dark'] [data-testid='side-menu'] nav a[aria-current='page'] {
+  background: var(--pm-tower-active);
+  border-color: var(--pm-tower-active-edge);
+  color: var(--pm-tower-active-ink);
+}
+html[data-theme='pmart-dark'] [data-testid='side-menu'] [data-group-label] {
+  color: var(--pm-tower-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+/* 본문: 제목은 크고 촘촘하게, 패널은 둥글게 + 보라 윗선 + 옅은 비스듬한 빛 + 부드러운 그림자 */
+html[data-theme='pmart-dark'] main h1 {
+  font-size: 1.75rem;
+  line-height: 2.125rem;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+html[data-theme='pmart-dark'] main :is(.rounded-box.border, .rounded-box.bg-base-100, section.bg-base-100) {
+  border-color: var(--color-base-300);
+  border-top-color: var(--pm-tower-edge);
+  background-image: linear-gradient(145deg, rgb(28 30 48 / 0.7), transparent 55%);
+  box-shadow: 0 7px 19px rgb(0 0 0 / 0.22);
+}
+html[data-theme='pmart-dark'] main :is(.rounded-box.border, .rounded-box.bg-base-100):not(:has(> table)) {
+  overflow: clip;
+}
+/* 숫자 칸: 굵게·촘촘하게(관제실 지표) */
+html[data-theme='pmart-dark'] main :is(.pm-stat-value, [data-testid$='-value']) {
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+/* 표: 머리 띠 + 줄 위 마우스 */
+html[data-theme='pmart-dark'] main table th {
+  background: var(--pm-tower-head);
+  color: #a8b1c8;
+  font-weight: 600;
+}
+html[data-theme='pmart-dark'] main table tbody tr:hover {
+  background: var(--pm-tower-hover);
+}
+/* 입력칸 */
+html[data-theme='pmart-dark'] :is(.input, .select, .textarea) {
+  background-color: #171c29;
+  border-color: #30374a;
+}
+/* 주 버튼: 보라 그라데이션 */
+html[data-theme='pmart-dark'] .btn-primary {
+  background-image: linear-gradient(145deg, #8b5cf6, #6d28d9);
+  border-color: #6d28d9;
+}
+/* 살아 있음 점: 초록 빛 */
+html[data-theme='pmart-dark'] main .rounded-full.bg-success {
+  box-shadow: 0 0 8px rgb(16 185 129 / 0.57);
+}
+/* 흐린 글자는 회청색(남색 바탕에서 읽히게) */
+html[data-theme='pmart-dark'] main :is(.text-base-content\/60, .text-base-content\/55, .text-base-content\/50) {
+  color: var(--pm-tower-muted);
+}

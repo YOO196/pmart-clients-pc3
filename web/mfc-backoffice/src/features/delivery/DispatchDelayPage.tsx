@@ -11,7 +11,7 @@ import { formatSeoul, QueryState, toUiState } from '@pmart/web-ui';
 import type { Api } from '../../api/client';
 import { useApi } from '../../app/ApiContext';
 import { DisplayNumber, RiderLabel, SystemNumbers } from '../../shared/displayNumber';
-import { AllDone, GuideBox } from '../../shared/listParts';
+import { AllDone } from '../../shared/listParts';
 import { messages } from '../../shared/messages';
 import { useNow } from '../../shared/motion';
 import { DispatchCancelButton } from './DispatchCancel';
@@ -54,7 +54,6 @@ export function DispatchDelaysMenu({ mfcId }: { readonly mfcId: string }) {
   return (
     <section className="space-y-4">
       <h1>{messages.menus.dispatchDelays}</h1>
-      <GuideBox title={m.guideTitle} storeKey="dispatch-delays" items={m.guide} />
       {numbers.isError && (
         <p role="alert" className="alert alert-warning text-sm">
           {m.numbersFailed}

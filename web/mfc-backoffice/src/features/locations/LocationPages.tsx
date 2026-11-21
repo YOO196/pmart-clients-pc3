@@ -15,7 +15,7 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-location';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
-import { GuideBox, SearchBar } from '../../shared/listParts';
+import { SearchBar } from '../../shared/listParts';
 import { SavedViews } from '../../shared/SavedViews';
 import { SystemNumbers } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
@@ -101,7 +101,6 @@ function LocationListPage({ mfcId }: { readonly mfcId: string }) {
           {m.register}
         </Link>
       </div>
-      <GuideBox title={messages.listParts.guideOf(messages.menus.locations)} storeKey="locations" items={[m.intro]} />
       <SearchBar
         label={m.filter}
         summary={[

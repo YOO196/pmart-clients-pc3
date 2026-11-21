@@ -14,7 +14,7 @@ import { commandParams } from '../../api/command';
 import type { components } from '../../api/generated/mfc-capacity';
 import { useApi } from '../../app/ApiContext';
 import { ApprovalAwareFeedback, ApprovalRefInput } from '../../shared/approval';
-import { GuideBox, SearchBar } from '../../shared/listParts';
+import { SearchBar } from '../../shared/listParts';
 import { messages } from '../../shared/messages';
 
 const m = messages.restrictions;
@@ -44,7 +44,6 @@ export function RestrictionsMenu({ mfcId }: { readonly mfcId: string }) {
   return (
     <section className="max-w-5xl space-y-4">
       <h1>{messages.menus.restrictions}</h1>
-      <GuideBox title={messages.listParts.guideOf(messages.menus.restrictions)} storeKey="restrictions" items={[m.intro]} />
       {notice && (
         <p role="status" className="text-success text-sm">
           {notice}

@@ -16,7 +16,7 @@ import type { components as CaseC } from '../../api/generated/case';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { DisplayNumber, RiderLabel, SystemNumbers, type RiderDisplay } from '../../shared/displayNumber';
-import { GuideBox, SearchBar } from '../../shared/listParts';
+import { SearchBar } from '../../shared/listParts';
 import { SavedViews } from '../../shared/SavedViews';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
@@ -86,7 +86,6 @@ export function CenterDeliveriesMenu({ mfcId }: { readonly mfcId: string }) {
   return (
     <section className="space-y-4">
       <h1>{m.title}</h1>
-      <GuideBox title={messages.listParts.guideOf(messages.menus.deliveries)} storeKey="deliveries" items={[m.intro]} />
       <SearchBar
         summary={[[m.state, state ? name(m.executionState, state) : m.activeStates]]}
         startOpen={!state}

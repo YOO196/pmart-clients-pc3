@@ -18,7 +18,7 @@ import { centerPath } from '../../app/nav';
 import { LotLabel } from '../../shared/LotLabel';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
-import { GuideBox, SearchBar, StatCard, StatStrip } from '../../shared/listParts';
+import { SearchBar, StatCard, StatStrip } from '../../shared/listParts';
 import { useNewIds } from '../../shared/motion';
 import { Who } from '../../shared/OperatorLabel';
 import { ProgressSteps, type StepPlace } from '../../shared/ProgressSteps';
@@ -95,7 +95,6 @@ function MoveListPage({ mfcId }: { readonly mfcId: string }) {
           {m.create}
         </Link>
       </div>
-      <GuideBox title={m.ui.guideTitle} storeKey="moves" items={[m.intro, m.ui.countNote]} />
       <StatStrip label={m.ui.countsLabel} testId="move-counts">
         <StatCard testId="count-ACTIVE" label={m.state.ACTIVE} value={cell((o) => o.state === 'ACTIVE')} tone="info" active={state === 'ACTIVE'} onClick={() => setState(state === 'ACTIVE' ? '' : 'ACTIVE')} />
         <StatCard

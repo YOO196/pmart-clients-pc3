@@ -18,7 +18,7 @@ import { centerPath } from '../../app/nav';
 import { LotLabel } from '../../shared/LotLabel';
 import { messages } from '../../shared/messages';
 import { RiderLabel, SystemNumbers } from '../../shared/displayNumber';
-import { AllDone, countCell, GuideBox, SearchBar, StatCard, StatStrip } from '../../shared/listParts';
+import { AllDone, countCell, SearchBar, StatCard, StatStrip } from '../../shared/listParts';
 import { useNewIds, useNow } from '../../shared/motion';
 import { PreviewDrawer, PreviewFacts, usePreview } from '../../shared/Preview';
 import { ProgressSteps, type StepPlace } from '../../shared/ProgressSteps';
@@ -134,7 +134,6 @@ function TaskListPage({ mfcId }: { readonly mfcId: string }) {
   return (
     <section className="space-y-4">
       <h1>{messages.menus.tasks}</h1>
-      <GuideBox title={m.ui.guideTitle} storeKey="tasks" items={[m.intro, m.lateHint, m.ui.sortNote]} />
       <StatStrip label={m.ui.countsLabel} testId="task-counts">
         {COUNT_STATES.map((s) => (
           <StatCard
