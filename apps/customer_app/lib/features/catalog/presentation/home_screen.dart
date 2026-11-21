@@ -749,6 +749,9 @@ class _SectionView extends ConsumerWidget {
               padding: const EdgeInsets.all(16),
               child: Text(l10n.sectionEmpty),
             )
+          // 홈의 순위 진열(자동 랭킹 테마): 레퍼런스 "16. 지금 TOP 30" — 순위 숫자를 단 3칸 × 2줄, 나머지는 전체 보기.
+          : !vertical && shown.ranked
+          ? _RankGrid(items: shown.items.take(rankGridCount).toList())
           : vertical
           ? Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -844,7 +847,11 @@ class _SectionView extends ConsumerWidget {
                     key: ValueKey('section-timer-${section.sectionId}'),
                     endsAt: endsAt,
                   ),
-            trailing: shown.hasViewAll
+            trailing:
+                shown.hasViewAll ||
+                    (!vertical &&
+                        shown.rankedComplete &&
+                        shown.items.length > rankGridCount)
                 ? TextButton(
                     key: ValueKey('section-view-all-${section.sectionId}'),
                     style: TextButton.styleFrom(
@@ -1512,4 +1519,41 @@ class _SectionExpiryState extends ConsumerState<SectionExpiry> {
   @override
   Widget build(BuildContext context) =>
       _expired ? const SizedBox.shrink() : widget.child;
+}
+
+/// 홈 순위 진열에 보이는 칸 수(3칸 × 2줄, 레퍼런스 "16. 지금 TOP 30").
+const rankGridCount = 6;
+
+/// 순위 숫자를 단 3칸 격자(좌우 16, 칸 사이 8).
+class _RankGrid extends StatelessWidget {
+  const _RankGrid({required this.items});
+
+  final List<ProductTile> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = (MediaQuery.sizeOf(context).width - 16 * 2 - 8 * 2) / 3;
+    final height = ProductTileCard.heightFor(context, width, rank: true);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 16,
+        children: [
+          for (final tile in items)
+            SizedBox(
+              key: ValueKey('rank-grid-${tile.productId}'),
+              width: width,
+              height: height,
+              child: ProductTileCard(
+                rail: true,
+                tile: tile,
+                onTap: () =>
+                    context.push('/products/${tile.productId}', extra: tile),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

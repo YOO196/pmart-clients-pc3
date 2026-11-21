@@ -1026,6 +1026,31 @@ void main() {
     debugDisableShadows = true;
   });
 
+  // 자동 랭킹 테마(storefront 0.9.0 RANKING_AUTO → 홈 영역 kind RANKING, 항목 rank·badge RANK)와 랭킹 탭.
+  testWidgets('ranking-theme', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/$name.png').uri),
+      );
+    }
+
+    await t.drag(find.byType(CustomScrollView).first, const Offset(0, -560));
+    await shot('ranking-home');
+    await t.drag(find.byType(CustomScrollView).first, const Offset(0, 2000));
+    await t.pumpAndSettle();
+    await t.tap(find.text('랭킹').first);
+    await shot('ranking-tab');
+  });
   // 타이머 테마(storefront 0.9.0 showTimer): 제목 옆 남은 시간 알약.
   testWidgets('section-timer', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

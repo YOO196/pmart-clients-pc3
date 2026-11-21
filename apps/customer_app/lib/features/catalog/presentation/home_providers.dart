@@ -152,6 +152,10 @@ class SectionItemsController extends AsyncNotifier<ProductListState> {
   @override
   Future<ProductListState> build() async {
     ref.watch(currentMfcIdProvider);
+    // 자동 랭킹 테마는 서버가 상위 N 을 한 번에 준다(다음 묶음 없음) — 받은 목록을 그대로.
+    if (target.section.rankedComplete) {
+      return ProductListState(items: target.section.items, nextCursor: null);
+    }
     final first = await _fetch(null);
     return ProductListState(items: first.items, nextCursor: first.nextCursor);
   }

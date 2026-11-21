@@ -304,22 +304,29 @@ void main() {
     });
 
     testWidgets('전체보기는 같은 영역 상품을 이어 받는다(다음 묶음)', (t) async {
-      await t.pumpWidget(testApp(const []));
+      // 한 쪽 3개 — 이번 주 장보기(6개)가 두 쪽이 된다.
+      await t.pumpWidget(
+        testApp(
+          const [],
+          catalog: MockCatalogRepository(latency: Duration.zero, pageSize: 3),
+        ),
+      );
       await t.pumpAndSettle();
 
       await t.scrollUntilVisible(
-        find.byKey(const ValueKey('section-view-all-S-RANK')),
+        find.byKey(const ValueKey('section-view-all-S-WEEKLY')),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await t.pumpAndSettle();
       await t.ensureVisible(
-        find.byKey(const ValueKey('section-view-all-S-RANK')),
+        find.byKey(const ValueKey('section-view-all-S-WEEKLY')),
       );
       await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('section-view-all-S-RANK')));
+      await t.tap(find.byKey(const ValueKey('section-view-all-S-WEEKLY')));
       await t.pumpAndSettle();
-      expect(find.text('지금 많이 사는 상품'), findsOneWidget); // 화면 제목
+      // 지금 많이 사는 상품(S-RANK)은 자동 랭킹(다음 묶음 없음 — ranking_theme_test)이라 테마 영역으로 본다.
+      expect(find.text('이번 주 장보기'), findsOneWidget); // 화면 제목
       expect(find.byKey(const ValueKey('tile-P-0006')), findsNothing);
 
       final more = find.byKey(const ValueKey('load-more'));

@@ -287,10 +287,18 @@ base class MockCatalogRepository implements CatalogRepository {
                   'showTimer': true,
                 },
                 'items': [
-                  for (final p in _sectionProducts(id)) displayItemJson(p),
+                  for (final (i, p) in _sectionProducts(id).indexed)
+                    {
+                      ...displayItemJson(p),
+                      // 자동 랭킹 테마(storefront 0.9.0 RANKING_AUTO): 순위·badge RANK, 한 번에 상위 N(다음 묶음 없음)
+                      if (kind == 'RANKING') ...{
+                        'badge': 'RANK',
+                        'rank': i + 1,
+                      },
+                    },
                 ],
                 'nextCursor': null,
-                'viewAllRef': id,
+                if (kind != 'RANKING') 'viewAllRef': id,
               },
     ],
   };

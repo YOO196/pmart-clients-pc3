@@ -147,6 +147,15 @@ class HomeSection {
   /// true 면 제목 옆에 [endsAt] 까지 남은 시간을 보이고, 0 이 되면 영역을 숨긴다(백엔드 요청서 2026-11-21 ③).
   final bool showTimer;
 
+  /// 순위 진열(랭킹 탭·자동 랭킹 테마 — 항목마다 badge RANK·rank). 홈에서는 순위 숫자를 단 3칸 격자로 그린다.
+  bool get ranked =>
+      items.isNotEmpty &&
+      items.every((t) => t.badge == DisplayBadge.rank && t.rank != null);
+
+  /// 서버가 다음 묶음·연결 없이 한 번에 준 순위 진열(자동 랭킹 테마 — storefront 0.9.0, 상위 N).
+  /// 전체 보기는 받은 목록을 그대로 보인다.
+  bool get rankedComplete => ranked && nextCursor == null && viewAllRef == null;
+
   /// 전체보기를 보여도 되는지. 서버가 연결을 주었거나 다음 묶음이 있을 때만(앱이 임의로 만들지 않는다).
   bool get hasViewAll =>
       available && (viewAllRef != null || nextCursor != null);
