@@ -325,9 +325,9 @@ html[data-theme='pmart-dark'] [data-testid='side-menu'] nav ul a > span:first-ch
   transition: transform 0.8s linear;
   cursor: pointer;
 }
-/* 누른 뒤 남는 브라우저 포커스 테두리(큰 흰 상자) 대신, 키보드로 올 때만 점 둘레 띠 */
+/* 누른 뒤 남는 브라우저 포커스 테두리(큰 흰 상자)는 숨기고, 키보드로 올 때만 점 테두리를 밝게 */
 .pm-floor-dot:focus { outline: none; }
-.pm-floor-dot:focus-visible circle:last-of-type { stroke: var(--color-base-content); stroke-width: 0.14; }
+.pm-floor-dot:focus-visible .pm-floor-core { stroke: var(--color-base-content); }
 @media (prefers-reduced-motion: reduce) {
   .pm-floor-dot { transition: none; }
 }

@@ -334,9 +334,9 @@ export function FloorMap({
                   }
                 : {})}
             >
-              {!on && <circle r="0.6" style={{ fill: ROLE_COLOR[d.role] }} opacity="0.22" />}
-              {/* 고른 작업자는 점 둘레에 흰 띠만 */}
-              <circle r="0.3" style={{ fill: ROLE_COLOR[d.role] }} className={on ? 'stroke-white' : 'stroke-base-100'} strokeWidth={on ? 0.14 : 0.09} />
+              {/* 고른 작업자는 점에서 조금 떨어진 얇은 흰 고리 */}
+              {on ? <circle r="0.62" className="pm-floor-ring fill-none stroke-white" strokeWidth="0.06" /> : <circle r="0.6" style={{ fill: ROLE_COLOR[d.role] }} opacity="0.22" />}
+              <circle r="0.3" style={{ fill: ROLE_COLOR[d.role] }} className="pm-floor-core stroke-base-100" strokeWidth="0.09" />
               <title>{m.tip(d.name, m.role[d.role])}</title>
             </g>
             );
