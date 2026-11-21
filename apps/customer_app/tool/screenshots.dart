@@ -936,6 +936,55 @@ void main() {
     debugDisableShadows = true;
   });
 
+  // 새 가입 약관 동의 E안(사용자 2026-11-21): 처음 / 필수만 / 전체 동의, 이어서 휴대폰 확인(2/3)·내 정보(3/3).
+  testWidgets('signup', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp(
+        const [],
+        auth: MockAuthRepository(latency: Duration.zero)
+          ..requireIdentity = true,
+      ),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/s-$name.png').uri),
+      );
+    }
+
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-naver')));
+    await t.pumpAndSettle();
+    await shot('1-consent');
+    for (final c in MockAuthRepository.requiredConsents) {
+      await t.tap(find.byKey(ValueKey('consent-$c')));
+      await t.pump();
+    }
+    await shot('2-consent-required');
+    await t.tap(find.byKey(const ValueKey('consent-all')));
+    await shot('3-consent-all');
+    await t.tap(find.byKey(const ValueKey('consent-submit')));
+    await shot('4-identity');
+    await t.enterText(find.byKey(const ValueKey('id-phone')), '01012345678');
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('id-next')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('id-sent')));
+    await shot('5-my-info');
+  });
+
   // 처음 실행(레퍼런스 2): 환영·약관 → 로그인/둘러보기 → 주소 검색.
   testWidgets('start', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

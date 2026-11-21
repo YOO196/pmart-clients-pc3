@@ -136,15 +136,16 @@ void main() {
     expect(find.text('약관이 바뀌었어요. 계속 이용하려면 다시 동의해 주세요'), findsOneWidget);
     const marketing = 'MARKETING:2026-11-17';
     expect(find.text('[선택] 마케팅 정보 수신'), findsOneWidget);
-    expect(
-      t
-          .widget<Checkbox>(find.byKey(const ValueKey('consent-$marketing')))
-          .value,
-      isFalse,
-    );
+    expect(find.byKey(const ValueKey('consent-on-$marketing')), findsNothing);
+    // 재동의는 가입 단계 표시가 없다.
+    expect(find.byKey(const ValueKey('signup-steps-1')), findsNothing);
     await t.tap(find.byKey(const ValueKey('consent-$marketing')));
     await t.pump();
-    // 필수는 아래 [전체 동의하고 계속하기] 한 번으로 모두 동의한다(레퍼런스 13-9 — 재동의 시트와 같다).
+    // 약관 동의 E안(2026-11-21): 필수를 하나씩 체크해야 단추가 켜진다.
+    for (final c in MockAuthRepository.requiredConsents) {
+      await t.tap(find.byKey(ValueKey('consent-$c')));
+      await t.pump();
+    }
     await t.tap(find.byKey(const ValueKey('consent-submit')));
     await t.pumpAndSettle();
 
@@ -153,7 +154,7 @@ void main() {
     expect(sent.where((d) => d.agreed), hasLength(4));
   });
 
-  testWidgets('필수는 [전체 동의하고 계속하기] 한 번으로 동의, 선택은 고른 값 그대로(끄면 false)', (t) async {
+  testWidgets('필수를 모두 체크해야 [동의하고 계속하기]가 켜지고, 약관 전체 동의는 모두 체크·해제한다', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
     await t.tap(find.text('마이페이지').last);
@@ -165,18 +166,33 @@ void main() {
 
     FilledButton submit() =>
         t.widget<FilledButton>(find.byKey(const ValueKey('consent-submit')));
-    // 필수를 하나씩 체크하지 않는다 — 단추가 처음부터 눌린다.
-    expect(submit().onPressed, isNotNull);
-    for (final c in MockAuthRepository.requiredConsents) {
-      expect(find.byKey(ValueKey('consent-$c')), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(ValueKey('consent-$c')),
-          matching: find.byType(Checkbox),
-        ),
-        findsNothing,
-      );
+    // 새 가입: 단계 1/3. 처음엔 아무것도 체크 안 됨 — 단추 꺼짐.
+    expect(find.byKey(const ValueKey('signup-steps-1')), findsOneWidget);
+    expect(find.text('1 / 3'), findsOneWidget);
+    expect(submit().onPressed, isNull);
+    // 전체 동의 → 모두 체크(선택 포함), 다시 누르면 모두 해제.
+    await t.ensureVisible(find.byKey(const ValueKey('consent-all')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('consent-all')));
+    await t.pump();
+    for (final c in [
+      ...MockAuthRepository.requiredConsents,
+      ...MockAuthRepository.optionalConsents,
+    ]) {
+      expect(find.byKey(ValueKey('consent-on-$c')), findsOneWidget);
     }
+    expect(submit().onPressed, isNotNull);
+    await t.tap(find.byKey(const ValueKey('consent-all')));
+    await t.pump();
+    expect(submit().onPressed, isNull);
+    // 필수만 체크 — 단추 켜짐, 전체 동의는 꺼진 채.
+    for (final c in MockAuthRepository.requiredConsents) {
+      await t.ensureVisible(find.byKey(ValueKey('consent-$c')));
+      await t.tap(find.byKey(ValueKey('consent-$c')));
+      await t.pump();
+    }
+    expect(submit().onPressed, isNotNull);
+    expect(find.byKey(const ValueKey('consent-all-on')), findsNothing);
 
     await t.tap(find.byKey(const ValueKey('consent-submit')));
     await t.pumpAndSettle();
@@ -184,6 +200,7 @@ void main() {
     // 새로 가입한 계정은 내 정보(이름)부터 받는다. 저장 전에는 닫히지 않는다.
     // 휴대폰 번호는 여기서 보이기만 하고, "번호 확인"(OCTOMO) 화면에서 넣고 확인한다(customer 0.9.0).
     expect(find.text('내 정보 등록'), findsOneWidget);
+    expect(find.byKey(const ValueKey('signup-steps-3')), findsOneWidget);
     expect(find.byKey(const ValueKey('info-later')), findsNothing);
     expect(find.byKey(const ValueKey('info-phone-verify')), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('info-save')));
@@ -207,6 +224,8 @@ void main() {
     // 마이 → 내 정보: 이름을 바꾸면 그대로 저장된다.
     await t.tap(find.byKey(const ValueKey('my-info')));
     await t.pumpAndSettle();
+    // 마이의 내 정보는 가입 단계 표시가 없다.
+    expect(find.byKey(const ValueKey('signup-steps-3')), findsNothing);
     await t.enterText(find.byKey(const ValueKey('info-name')), '박피마');
     await t.tap(find.byKey(const ValueKey('info-save')));
     await t.pumpAndSettle();

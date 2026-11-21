@@ -8,6 +8,7 @@ import '../domain/profile.dart';
 import 'profile_avatar.dart';
 import 'profile_controller.dart';
 import '../../../shared/notice.dart';
+import '../../auth/presentation/signup_steps.dart';
 
 /// 마이 목록에 보일 한 줄 요약(이름 · 가린 번호). 번호는 등록된 것이 있을 때만 붙인다
 /// (연락처 등록은 서버가 아직 열지 않아 "번호 없음"을 따로 보이지 않는다, 2026-11-03 안내).
@@ -98,6 +99,7 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
         appBar: AppBar(
           title: Text(widget.signup ? l10n.infoSignupTitle : l10n.infoTitle),
           automaticallyImplyLeading: !widget.signup,
+          actions: [if (widget.signup) const SignupStepCount(step: 3)],
         ),
         body: switch (value) {
           AsyncError() when profile == null => Center(
@@ -111,6 +113,8 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // 새 가입 마지막 단계 3/3(사용자 2026-11-21).
+                if (widget.signup) const SignupSteps(step: 3),
                 _ProviderProfile(profile: profile),
                 const SizedBox(height: 16),
                 Text(widget.signup ? l10n.infoSignupGuide : l10n.infoGuide),

@@ -125,6 +125,9 @@ void main() {
     await t.tap(find.byKey(const ValueKey('consent-submit')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('login-identity')), findsOneWidget);
+    // 새 가입 단계 2/3(약관 동의 E안의 단계 표시).
+    expect(find.byKey(const ValueKey('signup-steps-2')), findsOneWidget);
+    expect(find.text('2 / 3'), findsOneWidget);
     expect(find.text('가입하려면 휴대폰 번호를\n확인해 주세요'), findsOneWidget);
     await enterPhone(t);
     await t.tap(find.byKey(const ValueKey('id-sent')));

@@ -49,10 +49,10 @@ void main() {
     await t.pumpAndSettle();
     expect(key('consent-term'), findsNothing);
     expect(key('consent-submit'), findsOneWidget);
-    final marketing = t.widget<Checkbox>(
-      key('consent-${MockAuthRepository.optionalConsents.first}'),
+    expect(
+      key('consent-on-${MockAuthRepository.optionalConsents.first}'),
+      findsOneWidget,
     );
-    expect(marketing.value, isTrue);
   });
 
   testWidgets('마이 → 약관 및 정책: 비회원도 목록·본문을 보고, 뒤로 가면 목록', (t) async {

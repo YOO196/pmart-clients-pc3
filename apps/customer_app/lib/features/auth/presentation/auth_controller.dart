@@ -303,6 +303,9 @@ class LoginFlowController extends Notifier<LoginFlow> {
 
   bool get busy => state is LoginWorking;
 
+  /// 이번 로그인 시도의 제공자(가입 화면의 "○○ 계정으로 가입하고 있어요"). 아직 없으면 null.
+  SocialProvider? get provider => _who?.provider;
+
   Future<void> start(SocialProvider provider) async {
     if (busy) return;
     state = LoginWorking(provider);

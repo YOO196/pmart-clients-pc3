@@ -11,6 +11,7 @@ import '../../address/presentation/phone_number_formatter.dart';
 import '../../profile/domain/profile.dart' show PhoneInput;
 import '../domain/auth.dart';
 import 'auth_controller.dart';
+import 'signup_steps.dart';
 
 /// 로그인 중 휴대폰 확인(AUTH_IDENTITY — auth 0.6.0, BR-64 회신 2026-11-20).
 /// 번호 입력 → "{받는 번호}로 {숫자}를 문자로 보내 주세요" → "보냈어요"(누를 때만 서버에 묻는다 — OCTOMO 월 한도) → 회원.
@@ -224,10 +225,13 @@ class _IdentityViewState extends ConsumerState<IdentityView> {
           onPressed: widget.onClose,
         ),
         title: Text(l10n.pvTitle),
+        actions: [if (w.newAccount) const SignupStepCount(step: 2)],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+        padding: EdgeInsets.fromLTRB(20, w.newAccount ? 8 : 20, 20, 20),
         children: [
+          // 새 가입 단계 2/3(약관 동의 E안의 단계 표시 — 사용자 2026-11-21). 기존 회원 번호 확인은 단계 없이.
+          if (w.newAccount) const SignupSteps(step: 2),
           Text(
             title,
             key: const ValueKey('id-title'),

@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart'
-    show PmartLineIcon, PmartLineIcons, keepWords;
+    show PmartBrand, PmartLineIcon, PmartLineIcons, keepWords;
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../data/auth_repository.dart' show consentTypeOf;
 import '../domain/auth.dart';
+import 'signup_steps.dart';
 
 import 'package:pmart_core/pmart_core.dart' show PmartEnv, ProblemCode;
 
@@ -149,133 +150,219 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ProblemCode.unknownResult => l10n.consentUnknown,
         _ => l10n.loginRejected,
       };
-      // 레퍼런스 13-9(약관 시트)와 같은 모양 — 재동의 시트(consents_screens)와 맞춘다(사용자 2026-11-20 "레퍼런스 참고해"):
-      // 굵은 2줄 제목 + ✕, 묶음 제목, 줄마다 회색 알약 [보기], 아래 [전체 동의하고 계속하기].
-      // 필수는 하나씩 체크하지 않고 아래 단추 한 번으로 모두 동의한다(재동의 시트와 같은 결정). 선택은 체크로 고른다.
-      // 항목은 `TYPE:version` — [보기]는 그 버전 본문(`/consent-terms/{항목}/{버전}`).
-      Widget view(String c) {
+      // 약관 동의 E안(사용자 2026-11-21, 초안 `../고객앱 ui/03_약관동의/consent_mix.html` — 색은 앱 팔레트):
+      // 위 ‹ · "1 / 3" + 진행 막대(새 가입만), "약관 동의 · 다음: 휴대폰 확인", 제목, "○○ 계정으로 가입하고 있어요",
+      // 동그란 체크 목록(필수·선택 하나씩 — › 는 그 버전 본문), 목록 아래 [약관 전체 동의], 맨 아래 [동의하고 계속하기]
+      // (필수를 모두 체크해야 켜진다 — 버튼 위 "필수 N개 남았어요" 안내는 뺌, 사용자). 2026-11-20 의 "버튼 한 번으로 필수
+      // 동의" 방식을 이 화면에서는 바꾼 것(재동의 시트 consents_screens 는 그대로). 항목·버전은 서버 값(`TYPE:version`).
+      final all = [...waiting.requiredConsents, ...waiting.optionalConsents];
+      final requiredDone = waiting.requiredConsents.every(_agreed.contains);
+      final allOn = all.isNotEmpty && all.every(_agreed.contains);
+      void toggle(String c) => setState(
+        () => _agreed.contains(c) ? _agreed.remove(c) : _agreed.add(c),
+      );
+
+      // [onKey]: 켜졌을 때만 붙는 키(시험에서 체크 상태를 본다).
+      Widget check(bool on, {String? onKey}) => AnimatedContainer(
+        key: on && onKey != null ? ValueKey(onKey) : null,
+        duration: const Duration(milliseconds: 120),
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: on ? scheme.primary : null,
+          border: Border.all(
+            color: on ? scheme.primary : scheme.outlineVariant,
+            width: 1.6,
+          ),
+        ),
+        child: PmartLineIcon(
+          PmartLineIcons.check,
+          size: 15,
+          strokeWidth: 2.4,
+          color: on ? scheme.onPrimary : scheme.outlineVariant,
+        ),
+      );
+
+      Widget row(String c, {required bool required}) {
         final d = ConsentDecision(c, agreed: true);
-        if (d.version.isEmpty) return const SizedBox.shrink();
-        return ActionChip(
-          key: ValueKey('consent-view-${d.type}'),
-          label: Text(l10n.consentView),
-          labelStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 13),
-          backgroundColor: scheme.surfaceContainer,
-          side: BorderSide.none,
-          shape: const StadiumBorder(),
-          visualDensity: VisualDensity.compact,
-          onPressed: () => context.push(StartRoutes.terms(d.type, d.version)),
+        final on = _agreed.contains(c);
+        return Semantics(
+          checked: on,
+          child: InkWell(
+            key: ValueKey('consent-$c'),
+            onTap: busy ? null : () => toggle(c),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+              child: Row(
+                children: [
+                  check(on, onKey: 'consent-on-$c'),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: required
+                                ? l10n.consentTagRequired
+                                : l10n.consentTagOptional,
+                            style: TextStyle(
+                              color: required
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant,
+                              fontWeight: required
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                            ),
+                          ),
+                          TextSpan(text: ' ${_consentLabel(l10n, c)}'),
+                        ],
+                      ),
+                      style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+                    ),
+                  ),
+                  // 그 버전 본문(`/consent-terms/{항목}/{버전}`). 버전이 없으면(만 14세 확인 등) 화살표 없음.
+                  if (d.version.isNotEmpty)
+                    IconButton(
+                      key: ValueKey('consent-view-${d.type}'),
+                      tooltip: l10n.consentView,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () =>
+                          context.push(StartRoutes.terms(d.type, d.version)),
+                      icon: PmartLineIcon(
+                        PmartLineIcons.chevronRight,
+                        size: 17,
+                        color: scheme.outline,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
         );
       }
 
-      Widget row(String c, String title, {Widget? lead}) => Padding(
-        key: lead == null ? ValueKey('consent-$c') : null,
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          children: [
-            lead ??
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 0, 10, 0),
-                  child: Container(width: 4, height: 4, color: scheme.outline),
-                ),
-            Expanded(
-              child: Text(
-                title,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  fontSize: 15,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            view(c),
-          ],
-        ),
-      );
-      Widget group(String text) => Padding(
-        padding: const EdgeInsets.only(top: 18, bottom: 6),
-        child: Text(
-          text,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
+      final provider = controller.provider;
       return guard(
         Scaffold(
+          appBar: AppBar(
+            leading: IconButton(
+              key: const ValueKey('consent-close'),
+              tooltip: l10n.actionClose,
+              icon: const PmartLineIcon(PmartLineIcons.back, size: 23),
+              onPressed: busy ? null : leaveStep,
+            ),
+            actions: [if (waiting.newAccount) const SignupStepCount(step: 1)],
+          ),
           body: SafeArea(
+            top: false,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 22, 12, 16),
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              // 기존 회원(newAccount=false)은 약관이 바뀌어 다시 묻는 것이다.
-                              waiting.newAccount
-                                  ? l10n.consentSignupTitle
-                                  : l10n.consentReconsentTitle,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontSize: 20,
-                                height: 1.35,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            key: const ValueKey('consent-close'),
-                            tooltip: l10n.actionClose,
-                            icon: const PmartLineIcon(
-                              PmartLineIcons.close,
-                              size: 24,
-                            ),
-                            onPressed: busy ? null : leaveStep,
-                          ),
-                        ],
+                      // 가입 단계: 약관 동의 → 휴대폰 확인 → 내 정보. 재동의(기존 회원)는 단계 없이.
+                      if (waiting.newAccount) const SignupSteps(step: 1),
+                      Text(
+                        // 기존 회원(newAccount=false)은 약관이 바뀌어 다시 묻는 것이다.
+                        waiting.newAccount
+                            ? l10n.consentSignupTitle
+                            : l10n.consentReconsentTitle,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontSize: 20,
+                          height: 1.35,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        waiting.newAccount
-                            ? l10n.consentBody
-                            : l10n.consentReconsentBody,
+                        switch ((waiting.newAccount, provider)) {
+                          (true, final p?) => l10n.consentSignupWith(
+                            _providerShort(l10n, p),
+                          ),
+                          (true, null) => l10n.consentBody,
+                          (false, _) => l10n.consentReconsentBody,
+                        },
                         key: const ValueKey('consent-body'),
                         style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 12.5,
                           color: scheme.onSurfaceVariant,
                         ),
                       ),
-                      if (waiting.requiredConsents.isNotEmpty)
-                        group(l10n.consentGroupRequired),
+                      const SizedBox(height: 18),
                       for (final c in waiting.requiredConsents)
-                        row(c, l10n.consentRequired(_consentLabel(l10n, c))),
-                      if (waiting.optionalConsents.isNotEmpty)
-                        group(l10n.consentGroupOptional),
+                        row(c, required: true),
                       for (final c in waiting.optionalConsents)
-                        row(
-                          c,
-                          l10n.consentOptional(_consentLabel(l10n, c)),
-                          lead: SizedBox(
-                            width: 32,
-                            child: Checkbox(
-                              key: ValueKey('consent-$c'),
-                              value: _agreed.contains(c),
-                              visualDensity: VisualDensity.compact,
-                              onChanged: busy
-                                  ? null
-                                  : (v) => setState(
-                                      () => (v ?? false)
-                                          ? _agreed.add(c)
-                                          : _agreed.remove(c),
-                                    ),
+                        row(c, required: false),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 10, bottom: 14),
+                        child: Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: scheme.outlineVariant,
+                        ),
+                      ),
+                      // 약관 전체 동의 — 누르면 위 목록 모두 체크, 다시 누르면 모두 해제. 항목 하나를 끄면 함께 꺼진다.
+                      Semantics(
+                        checked: allOn,
+                        child: Material(
+                          color: PmartBrand.lavenderMist,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(
+                              color: allOn
+                                  ? scheme.primary
+                                  : PmartBrand.lavender,
+                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            key: const ValueKey('consent-all'),
+                            onTap: busy
+                                ? null
+                                : () => setState(() {
+                                    if (allOn) {
+                                      _agreed.removeAll(all);
+                                    } else {
+                                      _agreed.addAll(all);
+                                    }
+                                  }),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Row(
+                                children: [
+                                  check(allOn, onKey: 'consent-all-on'),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    l10n.consentAllAgree,
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(
+                                          fontSize: 16.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (waiting.optionalConsents.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+                          child: Text(
+                            l10n.consentAllAgreeNote,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 12.5,
+                              height: 1.5,
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                         ),
                       if (error != null) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 12),
                         Text(
                           error,
                           key: const ValueKey('consent-error'),
@@ -286,25 +373,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                   child: FilledButton(
                     key: const ValueKey('consent-submit'),
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(50),
+                      disabledBackgroundColor: scheme.surfaceContainerHighest,
+                      disabledForegroundColor: scheme.outline,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    onPressed: busy
+                    // 필수를 모두 체크해야 켜진다. 선택 항목은 끈 것도 false 로 보낸다(거부로 기록돼 다시 묻지 않는다).
+                    onPressed: busy || !requiredDone
                         ? null
                         : () => controller.submitConsents(waiting, [
                             for (final c in waiting.requiredConsents)
                               ConsentDecision(c, agreed: true),
-                            // 선택 항목은 끈 것도 false 로 보낸다(거부로 기록돼 다시 묻지 않는다)
                             for (final c in waiting.optionalConsents)
                               ConsentDecision(c, agreed: _agreed.contains(c)),
                           ]),
-                    child: Text(l10n.consentAgreeAllContinue),
+                    child: Text(
+                      l10n.consentContinue,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
               ],
