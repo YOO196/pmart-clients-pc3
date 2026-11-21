@@ -462,7 +462,12 @@ class ProductReviewCard extends ConsumerWidget {
                   label: l10n.reviewPhotoLabel(i + 1),
                   onTap: urls[i] == null
                       ? null
-                      : () => openReviewPhotoViewer(context, urls, initial: i),
+                      : () => openReviewPhotoViewer(
+                          context,
+                          urls,
+                          initial: i,
+                          productId: r.productId,
+                        ),
                 ),
               ),
             ),
@@ -491,17 +496,22 @@ class ProductReviewCard extends ConsumerWidget {
           // 도움돼요(review 0.6.0): 서버 값이 있을 때만. 내 리뷰는 수만, 남의 리뷰는 회원만 누른다.
           if ((query, r.helpfulCount) case (final q?, final int count)) ...[
             const SizedBox(height: 12),
-            if (mine != null)
-              Text(
-                l10n.reviewHelpfulMine(count),
-                key: ValueKey('product-review-helpful-mine-${r.reviewId}'),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 13,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              )
-            else
-              _HelpfulButton(review: r, query: q, count: count),
+            // 카드 오른쪽 아래(사용자 2026-11-21).
+            Align(
+              alignment: Alignment.centerRight,
+              child: mine != null
+                  ? Text(
+                      l10n.reviewHelpfulMine(count),
+                      key: ValueKey(
+                        'product-review-helpful-mine-${r.reviewId}',
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    )
+                  : _HelpfulButton(review: r, query: q, count: count),
+            ),
           ],
         ],
       ),
@@ -653,7 +663,12 @@ class _PhotoStrip extends ConsumerWidget {
       label: l10n.reviewPhotoLabel(i + 1),
       onTap: shown[i] == null
           ? null
-          : () => openReviewPhotoViewer(context, urls, initial: i),
+          : () => openReviewPhotoViewer(
+              context,
+              urls,
+              initial: i,
+              productId: productId,
+            ),
     );
     return Padding(
       key: const ValueKey('review-photo-strip'),
@@ -773,7 +788,12 @@ class ReviewPhotosScreen extends ConsumerWidget {
                   label: l10n.reviewPhotoLabel(i + 1),
                   onTap: urls[i] == null
                       ? null
-                      : () => openReviewPhotoViewer(context, urls, initial: i),
+                      : () => openReviewPhotoViewer(
+                          context,
+                          urls,
+                          initial: i,
+                          productId: productId,
+                        ),
                 ),
               );
             },

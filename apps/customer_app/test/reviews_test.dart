@@ -846,6 +846,22 @@ void main() {
       await t.pumpAndSettle();
     }
 
+    testWidgets('내 리뷰 사진 → 크게 보기 → [상품 보기]로 그 상품 상세', (t) async {
+      final repo = MockReviewsRepository(latency: Duration.zero);
+      // 목 모드는 상대 경로 사진을 그리지 않는다 — 완전한 주소로.
+      repo.reviewJson.first['photos'] = [
+        {'photoId': 'rph-old', 'url': 'https://img.invalid/rph-old'},
+      ];
+      await openMine(t, repo);
+      await t.tap(find.byKey(const ValueKey('review-photo-rv-mine-1-0')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('review-photo-viewer')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('review-photo-viewer-product')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('review-photo-viewer')), findsNothing);
+      expect(find.text('그릭요거트 플레인 400g'), findsWidgets);
+      expect(find.byKey(const ValueKey('product-price')), findsOneWidget);
+    });
     testWidgets('내 리뷰 → 수정: 별점만 바꾸면 사진은 빼고 보내고, 고친 뒤 상세가 서버 값으로 바뀐다', (
       t,
     ) async {

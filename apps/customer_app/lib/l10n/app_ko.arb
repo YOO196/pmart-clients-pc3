@@ -1140,6 +1140,7 @@
   "reviewHelpfulLoginNeeded": "로그인하면 도움돼요를 누를 수 있어요",
   "reviewHelpfulOwn": "내 리뷰에는 누를 수 없어요",
   "reviewHelpfulNotPublished": "삭제된 리뷰예요",
+  "reviewPhotoViewProduct": "상품 보기",
   "reviewHelpfulFailed": "지금은 누를 수 없어요. 잠시 뒤 다시 해 주세요",  "orderLineNowOnSale": "지금 더 할인 중",
   "orderLineDiscount": "할인 {amount}",
   "@orderLineDiscount": { "placeholders": { "amount": { "type": "String" } } },

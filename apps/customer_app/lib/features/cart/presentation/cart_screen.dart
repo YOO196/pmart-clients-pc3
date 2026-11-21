@@ -446,6 +446,10 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
     final pendingLook = _pending != null || busy;
     // 레퍼런스 5: [☐ 굵은 이름] / [사진 | 회색 이름·옵션, 빨간 재고 문구, 굵은 금액] / 오른쪽 [− N +] 상자 하나
     final stepIcon = scheme.onSurface;
+    final VoidCallback? openProduct = switch (line.productId) {
+      final p? => () => context.push('/products/${Uri.encodeComponent(p)}'),
+      null => null,
+    };
     return Padding(
       key: ValueKey('cart-line-$id'),
       padding: const EdgeInsets.fromLTRB(4, 10, 14, 14),
@@ -466,13 +470,19 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
                     : null,
               ),
               Expanded(
-                child: Text(
-                  line.name ?? line.sku,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                // 이름·사진을 누르면 그 상품 상세(사용자 2026-11-21). 상품 ID 가 없으면 누를 수 없다.
+                child: GestureDetector(
+                  key: ValueKey('cart-open-product-$id'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: openProduct,
+                  child: Text(
+                    line.name ?? line.sku,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -484,7 +494,11 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ProductImage(url: line.imageUrl, size: 62, radius: 8),
+                GestureDetector(
+                  key: ValueKey('cart-open-product-image-$id'),
+                  onTap: openProduct,
+                  child: ProductImage(url: line.imageUrl, size: 62, radius: 8),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(

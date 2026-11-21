@@ -1797,10 +1797,15 @@ class _ReviewPhotos extends ConsumerWidget {
                 // 누르면 크게 보기(주소를 그릴 수 있는 사진만).
                 onTap: url == null
                     ? null
-                    : () => openReviewPhotoViewer(context, [
-                        for (final u in review.photoUrls)
-                          resolveImageUrl(u, origin),
-                      ], initial: i),
+                    : () => openReviewPhotoViewer(
+                        context,
+                        [
+                          for (final u in review.photoUrls)
+                            resolveImageUrl(u, origin),
+                        ],
+                        initial: i,
+                        productId: review.productId,
+                      ),
                 child: ClipRRect(
                   key: ValueKey('review-photo-${review.reviewId}-$i'),
                   borderRadius: BorderRadius.circular(8),
@@ -1837,18 +1842,28 @@ Future<void> openReviewPhotoViewer(
   BuildContext context,
   List<String?> urls, {
   int initial = 0,
+  String? productId,
 }) => Navigator.of(context, rootNavigator: true).push(
   MaterialPageRoute<void>(
     fullscreenDialog: true,
-    builder: (_) => ReviewPhotoViewer(urls: urls, initial: initial),
+    builder: (_) =>
+        ReviewPhotoViewer(urls: urls, initial: initial, productId: productId),
   ),
 );
 
 class ReviewPhotoViewer extends StatefulWidget {
-  const ReviewPhotoViewer({super.key, required this.urls, this.initial = 0});
+  const ReviewPhotoViewer({
+    super.key,
+    required this.urls,
+    this.initial = 0,
+    this.productId,
+  });
 
   final List<String?> urls;
   final int initial;
+
+  /// 있으면 아래 [상품 보기] — 크게 보기를 닫고 그 상품 상세로 간다(사용자 2026-11-21).
+  final String? productId;
 
   @override
   State<ReviewPhotoViewer> createState() => _ReviewPhotoViewerState();
@@ -1918,6 +1933,28 @@ class _ReviewPhotoViewerState extends State<ReviewPhotoViewer> {
           );
         },
       ),
+      bottomNavigationBar: switch (widget.productId) {
+        final id? => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: OutlinedButton(
+              key: const ValueKey('review-photo-viewer-product'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white54),
+                minimumSize: const Size.fromHeight(46),
+              ),
+              onPressed: () {
+                final router = GoRouter.of(context);
+                Navigator.of(context).pop();
+                router.push('/products/${Uri.encodeComponent(id)}');
+              },
+              child: Text(l10n.reviewPhotoViewProduct),
+            ),
+          ),
+        ),
+        null => null,
+      },
     );
   }
 }

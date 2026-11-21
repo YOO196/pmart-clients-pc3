@@ -11,7 +11,8 @@ import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart'
 import 'package:customer_app/features/reviews/data/reviews_repository.dart';
 import 'package:customer_app/features/reviews/domain/reviews.dart';
 
-import 'package:customer_app/shared/providers.dart' show sourceSystem;
+import 'package:customer_app/shared/providers.dart'
+    show imageOriginProvider, sourceSystem;
 
 import 'support/app_harness.dart';
 
@@ -31,7 +32,14 @@ void main() {
       ..physicalSize = const Size(800, 2400)
       ..devicePixelRatio = 1;
     addTearDown(t.view.reset);
-    await t.pumpWidget(testApp(const [], reviews: repo, env: env));
+    await t.pumpWidget(
+      testApp(
+        // 목 모드는 상대 경로 사진을 그리지 않는다 — 출처를 준다(사진 누르기 시험).
+        [imageOriginProvider.overrideWithValue('https://img.invalid')],
+        reviews: repo,
+        env: env,
+      ),
+    );
     await t.pumpAndSettle();
     if (login) {
       await t.tap(find.text('마이페이지').last);
@@ -250,5 +258,55 @@ void main() {
     await t.pumpAndSettle();
     expect(t.takeException(), isNull);
     expect(key('product-price'), findsOneWidget);
+  });
+  testWidgets('리뷰 사진 → 크게 보기 → [상품 보기]로 상품 상세, 도움돼요는 카드 오른쪽', (t) async {
+    final repo = MockReviewsRepository(latency: Duration.zero);
+    await open(t, repo, 'P-0001');
+    // 만든 리뷰 0번은 사진 리뷰
+    final photo = key('review-photo-rv-gen-P-0001-0-0');
+    await t.scrollUntilVisible(
+      photo,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    final card = key('product-review-rv-gen-P-0001-0');
+    final button = key('product-review-helpful-rv-gen-P-0001-0');
+    await t.scrollUntilVisible(
+      button,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(
+      t.getTopRight(button).dx,
+      closeTo(t.getTopRight(card).dx - 16, 1),
+      reason: '카드 오른쪽 여백(16) 안쪽 끝',
+    );
+    await t.scrollUntilVisible(
+      photo,
+      -200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await t.tap(photo);
+    await t.pumpAndSettle();
+    await t.tap(key('review-photo-viewer-product'));
+    await t.pumpAndSettle();
+    expect(key('review-photo-viewer'), findsNothing);
+    expect(key('product-price'), findsOneWidget);
+  });
+
+  testWidgets('장바구니 상품 이름·사진을 누르면 그 상품 상세', (t) async {
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await t.tap(find.text('장바구니').last);
+    await t.pumpAndSettle();
+    await t.tap(key('cart-open-product-ci-1'));
+    await t.pumpAndSettle();
+    expect(find.text('서울우유 1L'), findsWidgets);
+    expect(key('product-price'), findsOneWidget);
+    Navigator.of(t.element(find.byType(Scaffold).last)).pop();
+    await t.pumpAndSettle();
+    await t.tap(key('cart-open-product-image-ci-2'));
+    await t.pumpAndSettle();
+    expect(find.text('감자칩 오리지널 110g'), findsWidgets);
   });
 }
