@@ -179,7 +179,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const refetchAll = () => [picking, bySku, onTime, workers, live, tasks, damages, handovers, delays].forEach((q) => void q.refetch());
 
   return (
-    <section className="@container space-y-4">
+    <section className="@container space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1>{m.title}</h1>
@@ -199,7 +199,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
         <PriorityChip to={`${centerPath(mfcId, 'tasks')}?state=BLOCKED`} label={m.priority.blocked} n={tasks.data ? blocked : undefined} failed={tasks.isError} tone="warning" />
       </nav>
 
-      <div className="grid grid-cols-12 gap-3 @5xl:gap-4">
+      <div className="grid grid-cols-12 gap-3">
         {/* 지표 칸 넷 — 오늘 */}
         <Kpi
           testId="kpi-picked"
@@ -260,9 +260,24 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           ) : (
             <AreaChart title={m.chart.shortRate(DAYS)} columns={shortCols} format={(v) => rateText(v)} testId="chart-short-rate" />
           )}
+          <SubList title={m.chart.topShort(DAYS)} q={bySku} link={{ to: centerPath(mfcId, 'inventory'), text: m.toInventory }}>
+            {(bySku.data?.items ?? []).length === 0 ? (
+              <p className="text-sm text-base-content/55">{m.noShort}</p>
+            ) : (
+              <BarList
+                testId="top-short"
+                cols={2}
+                rows={(bySku.data?.items ?? []).map((s) => ({ key: s.sku, label: s.productName ?? s.sku, value: s.shortLines, text: m.shortOf(s.shortLines, s.pickedLines) }))}
+              />
+            )}
+          </SubList>
         </Panel>
         <Panel className="@5xl:col-span-5" title={m.chart.onTime(DAYS)} sub={m.chart.onTimeNote} help={m.chart.onTimeHelp} q={onTime}>
           <AreaChart title={m.chart.onTime(DAYS)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} />
+          <SubList title={m.chart.deliveries} q={live} link={{ to: centerPath(mfcId, 'deliveries'), text: m.toDeliveries }}>
+            {stateRows.length === 0 ? <p className="text-sm text-base-content/55">{m.noDeliveries}</p> : <BarList testId="delivery-states" cols={2} rows={stateRows} />}
+            {live.data?.truncated && <p className="mt-1 text-xs text-warning">{m.liveTruncated(LIVE_SIZE)}</p>}
+          </SubList>
         </Panel>
 
         {/* 알림 피드 · 지금 작업과 인력 */}
@@ -284,7 +299,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           ) : (
             <ul data-testid="alert-feed">
               {feed.slice(0, FEED_ROWS).map((f) => (
-                <li key={f.key} className="grid min-h-14 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 border-t border-base-300 px-4 py-2 transition-colors hover:bg-primary/5" data-testid="alert-feed-row">
+                <li key={f.key} className="grid min-h-12 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 border-t border-base-300 px-4 py-1.5 transition-colors hover:bg-primary/5" data-testid="alert-feed-row">
                   <span className={`badge ${f.tone === 'error' ? 'badge-error' : 'badge-warning'}`}>{f.tone === 'error' ? m.feed.urgent : m.feed.caution}</span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{f.title}</p>
@@ -315,7 +330,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
         >
           <BarList testId="task-types" rows={typeRows} />
           {tasksMore && <p className="mt-2 text-xs text-warning">{m.tasksMore}</p>}
-          <p className="mt-4 mb-2 flex items-baseline justify-between text-sm font-bold">
+          <p className="mt-3 mb-2 flex items-baseline justify-between text-sm font-bold">
             {m.chart.people}
             <Link to={centerPath(mfcId, 'workers')} className="link text-xs font-normal">
               {m.toWorkers}
@@ -335,39 +350,6 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           )}
         </Panel>
 
-        {/* 결품 많은 상품 · 배송 상태 */}
-        <Panel
-          className="@4xl:col-span-6"
-          title={m.chart.topShort(DAYS)}
-          q={bySku}
-          aside={
-            <Link to={centerPath(mfcId, 'inventory')} className="link text-xs">
-              {m.toInventory}
-            </Link>
-          }
-        >
-          {(bySku.data?.items ?? []).length === 0 ? (
-            <p className="text-sm text-base-content/55">{m.noShort}</p>
-          ) : (
-            <BarList
-              testId="top-short"
-              rows={(bySku.data?.items ?? []).map((s) => ({ key: s.sku, label: s.productName ?? s.sku, value: s.shortLines, text: m.shortOf(s.shortLines, s.pickedLines) }))}
-            />
-          )}
-        </Panel>
-        <Panel
-          className="@4xl:col-span-6"
-          title={m.chart.deliveries}
-          q={live}
-          aside={
-            <Link to={centerPath(mfcId, 'deliveries')} className="link text-xs">
-              {m.toDeliveries}
-            </Link>
-          }
-        >
-          {stateRows.length === 0 ? <p className="text-sm text-base-content/55">{m.noDeliveries}</p> : <BarList testId="delivery-states" rows={stateRows} />}
-          {live.data?.truncated && <p className="mt-2 text-xs text-warning">{m.liveTruncated(LIVE_SIZE)}</p>}
-        </Panel>
       </div>
     </section>
   );
@@ -440,7 +422,7 @@ function Kpi({
   // 숫자와 단위를 나눠 단위는 작게(레퍼런스 "428 UPH") — 글자 전체는 그대로
   const [, num = value, unit = ''] = /^([\d.,—-]+)(.*)$/.exec(value) ?? [];
   return (
-    <article className="col-span-12 flex min-h-32 flex-col rounded-box border border-base-300 bg-base-100 px-4 pt-3 pb-3 @md:col-span-6 @5xl:col-span-3" data-testid={testId}>
+    <article className="col-span-12 flex min-h-28 flex-col rounded-box border border-base-300 bg-base-100 px-4 pt-3 pb-3 @md:col-span-6 @5xl:col-span-3" data-testid={testId}>
       <p className="flex items-center justify-between gap-2 text-sm font-semibold text-base-content/80">
         <span className="truncate">{label}</span>
         <span className="grid h-8 w-8 place-items-center rounded-field border border-primary/25 bg-primary/15 text-primary">{ic}</span>
@@ -466,7 +448,7 @@ function Kpi({
               ))}
             </p>
           ) : (
-            <p data-testid={`${testId}-value`} className="mt-1 flex items-baseline gap-1.5 text-[34px] leading-tight font-extrabold tracking-[-0.045em] tabular-nums">
+            <p data-testid={`${testId}-value`} className="mt-1 flex items-baseline gap-1.5 text-[31px] leading-tight font-extrabold tracking-[-0.045em] tabular-nums">
               {num}
               {unit && <span className="text-sm font-semibold tracking-normal text-base-content/55">{unit}</span>}
             </p>
@@ -521,7 +503,7 @@ function Panel({
 }) {
   return (
     <section className={`col-span-12 min-w-0 rounded-box border border-base-300 bg-base-100 ${className}`} aria-label={title}>
-      <header className="flex min-h-14 items-center justify-between gap-2 px-4 py-2.5">
+      <header className="flex min-h-12 items-center justify-between gap-2 px-4 py-2">
         <div className="min-w-0">
           <h2 className="truncate text-base font-bold tracking-[-0.025em]">{title}</h2>
           {sub && (
@@ -552,6 +534,29 @@ function Stat({ label, value }: { readonly label: string; readonly value: number
     <div className="rounded-box bg-base-200/60 px-2 py-3">
       <dt className="text-xs text-base-content/60">{label}</dt>
       <dd className="text-xl font-bold tabular-nums">{value === null ? m.failedShort : value}</dd>
+    </div>
+  );
+}
+
+/** 패널 안 아래 칸(레퍼런스 "구역 진행률"처럼 그림 밑) — 작은 제목·링크 + 자기 원천 상태 */
+function SubList({ title, q, link, children }: { readonly title: string; readonly q: QueryLike; readonly link: { readonly to: string; readonly text: string }; readonly children: ReactNode }) {
+  return (
+    <div className="mt-3 border-t border-base-300 pt-3">
+      <p className="mb-2 flex items-baseline justify-between text-sm font-bold">
+        {title}
+        <Link to={link.to} className="link text-xs font-normal">
+          {link.text}
+        </Link>
+      </p>
+      {q.isPending ? (
+        <p className="text-sm text-base-content/40">…</p>
+      ) : q.isError ? (
+        <p role="alert" className="text-sm font-semibold text-error" data-state="error">
+          {m.failed}
+        </p>
+      ) : (
+        children
+      )}
     </div>
   );
 }

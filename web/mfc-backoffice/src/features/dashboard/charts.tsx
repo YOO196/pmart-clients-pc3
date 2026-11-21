@@ -87,10 +87,10 @@ export interface BarRow {
 }
 
 /** 가로 막대 목록 — 항목 이름 | 막대 | 숫자 */
-export function BarList({ rows, testId }: { readonly rows: readonly BarRow[]; readonly testId: string }) {
+export function BarList({ rows, testId, cols = 1 }: { readonly rows: readonly BarRow[]; readonly testId: string; readonly cols?: 1 | 2 }) {
   const max = Math.max(0, ...rows.map((r) => r.value));
   return (
-    <ul className="space-y-1.5" data-testid={testId}>
+    <ul className={cols === 2 ? 'grid gap-x-6 gap-y-1.5 @lg:grid-cols-2' : 'space-y-1.5'} data-testid={testId}>
       {rows.map((r) => (
         <li key={r.key} className="grid grid-cols-[7rem_1fr_auto] items-center gap-2 text-sm" data-testid={`${testId}-row`}>
           <span className="truncate text-base-content/75" title={r.label}>
@@ -156,7 +156,7 @@ export function AreaChart({
           {shown ? shown.tip : ''}
         </span>
       </div>
-      <div className="relative ml-12 h-40" onMouseLeave={() => setHover(null)}>
+      <div className="relative ml-12 h-32" onMouseLeave={() => setHover(null)}>
         {/* 세로 눈금(0 · 중간 · 끝) */}
         {[0, 0.5, 1].map((g) => (
           <span key={g} className="pm-mono pointer-events-none absolute -left-12 w-11 -translate-y-1/2 truncate text-right text-[10.5px] text-base-content/45" style={{ top: `${(1 - g) * 100}%` }}>
