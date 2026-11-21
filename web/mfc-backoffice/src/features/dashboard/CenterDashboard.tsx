@@ -5,6 +5,7 @@
 // - 결품 많은 상품: `/metrics/picking-lines/by-sku?sort=shortLines&limit=5`. 정시 배송률: delivery-dispatch `/metrics/on-time-deliveries`(onTime ÷ due).
 // - 작업·인력: 홈과 같은 끝나지 않은 작업·작업자. 배송 상태: bff live-delivery 50건(넘으면 안내).
 // - 추이 패널(그래프·결품 많은 상품)은 고른 기간(URL ?from=&to=, 기본 14일, 최대 92일 — 정시 배송은 31일씩 나눠 읽음). 지표 칸은 늘 오늘·14일.
+//   칸 단위: 시간(7일까지 — 서버 지표가 없어 목 모드에서만 하루 합계를 하루 수요 곡선으로 나눠 그림)·일·주·월(일 합계를 더함). 최대 1년, 피킹은 92일씩 나눠 읽음.
 //   그래프를 끌면 그 구간으로 확대, Ctrl+Z 는 바로 전 기간으로(브라우저 메모리 — 새로고침하면 처음부터).
 // - 알림 피드·우선 확인: 홈 원천(useOps — 출하 약속·인계 확인·피킹 파손 사고)과 배차 지연(useDispatchDelays) — 같은 쿼리 키라 두 번 읽지 않는다.
 import { useQuery } from '@tanstack/react-query';
@@ -23,7 +24,31 @@ import { OPS_REFRESH_MS } from '../ops/opsQueries';
 import { minutesText, promiseRows, seoulToday } from '../ops/opsRules';
 import { AreaChart, BarList, type Column } from './charts';
 import { FloorMap } from './FloorMap';
-import { addDays, chunks, DAYS, daysIn, lastDays, MAX_RANGE, ON_TIME_CHUNK, RANGE_PRESETS, rate, rateText, shortDate, spanDays, validRange, type Range } from './dashboardRules';
+import { env } from '../../env';
+import {
+  addDays,
+  buckets,
+  presetFrom,
+  chunks,
+  DAYS,
+  defaultUnit,
+  hourShare,
+  lastDays,
+  MAX_RANGE,
+  ON_TIME_CHUNK,
+  PICKING_CHUNK,
+  RANGE_PRESETS,
+  rate,
+  rateText,
+  shortDate,
+  spanDays,
+  UNITS,
+  unitsFor,
+  validRange,
+  type Bucket,
+  type Range,
+  type Unit,
+} from './dashboardRules';
 
 const m = messages.dashboard;
 const LIVE_SIZE = 50;
@@ -46,19 +71,27 @@ async function fetchOnTime(api: Api, mfcId: string, r: Range) {
   return { items: parts.flatMap((x) => x.items ?? []), asOf: parts.map((x) => x.asOf).sort()[0] };
 }
 
+/** 피킹 줄 — 계약 상한 92일이라 나눠 읽고 합친다 */
+async function fetchPicking(api: Api, mfcId: string, r: Range) {
+  const parts = await Promise.all(
+    chunks(r, PICKING_CHUNK).map((c) => request('GET', api.fulfillment.GET('/metrics/picking-lines', { params: { query: { from: c.from, to: c.to, mfcId } } }))),
+  );
+  return { items: parts.flatMap((x) => x.items ?? []), asOf: parts.map((x) => x.asOf).sort()[0] };
+}
+
+/** 결품 많은 상품은 기간을 나눠 합칠 수 없다(상위 5 가 조각마다 다름) — 92일을 넘으면 끝날까지 최근 92일 */
+const skuRangeOf = (r: Range): Range => (spanDays(r) > PICKING_CHUNK ? { from: addDays(r.to, -(PICKING_CHUNK - 1)), to: r.to } : r);
+
 /** 추이 패널 — 고른 기간 */
 function useTrend(mfcId: string, r: Range) {
   const api = useApi();
   const common = { refetchInterval: OPS_REFRESH_MS } as const;
-  const picking = useQuery({
-    ...common,
-    queryKey: ['dashboard', mfcId, 'picking-lines', r.from, r.to],
-    queryFn: () => request('GET', api.fulfillment.GET('/metrics/picking-lines', { params: { query: { from: r.from, to: r.to, mfcId } } })),
-  });
+  const picking = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'picking-lines', r.from, r.to], queryFn: () => fetchPicking(api, mfcId, r) });
+  const sr = skuRangeOf(r);
   const bySku = useQuery({
     ...common,
-    queryKey: ['dashboard', mfcId, 'by-sku', r.from, r.to],
-    queryFn: () => request('GET', api.fulfillment.GET('/metrics/picking-lines/by-sku', { params: { query: { from: r.from, to: r.to, mfcId, sort: 'shortLines', limit: 5 } } })),
+    queryKey: ['dashboard', mfcId, 'by-sku', sr.from, sr.to],
+    queryFn: () => request('GET', api.fulfillment.GET('/metrics/picking-lines/by-sku', { params: { query: { from: sr.from, to: sr.to, mfcId, sort: 'shortLines', limit: 5 } } })),
   });
   const onTime = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'on-time', r.from, r.to], queryFn: () => fetchOnTime(api, mfcId, r) });
   return { picking, bySku, onTime };
@@ -72,11 +105,7 @@ function useDashboard(mfcId: string) {
   const days = lastDays(today, DAYS);
   const from = days[0] ?? today;
   const common = { refetchInterval: OPS_REFRESH_MS } as const;
-  const picking = useQuery({
-    ...common,
-    queryKey: ['dashboard', mfcId, 'picking-lines', from, today],
-    queryFn: () => request('GET', api.fulfillment.GET('/metrics/picking-lines', { params: { query: { from, to: today, mfcId } } })),
-  });
+  const picking = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'picking-lines', from, today], queryFn: () => fetchPicking(api, mfcId, { from, to: today }) });
   const onTime = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'on-time', from, today], queryFn: () => fetchOnTime(api, mfcId, { from, to: today }) });
   const workers = useQuery({
     ...common,
@@ -104,24 +133,32 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const { tasks, damages, handovers } = ops;
   const [chart, setChart] = useState<ChartKind>('picked');
 
-  // 추이 기간 — URL(?from=&to=), 맞지 않으면 기본 14일. 바꿀 때마다 앞 기간을 쌓아 Ctrl+Z 로 되돌린다
+  // 추이 기간·칸 단위 — URL(?from=&to=&unit=), 맞지 않으면 기본 14일·일. 바꿀 때마다 앞 상태를 쌓아 Ctrl+Z 로 되돌린다
   const [params, setParams] = useSearchParams();
+  const hourOk = env.isMock;
   const range: Range = validRange(params.get('from'), params.get('to'), today) ?? { from: days[0] ?? today, to: today };
   const span = spanDays(range);
-  const [history, setHistory] = useState<readonly Range[]>([]);
-  const setRange = (next: Range) =>
+  const allowed = unitsFor(span, hourOk);
+  const askedUnit = params.get('unit') as Unit | null;
+  const unit: Unit = askedUnit && allowed.includes(askedUnit) ? askedUnit : defaultUnit(span, hourOk);
+  type View = Range & { readonly unit: Unit };
+  const [history, setHistory] = useState<readonly View[]>([]);
+  const setRange = (next: View) =>
     setParams(
       (p) => {
         const q = new URLSearchParams(p);
         q.set('from', next.from);
         q.set('to', next.to);
+        q.set('unit', next.unit);
         return q;
       },
       { replace: true },
     );
-  const applyRange = (next: Range) => {
-    if (next.from === range.from && next.to === range.to) return;
-    setHistory((h) => [...h, range].slice(-30));
+  /** 기간을 바꾸면 단위는 그 길이의 기본으로(1일 → 시간, 1년 → 월). 단위만 바꿀 때는 unit 을 준다 */
+  const applyRange = (r: Range, u?: Unit) => {
+    const next: View = { ...r, unit: u ?? defaultUnit(spanDays(r), hourOk) };
+    if (next.from === range.from && next.to === range.to && next.unit === unit) return;
+    setHistory((h) => [...h, { ...range, unit }].slice(-30));
     setRange(next);
   };
   const back = () => {
@@ -144,7 +181,8 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
     return () => window.removeEventListener('keydown', onKey);
   });
   const trend = useTrend(mfcId, range);
-  const tDays = daysIn(range);
+  const nowHour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', hourCycle: 'h23' }).format(nowMs));
+  const tBuckets = buckets(range, unit, today, nowHour);
   const tPick = new Map((trend.picking.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [i.date, i]));
   const tOnTime = new Map((trend.onTime.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [i.date, i]));
 
@@ -159,22 +197,41 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
     const r = pickRow.get(d);
     return rate(r?.shortLines ?? 0, r?.pickedLines ?? 0) ?? 0;
   });
-  const tPickedCols: Column[] = tDays.map((d) => {
-    const r = tPick.get(d);
-    return { key: d, label: shortDate(d), value: r?.pickedLines ?? 0, tip: m.pickTip(shortDate(d), r?.pickedLines ?? 0, r?.shortLines ?? 0) };
+  // 칸마다 합 — 일·주·월은 서버 일 합계를 더하고, 시간은(목만) 그날 합계를 시간 곡선으로 나눈다
+  const sumOf = (b: Bucket) => {
+    const acc = { picked: 0, short: 0, onTime: 0, due: 0, late: 0, days: 0 };
+    for (let d = b.from; d <= b.to; d = addDays(d, 1)) {
+      const p = tPick.get(d);
+      const o = tOnTime.get(d);
+      const last = d === today ? nowHour : 23;
+      const part = (v: number) => (b.hour === undefined ? v : hourShare(v, b.hour, last));
+      acc.picked += part(p?.pickedLines ?? 0);
+      acc.short += part(p?.shortLines ?? 0);
+      acc.onTime += part(o?.onTime ?? 0);
+      acc.due += part(o?.due ?? 0);
+      acc.late += part(o?.late ?? 0);
+      acc.days += 1;
+    }
+    return acc;
+  };
+  const sums = tBuckets.map((b) => ({ b, t: sumOf(b) }));
+  const tipLabel = (b: Bucket) => (b.hour !== undefined ? `${shortDate(b.from)} ${b.hour}시` : b.from === b.to ? shortDate(b.from) : `${b.label} (${shortDate(b.from)}–${shortDate(b.to)})`);
+  const tPickedCols: Column[] = sums.map(({ b, t }) => ({ key: b.key, label: b.label, value: t.picked, tip: m.pickTip(tipLabel(b), t.picked, t.short) }));
+  const shortCols: Column[] = sums.map(({ b, t }) => {
+    const v = rate(t.short, t.picked);
+    return { key: b.key, label: b.label, value: v, tip: m.shortTip(tipLabel(b), rateText(v), t.short, t.picked) };
   });
-  const shortCols: Column[] = tDays.map((d) => {
-    const r = tPick.get(d);
-    const v = rate(r?.shortLines ?? 0, r?.pickedLines ?? 0);
-    return { key: d, label: shortDate(d), value: v, tip: m.shortTip(shortDate(d), rateText(v), r?.shortLines ?? 0, r?.pickedLines ?? 0) };
-  });
-  const onTimeCols: Column[] = tDays.map((d) => {
-    const r = tOnTime.get(d);
-    const v = rate(r?.onTime ?? 0, r?.due ?? 0);
-    return { key: d, label: shortDate(d), value: v, tip: m.onTimeTip(shortDate(d), rateText(v), r?.onTime ?? 0, r?.due ?? 0, r?.late ?? 0) };
+  const onTimeCols: Column[] = sums.map(({ b, t }) => {
+    const v = rate(t.onTime, t.due);
+    return { key: b.key, label: b.label, value: v, tip: m.onTimeTip(tipLabel(b), rateText(v), t.onTime, t.due, t.late) };
   });
 
-  const zoom = (from: string, to: string) => applyRange({ from, to });
+  // 끌어서 고른 칸 → 첫 칸 시작일 ~ 끝 칸 끝날(시간 칸이면 그날). 하루 안이면 그날 시간대별로
+  const zoom = (fromKey: string, toKey: string) => {
+    const a = tBuckets.find((b) => b.key === fromKey);
+    const z = tBuckets.find((b) => b.key === toKey);
+    if (a && z) applyRange({ from: a.from, to: z.to });
+  };
 
   const todayPick = pickRow.get(today);
   const todayOnTime = onTimeRow.get(today);
@@ -330,11 +387,13 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
         </Panel>
         <Panel
           className="@5xl:col-span-5"
-          title={m.chart.trend(shortDate(range.from), shortDate(range.to), span)}
+          title={m.chart.trend(shortDate(range.from), shortDate(range.to), span, m.range.unit[unit])}
           sub={chart === 'onTime' ? m.chart.onTimeNote : m.chart.pickSub}
           {...(chart === 'onTime' ? { help: m.chart.onTimeHelp } : {})}
           q={chart === 'onTime' ? trend.onTime : trend.picking}
-          toolbar={<RangeBar range={range} today={today} canBack={history.length > 0} onChange={applyRange} onBack={back} />}
+          toolbar={
+            <RangeBar range={range} unit={unit} units={allowed} hourOk={hourOk} today={today} canBack={history.length > 0} onChange={applyRange} onBack={back} />
+          }
           aside={
             <div className="pm-seg" role="group" aria-label={m.chart.pickToggle}>
               {(['picked', 'shortRate', 'onTime'] as const).map((k) => (
@@ -347,13 +406,13 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
         >
           {/* key 에 기간 — 기간이 바뀌면 새로 그려 가로축에서 다시 차오른다 */}
           {chart === 'onTime' ? (
-            <AreaChart key={`o-${range.from}-${range.to}`} title={m.chart.onTime(span)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} onRange={zoom} />
+            <AreaChart key={`o-${range.from}-${range.to}-${unit}`} title={m.chart.onTime(span)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} onRange={zoom} />
           ) : chart === 'picked' ? (
-            <AreaChart key={`p-${range.from}-${range.to}`} title={m.chart.picked(span)} columns={tPickedCols} format={(v) => m.lines(v)} testId="chart-picked" onRange={zoom} />
+            <AreaChart key={`p-${range.from}-${range.to}-${unit}`} title={m.chart.picked(span)} columns={tPickedCols} format={(v) => m.lines(v)} testId="chart-picked" onRange={zoom} />
           ) : (
-            <AreaChart key={`s-${range.from}-${range.to}`} title={m.chart.shortRate(span)} columns={shortCols} format={(v) => rateText(v)} testId="chart-short-rate" onRange={zoom} />
+            <AreaChart key={`s-${range.from}-${range.to}-${unit}`} title={m.chart.shortRate(span)} columns={shortCols} format={(v) => rateText(v)} testId="chart-short-rate" onRange={zoom} />
           )}
-          <SubList title={m.chart.topShort(span)} q={trend.bySku} link={{ to: centerPath(mfcId, 'inventory'), text: m.toInventory }}>
+          <SubList title={m.chart.topShort(spanDays(skuRangeOf(range)))} q={trend.bySku} link={{ to: centerPath(mfcId, 'inventory'), text: m.toInventory }}>
             {(trend.bySku.data?.items ?? []).length === 0 ? (
               <p className="text-sm text-base-content/55">{m.noShort}</p>
             ) : (
@@ -573,15 +632,21 @@ function Kpi({
 /** 추이 기간 바 — 빠른 단추(오늘까지 n일)·시작일·끝일·이전 기간 */
 function RangeBar({
   range,
+  unit,
+  units,
+  hourOk,
   today,
   canBack,
   onChange,
   onBack,
 }: {
   readonly range: Range;
+  readonly unit: Unit;
+  readonly units: readonly Unit[];
+  readonly hourOk: boolean;
   readonly today: string;
   readonly canBack: boolean;
-  readonly onChange: (r: Range) => void;
+  readonly onChange: (r: Range, u?: Unit) => void;
   readonly onBack: () => void;
 }) {
   const r = m.range;
@@ -600,8 +665,23 @@ function RangeBar({
       <div className="flex flex-wrap items-center gap-1.5">
         <div className="pm-seg" role="group" aria-label={r.label}>
           {RANGE_PRESETS.map((n) => (
-            <button key={n} type="button" aria-pressed={range.to === today && spanDays(range) === n} onClick={() => pick(addDays(today, -(n - 1)), today)}>
-              {r.days(n)}
+            <button key={n} type="button" aria-pressed={range.to === today && range.from === presetFrom(n, today)} onClick={() => pick(presetFrom(n, today), today)}>
+              {n === 365 ? r.year : r.days(n)}
+            </button>
+          ))}
+        </div>
+        <div className="pm-seg" role="group" aria-label={r.unitLabel}>
+          {UNITS.map((u) => (
+            <button
+              key={u}
+              type="button"
+              aria-pressed={unit === u}
+              disabled={!units.includes(u)}
+              title={u === 'hour' && !hourOk ? r.hourNoApi : !units.includes(u) ? r.unitNotFit : undefined}
+              className="disabled:cursor-not-allowed disabled:opacity-35"
+              onClick={() => onChange(range, u)}
+            >
+              {r.unit[u]}
             </button>
           ))}
         </div>

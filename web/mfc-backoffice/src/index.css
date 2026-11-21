@@ -364,3 +364,11 @@ html[data-theme='pmart-dark'] [data-testid='side-menu'] nav ul a > span:first-ch
 @media (prefers-reduced-motion: reduce) {
   .pm-chart-rise, .pm-chart-fill { animation: none; }
 }
+
+/* 끌기 — 맞춰질 칸 표시는 칸이 바뀔 때 부드럽게 미끄러진다(띠 자체는 손을 그대로 따라감) */
+.pm-brush-snap {
+  transition: left 0.12s ease-out, width 0.12s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pm-brush-snap { transition: none; }
+}
