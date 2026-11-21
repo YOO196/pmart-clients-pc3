@@ -110,6 +110,13 @@ export function BarList({ rows, testId, cols = 1 }: { readonly rows: readonly Ba
  * 영역 그림(레퍼런스 "시간대별 처리량" — 보라 그라데이션 영역 + 선 + 마우스 십자선·말풍선). 한 계열·축 하나.
  * 값이 없는 날(null)은 선을 끊고 "—"(0 과 구분). 날짜 칸마다 단추(마우스·키보드 초점에 말풍선), 아래 "표로 보기".
  */
+/** 세로 눈금 글자 — 만 넘는 수는 "1.2만줄"처럼 줄여 칸에서 잘리지 않게(말풍선·표는 원래 숫자) */
+const compact = new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 });
+function axisText(format: (v: number) => string, v: number) {
+  const full = format(v);
+  return v >= 10_000 ? full.replace(/[\d,.]+/, compact.format(v)) : full;
+}
+
 export function AreaChart({
   title,
   columns,
@@ -128,17 +135,21 @@ export function AreaChart({
   readonly onRange?: (fromKey: string, toKey: string) => void;
 }) {
   const [hover, setHover] = useState<number | null>(null);
-  // 끌기: 누른 칸(a)부터 지금 칸(b)까지
-  const [drag, setDrag] = useState<{ readonly a: number; readonly b: number } | null>(null);
+  // 끌기: 누른 자리(a)부터 지금 자리(b)까지 — 판 폭 비율(0–1)로 따라가 띠가 픽셀 단위로 부드럽게 움직이고, 놓을 때 칸에 맞춘다
+  const [drag, setDrag] = useState<{ readonly a: number; readonly b: number; readonly px: number } | null>(null);
   const n = columns.length;
-  const canDrag = !!onRange && n > 2;
-  const colAt = (e: PointerEvent<HTMLElement>) => {
+  const canDrag = !!onRange && n > 1;
+  const fracAt = (e: PointerEvent<HTMLElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    return Math.min(n - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * n)));
+    return { f: Math.min(1, Math.max(0, (e.clientX - r.left) / (r.width || 1))), w: r.width || 1 };
   };
-  const lo = drag ? Math.min(drag.a, drag.b) : 0;
-  const hi = drag ? Math.max(drag.a, drag.b) : 0;
-  const dragging = drag !== null && hi > lo;
+  const colOf = (f: number) => Math.min(n - 1, Math.max(0, Math.floor(f * n)));
+  const fLo = drag ? Math.min(drag.a, drag.b) : 0;
+  const fHi = drag ? Math.max(drag.a, drag.b) : 0;
+  const lo = colOf(fLo);
+  const hi = colOf(fHi);
+  // 6px 넘게 끌어야 고르기(그냥 누름과 구분). 한 칸 안이어도 끌었으면 그 칸 하나(예: 하루 → 그날 시간별)
+  const dragging = drag !== null && (fHi - fLo) * drag.px > 6;
   const max = Math.max(0, ...columns.map((c) => c.value ?? 0));
   // 눈금 끝은 보기 좋은 수(1·2·2.5·5 × 10ⁿ)로 올림 — 비율은 fixedMax(1 = 100%)
   const nice = (v: number) => {
@@ -166,7 +177,7 @@ export function AreaChart({
     <figure className="space-y-2" data-testid={testId}>
       <div className="flex items-baseline justify-end text-xs text-base-content/55">
         <span className="min-h-4 tabular-nums text-base-content/85" aria-live="polite" data-testid={`${testId}-tip`}>
-          {dragging ? m.zoomTip(columns[lo]!.label, columns[hi]!.label, hi - lo + 1) : shown ? shown.tip : ''}
+          {dragging ? (lo === hi ? m.zoomOne(columns[lo]!.label) : m.zoomTip(columns[lo]!.label, columns[hi]!.label, hi - lo + 1)) : shown ? shown.tip : ''}
         </span>
       </div>
       <div
@@ -177,14 +188,14 @@ export function AreaChart({
               onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
                 if (e.button !== 0) return;
                 e.currentTarget.setPointerCapture(e.pointerId);
-                const i = colAt(e);
-                setDrag({ a: i, b: i });
+                const { f, w } = fracAt(e);
+                setDrag({ a: f, b: f, px: w });
               },
               onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
                 if (!drag) return;
-                const i = colAt(e);
-                setHover(i);
-                if (i !== drag.b) setDrag({ a: drag.a, b: i });
+                const { f } = fracAt(e);
+                setHover(colOf(f));
+                setDrag({ ...drag, b: f });
               },
               onPointerUp: () => {
                 if (dragging) onRange?.(columns[lo]!.key, columns[hi]!.key);
@@ -198,7 +209,7 @@ export function AreaChart({
         {/* 세로 눈금(0 · 중간 · 끝) */}
         {[0, 0.5, 1].map((g) => (
           <span key={g} className="pm-mono pointer-events-none absolute -left-12 w-11 -translate-y-1/2 truncate text-right text-[10.5px] text-base-content/45" style={{ top: `${(1 - g) * 100}%` }}>
-            {format(top * g)}
+            {axisText(format, top * g)}
           </span>
         ))}
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible text-primary" role="img" aria-label={title}>
@@ -227,11 +238,18 @@ export function AreaChart({
         </svg>
         {/* 끌어서 고르는 구간 */}
         {dragging && (
-          <span
-            className="pointer-events-none absolute inset-y-0 border-x border-primary/70 bg-primary/15"
-            style={{ left: `${(lo / n) * 100}%`, width: `${((hi - lo + 1) / n) * 100}%` }}
-            data-testid={`${testId}-brush`}
-          />
+          <>
+            {/* 맞춰질 칸(옅게) + 손을 따라가는 띠(진하게) */}
+            <span
+              className="pm-brush-snap pointer-events-none absolute inset-y-0 bg-primary/8"
+              style={{ left: `${(lo / n) * 100}%`, width: `${((hi - lo + 1) / n) * 100}%` }}
+            />
+            <span
+              className="pointer-events-none absolute inset-y-0 border-x border-primary/80 bg-primary/18 shadow-[0_0_16px] shadow-primary/25"
+              style={{ left: `${fLo * 100}%`, width: `${(fHi - fLo) * 100}%` }}
+              data-testid={`${testId}-brush`}
+            />
+          </>
         )}
         {/* 십자선·점(HTML — 늘어난 SVG 위에서도 둥글게) */}
         {!dragging && shown && shown.value !== null && hover !== null && (
