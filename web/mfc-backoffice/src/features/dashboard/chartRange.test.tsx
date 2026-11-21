@@ -1,10 +1,10 @@
-// 추이 그래프 기간 — 기간 바(빠른 단추·날짜)·끌어서 확대·Ctrl+Z 이전 기간·정시 배송 31일씩 나눠 읽기. 목(MSW) 기준.
+// 추이 그래프 기간 — 기간 바(빠른 단추·날짜)·끌어서 확대·Ctrl+Z 한 단계 넓게·정시 배송 31일씩 나눠 읽기. 목(MSW) 기준.
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import { renderAt } from '../../test/render';
-import { addDays, buckets, presetFrom, chunks, daysIn, defaultUnit, hourShare, unitsFor, validRange } from './dashboardRules';
+import { addDays, buckets, presetFrom, zoomOut, chunks, daysIn, defaultUnit, hourShare, unitsFor, validRange } from './dashboardRules';
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
 
@@ -50,7 +50,18 @@ describe('추이 그래프 기간', () => {
     for (const q of asked) expect(daysIn({ from: q.get('from')!, to: q.get('to')! }).length).toBeLessThanOrEqual(31);
   });
 
-  it('그래프를 끌면 그 구간(첫 칸~끝 칸)으로 확대, Ctrl+Z 면 바로 전 기간', async () => {
+  it('한 단계 넓게 규칙 — 1일 → 7일 → 30일 → 90일 → 1년, 가운데 중심, 오늘을 넘지 않음', () => {
+    const t = '2026-11-21';
+    expect(zoomOut({ from: '2026-11-10', to: '2026-11-10' }, t)).toEqual({ from: '2026-11-07', to: '2026-11-13' });
+    // 30일 창이 오늘을 넘으면 오늘에 붙인다
+    expect(zoomOut({ from: '2026-11-07', to: '2026-11-13' }, t)).toEqual({ from: '2026-10-23', to: t });
+    expect(zoomOut({ from: '2026-10-01', to: '2026-10-07' }, t)).toEqual({ from: '2026-09-20', to: '2026-10-19' });
+    expect(zoomOut({ from: t, to: t }, t)).toEqual({ from: addDays(t, -6), to: t });
+    expect(zoomOut({ from: '2026-08-24', to: t }, t)).toEqual({ from: '2025-12-01', to: t });
+    expect(zoomOut({ from: '2025-12-01', to: t }, t)).toBeNull();
+  });
+
+  it('그래프를 끌면 그 구간(첫 칸~끝 칸)으로 확대, Ctrl+Z 면 앞 상태가 아니라 한 단계 넓게', async () => {
     renderAt('/c/MFC-BSN-01/dashboard');
     await screen.findByTestId('chart-picked');
     // 14칸, 칸 폭 600/14 ≈ 42.9px — 2번째 칸(50px)부터 6번째 칸(250px)까지 = 5일
@@ -59,14 +70,13 @@ describe('추이 그래프 기간', () => {
     const from = addDays(today(), -12);
     expect(screen.getByLabelText('시작일')).toHaveValue(from);
     expect(screen.getByLabelText('끝일')).toHaveValue(addDays(from, 4));
-    // 한 번 더 확대 → 되돌리기 두 번이면 처음 14일
-    drag(sized(screen.getByTestId('chart-picked-plot')), 0, 300);
-    await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(3));
+    // 5일 → Ctrl+Z → 7일(가운데 중심 — 앞 상태 14일이 아님)
     fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
-    await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(5));
+    await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(7));
+    expect(screen.getByLabelText('시작일')).toHaveValue(addDays(from, 2 - 3));
+    // 단추도 같다 → 30일
     await userEvent.click(screen.getByTestId('range-back'));
-    await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(14));
-    expect(screen.getByTestId('range-back')).toBeDisabled();
+    await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(30));
   });
 
   it('한 칸만 누르면(끌지 않으면) 기간은 그대로', async () => {
@@ -74,7 +84,6 @@ describe('추이 그래프 기간', () => {
     await screen.findByTestId('chart-picked');
     drag(sized(screen.getByTestId('chart-picked-plot')), 50, 54);
     expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(14);
-    expect(screen.getByTestId('range-back')).toBeDisabled();
   });
 
   it('칸 단위 — 1일은 시간(목만, 시간 합 = 그날 합), 1년은 월, 주는 월요일부터, 단위 바꾸기', async () => {
@@ -109,9 +118,11 @@ describe('추이 그래프 기간', () => {
     expect(within(bar).getByRole('button', { name: '시간' })).toBeDisabled();
     await userEvent.click(within(bar).getByRole('button', { name: '1일' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: /\(1일 · 시간별\)/ })).toBeInTheDocument());
-    // Ctrl+Z 는 단위까지 되돌린다
+    // 1일 → Ctrl+Z → 7일(일별), 1년이면 단추가 꺼진다
     fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
-    await waitFor(() => expect(screen.getByRole('heading', { name: /주별/ })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: /\(7일 · 일별\)/ })).toBeInTheDocument());
+    await userEvent.click(within(bar).getByRole('button', { name: '1년' }));
+    await waitFor(() => expect(screen.getByTestId('range-back')).toBeDisabled());
   });
 
   it('하루 칸 안을 끌면 그날 시간별', async () => {
