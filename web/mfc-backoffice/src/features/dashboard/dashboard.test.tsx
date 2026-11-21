@@ -60,9 +60,9 @@ describe('센터 대시보드', () => {
     expect(within(bar).getByRole('link', { name: /막힌 작업/ })).toHaveAttribute('href', '/c/MFC-BSN-01/tasks?state=BLOCKED');
   });
 
-  it('알림 피드 — 긴급(약속 초과·지난 배차 지연)이 먼저, 6줄까지 + 나머지 건수', async () => {
+  it('알림 피드 — 긴급(약속 초과·지난 배차 지연)이 먼저, 5줄까지 + 나머지 건수', async () => {
     renderAt('/c/MFC-BSN-01/dashboard');
-    await waitFor(() => expect(screen.getAllByTestId('alert-feed-row').length).toBe(6));
+    await waitFor(() => expect(screen.getAllByTestId('alert-feed-row').length).toBe(5));
     const rows = screen.getAllByTestId('alert-feed-row');
     expect(rows[0]).toHaveTextContent('긴급');
     expect(rows.at(-1)).toHaveTextContent('주의');

@@ -24,6 +24,15 @@ import { DAYS, lastDays, rate, rateText, shortDate } from './dashboardRules';
 
 const m = messages.dashboard;
 const LIVE_SIZE = 50;
+const FEED_ROWS = 5;
+const hm = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', hour12: false });
+const md = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric' });
+/** 알림 시각 — 오늘이면 "10:06", 아니면 "11/19 09:10"(레퍼런스처럼 짧게) */
+const shortAt = (iso: string, today: string) => {
+  const t = Date.parse(iso);
+  const day = seoulToday(t);
+  return day === today ? hm.format(t) : `${md.format(t).replace(/\.\s?/g, '/').replace(/\/$/, '')} ${hm.format(t)}`;
+};
 
 function useDashboard(mfcId: string) {
   const api = useApi();
@@ -101,6 +110,8 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const openTasks = tasks.data?.items ?? [];
   const tasksMore = tasks.data ? !tasks.data.complete : false;
   const blocked = openTasks.filter((t) => t.state === 'BLOCKED').length;
+  const waitingN = openTasks.filter((t) => t.state === 'WAITING' || t.state === 'READY').length;
+  const runningN = openTasks.filter((t) => t.state === 'ASSIGNED' || t.state === 'IN_PROGRESS').length;
   const typeRows = (['PICK', 'PACK', 'DISPATCH', 'RETURN'] as const).map((type) => {
     const list = openTasks.filter((t) => t.taskType === type);
     const b = list.filter((t) => t.state === 'BLOCKED').length;
@@ -223,8 +234,9 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           icon={ICON.tasks}
           q={tasks}
           value={tasksMore ? m.atLeast(openTasks.length) : m.count(openTasks.length)}
-          foot={m.kpi.blocked(blocked)}
-          track={openTasks.length > 0 ? 1 - blocked / openTasks.length : null}
+          trio={[waitingN, runningN, blocked]}
+          foot={m.kpi.taskTrio}
+          stack={[waitingN, runningN, blocked]}
         />
 
         {/* 추이 — 피킹 줄·결품률은 한 패널에서 골라 보기(축 하나), 정시 배송은 옆 패널 */}
@@ -249,8 +261,8 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
             <AreaChart title={m.chart.shortRate(DAYS)} columns={shortCols} format={(v) => rateText(v)} testId="chart-short-rate" />
           )}
         </Panel>
-        <Panel className="@5xl:col-span-5" title={m.chart.onTime(DAYS)} sub={m.chart.onTimeNote} q={onTime}>
-          <AreaChart title={m.chart.onTime(DAYS)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" />
+        <Panel className="@5xl:col-span-5" title={m.chart.onTime(DAYS)} sub={m.chart.onTimeNote} help={m.chart.onTimeHelp} q={onTime}>
+          <AreaChart title={m.chart.onTime(DAYS)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} />
         </Panel>
 
         {/* 알림 피드 · 지금 작업과 인력 */}
@@ -271,14 +283,16 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
             <p className="px-4 pb-4 text-sm text-base-content/55">{m.feed.none}</p>
           ) : (
             <ul data-testid="alert-feed">
-              {feed.slice(0, 6).map((f) => (
+              {feed.slice(0, FEED_ROWS).map((f) => (
                 <li key={f.key} className="grid min-h-14 grid-cols-[auto_minmax(0,1fr)_auto_auto] items-center gap-3 border-t border-base-300 px-4 py-2 transition-colors hover:bg-primary/5" data-testid="alert-feed-row">
                   <span className={`badge ${f.tone === 'error' ? 'badge-error' : 'badge-warning'}`}>{f.tone === 'error' ? m.feed.urgent : m.feed.caution}</span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{f.title}</p>
                     <p className="truncate text-xs text-base-content/60">{f.where}</p>
                   </div>
-                  <time className="pm-mono hidden text-xs text-base-content/55 @lg:block">{f.at ? formatSeoul(f.at) : ''}</time>
+                  <time className="pm-mono hidden text-xs text-base-content/55 @lg:block" dateTime={f.at ?? undefined} title={f.at ? formatSeoul(f.at) : undefined}>
+                    {f.at ? shortAt(f.at, today) : ''}
+                  </time>
                   <Link to={f.to} className="btn btn-xs pm-action">
                     {m.feed.action}
                   </Link>
@@ -286,7 +300,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
               ))}
             </ul>
           )}
-          {feed.length > 6 && <p className="border-t border-base-300 px-4 py-2 text-xs text-base-content/55">{m.feed.more(feed.length - 6)}</p>}
+          {feed.length > FEED_ROWS && <p className="border-t border-base-300 px-4 py-2 text-xs text-base-content/55">{m.feed.more(feed.length - FEED_ROWS)}</p>}
         </Panel>
         <Panel
           className="@4xl:col-span-6"
@@ -406,6 +420,8 @@ function Kpi({
   q,
   trend,
   track,
+  trio,
+  stack,
 }: {
   readonly testId: string;
   readonly label: string;
@@ -415,12 +431,16 @@ function Kpi({
   readonly q: QueryLike;
   readonly trend?: readonly number[];
   readonly track?: number | null;
+  /** 세 숫자(레퍼런스 "36 / 24 / 284") — 있으면 큰 숫자 대신. value 는 화면 읽기용 이름에 */
+  readonly trio?: readonly [number, number, number];
+  /** 세 숫자 비율 막대(대기·진행·막힘) */
+  readonly stack?: readonly [number, number, number];
 }) {
   const max = Math.max(0, ...(trend ?? []));
   // 숫자와 단위를 나눠 단위는 작게(레퍼런스 "428 UPH") — 글자 전체는 그대로
   const [, num = value, unit = ''] = /^([\d.,—-]+)(.*)$/.exec(value) ?? [];
   return (
-    <article className="col-span-12 flex min-h-36 flex-col rounded-box border border-base-300 bg-base-100 px-4 pt-3.5 pb-3 @md:col-span-6 @5xl:col-span-3" data-testid={testId}>
+    <article className="col-span-12 flex min-h-32 flex-col rounded-box border border-base-300 bg-base-100 px-4 pt-3 pb-3 @md:col-span-6 @5xl:col-span-3" data-testid={testId}>
       <p className="flex items-center justify-between gap-2 text-sm font-semibold text-base-content/80">
         <span className="truncate">{label}</span>
         <span className="grid h-8 w-8 place-items-center rounded-field border border-primary/25 bg-primary/15 text-primary">{ic}</span>
@@ -433,16 +453,37 @@ function Kpi({
         </p>
       ) : (
         <>
-          <p data-testid={`${testId}-value`} className="mt-1 flex items-baseline gap-1.5 text-[34px] leading-tight font-extrabold tracking-[-0.045em] tabular-nums">
-            {num}
-            {unit && <span className="text-sm font-semibold tracking-normal text-base-content/55">{unit}</span>}
-          </p>
+          {trio ? (
+            <p className="mt-1 flex items-baseline gap-2 text-[30px] leading-tight font-extrabold tracking-[-0.04em] tabular-nums" aria-label={value}>
+              <span data-testid={`${testId}-value`} className="sr-only">
+                {value}
+              </span>
+              {trio.map((v, i) => (
+                <span key={i} className="flex items-baseline gap-2" aria-hidden="true">
+                  {i > 0 && <span className="text-lg font-medium text-base-content/30">/</span>}
+                  <span className={i === 2 && v > 0 ? 'text-error' : ''}>{v}</span>
+                </span>
+              ))}
+            </p>
+          ) : (
+            <p data-testid={`${testId}-value`} className="mt-1 flex items-baseline gap-1.5 text-[34px] leading-tight font-extrabold tracking-[-0.045em] tabular-nums">
+              {num}
+              {unit && <span className="text-sm font-semibold tracking-normal text-base-content/55">{unit}</span>}
+            </p>
+          )}
           <p className="truncate text-xs text-base-content/60">{foot}</p>
           {trend && max > 0 && (
             <span className="mt-auto flex h-6 items-end gap-0.5 pt-1" aria-hidden="true">
               {trend.map((v, i) => (
                 <i key={i} className={`max-w-3.5 flex-1 rounded-t-sm ${i === trend.length - 1 ? 'bg-primary shadow-[0_0_8px] shadow-primary/50' : 'bg-primary/35'}`} style={{ height: `${v > 0 ? Math.max(8, (v / max) * 100) : 0}%` }} />
               ))}
+            </span>
+          )}
+          {stack && stack.some((v) => v > 0) && (
+            <span className="mt-auto flex h-1.5 gap-0.5 overflow-hidden rounded-full" aria-hidden="true">
+              <i className="bg-base-content/30" style={{ flexGrow: stack[0] }} />
+              <i className="pm-meter-fill" style={{ flexGrow: stack[1] }} />
+              <i className="bg-error" style={{ flexGrow: stack[2] }} />
             </span>
           )}
           {track !== undefined && track !== null && (
@@ -462,12 +503,15 @@ function Panel({
   sub,
   aside,
   q,
+  help,
   className = '',
   flush = false,
   children,
 }: {
   readonly title: string;
   readonly sub?: string;
+  /** 설명 전체(마우스를 올리면) — 머리에는 짧은 sub 만 */
+  readonly help?: string;
   readonly aside?: ReactNode;
   readonly q: QueryLike;
   readonly className?: string;
@@ -480,7 +524,11 @@ function Panel({
       <header className="flex min-h-14 items-center justify-between gap-2 px-4 py-2.5">
         <div className="min-w-0">
           <h2 className="truncate text-base font-bold tracking-[-0.025em]">{title}</h2>
-          {sub && <p className="mt-0.5 line-clamp-2 text-xs text-base-content/55">{sub}</p>}
+          {sub && (
+            <p className="mt-0.5 truncate text-xs text-base-content/55" title={help ?? sub}>
+              {sub}
+            </p>
+          )}
         </div>
         {aside && <div className="shrink-0">{aside}</div>}
       </header>

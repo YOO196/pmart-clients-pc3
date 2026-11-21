@@ -99,7 +99,7 @@ export function BarList({ rows, testId }: { readonly rows: readonly BarRow[]; re
           <span className="pm-meter-track h-2 overflow-hidden rounded-full">
             <span className="pm-meter-fill block h-full rounded-full" style={{ width: `${max === 0 || r.value === 0 ? 0 : Math.max(2, (r.value / max) * 100)}%` }} />
           </span>
-          <span className="pm-mono text-right text-xs">{r.text}</span>
+          <span className="text-right text-xs tabular-nums">{r.text}</span>
         </li>
       ))}
     </ul>
@@ -110,11 +110,29 @@ export function BarList({ rows, testId }: { readonly rows: readonly BarRow[]; re
  * 영역 그림(레퍼런스 "시간대별 처리량" — 보라 그라데이션 영역 + 선 + 마우스 십자선·말풍선). 한 계열·축 하나.
  * 값이 없는 날(null)은 선을 끊고 "—"(0 과 구분). 날짜 칸마다 단추(마우스·키보드 초점에 말풍선), 아래 "표로 보기".
  */
-export function AreaChart({ title, columns, format, testId }: { readonly title: string; readonly columns: readonly Column[]; readonly format: (v: number) => string; readonly testId: string }) {
+export function AreaChart({
+  title,
+  columns,
+  format,
+  testId,
+  fixedMax,
+}: {
+  readonly title: string;
+  readonly columns: readonly Column[];
+  readonly format: (v: number) => string;
+  readonly testId: string;
+  /** 비율처럼 축 끝이 정해진 값(예 1 = 100%) */
+  readonly fixedMax?: number;
+}) {
   const [hover, setHover] = useState<number | null>(null);
   const n = columns.length;
   const max = Math.max(0, ...columns.map((c) => c.value ?? 0));
-  const top = max > 0 ? max * 1.12 : 1;
+  // 눈금 끝은 보기 좋은 수(1·2·2.5·5 × 10ⁿ)로 올림 — 비율은 fixedMax(1 = 100%)
+  const nice = (v: number) => {
+    const p = 10 ** Math.floor(Math.log10(v));
+    return ([1, 2, 2.5, 5, 10].find((k) => k * p >= v) ?? 10) * p;
+  };
+  const top = fixedMax ?? (max > 0 ? nice(max * 1.08) : 1);
   const W = 600;
   const H = 180;
   const x = (i: number) => ((i + 0.5) / n) * W;
@@ -133,13 +151,18 @@ export function AreaChart({ title, columns, format, testId }: { readonly title: 
   const ticks = new Set([0, Math.floor((n - 1) / 2), n - 1]);
   return (
     <figure className="space-y-2" data-testid={testId}>
-      <div className="flex items-baseline justify-between text-xs text-base-content/55">
-        <span className="pm-mono">{max > 0 ? m.maxLabel(format(max)) : ''}</span>
-        <span className="pm-mono min-h-4 text-base-content/85" aria-live="polite" data-testid={`${testId}-tip`}>
+      <div className="flex items-baseline justify-end text-xs text-base-content/55">
+        <span className="min-h-4 tabular-nums text-base-content/85" aria-live="polite" data-testid={`${testId}-tip`}>
           {shown ? shown.tip : ''}
         </span>
       </div>
-      <div className="relative h-44" onMouseLeave={() => setHover(null)}>
+      <div className="relative ml-12 h-40" onMouseLeave={() => setHover(null)}>
+        {/* 세로 눈금(0 · 중간 · 끝) */}
+        {[0, 0.5, 1].map((g) => (
+          <span key={g} className="pm-mono pointer-events-none absolute -left-12 w-11 -translate-y-1/2 truncate text-right text-[10.5px] text-base-content/45" style={{ top: `${(1 - g) * 100}%` }}>
+            {format(top * g)}
+          </span>
+        ))}
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible text-primary" role="img" aria-label={title}>
           <defs>
             <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
@@ -147,7 +170,7 @@ export function AreaChart({ title, columns, format, testId }: { readonly title: 
               <stop offset="1" stopColor="currentColor" stopOpacity="0" />
             </linearGradient>
           </defs>
-          {[0.25, 0.5, 0.75].map((g) => (
+          {[0, 0.5].map((g) => (
             <line key={g} x1="0" x2={W} y1={H * g} y2={H * g} className="stroke-base-content/10" strokeWidth="1" vectorEffect="non-scaling-stroke" />
           ))}
           <line x1="0" x2={W} y1={H} y2={H} className="stroke-base-content/25" strokeWidth="1" vectorEffect="non-scaling-stroke" />
@@ -188,7 +211,7 @@ export function AreaChart({ title, columns, format, testId }: { readonly title: 
           ))}
         </div>
       </div>
-      <div className="pm-mono flex text-[11px] text-base-content/50">
+      <div className="pm-mono ml-12 flex text-[11px] text-base-content/50">
         {columns.map((c, i) => (
           <span key={c.key} className="min-w-0 flex-1 text-center">
             {ticks.has(i) ? c.label : ''}
@@ -197,7 +220,7 @@ export function AreaChart({ title, columns, format, testId }: { readonly title: 
       </div>
       <details className="text-xs">
         <summary className="cursor-pointer text-base-content/60">{m.asTable}</summary>
-        <ul className="pm-mono mt-1 space-y-0.5 text-base-content/75">
+        <ul className="mt-1 space-y-0.5 tabular-nums text-base-content/75">
           {columns.map((c) => (
             <li key={c.key}>{c.tip}</li>
           ))}
