@@ -69,7 +69,7 @@ void main() {
     await t.pumpAndSettle();
     expect(key('home-popup'), findsNothing);
     // 다른 탭에 갔다가 홈으로 와도 다시 뜨지 않는다
-    await t.tap(find.text('장바구니').last);
+    await t.tap(find.text('주문내역').last);
     await t.pumpAndSettle();
     await t.tap(find.text('홈').last);
     await t.pumpAndSettle();

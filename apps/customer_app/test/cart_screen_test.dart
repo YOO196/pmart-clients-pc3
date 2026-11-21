@@ -10,6 +10,9 @@ import 'package:customer_app/features/cart/presentation/cart_controller.dart';
 import 'package:customer_app/features/catalog/presentation/home_screen.dart';
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 
+import 'package:customer_app/features/checkout/presentation/delivery_select_screen.dart'
+    show DeliveryOptionCard;
+
 import 'support/app_harness.dart';
 
 base class _CartDown extends MockCartRepository {
@@ -22,7 +25,18 @@ base class _CartDown extends MockCartRepository {
 
 Future<void> _openCartTab(WidgetTester t) async {
   await t.pumpAndSettle();
-  await t.tap(find.text('장바구니').last);
+  // 장바구니는 하단 탭이 아니라 홈 머리줄 아이콘으로 연다(사용자 2026-11-21). 다른 탭에 있으면 홈으로 먼저.
+  if (find.byKey(const ValueKey('home-top-cart')).evaluate().isEmpty) {
+    await t.tap(find.text('홈').last);
+    await t.pumpAndSettle();
+  }
+  await t.tap(find.byKey(const ValueKey('home-top-cart')));
+  await t.pumpAndSettle();
+}
+
+/// 장바구니(홈 위 화면)를 닫는다 — 하단 탭을 누르려면 먼저 닫아야 한다.
+Future<void> _closeCart(WidgetTester t) async {
+  await t.tap(find.byType(BackButton));
   await t.pumpAndSettle();
 }
 
@@ -53,6 +67,46 @@ void main() {
     expect(find.textContaining('개당'), findsNothing);
   });
 
+  testWidgets('수량을 바꿔 배달팁을 다시 묻는 동안 수령방법 카드는 그대로(진행 줄만), 끝나면 새 값', (t) async {
+    final checkout = MockCheckoutRepository(
+      latency: const Duration(milliseconds: 400),
+      now: () => DateTime.utc(2026, 10, 24, 3),
+    );
+    // 수량 버튼과 수령방법이 한 화면에 보이게 크게
+    t.view
+      ..physicalSize = const Size(800, 3000)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const [], cart: cart, checkout: checkout));
+    await t.pumpAndSettle();
+    // 수령방법은 회원만
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pump(const Duration(seconds: 2));
+    await t.pumpAndSettle();
+    await _openCartTab(t);
+    await t.pump(const Duration(seconds: 1));
+    await t.pumpAndSettle();
+    final cards = find.byType(DeliveryOptionCard);
+    final before = cards.evaluate().length;
+    expect(before, greaterThan(0));
+    await t.tap(find.byKey(const ValueKey('cart-inc-ci-1')));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 100));
+    // 다시 묻는 중 — 카드는 남고 진행 줄만
+    expect(
+      find.byKey(const ValueKey('cart-receive-reloading')),
+      findsOneWidget,
+    );
+    expect(cards.evaluate().length, before);
+    await t.pump(const Duration(seconds: 1));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cart-receive-reloading')), findsNothing);
+    expect(cards.evaluate().length, before);
+  });
   testWidgets('조회 실패는 빈 장바구니가 아니라 오류로 보인다', (t) async {
     await t.pumpWidget(testApp(const [], cart: _CartDown()));
     await _openCartTab(t);
@@ -203,6 +257,8 @@ void main() {
     );
 
     final noMfc = MockCartRepository(latency: Duration.zero)..noMfc = true;
+    // 새 앱으로(앞 앱의 장바구니 화면이 남지 않게)
+    await t.pumpWidget(const SizedBox());
     await t.pumpWidget(testApp(const [], cart: noMfc));
     await _openCartTab(t);
     expect(find.text('배송지를 정하면 재고를 확인해요'), findsNWidgets(2));
@@ -454,6 +510,7 @@ void main() {
     testWidgets('회원 결제금액: 봉투값은 정책값 100원, 자세히는 가운데 창(정적 문구)', (t) async {
       await t.pumpWidget(testApp(const [], cart: cart));
       await _openCartTab(t);
+      await _closeCart(t);
       await t.tap(find.text('마이페이지').last);
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('my-login')));
@@ -490,6 +547,7 @@ void main() {
       // 비회원은 묻지 않는다.
       expect(find.byKey(const ValueKey('cart-first-purchase')), findsNothing);
 
+      await _closeCart(t);
       await t.tap(find.text('마이페이지').last);
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('my-login')));

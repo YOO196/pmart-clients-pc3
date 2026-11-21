@@ -725,7 +725,7 @@ class _Answer extends ConsumerWidget {
             const _ActionOrders(),
             TextButton(
               key: const ValueKey('chat-go-orders'),
-              onPressed: () => context.push('/orders'),
+              onPressed: () => context.go('/orders'),
               child: Text(l10n.ordersTitle),
             ),
           ],

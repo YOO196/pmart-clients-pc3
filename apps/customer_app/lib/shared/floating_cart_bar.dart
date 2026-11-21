@@ -73,7 +73,7 @@ class FloatingCartBar extends ConsumerWidget {
             ),
             FilledButton(
               key: const ValueKey('home-cart-go'),
-              onPressed: () => context.go('/cart'),
+              onPressed: () => context.push('/cart'),
               style: FilledButton.styleFrom(
                 minimumSize: const Size(0, 46),
                 padding: const EdgeInsets.fromLTRB(10, 0, 18, 0),

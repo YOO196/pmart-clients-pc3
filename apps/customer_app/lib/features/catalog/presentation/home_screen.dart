@@ -7,6 +7,7 @@ import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/cart_icon_button.dart';
 import '../../../shared/floating_cart_bar.dart';
 import '../../../shared/notice.dart';
 import '../../../shared/providers.dart';
@@ -158,41 +159,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
     final gray = Theme.of(context).colorScheme.surfaceContainer;
     return Scaffold(
+      // 사용자 2026-11-21 "주소가 왼쪽으로", 검색은 하단 탭과 겹쳐 뺌, 장바구니는 머리줄에만(하단 탭은 주문내역).
+      // 레퍼런스 3-1 "1. 배민 홈": 왼쪽 주소 ▾, 오른쪽 알림·장바구니(조금 큰 아이콘).
       appBar: AppBar(
         backgroundColor: gray,
-        toolbarHeight: 46,
+        toolbarHeight: 48,
+        centerTitle: false,
+        titleSpacing: 16,
         title: const _AddressChip(),
         actions: [
           IconButton(
             key: const ValueKey('home-notifications'),
-            visualDensity: VisualDensity.compact,
-            icon: const PmartLineIcon(PmartLineIcons.bell, size: 23),
+            icon: const PmartLineIcon(PmartLineIcons.bell, size: 26),
             tooltip: l10n.noticeTitle,
             onPressed: () => context.push('/notifications'),
           ),
-          IconButton(
-            key: const ValueKey('home-top-search'),
-            visualDensity: VisualDensity.compact,
-            icon: const PmartLineIcon(PmartLineIcons.search, size: 23),
-            tooltip: l10n.searchTitle,
-            onPressed: () => context.go('/search'),
-          ),
-          IconButton(
-            key: const ValueKey('home-top-cart'),
-            visualDensity: VisualDensity.compact,
-            icon: const PmartLineIcon(PmartLineIcons.cart, size: 23),
-            tooltip: l10n.cartTitle,
-            onPressed: () => context.go('/cart'),
-          ),
-          const SizedBox(width: 4),
+          const CartIconButton(key: ValueKey('home-top-cart'), size: 26),
+          const SizedBox(width: 6),
           if (mock)
             Padding(
               padding: const EdgeInsets.only(right: 12),
               child: Center(child: PmartTag(l10n.mockModeBadge)),
             ),
         ],
-      ),
-      // 첫 로딩은 가운데 원형 표시 대신 자리 표시 블록을 그린다(§17).
+      ), // 첫 로딩은 가운데 원형 표시 대신 자리 표시 블록을 그린다(§17).
       body: state is UiLoading<HomeView>
           ? const HomeSkeleton()
           : UiStateView<HomeView>(
@@ -1561,9 +1551,9 @@ class _AddressChip extends ConsumerWidget {
             child: Text(
               text,
               overflow: TextOverflow.ellipsis,
-              // 레퍼런스 홈 주소 줄은 보통~중간 굵기(titleMedium 은 테마 w700).
+              // 레퍼런스 홈 주소 줄(3-1 "1. 배민 홈"): 약 16, 보통~중간 굵기(titleMedium 은 테마 w700).
               style: Theme.of(context).textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w500),
+                  ?.copyWith(fontSize: 16, fontWeight: FontWeight.w500),
             ),
           ),
           const SizedBox(width: 2),

@@ -1015,7 +1015,8 @@ void main() {
       );
     }
 
-    await t.tap(find.text('장바구니').last);
+    // 장바구니는 하단 탭이 아니다(사용자 2026-11-21) — 홈 위 화면으로 연다.
+    GoRouter.of(t.element(find.byType(Scaffold).first)).go('/cart');
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('cart-order')));
     await t.pumpAndSettle();
@@ -1026,6 +1027,27 @@ void main() {
     debugDisableShadows = true;
   });
 
+  // 홈 머리줄·하단 탭(사용자 2026-11-21): 주소 왼쪽, 알림·장바구니, 하단 탭 주문내역.
+  testWidgets('home-topbar', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/home-topbar.png').uri),
+    );
+    await t.tap(find.text('주문내역').last);
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/orders-tab.png').uri),
+    );
+  });
   // 주소 상세 별칭(새 레퍼런스 3-1/2-5): [우리집][회사][추가], [추가]를 누르면 아래 입력칸.
   testWidgets('address-alias', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
@@ -1401,16 +1423,18 @@ void main() {
       );
     }
 
-    await t.tap(find.text('장바구니').last);
+    GoRouter.of(t.element(find.byType(Scaffold).first)).go('/cart');
     await t.pumpAndSettle();
     await shot('guest');
-    await t.tap(find.text('마이페이지').last);
+    GoRouter.of(t.element(find.byType(Scaffold).first)).go('/my');
+    await t.pumpAndSettle();
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('my-login')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('login-kakao')));
     await t.pumpAndSettle();
-    await t.tap(find.text('장바구니').last);
+    // 장바구니는 하단 탭이 아니다(사용자 2026-11-21) — 홈 위 화면으로 연다.
+    GoRouter.of(t.element(find.byType(Scaffold).first)).go('/cart');
     await t.pumpAndSettle();
     await t.scrollUntilVisible(
       find.byKey(const ValueKey('cart-amount-bag')),

@@ -126,7 +126,8 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
         const <SaleOption>[];
 
     final scheme = theme.colorScheme;
-    final text16 = theme.textTheme.bodyLarge?.copyWith(fontSize: 16);
+    // 레퍼런스 4. 상품리뷰 전체 보기 - 상단을 재서 맞춤(2026-11-21): 공지·정렬·필터 줄 15.
+    final rowText = theme.textTheme.bodyLarge?.copyWith(fontSize: 15);
     // 새 레퍼런스(4. 상품리뷰 전체 보기 - 상단, 2026-11-21): 공지 줄 → 사진 후기 4칸 → 회색 띠 →
     // "총 N개 · 정렬 ⌄ · 필터" → [상품 옵션 ⌄]. 신고·멤버스 표시는 계약에 없어 두지 않는다.
     final header = <Widget>[
@@ -138,7 +139,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                 decoration: BoxDecoration(
                   color: scheme.surfaceContainer,
                   borderRadius: BorderRadius.circular(4),
@@ -146,13 +147,13 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
                 child: Text(
                   l10n.reviewNoticeTag,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
-              Text(l10n.reviewNoticeTitle, style: text16),
+              Text(l10n.reviewNoticeTitle, style: rowText),
             ],
           ),
         ),
@@ -160,7 +161,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
       _PhotoStrip(productId: widget.productId),
       Container(height: 8, color: scheme.surfaceContainer),
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
+        padding: const EdgeInsets.fromLTRB(16, 0, 4, 0),
         child: Row(
           children: [
             if (list?.averageRating case final avg?) ...[
@@ -170,7 +171,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
                 avg.toStringAsFixed(1),
                 key: const ValueKey('review-average'),
                 semanticsLabel: l10n.reviewAverage(avg.toStringAsFixed(1)),
-                style: text16?.copyWith(fontWeight: FontWeight.w600),
+                style: rowText?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(width: 8),
             ],
@@ -180,7 +181,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
                 null => l10n.reviewSectionTitle,
               },
               key: const ValueKey('review-count'),
-              style: text16,
+              style: rowText,
             ),
             const Spacer(),
             TextButton(
@@ -193,7 +194,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(reviewSortLabel(l10n, _sort), style: text16),
+                  Text(reviewSortLabel(l10n, _sort), style: rowText),
                   const SizedBox(width: 2),
                   const PmartLineIcon(PmartLineIcons.chevronDown, size: 18),
                 ],
@@ -212,7 +213,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
                 children: [
                   Text(
                     l10n.reviewFilter,
-                    style: text16?.copyWith(
+                    style: rowText?.copyWith(
                       color: _photoOnly ? scheme.primary : scheme.onSurface,
                     ),
                   ),
@@ -230,7 +231,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
       ),
       if (options.length >= 2)
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
           child: Align(
             alignment: Alignment.centerLeft,
             child: InkWell(
@@ -239,7 +240,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
               onTap: () => _pickOption(options),
               child: Container(
                 height: 33,
-                padding: const EdgeInsets.only(left: 14, right: 10),
+                padding: const EdgeInsets.only(left: 12, right: 8),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(17),
                   border: Border.all(color: scheme.outlineVariant),
@@ -256,7 +257,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
                       },
                       key: const ValueKey('review-option-label'),
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 15,
+                        fontSize: 13,
                         color: _sku == null
                             ? scheme.onSurfaceVariant
                             : scheme.onSurface,
@@ -471,7 +472,7 @@ class ProductReviewCard extends ConsumerWidget {
           ),
           _ReviewProductLine(review: r),
           if (r.photoUrls.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 7),
             _CardPhotos(review: r, query: query),
           ],
           if (r.text case final t? when t.isNotEmpty) ...[
@@ -488,8 +489,11 @@ class ProductReviewCard extends ConsumerWidget {
 
 /// 작성자 + 별점(레퍼런스 이름 줄 — 별점은 우리 리뷰의 서버 값이라 옆에 작게 둔다).
 class _ReviewAuthor extends StatelessWidget {
-  const _ReviewAuthor({required this.review});
+  const _ReviewAuthor({required this.review, this.fontSize = 16});
   final ReviewView review;
+
+  /// 목록 16, 사진 후기 화면 15(레퍼런스를 재서 맞춤).
+  final double fontSize;
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -499,7 +503,7 @@ class _ReviewAuthor extends StatelessWidget {
       children: [
         Text(
           review.authorMasked ?? l10n.reviewAuthorUnknown,
-          style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16),
+          style: theme.textTheme.bodyLarge?.copyWith(fontSize: fontSize),
         ),
         const SizedBox(width: 8),
         ReviewStars(rating: review.rating, size: 14),
@@ -511,8 +515,11 @@ class _ReviewAuthor extends StatelessWidget {
 /// 상품 이름 · 옵션(회색 15). 옵션은 리뷰의 SKU → 지금 상품 옵션 이름(옵션이 2개 이상일 때만).
 /// 상품을 아직 못 읽었으면 줄 없음.
 class _ReviewProductLine extends ConsumerWidget {
-  const _ReviewProductLine({required this.review});
+  const _ReviewProductLine({required this.review, this.fontSize = 15});
   final ReviewView review;
+
+  /// 목록 15, 사진 후기 화면 14.
+  final double fontSize;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
@@ -534,7 +541,7 @@ class _ReviewProductLine extends ConsumerWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: theme.textTheme.bodyMedium?.copyWith(
-          fontSize: 15,
+          fontSize: fontSize,
           color: theme.colorScheme.onSurfaceVariant,
         ),
       ),
@@ -549,7 +556,7 @@ class _ReviewBody extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     text,
     style: Theme.of(context).textTheme.bodyLarge
-        ?.copyWith(fontSize: 16, height: 1.35),
+        ?.copyWith(fontSize: 15, height: 1.4),
   );
 }
 
@@ -575,7 +582,7 @@ class _ReviewFooter extends StatelessWidget {
           reviewDate(r.createdAt),
           key: ValueKey('product-review-date-${r.reviewId}'),
           style: theme.textTheme.bodyMedium?.copyWith(
-            fontSize: 15,
+            fontSize: 14,
             color: grey,
           ),
         ),
@@ -711,8 +718,8 @@ class _HelpfulButtonState extends ConsumerState<_HelpfulButton> {
         borderRadius: BorderRadius.circular(17),
         onTap: _busy ? null : _tap,
         child: Container(
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          height: 35,
+          padding: const EdgeInsets.symmetric(horizontal: 11),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(17),
             border: Border.all(
@@ -724,7 +731,7 @@ class _HelpfulButtonState extends ConsumerState<_HelpfulButton> {
             children: [
               PmartLineIcon(
                 PmartLineIcons.thumbUp,
-                size: 17,
+                size: 15,
                 color: fg,
                 strokeWidth: 1.6,
               ),
@@ -732,7 +739,7 @@ class _HelpfulButtonState extends ConsumerState<_HelpfulButton> {
               Text(
                 l10n.reviewHelpful(widget.count),
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: 15,
+                  fontSize: 14,
                   color: fg,
                 ),
               ),
@@ -870,8 +877,8 @@ class _ReviewPhotoDetailScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _ReviewAuthor(review: r),
-                _ReviewProductLine(review: r),
+                _ReviewAuthor(review: r, fontSize: 15),
+                _ReviewProductLine(review: r, fontSize: 14),
                 if (r.text case final t? when t.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   _ReviewBody(text: t),
@@ -992,7 +999,7 @@ class _PhotoStrip extends ConsumerWidget {
           Text(
             l10n.reviewPhotoSectionTitle,
             style: theme.textTheme.titleMedium?.copyWith(
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
             ),
           ),

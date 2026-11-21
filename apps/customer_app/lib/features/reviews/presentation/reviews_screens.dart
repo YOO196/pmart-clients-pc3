@@ -113,7 +113,7 @@ class ReviewManageScreen extends ConsumerWidget {
           const SizedBox(width: 5),
           Text(
             l10n.reviewTabCount(count),
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w400),
           ),
         ],
       ],
@@ -136,9 +136,9 @@ class ReviewManageScreen extends ConsumerWidget {
                       .colorScheme
                       .onSurfaceVariant,
                   labelStyle: Theme.of(context).textTheme.bodyLarge
-                      ?.copyWith(fontSize: 16, fontWeight: FontWeight.w700),
+                      ?.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
                   unselectedLabelStyle: Theme.of(context).textTheme.bodyLarge
-                      ?.copyWith(fontSize: 16),
+                      ?.copyWith(fontSize: 15),
                   tabs: [
                     Tab(
                       key: const ValueKey('review-tab-write'),
@@ -464,9 +464,10 @@ class _MyReviewCard extends ConsumerWidget {
                     child: _ProductName(
                       productId: eligibility.productId,
                       title: eligibility.productName,
+                      // 새 레퍼런스 11/1. 리뷰관리 - 내가 쓴 리뷰(사진만 크게): 상품 이름 16 보통 굵기
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ),
@@ -480,7 +481,7 @@ class _MyReviewCard extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        ReviewStars(rating: r.rating, size: 15),
+                        ReviewStars(rating: r.rating, size: 16),
                         const SizedBox(width: 6),
                         Text(
                           [
@@ -489,6 +490,7 @@ class _MyReviewCard extends ConsumerWidget {
                           ].join(', '),
                           key: ValueKey('review-mine-when-$id'),
                           style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 15,
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -500,12 +502,12 @@ class _MyReviewCard extends ConsumerWidget {
                         child: Text(
                           t,
                           style: theme.textTheme.bodyLarge?.copyWith(
-                            fontSize: 15,
-                            height: 1.45,
+                            fontSize: 16,
+                            height: 1.4,
                           ),
                         ),
                       ),
-                    _ReviewPhotos(review: r, size: 120),
+                    _ReviewPhotos(review: r, size: 140),
                   ],
                 ),
                 AsyncError() => Row(

@@ -258,7 +258,7 @@ class MyScreen extends ConsumerWidget {
               l10n.ordersTitle,
               key: const ValueKey('my-orders'),
               icon: PmartLineIcons.receipt,
-              onTap: () => context.push('/orders'),
+              onTap: () => context.go('/orders'),
             ),
             // 취소·반품 목록은 회원 본인 것만 서버가 준다(claim 0.6.0).
             if (member)

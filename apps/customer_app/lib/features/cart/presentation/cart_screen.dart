@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/shopping_context.dart' show currentMfcIdProvider;
 import '../../../shared/big_button_text.dart';
 import '../../../shared/notice.dart';
 import '../../../shared/ui_state_of.dart';
@@ -1100,7 +1101,7 @@ class _AddToCartBarState extends ConsumerState<AddToCartBar> {
       action: outcome is CartChangeApplied
           ? SnackBarAction(
               label: l10n.cartGoToCart,
-              onPressed: () => context.go('/cart'),
+              onPressed: () => context.push('/cart'),
             )
           : null,
     );
@@ -1130,15 +1131,47 @@ Future<void> _order(BuildContext context, WidgetRef ref) async {
 }
 
 /// 장바구니 안 "수령방법"(사용자 캡처 2026-11-20): 방식 카드(서버 판정 그대로), 예약은 도착 시간 시트.
-class _ReceiveSection extends ConsumerWidget {
+/// 수량을 바꾸면 상품액이 바뀌어 배달팁을 서버에 다시 묻는다 — 그동안 이전 카드를 그대로 두고 위에 얇은 진행 줄만
+/// (전에는 칸 전체가 자리 표시로 바뀌어 깜빡였다, 사용자 2026-11-21). 그동안은 누를 수 없다.
+/// 배송지(센터)가 바뀐 재조회는 다른 센터 값을 남기지 않게 자리 표시를 보인다.
+class _ReceiveSection extends ConsumerStatefulWidget {
   const _ReceiveSection();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ReceiveSection> createState() => _ReceiveSectionState();
+}
+
+class _ReceiveSectionState extends ConsumerState<_ReceiveSection> {
+  /// 마지막으로 그린 수령방법이 어느 센터 것인지.
+  String? _shownMfc;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final setup = ref.watch(checkoutSetupProvider);
     final options = ref.watch(deliveryOptionsProvider);
+    final mfc = ref.watch(currentMfcIdProvider);
+    final previous = options.value;
+    final reloadingSameCenter =
+        options.isLoading && previous != null && _shownMfc == mfc;
+    if (options case AsyncData()) _shownMfc = mfc;
+    Widget cards(List<DeliveryOption> list) => Column(
+      children: [
+        for (final o in list)
+          DeliveryOptionCard(
+            option: o,
+            selected: o.mode == setup.mode,
+            window: o.mode == DeliveryMode.scheduled ? setup.window : null,
+            onTap: () async {
+              ref.read(checkoutSetupProvider.notifier).setMode(o.mode);
+              if (o.mode == DeliveryMode.scheduled) {
+                await showSlotSheet(context);
+              }
+            },
+          ),
+      ],
+    );
     return Padding(
       key: const ValueKey('cart-receive'),
       padding: const EdgeInsets.only(top: 22),
@@ -1155,28 +1188,25 @@ class _ReceiveSection extends ConsumerWidget {
               ),
             ),
           ),
-          UiStateView<List<DeliveryOption>>(
-            state: uiStateOf(options, isEmpty: (o) => o.isEmpty),
-            onRetry: () => ref.invalidate(deliveryOptionsProvider),
-            ready: (context, list) => Column(
+          if (reloadingSameCenter)
+            Stack(
+              key: const ValueKey('cart-receive-reloading'),
               children: [
-                for (final o in list)
-                  DeliveryOptionCard(
-                    option: o,
-                    selected: o.mode == setup.mode,
-                    window: o.mode == DeliveryMode.scheduled
-                        ? setup.window
-                        : null,
-                    onTap: () async {
-                      ref.read(checkoutSetupProvider.notifier).setMode(o.mode);
-                      if (o.mode == DeliveryMode.scheduled) {
-                        await showSlotSheet(context);
-                      }
-                    },
-                  ),
+                IgnorePointer(child: cards(previous)),
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
               ],
+            )
+          else
+            UiStateView<List<DeliveryOption>>(
+              state: uiStateOf(options, isEmpty: (o) => o.isEmpty),
+              onRetry: () => ref.invalidate(deliveryOptionsProvider),
+              ready: (context, list) => cards(list),
             ),
-          ),
         ],
       ),
     );

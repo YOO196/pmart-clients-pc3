@@ -121,8 +121,8 @@ void main() {
     expect(leaveBody.style?.fontWeight, isNot(FontWeight.w700));
     await t.tap(find.byKey(const ValueKey('checkout-leave-ok')));
     await t.pumpAndSettle();
-    // 배송 방식 화면이 장바구니에 합쳐져 주문서 뒤는 바로 장바구니다.
-    await t.tap(find.text('홈').last);
+    // 배송 방식 화면이 장바구니에 합쳐져 주문서 뒤는 바로 장바구니다. 장바구니(홈 위 화면)를 닫으면 홈.
+    await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('pending-payment')), findsOneWidget);
@@ -147,12 +147,14 @@ void main() {
     expect(find.text('주문 확인'), findsOneWidget);
     expect(find.textContaining('서울우유 1L'), findsWidgets);
 
-    // 상세 → 주문 내역 → (뒤에 화면이 없으니) 마이로 돌아갈 수 있다.
+    // 상세 → 뒤로 → 하단 탭 "주문내역"(사용자 2026-11-21 주문내역을 하단 탭으로).
     await t.tap(find.byType(BackButton));
     await t.pumpAndSettle();
-    expect(find.text('주문내역'), findsOneWidget);
-    await t.tap(find.byKey(const ValueKey('orders-back')));
-    await t.pumpAndSettle();
-    expect(find.byKey(const ValueKey('my-orders')), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(
+      t.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex,
+      3,
+    );
+    expect(find.byType(BackButton), findsNothing);
   });
 }

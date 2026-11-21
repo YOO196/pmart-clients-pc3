@@ -624,15 +624,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             ?.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
         title: Text(l10n.ordersTitle),
         actions: const [CartIconButton(), SizedBox(width: 6)],
-        // 결제 완료에서 주문 상세로 바로 오면(go) 뒤에 화면이 없다. 그때는 마이로 돌아간다.
-        leading: context.canPop()
-            ? null
-            : IconButton(
-                key: const ValueKey('orders-back'),
-                icon: const BackButtonIcon(),
-                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                onPressed: () => context.go('/my'),
-              ),
+        // 하단 탭 "주문내역"(사용자 2026-11-21) — 탭 첫 화면이라 뒤로 버튼이 없다.
       ),
       body: switch (value) {
         AsyncData(value: null) => LoginRequired(
@@ -1869,7 +1861,7 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
             alignment: Alignment.centerRight,
             child: TextButton(
               key: const ValueKey('reorder-go-cart'),
-              onPressed: () => context.go('/cart'),
+              onPressed: () => context.push('/cart'),
               child: Text(l10n.cartGoToCart),
             ),
           ),

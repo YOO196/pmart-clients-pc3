@@ -100,7 +100,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state, shell) => _TabShell(shell: shell),
         branches: [
           StatefulShellBranch(
-            routes: [GoRoute(path: '/', builder: (_, _) => const HomeScreen())],
+            routes: [
+              GoRoute(
+                path: '/',
+                builder: (_, _) => const HomeScreen(),
+                routes: [
+                  // 장바구니는 하단 탭에서 빼고 상단바에만(사용자 2026-11-21) — 홈 위에 올라오는 전체 화면.
+                  // 아이콘·떠 있는 막대는 push(뒤로 가면 보던 화면), 주문서의 "장바구니로"는 go(홈 위 장바구니).
+                  GoRoute(
+                    parentNavigatorKey: rootNavigatorKey,
+                    path: 'cart',
+                    builder: (_, _) => const CartScreen(),
+                  ),
+                ],
+              ),
+            ],
           ),
           StatefulShellBranch(
             routes: [
@@ -117,7 +131,78 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/cart', builder: (_, _) => const CartScreen()),
+              GoRoute(
+                // 하단 탭 "주문내역"(사용자 2026-11-21 "주문 내역을 하단바로") — 주문 상세 등은 그대로 전체 화면.
+                path: '/orders',
+                builder: (_, _) => const OrderListScreen(),
+                routes: [
+                  GoRoute(
+                    parentNavigatorKey: rootNavigatorKey,
+                    path: ':orderId',
+                    builder: (_, state) => OrderDetailScreen(
+                      orderId: state.pathParameters['orderId']!,
+                    ),
+                    routes: [
+                      // 오배송 다시 배송비 결제(ADR-0065, order-orchestration 0.3.0).
+                      GoRoute(
+                        parentNavigatorKey: rootNavigatorKey,
+                        path: 'redelivery-payments/:redeliveryPaymentId',
+                        builder: (_, state) => RedeliveryPaymentScreen(
+                          orderId: state.pathParameters['orderId']!,
+                          redeliveryPaymentId:
+                              state.pathParameters['redeliveryPaymentId']!,
+                        ),
+                      ),
+                      GoRoute(
+                        parentNavigatorKey: rootNavigatorKey,
+                        path: 'cancel',
+                        // 레퍼런스 9-1 4: 가운데 창 "주문을 취소할까요?"
+                        pageBuilder: (_, state) => PmartDialogPage<void>(
+                          key: state.pageKey,
+                          child: CancelScreen(
+                            orderId: state.pathParameters['orderId']!,
+                          ),
+                        ),
+                      ),
+                      GoRoute(
+                        parentNavigatorKey: rootNavigatorKey,
+                        path: 'reschedule',
+                        // 레퍼런스 9-1 4: 예약시간 변경은 아래 시트
+                        pageBuilder: (_, state) => PmartSheetPage<void>(
+                          key: state.pageKey,
+                          child: RescheduleScreen(
+                            orderId: state.pathParameters['orderId']!,
+                          ),
+                        ),
+                      ),
+                      // 리뷰 요청 알림(REVIEW_REQUESTED) → 그 주문의 리뷰 쓰기(하나면 바로, 여럿이면 고르기).
+                      GoRoute(
+                        parentNavigatorKey: rootNavigatorKey,
+                        path: 'review',
+                        builder: (_, state) => OrderReviewEntryScreen(
+                          orderId: state.pathParameters['orderId']!,
+                        ),
+                      ),
+                      // 주문 문의하기 — "무엇을 도와드릴까요?"(레퍼런스 9-2 3-1): 배송 신고 종류 → 문의 남기기.
+                      GoRoute(
+                        parentNavigatorKey: rootNavigatorKey,
+                        path: 'help',
+                        builder: (_, state) => OrderHelpScreen(
+                          orderId: state.pathParameters['orderId']!,
+                        ),
+                      ),
+                      // 주문 단위 배송 현황 — 배송 ID 를 몰라도 지도부터 뜬다(BR-61).
+                      GoRoute(
+                        parentNavigatorKey: rootNavigatorKey,
+                        path: 'tracking',
+                        builder: (_, state) => OrderTrackingScreen(
+                          orderId: state.pathParameters['orderId']!,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ],
           ),
           StatefulShellBranch(
@@ -153,76 +238,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/payments/:draftId',
         builder: (_, state) =>
             PaymentScreen(draftId: state.pathParameters['draftId']!),
-      ),
-      GoRoute(
-        parentNavigatorKey: rootNavigatorKey,
-        path: '/orders',
-        builder: (_, _) => const OrderListScreen(),
-        routes: [
-          GoRoute(
-            parentNavigatorKey: rootNavigatorKey,
-            path: ':orderId',
-            builder: (_, state) =>
-                OrderDetailScreen(orderId: state.pathParameters['orderId']!),
-            routes: [
-              // 오배송 다시 배송비 결제(ADR-0065, order-orchestration 0.3.0).
-              GoRoute(
-                parentNavigatorKey: rootNavigatorKey,
-                path: 'redelivery-payments/:redeliveryPaymentId',
-                builder: (_, state) => RedeliveryPaymentScreen(
-                  orderId: state.pathParameters['orderId']!,
-                  redeliveryPaymentId:
-                      state.pathParameters['redeliveryPaymentId']!,
-                ),
-              ),
-              GoRoute(
-                parentNavigatorKey: rootNavigatorKey,
-                path: 'cancel',
-                // 레퍼런스 9-1 4: 가운데 창 "주문을 취소할까요?"
-                pageBuilder: (_, state) => PmartDialogPage<void>(
-                  key: state.pageKey,
-                  child: CancelScreen(
-                    orderId: state.pathParameters['orderId']!,
-                  ),
-                ),
-              ),
-              GoRoute(
-                parentNavigatorKey: rootNavigatorKey,
-                path: 'reschedule',
-                // 레퍼런스 9-1 4: 예약시간 변경은 아래 시트
-                pageBuilder: (_, state) => PmartSheetPage<void>(
-                  key: state.pageKey,
-                  child: RescheduleScreen(
-                    orderId: state.pathParameters['orderId']!,
-                  ),
-                ),
-              ),
-              // 리뷰 요청 알림(REVIEW_REQUESTED) → 그 주문의 리뷰 쓰기(하나면 바로, 여럿이면 고르기).
-              GoRoute(
-                parentNavigatorKey: rootNavigatorKey,
-                path: 'review',
-                builder: (_, state) => OrderReviewEntryScreen(
-                  orderId: state.pathParameters['orderId']!,
-                ),
-              ),
-              // 주문 문의하기 — "무엇을 도와드릴까요?"(레퍼런스 9-2 3-1): 배송 신고 종류 → 문의 남기기.
-              GoRoute(
-                parentNavigatorKey: rootNavigatorKey,
-                path: 'help',
-                builder: (_, state) =>
-                    OrderHelpScreen(orderId: state.pathParameters['orderId']!),
-              ),
-              // 주문 단위 배송 현황 — 배송 ID 를 몰라도 지도부터 뜬다(BR-61).
-              GoRoute(
-                parentNavigatorKey: rootNavigatorKey,
-                path: 'tracking',
-                builder: (_, state) => OrderTrackingScreen(
-                  orderId: state.pathParameters['orderId']!,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
@@ -538,8 +553,8 @@ class _TabShell extends StatelessWidget {
             label: l10n.navSearch,
           ),
           NavigationDestination(
-            icon: const PmartLineIcon(PmartLineIcons.cart),
-            label: l10n.navCart,
+            icon: const PmartLineIcon(PmartLineIcons.receipt),
+            label: l10n.navOrders,
           ),
           NavigationDestination(
             icon: const PmartLineIcon(PmartLineIcons.user),
