@@ -564,6 +564,7 @@ function location(
       categoryId: null,
       position: null,
       highTurnover: false,
+      reserveStock: false,
       version: 1,
       state: 'ACTIVE',
       stateReason: null,

@@ -118,6 +118,7 @@ export const locationHandlers = [
         categoryId: body.categoryId ?? null,
         position: body.position ?? null,
         highTurnover: body.highTurnover ?? false,
+        reserveStock: body.reserveStock ?? false,
         locationId: loc.locationId,
         version: loc.version + 1,
         state: loc.state,

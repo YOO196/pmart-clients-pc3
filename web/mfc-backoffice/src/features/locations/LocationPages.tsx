@@ -224,6 +224,8 @@ interface FormValues {
   readonly positionX: string;
   readonly positionZ: string;
   readonly highTurnover: boolean;
+  /** 보충재고 칸(mfc-location 0.9.0) — 화면 칸은 아직 없다. PUT 은 전체 교체라 지금 값을 그대로 다시 보낸다(새 위치는 false). */
+  readonly reserveStock: boolean;
 }
 
 const str = (n: number | null | undefined) => (n === null || n === undefined ? '' : String(n));
@@ -244,6 +246,7 @@ function formFrom(l: Location | undefined): FormValues {
     positionX: str(l?.position?.xM),
     positionZ: str(l?.position?.zM),
     highTurnover: l?.highTurnover ?? false,
+    reserveStock: l?.reserveStock ?? false,
   };
 }
 
@@ -271,6 +274,7 @@ function bodyFrom(mfcId: string, v: FormValues): LocationBody {
     categoryId: v.categoryId.trim() || null,
     position: x === undefined || z === undefined ? null : { xM: x, zM: z },
     highTurnover: v.highTurnover,
+    reserveStock: v.reserveStock,
   };
 }
 
