@@ -306,3 +306,20 @@ html[data-theme='pmart-dark'] [data-testid='side-menu'] nav ul a > span:first-ch
 @media (prefers-reduced-motion: reduce) {
   .pm-pulse { animation: none; }
 }
+
+/* 센터 도면 구역 바탕·작업자 점(대시보드 B안) — 테마 변수(밝은/어두운) */
+:root {
+  --pm-zone-frozen: color-mix(in oklab, #3b82f6 14%, transparent);
+  --pm-zone-chilled: color-mix(in oklab, #14b8a6 13%, transparent);
+  --pm-zone-ambient: color-mix(in oklab, #f59e0b 11%, transparent);
+  --pm-zone-packing: color-mix(in oklab, var(--color-primary) 16%, transparent);
+  --pm-zone-quarantine: color-mix(in oklab, #ef4444 18%, transparent);
+  --pm-zone-neutral: color-mix(in oklab, var(--color-base-content) 6%, transparent);
+}
+.pm-floor-dot {
+  transition: transform 1.35s linear;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pm-floor-dot { transition: none; }
+}

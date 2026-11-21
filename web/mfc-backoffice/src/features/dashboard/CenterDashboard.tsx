@@ -20,7 +20,7 @@ import { useOps } from '../ops/OpsBoard';
 import { OPS_REFRESH_MS } from '../ops/opsQueries';
 import { minutesText, promiseRows, seoulToday } from '../ops/opsRules';
 import { AreaChart, BarList, type Column } from './charts';
-import { ZoneMap } from './ZoneMap';
+import { FloorMap } from './FloorMap';
 import { DAYS, lastDays, rate, rateText, shortDate } from './dashboardRules';
 
 const m = messages.dashboard;
@@ -241,8 +241,8 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
         />
 
         {/* 추이 — 피킹 줄·결품률은 한 패널에서 골라 보기(축 하나), 정시 배송은 옆 패널 */}
-        <Panel className="@5xl:col-span-7" title={m.zoneMap.title} sub={m.zoneMap.sub} q={{ isPending: false, isError: false }}>
-          <ZoneMap mfcId={mfcId} />
+        <Panel className="@5xl:col-span-7" title={m.floor.title} sub={m.floor.sub} q={{ isPending: false, isError: false }}>
+          <FloorMap mfcId={mfcId} />
         </Panel>
         <Panel
           className="@5xl:col-span-5"
