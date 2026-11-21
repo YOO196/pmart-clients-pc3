@@ -78,6 +78,9 @@ enum PmartLineIcons {
 
   /// 찜한 하트(채움).
   heartFilled,
+
+  /// 엄지(도움돼요 — 고객앱 리뷰, 레퍼런스 4. 상품리뷰).
+  thumbUp,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -133,6 +136,24 @@ class _LinePainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
     final fill = Paint()..color = color;
     switch (icon) {
+      case PmartLineIcons.thumbUp:
+        canvas.drawRRect(
+          RRect.fromLTRBR(3, 10, 7, 20.5, const Radius.circular(1)),
+          line,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(7, 10)
+            ..lineTo(11, 3.5)
+            ..quadraticBezierTo(13.6, 3, 13.5, 5.6)
+            ..lineTo(12.8, 9)
+            ..lineTo(18.8, 9)
+            ..quadraticBezierTo(21.2, 9.3, 20.8, 11.6)
+            ..lineTo(19.3, 18.6)
+            ..quadraticBezierTo(18.9, 20.5, 16.9, 20.5)
+            ..lineTo(7, 20.5),
+          line,
+        );
       case PmartLineIcons.home:
         canvas.drawPath(
           Path()

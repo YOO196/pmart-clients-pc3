@@ -846,7 +846,7 @@ void main() {
       await t.pumpAndSettle();
     }
 
-    testWidgets('내 리뷰 사진 → 크게 보기 → [상품 보기]로 그 상품 상세', (t) async {
+    testWidgets('내 리뷰 사진 → 사진만 크게 보기(새 레퍼런스 — [상품 보기] 없음)', (t) async {
       final repo = MockReviewsRepository(latency: Duration.zero);
       // 목 모드는 상대 경로 사진을 그리지 않는다 — 완전한 주소로.
       repo.reviewJson.first['photos'] = [
@@ -856,11 +856,10 @@ void main() {
       await t.tap(find.byKey(const ValueKey('review-photo-rv-mine-1-0')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('review-photo-viewer')), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('review-photo-viewer-product')));
+      expect(find.text('상품 보기'), findsNothing);
+      await t.tap(find.byKey(const ValueKey('review-photo-viewer-close')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('review-photo-viewer')), findsNothing);
-      expect(find.text('그릭요거트 플레인 400g'), findsWidgets);
-      expect(find.byKey(const ValueKey('product-price')), findsOneWidget);
     });
     testWidgets('내 리뷰 → 수정: 별점만 바꾸면 사진은 빼고 보내고, 고친 뒤 상세가 서버 값으로 바뀐다', (
       t,
@@ -1102,12 +1101,14 @@ void main() {
       expect(repo.productQueries.where((q) => q.photoOnly), hasLength(1));
     });
 
-    testWidgets('전체 보기: 정렬(시트 ✓)·사진리뷰만은 서버 조건으로 다시 읽고, 사진 모음 → 모아보기', (
+    testWidgets('전체 보기: 정렬(시트 ✓)·필터(사진 후기만)는 서버 조건으로 다시 읽고, 사진 모음 → 모아보기', (
       t,
     ) async {
       final repo = MockReviewsRepository(latency: Duration.zero);
+      // 사진 5장 — 사진 후기 줄은 4칸이라 넷째 칸이 [+ 더보기]가 된다.
       repo.reviewJson.first['photos'] = [
-        {'photoId': 'rp-1', 'url': '/api/v1/review-photos/rp-1'},
+        for (var i = 1; i <= 5; i++)
+          {'photoId': 'rp-$i', 'url': '/api/v1/review-photos/rp-$i'},
       ];
       expect(repo.reviewJson.first['productId'], 'P-0002');
       await openProduct(t, repo, 'P-0002');
@@ -1119,19 +1120,21 @@ void main() {
       await t.tap(find.byKey(const ValueKey('review-sort-open')));
       await t.pumpAndSettle();
       expect(find.text('정렬'), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('review-sort-ratingAsc')));
+      await t.tap(find.byKey(const ValueKey('review-sort-recommended')));
       await t.pumpAndSettle();
       expect(repo.productQueries.last, (
-        sort: ReviewSort.ratingAsc,
+        sort: ReviewSort.recommended,
         photoOnly: false,
         sku: null,
       ));
-      expect(find.text('별점 낮은 순'), findsOneWidget);
+      expect(find.text('도움돼요 많은순'), findsOneWidget);
 
-      await t.tap(find.byKey(const ValueKey('review-photo-only')));
+      await t.tap(find.byKey(const ValueKey('review-filter-open')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('review-filter-photo')));
       await t.pumpAndSettle();
       expect(repo.productQueries.last, (
-        sort: ReviewSort.ratingAsc,
+        sort: ReviewSort.recommended,
         photoOnly: true,
         sku: null,
       ));

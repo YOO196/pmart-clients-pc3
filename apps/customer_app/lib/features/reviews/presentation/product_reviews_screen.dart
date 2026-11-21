@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import 'package:pmart_core/pmart_core.dart' show PmartFailure, ProblemFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/big_button_text.dart';
 import '../../../shared/cart_icon_button.dart';
 import '../../../shared/choice_sheet.dart';
 import '../../../shared/notice.dart';
@@ -19,6 +22,7 @@ import '../../catalog/presentation/catalog_providers.dart'
     show productDetailProvider;
 import '../../checkout/presentation/checkout_controller.dart'
     show clockProvider;
+import '../../wishlist/presentation/wish_heart_button.dart';
 import '../domain/reviews.dart';
 import 'reviews_controller.dart';
 import 'reviews_screens.dart'
@@ -38,13 +42,13 @@ class ProductReviewsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
-  // 기본은 추천순(review 0.6.0 RECOMMENDED — 서버 기본은 NEWEST 라 늘 보낸다).
+  // 기본은 최신순(사용자 2026-11-21). 정렬은 늘 보낸다.
   late ReviewSort _sort;
 
   @override
   void initState() {
     super.initState();
-    _sort = ReviewSort.recommended;
+    _sort = ReviewSort.newest;
   }
 
   bool _photoOnly = false;
@@ -86,11 +90,26 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
       closeKey: const ValueKey('review-sort-close'),
       selected: _sort,
       options: [
-        for (final s in ReviewSort.values)
+        for (final s in reviewSortChoices)
           (s, reviewSortLabel(l10n, s), ValueKey('review-sort-${s.name}')),
       ],
     );
     if (picked != null && mounted) setState(() => _sort = picked);
+  }
+
+  Future<void> _pickFilter() async {
+    final l10n = AppLocalizations.of(context);
+    final picked = await showChoiceSheet<bool>(
+      context,
+      title: l10n.reviewFilter,
+      closeKey: const ValueKey('review-filter-close'),
+      selected: _photoOnly,
+      options: [
+        (false, l10n.reviewFilterAll, const ValueKey('review-filter-all')),
+        (true, l10n.reviewFilterPhoto, const ValueKey('review-filter-photo')),
+      ],
+    );
+    if (picked != null && mounted) setState(() => _photoOnly = picked);
   }
 
   @override
@@ -106,88 +125,103 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
         ref.watch(productDetailProvider(widget.productId)).value?.options ??
         const <SaleOption>[];
 
+    final scheme = theme.colorScheme;
+    final text16 = theme.textTheme.bodyLarge?.copyWith(fontSize: 16);
+    // 새 레퍼런스(4. 상품리뷰 전체 보기 - 상단, 2026-11-21): 공지 줄 → 사진 후기 4칸 → 회색 띠 →
+    // "총 N개 · 정렬 ⌄ · 필터" → [상품 옵션 ⌄]. 신고·멤버스 표시는 계약에 없어 두지 않는다.
     final header = <Widget>[
-      if (list?.averageRating case final avg?)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+      InkWell(
+        key: const ValueKey('review-policy-open'),
+        onTap: () => showReviewPolicyDialog(context),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
           child: Row(
             children: [
-              Text(
-                l10n.reviewAverage(avg.toStringAsFixed(1)),
-                key: const ValueKey('review-average'),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  l10n.reviewNoticeTag,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-              const SizedBox(width: 4),
-              const Icon(Icons.star, size: 20, color: Color(0xFFFFC107)),
+              const SizedBox(width: 8),
+              Text(l10n.reviewNoticeTitle, style: text16),
             ],
           ),
         ),
+      ),
       _PhotoStrip(productId: widget.productId),
-      Container(height: 8, color: theme.colorScheme.surfaceContainer),
+      Container(height: 8, color: scheme.surfaceContainer),
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 4),
+        padding: const EdgeInsets.fromLTRB(16, 8, 4, 0),
         child: Row(
           children: [
+            if (list?.averageRating case final avg?) ...[
+              Icon(Icons.star_rounded, size: 18, color: scheme.primary),
+              const SizedBox(width: 2),
+              Text(
+                avg.toStringAsFixed(1),
+                key: const ValueKey('review-average'),
+                semanticsLabel: l10n.reviewAverage(avg.toStringAsFixed(1)),
+                style: text16?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(width: 8),
+            ],
             Text(
               switch (list?.reviewCount) {
-                final int n => l10n.reviewSectionCount(n),
+                final int n => l10n.reviewTotalCount(n),
                 null => l10n.reviewSectionTitle,
               },
               key: const ValueKey('review-count'),
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(width: 8),
-            ActionChip(
-              key: const ValueKey('review-policy-open'),
-              label: Text(l10n.reviewPolicyShort),
-              labelStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 12),
-              backgroundColor: theme.colorScheme.surfaceContainer,
-              side: BorderSide.none,
-              shape: const StadiumBorder(),
-              visualDensity: VisualDensity.compact,
-              onPressed: () => showReviewPolicyDialog(context),
-            ),
-          ],
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(4, 0, 8, 0),
-        child: Row(
-          children: [
-            Checkbox(
-              key: const ValueKey('review-photo-only'),
-              value: _photoOnly,
-              onChanged: (v) => setState(() => _photoOnly = v ?? false),
-            ),
-            GestureDetector(
-              onTap: () => setState(() => _photoOnly = !_photoOnly),
-              child: Text(
-                l10n.reviewPhotoOnly,
-                style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
-              ),
+              style: text16,
             ),
             const Spacer(),
             TextButton(
               key: const ValueKey('review-sort-open'),
               onPressed: _pickSort,
               style: TextButton.styleFrom(
-                foregroundColor: theme.colorScheme.onSurface,
+                foregroundColor: scheme.onSurface,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(reviewSortLabel(l10n, _sort), style: text16),
+                  const SizedBox(width: 2),
+                  const PmartLineIcon(PmartLineIcons.chevronDown, size: 18),
+                ],
+              ),
+            ),
+            // 필터 = 사진 후기만 켜기·끄기(사용자 2026-11-21). 켜져 있으면 브랜드색.
+            TextButton(
+              key: const ValueKey('review-filter-open'),
+              onPressed: _pickFilter,
+              style: TextButton.styleFrom(
+                foregroundColor: _photoOnly ? scheme.primary : scheme.onSurface,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    reviewSortLabel(l10n, _sort),
-                    style: const TextStyle(fontSize: 15),
+                    l10n.reviewFilter,
+                    style: text16?.copyWith(
+                      color: _photoOnly ? scheme.primary : scheme.onSurface,
+                    ),
                   ),
-                  const SizedBox(width: 2),
-                  const PmartLineIcon(PmartLineIcons.chevronDown, size: 18),
+                  const SizedBox(width: 4),
+                  PmartLineIcon(
+                    PmartLineIcons.filter,
+                    size: 18,
+                    color: _photoOnly ? scheme.primary : scheme.onSurface,
+                  ),
                 ],
               ),
             ),
@@ -196,43 +230,52 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
       ),
       if (options.length >= 2)
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
           child: Align(
             alignment: Alignment.centerLeft,
             child: InkWell(
               key: const ValueKey('review-option-open'),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(17),
               onTap: () => _pickOption(options),
               child: Container(
-                padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+                height: 33,
+                padding: const EdgeInsets.only(left: 14, right: 10),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(17),
+                  border: Border.all(color: scheme.outlineVariant),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       switch (_sku) {
-                        null => l10n.reviewOptionAll,
+                        null => l10n.reviewOptionPlaceholder,
                         final s =>
                           options.where((o) => o.sku == s).firstOrNull?.label ??
                               s,
                       },
                       key: const ValueKey('review-option-label'),
-                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 15,
+                        color: _sku == null
+                            ? scheme.onSurfaceVariant
+                            : scheme.onSurface,
+                      ),
                     ),
                     const SizedBox(width: 2),
-                    const PmartLineIcon(PmartLineIcons.chevronDown, size: 16),
+                    PmartLineIcon(
+                      PmartLineIcons.chevronDown,
+                      size: 16,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ],
                 ),
               ),
             ),
           ),
         ),
-      const Divider(height: 1),
+      const SizedBox(height: 14),
     ];
-
     Widget body;
     if (list == null) {
       // 자리 표시(목록 모양)는 높이를 스스로 정하지 못한다 — 남은 높이를 그대로 준다.
@@ -335,6 +378,10 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
   }
 }
 
+/// 정렬 시트에 두는 것(사용자 2026-11-21): 최신순(기본)·도움돼요 많은순(계약 RECOMMENDED = 도움돼요 많은 순 → 최근 등록순).
+/// 별점 높은·낮은 순은 계약에 있지만 두지 않는다.
+const reviewSortChoices = [ReviewSort.newest, ReviewSort.recommended];
+
 String reviewSortLabel(AppLocalizations l10n, ReviewSort s) => switch (s) {
   ReviewSort.recommended => l10n.reviewSortRecommended,
   ReviewSort.newest => l10n.reviewSortNewest,
@@ -358,7 +405,12 @@ String reviewRelativeDate(AppLocalizations l10n, DateTime at, DateTime now) {
   return DateFormat('y.M.d', 'ko').format(a);
 }
 
-/// 리뷰 카드(레퍼런스): 작성자(서버가 가린 값)·별점·날짜, 사진(크게), 본문.
+/// 리뷰 날짜(레퍼런스: "2026.09.24", 서울 달력).
+String reviewDate(DateTime at) =>
+    DateFormat('yyyy.MM.dd', 'ko').format(toSeoulWallClock(at));
+
+/// 리뷰 카드(새 레퍼런스 "4. 상품리뷰 전체 보기 - 리뷰 목록에서 보이는 전문", 2026-11-21):
+/// 작성자(서버가 가린 값)·별점, 상품 이름·옵션(회색), 사진 4칸 줄, 본문 전문, 날짜 + 오른쪽 [👍 도움돼요 N].
 class ProductReviewCard extends ConsumerWidget {
   const ProductReviewCard({
     super.key,
@@ -378,37 +430,21 @@ class ProductReviewCard extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final r = review;
-    final origin = ref.watch(imageOriginProvider);
-    final urls = [for (final u in r.photoUrls) resolveImageUrl(u, origin)];
     // 같은 계정이 쓴 리뷰면 여기서 바로 고칠 수 있게 한다(사용자 2026-11-20). 못 읽었으면 단추 없이 — 목록은 그대로.
     final mine = ref.watch(myWrittenReviewsProvider).value?[r.reviewId];
-    // 옵션 줄: 리뷰의 SKU → 지금 상품 옵션 이름(옵션이 2개 이상일 때만). 못 찾으면 줄 없음.
-    final options =
-        ref.watch(productDetailProvider(r.productId)).value?.options ??
-        const <SaleOption>[];
-    final optionLabel = options.length >= 2
-        ? options.where((o) => o.sku == r.sku).firstOrNull?.label
-        : null;
     return Container(
       key: ValueKey('product-review-${r.reviewId}'),
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: theme.dividerColor)),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  r.authorMasked ?? l10n.reviewAuthorUnknown,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+              _ReviewAuthor(review: r),
+              const Spacer(),
               if (mine != null)
                 TextButton(
                   key: ValueKey('product-review-edit-${r.reviewId}'),
@@ -433,93 +469,184 @@ class ProductReviewCard extends ConsumerWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 2),
-          Row(
-            children: [
-              ReviewStars(rating: r.rating, size: 15),
-              const SizedBox(width: 6),
-              Text(
-                reviewRelativeDate(l10n, r.createdAt, now),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-          if (urls.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 130,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: urls.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 6),
-                itemBuilder: (context, i) => _Photo(
-                  key: ValueKey('review-photo-${r.reviewId}-$i'),
-                  url: urls[i],
-                  size: 130,
-                  radius: 8,
-                  label: l10n.reviewPhotoLabel(i + 1),
-                  onTap: urls[i] == null
-                      ? null
-                      : () => openReviewPhotoViewer(
-                          context,
-                          urls,
-                          initial: i,
-                          productId: r.productId,
-                        ),
-                ),
-              ),
-            ),
-          ],
-          if (optionLabel case final o?) ...[
-            const SizedBox(height: 6),
-            Text(
-              l10n.reviewOptionLine(o),
-              key: ValueKey('product-review-option-${r.reviewId}'),
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: 13,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
+          _ReviewProductLine(review: r),
+          if (r.photoUrls.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _CardPhotos(review: r, query: query),
           ],
           if (r.text case final t? when t.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text(
-              t,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontSize: 15,
-                height: 1.45,
-              ),
-            ),
+            _ReviewBody(text: t),
           ],
-          // 도움돼요(review 0.6.0): 서버 값이 있을 때만. 내 리뷰는 수만, 남의 리뷰는 회원만 누른다.
-          if ((query, r.helpfulCount) case (final q?, final int count)) ...[
-            const SizedBox(height: 12),
-            // 카드 오른쪽 아래(사용자 2026-11-21).
-            Align(
-              alignment: Alignment.centerRight,
-              child: mine != null
-                  ? Text(
-                      l10n.reviewHelpfulMine(count),
-                      key: ValueKey(
-                        'product-review-helpful-mine-${r.reviewId}',
-                      ),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 13,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    )
-                  : _HelpfulButton(review: r, query: q, count: count),
-            ),
-          ],
+          const SizedBox(height: 14),
+          _ReviewFooter(review: r, query: query, mine: mine != null),
         ],
       ),
     );
   }
 }
 
-/// 도움돼요 버튼(review 0.6.0, BR-76). 회원만 누른다 — 비회원은 로그인 안내. 누른 상태·수는 서버가 준 값.
+/// 작성자 + 별점(레퍼런스 이름 줄 — 별점은 우리 리뷰의 서버 값이라 옆에 작게 둔다).
+class _ReviewAuthor extends StatelessWidget {
+  const _ReviewAuthor({required this.review});
+  final ReviewView review;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          review.authorMasked ?? l10n.reviewAuthorUnknown,
+          style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16),
+        ),
+        const SizedBox(width: 8),
+        ReviewStars(rating: review.rating, size: 14),
+      ],
+    );
+  }
+}
+
+/// 상품 이름 · 옵션(회색 15). 옵션은 리뷰의 SKU → 지금 상품 옵션 이름(옵션이 2개 이상일 때만).
+/// 상품을 아직 못 읽었으면 줄 없음.
+class _ReviewProductLine extends ConsumerWidget {
+  const _ReviewProductLine({required this.review});
+  final ReviewView review;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final p = ref.watch(productDetailProvider(review.productId)).value;
+    if (p == null) return const SizedBox.shrink();
+    final options = p.options;
+    final option = options.length >= 2
+        ? options.where((o) => o.sku == review.sku).firstOrNull?.label
+        : null;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        [p.name, ?option].join(' · '),
+        key: option == null
+            ? null
+            : ValueKey('product-review-option-${review.reviewId}'),
+        semanticsLabel: option == null ? null : l10n.reviewOptionLine(option),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontSize: 15,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewBody extends StatelessWidget {
+  const _ReviewBody({required this.text});
+  final String text;
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: Theme.of(context).textTheme.bodyLarge
+        ?.copyWith(fontSize: 16, height: 1.35),
+  );
+}
+
+/// 날짜(회색 15) + 오른쪽 도움돼요(review 0.6.0 — 서버 값이 있을 때만. 내 리뷰는 수만, 남의 리뷰는 회원만 누른다).
+class _ReviewFooter extends StatelessWidget {
+  const _ReviewFooter({
+    required this.review,
+    required this.query,
+    required this.mine,
+  });
+  final ReviewView review;
+  final ProductReviewQuery? query;
+  final bool mine;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final grey = theme.colorScheme.onSurfaceVariant;
+    final r = review;
+    return Row(
+      children: [
+        Text(
+          reviewDate(r.createdAt),
+          key: ValueKey('product-review-date-${r.reviewId}'),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontSize: 15,
+            color: grey,
+          ),
+        ),
+        const Spacer(),
+        if ((query, r.helpfulCount) case (final q?, final int count))
+          mine
+              ? Text(
+                  l10n.reviewHelpfulMine(count),
+                  key: ValueKey('product-review-helpful-mine-${r.reviewId}'),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 14,
+                    color: grey,
+                  ),
+                )
+              : _HelpfulButton(review: r, query: q, count: count)
+        else
+          const SizedBox(height: 34),
+      ],
+    );
+  }
+}
+
+/// 카드 사진: 4칸 줄(사이 2, 바깥 모서리만 둥글게). 5장이면 넷째 칸에 "+1". 누르면 "사진 후기".
+class _CardPhotos extends ConsumerWidget {
+  const _CardPhotos({required this.review, required this.query});
+  final ReviewView review;
+  final ProductReviewQuery? query;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final origin = ref.watch(imageOriginProvider);
+    final r = review;
+    final urls = [for (final u in r.photoUrls) resolveImageUrl(u, origin)];
+    final shown = math.min(urls.length, 4);
+    return LayoutBuilder(
+      builder: (context, c) {
+        final cell = (c.maxWidth - 6) / 4;
+        return Row(
+          children: [
+            for (var i = 0; i < shown; i++) ...[
+              if (i > 0) const SizedBox(width: 2),
+              _Photo(
+                key: ValueKey('review-photo-${r.reviewId}-$i'),
+                url: urls[i],
+                size: cell,
+                radius: 0,
+                borderRadius: BorderRadius.horizontal(
+                  left: Radius.circular(i == 0 ? 10 : 0),
+                  right: Radius.circular(i == shown - 1 ? 10 : 0),
+                ),
+                label: l10n.reviewPhotoLabel(i + 1),
+                overlay: i == 3 && urls.length > 4
+                    ? l10n.reviewPhotoExtra(urls.length - 4)
+                    : null,
+                onTap: () => openReviewPhotoDetail(
+                  context,
+                  review: r,
+                  initial: i,
+                  query: query,
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// 도움돼요 버튼(review 0.6.0, BR-76): 테두리 알약(높이 34) + 엄지 아이콘 + "도움돼요 N"(15).
+/// 회원만 누른다 — 비회원은 로그인 안내. 누른 상태·수는 서버가 준 값.
 class _HelpfulButton extends ConsumerStatefulWidget {
   const _HelpfulButton({
     required this.review,
@@ -575,28 +702,41 @@ class _HelpfulButtonState extends ConsumerState<_HelpfulButton> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final on = widget.review.helpedByMe ?? false;
+    final fg = on ? scheme.primary : scheme.onSurface;
     return Semantics(
       button: true,
       selected: on,
       child: InkWell(
         key: ValueKey('product-review-helpful-${widget.review.reviewId}'),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(17),
         onTap: _busy ? null : _tap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            color: on ? scheme.primaryContainer : null,
+            borderRadius: BorderRadius.circular(17),
             border: Border.all(
               color: on ? scheme.primary : scheme.outlineVariant,
             ),
           ),
-          child: Text(
-            l10n.reviewHelpful(widget.count),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontSize: 13,
-              color: on ? scheme.primary : scheme.onSurface,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PmartLineIcon(
+                PmartLineIcons.thumbUp,
+                size: 17,
+                color: fg,
+                strokeWidth: 1.6,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                l10n.reviewHelpful(widget.count),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: 15,
+                  color: fg,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -604,24 +744,210 @@ class _HelpfulButtonState extends ConsumerState<_HelpfulButton> {
   }
 }
 
-/// 사진 리뷰 모음: 사진 리뷰만(withPhotoOnly)의 첫 쪽 사진을 2줄 × 3칸 + "모아보기".
+/// "사진 후기" 열기 — 그 리뷰 한 건(큰 사진·작은 사진 줄·전문·도움돼요, 아래 [♡][구매하기]).
+Future<void> openReviewPhotoDetail(
+  BuildContext context, {
+  required ReviewView review,
+  int initial = 0,
+  ProductReviewQuery? query,
+}) => Navigator.of(context).push(
+  MaterialPageRoute<void>(
+    builder: (_) =>
+        ReviewPhotoDetailScreen(review: review, initial: initial, query: query),
+  ),
+);
+
+/// 사진 후기(새 레퍼런스 "4. 상품리뷰 전체 보기 - 리뷰 사진을 클릭했을때", 2026-11-21).
+/// 큰 사진(3:4, 옆으로 넘김·누르면 확대 보기) → 작은 사진 줄(고른 것 ✓) → 작성자·별점, 상품·옵션, 전문, 날짜·도움돼요.
+/// 아래 [♡ 찜][구매하기] — 구매하기는 그 상품 상세(옵션 고르기·담기는 상세에서, 사용자 2026-11-21).
+class ReviewPhotoDetailScreen extends ConsumerStatefulWidget {
+  const ReviewPhotoDetailScreen({
+    super.key,
+    required this.review,
+    this.initial = 0,
+    this.query,
+  });
+
+  final ReviewView review;
+  final int initial;
+
+  /// 리뷰가 있던 목록 — 도움돼요를 누르면 그 목록 값(서버 값)으로 바뀐다. 없으면 도움돼요 없음.
+  final ProductReviewQuery? query;
+
+  @override
+  ConsumerState<ReviewPhotoDetailScreen> createState() =>
+      _ReviewPhotoDetailScreenState();
+}
+
+class _ReviewPhotoDetailScreenState
+    extends ConsumerState<ReviewPhotoDetailScreen> {
+  late final _pages = PageController(initialPage: widget.initial);
+  late int _index = widget.initial;
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final q = widget.query;
+    // 도움돼요를 누르면 목록의 값이 바뀐다 — 그 값을 따라 그린다(없으면 받은 값).
+    final r =
+        switch (q) {
+          final q? =>
+            ref
+                .watch(productReviewListProvider(q))
+                .value
+                ?.items
+                .where((e) => e.reviewId == widget.review.reviewId)
+                .firstOrNull,
+          null => null,
+        } ??
+        widget.review;
+    final mine = ref.watch(myWrittenReviewsProvider).value?[r.reviewId] != null;
+    final origin = ref.watch(imageOriginProvider);
+    final urls = [for (final u in r.photoUrls) resolveImageUrl(u, origin)];
+    final width = MediaQuery.sizeOf(context).width;
+    return Scaffold(
+      key: const ValueKey('review-photo-detail'),
+      appBar: AppBar(
+        centerTitle: false,
+        titleSpacing: 0,
+        title: Text(
+          l10n.reviewPhotoDetailTitle,
+          style: theme.appBarTheme.titleTextStyle?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      body: ListView(
+        children: [
+          AspectRatio(
+            aspectRatio: 3 / 4,
+            child: PageView.builder(
+              key: const ValueKey('review-photo-detail-pages'),
+              controller: _pages,
+              itemCount: urls.length,
+              onPageChanged: (i) => setState(() => _index = i),
+              itemBuilder: (context, i) => _Photo(
+                key: ValueKey('review-photo-detail-$i'),
+                url: urls[i],
+                size: width,
+                height: width * 4 / 3,
+                radius: 0,
+                label: l10n.reviewPhotoLabel(i + 1),
+                onTap: () => openReviewPhotoViewer(context, urls, initial: i),
+              ),
+            ),
+          ),
+          if (urls.length > 1)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Row(
+                children: [
+                  for (var i = 0; i < urls.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 4),
+                    _Photo(
+                      key: ValueKey('review-photo-detail-thumb-$i'),
+                      url: urls[i],
+                      size: 38,
+                      radius: 3,
+                      label: l10n.reviewPhotoLabel(i + 1),
+                      selected: i == _index,
+                      onTap: () => _pages.jumpToPage(i),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ReviewAuthor(review: r),
+                _ReviewProductLine(review: r),
+                if (r.text case final t? when t.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _ReviewBody(text: t),
+                ],
+                const SizedBox(height: 14),
+                _ReviewFooter(review: r, query: q, mine: mine),
+              ],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: scheme.outlineVariant),
+                ),
+                child: Center(
+                  child: WishHeartButton(
+                    key: const ValueKey('review-photo-detail-wish'),
+                    productId: r.productId,
+                    size: 26,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: BigButtonText(
+                  child: FilledButton(
+                    key: const ValueKey('review-photo-detail-buy'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    onPressed: () {
+                      final router = GoRouter.of(context);
+                      Navigator.of(context).pop();
+                      router.push(
+                        '/products/${Uri.encodeComponent(r.productId)}',
+                      );
+                    },
+                    child: Text(l10n.reviewBuy),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 사진 후기 모음: 사진 리뷰만(withPhotoOnly)의 첫 쪽 사진 4칸 줄. 4장을 넘으면 넷째 칸에 "+ 더보기"(모아보기 격자).
+/// 사진을 누르면 그 리뷰의 "사진 후기".
 class _PhotoStrip extends ConsumerWidget {
   const _PhotoStrip({required this.productId});
 
   final String productId;
 
-  static const tile = 88.0;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final provider = productReviewListProvider((
+    final query = (
       productId: productId,
       sort: ReviewSort.newest,
       photoOnly: true,
       sku: null,
-    ));
+    );
+    final provider = productReviewListProvider(query);
     final value = ref.watch(provider);
     final list = value.value;
     if (list == null) {
@@ -648,78 +974,70 @@ class _PhotoStrip extends ConsumerWidget {
       return const SizedBox.shrink();
     }
     final origin = ref.watch(imageOriginProvider);
-    final urls = [
+    final photos = [
       for (final r in list.items)
-        for (final u in r.photoUrls) resolveImageUrl(u, origin),
+        for (final (i, u) in r.photoUrls.indexed)
+          (review: r, index: i, url: resolveImageUrl(u, origin)),
     ];
     // 사진 리뷰가 없다는 서버 답 — 자리를 두지 않는다.
-    if (urls.isEmpty) return const SizedBox.shrink();
-    final shown = urls.take(6).toList();
-    Widget cell(int i) => _Photo(
-      key: ValueKey('review-strip-$i'),
-      url: shown[i],
-      size: tile,
-      radius: 6,
-      label: l10n.reviewPhotoLabel(i + 1),
-      onTap: shown[i] == null
-          ? null
-          : () => openReviewPhotoViewer(
-              context,
-              urls,
-              initial: i,
-              productId: productId,
-            ),
-    );
+    if (photos.isEmpty) return const SizedBox.shrink();
+    final shown = math.min(photos.length, 4);
+    final more = photos.length > 4 || list.hasMore;
     return Padding(
       key: const ValueKey('review-photo-strip'),
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              for (final row in [0, 1])
-                if (row * 3 < shown.length)
-                  Padding(
-                    padding: EdgeInsets.only(top: row == 0 ? 0 : 4),
-                    child: Row(
-                      children: [
-                        for (var c = 0; c < 3; c++)
-                          if (row * 3 + c < shown.length)
-                            Padding(
-                              padding: EdgeInsets.only(left: c == 0 ? 0 : 4),
-                              child: cell(row * 3 + c),
-                            ),
-                      ],
-                    ),
-                  ),
-            ],
-          ),
-          const Spacer(),
-          InkWell(
-            key: const ValueKey('review-photos-more'),
-            customBorder: const CircleBorder(),
-            onTap: () => context.push('/products/$productId/review-photos'),
-            child: Column(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: theme.colorScheme.surfaceContainer,
-                  ),
-                  child: const Center(
-                    child: PmartLineIcon(PmartLineIcons.chevronRight, size: 22),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.reviewPhotosMore,
-                  style: theme.textTheme.bodySmall?.copyWith(fontSize: 13),
-                ),
-              ],
+          Text(
+            l10n.reviewPhotoSectionTitle,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
             ),
+          ),
+          const SizedBox(height: 12),
+          LayoutBuilder(
+            builder: (context, c) {
+              final cell = (c.maxWidth - 6) / 4;
+              return Row(
+                children: [
+                  for (var i = 0; i < shown; i++) ...[
+                    if (i > 0) const SizedBox(width: 2),
+                    _Photo(
+                      key: ValueKey(
+                        i == 3 && more
+                            ? 'review-photos-more'
+                            : 'review-strip-$i',
+                      ),
+                      url: photos[i].url,
+                      size: cell,
+                      radius: 0,
+                      borderRadius: BorderRadius.horizontal(
+                        left: Radius.circular(i == 0 ? 10 : 0),
+                        right: Radius.circular(i == shown - 1 ? 10 : 0),
+                      ),
+                      label: i == 3 && more
+                          ? l10n.reviewPhotosTitle
+                          : l10n.reviewPhotoLabel(i + 1),
+                      overlay: i == 3 && more
+                          ? l10n.reviewPhotoMoreOverlay
+                          : null,
+                      onTap: i == 3 && more
+                          ? () => context.push(
+                              '/products/$productId/review-photos',
+                            )
+                          : () => openReviewPhotoDetail(
+                              context,
+                              review: photos[i].review,
+                              initial: photos[i].index,
+                              query: query,
+                            ),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -727,7 +1045,7 @@ class _PhotoStrip extends ConsumerWidget {
   }
 }
 
-/// 사진리뷰 모아보기 — 사진 리뷰만 목록의 사진을 3칸 격자로(끝에 닿으면 다음 쪽).
+/// 사진리뷰 모아보기 — 사진 리뷰만 목록의 사진을 3칸 격자로(끝에 닿으면 다음 쪽). 누르면 그 리뷰의 "사진 후기".
 class ReviewPhotosScreen extends ConsumerWidget {
   const ReviewPhotosScreen({super.key, required this.productId});
 
@@ -736,12 +1054,13 @@ class ReviewPhotosScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final provider = productReviewListProvider((
+    final query = (
       productId: productId,
       sort: ReviewSort.newest,
       photoOnly: true,
       sku: null,
-    ));
+    );
+    final provider = productReviewListProvider(query);
     final origin = ref.watch(imageOriginProvider);
     return Scaffold(
       appBar: AppBar(
@@ -758,9 +1077,10 @@ class ReviewPhotosScreen extends ConsumerWidget {
         onRetry: () => ref.invalidate(provider),
         empty: (_) => Center(child: Text(l10n.reviewPhotoOnlyEmpty)),
         ready: (context, list) {
-          final urls = [
+          final photos = [
             for (final r in list.items)
-              for (final u in r.photoUrls) resolveImageUrl(u, origin),
+              for (final (i, u) in r.photoUrls.indexed)
+                (review: r, index: i, url: resolveImageUrl(u, origin)),
           ];
           final notifier = ref.read(provider.notifier);
           return GridView.builder(
@@ -770,9 +1090,9 @@ class ReviewPhotosScreen extends ConsumerWidget {
               mainAxisSpacing: 2,
               crossAxisSpacing: 2,
             ),
-            itemCount: urls.length,
+            itemCount: photos.length,
             itemBuilder: (context, i) {
-              if (i >= urls.length - 6 &&
+              if (i >= photos.length - 6 &&
                   list.hasMore &&
                   !list.loadingMore &&
                   list.loadMoreFailure == null) {
@@ -780,20 +1100,20 @@ class ReviewPhotosScreen extends ConsumerWidget {
                   (_) => notifier.loadMore(),
                 );
               }
+              final p = photos[i];
               return LayoutBuilder(
                 builder: (context, c) => _Photo(
-                  url: urls[i],
+                  key: ValueKey('review-photos-grid-$i'),
+                  url: p.url,
                   size: c.maxWidth,
                   radius: 0,
                   label: l10n.reviewPhotoLabel(i + 1),
-                  onTap: urls[i] == null
-                      ? null
-                      : () => openReviewPhotoViewer(
-                          context,
-                          urls,
-                          initial: i,
-                          productId: productId,
-                        ),
+                  onTap: () => openReviewPhotoDetail(
+                    context,
+                    review: p.review,
+                    initial: p.index,
+                    query: query,
+                  ),
                 ),
               );
             },
@@ -811,18 +1131,35 @@ class _Photo extends StatelessWidget {
     required this.size,
     required this.radius,
     required this.label,
+    this.height,
+    this.borderRadius,
+    this.overlay,
+    this.selected = false,
     this.onTap,
   });
 
   final String? url;
   final double size;
+
+  /// 없으면 [size] (정사각형).
+  final double? height;
   final double radius;
+
+  /// 있으면 [radius] 대신(사진 줄의 바깥 모서리만 둥글게).
+  final BorderRadius? borderRadius;
   final String label;
+
+  /// 사진 위 어두운 막 + 흰 글("+ 더보기"·"+1").
+  final String? overlay;
+
+  /// 고른 사진(어두운 막 + ✓ — 사진 후기의 작은 사진 줄).
+  final bool selected;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final h = height ?? size;
     Widget placeholder() => ColoredBox(
       color: theme.colorScheme.surfaceContainerHighest,
       child: Center(
@@ -834,25 +1171,59 @@ class _Photo extends StatelessWidget {
       ),
     );
     final px = size * MediaQuery.devicePixelRatioOf(context);
+    final dim = Colors.black.withValues(alpha: 0.45);
     return Semantics(
       image: true,
       button: onTap != null,
+      selected: selected,
       label: label,
       child: GestureDetector(
-        onTap: onTap,
+        onTap: url == null && overlay == null ? null : onTap,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(radius),
-          child: SizedBox.square(
-            dimension: size,
-            child: url == null
-                ? placeholder()
-                // 축소본(?w=240/480)·그릴 크기로만 디코딩(요청 2026-11-20).
-                : Image.network(
+          borderRadius: borderRadius ?? BorderRadius.circular(radius),
+          child: SizedBox(
+            width: size,
+            height: h,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (url == null)
+                  placeholder()
+                else
+                  // 축소본(?w=240/480/720)·그릴 크기로만 디코딩(요청 2026-11-20).
+                  Image.network(
                     withImageWidth(url, px)!,
                     fit: BoxFit.cover,
                     cacheWidth: px.round(),
                     errorBuilder: (_, _, _) => placeholder(),
                   ),
+                if (overlay case final o?)
+                  ColoredBox(
+                    color: dim,
+                    child: Center(
+                      child: Text(
+                        o,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (selected)
+                  ColoredBox(
+                    color: dim,
+                    child: const Center(
+                      child: PmartLineIcon(
+                        PmartLineIcons.check,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

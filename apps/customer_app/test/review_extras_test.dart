@@ -10,6 +10,8 @@ import 'package:pmart_ui/pmart_ui.dart';
 import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
 import 'package:customer_app/features/reviews/data/reviews_repository.dart';
 import 'package:customer_app/features/reviews/domain/reviews.dart';
+import 'package:customer_app/features/reviews/presentation/product_reviews_screen.dart'
+    show reviewDate;
 
 import 'package:customer_app/shared/providers.dart'
     show imageOriginProvider, sourceSystem;
@@ -54,17 +56,22 @@ void main() {
     await t.pumpAndSettle();
   }
 
-  testWidgets('목 모드: 기본 추천순, 정렬에 추천순·최근 등록순', (t) async {
+  testWidgets('정렬: 기본 최신순, 시트에는 최신순·도움돼요 많은순 둘만(사용자 2026-11-21)', (t) async {
     final repo = MockReviewsRepository(latency: Duration.zero);
     await open(t, repo, 'P-0002');
-    expect(repo.productQueries.first.sort, ReviewSort.recommended);
-    expect(find.text('추천순'), findsOneWidget);
+    expect(repo.productQueries.first.sort, ReviewSort.newest);
+    expect(find.text('최신순'), findsOneWidget);
     await t.tap(key('review-sort-open'));
     await t.pumpAndSettle();
+    expect(key('review-sort-newest'), findsOneWidget);
     expect(key('review-sort-recommended'), findsOneWidget);
-    expect(find.text('최근 등록순'), findsOneWidget);
+    expect(key('review-sort-ratingDesc'), findsNothing);
+    expect(key('review-sort-ratingAsc'), findsNothing);
+    await t.tap(key('review-sort-recommended'));
+    await t.pumpAndSettle();
+    expect(repo.productQueries.last.sort, ReviewSort.recommended);
+    expect(find.text('도움돼요 많은순'), findsOneWidget);
   });
-
   testWidgets('옵션이 2개 이상인 상품만 옵션 필터 — 고르면 그 SKU 로 묻는다', (t) async {
     final repo = MockReviewsRepository(latency: Duration.zero);
     await open(t, repo, 'P-0001'); // 서울우유: 1개·2개 묶음
@@ -259,7 +266,7 @@ void main() {
     expect(t.takeException(), isNull);
     expect(key('product-price'), findsOneWidget);
   });
-  testWidgets('리뷰 사진 → 크게 보기 → [상품 보기]로 상품 상세, 도움돼요는 카드 오른쪽', (t) async {
+  testWidgets('리뷰 사진 → 사진 후기 → [구매하기]로 상품 상세, 도움돼요는 카드 오른쪽', (t) async {
     final repo = MockReviewsRepository(latency: Duration.zero);
     await open(t, repo, 'P-0001');
     // 만든 리뷰 0번은 사진 리뷰
@@ -288,12 +295,52 @@ void main() {
     );
     await t.tap(photo);
     await t.pumpAndSettle();
-    await t.tap(key('review-photo-viewer-product'));
+    // 사진 후기(그 리뷰 한 건) — 큰 사진을 누르면 확대 보기, [구매하기]는 상품 상세
+    expect(key('review-photo-detail'), findsOneWidget);
+    expect(key('review-photo-detail-wish'), findsOneWidget);
+    await t.tap(key('review-photo-detail-0'));
     await t.pumpAndSettle();
-    expect(key('review-photo-viewer'), findsNothing);
+    expect(key('review-photo-viewer'), findsOneWidget);
+    await t.tap(key('review-photo-viewer-close'));
+    await t.pumpAndSettle();
+    await t.tap(key('review-photo-detail-buy'));
+    await t.pumpAndSettle();
+    expect(key('review-photo-detail'), findsNothing);
     expect(key('product-price'), findsOneWidget);
   });
 
+  testWidgets('사진 후기: 작은 사진을 누르면 큰 사진이 바뀌고, 도움돼요는 서버 값으로 목록과 같이 바뀐다', (
+    t,
+  ) async {
+    final repo = MockReviewsRepository(latency: Duration.zero);
+    await open(t, repo, 'P-0001', login: true);
+    final photo = key('review-photo-rv-gen-P-0001-0-0');
+    await t.scrollUntilVisible(
+      photo,
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await t.tap(photo);
+    await t.pumpAndSettle();
+    expect(key('review-photo-detail'), findsOneWidget);
+    final button = key('product-review-helpful-rv-gen-P-0001-0');
+    String label() => t
+        .widget<Text>(find.descendant(of: button, matching: find.byType(Text)))
+        .data!;
+    final before = int.parse(label().split(' ').last);
+    await t.tap(button);
+    await t.pumpAndSettle();
+    expect(repo.helped, contains('rv-gen-P-0001-0'));
+    expect(label(), '도움돼요 ${before + 1}');
+    // 목록으로 돌아가도 같은 값(서버가 준 값으로 바뀐 목록)
+    Navigator.of(t.element(key('review-photo-detail'))).pop();
+    await t.pumpAndSettle();
+    expect(label(), '도움돼요 ${before + 1}');
+  });
+
+  test('리뷰 날짜는 서울 달력 yyyy.MM.dd', () {
+    expect(reviewDate(DateTime.utc(2026, 9, 23, 16)), '2026.09.24');
+  });
   testWidgets('장바구니 상품 이름·사진을 누르면 그 상품 상세', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();

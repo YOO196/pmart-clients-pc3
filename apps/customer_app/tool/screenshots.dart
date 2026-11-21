@@ -51,6 +51,8 @@ import 'package:pmart_core/pmart_core.dart'
         ProblemDetail,
         UnknownResultFailure;
 
+import 'package:customer_app/shared/providers.dart' show imageOriginProvider;
+
 import '../test/support/app_harness.dart';
 
 const _dir = String.fromEnvironment('SHOT_DIR');
@@ -1018,6 +1020,46 @@ void main() {
     debugDisableShadows = true;
   });
 
+  // 상품 리뷰 새 레퍼런스(2026-11-21 "4. 상품리뷰 전체 보기 - …"): 위쪽·카드·필터·사진 후기.
+  // 사진을 누를 수 있게 출처를 준다(캡처에선 사진이 자리표시로 그려진다).
+  testWidgets('reviews-new', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp([
+        imageOriginProvider.overrideWithValue('https://img.invalid'),
+      ], reviews: MockReviewsRepository(latency: Duration.zero)),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/r-$name.png').uri),
+      );
+    }
+
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first))
+          .push('/products/P-0001/reviews'),
+    );
+    await shot('top');
+    await t.tap(find.byKey(const ValueKey('review-filter-open')));
+    await shot('filter');
+    await t.tap(find.byKey(const ValueKey('review-filter-close')));
+    await t.pumpAndSettle();
+    await t.drag(
+      find.byKey(const ValueKey('product-reviews-list')),
+      const Offset(0, -420),
+    );
+    await shot('card');
+    await t.tap(find.byKey(const ValueKey('review-photo-rv-gen-P-0001-0-0')));
+    await shot('photo-detail');
+  });
   // 자주 묻는 질문 > 질문 유형(사용자 2026-11-21): 4줄 + [더보기], 고른 것 검정 — 분류가 많은 목.
   testWidgets('faq-types', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
