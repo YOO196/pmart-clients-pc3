@@ -51,8 +51,6 @@ import '../../support/domain/inquiry.dart' show InquiryCategory;
 import '../../support/presentation/inquiry_screens.dart' show InquiryFormArgs;
 import '../../redelivery/presentation/redelivery_screens.dart'
     show RedeliveryPaymentsSection;
-import '../../reviews/presentation/reviews_screens.dart'
-    show OrderReviewsSection;
 
 String _money(AppLocalizations l10n, int? v) => switch (v) {
   final int a => formatKrw(a),
@@ -442,56 +440,19 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     });
   }
 
-  /// 숨기기: 확인 창 → `POST /orders/{id}/hides`. 결과를 모르면 같은 키로 한 번 더 보낸다(계약: 같은 키는 같은 결과).
+  /// 숨기기: 확인 창 → `POST /orders/{id}/hides`([confirmAndHideOrder]).
   Future<void> _hide(AppLocalizations l10n, OrderListItem o) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.ordersHideTitle),
-        content: Text(l10n.ordersHideBody),
-        actions: [
-          TextButton(
-            key: const ValueKey('orders-hide-cancel'),
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.ordersHideCancel),
-          ),
-          FilledButton(
-            key: const ValueKey('orders-hide-confirm'),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(l10n.ordersHideConfirm),
-          ),
-        ],
-      ),
+    await confirmAndHideOrder(
+      context,
+      ref,
+      o.orderId,
+      onSending: (sending) {
+        if (!mounted) return;
+        setState(
+          () => sending ? _hiding.add(o.orderId) : _hiding.remove(o.orderId),
+        );
+      },
     );
-    if (ok != true || !mounted) return;
-    setState(() => _hiding.add(o.orderId));
-    final repo = ref.read(ordersRepositoryProvider);
-    final key = IdempotencyKey.generate();
-    String message;
-    try {
-      CommandStatus status;
-      try {
-        status = await repo.hide(o.orderId, key: key);
-      } on UnknownResultFailure {
-        status = await repo.hide(o.orderId, key: key);
-      }
-      message = switch (status) {
-        CommandStatus.applied => l10n.ordersHideDone,
-        CommandStatus.accepted => l10n.ordersHideAccepted,
-        _ => l10n.ordersHideFailed,
-      };
-    } on ProblemFailure catch (f) {
-      message = f.problem.code == orderNotFinishedCode
-          ? l10n.ordersHideNotFinished
-          : l10n.ordersHideFailed;
-    } on PmartFailure {
-      message = l10n.ordersHideFailed;
-    }
-    if (!mounted) return;
-    setState(() => _hiding.remove(o.orderId));
-    // 서버 목록이 정본이다. 숨겼든 못 했든 다시 읽는다.
-    ref.invalidate(orderListProvider);
-    showNotice(context, message);
   }
 
   Widget _pill({
@@ -1043,6 +1004,68 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
   }
 }
 
+/// 주문 내역에서 삭제(숨기기): 확인 창 → `POST /orders/{id}/hides`(order 0.12.0 — 끝난 주문만, 아니면 409
+/// `ORDER_NOT_FINISHED`). 결과를 모르면 같은 키로 한 번 더 보낸다(계약: 같은 키는 같은 결과). 서버 목록이 정본이라
+/// 결과와 상관없이 목록을 다시 읽는다. 서버가 받아들였으면(APPLIED·ACCEPTED) true.
+/// 목록 줄의 [삭제]와 주문 상세 맨 아래 [주문내역 삭제]가 같이 쓴다.
+Future<bool> confirmAndHideOrder(
+  BuildContext context,
+  WidgetRef ref,
+  String orderId, {
+  void Function(bool sending)? onSending,
+}) async {
+  final l10n = AppLocalizations.of(context);
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(l10n.ordersHideTitle),
+      content: Text(l10n.ordersHideBody),
+      actions: [
+        TextButton(
+          key: const ValueKey('orders-hide-cancel'),
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(l10n.ordersHideCancel),
+        ),
+        FilledButton(
+          key: const ValueKey('orders-hide-confirm'),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(l10n.ordersHideConfirm),
+        ),
+      ],
+    ),
+  );
+  if (ok != true || !context.mounted) return false;
+  onSending?.call(true);
+  final repo = ref.read(ordersRepositoryProvider);
+  final key = IdempotencyKey.generate();
+  String message;
+  var done = false;
+  try {
+    CommandStatus status;
+    try {
+      status = await repo.hide(orderId, key: key);
+    } on UnknownResultFailure {
+      status = await repo.hide(orderId, key: key);
+    }
+    done = status == CommandStatus.applied || status == CommandStatus.accepted;
+    message = switch (status) {
+      CommandStatus.applied => l10n.ordersHideDone,
+      CommandStatus.accepted => l10n.ordersHideAccepted,
+      _ => l10n.ordersHideFailed,
+    };
+  } on ProblemFailure catch (f) {
+    message = f.problem.code == orderNotFinishedCode
+        ? l10n.ordersHideNotFinished
+        : l10n.ordersHideFailed;
+  } on PmartFailure {
+    message = l10n.ordersHideFailed;
+  }
+  onSending?.call(false);
+  ref.invalidate(orderListProvider);
+  if (context.mounted) showNotice(context, message);
+  return done;
+}
+
 /// SCR-ORDER-DETAIL-001. 주문 당시 스냅샷 + 원천별 기준시각. 분할배송은 배송별로 보인다.
 class OrderDetailScreen extends ConsumerWidget {
   const OrderDetailScreen({super.key, required this.orderId});
@@ -1396,68 +1419,78 @@ class _OrderBody extends ConsumerWidget {
               padding: const EdgeInsets.only(top: 8),
               child: Text(l10n.splitShipment(o.shipments.length)),
             ),
+          // 배송 완료된 배송 칸은 그리지 않는다(사용자 2026-11-21 — 위 단계 제목이 이미 "배달이 완료됐어요"를 말한다).
+          // 단, 방금 "받았어요"를 눌러 결과(완료·접수·확인 중)를 보이는 배송은 남긴다 — 결과·다시 확인을 숨기지 않는다.
           for (final (i, s) in o.shipments.indexed)
-            Card(
-              key: ValueKey('shipment-${s.shipmentId}'),
-              margin: const EdgeInsets.only(top: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: scheme.outlineVariant),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 6, 6, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            o.isSplit
-                                ? l10n.shipmentN(
-                                    i + 1,
-                                    shipmentStateText(l10n, s.state),
-                                  )
-                                : shipmentStateText(l10n, s.state),
-                            style: theme.textTheme.titleMedium,
-                          ),
-                        ),
-                        if (s.deliveryId case final id?)
-                          TextButton(
-                            key: ValueKey('track-$id'),
-                            onPressed: () => visit(
-                              '/deliveries/$id?orderId=${Uri.encodeQueryComponent(o.orderId)}',
+            if (s.state != ShipmentState.delivered ||
+                (s.deliveryId != null &&
+                    ref.watch(
+                      receiptConfirmationProvider((
+                        orderId: o.orderId,
+                        deliveryId: s.deliveryId!,
+                      )),
+                    ) is! ReceiptIdle))
+              Card(
+                key: ValueKey('shipment-${s.shipmentId}'),
+                margin: const EdgeInsets.only(top: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: scheme.outlineVariant),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 6, 6, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              o.isSplit
+                                  ? l10n.shipmentN(
+                                      i + 1,
+                                      shipmentStateText(l10n, s.state),
+                                    )
+                                  : shipmentStateText(l10n, s.state),
+                              style: theme.textTheme.titleMedium,
                             ),
-                            child: Text(l10n.trackDelivery),
                           ),
-                      ],
-                    ),
-                    // 주문 당시 상품명·옵션 사본(BR-35). 없을 때만 sku.
-                    for (final sl in s.lines)
-                      Text(
-                        '${byLine[sl.orderLineId]?.title ?? sl.orderLineId} · ${l10n.cartLineQuantity(sl.qty)}',
+                          if (s.deliveryId case final id?)
+                            TextButton(
+                              key: ValueKey('track-$id'),
+                              onPressed: () => visit(
+                                '/deliveries/$id?orderId=${Uri.encodeQueryComponent(o.orderId)}',
+                              ),
+                              child: Text(l10n.trackDelivery),
+                            ),
+                        ],
                       ),
-                    // "받았어요"(수령 확인): 배송 중인 배송만 도착 예상 단계를 묻는다. 누른 뒤에는 결과를 남긴다.
-                    if (s.deliveryId case final id?
-                        when s.state == ShipmentState.handedOver ||
-                            s.state == ShipmentState.inDelivery ||
-                            ref.watch(
-                              receiptConfirmationProvider((
-                                orderId: o.orderId,
-                                deliveryId: id,
-                              )),
-                            ) is! ReceiptIdle)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ReceiptConfirmation(
-                          orderId: o.orderId,
-                          deliveryId: id,
+                      // 주문 당시 상품명·옵션 사본(BR-35). 없을 때만 sku.
+                      for (final sl in s.lines)
+                        Text(
+                          '${byLine[sl.orderLineId]?.title ?? sl.orderLineId} · ${l10n.cartLineQuantity(sl.qty)}',
                         ),
-                      ),
-                  ],
+                      // "받았어요"(수령 확인): 배송 중인 배송만 도착 예상 단계를 묻는다. 누른 뒤에는 결과를 남긴다.
+                      if (s.deliveryId case final id?
+                          when s.state == ShipmentState.handedOver ||
+                              s.state == ShipmentState.inDelivery ||
+                              ref.watch(
+                                receiptConfirmationProvider((
+                                  orderId: o.orderId,
+                                  deliveryId: id,
+                                )),
+                              ) is! ReceiptIdle)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ReceiptConfirmation(
+                            orderId: o.orderId,
+                            deliveryId: id,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
           const SizedBox(height: 32),
           KeyedSubtree(
             key: itemsKey,
@@ -1516,14 +1549,59 @@ class _OrderBody extends ConsumerWidget {
           // 배달 정보: 주문 당시 배송지 사본(BR-37, 주소록을 다시 부르지 않는다) + 요청사항·품절 시 처리.
           _DetailTitle(l10n.orderTabDelivery, key: deliveryKey),
           _DeliveryInfoBox(order: o),
-          // 배송 완료된 배송이 있는 주문만 리뷰 자격을 묻는다(작성 가능 여부는 서버 자격 값으로만 판단).
-          if (o.shipments.any((s) => s.state == ShipmentState.delivered))
-            OrderReviewsSection(
-              orderId: o.orderId,
-              lineTitles: {for (final l in o.lines) l.orderLineId: l.title},
-            ),
+          // 리뷰 쓰기 칸은 뺐다(사용자 2026-11-21) — 리뷰는 마이 > 리뷰관리에서.
+          // 끝난 주문(완료·취소·만료)은 맨 아래 [주문내역 삭제](order 0.12.0 숨기기 — 최종 판정은 서버).
+          if (switch (o.status) {
+            OrderStatus.completed ||
+            OrderStatus.cancelled ||
+            OrderStatus.expired => true,
+            _ => false,
+          }) ...[
+            const SizedBox(height: 32),
+            _HideOrderButton(orderId: o.orderId),
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// 주문 상세 맨 아래 [주문내역 삭제] — 숨기면 목록에서 빠지고 이 화면을 닫는다(상세 조회는 그대로 된다).
+class _HideOrderButton extends ConsumerStatefulWidget {
+  const _HideOrderButton({required this.orderId});
+  final String orderId;
+  @override
+  ConsumerState<_HideOrderButton> createState() => _HideOrderButtonState();
+}
+
+class _HideOrderButtonState extends ConsumerState<_HideOrderButton> {
+  bool _busy = false;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    return OutlinedButton(
+      key: const ValueKey('order-detail-hide'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(48),
+        foregroundColor: scheme.onSurfaceVariant,
+        side: BorderSide(color: scheme.outlineVariant),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      onPressed: _busy
+          ? null
+          : () async {
+              final done = await confirmAndHideOrder(
+                context,
+                ref,
+                widget.orderId,
+                onSending: (b) {
+                  if (mounted) setState(() => _busy = b);
+                },
+              );
+              if (done && context.mounted && context.canPop()) context.pop();
+            },
+      child: Text(l10n.orderDetailHide),
     );
   }
 }

@@ -1309,40 +1309,20 @@ void main() {
       );
     });
 
-    testWidgets('주문 상세: 서버가 작성 가능이라 준 품목만 리뷰 쓰기(주문 당시 이름)', (t) async {
+    testWidgets('주문 상세에는 리뷰 쓰기 칸이 없다(사용자 2026-11-21 — 리뷰는 리뷰관리에서)', (t) async {
       final repo = MockReviewsRepository(latency: Duration.zero);
       await openManage(t, repo);
-      final router = GoRouter.of(t.element(find.byType(TabBar)));
-      unawaited(router.push('/orders/order-seed-1'));
-      await t.pumpAndSettle();
-      await t.scrollUntilVisible(
-        find.byKey(const ValueKey('order-review-write-ol-1')),
-        200,
-        scrollable: find.byType(Scrollable).last,
-      );
-      expect(find.byKey(const ValueKey('order-review-ol-2')), findsNothing);
-      await t.tap(find.byKey(const ValueKey('order-review-write-ol-1')));
-      await t.pumpAndSettle();
-      expect(find.byKey(const ValueKey('review-text')), findsOneWidget);
-      expect(find.text('서울우유 1L'), findsOneWidget);
-      expect(repo.eligibilityQueries.last.orderId, 'order-seed-1');
-    });
-
-    testWidgets('주문 상세: 자격 조회 실패는 실패 줄로 보인다', (t) async {
-      final repo = MockReviewsRepository(latency: Duration.zero);
-      await openManage(t, repo);
-      repo.eligibilityFailures.add(
-        const NetworkFailure(DioExceptionType.connectionError),
-      );
       final router = GoRouter.of(t.element(find.byType(TabBar)));
       unawaited(router.push('/orders/order-seed-2'));
       await t.pumpAndSettle();
-      await t.scrollUntilVisible(
-        find.byKey(const ValueKey('order-reviews-failed')),
-        200,
-        scrollable: find.byType(Scrollable).last,
-      );
+      await t.drag(find.byType(Scrollable).last, const Offset(0, -3000));
+      await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('order-reviews')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('order-review-write-ol-3')),
+        findsNothing,
+      );
+      expect(repo.eligibilityQueries.where((q) => q.orderId != null), isEmpty);
     });
   });
 }

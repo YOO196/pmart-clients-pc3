@@ -95,14 +95,46 @@ void main() {
     await t.tap(find.byKey(const ValueKey('order-order-seed-1')));
     await t.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('shipment-sh-1')), findsOneWidget);
+    // 배송 완료된 배송 칸은 그리지 않는다(사용자 2026-11-21). 배송 중인 칸만.
+    expect(find.byKey(const ValueKey('shipment-sh-1')), findsNothing);
     expect(find.byKey(const ValueKey('shipment-sh-2')), findsOneWidget);
-    expect(find.textContaining('배송 1 · 배송 완료'), findsOneWidget);
+    expect(find.textContaining('배송 1 · 배송 완료'), findsNothing);
     expect(find.textContaining('배송 2 · 배송 중'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('stale-delivery-execution-service')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('끝난 주문 상세 맨 아래 [주문내역 삭제] → 확인 → 숨기고 목록으로(진행 중 주문은 버튼 없음)', (
+    t,
+  ) async {
+    await openOrders(t);
+    // 진행 중(부분 전달) 주문: 버튼 없음
+    await t.tap(find.byKey(const ValueKey('order-order-seed-1')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('order-detail-hide')), findsNothing);
+    await t.binding.handlePopRoute();
+    await t.pumpAndSettle();
+    // 완료 주문
+    await t.scrollUntilVisible(
+      find.byKey(const ValueKey('order-order-seed-2')),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await t.tap(find.byKey(const ValueKey('order-order-seed-2')));
+    await t.pumpAndSettle();
+    await t.scrollUntilVisible(
+      find.byKey(const ValueKey('order-detail-hide')),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await t.tap(find.byKey(const ValueKey('order-detail-hide')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('orders-hide-confirm')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('order-detail-hide')), findsNothing);
+    expect(find.byKey(const ValueKey('order-order-seed-2')), findsNothing);
   });
 
   testWidgets('주문 상세의 받는 곳은 주문 당시 배송지 사본이다(BR-37)', (t) async {
