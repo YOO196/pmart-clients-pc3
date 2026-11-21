@@ -287,3 +287,15 @@
 - 인계 번호 4자리(fulfillment 0.23.0 — 새 포장 4자리, 예전 6자리, 길이 가정 안 함): 목·주석.
 - 변질(SPOILED, fulfillment 0.22.0): 운영판 "변질 줄(오늘)" 칸, 피킹 사고 목록은 파손(DAMAGE)·변질(SPOILAGE) 자동 사고 둘 다.
 - 반납 도착 대기(mfc-inbound 0.13.0): 반납 인증번호 화면 아래 "도착한 회수품(반입 대기)" — 종류·도착 시각·상품 × 수량·라이더 표기, 클레임 없는 반납 표시, 30초마다. 보기만(반입은 PDA "회수품 반입"). 반납 번호 문구를 PDA 와 같게(발급·재발급·잠금 해제).
+
+### 4-15. 실시간 관제 — 센터 대시보드·센터 도면, 관제실 겉모습(2026-11-21 PC 3)
+- **메뉴 묶음**(`app/nav.ts`): 실시간 관제(홈 `ops` · 센터 대시보드 `dashboard` · 센터 도면 `floor`) · 출고 운영 · 입고·재고 · 인력·센터 — 17개. 좁은 화면에서 메뉴 접기, 머리줄 살아 있음 점 + KST 시계(`LiveClock`).
+- **겉모습**: 어두운 테마 `pmart-dark` 기본(관제실 — 남색 바탕·보라 강조·유리 패널, 참고 `corap/mfc-control-tower.html`). 바 크기·비례는 공용 콘솔(ConsoleShell) 그대로. 다른 웹에 넘긴 알림 `docs/operations/2026-11-21-notice-web-ui-tower-design.md`(PC 2 가 공용 `web/ui/src/tower.css` 로 올림 — MFC `index.css` 에 같은 블록이 아직 남아 있음, 정리는 다음 일).
+- **센터 대시보드**(`features/dashboard/CenterDashboard.tsx`·`charts.tsx`·`dashboardRules.ts`): 우선 확인 칩 → 지표 칸 넷(오늘·14일) → 센터 도면(미리보기, 누르면 `floor`) · 추이 패널 → 알림 피드 · 지금 작업·인력 · 배송 상태.
+  - 추이 고르기: 주문 · 매출(**목 시뮬레이션만** `orderSim.ts` — 실서버 "API 없음") · 피킹 줄 · 결품(사유별 쌓은 막대, `shortLinesByReason`) · 정시율.
+  - 기간 바(URL `?from=&to=&unit=`): 1일·7일·30일·90일·1년, 시작·끝 날짜, 칸 단위 시간(7일까지·**목만**)·일·주·월. 그래프를 끌면 그 구간 확대(한 칸 안이면 그 칸 — 하루 → 시간별), Ctrl+Z·"넓게 보기" = 한 단계 넓게(1일→7일→30일→90일→1년). 피킹 92일·정시 31일씩 나눠 읽어 합침. 그릴 때 가로축에서 차오름(`.pm-chart-rise`).
+  - 주문·매출: 카테고리·상품 거르기(`?cat=&sku=`), 요일 × 시간대 열지도, 많이 팔린 상품 5.
+- **센터 도면**(`features/floor/FloorPage.tsx`, 도면 `features/dashboard/FloorMap.tsx`·`floorLayout.ts`·`navGrid.ts`): 가상 현장(`pmart-mfc-simulation`) 평면 배치를 옮긴 위에서 본 도면 — **실측 아님**. 랙 ↔ 칸 코드는 가정(온도대마다 앞 절반 피킹 `F-P3`·`C-P2`·`A-P1`, 뒤 보관 `F-S2`·`C-S1`·`A-S3`, 번호 01~).
+  - 랙 누름 → 오른쪽 패널: 칸 수·상품 있는 칸·재고 합, 단마다 칸 카드(상품·수량·LOT 번호·유통기한 D-n). 칸 목록은 `fetchAllLocations`(랙 온도대로 좁혀 끝까지), 재고는 `stock-units?locationPrefix=`. "지정 상품"은 위치 계약에 없어 지금 놓인 재고로 보임.
+  - 작업자 점 누름 → 정보·맡는 업무·진행 중·예정 작업. 점 이동은 **목 시뮬레이션만**(A* 길찾기로 통로·문만) — 위치 API 없음(요청 `docs/handoff/mfc-backoffice/2026-11-21-backend-worker-floor-positions.md`), 실서버는 "작업자 위치 API 없음".
+- **목 모드 덧붙임**: 브라우저 목에만 `seedDemoFloor()`(도면 모든 랙 3단 × 2칸·상품·LOT, 시연 작업자 10명·작업 13건). 서비스 워커가 멈췄다 깨면 목이 끊기던 것 → `keepMocking`(핑으로 살펴 다시 연결).
