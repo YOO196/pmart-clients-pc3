@@ -96,12 +96,113 @@ export function BarList({ rows, testId }: { readonly rows: readonly BarRow[]; re
           <span className="truncate text-base-content/75" title={r.label}>
             {r.label}
           </span>
-          <span className="h-2.5 rounded-full bg-base-200">
-            <span className="block h-full rounded-full bg-primary" style={{ width: `${max === 0 || r.value === 0 ? 0 : Math.max(2, (r.value / max) * 100)}%` }} />
+          <span className="pm-meter-track h-2 overflow-hidden rounded-full">
+            <span className="pm-meter-fill block h-full rounded-full" style={{ width: `${max === 0 || r.value === 0 ? 0 : Math.max(2, (r.value / max) * 100)}%` }} />
           </span>
-          <span className="text-right tabular-nums">{r.text}</span>
+          <span className="pm-mono text-right text-xs">{r.text}</span>
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * 영역 그림(레퍼런스 "시간대별 처리량" — 보라 그라데이션 영역 + 선 + 마우스 십자선·말풍선). 한 계열·축 하나.
+ * 값이 없는 날(null)은 선을 끊고 "—"(0 과 구분). 날짜 칸마다 단추(마우스·키보드 초점에 말풍선), 아래 "표로 보기".
+ */
+export function AreaChart({ title, columns, format, testId }: { readonly title: string; readonly columns: readonly Column[]; readonly format: (v: number) => string; readonly testId: string }) {
+  const [hover, setHover] = useState<number | null>(null);
+  const n = columns.length;
+  const max = Math.max(0, ...columns.map((c) => c.value ?? 0));
+  const top = max > 0 ? max * 1.12 : 1;
+  const W = 600;
+  const H = 180;
+  const x = (i: number) => ((i + 0.5) / n) * W;
+  const y = (v: number) => H - (v / top) * H;
+  // null 에서 끊긴 조각들
+  const segs: Array<Array<readonly [number, number]>> = [[]];
+  columns.forEach((c, i) => {
+    if (c.value === null) segs.push([]);
+    else segs[segs.length - 1]!.push([x(i), y(c.value)]);
+  });
+  const parts = segs.filter((p) => p.length > 0);
+  const line = (p: ReadonlyArray<readonly [number, number]>) => p.map(([px, py], k) => `${k ? 'L' : 'M'}${px.toFixed(1)},${py.toFixed(1)}`).join('');
+  const area = (p: ReadonlyArray<readonly [number, number]>) => (p.length > 1 ? `${line(p)}L${p[p.length - 1]![0].toFixed(1)},${H}L${p[0]![0].toFixed(1)},${H}Z` : '');
+  const shown = hover === null ? null : columns[hover];
+  const gid = `pm-area-${testId}`;
+  const ticks = new Set([0, Math.floor((n - 1) / 2), n - 1]);
+  return (
+    <figure className="space-y-2" data-testid={testId}>
+      <div className="flex items-baseline justify-between text-xs text-base-content/55">
+        <span className="pm-mono">{max > 0 ? m.maxLabel(format(max)) : ''}</span>
+        <span className="pm-mono min-h-4 text-base-content/85" aria-live="polite" data-testid={`${testId}-tip`}>
+          {shown ? shown.tip : ''}
+        </span>
+      </div>
+      <div className="relative h-44" onMouseLeave={() => setHover(null)}>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible text-primary" role="img" aria-label={title}>
+          <defs>
+            <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="currentColor" stopOpacity="0.5" />
+              <stop offset="1" stopColor="currentColor" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {[0.25, 0.5, 0.75].map((g) => (
+            <line key={g} x1="0" x2={W} y1={H * g} y2={H * g} className="stroke-base-content/10" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          ))}
+          <line x1="0" x2={W} y1={H} y2={H} className="stroke-base-content/25" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          {parts.map((p, k) => (
+            <path key={`a${k}`} d={area(p)} fill={`url(#${gid})`} />
+          ))}
+          {parts.map((p, k) => (
+            <path key={`g${k}`} d={line(p)} fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="6" vectorEffect="non-scaling-stroke" />
+          ))}
+          {parts.map((p, k) => (
+            <path key={`l${k}`} d={line(p)} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          ))}
+        </svg>
+        {/* 십자선·점(HTML — 늘어난 SVG 위에서도 둥글게) */}
+        {shown && shown.value !== null && hover !== null && (
+          <>
+            <span className="pointer-events-none absolute inset-y-0 w-px border-l border-dashed border-primary/60" style={{ left: `${((hover + 0.5) / n) * 100}%` }} />
+            <span
+              className="pointer-events-none absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-base-100 bg-primary shadow-[0_0_10px] shadow-primary/60"
+              style={{ left: `${((hover + 0.5) / n) * 100}%`, top: `${(y(shown.value) / H) * 100}%` }}
+            />
+          </>
+        )}
+        <div className="absolute inset-0 flex">
+          {columns.map((c, i) => (
+            <button
+              key={c.key}
+              type="button"
+              className="flex min-w-0 flex-1 items-end justify-center pb-1 focus:outline-none"
+              aria-label={c.tip}
+              onMouseEnter={() => setHover(i)}
+              onFocus={() => setHover(i)}
+              onBlur={() => setHover(null)}
+              data-testid={`${testId}-col`}
+            >
+              {c.value === null && <span className="text-xs text-base-content/35">—</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="pm-mono flex text-[11px] text-base-content/50">
+        {columns.map((c, i) => (
+          <span key={c.key} className="min-w-0 flex-1 text-center">
+            {ticks.has(i) ? c.label : ''}
+          </span>
+        ))}
+      </div>
+      <details className="text-xs">
+        <summary className="cursor-pointer text-base-content/60">{m.asTable}</summary>
+        <ul className="pm-mono mt-1 space-y-0.5 text-base-content/75">
+          {columns.map((c) => (
+            <li key={c.key}>{c.tip}</li>
+          ))}
+        </ul>
+      </details>
+    </figure>
   );
 }

@@ -18,7 +18,7 @@ describe('왼쪽 메뉴 접기', () => {
     expect(side).toHaveAttribute('data-collapsed', 'false');
     await userEvent.click(within(side).getByRole('button', { name: '메뉴 접기' }));
     expect(side).toHaveAttribute('data-collapsed', 'true');
-    expect(within(side).getByRole('link', { name: '배송' })).toHaveAttribute('href', '/c/MFC-BSN-01/packing-handover');
+    expect(within(side).getByRole('link', { name: '출고 운영' })).toHaveAttribute('href', '/c/MFC-BSN-01/tasks');
     first.unmount();
     renderAt('/c/MFC-BSN-01/ops');
     expect(await screen.findByTestId('side-menu')).toHaveAttribute('data-collapsed', 'true');

@@ -24,7 +24,7 @@ export interface MenuGroup {
 
 export const navGroups: readonly MenuGroup[] = [
   {
-    // 센터 홈(2026-11-19) — 출하 약속 임박·초과, 피킹 결품·파손, 인계 확인 필요를 한 화면에서 찾고 상세로 간다. 묶음 제목 없이 맨 위 "홈".
+    // 실시간 관제 — 홈(예외 처리함)·센터 대시보드. 2026-11-21 사용자 "레퍼런스(corap/mfc-admin) 구조 따오기" — 업무 흐름 묶음
     key: 'overview',
     items: [
       {
@@ -45,26 +45,8 @@ export const navGroups: readonly MenuGroup[] = [
     ],
   },
   {
-    key: 'people',
-    items: [
-      {
-        key: 'workers',
-        segment: 'workers',
-        ready: true,
-        apiReady: ['작업자 목록·상세', '등록·업무·자격·상태·속도 변경', '근무 목록·등록·취소', '휴게·일일크루 등록'],
-        apiMissing: [],
-      },
-      {
-        key: 'assignments',
-        segment: 'assignments',
-        ready: true,
-        apiReady: ['배정 목록', '배정·재배정', '배정 추천 계산·확정·조회', '지난 배정 추천 목록'],
-        apiMissing: [],
-      },
-    ],
-  },
-  {
-    key: 'work',
+    // 출고 운영 — 작업 → 포장 인계 → 배송 → 배차 지연·실패 → 반납
+    key: 'outbound',
     items: [
       {
         key: 'tasks',
@@ -73,26 +55,6 @@ export const navGroups: readonly MenuGroup[] = [
         apiReady: ['작업 목록·상세', '작업 풀기', '포장 상세·인계 상태', '확인 필요 포장 목록·확인'],
         apiMissing: [],
       },
-      {
-        key: 'moves',
-        segment: 'moves',
-        ready: true,
-        apiReady: ['이동 지시 목록·상세', '이동 지시 만들기·취소'],
-        apiMissing: [],
-      },
-      {
-        key: 'inbound',
-        segment: 'inbound',
-        ready: true,
-        apiReady: ['입고 작업 목록·상세', '품질검사·적치', '회수품 반입·조회·목록', '초기 보유 수령·센터별 목록', '공급 요청 만들기·수정·철회·조회·목록'],
-        apiMissing: ['입고 예정(TRF) — 계약만'],
-      },
-    ],
-  },
-  {
-    // 우리 센터 배송(2026-11-16 백엔드 요청 request-center-deliveries-and-dispatch-failures — bff 0.3.1·case 0.5.2, 보기만)
-    key: 'delivery',
-    items: [
       {
         // 포장 인계 현황(bff 0.11.0, 2026-11-17 request-packing-handover — 보기만)
         key: 'packingHandover',
@@ -109,18 +71,18 @@ export const navGroups: readonly MenuGroup[] = [
         apiMissing: [],
       },
       {
-        key: 'dispatchFailures',
-        segment: 'dispatch-failures',
-        ready: true,
-        apiReady: ['배차 실패 사건 목록·상세(보기만)'],
-        apiMissing: [],
-      },
-      {
         // 배차 지연(delivery-dispatch 0.12.0 — 2026-11-19 백엔드 요청 request-dispatch-delays)
         key: 'dispatchDelays',
         segment: 'dispatch-delays',
         ready: true,
         apiReady: ['배차 지연 배송(픽업 전, 지연 안내 난 것)', '배송 번호 묶음 조회', '배차 불가로 취소(claim 0.11.0 DC-1)'],
+        apiMissing: [],
+      },
+      {
+        key: 'dispatchFailures',
+        segment: 'dispatch-failures',
+        ready: true,
+        apiReady: ['배차 실패 사건 목록·상세(보기만)'],
         apiMissing: [],
       },
       {
@@ -134,13 +96,35 @@ export const navGroups: readonly MenuGroup[] = [
     ],
   },
   {
-    key: 'stock',
+    // 입고·재고 — 입고 → 이동·보충 → 재고 → 위치 → 품질
+    key: 'inbound',
     items: [
+      {
+        key: 'inbound',
+        segment: 'inbound',
+        ready: true,
+        apiReady: ['입고 작업 목록·상세', '품질검사·적치', '회수품 반입·조회·목록', '초기 보유 수령·센터별 목록', '공급 요청 만들기·수정·철회·조회·목록'],
+        apiMissing: ['입고 예정(TRF) — 계약만'],
+      },
+      {
+        key: 'moves',
+        segment: 'moves',
+        ready: true,
+        apiReady: ['이동 지시 목록·상세', '이동 지시 만들기·취소'],
+        apiMissing: [],
+      },
       {
         key: 'inventory',
         segment: 'inventory',
         ready: true,
         apiReady: ['센터 전체 재고 목록', '상품별 재고', '위치·LOT 정정', '순환 실사 만들기·입력·승인·목록', '보충 기준', '출하 부적격 LOT', '상품 취급'],
+        apiMissing: [],
+      },
+      {
+        key: 'locations',
+        segment: 'locations',
+        ready: true,
+        apiReady: ['칸 목록·상세·등록·수정', '닫기·열기·폐지', '적치 후보'],
         apiMissing: [],
       },
       {
@@ -153,13 +137,21 @@ export const navGroups: readonly MenuGroup[] = [
     ],
   },
   {
-    key: 'center',
+    // 인력·센터 — 배정·작업자·운영 제한
+    key: 'people',
     items: [
       {
-        key: 'locations',
-        segment: 'locations',
+        key: 'assignments',
+        segment: 'assignments',
         ready: true,
-        apiReady: ['칸 목록·상세·등록·수정', '닫기·열기·폐지', '적치 후보'],
+        apiReady: ['배정 목록', '배정·재배정', '배정 추천 계산·확정·조회', '지난 배정 추천 목록'],
+        apiMissing: [],
+      },
+      {
+        key: 'workers',
+        segment: 'workers',
+        ready: true,
+        apiReady: ['작업자 목록·상세', '등록·업무·자격·상태·속도 변경', '근무 목록·등록·취소', '휴게·일일크루 등록'],
         apiMissing: [],
       },
       {

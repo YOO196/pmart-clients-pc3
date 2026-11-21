@@ -50,10 +50,8 @@ const path = (d: string) => (
 
 /** 접었을 때 묶음 아이콘(얇은 선) */
 export const groupIcon: Readonly<Record<string, ReturnType<typeof path>>> = {
-  overview: path('M3 11 12 4l9 7M5 10v10h5v-6h4v6h5V10'),
+  overview: path('M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z'),
+  outbound: path('M2 6h11v10H2zM13 10h4l4 4v2h-8M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z'),
+  inbound: path('M3 7l9-4 9 4-9 4-9-4ZM3 7v10l9 4 9-4V7M12 11v10'),
   people: path('M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM2 21a7 7 0 0 1 14 0M16 3.5a4 4 0 0 1 0 7.5M22 21a7 7 0 0 0-4-6.3'),
-  work: path('M9 4h6M9 4a1 1 0 0 0-1 1v1h8V5a1 1 0 0 0-1-1M8 6H6v15h12V6h-2M9 12l2 2 4-4'),
-  delivery: path('M2 6h11v10H2zM13 10h4l4 4v2h-8M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM17 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z'),
-  stock: path('M3 7l9-4 9 4-9 4-9-4ZM3 7v10l9 4 9-4V7M12 11v10'),
-  center: path('M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12ZM12 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z'),
 };
