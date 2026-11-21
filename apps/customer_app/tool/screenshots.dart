@@ -1110,6 +1110,64 @@ void main() {
       await t.pumpAndSettle();
     }
   });
+  // 배송 단계 문구·홈 현황판·끝난 주문 배송현황·전달 완료 사진(사용자 2026-11-21, 레퍼런스 3-1·8·9-2·10).
+  testWidgets('delivery-status', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    // 그림자를 실제처럼(시험 기본은 그림자를 검은 선으로 그린다).
+    debugDisableShadows = false;
+    final orders = MockOrdersRepository(latency: Duration.zero);
+    await t.pumpWidget(testApp(const [], orders: orders));
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    Future<void> shot(String name) => expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/$name.png').uri),
+    );
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    Future<void> go(String location) async {
+      router.go(location);
+      for (var i = 0; i < 8; i++) {
+        await t.pump(const Duration(milliseconds: 250));
+      }
+      // 사진(Image.memory) 풀기는 실제 시간이 든다.
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 400)),
+      );
+      await t.pump(const Duration(milliseconds: 100));
+    }
+
+    await go('/');
+    await shot('ds-home');
+    await go('/orders/order-seed-4/tracking');
+    await shot('ds-track-reserved');
+    await go('/deliveries/dlv-s2?orderId=order-seed-1');
+    await shot('ds-track-delivering');
+    await go('/orders/order-seed-2/tracking');
+    await shot('ds-track-closed');
+    await go('/orders/order-seed-2/help');
+    await t.tap(find.byKey(const ValueKey('order-help-misdelivered')));
+    await t.pumpAndSettle();
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 500)),
+    );
+    await t.pumpAndSettle();
+    await shot('ds-proof');
+    await go('/orders/order-seed-1');
+    await shot('ds-detail-partial');
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(minutes: 1));
+    debugDisableShadows = true;
+  });
   // 로딩 모양(사용자 2026-11-21 "로딩 별로"): 리뷰관리 — 가운데 동그라미 대신 회색 자리 표시.
   testWidgets('loading-skeleton', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

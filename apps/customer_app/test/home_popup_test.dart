@@ -105,6 +105,52 @@ void main() {
     expect(key('home-popup'), findsOneWidget);
   });
 
+  testWidgets(
+    '창 크기: 화면 폭 80%, 그림 칸 4:5, 그림은 칸 안에 다 보이게(백엔드 요청 2026-11-21 R2)',
+    (t) async {
+      final catalog = catalogWithPopups();
+      catalog.placementBannersJson['POPUP']![1]['imageUrl'] =
+          'https://img.test/storefront/banner-images/IMG-1';
+      await open(t, catalog);
+      final box = find.descendant(
+        of: key('home-popup'),
+        matching: find.byType(AspectRatio),
+      );
+      final size = t.getSize(box);
+      expect(size.width, closeTo(800 * 0.8, 1));
+      expect(size.height, closeTo(800 * 0.8 * 5 / 4, 1));
+      final image = t.widget<Image>(
+        find.descendant(of: box, matching: find.byType(Image)).first,
+      );
+      expect(image.fit, BoxFit.contain);
+    },
+  );
+
+  testWidgets('오늘 그만 보기 뒤에도 같은 배너의 이미지가 바뀌면 다시 뜬다', (t) async {
+    final secure = MemoryKeyValueStore();
+    MockCatalogRepository withImage(String imageId) =>
+        MockCatalogRepository(latency: Duration.zero)
+          ..placementBannersJson['POPUP'] = [
+            {
+              'bannerId': 'B-POPUP-ICE',
+              'placement': 'POPUP',
+              'imageUrl': '/storefront/banner-images/$imageId',
+              'altText': '주말 아이스크림',
+              'linkType': 'NONE',
+              'sortOrder': 1,
+            },
+          ];
+    await open(t, withImage('IMG-1'), secure: secure);
+    await t.tap(key('home-popup-hide-today'));
+    await t.pumpAndSettle();
+    await t.pumpWidget(const SizedBox());
+    await open(t, withImage('IMG-1'), secure: secure);
+    expect(key('home-popup'), findsNothing, reason: '같은 그림은 오늘 안 뜬다');
+    await t.pumpWidget(const SizedBox());
+    await open(t, withImage('IMG-2'), secure: secure);
+    expect(key('home-popup'), findsOneWidget, reason: '그림이 바뀌면 다시');
+  });
+
   testWidgets('이미지를 누르면 닫고 배너가 가리키는 상품으로', (t) async {
     await open(t, catalogWithPopups());
     await t.tap(key('home-popup-image-PU-1'));

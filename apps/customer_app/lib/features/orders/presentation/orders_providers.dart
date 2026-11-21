@@ -85,16 +85,14 @@ bool canRequestCancel(OrderDetail o) => o.status == OrderStatus.confirmed;
 /// 주문상세 요약 카드 아래 버튼(레퍼런스 9-1·9-2, 사용자 2026-11-21 "주문상태마다 버튼이 다름").
 enum OrderDetailAction { returnExchange, inquiry, track }
 
-/// 상태별 버튼: 취소 → 없음, 배송 완료 → [반품·교환][문의하기], 예약 확정(준비 전) → [문의하기],
-/// 준비~배달 중(바로배달 확정 포함) → [문의하기][배달 현황], 그 밖(결제 대기·실패·알 수 없음) → [문의하기].
+/// 상태별 버튼: 취소 → 없음, 배송 완료 → [반품·교환][문의하기],
+/// 주문 확인(예약 포함)~배달 중 → [문의하기][배달 현황], 그 밖(결제 대기·실패·알 수 없음) → [문의하기].
+/// 배송현황은 배달이 끝나기 전까지 늘 들어갈 수 있다(레퍼런스 8-4 예약 상태 배송현황·10-3 준비중 알림 → 배송현황, 사용자 2026-11-21).
 /// 반품·교환 가능 여부(기한 7일/24h)는 앱이 계산하지 않는다 — 문의로 받고 고객센터가 판정한다(claim 0.2.0).
 List<OrderDetailAction> orderDetailActions(OrderDetail o) => switch (o.status) {
   OrderStatus.cancelled => const [],
   OrderStatus.completed => const [
     OrderDetailAction.returnExchange,
-    OrderDetailAction.inquiry,
-  ],
-  OrderStatus.confirmed when o.deliveryMode == 'SCHEDULED' => const [
     OrderDetailAction.inquiry,
   ],
   OrderStatus.confirmed ||
@@ -194,3 +192,76 @@ String stageText(AppLocalizations l10n, DeliveryStage s) => switch (s) {
   DeliveryStage.done => l10n.stDone,
   DeliveryStage.unknown => l10n.stUnknown,
 };
+
+/// 배송 단계 문구 — 큰 제목 + 한 줄 설명(레퍼런스 8. 배송현황·10. 알림, 사용자 2026-11-21 "단계마다 같은 문구로").
+/// 배송현황·주문상세·홈 진행 중 주문 현황판이 같이 쓴다. 주문 상태가 먼저고, 배달이 진행 중이면 라이더 단계([stage])로 나눈다.
+/// 예약 확정(상품 준비 전)이면 제목이 "M월 d일 (E)\n오전 8:00~9:00 예약"([reservedTitle]이 그 문구 — 없으면 "주문을 확인했어요").
+typedef DeliveryPhaseText = ({String title, String? subtitle});
+
+DeliveryPhaseText deliveryPhaseText(
+  AppLocalizations l10n, {
+  required OrderStatus status,
+  String? deliveryMode,
+  DeliveryStage? stage,
+  String? reservedTitle,
+}) {
+  final scheduled = deliveryMode == 'SCHEDULED';
+  final moving = switch (status) {
+    OrderStatus.confirmed ||
+    OrderStatus.preparing ||
+    OrderStatus.partiallyHandedOver ||
+    OrderStatus.inDelivery ||
+    // 일부만 전달됐어도 남은 배송은 라이더 단계로(그 배송의 배송현황·홈 현황판).
+    OrderStatus.partiallyDelivered => true,
+    _ => false,
+  };
+  // 라이더가 움직이기 시작한 뒤는 라이더 단계가 더 정확하다(서버 ETA 의 stage).
+  if (moving) {
+    switch (stage) {
+      case DeliveryStage.atCustomer:
+        return (title: l10n.phNearTitle, subtitle: l10n.phNearSub);
+      case DeliveryStage.toCustomer:
+        return (title: l10n.phDeliveringTitle, subtitle: l10n.phDeliveringSub);
+      case DeliveryStage.toStore || DeliveryStage.atStore:
+        return (
+          title: l10n.phRiderStartedTitle,
+          subtitle: l10n.phRiderStartedSub,
+        );
+      // 라이더 단계 "끝남"만으로는 배달 완료가 아니다 — 완료는 주문·배송 상태(서버 확정)로만 말한다.
+      case DeliveryStage.done ||
+          DeliveryStage.unassigned ||
+          DeliveryStage.unknown ||
+          null:
+        break;
+    }
+  }
+  return switch (status) {
+    OrderStatus.confirmed when scheduled && reservedTitle != null => (
+      title: reservedTitle,
+      subtitle: l10n.phReservedSub,
+    ),
+    OrderStatus.confirmed => (
+      title: l10n.phConfirmedTitle,
+      subtitle: l10n.phConfirmedSub,
+    ),
+    OrderStatus.preparing || OrderStatus.partiallyHandedOver => (
+      title: scheduled ? l10n.phPreparingReservedTitle : l10n.phPreparingTitle,
+      subtitle: l10n.phPreparingSub,
+    ),
+    OrderStatus.inDelivery => (
+      title: l10n.phDeliveringTitle,
+      subtitle: l10n.phDeliveringSub,
+    ),
+    OrderStatus.partiallyDelivered => (
+      title: l10n.phPartialTitle,
+      subtitle: l10n.phPartialSub,
+    ),
+    OrderStatus.completed => (
+      title: l10n.phDeliveredTitle,
+      subtitle: l10n.phDeliveredSub,
+    ),
+    OrderStatus.cancelled => (title: l10n.phCancelledTitle, subtitle: null),
+    // 결제 중·확인 중·만료·모름은 상태 이름 그대로(배송 단계가 아니다).
+    _ => (title: orderStatusText(l10n, status), subtitle: null),
+  };
+}

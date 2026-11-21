@@ -19,7 +19,7 @@ import '../../checkout/domain/checkout.dart';
 import '../../checkout/presentation/delivery_select_screen.dart'
     show modeLabel, optionSubtitle, windowText;
 import '../../orders/domain/orders.dart';
-import '../../orders/presentation/orders_providers.dart' show orderStatusText;
+import '../../orders/presentation/orders_providers.dart' show deliveryPhaseText;
 import '../../payment/presentation/payment_controller.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
@@ -1254,7 +1254,6 @@ class _InProgressOrderCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     return switch (ref.watch(homeInProgressOrderProvider)) {
       AsyncData(value: final order?) when floating => Material(
         key: const ValueKey('home-order-card'),
@@ -1269,41 +1268,9 @@ class _InProgressOrderCard extends ConsumerWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              orderStatusText(l10n, order.status),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const PmartLineIcon(
-                            PmartLineIcons.chevronRight,
-                            size: 20,
-                            color: Colors.white,
-                          ),
-                        ],
-                      ),
-                      if (homeOrderHasEta(order.status))
-                        DefaultTextStyle.merge(
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontSize: 14,
-                            color: const Color(0xFFB9A8FF),
-                          ),
-                          child: _OrderEtaLine(orderId: order.orderId),
-                        ),
-                    ],
-                  ),
+                  // 레퍼런스 3-1 "B마트 홈 - 배달중": 큰 단계 문장 + ›, 아래 "13분 · 센터 이름"(남은 분은 강조색).
+                  // 단계 문장은 배송현황·주문상세와 같다(사용자 2026-11-21 "일부 전달" 같은 상태 이름 대신).
+                  child: _OrderCardText(order: order),
                 ),
                 const SizedBox(width: 8),
                 Container(
@@ -1335,28 +1302,87 @@ class _InProgressOrderCard extends ConsumerWidget {
   }
 }
 
-/// 도착 예상 한 줄. 산출됐을 때만 그린다(위치 확인 중·조회 실패는 시간을 만들지 않는다).
-class _OrderEtaLine extends ConsumerWidget {
-  const _OrderEtaLine({required this.orderId});
+/// 홈 현황판 글: 단계 제목(라이더 단계까지 — 도착 예상 조회의 stage) + "N분 · 센터 이름".
+/// 남은 분·센터 이름은 서버 값만(산출 전·위치 확인 중이면 분을 만들지 않는다).
+class _OrderCardText extends ConsumerWidget {
+  const _OrderCardText({required this.order});
 
-  final String orderId;
+  final OrderListItem order;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final eta = ref.watch(homeOrderEtaProvider(orderId)).value;
-    final text = switch (eta) {
+    final theme = Theme.of(context);
+    final eta = homeOrderHasEta(order.status)
+        ? ref.watch(homeOrderEtaProvider(order.orderId)).value
+        : null;
+    final phase = deliveryPhaseText(
+      l10n,
+      status: order.status,
+      deliveryMode: order.deliveryMode == DeliveryMode.scheduled
+          ? 'SCHEDULED'
+          : null,
+      stage: eta?.stage,
+    );
+    final minutes = switch (eta) {
       DeliveryEtaView(
         status: EtaStatus.available,
         :final int remainingSeconds,
       ) =>
-        l10n.etaRemaining((remainingSeconds / 60).ceil()),
-      DeliveryEtaView(status: EtaStatus.available, :final DateTime etaAt) =>
-        l10n.etaAt(formatSeoulTime(etaAt)),
+        (remainingSeconds / 60).ceil(),
       _ => null,
     };
-    if (text == null) return const SizedBox.shrink();
-    return Text(text, key: const ValueKey('home-order-eta'));
+    final second = [
+      if (minutes != null)
+        TextSpan(
+          text: l10n.homeOrderEtaMinutes(minutes),
+          style: const TextStyle(color: Color(0xFFB9A8FF)),
+        ),
+      if (minutes != null && order.mfcName != null) const TextSpan(text: ' · '),
+      if (order.mfcName case final name?) TextSpan(text: name),
+    ];
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Flexible(
+              child: Text(
+                phase.title,
+                key: const ValueKey('home-order-title'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 2),
+            const PmartLineIcon(
+              PmartLineIcons.chevronRight,
+              size: 20,
+              color: Colors.white,
+            ),
+          ],
+        ),
+        if (second.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text.rich(
+            TextSpan(children: second),
+            key: const ValueKey('home-order-eta'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 15,
+              color: Colors.white.withValues(alpha: 0.78),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }
 

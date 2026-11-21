@@ -59,18 +59,32 @@ class StartSplashScreen extends ConsumerWidget {
         body: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => ref.read(splashHoldProvider.notifier).release(),
-          child: SizedBox.expand(
-            child: Image.memory(
-              promo.bytes,
-              key: ValueKey('start-splash-promo-${promo.bannerId}'),
-              fit: BoxFit.cover,
-              gaplessPlayback: true,
-              errorBuilder: (_, _, _) {
-                WidgetsBinding.instance.addPostFrameCallback(
-                  (_) => ref.read(splashHoldProvider.notifier).release(),
-                );
-                return _splash;
-              },
+          child: DecoratedBox(
+            // 그림을 다 보이고(contain) 남는 위·아래는 그림 가장자리 색(백엔드 요청 2026-11-21 R1 — 세로 9:16 그림의 글자가 잘리지 않게).
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: const [0.5, 0.5],
+                colors: [
+                  promo.top ?? Colors.black,
+                  promo.bottom ?? promo.top ?? Colors.black,
+                ],
+              ),
+            ),
+            child: SizedBox.expand(
+              child: Image.memory(
+                promo.bytes,
+                key: ValueKey('start-splash-promo-${promo.bannerId}'),
+                fit: BoxFit.contain,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) {
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => ref.read(splashHoldProvider.notifier).release(),
+                  );
+                  return _splash;
+                },
+              ),
             ),
           ),
         ),

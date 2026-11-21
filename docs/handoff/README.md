@@ -52,6 +52,8 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-21-backend-coupons-applied-and-open-questions.md` | 쿠폰·할인가(ADR-0082 1~7번)·AI 상담 상품 답(rag 0.3.0) 목 모드 반영 알림 + 회신 부탁 R1(BR-71 재촉)·Q1~Q3(찜·BR-64 details 읽는 법, 탈퇴 대기 거절 문구)·스위치 상태 — 보냄, 회신 대기 |
 | `customer-app/2026-11-21-backend-faq-login-policy.md` | BR-78 고객 FAQ·AI 상담 안내 문서에 카카오·네이버 로그인·가입 휴대폰 확인·앱 탈퇴 반영 + 재색인(앱 변경 없음) |
 | `customer-app/2026-11-21-backend-naver-email.md` | BR-77 네이버 로그인 계정에도 이메일 — 회신 받음(서버만, 앱 변경 없음). **남은 것: 네이버 콘솔 이메일 주소 켜고 실기기 확인 뒤 archive** |
+| `customer-app/2026-11-21-backend-splash-popup-display-reply.md` | 회신 — 로딩 화면 이미지 갱신(배너+이미지 주소 비교, contain+가장자리 색)·팝업 80%·4:5·contain·기억 키 배너+이미지(서버 변경 없음, 선택: Banner.endsAt). **남은 것: 실기기 확인 뒤 archive** |
+| `customer-app/2026-11-21-backend-social-login-chooser-and-revoke-reply.md` | 회신 — 백엔드 요청 2건(탈퇴 때 구글 revoke·로그인 버튼마다 계정 고르기) 고객앱 반영: 구글 disconnect+signOut(탈퇴 성공 뒤만)·로그아웃 signOut, 카카오 `prompt=login`·SDK logout, 네이버 `reauthenticate`(기존). **남은 것: 실기기 확인 뒤 archive** |
 | `customer-app/2026-11-21-backend-review-sort-option-helpful.md` | BR-76 상품 리뷰 추천순·옵션 필터·도움돼요(회원만) — 회신 받음(review 0.6.0, LAN 배포)·앱 실서버 연결(2026-11-21). **남은 것: 실기기 확인 뒤 archive** |
 | `customer-app/2026-11-20-backend-wishlist-applied.md` | 찜(하트 — customer 0.13.0) 목 모드 반영 알림 + Q1(422 details 읽는 법) — LAN 확인 대기 |
 | `customer-app/2026-11-20-backend-naver-consent-every-login.md` | BR-74 네이버 로그인마다 동의 화면 다시 — 교환 뒤 네이버 연결 끊기(R1~R5, sub 유지 확인) — 보냄, 회신 대기 |

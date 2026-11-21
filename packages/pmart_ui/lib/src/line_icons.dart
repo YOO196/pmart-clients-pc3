@@ -87,6 +87,9 @@ enum PmartLineIcons {
 
   /// 말풍선 안 ?(문의하기 — 고객앱 주문상세, 레퍼런스 9-1·9-2).
   questionBubble,
+
+  /// 크게 보기(↙↗ 대각선 양쪽 화살표 — 고객앱 배달 완료 사진, 레퍼런스 9-2 3-3).
+  expand,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -462,6 +465,22 @@ class _LinePainter extends CustomPainter {
         canvas.drawCircle(const Offset(12, 12), 9, line);
         canvas.drawLine(const Offset(12, 7.2), const Offset(12, 13), line);
         canvas.drawCircle(const Offset(12, 16.4), 1.1, fill);
+      case PmartLineIcons.expand:
+        canvas.drawLine(const Offset(6, 18), const Offset(18, 6), line);
+        canvas.drawPath(
+          Path()
+            ..moveTo(12.5, 6)
+            ..lineTo(18, 6)
+            ..lineTo(18, 11.5),
+          line,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(6, 12.5)
+            ..lineTo(6, 18)
+            ..lineTo(11.5, 18),
+          line,
+        );
       case PmartLineIcons.questionBubble:
         // 원 모양 말풍선(왼쪽 아래 꼬리) + 가운데 ?. 왼쪽 아래 149°에서 시계 방향으로 109°까지 돌고 꼬리 끝을 거쳐 닫는다.
         canvas.drawPath(

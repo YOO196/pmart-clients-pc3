@@ -121,8 +121,14 @@ final class GoogleSocialTokenSource implements SocialTokenSource {
       await (_initialized ??= _signIn.initialize(
         serverClientId: serverClientId,
       ));
-      // disconnect = Google 쪽 앱 연결(동의) 끊기(google_sign_in 7, Android revokeAccess 에 해당).
-      revoke ? await _signIn.disconnect() : await _signIn.signOut();
+      // 탈퇴(revoke): disconnect = 이번 실행에서 로그인한 계정마다 Android `revokeAccess` 뒤 `clearCredentialState`
+      // (google_sign_in_android 7.2 — 탈퇴 재인증으로 방금 로그인해 그 계정이 잡혀 있다). 다음 가입 때 동의 화면이 다시 뜬다.
+      // 로그아웃: signOut = `clearCredentialState` — 연결(동의)은 남기고, 다음 로그인 버튼은 계정 선택 창부터.
+      // (로그인 버튼의 `authenticate()` 는 늘 버튼 흐름 = 계정 선택 창, 자동 선택 없음 — 백엔드 요청 2026-11-21 R1.)
+      if (revoke) {
+        await _signIn.disconnect();
+      }
+      await _signIn.signOut();
     } on Object {
       // 오프라인 등 — 흐름을 막지 않는다.
     }

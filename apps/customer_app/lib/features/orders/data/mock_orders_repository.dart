@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:pmart_api_delivery_tracking/pmart_api_delivery_tracking.dart'
@@ -15,6 +16,7 @@ import '../../claims/domain/claims.dart'
     show RequestState, TimeChangeCode, TimeChangeResult;
 import '../domain/orders.dart';
 import '../domain/tracking.dart';
+import 'mock_proof_photo.dart';
 import 'orders_repository.dart';
 
 /// 목 구현. 지난 주문 3건(분할배송 진행 중·완료·취소)과, 목 결제로 확정된 주문을 함께 보여 준다.
@@ -509,6 +511,52 @@ base class MockOrdersRepository implements OrdersRepository {
       );
     }
     return orderFromContract(api.Order.fromJson(_withReceipts(json)));
+  }
+
+  /// 전달 완료 증빙 조회 실패(시험용): 배송 ID → 실패.
+  final proofFailures = <String, PmartFailure>{};
+
+  /// 전달 완료 증빙의 사진 수(시험·캡처용, 기본 1장). 0 이면 사진 없음.
+  int proofPhotoCount = 1;
+
+  @override
+  Future<DeliveryProof> deliveryProof(String deliveryId) async {
+    await _wait();
+    if (proofFailures[deliveryId] case final f?) throw f;
+    // 서버 흉내: 본인 주문의 배송이 전달 완료(DELIVERED)일 때만, 아니면 409, 없으면 404.
+    for (final json in _all().values) {
+      for (final s
+          in (_withReceipts(json)['shipments'] as List<Object?>? ??
+                  const <Object?>[])
+              .cast<Map<String, Object?>>()) {
+        if (s['deliveryId'] != deliveryId) continue;
+        if (s['state'] != 'DELIVERED') {
+          throw const ProblemFailure(
+            Problem(status: 409, code: deliveryNotCompletedCode),
+          );
+        }
+        return DeliveryProof(
+          deliveryId: deliveryId,
+          photoRefs: [
+            for (var i = 1; i <= proofPhotoCount; i++) 'ph-$deliveryId-$i',
+          ],
+          completedAt: DateTime.utc(2026, 11, 20, 6, 12),
+          placementDetail: '문 앞에 두었어요',
+        );
+      }
+    }
+    throw const ProblemFailure(
+      Problem(status: 404, code: ProblemCode.notFound),
+    );
+  }
+
+  @override
+  Future<Uint8List> deliveryProofPhoto(
+    String deliveryId,
+    String photoRef,
+  ) async {
+    await _wait();
+    return mockProofPhoto;
   }
 
   /// 고객이 "받았어요"를 누른 배송(서버가 전달 완료로 바꾼 것).

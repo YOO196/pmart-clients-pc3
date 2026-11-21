@@ -395,14 +395,20 @@ void main() {
 
       final card = find.byKey(const ValueKey('home-order-card'));
       expect(card, findsOneWidget);
+      // 레퍼런스 3-1 "배달 중이에요 ›" / "13분 · 센터": 단계 문장(배송현황과 같은 문구) + 남은 분 · 센터 이름.
+      // order-seed-1 은 일부 전달 — 남은 배송이 배달 중이라 "일부 전달" 같은 상태 이름 대신 배달 단계 문장.
       expect(
-        find.descendant(of: card, matching: find.text('일부 전달')),
+        find.descendant(of: card, matching: find.text('배달 중이에요')),
         findsOneWidget,
       );
-      expect(
-        find.descendant(of: card, matching: find.text('약 12분 남았어요')),
-        findsOneWidget,
+      expect(find.text('일부 전달'), findsNothing);
+      final eta = t.widget<Text>(
+        find.descendant(
+          of: card,
+          matching: find.byKey(const ValueKey('home-order-eta')),
+        ),
       );
+      expect(eta.textSpan!.toPlainText(), startsWith('12분'));
       // 계약 status 는 하나만 받으므로 진행 중 상태마다 물었다.
       expect(orders.listStatuses, containsAll(homeInProgressStatuses));
 

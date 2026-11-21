@@ -429,3 +429,22 @@ class DeliveryEtaView {
     riderLocation: riderLocation,
   );
 }
+
+/// 고객용 전달 완료 증빙(delivery-execution 0.9.0 `GET /deliveries/{id}/delivery-proof`) — 본인 주문의 배송이
+/// 전달 완료된 뒤만. 라이더 ID·위치·전화는 없다. 사진은 [photoRefs] 로 따로 받는다(`…/evidence-photos/{photoRef}`).
+@immutable
+class DeliveryProof {
+  const DeliveryProof({
+    required this.deliveryId,
+    required this.photoRefs,
+    this.completedAt,
+    this.placementDetail,
+  });
+
+  final String deliveryId;
+  final List<String> photoRefs;
+  final DateTime? completedAt;
+
+  /// 놓은 곳 설명(라이더가 쓴 글). 없으면 null.
+  final String? placementDetail;
+}

@@ -144,8 +144,8 @@ void main() {
     await t.tap(find.byKey(const ValueKey('track-dlv-s2')));
     await t.pumpAndSettle();
 
-    expect(find.text('배송 중이에요'), findsOneWidget);
-    // 레퍼런스 8-5: "N분 남음" + 도착 시각(서버 값).
+    // 레퍼런스 8-5: "N분 남음" + 도착 시각(서버 값) + 한 줄 설명(주문상세·홈 현황판과 같은 단계 문구).
+    expect(find.text('주문하신 주소로 가고 있어요.'), findsOneWidget);
     expect(find.byKey(const ValueKey('track-sheet-remaining')), findsOneWidget);
     expect(find.byKey(const ValueKey('eta-delayed')), findsOneWidget);
 

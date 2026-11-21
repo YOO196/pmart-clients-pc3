@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:pmart_api_delivery_execution/pmart_api_delivery_execution.dart'
@@ -20,6 +21,9 @@ import '../../claims/domain/claims.dart' show RequestState, TimeChangeResult;
 import '../domain/orders.dart';
 import '../domain/tracking.dart';
 import 'sse_parser.dart';
+
+/// 전달 완료 증빙 409 — 아직 전달 완료 전(delivery-execution 0.9.0).
+const deliveryNotCompletedCode = 'DELIVERY_NOT_COMPLETED';
 
 /// 숨기기 409 — 끝나지 않은 주문(order 0.12.0).
 const orderNotFinishedCode = 'ORDER_NOT_FINISHED';
@@ -66,6 +70,13 @@ abstract interface class OrdersRepository {
     String deliveryId, {
     required IdempotencyKey key,
   });
+
+  /// 전달 완료 증빙 — GET /deliveries/{id}/delivery-proof(delivery-execution 0.9.0, 고객 본인 주문만).
+  /// 완료 전 409 [deliveryNotCompletedCode], 남의·없는 배송 404.
+  Future<DeliveryProof> deliveryProof(String deliveryId);
+
+  /// 증빙 사진 원본 — GET /deliveries/{id}/evidence-photos/{photoRef}(고객은 증빙의 photoRefs 만). 앱에 저장하지 않는다.
+  Future<Uint8List> deliveryProofPhoto(String deliveryId, String photoRef);
 }
 
 final class ApiOrdersRepository implements OrdersRepository {
@@ -282,6 +293,44 @@ final class ApiOrdersRepository implements OrdersRepository {
       throw const ContractViolationFailure('수령 확인 응답 본문 없음');
     }
     return CommandStatus.parse(status);
+  }
+
+  @override
+  Future<DeliveryProof> deliveryProof(String deliveryId) async {
+    final res = await pmartGuard(
+      () => _execution.getDeliveryProof(deliveryId: deliveryId),
+    );
+    final d = res.data;
+    if (d == null) {
+      throw const ContractViolationFailure('전달 완료 증빙 응답 본문 없음');
+    }
+    return DeliveryProof(
+      deliveryId: d.deliveryId,
+      photoRefs: d.photoRefs,
+      completedAt: d.completedAt,
+      placementDetail: switch (d.placementDetail?.trim()) {
+        final s? when s.isNotEmpty => s,
+        _ => null,
+      },
+    );
+  }
+
+  @override
+  Future<Uint8List> deliveryProofPhoto(
+    String deliveryId,
+    String photoRef,
+  ) async {
+    final res = await pmartGuard(
+      () => _execution.getEvidencePhoto(
+        deliveryId: deliveryId,
+        photoRef: photoRef,
+      ),
+    );
+    final bytes = res.data;
+    if (bytes == null || bytes.isEmpty) {
+      throw const ContractViolationFailure('증빙 사진 본문 없음');
+    }
+    return bytes;
   }
 }
 

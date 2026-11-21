@@ -1,5 +1,5 @@
 import 'package:flutter/services.dart' show PlatformException;
-import 'package:flutter_appauth/flutter_appauth.dart';
+import 'package:flutter_appauth/flutter_appauth.dart' hide Prompt;
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'package:pmart_core/pmart_core.dart'
     show
@@ -13,11 +13,33 @@ import '../domain/auth.dart';
 import 'auth_repository.dart';
 import 'google_token_source.dart' show SocialProviderMisconfigured;
 
-/// 카카오 로그인(BR-65): 카카오톡이 있으면 카카오톡, 없으면 카카오계정(웹)으로 로그인해 **OIDC ID 토큰**을
-/// `providerToken` 으로 넘긴다(서버가 카카오 JWKS 로 검증 — Google 과 같은 방식, ADR-0055). 콘솔에서 OpenID Connect 를
-/// 켜야 ID 토큰이 온다(사용자 2026-11-19 활성화). 토큰은 로그에 남기지 않는다.
+/// 카카오 로그인 요청의 prompt(백엔드 요청 2026-11-21 "로그인 버튼마다 계정 고르기·다시 로그인").
+/// `login` — 카카오계정에 로그인돼 있어도 매번 로그인 화면을 띄워 다른 계정으로 바꿀 수 있게(OIDC `prompt=login`).
+/// 동의 화면은 처음 가입 때만 뜬다(이미 동의한 계정이면 다시 묻지 않는다).
+const kakaoLoginPrompts = [Prompt.login];
+
+Future<OAuthToken> _kakaoAccountLogin() =>
+    UserApi.instance.loginWithKakaoAccount(prompts: kakaoLoginPrompts);
+
+Future<void> _kakaoLogout() async {
+  await UserApi.instance.logout();
+}
+
+/// 카카오 로그인(BR-65): 카카오계정 로그인 화면으로 로그인해 **OIDC ID 토큰**을 `providerToken` 으로 넘긴다
+/// (서버가 카카오 JWKS 로 검증 — Google 과 같은 방식, ADR-0055). 콘솔에서 OpenID Connect 를 켜야 ID 토큰이 온다
+/// (사용자 2026-11-19 활성화). 토큰은 로그에 남기지 않는다.
+/// 2026-11-21 백엔드 요청: 카카오톡 앱 자동 로그인(바로 들어가 계정을 못 바꿈) 대신 카카오계정 로그인 화면 + [kakaoLoginPrompts].
 final class KakaoSocialTokenSource implements SocialTokenSource {
-  const KakaoSocialTokenSource();
+  const KakaoSocialTokenSource({
+    this.login = _kakaoAccountLogin,
+    this.logout = _kakaoLogout,
+  });
+
+  /// 카카오계정 로그인 화면(시험에서 바꿔 끼운다).
+  final Future<OAuthToken> Function() login;
+
+  /// 카카오 SDK 로그아웃 — 이 기기에 저장된 카카오 토큰을 지운다(시험에서 바꿔 끼운다).
+  final Future<void> Function() logout;
 
   @override
   Future<SocialCredential?> obtain(
@@ -26,9 +48,7 @@ final class KakaoSocialTokenSource implements SocialTokenSource {
   }) async {
     if (provider != SocialProvider.kakao) throw const SocialProviderDown();
     try {
-      final token = await isKakaoTalkInstalled()
-          ? await UserApi.instance.loginWithKakaoTalk()
-          : await UserApi.instance.loginWithKakaoAccount();
+      final token = await login();
       final idToken = token.idToken;
       // OIDC 가 꺼져 있으면 ID 토큰이 없다 — 서버가 검증할 수 없어 설정 문제로 알린다.
       if (idToken == null || idToken.isEmpty) {
@@ -42,7 +62,7 @@ final class KakaoSocialTokenSource implements SocialTokenSource {
       if (e.reason == ClientErrorCause.cancelled) return null;
       throw const SocialProviderDown();
     } on PlatformException catch (e) {
-      // 카카오톡 로그인 화면에서 뒤로 — SDK 가 CANCELED 로 준다.
+      // 로그인 화면에서 뒤로 — SDK 가 CANCELED 로 준다.
       if (e.code == 'CANCELED') return null;
       throw const SocialProviderDown();
     }
@@ -53,9 +73,17 @@ final class KakaoSocialTokenSource implements SocialTokenSource {
   Future<SocialCredential?> obtainSilently(SocialProvider provider) async =>
       null;
 
-  /// 서버가 끊는다(카카오: 탈퇴 반영 뒤 Admin 키, 네이버: 탈퇴 재인증 교환 때) — 앱은 할 일 없음.
+  /// 앱 로그아웃·탈퇴 때 카카오 SDK `logout()`(백엔드 요청 2026-11-21 R2). 앱 연결 끊기는 서버가 한다
+  /// (탈퇴 반영 뒤 Admin 키) — 앱은 끊지 않는다. 실패(오프라인 등)는 흐름을 막지 않는다.
   @override
-  Future<void> forget(SocialProvider provider, {bool revoke = false}) async {}
+  Future<void> forget(SocialProvider provider, {bool revoke = false}) async {
+    if (provider != SocialProvider.kakao) return;
+    try {
+      await logout();
+    } on Object {
+      // 이 기기 토큰 정리 실패 — 다음 로그인은 prompt=login 이라 그대로 로그인 화면이 뜬다.
+    }
+  }
 }
 
 /// 네이버 Client ID(공개 값, 빌드 때 `.secrets` 에서 dart-define 으로). 비면 네이버 버튼은 설정 문제로 알린다.
@@ -184,7 +212,8 @@ final class NaverSocialTokenSource implements SocialTokenSource {
   Future<SocialCredential?> obtainSilently(SocialProvider provider) async =>
       null;
 
-  /// 서버가 끊는다(카카오: 탈퇴 반영 뒤 Admin 키, 네이버: 탈퇴 재인증 교환 때) — 앱은 할 일 없음.
+  /// 네이버 앱 연결은 서버가 끊는다(탈퇴 재인증 교환 때, BR-74). 네이버 로그인은 앱에 토큰을 남기지 않고(인가 코드만)
+  /// 인가 요청마다 [naverAuthorizeExtra] 로 다시 로그인하게 해 — 앱은 할 일 없음.
   @override
   Future<void> forget(SocialProvider provider, {bool revoke = false}) async {}
 }

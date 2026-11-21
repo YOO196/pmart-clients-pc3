@@ -7,6 +7,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/order_status.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../support/domain/inquiry.dart' show DeliveryIssue;
+import 'delivery_proof_screen.dart';
 import '../../support/presentation/inquiry_screens.dart'
     show InquiryFormArgs, deliveryIssueText;
 import '../domain/orders.dart';
@@ -113,6 +114,18 @@ class OrderHelpScreen extends ConsumerWidget {
                         MaterialPageRoute<void>(
                           builder: (_) =>
                               _DelayedGuide(order: o, onInquiry: form),
+                        ),
+                      );
+                    } else if (issue != DeliveryIssue.delayed &&
+                        deliveredShipments(o).isNotEmpty) {
+                      // 레퍼런스 9-2 3-3: 다른 곳으로 배달·못 받음 → 라이더가 남긴 전달 완료 사진부터(사용자 2026-11-21).
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => DeliveryProofScreen(
+                            order: o,
+                            onInquiry: form,
+                            onChat: () => context.push('/support/chat'),
+                          ),
                         ),
                       );
                     } else {

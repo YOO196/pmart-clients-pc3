@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +31,32 @@ void main() {
       expect(source.downloads, ['/img/1']);
       await refreshSplashPromo(source, store);
       expect(source.downloads, hasLength(1));
+    });
+
+    test('같은 배너라도 이미지가 바뀌면 새로 받는다(백엔드 요청 2026-11-21 R1)', () async {
+      final source = MockSplashBannerSource(
+        banner: const SplashBannerRef(
+          bannerId: 'B-SPLASH',
+          imageUrl: '/storefront/banner-images/IMG-1',
+        ),
+        bytes: png,
+      );
+      final store = MemorySplashPromoStore();
+      await refreshSplashPromo(source, store);
+      source.banner = const SplashBannerRef(
+        bannerId: 'B-SPLASH',
+        imageUrl: '/storefront/banner-images/IMG-2',
+      );
+      await refreshSplashPromo(source, store);
+      expect(source.downloads, [
+        '/storefront/banner-images/IMG-1',
+        '/storefront/banner-images/IMG-2',
+      ]);
+      expect(store.promo?.imageUrl, '/storefront/banner-images/IMG-2');
+      // 예전 앱이 저장한 것(이미지 주소 없음)도 한 번 다시 받는다.
+      store.promo = SplashPromo(bannerId: 'B-SPLASH', bytes: png);
+      await refreshSplashPromo(source, store);
+      expect(source.downloads, hasLength(3));
     });
 
     test('서버에 걸린 것이 없으면 지운다(다음 실행은 기본 로딩 화면)', () async {
@@ -142,6 +169,59 @@ void main() {
       await t.tap(key('start-splash-promo'));
       await t.pumpAndSettle();
       expect(key('start-splash-promo'), findsNothing);
+    });
+
+    testWidgets('그림은 다 보이고(contain) 남는 위·아래는 받아 둔 가장자리 색', (t) async {
+      await start(
+        t,
+        MemorySplashPromoStore(
+          SplashPromo(
+            bannerId: 'BN-1',
+            bytes: png,
+            top: const Color(0xFFFF8800),
+            bottom: const Color(0xFF113355),
+          ),
+        ),
+      );
+      final image = t.widget<Image>(key('start-splash-promo-BN-1'));
+      expect(image.fit, BoxFit.contain);
+      final box = t.widget<DecoratedBox>(
+        find
+            .ancestor(
+              of: find.byWidget(image),
+              matching: find.byType(DecoratedBox),
+            )
+            .first,
+      );
+      final g = (box.decoration as BoxDecoration).gradient! as LinearGradient;
+      expect(g.colors, [const Color(0xFFFF8800), const Color(0xFF113355)]);
+    });
+
+    testWidgets('받을 때 그림 위·아래 가장자리 색을 계산해 둔다', (t) async {
+      // 위 절반 주황, 아래 절반 남색인 2x4 그림
+      final bytes = (await t.runAsync(() async {
+        final rec = ui.PictureRecorder();
+        Canvas(rec)
+          ..drawRect(
+            const Rect.fromLTWH(0, 0, 2, 2),
+            Paint()..color = const Color(0xFFFF8800),
+          )
+          ..drawRect(
+            const Rect.fromLTWH(0, 2, 2, 2),
+            Paint()..color = const Color(0xFF113355),
+          );
+        final img = await rec.endRecording().toImage(2, 4);
+        final data = await img.toByteData(format: ui.ImageByteFormat.png);
+        return data!.buffer.asUint8List();
+      }))!;
+      final source = MockSplashBannerSource(
+        banner: const SplashBannerRef(bannerId: 'BN-1', imageUrl: '/img/1'),
+        bytes: bytes,
+      );
+      final store = MemorySplashPromoStore();
+      await t.runAsync(() => refreshSplashPromo(source, store));
+      expect(store.promo?.top, const Color(0xFFFF8800));
+      expect(store.promo?.bottom, const Color(0xFF113355));
     });
 
     testWidgets('받아 둔 것이 없으면 프로모션 없이 지금처럼', (t) async {

@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -15,11 +16,54 @@ class SplashBannerRef {
 }
 
 /// 기기에 받아 둔 로딩 화면 이미지(다음 실행에 바로 그린다 — 사용자 결정 2026-11-21 "다음 실행부터").
+/// 같은 배너라도 이미지가 바뀌면(이미지 주소 = `/storefront/banner-images/{imageId}`) 새로 받는다(백엔드 요청 2026-11-21 R1).
 class SplashPromo {
-  const SplashPromo({required this.bannerId, required this.bytes});
+  const SplashPromo({
+    required this.bannerId,
+    required this.bytes,
+    this.imageUrl,
+    this.top,
+    this.bottom,
+  });
 
   final String bannerId;
   final Uint8List bytes;
+
+  /// 받은 이미지의 주소(이미지 ID 가 들어 있다). 예전에 저장한 것은 없다 → 다음에 다시 받는다.
+  final String? imageUrl;
+
+  /// 그림 위·아래 가장자리 색 — 화면이 그림보다 길면 남는 위·아래를 이 색으로 채운다(`contain`).
+  final ui.Color? top;
+  final ui.Color? bottom;
+}
+
+/// 그림 맨 위·맨 아래 줄의 평균 색(작게 풀어 계산). 풀지 못하면 (null, null).
+Future<(ui.Color?, ui.Color?)> splashEdgeColors(Uint8List bytes) async {
+  try {
+    final codec = await ui.instantiateImageCodec(bytes, targetWidth: 24);
+    final frame = await codec.getNextFrame();
+    final image = frame.image;
+    final data = await image.toByteData();
+    final w = image.width;
+    final h = image.height;
+    image.dispose();
+    codec.dispose();
+    if (data == null || w == 0 || h == 0) return (null, null);
+    ui.Color row(int y) {
+      var r = 0, g = 0, b = 0;
+      for (var x = 0; x < w; x++) {
+        final i = (y * w + x) * 4;
+        r += data.getUint8(i);
+        g += data.getUint8(i + 1);
+        b += data.getUint8(i + 2);
+      }
+      return ui.Color.fromARGB(255, r ~/ w, g ~/ w, b ~/ w);
+    }
+
+    return (row(0), row(h - 1));
+  } on Object {
+    return (null, null);
+  }
 }
 
 abstract interface class SplashBannerSource {
@@ -120,12 +164,27 @@ final class FileSplashPromoStore implements SplashPromoStore {
       final d = await _dir();
       final id = File('${d.path}/banner.id');
       final img = File('${d.path}/banner.img');
+      final url = File('${d.path}/banner.url');
+      final edge = File('${d.path}/banner.edge');
       if (!await id.exists() || !await img.exists()) return null;
       final bytes = await img.readAsBytes();
       if (bytes.isEmpty) return null;
+      // 가장자리 색 "위,아래"(ARGB 정수) — 받을 때 계산해 둔 것. 없거나 깨졌으면 검정.
+      final edges = switch (await edge.exists()
+          ? (await edge.readAsString()).trim().split(',')
+          : const <String>[]) {
+        [final a, final b] => (
+          int.tryParse(a) == null ? null : ui.Color(int.parse(a)),
+          int.tryParse(b) == null ? null : ui.Color(int.parse(b)),
+        ),
+        _ => (null, null),
+      };
       return SplashPromo(
         bannerId: (await id.readAsString()).trim(),
         bytes: bytes,
+        imageUrl: await url.exists() ? (await url.readAsString()).trim() : null,
+        top: edges.$1,
+        bottom: edges.$2,
       );
     } on FileSystemException {
       return null;
@@ -138,6 +197,12 @@ final class FileSplashPromoStore implements SplashPromoStore {
     await d.create(recursive: true);
     // 이미지를 먼저 쓰고 ID 를 나중에 — 중간에 끊기면 ID 가 옛것이라 다음에 다시 받는다.
     await File('${d.path}/banner.img').writeAsBytes(promo.bytes, flush: true);
+    await File('${d.path}/banner.url')
+        .writeAsString(promo.imageUrl ?? '', flush: true);
+    await File('${d.path}/banner.edge').writeAsString(
+      '${promo.top?.toARGB32() ?? ''},${promo.bottom?.toARGB32() ?? ''}',
+      flush: true,
+    );
     await File('${d.path}/banner.id')
         .writeAsString(promo.bannerId, flush: true);
   }
@@ -181,11 +246,22 @@ Future<void> refreshSplashPromo(
     return;
   }
   final kept = await store.read();
-  if (kept?.bannerId == now.bannerId) return;
+  // 배너와 이미지가 둘 다 같을 때만 그대로 — 이미지만 바뀌어도 새로 받는다(백엔드 요청 2026-11-21 R1).
+  if (kept?.bannerId == now.bannerId && kept?.imageUrl == now.imageUrl) return;
   try {
     final bytes = await source.download(now.imageUrl);
     if (bytes.isEmpty) return;
-    await store.save(SplashPromo(bannerId: now.bannerId, bytes: bytes));
+    // 로딩 화면은 그림을 다 보이고(contain) 남는 위·아래를 가장자리 색으로 — 받을 때 한 번 계산해 둔다.
+    final (top, bottom) = await splashEdgeColors(bytes);
+    await store.save(
+      SplashPromo(
+        bannerId: now.bannerId,
+        bytes: bytes,
+        imageUrl: now.imageUrl,
+        top: top,
+        bottom: bottom,
+      ),
+    );
   } on Object {
     return;
   }

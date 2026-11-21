@@ -37,7 +37,8 @@ import '../../catalog/presentation/widgets/discount_price.dart'
     show discountRateColor;
 import '../../catalog/presentation/widgets/product_tile_card.dart'
     show ProductImage;
-import '../../checkout/domain/checkout.dart' show OutOfStockPreference;
+import '../../checkout/domain/checkout.dart'
+    show ArrivalWindow, OutOfStockPreference;
 import '../data/orders_repository.dart'
     show OrdersRepository, orderNotFinishedCode;
 import '../domain/orders.dart';
@@ -1194,18 +1195,17 @@ class _OrderBody extends ConsumerWidget {
           _DetailBox(
             children: [
               Text(
-                switch (o.window) {
-                  // 레퍼런스 9-1 3-2: "10월 11일 (일)" 줄바꿈 "오전 8:00~오전 9:00 예약"
-                  final w? => l10n.orderHeadlineReserved(
-                    DateFormat(
-                      'M월 d일 (E)',
-                      'ko',
-                    ).format(DateTime.parse(w.date)),
-                    windowText(w),
-                  ),
-                  // 사용자 캡처(2026-11-20 주문상세): "배달이 완료됐어요"처럼 상태 문장
-                  null => orderHeadlineText(l10n, o.status),
-                },
+                // 배송 단계 문구(배송현황·홈 현황판과 같은 제목, 사용자 2026-11-21). 예약 확정(준비 전)이면
+                // 레퍼런스 9-1 3-2 "10월 11일 (일)" 줄바꿈 "오전 8:00~오전 9:00 예약".
+                deliveryPhaseText(
+                  l10n,
+                  status: o.status,
+                  deliveryMode: o.deliveryMode,
+                  reservedTitle: switch (o.window) {
+                    final w? => reservedHeadline(l10n, w),
+                    null => null,
+                  },
+                ).title,
                 key: const ValueKey('order-headline'),
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontSize: 18,
@@ -2287,6 +2287,9 @@ enum _Live { connecting, live, polling, ended, paused }
 
 class _TrackingScreenState extends ConsumerState<TrackingScreen>
     with WidgetsBindingObserver {
+  /// 이 화면에서 아직 끝나지 않은 주문을 본 적이 있는지 — 있으면 끝나는 순간에도 막지 않는다.
+  bool _sawInProgress = false;
+
   late final OrdersRepository _repo;
   StreamSubscription<TrackingEvent>? _sub;
   Timer? _poll;
@@ -2481,6 +2484,16 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       final id? => ref.watch(orderDetailProvider(id)),
       null => null,
     };
+    // 이미 배달이 끝난 주문을 열면 배송현황을 보이지 않는다(레퍼런스 10-4) — "주문내역에서 확인해주세요" 안내.
+    // 보고 있던 배송이 끝나는 순간은 그대로 "배달 완료" 단계를 보인다.
+    switch (order?.value?.status) {
+      case OrderStatus.completed when !_sawInProgress:
+        return TrackClosedNotice(orderId: widget.orderId!);
+      case final s? when s != OrderStatus.completed:
+        _sawInProgress = true;
+      default:
+        break;
+    }
     final live = _live;
     // 배송현황은 늘 지도 화면이다(사용자 2026-11-19 "지도 바로 뜨게"). 라이더 위치는 배달 중에만 서버가 준다 —
     // 구독 값이 있으면 그것만(null 이면 숨김 — 예전 조회 값으로 채우지 않는다), 구독이 없으면 조회 값.
@@ -2553,6 +2566,73 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
       ),
       sheet: sheet,
       onInquiry: orderId == null ? null : () => _visit('/orders/$orderId/help'),
+    );
+  }
+}
+
+/// 배달이 끝난 주문의 배송현황 자리(레퍼런스 10-4): 흐린 지도 위 가운데 안내 "선택하신 주문의 배달 상태는
+/// 주문내역에서 확인해주세요" + [확인] → 그 주문 상세로.
+class TrackClosedNotice extends StatelessWidget {
+  const TrackClosedNotice({super.key, required this.orderId});
+
+  final String orderId;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Scaffold(
+      key: const ValueKey('track-closed'),
+      body: Stack(
+        children: [
+          const Positioned.fill(child: TrackingMap(rider: null, home: null)),
+          Positioned.fill(
+            child: ColoredBox(color: Colors.black.withValues(alpha: 0.5)),
+          ),
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 40),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
+                    child: Text(
+                      l10n.trackClosedNotice,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontSize: 16,
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  InkWell(
+                    key: const ValueKey('track-closed-ok'),
+                    onTap: () => GoRouter.of(context).go('/orders/$orderId'),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text(
+                        l10n.startConfirm,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2671,6 +2751,9 @@ class OrderTrackingScreen extends ConsumerStatefulWidget {
 /// 마다 주문을 다시 읽어, 배송이 생기는 대로 실시간 화면(라이더 위치)으로 넘어간다. 앱이 가려지면 멈춘다.
 class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     with WidgetsBindingObserver {
+  /// 이 화면에서 아직 끝나지 않은 주문을 본 적이 있는지 — 있으면 끝나는 순간에도 막지 않는다.
+  bool _sawInProgress = false;
+
   Timer? _poll;
 
   String get orderId => widget.orderId;
@@ -2724,6 +2807,15 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     final theme = Theme.of(context);
     final value = ref.watch(orderDetailProvider(orderId));
     final o = value.value;
+    // 이미 배달이 끝난 주문을 열면 배송현황을 보이지 않는다(레퍼런스 10-4 "배송완료 이후 알림 클릭해도 배송현황 볼 수 없음").
+    switch (o?.status) {
+      case OrderStatus.completed when !_sawInProgress:
+        return TrackClosedNotice(orderId: orderId);
+      case final s? when s != OrderStatus.completed:
+        _sawInProgress = true;
+      default:
+        break;
+    }
     final deliveryIds = [
       for (final s in o?.shipments ?? const <ShipmentView>[]) ?s.deliveryId,
     ];
@@ -2756,12 +2848,26 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TrackSheetHead(
-              mode: deliveryModeText(l10n, o.deliveryMode),
-              headline: orderStatusText(l10n, o.status),
-              headlineKey: 'order-track-status',
-              subtitle: o.window == null ? null : windowText(o.window!),
-              receipt: true,
+            Builder(
+              builder: (context) {
+                // 배송 단계 문구(레퍼런스 8-2 "주문을 확인했어요" / 8-4 예약) — 주문상세·홈 현황판과 같다.
+                final phase = deliveryPhaseText(
+                  l10n,
+                  status: o.status,
+                  deliveryMode: o.deliveryMode,
+                  reservedTitle: switch (o.window) {
+                    final w? => reservedHeadline(l10n, w),
+                    null => null,
+                  },
+                );
+                return TrackSheetHead(
+                  mode: deliveryModeText(l10n, o.deliveryMode),
+                  headline: phase.title,
+                  headlineKey: 'order-track-status',
+                  subtitle: phase.subtitle,
+                  receipt: true,
+                );
+              },
             ),
             Text(
               l10n.trackRiderNotLinked,
@@ -2859,21 +2965,46 @@ class _TrackBody extends StatelessWidget {
         e.status == EtaStatus.available && e.remainingSeconds != null
         ? (e.remainingSeconds! / 60).ceil()
         : null;
+    // 배송 단계 문구(주문상세·홈 현황판과 같다, 사용자 2026-11-21). 주문을 모르고 들어왔으면(알림 등) 라이더 단계 문장.
+    final phase = o == null
+        ? null
+        : deliveryPhaseText(
+            l10n,
+            status: o.status,
+            deliveryMode: o.deliveryMode,
+            stage: e.stage,
+            reservedTitle: switch (window) {
+              final w? => reservedHeadline(l10n, w),
+              null => null,
+            },
+          );
+    // 예약 확정(준비 전)이면 머리 제목이 예약 시간이다(레퍼런스 8-4) — 아래 예약 칸을 따로 두지 않는다.
+    final reservedHead =
+        sheet &&
+        scheduled &&
+        window != null &&
+        o?.status == OrderStatus.confirmed &&
+        remainingMin == null;
     final children = <Widget>[
-      // 시트 머리(레퍼런스 8-5): 배달 방식 → "N분 남음 오후 6:50" → 단계 문장(오른쪽 그림) → 라이더 위치 시각.
+      // 시트 머리(레퍼런스 8-2·8-4·8-5): 배달 방식 → 큰 제목("N분 남음 오후 6:50" 또는 단계 제목) → 한 줄 설명.
       if (sheet) ...[
         TrackSheetHead(
           mode: deliveryModeText(l10n, o?.deliveryMode),
           headline: remainingMin != null
               ? l10n.trackRemainingShort(remainingMin)
-              : etaLine,
+              : phase?.title ?? etaLine,
           headlineKey: remainingMin != null
               ? 'track-sheet-remaining'
+              : reservedHead
+              ? 'track-reserved'
+              : phase != null
+              ? 'track-phase'
               : 'eta-line',
           time: remainingMin != null && e.etaAt != null
               ? formatSeoulTime(e.etaAt!)
               : null,
-          subtitle: stageText(l10n, e.stage),
+          subtitle: phase?.subtitle ?? stageText(l10n, e.stage),
+          receipt: phase != null && !_isDelivering(e.stage),
         ),
         // 위치가 없거나(서버가 주지 않음) 받은 지 60초가 넘었으면 지어내지 않고 확인 중이라고만.
         if (rider case final r? when !r.stale && r.recordedAt != null)
@@ -2906,7 +3037,7 @@ class _TrackBody extends StatelessWidget {
         const SizedBox(height: 8),
       ],
       // 예약배달: 서버가 준 도착 구간을 크게. 변경·취소는 진입만, 가능 여부는 서버가 판정한다.
-      if (scheduled && window != null) ...[
+      if (scheduled && window != null && !reservedHead) ...[
         Text(
           l10n.trackReservedWindow(windowText(window)),
           key: const ValueKey('track-reserved'),
@@ -3516,13 +3647,12 @@ class _OrderSheetDetailsState extends State<OrderSheetDetails> {
   }
 }
 
-/// 주문상세 머리 문장(사용자 캡처 2026-11-20 "배달이 완료됐어요").
-String orderHeadlineText(AppLocalizations l10n, OrderStatus s) => switch (s) {
-  OrderStatus.completed => l10n.orderHeadlineDelivered,
-  OrderStatus.cancelled => l10n.orderHeadlineCancelled,
-  OrderStatus.inDelivery => l10n.orderHeadlineDelivering,
-  _ => l10n.orderHeadlineInProgress,
-};
+/// 예약 주문 제목 — 레퍼런스 9-1 3-2·8-4 "10월 11일 (일)" 줄바꿈 "오전 8:00~오전 9:00 예약".
+String reservedHeadline(AppLocalizations l10n, ArrivalWindow w) =>
+    l10n.orderHeadlineReserved(
+      DateFormat('M월 d일 (E)', 'ko').format(DateTime.parse(w.date)),
+      windowText(w),
+    );
 
 /// 다시 담기 ⊕ 모양(레퍼런스 9-1 3-3·9-2 — 검은 1.5dp 테두리, 흰 바탕). 담은 뒤(누를 수 없음)는 옅게.
 ButtonStyle reorderCircleStyle(ColorScheme scheme) => IconButton.styleFrom(

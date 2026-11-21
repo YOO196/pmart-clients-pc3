@@ -49,6 +49,10 @@ final popupHiddenStoreProvider = Provider<PopupHiddenStore>(
   (ref) => PopupHiddenStore(ref.watch(secureStoreProvider)),
 );
 
+/// 팝업 기억 단위 = 배너 + 이미지(백엔드 요청 2026-11-21 R2). 같은 배너라도 이미지가 바뀌면(이미지 주소의 imageId)
+/// "오늘 그만 보기"·"닫기" 기록과 상관없이 다시 보인다.
+String popupSeenKey(HomeBanner b) => '${b.bannerId}|${b.imageUrl ?? ''}';
+
 /// 서울 날짜(yyyy-MM-dd).
 String seoulDay(DateTime now) {
   final s = toSeoulWallClock(now);
@@ -92,7 +96,9 @@ final homePopupProvider = FutureProvider.autoDispose<List<HomeBanner>>((
   final closed = ref.read(popupSessionProvider).closed;
   return [
     for (final b in all)
-      if (!hidden.contains(b.bannerId) && !closed.contains(b.bannerId)) b,
+      if (!hidden.contains(popupSeenKey(b)) &&
+          !closed.contains(popupSeenKey(b)))
+        b,
   ];
 });
 
@@ -104,7 +110,7 @@ Future<void> showHomePopup(
   required void Function(HomeBanner) onOpen,
 }) async {
   ref.read(popupSessionProvider.notifier).markShown();
-  final ids = [for (final b in banners) b.bannerId];
+  final ids = [for (final b in banners) popupSeenKey(b)];
   final result = await showDialog<_PopupResult>(
     context: context,
     builder: (_) => HomePopupDialog(banners: banners),
@@ -139,7 +145,8 @@ final class _Open extends _PopupResult {
   final HomeBanner banner;
 }
 
-/// 가운데 카드(사용자 결정 2026-11-21 A): 이미지 1:1(여럿이면 옆으로 넘김·"1 / N"), 아래 [오늘 그만 보기 | 닫기].
+/// 가운데 카드(사용자 결정 2026-11-21 A): 아래 [오늘 그만 보기 | 닫기], 여럿이면 옆으로 넘김·"1 / N".
+/// 크기(백엔드 요청 2026-11-21 R2): 창 폭 = 화면 폭의 80%, 그림 칸 4:5 고정, 그림은 칸 안에 다 보이게(contain).
 class HomePopupDialog extends ConsumerStatefulWidget {
   const HomePopupDialog({super.key, required this.banners});
 
@@ -162,7 +169,9 @@ class _HomePopupDialogState extends ConsumerState<HomePopupDialog> {
     final text = theme.textTheme.bodyLarge?.copyWith(fontSize: 15);
     return Dialog(
       key: const ValueKey('home-popup'),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.sizeOf(context).width * 0.1,
+      ),
       clipBehavior: Clip.antiAlias,
       backgroundColor: scheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -170,7 +179,7 @@ class _HomePopupDialogState extends ConsumerState<HomePopupDialog> {
         mainAxisSize: MainAxisSize.min,
         children: [
           AspectRatio(
-            aspectRatio: 1,
+            aspectRatio: 4 / 5,
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -209,7 +218,7 @@ class _HomePopupDialogState extends ConsumerState<HomePopupDialog> {
                             ? fallback
                             : Image.network(
                                 url,
-                                fit: BoxFit.cover,
+                                fit: BoxFit.contain,
                                 cacheWidth:
                                     (MediaQuery.sizeOf(context).width *
                                             MediaQuery.devicePixelRatioOf(

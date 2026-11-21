@@ -31,12 +31,13 @@ void main() {
     await t.pumpAndSettle();
   }
 
-  testWidgets('예약 확정(준비 전): [주문취소][예약시간 변경] + [문의하기]만', (t) async {
+  testWidgets('예약 확정(준비 전): [주문취소][예약시간 변경] + [문의하기][배달 현황]', (t) async {
     await openDetail(t, 'order-seed-4');
     expect(key('cancel-order'), findsOneWidget);
     expect(key('reschedule'), findsOneWidget);
     expect(key('order-inquiry'), findsOneWidget);
-    expect(key('order-track'), findsNothing);
+    // 배송현황은 배달이 끝나기 전까지 늘 들어갈 수 있다(레퍼런스 8-4, 사용자 2026-11-21).
+    expect(key('order-track'), findsOneWidget);
     expect(key('order-return-exchange'), findsNothing);
     // 예약시간 변경은 아래 시트로 열린다(레퍼런스 9-1 4)
     await t.tap(key('reschedule'));

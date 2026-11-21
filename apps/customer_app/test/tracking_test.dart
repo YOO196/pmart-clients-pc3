@@ -424,7 +424,8 @@ void main() {
         ),
       );
       await t.pumpAndSettle();
-      expect(find.text('곧 도착해요'), findsOneWidget);
+      // 곧 도착(레퍼런스 10 3-4 "라이더님이 곧 도착해요! / 배달을 받을 수 있게 준비해주세요").
+      expect(find.text('배달을 받을 수 있게 준비해 주세요.'), findsOneWidget);
 
       // 단계만 DONE 으로 바뀜: 주문을 다시 묻지만 배송은 아직 IN_DELIVERY → 완료 아님.
       orders.emitTracking(
@@ -435,7 +436,7 @@ void main() {
         ),
       );
       await t.pumpAndSettle();
-      expect(find.text('배송이 끝났어요'), findsOneWidget);
+      expect(find.text('배달이 완료됐어요'), findsNothing);
       expect(key('track-step-current-delivered'), findsNothing);
       expect(key('track-step-current-delivering'), findsOneWidget);
 
