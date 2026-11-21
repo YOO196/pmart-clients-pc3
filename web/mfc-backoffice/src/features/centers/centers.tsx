@@ -14,8 +14,12 @@ export function CenterSwitcher({ centers, current, segment }: { readonly centers
   const missingNames = centers.some((c) => !session?.centerNames?.has(c));
   if (centers.length < 2) {
     return (
-      <div className="text-sm">
-        <span className="opacity-70">{m.center.label}</span> <strong>{centerDisplayName(session, current)}</strong>
+      <div className="min-w-0 text-sm">
+        {/* 좁은 화면(2026-11-21): "센터" 글자는 빼고 이름은 한 줄로 줄인다 */}
+        <span className="hidden opacity-70 sm:inline">{m.center.label} </span>
+        <strong className="inline-block max-w-[6rem] truncate align-bottom sm:max-w-none" title={centerDisplayName(session, current)}>
+          {centerDisplayName(session, current)}
+        </strong>
         {missingNames && <p className="text-warning text-xs">{m.center.namesFailed}</p>}
       </div>
     );
@@ -23,9 +27,10 @@ export function CenterSwitcher({ centers, current, segment }: { readonly centers
   return (
     <div className="flex items-center gap-2 text-sm">
       <label className="flex items-center gap-2">
-        <span className="opacity-70">{m.center.choose}</span>
+        <span className="hidden opacity-70 sm:inline">{m.center.choose}</span>
         <select
-          className="select select-sm w-auto"
+          aria-label={m.center.choose}
+          className="select select-sm w-auto max-w-[7rem] sm:max-w-none"
           value={current}
           onChange={(e) => void navigate(`/c/${encodeURIComponent(e.target.value)}/${segment}`)}
         >
