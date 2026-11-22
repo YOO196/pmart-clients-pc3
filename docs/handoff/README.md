@@ -77,3 +77,4 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-21-backend-profile-photo-edit.md` | BR-80 내 정보 프로필 사진 올리기·기본·되돌리기 API 요청 |
 | `customer-app/2026-11-22-backend-search-filter-data.md` | BR-81 검색·카테고리 필터 데이터(LAN 비어 있음)·필터 정본 질문 |
 | `customer-app/2026-11-22-backend-category-banner-discount-list.md` | BR-82 카테고리 배너 자리 CATEGORY·할인 상품 목록 |
+| `customer-app/2026-11-22-backend-sale-list-filters-sort.md` | BR-83 할인 상품 목록 필터(`/search/filters` onSale)·할인율순 정렬 |

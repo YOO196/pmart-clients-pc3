@@ -2,6 +2,7 @@
 // 맨 위 CATEGORY 배너(storefront placement=CATEGORY, BR-82), 아래 추천 타일(할인·기획전·인기·신상)·고객센터 상자.
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/presentation/product_list_screen.dart';
+import 'package:customer_app/features/catalog/presentation/widgets/product_tile_card.dart';
 import 'package:customer_app/features/support/presentation/inquiry_screens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -78,6 +79,19 @@ void main() {
     expect(key('home-tab-body-isNew'), findsOneWidget);
   });
 
+  testWidgets('할인율순은 다른 목록 정렬에 없다(서버가 onSale 과 함께만 받음)', (t) async {
+    await openCategories(t);
+    await t.tap(find.text('검색').last);
+    await t.pumpAndSettle();
+    await t.enterText(key('search-field'), '우유');
+    await t.tap(key('search-submit'));
+    await t.pumpAndSettle();
+    await t.tap(key('sort'));
+    await t.pumpAndSettle();
+    expect(key('sort-reviewCount'), findsOneWidget);
+    expect(key('sort-discountRate'), findsNothing);
+  });
+
   testWidgets('[기획전]은 지금 MD 탭, 없으면 홈', (t) async {
     await openCategories(t);
     await scrollTo(t, 'category-pick-event');
@@ -103,16 +117,32 @@ void main() {
     expect(key('home-tab-body-X-DEAL'), findsOneWidget);
   });
 
-  testWidgets('[할인]은 할인 상품 목록(onSale, BR-82)·필터 없음, 고객센터 상자는 고객센터로', (t) async {
+  testWidgets('[할인]은 할인 상품 목록(onSale, BR-82)·필터·할인율순(BR-83), 고객센터 상자는 고객센터로', (
+    t,
+  ) async {
     await openCategories(t);
     await scrollTo(t, 'category-pick-discount');
     await t.tap(key('category-pick-discount'));
     await t.pumpAndSettle();
     expect(find.byType(ProductListScreen), findsOneWidget);
     expect(find.text('할인 상품'), findsOneWidget);
-    expect(key('open-filters'), findsNothing);
-    final onSale = mockProducts.where((p) => p.salePrice != null).length;
-    expect(find.text('상품 $onSale개'), findsOneWidget);
+    final sale = mockProducts.where((p) => p.salePrice != null).toList();
+    expect(find.text('상품 ${sale.length}개'), findsOneWidget);
+    // 필터(할인 상품만으로 센 값)
+    expect(key('open-filters'), findsOneWidget);
+    // 할인율순은 할인 목록 정렬에만 있다
+    await t.tap(key('sort'));
+    await t.pumpAndSettle();
+    await t.tap(key('sort-discountRate'));
+    await t.pumpAndSettle();
+    expect(find.text('할인율순'), findsOneWidget);
+    double rate(MockProduct p) => 1 - p.salePrice! / p.price;
+    final top = (sale..sort((a, b) => rate(b).compareTo(rate(a)))).first;
+    final first = find.byType(ProductTileCard).first;
+    expect(
+      find.descendant(of: first, matching: find.text(top.name)),
+      findsOneWidget,
+    );
     GoRouter.of(t.element(find.byType(ProductListScreen))).pop();
     await t.pumpAndSettle();
 

@@ -291,6 +291,9 @@ enum SortKey {
 
   /// 리뷰 많은 순(search 0.3.0 `REVIEW_COUNT`).
   reviewCount,
+
+  /// 할인율 높은 순(search 0.9.0 `DISCOUNT_RATE`, BR-83) — 할인 목록(onSale)에서만. 다른 목록에서 보내면 서버가 400.
+  discountRate,
 }
 
 @immutable

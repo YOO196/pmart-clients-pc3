@@ -854,6 +854,20 @@ base class MockCatalogRepository implements CatalogRepository {
         all.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
       case SortKey.reviewCount:
         all.sort((a, b) => (b.reviewCount ?? 0).compareTo(a.reviewCount ?? 0));
+      case SortKey.discountRate:
+        // 서버처럼 할인 목록에서만 받는다(아니면 400 VALIDATION_FAILED).
+        if (!query.onSale) {
+          throw const ProblemFailure(
+            Problem(status: 400, code: 'VALIDATION_FAILED'),
+          );
+        }
+        double rate(MockProduct p) => 1 - (p.salePrice ?? p.price) / p.price;
+        all.sort((a, b) {
+          final r = rate(b).compareTo(rate(a));
+          return r != 0
+              ? r
+              : (a.salePrice ?? a.price).compareTo(b.salePrice ?? b.price);
+        });
     }
     final start = int.tryParse(cursor ?? '') ?? 0;
     final end = (start + pageSize).clamp(0, all.length);
@@ -892,6 +906,7 @@ base class MockCatalogRepository implements CatalogRepository {
     SortKey.priceDesc => 'PRICE_DESC',
     SortKey.rating => 'RATING',
     SortKey.reviewCount => 'REVIEW_COUNT',
+    SortKey.discountRate => 'DISCOUNT_RATE',
   };
 
   @override
@@ -901,7 +916,11 @@ base class MockCatalogRepository implements CatalogRepository {
   }) async {
     await _wait();
     final base = _match(
-      ProductQuery(keyword: query.keyword, categoryId: query.categoryId),
+      ProductQuery(
+        keyword: query.keyword,
+        categoryId: query.categoryId,
+        onSale: query.onSale,
+      ),
     );
     final counts = <String, int>{};
     for (final p in base) {

@@ -156,6 +156,7 @@ final class ApiCatalogRepository implements CatalogRepository {
         q: query.keyword,
         categoryId: query.categoryId,
         mfcId: mfcId,
+        onSale: query.onSale ? true : null,
       ),
     );
     return filtersFromContract(_body(res.data, 'SearchFilters'));
@@ -301,6 +302,7 @@ sr.SortKey _sortToContract(SortKey s) => switch (s) {
   SortKey.priceDesc => sr.SortKey.PRICE_DESC,
   SortKey.rating => sr.SortKey.RATING,
   SortKey.reviewCount => sr.SortKey.REVIEW_COUNT,
+  SortKey.discountRate => sr.SortKey.DISCOUNT_RATE,
 };
 
 SaleState _saleState(String? wire) => switch (wire) {

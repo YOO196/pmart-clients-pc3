@@ -21,6 +21,7 @@ String sortLabel(AppLocalizations l10n, SortKey s) => switch (s) {
   SortKey.priceDesc => l10n.sortPriceDesc,
   SortKey.rating => l10n.sortRating,
   SortKey.reviewCount => l10n.sortReviewCount,
+  SortKey.discountRate => l10n.sortDiscountRate,
 };
 
 /// SCR-LIST-001 본문. 정렬·필터는 이 위젯이 들고, 결과는 조건별 provider 에서 읽는다.
@@ -62,8 +63,10 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
       closeKey: const ValueKey('sort-close'),
       selected: _sort,
       options: [
+        // 할인율순은 할인 목록에서만(BR-83 — 서버가 onSale 과 함께만 받는다).
         for (final s in SortKey.values)
-          (s, sortLabel(l10n, s), ValueKey('sort-${s.name}')),
+          if (s != SortKey.discountRate || widget.baseQuery.onSale)
+            (s, sortLabel(l10n, s), ValueKey('sort-${s.name}')),
       ],
     );
     if (picked != null && mounted) setState(() => _sort = picked);
@@ -156,13 +159,11 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
     return Column(
       children: [
         ?correction,
-        // 할인 목록(onSale)에는 필터를 두지 않는다 — /search/filters 가 onSale 을 받지 않아 할인 상품 밖의 값까지 나온다.
-        if (!widget.baseQuery.onSale)
-          _AttributeRows(
-            query: widget.baseQuery,
-            picked: _filters,
-            onToggle: _toggleAttribute,
-          ),
+        _AttributeRows(
+          query: widget.baseQuery,
+          picked: _filters,
+          onToggle: _toggleAttribute,
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
           child: Row(
@@ -184,24 +185,22 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
                 label: sortLabel(l10n, _sort),
                 onPressed: _pickSort,
               ),
-              if (!widget.baseQuery.onSale) ...[
-                const SizedBox(width: 6),
-                // 고른 필터 수는 알약 오른쪽 위 작은 동그라미(레퍼런스).
-                Badge(
-                  key: const ValueKey('filter-count'),
-                  isLabelVisible: _filters.isNotEmpty,
-                  label: Text('${_filters.length}'),
-                  backgroundColor: scheme.onSurface,
-                  textColor: scheme.surface,
-                  offset: const Offset(-2, -4),
-                  child: pill(
-                    key: const ValueKey('open-filters'),
-                    icon: PmartLineIcons.filter,
-                    label: l10n.filterTitle,
-                    onPressed: _openFilters,
-                  ),
+              const SizedBox(width: 6),
+              // 고른 필터 수는 알약 오른쪽 위 작은 동그라미(레퍼런스).
+              Badge(
+                key: const ValueKey('filter-count'),
+                isLabelVisible: _filters.isNotEmpty,
+                label: Text('${_filters.length}'),
+                backgroundColor: scheme.onSurface,
+                textColor: scheme.surface,
+                offset: const Offset(-2, -4),
+                child: pill(
+                  key: const ValueKey('open-filters'),
+                  icon: PmartLineIcons.filter,
+                  label: l10n.filterTitle,
+                  onPressed: _openFilters,
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -455,6 +454,7 @@ class _FilterSheetState extends ConsumerState<FilterSheet> {
       ProductQuery(
         keyword: widget.query.keyword,
         categoryId: widget.query.categoryId,
+        onSale: widget.query.onSale,
       ),
     );
     final value = ref.watch(provider);
@@ -700,7 +700,11 @@ class _AttributeRows extends ConsumerWidget {
     final attributes = ref
         .watch(
           filtersProvider(
-            ProductQuery(keyword: query.keyword, categoryId: query.categoryId),
+            ProductQuery(
+              keyword: query.keyword,
+              categoryId: query.categoryId,
+              onSale: query.onSale,
+            ),
           ),
         )
         .value;
