@@ -110,6 +110,7 @@ enum SectionKind {
   ranking,
   highRating,
   inProgressOrder,
+
   /// storefront 0.10.0 배너 묶음(HOME_INLINE) — 상품 대신 [HomeSection.banners].
   banner,
   unknown,
@@ -300,7 +301,11 @@ class ProductQuery {
     this.sort = SortKey.relevance,
     this.filters = const {},
     this.noCorrection = false,
+    this.onSale = false,
   });
+
+  /// 지금 기간 할인이 있는 상품만(search 0.8.0 `onSale`, BR-82) — 카테고리 [할인] 타일.
+  final bool onSale;
 
   /// 오타 교정 없이 원래 검색어로(search 0.4.0 `noCorrection`) — "원래 검색어로 찾기".
   final bool noCorrection;
@@ -318,6 +323,7 @@ class ProductQuery {
     sort: sort ?? this.sort,
     filters: filters ?? this.filters,
     noCorrection: noCorrection,
+    onSale: onSale,
   );
 
   @override
@@ -327,6 +333,7 @@ class ProductQuery {
       other.categoryId == categoryId &&
       other.sort == sort &&
       other.noCorrection == noCorrection &&
+      other.onSale == onSale &&
       setEquals(other.filters, filters);
 
   @override
@@ -335,6 +342,7 @@ class ProductQuery {
     categoryId,
     sort,
     noCorrection,
+    onSale,
     Object.hashAllUnordered(filters),
   );
 }

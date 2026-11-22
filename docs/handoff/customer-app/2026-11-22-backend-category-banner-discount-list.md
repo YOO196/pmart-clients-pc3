@@ -19,3 +19,9 @@
 ## 참고(요청 아님)
 - [기획전] = 홈의 지금 기간 안 첫 MD 탭(없으면 홈), [인기] = 홈 RANKING 탭, [신상] = 홈 NEW 탭 — 기존 계약으로 됨.
 - 고객센터 상자: 전화번호·운영시간이 업무 문서·계약에 없어 넣지 않고 앱 고객센터(`/support`)로 보낸다. 번호·시간을 보일 거면 값의 출처를 정해야 한다(지금은 요청 안 함).
+
+## 백엔드 회신·앱 반영 (2026-11-22)
+- 회신: `../pmart-backend/docs/handoff/clients/customer-app/2026-11-22-reply-br82-category-banner-discount-list.md` (main 41497f1e). storefront 0.11.0(CATEGORY 자리), search 0.8.0(`onSale`).
+- 앱: storefront·search 다시 생성(contracts.lock 41497f1e). `ProductQuery.onSale` 을 더해 `searchProducts(onSale: true)` 로 보낸다. 카테고리 [할인] 타일 → `/products?onSale=true&title=할인 상품`(모든 카테고리, 정렬만 — `/search/filters` 가 onSale 을 받지 않아 필터는 두지 않음). 비면 "지금 할인 중인 상품이 없어요", 503 은 오류·다시 시도.
+- LAN 확인: `onSale=true` total 7(모두 salePrice 있음), `placement=CATEGORY` 배너 B-CAT-VEG·B-CAT-MEAT(linkType CATEGORY → 카테고리 상품 목록).
+- 남은 것: 폰에서 화면 확인 뒤 archive.

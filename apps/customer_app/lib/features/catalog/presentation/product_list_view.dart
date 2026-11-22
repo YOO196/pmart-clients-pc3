@@ -156,11 +156,13 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
     return Column(
       children: [
         ?correction,
-        _AttributeRows(
-          query: widget.baseQuery,
-          picked: _filters,
-          onToggle: _toggleAttribute,
-        ),
+        // 할인 목록(onSale)에는 필터를 두지 않는다 — /search/filters 가 onSale 을 받지 않아 할인 상품 밖의 값까지 나온다.
+        if (!widget.baseQuery.onSale)
+          _AttributeRows(
+            query: widget.baseQuery,
+            picked: _filters,
+            onToggle: _toggleAttribute,
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
           child: Row(
@@ -182,22 +184,24 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
                 label: sortLabel(l10n, _sort),
                 onPressed: _pickSort,
               ),
-              const SizedBox(width: 6),
-              // 고른 필터 수는 알약 오른쪽 위 작은 동그라미(레퍼런스).
-              Badge(
-                key: const ValueKey('filter-count'),
-                isLabelVisible: _filters.isNotEmpty,
-                label: Text('${_filters.length}'),
-                backgroundColor: scheme.onSurface,
-                textColor: scheme.surface,
-                offset: const Offset(-2, -4),
-                child: pill(
-                  key: const ValueKey('open-filters'),
-                  icon: PmartLineIcons.filter,
-                  label: l10n.filterTitle,
-                  onPressed: _openFilters,
+              if (!widget.baseQuery.onSale) ...[
+                const SizedBox(width: 6),
+                // 고른 필터 수는 알약 오른쪽 위 작은 동그라미(레퍼런스).
+                Badge(
+                  key: const ValueKey('filter-count'),
+                  isLabelVisible: _filters.isNotEmpty,
+                  label: Text('${_filters.length}'),
+                  backgroundColor: scheme.onSurface,
+                  textColor: scheme.surface,
+                  offset: const Offset(-2, -4),
+                  child: pill(
+                    key: const ValueKey('open-filters'),
+                    icon: PmartLineIcons.filter,
+                    label: l10n.filterTitle,
+                    onPressed: _openFilters,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -212,7 +216,9 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
                   onRetry: () => ref.invalidate(provider),
                   empty: (_) => Center(
                     child: Text(
-                      widget.baseQuery.keyword == null
+                      widget.baseQuery.onSale
+                          ? l10n.listNoSaleProducts
+                          : widget.baseQuery.keyword == null
                           ? l10n.listNoProducts
                           : l10n.searchNoResult,
                     ),

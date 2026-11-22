@@ -1,7 +1,7 @@
 // 카테고리 화면 레퍼런스 3-3 보강(사용자 2026-11-22 "7, 8 다 추가"):
 // 맨 위 CATEGORY 배너(storefront placement=CATEGORY, BR-82), 아래 추천 타일(할인·기획전·인기·신상)·고객센터 상자.
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
-import 'package:customer_app/features/coupons/presentation/coupon_screens.dart';
+import 'package:customer_app/features/catalog/presentation/product_list_screen.dart';
 import 'package:customer_app/features/support/presentation/inquiry_screens.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -103,13 +103,17 @@ void main() {
     expect(key('home-tab-body-X-DEAL'), findsOneWidget);
   });
 
-  testWidgets('[할인]은 쿠폰함, 고객센터 상자는 고객센터로', (t) async {
+  testWidgets('[할인]은 할인 상품 목록(onSale, BR-82)·필터 없음, 고객센터 상자는 고객센터로', (t) async {
     await openCategories(t);
     await scrollTo(t, 'category-pick-discount');
     await t.tap(key('category-pick-discount'));
     await t.pumpAndSettle();
-    expect(find.byType(CouponBoxScreen), findsOneWidget);
-    GoRouter.of(t.element(find.byType(CouponBoxScreen))).pop();
+    expect(find.byType(ProductListScreen), findsOneWidget);
+    expect(find.text('할인 상품'), findsOneWidget);
+    expect(key('open-filters'), findsNothing);
+    final onSale = mockProducts.where((p) => p.salePrice != null).length;
+    expect(find.text('상품 $onSale개'), findsOneWidget);
+    GoRouter.of(t.element(find.byType(ProductListScreen))).pop();
     await t.pumpAndSettle();
 
     await scrollTo(t, 'category-support');

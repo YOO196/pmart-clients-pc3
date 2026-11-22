@@ -204,7 +204,7 @@ class _CategoryBanners extends ConsumerWidget {
 }
 
 /// 추천 타일 4개(레퍼런스 "B마트 추천" — 할인·기획전·인기·신상). 갈 곳(사용자 2026-11-22):
-/// 할인 = 쿠폰함(할인 상품 목록 API 가 없어 BR-82 로 요청), 기획전 = 홈의 지금 MD 탭(없으면 홈),
+/// 할인 = 할인 상품 목록(search 0.8.0 onSale, BR-82), 기획전 = 홈의 지금 MD 탭(없으면 홈),
 /// 인기 = 홈 랭킹 탭, 신상 = 홈 신상품 탭(서버가 그 탭을 주지 않으면 홈).
 class _Picks extends ConsumerWidget {
   const _Picks();
@@ -278,7 +278,15 @@ class _Picks extends ConsumerWidget {
                 label: l10n.categoryPickDiscount,
                 background: scheme.tertiaryContainer,
                 color: scheme.tertiary,
-                onTap: () => context.push('/me/coupons'),
+                onTap: () => context.push(
+                  Uri(
+                    path: '/products',
+                    queryParameters: {
+                      'onSale': 'true',
+                      'title': l10n.categoryPickDiscountTitle,
+                    },
+                  ).toString(),
+                ),
               ),
               const SizedBox(width: 8),
               tile(

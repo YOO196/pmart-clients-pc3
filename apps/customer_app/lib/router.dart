@@ -396,6 +396,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           child: ProductListScreen(
             categoryId: state.uri.queryParameters['categoryId'] ?? '',
             title: state.uri.queryParameters['title'],
+            onSale: state.uri.queryParameters['onSale'] == 'true',
           ),
         ),
       ),

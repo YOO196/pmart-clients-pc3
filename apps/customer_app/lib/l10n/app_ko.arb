@@ -73,6 +73,8 @@
   },
   "categoryPicksTitle": "바로픽 추천",
   "categoryPickDiscount": "할인",
+  "categoryPickDiscountTitle": "할인 상품",
+  "listNoSaleProducts": "지금 할인 중인 상품이 없어요",
   "categoryPickEvent": "기획전",
   "categoryPickPopular": "인기",
   "categoryPickNew": "신상",

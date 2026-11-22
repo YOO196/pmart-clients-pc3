@@ -139,6 +139,7 @@ final class ApiCatalogRepository implements CatalogRepository {
         cursor: cursor,
         size: searchPageSize,
         noCorrection: query.noCorrection ? true : null,
+        onSale: query.onSale ? true : null,
         cancelToken: cancelToken,
       ),
     );

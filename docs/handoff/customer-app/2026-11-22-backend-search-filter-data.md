@@ -26,3 +26,8 @@
 - Q1: 앱은 지금처럼 `GET /search/filters?categoryId=` 를 쓴다(바꿀 것 없음). 이 응답은 product-service 필터 패널(그룹 이름·선택 방식·옵션 순서)을 그 카테고리 + 조상까지 합쳐(5분 사본) 색인 집계 건수를 붙인 것이고, 상품 없는 옵션은 빠진다. `/categories/{id}/filters` 는 패널 정의 원본(건수 없음·조상 안 합침) — 백오피스·참고용. 두 응답의 그룹·옵션 이름은 같다(색인 filters = "그룹.옵션").
 - Q2: 계약에 가격 구간은 없다 — 앱이 정한 구간으로 `minPrice`·`maxPrice` 를 보내면 된다.
 - R1·R2: LAN 카테고리 트리(v11)에 필터 패널이 하나도 없고 상품 `filterOptions` 도 비어 둘 다 []. 넣으려면 카테고리 트리 새 버전(패널 포함)·상품 속성 수정 → PRODUCT 승인 → 색인 자동 반영. LAN 데이터 변경이라 백엔드가 사용자에게 범위(몇 카테고리)를 먼저 묻는다. 끝나면 다시 알림.
+
+## LAN 반영(PC1 백엔드 회신 `clients/customer-app/2026-11-22-reply-br81-search-filter-data.md`, 2026-11-22 12:19)
+- 카테고리 트리 v12(필터 그룹 282)·상품 463개 속성(내용량·입수·보관·상품명 낱말 근거). search 0.7.0: `/search/filters` 이름을 모든 패널에서 찾고 같은 이름 그룹은 한 줄(key `n:<그룹 이름>`), 새 원산지 줄(key `origin`, 국내산·수입산).
+- 영양 정보(열량·당류)는 검색·필터에 넣지 않음(사용자 결정) — 패널의 "열량"·"저칼로리" 줄은 안 나온다.
+- 앱 확인(PC 1, 12:23): `GET /search/filters?q=라면` → 중량·개당 중량 등 속성, `GET /search/products?q=라면&filters=n:중량.500g ~ 1kg` → 10건. 앱 토큰 형식(`<key>.<value>`) 그대로 맞음. search 다시 생성(contracts.lock 74ae1158). 남은 것: 폰에서 화면 확인 → archive.
