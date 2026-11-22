@@ -51,7 +51,7 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     dispatch: createClient<DispatchPaths>(options),
     // 배차 불가로 취소(claim 0.11.0 DC-1 — 회사 사유 전체 취소는 lines 생략)
     claims: createClient<ClaimPaths>(options),
-    // 라이더 화면 표기 묶음 조회(rider 0.18.0 RS-MFC — "김*수 · 482913")
+    // 라이더 화면 표기 묶음 조회(rider 0.18.0 RS-MFC — "R4785" — ADR-0085)
     rider: createClient<RiderPaths>(options),
   };
 }

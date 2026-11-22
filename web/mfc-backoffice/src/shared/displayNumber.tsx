@@ -1,5 +1,5 @@
 // 화면 번호(ADR-0070, bff 0.14.0·0.15.0 — 백엔드 알림 clients/all/2026-11-18-notice-display-numbers). web/backoffice displayNumber.tsx 와 같은 규칙.
-// - 목록·표에는 화면 번호만: 주문 orderNumber(8자리), 배송 deliveryNumber("주문번호-순번") + 종류, 라이더 가린 이름 + 라이더 번호 6자리.
+// - 목록·표에는 화면 번호만: 주문 orderNumber(8자리), 배송 deliveryNumber("D74939255", 같은 주문 두 번째부터 "D74939255-2") + 종류, 라이더는 번호만 "R4785"(ADR-0085 — 가린 이름은 마우스를 올리면).
 // - 시스템 ID(orderId·deliveryId·riderId·packageId)는 접힌 "시스템 번호" 칸에만(복사 단추).
 // - 화면 번호가 null(옛 기록·번호 전 주문)이면 "번호 없음"만(ADR-0070 덧붙임 2026-11-19 — 끝 8자리도 쓰지 않는다). 번호를 화면에서 만들지 않는다.
 // - 라이더: bff 가 번호를 주면 그대로. 없으면(센터 관리자는 bff 가 null — 0.15.0) rider 0.18.0 `GET /riders/display-names`(RS-MFC,
@@ -38,7 +38,7 @@ export function DisplayNumber({ number, systemId, failed = false }: { readonly n
   return failed ? <Fallback note={m.failed} kind="failed" /> : <Fallback note={m.missing} kind="missing" />;
 }
 
-/** 라이더 한 칸 — "김*수 · 482913". bff 값이 없으면 rider display-names 로 채운다. 라이더가 없으면 부르는 쪽이 정한다. */
+/** 라이더 한 칸 — 번호만 "R4785"(ADR-0085, 사용자 2026-11-22 "R4785 만"), 가린 이름은 title 에. 번호가 없는 옛 기록이면 가린 이름. bff 값이 없으면 rider display-names 로 채운다. 라이더가 없으면 부르는 쪽이 정한다. */
 export function RiderLabel({ rider, riderId }: { readonly rider?: RiderDisplay | null | undefined; readonly riderId?: string | null | undefined }) {
   const api = useApi();
   const id = rider?.riderId ?? riderId ?? null;
@@ -53,9 +53,8 @@ export function RiderLabel({ rider, riderId }: { readonly rider?: RiderDisplay |
   const shown = known ? { nameMasked: rider?.nameMasked ?? null, riderNumber: rider?.riderNumber ?? null } : q.data;
   if (shown?.riderNumber || shown?.nameMasked)
     return (
-      <span data-testid="rider-label" title={id ?? undefined}>
-        {shown.nameMasked ? `${shown.nameMasked}${shown.riderNumber ? ' · ' : ''}` : ''}
-        {shown.riderNumber && <span className="font-mono">{shown.riderNumber}</span>}
+      <span data-testid="rider-label" title={shown.riderNumber ? (shown.nameMasked ?? undefined) : undefined}>
+        {shown.riderNumber ? <span className="font-mono">{shown.riderNumber}</span> : shown.nameMasked}
       </span>
     );
   if (!id) return <span>{messages.none}</span>;

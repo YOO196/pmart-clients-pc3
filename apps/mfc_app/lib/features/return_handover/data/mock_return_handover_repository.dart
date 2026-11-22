@@ -28,7 +28,7 @@ base class MockReturnHandoverRepository implements ReturnHandoverRepository {
   static final _seed = [
     ReturnHandoverView(
       deliveryId: 'dlv-ret-1',
-      deliveryNumber: 'D-1118-0042',
+      deliveryNumber: 'D11180042-2',
       purpose: ReturnPurpose.claimReturn,
       state: 'RETURN_PICKED_UP',
       riderId: 'r-7',
@@ -39,7 +39,7 @@ base class MockReturnHandoverRepository implements ReturnHandoverRepository {
     ),
     ReturnHandoverView(
       deliveryId: 'dlv-ret-2',
-      deliveryNumber: 'D-1118-0051',
+      deliveryNumber: 'D11180051-2',
       purpose: ReturnPurpose.failedDeliveryReturn,
       state: 'ASSIGNED',
       riderId: 'r-9',

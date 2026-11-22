@@ -102,7 +102,7 @@ export const packingHandoverHandlers = [
         // 센터 관리자는 라이더를 못 봐 bff 가 번호·이름을 null 로 준다(0.15.0)
         packages: r.packages.map((p) => ({ ...p, handoverAuthorizedAt: null, rider: hiddenRider(p.riderId) })),
         deliveryId: r.delivery ? `DLV-${r.orderId}` : null,
-        deliveryNumber: r.delivery && r.orderNumber ? `${r.orderNumber}-1` : null,
+        deliveryNumber: r.delivery && r.orderNumber ? `D${r.orderNumber}` : null,
         delivery: r.delivery === null ? null : { state: down ? null : r.delivery, version: down ? null : 1, source: stamp('delivery-execution-service', !down) },
         riderId: down ? null : r.riderId,
         rider: down ? null : hiddenRider(r.riderId),

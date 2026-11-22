@@ -212,7 +212,7 @@ void main() {
             'items': [
               for (final id in ids)
                 if (id != 'r-missing')
-                  {'riderId': id, 'riderNumber': '100000', 'nameMasked': '김*수'},
+                  {'riderId': id, 'riderNumber': 'R1000', 'nameMasked': '김*수'},
             ],
           },
         );
@@ -228,7 +228,7 @@ void main() {
         );
       }
       expect(labels, hasLength(120));
-      expect(labels['r-119']?.text, '김*수 · 100000');
+      expect(labels['r-119']?.text, 'R1000');
       expect(labels.containsKey('r-missing'), isFalse);
     });
 
@@ -281,9 +281,11 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('인계 번호 3817'), findsOneWidget);
     expect(find.text('주문 20000007'), findsOneWidget);
-    expect(find.text('허가받은 라이더: 박*민 · 503217'), findsOneWidget);
-    // 탈퇴로 이름이 지워진 라이더는 번호만.
-    expect(find.text('허가받은 라이더: 611045'), findsOneWidget);
+    // 라이더는 번호만(ADR-0085 "R4785 만") — 가린 이름은 내지 않는다.
+    expect(find.text('허가받은 라이더: R5032'), findsOneWidget);
+    expect(find.textContaining('박*민'), findsNothing);
+    // 탈퇴로 이름이 지워진 라이더도 번호만.
+    expect(find.text('허가받은 라이더: R6110'), findsOneWidget);
     expect(find.textContaining('pkg-chk-1'), findsNothing);
     expect(find.textContaining('order-seed'), findsNothing);
     expect(find.textContaining('rider-mock'), findsNothing);
@@ -340,7 +342,7 @@ void main() {
     expect(
       find.descendant(
         of: dialog,
-        matching: find.textContaining(RegExp(r'허가받은 라이더\(\S+ · \d{6}\)')),
+        matching: find.textContaining(RegExp(r'허가받은 라이더\(R\d{4,5}\)')),
       ),
       findsOneWidget,
     );

@@ -15,7 +15,7 @@ describe('배차 지연', () => {
   it('우리 센터 것만, 약속 이른 순 — 배송 번호(묶음 조회), 라이더 없음, 약속 대비 지난 분', async () => {
     const view = renderAt('/c/MFC-BSN-01/dispatch-delays');
     await waitFor(() => expect(rows()).toHaveLength(2));
-    await waitFor(() => expect(within(rows()[0]!).getAllByTestId('display-number')[0]).toHaveTextContent('35726513-1'));
+    await waitFor(() => expect(within(rows()[0]!).getAllByTestId('display-number')[0]).toHaveTextContent('D35726513'));
     expect(rows()[0]).toHaveTextContent('라이더 찾는 중');
     expect(rows()[0]).toHaveTextContent('라이더 없음');
     expect(within(rows()[0]!).getByTestId('delay-minutes')).toHaveTextContent(/7[45]분 지남/);
