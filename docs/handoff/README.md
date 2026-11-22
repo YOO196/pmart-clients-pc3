@@ -79,3 +79,4 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-22-backend-category-banner-discount-list.md` | BR-82 카테고리 배너 자리 CATEGORY·할인 상품 목록 |
 | `customer-app/2026-11-22-backend-sale-list-filters-sort.md` | BR-83 할인 상품 목록 필터(`/search/filters` onSale)·할인율순 정렬 |
 | `rider-app/2026-11-23-backend-delivery-area-change.md` | 라이더 마이페이지 배달 지역 바꾸기(운행 쉴 때만·한 곳·바로 반영 — 앱 반영 #391). 서버 1) 운행 중 변경 409 INVALID_STATE 로 막기 2) 쉬는 동안 남은 operatingMfcId 정리 3) 없는·운영 안 하는 지점 거절 여부 — 회신 대기 |
+| `rider-app/2026-11-23-backend-rider-list-active-deliveries.md` | 라이더 백오피스 라이더 목록 "진행 중 배송 수"(StaffRiderSummary.activeDeliveryCount — 여러 라이더를 한 번에) — 보냄, 회신 대기 |
