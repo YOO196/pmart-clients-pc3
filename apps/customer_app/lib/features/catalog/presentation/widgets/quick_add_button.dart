@@ -13,6 +13,7 @@ import '../../../cart/presentation/cart_controller.dart';
 import '../../../cart/presentation/cart_messages.dart';
 import '../../domain/catalog.dart';
 import '../catalog_providers.dart';
+import '../../../../shared/floating_cart_bar.dart';
 import '../../../../shared/notice.dart';
 
 /// 상품 카드의 `+` 바로 담기(Commerce §6.11).
@@ -84,14 +85,21 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
           .read(cartControllerProvider.notifier)
           .submitWhenReady(change);
       if (!mounted) return;
-      say(switch (outcome) {
+      final text = switch (outcome) {
         null => l10n.reorderBusy,
         // 서버가 반영한 뒤에만 늘어난 수량을 알린다.
         CartChangeApplied() when inCart != null => l10n.cartInCart(
           inCart.quantity + 1,
         ),
         final o => cartOutcomeText(l10n, o),
-      });
+      };
+      // 성공은 아래 장바구니 막대가 알린다(알림이 목록을 가려서 — 사용자 2026-11-22). 막대 자리가 없는
+      // 화면(찜 목록 등)·실패·확인 중은 그대로 알림.
+      if (outcome is CartChangeApplied && FloatingCartBar.hostedOnScreen()) {
+        ref.read(cartBarPulseProvider.notifier).pulse(text);
+      } else {
+        say(text);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

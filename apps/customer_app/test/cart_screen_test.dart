@@ -360,13 +360,21 @@ void main() {
     await t.tap(find.byKey(const ValueKey('add-to-cart')));
     await t.pumpAndSettle();
 
-    expect(find.text('장바구니에 담았어요'), findsOneWidget);
+    // 화면을 가리는 알림 대신 버튼이 잠깐 "담았어요"(사용자 2026-11-22).
+    expect(find.text('장바구니에 담았어요'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('add-to-cart')),
+        matching: find.text('담았어요'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('장바구니에 2개 있어요'), findsOneWidget);
 
-    // "장바구니 보기" 버튼이 있어도 알림은 잠시 뒤 스스로 닫힌다.
-    await t.pump(const Duration(seconds: 5));
+    // 잠시 뒤 원래 글자로 돌아온다.
+    await t.pump(const Duration(seconds: 2));
     await t.pumpAndSettle();
-    expect(find.text('장바구니에 담았어요'), findsNothing);
+    expect(find.text('담았어요'), findsNothing);
   });
 
   testWidgets('상세에서 상한 초과는 서버 상한으로 안내한다', (t) async {

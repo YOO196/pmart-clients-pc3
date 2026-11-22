@@ -52,9 +52,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// 마지막 홈 조회가 끝난 시각(성공·실패 모두). null 이면 아직 첫 조회 중이다.
   DateTime? _loadedAt;
 
+  /// 다른 화면이 연 탭 요청(카테고리 추천 타일 — 인기·신상·기획전, 사용자 2026-11-22).
+  void _applyTabRequest() {
+    final req = ref.read(homeTabRequestProvider.notifier).take();
+    if (req == null) return;
+    final home = ref.read(homeProvider).value;
+    final now = ref.read(homeClockProvider)();
+    setState(() {
+      if (req.firstCustom) {
+        // 지금 기간 안 첫 MD 탭, 없으면 홈.
+        _customTab = home?.customTabs
+            .where(
+              (c) =>
+                  !_goneTabs.contains(c.tabKey) &&
+                  (c.endsAt == null || c.endsAt!.isAfter(now)),
+            )
+            .firstOrNull
+            ?.tabKey;
+        _tab = HomeTab.home;
+      } else {
+        _customTab = null;
+        _tab = req.tab ?? HomeTab.home;
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    ref.listenManual(homeTabRequestProvider, (_, _) => _applyTabRequest());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _applyTabRequest();
+    });
     ref.listenManual(homeProvider, (_, next) {
       if (next.isLoading) return;
       _loadedAt = ref.read(homeClockProvider)();
@@ -74,7 +103,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           banners,
           onOpen: (b) {
             final home = ref.read(homeProvider).value;
-            if (home != null && mounted) _openBanner(context, b, home);
+            if (home != null && mounted) openHomeBanner(context, b, home);
           },
         ).ignore();
       });
@@ -245,12 +274,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                         .where((b) => !b.middle)
                                         .toList()
                                     case final top when top.isNotEmpty)
-                                  _BannerPager(
+                                  BannerPager(
                                     key: const ValueKey('home-banners-top'),
                                     banners: top,
                                     intervalSeconds: home.bannerIntervalSeconds,
                                     onOpen: (b) =>
-                                        _openBanner(context, b, home),
+                                        openHomeBanner(context, b, home),
                                   ),
                                 // 사용자 캡처(2026-11-20 홈): 배너 아래 배송 안내 → 회색 띠 → 검색·카테고리
                                 const _DeliverySummaryCard(),
@@ -278,7 +307,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                             .where((b) => b.middle)
                                             .toList()
                                         case final mid when mid.isNotEmpty)
-                                      _BannerPager(
+                                      BannerPager(
                                         key: const ValueKey(
                                           'home-banners-middle',
                                         ),
@@ -286,18 +315,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                         intervalSeconds:
                                             home.bannerIntervalSeconds,
                                         onOpen: (b) =>
-                                            _openBanner(context, b, home),
+                                            openHomeBanner(context, b, home),
                                       ),
                                   // 배너 묶음(storefront 0.10.0 kind BANNER) — 받은 순서 그대로 이 자리에서 넘겨 보기
                                   if (s.kind == SectionKind.banner)
-                                    _BannerPager(
+                                    BannerPager(
                                       key: ValueKey('section-${s.sectionId}'),
                                       banners: s.banners,
                                       intervalSeconds:
                                           s.intervalSeconds ??
                                           home.bannerIntervalSeconds,
                                       onOpen: (b) =>
-                                          _openBanner(context, b, home),
+                                          openHomeBanner(context, b, home),
                                     )
                                   else
                                     _SectionView(
@@ -579,11 +608,11 @@ class _CustomTabBody extends ConsumerWidget {
         children: [
           for (final s in value.sections)
             if (s.kind == SectionKind.banner)
-              _BannerPager(
+              BannerPager(
                 key: ValueKey('section-${s.sectionId}'),
                 banners: s.banners,
                 intervalSeconds: s.intervalSeconds,
-                onOpen: (b) => _openBanner(context, b, value),
+                onOpen: (b) => openHomeBanner(context, b, value),
               )
             else
               _SectionView(
@@ -625,11 +654,11 @@ class _TabBody extends ConsumerWidget {
         children: [
           for (final s in value.sections)
             if (s.kind == SectionKind.banner)
-              _BannerPager(
+              BannerPager(
                 key: ValueKey('section-${s.sectionId}'),
                 banners: s.banners,
                 intervalSeconds: s.intervalSeconds,
-                onOpen: (b) => _openBanner(context, b, value),
+                onOpen: (b) => openHomeBanner(context, b, value),
               )
             else
               _SectionView(
@@ -656,8 +685,8 @@ const bannerDefaultInterval = Duration(seconds: 4);
 /// 넘겨 보는 배너. 오른쪽 아래에 `1 / N`.
 /// storefront 0.10.0(백엔드 요청서 7번): 2개 이상이면 [interval](서버 값, 없으면 4초)마다 다음 장으로 — 마지막 다음은 첫 장으로
 /// 이어진다. 손으로 넘기거나 누르고 있는 동안은 멈추고, 손을 떼면 그때부터 다시 센다. 1개면 넘기지 않는다.
-class _BannerPager extends StatefulWidget {
-  const _BannerPager({
+class BannerPager extends StatefulWidget {
+  const BannerPager({
     super.key,
     required this.banners,
     required this.onOpen,
@@ -671,10 +700,10 @@ class _BannerPager extends StatefulWidget {
   final int? intervalSeconds;
 
   @override
-  State<_BannerPager> createState() => _BannerPagerState();
+  State<BannerPager> createState() => _BannerPagerState();
 }
 
-class _BannerPagerState extends State<_BannerPager> {
+class _BannerPagerState extends State<BannerPager> {
   /// 끝없이 넘기려고 가운데쯤에서 시작한다(쪽 번호는 배너 수로 나눈 나머지).
   static const _loopStart = 10000;
 
@@ -699,7 +728,7 @@ class _BannerPagerState extends State<_BannerPager> {
   }
 
   @override
-  void didUpdateWidget(_BannerPager old) {
+  void didUpdateWidget(BannerPager old) {
     super.didUpdateWidget(old);
     if (old.intervalSeconds != widget.intervalSeconds ||
         old.banners.length != widget.banners.length) {
@@ -1804,11 +1833,13 @@ class _PendingPaymentBanner extends ConsumerWidget {
 }
 
 /// 배너 누르기(storefront 0.7.0): 영역 → 그 영역 전체 보기, 상품 → 상세, 카테고리 → 그 카테고리 목록.
-void _openBanner(BuildContext context, HomeBanner b, HomeView home) {
+/// 배너를 누르면 갈 곳. 진열 영역 링크는 [home] 의 영역에서 찾는다(모르면 가지 않음).
+void openHomeBanner(BuildContext context, HomeBanner b, HomeView? home) {
   final ref = b.linkRef;
   if (ref == null || ref.isEmpty) return;
   switch (b.link) {
     case BannerLink.section:
+      if (home == null) return;
       final section = home.sections
           .where((s) => s.sectionId == ref)
           .firstOrNull;

@@ -1028,6 +1028,62 @@ void main() {
     );
   });
 
+  // 카테고리 레퍼런스 3-3 보강(사용자 2026-11-22): 맨 위 CATEGORY 배너, 아래 추천 타일·고객센터.
+  // 상품 카드 + 로 담으면 알림 대신 아래 장바구니 막대가 알린다.
+  testWidgets('category-picks', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp(
+        const [],
+        catalog: MockCatalogRepository(latency: Duration.zero)
+          ..placementBannersJson['CATEGORY'] = [
+            {
+              'bannerId': 'CB-1',
+              'placement': 'CATEGORY',
+              'altText': '라면X김치 국물 조합 특가',
+              'linkType': 'NONE',
+              'sortOrder': 1,
+            },
+          ],
+      ),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/k-$name.png').uri),
+      );
+    }
+
+    await t.tap(find.text('카테고리').last);
+    await shot('1-top');
+    await t.drag(find.byType(Scrollable).first, const Offset(0, -3000));
+    await shot('2-bottom');
+
+    await t.tap(find.text('검색').last);
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('search-field')), '그릭요거트');
+    await t.tap(find.byKey(const ValueKey('search-submit')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('quick-add-P-0002')));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 200));
+    await t.pump(const Duration(milliseconds: 200));
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/k-3-cart-pulse.png').uri),
+    );
+    await t.pump(const Duration(seconds: 2));
+    await t.pumpAndSettle();
+  });
+
   // 마이 > 내 정보 F안(사용자 2026-11-21): 번호 확인 전 / 이름 바꾸기 시트.
   testWidgets('my-info', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

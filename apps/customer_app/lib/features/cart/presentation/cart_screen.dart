@@ -964,6 +964,9 @@ Future<void> _showFeeInfo(BuildContext context) {
 }
 
 /// 상품 상세 하단의 담기 막대. 수량은 절대값이다(이미 담겼으면 그 수량에서 시작).
+/// 상세 [담기] 성공 뒤 버튼이 "담았어요"로 있는 시간.
+const addedButtonDuration = Duration(milliseconds: 1500);
+
 class AddToCartBar extends ConsumerStatefulWidget {
   const AddToCartBar({
     super.key,
@@ -987,6 +990,16 @@ class AddToCartBar extends ConsumerStatefulWidget {
 class _AddToCartBarState extends ConsumerState<AddToCartBar> {
   int? _quantity;
   String? _skuForQuantity;
+
+  /// 방금 담았다 — 버튼 글자를 잠깐 "담았어요"로(알림 대신, 사용자 2026-11-22).
+  bool _justAdded = false;
+  Timer? _addedTimer;
+
+  @override
+  void dispose() {
+    _addedTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1056,7 +1069,9 @@ class _AddToCartBarState extends ConsumerState<AddToCartBar> {
                     child: BigButtonText(
                       child: CommandButton(
                         key: const ValueKey('add-to-cart'),
-                        label: inCart == null
+                        label: _justAdded
+                            ? l10n.cartAddedButton
+                            : inCart == null
                             ? l10n.cartAdd
                             : l10n.cartUpdateQuantity,
                         onPressed: canSubmit
@@ -1092,17 +1107,21 @@ class _AddToCartBarState extends ConsumerState<AddToCartBar> {
       CartChangeNotApplied() => l10n.cartNoticeNotApplied,
       null => null,
     };
-    if (outcome is CartChangeApplied) setState(() => _quantity = null);
+    if (outcome is CartChangeApplied) {
+      // 성공은 버튼이 잠깐 "담았어요"로 바뀌어 알린다(화면을 가리는 알림 대신 — 사용자 2026-11-22).
+      // 담긴 수량은 위 "장바구니에 N개 담겨 있어요" 줄이 서버 값으로 바뀐다.
+      _addedTimer?.cancel();
+      setState(() {
+        _quantity = null;
+        _justAdded = true;
+      });
+      _addedTimer = Timer(addedButtonDuration, () {
+        if (mounted) setState(() => _justAdded = false);
+      });
+      return;
+    }
     if (text == null) return;
-    messenger.notice(
-      text,
-      action: outcome is CartChangeApplied
-          ? SnackBarAction(
-              label: l10n.cartGoToCart,
-              onPressed: () => context.push('/cart'),
-            )
-          : null,
-    );
+    messenger.notice(text);
   }
 }
 

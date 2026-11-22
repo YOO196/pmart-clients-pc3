@@ -99,6 +99,18 @@ enum PmartLineIcons {
 
   /// 되돌리기(↶ — 꺾인 화살표).
   undo,
+
+  /// 할인(% — 두 동그라미 + 사선).
+  percent,
+
+  /// 기획전(가격표 — 구멍 난 꼬리표).
+  tag,
+
+  /// 인기(트로피).
+  trophy,
+
+  /// 신상(반짝이 — 네 꼭지 별 + 작은 별).
+  sparkle,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -552,6 +564,74 @@ class _LinePainter extends CustomPainter {
             ..lineTo(19, 17),
           line,
         );
+      case PmartLineIcons.percent:
+        canvas.drawLine(const Offset(18, 6), const Offset(6, 18), line);
+        canvas.drawCircle(const Offset(7.6, 7.6), 2.4, line);
+        canvas.drawCircle(const Offset(16.4, 16.4), 2.4, line);
+      case PmartLineIcons.tag:
+        canvas.drawPath(
+          Path()
+            ..moveTo(12.6, 3.8)
+            ..lineTo(20.2, 3.8)
+            ..lineTo(20.2, 11.4)
+            ..lineTo(11.4, 20.2)
+            ..lineTo(3.8, 12.6)
+            ..close(),
+          line,
+        );
+        canvas.drawCircle(const Offset(16.2, 7.8), 1.4, line);
+      case PmartLineIcons.trophy:
+        canvas.drawPath(
+          Path()
+            ..moveTo(7, 4.5)
+            ..lineTo(17, 4.5)
+            ..lineTo(17, 9.5)
+            ..arcToPoint(const Offset(7, 9.5), radius: const Radius.circular(5))
+            ..close(),
+          line,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(7, 6.5)
+            ..lineTo(4.4, 6.5)
+            ..arcToPoint(
+              const Offset(7.6, 11.8),
+              radius: const Radius.circular(3),
+              clockwise: false,
+            ),
+          line,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(17, 6.5)
+            ..lineTo(19.6, 6.5)
+            ..arcToPoint(
+              const Offset(16.4, 11.8),
+              radius: const Radius.circular(3),
+            ),
+          line,
+        );
+        canvas.drawLine(const Offset(12, 14.5), const Offset(12, 17.5), line);
+        canvas.drawLine(
+          const Offset(8.5, 19.5),
+          const Offset(15.5, 19.5),
+          line,
+        );
+        canvas.drawLine(
+          const Offset(9.5, 17.5),
+          const Offset(14.5, 17.5),
+          line,
+        );
+      case PmartLineIcons.sparkle:
+        Path star(Offset c, double r) => Path()
+          ..moveTo(c.dx, c.dy - r)
+          ..quadraticBezierTo(c.dx, c.dy, c.dx + r, c.dy)
+          ..quadraticBezierTo(c.dx, c.dy, c.dx, c.dy + r)
+          ..quadraticBezierTo(c.dx, c.dy, c.dx - r, c.dy)
+          ..quadraticBezierTo(c.dx, c.dy, c.dx, c.dy - r)
+          ..close();
+        canvas.drawPath(star(const Offset(10, 13), 7), line);
+        canvas.drawPath(star(const Offset(18, 5.6), 2.8), line);
       case PmartLineIcons.undo:
         canvas.drawPath(
           Path()

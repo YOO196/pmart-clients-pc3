@@ -71,6 +71,14 @@
       }
     }
   },
+  "categoryPicksTitle": "바로픽 추천",
+  "categoryPickDiscount": "할인",
+  "categoryPickEvent": "기획전",
+  "categoryPickPopular": "인기",
+  "categoryPickNew": "신상",
+  "categorySupportTitle": "고객센터",
+  "categorySupportBody": "자주 묻는 질문 · 채팅 상담 · 내 문의",
+  "categorySupportGo": "고객센터 바로가기",
   "categoryTitle": "카테고리",
   "categoryAll": "{name} 전체",
   "@categoryAll": {
@@ -325,6 +333,7 @@
   "cartAdd": "장바구니 담기",
   "cartUpdateQuantity": "수량 바꾸기",
   "cartAdded": "장바구니에 담았어요",
+  "cartAddedButton": "담았어요",
   "cartInCart": "장바구니에 {quantity}개 있어요",
   "@cartInCart": {
     "placeholders": {

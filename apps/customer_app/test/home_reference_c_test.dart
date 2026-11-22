@@ -498,7 +498,20 @@ void main() {
       await t.tap(find.byKey(const ValueKey('quick-add-P-0002')));
       await t.pumpAndSettle();
       expect(cart.adds, ['E-00000002']);
-      expect(find.text('장바구니에 담았어요'), findsOneWidget);
+      // 성공은 화면을 가리는 알림 대신 아래 장바구니 막대가 알린다(사용자 2026-11-22).
+      expect(find.byType(SnackBar), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('home-cart-bar')),
+          matching: find.text('장바구니에 담았어요'),
+        ),
+        findsOneWidget,
+      );
+      // 잠시 뒤 막대는 원래 줄("주문 가능" 등)로 돌아온다.
+      await t.pump(const Duration(seconds: 2));
+      await t.pumpAndSettle();
+      expect(find.text('장바구니에 담았어요'), findsNothing);
+      expect(find.byKey(const ValueKey('home-cart-sub')), findsOneWidget);
     });
 
     testWidgets('이미 담긴 상품은 누를 때마다 1개씩 늘린다(덮어쓰지 않고 서버 수량 + 1)', (t) async {
