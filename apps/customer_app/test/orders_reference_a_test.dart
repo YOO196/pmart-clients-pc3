@@ -362,13 +362,17 @@ void main() {
       );
       expect(find.text('장바구니에 담았어요'), findsOneWidget);
 
-      // 이미 담긴 상품은 다시 보내지 않고 알린다.
+      // 이미 담긴 상품이면 그 수량에 더한다(사용자 2026-11-23) — 담긴 3개 + 주문 3개 = 6개로.
       await t.pump(const Duration(seconds: 3));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('order-line-add-ol-5')));
       await t.pumpAndSettle();
-      expect(cart.changes.sublist(sent), hasLength(1));
-      expect(find.text('장바구니에 3개 있어요'), findsOneWidget);
+      expect(
+        cart.changes.sublist(sent).last,
+        isA<SetQuantity>().having((c) => c.quantity, 'quantity', 6),
+      );
+      expect(find.text('장바구니에 3개 있어요'), findsNothing);
+      expect(find.text('장바구니에 담았어요'), findsOneWidget);
     });
 
     testWidgets(
@@ -414,13 +418,16 @@ void main() {
           expect(added.length, lessThanOrEqualTo(lines.evaluate().length));
         }
 
-        // 다시 누르면 이미 담긴 상품은 보내지 않는다.
+        // 다시 누르면 이미 담긴 상품도 그 수량에 더해 담는다(사용자 2026-11-23).
         await t.pump(const Duration(seconds: 3));
         await t.pumpAndSettle();
         await t.tap(button.first);
         await t.pumpAndSettle();
-        expect(cart.changes.sublist(sent), hasLength(added.length));
-        expect(find.text('이미 장바구니에 있어요'), findsOneWidget);
+        final again = cart.changes.sublist(sent + added.length);
+        expect(again, hasLength(added.length));
+        expect(again, everyElement(isA<SetQuantity>()));
+        expect(find.text('이미 장바구니에 있어요'), findsNothing);
+        expect(find.text('${added.length}개 상품을 장바구니에 담았어요'), findsOneWidget);
       },
     );
 
@@ -498,20 +505,22 @@ void main() {
       await t.pumpAndSettle();
 
       List<String> sentSkus() => [
-        for (final c in cart.changes.sublist(sent)) (c as AddItem).sku,
+        for (final c in cart.changes.sublist(sent))
+          if (c is AddItem) c.sku else 'set:${(c as SetQuantity).quantity}',
       ];
-      expect(sentSkus(), ['E-00000004', 'E-00000002']);
+      // 우유(E-00000001)는 이미 2개 담겨 있어 그 수량에 더한다(SetQuantity).
+      expect(sentSkus(), ['E-00000004', 'E-00000002', startsWith('set:')]);
       String result(String id) =>
           t.widget<Text>(find.byKey(ValueKey('reorder-result-$id'))).data!;
       expect(result('m-1'), '지금 살 수 없는 상품이에요');
       expect(result('m-2'), '장바구니에 담았어요');
-      // 우유는 이미 2개 담겨 있다. 담기는 절대 수량 설정이라 보내지 않고 담긴 수량을 알린다.
-      expect(result('m-3'), '장바구니에 2개 있어요');
+      expect(result('m-3'), '장바구니에 담았어요');
 
       // 다시 누르면 담기지 않은(거절된) 줄만 다시 보낸다.
       await t.tap(find.byKey(const ValueKey('reorder-all')));
       await t.pumpAndSettle();
-      expect(sentSkus(), ['E-00000004', 'E-00000002', 'E-00000004']);
+      expect(sentSkus().last, 'E-00000004');
+      expect(sentSkus(), hasLength(4));
     });
 
     testWidgets('결과 불명이면 거기서 멈추고 다음 품목을 보내지 않는다', (t) async {

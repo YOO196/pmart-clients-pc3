@@ -337,6 +337,23 @@ class CartController extends AsyncNotifier<CartState> {
   /// 다른 화면(주문 상세의 "같은 상품 담기" 등)에서 보내는 변경. 장바구니를 아직 안 읽었으면 읽고, 다른 변경이 진행 중이면
   /// 끝날 때까지 잠깐 기다렸다가 [submit] 한다. 결과 불명인 변경이 걸려 있거나 끝내 바쁘면 null(보내지 않음).
   /// 장바구니 조회 실패는 [PmartFailure] 로 던진다.
+  /// [setAllSelected] 를 다른 변경이 끝난 뒤에(수량 바꾸는 중에 눌러도 잠그지 않는다, 사용자 2026-11-23).
+  Future<CartChangeOutcome?> setAllSelectedWhenReady(
+    bool selected, {
+    int attempts = 20,
+    Duration step = const Duration(milliseconds: 100),
+  }) async {
+    for (var i = 0; ; i++) {
+      final s = await future;
+      if (!ref.mounted || s.sync == CartSync.unknown) return null;
+      if (s.canChange && !_bulkRunning && !_autoRunning) {
+        return setAllSelected(selected);
+      }
+      if (i >= attempts) return null;
+      await Future<void>.delayed(step);
+    }
+  }
+
   Future<CartChangeOutcome?> submitWhenReady(
     CartChange change, {
     int attempts = 20,

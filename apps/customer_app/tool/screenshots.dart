@@ -1349,6 +1349,30 @@ void main() {
       await t.pumpAndSettle();
     }
   });
+  // 취소된 주문 상세 전체(사용자 2026-11-23 "배송 취소 컴포넌트 없애, 처리 내역 디자인 통일").
+  testWidgets('order-detail-cancelled-full', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 6600)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    unawaited(router.push('/orders/order-seed-3'));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/odc-full.png').uri),
+    );
+  });
   // 배송 단계 문구·홈 현황판·끝난 주문 배송현황·전달 완료 사진(사용자 2026-11-21, 레퍼런스 3-1·8·9-2·10).
   testWidgets('delivery-status', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

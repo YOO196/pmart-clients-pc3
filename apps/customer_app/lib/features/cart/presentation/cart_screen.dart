@@ -193,8 +193,9 @@ class _CartHeader extends ConsumerWidget {
           Checkbox(
             key: const ValueKey('cart-select-all'),
             value: allSelected,
-            onChanged: (state.canChange && selectable.isNotEmpty)
-                ? (_) => controller.setAllSelected(!allSelected)
+            // 다른 변경이 처리 중이어도 누를 수 있다 — 끝나면 이어서 보낸다(결과 불명일 때만 막음).
+            onChanged: (state.sync != CartSync.unknown && selectable.isNotEmpty)
+                ? (_) => controller.setAllSelectedWhenReady(!allSelected)
                 : null,
           ),
           Expanded(
@@ -334,6 +335,32 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
   int? _pending;
   Timer? _timer;
 
+  /// 누른 선택 값(서버 반영 전). 다른 변경(수량 등)이 처리 중이어도 체크를 받아 두고, 끝나면 이어서 보낸다
+  /// (사용자 2026-11-23 "수량 바꿀 때 선택 잠금 — UX 안 좋아"). null 이면 서버 값 그대로.
+  bool? _selectTarget;
+  bool _selecting = false;
+
+  Future<void> _toggleSelect(bool want) async {
+    setState(() => _selectTarget = want);
+    if (_selecting) return; // 보내는 중이면 끝난 뒤 마지막 값으로 한 번 더 보낸다.
+    _selecting = true;
+    final controller = ref.read(cartControllerProvider.notifier);
+    try {
+      while (mounted) {
+        final target = _selectTarget;
+        if (target == null || target == line.selected) break;
+        final outcome = await controller.submitWhenReady(
+          SetSelected(cartItemId: line.cartItemId, selected: target),
+        );
+        // 반영이 아니면(거절·불명·바쁨) 멈추고 서버 값으로 돌아간다 — 이유는 장바구니 알림이 보인다.
+        if (outcome is! CartChangeApplied) break;
+      }
+    } finally {
+      _selecting = false;
+      if (mounted) setState(() => _selectTarget = null);
+    }
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -410,7 +437,6 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final controller = ref.read(cartControllerProvider.notifier);
     // 주문하기가 422 INSUFFICIENT_STOCK 으로 막혔을 때 서버가 짚은 상품(order 0.8.0). 수량을 맞추면 사라진다.
     final shortage = switch (ref.watch(stockShortageProvider)[line.sku]) {
       final s? when s.stillShortAt(line.quantity) => s,
@@ -460,13 +486,13 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
             children: [
               Checkbox(
                 key: ValueKey('cart-select-$id'),
-                value: line.selected,
+                value: _selectTarget ?? line.selected,
                 // 구매 불가 품목은 새로 고르는 것만 막는다. 이미 선택된 채 품절·미취급이 됐으면
                 // 해제는 할 수 있어야 한다(선택 합계에서 빼려면). 삭제는 언제나 가능.
-                onChanged: (enabled && (line.purchasable || line.selected))
-                    ? (v) => controller.submit(
-                        SetSelected(cartItemId: id, selected: v ?? false),
-                      )
+                // 다른 변경이 처리 중이어도 누를 수 있다(차례로 보냄). 결과 불명일 때만 막는다.
+                onChanged:
+                    (!widget.unknown && (line.purchasable || line.selected))
+                    ? (v) => unawaited(_toggleSelect(v ?? false))
                     : null,
               ),
               Expanded(

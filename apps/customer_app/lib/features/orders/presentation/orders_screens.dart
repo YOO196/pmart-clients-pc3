@@ -76,9 +76,6 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
   bool _searching = false;
   final _searchCtl = TextEditingController();
 
-  /// 숨기기 진행 중인 주문(버튼 비활성).
-  final _hiding = <String>{};
-
   /// [더보기]를 누른 주문(카드에 나머지 줄을 그린다).
   final _expanded = <String>{};
 
@@ -464,21 +461,6 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     });
   }
 
-  /// 숨기기: 확인 창 → `POST /orders/{id}/hides`([confirmAndHideOrder]).
-  Future<void> _hide(AppLocalizations l10n, OrderListItem o) async {
-    await confirmAndHideOrder(
-      context,
-      ref,
-      o.orderId,
-      onSending: (sending) {
-        if (!mounted) return;
-        setState(
-          () => sending ? _hiding.add(o.orderId) : _hiding.remove(o.orderId),
-        );
-      },
-    );
-  }
-
   Widget _pill({
     required Key key,
     required Widget label,
@@ -670,7 +652,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
     );
   }
 
-  /// 주문 카드 한 장: 배송 방식·상태 · "주문 상세" 알약 / 주문 시각(크게) / 대표 상품 · 금액 / (끝난 주문) 삭제.
+  /// 주문 카드 한 장: 배송 방식·상태 · "주문 상세" 알약 / 주문 시각(크게) / 대표 상품 · 금액 / (끝난 주문) 같은 상품 담기.
   Widget _orderCard(
     BuildContext context,
     AppLocalizations l10n,
@@ -898,24 +880,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
                   onPressed: () => context.push('/orders/${o.orderId}'),
                 ),
         ],
-        if (o.canHide)
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              key: ValueKey('order-hide-${o.orderId}'),
-              style: TextButton.styleFrom(
-                foregroundColor: scheme.onSurfaceVariant,
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                minimumSize: const Size(0, 32),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                textStyle: theme.textTheme.bodySmall,
-              ),
-              onPressed: _hiding.contains(o.orderId)
-                  ? null
-                  : () => _hide(l10n, o),
-              child: Text(l10n.ordersHide),
-            ),
-          ),
+        // 목록 카드의 [삭제]는 뺐다(사용자 2026-11-23 "주문마다 붙어 있는 삭제 버튼 지워") — 삭제는 주문 상세 맨 아래에서만.
       ],
     );
   }
@@ -1445,15 +1410,18 @@ class _OrderBody extends ConsumerWidget {
             ),
           // 배송 완료된 배송 칸은 그리지 않는다(사용자 2026-11-21 — 위 단계 제목이 이미 "배달이 완료됐어요"를 말한다).
           // 단, 방금 "받았어요"를 눌러 결과(완료·접수·확인 중)를 보이는 배송은 남긴다 — 결과·다시 확인을 숨기지 않는다.
+          // 취소된 주문은 배송 칸을 그리지 않는다(사용자 2026-11-23 "주문취소됐을 때 배송 취소 컴포넌트 없애") — 위 제목이
+          // 이미 "주문이 취소됐어요"를 말한다.
           for (final (i, s) in o.shipments.indexed)
-            if (s.state != ShipmentState.delivered ||
-                (s.deliveryId != null &&
-                    ref.watch(
-                      receiptConfirmationProvider((
-                        orderId: o.orderId,
-                        deliveryId: s.deliveryId!,
-                      )),
-                    ) is! ReceiptIdle))
+            if (o.status != OrderStatus.cancelled &&
+                (s.state != ShipmentState.delivered ||
+                    (s.deliveryId != null &&
+                        ref.watch(
+                          receiptConfirmationProvider((
+                            orderId: o.orderId,
+                            deliveryId: s.deliveryId!,
+                          )),
+                        ) is! ReceiptIdle)))
               Card(
                 key: ValueKey('shipment-${s.shipmentId}'),
                 margin: const EdgeInsets.only(top: 12),
@@ -1703,48 +1671,76 @@ class _ClaimsSection extends ConsumerWidget {
         !value.hasValue &&
         (order.status == OrderStatus.cancelled || order.claims.isNotEmpty);
     if (items.isEmpty && !failed) return const SizedBox.shrink();
+    final scheme = theme.colorScheme;
+    // 다른 칸(주문 상품·결제 정보·배달 정보)과 같은 모양: 제목 + 테두리 카드, 칸 사이 32(사용자 2026-11-23 "처리 내역 디자인 통일").
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 16),
-        Text(l10n.orderClaimsTitle, style: theme.textTheme.titleMedium),
-        if (failed)
-          Row(
-            key: const ValueKey('order-claims-failed'),
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.orderClaimsLoadFailed,
-                  style: TextStyle(color: theme.colorScheme.error),
+        const SizedBox(height: 32),
+        _DetailTitle(l10n.orderClaimsTitle),
+        _DetailBox(
+          children: [
+            if (failed)
+              Row(
+                key: const ValueKey('order-claims-failed'),
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.orderClaimsLoadFailed,
+                      style: TextStyle(color: scheme.error),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => ref.invalidate(provider),
+                    child: Text(l10n.checkoutCheckAgain),
+                  ),
+                ],
+              ),
+            // 취소된 주문이면 가장 최근 취소 클레임의 사유로 자동 취소인지 본다(주문 상세 `claims` 는 아직 비어 있다)
+            if (order.status == OrderStatus.cancelled)
+              if (items.where((c) => c.type == ClaimType.cancel).firstOrNull
+                  case final latest?)
+                _AutoCancelNotice(claimId: latest.claimId),
+            for (final (i, c) in items.indexed) ...[
+              if (i > 0 || failed) const Divider(height: 20),
+              InkWell(
+                key: ValueKey('order-claim-${c.claimId}'),
+                onTap: () => onVisit('/claims/${c.claimId}'),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            claimTypeText(l10n, c.type),
+                            style: theme.textTheme.bodyLarge,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            [
+                              claimStateText(l10n, c.state, type: c.type),
+                              if (c.openedAt case final t?)
+                                l10n.claimOpenedAt(formatSeoulDateTime(t)),
+                            ].join(' · '),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    PmartLineIcon(
+                      PmartLineIcons.chevronRight,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ],
                 ),
               ),
-              TextButton(
-                onPressed: () => ref.invalidate(provider),
-                child: Text(l10n.checkoutCheckAgain),
-              ),
             ],
-          ),
-        // 취소된 주문이면 가장 최근 취소 클레임의 사유로 자동 취소인지 본다(주문 상세 `claims` 는 아직 비어 있다)
-        if (order.status == OrderStatus.cancelled)
-          if (items.where((c) => c.type == ClaimType.cancel).firstOrNull
-              case final latest?)
-            _AutoCancelNotice(claimId: latest.claimId),
-        for (final c in items)
-          ListTile(
-            key: ValueKey('order-claim-${c.claimId}'),
-            contentPadding: EdgeInsets.zero,
-            leading: const PmartLineIcon(PmartLineIcons.refresh),
-            title: Text(claimTypeText(l10n, c.type)),
-            subtitle: Text(
-              [
-                claimStateText(l10n, c.state, type: c.type),
-                if (c.openedAt case final t?)
-                  l10n.claimOpenedAt(formatSeoulDateTime(t)),
-              ].join(' · '),
-            ),
-            trailing: const PmartLineIcon(PmartLineIcons.chevronRight),
-            onTap: () => onVisit('/claims/${c.claimId}'),
-          ),
+          ],
+        ),
       ],
     );
   }
@@ -1815,6 +1811,20 @@ class _PaymentMethodRow extends ConsumerWidget {
   }
 }
 
+/// 지난 주문 상품을 다시 담는 변경. 같은 SKU 가 이미 있으면 그 줄 수량에 더한다(사용자 2026-11-23 "같은 상품 장바구니에
+/// 있다고 뜨지 말고 추가해줘") — 담기(AddItem)는 절대 수량 설정이라 있는 줄은 SetQuantity(있는 수량 + 주문 수량)로 보낸다.
+/// 상한 초과 등은 서버가 거절하고 그 이유를 보인다.
+CartChange reorderChange(Cart cart, String sku, int quantity) {
+  final qty = quantity < 1 ? 1 : quantity;
+  final inCart = cart.lineForSku(sku);
+  return inCart == null
+      ? AddItem(sku: sku, quantity: qty)
+      : SetQuantity(
+          cartItemId: inCart.cartItemId,
+          quantity: inCart.quantity + qty,
+        );
+}
+
 /// 한 줄의 "같은 상품 담기" 결과. 서버 응답을 그대로 안내한다(담기 전 판정·추정 없음).
 @immutable
 sealed class _Reorder {
@@ -1829,13 +1839,6 @@ final class _ReorderDone extends _Reorder {
   const _ReorderDone(this.outcome);
 
   final CartChangeOutcome outcome;
-}
-
-/// 같은 SKU 가 이미 장바구니에 있다. 담기는 절대 수량 설정이라 보내면 담아 둔 수량을 바꾸므로 보내지 않는다.
-final class _ReorderInCart extends _Reorder {
-  const _ReorderInCart(this.quantity);
-
-  final int quantity;
 }
 
 /// 장바구니가 다른 변경(결과 불명 포함)을 처리 중이라 보내지 않았다.
@@ -1864,7 +1867,6 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
   bool _running = false;
 
   bool _settled(_Reorder? r) =>
-      r is _ReorderInCart ||
       (r is _ReorderDone && r.outcome is CartChangeApplied);
 
   /// 한 줄 담기. 다음 줄로 이어가도 되는지 돌려준다(결과 불명·장바구니 바쁨·조회 실패면 멈춘다).
@@ -1873,18 +1875,12 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
     _Reorder result;
     try {
       final cart = await ref.read(cartControllerProvider.future);
-      final inCart = cart.cart.lineForSku(line.sku);
-      if (inCart != null) {
-        result = _ReorderInCart(inCart.quantity);
-      } else {
-        final qty = line.originalQty ?? 1;
-        final outcome = await ref
-            .read(cartControllerProvider.notifier)
-            .submitWhenReady(
-              AddItem(sku: line.sku, quantity: qty < 1 ? 1 : qty),
-            );
-        result = outcome == null ? const _ReorderBusy() : _ReorderDone(outcome);
-      }
+      final outcome = await ref
+          .read(cartControllerProvider.notifier)
+          .submitWhenReady(
+            reorderChange(cart.cart, line.sku, line.originalQty ?? 1),
+          );
+      result = outcome == null ? const _ReorderBusy() : _ReorderDone(outcome);
     } on PmartFailure {
       result = const _ReorderCartFailed();
     }
@@ -1892,7 +1888,6 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
     setState(() => _results[line.orderLineId] = result);
     return switch (result) {
       _ReorderDone(:final outcome) => outcome is! CartChangeUnknown,
-      _ReorderInCart() => true,
       _ => false,
     };
   }
@@ -1913,7 +1908,6 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
   String? _text(AppLocalizations l10n, _Reorder? r) => switch (r) {
     null => null,
     _ReorderRunning() => l10n.reorderRunning,
-    _ReorderInCart(:final quantity) => l10n.cartInCart(quantity),
     _ReorderBusy() => l10n.reorderBusy,
     _ReorderCartFailed() => l10n.cartUnavailableForAdd,
     _ReorderDone(:final outcome) => switch (outcome) {
@@ -2206,17 +2200,9 @@ class _ReorderAllButtonState extends ConsumerState<ReorderAllButton> {
     try {
       for (final line in widget.lines) {
         final cart = await ref.read(cartControllerProvider.future);
-        if (cart.cart.lineForSku(line.sku) != null) {
-          continue;
-        }
         final outcome = await ref
             .read(cartControllerProvider.notifier)
-            .submitWhenReady(
-              AddItem(
-                sku: line.sku,
-                quantity: line.quantity < 1 ? 1 : line.quantity,
-              ),
-            );
+            .submitWhenReady(reorderChange(cart.cart, line.sku, line.quantity));
         switch (outcome) {
           case null:
             stop = l10n.reorderBusy;
@@ -2268,7 +2254,7 @@ class _ReorderAllButtonState extends ConsumerState<ReorderAllButton> {
   }
 }
 
-/// 지난 주문의 상품을 장바구니에 다시 담는 동그란 ⊕(주문내역 카드). 이미 담긴 상품은 새로 담지 않고 알린다.
+/// 지난 주문의 상품을 장바구니에 다시 담는 동그란 ⊕(주문내역 카드). 이미 담긴 상품이면 그 수량에 더한다.
 /// 결과는 알림으로 — 서버가 반영한 뒤에만 "담았어요"라고 한다.
 class ReorderButton extends ConsumerStatefulWidget {
   const ReorderButton({super.key, required this.sku, required this.quantity});
@@ -2291,22 +2277,14 @@ class _ReorderButtonState extends ConsumerState<ReorderButton> {
     String text;
     try {
       final cart = await ref.read(cartControllerProvider.future);
-      final inCart = cart.cart.lineForSku(widget.sku);
-      if (inCart != null) {
-        text = l10n.cartInCart(inCart.quantity);
-      } else {
-        final outcome = await ref
-            .read(cartControllerProvider.notifier)
-            .submitWhenReady(
-              AddItem(
-                sku: widget.sku,
-                quantity: widget.quantity < 1 ? 1 : widget.quantity,
-              ),
-            );
-        text = outcome == null
-            ? l10n.reorderBusy
-            : cartOutcomeText(l10n, outcome);
-      }
+      final outcome = await ref
+          .read(cartControllerProvider.notifier)
+          .submitWhenReady(
+            reorderChange(cart.cart, widget.sku, widget.quantity),
+          );
+      text = outcome == null
+          ? l10n.reorderBusy
+          : cartOutcomeText(l10n, outcome);
     } on PmartFailure {
       text = l10n.cartUnavailableForAdd;
     }

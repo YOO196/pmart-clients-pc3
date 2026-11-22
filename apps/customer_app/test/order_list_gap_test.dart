@@ -129,29 +129,11 @@ void main() {
     expect(find.byKey(const ValueKey('order-order-seed-4')), findsNothing);
   });
 
-  testWidgets('숨기기: 끝난 주문에만 버튼, 확인 창 뒤 서버가 숨긴 뒤 목록에서 빠짐', (t) async {
+  testWidgets('목록 카드에는 [삭제]가 없다 — 삭제는 주문 상세에서만(사용자 2026-11-23)', (t) async {
     await openOrders(t);
-    // 진행 중 주문(order-seed-4 CONFIRMED)에는 버튼이 없다.
+    expect(find.byKey(const ValueKey('order-order-seed-3')), findsOneWidget);
+    expect(find.byKey(const ValueKey('order-hide-order-seed-3')), findsNothing);
     expect(find.byKey(const ValueKey('order-hide-order-seed-4')), findsNothing);
-    expect(
-      find.byKey(const ValueKey('order-hide-order-seed-3')),
-      findsOneWidget,
-    );
-
-    // 취소를 누르면 보내지 않는다.
-    await t.tap(find.byKey(const ValueKey('order-hide-order-seed-3')));
-    await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('orders-hide-cancel')));
-    await t.pumpAndSettle();
-    expect(orders.hideKeys, isEmpty);
-
-    await t.tap(find.byKey(const ValueKey('order-hide-order-seed-3')));
-    await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('orders-hide-confirm')));
-    await t.pumpAndSettle();
-    expect(orders.hideKeys.keys, ['order-seed-3']);
-    expect(find.text('주문 내역에서 삭제했어요'), findsOneWidget);
-    expect(find.byKey(const ValueKey('order-order-seed-3')), findsNothing);
   });
 
   test('계약 → 앱: 상품 줄(앞 5개)·센터 이름, 나머지는 "외 N개"(전체 수량 − 보인 수량)', () {

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -38,6 +39,11 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  static const _slideDuration = Duration(milliseconds: 260);
+
+  /// 좌우로 이만큼(논리 픽셀) 끌어야 옆 탭으로 넘어간다 — 화면 폭 360 의 약 1/4.
+  static const _swipeMinDistance = 90.0;
+
   HomeTab _tab = HomeTab.home;
 
   /// 고른 MD 탭(storefront 0.9.0 customTabs). null 이면 고정 탭([_tab]).
@@ -45,6 +51,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   /// 기간이 끝나 지운 MD 탭(시각이 지났거나 서버가 404 TAB_NOT_FOUND).
   final _goneTabs = <String>{};
+
+  /// 탭 바뀜 미끄럼 방향(사용자 2026-11-23 "탭 이동할 때 좌우 슬라이딩"): 오른쪽 탭으로 가면 1(오른쪽에서 들어옴),
+  /// 왼쪽이면 -1. [_tabIndex] 는 마지막으로 그린 탭 순서.
+  int _slideFrom = 0;
+  int? _tabIndex;
+
+  /// 좌우로 끈 거리(사용자 2026-11-23 "안 민감한 선에서 좌우 드래그로 탭 넘기기").
+  double _swipeDx = 0;
 
   GoRouter? _router;
   String? _lastPath;
@@ -195,7 +209,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
-        shape: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+        // 홈 탭바 A안(사용자 2026-11-21 확정, 초안 `../고객앱 ui/05_홈_탭바`): 상단바와 탭 사이 선을 없앤다 — 선은 탭 줄 아래 한 줄만.
+        // 내리면 위에 붙는 검색창이 옅은 그림자로 경계를 보인다.
         toolbarHeight: 58,
         centerTitle: false,
         titleSpacing: 16,
@@ -234,125 +249,226 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     .firstOrNull;
                 final tab = home.tabs.contains(_tab) ? _tab : HomeTab.home;
                 final isHome = custom == null && tab == HomeTab.home;
+                // 탭 순서: 고정 탭 → MD 탭. 바뀌었으면 미끄럼 방향을 정한다(첫 그림은 미끄럼 없음).
+                final order = <Object>[
+                  ...home.tabs,
+                  ...customs.map((c) => c.tabKey),
+                ];
+                final index = order.indexOf(custom?.tabKey ?? tab);
+                if (_tabIndex != null && index != _tabIndex) {
+                  _slideFrom = index > _tabIndex! ? 1 : -1;
+                }
+                _tabIndex = index;
+                final slideKey = custom?.tabKey ?? tab.name;
+                void goTo(int i) {
+                  if (i < 0 || i >= order.length) return;
+                  final next = order[i];
+                  setState(() {
+                    if (next is HomeTab) {
+                      _tab = next;
+                      _customTab = null;
+                    } else {
+                      _customTab = next as String;
+                    }
+                  });
+                }
+
                 // 진행 중 주문은 화면 아래에 떠 있는 카드(레퍼런스 3-1 배달중). 목록 끝이 가리지 않게 아래 여백을 둔다.
                 return Stack(
                   children: [
-                    RefreshIndicator(
-                      onRefresh: _refresh,
-                      // 사용자 요청(2026-11-20): 아래로 내려도 검색창은 위에 붙어 남는다(배너·배송 안내는 올라간다).
-                      child: CustomScrollView(
-                        key: const ValueKey('home-scroll'),
-                        slivers: [
-                          SliverList.list(
-                            children: [
-                              // 상단바가 흰 바탕이 되어(D안) 그 아래 회색 번짐을 뺐다.
-                              const Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  SizedBox(height: 4),
-                                  _PendingPaymentBanner(),
-                                  _InProgressOrderCard(),
-                                ],
+                    RawGestureDetector(
+                      // 좌우로 길게 끌면 옆 탭으로. 안쪽 가로 목록(배너·상품 줄)은 그 목록이 먼저 받는다.
+                      // 덜 민감하게: 가로로 판정하는 거리를 기본의 2배로(살짝 비스듬한 세로 스크롤은 세로로),
+                      // 놓을 때 [_swipeMinDistance] 이상 끌었어야 넘긴다.
+                      gestures: {
+                        if (order.length > 1)
+                          HorizontalDragGestureRecognizer:
+                              GestureRecognizerFactoryWithHandlers<
+                                HorizontalDragGestureRecognizer
+                              >(
+                                () =>
+                                    HorizontalDragGestureRecognizer(
+                                        debugOwner: this,
+                                      )
+                                      // 누른 자리부터 잰다(가로 판정 전 움직임도 거리에 넣는다).
+                                      ..dragStartBehavior =
+                                          DragStartBehavior.down
+                                      ..gestureSettings =
+                                          const DeviceGestureSettings(
+                                            touchSlop: kTouchSlop * 2,
+                                          ),
+                                (HorizontalDragGestureRecognizer r) {
+                                  r
+                                    ..onStart = (DragStartDetails _) {
+                                      _swipeDx = 0;
+                                    }
+                                    ..onUpdate = (DragUpdateDetails d) {
+                                      _swipeDx += d.delta.dx;
+                                    }
+                                    ..onEnd = (DragEndDetails d) {
+                                      final v = d.primaryVelocity ?? 0;
+                                      if (_swipeDx.abs() < _swipeMinDistance ||
+                                          (v != 0 && v.sign != _swipeDx.sign)) {
+                                        return;
+                                      }
+                                      goTo(index + (_swipeDx < 0 ? 1 : -1));
+                                    };
+                                },
                               ),
-                              if (home.tabs.length > 1 || customs.isNotEmpty)
-                                _HomeTabs(
-                                  tabs: home.tabs,
-                                  selected: custom == null ? tab : null,
-                                  onSelected: (t) => setState(() {
-                                    _tab = t;
-                                    _customTab = null;
-                                  }),
-                                  customTabs: customs,
-                                  selectedCustom: custom?.tabKey,
-                                  onSelectedCustom: (k) =>
-                                      setState(() => _customTab = k),
-                                  onCustomGone: _dropCustomTab,
+                      },
+                      child: RefreshIndicator(
+                        onRefresh: _refresh,
+                        // 사용자 요청(2026-11-20): 아래로 내려도 검색창은 위에 붙어 남는다(배너·배송 안내는 올라간다).
+                        child: CustomScrollView(
+                          key: const ValueKey('home-scroll'),
+                          slivers: [
+                            SliverList.list(
+                              children: [
+                                // 상단바가 흰 바탕이 되어(D안) 그 아래 회색 번짐을 뺐다.
+                                const Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    SizedBox(height: 4),
+                                    _PendingPaymentBanner(),
+                                    _InProgressOrderCard(),
+                                  ],
                                 ),
-                              if (isHome) ...[
-                                // HOME_TOP 배너(가로 넘기기). 없으면 자리를 비운다.
-                                if (home.banners
-                                        .where((b) => !b.middle)
-                                        .toList()
-                                    case final top when top.isNotEmpty)
-                                  BannerPager(
-                                    key: const ValueKey('home-banners-top'),
-                                    banners: top,
-                                    intervalSeconds: home.bannerIntervalSeconds,
-                                    onOpen: (b) =>
-                                        openHomeBanner(context, b, home),
+                                if (home.tabs.length > 1 || customs.isNotEmpty)
+                                  _HomeTabs(
+                                    key: const ValueKey('home-tabs'),
+                                    tabs: home.tabs,
+                                    selected: custom == null ? tab : null,
+                                    onSelected: (t) => setState(() {
+                                      _tab = t;
+                                      _customTab = null;
+                                    }),
+                                    customTabs: customs,
+                                    selectedCustom: custom?.tabKey,
+                                    onSelectedCustom: (k) =>
+                                        setState(() => _customTab = k),
+                                    onCustomGone: _dropCustomTab,
                                   ),
-                                // 사용자 캡처(2026-11-20 홈): 배너 아래 배송 안내 → 회색 띠 → 검색·카테고리
-                                const _DeliverySummaryCard(),
-                                const PmartSectionGap(height: 8),
+                                if (isHome)
+                                  _SlideIn(
+                                    key: ValueKey('slide-top-$slideKey'),
+                                    from: _slideFrom,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        // HOME_TOP 배너(가로 넘기기). 없으면 자리를 비운다.
+                                        if (home.banners
+                                                .where((b) => !b.middle)
+                                                .toList()
+                                            case final top when top.isNotEmpty)
+                                          BannerPager(
+                                            key: const ValueKey(
+                                              'home-banners-top',
+                                            ),
+                                            banners: top,
+                                            intervalSeconds:
+                                                home.bannerIntervalSeconds,
+                                            onOpen: (b) => openHomeBanner(
+                                              context,
+                                              b,
+                                              home,
+                                            ),
+                                          ),
+                                        // 사용자 캡처(2026-11-20 홈): 배너 아래 배송 안내 → 회색 띠 → 검색·카테고리
+                                        const _DeliverySummaryCard(),
+                                        const PmartSectionGap(height: 8),
+                                      ],
+                                    ),
+                                  ),
                               ],
-                            ],
-                          ),
-                          if (isHome)
-                            const SliverPersistentHeader(
-                              pinned: true,
-                              delegate: _PinnedSearchBar(),
                             ),
-                          SliverList.list(
-                            children: [
-                              if (isHome) ...[
-                                const _CategoryShortcuts(),
-                                const SizedBox(height: 14),
-                                const PmartSectionGap(height: 10),
-                                // 레퍼런스: 섹션마다 회색 띠(약 8dp)로 나눈다.
-                                for (final (i, s) in home.sections.indexed) ...[
-                                  if (i > 0) const PmartSectionGap(height: 8),
-                                  // HOME_MIDDLE 배너는 첫 영역 아래(storefront 0.7.0)
-                                  if (i == 1)
-                                    if (home.banners
-                                            .where((b) => b.middle)
-                                            .toList()
-                                        case final mid when mid.isNotEmpty)
-                                      BannerPager(
-                                        key: const ValueKey(
-                                          'home-banners-middle',
+                            if (isHome)
+                              const SliverPersistentHeader(
+                                pinned: true,
+                                delegate: _PinnedSearchBar(),
+                              ),
+                            SliverList.list(
+                              children: [
+                                // 영역마다 따로 감싼다(한 Column 으로 묶으면 화면 밖 영역까지 한꺼번에 만든다).
+                                for (final (i, w) in <Widget>[
+                                  if (isHome) ...[
+                                    const _CategoryShortcuts(),
+                                    const SizedBox(height: 14),
+                                    const PmartSectionGap(height: 10),
+                                    // 레퍼런스: 섹션마다 회색 띠(약 8dp)로 나눈다.
+                                    for (final (i, s)
+                                        in home.sections.indexed) ...[
+                                      if (i > 0)
+                                        const PmartSectionGap(height: 8),
+                                      // HOME_MIDDLE 배너는 첫 영역 아래(storefront 0.7.0)
+                                      if (i == 1)
+                                        if (home.banners
+                                                .where((b) => b.middle)
+                                                .toList()
+                                            case final mid when mid.isNotEmpty)
+                                          BannerPager(
+                                            key: const ValueKey(
+                                              'home-banners-middle',
+                                            ),
+                                            banners: mid,
+                                            intervalSeconds:
+                                                home.bannerIntervalSeconds,
+                                            onOpen: (b) => openHomeBanner(
+                                              context,
+                                              b,
+                                              home,
+                                            ),
+                                          ),
+                                      // 배너 묶음(storefront 0.10.0 kind BANNER) — 받은 순서 그대로 이 자리에서 넘겨 보기
+                                      if (s.kind == SectionKind.banner)
+                                        BannerPager(
+                                          key: ValueKey(
+                                            'section-${s.sectionId}',
+                                          ),
+                                          banners: s.banners,
+                                          intervalSeconds:
+                                              s.intervalSeconds ??
+                                              home.bannerIntervalSeconds,
+                                          onOpen: (b) =>
+                                              openHomeBanner(context, b, home),
+                                        )
+                                      else
+                                        _SectionView(
+                                          key: ValueKey(
+                                            'section-${s.sectionId}',
+                                          ),
+                                          section: s,
+                                          layoutVersion: home.layoutVersion,
                                         ),
-                                        banners: mid,
-                                        intervalSeconds:
-                                            home.bannerIntervalSeconds,
-                                        onOpen: (b) =>
-                                            openHomeBanner(context, b, home),
+                                    ],
+                                  ] else if (custom != null)
+                                    _CustomTabBody(
+                                      key: ValueKey(
+                                        'home-tab-body-${custom.tabKey}',
                                       ),
-                                  // 배너 묶음(storefront 0.10.0 kind BANNER) — 받은 순서 그대로 이 자리에서 넘겨 보기
-                                  if (s.kind == SectionKind.banner)
-                                    BannerPager(
-                                      key: ValueKey('section-${s.sectionId}'),
-                                      banners: s.banners,
-                                      intervalSeconds:
-                                          s.intervalSeconds ??
-                                          home.bannerIntervalSeconds,
-                                      onOpen: (b) =>
-                                          openHomeBanner(context, b, home),
+                                      tabKey: custom.tabKey,
+                                      onGone: _dropCustomTab,
                                     )
                                   else
-                                    _SectionView(
-                                      key: ValueKey('section-${s.sectionId}'),
-                                      section: s,
-                                      layoutVersion: home.layoutVersion,
+                                    _TabBody(
+                                      key: ValueKey(
+                                        'home-tab-body-${tab.name}',
+                                      ),
+                                      tab: tab,
                                     ),
-                                ],
-                              ] else if (custom != null)
-                                _CustomTabBody(
-                                  key: ValueKey(
-                                    'home-tab-body-${custom.tabKey}',
+                                ].indexed)
+                                  _SlideIn(
+                                    key: ValueKey('slide-$slideKey-$i'),
+                                    from: _slideFrom,
+                                    child: w,
                                   ),
-                                  tabKey: custom.tabKey,
-                                  onGone: _dropCustomTab,
-                                )
-                              else
-                                _TabBody(
-                                  key: ValueKey('home-tab-body-${tab.name}'),
-                                  tab: tab,
-                                ),
-                              // 아래 떠 있는 카드·막대가 목록 끝을 가리지 않게
-                              const SizedBox(height: 170),
-                            ],
-                          ),
-                        ],
+                                // 아래 떠 있는 카드·막대가 목록 끝을 가리지 않게
+                                const SizedBox(height: 170),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ), // 배달 중 카드 위, 장바구니 막대 아래(사용자 캡처 2026-11-20 홈 — 둘 다 있으면 위아래로)
                     const Positioned(
@@ -388,8 +504,9 @@ String homeTabLabel(AppLocalizations l10n, HomeTab t) => switch (t) {
 /// 서버가 준 고정 탭(`HomeLayout.tabs`) 뒤에 MD 탭(storefront 0.9.0 `customTabs`, 서버 순서).
 /// 할인 탭(DEAL)은 1차 제외라 계약에 없다. MD 탭에 타이머가 있으면 이름 위에 남은 시간(레퍼런스 "오늘만특가" 자리),
 /// 기간이 끝나면 [onCustomGone].
-class _HomeTabs extends StatelessWidget {
+class _HomeTabs extends StatefulWidget {
   const _HomeTabs({
+    super.key,
     required this.tabs,
     required this.selected,
     required this.onSelected,
@@ -410,7 +527,41 @@ class _HomeTabs extends StatelessWidget {
   final ValueChanged<String>? onCustomGone;
 
   @override
+  State<_HomeTabs> createState() => _HomeTabsState();
+}
+
+class _HomeTabsState extends State<_HomeTabs> {
+  /// 고른 탭 — 좌우로 끌어 화면 밖 탭으로 가면 탭 줄을 그 탭이 보이게 민다.
+  final _selectedKey = GlobalKey();
+
+  @override
+  void didUpdateWidget(_HomeTabs old) {
+    super.didUpdateWidget(old);
+    if (old.selected != widget.selected ||
+        old.selectedCustom != widget.selectedCustom) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final c = _selectedKey.currentContext;
+        if (c != null && c.mounted) {
+          Scrollable.ensureVisible(
+            c,
+            alignment: 0.5,
+            duration: _HomeScreenState._slideDuration,
+            curve: Curves.easeOutCubic,
+          );
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final tabs = widget.tabs;
+    final selected = widget.selected;
+    final onSelected = widget.onSelected;
+    final customTabs = widget.customTabs;
+    final selectedCustom = widget.selectedCustom;
+    final onSelectedCustom = widget.onSelectedCustom;
+    final onCustomGone = widget.onCustomGone;
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -424,7 +575,9 @@ class _HomeTabs extends StatelessWidget {
       key: key,
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(11, 4, 11, 10),
+        key: on ? _selectedKey : null,
+        // 상단바와 탭 글자 사이 숨 쉴 간격(A안 약 12 = 위 4 + 여기 8).
+        padding: const EdgeInsets.fromLTRB(11, 8, 11, 10),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
@@ -2018,4 +2171,43 @@ class _RankGrid extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 탭이 바뀌면 내용이 옆에서 미끄러져 들어온다([from] 1 = 오른쪽에서, -1 = 왼쪽에서, 0 = 그대로).
+/// 탭마다 key 가 달라 새로 만들어질 때 한 번만 움직인다.
+class _SlideIn extends StatefulWidget {
+  const _SlideIn({super.key, required this.from, required this.child});
+
+  final int from;
+  final Widget child;
+
+  @override
+  State<_SlideIn> createState() => _SlideInState();
+}
+
+class _SlideInState extends State<_SlideIn>
+    with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(
+    vsync: this,
+    duration: _HomeScreenState._slideDuration,
+    value: widget.from == 0 ? 1 : 0,
+  )..forward();
+  late final _offset = Tween(
+    begin: Offset(0.35 * widget.from, 0),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ClipRect(
+    child: SlideTransition(
+      position: _offset,
+      child: FadeTransition(opacity: _c, child: widget.child),
+    ),
+  );
 }

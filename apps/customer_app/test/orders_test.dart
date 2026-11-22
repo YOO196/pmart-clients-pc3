@@ -184,6 +184,19 @@ void main() {
     expect(find.byKey(const ValueKey('refunded')), findsOneWidget);
     // 줄마다 "취소 N개" 문구는 두지 않는다(사용자 2026-11-21) — 환불 금액·처리 내역으로 보인다.
     expect(find.textContaining('취소 2개'), findsNothing);
+    // 취소된 주문은 배송 칸("배송 취소")을 그리지 않는다(사용자 2026-11-23).
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith('shipment-'),
+      ),
+      findsNothing,
+    );
+    expect(find.text('배송 취소'), findsNothing);
+    // 처리 내역은 다른 칸처럼 제목 + 테두리 카드.
+    expect(find.text('처리 내역'), findsOneWidget);
+    expect(find.text('취소 요청'), findsOneWidget);
   });
 
   testWidgets('배송 조회: 도착 예정·지연은 서버 값, 위치 실패는 배송 실패가 아니다', (t) async {
