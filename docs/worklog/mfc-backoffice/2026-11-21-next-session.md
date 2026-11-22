@@ -39,8 +39,8 @@ docs/worklog/mfc-backoffice/2026-11-21-next-session.md 읽고 이어서 해. 먼
 - 화면 확인: 헤드리스 크롬 CDP 스크립트로 캡처해 직접 본다(사용자가 "직접 보고 비교"를 요구). 예전 스크립트는 세션 scratchpad 에 있었다(없어졌으면 다시 만든다 — 목 로그인 단추 "센터 관리자(MFC 1곳)" 누르고 메뉴 링크로 옮겨 다니며 `Page.captureScreenshot`).
 
 ## 바로 할 일
-1. **PR 배포 확인** — `mfc/floor-panel-1121-pr` PR 이 main 에 들어갔는지·`version.txt` 가 바뀌었는지 보고 사용자에게 알림.
-2. **피킹 지표 bucket 반영**(백엔드 회신 1, mfc-fulfillment 0.33.0 — LAN 배포 뒤): `GET /metrics/picking-lines?bucket=HOUR|DAY|WEEK|MONTH`.
+1. ~~PR 배포 확인~~ — #364 main 반영·실서버 `cacc8f6a` 확인(2026-11-21 저녁).
+2. ~~**피킹 지표 bucket 반영**~~ — 끝(브랜치 `mfc/picking-bucket-1123`, 일지 맨 아래 절). 아래는 기록용.(백엔드 회신 1, mfc-fulfillment 0.33.0 — LAN 배포 뒤): `GET /metrics/picking-lines?bucket=HOUR|DAY|WEEK|MONTH`.
    - `npm run gen:api -w web/mfc-backoffice` 로 타입 갱신 → `CenterDashboard.tsx` `fetchPicking` 이 단위에 맞는 bucket 으로 읽게(1년은 한 번에, 92일 나눠 읽기 정리). 피킹 줄·결품 막대의 "시간" 칸을 **실서버에서도** 켠다(지금은 목에서만 하루 합을 곡선으로 나눔 — `hourShare`).
    - 주의: 정시율 시간 칸은 아직 없음(DD-6, PC 5) → 정시율만 "시간" 끔. 주문·매출은 3번.
    - 목 핸들러(`mocks/taskHandlers.ts` picking-lines)에 bucket·hour 도 넣고 시험 고치기.

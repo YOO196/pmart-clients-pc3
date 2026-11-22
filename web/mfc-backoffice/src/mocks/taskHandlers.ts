@@ -4,6 +4,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
+import { hourShare } from '../features/dashboard/dashboardRules';
 import { db, type MockShipment, type MockTask } from './db';
 import { idempotent, operator, problem, unauthorized } from './support';
 
@@ -73,7 +74,7 @@ function resolutionOf(s: MockShipment, p: Pkg) {
   };
 }
 
-/** 결품 지표 목(0.19.0): 오늘 피킹 시작 줄·결품 줄(사유별). 0건 날짜는 줄이 없다(계약) — 서울 센터는 줄 없음. */
+/** 결품 지표 목(0.19.0, bucket 0.34.0): 오늘 피킹 시작 줄·결품 줄(사유별). 0건 날짜는 줄이 없다(계약) — 서울 센터는 줄 없음. */
 const seoulToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
 const pickingLines: Readonly<Record<string, { readonly pickedLines: number; readonly SHORT: number; readonly DAMAGED: number; readonly SPOILED: number; readonly BLOCKED: number }>> = {
   'MFC-BSN-01': { pickedLines: 40, SHORT: 2, DAMAGED: 1, SPOILED: 1, BLOCKED: 0 },
@@ -100,11 +101,40 @@ export const taskHandlers = [
     const today = seoulToday();
     const from = q.get('from') ?? '';
     const to = q.get('to') ?? '';
+    // bucket(0.34.0): HOUR 7일·DAY 92일·WEEK·MONTH 366일 상한, 빼면 DAY
+    const bucket = q.get('bucket') ?? 'DAY';
+    const limit = { HOUR: 7, DAY: 92, WEEK: 366, MONTH: 366 }[bucket];
+    if (!limit) return problem(400, 'VALIDATION_FAILED');
+    if (from && to && (Date.parse(to) - Date.parse(from)) / 86_400_000 + 1 > limit) return problem(400, 'VALIDATION_FAILED');
     const v = pickingLines[mfcId];
-    const row = (date: string, x: (typeof pickingLines)[string]) => ({ date, mfcId, pickedLines: x.pickedLines, shortLines: x.SHORT + x.DAMAGED + x.SPOILED + x.BLOCKED, shortLinesByReason: { SHORT: x.SHORT, DAMAGED: x.DAMAGED, SPOILED: x.SPOILED, BLOCKED: x.BLOCKED } });
-    if (from && to && (Date.parse(to) - Date.parse(from)) / 86_400_000 + 1 > 92) return problem(400, 'VALIDATION_FAILED');
-    // 대시보드 추이용 지난 날(최대 92일 기간)(오늘 값은 위 표 그대로). 일요일은 0건 → 줄 없음(계약).
-    const items = v ? pastDays(today, 400).filter((d) => from <= d && d <= to).flatMap((d) => (d === today ? [row(d, v)] : pastPicking(d) ? [row(d, pastPicking(d)!)] : [])) : [];
+    // 날마다 값(오늘은 위 표 그대로). 일요일은 0건 → 줄 없음(계약)
+    const daily = v ? pastDays(today, 400).filter((d) => from <= d && d <= to).flatMap((d) => (d === today ? [{ d, x: v }] : pastPicking(d) ? [{ d, x: pastPicking(d)! }] : [])) : [];
+    type Acc = { date: string; hour: string | null; picked: number; SHORT: number; DAMAGED: number; SPOILED: number; BLOCKED: number };
+    const acc = new Map<string, Acc>();
+    const add = (key: string, date: string, hour: string | null, x: (typeof pickingLines)[string], part: (n: number) => number) => {
+      const a = acc.get(key) ?? { date, hour, picked: 0, SHORT: 0, DAMAGED: 0, SPOILED: 0, BLOCKED: 0 };
+      a.picked += part(x.pickedLines);
+      a.SHORT += part(x.SHORT);
+      a.DAMAGED += part(x.DAMAGED);
+      a.SPOILED += part(x.SPOILED);
+      a.BLOCKED += part(x.BLOCKED);
+      acc.set(key, a);
+    };
+    const nowHour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', hourCycle: 'h23' }).format(new Date()));
+    for (const { d, x } of daily) {
+      if (bucket === 'HOUR') {
+        // 그날 합계를 하루 수요 곡선으로 나눈다(시간 합 = 그날 합 — 서버 시험과 같은 성질)
+        const last = d === today ? nowHour : 23;
+        for (let h = 0; h <= last; h++) add(`${d}T${h}`, d, `${d}T${String(h).padStart(2, '0')}:00:00+09:00`, x, (n) => hourShare(n, h, last));
+      } else if (bucket === 'WEEK') {
+        const monday = new Date(Date.parse(`${d}T00:00:00Z`) - ((new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7) * 86_400_000).toISOString().slice(0, 10);
+        add(monday, monday, null, x, (n) => n);
+      } else if (bucket === 'MONTH') add(d.slice(0, 7), `${d.slice(0, 7)}-01`, null, x, (n) => n);
+      else add(d, d, null, x, (n) => n);
+    }
+    const items = [...acc.values()]
+      .filter((a) => a.picked > 0 || a.SHORT + a.DAMAGED + a.SPOILED + a.BLOCKED > 0)
+      .map((a) => ({ date: a.date, hour: a.hour, mfcId, pickedLines: a.picked, shortLines: a.SHORT + a.DAMAGED + a.SPOILED + a.BLOCKED, shortLinesByReason: { SHORT: a.SHORT, DAMAGED: a.DAMAGED, SPOILED: a.SPOILED, BLOCKED: a.BLOCKED } }));
     return HttpResponse.json({ items, asOf: new Date().toISOString() });
   }),
 

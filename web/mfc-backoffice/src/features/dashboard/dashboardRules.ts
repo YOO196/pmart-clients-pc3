@@ -20,6 +20,16 @@ export const shortDate = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.sli
 /** 추이 기간 상한(일) — 1년. 서버 상한(피킹 92일·정시 배송 31일)은 나눠 읽어 합친다 */
 export const MAX_RANGE = 366;
 export const PICKING_CHUNK = 92;
+/** 피킹 지표 칸 단위(mfc-fulfillment 0.34.0 bucket)와 단위마다 한 번에 읽는 기간 상한(HOUR 7일·DAY 92일·WEEK·MONTH 366일) */
+export const PICKING_BUCKET = { hour: 'HOUR', day: 'DAY', week: 'WEEK', month: 'MONTH' } as const;
+export const PICKING_LIMIT: Readonly<Record<Unit, number>> = { hour: 7, day: PICKING_CHUNK, week: 366, month: 366 };
+
+/** 피킹 지표 줄 → 그 단위 칸 key(buckets 의 key 와 같은 모양). HOUR 는 hour(+09:00 시작 시각)의 "YYYY-MM-DDTHH", 주는 월요일, 달은 YYYY-MM */
+export function pickingKey(row: { readonly date: string; readonly hour?: string | null }, unit: Unit): string {
+  if (unit === 'hour') return row.hour ? row.hour.slice(0, 13) : `${row.date}T00`;
+  if (unit === 'month') return row.date.slice(0, 7);
+  return row.date;
+}
 export const ON_TIME_CHUNK = 31;
 /** 기간 바 빠른 단추(일) — 1년 = 365 */
 export const RANGE_PRESETS = [1, 7, 30, 90, 365] as const;
@@ -64,7 +74,7 @@ export function chunks(r: Range, n: number): Range[] {
 export type Unit = 'hour' | 'day' | 'week' | 'month';
 export const UNITS: readonly Unit[] = ['hour', 'day', 'week', 'month'];
 
-/** 기간 길이에 쓸 수 있는 단위 — 시간은 7일까지, 주는 14일부터, 월은 60일부터. 시간은 서버 지표가 없어 목에서만 */
+/** 기간 길이에 쓸 수 있는 단위 — 시간은 7일까지, 주는 14일부터, 월은 60일부터. hourOk = 그 지표에 시간 칸이 있는가(정시율은 아직 없음 — 목에서만) */
 export function unitsFor(span: number, hourOk: boolean): Unit[] {
   return UNITS.filter((u) => (u === 'hour' ? hourOk && span <= 7 : u === 'week' ? span >= 14 : u === 'month' ? span >= 60 : true));
 }
@@ -119,12 +129,14 @@ export function buckets(r: Range, unit: Unit, today: string, nowHour: number): B
   return out;
 }
 
-/** 목 모드 시간대별(서버 지표 없음 — 그날 서버 합계를 하루 수요 곡선으로 나눠 그린다. 시간 합 = 그날 합) */
+/** 목 모드 시간대별(정시 배송은 서버 시간 칸이 없음 DD-6, 피킹 목도 같은 곡선) — 그날 합계를 하루 수요 곡선으로 나눈다. 시간 합 = 그날 합 */
 const HOUR_WEIGHT = [0, 0, 0, 0, 0, 0, 1, 3, 5, 6, 7, 9, 10, 8, 6, 6, 7, 9, 11, 12, 10, 7, 4, 1];
 export function hourShare(total: number, hour: number, lastHour: number): number {
+  if (total === 0) return 0;
   const w = HOUR_WEIGHT.slice(0, lastHour + 1);
   const sum = w.reduce((a, b) => a + b, 0);
-  if (sum === 0 || total === 0) return 0;
+  // 새벽(곡선이 아직 0)이면 합계를 지금 시각 칸에 — 버리면 시간 합 ≠ 그날 합
+  if (sum === 0) return hour === lastHour ? total : 0;
   // 가장 큰 나머지 방식 — 정수로 나눠도 합이 total
   const raw = w.map((x) => (total * x) / sum);
   const base = raw.map(Math.floor);

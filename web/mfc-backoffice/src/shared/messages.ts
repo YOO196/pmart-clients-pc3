@@ -374,7 +374,7 @@ export const messages = {
       year: '1년',
       unitLabel: '칸 단위',
       unit: { hour: '시간', day: '일', week: '주', month: '월' } as Readonly<Record<'hour' | 'day' | 'week' | 'month', string>>,
-      hourNoApi: '시간대별 지표 API 가 아직 없어요(백엔드 요청) — 목 모드에서만 볼 수 있어요.',
+      hourNoApi: '이 지표는 시간대별 API 가 아직 없어요(백엔드 요청) — 시간 칸은 피킹 줄·결품에서 볼 수 있어요.',
       unitNotFit: '이 기간에는 맞지 않는 단위예요(시간 7일까지 · 주 14일부터 · 월 60일부터).',
       tooLong: (max: number) => `기간은 ${max}일까지 볼 수 있어요.`,
       bad: '시작일은 끝일보다 앞이고, 끝일은 오늘까지예요.',

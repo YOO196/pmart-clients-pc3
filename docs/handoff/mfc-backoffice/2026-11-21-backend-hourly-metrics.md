@@ -3,6 +3,7 @@
 보낸 앱: mfc-backoffice (PC 3)
 받는 백엔드 영역: mfc (mfc-fulfillment) · delivery (delivery-dispatch)
 날짜: 2026-11-21
+상태(2026-11-21 저녁): 피킹 지표는 회신·반영 끝(mfc-fulfillment 0.34.0 `bucket`, 회신 `../pmart-backend/docs/handoff/clients/mfc-backoffice/2026-11-21-reply-hourly-and-order-metrics.md` §1) — 정시 배송 시간 칸만 남음(delivery-dispatch DD-6, PC 5).
 
 ## 상황
 - 사용자 요청(2026-11-21): 센터 대시보드 추이 그래프를 "시간대별 기록 1일·7일·한 달·년 단위" 로 자세히 보고 싶다.

@@ -5,7 +5,8 @@
 // - 결품 많은 상품: `/metrics/picking-lines/by-sku?sort=shortLines&limit=5`. 정시 배송률: delivery-dispatch `/metrics/on-time-deliveries`(onTime ÷ due).
 // - 작업·인력: 홈과 같은 끝나지 않은 작업·작업자. 배송 상태: bff live-delivery 50건(넘으면 안내).
 // - 추이 패널(그래프·결품 많은 상품)은 고른 기간(URL ?from=&to=, 기본 14일, 최대 92일 — 정시 배송은 31일씩 나눠 읽음). 지표 칸은 늘 오늘·14일.
-//   칸 단위: 시간(7일까지 — 서버 지표가 없어 목 모드에서만 하루 합계를 하루 수요 곡선으로 나눠 그림)·일·주·월(일 합계를 더함). 최대 1년, 피킹은 92일씩 나눠 읽음.
+//   칸 단위: 시간(7일까지)·일·주·월. 피킹 줄·결품은 서버가 그 단위로 센다(fulfillment 0.34.0 bucket — 시간 7일·일 92일씩 나눠, 주·월 1년 한 번에).
+//   정시율은 날짜 칸만 있어(시간 칸 DD-6 대기) 일 합계를 더하고, 시간은 목 모드에서만 하루 곡선으로 나눠 그림. 최대 1년.
 //   그래프를 끌면 그 구간으로 확대, Ctrl+Z 는 한 단계 넓게(1일 → 7일 → 30일 → 90일 → 1년, 지금 기간 가운데 중심).
 // - 알림 피드·우선 확인: 홈 원천(useOps — 출하 약속·인계 확인·피킹 파손 사고)과 배차 지연(useDispatchDelays) — 같은 쿼리 키라 두 번 읽지 않는다.
 import { useQuery } from '@tanstack/react-query';
@@ -38,7 +39,10 @@ import {
   lastDays,
   MAX_RANGE,
   ON_TIME_CHUNK,
+  PICKING_BUCKET,
   PICKING_CHUNK,
+  PICKING_LIMIT,
+  pickingKey,
   RANGE_PRESETS,
   rate,
   rateText,
@@ -80,10 +84,11 @@ async function fetchOnTime(api: Api, mfcId: string, r: Range) {
   return { items: parts.flatMap((x) => x.items ?? []), asOf: parts.map((x) => x.asOf).sort()[0] };
 }
 
-/** 피킹 줄 — 계약 상한 92일이라 나눠 읽고 합친다 */
-async function fetchPicking(api: Api, mfcId: string, r: Range) {
+/** 피킹 줄 — 서버가 단위(bucket)로 센다. 단위마다 기간 상한(시간 7일·일 92일·주·월 366일)이 있어 넘으면 나눠 읽고 합친다 */
+async function fetchPicking(api: Api, mfcId: string, r: Range, unit: Unit) {
+  const bucket = PICKING_BUCKET[unit];
   const parts = await Promise.all(
-    chunks(r, PICKING_CHUNK).map((c) => request('GET', api.fulfillment.GET('/metrics/picking-lines', { params: { query: { from: c.from, to: c.to, mfcId } } }))),
+    chunks(r, PICKING_LIMIT[unit]).map((c) => request('GET', api.fulfillment.GET('/metrics/picking-lines', { params: { query: { from: c.from, to: c.to, mfcId, bucket } } }))),
   );
   return { items: parts.flatMap((x) => x.items ?? []), asOf: parts.map((x) => x.asOf).sort()[0] };
 }
@@ -92,10 +97,10 @@ async function fetchPicking(api: Api, mfcId: string, r: Range) {
 const skuRangeOf = (r: Range): Range => (spanDays(r) > PICKING_CHUNK ? { from: addDays(r.to, -(PICKING_CHUNK - 1)), to: r.to } : r);
 
 /** 추이 패널 — 고른 기간 */
-function useTrend(mfcId: string, r: Range) {
+function useTrend(mfcId: string, r: Range, unit: Unit) {
   const api = useApi();
   const common = { refetchInterval: OPS_REFRESH_MS } as const;
-  const picking = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'picking-lines', r.from, r.to], queryFn: () => fetchPicking(api, mfcId, r) });
+  const picking = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'picking-lines', r.from, r.to, unit], queryFn: () => fetchPicking(api, mfcId, r, unit) });
   const sr = skuRangeOf(r);
   const bySku = useQuery({
     ...common,
@@ -114,7 +119,7 @@ function useDashboard(mfcId: string) {
   const days = lastDays(today, DAYS);
   const from = days[0] ?? today;
   const common = { refetchInterval: OPS_REFRESH_MS } as const;
-  const picking = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'picking-lines', from, today], queryFn: () => fetchPicking(api, mfcId, { from, to: today }) });
+  const picking = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'picking-lines', from, today, 'day'], queryFn: () => fetchPicking(api, mfcId, { from, to: today }, 'day') });
   const onTime = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'on-time', from, today], queryFn: () => fetchOnTime(api, mfcId, { from, to: today }) });
   const workers = useQuery({
     ...common,
@@ -146,7 +151,8 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
 
   // 추이 기간·칸 단위 — URL(?from=&to=&unit=), 맞지 않으면 기본 14일·일. 바꿀 때마다 앞 상태를 쌓아 Ctrl+Z 로 되돌린다
   const [params, setParams] = useSearchParams();
-  const hourOk = env.isMock;
+  // 시간 칸 — 피킹 줄·결품은 서버(0.34.0), 정시율·주문·매출은 목에서만(정시 시간 칸 DD-6 대기, 주문 지표 O-11 대기)
+  const hourOk = env.isMock || chart === 'picked' || chart === 'shortRate';
   const range: Range = validRange(params.get('from'), params.get('to'), today) ?? { from: days[0] ?? today, to: today };
   const span = spanDays(range);
   const allowed = unitsFor(span, hourOk);
@@ -188,10 +194,11 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
-  const trend = useTrend(mfcId, range);
+  const trend = useTrend(mfcId, range, unit);
   const nowHour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', hourCycle: 'h23' }).format(nowMs));
   const tBuckets = buckets(range, unit, today, nowHour);
-  const tPick = new Map((trend.picking.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [i.date, i]));
+  // 피킹은 서버가 센 칸(bucket) 그대로 — key 가 칸 key 와 같다
+  const tPick = new Map((trend.picking.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [pickingKey(i, unit), i]));
   const tOnTime = new Map((trend.onTime.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [i.date, i]));
 
   // 날짜별 — 피킹은 줄이 없으면 0줄(계약), 정시 배송은 줄이 없으면 due 0(비율 "—")
@@ -205,16 +212,14 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
     const r = pickRow.get(d);
     return rate(r?.shortLines ?? 0, r?.pickedLines ?? 0) ?? 0;
   });
-  // 칸마다 합 — 일·주·월은 서버 일 합계를 더하고, 시간은(목만) 그날 합계를 시간 곡선으로 나눈다
+  // 칸마다 합 — 피킹은 서버 칸 값(줄 없으면 0줄), 정시 배송은 서버 일 합계를 더하고 시간은(목만) 그날 합계를 시간 곡선으로 나눈다
   const sumOf = (b: Bucket) => {
-    const acc = { picked: 0, short: 0, onTime: 0, due: 0, late: 0, days: 0 };
+    const p = tPick.get(b.key);
+    const acc = { picked: p?.pickedLines ?? 0, short: p?.shortLines ?? 0, onTime: 0, due: 0, late: 0, days: 0 };
     for (let d = b.from; d <= b.to; d = addDays(d, 1)) {
-      const p = tPick.get(d);
       const o = tOnTime.get(d);
       const last = d === today ? nowHour : 23;
       const part = (v: number) => (b.hour === undefined ? v : hourShare(v, b.hour, last));
-      acc.picked += part(p?.pickedLines ?? 0);
-      acc.short += part(p?.shortLines ?? 0);
       acc.onTime += part(o?.onTime ?? 0);
       acc.due += part(o?.due ?? 0);
       acc.late += part(o?.late ?? 0);
@@ -228,16 +233,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   // 결품 — 사유별 쌓은 막대(드문 사건이라 비율 선보다 "몇 줄·왜"). 사유 합은 결품 줄보다 클 수 있다(계약)
   const REASONS = ['SHORT', 'DAMAGED', 'SPOILED', 'BLOCKED'] as const;
   const reasonSeries: StackSeries[] = REASONS.map((k) => ({ key: k, name: m.chart.reason[k], color: REASON_COLOR[k] }));
-  const reasonVals = tBuckets.map((b) =>
-    REASONS.map((k) => {
-      let v = 0;
-      for (let d = b.from; d <= b.to; d = addDays(d, 1)) {
-        const n = tPick.get(d)?.shortLinesByReason[k] ?? 0;
-        v += b.hour === undefined ? n : hourShare(n, b.hour, d === today ? nowHour : 23);
-      }
-      return v;
-    }),
-  );
+  const reasonVals = tBuckets.map((b) => REASONS.map((k) => tPick.get(b.key)?.shortLinesByReason[k] ?? 0));
   const shortBarCols: Column[] = tBuckets.map((b, i) => {
     const vals = reasonVals[i]!;
     const total = vals.reduce((a, c) => a + c, 0);
