@@ -31,7 +31,9 @@ import 'package:customer_app/features/cart/data/cart_merge_repository.dart';
 import 'package:customer_app/features/cart/data/mock_cart_repository.dart';
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/presentation/catalog_providers.dart'
-    show homeClockProvider;
+    show homeClockProvider, recentSearchesRepositoryProvider;
+import 'package:customer_app/features/catalog/data/recent_searches_repository.dart'
+    show MockRecentSearchesRepository;
 import 'package:customer_app/features/cart/presentation/cart_merge_screen.dart';
 import 'package:customer_app/features/start/presentation/current_location_flow.dart';
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
@@ -987,6 +989,43 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('id-sent')));
     await shot('5-my-info');
+  });
+
+  // 검색 — 최근 검색어 10개(서버 max-items 지금 10)가 여러 줄로 감길 때 줄 간격(사용자 2026-11-22).
+  testWidgets('search-recent', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp([
+        recentSearchesRepositoryProvider.overrideWithValue(
+          MockRecentSearchesRepository(
+            latency: Duration.zero,
+            seeded: const [
+              '우유', '감귤', '감자칩', '두부', '계란', //
+              '바나나', '닭가슴살', '아이스크림', '생수', '샐러드',
+            ],
+          ),
+        ),
+      ]),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    GoRouter.of(t.element(find.byType(Scaffold).first)).go('/search');
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/s-recent.png').uri),
+    );
   });
 
   // 마이 > 내 정보 F안(사용자 2026-11-21): 번호 확인 전 / 이름 바꾸기 시트.

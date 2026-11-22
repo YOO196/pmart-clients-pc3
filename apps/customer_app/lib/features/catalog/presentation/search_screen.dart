@@ -268,11 +268,14 @@ class _RecentSearchesState extends ConsumerState<_RecentSearches> {
             )
           : Wrap(
               spacing: 8,
-              runSpacing: 8,
+              runSpacing: 6,
               children: [
                 for (final k in items)
                   InputChip(
                     key: ValueKey('recent-$k'),
+                    // 줄 사이를 좁힌다(사용자 2026-11-22) — 48dp 터치 여백을 빼고 칩 높이도 줄인다.
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
                     label: Text(k),
                     onPressed: _busy.contains(k)
                         ? null

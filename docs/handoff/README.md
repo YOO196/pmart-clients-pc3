@@ -75,3 +75,4 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-18-backend-customer-push-fcm-reply.md` | 고객앱 휴대폰 푸시 회신 — 앱 반영 끝(토큰 등록 `7cbe1f2`, 누르면 목적지 화면). Q6·Q8 은 11-18 답 받음(앱 고칠 것 없음). **남은 것: 실기기 확인, `pmart-123` json 교체 — 결과 덧붙이면 archive** |
 | `customer-app/2026-11-15-backend-support-chat-inquiry.md` | 고객앱 문의·AI 상담 반영 알림 — LAN 고객 토큰으로 실제 확인, 질문 3개 |
 | `customer-app/2026-11-21-backend-profile-photo-edit.md` | BR-80 내 정보 프로필 사진 올리기·기본·되돌리기 API 요청 |
+| `customer-app/2026-11-22-backend-search-filter-data.md` | BR-81 검색·카테고리 필터 데이터(LAN 비어 있음)·필터 정본 질문 |
