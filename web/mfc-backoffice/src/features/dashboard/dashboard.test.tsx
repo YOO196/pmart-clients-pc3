@@ -99,29 +99,70 @@ describe('센터 대시보드', () => {
     expect(within(map).getByText('닫힘 2칸')).toBeInTheDocument();
   });
 
-  it('주문·매출(목 시뮬레이션) — 카테고리·상품 거르기(URL), 요일×시간 열지도, 많이 팔린 상품을 누르면 그 상품 추이', async () => {
-    renderAt('/c/MFC-BSN-01/dashboard');
+  it('주문·매출(order 0.20.0 O-11) — 센터·칸 단위로 묻고, 요일×시간 열지도, 카테고리·상품 거르기(URL), 많이 팔린 상품을 누르면 그 상품 추이', async () => {
+    const view = renderAt('/c/MFC-BSN-01/dashboard');
     const chart = await screen.findByTestId('chart-orders');
-    expect(screen.getByText('주문 시뮬레이션(목)')).toBeInTheDocument();
     expect(within(chart).getAllByTestId('chart-orders-col')).toHaveLength(14);
-    const heat = screen.getByTestId('order-heat');
+    const series = () => view.gets('/orders/metrics/series').map((r) => new URL(r.url).searchParams);
+    await waitFor(() => expect(series().some((q) => q.get('bucket') === 'WEEKDAY_HOUR')).toBe(true));
+    const day = series().find((q) => q.get('bucket') === 'DAY')!;
+    expect(day.get('mfcId')).toBe('MFC-BSN-01');
+    expect(day.get('sku')).toBeNull();
+    const heat = await screen.findByTestId('order-heat');
     expect(within(heat).getAllByTestId('order-heat-cell')).toHaveLength(7 * 24);
     expect(within(heat).getByTestId('order-heat-tip')).toHaveTextContent(/가장 많은 때 [월화수목금토일] \d+시/);
-    // 카테고리 → 상품 목록도 그 카테고리만
-    await userEvent.selectOptions(screen.getByLabelText('카테고리'), 'DAIRY');
-    const opts = within(screen.getByLabelText('상품')).getAllByRole('option').map((o) => o.textContent);
-    expect(opts).toEqual(['전체 상품', '서울우유 1L', '플레인 요거트 4입', '국산콩 두부 300g']);
-    // 많이 팔린 상품 누르면 그 상품 판매 수량 추이
+    // 많이 팔린 상품 이름은 센터 재고(stocks)에서
+    await waitFor(() => expect(screen.getAllByTestId('top-sold-row')[0]).not.toHaveTextContent(/^SKU-/));
+    // 카테고리 → 서버가 거른다(series·top-products 에 categoryId), 상품 목록도 그 카테고리만
+    await userEvent.selectOptions(await screen.findByLabelText('카테고리'), 'DAIRY');
+    await waitFor(() => expect(series().some((q) => q.get('categoryId') === 'DAIRY')).toBe(true));
+    expect(view.gets('/orders/metrics/top-products').some((r) => new URL(r.url).searchParams.get('categoryId') === 'DAIRY')).toBe(true);
+    await waitFor(() => expect(within(screen.getByLabelText('상품')).getAllByRole('option').map((o) => o.textContent).sort()).toEqual(['국산콩 두부 300g', '서울우유 1L', '전체 상품', '플레인 요거트 4입'].sort()));
+    // 많이 팔린 상품 누르면 그 상품(sku)만 — 판매 수량 추이
     const rows = screen.getAllByTestId('top-sold-row');
-    expect(rows.length).toBeGreaterThan(0);
     await userEvent.click(rows[0]!);
-    expect(rows[0]).toHaveAttribute('aria-pressed', 'true');
-    await userEvent.hover(within(screen.getByTestId('chart-orders')).getAllByTestId('chart-orders-col').at(-2)!);
+    await waitFor(() => expect(series().some((q) => q.get('sku') !== null && q.get('categoryId') === null)).toBe(true));
+    await waitFor(() => expect(screen.getAllByTestId('top-sold-row')[0]).toHaveAttribute('aria-pressed', 'true'));
+    await userEvent.hover(within(await screen.findByTestId('chart-orders')).getAllByTestId('chart-orders-col').at(-2)!);
     expect(screen.getByTestId('chart-orders-tip')).toHaveTextContent(/판매 [\d,]+개/);
-    // 매출로 바꾸면 원
+    // 매출로 바꾸면 원 — 거른 동안은 그 상품 줄 금액(승인 금액은 서버가 null)
     await userEvent.click(screen.getByRole('button', { name: '매출' }));
+    expect(screen.getByText('고른 상품 줄 금액만(할인 뺀 값)')).toBeInTheDocument();
+    // 세로 눈금 — 이미 줄인 "50만원"을 다시 줄이지 않는다("50만만원" 아님)
+    expect(within(await screen.findByTestId('chart-sales')).queryByText(/만만/)).not.toBeInTheDocument();
     await userEvent.hover(within(await screen.findByTestId('chart-sales')).getAllByTestId('chart-sales-col').at(-2)!);
-    expect(screen.getByTestId('chart-sales-tip')).toHaveTextContent(/매출 [\d,]+원/);
+    expect(screen.getByTestId('chart-sales-tip')).toHaveTextContent(/매출 [1-9][\d,]*원/);
+  });
+
+  it('주문 추이 — 0건 칸은 서버가 주지 않아 0 으로 채우고, 추이 조회 실패는 0 이 아니라 "조회 실패"', async () => {
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+    server.use(
+      http.get(`${API_BASE}/orders/metrics/series`, ({ request }) => {
+        const q = new URL(request.url).searchParams;
+        if (q.get('bucket') !== 'DAY') return HttpResponse.json({ from: q.get('from'), to: q.get('to'), mfcId: q.get('mfcId'), bucket: q.get('bucket'), items: [] });
+        return HttpResponse.json({
+          from: q.get('from'),
+          to: q.get('to'),
+          mfcId: q.get('mfcId'),
+          bucket: 'DAY',
+          items: [{ start: `${today}T00:00:00+09:00`, orderCount: 7, approvedAmount: 182000, qty: 19, lineAmount: 182000 }],
+        });
+      }),
+    );
+    renderAt('/c/MFC-BSN-01/dashboard');
+    const cols = within(await screen.findByTestId('chart-orders')).getAllByTestId('chart-orders-col');
+    expect(cols).toHaveLength(14);
+    await userEvent.hover(cols.at(-1)!);
+    expect(screen.getByTestId('chart-orders-tip')).toHaveTextContent('주문 7건');
+    await userEvent.hover(cols.at(-2)!);
+    expect(screen.getByTestId('chart-orders-tip')).toHaveTextContent('주문 0건');
+
+    // 기간을 바꿔 새로 읽을 때 실패
+    server.use(http.get(`${API_BASE}/orders/metrics/series`, unavailable));
+    await userEvent.click(within(screen.getByTestId('range-bar')).getByRole('button', { name: '30일' }));
+    const panel = screen.getByRole('region', { name: /^추이/ });
+    await waitFor(() => expect(within(panel).getByRole('alert')).toHaveTextContent('조회 실패'));
+    expect(screen.queryByTestId('chart-orders')).not.toBeInTheDocument();
   });
 
   it('메뉴에 있고 누르면 대시보드', async () => {

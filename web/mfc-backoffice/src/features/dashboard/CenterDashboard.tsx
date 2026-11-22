@@ -24,7 +24,7 @@ import { useOps } from '../ops/OpsBoard';
 import { OPS_REFRESH_MS } from '../ops/opsQueries';
 import { minutesText, promiseRows, seoulToday } from '../ops/opsRules';
 import { AreaChart, BarList, Heatmap, type Column, type StackSeries } from './charts';
-import { SIM_CATEGORIES, SIM_PRODUCTS, simAt } from './orderSim';
+import { seriesKey, useOrderTrend, type OrderFilter } from './orderQueries';
 import { FloorMap } from './FloorMap';
 import { env } from '../../env';
 import {
@@ -33,6 +33,7 @@ import {
   presetFrom,
   zoomOut,
   chunks,
+  daysIn,
   DAYS,
   defaultUnit,
   hourShare,
@@ -146,13 +147,13 @@ const KINDS: readonly ChartKind[] = ['orders', 'sales', 'picked', 'shortRate', '
 function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const { nowMs, today, days, picking, onTime, workers, live, ops, delays } = useDashboard(mfcId);
   const { tasks, damages, handovers } = ops;
-  // 주문·매출은 목에서만(시뮬레이션) — 실서버 기본은 피킹 줄
-  const [chart, setChart] = useState<ChartKind>(env.isMock ? 'orders' : 'picked');
+  // 주문·매출(order 0.20.0 O-11)이 기본
+  const [chart, setChart] = useState<ChartKind>('orders');
 
   // 추이 기간·칸 단위 — URL(?from=&to=&unit=), 맞지 않으면 기본 14일·일. 바꿀 때마다 앞 상태를 쌓아 Ctrl+Z 로 되돌린다
   const [params, setParams] = useSearchParams();
-  // 시간 칸 — 피킹 줄·결품은 서버(0.34.0), 정시율·주문·매출은 목에서만(정시 시간 칸 DD-6 대기, 주문 지표 O-11 대기)
-  const hourOk = env.isMock || chart === 'picked' || chart === 'shortRate';
+  // 시간 칸 — 주문·매출(order 0.20.0)·피킹 줄·결품(fulfillment 0.34.0)은 서버, 정시율은 목에서만(시간 칸 DD-6 대기)
+  const hourOk = env.isMock || chart !== 'onTime';
   const range: Range = validRange(params.get('from'), params.get('to'), today) ?? { from: days[0] ?? today, to: today };
   const span = spanDays(range);
   const allowed = unitsFor(span, hourOk);
@@ -242,11 +243,10 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   });
   const periodShort = sums.reduce((a, { t }) => ({ s: a.s + t.short, p: a.p + t.picked }), { s: 0, p: 0 });
 
-  // 주문·매출(목 시뮬레이션) — 카테고리·상품 거르기는 URL(?cat=&sku=)
+  // 주문·매출(order 0.20.0 O-11) — 카테고리·상품 거르기는 URL(?cat=&sku=, 상품을 고르면 상품만)
   const cat = params.get('cat');
   const sku = params.get('sku');
-  const product = SIM_PRODUCTS.find((x) => x.sku === sku) ?? null;
-  const filter = { category: product ? null : cat, sku: product?.sku ?? null };
+  const orderFilter: OrderFilter = { sku, categoryId: sku ? null : cat };
   const setFilter = (next: { readonly cat?: string | null; readonly sku?: string | null }) =>
     setParams(
       (p) => {
@@ -260,58 +260,47 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
       { replace: true },
     );
   const ordersView = chart === 'orders' || chart === 'sales';
-  const simOn = hourOk && ordersView;
-  const simSum = (b: Bucket) => {
+  const orderQ = useOrderTrend(mfcId, range, unit, orderFilter, ordersView);
+  const filtered = !!(orderFilter.sku || orderFilter.categoryId);
+  const nameOf = (s: string) => orderQ.names.data?.get(s) ?? s;
+  const topRows = orderQ.top.data ?? [];
+  const picked = sku ? (topRows.find((x) => x.sku === sku) ?? null) : null;
+  // 칸 값 — 0건 칸은 오지 않는다(계약) → 0. 상품이면 수량, 거르면 그 줄 금액(승인 금액은 null)
+  const orderByKey = new Map((orderQ.series.data ?? []).flatMap((x) => (x.start ? [[seriesKey(x.start, unit), x] as const] : [])));
+  const orderSum = (b: Bucket) => {
+    const keys = b.hour !== undefined ? [b.key] : daysIn(b);
     const acc = { orders: 0, amount: 0 };
-    for (let d = b.from; d <= b.to; d = addDays(d, 1)) {
-      const hours = b.hour !== undefined ? [b.hour] : Array.from({ length: d === today ? nowHour + 1 : 24 }, (_, h) => h);
-      for (const h of hours) {
-        const v = simAt(d, h, filter);
-        acc.orders += v.orders;
-        acc.amount += v.amount;
-      }
+    for (const k of keys) {
+      const x = orderByKey.get(k);
+      if (!x) continue;
+      acc.orders += sku ? x.qty : x.orderCount;
+      acc.amount += filtered ? x.lineAmount : (x.approvedAmount ?? 0);
     }
     return acc;
   };
-  const simCols: Column[] = simOn
+  const orderCols: Column[] = ordersView
     ? tBuckets.map((b) => {
-        const v = simSum(b);
+        const v = orderSum(b);
         return chart === 'sales'
           ? { key: b.key, label: b.label, value: v.amount, tip: m.chart.salesTip(tipLabel(b), v.amount) }
-          : { key: b.key, label: b.label, value: v.orders, tip: product ? m.chart.qtyTip(tipLabel(b), v.orders) : m.chart.orderTip(tipLabel(b), v.orders) };
+          : { key: b.key, label: b.label, value: v.orders, tip: sku ? m.chart.qtyTip(tipLabel(b), v.orders) : m.chart.orderTip(tipLabel(b), v.orders) };
       })
     : [];
-  // 요일 × 시간 평균(그 기간에 그 요일이 몇 번 있었나로 나눔)
+  // 요일 × 시간대 평균 — 서버 평균(avg…), 승인 금액·상품 수량 평균은 합 ÷ 그 요일 날 수. 없는 칸은 0
   const heat = (() => {
-    if (!simOn) return null;
-    const sum = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
-    const seen = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
-    for (let d = range.from; d <= range.to; d = addDays(d, 1)) {
-      const wd = (new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7;
-      for (let h = 0; h < (d === today ? nowHour + 1 : 24); h++) {
-        const v = simAt(d, h, filter);
-        sum[wd]![h]! += chart === 'sales' ? v.amount : v.orders;
-        seen[wd]![h]! += 1;
-      }
+    if (!ordersView || !orderQ.heat.data) return null;
+    const cells = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
+    for (const x of orderQ.heat.data) {
+      if (!x.weekday || x.hour === null || x.hour === undefined) continue;
+      const days = x.days ?? 0;
+      const per = (n: number) => (days > 0 ? n / days : 0);
+      const v = chart === 'sales' ? (filtered ? (x.avgLineAmount ?? 0) : per(x.approvedAmount ?? 0)) : sku ? per(x.qty) : (x.avgOrderCount ?? 0);
+      cells[x.weekday - 1]![x.hour] = Math.round(v);
     }
-    return sum.map((row, wd) => row.map((v, h) => (seen[wd]![h]! > 0 ? Math.round(v / seen[wd]![h]!) : 0)));
+    return cells;
   })();
-  const topSold = simOn
-    ? SIM_PRODUCTS.filter((x) => !cat || x.category === cat)
-        .map((x) => {
-          let qty = 0;
-          let amount = 0;
-          for (let d = range.from; d <= range.to; d = addDays(d, 1))
-            for (let h = 0; h < (d === today ? nowHour + 1 : 24); h++) {
-              const v = simAt(d, h, { sku: x.sku });
-              qty += v.orders;
-              amount += v.amount;
-            }
-          return { x, qty, amount };
-        })
-        .sort((a, b) => (chart === 'sales' ? b.amount - a.amount : b.qty - a.qty))
-        .slice(0, 5)
-    : [];
+  // 많이 팔린 상품 — 매출은 서버 순서(금액), 주문은 수량 순
+  const topSold = (chart === 'sales' ? topRows : [...topRows].sort((a, b) => b.qty - a.qty)).slice(0, 5);
   const won = (v: number) => (v >= 10_000 ? `${Math.round(v / 10_000).toLocaleString('ko-KR')}만원` : `${v.toLocaleString('ko-KR')}원`);
 
   const onTimeCols: Column[] = sums.map(({ b, t }) => {
@@ -491,7 +480,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
                   : m.chart.pickSub
           }
           {...(chart === 'onTime' ? { help: m.chart.onTimeHelp } : {})}
-          q={chart === 'onTime' ? trend.onTime : ordersView ? { isPending: false, isError: false } : trend.picking}
+          q={chart === 'onTime' ? trend.onTime : ordersView ? orderQ.series : trend.picking}
           toolbar={
             <RangeBar range={range} unit={unit} units={allowed} hourOk={hourOk} today={today} canBack={wider !== null} onChange={applyRange} onBack={widen} />
           }
@@ -515,46 +504,42 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
         >
           {/* key 에 기간 — 기간이 바뀌면 새로 그려 가로축에서 다시 차오른다 */}
           {ordersView ? (
-            !simOn ? (
-              <p role="status" className="rounded-field border border-dashed border-base-300 p-4 text-sm text-base-content/65" data-testid="orders-no-api">
-                {m.chart.ordersNoApi}
-              </p>
-            ) : (
-              <>
-                <div className="mb-2 flex flex-wrap items-center gap-1.5" data-testid="orders-filter">
-                  <span className="badge badge-accent badge-sm">{m.chart.simBadge}</span>
-                  <select
-                    className="select select-xs w-auto"
-                    aria-label={m.chart.category}
-                    value={product ? product.category : (cat ?? '')}
-                    onChange={(e) => setFilter({ cat: e.target.value || null, sku: null })}
-                  >
-                    <option value="">{m.chart.allCategories}</option>
-                    {SIM_CATEGORIES.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select className="select select-xs w-auto max-w-[11rem]" aria-label={m.chart.product} value={sku ?? ''} onChange={(e) => setFilter({ sku: e.target.value || null })}>
-                    <option value="">{m.chart.allProducts}</option>
-                    {SIM_PRODUCTS.filter((x) => !(product ? product.category : cat) || x.category === (product ? product.category : cat)).map((x) => (
-                      <option key={x.sku} value={x.sku}>
-                        {x.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <AreaChart
-                  key={`${chart}-${range.from}-${range.to}-${unit}-${cat ?? ''}-${sku ?? ''}`}
-                  title={chart === 'sales' ? m.chart.sales(span) : m.chart.orders(span)}
-                  columns={simCols}
-                  format={(v) => (chart === 'sales' ? won(v) : product ? `${v.toLocaleString('ko-KR')}개` : m.count(v))}
-                  testId={chart === 'sales' ? 'chart-sales' : 'chart-orders'}
-                  onRange={zoom}
-                />
-              </>
-            )
+            <>
+              <div className="mb-2 flex flex-wrap items-center gap-1.5" data-testid="orders-filter">
+                <select
+                  className="select select-xs w-auto"
+                  aria-label={m.chart.category}
+                  value={picked?.categoryId ?? cat ?? ''}
+                  disabled={!!sku}
+                  onChange={(e) => setFilter({ cat: e.target.value || null, sku: null })}
+                >
+                  <option value="">{orderQ.categories.isError ? m.chart.categoriesFailed : m.chart.allCategories}</option>
+                  {(orderQ.categories.data ?? []).map((c) => (
+                    <option key={c.categoryId} value={c.categoryId}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <select className="select select-xs w-auto max-w-[11rem]" aria-label={m.chart.product} value={sku ?? ''} onChange={(e) => setFilter({ sku: e.target.value || null })}>
+                  <option value="">{m.chart.allProducts}</option>
+                  {sku && !picked && <option value={sku}>{nameOf(sku)}</option>}
+                  {topRows.map((x) => (
+                    <option key={x.sku} value={x.sku}>
+                      {nameOf(x.sku)}
+                    </option>
+                  ))}
+                </select>
+                {filtered && chart === 'sales' && <span className="text-xs text-base-content/55">{m.chart.lineAmountNote}</span>}
+              </div>
+              <AreaChart
+                key={`${chart}-${range.from}-${range.to}-${unit}-${cat ?? ''}-${sku ?? ''}`}
+                title={chart === 'sales' ? m.chart.sales(span) : sku ? m.chart.qty(span) : m.chart.orders(span)}
+                columns={orderCols}
+                format={(v) => (chart === 'sales' ? won(v) : sku ? `${v.toLocaleString('ko-KR')}개` : m.count(v))}
+                testId={chart === 'sales' ? 'chart-sales' : 'chart-orders'}
+                onRange={zoom}
+              />
+            </>
           ) : chart === 'onTime' ? (
             <AreaChart key={`o-${range.from}-${range.to}-${unit}`} title={m.chart.onTime(span)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} onRange={zoom} />
           ) : chart === 'picked' ? (
@@ -571,35 +556,57 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
             />
           )}
           {ordersView ? (
-            heat && (
-              <div className="mt-4 space-y-4 border-t border-base-300 pt-3">
-                <Heatmap title={m.chart.heatTitle(chart === 'sales' ? m.chart.salesShort : m.chart.ordersShort)} cells={heat} format={(v) => (chart === 'sales' ? won(v) : m.count(v))} testId="order-heat" />
-                <div>
-                  <p className="mb-1.5 flex items-baseline justify-between text-xs">
-                    <span className="font-semibold text-base-content/80">{m.chart.topSold(span)}</span>
-                    <span className="text-base-content/45">{m.chart.topSoldHint}</span>
+            <div className="mt-4 space-y-4 border-t border-base-300 pt-3">
+              {orderQ.heat.isError ? (
+                <p role="alert" className="text-sm font-semibold text-error">
+                  {m.chart.heatFailed}
+                </p>
+              ) : heat ? (
+                <Heatmap
+                  title={m.chart.heatTitle(chart === 'sales' ? m.chart.salesShort : sku ? m.chart.qtyShort : m.chart.ordersShort)}
+                  cells={heat}
+                  format={(v) => (chart === 'sales' ? won(v) : m.count(v))}
+                  testId="order-heat"
+                />
+              ) : (
+                <p className="text-sm text-base-content/40">…</p>
+              )}
+              <div>
+                <p className="mb-1.5 flex items-baseline justify-between text-xs">
+                  <span className="font-semibold text-base-content/80">{m.chart.topSold(spanDays(orderQ.tr))}</span>
+                  <span className="text-base-content/45">{m.chart.topSoldHint}</span>
+                </p>
+                {orderQ.top.isError ? (
+                  <p role="alert" className="text-sm font-semibold text-error">
+                    {m.failed}
                   </p>
+                ) : orderQ.top.isPending ? (
+                  <p className="text-sm text-base-content/40">…</p>
+                ) : topSold.length === 0 ? (
+                  <p className="text-sm text-base-content/55">{m.chart.noSales}</p>
+                ) : (
                   <ul className="space-y-1" data-testid="top-sold">
-                    {topSold.map(({ x, qty, amount }) => (
+                    {topSold.map((x) => (
                       <li key={x.sku}>
                         <button
                           type="button"
                           className={`grid w-full grid-cols-[1fr_auto] items-center gap-2 rounded-field px-1.5 py-0.5 text-left text-sm transition-colors hover:bg-primary/8 ${sku === x.sku ? 'bg-primary/12' : ''}`}
                           aria-pressed={sku === x.sku}
-                          onClick={() => setFilter({ sku: sku === x.sku ? null : x.sku, cat: null })}
+                          title={x.categoryName ?? undefined}
+                          onClick={() => setFilter({ sku: sku === x.sku ? null : x.sku })}
                           data-testid="top-sold-row"
                         >
-                          <span className="truncate">{x.name}</span>
+                          <span className="truncate">{nameOf(x.sku)}</span>
                           <span className="pm-mono text-xs text-base-content/70">
-                            {qty.toLocaleString('ko-KR')}개 · {won(amount)}
+                            {x.qty.toLocaleString('ko-KR')}개 · {won(x.amount)}
                           </span>
                         </button>
                       </li>
                     ))}
                   </ul>
-                </div>
+                )}
               </div>
-            )
+            </div>
           ) : (
           <SubList title={m.chart.topShort(spanDays(skuRangeOf(range)))} q={trend.bySku} link={{ to: centerPath(mfcId, 'inventory'), text: m.toInventory }}>
             {(trend.bySku.data?.items ?? []).length === 0 ? (

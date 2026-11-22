@@ -3,6 +3,7 @@
 보낸 앱: mfc-backoffice (PC 3)
 받는 백엔드 영역: platform (order-service — PC 1)
 날짜: 2026-11-23
+상태(2026-11-23): 회신·LAN 배포 끝(order-service 0.20.0, 회신 `../pmart-backend/docs/handoff/clients/mfc-backoffice/2026-11-23-reply-order-metrics-supervisor.md`) — 화면 반영함. 남은 것: LAN 확인 뒤 archive.
 
 ## 결정
 - 사용자 2026-11-23: **연다.** 센터 관리자(MFC_SUPERVISOR)가 MFC 백오피스 센터 대시보드에서 **자기 센터의** 주문 수·매출 추이를 본다.

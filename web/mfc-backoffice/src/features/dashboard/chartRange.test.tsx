@@ -195,10 +195,14 @@ describe('추이 그래프 기간', () => {
       expect(long.map((q) => daysIn({ from: q.get('from')!, to: q.get('to')! }).length).sort((a, b) => a - b)).toEqual([28, 92]);
     });
 
-    it('실서버 — 피킹 줄·결품은 시간 칸이 켜지고, 정시율은 꺼진다(시간 칸 DD-6 대기)', async () => {
+    it('실서버 — 주문·피킹 줄·결품은 시간 칸이 켜지고, 정시율은 꺼진다(시간 칸 DD-6 대기)', async () => {
       env.isMock = false;
       renderAt('/c/MFC-BSN-01/dashboard');
-      await screen.findByTestId('chart-picked');
+      // 실서버도 주문(order 0.20.0)이 기본 — 1일이면 시간별
+      await screen.findByTestId('chart-orders');
+      await userEvent.click(within(screen.getByTestId('range-bar')).getByRole('button', { name: '1일' }));
+      await waitFor(() => expect(screen.getByRole('heading', { name: /\(1일 · 시간별\)/ })).toBeInTheDocument());
+      await openPicked();
       const bar = screen.getByTestId('range-bar');
       await userEvent.click(within(bar).getByRole('button', { name: '1일' }));
       await waitFor(() => expect(screen.getByRole('heading', { name: /\(1일 · 시간별\)/ })).toBeInTheDocument());

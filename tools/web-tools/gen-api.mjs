@@ -33,7 +33,8 @@ const copies = [
     // delivery-dispatch: 배차 지연 목록 `GET /dispatch-delays?mfcId=`(0.12.0 — PC 3, 2026-11-19)
     // claim: 배차 불가로 취소 `POST /claims`(0.11.0 DC-1 — 회사 사유 전체 취소는 lines 생략, PC 3 2026-11-21)
     // rider: 라이더 화면 표기 `GET /riders/display-names`(0.18.0 RS-MFC — MFC_SUPERVISOR 허용, PC 3 2026-11-20)
-    services: ['approval', 'backoffice-bff', 'case', 'center-master', 'claim', 'delivery-dispatch', 'delivery-execution', 'hr', 'mfc-capacity', 'mfc-fulfillment', 'mfc-inbound', 'mfc-inventory', 'mfc-location', 'mfc-quality', 'rider'],
+    // order·product: 센터 대시보드 주문 수·매출 `GET /orders/metrics/series|summary|top-products`(order 0.20.0 O-11 — MFC_SUPERVISOR 토큰 센터, PC 3 2026-11-23)·카테고리 `GET /categories/tree`
+    services: ['approval', 'backoffice-bff', 'case', 'center-master', 'claim', 'delivery-dispatch', 'delivery-execution', 'hr', 'mfc-capacity', 'mfc-fulfillment', 'mfc-inbound', 'mfc-inventory', 'mfc-location', 'mfc-quality', 'order', 'product', 'rider'],
   },
 ];
 const excluded = ['/internal', '/webhooks', '/actuator'];
