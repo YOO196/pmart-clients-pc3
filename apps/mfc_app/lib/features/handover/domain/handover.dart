@@ -82,7 +82,7 @@ class HandoverView {
   final bool fresh;
 }
 
-/// 라이더 화면 표기(rider 0.18.0 `GET /riders/display-names`) — "김*수 · 482913".
+/// 라이더 화면 표기(rider 0.18.0 `GET /riders/display-names`) — 번호만 "R4785"(ADR-0085, 사용자 2026-11-22 "R4785 만").
 @immutable
 class RiderLabel {
   const RiderLabel({this.riderNumber, this.nameMasked});
@@ -92,11 +92,8 @@ class RiderLabel {
   /// 가린 이름(첫·끝 글자). 탈퇴로 지워졌으면 null.
   final String? nameMasked;
 
-  /// 둘 다 없으면 null(화면은 "라이더").
-  String? get text {
-    final parts = [?nameMasked, ?riderNumber];
-    return parts.isEmpty ? null : parts.join(' · ');
-  }
+  /// 화면 표기 — 번호만("R4785"). 번호가 없을 때(옛 기록)만 가린 이름, 둘 다 없으면 null(화면은 "라이더").
+  String? get text => riderNumber ?? nameMasked;
 }
 
 @immutable

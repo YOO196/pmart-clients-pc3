@@ -31,8 +31,10 @@ describe('센터 대시보드', () => {
     await userEvent.click(screen.getByRole('button', { name: '정시율' }));
     const chart = await screen.findByTestId('chart-on-time');
     expect(within(chart).getAllByTestId('chart-on-time-col')).toHaveLength(14);
-    // 목은 일요일 줄이 없다 → 14일 중 일요일 2번
-    expect(within(chart).getAllByText('—')).toHaveLength(2);
+    // 목은 일요일 줄이 없다(오늘은 늘 있음) → 14일 중 오늘이 아닌 일요일 수
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+    const sundays = lastDays(today, 14).filter((d) => d !== today && new Date(`${d}T00:00:00Z`).getUTCDay() === 0).length;
+    expect(within(chart).getAllByText('—')).toHaveLength(sundays);
     await userEvent.click(screen.getByRole('button', { name: '피킹 줄' }));
     await userEvent.hover(within(await screen.findByTestId('chart-picked')).getAllByTestId('chart-picked-col').at(-1)!);
     expect(screen.getByTestId('chart-picked-tip')).toHaveTextContent('피킹 40줄 · 결품 4줄');

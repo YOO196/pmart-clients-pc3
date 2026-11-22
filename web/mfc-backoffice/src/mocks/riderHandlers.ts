@@ -6,15 +6,15 @@ import { API_BASE } from '../api/client';
 import { operator, problem, unauthorized } from './support';
 
 const names: Readonly<Record<string, { readonly riderNumber: string; readonly nameMasked: string | null }>> = {
-  'RD-1': { riderNumber: '482913', nameMasked: '김*수' },
-  'RD-2': { riderNumber: '503217', nameMasked: '박*민' },
-  'RD-7': { riderNumber: '377102', nameMasked: '이*진' },
-  'RD-8': { riderNumber: '611045', nameMasked: '최*훈' },
-  'RD-9': { riderNumber: '290386', nameMasked: '정*아' },
-  'RD-31': { riderNumber: '715520', nameMasked: '한*우' },
-  'RD-32': { riderNumber: '826631', nameMasked: '오*림' },
-  'RD-39': { riderNumber: '918742', nameMasked: null },
-  'RD-41': { riderNumber: '104853', nameMasked: '윤*서' },
+  'RD-1': { riderNumber: 'R4829', nameMasked: '김*수' },
+  'RD-2': { riderNumber: 'R5032', nameMasked: '박*민' },
+  'RD-7': { riderNumber: 'R3771', nameMasked: '이*진' },
+  'RD-8': { riderNumber: 'R6110', nameMasked: '최*훈' },
+  'RD-9': { riderNumber: 'R2903', nameMasked: '정*아' },
+  'RD-31': { riderNumber: 'R7155', nameMasked: '한*우' },
+  'RD-32': { riderNumber: 'R8266', nameMasked: '오*림' },
+  'RD-39': { riderNumber: 'R9187', nameMasked: null },
+  'RD-41': { riderNumber: 'R1048', nameMasked: '윤*서' },
 };
 
 export const riderHandlers = [

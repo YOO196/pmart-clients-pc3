@@ -133,12 +133,12 @@ void main() {
     expect(find.text('반납 인증번호'), findsOneWidget);
     expect(find.byKey(const ValueKey('rh-code-dlv-ret-1')), findsOneWidget);
     expect(find.text('4821'), findsOneWidget);
-    expect(find.text('배송 번호: D-1118-0042'), findsOneWidget);
-    // 라이더 ID(r-7) 대신 가린 이름·라이더 번호(ADR-0070).
-    expect(find.text('라이더: 김*수 · 482913'), findsOneWidget);
+    expect(find.text('배송 번호: D11180042-2'), findsOneWidget);
+    // 라이더 ID(r-7) 대신 라이더 번호만(ADR-0070·0085).
+    expect(find.text('라이더: R4829'), findsOneWidget);
     expect(find.textContaining('r-7'), findsNothing);
     // 화면의 라이더(r-7·r-9)를 모아 한 번에 묻는다 — 줄마다 묻지 않는다.
-    expect(find.text('라이더: 이*진 · 377102'), findsOneWidget);
+    expect(find.text('라이더: R3771'), findsOneWidget);
     expect(handovers.riderLabelRequests, [
       ['r-7', 'r-9'],
     ]);
@@ -184,7 +184,7 @@ void main() {
             'items': [
               {
                 'deliveryId': 'dlv-1',
-                'deliveryNumber': 'D-1',
+                'deliveryNumber': 'D10000001',
                 'purpose': 'MISDELIVERY_RECOVERY',
                 'state': 'RETURN_PICKED_UP',
                 'riderId': 'r-1',

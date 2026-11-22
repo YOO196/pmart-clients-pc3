@@ -21,10 +21,10 @@ describe('배송 현황(우리 센터)', () => {
     expect(within(failed).getByText('약속 지남')).toBeInTheDocument();
     expect(within(failed).getByRole('link', { name: '배차 실패 P2' })).toHaveAttribute('href', '/c/MFC-BSN-01/dispatch-failures/CASE-DF-1');
     // 화면 번호(ADR-0070): 번호가 있으면 배송 주문번호-순번·주문번호 8자리, 없으면 번호 없음.
-    // 라이더: bff 는 센터 관리자에게 번호를 안 주지만(0.15.0) rider display-names(0.18.0 RS-MFC)로 "이*진 · 377102"
-    const moving = rows.find((r) => r.textContent?.includes('20000002-1'))!;
+    // 라이더: bff 는 센터 관리자에게 번호를 안 주지만(0.15.0) rider display-names(0.18.0 RS-MFC)로 번호만 "R3771"(ADR-0085)
+    const moving = rows.find((r) => r.textContent?.includes('D20000002'))!;
     expect(moving).toHaveTextContent('20000002');
-    await waitFor(() => expect(moving).toHaveTextContent('이*진 · 377102'));
+    await waitFor(() => expect(moving).toHaveTextContent('R3771'));
     expect(moving).not.toHaveTextContent('RD-7');
     expect(failed).toHaveTextContent('번호 없음');
     const q = liveCalls(view.sent)[0]!;

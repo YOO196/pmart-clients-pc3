@@ -644,9 +644,9 @@ export interface MockReturnHandover {
 }
 
 const seedReturnHandovers = (): MockReturnHandover[] => [
-  { mfcId: 'MFC-BSN-01', deliveryId: 'DLV-RET-1', deliveryNumber: '30000001-2', purpose: 'CLAIM_RETURN', state: 'RETURN_PICKED_UP', riderId: 'RD-31', code: '4821', failedAttempts: 2, locked: false, issuedAt: '2026-11-19T01:00:00.000Z' },
+  { mfcId: 'MFC-BSN-01', deliveryId: 'DLV-RET-1', deliveryNumber: 'D30000001-2', purpose: 'CLAIM_RETURN', state: 'RETURN_PICKED_UP', riderId: 'RD-31', code: '4821', failedAttempts: 2, locked: false, issuedAt: '2026-11-19T01:00:00.000Z' },
   { mfcId: 'MFC-BSN-01', deliveryId: 'DLV-RET-2', deliveryNumber: null, purpose: 'FAILED_DELIVERY_RETURN', state: 'ASSIGNED', riderId: 'RD-32', code: '1357', failedAttempts: 5, locked: true, issuedAt: '2026-11-19T00:20:00.000Z' },
-  { mfcId: 'MFC-SEL-01', deliveryId: 'DLV-RET-9', deliveryNumber: '30000009-2', purpose: 'MISDELIVERY_RECOVERY', state: 'RETURN_PICKED_UP', riderId: 'RD-39', code: '9999', failedAttempts: 0, locked: false, issuedAt: '2026-11-19T00:00:00.000Z' },
+  { mfcId: 'MFC-SEL-01', deliveryId: 'DLV-RET-9', deliveryNumber: 'D30000009-2', purpose: 'MISDELIVERY_RECOVERY', state: 'RETURN_PICKED_UP', riderId: 'RD-39', code: '9999', failedAttempts: 0, locked: false, issuedAt: '2026-11-19T00:00:00.000Z' },
 ];
 
 /** 품질 사고(quality 0.6.0) — 처리 여부는 조회 때 판정·폐기로 다시 맞춘다(qualityHandlers). seedResolved = 시드에서 이미 처리된 LOT → 처리한 ID */

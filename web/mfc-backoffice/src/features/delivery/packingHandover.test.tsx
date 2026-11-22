@@ -20,9 +20,11 @@ describe('포장 인계 현황(우리 센터)', () => {
     const row = (orderNumber: string) => rows.find((r) => r.textContent?.includes(orderNumber))!;
     expect(within(row('10000001')).getByTestId('stage')).toHaveTextContent('출고요청');
     expect(within(row('10000002')).getByTestId('stage')).toHaveTextContent('피킹중');
-    // 화면 번호(ADR-0070): 배송은 주문번호-순번, 라이더는 rider display-names(0.18.0 RS-MFC)로 "김*수 · 482913"
-    expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('10000002-1');
-    await waitFor(() => expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('배정 김*수 · 482913'));
+    // 화면 번호(ADR-0070·0085): 배송은 D + 주문번호, 라이더는 rider display-names(0.18.0 RS-MFC)로 번호만 "R4829"(가린 이름은 title)
+    expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('D10000002');
+    await waitFor(() => expect(within(row('10000002')).getByTestId('delivery')).toHaveTextContent('배정 R4829'));
+    expect(within(row('10000002')).getByTestId('rider-label')).toHaveAttribute('title', '김*수');
+    expect(within(row('10000002')).getByTestId('delivery')).not.toHaveTextContent('김*수');
     expect(within(row('10000002')).getByTestId('delivery')).not.toHaveTextContent('DLV-');
     expect(within(row('10000002')).getByTestId('system-numbers')).toHaveTextContent('DLV-ORD-P-2');
     // 단계 규칙에 없는 조합은 추정하지 않고 원천 출고 상태
@@ -34,7 +36,7 @@ describe('포장 인계 현황(우리 센터)', () => {
     expect(within(partial).getByText('재발송')).toBeInTheDocument();
     expect(within(partial).getByTestId('packages')).toHaveTextContent('밀봉 1 / 2 · 인계 1 · 남음 1');
     // 포장 표기 = 라벨 인계 번호(bff 0.21.0 DL-2, 새 포장 4자리), 원천이 아직 안 주면 출고 안 순서 "포장 2"
-    expect(within(partial).getByTestId('packages')).toHaveTextContent(/포장 5902 · 인계됨 · 인계 확정 · .* 박\*민 · 503217 인계/);
+    expect(within(partial).getByTestId('packages')).toHaveTextContent(/포장 5902 · 인계됨 · 인계 확정 · .* R5032 인계/);
     expect(within(partial).getByTestId('packages')).toHaveTextContent('포장 2 · 밀봉');
     // 포장 시스템 ID 는 접힌 시스템 번호 칸에만
     expect(within(partial).getByTestId('packages')).not.toHaveTextContent('PKG-4-');

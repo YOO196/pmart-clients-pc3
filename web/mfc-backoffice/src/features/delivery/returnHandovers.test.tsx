@@ -18,12 +18,12 @@ describe('반납 인증번호(우리 센터)', () => {
     expect(screen.queryByText('9999')).not.toBeInTheDocument();
     expect(new URL(view.gets('/return-handovers')[0]!.url).searchParams.get('mfcId')).toBe('MFC-BSN-01');
 
-    const claim = cards.find((c) => c.textContent?.includes('30000001-2'))!;
+    const claim = cards.find((c) => c.textContent?.includes('D30000001-2'))!;
     expect(within(claim).getByTestId('return-code')).toHaveTextContent('4821');
     expect(within(claim).getByText('고객 반품 회수')).toBeInTheDocument();
     expect(within(claim).getByText('라이더가 2번 틀렸어요')).toBeInTheDocument();
     // 라이더 ID 대신 "가린 이름 · 라이더 번호"(rider 0.18.0 RS-MFC)
-    await waitFor(() => expect(within(claim).getByTestId('rider-label')).toHaveTextContent(/^한\*우 · 715520$/));
+    await waitFor(() => expect(within(claim).getByTestId('rider-label')).toHaveTextContent(/^R7155$/));
 
     const locked = cards.find((c) => c.textContent?.includes('1357'))!;
     expect(within(locked).getByRole('alert')).toHaveTextContent('잠겼어요');
@@ -79,7 +79,7 @@ describe('반납 인증번호(우리 센터)', () => {
     expect(cards).toHaveLength(2);
     expect(cards[0]).toHaveTextContent('고객 반품 회수');
     expect(cards[0]).toHaveTextContent('서울우유 1L × 2');
-    await waitFor(() => expect(cards[0]).toHaveTextContent('한*우 · 715520'));
+    await waitFor(() => expect(cards[0]).toHaveTextContent('R7155'));
     // 클레임 없는 반납(오배송 회수)은 환불로 이어지지 않는다는 표시
     expect(cards[1]).toHaveTextContent('클레임 없음');
     expect(cards[0]).not.toHaveTextContent('클레임 없음');
