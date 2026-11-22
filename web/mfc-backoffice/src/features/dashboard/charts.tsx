@@ -114,7 +114,9 @@ export function BarList({ rows, testId, cols = 1 }: { readonly rows: readonly Ba
 const compact = new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 });
 function axisText(format: (v: number) => string, v: number) {
   const full = format(v);
-  return v >= 10_000 ? full.replace(/[\d,.]+/, compact.format(v)) : full;
+  // 이미 줄인 글자(예 매출 "50만원")는 그대로 — 다시 줄이면 "50만만원"
+  if (v < 10_000 || /[\d.]\s*[만억]/.test(full)) return full;
+  return full.replace(/[\d,.]+/, compact.format(v));
 }
 
 /** 쌓은 막대 계열(예: 결품 사유) — 색은 테마 변수, 범례를 늘 함께 */

@@ -3,6 +3,7 @@
 보낸 앱: mfc-backoffice (PC 3)
 받는 백엔드 영역: platform (order-service) — 카테고리는 상품 원천(product/catalog) 확인 필요
 날짜: 2026-11-21
+상태(2026-11-23): 회신·반영 끝 — order-service 0.20.0 O-11(회신 `../pmart-backend/docs/handoff/clients/mfc-backoffice/2026-11-23-reply-order-metrics-supervisor.md`), 화면 `features/dashboard/orderQueries.ts`. 남은 것: LAN 확인 뒤 archive.
 
 ## 상황
 - 사용자 요청(2026-11-21): 대시보드 추이 그래프를 **주문량**으로(매출이 좋은 시기·시간대를 알려고), **카테고리별**·**상품별 매출 추이**를 따로 보고 싶다.

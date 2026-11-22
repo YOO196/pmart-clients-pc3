@@ -17,6 +17,8 @@ import type { paths as InboundPaths } from './generated/mfc-inbound';
 import type { paths as InventoryPaths } from './generated/mfc-inventory';
 import type { paths as LocationPaths } from './generated/mfc-location';
 import type { paths as QualityPaths } from './generated/mfc-quality';
+import type { paths as OrderPaths } from './generated/order';
+import type { paths as ProductPaths } from './generated/product';
 import type { paths as RiderPaths } from './generated/rider';
 
 export { SOURCE_SYSTEM };
@@ -53,6 +55,9 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     claims: createClient<ClaimPaths>(options),
     // 라이더 화면 표기 묶음 조회(rider 0.18.0 RS-MFC — "R4785" — ADR-0085)
     rider: createClient<RiderPaths>(options),
+    // 센터 대시보드 주문 수·매출(order 0.20.0 O-11 — MFC_SUPERVISOR 는 토큰 센터만)·카테고리 목록(product 공개 categories/tree)
+    order: createClient<OrderPaths>(options),
+    product: createClient<ProductPaths>(options),
   };
 }
 

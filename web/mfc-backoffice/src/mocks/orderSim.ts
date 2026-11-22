@@ -1,7 +1,6 @@
-// ⚠ 목 모드 전용 — 센터 주문량·매출 시뮬레이션(2026-11-21 사용자 "줄 그래프는 주문량 · 카테고리별 · 상품별 매출 추이").
-// 계약의 주문 지표(order-service `/orders/metrics/summary`·`/top-products`)는 본사 관리자(OPERATOR_ADMIN)만 + 기간 합계뿐이라
-// 센터 관리자 화면에서 시간·날짜별로 그릴 수 없다 → 백엔드 요청(docs/handoff/mfc-backoffice/2026-11-21-backend-center-order-metrics.md).
-// 실서버에서는 쓰지 않는다(화면이 "주문 지표 API 없음"을 보인다). 같은 날짜·시각이면 늘 같은 값(결정적).
+// 목(MSW) 전용 — 센터 주문량·매출 값 만들기. order-service 0.20.0(O-11) `GET /orders/metrics/series`·`/top-products` 목과
+// product `GET /categories/tree`·mfc-inventory `/mfcs/{mfcId}/stocks` 목(상품 이름)이 쓴다. 화면은 이 파일을 모른다.
+// 같은 날짜·시각이면 늘 같은 값(결정적).
 
 export interface SimCategory {
   readonly id: string;
@@ -80,7 +79,7 @@ export interface SimFilter {
 }
 
 /** 그 날짜·시각의 값 — 거르지 않으면 주문 수·매출, 카테고리면 그 카테고리가 든 주문 수·그 카테고리 매출, 상품이면 판매 수량·그 상품 매출 */
-export function simAt(date: string, hour: number, f: SimFilter): { readonly orders: number; readonly amount: number } {
+export function simAt(date: string, hour: number, f: SimFilter): { readonly orders: number; readonly amount: number; readonly qty: number } {
   const orders = simOrders(date, hour);
   const prods = SIM_PRODUCTS.filter((p) => (f.sku ? p.sku === f.sku : f.category ? p.category === f.category : true));
   let qty = 0;
@@ -93,8 +92,8 @@ export function simAt(date: string, hour: number, f: SimFilter): { readonly orde
     amount += q * p.price;
     share += p.perOrder * tilt;
   }
-  if (f.sku) return { orders: qty, amount };
-  if (f.category) return { orders: Math.min(orders, Math.round(orders * Math.min(1, share))), amount };
+  if (f.sku) return { orders: qty, amount, qty };
+  if (f.category) return { orders: Math.min(orders, Math.round(orders * Math.min(1, share))), amount, qty };
   // 전체 매출 = 상품 매출 + 목록에 없는 상품 몫(평균 장바구니 약 2.6만 원)
-  return { orders, amount: Math.max(amount, orders * 26_000) };
+  return { orders, amount: Math.max(amount, orders * 26_000), qty: Math.max(qty, Math.round(orders * 2.6)) };
 }

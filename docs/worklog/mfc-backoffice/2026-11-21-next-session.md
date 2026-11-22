@@ -44,7 +44,7 @@ docs/worklog/mfc-backoffice/2026-11-21-next-session.md 읽고 이어서 해. 먼
    - `npm run gen:api -w web/mfc-backoffice` 로 타입 갱신 → `CenterDashboard.tsx` `fetchPicking` 이 단위에 맞는 bucket 으로 읽게(1년은 한 번에, 92일 나눠 읽기 정리). 피킹 줄·결품 막대의 "시간" 칸을 **실서버에서도** 켠다(지금은 목에서만 하루 합을 곡선으로 나눔 — `hourShare`).
    - 주의: 정시율 시간 칸은 아직 없음(DD-6, PC 5) → 정시율만 "시간" 끔. 주문·매출은 3번.
    - 목 핸들러(`mocks/taskHandlers.ts` picking-lines)에 bucket·hour 도 넣고 시험 고치기.
-3. **주문·매출 지표 — 사용자 결정 "연다"(2026-11-23)**: 센터 관리자에게 자기 센터만. 요청서 `docs/handoff/mfc-backoffice/2026-11-23-backend-order-metrics-supervisor.md`(PC 1 order-service O-11). API 가 생기면 `orderSim.ts` 지우고 실서버 값으로.
+3. ~~주문·매출 지표~~ — 사용자 결정 "연다"(2026-11-23) → order 0.20.0 O-11 LAN 배포 → 화면 반영(브랜치 `mfc/order-metrics-1123`, 일지 2026-11-23). 남은 것: LAN 에서 센터 관리자로 실제 값 확인.
 4. **"피킹 줄" 이름** — 사용자 "피킹 작업 수라고 하면 되잖아" → 같은 화면 "지금 작업"의 피킹 N건(작업 수)과 겹친다고 말했고, 대안 "피킹 상품 수(개)"를 냄. 사용자 답: **"일단 기다려봐"** — 사용자가 다시 말할 때까지 바꾸지 않는다.
 5. 대시보드 배치: 추이 패널(주문 보기)이 길어져 왼쪽 센터 도면 패널 아래가 비어 보인다 — 다음에 손볼 수 있다고 말해 둠.
 6. 관제실 CSS 정리: PC 2 가 공용 `web/ui/src/tower.css` 를 만들었다. MFC `src/index.css` 의 같은 블록(관제실 겉모습)과 겹치는지 보고, 공용을 `@import` 하고 MFC 쪽 중복은 지운다(MFC 만의 것 — 도면·차트·`--pm-cat-*` 은 남김). 바꾼 뒤 캡처로 전후 비교.
