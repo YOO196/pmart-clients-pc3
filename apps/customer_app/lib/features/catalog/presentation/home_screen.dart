@@ -1952,12 +1952,22 @@ class _DeliveryStatusLine extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     // 초안 11-C(회색, 사용자 2026-11-23): 서버가 권역 밖이라고 판정한 주소면 배송 방식을 묻지 않고(센터 없음) 회색 불가 줄.
-    if (ref.watch(_shoppingOutOfAreaProvider)) {
-      return _statusLine(
-        context,
-        l10n.homeTopOutOfArea,
-        scheme.onSurfaceVariant,
-      );
+    // 초안 11-E(사용자 2026-11-23 "넣는다"): 판정 모름(확인 중·중첩·보완 필요·조회 불명)은 불가가 아니라 "확인 중".
+    switch (ref.watch(_shoppingServiceabilityProvider)) {
+      case Serviceability.outOfArea:
+        return _statusLine(
+          context,
+          l10n.homeTopOutOfArea,
+          scheme.onSurfaceVariant,
+        );
+      case Serviceability.unknown:
+        return _statusLine(
+          context,
+          l10n.homeTopServiceUnknown,
+          scheme.onSurfaceVariant,
+        );
+      case Serviceability.serviceable || null:
+        break;
     }
     final options = ref.watch(homeDeliveryOptionsProvider).value;
     if (options == null || options.isEmpty) return const SizedBox.shrink();
@@ -2028,24 +2038,25 @@ class _DeliveryStatusLine extends ConsumerWidget {
 }
 
 /// 쇼핑 주소가 서버 판정으로 권역 밖(`OUT_OF_SERVICE_AREA`)인지. 판정 모름·주소 없음·조회 실패는 false(불가로 보이지 않음).
-final _shoppingOutOfAreaProvider = Provider.autoDispose<bool>(
-  (ref) =>
-      ref.watch(
-        addressBookProvider.select(
-          (v) => v.value?.shoppingAddress?.serviceability,
-        ),
-      ) ==
-      Serviceability.outOfArea,
+final _shoppingServiceabilityProvider = Provider.autoDispose<Serviceability?>(
+  (ref) => ref.watch(
+    addressBookProvider.select((v) => v.value?.shoppingAddress?.serviceability),
+  ),
 );
 
 /// 초안 11-C(회색, 사용자 2026-11-23): 권역 밖 주소면 홈 맨 위 회색 띠 "이 주소는 아직 배달하지 않아요" + [주소 바꾸기 ›].
+/// 초안 11-E: 판정 모름이면 같은 회색 띠 "배달 가능 여부를 확인하고 있어요" + [다시 확인](주소 목록 다시 읽기).
 /// 상품 둘러보기는 그대로 둔다.
 class _OutOfAreaStrip extends ConsumerWidget {
   const _OutOfAreaStrip();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!ref.watch(_shoppingOutOfAreaProvider)) return const SizedBox.shrink();
+    final state = ref.watch(_shoppingServiceabilityProvider);
+    if (state != Serviceability.outOfArea && state != Serviceability.unknown) {
+      return const SizedBox.shrink();
+    }
+    final unknown = state == Serviceability.unknown;
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -2055,9 +2066,11 @@ class _OutOfAreaStrip extends ConsumerWidget {
         color: scheme.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
-          key: const ValueKey('home-out-of-area'),
+          key: ValueKey(unknown ? 'home-service-unknown' : 'home-out-of-area'),
           borderRadius: BorderRadius.circular(12),
-          onTap: () => context.push('/addresses'),
+          onTap: unknown
+              ? () => ref.invalidate(addressBookProvider)
+              : () => context.push('/addresses'),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
             child: Row(
@@ -2067,7 +2080,9 @@ class _OutOfAreaStrip extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        l10n.homeOutOfAreaTitle,
+                        unknown
+                            ? l10n.homeServiceUnknownTitle
+                            : l10n.homeOutOfAreaTitle,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -2075,7 +2090,9 @@ class _OutOfAreaStrip extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        l10n.homeOutOfAreaBody,
+                        unknown
+                            ? l10n.homeServiceUnknownBody
+                            : l10n.homeOutOfAreaBody,
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 13,
                           color: scheme.onSurfaceVariant,
@@ -2086,7 +2103,7 @@ class _OutOfAreaStrip extends ConsumerWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  l10n.homeOutOfAreaChange,
+                  unknown ? l10n.homeServiceRecheck : l10n.homeOutOfAreaChange,
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -2094,7 +2111,9 @@ class _OutOfAreaStrip extends ConsumerWidget {
                   ),
                 ),
                 PmartLineIcon(
-                  PmartLineIcons.chevronRight,
+                  unknown
+                      ? PmartLineIcons.refresh
+                      : PmartLineIcons.chevronRight,
                   size: 16,
                   color: scheme.onSurface,
                 ),
