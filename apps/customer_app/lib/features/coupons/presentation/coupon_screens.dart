@@ -22,23 +22,23 @@ String couponDiscountText(AppLocalizations l10n, CouponDiscount d) =>
       CouponDiscountType.rate => l10n.couponRate(d.value),
     };
 
-String _ymd(DateTime instant) =>
-    DateFormat('yyyy.MM.dd').format(toSeoulWallClock(instant));
+/// `11.30(일)` — 서울 날짜.
+String _md(DateTime instant) =>
+    DateFormat('M.d(E)', 'ko').format(toSeoulWallClock(instant));
 
-/// `5일 후 만료 (2026.10.15)` — 서울 날짜로 센 날 수(표시만, 쓸 수 있는지는 서버가 정한다).
-String couponExpiryText(AppLocalizations l10n, DateTime until, DateTime now) {
+/// 서울 날짜로 센 남은 날 수(오늘 = 0). 표시만 — 쓸 수 있는지는 서버가 정한다.
+int couponDaysLeft(DateTime until, DateTime now) {
   final u = toSeoulWallClock(until);
   final n = toSeoulWallClock(now);
-  final days = DateTime.utc(
+  return DateTime.utc(
     u.year,
     u.month,
     u.day,
   ).difference(DateTime.utc(n.year, n.month, n.day)).inDays;
-  final date = _ymd(until);
-  return days <= 0
-      ? l10n.couponExpireToday(date)
-      : l10n.couponExpireIn(days, date);
 }
+
+/// 만료 임박 기준(초안 10-C: 3일 안이면 분홍 칩).
+const couponSoonDays = 3;
 
 /// 쓸 수 없는 쿠폰 사유(서버 `coupon.reason`·차단 detail). 모르는 값은 일반 문구.
 String couponReasonText(AppLocalizations l10n, String? reason) =>
@@ -52,120 +52,407 @@ String couponReasonText(AppLocalizations l10n, String? reason) =>
       _ => l10n.couponReasonUnknown,
     };
 
-/// 쿠폰 카드(레퍼런스 6-5 "할인쿠폰"): 큰 할인 크기 / 이름 / 만료 / 최소주문금액, 오른쪽 고르기 동그라미.
-class CouponCard extends StatelessWidget {
-  const CouponCard({
+/// 최소 주문 조건 짧은 표기: "15,000원 이상" / "금액 조건 없음".
+String _minText(AppLocalizations l10n, int min, {bool order = false}) =>
+    min <= 0
+    ? l10n.couponCondNoMin
+    : (order
+          ? l10n.couponCondMinOrder(formatKrw(min))
+          : l10n.couponCondMin(formatKrw(min)));
+
+/// 쿠폰 티켓 카드(초안 10-B·C·D): 왼쪽 연보라 칸에 할인(정률이면 아래 "최대 N원"), 점선 오른쪽에 이름·조건 줄·칩,
+/// 오른쪽 끝 [trailing]. [dim] 은 회색 티켓(지난 쿠폰·마감), [stamp] 는 기울어진 도장("사용함"/"기간 만료").
+class CouponTicket extends StatelessWidget {
+  const CouponTicket({
     super.key,
     required this.discount,
     required this.name,
     required this.lines,
+    this.chip,
+    this.link,
     this.trailing,
     this.onTap,
     this.dim = false,
-    this.note,
+    this.stamp,
   });
 
   final CouponDiscount discount;
   final String name;
 
-  /// 회색 작은 줄들(만료·최소주문금액 등).
+  /// 회색 작은 줄들(조건·기한).
   final List<String> lines;
+
+  /// 줄 아래 작은 칩(만료 임박 분홍 / 날짜 회색).
+  final Widget? chip;
+
+  /// 줄 아래 보라 글자 링크(쓴 주문 보기 ›).
+  final Widget? link;
   final Widget? trailing;
   final VoidCallback? onTap;
-
-  /// 쓸 수 없는 쿠폰(사용·만료) — 흐리게.
   final bool dim;
-
-  /// 빨간 안내 한 줄.
-  final String? note;
+  final String? stamp;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final bg = scheme.surfaceContainer; // 티켓 파인 자리는 바탕색
+    final leftBg = dim ? scheme.surfaceContainerHigh : scheme.primaryContainer;
+    final leftFg = dim ? scheme.outline : scheme.onPrimaryContainer;
     final fg = dim ? scheme.outline : scheme.onSurface;
-    final sub = dim ? scheme.outlineVariant : scheme.onSurfaceVariant;
+    final sub = dim ? scheme.outline : scheme.onSurfaceVariant;
+    final rate = discount.type == CouponDiscountType.rate;
+    final number = NumberFormat.decimalPattern('ko').format(discount.value);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Material(
         color: scheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: scheme.outlineVariant),
-        ),
+        borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 18, 20),
+          child: IntrinsicHeight(
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
+                Container(
+                  width: 96,
+                  color: leftBg,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 14,
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text.rich(
                         TextSpan(
-                          text: couponDiscountText(l10n, discount),
+                          text: number,
                           children: [
-                            if (discount.type == CouponDiscountType.rate)
-                              if (discount.maxAmount case final m?)
-                                TextSpan(
-                                  text:
-                                      '  ${l10n.couponMaxAmount(formatKrw(m))}',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: sub,
-                                  ),
-                                ),
+                            TextSpan(
+                              text: rate
+                                  ? l10n.couponPercentUnit
+                                  : l10n.couponWonUnit,
+                              style: const TextStyle(fontSize: 14),
+                            ),
                           ],
                         ),
+                        textAlign: TextAlign.center,
                         style: theme.textTheme.headlineSmall?.copyWith(
-                          fontSize: 24,
+                          fontSize: 23,
                           fontWeight: FontWeight.w800,
-                          color: fg,
+                          height: 1.1,
+                          color: leftFg,
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        name,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontSize: 18,
-                          color: fg,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      for (final l in lines)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            l,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 14,
-                              color: sub,
+                      if (rate)
+                        if (discount.maxAmount case final m?)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              l10n.couponMaxShort(formatKrw(m)),
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 11,
+                                color: leftFg,
+                              ),
                             ),
                           ),
+                    ],
+                  ),
+                ),
+                // 점선 + 위·아래 파인 반원(바탕색).
+                SizedBox(
+                  width: 14,
+                  child: CustomPaint(
+                    painter: _TicketCut(
+                      notch: bg,
+                      dash: scheme.outlineVariant,
+                      left: leftBg,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(2, 14, 12, 14),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                      color: fg,
+                                    ),
+                                  ),
+                                  for (final l in lines)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 3),
+                                      child: Text(
+                                        l,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              fontSize: 12.5,
+                                              height: 1.4,
+                                              color: sub,
+                                            ),
+                                      ),
+                                    ),
+                                  if (chip case final c?)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: c,
+                                    ),
+                                  if (link case final k?)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: k,
+                                    ),
+                                ],
+                              ),
+                            ),
+                            if (trailing case final t?) ...[
+                              const SizedBox(width: 8),
+                              t,
+                            ],
+                          ],
                         ),
-                      if (note case final n?)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            n,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 14,
-                              color: scheme.error,
+                      ),
+                      if (stamp case final s?)
+                        Positioned(
+                          right: 12,
+                          top: 0,
+                          bottom: 0,
+                          child: Center(
+                            child: Transform.rotate(
+                              angle: -0.18,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: scheme.outline,
+                                    width: 1.4,
+                                  ),
+                                ),
+                                child: Text(
+                                  s,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: scheme.outline,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
                     ],
                   ),
                 ),
-                if (trailing case final t?) ...[const SizedBox(width: 12), t],
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 티켓 가운데 자르는 선: 세로 점선 + 위·아래 반원 홈.
+class _TicketCut extends CustomPainter {
+  _TicketCut({required this.notch, required this.dash, required this.left});
+
+  final Color notch;
+  final Color dash;
+  final Color left;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 왼쪽 반은 왼쪽 칸 색으로 이어 칠한다(홈이 칸 경계에 걸치게).
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width / 2, size.height),
+      Paint()..color = left,
+    );
+    final p = Paint()
+      ..color = dash
+      ..strokeWidth = 1.4;
+    final x = size.width / 2;
+    for (var y = 10.0; y < size.height - 10; y += 7) {
+      canvas.drawLine(Offset(x, y), Offset(x, y + 3.5), p);
+    }
+    final n = Paint()..color = notch;
+    canvas.drawCircle(Offset(x, 0), 7, n);
+    canvas.drawCircle(Offset(x, size.height), 7, n);
+  }
+
+  @override
+  bool shouldRepaint(_TicketCut old) =>
+      old.notch != notch || old.dash != dash || old.left != left;
+}
+
+/// 작은 칩(만료 임박 분홍 / 그 밖 회색).
+Widget _expiryChip(
+  BuildContext context,
+  AppLocalizations l10n,
+  DateTime until,
+  DateTime now,
+) {
+  final scheme = Theme.of(context).colorScheme;
+  final days = couponDaysLeft(until, now);
+  final soon = days <= couponSoonDays;
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: soon ? scheme.tertiaryContainer : scheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: Text(
+      soon
+          ? (days <= 0 ? l10n.couponExpiresToday : l10n.couponDaysLeft(days))
+          : l10n.couponValidUntil(_md(until)),
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+        fontSize: 11.5,
+        fontWeight: FontWeight.w700,
+        color: soon ? scheme.onTertiaryContainer : scheme.onSurfaceVariant,
+      ),
+    ),
+  );
+}
+
+/// 목록 위 머리: "받을 수 있는 쿠폰 2장"(수는 보라 굵게) + 오른쪽 [action].
+class _ListHead extends StatelessWidget {
+  const _ListHead({required this.label, required this.count, this.action});
+
+  final String label;
+  final int count;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 0, 0, 12),
+      child: Row(
+        children: [
+          Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(text: '$label '),
+                TextSpan(
+                  text: l10n.couponCountUnit(count),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: scheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 14,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const Spacer(),
+          ?action,
+        ],
+      ),
+    );
+  }
+}
+
+/// 빈 상태(초안 10-D): 연보라 동그라미 티켓 + 제목 + 안내 + 버튼(있으면).
+class _CouponEmpty extends StatelessWidget {
+  const _CouponEmpty({
+    super.key,
+    required this.title,
+    this.body,
+    this.action,
+    this.onAction,
+  });
+
+  final String title;
+  final String? body;
+  final String? action;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(32, 0, 32, 64),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
+                color: PmartBrand.lavender,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: PmartLineIcon(
+                PmartLineIcons.ticket,
+                size: 32,
+                color: scheme.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            if (body case final b?) ...[
+              const SizedBox(height: 6),
+              Text(
+                b,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            if (action case final a?) ...[
+              const SizedBox(height: 18),
+              OutlinedButton(
+                key: const ValueKey('coupon-empty-action'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 42),
+                  foregroundColor: scheme.onSurface,
+                  side: BorderSide(color: scheme.outlineVariant),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: onAction,
+                child: Text(a),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -207,6 +494,7 @@ typedef CouponPick = ({String? couponId});
 
 /// 주문서 "할인쿠폰" 고르기(레퍼런스 6-5). 지금 쓸 수 있는 내 쿠폰만 보인다. 한 장만 고른다(다시 누르면 빼기).
 /// 할인 금액·쓸 수 있는지는 고른 뒤 다시 만든 주문서 견적(서버)으로만 보인다 — 여기서 계산하지 않는다.
+/// 카드는 쿠폰함과 같은 티켓(초안 10 — 오른쪽 끝이 고르기 동그라미).
 class CouponPickScreen extends ConsumerStatefulWidget {
   const CouponPickScreen({super.key, this.selected});
 
@@ -227,6 +515,7 @@ class _CouponPickScreenState extends ConsumerState<CouponPickScreen> {
     final value = ref.watch(availableCouponsProvider);
     return Scaffold(
       key: const ValueKey('coupon-pick'),
+      backgroundColor: theme.colorScheme.surfaceContainer,
       appBar: AppBar(
         leading: IconButton(
           key: const ValueKey('coupon-pick-close'),
@@ -250,17 +539,15 @@ class _CouponPickScreenState extends ConsumerState<CouponPickScreen> {
           child: Text(l10n.couponNoneAvailable),
         ),
         ready: (context, list) => ListView(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
           children: [
-            for (final c in list!)
-              CouponCard(
+            for (final c in _byExpiry(list!))
+              CouponTicket(
                 key: ValueKey('coupon-${c.couponId}'),
                 discount: c.discount,
                 name: c.name,
-                lines: [
-                  couponExpiryText(l10n, c.validUntil, now),
-                  l10n.couponMinOrder(formatKrw(c.minOrderAmount)),
-                ],
+                lines: [_minText(l10n, c.minOrderAmount, order: true)],
+                chip: _expiryChip(context, l10n, c.validUntil, now),
                 trailing: _PickMark(selected: _picked == c.couponId),
                 onTap: () => setState(
                   () => _picked = _picked == c.couponId ? null : c.couponId,
@@ -334,22 +621,45 @@ class _CouponPickScreenState extends ConsumerState<CouponPickScreen> {
   }
 }
 
-/// 마이 → 쿠폰함: 쿠폰 받기 / 사용 가능 / 지난 쿠폰. 비회원은 조회하지 않고 로그인 안내만.
+/// 만료 가까운 순(초안 10-C). 서버가 준 목록 안에서만 다시 줄 세운다(같은 날이면 서버 순서 그대로).
+List<Coupon> _byExpiry(List<Coupon> list) {
+  final indexed = list.indexed.toList()
+    ..sort((a, b) {
+      final c = a.$2.validUntil.compareTo(b.$2.validUntil);
+      return c != 0 ? c : a.$1.compareTo(b.$1);
+    });
+  return [for (final (_, c) in indexed) c];
+}
+
+/// 마이 → 쿠폰함: 쿠폰 받기 / 사용 가능(장수) / 지난 쿠폰. 비회원은 조회하지 않고 로그인 안내만.
 class CouponBoxScreen extends ConsumerWidget {
   const CouponBoxScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
     final member = ref.watch(sessionProvider) is MemberSession;
+    // 탭 장수: 사용 가능 목록 길이(서버 값). 못 읽었으면 수 없이.
+    final available = member ? ref.watch(availableCouponsProvider).value : null;
     return DefaultTabController(
       length: 3,
       child: Scaffold(
         key: const ValueKey('coupon-box'),
+        backgroundColor: member ? scheme.surfaceContainer : null,
         appBar: AppBar(
           title: Text(l10n.couponBoxTitle),
           bottom: member
               ? TabBar(
+                  // 초안 10: 고른 탭은 검정 굵게 + 검정 밑줄, 나머지 회색.
+                  labelColor: scheme.onSurface,
+                  unselectedLabelColor: scheme.onSurfaceVariant,
+                  indicatorColor: scheme.onSurface,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  labelStyle: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w700),
+                  unselectedLabelStyle: Theme.of(context).textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w400),
                   tabs: [
                     Tab(
                       key: const ValueKey('coupon-tab-download'),
@@ -357,7 +667,21 @@ class CouponBoxScreen extends ConsumerWidget {
                     ),
                     Tab(
                       key: const ValueKey('coupon-tab-available'),
-                      text: l10n.couponTabAvailable,
+                      child: Text.rich(
+                        TextSpan(
+                          text: l10n.couponTabAvailable,
+                          children: [
+                            if (available case final a? when a.isNotEmpty)
+                              TextSpan(
+                                text: ' ${a.length}',
+                                style: TextStyle(
+                                  color: scheme.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
                     Tab(
                       key: const ValueKey('coupon-tab-past'),
@@ -391,6 +715,21 @@ class _CampaignList extends ConsumerStatefulWidget {
 class _CampaignListState extends ConsumerState<_CampaignList> {
   /// 받는 중인 행사(버튼 잠금).
   final _busy = <String>{};
+  bool _allBusy = false;
+
+  String _resultText(AppLocalizations l10n, CouponDownloadResult r) =>
+      switch (r) {
+        CouponDownloaded() => l10n.couponDownloadDone,
+        CouponDownloadRejected(:final code) => switch (code) {
+          CouponProblemCode.limitReached => l10n.couponDownloadLimit,
+          CouponProblemCode.soldOut => l10n.couponDownloadSoldOut,
+          CouponProblemCode.notActive ||
+          CouponProblemCode.unsupported => l10n.couponDownloadNotActive,
+          _ => l10n.couponDownloadFailed,
+        },
+        CouponDownloadUnknown() => l10n.couponDownloadUnknown,
+        CouponDownloadFailed() => l10n.couponDownloadFailed,
+      };
 
   Future<void> _download(String promotionId) async {
     final l10n = AppLocalizations.of(context);
@@ -398,106 +737,253 @@ class _CampaignListState extends ConsumerState<_CampaignList> {
     final r = await downloadCoupon(ref, promotionId);
     if (!mounted) return;
     setState(() => _busy.remove(promotionId));
-    showNotice(context, switch (r) {
-      CouponDownloaded() => l10n.couponDownloadDone,
-      CouponDownloadRejected(:final code) => switch (code) {
-        CouponProblemCode.limitReached => l10n.couponDownloadLimit,
-        CouponProblemCode.soldOut => l10n.couponDownloadSoldOut,
-        CouponProblemCode.notActive ||
-        CouponProblemCode.unsupported => l10n.couponDownloadNotActive,
-        _ => l10n.couponDownloadFailed,
-      },
-      CouponDownloadUnknown() => l10n.couponDownloadUnknown,
-      CouponDownloadFailed() => l10n.couponDownloadFailed,
+    showNotice(context, _resultText(l10n, r));
+  }
+
+  /// 초안 10-B [모두 받기]: 묶음 API 가 없어 받을 수 있는 행사를 하나씩 차례로 받는다(누르는 동안 잠금).
+  /// 끝나면 받은 수/못 받은 수로 한 번에 알린다. 받았는지 모르는 것이 있으면 확인 안내.
+  Future<void> _downloadAll(List<CouponCampaign> targets) async {
+    final l10n = AppLocalizations.of(context);
+    setState(() {
+      _allBusy = true;
+      _busy.addAll(targets.map((c) => c.promotionId));
     });
+    var ok = 0;
+    var failed = 0;
+    var unknown = 0;
+    for (final c in targets) {
+      final r = await downloadCoupon(ref, c.promotionId);
+      if (!mounted) return;
+      setState(() => _busy.remove(c.promotionId));
+      switch (r) {
+        case CouponDownloaded():
+          ok++;
+        case CouponDownloadUnknown():
+          unknown++;
+        case CouponDownloadRejected() || CouponDownloadFailed():
+          failed++;
+      }
+    }
+    setState(() => _allBusy = false);
+    showNotice(
+      context,
+      unknown > 0
+          ? l10n.couponDownloadUnknown
+          : failed == 0
+          ? l10n.couponAllDone(ok)
+          : ok == 0
+          ? l10n.couponDownloadFailed
+          : l10n.couponAllPartial(ok, failed),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final value = ref.watch(couponCampaignsProvider);
     return UiStateView<List<CouponCampaign>?>(
       state: uiStateOf(value, isEmpty: (l) => l == null || l.isEmpty),
       onRetry: () => ref.invalidate(couponCampaignsProvider),
       loading: (_) => const PmartListSkeleton(rows: 3),
-      empty: (_) => Center(
+      empty: (_) => _CouponEmpty(
         key: const ValueKey('coupon-campaigns-empty'),
-        child: Text(l10n.couponCampaignsEmpty),
+        title: l10n.couponCampaignsEmpty,
       ),
-      ready: (context, list) => RefreshIndicator(
-        onRefresh: () => ref.refresh(couponCampaignsProvider.future),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-          children: [
-            for (final c in list!)
-              CouponCard(
-                key: ValueKey('campaign-${c.promotionId}'),
-                discount: c.discount,
-                name: c.name,
-                dim: c.soldOut,
-                lines: [
-                  l10n.couponMinOrder(formatKrw(c.minOrderAmount)),
-                  switch ((c.useDays, c.useUntil)) {
-                    (final int d, _) => l10n.couponUseDays(d),
-                    (null, final DateTime u) => l10n.couponUseUntil(_ymd(u)),
-                    _ => '',
-                  },
-                  l10n.couponDownloadUntil(_ymd(c.endsAt)),
-                  if (c.remaining case final r? when r > 0)
-                    l10n.couponRemaining(r),
-                ].where((s) => s.isNotEmpty).toList(),
-                trailing: _DownloadButton(
-                  key: ValueKey('campaign-download-${c.promotionId}'),
-                  label: c.reachedLimit
-                      ? l10n.couponDownloaded
-                      : c.soldOut
-                      ? l10n.couponSoldOut
-                      : l10n.couponDownload,
-                  busy: _busy.contains(c.promotionId),
-                  onPressed: c.reachedLimit || c.soldOut
-                      ? null
-                      : () => _download(c.promotionId),
-                ),
+      ready: (context, list) {
+        final open = [
+          for (final c in list!)
+            if (!c.reachedLimit && !c.soldOut) c,
+        ];
+        return RefreshIndicator(
+          onRefresh: () => ref.refresh(couponCampaignsProvider.future),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            children: [
+              _ListHead(
+                label: l10n.couponCanDownload,
+                count: open.length,
+                action: open.isEmpty
+                    ? null
+                    : FilledButton.icon(
+                        key: const ValueKey('coupon-download-all'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 32),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: const StadiumBorder(),
+                          textStyle: theme.textTheme.labelLarge?.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        onPressed: _allBusy ? null : () => _downloadAll(open),
+                        icon: _allBusy
+                            ? const SizedBox.square(
+                                dimension: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : PmartLineIcon(
+                                PmartLineIcons.download,
+                                size: 15,
+                                strokeWidth: 2,
+                                color: scheme.onPrimary,
+                              ),
+                        label: Text(l10n.couponDownloadAll),
+                      ),
               ),
-          ],
-        ),
-      ),
+              for (final c in list)
+                CouponTicket(
+                  key: ValueKey('campaign-${c.promotionId}'),
+                  discount: c.discount,
+                  name: c.name,
+                  dim: c.soldOut,
+                  lines: [
+                    [
+                      _minText(l10n, c.minOrderAmount),
+                      switch ((c.useDays, c.useUntil)) {
+                        (final int d, _) => l10n.couponCondDays(d),
+                        // 초안: 조건 줄은 요일 없이 짧게("11.30까지 사용").
+                        (null, final DateTime u) => l10n.couponCondUntil(
+                          DateFormat('M.d', 'ko').format(toSeoulWallClock(u)),
+                        ),
+                        _ => null,
+                      },
+                    ].nonNulls.join(' · '),
+                    [
+                      l10n.couponCondDownloadBy(_md(c.endsAt)),
+                      if (c.remaining case final r? when r > 0)
+                        l10n.couponCondRemaining(r),
+                    ].join(' · '),
+                  ],
+                  trailing: _DownloadButton(
+                    key: ValueKey('campaign-download-${c.promotionId}'),
+                    state: c.reachedLimit
+                        ? _DownloadState.done
+                        : c.soldOut
+                        ? _DownloadState.closed
+                        : _DownloadState.open,
+                    busy: _busy.contains(c.promotionId),
+                    onPressed: () => _download(c.promotionId),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
+enum _DownloadState { open, done, closed }
+
+/// 초안 10-B 받기 동그라미: 보라 ↓ / 받음 연보라 ✓ + "받음" / 마감 회색 "마감".
 class _DownloadButton extends StatelessWidget {
   const _DownloadButton({
     super.key,
-    required this.label,
+    required this.state,
     required this.busy,
     required this.onPressed,
   });
 
-  final String label;
+  final _DownloadState state;
   final bool busy;
-  final VoidCallback? onPressed;
+  final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: 36,
-    child: OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        textStyle: Theme.of(context).textTheme.labelLarge
-            ?.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final circle = switch (state) {
+      _DownloadState.open => Material(
+        color: scheme.primary,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: busy ? null : onPressed,
+          child: SizedBox.square(
+            dimension: 40,
+            child: Center(
+              child: busy
+                  ? SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: scheme.onPrimary,
+                      ),
+                    )
+                  : PmartLineIcon(
+                      PmartLineIcons.download,
+                      size: 20,
+                      strokeWidth: 2.2,
+                      color: scheme.onPrimary,
+                    ),
+            ),
+          ),
+        ),
       ),
-      onPressed: busy ? null : onPressed,
-      child: busy
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Text(label),
-    ),
-  );
+      _DownloadState.done => Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          color: PmartBrand.lavender,
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: PmartLineIcon(
+          PmartLineIcons.check,
+          size: 18,
+          strokeWidth: 2.2,
+          color: scheme.primary,
+        ),
+      ),
+      _DownloadState.closed => Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHigh,
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          l10n.couponSoldOut,
+          style: theme.textTheme.labelSmall?.copyWith(
+            fontSize: 11,
+            color: scheme.outline,
+          ),
+        ),
+      ),
+    };
+    return Semantics(
+      button: state == _DownloadState.open,
+      label: switch (state) {
+        _DownloadState.open => l10n.couponDownload,
+        _DownloadState.done => l10n.couponDownloaded,
+        _DownloadState.closed => l10n.couponSoldOut,
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          circle,
+          if (state == _DownloadState.done)
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(
+                l10n.couponDownloaded,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  fontSize: 11,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _MyCouponList extends ConsumerWidget {
@@ -508,6 +994,8 @@ class _MyCouponList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final now = ref.watch(clockProvider)();
     final provider = past ? pastCouponsProvider : availableCouponsProvider;
     final value = ref.watch(provider);
@@ -515,36 +1003,97 @@ class _MyCouponList extends ConsumerWidget {
       state: uiStateOf(value, isEmpty: (l) => l == null || l.isEmpty),
       onRetry: () => ref.invalidate(provider),
       loading: (_) => const PmartListSkeleton(rows: 3),
-      empty: (_) => Center(
-        key: ValueKey(past ? 'coupon-past-empty' : 'coupon-available-empty'),
-        child: Text(past ? l10n.couponPastEmpty : l10n.couponNoneAvailable),
-      ),
+      empty: (_) => past
+          ? _CouponEmpty(
+              key: const ValueKey('coupon-past-empty'),
+              title: l10n.couponPastEmpty,
+            )
+          : _CouponEmpty(
+              key: const ValueKey('coupon-available-empty'),
+              title: l10n.couponNoneAvailable,
+              body: l10n.couponNoneAvailableGuide,
+              action: l10n.couponGoDownload,
+              onAction: () => DefaultTabController.of(context).animateTo(0),
+            ),
       ready: (context, list) => RefreshIndicator(
         onRefresh: () => ref.refresh(provider.future),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
           children: [
-            for (final c in list!)
-              CouponCard(
+            if (!past) _ListHead(label: l10n.couponCanUse, count: list!.length),
+            for (final c in past ? list! : _byExpiry(list!))
+              CouponTicket(
                 key: ValueKey('my-coupon-${c.couponId}'),
                 discount: c.discount,
                 name: c.name,
                 dim: past,
+                stamp: switch (c.status) {
+                  CouponStatus.used => l10n.couponStatusUsed,
+                  CouponStatus.expired => l10n.couponStatusExpired,
+                  _ => null,
+                },
                 lines: [
-                  switch (c.status) {
-                    CouponStatus.available => couponExpiryText(
-                      l10n,
-                      c.validUntil,
-                      now,
-                    ),
-                    CouponStatus.used => l10n.couponStatusUsed,
-                    CouponStatus.expired => l10n.couponStatusExpired,
-                    CouponStatus.unknown => l10n.couponValidUntil(
-                      _ymd(c.validUntil),
-                    ),
-                  },
-                  l10n.couponMinOrder(formatKrw(c.minOrderAmount)),
+                  if (past)
+                    switch (c.status) {
+                      CouponStatus.expired => l10n.couponExpiredOn(
+                        _md(c.validUntil),
+                      ),
+                      _ => _minText(l10n, c.minOrderAmount, order: true),
+                    }
+                  else
+                    _minText(l10n, c.minOrderAmount, order: true),
                 ],
+                chip: past
+                    ? null
+                    : _expiryChip(context, l10n, c.validUntil, now),
+                // 쓴 쿠폰은 쓴 주문으로(서버의 쓴 주문 ID → 주문 상세).
+                link: past && c.status == CouponStatus.used
+                    ? switch (c.usedOrderId) {
+                        final id? => InkWell(
+                          key: ValueKey('coupon-used-order-${c.couponId}'),
+                          onTap: () => context.push(
+                            '/orders/${Uri.encodeComponent(id)}',
+                          ),
+                          child: Text(
+                            l10n.couponSeeOrder,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.primary,
+                            ),
+                          ),
+                        ),
+                        null => null,
+                      }
+                    : null,
+              ),
+            if (!past)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: PmartLineIcon(
+                        PmartLineIcons.info,
+                        size: 15,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        l10n.couponUseGuide,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 12.5,
+                          height: 1.5,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
           ],
         ),

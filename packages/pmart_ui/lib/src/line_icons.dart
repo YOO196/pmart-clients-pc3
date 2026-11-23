@@ -111,6 +111,12 @@ enum PmartLineIcons {
 
   /// 신상(반짝이 — 네 꼭지 별 + 작은 별).
   sparkle,
+
+  /// 내려받기(쿠폰 받기 — 초안 10-B): 아래 화살표 + 바닥 줄.
+  download,
+
+  /// 쿠폰 티켓(쿠폰함 빈 상태 — 초안 10-D): 양옆이 파인 직사각형 + 가운데 점선.
+  ticket,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -568,6 +574,41 @@ class _LinePainter extends CustomPainter {
         canvas.drawLine(const Offset(18, 6), const Offset(6, 18), line);
         canvas.drawCircle(const Offset(7.6, 7.6), 2.4, line);
         canvas.drawCircle(const Offset(16.4, 16.4), 2.4, line);
+      case PmartLineIcons.download:
+        canvas.drawLine(const Offset(12, 4.5), const Offset(12, 15), line);
+        canvas.drawPath(
+          Path()
+            ..moveTo(7.5, 10.8)
+            ..lineTo(12, 15.3)
+            ..lineTo(16.5, 10.8),
+          line,
+        );
+        canvas.drawLine(const Offset(5.5, 19.2), const Offset(18.5, 19.2), line);
+      case PmartLineIcons.ticket:
+        canvas.drawPath(
+          Path()
+            ..moveTo(3.5, 6.5)
+            ..lineTo(20.5, 6.5)
+            ..lineTo(20.5, 10)
+            ..arcToPoint(
+              const Offset(20.5, 14),
+              radius: const Radius.circular(2),
+              clockwise: false,
+            )
+            ..lineTo(20.5, 17.5)
+            ..lineTo(3.5, 17.5)
+            ..lineTo(3.5, 14)
+            ..arcToPoint(
+              const Offset(3.5, 10),
+              radius: const Radius.circular(2),
+              clockwise: false,
+            )
+            ..close(),
+          line,
+        );
+        for (final y in [8.6, 11.2, 13.8]) {
+          canvas.drawLine(Offset(14.5, y), Offset(14.5, y + 1.4), line);
+        }
       case PmartLineIcons.tag:
         canvas.drawPath(
           Path()

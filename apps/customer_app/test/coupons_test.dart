@@ -358,16 +358,19 @@ void main() {
       final soldOut = find.byKey(
         const ValueKey('campaign-download-PRM-MOCK-2'),
       );
+      // 초안 10-B: 마감은 회색 동그라미 "마감" — 누를 자리가 없다.
       expect(
-        t
-            .widget<OutlinedButton>(
-              find.descendant(
-                of: soldOut,
-                matching: find.byType(OutlinedButton),
-              ),
-            )
-            .onPressed,
-        isNull,
+        find.descendant(of: soldOut, matching: find.text('마감')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: soldOut, matching: find.byType(InkWell)),
+        findsNothing,
+      );
+      // 받을 수 있는 것만 센다(마감 제외).
+      expect(
+        find.textContaining('받을 수 있는 쿠폰 1장', findRichText: true),
+        findsOneWidget,
       );
 
       await t.tap(find.byKey(const ValueKey('campaign-download-PRM-MOCK-1')));
@@ -385,6 +388,83 @@ void main() {
       await t.tap(find.byKey(const ValueKey('coupon-tab-available')));
       await t.pumpAndSettle();
       expect(find.text('[목] 주말 장보기 3천원 할인'), findsOneWidget);
+    });
+
+    // 초안 10-B [모두 받기]: 받을 수 있는 행사만 하나씩 차례로, 끝나면 한 번에 알림. 받을 게 없으면 버튼 없음.
+    testWidgets('모두 받기: 받을 수 있는 것만 차례로 받고 한 번에 알린다', (t) async {
+      Map<String, Object?> camp(String id, {int remaining = 50}) => {
+        'promotionId': id,
+        'name': '[목] $id',
+        'discount': {'type': 'AMOUNT', 'value': 1000},
+        'minOrderAmount': 0,
+        'perCustomerLimit': 1,
+        'myIssuedCount': 0,
+        'remaining': remaining,
+        'endsAt': '2026-11-30T14:59:59Z',
+        'useDays': 3,
+        'useUntil': null,
+      };
+      final coupons = MockCouponRepository(
+        latency: Duration.zero,
+        now: () => now,
+        campaigns: [camp('P-A'), camp('P-B'), camp('P-C', remaining: 0)],
+      );
+      await openBox(t, coupons);
+      expect(find.text('금액 조건 없음 · 3일간 사용'), findsNWidgets(3));
+      await t.tap(find.byKey(const ValueKey('coupon-download-all')));
+      await t.pumpAndSettle();
+      expect(coupons.downloadKeys, hasLength(2));
+      expect(find.text('쿠폰 2장을 받았어요'), findsOneWidget);
+      expect(find.byKey(const ValueKey('coupon-download-all')), findsNothing);
+    });
+
+    // 초안 10-C·D: 탭에 사용 가능 장수, 만료 가까운 순·기한 칩, 지난 쿠폰은 도장 + 쓴 주문 보기, 빈 상태 → 쿠폰 받기 탭.
+    testWidgets('사용 가능 장수·기한 칩·지난 쿠폰 도장·빈 상태', (t) async {
+      final coupons = MockCouponRepository(
+        latency: Duration.zero,
+        now: () => now,
+      );
+      await openBox(t, coupons);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('coupon-tab-available')),
+          matching: find.textContaining('사용 가능 2'),
+        ),
+        findsOneWidget,
+      );
+      await t.tap(find.byKey(const ValueKey('coupon-tab-available')));
+      await t.pumpAndSettle();
+      expect(find.text('11.25(수)까지'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('coupon-tab-past')));
+      await t.pumpAndSettle();
+      expect(find.text('사용함'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('coupon-used-order-CPN-MOCK-3')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('사용 가능 쿠폰이 없으면 [쿠폰 받으러 가기] → 쿠폰 받기 탭', (t) async {
+      final empty = MockCouponRepository(
+        latency: Duration.zero,
+        now: () => now,
+        coupons: const [],
+      );
+      await openBox(t, empty);
+      await t.tap(find.byKey(const ValueKey('coupon-tab-available')));
+      await t.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('coupon-available-empty')),
+        findsOneWidget,
+      );
+      await t.tap(find.byKey(const ValueKey('coupon-empty-action')));
+      await t.pumpAndSettle();
+      expect(
+        DefaultTabController.of(
+          t.element(find.byKey(const ValueKey('coupon-tab-download'))),
+        ).index,
+        0,
+      );
     });
 
     testWidgets('받기 결과를 모르면 같은 키로 다시 보낸다', (t) async {

@@ -39,6 +39,8 @@ import 'package:customer_app/features/start/presentation/current_location_flow.d
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
 import 'package:customer_app/features/claims/data/mock_claims_repository.dart';
+import 'package:customer_app/features/coupons/data/coupon_repository.dart'
+    show MockCouponRepository;
 import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
 import 'package:customer_app/features/profile/data/mock_profile_repository.dart';
 import 'package:customer_app/features/profile/presentation/profile_controller.dart'
@@ -2308,6 +2310,140 @@ void reviewFlowShots() {
       router.pop();
       await t.pump(const Duration(milliseconds: 500));
     }
+  });
+
+  // 쿠폰함(초안 10 B·C·D, 사용자 2026-11-23 "쿠폰함 해줘").
+  testWidgets('coupons-10', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final now = DateTime.utc(2026, 11, 23, 3);
+    Map<String, Object?> camp(
+      String id,
+      String name,
+      Map<String, Object?> d,
+      int min, {
+      int? days,
+      String? until,
+      int? remaining,
+      int mine = 0,
+      String ends = '2026-11-30T14:59:59Z',
+    }) => {
+      'promotionId': id,
+      'name': name,
+      'discount': d,
+      'minOrderAmount': min,
+      'perCustomerLimit': 1,
+      'myIssuedCount': mine,
+      'remaining': remaining,
+      'endsAt': ends,
+      'useDays': days,
+      'useUntil': until,
+    };
+    Map<String, Object?> cp(
+      String id,
+      String name,
+      Map<String, Object?> d,
+      int min,
+      String status,
+      String until, {
+      String? order,
+    }) => {
+      'couponId': id,
+      'promotionId': 'P-$id',
+      'name': name,
+      'discount': d,
+      'minOrderAmount': min,
+      'status': status,
+      'issuedAt': '2026-11-10T01:00:00Z',
+      'validUntil': until,
+      'usedOrderId': order,
+    };
+    Map<String, Object?> won(int v) => {'type': 'AMOUNT', 'value': v};
+    final rate = {'type': 'RATE', 'value': 10, 'maxAmount': 5000};
+    final repo = MockCouponRepository(
+      latency: Duration.zero,
+      now: () => now,
+      campaigns: [
+        camp('C1', '첫 장보기 축하 쿠폰', won(3000), 15000, days: 7),
+        camp(
+          'C2',
+          '주말 신선 장보기',
+          rate,
+          20000,
+          until: '2026-11-30T14:59:59Z',
+          remaining: 128,
+          ends: '2026-11-29T14:59:59Z',
+        ),
+        camp('C3', '과일 코너 할인', won(1000), 12000, days: 3, mine: 1),
+        camp(
+          'C4',
+          '선착순 겨울 특가',
+          won(5000),
+          30000,
+          days: 3,
+          remaining: 0,
+          ends: '2026-11-25T14:59:59Z',
+        ),
+      ],
+      coupons: [
+        cp(
+          'U1',
+          '가입 축하 쿠폰',
+          won(2000),
+          10000,
+          'AVAILABLE',
+          '2026-11-23T14:59:59Z',
+        ),
+        cp('U2', '주말 신선 장보기', rate, 20000, 'AVAILABLE', '2026-11-30T14:59:59Z'),
+        cp(
+          'U3',
+          '배달 지연 보상 쿠폰',
+          won(3000),
+          0,
+          'AVAILABLE',
+          '2026-12-22T14:59:59Z',
+        ),
+        cp(
+          'X1',
+          '첫 장보기 축하 쿠폰',
+          won(3000),
+          15000,
+          'USED',
+          '2026-11-25T14:59:59Z',
+          order: 'order-seed-1',
+        ),
+        cp('X2', '11월 첫 주 장보기', rate, 20000, 'EXPIRED', '2026-11-09T14:59:59Z'),
+      ],
+    );
+    await t.pumpWidget(
+      testApp([clockProvider.overrideWithValue(() => now)], coupons: repo),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/me/coupons'),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String name) => expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/cp-$name.png').uri),
+    );
+    await shot('b-download');
+    await t.tap(find.byKey(const ValueKey('coupon-tab-available')));
+    await t.pumpAndSettle();
+    await shot('c-available');
+    await t.tap(find.byKey(const ValueKey('coupon-tab-past')));
+    await t.pumpAndSettle();
+    await shot('d-past');
   });
 }
 
