@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 
+import '../../../shared/account_restriction.dart' show restrictionUntilOf;
 import '../../../shared/providers.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -128,7 +129,10 @@ final class InquirySubmitted extends InquirySubmitOutcome {
 
 /// 서버가 거절했다(확정). [code] 는 Problem code.
 final class InquiryRejected extends InquirySubmitOutcome {
-  const InquiryRejected(this.code, {this.status});
+  const InquiryRejected(this.code, {this.status, this.until});
+
+  /// 이용제한·정지(403 ACCOUNT_RESTRICTED)가 풀리는 시각.
+  final DateTime? until;
 
   final String code;
   final int? status;
@@ -162,7 +166,11 @@ class InquirySubmitter {
       return InquirySubmitted(made);
     } on ProblemFailure catch (f) {
       _clear();
-      return InquiryRejected(f.problem.code, status: f.problem.status);
+      return InquiryRejected(
+        f.problem.code,
+        status: f.problem.status,
+        until: restrictionUntilOf(f.problem),
+      );
     } on PmartFailure {
       return const InquiryUnknown();
     }

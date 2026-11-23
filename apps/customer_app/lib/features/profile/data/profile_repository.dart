@@ -180,6 +180,12 @@ Profile profileFromContract(api.Profile p) {
       api.ProfileSocialProviderEnum.APPLE => SocialProvider.apple,
       _ => null,
     },
+    restriction: switch (p.restriction?.value) {
+      'RESTRICTED' => AccountRestriction.restricted,
+      'SUSPENDED' => AccountRestriction.suspended,
+      _ => AccountRestriction.none,
+    },
+    restrictedUntil: p.restrictedUntil,
     photoSource: switch (p.photoSource) {
       api.ProfilePhotoSourceEnum.PROVIDER => ProfilePhotoSource.provider,
       api.ProfilePhotoSourceEnum.CUSTOM => ProfilePhotoSource.custom,

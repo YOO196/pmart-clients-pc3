@@ -20,7 +20,20 @@ class Profile {
     this.withdrawPending = false,
     this.socialProvider,
     this.photoSource,
+    this.restriction = AccountRestriction.none,
+    this.restrictedUntil,
   });
+
+  /// 계정 제한(customer 0.16.0 CU-7) — 이용제한이면 문의·리뷰를 못 쓴다, 정지면 주문·로그인까지.
+  final AccountRestriction restriction;
+
+  /// 제한이 풀리는 시각(늘 있음 — 지나면 없음으로 본다).
+  final DateTime? restrictedUntil;
+
+  /// 지금 문의·리뷰를 쓸 수 없는지(기한이 지났으면 아니다 — 서버가 최종 판정).
+  bool writingBlockedAt(DateTime now) =>
+      restriction != AccountRestriction.none &&
+      (restrictedUntil == null || restrictedUntil!.isAfter(now));
 
   /// 사진 출처(customer 0.15.0 BR-80). 모르면 null(옛 서버).
   final ProfilePhotoSource? photoSource;
@@ -154,3 +167,6 @@ final class ProfileChangeRejected extends ProfileChangeOutcome {
 final class ProfileChangeUnknown extends ProfileChangeOutcome {
   const ProfileChangeUnknown();
 }
+
+/// 계정 제한(계약 AccountRestriction). 모르는 값은 none(서버가 막으면 그 응답으로 안내한다).
+enum AccountRestriction { none, restricted, suspended }

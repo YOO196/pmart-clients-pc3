@@ -12,6 +12,9 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/providers.dart'
     show imageOriginProvider, resolveImageUrl, withImageWidth;
 import '../../../shared/ui_state_of.dart';
+import '../../../shared/account_restriction.dart';
+import '../../profile/presentation/profile_controller.dart'
+    show profileProvider;
 import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -1590,6 +1593,11 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
   }
 
   String _rejectText(AppLocalizations l10n, String code) => switch (code) {
+    // 이용제한·정지(CU-7, 403 ACCOUNT_RESTRICTED) — 기한은 내 정보의 restrictedUntil.
+    AccountRestrictionCode.restricted => restrictedText(
+      l10n,
+      ref.read(profileProvider).value?.restrictedUntil,
+    ),
     ReviewProblemCode.notEligible => l10n.reviewRejectedNotEligible,
     ReviewProblemCode.eligibilityExpired => l10n.reviewRejectedExpired,
     ReviewProblemCode.alreadyReviewed => l10n.reviewRejectedAlready,
@@ -1603,6 +1611,10 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final member = ref.watch(sessionProvider) is MemberSession;
+    // 이용제한·정지 중이면 미리 막는다(CU-7 — 서버가 최종 판정).
+    final restrictedProfile = ref.watch(profileProvider).value;
+    final blocked =
+        restrictedProfile?.writingBlockedAt(DateTime.now()) ?? false;
     final t = widget.target;
     final outcome = _outcome;
     if (!member) {
@@ -1648,26 +1660,44 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: FilledButton(
-            key: const ValueKey('review-submit'),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (blocked)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    restrictedText(l10n, restrictedProfile?.restrictedUntil),
+                    key: const ValueKey('review-restricted'),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              FilledButton(
+                key: const ValueKey('review-submit'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  disabledBackgroundColor: scheme.surfaceContainerHigh,
+                  disabledForegroundColor: scheme.outline,
+                  textStyle: theme.textTheme.titleSmall?.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                // 확인 중에는 새 등록을 막는다("다시 확인"만 같은 키로 보낸다).
+                // 사진이 다 올라가기 전에는 등록하지 않는다.
+                onPressed: locked || rating == null || !_photosReady || blocked
+                    ? null
+                    : _submit,
+                child: Text(l10n.reviewSubmit),
               ),
-              disabledBackgroundColor: scheme.surfaceContainerHigh,
-              disabledForegroundColor: scheme.outline,
-              textStyle: theme.textTheme.titleSmall?.copyWith(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            // 확인 중에는 새 등록을 막는다("다시 확인"만 같은 키로 보낸다).
-            // 사진이 다 올라가기 전에는 등록하지 않는다.
-            onPressed: locked || rating == null || !_photosReady
-                ? null
-                : _submit,
-            child: Text(l10n.reviewSubmit),
+            ],
           ),
         ),
       ),

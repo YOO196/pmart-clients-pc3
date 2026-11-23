@@ -3,6 +3,7 @@ import 'package:pmart_api_auth/pmart_api_auth.dart' as auth;
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart' show sourceSystem;
+import '../../../shared/account_restriction.dart';
 import '../domain/auth.dart';
 
 /// 제공자 SDK 에서 인가 코드·ID 토큰(과 표시용 계정 이름)을 받는다. 고객이 취소하면 null.
@@ -354,6 +355,9 @@ LoginOutcome authResultToOutcome(auth.AuthResult r) => switch (r.state) {
 };
 
 LoginOutcome authFailureToOutcome(PmartFailure f) => switch (f) {
+  ProblemFailure(:final problem)
+      when problem.code == AccountRestrictionCode.suspended =>
+    LoginSuspended(until: restrictionUntilOf(problem)),
   ProblemFailure(:final problem)
       when problem.code == AuthProblemCode.restricted =>
     LoginRestricted(

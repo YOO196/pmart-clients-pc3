@@ -180,6 +180,13 @@ final class IdentityConflict {
 }
 
 /// 실패가 잦아 잠시 제한됨(423 AUTH_RESTRICTED). 남은 시간은 서버 값.
+/// 계정 정지(auth — 403 ACCOUNT_SUSPENDED, CU-7). [until] 은 풀리는 시각(모르면 null).
+final class LoginSuspended extends LoginOutcome {
+  const LoginSuspended({this.until});
+
+  final DateTime? until;
+}
+
 final class LoginRestricted extends LoginOutcome {
   const LoginRestricted({this.retryAfterSeconds});
 

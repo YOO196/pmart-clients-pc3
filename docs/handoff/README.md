@@ -87,3 +87,4 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-23-backend-category-image.md` | BR-89 카테고리 이미지(CategoryNode.imageUrl) |
 | `customer-app/2026-11-23-backend-review-report.md` | BR-90 리뷰 신고하기(고객) + 운영자 확인 처리 |
 | `customer-app/2026-11-23-backend-faq-feedback.md` | BR-91 FAQ 답 의견(도움이 되었어요/수정이 필요해요) |
+| `customer-app/2026-11-23-backend-lan-seed-popup-banner-coupon.md` | LAN 시험 데이터 — 홈 팝업 2·배너 몇 개·쿠폰 몇 개(계약 변경 아님) |

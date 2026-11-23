@@ -7,6 +7,7 @@ import 'package:pmart_ui/pmart_ui.dart'
 import '../../../l10n/gen/app_localizations.dart';
 import '../data/auth_repository.dart' show consentTypeOf;
 import '../domain/auth.dart';
+import '../../../shared/account_restriction.dart' show suspendedText;
 import 'signup_steps.dart';
 
 import 'package:pmart_core/pmart_core.dart' show PmartEnv, ProblemCode;
@@ -415,6 +416,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         null => l10n.loginRestricted,
       },
       LoginProviderUnavailable() => l10n.loginProviderDown,
+      LoginSuspended(:final until) => suspendedText(l10n, until),
       LoginRejected(:final code) => switch (code) {
         AuthProblemCode.providerRejected => l10n.loginProviderRejected,
         // 동의 완료가 막혔다(다른 기기·계정, 이미 끝남, 그 사이 약관 버전이 바뀜) — 처음부터

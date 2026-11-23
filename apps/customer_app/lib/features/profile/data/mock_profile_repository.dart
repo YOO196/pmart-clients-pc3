@@ -55,6 +55,10 @@ final class MockProfileRepository implements ProfileRepository {
 
   final changeKeys = <String>[];
 
+  /// 시험용: 계정 제한(CU-7).
+  AccountRestriction restriction = AccountRestriction.none;
+  DateTime? restrictedUntil;
+
   Future<void> _wait() => Future<void>.delayed(latency);
 
   static String mask(String digits) => digits.length < 7
@@ -77,6 +81,8 @@ final class MockProfileRepository implements ProfileRepository {
       profileImageUrl: profileImageUrl,
       withdrawPending: withdrawPending,
       photoSource: photoSource,
+      restriction: restriction,
+      restrictedUntil: restrictedUntil,
     );
   }
 

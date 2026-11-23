@@ -18,6 +18,7 @@ import '../../orders/presentation/orders_providers.dart'
     show orderDetailProvider, orderListProvider, orderStatusText;
 import '../../orders/domain/orders.dart'
     show OrderDetail, OrderLineView, OrderListQuery;
+import '../../../shared/account_restriction.dart';
 import '../../../shared/choice_sheet.dart';
 import '../../catalog/presentation/widgets/product_tile_card.dart'
     show ProductImage;
@@ -1749,11 +1750,16 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
           _busy = false;
           _done = (category: category, photos: _photos.length);
         });
-      case InquiryRejected(:final code, :final status):
+      case InquiryRejected(:final code, :final status, :final until):
+        // 이용제한·정지면 내 정보(제한 상태)를 다시 읽어 화면도 막는다.
+        if (code == AccountRestrictionCode.restricted) {
+          ref.invalidate(profileProvider);
+        }
         setState(() {
           _busy = false;
           _unknown = false;
           _message = switch (code) {
+            AccountRestrictionCode.restricted => restrictedText(l10n, until),
             InquiryProblemCode.orderNotFound => l10n.inqOrderNotFound,
             InquiryProblemCode.orderNotInProgress => l10n.inqOrderNotInProgress,
             InquiryProblemCode.photoNotFound => l10n.inqPhotoNotFound,
@@ -1802,9 +1808,14 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
       (_, final o?) => _orderSummary(l10n, o),
       _ => l10n.inqOrderChosenNoNumber,
     };
+    // 이용제한·정지 중이면 미리 막는다(customer 0.16.0 CU-7 — 서버가 최종 판정, 기한이 지나면 풀림).
+    final profile = ref.watch(profileProvider).value;
+    final blocked = profile?.writingBlockedAt(DateTime.now()) ?? false;
     // 못 누를 때 이유 한 줄(초안 17 I).
     final reason = _unknown || _busy
         ? null
+        : blocked
+        ? restrictedText(l10n, profile?.restrictedUntil)
         : _category == null
         ? l10n.inqReasonCategory
         : _body.text.trim().isEmpty
@@ -2068,7 +2079,7 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
                 ),
                 onPressed: _unknown
                     ? (_busy ? null : _submit)
-                    : (_canSend ? _submit : null),
+                    : (_canSend && !blocked ? _submit : null),
                 child: Text(_unknown ? l10n.inqCheckAgain : l10n.inqSubmit),
               ),
             ],
