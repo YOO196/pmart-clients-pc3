@@ -1830,32 +1830,6 @@ CartChange reorderChange(Cart cart, String sku, int quantity) {
         );
 }
 
-/// 한 줄의 "같은 상품 담기" 결과. 서버 응답을 그대로 안내한다(담기 전 판정·추정 없음).
-@immutable
-sealed class _Reorder {
-  const _Reorder();
-}
-
-final class _ReorderRunning extends _Reorder {
-  const _ReorderRunning();
-}
-
-final class _ReorderDone extends _Reorder {
-  const _ReorderDone(this.outcome);
-
-  final CartChangeOutcome outcome;
-}
-
-/// 장바구니가 다른 변경(결과 불명 포함)을 처리 중이라 보내지 않았다.
-final class _ReorderBusy extends _Reorder {
-  const _ReorderBusy();
-}
-
-/// 장바구니를 불러오지 못해 보내지 않았다.
-final class _ReorderCartFailed extends _Reorder {
-  const _ReorderCartFailed();
-}
-
 /// 주문 상품 + "같은 상품 담기"(Commerce 주문내역: 과거 주문 수정이 아니라 현재 조건의 새 담기, 성공 항목만 담김).
 /// 품목마다 기존 장바구니 담기 경로(AddItem)로 보내고 결과를 그 줄에 보인다. "전체 다시 담기"는 차례로 보낸다.
 class _OrderLinesSection extends ConsumerStatefulWidget {
@@ -1868,70 +1842,99 @@ class _OrderLinesSection extends ConsumerStatefulWidget {
 }
 
 class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
-  final _results = <String, _Reorder>{};
-  bool _running = false;
+  /// [같은 상품 담기]로 이미 담은 줄 — 다시 누르면 담기지 않은 줄만 보낸다.
+  final _done = <String>{};
 
-  bool _settled(_Reorder? r) =>
-      (r is _ReorderDone && r.outcome is CartChangeApplied);
+  /// 지금 담는 줄(⊕) 또는 전체(null 이 아니면 줄 id, '*' 는 전체).
+  String? _busy;
 
-  /// 한 줄 담기. 다음 줄로 이어가도 되는지 돌려준다(결과 불명·장바구니 바쁨·조회 실패면 멈춘다).
-  Future<bool> _add(OrderLineView line) async {
-    setState(() => _results[line.orderLineId] = const _ReorderRunning());
-    _Reorder result;
+  String _outcomeText(AppLocalizations l10n, CartChangeOutcome? o) =>
+      switch (o) {
+        null => l10n.reorderBusy,
+        final o => cartOutcomeText(l10n, o),
+      };
+
+  void _say(String text, {bool toCart = false}) {
+    final l10n = AppLocalizations.of(context);
+    ScaffoldMessenger.of(context).notice(
+      text,
+      action: toCart
+          ? SnackBarAction(
+              label: l10n.cartGoToCart,
+              onPressed: () => context.push('/cart'),
+            )
+          : null,
+    );
+  }
+
+  /// 줄 ⊕ — 누를 때마다 1개씩(상품 카드·찜 + 와 같은 규칙, 사용자 2026-11-23). 결과는 아래 알림.
+  Future<void> _addOne(OrderLineView line) async {
+    if (_busy != null) return;
+    final l10n = AppLocalizations.of(context);
+    setState(() => _busy = line.orderLineId);
     try {
       final cart = await ref.read(cartControllerProvider.future);
+      final before = cart.cart.lineForSku(line.sku)?.quantity ?? 0;
       final outcome = await ref
           .read(cartControllerProvider.notifier)
-          .submitWhenReady(
-            reorderChange(cart.cart, line.sku, line.originalQty ?? 1),
-          );
-      result = outcome == null ? const _ReorderBusy() : _ReorderDone(outcome);
+          .submitWhenReady(reorderChange(cart.cart, line.sku, 1));
+      if (!mounted) return;
+      // 서버가 반영한 뒤에만 담긴 수량을 알린다.
+      if (outcome is CartChangeApplied) {
+        _say(l10n.cartInCart(before + 1), toCart: true);
+      } else {
+        _say(_outcomeText(l10n, outcome));
+      }
     } on PmartFailure {
-      result = const _ReorderCartFailed();
+      if (mounted) _say(l10n.cartUnavailableForAdd);
+    } finally {
+      if (mounted) setState(() => _busy = null);
     }
-    if (!mounted) return false;
-    setState(() => _results[line.orderLineId] = result);
-    return switch (result) {
-      _ReorderDone(:final outcome) => outcome is! CartChangeUnknown,
-      _ => false,
-    };
   }
 
-  Future<void> _run(List<OrderLineView> lines) async {
-    if (_running) return;
-    setState(() => _running = true);
+  /// [같은 상품 담기] — 지난 주문 수량대로 차례로. 거절은 건너뛰고, 결과 모름·장바구니 바쁨이면 멈춘다.
+  /// 결과는 알림 한 줄(담은 수 + 담지 못한 첫 사유).
+  Future<void> _addAll(List<OrderLineView> lines) async {
+    if (_busy != null) return;
+    final l10n = AppLocalizations.of(context);
+    setState(() => _busy = '*');
+    var added = 0;
+    String? problem;
     try {
       for (final l in lines) {
-        if (_settled(_results[l.orderLineId])) continue;
-        if (!await _add(l)) break;
+        if (_done.contains(l.orderLineId)) continue;
+        final cart = await ref.read(cartControllerProvider.future);
+        final outcome = await ref
+            .read(cartControllerProvider.notifier)
+            .submitWhenReady(
+              reorderChange(cart.cart, l.sku, l.originalQty ?? 1),
+            );
+        if (outcome is CartChangeApplied) {
+          _done.add(l.orderLineId);
+          added++;
+          continue;
+        }
+        problem ??= _outcomeText(l10n, outcome);
+        if (outcome == null || outcome is CartChangeUnknown) break;
       }
+    } on PmartFailure {
+      problem ??= l10n.cartUnavailableForAdd;
     } finally {
-      if (mounted) setState(() => _running = false);
+      if (mounted) setState(() => _busy = null);
     }
+    if (!mounted) return;
+    _say(switch ((added, problem)) {
+      (_, null) => l10n.reorderAllAdded(added),
+      (0, final p?) => p,
+      (final n, final p?) => l10n.reorderAllSome(n, p),
+    }, toCart: added > 0);
   }
-
-  String? _text(AppLocalizations l10n, _Reorder? r) => switch (r) {
-    null => null,
-    _ReorderRunning() => l10n.reorderRunning,
-    _ReorderBusy() => l10n.reorderBusy,
-    _ReorderCartFailed() => l10n.cartUnavailableForAdd,
-    _ReorderDone(:final outcome) => switch (outcome) {
-      CartChangeApplied() => l10n.cartAdded,
-      CartChangeRejected() => cartRejectionText(l10n, outcome),
-      CartVersionConflict() => l10n.cartNoticeConflict,
-      CartChangeUnknown() => l10n.cartChangeUnknown,
-      CartChangeNotApplied() => l10n.cartNoticeNotApplied,
-    },
-  };
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final lines = widget.order.lines;
-    final anyAdded = _results.values.any(
-      (r) => r is _ReorderDone && r.outcome is CartChangeApplied,
-    );
     // 레퍼런스 9-1 3-1: "주문 상품" 제목 + 테두리 카드 안에 줄·같은 상품 담기(사용자 2026-11-21 "다닥다닥").
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1959,42 +1962,16 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
                   key: ValueKey('reorder-${l.orderLineId}'),
                   size: 24,
                   tooltip: l10n.reorderLine,
-                  onPressed: (_running || _settled(_results[l.orderLineId]))
-                      ? null
-                      : () => _run([l]),
-                  icon: PmartLineIcon(
-                    _settled(_results[l.orderLineId])
-                        ? PmartLineIcons.check
-                        : PmartLineIcons.plus,
-                    size: 20,
-                  ),
+                  onPressed: _busy != null ? null : () => _addOne(l),
+                  icon: _busy == l.orderLineId
+                      ? const SizedBox.square(
+                          dimension: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const PmartLineIcon(PmartLineIcons.plus, size: 20),
                 ),
               ),
-              if (_text(l10n, _results[l.orderLineId]) case final t?)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    t,
-                    key: ValueKey('reorder-result-${l.orderLineId}'),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color:
-                          (_settled(_results[l.orderLineId]) ||
-                              _results[l.orderLineId] is _ReorderRunning)
-                          ? null
-                          : theme.colorScheme.error,
-                    ),
-                  ),
-                ),
             ],
-            if (anyAdded)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  key: const ValueKey('reorder-go-cart'),
-                  onPressed: () => context.push('/cart'),
-                  child: Text(l10n.cartGoToCart),
-                ),
-              ),
             // 레퍼런스 9-1 3-3: 목록 아래 넓은 테두리 단추 "같은 상품 담기"
             if (lines.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -2016,7 +1993,7 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                onPressed: _running ? null : () => _run(lines),
+                onPressed: _busy != null ? null : () => _addAll(lines),
                 child: Text(l10n.reorderAll),
               ),
               const SizedBox(height: 8),

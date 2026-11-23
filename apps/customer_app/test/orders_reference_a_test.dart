@@ -431,7 +431,7 @@ void main() {
       },
     );
 
-    testWidgets('품목 담기는 현재 조건의 새 담기(AddItem)이고 서버 결과를 그 줄에 보인다', (t) async {
+    testWidgets('줄 ⊕ 는 누를 때마다 1개씩(사용자 2026-11-23), 결과는 아래 알림', (t) async {
       final cart = MockCartRepository(latency: Duration.zero);
       await openOrders(t, cart: cart);
       await t.tapAt(
@@ -448,20 +448,25 @@ void main() {
         cart.changes.sublist(sent).single,
         isA<AddItem>()
             .having((c) => c.sku, 'sku', 'E-00000002')
-            .having((c) => c.quantity, 'quantity', 3),
+            .having((c) => c.quantity, 'quantity', 1),
       );
-      expect(
-        t.widget<Text>(find.byKey(const ValueKey('reorder-result-ol-5'))).data,
-        '장바구니에 담았어요',
-      );
-      // 담긴 줄은 다시 보내지 않는다.
+      expect(find.text('장바구니에 1개 있어요'), findsOneWidget);
+      expect(find.byKey(const ValueKey('reorder-result-ol-5')), findsNothing);
+      // 다시 누르면 1개 더(서버 수량 + 1 로 수량 변경).
       expect(
         t
             .widget<IconButton>(find.byKey(const ValueKey('reorder-ol-5')))
             .onPressed,
-        isNull,
+        isNotNull,
       );
-      expect(find.byKey(const ValueKey('reorder-go-cart')), findsOneWidget);
+      await t.pump(const Duration(seconds: 5));
+      await t.tap(find.byKey(const ValueKey('reorder-ol-5')));
+      await t.pumpAndSettle();
+      expect(
+        cart.changes.last,
+        isA<SetQuantity>().having((c) => c.quantity, 'quantity', 2),
+      );
+      expect(find.text('장바구니에 2개 있어요'), findsOneWidget);
     });
 
     testWidgets('전체 다시 담기: 차례로 보내고 거절은 사유, 이미 담긴 상품은 수량을 바꾸지 않는다', (t) async {
@@ -510,11 +515,9 @@ void main() {
       ];
       // 우유(E-00000001)는 이미 2개 담겨 있어 그 수량에 더한다(SetQuantity).
       expect(sentSkus(), ['E-00000004', 'E-00000002', startsWith('set:')]);
-      String result(String id) =>
-          t.widget<Text>(find.byKey(ValueKey('reorder-result-$id'))).data!;
-      expect(result('m-1'), '지금 살 수 없는 상품이에요');
-      expect(result('m-2'), '장바구니에 담았어요');
-      expect(result('m-3'), '장바구니에 담았어요');
+      // 결과는 알림 한 줄: 담은 수 + 담지 못한 첫 사유.
+      expect(find.text('2개 상품을 담았어요. 지금 살 수 없는 상품이에요'), findsOneWidget);
+      await t.pump(const Duration(seconds: 5));
 
       // 다시 누르면 담기지 않은(거절된) 줄만 다시 보낸다.
       await t.tap(find.byKey(const ValueKey('reorder-all')));
@@ -553,11 +556,8 @@ void main() {
       }
 
       expect(cart.changes.sublist(sent), hasLength(1));
-      expect(
-        t.widget<Text>(find.byKey(const ValueKey('reorder-result-t-1'))).data,
-        '변경이 반영됐는지 확인하는 중이에요',
-      );
-      expect(find.byKey(const ValueKey('reorder-result-t-2')), findsNothing);
+      // 담았다고 하지 않는다.
+      expect(find.textContaining('상품을 담았어요'), findsNothing);
     });
   });
 }
