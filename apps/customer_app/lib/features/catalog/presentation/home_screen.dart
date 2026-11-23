@@ -20,8 +20,8 @@ import '../../auth/presentation/auth_controller.dart';
 import '../../checkout/domain/checkout.dart';
 import '../../checkout/presentation/delivery_select_screen.dart'
     show modeLabel, optionSubtitle, windowText;
+import '../../../shared/order_status.dart' show OrderStatus;
 import '../../orders/domain/orders.dart';
-import '../../orders/presentation/orders_providers.dart' show deliveryPhaseText;
 import '../../payment/presentation/payment_controller.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
@@ -1472,7 +1472,7 @@ class _InlineFailure extends StatelessWidget {
 /// 진행 중 주문(회원만). 상태·도착 예상은 서버 값만 보인다.
 /// 조회 실패는 "주문 없음"이 아니라 실패 한 줄로 보인다. 비회원·진행 중 주문 없음은 그리지 않는다.
 class _InProgressOrderCard extends ConsumerWidget {
-  /// [floating] 이면 화면 아래 떠 있는 카드만(레퍼런스 3-1 "B마트 홈 - 배달중"), 아니면 목록 안 실패 한 줄만.
+  /// [floating] 이면 화면 아래 떠 있는 알약만(초안 12 v2 H), 아니면 목록 안 실패 한 줄만.
   const _InProgressOrderCard({this.floating = false});
 
   final bool floating;
@@ -1481,42 +1481,9 @@ class _InProgressOrderCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     return switch (ref.watch(homeInProgressOrderProvider)) {
-      AsyncData(value: final order?) when floating => Material(
-        key: const ValueKey('home-order-card'),
-        color: const Color(0xF2232428),
-        borderRadius: BorderRadius.circular(20),
-        clipBehavior: Clip.antiAlias,
-        elevation: 3,
-        child: InkWell(
-          onTap: () => context.push('/orders/${order.orderId}'),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 14, 14),
-            child: Row(
-              children: [
-                Expanded(
-                  // 레퍼런스 3-1 "B마트 홈 - 배달중": 큰 단계 문장 + ›, 아래 "13분 · 센터 이름"(남은 분은 강조색).
-                  // 단계 문장은 배송현황·주문상세와 같다(사용자 2026-11-21 "일부 전달" 같은 상태 이름 대신).
-                  child: _OrderCardText(order: order),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: const PmartLineIcon(
-                    PmartLineIcons.scooter,
-                    size: 34,
-                    color: Color(0xFFB9A8FF),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+      AsyncData(value: final order?) when floating => Align(
+        alignment: Alignment.centerRight,
+        child: _DeliveringPill(order: order),
       ),
       AsyncError() when !floating => _InlineFailure(
         key: const ValueKey('home-order-failed'),
@@ -1528,28 +1495,120 @@ class _InProgressOrderCard extends ConsumerWidget {
   }
 }
 
-/// 홈 현황판 글: 단계 제목(라이더 단계까지 — 도착 예상 조회의 stage) + "N분 · 센터 이름".
-/// 남은 분·센터 이름은 서버 값만(산출 전·위치 확인 중이면 분을 만들지 않는다).
-class _OrderCardText extends ConsumerWidget {
-  const _OrderCardText({required this.order});
+/// 홈 알약의 짧은 단계 말(초안 12 H — 상품 준비 중 / 배달 시작 / 배달 중 / 곧 도착). 라이더 단계(서버 ETA stage)가
+/// 있으면 그것을, 없으면 주문 상태로. 주문 확인(준비 전)은 "주문 확인".
+String deliveryPhaseShort(
+  AppLocalizations l10n, {
+  required OrderStatus status,
+  DeliveryStage? stage,
+}) => switch (stage) {
+  DeliveryStage.atCustomer => l10n.homePillNear,
+  DeliveryStage.toCustomer => l10n.homePillDelivering,
+  DeliveryStage.toStore || DeliveryStage.atStore => l10n.homePillStarted,
+  _ => switch (status) {
+    OrderStatus.confirmed => l10n.homePillConfirmed,
+    OrderStatus.preparing ||
+    OrderStatus.partiallyHandedOver => l10n.homePillPreparing,
+    _ => l10n.homePillDelivering,
+  },
+};
+
+/// 초안 12 v2 H: 장바구니 막대 위 오른쪽 작은 검은 알약 "(스쿠터) 13분 배달 중 ›". 누르면 주문 상세.
+/// 홈이 보일 때마다(처음·탭 돌아옴·위 화면 닫힘·앱이 다시 앞으로) 오른쪽에서 미끄러져 들어와 4초 뒤 사라진다.
+/// 홈에 있는 동안 단계가 바뀌면 다시 4초. "동작 줄이기"면 미끄러짐 없이 흐림만. 남은 분은 서버 도착 예상만.
+class _DeliveringPill extends ConsumerStatefulWidget {
+  const _DeliveringPill({required this.order});
 
   final OrderListItem order;
 
+  /// 보이는 시간(사용자 2026-11-23 확정).
+  static const hold = Duration(seconds: 4);
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DeliveringPill> createState() => _DeliveringPillState();
+}
+
+class _DeliveringPillState extends ConsumerState<_DeliveringPill>
+    with SingleTickerProviderStateMixin {
+  // 들어옴 0.65초(앞 0.3초는 화면 전환과 겹치지 않게 기다림) · 나감 0.3초.
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 650),
+    reverseDuration: const Duration(milliseconds: 300),
+  );
+  late final Animation<double> _t = CurvedAnimation(
+    parent: _c,
+    curve: const Interval(0.46, 1, curve: Curves.easeOutCubic),
+    reverseCurve: Curves.easeInCubic,
+  );
+  Timer? _hold;
+  bool _visible = false;
+  String? _lastLabel;
+  late final AppLifecycleListener _life = AppLifecycleListener(
+    onResume: () {
+      if (_visible) _show();
+    },
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _life; // 앱이 다시 앞으로 오면 다시 띄운다.
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 홈이 보이는지: 탭(TickerMode)·위에 쌓인 화면(isCurrent). 안 보이다 보이면 다시 띄운다.
+    final visible =
+        TickerMode.valuesOf(context).enabled &&
+        (ModalRoute.of(context)?.isCurrent ?? true);
+    if (visible && !_visible) _show();
+    if (!visible) _hideNow();
+    _visible = visible;
+  }
+
+  void _show() {
+    _hold?.cancel();
+    _c.forward(from: _c.value > 0.5 ? 0.46 : 0);
+    _hold = Timer(_DeliveringPill.hold + _c.duration!, () {
+      if (mounted) _c.reverse();
+    });
+  }
+
+  void _hideNow() {
+    _hold?.cancel();
+    _c.value = 0;
+  }
+
+  @override
+  void dispose() {
+    _hold?.cancel();
+    _life.dispose();
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final order = widget.order;
     final eta = homeOrderHasEta(order.status)
         ? ref.watch(homeOrderEtaProvider(order.orderId)).value
         : null;
-    final phase = deliveryPhaseText(
+    final label = deliveryPhaseShort(
       l10n,
       status: order.status,
-      deliveryMode: order.deliveryMode == DeliveryMode.scheduled
-          ? 'SCHEDULED'
-          : null,
       stage: eta?.stage,
     );
+    // 홈에 있는 동안 단계가 바뀌면 다시 4초(남은 분만 바뀌면 다시 띄우지 않는다).
+    if (_lastLabel != null && _lastLabel != label && _visible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _show();
+      });
+    }
+    _lastLabel = label;
     final minutes = switch (eta) {
       DeliveryEtaView(
         status: EtaStatus.available,
@@ -1558,56 +1617,89 @@ class _OrderCardText extends ConsumerWidget {
         (remainingSeconds / 60).ceil(),
       _ => null,
     };
-    final second = [
-      if (minutes != null)
-        TextSpan(
-          text: l10n.homeOrderEtaMinutes(minutes),
-          style: const TextStyle(color: Color(0xFFB9A8FF)),
-        ),
-      if (minutes != null && order.mfcName != null) const TextSpan(text: ' · '),
-      if (order.mfcName case final name?) TextSpan(text: name),
-    ];
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Flexible(
-              child: Text(
-                phase.title,
+    final reduce = MediaQuery.disableAnimationsOf(context);
+    final pill = Material(
+      key: const ValueKey('home-order-card'),
+      color: const Color(0xF2232428),
+      shape: const StadiumBorder(),
+      clipBehavior: Clip.antiAlias,
+      elevation: 3,
+      child: InkWell(
+        onTap: () => context.push('/orders/${order.orderId}'),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(7, 7, 12, 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const PmartLineIcon(
+                  PmartLineIcons.scooter,
+                  size: 20,
+                  color: Color(0xFFB9A8FF),
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (minutes != null) ...[
+                Text(
+                  l10n.homeOrderEtaMinutes(minutes),
+                  key: const ValueKey('home-order-eta'),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFB9A8FF),
+                  ),
+                ),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                label,
                 key: const ValueKey('home-order-title'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w600,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
               ),
-            ),
-            const SizedBox(width: 2),
-            const PmartLineIcon(
-              PmartLineIcons.chevronRight,
-              size: 20,
-              color: Colors.white,
-            ),
-          ],
-        ),
-        if (second.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text.rich(
-            TextSpan(children: second),
-            key: const ValueKey('home-order-eta'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontSize: 15,
-              color: Colors.white.withValues(alpha: 0.78),
-            ),
+              const SizedBox(width: 2),
+              const PmartLineIcon(
+                PmartLineIcons.chevronRight,
+                size: 16,
+                color: Colors.white,
+              ),
+            ],
           ),
-        ],
-      ],
+        ),
+      ),
+    );
+    return AnimatedBuilder(
+      animation: _t,
+      child: pill,
+      builder: (context, child) {
+        // 다 사라졌으면 자리도 누를 곳도 없다(장바구니 막대는 아래에 붙어 있어 움직이지 않는다).
+        if (_c.isDismissed) return const SizedBox.shrink();
+        final v = _t.value;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Opacity(
+            opacity: v.clamp(0.0, 1.0),
+            child: reduce
+                ? child
+                : FractionalTranslation(
+                    translation: Offset((1 - v) * 1.1, 0),
+                    child: child,
+                  ),
+          ),
+        );
+      },
     );
   }
 }

@@ -395,10 +395,10 @@ void main() {
 
       final card = find.byKey(const ValueKey('home-order-card'));
       expect(card, findsOneWidget);
-      // 레퍼런스 3-1 "배달 중이에요 ›" / "13분 · 센터": 단계 문장(배송현황과 같은 문구) + 남은 분 · 센터 이름.
-      // order-seed-1 은 일부 전달 — 남은 배송이 배달 중이라 "일부 전달" 같은 상태 이름 대신 배달 단계 문장.
+      // 초안 12 v2 H: 오른쪽 작은 알약 "12분 배달 중 ›" — 짧은 단계 말 + 서버 남은 분.
+      // order-seed-1 은 일부 전달 — 남은 배송이 배달 중이라 "일부 전달" 같은 상태 이름 대신 배달 단계.
       expect(
-        find.descendant(of: card, matching: find.text('배달 중이에요')),
+        find.descendant(of: card, matching: find.text('배달 중')),
         findsOneWidget,
       );
       expect(find.text('일부 전달'), findsNothing);
@@ -408,9 +408,21 @@ void main() {
           matching: find.byKey(const ValueKey('home-order-eta')),
         ),
       );
-      expect(eta.textSpan!.toPlainText(), startsWith('12분'));
+      expect(eta.data, startsWith('12분'));
       // 계약 status 는 하나만 받으므로 진행 중 상태마다 물었다.
       expect(orders.listStatuses, containsAll(homeInProgressStatuses));
+
+      // 4초 뒤 미끄러져 사라진다.
+      await t.pump(const Duration(seconds: 5));
+      await t.pumpAndSettle();
+      expect(card, findsNothing);
+
+      // 다른 화면에 갔다가 홈으로 돌아오면 다시 나타난다.
+      await t.tap(find.text('주문내역').last);
+      await t.pumpAndSettle();
+      await t.tap(find.text('홈').last);
+      await t.pumpAndSettle();
+      expect(card, findsOneWidget);
 
       await t.tap(card);
       await t.pumpAndSettle();
