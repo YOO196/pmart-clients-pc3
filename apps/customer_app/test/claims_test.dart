@@ -409,6 +409,7 @@ void main() {
         matching: find.text(text),
       );
       expect(inRefund('진행 중'), findsOneWidget);
+      expect(inRefund('결제하신 수단으로 돌려드려요'), findsOneWidget);
       expect(inRefund('완료'), findsNothing);
       await next();
       expect(find.text('처리가 끝났어요'), findsOneWidget);

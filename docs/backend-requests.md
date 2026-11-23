@@ -92,6 +92,8 @@
 | BR-82 | 보통 | 고객 | 카테고리 화면 배너 — 편성 `Banner.placement` 에 CATEGORY 없음(조회 query 에는 있음) → 넣기·LAN 시험 배너(R1). 할인 중인 상품만 보는 검색 조건(예 `onSale=true`) 또는 할인율순(R2) — 요청서 `docs/handoff/customer-app/2026-11-22-backend-category-banner-discount-list.md` | LAN 반영 끝 2026-11-22(storefront 0.11.0·search 0.8.0, 회신 `clients/customer-app/2026-11-22-reply-br82-category-banner-discount-list.md`). 앱: [할인] 타일 → `/products?onSale=true` 할인 상품 목록(필터 없음, 정렬만), 배너는 코드 그대로. LAN 확인 onSale 7개·CATEGORY 배너 2장. 폰 확인 뒤 archive |
 | BR-83 | 보통 | 고객 | 할인 상품 목록(`onSale=true`) 보강 — `GET /search/filters` 에 `onSale`(R1, 지금 앱은 할인 목록에서 필터 숨김), 할인율순 정렬 `SortKey`(R2, 지금 1차 제외 — 사용자 확인 뒤). 요청서 `docs/handoff/customer-app/2026-11-22-backend-sale-list-filters-sort.md` | LAN 반영 끝 2026-11-22(search 0.9.0, 회신 `clients/customer-app/2026-11-22-reply-br83-sale-list-filters-sort.md`). 앱: 할인 목록 필터 다시 보임(filters onSale)·정렬 "할인율순"(할인 목록에만). LAN 확인 필터 건수 할인 7개 기준·DISCOUNT_RATE 7건·커서, onSale 없이 400. 폰 확인 뒤 archive |
 | BR-84 | 보통 | 고객·백오피스 | 타이머 테마 머리 모양 고르기 — 편성 `LayoutTheme`·홈 `Section` 에 `timerStyle`(LABEL=초안 C 제목 위 분홍 글자 / BAND=초안 D 연분홍 띠·시분초 칸), 백오피스 테마 편집에서 고르기. 요청서 `docs/handoff/customer-app/2026-11-23-backend-timer-theme-style.md` | 요청 |
+| BR-85 | 보통 | 고객 | 내 쿠폰에 쓴 시각 — `Coupon.usedAt`(쿠폰함 초안 10-D 지난 쿠폰 "M.d(E)에 사용"). 요청서 `docs/handoff/customer-app/2026-11-23-backend-coupon-used-at.md` | 요청 |
+| BR-86 | 낮음 | 고객 | 리뷰 쓰기 목록 주문별 쓸 수 있는 품목 수 — `ReviewEligibility.orderWritableCount`(쪽 경계에서 리뷰관리 H 주문 머리 수가 덜 세지는 것). 요청서 `docs/handoff/customer-app/2026-11-23-backend-review-order-writable-count.md` | 요청 |
 
 ---
 

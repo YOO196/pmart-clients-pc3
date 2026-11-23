@@ -985,6 +985,19 @@ class _RefundBlock extends StatelessWidget {
               ),
             ],
           ),
+          // 초안 08-B(사용자 2026-11-23 "응 넣어줘"): 원결제를 PG 에서 취소해 돌려준다(cs-scripts/03, Commerce 환불).
+          // "반영까지 며칠" 같은 기간 안내는 정해지지 않아 넣지 않는다.
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              l10n.claimRefundToOriginal,
+              key: const ValueKey('refund-to-original'),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 13,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
           if (r.done && r.completedAt != null)
             Padding(
               padding: const EdgeInsets.only(top: 10),
