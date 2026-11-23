@@ -1039,6 +1039,8 @@
     }
   },
   "trackRemainingShort": "{minutes}분 남음",
+  "trackArriveAtTime": "{time} 도착",
+  "@trackArriveAtTime": { "placeholders": { "time": { "type": "String" } } },
   "@trackRemainingShort": { "placeholders": { "minutes": { "type": "int" } } },
   "trackRiderLocationAt": "{time} 기준 라이더 위치",
   "@trackRiderLocationAt": { "placeholders": { "time": { "type": "String" } } },

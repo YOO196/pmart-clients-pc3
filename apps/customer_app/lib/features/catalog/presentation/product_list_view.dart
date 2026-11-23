@@ -54,6 +54,12 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
   SortKey _sort = SortKey.relevance;
   Set<String> _filters = const {};
 
+  /// 마지막으로 받은 목록과 그 검색어·카테고리. 정렬·필터를 바꿔 새로 읽는 동안 이 목록을 그대로 두고
+  /// 위에 진행 줄만 보인다 — 화면 전체가 "불러오는 중"으로 깜박이지 않게(사용자 2026-11-23).
+  /// 검색어·카테고리가 바뀌면 쓰지 않는다(다른 조건의 결과를 보이지 않는다).
+  ProductListState? _last;
+  ProductQuery? _lastBase;
+
   ProductQuery get _query =>
       widget.baseQuery.copyWith(sort: _sort, filters: _filters);
 
@@ -113,7 +119,19 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
     final l10n = AppLocalizations.of(context);
     final query = _query;
     final provider = productListProvider(query);
-    final value = ref.watch(provider);
+    final live = ref.watch(provider);
+    final refreshing =
+        live.isLoading &&
+        !live.hasValue &&
+        _last != null &&
+        _lastBase == widget.baseQuery;
+    final AsyncValue<ProductListState> value = refreshing
+        ? AsyncData(_last!)
+        : live;
+    if (live case AsyncData(value: final v)) {
+      _last = v;
+      _lastBase = widget.baseQuery;
+    }
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final list = value.value;
@@ -315,6 +333,16 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
                         ),
                 ),
               ),
+              if (refreshing)
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  child: LinearProgressIndicator(
+                    key: ValueKey('product-list-refreshing'),
+                    minHeight: 2,
+                  ),
+                ),
               const Positioned(
                 left: 12,
                 right: 12,

@@ -3169,8 +3169,9 @@ class _TrackBody extends StatelessWidget {
               : phase != null
               ? 'track-phase'
               : 'eta-line',
+          // 초안 13 "오후 6:50 도착"(사용자 2026-11-23 추천대로 — 무슨 시각인지 분명하게).
           time: remainingMin != null && e.etaAt != null
-              ? formatSeoulTime(e.etaAt!)
+              ? l10n.trackArriveAtTime(formatSeoulTime(e.etaAt!))
               : null,
           subtitle: reservedHead
               ? null

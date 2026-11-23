@@ -486,6 +486,49 @@ void main() {
       expect(find.byKey(const ValueKey('category-photo-C-VEG')), findsNothing);
     });
 
+    testWidgets(
+      '정렬·필터를 바꿔 다시 읽는 동안 화면이 비지 않고 이전 목록 + 진행 줄(사용자 2026-11-23 "깜박거리면서")',
+      (t) async {
+        await t.pumpWidget(
+          testApp(
+            const [],
+            catalog: MockCatalogRepository(
+              latency: const Duration(milliseconds: 400),
+            ),
+          ),
+        );
+        await t.pump(const Duration(seconds: 2));
+        await t.pumpAndSettle();
+        await t.tap(find.text('카테고리').last);
+        await t.pump(const Duration(seconds: 1));
+        await t.pumpAndSettle();
+        await t.tap(find.text('과일·채소·샐러드'));
+        await t.pump(const Duration(seconds: 1));
+        await t.pumpAndSettle();
+        // 정렬을 바꾸면(필터와 같은 길) 새 조건으로 다시 읽는다.
+        await t.ensureVisible(find.byKey(const ValueKey('sort')));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('sort')));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('sort-priceAsc')));
+        await t.pump(const Duration(milliseconds: 100));
+        // 읽는 중: 머리(하위 동그라미)·이전 카드가 그대로, 자리 표시(skeleton) 없음, 위 진행 줄.
+        expect(find.byKey(const ValueKey('category-children')), findsOneWidget);
+        expect(find.byType(PmartGridSkeleton), findsNothing);
+        expect(find.byType(ProductTileCard), findsWidgets);
+        expect(
+          find.byKey(const ValueKey('product-list-refreshing')),
+          findsOneWidget,
+        );
+        await t.pump(const Duration(seconds: 1));
+        await t.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('product-list-refreshing')),
+          findsNothing,
+        );
+      },
+    );
+
     testWidgets('초안 15 B: 하위 id 로 들어오면 그 상위 탭 + 그 하위가 골라진 상태', (t) async {
       await t.pumpWidget(testApp(const []));
       await t.pumpAndSettle();
