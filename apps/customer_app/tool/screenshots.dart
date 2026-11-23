@@ -1542,7 +1542,8 @@ void main() {
     GoRouter.of(t.element(find.byType(Scaffold).first)).pop();
     await t.pumpAndSettle();
     unawaited(
-      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/addresses/new'),
+      GoRouter.of(t.element(find.byType(Scaffold).first))
+          .push('/addresses/new'),
     );
     await t.pumpAndSettle();
     await expectLater(
@@ -1867,6 +1868,58 @@ void main() {
     );
     await t.tap(find.byKey(const ValueKey('faq-faq-cancel-1')));
     await shot('expanded');
+    // BR-91: 짧은 답(환불)을 펼쳐 아래 의견 버튼까지 — [도움이 되었어요]를 누른 뒤.
+    await t.tap(find.byKey(const ValueKey('faq-faq-cancel-1')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('faq-cat-REFUND')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('faq-faq-refund-1')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('faq-feedback-yes-faq-refund-1')));
+    await t.pump(const Duration(seconds: 5));
+    await shot('feedback');
+  });
+
+  // BR-90 리뷰 신고하기: 카드 날짜 옆 "| 신고하기"(레퍼런스 상품리뷰 전문) · 사유 시트.
+  testWidgets('review-report', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first))
+          .push('/products/P-0002/reviews'),
+    );
+    await t.pumpAndSettle();
+    final link = find.byKey(const ValueKey('product-review-report-rv-p2-1'));
+    await t.scrollUntilVisible(
+      link,
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/review-report-card.png').uri),
+    );
+    await t.tap(link);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('review-report-ad')));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/review-report-sheet.png').uri),
+    );
   });
 
   // 초안 17 문의 남기기(I 입력·D 완료·F 배송 신고·G-1 비회원) 비교용.

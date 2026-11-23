@@ -573,3 +573,19 @@ class KeptReviewCommand<T> {
     _send = null;
   }
 }
+
+/// 이 앱에서 신고를 마친 리뷰(서버 확정 뒤에만 넣는다 — BR-90). 계정이 바뀌면 비운다.
+/// 목록을 다시 읽기 전에도 카드가 "신고함"으로 보이게 한다(서버 값 reportedByMe 가 오면 그것도 본다).
+final reportedReviewsProvider = NotifierProvider<ReportedReviews, Set<String>>(
+  ReportedReviews.new,
+);
+
+class ReportedReviews extends Notifier<Set<String>> {
+  @override
+  Set<String> build() {
+    ref.watch(sessionProvider);
+    return const {};
+  }
+
+  void add(String reviewId) => state = {...state, reviewId};
+}

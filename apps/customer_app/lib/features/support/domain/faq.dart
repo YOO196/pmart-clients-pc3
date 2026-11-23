@@ -10,7 +10,11 @@ class Faq {
     required this.categoryTitle,
     required this.question,
     required this.answer,
+    this.myFeedback,
   });
+
+  /// 내가 남긴 답 의견(customer-assistant 0.4.0 BR-91): true 도움이 되었어요 · false 수정이 필요해요 · null 안 남김/모름.
+  final bool? myFeedback;
 
   final String faqId;
   final String category;

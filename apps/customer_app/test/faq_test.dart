@@ -70,6 +70,54 @@ void main() {
     expect(find.byType(MarkdownBody), findsNothing);
   });
 
+  testWidgets('펼친 답 아래 의견: 누르면 서버 값으로 눌린 모양, 다른 쪽을 누르면 바뀐다(BR-91)', (t) async {
+    await openSupport(t);
+    await t.tap(find.byKey(const ValueKey('support-faq-cat-CANCEL')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('faq-faq-cancel-1')));
+    await t.pumpAndSettle();
+    final yes = find.byKey(const ValueKey('faq-feedback-yes-faq-cancel-1'));
+    final no = find.byKey(const ValueKey('faq-feedback-no-faq-cancel-1'));
+    expect(yes, findsOneWidget);
+    await t.tap(yes);
+    await t.pumpAndSettle();
+    expect(faqs.feedback['faq-cancel-1'], isTrue);
+    expect(find.text('의견을 남겨 주셔서 고마워요'), findsOneWidget);
+    // 눌린 쪽은 다시 누를 수 없고, 다른 쪽은 누를 수 있다.
+    expect(
+      t
+          .widget<OutlinedButton>(
+            find.ancestor(
+              of: find.text('도움이 되었어요'),
+              matching: find.byType(OutlinedButton),
+            ),
+          )
+          .onPressed,
+      isNull,
+    );
+    await t.tap(no);
+    await t.pumpAndSettle();
+    expect(faqs.feedback['faq-cancel-1'], isFalse);
+  });
+
+  testWidgets('의견 결과를 모르면 눌린 모양이 되지 않고, 다시 누르면 같은 키', (t) async {
+    faqs.failNextFeedback = const UnknownResultFailure(requestId: 'x');
+    await openSupport(t);
+    await t.tap(find.byKey(const ValueKey('support-faq-cat-CANCEL')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('faq-faq-cancel-1')));
+    await t.pumpAndSettle();
+    final yes = find.byKey(const ValueKey('faq-feedback-yes-faq-cancel-1'));
+    await t.tap(yes);
+    await t.pumpAndSettle();
+    expect(faqs.feedback, isEmpty);
+    await t.tap(yes);
+    await t.pumpAndSettle();
+    expect(faqs.feedbackKeys, hasLength(2));
+    expect(faqs.feedbackKeys.toSet(), hasLength(1));
+    expect(faqs.feedback['faq-cancel-1'], isTrue);
+  });
+
   test('답 안 링크는 앱 안 화면만 연다', () {
     expect(FaqAnswer.opens('/orders'), isTrue);
     expect(FaqAnswer.opens('/orders/o-1'), isTrue);

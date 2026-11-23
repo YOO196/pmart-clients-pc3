@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' show DateFormat;
-import 'package:pmart_core/pmart_core.dart' show PmartFailure, ProblemFailure;
+import 'package:pmart_core/pmart_core.dart'
+    show IdempotencyKey, PmartFailure, ProblemFailure, UnknownResultFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
@@ -608,6 +609,8 @@ class _ReviewFooter extends StatelessWidget {
               color: grey,
             ),
           ),
+          // 레퍼런스(상품리뷰 전체 보기 전문) "2026.09.24 | 신고하기" — 남의 리뷰만(BR-90).
+          if (mineKnown && !mine) _ReportLink(review: r),
           const Spacer(),
           if (!mineKnown)
             const SizedBox.shrink()
@@ -1262,6 +1265,282 @@ class _Photo extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 날짜 옆 "| 신고하기"(이미 신고했으면 "| 신고함"). 비회원은 로그인 안내.
+class _ReportLink extends ConsumerWidget {
+  const _ReportLink({required this.review});
+
+  final ReviewView review;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final grey = theme.colorScheme.onSurfaceVariant;
+    final done =
+        review.reportedByMe == true ||
+        ref.watch(reportedReviewsProvider).contains(review.reviewId);
+    final style = theme.textTheme.bodyMedium?.copyWith(
+      fontSize: 14,
+      color: grey,
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Container(
+            width: 1,
+            height: 12,
+            color: theme.colorScheme.outlineVariant,
+          ),
+        ),
+        if (done)
+          Text(
+            l10n.reviewReported,
+            key: ValueKey('product-review-reported-${review.reviewId}'),
+            style: style,
+          )
+        else
+          InkWell(
+            key: ValueKey('product-review-report-${review.reviewId}'),
+            onTap: () {
+              if (ref.read(sessionProvider) is! MemberSession) {
+                ScaffoldMessenger.of(context).notice(
+                  l10n.reviewReportLoginNeeded,
+                  action: SnackBarAction(
+                    label: l10n.loginTitle,
+                    onPressed: () => context.push('/login'),
+                  ),
+                );
+                return;
+              }
+              showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                showDragHandle: true,
+                builder: (_) => ReviewReportSheet(reviewId: review.reviewId),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Text(l10n.reviewReport, style: style),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// 리뷰 신고 시트(BR-90, 사용자 결정 2026-11-23): 사유 5가지 중 하나, 기타면 글(300자) → [신고하기].
+/// 서버가 확정(APPLIED)한 뒤에만 "신고가 접수됐어요". 결과를 모르면 시트를 닫지 않고 같은 키로 다시 보낸다.
+class ReviewReportSheet extends ConsumerStatefulWidget {
+  const ReviewReportSheet({super.key, required this.reviewId});
+
+  final String reviewId;
+
+  @override
+  ConsumerState<ReviewReportSheet> createState() => _ReviewReportSheetState();
+}
+
+class _ReviewReportSheetState extends ConsumerState<ReviewReportSheet> {
+  ReviewReportReason? _reason;
+  final _detail = TextEditingController();
+  bool _busy = false;
+  bool _unknown = false;
+  String? _message;
+
+  /// 한 번 고른 내용의 키 — 결과를 모를 때 같은 키로 다시. 사유·글을 바꾸면 새 키.
+  IdempotencyKey? _key;
+
+  @override
+  void dispose() {
+    _detail.dispose();
+    super.dispose();
+  }
+
+  String _label(AppLocalizations l10n, ReviewReportReason r) => switch (r) {
+    ReviewReportReason.abuse => l10n.reviewReportAbuse,
+    ReviewReportReason.ad => l10n.reviewReportAd,
+    ReviewReportReason.irrelevant => l10n.reviewReportIrrelevant,
+    ReviewReportReason.privacy => l10n.reviewReportPrivacy,
+    ReviewReportReason.other => l10n.reviewReportOther,
+  };
+
+  bool get _canSend =>
+      !_busy &&
+      _reason != null &&
+      (_reason != ReviewReportReason.other || _detail.text.trim().isNotEmpty);
+
+  void _changed(VoidCallback f) => setState(() {
+    f();
+    if (!_unknown) _key = null;
+  });
+
+  Future<void> _send() async {
+    final l10n = AppLocalizations.of(context);
+    final reason = _reason;
+    if (reason == null) return;
+    final key = _key ??= IdempotencyKey.generate();
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    void done(String notice) {
+      ref.read(reportedReviewsProvider.notifier).add(widget.reviewId);
+      navigator.pop();
+      messenger.notice(notice);
+    }
+
+    try {
+      await ref
+          .read(reviewsRepositoryProvider)
+          .report(
+            widget.reviewId,
+            reason: reason,
+            detail: _detail.text.trim(),
+            key: key,
+          );
+      if (!mounted) return;
+      done(l10n.reviewReportDone);
+    } on ProblemFailure catch (f) {
+      if (!mounted) return;
+      switch (f.problem.code) {
+        case ReviewReportProblemCode.alreadyReported:
+          done(l10n.reviewReportAlready);
+        default:
+          setState(() {
+            _busy = false;
+            _unknown = false;
+            _key = null;
+            _message = switch (f.problem.code) {
+              ReviewReportProblemCode.ownReview => l10n.reviewReportOwn,
+              ReviewReportProblemCode.notFound => l10n.reviewReportNotFound,
+              _ => l10n.reviewReportFailed,
+            };
+          });
+      }
+    } on UnknownResultFailure {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _unknown = true;
+        _message = l10n.reviewReportUnknown;
+      });
+    } on PmartFailure catch (f) {
+      if (!mounted) return;
+      // 보내기 전 실패(연결 등)는 다시 눌러도 같은 키 — 결과 불명일 수 있다.
+      setState(() {
+        _busy = false;
+        _unknown = f is! ProblemFailure;
+        _message = l10n.reviewReportFailed;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final locked = _busy || _unknown;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          bottom: 16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          key: const ValueKey('review-report-sheet'),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.reviewReportTitle,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              l10n.reviewReportNote,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            for (final r in ReviewReportReason.values)
+              InkWell(
+                key: ValueKey('review-report-${r.name}'),
+                onTap: locked ? null : () => _changed(() => _reason = r),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _label(l10n, r),
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: _reason == r
+                                ? FontWeight.w700
+                                : FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                      if (_reason == r)
+                        PmartLineIcon(
+                          PmartLineIcons.check,
+                          size: 20,
+                          color: scheme.primary,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            if (_reason == ReviewReportReason.other)
+              TextField(
+                key: const ValueKey('review-report-detail'),
+                controller: _detail,
+                enabled: !locked,
+                maxLength: reviewReportDetailMax,
+                minLines: 2,
+                maxLines: 4,
+                onChanged: (_) => _changed(() {}),
+                decoration: InputDecoration(
+                  hintText: l10n.reviewReportDetailHint,
+                ),
+              ),
+            if (_message case final m?)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  m,
+                  key: const ValueKey('review-report-message'),
+                  style: TextStyle(color: scheme.error),
+                ),
+              ),
+            const SizedBox(height: 12),
+            FilledButton(
+              key: const ValueKey('review-report-send'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: _unknown
+                  ? (_busy ? null : _send)
+                  : (_canSend ? _send : null),
+              child: Text(
+                _unknown ? l10n.reviewReportCheckAgain : l10n.reviewReportSend,
+              ),
+            ),
+          ],
         ),
       ),
     );

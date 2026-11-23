@@ -92,6 +92,28 @@ final class MockFaqRepository implements FaqRepository {
     );
   }
 
+  /// 남긴 답 의견(목) · 보낸 키.
+  final feedback = <String, bool>{};
+  final feedbackKeys = <String>[];
+
+  /// 시험용: 다음 의견 보내기에 던질 실패.
+  PmartFailure? failNextFeedback;
+
+  @override
+  Future<bool> sendFeedback(
+    String faqId, {
+    required bool helpful,
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    feedbackKeys.add(key.value);
+    if (failNextFeedback case final f?) {
+      failNextFeedback = null;
+      throw f;
+    }
+    return feedback[faqId] = helpful;
+  }
+
   @override
   Future<Faq> get(String faqId) async {
     await _wait();

@@ -625,6 +625,43 @@ final class MockReviewsRepository implements ReviewsRepository {
     return r;
   }
 
+  /// 신고한 리뷰(목) · 보낸 신고 키.
+  final reported = <String>{};
+  final reportKeys = <String>[];
+
+  /// 시험용: 다음 신고에 던질 실패.
+  final reportFailures = Queue<PmartFailure>();
+
+  @override
+  Future<void> report(
+    String reviewId, {
+    required ReviewReportReason reason,
+    String? detail,
+    required IdempotencyKey key,
+  }) async {
+    await _wait();
+    final again = reportKeys.contains(key.value);
+    reportKeys.add(key.value);
+    if (reportFailures.isNotEmpty) throw reportFailures.removeFirst();
+    if (again && reported.contains(reviewId)) return;
+    if (reviewId.startsWith('rv-mine')) {
+      throw const ProblemFailure(
+        Problem(status: 422, code: ReviewReportProblemCode.ownReview),
+      );
+    }
+    if (reason == ReviewReportReason.other &&
+        (detail == null || detail.trim().isEmpty)) {
+      throw const ProblemFailure(
+        Problem(status: 400, code: 'VALIDATION_FAILED'),
+      );
+    }
+    if (!reported.add(reviewId)) {
+      throw const ProblemFailure(
+        Problem(status: 409, code: ReviewReportProblemCode.alreadyReported),
+      );
+    }
+  }
+
   static void _sortJson(List<Map<String, Object?>> list, ReviewSort sort) {
     int rating(Map<String, Object?> r) => r['rating'] as int;
     String at(Map<String, Object?> r) => r['createdAt'] as String;

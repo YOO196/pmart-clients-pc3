@@ -83,6 +83,27 @@ class ReviewEligibility {
 enum ReviewSort { recommended, newest, ratingDesc, ratingAsc }
 
 /// 도움돼요 누르기에서 서버가 거절하는 code(review 0.6.0).
+/// 리뷰 신고 사유(review 0.7.0 BR-90 — 사용자 결정 2026-11-23). 기타만 글을 쓴다.
+enum ReviewReportReason {
+  abuse('ABUSE'),
+  ad('AD'),
+  irrelevant('IRRELEVANT'),
+  privacy('PRIVACY'),
+  other('OTHER');
+
+  const ReviewReportReason(this.wire);
+  final String wire;
+}
+
+/// 기타 사유 글 최대 길이(계약 detail 300자).
+const reviewReportDetailMax = 300;
+
+abstract final class ReviewReportProblemCode {
+  static const alreadyReported = 'ALREADY_REPORTED';
+  static const ownReview = 'REPORT_OWN_REVIEW';
+  static const notFound = 'REVIEW_NOT_FOUND';
+}
+
 abstract final class ReviewHelpfulProblemCode {
   static const ownReview = 'HELPFUL_OWN_REVIEW';
   static const notPublished = 'REVIEW_NOT_PUBLISHED';
@@ -116,7 +137,11 @@ class ReviewView {
     this.updatedAt,
     this.helpfulCount,
     this.helpedByMe,
+    this.reportedByMe,
   });
+
+  /// 내가 이 리뷰를 신고했는지(review 0.7.0 BR-90 — 회원 토큰일 때만, 그 밖 null).
+  final bool? reportedByMe;
 
   /// 도움돼요 수·내가 눌렀는지(review 0.6.0 — 내가 눌렀는지는 회원 토큰이 있을 때만). 모르면 null — 0·안 누름으로 바꾸지 않는다.
   final int? helpfulCount;

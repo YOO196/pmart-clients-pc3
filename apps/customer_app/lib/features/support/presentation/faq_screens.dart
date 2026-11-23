@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pmart_core/pmart_core.dart' show PmartEnv;
+import 'package:pmart_core/pmart_core.dart'
+    show IdempotencyKey, PmartEnv, PmartFailure, UnknownResultFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
@@ -14,6 +15,7 @@ import '../../auth/presentation/auth_controller.dart';
 import '../data/faq_repository.dart';
 import '../data/mock_faq_repository.dart';
 import '../domain/faq.dart';
+import '../../../shared/notice.dart';
 import 'inquiry_screens.dart' show SupportRow;
 
 final faqRepositoryProvider = Provider<FaqRepository>(
@@ -310,7 +312,14 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
                             Padding(
                               key: ValueKey('faq-open-${f.faqId}'),
                               padding: const EdgeInsets.fromLTRB(26, 0, 20, 24),
-                              child: FaqAnswer(answer: f.answer),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  FaqAnswer(answer: f.answer),
+                                  const SizedBox(height: 20),
+                                  FaqFeedbackButtons(faq: f),
+                                ],
+                              ),
                             ),
                         ],
                       ),
@@ -369,6 +378,8 @@ class FaqDetailScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 16),
         FaqAnswer(key: const ValueKey('faq-answer'), answer: f.answer),
+        const SizedBox(height: 24),
+        FaqFeedbackButtons(faq: f),
       ],
     );
     final first = initial;
@@ -639,6 +650,120 @@ class FaqAnswer extends StatelessWidget {
           decoration: TextDecoration.underline,
         ),
       ),
+    );
+  }
+}
+
+/// 이 앱에서 남긴 답 의견(서버가 돌려준 값만 — BR-91). 목록을 다시 읽기 전에도 눌린 모양을 지킨다. 계정이 바뀌면 비운다.
+final faqFeedbackProvider = NotifierProvider<FaqFeedbacks, Map<String, bool>>(
+  FaqFeedbacks.new,
+);
+
+class FaqFeedbacks extends Notifier<Map<String, bool>> {
+  @override
+  Map<String, bool> build() {
+    ref.watch(sessionProvider);
+    return const {};
+  }
+
+  void set(String faqId, bool helpful) => state = {...state, faqId: helpful};
+}
+
+/// 펼친 답 아래 [도움이 되었어요] [수정이 필요해요](레퍼런스 고객센터 3, customer-assistant 0.4.0 BR-91).
+/// 한 FAQ 에 하나 — 다른 쪽을 누르면 바뀐다. 서버가 돌려준 값만 눌린 모양으로 보인다.
+/// 결과를 모르면 같은 키로 다시 보낸다(서버가 같은 요청 재전송을 받는다).
+class FaqFeedbackButtons extends ConsumerStatefulWidget {
+  const FaqFeedbackButtons({super.key, required this.faq});
+
+  final Faq faq;
+
+  @override
+  ConsumerState<FaqFeedbackButtons> createState() => _FaqFeedbackButtonsState();
+}
+
+class _FaqFeedbackButtonsState extends ConsumerState<FaqFeedbackButtons> {
+  bool _busy = false;
+
+  /// 결과를 모른 요청(같은 값으로 다시 누르면 같은 키).
+  ({bool helpful, IdempotencyKey key})? _pending;
+
+  Future<void> _send(bool helpful) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final key = switch (_pending) {
+      (helpful: final h, :final key) when h == helpful => key,
+      _ => IdempotencyKey.generate(),
+    };
+    setState(() => _busy = true);
+    try {
+      final now = await ref
+          .read(faqRepositoryProvider)
+          .sendFeedback(widget.faq.faqId, helpful: helpful, key: key);
+      if (!mounted) return;
+      _pending = null;
+      ref.read(faqFeedbackProvider.notifier).set(widget.faq.faqId, now);
+      messenger.notice(l10n.faqFeedbackThanks);
+    } on UnknownResultFailure {
+      _pending = (helpful: helpful, key: key);
+      messenger.notice(l10n.faqFeedbackUnknown);
+    } on PmartFailure {
+      _pending = null;
+      messenger.notice(l10n.faqFeedbackFailed);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final mine =
+        ref.watch(faqFeedbackProvider)[widget.faq.faqId] ??
+        widget.faq.myFeedback;
+    Widget button(bool helpful, PmartLineIcons icon, String label) {
+      final on = mine == helpful;
+      return OutlinedButton.icon(
+        key: ValueKey(
+          'faq-feedback-${helpful ? 'yes' : 'no'}-${widget.faq.faqId}',
+        ),
+        onPressed: _busy || on ? null : () => _send(helpful),
+        icon: PmartLineIcon(
+          icon,
+          size: 18,
+          color: on ? scheme.primary : scheme.onSurfaceVariant,
+        ),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          shape: const StadiumBorder(),
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          backgroundColor: scheme.surface,
+          disabledBackgroundColor: on
+              ? scheme.primaryContainer
+              : scheme.surface,
+          foregroundColor: scheme.onSurface,
+          disabledForegroundColor: on
+              ? scheme.onPrimaryContainer
+              : scheme.onSurfaceVariant,
+          side: BorderSide(color: on ? scheme.primary : scheme.outlineVariant),
+          textStyle: theme.textTheme.bodyMedium?.copyWith(
+            fontSize: 14,
+            fontWeight: on ? FontWeight.w700 : FontWeight.w400,
+          ),
+        ),
+      );
+    }
+
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 10,
+      runSpacing: 8,
+      children: [
+        button(true, PmartLineIcons.thumbUp, l10n.faqFeedbackHelpful),
+        button(false, PmartLineIcons.pencil, l10n.faqFeedbackNeedsFix),
+      ],
     );
   }
 }

@@ -65,6 +65,16 @@ abstract interface class ReviewsRepository {
     required bool on,
     required IdempotencyKey key,
   });
+
+  /// 리뷰 신고(`POST /reviews/{id}/reports`, review 0.7.0 BR-90) — 회원만, 같은 [key] 는 같은 결과.
+  /// 서버가 바로 기록한다(APPLIED). 거절은 [ProblemFailure]: 409 `ALREADY_REPORTED`, 422 `REPORT_OWN_REVIEW`,
+  /// 404 `REVIEW_NOT_FOUND`. 확정이 아니면 [UnknownResultFailure](같은 키로 다시).
+  Future<void> report(
+    String reviewId, {
+    required ReviewReportReason reason,
+    String? detail,
+    required IdempotencyKey key,
+  });
 }
 
 final class ApiReviewsRepository implements ReviewsRepository {
@@ -248,6 +258,33 @@ final class ApiReviewsRepository implements ReviewsRepository {
     final r = res.data ?? (throw UnknownResultFailure(requestId: key.value));
     return (count: r.helpfulCount, helped: r.helpedByMe);
   }
+
+  @override
+  Future<void> report(
+    String reviewId, {
+    required ReviewReportReason reason,
+    String? detail,
+    required IdempotencyKey key,
+  }) async {
+    final res = await pmartGuard(
+      () => _reviews.reportReview(
+        reviewId: reviewId,
+        idempotencyKey: key.value,
+        xSourceSystem: sourceSystem,
+        extra: commandOptions(key).extra,
+        reportReviewRequest: api.ReportReviewRequest(
+          reason: api.ReportReason.values.firstWhere(
+            (v) => v.value == reason.wire,
+          ),
+          detail: reason == ReviewReportReason.other ? detail : null,
+        ),
+      ),
+    );
+    // 서버가 확정(APPLIED)했을 때만 접수로 본다. 그 밖·본문 없음은 결과 모름 — 같은 키로 다시.
+    if (res.data?.status.value != 'APPLIED') {
+      throw UnknownResultFailure(requestId: key.value);
+    }
+  }
 }
 
 EligibilityPage eligibilityPageFromContract(
@@ -317,4 +354,5 @@ ReviewView reviewFromContract(api.Review r) => ReviewView(
   // review 0.6.0(BR-76): 도움돼요 수·내가 눌렀는지(회원 토큰이 있을 때만 — 비회원은 null).
   helpfulCount: r.helpfulCount,
   helpedByMe: r.helpedByMe,
+  reportedByMe: r.reportedByMe,
 );
