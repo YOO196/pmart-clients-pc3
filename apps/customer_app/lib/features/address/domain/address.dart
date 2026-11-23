@@ -80,6 +80,13 @@ abstract final class DevTestAddress {
   static const geo = (lat: 35.1529, lng: 129.0596);
 }
 
+/// 개발 빌드 전용 목포 시험 주소(2호점 `MFC-MOKPO-01` 시험 권역 "목포 시내" 안, 사용자 2026-11-23).
+/// 백엔드 LAN 목포 시험 고객이 쓰는 주소(→ 쇼핑 센터 MFC-MOKPO-01 확인, pmart-backend lan-test-accounts §3).
+/// 좌표·우편번호는 넣지 않는다 — 버튼을 누르면 주소 검색처럼 서버 주소 변환으로 핀을 잡는다.
+abstract final class DevTestAddressMokpo {
+  static const roadAddress = '전남 목포시 평화로83번길 16';
+}
+
 /// 계약 `AddressInput` maxLength. 화면 입력 상한으로만 쓴다(서버가 최종 검증).
 abstract final class AddressLimits {
   static const label = 20;

@@ -76,7 +76,10 @@ flutter pub get                                   # 루트 workspace
 cd apps/customer_app && flutter run --dart-define=PMART_ENV=mock   # 에뮬레이터면 --dart-define=PMART_ANDROID_EMULATOR=true
 # 고객앱 LAN APK(HTTPS 게이트웨이, 사설 CA 는 debug 빌드가 앱에 넣어 믿는다 — pmart_core trustPmartLanRootCa, ADR-0057 T6):
 #   flutter build apk --debug --dart-define=PMART_ENV=local --dart-define=PMART_API_BASE_URL=https://192.168.0.40:8443/api/v1 --dart-define-from-file=.secrets/customer.env
-flutter analyze && flutter test                   # 앱/패키지 디렉터리에서 (packages/pmart_core·pmart_ui, apps/*)
+flutter analyze && flutter test --concurrency=1   # 앱/패키지 디렉터리에서 (packages/pmart_core·pmart_ui, apps/*)
+# ⚠ flutter test 메모리 [사용자 지시 2026-11-23]: customer_app 전체 시험의 flutter_tester 가 20GB 넘게 잡아 PC1 메모리가 바닥나
+#   다른 세션의 build·vitest 가 깨졌다. 전체는 --concurrency=1, 평소엔 바뀐 기능의 시험 파일·폴더만 돌린다.
+#   시험 전 실메모리 남은 양이 4GB 미만이면 미루고, 끝난 뒤 남은 flutter_tester 프로세스가 없는지 확인한다.
 
 # React (Node 24 / npm 11 확인됨)
 npm install                                       # 루트 workspace (web/*)
