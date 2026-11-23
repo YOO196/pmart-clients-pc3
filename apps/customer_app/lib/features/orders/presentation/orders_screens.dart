@@ -2620,10 +2620,8 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
           ],
         ),
       ),
-      _ => const Padding(
-        padding: EdgeInsets.all(32),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      // 초안 13-D: 원형 진행 표시 대신 회색 자리 표시.
+      _ => const TrackSheetLoading(),
     };
     return _mapScaffold(context, sheet, rider, home);
   }
@@ -2881,10 +2879,19 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     super.dispose();
   }
 
+  /// 취소·예약 변경 화면에 다녀오면 주문을 다시 읽는다(취소됐으면 버튼이 사라지고 단계가 바뀐다).
+  Future<void> _visit(String location) async {
+    _poll?.cancel();
+    await context.push(location);
+    if (!mounted) return;
+    ref.invalidate(orderListProvider);
+    ref.invalidate(orderDetailProvider(orderId));
+    _start();
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final value = ref.watch(orderDetailProvider(orderId));
     final o = value.value;
     // 이미 배달이 끝난 주문을 열면 배송현황을 보이지 않는다(레퍼런스 10-4 "배송완료 이후 알림 클릭해도 배송현황 볼 수 없음").
@@ -2940,19 +2947,63 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                     null => null,
                   },
                 );
-                return TrackSheetHead(
-                  mode: deliveryModeText(l10n, o.deliveryMode),
-                  headline: phase.title,
-                  headlineKey: 'order-track-status',
-                  subtitle: phase.subtitle,
-                  receipt: true,
+                // 예약 확정(준비 전): 설명 줄 대신 변경 안내를 정보 칸으로(초안 13-B-4).
+                final reserved =
+                    o.status == OrderStatus.confirmed &&
+                    o.deliveryMode == 'SCHEDULED' &&
+                    o.window != null;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TrackSheetHead(
+                      mode: deliveryModeText(l10n, o.deliveryMode),
+                      headline: phase.title,
+                      headlineKey: 'order-track-status',
+                      subtitle: reserved ? null : phase.subtitle,
+                      receipt: true,
+                      calendar: reserved,
+                    ),
+                    // 초안 13-B: 작은 줄 대신 회색 정보 칸.
+                    TrackInfo(
+                      key: const ValueKey('track-no-delivery'),
+                      text: l10n.trackRiderNotLinked,
+                      tone: TrackInfoTone.muted,
+                    ),
+                    if (reserved && phase.subtitle != null)
+                      TrackInfo(
+                        text: phase.subtitle!,
+                        tone: TrackInfoTone.muted,
+                      ),
+                    // 레퍼런스 8-2·초안 13-B-1(사용자 2026-11-23 "넣어"): 상품 준비 전(CONFIRMED)만 취소·예약 변경.
+                    // 배달 중 화면과 같은 규칙([canRequestCancel]·[canRequestTimeChange]), 가능 여부는 서버가 최종 판정.
+                    if (canRequestCancel(o) || canRequestTimeChange(o))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Wrap(
+                          spacing: 8,
+                          children: [
+                            if (canRequestCancel(o))
+                              TextButton(
+                                key: const ValueKey('track-cancel'),
+                                style: trackPillButtonStyle(Theme.of(context)),
+                                onPressed: () =>
+                                    _visit('/orders/$orderId/cancel'),
+                                child: Text(l10n.cancelTitle),
+                              ),
+                            if (canRequestTimeChange(o))
+                              TextButton(
+                                key: const ValueKey('track-reschedule'),
+                                style: trackPillButtonStyle(Theme.of(context)),
+                                onPressed: () =>
+                                    _visit('/orders/$orderId/reschedule'),
+                                child: Text(l10n.rescheduleTitle),
+                              ),
+                          ],
+                        ),
+                      ),
+                  ],
                 );
               },
-            ),
-            Text(
-              l10n.trackRiderNotLinked,
-              key: const ValueKey('track-no-delivery'),
-              style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 16),
             _TrackSteps(progress: trackProgressOf(order: o.status)),
@@ -2973,16 +3024,16 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
           ],
         ),
       ),
-      _ => const Padding(
-        padding: EdgeInsets.all(32),
-        child: Center(child: CircularProgressIndicator()),
-      ),
+      // 초안 13-D: 원형 진행 표시 대신 회색 자리 표시.
+      _ => const TrackSheetLoading(),
     };
-    // 레퍼런스 8-2·8-4: 배차 전(주문 확인·예약)은 시트를 거의 위까지, 문의하기 알약은 배달 중에만.
+    // 레퍼런스 8-2·8-4: 배차 전(주문 확인·예약)은 시트를 거의 위까지.
+    // 문의하기는 배정 전에도(초안 13-B ④, 사용자 2026-11-23) — 배달 중 화면과 같은 곳으로.
     return TrackMapLayout(
       map: TrackingMap(rider: null, home: home),
       sheet: sheet,
       sheetFraction: 0.85,
+      onInquiry: () => context.push('/orders/$orderId/help'),
     );
   }
 }
@@ -3065,11 +3116,63 @@ class _TrackBody extends StatelessWidget {
         window != null &&
         o?.status == OrderStatus.confirmed &&
         remainingMin == null;
+    final delayed =
+        (e.delayedBySeconds ?? 0) > 0 && e.status == EtaStatus.available;
+    // 초안 13-B·E(사용자 2026-11-23): 머리 아래 작은 줄을 쌓지 않고 정보 칸 최대 2개.
+    // 우선순위: 늦어짐(분홍) → 실시간 끊김(+기준 시각) → 라이더 위치 시각 / 확인 중 → 기준 시각 → 예약 변경 안내.
+    final infos = <Widget>[
+      if (delayed)
+        TrackInfo(
+          key: const ValueKey('eta-delayed'),
+          text: l10n.etaDelayed((e.delayedBySeconds! / 60).ceil()),
+          tone: TrackInfoTone.warn,
+        ),
+      if (polling)
+        TrackInfo(
+          key: const ValueKey('track-live-fallback'),
+          text: [
+            l10n.trackLiveFallback,
+            if (e.asOf case final t?) l10n.asOfTime(formatSeoulTime(t)),
+          ].join(' · '),
+          tone: TrackInfoTone.muted,
+        )
+      // 위치가 없거나(서버가 주지 않음) 받은 지 60초가 넘었으면 지어내지 않고 확인 중이라고만.
+      else if (rider case final r? when !r.stale && r.recordedAt != null)
+        TrackInfo(
+          key: const ValueKey('track-rider-at'),
+          text: l10n.trackRiderLocationAt(formatSeoulTime(r.recordedAt!)),
+        )
+      else if (_isDelivering(e.stage))
+        TrackInfo(
+          key: const ValueKey('track-rider-locating'),
+          text: l10n.trackRiderLocating,
+          tone: TrackInfoTone.muted,
+        )
+      else if (e.asOf case final t?)
+        TrackInfo(
+          text: e.freshness == Freshness.current
+              ? l10n.asOfTime(formatSeoulTime(t))
+              : l10n.sourceStale(formatSeoulTime(t)),
+          tone: TrackInfoTone.muted,
+        ),
+      // 예약 확정(준비 전): 설명 줄 대신 변경 안내를 정보 칸으로(초안 13-B-4).
+      if (reservedHead && phase?.subtitle != null)
+        TrackInfo(text: phase!.subtitle!, tone: TrackInfoTone.muted)
+      else if (scheduled &&
+          window != null &&
+          o != null &&
+          canRequestTimeChange(o))
+        TrackInfo(text: l10n.trackRescheduleNote, tone: TrackInfoTone.muted),
+    ].take(2).toList();
+    final modeName = deliveryModeText(l10n, o?.deliveryMode);
     final children = <Widget>[
       // 시트 머리(레퍼런스 8-2·8-4·8-5): 배달 방식 → 큰 제목("N분 남음 오후 6:50" 또는 단계 제목) → 한 줄 설명.
       if (sheet) ...[
         TrackSheetHead(
-          mode: deliveryModeText(l10n, o?.deliveryMode),
+          // 묶음배달 도착 구간은 시트 맨 아래 줄 대신 방식 옆에(초안 13-B).
+          mode: !scheduled && window != null && modeName != null
+              ? '$modeName · ${windowText(window)}'
+              : modeName,
           headline: remainingMin != null
               ? l10n.trackRemainingShort(remainingMin)
               : phase?.title ?? etaLine,
@@ -3083,38 +3186,13 @@ class _TrackBody extends StatelessWidget {
           time: remainingMin != null && e.etaAt != null
               ? formatSeoulTime(e.etaAt!)
               : null,
-          subtitle: phase?.subtitle ?? stageText(l10n, e.stage),
+          subtitle: reservedHead
+              ? null
+              : phase?.subtitle ?? stageText(l10n, e.stage),
           receipt: phase != null && !_isDelivering(e.stage),
+          calendar: reservedHead,
         ),
-        // 위치가 없거나(서버가 주지 않음) 받은 지 60초가 넘었으면 지어내지 않고 확인 중이라고만.
-        if (rider case final r? when !r.stale && r.recordedAt != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              l10n.trackRiderLocationAt(formatSeoulTime(r.recordedAt!)),
-              key: const ValueKey('track-rider-at'),
-              style: theme.textTheme.bodySmall,
-            ),
-          )
-        else if (_isDelivering(e.stage) && (rider == null || rider!.stale))
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              l10n.trackRiderLocating,
-              key: const ValueKey('track-rider-locating'),
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
-        if ((e.delayedBySeconds ?? 0) > 0 && e.status == EtaStatus.available)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              l10n.etaDelayed((e.delayedBySeconds! / 60).ceil()),
-              key: const ValueKey('eta-delayed'),
-              style: TextStyle(color: theme.colorScheme.error),
-            ),
-          ),
-        const SizedBox(height: 8),
+        ...infos,
       ],
       // 예약배달: 서버가 준 도착 구간을 크게. 변경·취소는 진입만, 가능 여부는 서버가 판정한다.
       if (scheduled && window != null && !reservedHead) ...[
@@ -3126,7 +3204,7 @@ class _TrackBody extends StatelessWidget {
             fontWeight: FontWeight.w500,
           ),
         ),
-        if (o != null && canRequestTimeChange(o))
+        if (!sheet && o != null && canRequestTimeChange(o))
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
@@ -3141,15 +3219,18 @@ class _TrackBody extends StatelessWidget {
           child: Wrap(
             spacing: 8,
             children: [
+              // 회색 알약(초안 13-B, 레퍼런스 8-2 "주문취소").
               if (canRequestCancel(o))
-                OutlinedButton(
+                TextButton(
                   key: const ValueKey('track-cancel'),
+                  style: trackPillButtonStyle(theme),
                   onPressed: () => onVisit('/orders/${o.orderId}/cancel'),
                   child: Text(l10n.cancelTitle),
                 ),
               if (canRequestTimeChange(o))
-                OutlinedButton(
+                TextButton(
                   key: const ValueKey('track-reschedule'),
+                  style: trackPillButtonStyle(theme),
                   onPressed: () => onVisit('/orders/${o.orderId}/reschedule'),
                   child: Text(l10n.rescheduleTitle),
                 ),
@@ -3216,19 +3297,18 @@ class _TrackBody extends StatelessWidget {
             ),
           ),
       ],
-      if (!scheduled && window != null) Text(windowText(window)),
-      if (!sheet &&
-          (e.delayedBySeconds ?? 0) > 0 &&
-          e.status == EtaStatus.available)
+      // 아래 줄들은 목록 모양([sheet] 아님)에서만. 시트에서는 머리 아래 정보 칸으로 옮겼다(초안 13-B ③).
+      if (!sheet && !scheduled && window != null) Text(windowText(window)),
+      if (!sheet && delayed)
         Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: Text(
-            l10n.etaDelayed((e.delayedBySeconds! / 60).ceil()),
+          child: TrackInfo(
             key: const ValueKey('eta-delayed'),
-            style: TextStyle(color: theme.colorScheme.error),
+            text: l10n.etaDelayed((e.delayedBySeconds! / 60).ceil()),
+            tone: TrackInfoTone.warn,
           ),
         ),
-      if (polling)
+      if (!sheet && polling)
         Padding(
           padding: const EdgeInsets.only(top: 16),
           child: Text(
@@ -3237,16 +3317,17 @@ class _TrackBody extends StatelessWidget {
             style: theme.textTheme.bodySmall,
           ),
         ),
-      if (e.asOf case final t?)
-        Padding(
-          padding: const EdgeInsets.only(top: 16),
-          child: Text(
-            e.freshness == Freshness.current
-                ? l10n.asOfTime(formatSeoulTime(t))
-                : l10n.sourceStale(formatSeoulTime(t)),
-            style: theme.textTheme.bodySmall,
+      if (!sheet)
+        if (e.asOf case final t?)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Text(
+              e.freshness == Freshness.current
+                  ? l10n.asOfTime(formatSeoulTime(t))
+                  : l10n.sourceStale(formatSeoulTime(t)),
+              style: theme.textTheme.bodySmall,
+            ),
           ),
-        ),
     ];
     if (sheet) {
       return Padding(
@@ -3328,36 +3409,43 @@ class _TrackSteps extends StatelessWidget {
                             : 'track-step-${step.name}',
                       ),
                       textAlign: TextAlign.center,
+                      // 초안 13-B: 단계 이름 13, 지금 단계는 진한 색 + 굵게.
                       style: step == current
-                          // 레퍼런스 8: 지금 단계는 진한 색일 뿐 보통 굵기.
                           ? theme.textTheme.titleSmall?.copyWith(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w400,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                             )
                           : theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 12,
+                              fontSize: 13,
                               color: theme.colorScheme.outline,
                             ),
                     ),
                     // 레퍼런스 8-5: 배달 중이면 지금 단계 아래 말풍선 "내 주소로 오는 중"
+                    // 말풍선은 단계 칸(폭 1/4)보다 넓을 수 있어 칸 밖으로 넘치게 둔다(가운데 맞춤 — 초안 13-B).
                     if (step == current && step == TrackStep.delivering)
-                      Container(
-                        key: const ValueKey('track-step-bubble'),
-                        margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          l10n.trackStepComingBubble,
-                          maxLines: 1,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 10.5,
-                            color: theme.colorScheme.onPrimary,
+                      SizedBox(
+                        height: 26,
+                        child: OverflowBox(
+                          maxWidth: 200,
+                          child: Container(
+                            key: const ValueKey('track-step-bubble'),
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              l10n.trackStepComingBubble,
+                              maxLines: 1,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 11.5,
+                                color: theme.colorScheme.onPrimary,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -3443,10 +3531,14 @@ class TrackSheetHead extends StatelessWidget {
     this.time,
     this.subtitle,
     this.receipt = false,
+    this.calendar = false,
   });
 
   /// 배차 전(주문 확인·예약)이면 오른쪽 그림이 영수증(레퍼런스 8-4), 배달 중이면 오토바이(8-5).
   final bool receipt;
+
+  /// 예약 확정(준비 전)이면 오른쪽 그림이 달력(초안 13-B-4, 사용자 2026-11-23). [receipt] 보다 먼저.
+  final bool calendar;
 
   final String? mode;
   final String headline;
@@ -3480,36 +3572,39 @@ class TrackSheetHead extends StatelessWidget {
                   if (mode case final m?)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
+                      // 초안 13-B(사용자 2026-11-23): 방식 13 회색 · 제목 23 굵게 · 시각 14 회색 · 설명 15 회색.
                       child: Text(
                         m,
                         key: const ValueKey('track-mode'),
                         style: theme.textTheme.titleSmall?.copyWith(
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.w400,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
                   Wrap(
                     crossAxisAlignment: WrapCrossAlignment.end,
-                    spacing: 8,
+                    spacing: 6,
                     children: [
                       Text(
                         headline,
                         key: ValueKey(headlineKey),
-                        // 레퍼런스 8-5: "14분 남음" 약 20sp 보통 굵기(크기만 큼) + 작은 시각
                         style: theme.textTheme.headlineMedium?.copyWith(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w400,
+                          fontSize: 23,
+                          fontWeight: FontWeight.w700,
+                          height: 1.3,
                         ),
                       ),
                       if (time case final t?)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 3),
+                          padding: const EdgeInsets.only(bottom: 4),
                           child: Text(
                             t,
                             style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w400,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -3517,12 +3612,13 @@ class TrackSheetHead extends StatelessWidget {
                   ),
                   if (subtitle case final sub?)
                     Padding(
-                      padding: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.only(top: 6),
                       child: Text(
                         sub,
                         key: const ValueKey('eta-stage'),
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          fontSize: 12,
+                          fontSize: 15,
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -3539,9 +3635,14 @@ class TrackSheetHead extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
-              child: receipt
+              child: calendar || receipt
                   ? PmartLineIcon(
-                      PmartLineIcons.receipt,
+                      calendar
+                          ? PmartLineIcons.calendar
+                          : PmartLineIcons.receipt,
+                      key: ValueKey(
+                        calendar ? 'track-art-calendar' : 'track-art-receipt',
+                      ),
                       size: 40,
                       strokeWidth: 1.6,
                       color: theme.colorScheme.primary,
@@ -3550,8 +3651,154 @@ class TrackSheetHead extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
       ],
+    );
+  }
+}
+
+/// 시트 머리 아래 정보 칸(초안 13-B·E): 둥근 회색 칸 + 점 + 한 줄. 늦어짐은 분홍 칸(tertiary).
+/// 라이더 위치 시각·확인 중·실시간 끊김·기준 시각·배정 전 안내를 작은 줄로 쌓지 않고 이 칸에 담는다.
+enum TrackInfoTone { normal, muted, warn }
+
+class TrackInfo extends StatelessWidget {
+  const TrackInfo({
+    super.key,
+    required this.text,
+    this.tone = TrackInfoTone.normal,
+  });
+
+  final String text;
+  final TrackInfoTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final (bg, fg, dot) = switch (tone) {
+      TrackInfoTone.warn => (
+        scheme.tertiaryContainer,
+        scheme.onTertiaryContainer,
+        scheme.tertiary,
+      ),
+      TrackInfoTone.muted => (
+        scheme.surfaceContainer,
+        scheme.onSurfaceVariant,
+        scheme.outline,
+      ),
+      TrackInfoTone.normal => (
+        scheme.surfaceContainer,
+        scheme.onSurfaceVariant,
+        scheme.primary,
+      ),
+    };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 12.5,
+                color: fg,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 시트 안 작은 버튼(초안 13-B): 회색 알약(레퍼런스 8-2 "주문취소" 모양).
+ButtonStyle trackPillButtonStyle(ThemeData theme) => TextButton.styleFrom(
+  backgroundColor: theme.colorScheme.surfaceContainerHigh,
+  foregroundColor: theme.colorScheme.onSurface,
+  shape: const StadiumBorder(),
+  visualDensity: VisualDensity.compact,
+  padding: const EdgeInsets.symmetric(horizontal: 14),
+  // 글꼴은 테마에서(따로 TextStyle 을 만들면 앱 글꼴이 빠진다).
+  textStyle: theme.textTheme.labelLarge?.copyWith(
+    fontSize: 13.5,
+    fontWeight: FontWeight.w500,
+  ),
+);
+
+/// 시트 불러오는 중(초안 13-D): 원형 진행 표시 대신 머리·정보 칸·단계 자리의 회색 자리 표시.
+class TrackSheetLoading extends StatelessWidget {
+  const TrackSheetLoading({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      key: const ValueKey('track-sheet-loading'),
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      child: PmartShimmer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: scheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      PmartBone(width: 60, height: 13),
+                      SizedBox(height: 10),
+                      PmartBone(width: 170, height: 24),
+                      SizedBox(height: 10),
+                      PmartBone(width: 220, height: 15),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 12),
+                PmartBone(height: 72, circle: true),
+              ],
+            ),
+            const SizedBox(height: 14),
+            const PmartBone(width: double.infinity, height: 32, radius: 8),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                for (var i = 0; i < 4; i++) ...[
+                  if (i > 0) const SizedBox(width: 18),
+                  const Expanded(
+                    child: PmartBone(width: double.infinity, height: 6),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -479,7 +479,14 @@ void main() {
         deliveryId: 'dlv-s2',
       );
       expect(key('track-live-fallback'), findsOneWidget);
-      expect(find.text('실시간 연결이 끊겨 주기적으로 확인하고 있어요'), findsOneWidget);
+      // 초안 13 B: 안내와 기준 시각이 한 정보 칸에 "· "로 이어 붙는다.
+      expect(
+        find.descendant(
+          of: key('track-live-fallback'),
+          matching: find.textContaining('실시간 연결이 끊겨 주기적으로 확인하고 있어요'),
+        ),
+        findsOneWidget,
+      );
       // 끊김은 배송 실패·완료가 아니다.
       expect(find.text('배송하지 못함'), findsNothing);
       expect(key('track-step-current-delivered'), findsNothing);

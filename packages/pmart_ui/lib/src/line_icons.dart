@@ -117,6 +117,9 @@ enum PmartLineIcons {
 
   /// 쿠폰 티켓(쿠폰함 빈 상태 — 초안 10-D): 양옆이 파인 직사각형 + 가운데 점선.
   ticket,
+
+  /// 달력(예약배달 — 초안 13-B-4): 둥근 상자 + 머리 줄 + 위 고리 둘 + 날짜 점 둘.
+  calendar,
 }
 
 class PmartLineIcon extends StatelessWidget {
@@ -583,7 +586,11 @@ class _LinePainter extends CustomPainter {
             ..lineTo(16.5, 10.8),
           line,
         );
-        canvas.drawLine(const Offset(5.5, 19.2), const Offset(18.5, 19.2), line);
+        canvas.drawLine(
+          const Offset(5.5, 19.2),
+          const Offset(18.5, 19.2),
+          line,
+        );
       case PmartLineIcons.ticket:
         canvas.drawPath(
           Path()
@@ -609,6 +616,16 @@ class _LinePainter extends CustomPainter {
         for (final y in [8.6, 11.2, 13.8]) {
           canvas.drawLine(Offset(14.5, y), Offset(14.5, y + 1.4), line);
         }
+      case PmartLineIcons.calendar:
+        canvas.drawRRect(
+          RRect.fromLTRBR(4, 5.5, 20, 20, const Radius.circular(2.4)),
+          line,
+        );
+        canvas.drawLine(const Offset(4, 10), const Offset(20, 10), line);
+        canvas.drawLine(const Offset(8.5, 3.5), const Offset(8.5, 7), line);
+        canvas.drawLine(const Offset(15.5, 3.5), const Offset(15.5, 7), line);
+        canvas.drawCircle(const Offset(9, 14.5), 1.1, fill);
+        canvas.drawCircle(const Offset(15, 14.5), 1.1, fill);
       case PmartLineIcons.tag:
         canvas.drawPath(
           Path()
