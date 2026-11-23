@@ -223,6 +223,7 @@ class ReviewTarget {
     this.title,
     this.eligibleUntil,
     this.initialRating,
+    this.imageUrl,
   });
 
   ReviewTarget.of(ReviewEligibility e, {String? title, int? initialRating})
@@ -233,6 +234,7 @@ class ReviewTarget {
         title: title ?? e.productName,
         eligibleUntil: e.eligibleUntil,
         initialRating: initialRating,
+        imageUrl: e.imageUrl,
       );
 
   final String orderId;
@@ -243,6 +245,9 @@ class ReviewTarget {
   final String? title;
   final DateTime? eligibleUntil;
   final int? initialRating;
+
+  /// 지금 상품의 대표 사진(자격 응답 값, 없으면 자리 그림). 쓰기 화면 상품 줄에 쓴다(초안 09-C).
+  final String? imageUrl;
 }
 
 /// 계약 `POST /reviews`·`POST /review-photos` 422 코드.

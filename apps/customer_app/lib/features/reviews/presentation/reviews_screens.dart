@@ -103,7 +103,10 @@ void invalidateReviewLists(WidgetRef ref, ReviewTarget target) {
 
 /// SCR-REVIEW-LIST-001. 리뷰 쓰기(작성 가능 품목) / 내가 쓴 리뷰. 정상 0건과 조회 실패를 구분한다.
 class ReviewManageScreen extends ConsumerWidget {
-  const ReviewManageScreen({super.key});
+  const ReviewManageScreen({super.key, this.initialMine = false});
+
+  /// "내가 쓴 리뷰" 칸으로 열지.
+  final bool initialMine;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -129,6 +132,7 @@ class ReviewManageScreen extends ConsumerWidget {
     );
     return DefaultTabController(
       length: 2,
+      initialIndex: initialMine ? 1 : 0,
       child: Scaffold(
         appBar: AppBar(
           title: Text(l10n.reviewManageTitle),
@@ -1598,38 +1602,12 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
       );
     }
     if (outcome case CommandDone(value: final r)) {
-      return Scaffold(
-        appBar: AppBar(title: Text(l10n.reviewWrite)),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  r.state == ReviewState.submitPending
-                      ? l10n.reviewSubmitPending
-                      : l10n.reviewPublished,
-                  key: const ValueKey('review-result-done'),
-                  style: theme.textTheme.titleMedium,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                ReviewStars(rating: r.rating, size: 24),
-                const SizedBox(height: 16),
-                FilledButton(
-                  key: const ValueKey('review-result-ok'),
-                  onPressed: () => context.pop(),
-                  child: Text(l10n.reviewDone),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+      return _ReviewDoneView(target: t, review: r);
     }
     // 결과를 모르는 요청을 보관 중이면 입력을 잠근다(다시 확인은 같은 키·같은 본문이어야 한다).
     final locked = _busy || _submitter.pending;
+    final scheme = theme.colorScheme;
+    final rating = _rating;
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.reviewWrite),
@@ -1637,7 +1615,7 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
           key: const ValueKey('review-close'),
           icon: const PmartLineIcon(PmartLineIcons.close),
           tooltip: l10n.reviewCancel,
-          onPressed: () => context.pop(),
+          onPressed: _busy ? null : () => context.pop(),
         ),
         // 레퍼런스 11-2: 오른쪽 위 회색 알약 [리뷰정책안내] → 창
         actions: [
@@ -1647,7 +1625,7 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
               key: const ValueKey('review-policy-open'),
               label: Text(l10n.reviewPolicyShort),
               labelStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 9.5),
-              backgroundColor: theme.colorScheme.surfaceContainer,
+              backgroundColor: scheme.surfaceContainer,
               side: BorderSide.none,
               shape: const StadiumBorder(),
               visualDensity: VisualDensity.compact,
@@ -1656,47 +1634,110 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // 레퍼런스 11-2: 상품 카드(이름 + 노란 별) — 별을 눌러 별점
-          Container(
-            padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: theme.colorScheme.outlineVariant),
+      // 초안 09-C: 아래 고정 [등록하기] 하나(별 전·사진 올리는 중·확인 중엔 회색). 취소는 위 X.
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton(
+            key: const ValueKey('review-submit'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              disabledBackgroundColor: scheme.surfaceContainerHigh,
+              disabledForegroundColor: scheme.outline,
+              textStyle: theme.textTheme.titleSmall?.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            // 확인 중에는 새 등록을 막는다("다시 확인"만 같은 키로 보낸다).
+            // 사진이 다 올라가기 전에는 등록하지 않는다.
+            onPressed: locked || rating == null || !_photosReady
+                ? null
+                : _submit,
+            child: Text(l10n.reviewSubmit),
+          ),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: 16),
+        children: [
+          // 초안 09-C: 상품 줄(사진 56 · 이름 2줄 · 기한) + 아래 회색 구분 띠.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Row(
               children: [
-                _ProductName(
-                  productId: t.productId,
-                  title: t.title,
-                  // 레퍼런스 11: 리뷰 쓰기 위 상품 이름은 보통 굵기(titleSmall 은 테마 w700).
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
+                ProductImage(
+                  key: const ValueKey('review-write-image'),
+                  url: t.imageUrl,
+                  size: 56,
+                  radius: 8,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _ProductName(
+                        productId: t.productId,
+                        title: t.title,
+                        maxLines: 2,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontSize: 15,
+                          height: 1.35,
+                        ),
+                      ),
+                      if (t.eligibleUntil case final u?)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Text(
+                            l10n.reviewDeadlineShort(
+                              DateFormat(
+                                'M.d(E)',
+                                'ko',
+                              ).format(toSeoulWallClock(u)),
+                            ),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 12.5,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                if (t.eligibleUntil case final u?)
-                  Text(
-                    l10n.reviewDeadline(formatSeoulDateTime(u)),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+              ],
+            ),
+          ),
+          Container(height: 8, color: scheme.surfaceContainer),
+          // 초안 09-C: "상품은 어떠셨나요?" + 큰 보라 별 40 + 별점 말.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+            child: Column(
+              children: [
+                Text(
+                  l10n.reviewHowWasIt,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
                   ),
+                ),
+                const SizedBox(height: 8),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     for (var i = 1; i <= reviewRatingMax; i++)
                       IconButton(
                         key: ValueKey('review-star-$i'),
                         tooltip: l10n.reviewStar(i),
-                        iconSize: 30,
-                        padding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                        color: i <= (_rating ?? 0)
-                            ? const Color(0xFFFFB300)
-                            : theme.colorScheme.outlineVariant,
+                        iconSize: 40,
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        constraints: const BoxConstraints(),
+                        color: i <= (rating ?? 0)
+                            ? scheme.primary
+                            : scheme.outlineVariant,
                         icon: const Icon(Icons.star_rounded),
                         onPressed: locked
                             ? null
@@ -1704,137 +1745,245 @@ class _ReviewWriteScreenState extends ConsumerState<ReviewWriteScreen>
                       ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          if (_rating == null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                l10n.reviewRatingHint,
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-          const SizedBox(height: 14),
-          Stack(
-            children: [
-              TextField(
-                key: const ValueKey('review-text'),
-                controller: _text,
-                enabled: !locked,
-                minLines: 5,
-                maxLines: 10,
-                // 글자 수 칸을 아래에 두지 않으려고 maxLength 대신 입력 제한만(글자 수는 칸 안에 따로).
-                inputFormatters: [
-                  LengthLimitingTextInputFormatter(reviewTextMaxLength),
-                ],
-                // 레퍼런스: 회색 채움·테두리 없음, 글자 수는 칸 안 오른쪽 아래 "0 / 1,000"
-                decoration: InputDecoration(
-                  hintText: l10n.reviewTextHint,
-                  hintStyle: theme.inputDecorationTheme.hintStyle?.copyWith(
-                    fontSize: 12,
-                  ),
-                  filled: true,
-                  fillColor: theme.colorScheme.surfaceContainer,
-                  contentPadding: const EdgeInsets.fromLTRB(14, 14, 14, 34),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 14,
-                bottom: 12,
-                child: ListenableBuilder(
-                  listenable: _text,
-                  builder: (context, _) => Text(
-                    '${NumberFormat.decimalPattern('ko').format(_text.text.characters.length)} / ${NumberFormat.decimalPattern('ko').format(reviewTextMaxLength)}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.outline,
+                const SizedBox(height: 6),
+                SizedBox(
+                  height: 20,
+                  child: Text(
+                    rating == null
+                        ? l10n.reviewRatingHint
+                        : _ratingWord(l10n, rating),
+                    key: const ValueKey('review-rating-word'),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 14,
+                      fontWeight: rating == null
+                          ? FontWeight.w400
+                          : FontWeight.w700,
+                      color: rating == null
+                          ? scheme.onSurfaceVariant
+                          : scheme.primary,
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          _photoSection(context, locked: locked),
-          const SizedBox(height: 16),
-          // 정책 문구(Commerce 업무 문서 15장)는 머리줄 [리뷰정책안내] 창으로 옮겼다(레퍼런스 11-2).
-          const SizedBox(height: 16),
-          switch (outcome) {
-            CommandRejected(:final code) => Text(
-              _rejectText(l10n, code),
-              key: const ValueKey('review-result-rejected'),
-              style: TextStyle(color: theme.colorScheme.error),
+              ],
             ),
-            CommandUnknown() => Row(
-              key: const ValueKey('review-result-unknown'),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Stack(
               children: [
-                Expanded(child: Text(l10n.reviewUnknown)),
-                TextButton(
-                  key: const ValueKey('review-recheck'),
-                  onPressed: _busy ? null : _submit,
-                  child: Text(l10n.reviewRecheck),
+                TextField(
+                  key: const ValueKey('review-text'),
+                  controller: _text,
+                  enabled: !locked,
+                  minLines: 6,
+                  maxLines: 10,
+                  style: const TextStyle(fontSize: 14, height: 1.55),
+                  // 글자 수 칸을 아래에 두지 않으려고 maxLength 대신 입력 제한만(글자 수는 칸 안에 따로).
+                  inputFormatters: [
+                    LengthLimitingTextInputFormatter(reviewTextMaxLength),
+                  ],
+                  decoration: InputDecoration(
+                    hintText: l10n.reviewTextHint,
+                    hintStyle: theme.inputDecorationTheme.hintStyle?.copyWith(
+                      fontSize: 14,
+                    ),
+                    filled: true,
+                    fillColor: scheme.surfaceContainer,
+                    contentPadding: const EdgeInsets.fromLTRB(14, 14, 14, 34),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 14,
+                  bottom: 12,
+                  child: ListenableBuilder(
+                    listenable: _text,
+                    builder: (context, _) => Text(
+                      '${NumberFormat.decimalPattern('ko').format(_text.text.characters.length)} / ${NumberFormat.decimalPattern('ko').format(reviewTextMaxLength)}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.outline,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
-            _ => const SizedBox.shrink(),
-          },
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: _photoSection(context, locked: locked),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Text(
+              l10n.reviewPhotoMaxNote(reviewPhotoMax),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 12,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          // 정책 문구(Commerce 업무 문서 15장)는 머리줄 [리뷰정책안내] 창으로 옮겼다(레퍼런스 11-2).
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: switch (outcome) {
+              CommandRejected(:final code) => Text(
+                _rejectText(l10n, code),
+                key: const ValueKey('review-result-rejected'),
+                style: TextStyle(color: scheme.error),
+              ),
+              CommandUnknown() => Row(
+                key: const ValueKey('review-result-unknown'),
+                children: [
+                  Expanded(child: Text(l10n.reviewUnknown)),
+                  TextButton(
+                    key: const ValueKey('review-recheck'),
+                    onPressed: _busy ? null : _submit,
+                    child: Text(l10n.reviewRecheck),
+                  ),
+                ],
+              ),
+              _ => const SizedBox.shrink(),
+            },
+          ),
           if (_busy)
             Padding(
-              padding: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: Text(l10n.reviewSubmitting),
             ),
-          const SizedBox(height: 8),
-          // 레퍼런스 11-2: 아래 "취소 | 등록하기" 글자 단추 둘(위·가운데 선)
-          const Divider(height: 1),
-          Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  style: TextButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                    foregroundColor: theme.colorScheme.onSurface,
-                    shape: const RoundedRectangleBorder(),
-                    // 레퍼런스 11: 아래 "취소 | 등록하기"는 중간 굵기.
-                    textStyle: theme.textTheme.titleSmall?.copyWith(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  onPressed: _busy ? null : () => context.pop(),
-                  child: Text(l10n.reviewCancel),
-                ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 별점 말(초안 09-C). 별 수는 고객이 고른 값 그대로.
+String _ratingWord(AppLocalizations l10n, int rating) => switch (rating) {
+  1 => l10n.reviewRatingWord1,
+  2 => l10n.reviewRatingWord2,
+  3 => l10n.reviewRatingWord3,
+  4 => l10n.reviewRatingWord4,
+  _ => l10n.reviewRatingWord5,
+};
+
+/// 초안 09-D 등록 뒤: 연보라 체크 + "리뷰를 등록했어요"(게시 준비 중이면 그 문구) + "소중한 리뷰 고마워요".
+/// 같은 주문에 아직 쓸 품목이 있으면(서버 자격 다시 읽기) 고르기 카드로 이어 쓰기. 아래 고정 [확인].
+/// 자격을 못 읽었거나 읽는 중이면 이어 쓰기 칸을 그리지 않는다(남은 것이 없다고 말하지 않는다).
+class _ReviewDoneView extends ConsumerWidget {
+  const _ReviewDoneView({required this.target, required this.review});
+
+  final ReviewTarget target;
+  final ReviewView review;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final rest = [
+      for (final e
+          in ref
+                  .watch(orderReviewEligibilitiesProvider(target.orderId))
+                  .value ??
+              const <ReviewEligibility>[])
+        if (e.writable && e.orderLineId != target.orderLineId) e,
+    ];
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(l10n.reviewWrite),
+        leading: IconButton(
+          icon: const PmartLineIcon(PmartLineIcons.close),
+          tooltip: l10n.reviewDone,
+          onPressed: () => context.pop(),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton(
+            key: const ValueKey('review-result-ok'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(height: 50, child: VerticalDivider(width: 1)),
-              Expanded(
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                    backgroundColor: Colors.transparent,
-                    foregroundColor: theme.colorScheme.primary,
-                    disabledBackgroundColor: Colors.transparent,
-                    disabledForegroundColor: theme.colorScheme.outline,
-                    elevation: 0,
-                    shape: const RoundedRectangleBorder(),
-                    textStyle: theme.textTheme.titleSmall?.copyWith(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  key: const ValueKey('review-submit'),
-                  // 확인 중에는 새 등록을 막는다("다시 확인"만 같은 키로 보낸다).
-                  // 사진이 다 올라가기 전에는 등록하지 않는다.
-                  onPressed: locked || _rating == null || !_photosReady
-                      ? null
-                      : _submit,
-                  child: Text(l10n.reviewSubmit),
-                ),
+              textStyle: theme.textTheme.titleSmall?.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
               ),
-            ],
+            ),
+            onPressed: () => context.pop(),
+            child: Text(l10n.reviewDone),
           ),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 64, 16, 16),
+        children: [
+          Center(
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
+                color: PmartBrand.lavender,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: PmartLineIcon(
+                PmartLineIcons.check,
+                size: 36,
+                strokeWidth: 2.4,
+                color: scheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            review.state == ReviewState.submitPending
+                ? l10n.reviewSubmitPending
+                : l10n.reviewPublished,
+            key: const ValueKey('review-result-done'),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l10n.reviewThanks,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 14,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          if (rest.isNotEmpty) ...[
+            const SizedBox(height: 56),
+            Text.rich(
+              key: const ValueKey('review-done-more'),
+              TextSpan(
+                children: [TextSpan(text: l10n.reviewMoreInOrder(rest.length))],
+              ),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            for (final e in rest)
+              ReviewPickCard(
+                key: ValueKey('review-done-next-${e.orderLineId}'),
+                eligibility: e,
+                // 이어 쓰기: 이 완료 화면을 그 품목 쓰기로 바꾼다(뒤로 가면 원래 화면).
+                onOpen: (rating) => context.pushReplacement(
+                  '/reviews/write',
+                  extra: ReviewTarget.of(e, initialRating: rating),
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -2430,7 +2579,7 @@ class OrderReviewsSection extends ConsumerWidget {
 }
 
 /// 리뷰 요청 알림(notification 0.4.4 `REVIEW_REQUESTED`)을 눌렀을 때 — 그 주문의 리뷰 쓰기.
-/// 작성 가능 여부는 서버 자격 값만 본다: 하나면 바로 쓰기 화면, 여럿이면 고르기, 없으면 안내(주문 상세로).
+/// 작성 가능 여부는 서버 자격 값만 본다: 하나면 바로 쓰기 화면, 여럿이면 고르기(초안 09-B), 없으면 안내(09-E).
 class OrderReviewEntryScreen extends ConsumerStatefulWidget {
   const OrderReviewEntryScreen({super.key, required this.orderId});
 
@@ -2450,8 +2599,9 @@ class _OrderReviewEntryScreenState
     final l10n = AppLocalizations.of(context);
     final provider = orderReviewEligibilitiesProvider(widget.orderId);
     final value = ref.watch(provider);
+    final all = value.value ?? const <ReviewEligibility>[];
     final writable = [
-      for (final e in value.value ?? const <ReviewEligibility>[])
+      for (final e in all)
         if (e.writable) e,
     ];
     // 쓸 품목이 하나뿐이면 고르기 없이 바로 쓰기 화면으로(이 화면을 대신한다).
@@ -2476,55 +2626,342 @@ class _OrderReviewEntryScreenState
           state: uiStateOf(value),
           onRetry: () => ref.invalidate(provider),
           ready: (context, _) => writable.isEmpty
-              ? Center(
-                  key: const ValueKey('order-review-entry-none'),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(l10n.orderReviewNone, textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        OutlinedButton(
-                          key: const ValueKey('order-review-entry-order'),
-                          onPressed: () => context.pushReplacement(
-                            '/orders/${Uri.encodeComponent(widget.orderId)}',
-                          ),
-                          child: Text(l10n.orderDetailTitle),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
+              ? _ReviewNone(orderId: widget.orderId)
               : ListView(
                   key: const ValueKey('order-review-entry-list'),
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   children: [
+                    _ReviewOrderHeader(writable: writable),
+                    // 쓸 것 먼저, 이미 쓴 것(작성 완료)은 아래에 — 몇 개 남았는지 보이게.
                     for (final e in writable)
-                      ListTile(
+                      ReviewPickCard(
                         key: ValueKey('order-review-entry-${e.orderLineId}'),
-                        contentPadding: EdgeInsets.zero,
-                        title: _ProductName(
-                          productId: e.productId,
-                          title: e.productName,
-                        ),
-                        subtitle: e.eligibleUntil != null
-                            ? Text(
-                                l10n.reviewDeadline(
-                                  formatSeoulDateTime(e.eligibleUntil!),
-                                ),
-                              )
-                            : null,
-                        trailing: TextButton(
-                          onPressed: () =>
-                              openReviewWrite(context, ReviewTarget.of(e)),
-                          child: Text(l10n.reviewWrite),
+                        eligibility: e,
+                        onOpen: (rating) => openReviewWrite(
+                          context,
+                          ReviewTarget.of(e, initialRating: rating),
                         ),
                       ),
+                    for (final e in all)
+                      if (e.written)
+                        ReviewPickCard(
+                          key: ValueKey('order-review-entry-${e.orderLineId}'),
+                          eligibility: e,
+                          onOpen: (_) {},
+                        ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: TextButton(
+                        key: const ValueKey('order-review-entry-manage'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
+                        onPressed: () => context.push('/reviews'),
+                        child: Text(l10n.reviewGoManage),
+                      ),
+                    ),
                   ],
                 ),
         ),
       },
+    );
+  }
+}
+
+/// 초안 09-B 주문 머리: 연보라 칸 "11월 20일 배송된 상품, 어떠셨나요?" + "쓸 수 있는 리뷰 N개 · 기한".
+/// 배송 시각·기한은 서버 값만(모르면 그 부분을 뺀다). 기한은 품목마다 같을 때만 머리에 한 번.
+class _ReviewOrderHeader extends StatelessWidget {
+  const _ReviewOrderHeader({required this.writable});
+
+  final List<ReviewEligibility> writable;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final delivered = writable.map((e) => e.deliveredAt).nonNulls.firstOrNull;
+    String day(DateTime t, String pattern) =>
+        DateFormat(pattern, 'ko').format(toSeoulWallClock(t));
+    final deadlines = {
+      for (final e in writable)
+        if (e.eligibleUntil case final u?) day(u, 'M.d(E)'),
+    };
+    final allDated = writable.every((e) => e.eligibleUntil != null);
+    return Container(
+      key: const ValueKey('order-review-entry-head'),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: PmartBrand.lavenderMist,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            delivered == null
+                ? l10n.reviewEntryTitle
+                : l10n.reviewEntryTitleDelivered(day(delivered, 'M월 d일')),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            [
+              l10n.reviewEntryCount(writable.length),
+              if (allDated && deadlines.length == 1)
+                l10n.reviewEntryUntil(deadlines.single),
+            ].join(' · '),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 13,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 리뷰 쓸 품목 카드(초안 09-B·D): 위 회색 상품 띠(사진 44 · 이름 · 기한) + 아래 "별을 눌러 리뷰 쓰기" + 별 5개.
+/// 별을 누르면 그 별점으로, 띠를 누르면 별점 없이 쓰기를 연다([onOpen]). 이미 쓴 품목은 흐리게 + "작성 완료" + 내가 쓴 리뷰.
+class ReviewPickCard extends StatelessWidget {
+  const ReviewPickCard({
+    super.key,
+    required this.eligibility,
+    required this.onOpen,
+  });
+
+  final ReviewEligibility eligibility;
+  final void Function(int? rating) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final e = eligibility;
+    final done = e.written;
+    final strip = Container(
+      color: scheme.surfaceContainerLow,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Row(
+        children: [
+          Opacity(
+            opacity: done ? 0.5 : 1,
+            child: ProductImage(url: e.imageUrl, size: 44, radius: 8),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ProductName(
+                  productId: e.productId,
+                  title: e.productName,
+                  maxLines: 1,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 14,
+                    color: done ? scheme.onSurfaceVariant : null,
+                  ),
+                ),
+                if (!done && e.eligibleUntil != null)
+                  Text(
+                    l10n.reviewDeadlineShort(
+                      DateFormat(
+                        'M.d(E)',
+                        'ko',
+                      ).format(toSeoulWallClock(e.eligibleUntil!)),
+                    ),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (done)
+            strip
+          else
+            InkWell(
+              key: ValueKey('review-pick-open-${e.orderLineId}'),
+              onTap: () => onOpen(null),
+              child: strip,
+            ),
+          if (done)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 6, 4, 6),
+              child: Row(
+                children: [
+                  Container(
+                    key: ValueKey('review-pick-done-${e.orderLineId}'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: scheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      l10n.reviewWrittenChip,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (e.reviewId case final id?)
+                    TextButton(
+                      key: ValueKey('review-pick-mine-${e.orderLineId}'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: scheme.onSurfaceVariant,
+                        textStyle: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 13,
+                        ),
+                      ),
+                      onPressed: () =>
+                          context.push('/reviews/mine/$id', extra: e),
+                      child: Text(l10n.reviewSeeMine),
+                    ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.reviewTapStarToWrite,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 13,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  // 초안: 작은 별 5개를 붙여서(칸 26). 누르는 자리는 높이 40.
+                  for (var i = 1; i <= reviewRatingMax; i++)
+                    Semantics(
+                      button: true,
+                      label: l10n.reviewStar(i),
+                      child: InkResponse(
+                        key: ValueKey('review-pick-star-${e.orderLineId}-$i'),
+                        radius: 18,
+                        onTap: () => onOpen(i),
+                        child: SizedBox(
+                          width: 26,
+                          height: 40,
+                          child: Icon(
+                            Icons.star_rounded,
+                            size: 24,
+                            color: scheme.outlineVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 초안 09-E 쓸 리뷰 없음: 회색 동그라미 연필 + 제목 + 이유 한 줄 + [주문 상세] · [내가 쓴 리뷰].
+class _ReviewNone extends StatelessWidget {
+  const _ReviewNone({required this.orderId});
+
+  final String orderId;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Center(
+      key: const ValueKey('order-review-entry-none'),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(36, 0, 36, 80),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainer,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: PmartLineIcon(
+                PmartLineIcons.pencil,
+                size: 32,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.reviewWritableEmpty,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              l10n.reviewNoneReason,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: 14,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                OutlinedButton(
+                  key: const ValueKey('order-review-entry-order'),
+                  onPressed: () => context.pushReplacement(
+                    '/orders/${Uri.encodeComponent(orderId)}',
+                  ),
+                  child: Text(l10n.orderDetailTitle),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  key: const ValueKey('order-review-entry-mine'),
+                  onPressed: () => context.pushReplacement('/reviews?tab=mine'),
+                  child: Text(l10n.reviewTabMine),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

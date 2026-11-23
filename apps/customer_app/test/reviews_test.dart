@@ -609,16 +609,20 @@ void main() {
       await t.tap(find.byKey(const ValueKey('review-quick-star-ol-1-4')));
       await t.pumpAndSettle();
       // 별 4개가 미리 골라져 있다. 사진 칸은 "사진 0/5".
-      // 고른 별은 노란 별(레퍼런스 11-2)
+      // 고른 별은 보라 큰 별 + 별점 말(초안 09-C, 노랑은 팔레트 밖이라 바꿈)
+      final violet = Theme.of(
+        t.element(find.byKey(const ValueKey('review-star-1'))),
+      ).colorScheme.primary;
       expect(
         find.byWidgetPredicate(
           (w) =>
               w is IconButton &&
               w.key.toString().contains('review-star-') &&
-              w.color == const Color(0xFFFFB300),
+              w.color == violet,
         ),
         findsNWidgets(4),
       );
+      expect(find.text('좋아요'), findsOneWidget);
       expect(find.text('사진 0/5'), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('review-text')), '신선해요');
       await t.tap(find.byKey(const ValueKey('review-submit')));

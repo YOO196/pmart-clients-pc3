@@ -101,6 +101,7 @@ Future<void> _loadFonts() async {
 
 void main() {
   setUpAll(initPmartFormatting);
+  reviewFlowShots();
 
   final now = DateTime.utc(2026, 10, 24, 3); // 서울 12:00
 
@@ -1944,6 +1945,130 @@ void main() {
       matchesGoldenFile(File('$_dir/h-no-center-detail.png').uri),
     );
   });
+}
+
+/// 알림 → 리뷰 쓰기 흐름(초안 09 B·C·D·E, 사용자 2026-11-23 "리뷰 쓰기 흐름 다 넣는거라고").
+void reviewFlowShots() {
+  testWidgets('review-flow', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    Map<String, Object?> el(String line, String name, {String? review}) => {
+      'orderId': 'order-x',
+      'orderLineId': line,
+      'productId': 'P-$line',
+      'productName': name,
+      'deliveredAt': '2026-11-20T02:30:00Z',
+      'eligibleUntil': '2026-11-27T14:59:00Z',
+      'state': review == null ? 'REV_ELIGIBLE' : 'PUBLISHED',
+      'reviewId': review,
+    };
+    await t.pumpWidget(
+      testApp(
+        const [],
+        reviews: MockReviewsRepository(
+          latency: Duration.zero,
+          eligibilities: [
+            el('l-1', '국산 햇감자 1kg (특품)'),
+            el('l-2', '서울우유 나100% 1L 2개 묶음 기획'),
+            el('l-3', '풀무원 국산콩 두부 부침용 300g', review: 'rv-3'),
+          ],
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    unawaited(router.push('/orders/order-x/review'));
+    await t.pumpAndSettle();
+    Future<void> shot(String name) => expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/rf-$name.png').uri),
+    );
+    await shot('b-pick');
+    await t.tap(find.byKey(const ValueKey('review-pick-star-l-1-4')));
+    await t.pumpAndSettle();
+    await t.enterText(
+      find.byKey(const ValueKey('review-text')),
+      '알이 굵고 흙도 적어서 손질이 편했어요. 다음에도 살 것 같아요.',
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await t.pumpAndSettle();
+    await shot('c-write');
+    await t.tap(find.byKey(const ValueKey('review-submit')));
+    await t.pumpAndSettle();
+    await shot('d-done');
+  });
+
+  // 09-E: 쓸 리뷰가 없는 주문(목의 order-seed-2).
+  testWidgets('review-flow-none', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first))
+          .push('/orders/order-seed-2/review'),
+    );
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/rf-e-none.png').uri),
+    );
+  });
+
+  // 홈 배달 불가 지역(초안 11-C 회색, 사용자 2026-11-23).
+  testWidgets('home-out-of-area', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final secure = MemoryKeyValueStore();
+    final store = GuestAddressStore(secure);
+    await store.add('gaddr-x');
+    await store.select('gaddr-x');
+    await t.pumpWidget(
+      testApp(const [], address: _OutOfArea(), secure: secure),
+    );
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/h-out-of-area.png').uri),
+    );
+  });
+}
+
+final class _OutOfArea extends MockAddressRepository {
+  _OutOfArea() : super(latency: Duration.zero);
+
+  @override
+  Future<Address> guest(String guestAddressId) async => Address(
+    addressId: guestAddressId,
+    version: 1,
+    roadAddress: '제주 제주시 연동 312-1',
+    detailAddress: '201호',
+    serviceability: Serviceability.outOfArea,
+  );
 }
 
 /// 회원 주소록이 빈 목(캡처용).

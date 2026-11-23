@@ -80,6 +80,9 @@ flutter analyze && flutter test --concurrency=1   # 앱/패키지 디렉터리�
 # ⚠ flutter test 메모리 [사용자 지시 2026-11-23]: customer_app 전체 시험의 flutter_tester 가 20GB 넘게 잡아 PC1 메모리가 바닥나
 #   다른 세션의 build·vitest 가 깨졌다. 전체는 --concurrency=1, 평소엔 바뀐 기능의 시험 파일·폴더만 돌린다.
 #   시험 전 실메모리 남은 양이 4GB 미만이면 미루고, 끝난 뒤 남은 flutter_tester 프로세스가 없는지 확인한다.
+#   Flutter 앱 시험(customer_app·mfc_app·rider_app·pmart_*)에만 해당 — 백엔드(Gradle)·웹(vitest)은 대상 아님. 클라이언트 세션들에 알림(2026-11-23).
+#   메모리 새는 파일 찾기: 앱 폴더에서 powershell -ExecutionPolicy Bypass -File ..\..\tools\flutter_test_mem.ps1
+#   (파일 하나씩, 자기 프로세스 트리만 재고 3GB·5분 넘으면 그것만 끔 → build\test-mem.csv)
 
 # React (Node 24 / npm 11 확인됨)
 npm install                                       # 루트 workspace (web/*)

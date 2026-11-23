@@ -502,7 +502,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       _slide(
         parentNavigatorKey: rootNavigatorKey,
         path: '/reviews',
-        builder: (_, _) => const ReviewManageScreen(),
+        // ?tab=mine 이면 "내가 쓴 리뷰" 칸으로 연다(리뷰 쓰기 흐름의 [내가 쓴 리뷰], 초안 09-E).
+        builder: (_, state) => ReviewManageScreen(
+          initialMine: state.uri.queryParameters['tab'] == 'mine',
+        ),
         routes: [
           _slide(
             parentNavigatorKey: rootNavigatorKey,

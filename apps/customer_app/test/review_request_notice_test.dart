@@ -105,12 +105,9 @@ void main() {
       find.byKey(const ValueKey('order-review-entry-list')),
       findsOneWidget,
     );
-    await t.tap(
-      find.descendant(
-        of: find.byKey(const ValueKey('order-review-entry-l-2')),
-        matching: find.byType(TextButton),
-      ),
-    );
+    // 초안 09-B: 주문 머리 + 품목 카드, 카드의 상품 띠를 누르면 그 상품 쓰기.
+    expect(find.textContaining('쓸 수 있는 리뷰 2개'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('review-pick-open-l-2')));
     await t.pumpAndSettle();
     expect(
       t
@@ -132,6 +129,87 @@ void main() {
       findsOneWidget,
     );
     expect(find.byType(ReviewWriteScreen), findsNothing);
+  });
+
+  // 초안 09-B: 주문 머리(배송 날짜·남은 수·같은 기한), 별을 누르면 그 별점으로, 이미 쓴 품목은 "작성 완료".
+  testWidgets('고르기: 주문 머리 · 별 바로 쓰기 · 작성 완료', (t) async {
+    await tapReviewNotice(
+      t,
+      orderId: 'order-x',
+      reviews: MockReviewsRepository(
+        latency: Duration.zero,
+        eligibilities: [
+          eligible('order-x', 'l-1', '우유'),
+          eligible('order-x', 'l-2', '요거트'),
+          {
+            ...eligible('order-x', 'l-3', '두부'),
+            'state': 'PUBLISHED',
+            'reviewId': 'rv-3',
+          },
+        ],
+      ),
+    );
+    expect(find.text('10월 24일 배송된 상품,\n어떠셨나요?'), findsOneWidget);
+    expect(find.text('쓸 수 있는 리뷰 2개 · 11.7(토)까지'), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-pick-done-l-3')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-pick-star-l-3-1')), findsNothing);
+    await t.tap(find.byKey(const ValueKey('review-pick-star-l-1-3')));
+    await t.pumpAndSettle();
+    final w = t.widget<ReviewWriteScreen>(find.byType(ReviewWriteScreen));
+    expect((w.target.orderLineId, w.target.initialRating), ('l-1', 3));
+    expect(find.text('보통이에요'), findsOneWidget);
+  });
+
+  // 초안 09-C·D: 등록 확정 뒤 같은 주문에 남은 품목으로 이어 쓰기.
+  testWidgets('등록 뒤: 남은 품목 이어 쓰기', (t) async {
+    final repo = MockReviewsRepository(
+      latency: Duration.zero,
+      eligibilities: [
+        eligible('order-x', 'l-1', '우유'),
+        eligible('order-x', 'l-2', '요거트'),
+      ],
+    );
+    await tapReviewNotice(t, orderId: 'order-x', reviews: repo);
+    await t.tap(find.byKey(const ValueKey('review-pick-star-l-1-5')));
+    await t.pumpAndSettle();
+    expect(find.text('상품은 어떠셨나요?'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('review-submit')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('review-result-done')), findsOneWidget);
+    expect(find.text('소중한 리뷰 고마워요'), findsOneWidget);
+    expect(find.text('이 주문에 쓸 리뷰가 1개 더 있어요'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('review-pick-open-l-2')));
+    await t.pumpAndSettle();
+    expect(
+      t
+          .widget<ReviewWriteScreen>(find.byType(ReviewWriteScreen))
+          .target
+          .orderLineId,
+      'l-2',
+    );
+  });
+
+  // 초안 09-E: 쓸 리뷰가 없으면 제목·이유 + [주문 상세] · [내가 쓴 리뷰](내가 쓴 리뷰 칸으로).
+  testWidgets('쓸 리뷰 없음: 내가 쓴 리뷰로 가기', (t) async {
+    await tapReviewNotice(
+      t,
+      orderId: 'order-seed-2',
+      reviews: MockReviewsRepository(latency: Duration.zero),
+    );
+    expect(find.text('이미 썼거나 작성 기간이 지났을 수 있어요'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('order-review-entry-order')),
+      findsOneWidget,
+    );
+    await t.tap(find.byKey(const ValueKey('order-review-entry-mine')));
+    await t.pumpAndSettle();
+    expect(find.byType(ReviewManageScreen), findsOneWidget);
+    expect(
+      DefaultTabController.of(
+        t.element(find.byKey(const ValueKey('review-tab-mine'))),
+      ).index,
+      1,
+    );
   });
 
   test('경로: REVIEW_REQUESTED + ORDER 만 리뷰 쓰기, 그 밖은 기존 목적지', () {

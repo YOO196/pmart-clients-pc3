@@ -13,6 +13,7 @@ import '../../../shared/floating_cart_bar.dart';
 import '../../../shared/notice.dart';
 import '../../../shared/providers.dart';
 import '../../../shared/ui_state_of.dart';
+import '../../address/domain/address.dart' show Serviceability;
 import '../../address/presentation/address_controller.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -357,6 +358,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
                                       children: [
+                                        const _OutOfAreaStrip(),
                                         // HOME_TOP 배너(가로 넘기기). 없으면 자리를 비운다.
                                         if (home.banners
                                                 .where((b) => !b.middle)
@@ -1898,6 +1900,14 @@ class _DeliveryStatusLine extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
+    // 초안 11-C(회색, 사용자 2026-11-23): 서버가 권역 밖이라고 판정한 주소면 배송 방식을 묻지 않고(센터 없음) 회색 불가 줄.
+    if (ref.watch(_shoppingOutOfAreaProvider)) {
+      return _statusLine(
+        context,
+        l10n.homeTopOutOfArea,
+        scheme.onSurfaceVariant,
+      );
+    }
     final options = ref.watch(homeDeliveryOptionsProvider).value;
     if (options == null || options.isEmpty) return const SizedBox.shrink();
     String? etaOf(DeliveryOption o) => switch (o.eta) {
@@ -1928,7 +1938,14 @@ class _DeliveryStatusLine extends ConsumerWidget {
       _ => ('', false),
     };
     if (text.isEmpty) return const SizedBox.shrink();
-    final color = ok ? scheme.primary : scheme.onSurfaceVariant;
+    return _statusLine(
+      context,
+      text,
+      ok ? scheme.primary : scheme.onSurfaceVariant,
+    );
+  }
+
+  Widget _statusLine(BuildContext context, String text, Color color) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 1),
       child: Row(
@@ -1954,6 +1971,86 @@ class _DeliveryStatusLine extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 쇼핑 주소가 서버 판정으로 권역 밖(`OUT_OF_SERVICE_AREA`)인지. 판정 모름·주소 없음·조회 실패는 false(불가로 보이지 않음).
+final _shoppingOutOfAreaProvider = Provider.autoDispose<bool>(
+  (ref) =>
+      ref.watch(
+        addressBookProvider.select(
+          (v) => v.value?.shoppingAddress?.serviceability,
+        ),
+      ) ==
+      Serviceability.outOfArea,
+);
+
+/// 초안 11-C(회색, 사용자 2026-11-23): 권역 밖 주소면 홈 맨 위 회색 띠 "이 주소는 아직 배달하지 않아요" + [주소 바꾸기 ›].
+/// 상품 둘러보기는 그대로 둔다.
+class _OutOfAreaStrip extends ConsumerWidget {
+  const _OutOfAreaStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(_shoppingOutOfAreaProvider)) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Material(
+        color: scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          key: const ValueKey('home-out-of-area'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => context.push('/addresses'),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.homeOutOfAreaTitle,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        l10n.homeOutOfAreaBody,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 13,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.homeOutOfAreaChange,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
+                ),
+                PmartLineIcon(
+                  PmartLineIcons.chevronRight,
+                  size: 16,
+                  color: scheme.onSurface,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
