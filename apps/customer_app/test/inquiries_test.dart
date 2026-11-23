@@ -193,7 +193,9 @@ void main() {
       expect(find.text('문의 내용'), findsOneWidget);
       expect(find.byKey(const ValueKey('inquiry-body')), findsOneWidget);
       expect(find.text('배송이 늦어요'), findsOneWidget);
-      expect(find.text('아직 답변 전이에요. 상담원이 확인하고 있어요.'), findsOneWidget);
+      // 초안 18 타임라인 ①: 점선 점 "답변을 기다리고 있어요" + 새로 고침 안내.
+      expect(find.text('답변을 기다리고 있어요'), findsOneWidget);
+      expect(find.byKey(const ValueKey('inquiry-no-reply')), findsOneWidget);
     });
 
     testWidgets('주문 고르기: 내 주문 목록에서 고르면 그 주문으로 접수된다(종류는 "주문"이 기본)', (t) async {
@@ -252,7 +254,8 @@ void main() {
       await t.tap(find.byKey(const ValueKey('support-my-inquiries')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('inquiry-inq-seed-2')), findsOneWidget);
-      expect(find.text('접수'), findsOneWidget);
+      // 초안 18: "접수" → "답변 대기" 알약.
+      expect(find.text('답변 대기'), findsOneWidget);
       expect(find.text('답변 완료'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('inquiry-inq-seed-1')));
       await t.pumpAndSettle();

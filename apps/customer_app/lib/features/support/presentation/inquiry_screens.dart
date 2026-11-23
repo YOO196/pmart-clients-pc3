@@ -1,23 +1,26 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart' show NumberFormat;
+import 'package:intl/intl.dart' show DateFormat, NumberFormat;
 import 'package:pmart_core/pmart_core.dart'
     show IdempotencyKey, PmartFailure, ProblemFailure;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/ui_state_of.dart';
-import '../../address/presentation/address_screens.dart' show LoginRequired;
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../orders/presentation/orders_providers.dart'
     show orderDetailProvider, orderListProvider, orderStatusText;
-import '../../orders/domain/orders.dart' show OrderDetail, OrderListQuery;
+import '../../orders/domain/orders.dart'
+    show OrderDetail, OrderLineView, OrderListQuery;
 import '../../../shared/choice_sheet.dart';
+import '../../catalog/presentation/widgets/product_tile_card.dart'
+    show ProductImage;
 import '../../reviews/presentation/reviews_controller.dart'
     show ReviewPhotoSource, reviewPhotoPickerProvider;
 import '../../profile/presentation/profile_controller.dart'
@@ -243,43 +246,60 @@ class SupportRow extends StatelessWidget {
   }
 }
 
-/// 내 문의 목록(본인만, 최근 순). 답변 알림이 없어 당겨서 새로 고친다.
+/// 내 문의 목록(본인만, 최근 순) — 초안 18 B 카드형. 답변 알림이 없어 당겨서 새로 고친다.
 class InquiryListScreen extends ConsumerWidget {
   const InquiryListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final value = ref.watch(inquiryListProvider);
+    final member = ref.watch(sessionProvider) is MemberSession;
+    final list = value.value;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.supportMyInquiries)),
-      floatingActionButton: value.value == null
+      backgroundColor: member ? scheme.surfaceContainer : null,
+      appBar: AppBar(
+        title: Text(l10n.supportMyInquiries),
+        backgroundColor: scheme.surface,
+      ),
+      // 아래 고정 [새 문의 남기기](떠 있는 버튼 대신). 빈 목록은 가운데 버튼이 있어 두지 않는다.
+      bottomNavigationBar: list == null || list.items.isEmpty
           ? null
-          : FloatingActionButton.extended(
-              key: const ValueKey('inquiry-new'),
-              onPressed: () => context.push('/support/inquiries/new'),
-              label: Text(l10n.supportNewInquiry),
+          : SafeArea(
+              child: Container(
+                color: scheme.surface,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: FilledButton(
+                  key: const ValueKey('inquiry-new'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                  ),
+                  onPressed: () => context.push('/support/inquiries/new'),
+                  child: Text(l10n.inqNewInquiry),
+                ),
+              ),
             ),
       body: switch (value) {
-        AsyncData(value: null) => LoginRequired(message: l10n.inqLoginNeeded),
+        AsyncData(value: null) => const _InquiryGuest(),
         _ => UiStateView<InquiryListState?>(
           loading: (_) => const PmartListSkeleton(),
           state: uiStateOf(value, isEmpty: (s) => s!.items.isEmpty),
           onRetry: () => ref.invalidate(inquiryListProvider),
-          empty: (_) => Center(
-            key: const ValueKey('inquiries-empty'),
-            child: Text(l10n.inqEmpty),
-          ),
+          empty: (_) => const _InquiriesEmpty(),
           ready: (context, s) => RefreshIndicator(
             onRefresh: () => ref.refresh(inquiryListProvider.future),
             child: ListView(
-              padding: const EdgeInsets.only(bottom: 88),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  padding: const EdgeInsets.fromLTRB(4, 12, 4, 10),
                   child: Text(
                     l10n.inqListNote,
-                    style: Theme.of(context).textTheme.bodySmall,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 for (final i in s!.items) _InquiryTile(item: i),
@@ -293,6 +313,84 @@ class InquiryListScreen extends ConsumerWidget {
   }
 }
 
+/// 상태 알약 — 답변 대기 회색 · 답변 완료 연보라 · 종료 흐림 · 모름 "확인 중"(초안 18).
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.status});
+
+  final InquiryStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final (bg, fg, dot) = switch (status) {
+      InquiryStatus.answered => (scheme.primaryContainer, scheme.primary, true),
+      InquiryStatus.closed => (scheme.surfaceContainer, scheme.outline, false),
+      _ => (scheme.surfaceContainer, scheme.onSurfaceVariant, true),
+    };
+    return Container(
+      key: const ValueKey('inquiry-status'),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (dot) ...[
+            Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            inquiryStatusText(l10n, status),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 문의 제목 — 없으면 "{종류} 문의".
+String inquiryTitleOf(AppLocalizations l10n, InquirySummary s) =>
+    s.title ?? l10n.inqTitleOfKind(inquiryCategoryText(l10n, s.category));
+
+/// 시스템 주문 ID 는 보이지 않는다 — 화면용 주문번호(주문 상세에서), 못 읽으면 줄을 두지 않는다.
+class _OrderNumberLine extends ConsumerWidget {
+  const _OrderNumberLine({required this.orderId});
+
+  final String orderId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final n = ref.watch(orderDetailProvider(orderId)).value?.orderNumber;
+    if (n == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Text(
+        l10n.inqOrderChosen(n),
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+String _shortWhen(DateTime t) =>
+    DateFormat('M. d. HH:mm', 'ko').format(toSeoulWallClock(t));
+
 class _InquiryTile extends StatelessWidget {
   const _InquiryTile({required this.item});
 
@@ -302,27 +400,161 @@ class _InquiryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final closed = item.status == InquiryStatus.closed;
     final answered = item.status == InquiryStatus.answered;
-    return ListTile(
-      key: ValueKey('inquiry-${item.inquiryId}'),
-      title: Text(
-        item.title ?? inquiryCategoryText(l10n, item.category),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        '${inquiryCategoryText(l10n, item.category)} · ${formatSeoulDateTime(item.createdAt)}',
-      ),
-      trailing: Text(
-        inquiryStatusText(l10n, item.status),
-        style: theme.textTheme.labelMedium?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: answered
-              ? theme.colorScheme.primary
-              : theme.colorScheme.outline,
+    final grey = scheme.onSurfaceVariant;
+    final card = Material(
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        key: ValueKey('inquiry-${item.inquiryId}'),
+        borderRadius: BorderRadius.circular(14),
+        onTap: () => context.push('/support/inquiries/${item.inquiryId}'),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _StatusPill(status: item.status),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      inquiryCategoryText(l10n, item.category),
+                      style: theme.textTheme.bodySmall?.copyWith(color: grey),
+                    ),
+                  ),
+                  Text(
+                    _shortWhen(item.createdAt),
+                    style: theme.textTheme.bodySmall?.copyWith(color: grey),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                inquiryTitleOf(l10n, item),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (item.orderId case final id?) _OrderNumberLine(orderId: id),
+              if (answered) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.inqReplyArrived,
+                        key: ValueKey('inquiry-replied-${item.inquiryId}'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (item.answeredAt case final at?)
+                      Text(
+                        '${DateFormat('M/d HH:mm', 'ko').format(toSeoulWallClock(at))} ›',
+                        style: theme.textTheme.bodySmall?.copyWith(color: grey),
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
       ),
-      onTap: () => context.push('/support/inquiries/${item.inquiryId}'),
+    );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      // 종료는 카드도 흐리게.
+      child: closed ? Opacity(opacity: 0.6, child: card) : card,
+    );
+  }
+}
+
+/// 초안 18 H 빈 목록: 회색 원 + "남긴 문의가 없어요" + 안내 + [자주 묻는 질문] [문의 남기기].
+class _InquiriesEmpty extends StatelessWidget {
+  const _InquiriesEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Center(
+      key: const ValueKey('inquiries-empty'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: PmartLineIcon(
+                  PmartLineIcons.questionBubble,
+                  size: 28,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.inqEmpty,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              l10n.inqEmptyHint,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    key: const ValueKey('inquiries-empty-faq'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      backgroundColor: scheme.surface,
+                    ),
+                    onPressed: () => context.push('/support/faqs'),
+                    child: Text(l10n.faqTitle),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton(
+                    key: const ValueKey('inquiry-new'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    onPressed: () => context.push('/support/inquiries/new'),
+                    child: Text(l10n.supportNewInquiry),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -363,7 +595,8 @@ class _MoreFooter extends ConsumerWidget {
   }
 }
 
-/// 문의 상세 + 답변. 고객이 이어 쓰는 기능은 없다(새 문의로).
+/// 문의 상세 — 초안 18 타임라인: 문의를 남겼어요 → 답변이 왔어요(답변마다) / 답변을 기다리고 있어요 → 만족도 →
+/// 문의를 닫았어요. 고객이 이어 쓰는 기능은 없다(새 문의로).
 class InquiryDetailScreen extends ConsumerWidget {
   const InquiryDetailScreen({super.key, required this.inquiryId});
 
@@ -373,142 +606,294 @@ class InquiryDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final provider = inquiryProvider(inquiryId);
     final loaded = ref.watch(provider).value;
+    final grey = scheme.onSurfaceVariant;
+    TextStyle? meta() => theme.textTheme.bodySmall?.copyWith(color: grey);
+    BoxDecoration box(Color c, {Color? border}) => BoxDecoration(
+      color: c,
+      borderRadius: BorderRadius.circular(12),
+      border: border == null ? null : Border.all(color: border),
+    );
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.inqDetailTitle),
-        actions: [
-          if (loaded != null && !loaded.closed)
-            _CloseButton(inquiryId: inquiryId),
-        ],
-      ),
+      appBar: AppBar(title: Text(l10n.inqDetailTitle)),
+      // ④ 종료: 닫기 없이 아래 고정 [새 문의 남기기].
+      bottomNavigationBar: loaded?.closed ?? false
+          ? SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: OutlinedButton(
+                  key: const ValueKey('inquiry-new-after-close'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                  ),
+                  onPressed: () => context.push('/support/inquiries/new'),
+                  child: Text(l10n.inqNewInquiry),
+                ),
+              ),
+            )
+          : null,
       body: UiStateView<InquiryDetail>(
         state: uiStateOf(ref.watch(provider)),
         onRetry: () => ref.invalidate(provider),
-        ready: (context, d) => RefreshIndicator(
-          onRefresh: () => ref.refresh(provider.future),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      inquiryCategoryText(l10n, d.summary.category),
-                      style: theme.textTheme.labelLarge,
-                    ),
-                  ),
-                  Text(
-                    inquiryStatusText(l10n, d.summary.status),
-                    key: const ValueKey('inquiry-status'),
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                formatSeoulDateTime(d.summary.createdAt),
-                style: theme.textTheme.bodySmall,
-              ),
-              if (d.summary.orderId case final orderId?)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    key: const ValueKey('inquiry-order'),
-                    onPressed: () => context.push('/orders/$orderId'),
-                    child: Text(l10n.inqOrderLink),
-                  ),
-                ),
-              const SizedBox(height: 12),
-              if (d.summary.title case final title?)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              Text(d.body, key: const ValueKey('inquiry-body')),
-              if (d.photoIds.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+        ready: (context, d) {
+          final s = d.summary;
+          return RefreshIndicator(
+            onRefresh: () => ref.refresh(provider.future),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+              children: [
+                Row(
                   children: [
-                    for (final p in d.photoIds) _InquiryPhotoThumb(photoId: p),
+                    _StatusPill(status: s.status),
+                    const SizedBox(width: 8),
+                    Text(inquiryCategoryText(l10n, s.category), style: meta()),
                   ],
                 ),
-              ],
-              const Divider(height: 32),
-              Text(
-                l10n.inqRepliesTitle,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              if (d.replies.isEmpty)
+                const SizedBox(height: 8),
                 Text(
-                  d.summary.status == InquiryStatus.received
-                      ? l10n.inqNoReplyYet
-                      : l10n.inqNoReply,
-                  key: const ValueKey('inquiry-no-reply'),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.outline,
+                  inquiryTitleOf(l10n, s),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
                   ),
-                )
-              else
-                for (final r in d.replies)
-                  Container(
-                    key: ValueKey('inquiry-reply-${r.replyId}'),
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainer,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                ),
+                if (s.orderId case final orderId?) ...[
+                  const SizedBox(height: 12),
+                  _InquiryOrderCard(orderId: orderId),
+                ],
+                const SizedBox(height: 16),
+                // ● 문의를 남겼어요
+                _TimelineStep(
+                  dot: _Dot.ring,
+                  title: l10n.inqStepAsked,
+                  meta: formatSeoulDateTime(s.createdAt),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: box(scheme.surfaceContainer),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(r.body),
-                        if (r.createdAt case final t?)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              formatSeoulDateTime(t),
-                              style: theme.textTheme.bodySmall,
+                        Text(d.body, key: const ValueKey('inquiry-body')),
+                        if (d.photoIds.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final p in d.photoIds)
+                                _InquiryPhotoThumb(photoId: p),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                // ● 답변이 왔어요(답변마다) — 없으면 ○ 답변을 기다리고 있어요
+                if (d.replies.isEmpty && !d.closed)
+                  _TimelineStep(
+                    dot: _Dot.dashed,
+                    title: l10n.inqStepWaiting,
+                    last: true,
+                    child: Text(
+                      l10n.inqStepWaitingNote,
+                      key: const ValueKey('inquiry-no-reply'),
+                      style: meta(),
+                    ),
+                  )
+                else
+                  for (final (i, r) in d.replies.indexed)
+                    _TimelineStep(
+                      dot: _Dot.ring,
+                      title: l10n.inqReplyArrived,
+                      meta: [
+                        if (r.createdAt case final t?) formatSeoulTime(t),
+                        l10n.inqReplyFrom,
+                      ].join(' · '),
+                      last:
+                          i == d.replies.length - 1 &&
+                          !d.closed &&
+                          !d.canRate &&
+                          d.satisfaction == null,
+                      child: Container(
+                        key: ValueKey('inquiry-reply-${r.replyId}'),
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: box(
+                          PmartBrand.lavenderMist,
+                          border: PmartBrand.lavender,
+                        ),
+                        child: Text(r.body),
+                      ),
+                    ),
+                // ● 만족도(답변 뒤 한 번) / 평가를 남겼어요
+                if (d.satisfaction case final sat?)
+                  _TimelineStep(
+                    dot: _Dot.filled,
+                    title: l10n.inqStepRated,
+                    last: !d.closed,
+                    child: Container(
+                      key: const ValueKey('inquiry-rated'),
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: box(scheme.surfaceContainer),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _RateFace(score: sat.score, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  rateLabel(l10n, sat.score),
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                if (sat.comment case final c?)
+                                  Text('"$c"', style: meta()),
+                              ],
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (d.canRate && !d.closed)
+                  _TimelineStep(
+                    dot: _Dot.filled,
+                    title: l10n.inqStepRate,
+                    last: true,
+                    child: _RateBox(inquiryId: inquiryId),
+                  ),
+                // ● 문의를 닫았어요(회색)
+                if (d.closed)
+                  _TimelineStep(
+                    dot: _Dot.grey,
+                    title: l10n.inqStepClosed,
+                    meta: d.closedAt == null
+                        ? null
+                        : formatSeoulDateTime(d.closedAt!),
+                    last: true,
+                    child: Text(
+                      l10n.inqClosedNote,
+                      key: const ValueKey('inquiry-closed-note'),
+                      style: meta(),
+                    ),
+                  ),
+                // 아래 작은 밑줄 [문의 닫기](· [새 문의 남기기] — 평가를 남겼으면).
+                if (!d.closed)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _CloseButton(inquiryId: inquiryId),
+                        if (d.satisfaction != null)
+                          _UnderlineLink(
+                            key: const ValueKey('inquiry-new-link'),
+                            label: l10n.inqNewInquiry,
+                            onTap: () => context.push('/support/inquiries/new'),
                           ),
                       ],
                     ),
                   ),
-              if (d.satisfaction case final s?)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    [
-                      l10n.inqRated(rateLabel(l10n, s.score)),
-                      ?s.comment,
-                    ].join(' · '),
-                    key: const ValueKey('inquiry-rated'),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// 작은 회색 밑줄 글자 버튼(초안 18 "문의 닫기 · 새 문의 남기기").
+class _UnderlineLink extends StatelessWidget {
+  const _UnderlineLink({super.key, required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        foregroundColor: theme.colorScheme.onSurfaceVariant,
+        textStyle: theme.textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          decoration: TextDecoration.underline,
+        ),
+      ),
+      child: Text(label),
+    );
+  }
+}
+
+/// 문의한 주문 칸(회색) — 대표 사진 · "이름 외 N개" · 주문번호 ›. 누르면 주문 상세.
+class _InquiryOrderCard extends ConsumerWidget {
+  const _InquiryOrderCard({required this.orderId});
+
+  final String orderId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final o = ref.watch(orderDetailProvider(orderId)).value;
+    final names = <String>[
+      for (final l in o?.lines ?? const <OrderLineView>[]) ?l.productName,
+    ];
+    final goods = switch (names) {
+      [] => l10n.inqOrderLink,
+      [final one] => one,
+      [final first, ...] => l10n.ordersRepresentative(first, names.length - 1),
+    };
+    final image = o?.lines.firstOrNull?.imageUrl;
+    return Material(
+      color: scheme.surfaceContainer,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        key: const ValueKey('inquiry-order'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => context.push('/orders/$orderId'),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              ProductImage(url: image, size: 40, radius: 8),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      goods,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium,
                     ),
-                  ),
-                )
-              else if (d.canRate)
-                _RateBox(inquiryId: inquiryId),
-              const SizedBox(height: 16),
-              Text(
-                d.closed ? l10n.inqClosedNote : l10n.inqDetailNote,
-                key: d.closed ? const ValueKey('inquiry-closed-note') : null,
-                style: theme.textTheme.bodySmall,
+                    if (o?.orderNumber case final n?)
+                      Text(
+                        l10n.inqOrderChosen(n),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              PmartLineIcon(
+                PmartLineIcons.chevronRight,
+                size: 16,
+                color: scheme.outline,
               ),
             ],
           ),
@@ -516,6 +901,142 @@ class InquiryDetailScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+enum _Dot { ring, dashed, filled, grey }
+
+/// 타임라인 한 칸: 왼쪽 점 + 아래로 이어지는 세로 선, 오른쪽 제목·시각 + 내용.
+class _TimelineStep extends StatelessWidget {
+  const _TimelineStep({
+    required this.dot,
+    required this.title,
+    required this.child,
+    this.meta,
+    this.last = false,
+  });
+
+  final _Dot dot;
+  final String title;
+  final String? meta;
+  final Widget child;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dotWidget = switch (dot) {
+      _Dot.ring => Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: scheme.surface,
+          border: Border.all(color: scheme.primary, width: 2),
+        ),
+      ),
+      _Dot.dashed => CustomPaint(
+        size: const Size.square(14),
+        painter: _DashedCirclePainter(scheme.outline),
+      ),
+      _Dot.filled => Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: scheme.primary,
+        ),
+      ),
+      _Dot.grey => Container(
+        width: 14,
+        height: 14,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: scheme.outline,
+        ),
+      ),
+    };
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 22,
+            child: Column(
+              children: [
+                const SizedBox(height: 3),
+                dotWidget,
+                if (!last)
+                  Expanded(
+                    child: Container(width: 1.5, color: scheme.outlineVariant),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: title,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        if (meta case final m?)
+                          TextSpan(
+                            text: '  $m',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
+                    ),
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  child,
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashedCirclePainter extends CustomPainter {
+  _DashedCirclePainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final r = size.width / 2 - 1;
+    const n = 10;
+    for (var i = 0; i < n; i++) {
+      final a = i * 2 * math.pi / n;
+      canvas.drawArc(
+        Rect.fromCircle(center: size.center(Offset.zero), radius: r),
+        a,
+        math.pi / n,
+        false,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedCirclePainter old) => old.color != color;
 }
 
 /// 붙은 사진 한 장(본인 토큰으로 받은 바이트). 실패는 "불러오지 못했어요" 칸.
@@ -648,16 +1169,17 @@ class _RateBoxState extends ConsumerState<_RateBox> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Container(
       key: const ValueKey('inquiry-rate'),
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        color: scheme.surface,
+        border: Border.all(color: scheme.outlineVariant),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
             l10n.inqRateTitle,
@@ -666,79 +1188,132 @@ class _RateBoxState extends ConsumerState<_RateBox> {
             ),
           ),
           const SizedBox(height: 2),
-          Text(l10n.inqRateSubtitle, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 10),
-          // 레퍼런스(고객센터 2-2-2 만족도 조사): 얼굴 + 문구 5줄. 위에서부터 5점 → 1점.
-          for (final s in const [5, 4, 3, 2, 1])
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Material(
-                color: _score == s
-                    ? theme.colorScheme.primaryContainer
-                    : theme.colorScheme.surface,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(
-                    color: _score == s
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.outlineVariant,
+          Text(
+            l10n.inqRateSubtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+          // 초안 18: 지금 앱 얼굴을 가로 한 줄(왼쪽 1 → 오른쪽 5). 고르기 전엔 모두 흐리게, 고르면 그 얼굴만 크게·선명 + 연보라.
+          Row(
+            children: [
+              for (final s in const [1, 2, 3, 4, 5])
+                Expanded(
+                  child: InkWell(
+                    key: ValueKey('inquiry-rate-$s'),
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: _busy ? null : () => setState(() => _score = s),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _score == s ? scheme.primaryContainer : null,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        children: [
+                          Opacity(
+                            opacity: _score == s ? 1 : 0.45,
+                            child: _RateFace(
+                              score: s,
+                              size: _score == s ? 32 : 24,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            rateShort(l10n, s),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: _score == s
+                                  ? scheme.primary
+                                  : scheme.onSurfaceVariant,
+                              fontWeight: _score == s
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                child: InkWell(
-                  key: ValueKey('inquiry-rate-$s'),
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: _busy ? null : () => setState(() => _score = s),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      children: [
-                        // 레퍼런스 2-2-2: 색 채운 동그라미 얼굴(16dp)
-                        Container(
-                          width: 18,
-                          height: 18,
-                          decoration: BoxDecoration(
-                            color: _rateColor(s),
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
-                          child: Icon(
-                            _rateIcon(s),
-                            size: 15,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(rateLabel(l10n, s)),
-                      ],
-                    ),
-                  ),
+            ],
+          ),
+          if (_score case final s?)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                rateLabel(l10n, s),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 10),
           TextField(
             key: const ValueKey('inquiry-rate-comment'),
             controller: _comment,
             enabled: !_busy,
             maxLength: inquiryCommentMax,
-            decoration: InputDecoration(labelText: l10n.inqRateComment),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton(
-              key: const ValueKey('inquiry-rate-send'),
-              onPressed: _busy || _score == null ? null : _send,
-              child: Text(l10n.inqRateSubmit),
+            // 초안 18: 회색 채운 한 줄 칸(테두리 없음).
+            decoration: InputDecoration(
+              hintText: l10n.inqRateComment,
+              counterText: '',
+              filled: true,
+              fillColor: scheme.surfaceContainer,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              isDense: true,
             ),
+          ),
+          const SizedBox(height: 10),
+          FilledButton(
+            key: const ValueKey('inquiry-rate-send'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+            ),
+            onPressed: _busy || _score == null ? null : _send,
+            child: Text(l10n.inqRateSubmit),
           ),
         ],
       ),
     );
   }
 }
+
+/// 만족도 얼굴(색 채운 동그라미 + 흰 얼굴) — 레퍼런스 2-2-2, 색은 사용자 "기존 이모지 사용"으로 팔레트 밖 그대로.
+class _RateFace extends StatelessWidget {
+  const _RateFace({required this.score, required this.size});
+
+  final int score;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: size,
+    height: size,
+    decoration: BoxDecoration(color: _rateColor(score), shape: BoxShape.circle),
+    alignment: Alignment.center,
+    child: Icon(_rateIcon(score), size: size * 0.84, color: Colors.white),
+  );
+}
+
+/// 얼굴 아래 짧은 말(초안 18): 매우 아쉬워요 / 아쉬워요 / 그럭저럭 / 도움 됐어요 / 많은 도움.
+String rateShort(AppLocalizations l10n, int score) => switch (score) {
+  5 => l10n.inqRateShort5,
+  4 => l10n.inqRateShort4,
+  3 => l10n.inqRateShort3,
+  2 => l10n.inqRateShort2,
+  _ => l10n.inqRateShort1,
+};
 
 /// 문의 닫기(확인 뒤). 닫힌 문의는 다시 열 수 없다.
 class _CloseButton extends ConsumerStatefulWidget {
@@ -801,10 +1376,11 @@ class _CloseButtonState extends ConsumerState<_CloseButton> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return TextButton(
+    // 초안 18: 앱바 대신 아래 작은 밑줄 글자(확인 대화는 그대로).
+    return _UnderlineLink(
       key: const ValueKey('inquiry-close'),
-      onPressed: _busy ? null : _close,
-      child: Text(l10n.inqClose),
+      label: l10n.inqClose,
+      onTap: _busy ? null : _close,
     );
   }
 }

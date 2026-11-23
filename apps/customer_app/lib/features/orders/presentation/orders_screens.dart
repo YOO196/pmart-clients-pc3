@@ -1712,11 +1712,14 @@ class _ClaimsSection extends ConsumerWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // 배달 정보 칸과 같은 글자·간격(이름 16 → 6 → 값 15 회색, 사용자 2026-11-23).
                           Text(
                             claimTypeText(l10n, c.type),
-                            style: theme.textTheme.bodyLarge,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontSize: 16,
+                            ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Text(
                             [
                               claimStateText(l10n, c.state, type: c.type),
@@ -1724,6 +1727,8 @@ class _ClaimsSection extends ConsumerWidget {
                                 l10n.claimOpenedAt(formatSeoulDateTime(t)),
                             ].join(' · '),
                             style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 15,
+                              height: 1.45,
                               color: scheme.onSurfaceVariant,
                             ),
                           ),
@@ -1946,6 +1951,7 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
                 ),
               _LineTile(
                 line: l,
+                first: i == 0,
                 // 레퍼런스 9-1 3-3: 줄마다 동그란 ⊕(글자 "담기" 아님)
                 // 레퍼런스 9-1 3-3: 원 72px ≈ 24dp
                 action: reorderCircle(
@@ -2026,7 +2032,10 @@ class _OrderLinesSectionState extends ConsumerState<_OrderLinesSection> {
 /// 주문 상품 한 줄(레퍼런스 9-1 3-3): 사진 · 이름 / 옵션 / **금액** 수량 · 오른쪽 ⊕.
 /// 사진은 주문 행에 없어 지금 상품의 대표 사진을 쓴다(상품 조회 — 못 읽으면 자리 그림).
 class _LineTile extends ConsumerWidget {
-  const _LineTile({required this.line, this.action});
+  const _LineTile({required this.line, this.action, this.first = false});
+
+  /// 카드의 첫 줄 — 위 여백을 다른 카드(결제·배달 정보)와 같게 줄인다(사용자 2026-11-23 "카드 안 간격 같게").
+  final bool first;
 
   final OrderLineView line;
   final Widget? action;
@@ -2054,7 +2063,7 @@ class _LineTile extends ConsumerWidget {
     return Padding(
       key: ValueKey('line-${l.orderLineId}'),
       // 레퍼런스 9-1 3-3: 줄 사이를 넉넉히(위아래 약 18dp) — 전에는 10dp 라 다닥다닥 붙어 보였다(사용자 2026-11-20).
-      padding: const EdgeInsets.symmetric(vertical: 18),
+      padding: EdgeInsets.only(top: first ? 6 : 18, bottom: 18),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

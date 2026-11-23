@@ -139,7 +139,16 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('inquiry-rate')), findsNothing);
-    expect(find.text('남긴 평가: 도움이 되었어요 · 빨리 답해 주셨어요'), findsOneWidget);
+    // 초안 18 ③: "평가를 남겼어요" 점 + 고른 얼굴 문구 + 남긴 의견.
+    expect(find.text('평가를 남겼어요'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('inquiry-rated')),
+        matching: find.text('도움이 되었어요'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('"빨리 답해 주셨어요"'), findsOneWidget);
     expect(repo.rateKeys.length, 1);
   });
 

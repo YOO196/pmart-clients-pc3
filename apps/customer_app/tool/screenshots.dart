@@ -1880,6 +1880,65 @@ void main() {
     await shot('feedback');
   });
 
+  // 초안 18 내 문의 내역: 목록 B 카드형 · 상세 타임라인(① 답변 전 · ② 답변 옴 만족도 · ③ 평가 남김 · ④ 종료).
+  testWidgets('inquiry-18', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp([
+        inquiriesRepositoryProvider.overrideWithValue(
+          MockInquiriesRepository(latency: Duration.zero),
+        ),
+      ]),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String n) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/q18-$n.png').uri),
+      );
+    }
+
+    GoRouter router() => GoRouter.of(t.element(find.byType(Scaffold).first));
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    unawaited(router().push('/support/inquiries'));
+    await shot('list');
+    await t.tap(find.byKey(const ValueKey('inquiry-inq-seed-2')));
+    await shot('1-waiting');
+    router().pop();
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('inquiry-inq-seed-1')));
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const ValueKey('inquiry-rate-4')));
+    await t.tap(find.byKey(const ValueKey('inquiry-rate-4')));
+    await shot('2-rate');
+    await t.enterText(
+      find.byKey(const ValueKey('inquiry-rate-comment')),
+      '빠르게 확인해 주셔서 감사해요',
+    );
+    FocusManager.instance.primaryFocus?.unfocus();
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const ValueKey('inquiry-rate-send')));
+    await t.tap(find.byKey(const ValueKey('inquiry-rate-send')));
+    await t.pump(const Duration(seconds: 5));
+    await shot('3-rated');
+    await t.tap(find.byKey(const ValueKey('inquiry-close')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('inquiry-close-confirm')));
+    await t.pump(const Duration(seconds: 5));
+    await shot('4-closed');
+  });
+
   // BR-90 리뷰 신고하기: 카드 날짜 옆 "| 신고하기"(레퍼런스 상품리뷰 전문) · 사유 시트.
   testWidgets('review-report', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
@@ -2077,6 +2136,12 @@ void main() {
     );
     await t.drag(find.byType(Scrollable).last, const Offset(0, -200));
     await shot('order-detail');
+    // 주문 상세 전체(카드 안 간격 비교용) — 긴 화면 한 장.
+    t.view.physicalSize = const Size(1080, 7200);
+    await t.pumpAndSettle();
+    await t.drag(find.byType(Scrollable).last, const Offset(0, 3000));
+    await t.pumpAndSettle();
+    await shot('order-detail-full');
     debugDisableShadows = true;
   });
   // 장바구니 최소주문 막힘·봉투값 줄(사용자 2026-11-21, 레퍼런스 5-1) — 목 장바구니 7,940원(최소 15,000).
