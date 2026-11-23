@@ -18,6 +18,9 @@ export const searchMessages = {
   headerGo: '통합 찾기로 관제에서 열기',
   headerOpen: '통합 찾기 열기',
   placeholder: '주문·배송 번호(D74939255) · 라이더 번호(R4785) · 라이더 ID',
+  // 머리줄 찾기 칸은 좁아 긴 안내가 잘렸다(2026-11-23 사용자 "상단바 검색창에 이렇게 뜨는 거 바꿔") — 짧게, 자세한 형식은 마우스를 올리면
+  headerPlaceholder: '주문·배송·라이더 번호로 찾기',
+  headerTitle: '주문번호 8자리 · 배송 번호 D74939255 · 라이더 번호 R4785 · 라이더 ID',
   go: '찾기',
   notFound: (no: string) => `주문번호 ${no} 로 배정된 배송이 없어요(배정 전 배송은 번호로 찾을 수 없어요).`,
   riderNotFound: (no: string) => `라이더 번호 ${no} 인 라이더가 없어요.`,
@@ -105,7 +108,7 @@ export function ControlSearch({ onFound, compact = false }: { readonly onFound: 
       <form className={`${open ? 'absolute inset-x-2 top-full z-30 mt-1' : 'hidden'} sm:relative sm:inset-auto sm:mt-0 sm:block sm:w-full`} onSubmit={(e) => void submit(e)} role="search" aria-label={s.headerLabel}>
         <label className="input input-sm flex w-full items-center gap-2 bg-base-200/70">
           <Icon name="search" className="h-4 w-4 opacity-50" />
-          <input className="grow" value={text} placeholder={s.placeholder} aria-label={s.headerLabel} maxLength={64} onChange={(e) => setText(e.target.value)} />
+          <input className="grow" value={text} placeholder={s.headerPlaceholder} title={s.headerTitle} aria-label={s.headerLabel} maxLength={64} onChange={(e) => setText(e.target.value)} />
           <button type="submit" className="btn btn-primary btn-xs" aria-label={s.headerGo} disabled={busy || !text.trim()}>
             {s.go}
           </button>

@@ -63,6 +63,9 @@ export const statsMessages = {
   efficiency: '배송 효율',
   dispatch: '배차 효율',
   daily: '날짜별',
+  dailyChart: (n: number) => `날짜별 배송 ${n}일 — 완료·실패`,
+  legendDone: '완료',
+  legendFailed: '실패',
   byMfc: '센터별 비교',
   byRider: '라이더별 성과',
   incidents: '사고(도움요청) 통계',
@@ -294,6 +297,7 @@ export function StatsPage() {
           ) : (
             <>
               <Section title={s.daily} testId="stats-daily">
+                <DailyChart days={daily} />
                 <DataTable testId="stats-daily-table">
                   <thead>
                     <tr>
@@ -319,7 +323,7 @@ export function StatsPage() {
                           <td>{x.assigned}</td>
                           <td>{x.completed}</td>
                           <td>{x.failed}</td>
-                          <td>{pct(x.late, x.judged)}</td>
+                          <td><RateCell num={x.late} den={x.judged} kind="late" /></td>
                           <td>{dur(x.delivery)}</td>
                         </tr>
                       );
@@ -350,8 +354,8 @@ export function StatsPage() {
                           <td>{centerName(mfc)}</td>
                           <td>{x.assigned}</td>
                           <td>{x.riders}</td>
-                          <td>{pct(x.completed, x.completed + x.failed)}</td>
-                          <td>{pct(x.late, x.judged)}</td>
+                          <td><RateCell num={x.completed} den={x.completed + x.failed} kind="done" /></td>
+                          <td><RateCell num={x.late} den={x.judged} kind="late" /></td>
                           <td>{dur(x.pickupWait)}</td>
                           <td>{dur(x.delivery)}</td>
                           <td>{dur(wavg(dd, (r) => r.avgAssignSeconds, (r) => r.assigned))}</td>
@@ -388,8 +392,8 @@ export function StatsPage() {
                           <td>{x.assigned}</td>
                           <td>{x.completed}</td>
                           <td>{x.failed}</td>
-                          <td>{pct(x.completed, x.completed + x.failed)}</td>
-                          <td>{pct(x.late, x.judged)}</td>
+                          <td><RateCell num={x.completed} den={x.completed + x.failed} kind="done" /></td>
+                          <td><RateCell num={x.late} den={x.judged} kind="late" /></td>
                           <td>{dur(x.delivery)}</td>
                         </tr>
                       );
@@ -429,5 +433,61 @@ export function StatsPage() {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * 비율 칸(2026-11-23 사용자 "운영통계 탭 눈에 안 들어온다") — 숫자 옆 작은 막대. 완료율은 초록, 지연율은 주황.
+ * 분모가 0 이면 "—"(0% 로 보이지 않는다). 좋고 나쁨의 기준선은 정책에 없어 색 세기를 바꾸지 않는다.
+ */
+function RateCell({ num, den, kind }: { readonly num: number; readonly den: number; readonly kind: 'done' | 'late' }) {
+  if (den <= 0) return <span className="text-base-content/40">—</span>;
+  const w = Math.min(100, Math.round((num / den) * 100));
+  return (
+    <span className="inline-flex min-w-28 items-center gap-2" data-testid={`rate-${kind}`}>
+      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-base-200" aria-hidden="true">
+        <span className={`block h-full rounded-full ${kind === 'done' ? 'bg-success' : 'bg-warning'}`} style={{ width: `${w}%` }} />
+      </span>
+      <span className="tabular-nums">{pct(num, den)}</span>
+    </span>
+  );
+}
+
+/** 날짜별 완료·실패 막대(왼쪽이 오래된 날). 높이는 그 기간에서 가장 많은 날 기준. 날이 많으면 날짜 글자는 5일마다. */
+function DailyChart({ days }: { readonly days: ReadonlyArray<readonly [string, readonly ExecRow[]]> }) {
+  const pts = [...days].reverse().map(([d, rs]) => {
+    const x = agg(rs);
+    return { d, done: x.completed, failed: x.failed };
+  });
+  const max = Math.max(1, ...pts.map((p) => p.done + p.failed));
+  const sparse = pts.length > 10;
+  return (
+    <div className="mb-4" data-testid="stats-daily-chart">
+      <div className="mb-2 flex items-center gap-3 text-xs text-base-content/70">
+        <span className="inline-flex items-center gap-1">
+          <i className="inline-block h-2.5 w-2.5 rounded-sm bg-success" aria-hidden="true" />
+          {s.legendDone}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <i className="inline-block h-2.5 w-2.5 rounded-sm bg-error" aria-hidden="true" />
+          {s.legendFailed}
+        </span>
+      </div>
+      <div className="flex h-36 items-end gap-1.5" role="img" aria-label={`${s.dailyChart(pts.length)}: ${pts.map((p) => `${p.d} 완료 ${p.done} 실패 ${p.failed}`).join(', ')}`}>
+        {pts.map((p, i) => {
+          const sum = p.done + p.failed;
+          return (
+            <div key={p.d} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
+              <span className="text-xs font-semibold tabular-nums">{sum}</span>
+              <div className="flex w-full max-w-10 flex-col overflow-hidden rounded-t" style={{ height: `${(sum / max) * 100}%`, minHeight: sum > 0 ? 3 : 0 }}>
+                <div className="bg-error/85" style={{ flexGrow: p.failed }} />
+                <div className="bg-success/85" style={{ flexGrow: p.done }} />
+              </div>
+              <span className="h-4 text-[11px] text-base-content/60">{!sparse || i % 5 === 0 || i === pts.length - 1 ? p.d.slice(5) : ''}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

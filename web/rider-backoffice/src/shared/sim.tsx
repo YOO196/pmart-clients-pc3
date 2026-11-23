@@ -29,16 +29,17 @@ export function SimulatorLink() {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="btn btn-ghost btn-xs gap-1"
+      className="btn btn-ghost btn-xs gap-1 font-bold"
       title={
         env.isMock
-          ? '시뮬레이션 웹(MOCK — 이 화면의 목 데이터와는 따로)을 새 탭으로'
-          : '시뮬레이션 웹(실서버 모드)을 새 탭으로 — 시뮬 라이더 운행이 이 화면 관제에 그대로 보여요. PC 5 시뮬레이터가 켜져 있어야 열려요(다른 PC 에서는 보기만).'
+          ? '관제시스템(시뮬레이션 웹, MOCK — 이 화면의 목 데이터와는 따로)을 새 탭으로'
+          : '관제시스템(시뮬레이션 웹, 실서버 모드)을 새 탭으로 — 시뮬 라이더 운행이 이 화면 관제에 그대로 보여요. PC 5 시뮬레이터가 켜져 있어야 열려요(다른 PC 에서는 보기만).'
       }
       data-testid="simulator-link"
     >
-      <span className="hidden sm:inline">시뮬레이터</span> <span aria-hidden>↗</span>
-      <span className="sr-only sm:hidden">시뮬레이터</span>
+      {/* 2026-11-23 사용자 "시뮬레이터가 아니라 관제시스템이라고, 폰트 두껍게" — 좁은 화면은 화살표만(f1081178) */}
+      <span className="hidden sm:inline">관제시스템</span> <span aria-hidden>↗</span>
+      <span className="sr-only sm:hidden">관제시스템</span>
     </a>
   );
 }

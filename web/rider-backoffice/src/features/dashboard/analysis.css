@@ -5,13 +5,13 @@
   --an-t1: 18px;
   --an-t2: 14px;
   --an-t3: 13px;
-  /* 2026-11-23 사용자 "그래프 나눠 놓은 색깔이 좀 칙칙해" — 겨자색·진한 청록·탁한 회색을 맑은 색으로.
-     막대 안 흰 숫자가 읽히게 흰 글자 대비 3:1 안팎(굵은 글자)을 지키고, 실패 빨강(--an-failed)과 겹치지 않게 4는 장밋빛. */
-  --an-c1: #0891b2;
-  --an-c2: #3b6ef6;
-  --an-c3: #d97706;
-  --an-c4: #e11d74;
-  --an-c5: #7c8db0;
+  /* 2026-11-23 사용자 "그래프 나눠 놓은 색깔이 좀 칙칙해"(두 번째 — 진한 색에 흰 숫자도 여전히 칙칙) — 밝고 맑은 색에 짙은 숫자로 바꾼다
+     (아래 :root:not(dark) 흰 글자 덮기는 상태 알약에만). 실패 빨강(--an-failed)과 겹치지 않게 4는 분홍. */
+  --an-c1: #22c7dd;
+  --an-c2: #5b9bff;
+  --an-c3: #fbbf24;
+  --an-c4: #fb7aa6;
+  --an-c5: #b4c0d3;
   --an-done: var(--color-success);
   --an-active: var(--color-info);
   --an-failed: var(--color-error);
@@ -842,9 +842,13 @@
 .an-steps .l {
   font-weight: 600;
 }
-/* 화이트 화면은 단계 색이 진해 숫자를 흰 글자로(어두운 화면은 밝은 색 위 짙은 글자) */
-:root:not([data-theme='pmart-dark']) :is(.an-journey-bar i, .an-journey-legs .n, .an-pill) {
+/* 상태 알약은 화이트 화면에서 흰 글자. 구간 막대·번호는 2026-11-23 부터 밝은 색 위 짙은 글자(위 .an-journey-bar i 기본값) */
+:root:not([data-theme='pmart-dark']) .an-pill {
   color: #ffffff;
+}
+/* 밝은 분홍(--an-c4)은 흰 바탕 글자로는 옅어 "늦음" 표시 글자만 짙게 */
+:root:not([data-theme='pmart-dark']) .an-tag:not(.ok, .mute) {
+  color: #be185d;
 }
 
 /* 펼친 흐름 | 주문 내역 두 칸(시뮬레이터와 같게) */
