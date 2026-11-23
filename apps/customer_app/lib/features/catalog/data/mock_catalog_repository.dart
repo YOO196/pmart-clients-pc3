@@ -820,6 +820,13 @@ base class MockCatalogRepository implements CatalogRepository {
     );
   }
 
+  /// 목 상품에는 사진이 없어 대표 사진도 없다(서버도 상품 사진이 없는 카테고리는 빼고 준다) — 앱 그림으로.
+  @override
+  Future<Map<String, String>> categoryImages({String? mfcId}) async {
+    await _wait();
+    return const {};
+  }
+
   static const _parents = {
     'C-FRUIT': 'C-FV',
     'C-VEG': 'C-FV',

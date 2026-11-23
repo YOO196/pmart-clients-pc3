@@ -125,6 +125,16 @@ final class _SecondPageDown extends MockCatalogRepository {
   }
 }
 
+/// 카테고리 대표 사진(BR-89)을 '과일'에만 주는 서버.
+final class _FruitPhoto extends MockCatalogRepository {
+  _FruitPhoto() : super(latency: Duration.zero);
+
+  @override
+  Future<Map<String, String>> categoryImages({String? mfcId}) async => const {
+    'C-FRUIT': 'https://img.test/fruit.jpg',
+  };
+}
+
 /// 서버가 비슷한 상품(BR-87)을 주지 않는 경우.
 final class _NoSimilar extends MockCatalogRepository {
   _NoSimilar() : super(latency: Duration.zero);
@@ -447,6 +457,20 @@ void main() {
       await t.tap(find.byKey(const ValueKey('category-pill-all')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('category-pills')), findsNothing);
+    });
+
+    testWidgets('하위 동그라미: 서버 대표 사진이 있으면 사진, 없으면 앱 그림(BR-89)', (t) async {
+      await t.pumpWidget(testApp(const [], catalog: _FruitPhoto()));
+      await t.pumpAndSettle();
+      await t.tap(find.text('카테고리').last);
+      await t.pumpAndSettle();
+      await t.tap(find.text('과일·채소·샐러드'));
+      await t.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('category-photo-C-FRUIT')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('category-photo-C-VEG')), findsNothing);
     });
 
     testWidgets('초안 15 B: 하위 id 로 들어오면 그 상위 탭 + 그 하위가 골라진 상태', (t) async {

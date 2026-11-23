@@ -11,6 +11,8 @@ import 'home_screen.dart' show BannerPager, openHomeBanner;
 import 'product_list_view.dart';
 import 'widgets/category_art.dart';
 import 'widgets/product_tile_card.dart';
+import '../../../shared/providers.dart'
+    show imageOriginProvider, resolveImageUrl, withImageWidth;
 
 /// 카테고리 화면을 연다 — 아래 탭 막대를 둔 채, 들어온 탭 안에서(사용자 2026-11-23 "1,2 하고"):
 /// 홈 탭이면 `/category`, 카테고리 탭이면 `/categories/list`, 그 밖(전체 화면 위 등)은 `/products`(전체 화면).
@@ -368,7 +370,7 @@ class _ChildCircles extends StatelessWidget {
                 item(
                   key: ValueKey('category-child-${c.categoryId}'),
                   on: selected == c.categoryId,
-                  art: CategoryArt(name: c.name, size: 56),
+                  art: _CategoryPhoto(node: c, size: 56),
                   label: c.name,
                   onTap: () => onPick(c.categoryId),
                 ),
@@ -473,7 +475,7 @@ class _ChildPills extends StatelessWidget {
             pill(
               key: ValueKey('category-pill-${c.categoryId}'),
               on: selected == c.categoryId,
-              lead: CategoryArt(name: c.name, size: 24, radius: 12),
+              lead: _CategoryPhoto(node: c, size: 24),
               label: c.name,
               onTap: () => onPick(c.categoryId),
             ),
@@ -587,6 +589,44 @@ class _CategorySaleRow extends ConsumerWidget {
         ),
         Container(height: 8, color: scheme.surfaceContainer),
       ],
+    );
+  }
+}
+
+/// 하위 카테고리 동그라미 그림: 서버 대표 사진(BR-89 — 그 카테고리 인기 1위 상품, 회색 동그라미 안 contain)이
+/// 있으면 그것, 없거나 읽는 중·실패면 앱 그림(이름 키워드).
+class _CategoryPhoto extends ConsumerWidget {
+  const _CategoryPhoto({required this.node, required this.size});
+
+  final CategoryNode node;
+  final double size;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final art = CategoryArt(name: node.name, size: size, radius: size / 2);
+    final path = ref.watch(categoryImagesProvider).value?[node.categoryId];
+    final px = size * MediaQuery.devicePixelRatioOf(context);
+    final url = resolveImageUrl(
+      withImageWidth(path, px),
+      ref.watch(imageOriginProvider),
+    );
+    if (url == null) return art;
+    return Container(
+      key: ValueKey('category-photo-${node.categoryId}'),
+      width: size,
+      height: size,
+      clipBehavior: Clip.antiAlias,
+      padding: EdgeInsets.all(size * 0.1),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Theme.of(context).colorScheme.surfaceContainer,
+      ),
+      child: Image.network(
+        url,
+        fit: BoxFit.contain,
+        cacheWidth: px.round(),
+        errorBuilder: (_, _, _) => art,
+      ),
     );
   }
 }

@@ -29,6 +29,10 @@ abstract interface class CatalogRepository {
 
   Future<List<CategoryNode>> categories();
 
+  /// 카테고리 대표 사진(search 0.13.0 `GET /search/category-images`, BR-89, 로그인 없이) — categoryId → 사진 경로.
+  /// 상품이 없는 카테고리는 빠진다(앱 그림으로). 실패는 [PmartFailure].
+  Future<Map<String, String>> categoryImages({String? mfcId});
+
   Future<ProductPage> search(
     ProductQuery query, {
     String? mfcId,
@@ -117,6 +121,17 @@ final class ApiCatalogRepository implements CatalogRepository {
   Future<List<CategoryNode>> categories() async {
     final res = await pmartGuard(() => _categories.getCategoryTree());
     return categoriesFromContract(_body(res.data, 'CategoryTree'));
+  }
+
+  @override
+  Future<Map<String, String>> categoryImages({String? mfcId}) async {
+    final res = await pmartGuard(() => _search.getCategoryImages(mfcId: mfcId));
+    return {
+      for (final i
+          in res.data?.items ??
+              const <sr.GetCategoryImages200ResponseItemsInner>[])
+        if (i.imageUrl.trim().isNotEmpty) i.categoryId: i.imageUrl,
+    };
   }
 
   /// 검색·카테고리 한 묶음 크기. 서버 기본 50 대신 첫 화면 두세 쪽 분량(백엔드 요청 2026-11-19 search-page-size).

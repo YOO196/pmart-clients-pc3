@@ -1696,8 +1696,6 @@
   "supportTitle": "고객센터",
   "homeCartOrderable": "주문 가능",
   "homeDeliveryGuide": "배달안내",
-  "homeTopDeliverableEta": "배송 가능 · {eta} 도착",
-  "@homeTopDeliverableEta": { "placeholders": { "eta": { "type": "String" } } },
   "homeTopDeliverable": "배송 가능",
   "homeTopScheduledOnly": "예약배달 가능",
   "homeTopUndeliverable": "지금은 배송할 수 없어요",

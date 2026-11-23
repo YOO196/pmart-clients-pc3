@@ -3,6 +3,7 @@
 import 'package:customer_app/features/address/data/guest_address_store.dart';
 import 'package:customer_app/features/address/data/mock_address_repository.dart';
 import 'package:customer_app/features/address/domain/address.dart';
+import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_core/pmart_core.dart' show MemoryKeyValueStore;
@@ -26,6 +27,10 @@ final class _OneAddress extends MockAddressRepository {
       roadAddress: '제주 제주시 연동 312-1',
       detailAddress: '201호',
       serviceability: state,
+      // 배송되는 주소만 센터가 정해진다(상태 줄은 그 센터의 배송 방식을 읽는다).
+      mfcId: state == Serviceability.serviceable
+          ? MockCatalogRepository.mfcId
+          : null,
     ),
   ).$2;
 }
@@ -48,6 +53,15 @@ void main() {
     await t.pumpAndSettle();
     return repo;
   }
+
+  testWidgets(
+    '배송되는 주소면 상태 줄은 도착 시간 없이 "배송 가능"(사용자 2026-11-23 "30분 도착은 안넣을거야")',
+    (t) async {
+      await openHome(t, Serviceability.serviceable);
+      expect(find.text('배송 가능'), findsOneWidget);
+      expect(find.textContaining('분 도착'), findsNothing);
+    },
+  );
 
   testWidgets('권역 밖이면 주소 위 회색 불가 줄과 홈 맨 위 회색 띠', (t) async {
     await openHome(t, Serviceability.outOfArea);

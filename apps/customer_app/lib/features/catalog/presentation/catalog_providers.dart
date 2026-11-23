@@ -141,6 +141,13 @@ final categoryBannersProvider = FutureProvider.autoDispose<List<HomeBanner>>(
   (ref) => ref.watch(catalogRepositoryProvider).banners(placement: 'CATEGORY'),
 );
 
+/// 카테고리 대표 사진(BR-89). 센터가 바뀌면 다시 읽는다. 실패·읽는 중이면 앱 그림(꾸밈 — 안내 없음).
+final categoryImagesProvider = FutureProvider.autoDispose<Map<String, String>>(
+  (ref) => ref
+      .watch(catalogRepositoryProvider)
+      .categoryImages(mfcId: ref.watch(currentMfcIdProvider)),
+);
+
 final categoriesProvider = FutureProvider<List<CategoryNode>>(
   (ref) => ref.watch(catalogRepositoryProvider).categories(),
 );

@@ -2031,7 +2031,7 @@ class _AddressChip extends ConsumerWidget {
 }
 
 /// 주소 위 작은 배송 상태 줄(D안 "● 배송 가능 · 약 30분 도착"). 서버 배송 방식(`GET /delivery-options`) 값만 쓴다:
-/// 바로 받는 방식(단독·묶음)이 가능하면 "배송 가능 · 예상 시간", 예약만 가능하면 "예약배달 가능",
+/// 바로 받는 방식(단독·묶음)이 가능하면 "배송 가능"(도착 시간은 넣지 않음 — 사용자 2026-11-23), 예약만 가능하면 "예약배달 가능",
 /// 서버가 모두 불가라고 하면 "지금은 배송할 수 없어요"(회색). 불러오는 중·실패·주소 없음·미설정(CONFIG_REQUIRED)·
 /// 모름(UNKNOWN)은 줄을 그리지 않는다 — 실패를 "불가"로 보이지 않는다(실패 안내는 아래 배송 안내 칸이 한다).
 class _DeliveryStatusLine extends ConsumerWidget {
@@ -2061,21 +2061,12 @@ class _DeliveryStatusLine extends ConsumerWidget {
     }
     final options = ref.watch(homeDeliveryOptionsProvider).value;
     if (options == null || options.isEmpty) return const SizedBox.shrink();
-    String? etaOf(DeliveryOption o) => switch (o.eta) {
-      final e? when !e.notSet => switch ((e.minMinutes, e.maxMinutes)) {
-        (final int a, final int b) => l10n.optionEta(a, b),
-        _ => null,
-      },
-      _ => null,
-    };
     final now = options
         .where((o) => o.available && o.mode != DeliveryMode.scheduled)
         .toList();
     final (String text, bool ok) = switch (now) {
-      [final o, ...] => switch (etaOf(o)) {
-        final eta? => (l10n.homeTopDeliverableEta(eta), true),
-        null => (l10n.homeTopDeliverable, true),
-      },
+      // 도착 시간은 넣지 않는다(사용자 2026-11-23 "30분 도착은 안넣을거야") — 즉시 배송이 되면 늘 "배송 가능".
+      [_, ...] => (l10n.homeTopDeliverable, true),
       []
           when options.any(
             (o) => o.available && o.mode == DeliveryMode.scheduled,
