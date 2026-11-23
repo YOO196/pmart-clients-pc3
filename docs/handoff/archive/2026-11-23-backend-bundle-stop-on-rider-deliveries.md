@@ -26,3 +26,6 @@
   - `stopSequence`: 묶음 안 고객 방문 순서(1부터), 묶음 아니면 null
 - 값은 배정 때 dispatch Assignment 의 값 그대로면 된다.
 - 넣어 주시면 앱은 그 값을 먼저 쓰고, 없을 때만 수락 때 받아 둔 값을 쓴다.
+
+## 끝남 (2026-11-24)
+- 백엔드 #388 execution 0.40.0 `bundleId`·`stopSequence` 로 반영, pc5 LAN 배포. 앱은 클라이언트 #450 으로 그 값을 먼저 쓴다.
