@@ -515,16 +515,30 @@ void main() {
       );
     });
 
-    testWidgets('최근 주문이 없으면 안내하고 일반 문의로 이어 간다', (t) async {
+    testWidgets('최근 주문이 없으면 "최근 2일 내 주문이 확인되지 않습니다…" 뒤 바로 묻는다(레퍼런스 2-4-1)', (
+      t,
+    ) async {
       final repo = mock()..noRecentOrders = true;
       await open(t, repo, general: false);
       await t.tap(find.byKey(const ValueKey('chat-topic-order')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('chat-recent-empty')), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('chat-topic-general-instead')));
-      await t.pumpAndSettle();
+      expect(
+        find.text('최근 2일 내 주문이 확인되지 않습니다. 어떤 문의 사항이 있으신가요?'),
+        findsOneWidget,
+      );
+      // 다른 버튼 없이 바로 입력 — 주문 없이 보낸다.
       await ask(t, '포인트는요?');
       expect(repo.sentOrderIds, [null]);
+    });
+
+    testWidgets('2일보다 오래된 주문만 있으면 고를 주문으로 보이지 않고 같은 안내', (t) async {
+      final repo = mock()..onlyOldOrders = true;
+      await open(t, repo, general: false);
+      await t.tap(find.byKey(const ValueKey('chat-topic-order')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('chat-recent-order-old')), findsNothing);
+      expect(find.byKey(const ValueKey('chat-recent-empty')), findsOneWidget);
     });
 
     testWidgets('응답 유실: "다시 확인"으로 같은 질문의 답을 받는다', (t) async {

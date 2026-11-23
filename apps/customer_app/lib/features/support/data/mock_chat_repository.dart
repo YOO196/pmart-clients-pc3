@@ -51,11 +51,12 @@ final class MockChatRepository implements ChatRepository {
     return MockChatScenario.answered;
   }
 
-  static final _orders = [
+  // 주문 시각은 지금 기준(채팅의 "최근 2일" 조건에 들도록 — 사용자 2026-11-23).
+  static List<ChatOrder> get _orders => [
     ChatOrder(
       orderId: 'order-seed-4',
       statusLabel: '상품 준비 중',
-      orderedAt: DateTime.utc(2026, 11, 15, 4, 10),
+      orderedAt: DateTime.now().toUtc().subtract(const Duration(hours: 2)),
       itemCount: 3,
       totalAmount: 18900,
       arrivalDate: '2026-11-15',
@@ -65,7 +66,7 @@ final class MockChatRepository implements ChatRepository {
     ChatOrder(
       orderId: 'order-seed-1',
       statusLabel: '배송 완료',
-      orderedAt: DateTime.utc(2026, 11, 14, 9, 30),
+      orderedAt: DateTime.now().toUtc().subtract(const Duration(hours: 30)),
       itemCount: 2,
       totalAmount: 9800,
     ),
@@ -94,6 +95,9 @@ final class MockChatRepository implements ChatRepository {
   /// 시험용: 최근 주문이 없는 고객.
   bool noRecentOrders = false;
 
+  /// 시험용: 주문은 있지만 모두 2일보다 오래된 고객.
+  bool onlyOldOrders = false;
+
   @override
   Future<List<ChatOrder>> recentOrders({int size = 5}) async {
     await _wait();
@@ -102,6 +106,15 @@ final class MockChatRepository implements ChatRepository {
       throw const ProblemFailure(
         Problem(status: 503, code: 'DEPENDENCY_UNAVAILABLE'),
       );
+    }
+    if (onlyOldOrders) {
+      return [
+        ChatOrder(
+          orderId: 'order-old',
+          statusLabel: '배송 완료',
+          orderedAt: DateTime.now().toUtc().subtract(const Duration(days: 3)),
+        ),
+      ];
     }
     return noRecentOrders ? const [] : _orders.take(size).toList();
   }

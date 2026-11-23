@@ -75,7 +75,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final topic = ref.watch(chatTopicProvider);
     final log = ref.watch(chatTopicLogProvider);
     // 종류를 고르기 전(또는 주문을 고르는 중)에는 입력을 막는다.
-    final canType = topic is ChatTopicGeneral || topic is ChatTopicOrder;
+    final canType =
+        topic is ChatTopicGeneral ||
+        topic is ChatTopicOrder ||
+        topic is ChatTopicNoRecentOrder;
     ref.listen(chatProvider, (_, _) => _toEnd());
     ref.listen(chatTopicProvider, (_, _) => _toEnd());
     return Scaffold(
@@ -465,6 +468,21 @@ class _TopicSection extends ConsumerWidget {
           const _RecentOrderPicker(),
         ],
       ),
+      // 레퍼런스 2-4-1: 최근 2일 주문이 없으면 안내 한 줄 뒤 바로 입력(일반 질문으로 보낸다).
+      ChatTopicNoRecentOrder() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          mine(l10n.chatTopicOrder, const ValueKey('chat-topic-order-chosen')),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _Bubble(
+              key: const ValueKey('chat-recent-empty'),
+              color: scheme.surfaceContainer,
+              child: Text(l10n.chatNoRecentOrdersAsk),
+            ),
+          ),
+        ],
+      ),
       ChatTopicOrder(:final order) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -545,24 +563,13 @@ class _RecentOrderPicker extends ConsumerWidget {
       ),
     );
     return switch (orders) {
-      AsyncData(:final value) when value.isEmpty => Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: _Bubble(
-              key: const ValueKey('chat-recent-empty'),
-              color: theme.colorScheme.surfaceContainer,
-              child: Text(l10n.chatNoRecentOrders),
-            ),
-          ),
-          _ChoiceButton(
-            key: const ValueKey('chat-topic-general-instead'),
-            label: l10n.chatAskGeneralInstead,
-            onTap: notifier.chooseGeneral,
-          ),
-        ],
-      ),
+      // 2일 안의 주문이 없으면 안내로 넘어간다(그린 뒤 — 그리는 중엔 상태를 바꾸지 않는다).
+      AsyncData(:final value) when value.isEmpty => () {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          notifier.noRecentOrder();
+        });
+        return const SizedBox.shrink();
+      }(),
       AsyncData(:final value) => Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [

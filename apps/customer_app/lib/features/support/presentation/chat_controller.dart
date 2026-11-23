@@ -126,6 +126,11 @@ class ChatTopicController extends Notifier<ChatTopic?> {
 
   void pickOrder(ChatOrder order) => _settle(ChatTopicOrder(order));
 
+  /// 최근 2일 안의 주문이 없다 — 주문을 고르는 중일 때만 넘어간다.
+  void noRecentOrder() {
+    if (state is ChatTopicPickingOrder) _settle(const ChatTopicNoRecentOrder());
+  }
+
   void reset() => state = null;
 
   /// 정해진 종류는 대화 기록에도 남긴다 — 그때까지의 질문 수 자리에(한 줄 시간순으로 그린다).
@@ -134,7 +139,10 @@ class ChatTopicController extends Notifier<ChatTopic?> {
     ref.read(chatTopicLogProvider.notifier).add((
       topic: topic,
       at: ref.read(chatProvider).length,
-      fromChooser: topic is ChatTopicGeneral || state is ChatTopicPickingOrder,
+      fromChooser:
+          topic is ChatTopicGeneral ||
+          topic is ChatTopicNoRecentOrder ||
+          state is ChatTopicPickingOrder,
     ));
     state = topic;
   }
@@ -162,6 +170,21 @@ final chatTopicProvider = NotifierProvider<ChatTopicController, ChatTopic?>(
 );
 
 /// "주문 건에 대한 문의"에서 고를 최근 주문. 실패는 오류로 남는다(빈 목록으로 바꾸지 않는다).
-final chatRecentOrdersProvider = FutureProvider.autoDispose<List<ChatOrder>>(
-  (ref) => ref.watch(chatRepositoryProvider).recentOrders(),
-);
+/// "주문 건에 대한 문의"에서 고를 주문 — 서버가 준 최근 주문 중 **주문한 지 2일(48시간) 안**인 것만
+/// (레퍼런스 고객센터 2-4·2-4-1 "최근 2일 내 주문", 사용자 2026-11-23). 주문 시각을 모르면 빼지 않는다.
+final chatRecentOrdersProvider = FutureProvider.autoDispose<List<ChatOrder>>((
+  ref,
+) async {
+  final all = await ref.watch(chatRepositoryProvider).recentOrders();
+  final now = ref.watch(chatClockProvider)();
+  return [
+    for (final o in all)
+      if (o.orderedAt == null ||
+          now.difference(o.orderedAt!) <= chatRecentOrderWindow)
+        o,
+  ];
+});
+
+const chatRecentOrderWindow = Duration(days: 2);
+
+final chatClockProvider = Provider<DateTime Function()>((_) => DateTime.now);

@@ -213,6 +213,9 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
   late String? _q = widget.q;
   late String? _category = widget.category;
 
+  /// 펼친 질문(레퍼런스 고객센터 3 — 목록 안에서 답을 펼친다, 사용자 2026-11-23).
+  final Set<String> _open = {};
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -259,41 +262,70 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
             if (value case AsyncData(value: final FaqList list)
                 when list.items.isNotEmpty)
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                padding: const EdgeInsets.only(top: 4, bottom: 24),
                 sliver: SliverList.separated(
                   itemCount: list.items.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1),
+                  separatorBuilder: (_, _) =>
+                      const Divider(height: 1, indent: 16, endIndent: 16),
                   itemBuilder: (context, i) {
                     final f = list.items[i];
-                    return InkWell(
-                      key: ValueKey('faq-${f.faqId}'),
-                      onTap: () =>
-                          context.push('/support/faqs/${f.faqId}', extra: f),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                    final open = _open.contains(f.faqId);
+                    // 레퍼런스 고객센터 3: 누르면 그 자리에서 답이 펼쳐진다 — 회색 바탕, 질문 굵게, ⌃.
+                    return Container(
+                      color: open ? theme.colorScheme.surfaceContainer : null,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          InkWell(
+                            key: ValueKey('faq-${f.faqId}'),
+                            onTap: () => setState(
+                              () => open
+                                  ? _open.remove(f.faqId)
+                                  : _open.add(f.faqId),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                16,
+                                16,
+                                16,
+                              ),
+                              child: Row(
                                 children: [
-                                  // 사용자 캡처: "[분류] 질문" 한 줄 제목
-                                  Text(
-                                    '[${f.categoryTitle}] ${f.question}',
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      fontSize: 16,
+                                  Expanded(
+                                    // 사용자 캡처: "[분류] 질문" 한 줄 제목
+                                    child: Text(
+                                      '[${f.categoryTitle}] ${f.question}',
+                                      style: theme.textTheme.bodyLarge
+                                          ?.copyWith(
+                                            fontSize: 16,
+                                            fontWeight: open
+                                                ? FontWeight.w700
+                                                : FontWeight.w400,
+                                          ),
                                     ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  PmartLineIcon(
+                                    open
+                                        ? PmartLineIcons.chevronUp
+                                        : PmartLineIcons.chevronDown,
+                                    size: 20,
+                                    color: open
+                                        ? theme.colorScheme.onSurface
+                                        : theme.colorScheme.outline,
                                   ),
                                 ],
                               ),
                             ),
-                            PmartLineIcon(
-                              PmartLineIcons.chevronRight,
-                              size: 18,
-                              color: theme.colorScheme.outline,
+                          ),
+                          if (open)
+                            Padding(
+                              key: ValueKey('faq-open-${f.faqId}'),
+                              padding: const EdgeInsets.fromLTRB(26, 0, 20, 24),
+                              child: FaqAnswer(answer: f.answer),
                             ),
-                          ],
-                        ),
+                        ],
                       ),
                     );
                   },
@@ -349,13 +381,7 @@ class FaqDetailScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        MarkdownBody(
-          key: const ValueKey('faq-answer'),
-          data: f.answer,
-          // 링크는 열지 않는다(앱 밖으로 나가지 않게). 원문 그대로 보인다.
-          styleSheet: MarkdownStyleSheet.fromTheme(theme)
-              .copyWith(p: theme.textTheme.bodyLarge?.copyWith(height: 1.5)),
-        ),
+        FaqAnswer(key: const ValueKey('faq-answer'), answer: f.answer),
       ],
     );
     final first = initial;
@@ -554,4 +580,50 @@ int chipsFitInLines(
     }
   }
   return labels.length;
+}
+
+/// FAQ 답(마크다운). 답 안 링크는 **앱 안 화면**(예 "주문내역 바로가기" → `/orders`, 레퍼런스 고객센터 3)만
+/// 연다 — 앱 밖 주소·모르는 경로는 열지 않는다(앱 밖으로 나가지 않게).
+class FaqAnswer extends StatelessWidget {
+  const FaqAnswer({super.key, required this.answer});
+
+  final String answer;
+
+  /// 열어도 되는 앱 안 경로의 앞부분.
+  static const inAppPrefixes = [
+    '/orders',
+    '/claims',
+    '/support',
+    '/me',
+    '/addresses',
+    '/notifications',
+    '/categories',
+    '/search',
+    '/cart',
+  ];
+
+  static bool opens(String? href) =>
+      href != null &&
+      !href.startsWith('//') &&
+      inAppPrefixes.any(
+        (p) => href == p || href.startsWith('$p/') || href.startsWith('$p?'),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MarkdownBody(
+      data: answer,
+      onTapLink: (_, href, _) {
+        if (opens(href)) context.push(href!);
+      },
+      styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+        p: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
+        a: TextStyle(
+          color: theme.colorScheme.primary,
+          decoration: TextDecoration.underline,
+        ),
+      ),
+    );
+  }
 }

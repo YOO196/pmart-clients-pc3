@@ -60,6 +60,23 @@ void main() {
     // 마크다운 기호(##, **)가 글자로 보이지 않는다.
     expect(find.textContaining('##'), findsNothing);
     expect(find.textContaining('**'), findsNothing);
+
+    // 레퍼런스 고객센터 3: 다른 화면으로 가지 않고 그 자리에서 펼친다 — 다시 누르면 접힌다.
+    expect(find.byType(FaqDetailScreen), findsNothing);
+    expect(find.byKey(const ValueKey('faq-open-faq-cancel-1')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('faq-faq-cancel-1')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('faq-open-faq-cancel-1')), findsNothing);
+    expect(find.byType(MarkdownBody), findsNothing);
+  });
+
+  test('답 안 링크는 앱 안 화면만 연다', () {
+    expect(FaqAnswer.opens('/orders'), isTrue);
+    expect(FaqAnswer.opens('/orders/o-1'), isTrue);
+    expect(FaqAnswer.opens('https://example.com'), isFalse);
+    expect(FaqAnswer.opens('//evil.example'), isFalse);
+    expect(FaqAnswer.opens('/payments/x'), isFalse);
+    expect(FaqAnswer.opens(null), isFalse);
   });
 
   testWidgets('폰 크기 화면: 질문 유형을 고른 뒤 질문 목록이 화면 전체와 같이 내려간다(좁은 칸에 갇히지 않음)', (

@@ -10,6 +10,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:customer_app/features/support/data/mock_chat_repository.dart';
+import 'package:customer_app/features/support/presentation/chat_controller.dart'
+    show chatRepositoryProvider;
 import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 import 'package:customer_app/features/profile/domain/profile.dart'
@@ -1826,6 +1829,53 @@ void main() {
     await shot('closed');
     await t.tap(find.byKey(const ValueKey('faq-types-more')));
     await shot('open');
+    // 레퍼런스 고객센터 3: 질문을 누르면 그 자리에서 답이 펼쳐진다.
+    await t.tap(find.byKey(const ValueKey('faq-types-more')));
+    await t.pumpAndSettle();
+    await t.scrollUntilVisible(
+      find.byKey(const ValueKey('faq-faq-cancel-1')),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('faq-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await t.tap(find.byKey(const ValueKey('faq-faq-cancel-1')));
+    await shot('expanded');
+  });
+
+  // 고객센터 2-4-1: 주문 건 문의인데 최근 2일 주문이 없을 때.
+  testWidgets('chat-no-recent', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final chat = MockChatRepository(latency: Duration.zero)
+      ..noRecentOrders = true;
+    await t.pumpWidget(
+      testApp([chatRepositoryProvider.overrideWithValue(chat)]),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/support/chat'),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('chat-topic-order')));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/chat-no-recent.png').uri),
+    );
   });
   // 상품 할인가(ADR-0082 4단계 — 목 요거트·토마토·저지방 우유): 검색 카드·상세·장바구니.
   testWidgets('discounts', (t) async {

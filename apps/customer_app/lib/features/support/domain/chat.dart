@@ -124,6 +124,12 @@ final class ChatTopicPickingOrder extends ChatTopic {
   const ChatTopicPickingOrder();
 }
 
+/// 주문 건에 대한 문의를 골랐지만 최근 2일 안의 주문이 없다(레퍼런스 고객센터 2-4-1, 사용자 2026-11-23) —
+/// "최근 2일 내 주문이 확인되지 않습니다. 어떤 문의 사항이 있으신가요?" 뒤 바로 입력, 질문은 주문 없이 보낸다.
+final class ChatTopicNoRecentOrder extends ChatTopic {
+  const ChatTopicNoRecentOrder();
+}
+
 /// 주문 건에 대한 문의 — 고른 주문으로 묻는다.
 final class ChatTopicOrder extends ChatTopic {
   const ChatTopicOrder(this.order);
