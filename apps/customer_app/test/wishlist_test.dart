@@ -151,16 +151,12 @@ void main() {
         t.widget<Text>(key('wishlist-count')).textSpan!.toPlainText();
     expect(count(), '전체 2개');
     expect(t.widget<Text>(key('wish-name-P-0002')).data, '그릭요거트 플레인 400g');
-    // 초안 07-C: 품절은 사진 아래 띠, 담기 대신 "담을 수 없어요"(눌리지 않음). 판매 중은 [담기].
+    // 초안 07 v2 B-1: 품절은 사진에 어두운 막 + 글, + 없음. 판매 중은 사진 위 +.
     expect(
       find.descendant(of: key('wish-state-P-0004'), matching: find.text('품절')),
       findsOneWidget,
     );
     expect(key('wish-state-P-0002'), findsNothing);
-    expect(
-      t.widget<OutlinedButton>(key('wish-cannot-P-0004')).onPressed,
-      isNull,
-    );
     expect(key('wish-add-P-0002'), findsOneWidget);
     expect(key('wish-add-P-0004'), findsNothing);
 
@@ -175,7 +171,7 @@ void main() {
   });
 
   // 초안 07-C [담기]: 카드 + 와 같은 규칙 — 옵션을 확인하고 하나면 바로 장바구니에.
-  testWidgets('찜한 상품 [담기]: 옵션 하나면 바로 장바구니에 담는다', (t) async {
+  testWidgets('찜한 상품 +: 옵션 하나면 바로 담고 "− N +" 알약으로, 0 이면 + 로 접힌다', (t) async {
     final repo = repo0();
     await start(t, repo);
     await login(t);
@@ -185,7 +181,20 @@ void main() {
     await t.tap(key('wish-add-P-0002'));
     await t.pumpAndSettle();
     expect(find.byType(ProductDetailScreen), findsNothing);
-    expect(find.textContaining('장바구니'), findsWidgets);
+    // 담기면 + 자리가 "− 1 +" 알약(장바구니 서버 수량).
+    final pill = key('wish-qty-P-0002');
+    expect(pill, findsOneWidget);
+    expect(find.descendant(of: pill, matching: find.text('1')), findsOneWidget);
+    await t.tap(find.descendant(of: pill, matching: key('wish-qty-plus')));
+    await t.pumpAndSettle();
+    expect(find.descendant(of: pill, matching: find.text('2')), findsOneWidget);
+    await t.tap(find.descendant(of: pill, matching: key('wish-qty-minus')));
+    await t.pumpAndSettle();
+    await t.tap(find.descendant(of: pill, matching: key('wish-qty-minus')));
+    await t.pumpAndSettle();
+    // 0 이 되면 장바구니에서 빠지고 + 로 접힌다.
+    expect(pill, findsNothing);
+    expect(key('wish-add-P-0002'), findsOneWidget);
   });
 
   // 초안 07-E: 빈 상태는 하트 동그라미 + 안내 + [상품 둘러보기], 비회원은 같은 틀에 [로그인].

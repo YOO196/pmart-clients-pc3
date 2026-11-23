@@ -181,8 +181,8 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
       picked: _filters,
       onToggle: _toggleAttribute,
       correctedKeyword: list?.correctedQuery,
-      // 초안 16 B: 검색 결과는 서버가 준 속성 줄 전부, 0건 값은 흐리게(못 누름).
-      all: search,
+      // 사용자 2026-11-23: 검색도 연관 속성 앞 2줄·고를 수 있는 값만(전부는 [필터] 시트에서). 초안 16 B 의 "전부·0건 흐림"은 되돌림.
+      all: false,
     );
     final countRow = Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
@@ -229,7 +229,22 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
     );
     // 이름 속 강조 글자(초안 16 B): 고친 검색어가 있으면 그것.
     final highlight = search ? (list?.correctedQuery ?? keyword) : null;
-    final top = widget.header;
+    // 위 머리·상품 수·속성 줄을 목록과 함께 넘긴다 — 속성 줄 위에서 세로로 끌어도 목록이 내려간다(사용자 2026-11-23
+    // "그 위에서 스크롤하려고 드래그하는데 안돼"). 카테고리 화면은 머리(동그라미·배너·할인 줄)가 맨 위.
+    final top = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ?widget.header,
+        if (search) countRow,
+        attributes,
+        if (!search) countRow,
+        if (search && !widget.baseQuery.onSale)
+          _KeywordSaleStrip(
+            keyword: highlight!,
+            categoryId: widget.baseQuery.categoryId,
+          ),
+      ],
+    );
     final emptyText = Text(
       widget.baseQuery.onSale
           ? l10n.listNoSaleProducts
@@ -240,37 +255,28 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
     return Column(
       children: [
         ?correction,
-        if (top == null && similar == null) ...[
-          if (search) countRow,
-          attributes,
-          if (!search) countRow,
-        ],
         Expanded(
           // 레퍼런스: 목록 위에 떠 있는 장바구니 막대(담긴 게 있을 때만).
           child: Stack(
             children: [
               Positioned.fill(
                 child: UiStateView<ProductListState>(
-                  loading: (_) => top == null
-                      ? const PmartGridSkeleton()
-                      : Column(
-                          children: [
-                            top,
-                            const Expanded(child: PmartGridSkeleton()),
-                          ],
-                        ),
+                  loading: (_) => Column(
+                    children: [
+                      ?widget.header,
+                      const Expanded(child: PmartGridSkeleton()),
+                    ],
+                  ),
                   state: uiStateOf(
                     value,
                     isEmpty: (s) => s.items.isEmpty && s.similarItems == null,
                   ),
                   onRetry: () => ref.invalidate(provider),
-                  empty: (_) => top == null
+                  empty: (_) => widget.header == null
                       ? Center(child: emptyText)
                       : ListView(
                           children: [
                             top,
-                            attributes,
-                            countRow,
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 48),
                               child: Center(child: emptyText),
@@ -301,18 +307,7 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
                           key: const PageStorageKey('product-list'),
                           list: list,
                           highlight: highlight,
-                          header: top != null
-                              ? Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [top, attributes, countRow],
-                                )
-                              : search && !widget.baseQuery.onSale
-                              ? _KeywordSaleStrip(
-                                  keyword: highlight!,
-                                  categoryId: widget.baseQuery.categoryId,
-                                )
-                              : null,
+                          header: top,
                           onLoadMore: () =>
                               ref.read(provider.notifier).loadMore(),
                           autoLoadMore: true,

@@ -125,6 +125,8 @@
   "@wishCountUnit": { "placeholders": { "count": { "type": "int" } } },
   "wishAddToCart": "담기",
   "wishCannotAdd": "담을 수 없어요",
+  "wishStockLimit": "남은 {count}개까지 담을 수 있어요",
+  "@wishStockLimit": { "placeholders": { "count": { "type": "int" } } },
   "wishEmptyGuide": "마음에 드는 상품의 하트를 누르면\n여기에 모아 둘게요",
   "wishBrowse": "상품 둘러보기",
   "@wishCount": { "placeholders": { "count": { "type": "int" } } },

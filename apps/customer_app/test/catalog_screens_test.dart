@@ -266,6 +266,21 @@ void main() {
       },
     );
 
+    testWidgets('속성 줄 위에서 세로로 끌면 목록이 함께 내려간다(사용자 2026-11-23)', (t) async {
+      await t.pumpWidget(testApp([]));
+      await t.pumpAndSettle();
+      await t.tap(find.text('검색').last);
+      await t.pumpAndSettle();
+      await _search(t, '우유');
+      await t.pumpAndSettle();
+      final rows = find.byKey(const ValueKey('attribute-rows'));
+      expect(rows, findsOneWidget);
+      final before = t.getTopLeft(rows).dy;
+      await t.dragFrom(t.getCenter(rows), const Offset(0, -150));
+      await t.pumpAndSettle();
+      expect(rows.evaluate().isEmpty || t.getTopLeft(rows).dy < before, isTrue);
+    });
+
     test('을/를·로/으로 받침 맞춤', () {
       expect(hasBatchim('우유'), isFalse);
       expect(hasBatchim('두부김치'), isFalse);
@@ -408,10 +423,8 @@ void main() {
       await _search(t, '우유');
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('attribute-rows')), findsOneWidget);
-      // 초안 16 B: 검색 결과에선 0건 값도 흐리게 보이되 누를 수 없다.
-      final zero = find.byKey(const ValueKey('attr-capacity.110g'));
-      expect(zero, findsOneWidget);
-      expect(t.widget<InkWell>(zero).onTap, isNull);
+      // 사용자 2026-11-23: 검색도 고를 수 있는 값만(0건 값은 줄에 없다 — 전부는 [필터] 시트).
+      expect(find.byKey(const ValueKey('attr-capacity.110g')), findsNothing);
       await t.tap(find.byKey(const ValueKey('attr-capacity.1l')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('tile-P-0001')), findsOneWidget);
