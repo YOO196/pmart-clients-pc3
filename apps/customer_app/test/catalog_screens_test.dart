@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:customer_app/features/catalog/presentation/product_list_view.dart'
+    show hasBatchim, rieulOrNoBatchim;
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
@@ -192,33 +195,52 @@ void main() {
 
   group('검색', () {
     // 백엔드 요청 2026-11-20 search-correction-text(search 0.4.0~0.5.1).
-    testWidgets('0건이라 서버가 고친 검색어로 찾았으면 "○○ 검색 결과예요" + 원래 검색어로 검색하기(교정 끔)', (
-      t,
-    ) async {
-      await t.pumpWidget(testApp([]));
-      await t.pumpAndSettle();
-      await t.tap(find.text('검색').last);
-      await t.pumpAndSettle();
-      await _search(t, '우우');
-      await t.pumpAndSettle();
-      expect(find.byKey(const ValueKey('search-corrected')), findsOneWidget);
-      expect(find.textContaining('검색 결과예요'), findsOneWidget);
-      expect(find.byKey(const ValueKey('tile-P-0001')), findsWidgets);
-      // 속성 줄은 고친 검색어 기준 값으로 — 값 없는 빈 줄이 남지 않는다.
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('attribute-rows')),
-          matching: find.byType(InkWell),
-        ),
-        findsWidgets,
-      );
+    testWidgets(
+      '0건이라 서버가 고친 검색어로 찾았으면 화면 폭 띠 "우유를 찾으시는 것 같아요."(초안 16 B-1, 원래 검색어 링크 없음)',
+      (t) async {
+        await t.pumpWidget(testApp([]));
+        await t.pumpAndSettle();
+        await t.tap(find.text('검색').last);
+        await t.pumpAndSettle();
+        await _search(t, '우우');
+        await t.pumpAndSettle();
+        final band = find.byKey(const ValueKey('search-corrected'));
+        expect(band, findsOneWidget);
+        expect(
+          find.descendant(
+            of: band,
+            matching: find.textContaining(
+              '우유를 찾으시는 것 같아요.',
+              findRichText: true,
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('search-use-original')), findsNothing);
+        expect(find.byKey(const ValueKey('tile-P-0001')), findsWidgets);
+        // 속성 줄은 고친 검색어 기준 값으로 — 값 없는 빈 줄이 남지 않는다.
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('attribute-rows')),
+            matching: find.byType(InkWell),
+          ),
+          findsWidgets,
+        );
+        // 이름 속 검색어(고친 검색어 "우유")를 보라 굵게.
+        expect(
+          find.textContaining('서울우유 1L', findRichText: true),
+          findsWidgets,
+        );
+      },
+    );
 
-      await t.tap(find.byKey(const ValueKey('search-use-original')));
-      await t.pumpAndSettle();
-      // 교정 없이 원래 검색어 — 결과 0건, 띠 없음, 고를 값이 없는 속성 줄도 없음.
-      expect(find.byKey(const ValueKey('search-corrected')), findsNothing);
-      expect(find.text('검색 결과가 없어요'), findsOneWidget);
-      expect(find.byKey(const ValueKey('attribute-rows')), findsNothing);
+    test('을/를·로/으로 받침 맞춤', () {
+      expect(hasBatchim('우유'), isFalse);
+      expect(hasBatchim('두부김치'), isFalse);
+      expect(hasBatchim('라면'), isTrue);
+      expect(rieulOrNoBatchim('우유'), isTrue);
+      expect(rieulOrNoBatchim('라면'), isFalse);
+      expect(rieulOrNoBatchim('과일'), isTrue);
     });
 
     testWidgets('결과가 적으면 "혹시 ○○를 찾으셨나요?" — 누르면 그 검색어로 새로 찾는다', (t) async {
@@ -327,7 +349,10 @@ void main() {
       await _search(t, '우유');
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('attribute-rows')), findsOneWidget);
-      expect(find.byKey(const ValueKey('attr-capacity.110g')), findsNothing);
+      // 초안 16 B: 검색 결과에선 0건 값도 흐리게 보이되 누를 수 없다.
+      final zero = find.byKey(const ValueKey('attr-capacity.110g'));
+      expect(zero, findsOneWidget);
+      expect(t.widget<InkWell>(zero).onTap, isNull);
       await t.tap(find.byKey(const ValueKey('attr-capacity.1l')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('tile-P-0001')), findsOneWidget);
@@ -337,6 +362,61 @@ void main() {
       expect(find.byKey(const ValueKey('tile-P-0006')), findsOneWidget);
     });
 
+    testWidgets('초안 15 B: 상위를 누르면 시트 없이 상위 탭·하위 동그라미 화면, 하위를 고르면 그 목록·알약 칩', (
+      t,
+    ) async {
+      await t.pumpWidget(testApp(const []));
+      await t.pumpAndSettle();
+      await t.tap(find.text('카테고리').last);
+      await t.pumpAndSettle();
+      await t.tap(find.text('과일·채소·샐러드'));
+      await t.pumpAndSettle();
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byKey(const ValueKey('category-tabs')), findsOneWidget);
+      expect(find.byKey(const ValueKey('category-children')), findsOneWidget);
+      final all = find.byKey(const ValueKey('category-child-all'));
+      expect(all, findsOneWidget);
+      expect(find.byType(ProductTileCard), findsWidgets);
+      final childKeys = find.descendant(
+        of: find.byKey(const ValueKey('category-children')),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith(
+                'category-child-C-',
+              ),
+        ),
+      );
+      expect(childKeys, findsWidgets);
+      await t.tap(childKeys.first);
+      await t.pumpAndSettle();
+      // 내려 보면 동그라미 줄 대신 알약 칩 줄이 탭 아래 붙는다.
+      expect(find.byKey(const ValueKey('category-pills')), findsNothing);
+      await t.drag(find.byType(CustomScrollView).last, const Offset(0, -300));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('category-pills')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('category-pill-all')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('category-pills')), findsNothing);
+    });
+
+    testWidgets('초안 15 B: 하위 id 로 들어오면 그 상위 탭 + 그 하위가 골라진 상태', (t) async {
+      await t.pumpWidget(testApp(const []));
+      await t.pumpAndSettle();
+      const child = (categoryId: 'C-FRUIT', name: '과일');
+      final router = GoRouter.of(t.element(find.byType(Navigator).first));
+      unawaited(router.push('/products?categoryId=${child.categoryId}'));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('category-tabs')), findsOneWidget);
+      final circle = t.widget<Text>(
+        find.descendant(
+          of: find.byKey(ValueKey('category-child-${child.categoryId}')),
+          matching: find.text(child.name),
+        ),
+      );
+      expect(circle.style?.fontWeight, FontWeight.w700);
+    });
+
     testWidgets('다음 묶음 실패는 받은 목록을 지우지 않는다', (t) async {
       await t.pumpWidget(testApp(const [], catalog: _SecondPageDown()));
       await t.pumpAndSettle();
@@ -344,15 +424,25 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('과일·채소·샐러드'));
       await t.pumpAndSettle();
-      await t.tap(find.text('과일·채소·샐러드 전체'));
+      // 초안 15 B: 동그라미·할인 줄 머리를 지나 격자까지 내린다.
+      await t.drag(find.byType(CustomScrollView).last, const Offset(0, -500));
       await t.pumpAndSettle();
+      final grid = find.descendant(
+        of: find.byType(SliverGrid),
+        matching: find.byType(ProductTileCard),
+      );
 
-      expect(find.byType(ProductTileCard), findsNWidgets(2));
+      expect(grid, findsNWidgets(2));
       // 격자 아래의 "더 보기"는 스크롤해야 만들어진다.
       await t.scrollUntilVisible(
         find.byKey(const ValueKey('load-more')),
         200,
-        scrollable: find.byType(Scrollable).last,
+        // 세로 목록(초안 15 B 화면엔 가로 탭·칩 줄도 Scrollable 이다).
+        scrollable: find
+            .byWidgetPredicate(
+              (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+            )
+            .last,
       );
       await t.pumpAndSettle();
       await t.ensureVisible(find.byKey(const ValueKey('load-more')));
@@ -361,7 +451,7 @@ void main() {
       await t.pumpAndSettle();
 
       expect(find.text('다음 상품을 불러오지 못했어요'), findsOneWidget);
-      expect(find.byType(ProductTileCard), findsNWidgets(2));
+      expect(grid, findsNWidgets(2));
     });
 
     testWidgets('목록 끝에 가까워지면 "더 보기"를 누르지 않아도 다음 묶음을 받는다', (t) async {
@@ -373,9 +463,15 @@ void main() {
         await t.pumpAndSettle();
         await t.tap(find.text('과일·채소·샐러드'));
         await t.pumpAndSettle();
-        await t.tap(find.text('과일·채소·샐러드 전체'));
+        await t.drag(find.byType(CustomScrollView).last, const Offset(0, -500));
         await t.pumpAndSettle();
-        return find.byType(ProductTileCard).evaluate().length;
+        return find
+            .descendant(
+              of: find.byType(SliverGrid),
+              matching: find.byType(ProductTileCard),
+            )
+            .evaluate()
+            .length;
       }
 
       final all = await open(

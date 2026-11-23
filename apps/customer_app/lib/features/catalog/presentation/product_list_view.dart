@@ -11,6 +11,7 @@ import '../../cart/presentation/cart_controller.dart'
 import '../../../shared/ui_state_of.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
+import 'widgets/discount_price.dart' show DiscountPriceText;
 import 'widgets/product_tile_card.dart';
 
 String sortLabel(AppLocalizations l10n, SortKey s) => switch (s) {
@@ -28,7 +29,16 @@ String sortLabel(AppLocalizations l10n, SortKey s) => switch (s) {
 ///
 /// 상세로 갔다 돌아오면(push) 이 위젯이 살아 있으므로 조건·스크롤이 그대로다.
 class ProductListView extends ConsumerStatefulWidget {
-  const ProductListView({super.key, required this.baseQuery, this.onKeyword});
+  const ProductListView({
+    super.key,
+    required this.baseQuery,
+    this.onKeyword,
+    this.header,
+  });
+
+  /// 목록과 함께 넘어가는 머리(초안 15 B 카테고리: 하위 동그라미·배너·할인 줄). 주면 속성 줄·상품 수 줄도
+  /// 그 아래에서 함께 넘어간다(빈 목록·읽는 중에도 머리는 보인다).
+  final Widget? header;
 
   /// 검색어·카테고리. 정렬·필터는 여기서 바꾼다.
   final ProductQuery baseQuery;
@@ -113,22 +123,21 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
       list?.correctedQuery,
       list?.suggestedQuery,
     )) {
+      // 초안 16 B-1(사용자 확정): 화면 폭 회색 띠 "우유를 찾으시는 것 같아요." — 원래 검색어 링크는 없앰.
       (final c?, _) when keyword != null => _CorrectionBand(
         key: const ValueKey('search-corrected'),
-        // 요청(2026-11-20 search-correction-text): "'순두부' 검색 결과예요" + "'순두뷰'로 검색하기"
-        lead: "'$c'",
-        text: l10n.searchCorrected,
-        action: l10n.searchUseOriginal(keyword),
-        onAction: widget.onKeyword == null
-            ? null
-            : () => widget.onKeyword!(keyword, noCorrection: true),
+        lead: c,
+        text: hasBatchim(c) ? l10n.searchSeemsEul : l10n.searchSeemsReul,
       ),
+      // 초안 16 B-2: "혹시 우유를 찾으셨나요? 우유로 검색 ›" — 띠를 누르면 그 검색어로.
       (_, final s?) => _CorrectionBand(
         key: const ValueKey('search-suggested'),
-        // "혹시 '순두부'를 찾으셨나요?" — 누르면 그 검색어로 새로 찾는다
         prefix: l10n.searchSuggestedPrefix,
-        lead: "'$s'",
-        text: l10n.searchSuggested,
+        lead: s,
+        text: hasBatchim(s) ? l10n.searchDidYouEul : l10n.searchDidYouReul,
+        action: rieulOrNoBatchim(s)
+            ? l10n.searchGoWithRo(s)
+            : l10n.searchGoWithEuro(s),
         onTap: widget.onKeyword == null ? null : () => widget.onKeyword!(s),
       ),
       _ => null,
@@ -156,76 +165,117 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
     );
     final hasCart =
         ref.watch(cartControllerProvider).value?.cart.lines.isNotEmpty ?? false;
+    final search = keyword != null && keyword.isNotEmpty;
+    final attributes = _AttributeRows(
+      query: widget.baseQuery,
+      picked: _filters,
+      onToggle: _toggleAttribute,
+      correctedKeyword: list?.correctedQuery,
+      // 초안 16 B: 검색 결과는 서버가 준 속성 줄 전부, 0건 값은 흐리게(못 누름).
+      all: search,
+    );
+    final countRow = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              switch (list?.total) {
+                final int total => l10n.searchResultCount(total),
+                null => '',
+              },
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          pill(
+            key: const ValueKey('sort'),
+            icon: PmartLineIcons.sort,
+            label: sortLabel(l10n, _sort),
+            onPressed: _pickSort,
+          ),
+          const SizedBox(width: 6),
+          // 고른 필터 수는 알약 오른쪽 위 작은 동그라미(레퍼런스).
+          Badge(
+            key: const ValueKey('filter-count'),
+            isLabelVisible: _filters.isNotEmpty,
+            label: Text('${_filters.length}'),
+            backgroundColor: scheme.onSurface,
+            textColor: scheme.surface,
+            offset: const Offset(-2, -4),
+            child: pill(
+              key: const ValueKey('open-filters'),
+              icon: PmartLineIcons.filter,
+              label: l10n.filterTitle,
+              onPressed: _openFilters,
+            ),
+          ),
+        ],
+      ),
+    );
+    // 이름 속 강조 글자(초안 16 B): 고친 검색어가 있으면 그것.
+    final highlight = search ? (list?.correctedQuery ?? keyword) : null;
+    final top = widget.header;
+    final emptyText = Text(
+      widget.baseQuery.onSale
+          ? l10n.listNoSaleProducts
+          : widget.baseQuery.keyword == null
+          ? l10n.listNoProducts
+          : l10n.searchNoResult,
+    );
     return Column(
       children: [
         ?correction,
-        _AttributeRows(
-          query: widget.baseQuery,
-          picked: _filters,
-          onToggle: _toggleAttribute,
-          correctedKeyword: list?.correctedQuery,
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  switch (list?.total) {
-                    final int total => l10n.searchResultCount(total),
-                    null => '',
-                  },
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              pill(
-                key: const ValueKey('sort'),
-                icon: PmartLineIcons.sort,
-                label: sortLabel(l10n, _sort),
-                onPressed: _pickSort,
-              ),
-              const SizedBox(width: 6),
-              // 고른 필터 수는 알약 오른쪽 위 작은 동그라미(레퍼런스).
-              Badge(
-                key: const ValueKey('filter-count'),
-                isLabelVisible: _filters.isNotEmpty,
-                label: Text('${_filters.length}'),
-                backgroundColor: scheme.onSurface,
-                textColor: scheme.surface,
-                offset: const Offset(-2, -4),
-                child: pill(
-                  key: const ValueKey('open-filters'),
-                  icon: PmartLineIcons.filter,
-                  label: l10n.filterTitle,
-                  onPressed: _openFilters,
-                ),
-              ),
-            ],
-          ),
-        ),
+        if (top == null) ...[
+          if (search) countRow,
+          attributes,
+          if (!search) countRow,
+        ],
         Expanded(
           // 레퍼런스: 목록 위에 떠 있는 장바구니 막대(담긴 게 있을 때만).
           child: Stack(
             children: [
               Positioned.fill(
                 child: UiStateView<ProductListState>(
-                  loading: (_) => const PmartGridSkeleton(),
+                  loading: (_) => top == null
+                      ? const PmartGridSkeleton()
+                      : Column(
+                          children: [
+                            top,
+                            const Expanded(child: PmartGridSkeleton()),
+                          ],
+                        ),
                   state: uiStateOf(value, isEmpty: (s) => s.items.isEmpty),
                   onRetry: () => ref.invalidate(provider),
-                  empty: (_) => Center(
-                    child: Text(
-                      widget.baseQuery.onSale
-                          ? l10n.listNoSaleProducts
-                          : widget.baseQuery.keyword == null
-                          ? l10n.listNoProducts
-                          : l10n.searchNoResult,
-                    ),
-                  ),
+                  empty: (_) => top == null
+                      ? Center(child: emptyText)
+                      : ListView(
+                          children: [
+                            top,
+                            attributes,
+                            countRow,
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 48),
+                              child: Center(child: emptyText),
+                            ),
+                          ],
+                        ),
                   ready: (context, list) => ProductGrid(
                     key: const PageStorageKey('product-list'),
                     list: list,
+                    highlight: highlight,
+                    header: top != null
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [top, attributes, countRow],
+                          )
+                        : search && !widget.baseQuery.onSale
+                        ? _KeywordSaleStrip(
+                            keyword: highlight!,
+                            categoryId: widget.baseQuery.categoryId,
+                          )
+                        : null,
                     onLoadMore: () => ref.read(provider.notifier).loadMore(),
                     autoLoadMore: true,
                     bottomInset: hasCart ? 90 : 0,
@@ -246,7 +296,23 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
   }
 }
 
-/// 오타 교정 띠(레퍼런스 3-4): 회색 바탕 가운데 "[굵게 검색어]을 찾으시는 것 같아요." 교정 결과면 오른쪽 아래 원래 검색어 링크.
+/// 마지막 글자에 받침이 있는지(을/를). 한글이 아니면 받침 없음으로 본다.
+bool hasBatchim(String word) {
+  if (word.isEmpty) return false;
+  final c = word.runes.last;
+  if (c < 0xAC00 || c > 0xD7A3) return false;
+  return (c - 0xAC00) % 28 != 0;
+}
+
+/// "로"를 쓰는지(받침 없음 또는 ㄹ 받침) — 아니면 "으로".
+bool rieulOrNoBatchim(String word) {
+  if (!hasBatchim(word)) return true;
+  final c = word.runes.last;
+  return (c - 0xAC00) % 28 == 8;
+}
+
+/// 오타 교정·제안 띠(초안 16 B-1·B-2): 화면 폭 회색 띠 가운데 한 줄 — [prefix] + 굵은 [lead] + [text],
+/// 제안이면 뒤에 보라 "[action]"(띠 전체가 눌린다).
 class _CorrectionBand extends StatelessWidget {
   const _CorrectionBand({
     super.key,
@@ -254,7 +320,6 @@ class _CorrectionBand extends StatelessWidget {
     required this.text,
     this.prefix,
     this.action,
-    this.onAction,
     this.onTap,
   });
 
@@ -262,52 +327,195 @@ class _CorrectionBand extends StatelessWidget {
   final String lead;
   final String text;
   final String? action;
-  final VoidCallback? onAction;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Material(
-      color: scheme.surfaceContainer,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-          child: Column(
-            children: [
-              Text.rich(
-                TextSpan(
-                  children: [
-                    if (prefix case final p?) TextSpan(text: p),
+    return SizedBox(
+      width: double.infinity,
+      child: Material(
+        color: scheme.surfaceContainer,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  if (prefix case final p?) TextSpan(text: p),
+                  TextSpan(
+                    text: lead,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  TextSpan(text: text),
+                  if (action case final a?)
                     TextSpan(
-                      text: lead,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      text: ' $a',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.primary,
+                      ),
                     ),
-                    TextSpan(text: text),
-                  ],
-                ),
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
+                ],
               ),
-              if (action case final a?)
-                TextButton(
-                  key: const ValueKey('search-use-original'),
-                  onPressed: onAction,
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    foregroundColor: scheme.onSurfaceVariant,
-                    textStyle: theme.textTheme.bodySmall?.copyWith(
-                      decoration: TextDecoration.underline,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 초안 16 B "찾으시는 키워드의 할인 상품 전체 ›": 같은 검색어의 할인 상품(search onSale, BR-83)을 한 줄 카드로
+/// 넘겨 보고 아래 점. 0개·읽는 중·실패면 칸을 통째로 숨긴다(홍보 칸 — 결과 목록은 그대로).
+class _KeywordSaleStrip extends ConsumerStatefulWidget {
+  const _KeywordSaleStrip({required this.keyword, this.categoryId});
+
+  final String keyword;
+  final String? categoryId;
+
+  @override
+  ConsumerState<_KeywordSaleStrip> createState() => _KeywordSaleStripState();
+}
+
+class _KeywordSaleStripState extends ConsumerState<_KeywordSaleStrip> {
+  int _page = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final items =
+        ref
+            .watch(
+              productListProvider(
+                ProductQuery(
+                  keyword: widget.keyword,
+                  categoryId: widget.categoryId,
+                  onSale: true,
+                ),
+              ),
+            )
+            .value
+            ?.items
+            .take(5)
+            .toList() ??
+        const <ProductTile>[];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      key: const ValueKey('keyword-sale'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 8, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.searchKeywordSaleTitle,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              TextButton(
+                key: const ValueKey('keyword-sale-all'),
+                style: TextButton.styleFrom(
+                  foregroundColor: scheme.onSurfaceVariant,
+                  textStyle: theme.textTheme.bodySmall?.copyWith(fontSize: 13),
+                ),
+                onPressed: () => context.push(
+                  Uri(
+                    path: '/products',
+                    queryParameters: {
+                      'q': widget.keyword,
+                      'onSale': 'true',
+                      'title': l10n.searchKeywordSaleTitle,
+                    },
+                  ).toString(),
+                ),
+                child: Text(l10n.searchKeywordSaleAll),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 112,
+          child: PageView(
+            onPageChanged: (i) => setState(() => _page = i),
+            children: [
+              for (final t in items)
+                InkWell(
+                  key: ValueKey('keyword-sale-${t.productId}'),
+                  onTap: () =>
+                      context.push('/products/${t.productId}', extra: t),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        ProductImage(url: t.imageUrl, size: 100, radius: 10),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              HighlightedName(
+                                name: t.name,
+                                highlight: widget.keyword,
+                                maxLines: 2,
+                              ),
+                              const SizedBox(height: 4),
+                              if (t.discount case final d?)
+                                DiscountPriceText(
+                                  price: d.salePrice,
+                                  ratePercent: d.ratePercent,
+                                  showBase: false,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Text(a),
                 ),
             ],
           ),
         ),
-      ),
+        if (items.length > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (var i = 0; i < items.length; i++)
+                  Container(
+                    width: i == _page ? 14 : 6,
+                    height: 6,
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: i == _page
+                          ? scheme.onSurface
+                          : scheme.outlineVariant,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 8),
+        Container(height: 8, color: scheme.surfaceContainer),
+      ],
     );
   }
 }
@@ -320,7 +528,15 @@ class ProductGrid extends StatelessWidget {
     required this.onLoadMore,
     this.autoLoadMore = false,
     this.bottomInset = 0,
+    this.header,
+    this.highlight,
   });
+
+  /// 격자 위에 함께 넘어가는 칸(검색 결과의 키워드 할인 줄).
+  final Widget? header;
+
+  /// 상품 이름에서 보라 굵게 보일 글자(검색어).
+  final String? highlight;
 
   /// 아래 떠 있는 막대에 가리지 않게 끝에 더 띄운다.
   final double bottomInset;
@@ -338,6 +554,7 @@ class ProductGrid extends StatelessWidget {
     final width = ProductTileCard.gridWidthOf(context);
     return CustomScrollView(
       slivers: [
+        if (header case final h?) SliverToBoxAdapter(child: h),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           sliver: SliverGrid.builder(
@@ -362,6 +579,7 @@ class ProductGrid extends StatelessWidget {
               return ProductTileCard(
                 rail: true,
                 tile: tile,
+                highlight: highlight,
                 onTap: () =>
                     context.push('/products/${tile.productId}', extra: tile),
               );
@@ -689,7 +907,11 @@ class _AttributeRows extends ConsumerWidget {
     required this.picked,
     required this.onToggle,
     this.correctedKeyword,
+    this.all = false,
   });
+
+  /// 서버가 준 줄 전부 + 0건 값은 흐리게(못 누름) — 검색 결과(초안 16 B). 아니면 앞 2줄·0건 값 숨김(지금).
+  final bool all;
 
   final ProductQuery query;
 
@@ -724,7 +946,7 @@ class _AttributeRows extends ConsumerWidget {
     return Column(
       key: const ValueKey('attribute-rows'),
       children: [
-        for (final a in shown.take(2)) ...[
+        for (final a in all ? shown : shown.take(2)) ...[
           SizedBox(
             height: 52,
             child: Row(
@@ -750,10 +972,13 @@ class _AttributeRows extends ConsumerWidget {
                     padding: const EdgeInsets.only(right: 12),
                     children: [
                       for (final v in a.values)
-                        if (v.count != 0 || picked.contains(a.token(v)))
+                        if (all || v.count != 0 || picked.contains(a.token(v)))
                           InkWell(
                             key: ValueKey('attr-${a.token(v)}'),
-                            onTap: () => onToggle(a, v),
+                            // 0건 값은 흐리게, 누를 수 없음(고른 것은 풀 수 있게 둔다).
+                            onTap: v.count == 0 && !picked.contains(a.token(v))
+                                ? null
+                                : () => onToggle(a, v),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
@@ -768,6 +993,8 @@ class _AttributeRows extends ConsumerWidget {
                                         : FontWeight.w400,
                                     color: picked.contains(a.token(v))
                                         ? scheme.primary
+                                        : v.count == 0
+                                        ? scheme.outlineVariant
                                         : scheme.onSurfaceVariant,
                                   ),
                                 ),

@@ -42,6 +42,7 @@ import 'features/catalog/presentation/home_providers.dart' show SectionRef;
 import 'features/catalog/presentation/home_screen.dart';
 import 'features/catalog/presentation/section_items_screen.dart';
 import 'features/catalog/presentation/product_detail_screen.dart';
+import 'features/catalog/presentation/category_browse_screen.dart';
 import 'features/catalog/presentation/product_list_screen.dart';
 import 'features/catalog/presentation/search_screen.dart';
 import 'l10n/gen/app_localizations.dart';
@@ -393,11 +394,24 @@ final routerProvider = Provider<GoRouter>((ref) {
         // 사용자 요청(2026-11-20): 카테고리를 누르면 오른쪽에서 밀려 들어오고, 뒤로 가면 오른쪽으로 빠진다.
         pageBuilder: (_, state) => CupertinoPage<void>(
           key: state.pageKey,
-          child: ProductListScreen(
-            categoryId: state.uri.queryParameters['categoryId'] ?? '',
-            title: state.uri.queryParameters['title'],
-            onSale: state.uri.queryParameters['onSale'] == 'true',
-          ),
+          // 초안 15 B: 카테고리 하나(할인·검색어 없이)면 상위 탭·하위 동그라미가 있는 카테고리 화면 —
+          // 카테고리 탭 상위·홈 카테고리 타일·카테고리 연결 배너가 모두 이 길로 온다.
+          child: switch (state.uri.queryParameters) {
+            final q
+                when (q['categoryId'] ?? '').isNotEmpty &&
+                    q['onSale'] != 'true' &&
+                    q['q'] == null =>
+              CategoryBrowseScreen(
+                categoryId: q['categoryId']!,
+                title: q['title'],
+              ),
+            final q => ProductListScreen(
+              categoryId: q['categoryId'] ?? '',
+              title: q['title'],
+              onSale: q['onSale'] == 'true',
+              keyword: q['q'],
+            ),
+          },
         ),
       ),
       // 홈 영역 "전체보기". 영역·홈 구성 버전은 홈에서 넘긴다(없으면 홈으로).

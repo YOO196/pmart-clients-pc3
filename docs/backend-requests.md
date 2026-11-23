@@ -94,6 +94,9 @@
 | BR-84 | 보통 | 고객·백오피스 | 타이머 테마 머리 모양 고르기 — 편성 `LayoutTheme`·홈 `Section` 에 `timerStyle`(LABEL=초안 C 제목 위 분홍 글자 / BAND=초안 D 연분홍 띠·시분초 칸), 백오피스 테마 편집에서 고르기. 요청서 `docs/handoff/customer-app/2026-11-23-backend-timer-theme-style.md` | 요청 |
 | BR-85 | 보통 | 고객 | 내 쿠폰에 쓴 시각 — `Coupon.usedAt`(쿠폰함 초안 10-D 지난 쿠폰 "M.d(E)에 사용"). 요청서 `docs/handoff/customer-app/2026-11-23-backend-coupon-used-at.md` | 요청 |
 | BR-86 | 낮음 | 고객 | 리뷰 쓰기 목록 주문별 쓸 수 있는 품목 수 — `ReviewEligibility.orderWritableCount`(쪽 경계에서 리뷰관리 H 주문 머리 수가 덜 세지는 것). 요청서 `docs/handoff/customer-app/2026-11-23-backend-review-order-writable-count.md` | 요청 |
+| BR-87 | 보통 | 고객 | 검색 0건일 때 비슷한 상품 `similarItems`(초안 16 B-3 "이런 상품은 어때요?"). 요청서 `docs/handoff/customer-app/2026-11-23-backend-search-zero-similar-and-typo-only.md` | 요청 |
+| BR-88 | 보통 | 고객 | 검색 교정·제안은 진짜 오타일 때만 — "서울우유"(정상 상품명)에 suggestedQuery "우유"가 오는 것 막기. 요청서 `docs/handoff/customer-app/2026-11-23-backend-search-zero-similar-and-typo-only.md` | 요청 |
+| BR-89 | 보통 | 고객 | 카테고리 이미지 `CategoryNode.imageUrl`(초안 15 B 하위 동그라미·알약 칩 — 하위마다 다른 그림). 요청서 `docs/handoff/customer-app/2026-11-23-backend-category-image.md` | 요청 |
 
 ---
 

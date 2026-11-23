@@ -95,7 +95,8 @@ class CategoryScreen extends ConsumerWidget {
                     return InkWell(
                       key: ValueKey('category-${root.categoryId}'),
                       borderRadius: BorderRadius.circular(14),
-                      onTap: () => _showChildren(context, l10n, root, nodes),
+                      // 초안 15 B: 시트 없이 바로 카테고리 화면(전체).
+                      onTap: () => _open(context, root),
                       child: Row(
                         children: [
                           // 레퍼런스 3-3: 동그란 그림 칸.
@@ -124,58 +125,6 @@ class CategoryScreen extends ConsumerWidget {
             ],
           );
         },
-      ),
-    );
-  }
-
-  /// 상위 카테고리를 누르면 "전체" + 하위 카테고리를 아래 시트로 보인다.
-  void _showChildren(
-    BuildContext context,
-    AppLocalizations l10n,
-    CategoryNode root,
-    List<CategoryNode> nodes,
-  ) {
-    final children = nodes.where((n) => n.parentId == root.categoryId).toList();
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheet) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text(
-                root.name,
-                style: Theme.of(sheet).textTheme.titleLarge,
-              ),
-            ),
-            ListTile(
-              title: Text(l10n.categoryAll(root.name)),
-              trailing: const PmartLineIcon(
-                PmartLineIcons.chevronRight,
-                size: 18,
-              ),
-              onTap: () {
-                Navigator.of(sheet).pop();
-                _open(context, root);
-              },
-            ),
-            for (final child in children)
-              ListTile(
-                key: ValueKey('category-${child.categoryId}'),
-                title: Text(child.name),
-                trailing: const PmartLineIcon(
-                  PmartLineIcons.chevronRight,
-                  size: 18,
-                ),
-                onTap: () {
-                  Navigator.of(sheet).pop();
-                  _open(context, child);
-                },
-              ),
-          ],
-        ),
       ),
     );
   }

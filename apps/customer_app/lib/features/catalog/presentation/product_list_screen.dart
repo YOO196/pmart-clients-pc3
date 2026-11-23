@@ -10,7 +10,11 @@ class ProductListScreen extends StatelessWidget {
     required this.categoryId,
     this.title,
     this.onSale = false,
+    this.keyword,
   });
+
+  /// 검색어(검색 결과 "찾으시는 키워드의 할인 상품 전체 ›" — 초안 16 B).
+  final String? keyword;
 
   final String categoryId;
   final String? title;
@@ -24,6 +28,7 @@ class ProductListScreen extends StatelessWidget {
     body: ProductListView(
       baseQuery: ProductQuery(
         categoryId: categoryId.isEmpty ? null : categoryId,
+        keyword: keyword,
         onSale: onSale,
       ),
     ),

@@ -2565,7 +2565,7 @@ void reviewFlowShots() {
     );
   });
 
-  // 카테고리 → 하위 카테고리 시트 → 상품 목록(지금 모습 확인용).
+  // 카테고리 → 상품 목록(초안 15 B·E-3·D 비교용).
   testWidgets('category-children', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
     await t.runAsync(_loadFonts);
@@ -2588,12 +2588,16 @@ void reviewFlowShots() {
       );
     }
 
+    // 초안 15 B: 상위를 누르면 바로 카테고리 화면 → 하위 고름(E-3) → 내려 봄(D).
     await t.tap(find.text('과일·채소·샐러드').first);
     await t.pumpAndSettle();
-    await shot('cat-sheet');
-    await t.tap(find.byType(ListTile).at(1));
+    await shot('cat-browse-b');
+    await t.drag(find.byType(CustomScrollView).last, const Offset(0, -110));
     await t.pumpAndSettle();
-    await shot('cat-list');
+    await shot('cat-browse-d');
+    await t.tap(find.byKey(const ValueKey('category-pill-C-FRUIT')));
+    await t.pumpAndSettle();
+    await shot('cat-browse-e3');
   });
 
   // 검색 오타 교정 지금 모습(레퍼런스 3-4 2~4 와 비교용).
@@ -2607,6 +2611,7 @@ void reviewFlowShots() {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
     for (final (q, name) in [
+      ('우유', 'search-result-b'),
       ('우우', 'typo-corrected'),
       ('서울우유', 'typo-suggested'),
       ('듀부', 'typo-none'),

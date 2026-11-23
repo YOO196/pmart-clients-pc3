@@ -142,10 +142,14 @@ class ProductTileCard extends StatelessWidget {
     this.onTap,
     this.quickAdd = true,
     this.rail = false,
+    this.highlight,
   });
 
   final ProductTile tile;
   final VoidCallback? onTap;
+
+  /// 이름에서 보라 굵게 보일 글자(검색어, 초안 16 B). 없으면 그대로.
+  final String? highlight;
 
   /// 이미지 위 `+` 바로 담기. 담을 수 있어 보이는 카드에만 보인다([QuickAddButton.offeredFor]).
   final bool quickAdd;
@@ -255,10 +259,10 @@ class ProductTileCard extends StatelessWidget {
     );
     // 레퍼런스(3-2 TOP 30·신상품 카드): 이름 14sp 2줄 → 가격 14sp 굵게 → 회색 "100g당 999원" → 별점
     final info = <Widget>[
-      Text(
-        tile.name,
+      HighlightedName(
+        name: tile.name,
+        highlight: highlight,
         maxLines: 2,
-        overflow: TextOverflow.ellipsis,
         style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14, height: 1.25),
       ),
       const SizedBox(height: 4),
@@ -393,6 +397,67 @@ class _CornerBadge extends StatelessWidget {
           height: 1.1,
         ),
       ),
+    );
+  }
+}
+
+/// 상품 이름 — [highlight] 와 같은 글자(공백 무시 없이 그대로, 대소문자 같게)를 보라 굵게(초안 16 B 검색어 강조).
+class HighlightedName extends StatelessWidget {
+  const HighlightedName({
+    super.key,
+    required this.name,
+    this.highlight,
+    this.maxLines,
+    this.style,
+  });
+
+  final String name;
+  final String? highlight;
+  final int? maxLines;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final base =
+        style ??
+        theme.textTheme.bodyMedium?.copyWith(fontSize: 14, height: 1.25);
+    final h = highlight?.trim();
+    if (h == null || h.isEmpty) {
+      return Text(
+        name,
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+        style: base,
+      );
+    }
+    final lower = name.toLowerCase();
+    final needle = h.toLowerCase();
+    final spans = <TextSpan>[];
+    var i = 0;
+    while (true) {
+      final j = lower.indexOf(needle, i);
+      if (j < 0) {
+        spans.add(TextSpan(text: name.substring(i)));
+        break;
+      }
+      if (j > i) spans.add(TextSpan(text: name.substring(i, j)));
+      spans.add(
+        TextSpan(
+          text: name.substring(j, j + needle.length),
+          style: TextStyle(
+            color: theme.colorScheme.primary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+      i = j + needle.length;
+    }
+    return Text.rich(
+      TextSpan(children: spans),
+      maxLines: maxLines,
+      overflow: TextOverflow.ellipsis,
+      style: base,
     );
   }
 }
