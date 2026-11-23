@@ -97,6 +97,7 @@
 | BR-87 | 보통 | 고객 | 검색 0건일 때 비슷한 상품 `similarItems`(초안 16 B-3 "이런 상품은 어때요?"). 요청서 `docs/handoff/customer-app/2026-11-23-backend-search-zero-similar-and-typo-only.md` | 반영(search 0.12.0 similarItems, 앱 B-3 반영 2026-11-23 — 실기기 확인 남음) |
 | BR-88 | 보통 | 고객 | 검색 교정·제안은 진짜 오타일 때만 — "서울우유"(정상 상품명)에 suggestedQuery "우유"가 오는 것 막기. 요청서 `docs/handoff/customer-app/2026-11-23-backend-search-zero-similar-and-typo-only.md` | 반영(search 0.12.0, 앱 변경 없음 — "서울우유" 제안은 앱 목이었음, 목 고침) |
 | BR-89 | 보통 | 고객 | 카테고리 이미지 `CategoryNode.imageUrl`(초안 15 B 하위 동그라미·알약 칩 — 하위마다 다른 그림). 요청서 `docs/handoff/customer-app/2026-11-23-backend-category-image.md` | 반영(search 0.13.0 `GET /search/category-images` — 요청과 달리 별도 조회, 인기 1위 상품 사진. 앱 반영 2026-11-23 — 실기기 확인 남음) |
+| BR-90 | 보통 | 고객·백오피스 | 리뷰 신고하기(회원만·사유 5가지·한 번만·운영자 확인 뒤 숨김·자기 리뷰 불가·결과 안 알림 — 사용자 결정 2026-11-23) + 운영자 신고 처리. 요청서 `docs/handoff/customer-app/2026-11-23-backend-review-report.md` | 요청 |
 
 ---
 

@@ -85,3 +85,4 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-23-backend-review-order-writable-count.md` | BR-86 리뷰 쓰기 목록 주문별 쓸 수 있는 품목 수(orderWritableCount) |
 | `customer-app/2026-11-23-backend-search-zero-similar-and-typo-only.md` | BR-87 검색 0건 비슷한 상품(similarItems)·BR-88 오타일 때만 교정·제안 |
 | `customer-app/2026-11-23-backend-category-image.md` | BR-89 카테고리 이미지(CategoryNode.imageUrl) |
+| `customer-app/2026-11-23-backend-review-report.md` | BR-90 리뷰 신고하기(고객) + 운영자 확인 처리 |
