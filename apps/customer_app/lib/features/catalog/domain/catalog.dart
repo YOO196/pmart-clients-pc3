@@ -30,7 +30,13 @@ class ProductTile {
     this.rank,
     this.unitPrice,
     this.discount,
+    this.soldOut = false,
   });
+
+  /// 목록 카드 품절(search 0.10.0 `SearchHit.availability`·storefront 0.13.0 `DisplayItem.availability` = SOLD_OUT —
+  /// 그 센터가 취급하는 옵션이 모두 품절). UNKNOWN·null(센터 모름·조회 실패)은 false — 품절이라고 하지 않는다.
+  /// 목록 순서는 바꾸지 않는다(백엔드 회신 2026-11-23 "거르지도 줄 세우지도 않는다").
+  final bool soldOut;
 
   /// 기간 할인(storefront 0.8.0·search 0.6.0, ADR-0082 4단계). 없으면 정가만 보인다. 결제 금액은 주문서 견적.
   final SaleDiscount? discount;
@@ -57,7 +63,8 @@ class ProductTile {
   final int? rank;
 
   /// 담기 버튼을 보여도 되는지(안내용). 확정은 장바구니 서버 판정.
-  bool get canOfferAdd => saleState == SaleState.onSale && carried != false;
+  bool get canOfferAdd =>
+      saleState == SaleState.onSale && carried != false && !soldOut;
 }
 
 /// 표시용 기간 할인(서버 값 — 할인가·할인율을 앱이 계산하지 않는다). 결제 금액은 주문서 견적이 정한다.
@@ -116,6 +123,10 @@ enum SectionKind {
   unknown,
 }
 
+/// 타이머 테마 머리 모양(storefront 0.12.0 `timerStyle`, BR-84 — 운영자가 편성에서 고른다).
+/// [label] = 초안 06-C 제목 위 분홍 글자(기본·값 없음), [band] = 06-D 연분홍 띠 + 시·분·초 칸.
+enum TimerStyle { label, band }
+
 @immutable
 class HomeSection {
   const HomeSection({
@@ -129,9 +140,13 @@ class HomeSection {
     this.viewAllRef,
     this.endsAt,
     this.showTimer = false,
+    this.timerStyle = TimerStyle.label,
     this.banners = const [],
     this.intervalSeconds,
   });
+
+  /// [showTimer] 일 때의 머리 모양. 서버 값이 없으면 [TimerStyle.label].
+  final TimerStyle timerStyle;
 
   final String sectionId;
   final SectionKind kind;

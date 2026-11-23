@@ -51,6 +51,7 @@
     }
   },
   "soldOutTemporarily": "일시품절",
+  "listSoldOut": "품절",
   "notCarried": "이 지역에서 팔지 않아요",
   "saleStateUnknown": "판매 상태 확인 중",
   "availabilityLow": "남은 수량이 적어요",
@@ -1534,6 +1535,7 @@
   "reviewPhotosMore": "모아보기",
   "reviewPhotosTitle": "사진리뷰 모아보기",
   "sectionTimeLeft": "{time} 남음",
+  "sectionTimeLeftCaption": "남은 시간",
   "@sectionTimeLeft": { "placeholders": { "time": { "type": "String" } } },
   "popupHideToday": "오늘 그만 보기",
   "popupClose": "닫기",

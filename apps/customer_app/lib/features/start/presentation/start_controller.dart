@@ -9,6 +9,8 @@ import '../../address/domain/address.dart';
 import '../../address/presentation/address_controller.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../checkout/presentation/checkout_controller.dart'
+    show clockProvider;
 import '../data/device_consents_repository.dart';
 import '../data/splash_promo.dart';
 import '../data/start_store.dart';
@@ -140,6 +142,10 @@ final splashPromoProvider = FutureProvider<SplashPromo?>((ref) async {
     kept = null;
   }
   unawaited(Future.microtask(() => refreshSplashPromo(source, store)));
+  // 받아 둔 배너의 편성 기간이 끝났으면 그리지 않는다(storefront 0.13.0 endsAt).
+  if (kept != null && !kept.liveAt(ref.read(clockProvider)().toUtc())) {
+    return null;
+  }
   return kept;
 });
 

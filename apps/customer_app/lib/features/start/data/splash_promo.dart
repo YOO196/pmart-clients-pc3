@@ -9,10 +9,17 @@ import 'package:pmart_api_storefront/pmart_api_storefront.dart' as sf;
 /// 처음 로딩 화면 프로모션(storefront 0.9.0 배너 자리 SPLASH — 백엔드 요청서 2026-11-21 ①).
 /// 서버에 지금 걸린 SPLASH 배너(정렬 순서 첫째). 없으면 null.
 class SplashBannerRef {
-  const SplashBannerRef({required this.bannerId, required this.imageUrl});
+  const SplashBannerRef({
+    required this.bannerId,
+    required this.imageUrl,
+    this.endsAt,
+  });
 
   final String bannerId;
   final String imageUrl;
+
+  /// 편성 끝 시각(storefront 0.13.0 `Banner.endsAt`, UTC). null = 끝 없음.
+  final DateTime? endsAt;
 }
 
 /// 기기에 받아 둔 로딩 화면 이미지(다음 실행에 바로 그린다 — 사용자 결정 2026-11-21 "다음 실행부터").
@@ -24,10 +31,18 @@ class SplashPromo {
     this.imageUrl,
     this.top,
     this.bottom,
+    this.endsAt,
   });
 
   final String bannerId;
   final Uint8List bytes;
+
+  /// 받아 둔 배너의 끝 시각(storefront 0.13.0). 지났으면 다음 실행에 그리지 않는다(백엔드 회신 2026-11-23 §2 —
+  /// 서버에서 내려간 배너가 한 실행 더 보이던 것). null = 끝 없음(예전에 저장한 것 포함).
+  final DateTime? endsAt;
+
+  /// [now] 에 아직 보여도 되는지.
+  bool liveAt(DateTime now) => endsAt == null || now.isBefore(endsAt!);
 
   /// 받은 이미지의 주소(이미지 ID 가 들어 있다). 예전에 저장한 것은 없다 → 다음에 다시 받는다.
   final String? imageUrl;
@@ -96,7 +111,7 @@ final class ApiSplashBannerSource implements SplashBannerSource {
       final id = b.bannerId;
       final url = b.imageUrl;
       if (id != null && url != null && url.isNotEmpty) {
-        return SplashBannerRef(bannerId: id, imageUrl: url);
+        return SplashBannerRef(bannerId: id, imageUrl: url, endsAt: b.endsAt);
       }
     }
     return null;
@@ -166,6 +181,7 @@ final class FileSplashPromoStore implements SplashPromoStore {
       final img = File('${d.path}/banner.img');
       final url = File('${d.path}/banner.url');
       final edge = File('${d.path}/banner.edge');
+      final ends = File('${d.path}/banner.ends');
       if (!await id.exists() || !await img.exists()) return null;
       final bytes = await img.readAsBytes();
       if (bytes.isEmpty) return null;
@@ -185,6 +201,9 @@ final class FileSplashPromoStore implements SplashPromoStore {
         imageUrl: await url.exists() ? (await url.readAsString()).trim() : null,
         top: edges.$1,
         bottom: edges.$2,
+        endsAt: await ends.exists()
+            ? DateTime.tryParse((await ends.readAsString()).trim())
+            : null,
       );
     } on FileSystemException {
       return null;
@@ -203,6 +222,9 @@ final class FileSplashPromoStore implements SplashPromoStore {
       '${promo.top?.toARGB32() ?? ''},${promo.bottom?.toARGB32() ?? ''}',
       flush: true,
     );
+    await File(
+      '${d.path}/banner.ends',
+    ).writeAsString(promo.endsAt?.toUtc().toIso8601String() ?? '', flush: true);
     await File('${d.path}/banner.id')
         .writeAsString(promo.bannerId, flush: true);
   }
@@ -247,7 +269,24 @@ Future<void> refreshSplashPromo(
   }
   final kept = await store.read();
   // 배너와 이미지가 둘 다 같을 때만 그대로 — 이미지만 바뀌어도 새로 받는다(백엔드 요청 2026-11-21 R1).
-  if (kept?.bannerId == now.bannerId && kept?.imageUrl == now.imageUrl) return;
+  if (kept != null &&
+      kept.bannerId == now.bannerId &&
+      kept.imageUrl == now.imageUrl) {
+    // 그림은 같고 기간만 바뀌었으면 받지 않고 끝 시각만 고친다.
+    if (kept.endsAt != now.endsAt) {
+      await store.save(
+        SplashPromo(
+          bannerId: kept.bannerId,
+          bytes: kept.bytes,
+          imageUrl: kept.imageUrl,
+          top: kept.top,
+          bottom: kept.bottom,
+          endsAt: now.endsAt,
+        ),
+      );
+    }
+    return;
+  }
   try {
     final bytes = await source.download(now.imageUrl);
     if (bytes.isEmpty) return;
@@ -260,6 +299,7 @@ Future<void> refreshSplashPromo(
         imageUrl: now.imageUrl,
         top: top,
         bottom: bottom,
+        endsAt: now.endsAt,
       ),
     );
   } on Object {

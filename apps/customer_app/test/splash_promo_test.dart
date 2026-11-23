@@ -59,6 +59,33 @@ void main() {
       expect(source.downloads, hasLength(3));
     });
 
+    // storefront 0.13.0 Banner.endsAt(백엔드 회신 2026-11-23 §2): 받을 때 끝 시각도 저장, 기간만 바뀌면 다시 받지 않고 고친다.
+    test('끝 시각을 함께 저장하고, 기간만 바뀌면 그림은 다시 받지 않는다', () async {
+      final ends = DateTime.utc(2026, 11, 30, 15);
+      final source = MockSplashBannerSource(
+        banner: SplashBannerRef(
+          bannerId: 'BN-1',
+          imageUrl: '/img/1',
+          endsAt: ends,
+        ),
+        bytes: png,
+      );
+      final store = MemorySplashPromoStore();
+      await refreshSplashPromo(source, store);
+      expect(store.promo?.endsAt, ends);
+      final later = DateTime.utc(2026, 12, 5, 15);
+      source.banner = SplashBannerRef(
+        bannerId: 'BN-1',
+        imageUrl: '/img/1',
+        endsAt: later,
+      );
+      await refreshSplashPromo(source, store);
+      expect(store.promo?.endsAt, later);
+      expect(source.downloads, hasLength(1));
+      expect(store.promo!.liveAt(DateTime.utc(2026, 12, 5, 14)), isTrue);
+      expect(store.promo!.liveAt(later), isFalse);
+    });
+
     test('서버에 걸린 것이 없으면 지운다(다음 실행은 기본 로딩 화면)', () async {
       final store = MemorySplashPromoStore(
         SplashPromo(bannerId: 'BN-1', bytes: png),
@@ -222,6 +249,17 @@ void main() {
       await t.runAsync(() => refreshSplashPromo(source, store));
       expect(store.promo?.top, const Color(0xFFFF8800));
       expect(store.promo?.bottom, const Color(0xFF113355));
+    });
+
+    testWidgets('받아 둔 배너의 끝 시각이 지났으면 그리지 않는다', (t) async {
+      await start(
+        t,
+        MemorySplashPromoStore(
+          SplashPromo(bannerId: 'BN-1', bytes: png, endsAt: DateTime.utc(2000)),
+        ),
+      );
+      expect(key('start-splash-promo'), findsNothing);
+      await t.pumpAndSettle();
     });
 
     testWidgets('받아 둔 것이 없으면 프로모션 없이 지금처럼', (t) async {

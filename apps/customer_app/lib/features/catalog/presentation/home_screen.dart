@@ -1340,6 +1340,63 @@ class _SectionView extends ConsumerWidget {
     }
     final scheme = Theme.of(context).colorScheme;
     final endsAt = section.showTimer ? section.endsAt : null;
+    final hasViewAll =
+        shown.hasViewAll ||
+        (!vertical &&
+            shown.rankedComplete &&
+            shown.items.length > rankGridCount);
+    void openAll() => context.push(
+      '/sections/${shown.sectionId}',
+      extra: SectionRef(shown, layoutVersion),
+    );
+    // 초안 06-D 띠형(timerStyle BAND): 머리를 연분홍 띠로, 전체보기는 상품 줄 아래 넓은 버튼.
+    if (endsAt != null && section.timerStyle == TimerStyle.band) {
+      final band = Padding(
+        padding: const EdgeInsets.only(top: 6, bottom: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _TimerBandHeader(
+              key: ValueKey('section-timer-band-${section.sectionId}'),
+              title: section.title,
+              subtitle: section.subtitle,
+              endsAt: endsAt,
+            ),
+            const SizedBox(height: 12),
+            body,
+            if (hasViewAll)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: OutlinedButton(
+                  key: ValueKey('section-view-all-${section.sectionId}'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    foregroundColor: scheme.onSurface,
+                    side: BorderSide(color: scheme.outlineVariant),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    textStyle: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(fontSize: 14),
+                  ),
+                  onPressed: openAll,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(l10n.sectionViewAll),
+                      const PmartLineIcon(
+                        PmartLineIcons.chevronRight,
+                        size: 15,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+      return SectionExpiry(endsAt: endsAt, child: band);
+    }
     final view = Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 20),
       child: Column(
@@ -1350,17 +1407,14 @@ class _SectionView extends ConsumerWidget {
             subtitle: section.subtitle,
             // 타이머 테마(storefront 0.9.0 showTimer): 남은 시간 알약은 제목 위 줄에 — 옆에 두면 긴 제목이 좁은
             // 칸에 여러 줄로 꺾였다(사용자 2026-11-21 "테마 이름이 너무 좁게 잡혀").
+            // 초안 06-C 라벨형(timerStyle LABEL·값 없음): 제목 위 분홍 글자, 알약 바탕 없음(BR-84).
             titleTop: endsAt == null
                 ? null
                 : SectionCountdown(
                     key: ValueKey('section-timer-${section.sectionId}'),
                     endsAt: endsAt,
                   ),
-            trailing:
-                shown.hasViewAll ||
-                    (!vertical &&
-                        shown.rankedComplete &&
-                        shown.items.length > rankGridCount)
+            trailing: hasViewAll
                 ? TextButton(
                     key: ValueKey('section-view-all-${section.sectionId}'),
                     style: TextButton.styleFrom(
@@ -1368,10 +1422,7 @@ class _SectionView extends ConsumerWidget {
                       textStyle: Theme.of(context).textTheme.bodyMedium
                           ?.copyWith(fontSize: 14),
                     ),
-                    onPressed: () => context.push(
-                      '/sections/${shown.sectionId}',
-                      extra: SectionRef(shown, layoutVersion),
-                    ),
+                    onPressed: openAll,
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -2117,7 +2168,8 @@ String remainingClock(Duration d) {
   return '${two(s ~/ 3600)}:${two(s % 3600 ~/ 60)}:${two(s % 60)}';
 }
 
-/// 타이머 테마의 남은 시간 알약(레퍼런스 "일일 특가" 빨간 시계 알약). 1초마다 줄어든다.
+/// 타이머 테마의 남은 시간 — 초안 06-C 라벨형: 분홍(tertiary) 시계 + "05:12:30 남음", 바탕 없음. 1초마다 줄어든다.
+/// (전에는 빨간 알약 #F2383B — 팔레트 밖이라 초안대로 tertiary. MD 탭 이름 위 타이머는 그대로.)
 class SectionCountdown extends ConsumerStatefulWidget {
   const SectionCountdown({super.key, required this.endsAt});
 
@@ -2149,31 +2201,156 @@ class _SectionCountdownState extends ConsumerState<SectionCountdown> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final left = widget.endsAt.difference(ref.read(homeClockProvider)());
-    return Container(
-      height: 24,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+    final pink = theme.colorScheme.tertiary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        PmartLineIcon(
+          PmartLineIcons.clock,
+          size: 14,
+          color: pink,
+          strokeWidth: 2,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          l10n.sectionTimeLeft(remainingClock(left)),
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: pink,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 초안 06-D 띠형 머리: 연분홍(tertiaryContainer) 띠 — 왼쪽 제목(2줄까지)·부제, 오른쪽 시·분·초 흰 칸 + "남은 시간".
+class _TimerBandHeader extends ConsumerStatefulWidget {
+  const _TimerBandHeader({
+    super.key,
+    required this.title,
+    required this.endsAt,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final DateTime endsAt;
+
+  @override
+  ConsumerState<_TimerBandHeader> createState() => _TimerBandHeaderState();
+}
+
+class _TimerBandHeaderState extends ConsumerState<_TimerBandHeader> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final parts = remainingClock(
+      widget.endsAt.difference(ref.read(homeClockProvider)()),
+    ).split(':');
+    final digit = theme.textTheme.titleMedium?.copyWith(
+      fontSize: 17,
+      fontWeight: FontWeight.w800,
+      color: scheme.tertiary,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    Widget box(String v) => Container(
+      width: 34,
+      height: 32,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: sectionTimerColor,
-        borderRadius: BorderRadius.circular(12),
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(v, style: digit),
+    );
+    final colon = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: Text(':', style: digit),
+    );
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
+      decoration: BoxDecoration(
+        color: scheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          const PmartLineIcon(
-            PmartLineIcons.clock,
-            size: 14,
-            color: Colors.white,
-            strokeWidth: 2,
-          ),
-          const SizedBox(width: 3),
-          Text(
-            l10n.sectionTimeLeft(remainingClock(left)),
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-              fontFeatures: const [FontFeature.tabularFigures()],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    height: 1.3,
+                    color: scheme.onTertiaryContainer,
+                  ),
+                ),
+                if (widget.subtitle case final s? when s.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      s,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 13,
+                        color: scheme.onTertiaryContainer,
+                      ),
+                    ),
+                  ),
+              ],
             ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  box(parts[0]),
+                  colon,
+                  box(parts[1]),
+                  colon,
+                  box(parts[2]),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                l10n.sectionTimeLeftCaption,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 11.5,
+                  color: scheme.onTertiaryContainer,
+                ),
+              ),
+            ],
           ),
         ],
       ),

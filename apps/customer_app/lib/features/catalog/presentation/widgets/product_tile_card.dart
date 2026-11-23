@@ -183,6 +183,7 @@ class ProductTileCard extends StatelessWidget {
     final dimmed = !tile.canOfferAdd;
     final status = switch ((tile.saleState, tile.carried)) {
       (SaleState.temporarilySoldOut, _) => l10n.soldOutTemporarily,
+      _ when tile.soldOut => l10n.listSoldOut,
       (_, false) => l10n.notCarried,
       (SaleState.unknown, _) => l10n.saleStateUnknown,
       _ => null,

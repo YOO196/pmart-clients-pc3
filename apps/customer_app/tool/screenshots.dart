@@ -1619,6 +1619,38 @@ void main() {
       matchesGoldenFile(File('$_dir/section-timer.png').uri),
     );
   });
+  // BR-84 띠형(storefront 0.12.0 timerStyle BAND, 초안 06-D).
+  testWidgets('section-timer-band', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final now = DateTime.utc(2026, 11, 21, 3);
+    final catalog = MockCatalogRepository(latency: Duration.zero)
+      ..timedSections['S-NEW'] = now.add(
+        const Duration(hours: 5, minutes: 12, seconds: 30),
+      )
+      ..bandTimerSections.add('S-NEW');
+    await t.pumpWidget(
+      testApp([
+        homeClockProvider.overrideWithValue(() => now),
+      ], catalog: catalog),
+    );
+    await t.pumpAndSettle();
+    await t.scrollUntilVisible(
+      find.byKey(const ValueKey('section-timer-band-S-NEW')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await t.drag(find.byType(CustomScrollView).first, const Offset(0, 250));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/section-timer-band.png').uri),
+    );
+  });
   // 홈 팝업(storefront POPUP, 사용자 결정 A 가운데 카드): 목은 이미지가 없어 대체 문구로 그려진다.
   testWidgets('home-popup', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');

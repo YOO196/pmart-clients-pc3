@@ -172,6 +172,9 @@ base class MockCatalogRepository implements CatalogRepository {
   /// 타이머 테마(storefront 0.9.0 showTimer): 영역 ID → 끝 시각. 기본은 없음. 시험·캡처가 넣는다.
   final timedSections = <String, DateTime>{};
 
+  /// 타이머 테마 중 띠형(storefront 0.12.0 timerStyle BAND, BR-84)으로 보일 영역 ID. 없으면 라벨형.
+  final bandTimerSections = <String>{};
+
   /// MD 탭(storefront 0.9.0 customTabs): 탭 키(X-…) → 이름·기간·타이머·넣은 영역. 기본은 없음. 시험·캡처가 넣는다.
   /// [goneTabs] 에 넣은 탭은 홈에는 남아 있어도 내용 조회가 404 TAB_NOT_FOUND(기간이 지난 탭 흉내).
   final customTabs =
@@ -208,6 +211,8 @@ base class MockCatalogRepository implements CatalogRepository {
     'priceVersion': 1,
     'saleState': p.saleState,
     'carried': true,
+    // 목록 카드 품절(search 0.10.0·storefront 0.13.0): 모든 옵션 품절이면 SOLD_OUT.
+    'availability': p.availability == 'SOLD_OUT' ? 'SOLD_OUT' : 'AVAILABLE',
     'rating': ?p.rating,
     'reviewCount': ?p.reviewCount,
     'badge': p.newness > 0 ? 'NEW' : 'NONE',
@@ -324,6 +329,9 @@ base class MockCatalogRepository implements CatalogRepository {
                 if (timedSections[id] case final end?) ...{
                   'endsAt': end.toUtc().toIso8601String(),
                   'showTimer': true,
+                  'timerStyle': bandTimerSections.contains(id)
+                      ? 'BAND'
+                      : 'LABEL',
                 },
                 'items': [
                   for (final (i, p) in _sectionProducts(id).indexed)

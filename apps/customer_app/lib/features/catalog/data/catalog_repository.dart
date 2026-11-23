@@ -320,6 +320,7 @@ ProductTile _tileFromDisplay(sf.DisplayItem i) => ProductTile(
   basePrice: i.basePrice,
   saleState: _saleState(i.saleState?.value),
   carried: i.carried,
+  soldOut: i.availability?.value == 'SOLD_OUT',
   rating: i.rating?.toDouble(),
   reviewCount: i.reviewCount,
   badge: switch (i.badge) {
@@ -426,6 +427,9 @@ List<HomeSection> sectionsFromContract(Iterable<sf.Section> sections) => [
         viewAllRef: s.viewAllRef,
         endsAt: s.endsAt,
         showTimer: (s.showTimer ?? false) && s.endsAt != null,
+        timerStyle: s.timerStyle?.value == 'BAND'
+            ? TimerStyle.band
+            : TimerStyle.label,
       ),
 ];
 
@@ -461,6 +465,7 @@ HomeSection sectionItemsFromContract(
   viewAllRef: base.viewAllRef,
   endsAt: base.endsAt,
   showTimer: base.showTimer,
+  timerStyle: base.timerStyle,
 );
 
 List<CategoryNode> categoriesFromContract(pd.GetCategoryTree200Response r) {
@@ -500,6 +505,7 @@ ProductPage searchFromContract(sr.SearchResult r) => ProductPage(
         basePrice: h.basePrice,
         saleState: _saleState(h.saleState?.value),
         carried: h.carried,
+        soldOut: h.availability?.value == 'SOLD_OUT',
         rating: h.rating?.toDouble(),
         reviewCount: h.reviewCount,
         discount: saleDiscountOf(
