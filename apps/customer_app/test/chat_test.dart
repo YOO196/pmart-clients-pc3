@@ -296,6 +296,8 @@ void main() {
             .text,
         '포인트는 언제 생기나요?',
       );
+      await t.tap(find.byKey(const ValueKey('inq-kind')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('inq-cat-other')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('inq-submit')));

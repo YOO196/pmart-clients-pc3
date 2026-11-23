@@ -564,9 +564,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   /// 고른 별칭 알약(새 레퍼런스 3-1/2-5 [우리집][회사][추가], 사용자 2026-11-21 "[추가]를 누르면 아래 입력칸").
   _Alias _alias = _Alias.none;
 
-  bool get _aliasEnabled =>
-      widget.editAddressId != null &&
-      ref.read(sessionProvider) is MemberSession;
+  // 회원이면 새 주소 등록에도(사용자 2026-11-23 "로그인되었음에도 주소 별칭 넣는게 없어") — 계약 AddressInput.label.
+  bool get _aliasEnabled => ref.read(sessionProvider) is MemberSession;
 
   /// 고객이 큰 지도에서 확인한 배달 위치(보낼 `geo`). 확인 전에는 null — 서버가 도로명으로 채운다.
   GeoPoint? _geo;
@@ -728,8 +727,15 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
             ? notifier.add
             : (AddressDraft d) => notifier.modify(editId, d))(
           AddressDraft(
-            // 고칠 때는 고른 알약 값(고르지 않았으면 빈 글 — 별칭 지우기). 새 주소는 별칭을 묻지 않는다.
-            label: _aliasEnabled ? _aliasText(l10n) : null,
+            // 고칠 때는 고른 알약 값(고르지 않았으면 빈 글 — 별칭 지우기). 새 주소는 고르지 않았으면 보내지 않는다.
+            label: switch ((_aliasEnabled, editId)) {
+              (false, _) => null,
+              (true, null) => switch (_aliasText(l10n)) {
+                '' => null,
+                final v => v,
+              },
+              (true, _) => _aliasText(l10n),
+            },
             roadAddress: _road.text.trim(),
             detailAddress: _detail.text.trim(),
             // 받는 분·연락처는 보내지 않는다 — 주문 초안이 회원 프로필 값을 쓴다(BR-60 R1·R2).

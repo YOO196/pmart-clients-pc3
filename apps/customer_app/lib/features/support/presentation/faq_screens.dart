@@ -72,29 +72,16 @@ class SupportFaqBlock extends ConsumerWidget {
           onTap: () => context.push('/support/faqs'),
         ),
         switch (value) {
+          // 자주 묻는 질문 페이지의 질문 유형과 같은 알약·간격(사용자 2026-11-23): 높이 33, 칸·줄 사이 10.
           AsyncData(value: final FaqList list) => Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: FaqTypeChips.gap,
+            runSpacing: FaqTypeChips.gap,
             children: [
               for (final c in list.categories)
-                ActionChip(
+                FaqTypePill(
                   key: ValueKey('support-faq-cat-${c.category}'),
-                  label: Text(c.title),
-                  // 레퍼런스: 회색 채운 알약 + 얇은 회색 테두리
-                  backgroundColor: theme.colorScheme.surfaceContainer,
-                  side: BorderSide(color: theme.colorScheme.outlineVariant),
-                  labelStyle: theme.textTheme.bodyMedium?.copyWith(
-                    fontSize: 14,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 4,
-                  ),
-                  // 줄 사이를 좁게(사용자 2026-11-21 "세로 간격 조금 좁히기") — 칩마다 붙던 48 터치 여백을 뺀다.
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                  shape: const StadiumBorder(),
-                  onPressed: () => context.push(
+                  label: c.title,
+                  onTap: () => context.push(
                     Uri(
                       path: '/support/faqs',
                       queryParameters: {'category': c.category},
@@ -122,7 +109,7 @@ class SupportFaqBlock extends ConsumerWidget {
           ),
           _ => const SizedBox(height: 40),
         },
-        const SizedBox(height: 8),
+        const SizedBox(height: 20),
       ],
     );
   }
@@ -422,6 +409,9 @@ class FaqTypeChips extends StatefulWidget {
 
   static const maxLines = 4;
 
+  /// 알약 사이(칸·줄) 간격 — 고객센터 메인 칩도 같은 값.
+  static const gap = 10.0;
+
   @override
   State<FaqTypeChips> createState() => _FaqTypeChipsState();
 }
@@ -471,9 +461,9 @@ class _FaqTypeChipsState extends State<FaqTypeChips> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Wrap(
-                      spacing: 10,
+                      spacing: FaqTypeChips.gap,
                       // 줄 사이 15 → 10(사용자 2026-11-21 "세로 간격 조금 좁히기").
-                      runSpacing: 10,
+                      runSpacing: FaqTypeChips.gap,
                       children: [
                         for (final (value, label) in entries.take(shown))
                           _chip(theme, scheme, style, value, label),
@@ -520,15 +510,39 @@ class _FaqTypeChipsState extends State<FaqTypeChips> {
     TextStyle? style,
     String? value,
     String label,
-  ) {
-    final on = widget.selected == value;
+  ) => FaqTypePill(
+    key: ValueKey('faq-cat-${value ?? 'all'}'),
+    label: label,
+    selected: widget.selected == value,
+    onTap: () => widget.onSelected(value),
+  );
+}
+
+/// 질문 유형 알약(회색 채움·얇은 테두리, 높이 33, 글자 14). 고른 것은 검정 바탕·흰 글자.
+/// 자주 묻는 질문 페이지와 고객센터 메인이 같이 쓴다.
+class FaqTypePill extends StatelessWidget {
+  const FaqTypePill({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.selected = false,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final on = selected;
     return Semantics(
       button: true,
       selected: on,
       child: InkWell(
-        key: ValueKey('faq-cat-${value ?? 'all'}'),
         borderRadius: BorderRadius.circular(17),
-        onTap: () => widget.onSelected(value),
+        onTap: onTap,
         child: Container(
           height: 33,
           padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -543,7 +557,8 @@ class _FaqTypeChipsState extends State<FaqTypeChips> {
             widthFactor: 1,
             child: Text(
               label,
-              style: style?.copyWith(
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: 14,
                 color: on ? scheme.surface : scheme.onSurface,
               ),
             ),

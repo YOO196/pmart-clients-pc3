@@ -53,21 +53,19 @@ void main() {
     await t.pumpAndSettle();
   }
 
-  Future<FilledButton> submit(WidgetTester t) async {
-    await t.scrollUntilVisible(
-      find.byKey(const ValueKey('inq-submit')),
-      200,
-      scrollable: find.byType(Scrollable).last,
-    );
-    return t.widget(find.byKey(const ValueKey('inq-submit')));
-  }
+  // 초안 17: [문의 남기기]는 아래 고정이라 굴리지 않아도 보인다.
+  Future<FilledButton> submit(WidgetTester t) async =>
+      t.widget(find.byKey(const ValueKey('inq-submit')));
 
   testWidgets(
     '사진을 고르면 바로 올리고, 실패한 사진이 있으면 보낼 수 없다. 다시 올리기는 같은 키, 접수되면 상세에 사진',
     (t) async {
       await start(t);
       await push(t, '/support/inquiries/new');
+      await t.tap(find.byKey(const ValueKey('inq-kind')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('inq-cat-product')));
+      await t.pumpAndSettle();
       await t.enterText(find.byKey(const ValueKey('inq-body')), '상품이 깨져 왔어요');
       await t.pumpAndSettle();
 
@@ -91,8 +89,21 @@ void main() {
       expect(repo.photos.length, 2);
       expect((await submit(t)).onPressed, isNotNull);
 
-      await t.ensureVisible(find.byKey(const ValueKey('inq-submit')));
       await t.tap(find.byKey(const ValueKey('inq-submit')));
+      await t.pumpAndSettle();
+      // 완료 화면에 사진 수, 내 문의 내역 → 상세에 사진.
+      expect(find.text('2장'), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('inq-done-list')));
+      await t.pumpAndSettle();
+      await t.tap(
+        find
+            .byWidgetPredicate(
+              (w) =>
+                  w.key is ValueKey<String> &&
+                  (w.key! as ValueKey<String>).value.startsWith('inquiry-'),
+            )
+            .first,
+      );
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('inquiry-body')), findsOneWidget);
       expect(

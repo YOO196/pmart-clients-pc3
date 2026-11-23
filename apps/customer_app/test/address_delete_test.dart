@@ -215,7 +215,21 @@ void main() {
     await t.pumpAndSettle();
     expect(await labelOf(t, repo), isNull);
   });
-  testWidgets('새 주소 등록에는 별칭 칸이 없다', (t) async {
+  testWidgets('회원은 새 주소 등록에도 별칭 알약이 있다(사용자 2026-11-23)', (t) async {
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await _openAddresses(t);
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    unawaited(router.push('/addresses/new'));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('address-alias-home')), findsOneWidget);
+    expect(find.byKey(const ValueKey('address-alias-work')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('address-alias-custom')));
+    await t.pump();
+    expect(find.byKey(const ValueKey('f-label')), findsOneWidget);
+  });
+
+  testWidgets('비회원 새 주소 등록에는 별칭 칸이 없다(회원만)', (t) async {
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
     final router = GoRouter.of(t.element(find.byType(Scaffold).first));

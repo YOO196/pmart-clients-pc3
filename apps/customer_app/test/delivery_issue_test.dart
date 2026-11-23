@@ -66,13 +66,18 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('inq-issue')), findsOneWidget);
-    // 종류는 배송으로 고정 — 다른 종류를 고를 수 없다.
+    // 종류·주문은 고정(초안 17 F) — 줄을 눌러도 시트가 열리지 않고 오른쪽에 "고정".
+    expect(find.byKey(const ValueKey('inq-issue-head')), findsOneWidget);
     expect(
-      t
-          .widget<ChoiceChip>(find.byKey(const ValueKey('inq-cat-order')))
-          .onSelected,
+      t.widget<InkWell>(find.byKey(const ValueKey('inq-kind'))).onTap,
       isNull,
     );
+    expect(
+      t.widget<InkWell>(find.byKey(const ValueKey('inq-pick-order'))).onTap,
+      isNull,
+    );
+    expect(find.text('고정'), findsNWidgets(2));
+    expect(find.text('배송'), findsOneWidget);
     await t.enterText(find.byKey(const ValueKey('inq-body')), '30분째 안 와요');
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('inq-submit')));
@@ -102,8 +107,11 @@ void main() {
     await t.tap(find.byKey(const ValueKey('inq-submit')));
     await t.pumpAndSettle();
     expect(
-      t.widget<Text>(find.byKey(const ValueKey('inq-message'))).data,
-      contains('진행 중인 주문만'),
+      find.descendant(
+        of: find.byKey(const ValueKey('inq-message')),
+        matching: find.textContaining('진행 중인 주문만'),
+      ),
+      findsOneWidget,
     );
     expect(inquiries.created, 0);
   });

@@ -10,6 +10,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:customer_app/features/support/data/mock_inquiries_repository.dart';
+import 'package:customer_app/features/support/domain/inquiry.dart';
+import 'package:customer_app/features/support/presentation/inquiry_controller.dart'
+    show inquiriesRepositoryProvider;
+import 'package:customer_app/features/support/presentation/inquiry_screens.dart'
+    show InquiryFormArgs;
 import 'package:customer_app/features/support/data/mock_chat_repository.dart';
 import 'package:customer_app/features/support/presentation/chat_controller.dart'
     show chatRepositoryProvider;
@@ -1532,6 +1538,17 @@ void main() {
       find.byType(CustomerApp),
       matchesGoldenFile(File('$_dir/address-alias.png').uri),
     );
+    // 회원 새 주소 등록에도 별칭 알약(사용자 2026-11-23).
+    GoRouter.of(t.element(find.byType(Scaffold).first)).pop();
+    await t.pumpAndSettle();
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/addresses/new'),
+    );
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/address-alias-new.png').uri),
+    );
   });
   // MD 탭(storefront 0.9.0 customTabs): 고정 탭 뒤, 타이머 탭은 이름 위 남은 시간.
   testWidgets('custom-tabs', (t) async {
@@ -1821,10 +1838,16 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('login-kakao')));
     await t.pumpAndSettle();
+    // 고객센터 메인 FAQ 구역(페이지와 같은 간격인지 비교용).
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/support'),
+    );
+    await shot('support-main');
     unawaited(
       GoRouter.of(t.element(find.byType(Scaffold).first)).push('/support/faqs'),
     );
     await t.pumpAndSettle();
+    await shot('page-all');
     await t.tap(find.byKey(const ValueKey('faq-cat-CANCEL')));
     await shot('closed');
     await t.tap(find.byKey(const ValueKey('faq-types-more')));
@@ -1844,6 +1867,75 @@ void main() {
     );
     await t.tap(find.byKey(const ValueKey('faq-faq-cancel-1')));
     await shot('expanded');
+  });
+
+  // 초안 17 문의 남기기(I 입력·D 완료·F 배송 신고·G-1 비회원) 비교용.
+  testWidgets('inquiry-17', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2180)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp([
+        inquiriesRepositoryProvider.overrideWithValue(
+          MockInquiriesRepository(latency: Duration.zero),
+        ),
+      ]),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String n) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/inq-$n.png').uri),
+      );
+    }
+
+    GoRouter router() => GoRouter.of(t.element(find.byType(Scaffold).first));
+    unawaited(router().push('/support/inquiries/new'));
+    await shot('g1-guest');
+    router().pop();
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    unawaited(router().push('/support/inquiries/new'));
+    await shot('i-empty');
+    await t.tap(find.byKey(const ValueKey('inq-kind')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('inq-cat-delivery')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('inq-pick-order')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('inq-pick-order-seed-1')));
+    await t.pumpAndSettle();
+    await t.enterText(
+      find.byKey(const ValueKey('inq-body')),
+      '주문한 지 1시간이 넘었는데 아직 배달이 안 왔어요. 언제쯤 도착하는지 알려 주세요.',
+    );
+    await t.pumpAndSettle();
+    FocusManager.instance.primaryFocus?.unfocus();
+    await shot('i-filled');
+    await t.tap(find.byKey(const ValueKey('inq-submit')));
+    await shot('d-done');
+    await t.tap(find.byKey(const ValueKey('inq-done-ok')));
+    await t.pumpAndSettle();
+    unawaited(
+      router().push(
+        '/support/inquiries/new',
+        extra: const InquiryFormArgs(
+          orderId: 'order-seed-4',
+          deliveryIssue: DeliveryIssue.delayed,
+          origin: InquiryOrigin.inquiryPage,
+        ),
+      ),
+    );
+    await shot('f-issue');
   });
 
   // 고객센터 2-4-1: 주문 건 문의인데 최근 2일 주문이 없을 때.

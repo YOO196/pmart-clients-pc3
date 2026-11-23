@@ -140,22 +140,56 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('문의는 로그인한 뒤에 남길 수 있어요'), findsOneWidget);
       expect(find.byKey(const ValueKey('inq-submit')), findsNothing);
+      // 초안 17 G-1: [로그인] [자주 묻는 질문 보기]
+      expect(find.byKey(const ValueKey('inq-guest-login')), findsOneWidget);
+      expect(find.byKey(const ValueKey('inq-guest-faq')), findsOneWidget);
     });
 
-    testWidgets('종류·내용을 채워야 보낼 수 있고, 접수되면 문의 상세로 간다', (t) async {
+    testWidgets('종류·내용을 채워야 보낼 수 있고(못 누를 땐 이유 한 줄), 접수되면 완료 화면 → 내 문의 내역', (
+      t,
+    ) async {
       await openSupport(t);
       await t.tap(find.byKey(const ValueKey('support-new-inquiry')));
       await t.pumpAndSettle();
       FilledButton submit() =>
           t.widget(find.byKey(const ValueKey('inq-submit')));
       expect(submit().onPressed, isNull);
+      expect(find.text('종류를 고르면 남길 수 있어요'), findsOneWidget);
+      expect(find.text('선택'), findsNWidgets(2));
+      await t.tap(find.byKey(const ValueKey('inq-kind')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('inq-cat-delivery')));
+      await t.pumpAndSettle();
+      expect(find.text('내용을 적으면 남길 수 있어요'), findsOneWidget);
       await t.enterText(find.byKey(const ValueKey('inq-body')), '배송이 늦어요');
       await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('inq-reason')), findsNothing);
       expect(submit().onPressed, isNotNull);
       await t.tap(find.byKey(const ValueKey('inq-submit')));
       await t.pumpAndSettle();
       expect(repo.created, 1);
+      // 초안 17 D: 접수 완료 화면(서버 확정 뒤) — 요약 + [내 문의 내역] [확인].
+      expect(find.byKey(const ValueKey('inq-done')), findsOneWidget);
+      expect(find.text('문의를 접수했어요'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('inq-done-summary')),
+          matching: find.text('배송'),
+        ),
+        findsOneWidget,
+      );
+      await t.tap(find.byKey(const ValueKey('inq-done-list')));
+      await t.pumpAndSettle();
+      await t.tap(
+        find
+            .byWidgetPredicate(
+              (w) =>
+                  w.key is ValueKey<String> &&
+                  (w.key! as ValueKey<String>).value.startsWith('inquiry-'),
+            )
+            .first,
+      );
+      await t.pumpAndSettle();
       expect(find.text('문의 내용'), findsOneWidget);
       expect(find.byKey(const ValueKey('inquiry-body')), findsOneWidget);
       expect(find.text('배송이 늦어요'), findsOneWidget);
@@ -176,10 +210,8 @@ void main() {
       expect(find.byKey(const ValueKey('inq-order')), findsOneWidget);
       expect(find.textContaining('order-seed-1'), findsNothing);
       expect(
-        t
-            .widget<ChoiceChip>(find.byKey(const ValueKey('inq-cat-order')))
-            .selected,
-        isTrue,
+        t.widget<Text>(find.byKey(const ValueKey('inq-kind-value'))).data,
+        '주문',
       );
       await t.enterText(find.byKey(const ValueKey('inq-body')), '포장이 찢어졌어요');
       await t.pumpAndSettle();
@@ -192,7 +224,10 @@ void main() {
       await openSupport(t);
       await t.tap(find.byKey(const ValueKey('support-new-inquiry')));
       await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('inq-kind')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('inq-cat-other')));
+      await t.pumpAndSettle();
       await t.enterText(find.byKey(const ValueKey('inq-body')), '기타 문의');
       await t.pumpAndSettle();
       repo
@@ -209,7 +244,7 @@ void main() {
       await t.tap(find.byKey(const ValueKey('inq-submit')));
       await t.pumpAndSettle();
       expect(repo.created, 1);
-      expect(find.byKey(const ValueKey('inquiry-body')), findsOneWidget);
+      expect(find.byKey(const ValueKey('inq-done')), findsOneWidget);
     });
 
     testWidgets('내 문의: 최근 순 목록 · 상태, 답변 완료 문의는 답변을 보인다', (t) async {

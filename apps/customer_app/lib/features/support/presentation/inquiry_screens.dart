@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show Uint8List;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 import 'package:pmart_core/pmart_core.dart'
     show IdempotencyKey, PmartFailure, ProblemFailure;
 import 'package:pmart_ui/pmart_ui.dart';
@@ -15,7 +16,8 @@ import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../orders/presentation/orders_providers.dart'
     show orderDetailProvider, orderListProvider, orderStatusText;
-import '../../orders/domain/orders.dart' show OrderListQuery;
+import '../../orders/domain/orders.dart' show OrderDetail, OrderListQuery;
+import '../../../shared/choice_sheet.dart';
 import '../../reviews/presentation/reviews_controller.dart'
     show ReviewPhotoSource, reviewPhotoPickerProvider;
 import '../../profile/presentation/profile_controller.dart'
@@ -1016,6 +1018,9 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
 
   /// 접수 결과를 모른다 — 본문을 잠그고 같은 키로만 다시 확인한다.
   bool _unknown = false;
+
+  /// 서버가 접수를 확정했다 — 완료 화면(초안 17 D). 사진 수는 보낸 것.
+  ({InquiryCategory category, int photos})? _done;
   String? _message;
 
   @override
@@ -1106,6 +1111,22 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
     }
   }
 
+  /// 종류 고르기 — 아래 시트(초안 17 I).
+  Future<void> _pickCategory() async {
+    final l10n = AppLocalizations.of(context);
+    final picked = await showChoiceSheet<InquiryCategory?>(
+      context,
+      title: l10n.inqCategoryLabel,
+      closeKey: const ValueKey('inq-cat-close'),
+      selected: _category,
+      options: [
+        for (final c in InquiryCategory.values)
+          (c, inquiryCategoryText(l10n, c), ValueKey('inq-cat-${c.name}')),
+      ],
+    );
+    if (picked != null && mounted) setState(() => _category = picked);
+  }
+
   Future<void> _pickOrder() async {
     final picked = await showModalBottomSheet<String>(
       context: context,
@@ -1145,12 +1166,13 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
     );
     if (!mounted) return;
     switch (outcome) {
-      case InquirySubmitted(:final inquiry):
+      case InquirySubmitted():
         ref.invalidate(inquiryListProvider);
-        showNotice(context, l10n.inqSubmitted);
-        context.pushReplacement(
-          '/support/inquiries/${inquiry.summary.inquiryId}',
-        );
+        // 초안 17 D: 알림 한 줄 뒤 닫히지 않고 접수 완료 화면(서버가 확정한 뒤에만).
+        setState(() {
+          _busy = false;
+          _done = (category: category, photos: _photos.length);
+        });
       case InquiryRejected(:final code, :final status):
         setState(() {
           _busy = false;
@@ -1176,177 +1198,613 @@ class _InquiryFormScreenState extends ConsumerState<InquiryFormScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final member = ref.watch(sessionProvider) is MemberSession;
     final locked = _busy || _unknown;
     final issue = widget.args.deliveryIssue;
     // 배송 신고는 종류(배송)·주문을 바꾸지 않는다 — 서버가 DELIVERY + 주문을 요구한다.
-    final fixed = locked || issue != null;
+    final fixed = issue != null;
+    if (!member) {
+      return Scaffold(
+        appBar: AppBar(title: Text(l10n.supportNewInquiry)),
+        body: const _InquiryGuest(),
+      );
+    }
+    if (_done case final done?) {
+      return _InquiryDone(
+        category: done.category,
+        orderId: _orderId,
+        photos: done.photos,
+      );
+    }
+    final order = switch (_orderId) {
+      final id? => ref.watch(orderDetailProvider(id)).value,
+      null => null,
+    };
+    final orderText = switch ((_orderId, order)) {
+      (null, _) => null,
+      (_, final o?) => _orderSummary(l10n, o),
+      _ => l10n.inqOrderChosenNoNumber,
+    };
+    // 못 누를 때 이유 한 줄(초안 17 I).
+    final reason = _unknown || _busy
+        ? null
+        : _category == null
+        ? l10n.inqReasonCategory
+        : _body.text.trim().isEmpty
+        ? l10n.inqReasonBody
+        : !_photosReady
+        ? l10n.inqReasonPhotos
+        : null;
+    final hint = scheme.onSurfaceVariant;
+    Widget row({
+      required Key key,
+      Key? valueKey,
+      required String label,
+      required String? value,
+      required VoidCallback? onTap,
+    }) => InkWell(
+      key: key,
+      onTap: fixed || locked ? null : onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 52,
+              child: Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(color: hint),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                value ?? l10n.inqNotChosen,
+                key: value == null ? null : valueKey,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontWeight: value == null ? FontWeight.w400 : FontWeight.w700,
+                  color: value == null ? scheme.outline : scheme.onSurface,
+                ),
+              ),
+            ),
+            if (fixed)
+              Text(
+                l10n.inqFixed,
+                style: theme.textTheme.bodySmall?.copyWith(color: hint),
+              )
+            else
+              PmartLineIcon(
+                PmartLineIcons.chevronRight,
+                size: 18,
+                color: scheme.outline,
+              ),
+          ],
+        ),
+      ),
+    );
+    BoxDecoration card() => BoxDecoration(
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(14),
+    );
+    const plain = InputDecoration(
+      border: InputBorder.none,
+      enabledBorder: InputBorder.none,
+      focusedBorder: InputBorder.none,
+      disabledBorder: InputBorder.none,
+      filled: false,
+      counterText: '',
+    );
+    final form = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ① 종류 · 주문
+        Container(
+          decoration: card(),
+          child: Column(
+            children: [
+              row(
+                key: const ValueKey('inq-kind'),
+                valueKey: const ValueKey('inq-kind-value'),
+                label: l10n.inqKindLabel,
+                value: _category == null
+                    ? null
+                    : inquiryCategoryText(l10n, _category),
+                onTap: _pickCategory,
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              row(
+                key: const ValueKey('inq-pick-order'),
+                valueKey: const ValueKey('inq-order'),
+                label: l10n.inqOrderLabel,
+                value: orderText,
+                onTap: _pickOrder,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        // ② 제목 · 내용 · 사진
+        Container(
+          decoration: card(),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                key: const ValueKey('inq-title'),
+                controller: _title,
+                enabled: !locked,
+                maxLength: inquiryTitleMax,
+                decoration: plain.copyWith(hintText: l10n.inqTitleLabel),
+              ),
+              const Divider(height: 1),
+              TextField(
+                key: const ValueKey('inq-body'),
+                controller: _body,
+                enabled: !locked,
+                maxLength: inquiryBodyMax,
+                minLines: 4,
+                maxLines: 12,
+                decoration: plain.copyWith(hintText: l10n.inqBodyHint),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  l10n.inqBodyCount(
+                    NumberFormat.decimalPattern('ko')
+                        .format(_body.text.characters.length),
+                    NumberFormat.decimalPattern('ko').format(inquiryBodyMax),
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(color: hint),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (_photos.length < inquiryPhotosMax)
+                    _DashedAddBox(
+                      key: const ValueKey('inq-photo-add'),
+                      count: _photos.length,
+                      max: inquiryPhotosMax,
+                      onTap: locked ? null : _addPhotos,
+                    ),
+                  for (final (i, p) in _photos.indexed)
+                    _PhotoSlotView(
+                      key: ValueKey('inq-photo-$i'),
+                      slot: p,
+                      onRemove: locked
+                          ? null
+                          : () => setState(() => _photos.remove(p)),
+                      onRetry: locked || !p.failed ? null : () => _upload(p),
+                    ),
+                ],
+              ),
+              if (_photoMessage case final m?)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    m,
+                    key: const ValueKey('inq-photo-message'),
+                    style: TextStyle(color: scheme.error),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            l10n.inqFormNote,
+            style: theme.textTheme.bodySmall?.copyWith(color: hint),
+          ),
+        ),
+      ],
+    );
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.supportNewInquiry)),
-      body: !member
-          ? LoginRequired(message: l10n.inqLoginNeeded)
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (issue != null) ...[
+      backgroundColor: scheme.surfaceContainer,
+      appBar: AppBar(
+        title: Text(l10n.supportNewInquiry),
+        backgroundColor: scheme.surface,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+        children: [
+          // 초안 17 F: 배송 신고로 왔으면 카드 위 연보라 신고 머리.
+          if (issue != null) ...[
+            Container(
+              key: const ValueKey('inq-issue-head'),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.inqIssueHead,
+                    style: theme.textTheme.bodySmall?.copyWith(color: hint),
+                  ),
+                  const SizedBox(height: 2),
                   Text(
                     deliveryIssueText(l10n, issue),
                     key: const ValueKey('inq-issue'),
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
+                      color: scheme.onPrimaryContainer,
                     ),
                   ),
-                  const SizedBox(height: 16),
                 ],
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          // 초안 17 E: 결과 모름이면 카드를 흐리게 잠근다.
+          if (_unknown)
+            Opacity(opacity: 0.45, child: IgnorePointer(child: form))
+          else
+            form,
+          if (_message case final message?)
+            Container(
+              key: const ValueKey('inq-message'),
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _unknown ? scheme.tertiaryContainer : null,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: _unknown ? scheme.onTertiaryContainer : scheme.error,
+                ),
+              ),
+            ),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          color: scheme.surface,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (reason != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    reason,
+                    key: const ValueKey('inq-reason'),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(color: hint),
+                  ),
+                ),
+              FilledButton(
+                key: const ValueKey('inq-submit'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
+                onPressed: _unknown
+                    ? (_busy ? null : _submit)
+                    : (_canSend ? _submit : null),
+                child: Text(_unknown ? l10n.inqCheckAgain : l10n.inqSubmit),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "국산 햇감자 1kg 외 2개 · 20481135"(초안 17 I 주문 줄). 상품명이 없으면 주문번호만, 그것도 없으면 "선택한 주문".
+String _orderSummary(AppLocalizations l10n, OrderDetail o) {
+  final names = [for (final l in o.lines) ?l.productName];
+  final goods = switch (names) {
+    [] => null,
+    [final one] => one,
+    [final first, ...] => l10n.ordersRepresentative(first, names.length - 1),
+  };
+  return switch ((goods, o.orderNumber)) {
+    (final g?, final n?) => '$g · $n',
+    (final g?, null) => g,
+    (null, final n?) => l10n.inqOrderChosen(n),
+    _ => l10n.inqOrderChosenNoNumber,
+  };
+}
+
+/// 사진 더하기 점선 칸 — 카메라 + "n/5"(초안 17 I).
+class _DashedAddBox extends StatelessWidget {
+  const _DashedAddBox({
+    super.key,
+    required this.count,
+    required this.max,
+    required this.onTap,
+  });
+
+  final int count;
+  final int max;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Semantics(
+      button: true,
+      label: l10n.inqPhotoAdd,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: CustomPaint(
+          painter: _DashedRectPainter(scheme.outline),
+          child: SizedBox.square(
+            dimension: _PhotoSlotView.size,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                PmartLineIcon(
+                  PmartLineIcons.camera,
+                  size: 20,
+                  color: scheme.onSurfaceVariant,
+                ),
+                const SizedBox(height: 4),
                 Text(
-                  l10n.inqCategoryLabel,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+                  '$count/$max',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    for (final c in InquiryCategory.values)
-                      ChoiceChip(
-                        key: ValueKey('inq-cat-${c.name}'),
-                        label: Text(inquiryCategoryText(l10n, c)),
-                        selected: _category == c,
-                        onSelected: fixed
-                            ? null
-                            : (_) => setState(() => _category = c),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (_orderId case final orderId?)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: InputChip(
-                      key: const ValueKey('inq-order'),
-                      // 시스템 주문 ID(ORD-…)는 보이지 않는다 — 화면용 8자리 주문번호, 없으면 "선택한 주문".
-                      label: Text(switch (ref
-                          .watch(orderDetailProvider(orderId))
-                          .value
-                          ?.orderNumber) {
-                        final n? => l10n.inqOrderChosen(n),
-                        null => l10n.inqOrderChosenNoNumber,
-                      }),
-                      onDeleted: fixed
-                          ? null
-                          : () => setState(() => _orderId = null),
-                    ),
-                  )
-                else
-                  // 주문은 선택. 본인 주문 목록(`GET /orders`)에서 고른다 — 서버가 본인 주문인지 다시 확인한다(422 ORDER_NOT_FOUND).
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: OutlinedButton.icon(
-                      key: const ValueKey('inq-pick-order'),
-                      onPressed: locked ? null : _pickOrder,
-                      icon: const PmartLineIcon(
-                        PmartLineIcons.chevronRight,
-                        size: 14,
-                      ),
-                      iconAlignment: IconAlignment.end,
-                      label: Text(l10n.inqPickOrder),
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                TextField(
-                  key: const ValueKey('inq-title'),
-                  controller: _title,
-                  enabled: !locked,
-                  maxLength: inquiryTitleMax,
-                  decoration: InputDecoration(labelText: l10n.inqTitleLabel),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  key: const ValueKey('inq-body'),
-                  controller: _body,
-                  enabled: !locked,
-                  maxLength: inquiryBodyMax,
-                  minLines: 5,
-                  maxLines: 10,
-                  decoration: InputDecoration(
-                    labelText: l10n.inqBodyLabel,
-                    hintText: l10n.inqBodyHint,
-                    alignLabelWithHint: true,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.inqPhotosLabel(inquiryPhotosMax),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final (i, p) in _photos.indexed)
-                      _PhotoSlotView(
-                        key: ValueKey('inq-photo-$i'),
-                        slot: p,
-                        onRemove: locked
-                            ? null
-                            : () => setState(() => _photos.remove(p)),
-                        onRetry: locked || !p.failed ? null : () => _upload(p),
-                      ),
-                    if (_photos.length < inquiryPhotosMax)
-                      OutlinedButton.icon(
-                        key: const ValueKey('inq-photo-add'),
-                        onPressed: locked ? null : _addPhotos,
-                        icon: const PmartLineIcon(
-                          PmartLineIcons.camera,
-                          size: 18,
-                        ),
-                        label: Text(l10n.inqPhotoAdd),
-                      ),
-                  ],
-                ),
-                if (_photoMessage case final m?)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      m,
-                      key: const ValueKey('inq-photo-message'),
-                      style: TextStyle(color: theme.colorScheme.error),
-                    ),
-                  ),
-                if (!_photosReady && !_photos.any((p) => p.uploading))
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      l10n.inqPhotosPending,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ),
-                const SizedBox(height: 12),
-                Text(l10n.inqFormNote, style: theme.textTheme.bodySmall),
-                if (_message case final message?)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Text(
-                      message,
-                      key: const ValueKey('inq-message'),
-                      style: TextStyle(color: theme.colorScheme.error),
-                    ),
-                  ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  key: const ValueKey('inq-submit'),
-                  onPressed: _unknown
-                      ? (_busy ? null : _submit)
-                      : (_canSend ? _submit : null),
-                  child: Text(_unknown ? l10n.inqCheckAgain : l10n.inqSubmit),
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedRectPainter extends CustomPainter {
+  _DashedRectPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(8)),
+      );
+    for (final m in path.computeMetrics()) {
+      for (var d = 0.0; d < m.length; d += 7) {
+        canvas.drawPath(m.extractPath(d, d + 4), paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedRectPainter old) => old.color != color;
+}
+
+/// 초안 17 D 접수 완료 — 연보라 체크 + 두 문장 + 요약(종류·주문·사진) + [내 문의 내역] [확인].
+class _InquiryDone extends ConsumerWidget {
+  const _InquiryDone({
+    required this.category,
+    required this.orderId,
+    required this.photos,
+  });
+
+  final InquiryCategory category;
+  final String? orderId;
+  final int photos;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final order = switch (orderId) {
+      final id? => ref.watch(orderDetailProvider(id)).value,
+      null => null,
+    };
+    Widget line(String k, String v) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 48,
+            child: Text(
+              k,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(child: Text(v, style: theme.textTheme.bodyMedium)),
+        ],
+      ),
+    );
+    return Scaffold(
+      key: const ValueKey('inq-done'),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          tooltip: l10n.inqDoneOk,
+          icon: const PmartLineIcon(PmartLineIcons.close),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 60, 20, 24),
+        children: [
+          Center(
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: PmartLineIcon(
+                  PmartLineIcons.check,
+                  size: 32,
+                  color: scheme.primary,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            l10n.inqSubmitted,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l10n.inqDoneBody,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            key: const ValueKey('inq-done-summary'),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                line(l10n.inqKindLabel, inquiryCategoryText(l10n, category)),
+                if (orderId != null)
+                  line(
+                    l10n.inqOrderLabel,
+                    order == null
+                        ? l10n.inqOrderChosenNoNumber
+                        : _orderSummary(l10n, order),
+                  ),
+                if (photos > 0)
+                  line(l10n.inqPhotoLabel, l10n.inqPhotoCount(photos)),
+              ],
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  key: const ValueKey('inq-done-list'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                  ),
+                  onPressed: () =>
+                      context.pushReplacement('/support/inquiries'),
+                  child: Text(l10n.inqMyInquiries),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton(
+                  key: const ValueKey('inq-done-ok'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                  ),
+                  onPressed: () => context.pop(),
+                  child: Text(l10n.inqDoneOk),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 초안 17 G-1 비회원: 회색 사람 원 + "문의는 로그인한 뒤에 남길 수 있어요" + [로그인] + [자주 묻는 질문 보기].
+class _InquiryGuest extends StatelessWidget {
+  const _InquiryGuest();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          key: const ValueKey('inq-guest'),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: PmartLineIcon(
+                    PmartLineIcons.user,
+                    size: 28,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.inqLoginNeeded,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton(
+              key: const ValueKey('inq-guest-login'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: () => context.push('/login'),
+              child: Text(l10n.loginTitle),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton(
+              key: const ValueKey('inq-guest-faq'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
+              onPressed: () => context.push('/support/faqs'),
+              child: Text(l10n.inqSeeFaq),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
