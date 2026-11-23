@@ -2445,6 +2445,62 @@ void reviewFlowShots() {
     await t.pumpAndSettle();
     await shot('d-past');
   });
+
+  // 리뷰관리 › 리뷰 쓰기 탭 v3 H(사용자 2026-11-23 "H로 해줘").
+  testWidgets('review-tab-h', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    Map<String, Object?> el(
+      String order,
+      String line,
+      String name,
+      String day,
+    ) => {
+      'orderId': order,
+      'orderLineId': line,
+      'productId': 'P-$line',
+      'productName': name,
+      'mfcName': 'P마트 역삼센터',
+      'orderedAt': '2026-11-${day}T01:00:00Z',
+      'deliveredAt': '2026-11-${day}T05:00:00Z',
+      'eligibleUntil': '2026-11-26T14:59:00Z',
+      'state': 'REV_ELIGIBLE',
+      'reviewId': null,
+    };
+    await t.pumpWidget(
+      testApp(
+        const [],
+        reviews: MockReviewsRepository(
+          latency: Duration.zero,
+          eligibilities: [
+            el('o-1', 'l-1', '[제철] 국산 설향 딸기 500g 특등급 산지직송', '19'),
+            el('o-1', 'l-2', '유기농 바나나 1.2kg', '19'),
+            el('o-1', 'l-3', '서울우유 1L', '19'),
+            el('o-2', 'l-4', '무농약 대파 1단', '12'),
+          ],
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/reviews'),
+    );
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/rv-h.png').uri),
+    );
+  });
 }
 
 final class _OutOfArea extends MockAddressRepository {

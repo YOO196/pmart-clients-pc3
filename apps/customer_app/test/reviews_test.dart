@@ -538,7 +538,7 @@ void main() {
       final deadline = t.widget<Text>(
         find.byKey(const ValueKey('review-deadline-ol-1')),
       );
-      expect(deadline.data, contains('11월 7일'));
+      expect(deadline.data, contains('11.7('));
       expect(deadline.data, contains('까지 쓸 수 있어요'));
     });
 
@@ -556,19 +556,24 @@ void main() {
       expect(inTab('review-tab-write', '1개'), findsOneWidget);
       expect(inTab('review-tab-mine', '1개'), findsOneWidget);
 
+      // 초안 04 v3 H: 맨 위 요약(서버 counts) + 주문 머리 한 줄("10월 24일 배송 · 센터" + 품목 수), 옵션 줄 없음.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('review-writable-summary')),
+          matching: find.text('리뷰를 기다리는 상품 1개'),
+        ),
+        findsOneWidget,
+      );
       final head = find.byKey(const ValueKey('review-order-head-order-seed-1'));
-      expect(
-        find.descendant(of: head, matching: find.text('바로픽 부산동래')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: head, matching: find.text('2026. 10. 24 주문')),
-        findsOneWidget,
-      );
-      expect(
-        t.widget<Text>(find.byKey(const ValueKey('review-option-ol-1'))).data,
-        '1개',
-      );
+      String headText() => t
+          .widget<Text>(
+            find.descendant(of: head, matching: find.byType(Text)).first,
+          )
+          .textSpan!
+          .toPlainText();
+      expect(headText(), contains('바로픽 부산동래'));
+      expect(headText(), matches(RegExp(r'^10월 24일 (배송|주문)')));
+      expect(find.byKey(const ValueKey('review-option-ol-1')), findsNothing);
       expect(
         find.byKey(const ValueKey('review-writable-image-ol-1')),
         findsOneWidget,
@@ -596,9 +601,16 @@ void main() {
         find.byKey(const ValueKey('review-writable-ol-x')),
         findsOneWidget,
       );
+      // 센터·날짜를 모르면 머리에 그 자리가 없다(품목 수만).
+      final head = find.byKey(const ValueKey('review-order-head-order-x'));
       expect(
-        find.byKey(const ValueKey('review-order-head-order-x')),
-        findsNothing,
+        t
+            .widget<Text>(
+              find.descendant(of: head, matching: find.byType(Text)).first,
+            )
+            .textSpan!
+            .toPlainText(),
+        isEmpty,
       );
       expect(find.byKey(const ValueKey('review-option-ol-x')), findsNothing);
     });
@@ -807,7 +819,7 @@ void main() {
     });
 
     testWidgets(
-      '내가 쓴 리뷰 B안: 상품 회색 띠, 사진 3칸(4장이면 +1), 글 3줄 넘으면 더보기 → 리뷰 하나 화면',
+      '내가 쓴 리뷰 B안: 상품 회색 띠, 사진 3칸(4장이면 +1), 글 3줄 넘으면 더보기 → 그 자리에서 펼침·접기',
       (t) async {
         final repo = MockReviewsRepository(latency: Duration.zero);
         final mine = repo.reviewJson.firstWhere(
@@ -836,15 +848,29 @@ void main() {
           findsNothing,
         );
         expect(find.text('+1'), findsOneWidget);
+        // 더보기 → 그 자리에서 펼침(사용자 2026-11-23 "아래로 펼쳐지기를 원해"), 펼친 뒤 "접기".
+        Text body() => t.widget<Text>(
+          find.byKey(const ValueKey('review-mine-text-rv-mine-1')),
+        );
+        expect(body().maxLines, 3);
         await t.tap(
           find.byKey(const ValueKey('review-mine-readmore-rv-mine-1')),
         );
         await t.pumpAndSettle();
+        expect(find.text('내 리뷰'), findsNothing); // 리뷰 하나 화면으로 가지 않는다
+        expect(body().maxLines, isNull);
         expect(
-          find.byKey(const ValueKey('review-mine-readmore-rv-mine-1')),
-          findsNothing,
+          find.descendant(
+            of: find.byKey(const ValueKey('review-mine-readmore-rv-mine-1')),
+            matching: find.text('접기'),
+          ),
+          findsOneWidget,
         );
-        expect(find.text('내 리뷰'), findsWidgets);
+        await t.tap(
+          find.byKey(const ValueKey('review-mine-readmore-rv-mine-1')),
+        );
+        await t.pumpAndSettle();
+        expect(body().maxLines, 3);
       },
     );
 

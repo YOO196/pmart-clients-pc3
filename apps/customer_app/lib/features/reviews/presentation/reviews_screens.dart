@@ -259,17 +259,32 @@ class _WritableTab extends ConsumerWidget {
         key: const ValueKey('review-writable-empty'),
         child: Text(l10n.reviewWritableEmpty),
       ),
+      // 초안 04 v3 H(사용자 2026-11-23 "H로 해줘", 옵션 줄 뺌): 맨 위 연보라 요약 한 칸 + 주문 머리 한 줄 +
+      // 09 고르기와 같은 카드([ReviewPickCard]).
       ready: (context, list) => RefreshIndicator(
         onRefresh: () => ref.refresh(writableReviewsProvider.future),
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(15, 2, 15, 16),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
           children: [
-            // 주문 묶음 머리(레퍼런스 11-1): 주문이 바뀌는 자리에 센터 이름·주문 날짜. 둘 다 모르면 머리 없이.
-            for (final (i, e) in list!.items.indexed) ...[
-              if ((i == 0 || list.items[i - 1].orderId != e.orderId) &&
-                  (e.mfcName != null || e.orderedAt != null))
-                _OrderHead(eligibility: e),
-              _WritableCard(eligibility: e),
+            if (list!.counts?.writable case final n?)
+              _WritableSummary(count: n),
+            for (final (i, e) in list.items.indexed) ...[
+              if (i == 0 || list.items[i - 1].orderId != e.orderId)
+                _OrderHead(
+                  eligibility: e,
+                  // 이 주문의 품목 수 — 받아 온 쪽 안에서만 센다(쪽 경계면 덜 셀 수 있음).
+                  count: list.items.where((x) => x.orderId == e.orderId).length,
+                ),
+              ReviewPickCard(
+                key: ValueKey('review-writable-${e.orderLineId}'),
+                eligibility: e,
+                starKeyPrefix: 'review-quick-star',
+                openKeyPrefix: 'review-write',
+                onOpen: (rating) => openReviewWrite(
+                  context,
+                  ReviewTarget.of(e, initialRating: rating),
+                ),
+              ),
             ],
             _LoadMoreFooter(
               list: list,
@@ -283,161 +298,127 @@ class _WritableTab extends ConsumerWidget {
   }
 }
 
-/// 주문 묶음 머리: 센터 이름(굵게) + "2026. 10. 10 주문". 서버가 준 값만 — 없는 쪽은 그리지 않는다.
-class _OrderHead extends StatelessWidget {
-  const _OrderHead({required this.eligibility});
+/// 초안 04 v3 H 맨 위 요약: 연보라 칸 — 연필 동그라미 + "리뷰를 기다리는 상품 N개"(서버 `counts.writable`) / "기한이 지나면 쓸 수 없어요".
+class _WritableSummary extends StatelessWidget {
+  const _WritableSummary({required this.count});
 
-  final ReviewEligibility eligibility;
+  final int count;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final e = eligibility;
-    return Padding(
-      key: ValueKey('review-order-head-${e.orderId}'),
-      padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final scheme = theme.colorScheme;
+    return Container(
+      key: const ValueKey('review-writable-summary'),
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: PmartBrand.lavenderMist,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
         children: [
-          if (e.mfcName case final n?)
-            Text(
-              n,
-              // 레퍼런스 11: 주문 머리줄 가게 이름은 보통 굵기.
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontSize: 15.5,
-                fontWeight: FontWeight.w400,
-              ),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: PmartBrand.lavender,
+              shape: BoxShape.circle,
             ),
-          if (e.orderedAt case final t?)
-            Text(
-              l10n.reviewOrderedOn(
-                DateFormat('y. M. d', 'ko').format(toSeoulWallClock(t)),
-              ),
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: 13,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+            alignment: Alignment.center,
+            child: PmartLineIcon(
+              PmartLineIcons.pencil,
+              size: 18,
+              color: scheme.primary,
             ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.reviewWaitingCount(count),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.reviewWaitingNote,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 12.5,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-/// 작성 가능 품목 카드(레퍼런스 11 "리뷰 쓰기"): 둥근 테두리 상자 — 위 칸 사진 56·상품 이름 17·옵션 15(회색)·
-/// 쓸 수 있는 기한(서버 eligibleUntil 날짜 그대로, 15 회색), 아래 칸 회색 별 5개(누르면 그 별점으로 쓰기).
-/// 레퍼런스의 "배민포인트 적립"은 1차 제외, "N일 남음"은 앱이 세지 않고 기한 날짜로 보인다.
-class _WritableCard extends ConsumerWidget {
-  const _WritableCard({required this.eligibility});
+/// 초안 04 v3 H 주문 머리 한 줄: "11월 19일 배송"(굵게, 배송 시각이 없으면 "…주문") · 센터(회색) + 오른쪽 보라 "N개".
+/// 서버가 준 값만 — 없는 쪽은 그리지 않는다.
+class _OrderHead extends StatelessWidget {
+  const _OrderHead({required this.eligibility, required this.count});
 
   final ReviewEligibility eligibility;
+  final int count;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final e = eligibility;
-    Future<void> open([int? rating]) async {
-      final target = ReviewTarget.of(e, initialRating: rating);
-      await openReviewWrite(context, target);
-    }
-
-    return Container(
-      key: ValueKey('review-writable-${e.orderLineId}'),
-      margin: const EdgeInsets.only(bottom: 10),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    String day(DateTime t) =>
+        DateFormat('M월 d일', 'ko').format(toSeoulWallClock(t));
+    final when = switch ((e.deliveredAt, e.orderedAt)) {
+      (final d?, _) => l10n.reviewDeliveredOn(day(d)),
+      (null, final o?) => l10n.reviewOrderedOnDay(day(o)),
+      _ => null,
+    };
+    return Padding(
+      key: ValueKey('review-order-head-${e.orderId}'),
+      padding: const EdgeInsets.fromLTRB(2, 16, 2, 0),
+      child: Row(
         children: [
-          // 줄을 누르면 쓰기(레퍼런스: 오른쪽 글자·화살표 없음).
-          InkWell(
-            key: ValueKey('review-write-${e.orderLineId}'),
-            onTap: () => open(),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(7, 7, 12, 7),
-              child: Row(
+          Expanded(
+            child: Text.rich(
+              TextSpan(
                 children: [
-                  // 지금 상품의 대표 사진(review 0.5.0). 없으면(게시 안 됨·모름) 자리 그림.
-                  ProductImage(
-                    key: ValueKey('review-writable-image-${e.orderLineId}'),
-                    url: e.imageUrl,
-                    size: 56,
-                    radius: 8,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _ProductName(
-                          productId: e.productId,
-                          title: e.productName,
-                          maxLines: 1,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                        if (e.optionLabel case final o?)
-                          Text(
-                            o,
-                            key: ValueKey('review-option-${e.orderLineId}'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 13.5,
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        // 기한은 서버 eligibleUntil 을 그대로 보인다(남은 일수를 앱이 세지 않는다).
-                        if (e.eligibleUntil case final t?)
-                          Text(
-                            l10n.reviewDeadlineShort(
-                              DateFormat(
-                                'M월 d일 (E)',
-                                'ko',
-                              ).format(toSeoulWallClock(t)),
-                            ),
-                            key: ValueKey('review-deadline-${e.orderLineId}'),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 13.5,
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                      ],
+                  if (when != null)
+                    TextSpan(
+                      text: when,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
-                  ),
+                  if (e.mfcName case final n?)
+                    TextSpan(
+                      text: when == null ? n : ' · $n',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                 ],
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(fontSize: 15.5),
             ),
           ),
-          Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
-          SizedBox(
-            height: 52,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (var i = 1; i <= reviewRatingMax; i++)
-                  IconButton(
-                    key: ValueKey('review-quick-star-${e.orderLineId}-$i'),
-                    tooltip: l10n.reviewStar(i),
-                    iconSize: 32,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 49,
-                      height: 49,
-                    ),
-                    color: scheme.outlineVariant,
-                    icon: const Icon(Icons.star_rounded),
-                    onPressed: () => open(i),
-                  ),
-              ],
+          Text(
+            l10n.reviewOrderLineCount(count),
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: scheme.primary,
             ),
           ),
         ],
@@ -616,9 +597,9 @@ class _MyReviewCard extends ConsumerWidget {
                     if (r.text case final t? when t.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       _ClampedText(
+                        reviewId: id,
                         text: t,
                         moreKey: ValueKey('review-mine-readmore-$id'),
-                        onMore: open,
                       ),
                     ],
                   ],
@@ -793,19 +774,42 @@ class _PhotoGrid extends ConsumerWidget {
   }
 }
 
-/// 본문 3줄까지, 넘치면 아래 회색 "더보기"(누르면 [onMore] — 리뷰 하나 화면).
-class _ClampedText extends StatelessWidget {
+/// 펼친 리뷰(리뷰 ID). 목록을 다시 그려도(스크롤·새로고침) 펼친 것이 그대로 남게 카드 밖에 둔다.
+final _expandedReviewsProvider =
+    NotifierProvider.autoDispose<_ExpandedReviews, Set<String>>(
+      _ExpandedReviews.new,
+    );
+
+class _ExpandedReviews extends Notifier<Set<String>> {
+  @override
+  Set<String> build() => const {};
+
+  void toggle(String id) => state = state.contains(id)
+      ? {
+          for (final x in state)
+            if (x != id) x,
+        }
+      : {...state, id};
+}
+
+/// 본문 3줄까지, 넘치면 아래 회색 "더보기" — 누르면 그 자리에서 글 전체를 펼치고 "접기"(초안 04, 사용자 2026-11-23
+/// "아래로 펼쳐지기를 원해"). 리뷰 하나 화면은 ⋮ 로만 간다.
+class _ClampedText extends ConsumerWidget {
   const _ClampedText({
+    required this.reviewId,
     required this.text,
-    required this.onMore,
     required this.moreKey,
   });
+  final String reviewId;
   final String text;
-  final VoidCallback onMore;
   final Key moreKey;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
+    final open = ref.watch(
+      _expandedReviewsProvider.select((s) => s.contains(reviewId)),
+    );
     final style = theme.textTheme.bodyLarge?.copyWith(
       fontSize: 15,
       height: 1.45,
@@ -825,18 +829,22 @@ class _ClampedText extends StatelessWidget {
           children: [
             Text(
               text,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
+              key: ValueKey('review-mine-text-$reviewId'),
+              maxLines: open ? null : 3,
+              overflow: open ? null : TextOverflow.ellipsis,
               style: style,
             ),
             if (over)
               GestureDetector(
                 key: moreKey,
-                onTap: onMore,
+                behavior: HitTestBehavior.opaque,
+                onTap: () => ref
+                    .read(_expandedReviewsProvider.notifier)
+                    .toggle(reviewId),
                 child: Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    AppLocalizations.of(context).reviewMore,
+                    open ? l10n.reviewFold : l10n.reviewMore,
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontSize: 13,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -2734,10 +2742,16 @@ class ReviewPickCard extends StatelessWidget {
     super.key,
     required this.eligibility,
     required this.onOpen,
+    this.starKeyPrefix = 'review-pick-star',
+    this.openKeyPrefix = 'review-pick-open',
   });
 
   final ReviewEligibility eligibility;
   final void Function(int? rating) onOpen;
+
+  /// 별·띠 키 앞부분(리뷰관리 탭은 예전 키 `review-quick-star`·`review-write` 를 그대로 쓴다).
+  final String starKeyPrefix;
+  final String openKeyPrefix;
 
   @override
   Widget build(BuildContext context) {
@@ -2753,7 +2767,12 @@ class ReviewPickCard extends StatelessWidget {
         children: [
           Opacity(
             opacity: done ? 0.5 : 1,
-            child: ProductImage(url: e.imageUrl, size: 44, radius: 8),
+            child: ProductImage(
+              key: ValueKey('review-writable-image-${e.orderLineId}'),
+              url: e.imageUrl,
+              size: 44,
+              radius: 8,
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -2771,6 +2790,7 @@ class ReviewPickCard extends StatelessWidget {
                 ),
                 if (!done && e.eligibleUntil != null)
                   Text(
+                    key: ValueKey('review-deadline-${e.orderLineId}'),
                     l10n.reviewDeadlineShort(
                       DateFormat(
                         'M.d(E)',
@@ -2802,7 +2822,7 @@ class ReviewPickCard extends StatelessWidget {
             strip
           else
             InkWell(
-              key: ValueKey('review-pick-open-${e.orderLineId}'),
+              key: ValueKey('$openKeyPrefix-${e.orderLineId}'),
               onTap: () => onOpen(null),
               child: strip,
             ),
@@ -2867,7 +2887,7 @@ class ReviewPickCard extends StatelessWidget {
                       button: true,
                       label: l10n.reviewStar(i),
                       child: InkResponse(
-                        key: ValueKey('review-pick-star-${e.orderLineId}-$i'),
+                        key: ValueKey('$starKeyPrefix-${e.orderLineId}-$i'),
                         radius: 18,
                         onTap: () => onOpen(i),
                         child: SizedBox(
