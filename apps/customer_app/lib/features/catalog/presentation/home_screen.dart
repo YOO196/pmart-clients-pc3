@@ -682,8 +682,9 @@ class _TabCountdownState extends ConsumerState<_TabCountdown> {
       style: Theme.of(context).textTheme.bodySmall?.copyWith(
         fontSize: 11,
         height: 1.2,
-        fontWeight: FontWeight.w600,
-        color: sectionTimerColor,
+        fontWeight: FontWeight.w700,
+        // 사용자 2026-11-23 "분홍": 타이머 테마·쿠폰 만료 칩과 같은 팔레트 강조색(빨강 #F2383B 은 팔레트 밖).
+        color: Theme.of(context).colorScheme.tertiary,
         fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );
@@ -2280,7 +2281,7 @@ String remainingClock(Duration d) {
 }
 
 /// 타이머 테마의 남은 시간 — 초안 06-C 라벨형: 분홍(tertiary) 시계 + "05:12:30 남음", 바탕 없음. 1초마다 줄어든다.
-/// (전에는 빨간 알약 #F2383B — 팔레트 밖이라 초안대로 tertiary. MD 탭 이름 위 타이머는 그대로.)
+/// (전에는 빨간 알약 #F2383B — 팔레트 밖이라 초안대로 tertiary. MD 탭 이름 위 타이머도 2026-11-23 분홍으로.)
 class SectionCountdown extends ConsumerStatefulWidget {
   const SectionCountdown({super.key, required this.endsAt});
 
@@ -2468,9 +2469,6 @@ class _TimerBandHeaderState extends ConsumerState<_TimerBandHeader> {
     );
   }
 }
-
-/// 타이머 알약 바탕(레퍼런스 "일일 특가" 빨강).
-const sectionTimerColor = Color(0xFFF2383B);
 
 /// [endsAt] 이 지나면 [child] 를 숨긴다(이미 지났으면 처음부터 숨김).
 class SectionExpiry extends ConsumerStatefulWidget {
