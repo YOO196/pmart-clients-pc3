@@ -570,6 +570,30 @@ ProductDetail productFromContract(pc.ProductContent c, {OptionPrices? prices}) {
     returnGuide: c.returnGuide,
     notices: c.notices ?? const [],
     categoryPath: c.categoryPath ?? const [],
+    nutrition: switch (c.nutrition) {
+      null => null,
+      final n => ProductNutrition(
+        basis: n.basisUnit == pc.NutritionBasisUnitEnum.ML
+            ? NutritionBasis.milliliter
+            : NutritionBasis.gram,
+        energyKcal: n.energyKcal,
+        sodiumMg: n.sodiumMg,
+        sugarsG: n.sugarsG,
+        proteinG: n.proteinG,
+        fatG: n.fatG,
+      ),
+    },
+    allergens: switch (c.allergens) {
+      null => null,
+      final a => ProductAllergens(
+        contains: [...?a.contains],
+        mayContain: [...?a.mayContain],
+        text: switch (a.text?.trim()) {
+          final t? when t.isNotEmpty => t,
+          _ => null,
+        },
+      ),
+    },
     rating: switch (rating) {
       final r? when r.averageRating != null => RatingSummary(
         average: r.averageRating!.toDouble(),

@@ -470,6 +470,46 @@ class RatingSummary {
   final int count;
 }
 
+/// 영양 기준 단위(product-content 0.6.0 `basisUnit`) — 100g당 / 100mL당.
+enum NutritionBasis { gram, milliliter }
+
+/// 상품 영양(100g·100mL 기준, 서버 값 그대로 — 반올림·계산하지 않는다). 모르는 칸은 null.
+@immutable
+class ProductNutrition {
+  const ProductNutrition({
+    required this.basis,
+    this.energyKcal,
+    this.sodiumMg,
+    this.sugarsG,
+    this.proteinG,
+    this.fatG,
+  });
+
+  final NutritionBasis basis;
+  final num? energyKcal;
+  final num? sodiumMg;
+  final num? sugarsG;
+  final num? proteinG;
+  final num? fatG;
+}
+
+/// 상품 알레르기(product-content 0.6.0, 법정 이름). [contains] 함유 · [mayContain] 같은 시설 제조 · [text] 표시사항 원문.
+@immutable
+class ProductAllergens {
+  const ProductAllergens({
+    this.contains = const [],
+    this.mayContain = const [],
+    this.text,
+  });
+
+  final List<String> contains;
+  final List<String> mayContain;
+  final String? text;
+
+  /// 두 목록이 다 비었다 — 모름(알레르기가 없다는 뜻이 아니다).
+  bool get unknown => contains.isEmpty && mayContain.isEmpty;
+}
+
 @immutable
 class ProductDetail {
   const ProductDetail({
@@ -485,7 +525,15 @@ class ProductDetail {
     this.notices = const [],
     this.categoryPath = const [],
     this.rating,
+    this.nutrition,
+    this.allergens,
   });
+
+  /// 영양(product-content 0.6.0). null = 모름("정보 없음" — 0 으로 바꾸지 않는다).
+  final ProductNutrition? nutrition;
+
+  /// 알레르기(product-content 0.6.0). null 이거나 두 목록이 다 비면 모름(알레르기 "없음"이 아니다).
+  final ProductAllergens? allergens;
 
   /// 담을 수 있는 옵션이 하나도 없을 때의 까닭. 담을 수 있는 옵션이 있거나 까닭이 재고·취급이 아니면(가격 미설정 등) null.
   /// "다 팔렸어요"는 [CannotBuyReason.soldOut] 일 때만 쓴다.

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
@@ -275,6 +276,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       const SizedBox(height: 20),
       // 리뷰 미리보기(GET /products/{id}/reviews). 실패는 "리뷰 없음"이 아니라 실패로 보인다.
       ProductReviewsPreview(productId: p.productId),
+      // 초안 14 B(사용자 2026-11-23 "B해줘"): 리뷰 아래 영양·알레르기 구획.
+      const _DetailDivider(),
+      NutritionAllergenSection(nutrition: p.nutrition, allergens: p.allergens),
       if (p.description != null || p.descriptionImageUrls.isNotEmpty) ...[
         const _DetailDivider(),
         Text(l10n.productDescription, style: theme.textTheme.titleMedium),
@@ -592,6 +596,320 @@ class _PreviewBody extends StatelessWidget {
               const SizedBox(height: 24),
               const LinearProgressIndicator(),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 초안 14 B 영양·알레르기 구획: 분홍 테두리 알레르기 칸(함유 칩 · 같은 시설 제조 칩 · 표시사항 원문) + 영양 표(100g·100mL당 5줄).
+/// 모르는 것은 숨기지 않고 회색 "정보 없음"(알레르기 "없음"·0 으로 보이지 않는다 — 고객 안전 정보).
+class NutritionAllergenSection extends StatelessWidget {
+  const NutritionAllergenSection({
+    super.key,
+    required this.nutrition,
+    required this.allergens,
+  });
+
+  final ProductNutrition? nutrition;
+  final ProductAllergens? allergens;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Column(
+      key: const ValueKey('nutrition-allergen'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(l10n.nutriAllergenTitle, style: theme.textTheme.titleMedium),
+        const SizedBox(height: 10),
+        switch (allergens) {
+          final a? when !a.unknown => _AllergenBox(allergens: a),
+          _ => _UnknownBox(
+            key: const ValueKey('allergen-unknown'),
+            title: l10n.allergenInfoTitle,
+            body: l10n.allergenUnknown,
+          ),
+        },
+        const SizedBox(height: 10),
+        switch (nutrition) {
+          final n? => _NutritionTable(nutrition: n),
+          null => _UnknownBox(
+            key: const ValueKey('nutrition-unknown'),
+            title: l10n.nutritionTitle,
+            body: l10n.nutritionUnknown,
+          ),
+        },
+      ],
+    );
+  }
+}
+
+/// 모름 칸: 회색 바탕 + 회색 테두리, ⓘ 제목 + 안내.
+class _UnknownBox extends StatelessWidget {
+  const _UnknownBox({super.key, required this.title, required this.body});
+
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              PmartLineIcon(
+                PmartLineIcons.info,
+                size: 16,
+                color: scheme.onSurface,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            body,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 13,
+              height: 1.45,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AllergenBox extends StatelessWidget {
+  const _AllergenBox({required this.allergens});
+
+  final ProductAllergens allergens;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final a = allergens;
+    Widget row(String label, List<String> names, String key) => Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 84,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onTertiaryContainer,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: names.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text(
+                      l10n.nutritionNoValue,
+                      key: ValueKey('$key-none'),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 13.5,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  )
+                : Wrap(
+                    key: ValueKey(key),
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final n in names)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: scheme.surface,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: scheme.tertiary),
+                          ),
+                          child: Text(
+                            n,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.onTertiaryContainer,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+    return Container(
+      key: const ValueKey('allergen-box'),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+        color: scheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.tertiary, width: 1.2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              PmartLineIcon(
+                PmartLineIcons.alert,
+                size: 17,
+                color: scheme.tertiary,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                l10n.allergenTitle,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: scheme.tertiary,
+                ),
+              ),
+            ],
+          ),
+          row(l10n.allergenContains, a.contains, 'allergen-contains'),
+          row(l10n.allergenMayContain, a.mayContain, 'allergen-may-contain'),
+          if (a.text case final t?)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                l10n.allergenText(t),
+                key: const ValueKey('allergen-text'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 12,
+                  height: 1.45,
+                  color: scheme.onTertiaryContainer,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NutritionTable extends StatelessWidget {
+  const _NutritionTable({required this.nutrition});
+
+  final ProductNutrition nutrition;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final n = nutrition;
+    // 서버 값 그대로(천 단위만 띄움) — 반올림·계산하지 않는다.
+    String num0(num v) => NumberFormat('#,##0.###', 'ko').format(v);
+    Widget line(String label, num? v, String Function(String) unit, int i) =>
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: scheme.outlineVariant)),
+          ),
+          child: Row(
+            children: [
+              Text(label, style: theme.textTheme.bodyMedium),
+              const Spacer(),
+              Text(
+                v == null ? l10n.nutritionNoValue : unit(num0(v)),
+                key: ValueKey('nutrition-row-$i'),
+                style: v == null
+                    ? theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      )
+                    : theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+              ),
+            ],
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          key: const ValueKey('nutrition-table'),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                color: scheme.surfaceContainerLow,
+                padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+                child: Row(
+                  children: [
+                    Text(
+                      l10n.nutritionTitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      n.basis == NutritionBasis.milliliter
+                          ? l10n.nutritionBasisMl
+                          : l10n.nutritionBasisG,
+                      key: const ValueKey('nutrition-basis'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              line(l10n.nutritionEnergy, n.energyKcal, l10n.nutritionKcal, 0),
+              line(l10n.nutritionSodium, n.sodiumMg, l10n.nutritionMg, 1),
+              line(l10n.nutritionSugars, n.sugarsG, l10n.nutritionGram, 2),
+              line(l10n.nutritionProtein, n.proteinG, l10n.nutritionGram, 3),
+              line(l10n.nutritionFat, n.fatG, l10n.nutritionGram, 4),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          l10n.nutritionNote,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontSize: 12,
+            color: scheme.onSurfaceVariant,
           ),
         ),
       ],

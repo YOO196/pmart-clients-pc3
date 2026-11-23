@@ -203,6 +203,41 @@ base class MockCatalogRepository implements CatalogRepository {
 
   Future<void> _wait() => Future<void>.delayed(latency);
 
+  /// 상세의 영양·알레르기 목 값(계약 모양). 없는 상품은 둘 다 모름.
+  static const _nutritionAllergenJson = <String, Map<String, Object?>>{
+    'P-0001': {
+      'nutrition': {
+        'basisUnit': 'ML',
+        'energyKcal': 62,
+        'sodiumMg': 50,
+        'sugarsG': null,
+        'proteinG': 3.1,
+        'fatG': null,
+      },
+      'allergens': {
+        'contains': ['우유'],
+        'mayContain': ['대두', '밀'],
+        'text': '우유 함유. 이 제품은 대두, 밀을 사용한 제품과 같은 제조시설에서 제조하고 있습니다.',
+      },
+    },
+    'P-0002': {
+      'nutrition': {
+        'basisUnit': 'G',
+        'energyKcal': 95,
+        'sodiumMg': 45,
+        'sugarsG': 4,
+        'proteinG': 9.2,
+        'fatG': 3.8,
+      },
+    },
+    'P-0005': {
+      'allergens': {
+        'contains': <String>[],
+        'mayContain': ['땅콩', '메밀'],
+      },
+    },
+  };
+
   static Map<String, Object?> displayItemJson(MockProduct p) => {
     'productId': p.productId,
     'name': p.name,
@@ -974,6 +1009,8 @@ base class MockCatalogRepository implements CatalogRepository {
   static Map<String, Object?> productJson(MockProduct p) => {
     'productId': p.productId,
     'name': p.name,
+    // 영양·알레르기(product-content 0.6.0) — 둘 다 있음 / 하나만 / 둘 다 없음을 보이려고 몇 상품만.
+    ...?_nutritionAllergenJson[p.productId],
     'contentVersion': 2,
     'productVersion': 4,
     'rating': p.rating == null

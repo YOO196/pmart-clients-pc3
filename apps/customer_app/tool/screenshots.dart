@@ -30,6 +30,8 @@ import 'package:customer_app/features/auth/data/mock_auth_repository.dart';
 import 'package:customer_app/features/cart/data/cart_merge_repository.dart';
 import 'package:customer_app/features/cart/data/mock_cart_repository.dart';
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
+import 'package:customer_app/features/catalog/presentation/product_detail_screen.dart'
+    show ProductDetailScreen;
 import 'package:customer_app/features/catalog/presentation/catalog_providers.dart'
     show homeClockProvider, recentSearchesRepositoryProvider;
 import 'package:customer_app/features/catalog/data/recent_searches_repository.dart'
@@ -2500,6 +2502,43 @@ void reviewFlowShots() {
       find.byType(CustomerApp),
       matchesGoldenFile(File('$_dir/rv-h.png').uri),
     );
+  });
+
+  // 상품 상세 영양·알레르기(초안 14 B, 사용자 2026-11-23 "B해줘").
+  testWidgets('nutrition-allergen', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    for (final id in ['P-0001', 'P-0005', 'P-0003']) {
+      unawaited(router.push('/products/$id'));
+      await t.pumpAndSettle();
+      // 상세 목록(세로)만 끈다 — 사진 넘기기(가로)·아래 깔린 홈 목록이 아니라.
+      final list = find
+          .descendant(
+            of: find.byType(ProductDetailScreen),
+            matching: find.byType(ListView),
+          )
+          .first;
+      await t.dragUntilVisible(
+        find.byKey(const ValueKey('nutrition-allergen')),
+        list,
+        const Offset(0, -300),
+      );
+      await t.drag(list, const Offset(0, -320));
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/na-$id.png').uri),
+      );
+      router.pop();
+      await t.pumpAndSettle();
+    }
   });
 }
 
