@@ -106,6 +106,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/',
                 builder: (_, _) => const HomeScreen(),
                 routes: [
+                  // 초안 15 B 카테고리 화면 — 아래 탭 막대를 둔 채(레퍼런스 3-3, 사용자 2026-11-23).
+                  GoRoute(
+                    path: 'category',
+                    pageBuilder: (_, state) => CupertinoPage<void>(
+                      key: state.pageKey,
+                      child: CategoryBrowseScreen(
+                        categoryId:
+                            state.uri.queryParameters['categoryId'] ?? '',
+                        title: state.uri.queryParameters['title'],
+                      ),
+                    ),
+                  ),
                   // 장바구니는 하단 탭에서 빼고 상단바에만(사용자 2026-11-21) — 홈 위에 올라오는 전체 화면.
                   // 아이콘·떠 있는 막대는 push(뒤로 가면 보던 화면), 주문서의 "장바구니로"는 go(홈 위 장바구니).
                   _slide(
@@ -122,6 +134,20 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/categories',
                 builder: (_, _) => const CategoryScreen(),
+                routes: [
+                  // 초안 15 B 카테고리 화면 — 아래 탭 막대를 둔 채(레퍼런스 3-3, 사용자 2026-11-23).
+                  GoRoute(
+                    path: 'list',
+                    pageBuilder: (_, state) => CupertinoPage<void>(
+                      key: state.pageKey,
+                      child: CategoryBrowseScreen(
+                        categoryId:
+                            state.uri.queryParameters['categoryId'] ?? '',
+                        title: state.uri.queryParameters['title'],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

@@ -2613,7 +2613,8 @@ void reviewFlowShots() {
     for (final (q, name) in [
       ('우유', 'search-result-b'),
       ('우우', 'typo-corrected'),
-      ('서울우유', 'typo-suggested'),
+      ('지방 우유', 'typo-suggested'),
+      ('우유킥', 'typo-similar'),
       ('듀부', 'typo-none'),
     ]) {
       await t.tap(find.text('검색').last);

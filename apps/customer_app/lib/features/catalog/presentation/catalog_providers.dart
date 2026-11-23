@@ -155,7 +155,11 @@ class ProductListState {
     this.loadMoreFailure,
     this.correctedQuery,
     this.suggestedQuery,
+    this.similarItems,
   });
+
+  /// 첫 쪽 0건일 때 비슷한 상품(BR-87). 다음 쪽 없음.
+  final List<ProductTile>? similarItems;
 
   /// 첫 쪽의 오타 교정·제안 검색어(search 0.4.0). 다음 쪽에서도 그대로 둔다.
   final String? correctedQuery;
@@ -201,6 +205,7 @@ class ProductListController extends AsyncNotifier<ProductListState> {
       total: page.total,
       correctedQuery: page.correctedQuery,
       suggestedQuery: page.suggestedQuery,
+      similarItems: page.similarItems,
     );
   }
 

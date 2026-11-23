@@ -831,8 +831,8 @@ base class MockCatalogRepository implements CatalogRepository {
   /// 목 오타 사전(교정어).
   static const _typos = {'우우': '우유', '감굴': '감귤', '양퍄': '양파'};
 
-  /// 목 제안어(결과가 적을 때).
-  static const _hints = {'서울우유': '우유'};
+  /// 목 제안어(결과가 적을 때). 정상 상품명에는 제안하지 않는다(BR-88) — 앞 글자가 빠진 말만.
+  static const _hints = {'지방 우유': '저지방 우유'};
 
   Iterable<MockProduct> _match(ProductQuery q) => mockProducts.where((p) {
     if (q.onSale && p.salePrice == null) return false;
@@ -936,9 +936,35 @@ base class MockCatalogRepository implements CatalogRepository {
         'appliedSort': _sortWire(query.sort),
         'correctedQuery': ?corrected,
         'suggestedQuery': ?suggested,
+        // BR-87 흉내: 첫 쪽 0건(교정해도 0건)이면 두 글자 조각이 맞는 상품, 없으면 인기순 — 최대 20.
+        if (cursor == null && all.isEmpty && (query.keyword ?? '').isNotEmpty)
+          'similarItems': [
+            for (final p in _similar(query.keyword!.trim()))
+              {
+                ...displayItemJson(p)
+                  ..remove('badge')
+                  ..remove('unitPrice')
+                  ..remove('netContent'),
+                'categoryPath': [?_parents[p.categoryId], p.categoryId],
+              },
+          ],
         'appliedFilters': query.filters.toList(),
       }),
     );
+  }
+
+  List<MockProduct> _similar(String keyword) {
+    final pieces = {
+      for (var i = 0; i + 2 <= keyword.length; i++) keyword.substring(i, i + 2),
+    }..removeWhere((p) => p.trim().length < 2);
+    final near = mockProducts
+        .where((p) => pieces.any(p.name.contains))
+        .take(20)
+        .toList();
+    if (near.isNotEmpty) return near;
+    return ([
+      ...mockProducts,
+    ]..sort((a, b) => b.popularity.compareTo(a.popularity))).take(20).toList();
   }
 
   static String _sortWire(SortKey s) => switch (s) {

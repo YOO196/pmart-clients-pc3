@@ -140,8 +140,18 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
             : l10n.searchGoWithEuro(s),
         onTap: widget.onKeyword == null ? null : () => widget.onKeyword!(s),
       ),
+      // 초안 16 B-3: 0건(교정해도 0건)이라 서버가 비슷한 상품을 줬을 때(BR-87).
+      _ when list != null && list.items.isEmpty && list.similarItems != null =>
+        _CorrectionBand(
+          key: const ValueKey('search-similar'),
+          lead: '',
+          text: l10n.searchSimilarBand,
+        ),
       _ => null,
     };
+    final similar = list != null && list.items.isEmpty
+        ? list.similarItems
+        : null;
     // 정렬·필터는 회색 테두리 알약(레퍼런스 3-4 "⇅ 기본순"·"필터")
     Widget pill({
       required Key key,
@@ -181,6 +191,9 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
           Expanded(
             child: Text(
               switch (list?.total) {
+                // 카테고리 화면(머리 있음)은 레퍼런스 3-3 "총 N개 상품", 검색·목록은 "상품 N개".
+                final int total when widget.header != null =>
+                  l10n.categoryResultCount(total),
                 final int total => l10n.searchResultCount(total),
                 null => '',
               },
@@ -227,7 +240,7 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
     return Column(
       children: [
         ?correction,
-        if (top == null) ...[
+        if (top == null && similar == null) ...[
           if (search) countRow,
           attributes,
           if (!search) countRow,
@@ -246,7 +259,10 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
                             const Expanded(child: PmartGridSkeleton()),
                           ],
                         ),
-                  state: uiStateOf(value, isEmpty: (s) => s.items.isEmpty),
+                  state: uiStateOf(
+                    value,
+                    isEmpty: (s) => s.items.isEmpty && s.similarItems == null,
+                  ),
                   onRetry: () => ref.invalidate(provider),
                   empty: (_) => top == null
                       ? Center(child: emptyText)
@@ -261,25 +277,47 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
                             ),
                           ],
                         ),
-                  ready: (context, list) => ProductGrid(
-                    key: const PageStorageKey('product-list'),
-                    list: list,
-                    highlight: highlight,
-                    header: top != null
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [top, attributes, countRow],
-                          )
-                        : search && !widget.baseQuery.onSale
-                        ? _KeywordSaleStrip(
-                            keyword: highlight!,
-                            categoryId: widget.baseQuery.categoryId,
-                          )
-                        : null,
-                    onLoadMore: () => ref.read(provider.notifier).loadMore(),
-                    autoLoadMore: true,
-                    bottomInset: hasCart ? 90 : 0,
-                  ),
+                  ready: (context, list) => similar != null
+                      ? ProductGrid(
+                          key: const ValueKey('similar-grid'),
+                          list: ProductListState(
+                            items: similar,
+                            nextCursor: null,
+                          ),
+                          onLoadMore: () {},
+                          bottomInset: hasCart ? 90 : 0,
+                          header: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                            child: Text(
+                              l10n.searchSimilarTitle,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        )
+                      : ProductGrid(
+                          key: const PageStorageKey('product-list'),
+                          list: list,
+                          highlight: highlight,
+                          header: top != null
+                              ? Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [top, attributes, countRow],
+                                )
+                              : search && !widget.baseQuery.onSale
+                              ? _KeywordSaleStrip(
+                                  keyword: highlight!,
+                                  categoryId: widget.baseQuery.categoryId,
+                                )
+                              : null,
+                          onLoadMore: () =>
+                              ref.read(provider.notifier).loadMore(),
+                          autoLoadMore: true,
+                          bottomInset: hasCart ? 90 : 0,
+                        ),
                 ),
               ),
               const Positioned(

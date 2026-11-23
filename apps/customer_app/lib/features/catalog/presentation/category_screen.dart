@@ -7,6 +7,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/cart_icon_button.dart';
 import '../../../shared/ui_state_of.dart';
 import '../domain/catalog.dart';
+import 'category_browse_screen.dart' show openCategoryBrowse;
 import 'catalog_providers.dart';
 import 'home_screen.dart' show BannerPager, openHomeBanner;
 import 'widgets/category_art.dart';
@@ -129,12 +130,8 @@ class CategoryScreen extends ConsumerWidget {
     );
   }
 
-  void _open(BuildContext context, CategoryNode node) => context.push(
-    Uri(
-      path: '/products',
-      queryParameters: {'categoryId': node.categoryId, 'title': node.name},
-    ).toString(),
-  );
+  void _open(BuildContext context, CategoryNode node) =>
+      openCategoryBrowse(context, node.categoryId, title: node.name);
 }
 
 class _CategoryBanners extends ConsumerWidget {

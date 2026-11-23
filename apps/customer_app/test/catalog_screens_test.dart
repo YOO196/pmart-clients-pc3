@@ -125,6 +125,28 @@ final class _SecondPageDown extends MockCatalogRepository {
   }
 }
 
+/// 서버가 비슷한 상품(BR-87)을 주지 않는 경우.
+final class _NoSimilar extends MockCatalogRepository {
+  _NoSimilar() : super(latency: Duration.zero);
+
+  @override
+  Future<ProductPage> search(
+    ProductQuery query, {
+    String? mfcId,
+    String? cursor,
+    CancelToken? cancelToken,
+  }) async {
+    final p = await super.search(query, mfcId: mfcId, cursor: cursor);
+    return ProductPage(
+      items: p.items,
+      nextCursor: p.nextCursor,
+      total: p.total,
+      correctedQuery: p.correctedQuery,
+      suggestedQuery: p.suggestedQuery,
+    );
+  }
+}
+
 Future<void> _search(WidgetTester t, String keyword) async {
   await t.enterText(find.byKey(const ValueKey('search-field')), keyword);
   await t.tap(find.byKey(const ValueKey('search-submit')));
@@ -248,7 +270,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.text('검색').last);
       await t.pumpAndSettle();
-      await _search(t, '서울우유');
+      await _search(t, '지방 우유');
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('search-suggested')), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('search-suggested')));
@@ -259,8 +281,35 @@ void main() {
             .widget<TextField>(find.byKey(const ValueKey('search-field')))
             .controller!
             .text,
-        '우유',
+        '저지방 우유',
       );
+    });
+
+    testWidgets('정상 상품명(서울우유)은 결과가 적어도 제안하지 않는다(BR-88)', (t) async {
+      await t.pumpWidget(testApp([]));
+      await t.pumpAndSettle();
+      await t.tap(find.text('검색').last);
+      await t.pumpAndSettle();
+      await _search(t, '서울우유');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('search-suggested')), findsNothing);
+    });
+
+    testWidgets('0건이면 서버가 준 비슷한 상품 — "이런 상품은 어때요?"(초안 16 B-3, BR-87)', (
+      t,
+    ) async {
+      await t.pumpWidget(testApp([]));
+      await t.pumpAndSettle();
+      await t.tap(find.text('검색').last);
+      await t.pumpAndSettle();
+      await _search(t, '우유킥');
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('search-similar')), findsOneWidget);
+      expect(find.text('이런 상품은 어때요?'), findsOneWidget);
+      expect(find.byKey(const ValueKey('similar-grid')), findsOneWidget);
+      expect(find.byType(ProductTileCard), findsWidgets);
+      expect(find.text('검색 결과가 없어요'), findsNothing);
+      expect(find.byKey(const ValueKey('open-filters')), findsNothing);
     });
 
     Future<void> openSearch(WidgetTester t) async {
@@ -269,8 +318,8 @@ void main() {
       await t.pumpAndSettle();
     }
 
-    testWidgets('검색 결과와 0건을 구분한다', (t) async {
-      await t.pumpWidget(testApp([]));
+    testWidgets('검색 결과와 0건을 구분한다(비슷한 상품도 없으면 "검색 결과가 없어요")', (t) async {
+      await t.pumpWidget(testApp([], catalog: _NoSimilar()));
       await openSearch(t);
 
       await _search(t, '우유');

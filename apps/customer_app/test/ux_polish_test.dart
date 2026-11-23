@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:customer_app/features/catalog/presentation/category_browse_screen.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/presentation/product_detail_screen.dart';
-import 'package:customer_app/features/catalog/presentation/product_list_screen.dart';
 
 import 'support/app_harness.dart';
 
@@ -36,17 +36,19 @@ void main() {
     await t.pump();
     await t.pump(const Duration(milliseconds: 120));
     // 들어오는 중: 새 화면 왼쪽 끝이 화면 오른쪽 쪽에 있다.
-    final entering = t.getTopLeft(find.byType(ProductListScreen)).dx;
+    final entering = t.getTopLeft(find.byType(CategoryBrowseScreen)).dx;
     expect(entering, greaterThan(0));
     await t.pumpAndSettle();
-    expect(t.getTopLeft(find.byType(ProductListScreen)).dx, 0);
+    expect(t.getTopLeft(find.byType(CategoryBrowseScreen)).dx, 0);
+    // 초안 15 B·레퍼런스 3-3: 카테고리 화면은 아래 탭 막대를 둔 채 연다.
+    expect(find.byType(NavigationBar), findsOneWidget);
 
     await t.tap(find.byType(BackButton));
     await t.pump();
     await t.pump(const Duration(milliseconds: 120));
-    expect(t.getTopLeft(find.byType(ProductListScreen)).dx, greaterThan(0));
+    expect(t.getTopLeft(find.byType(CategoryBrowseScreen)).dx, greaterThan(0));
     await t.pumpAndSettle();
-    expect(find.byType(ProductListScreen), findsNothing);
+    expect(find.byType(CategoryBrowseScreen), findsNothing);
   });
 
   testWidgets('상품 상세: 상품을 누르면 오른쪽에서 밀려 들어오고, 뒤로 가면 오른쪽으로 빠진다', (t) async {
@@ -115,5 +117,8 @@ void main() {
     await t.pumpAndSettle();
     expect(find.byType(PmartGridSkeleton), findsNothing);
     expect(find.byKey(const ValueKey('tile-P-0001')), findsOneWidget);
+    // 결과 뒤에 읽는 "찾으시는 키워드의 할인 상품" 줄(초안 16 B)도 마저 받는다.
+    await t.pump(const Duration(seconds: 1));
+    await t.pumpAndSettle();
   });
 }

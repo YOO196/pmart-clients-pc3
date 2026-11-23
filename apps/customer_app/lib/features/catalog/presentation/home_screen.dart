@@ -27,6 +27,7 @@ import '../domain/catalog.dart';
 import 'catalog_providers.dart';
 import 'home_popup.dart';
 import 'home_providers.dart';
+import 'category_browse_screen.dart' show openCategoryBrowse;
 import 'widgets/category_art.dart';
 import 'widgets/product_tile_card.dart';
 
@@ -1177,12 +1178,8 @@ class _CategoryShortcuts extends ConsumerWidget {
           return InkWell(
             key: ValueKey('home-category-${c.categoryId}'),
             borderRadius: BorderRadius.circular(12),
-            onTap: () => context.push(
-              Uri(
-                path: '/products',
-                queryParameters: {'categoryId': c.categoryId, 'title': c.name},
-              ).toString(),
-            ),
+            onTap: () =>
+                openCategoryBrowse(context, c.categoryId, title: c.name),
             child: Column(
               children: [
                 // 사용자 캡처(2026-11-20 홈): 동그란 그림 약 44dp
@@ -2265,9 +2262,7 @@ void openHomeBanner(BuildContext context, HomeBanner b, HomeView? home) {
     case BannerLink.product:
       context.push('/products/$ref');
     case BannerLink.category:
-      context.push(
-        Uri(path: '/products', queryParameters: {'categoryId': ref}).toString(),
-      );
+      openCategoryBrowse(context, ref);
     case BannerLink.none:
       break;
   }

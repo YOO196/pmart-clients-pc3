@@ -373,7 +373,11 @@ class ProductPage {
     this.total,
     this.correctedQuery,
     this.suggestedQuery,
+    this.similarItems,
   });
+
+  /// 첫 쪽이 0건(교정해도 0건)일 때 서버가 고른 비슷한 상품(search 0.12.0, BR-87). 없으면 null.
+  final List<ProductTile>? similarItems;
 
   /// 원래 검색어가 0건이라 서버가 이 검색어로 고쳐 찾은 결과다(search 0.4.0).
   final String? correctedQuery;

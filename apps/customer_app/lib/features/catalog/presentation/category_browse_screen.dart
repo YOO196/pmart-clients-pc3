@@ -12,6 +12,31 @@ import 'product_list_view.dart';
 import 'widgets/category_art.dart';
 import 'widgets/product_tile_card.dart';
 
+/// 카테고리 화면을 연다 — 아래 탭 막대를 둔 채, 들어온 탭 안에서(사용자 2026-11-23 "1,2 하고"):
+/// 홈 탭이면 `/category`, 카테고리 탭이면 `/categories/list`, 그 밖(전체 화면 위 등)은 `/products`(전체 화면).
+void openCategoryBrowse(
+  BuildContext context,
+  String categoryId, {
+  String? title,
+}) {
+  final here = GoRouter.of(context)
+      .routerDelegate
+      .currentConfiguration
+      .uri
+      .path;
+  final path = switch (here) {
+    '/' || '/category' => '/category',
+    '/categories' || '/categories/list' => '/categories/list',
+    _ => '/products',
+  };
+  context.push(
+    Uri(
+      path: path,
+      queryParameters: {'categoryId': categoryId, 'title': ?title},
+    ).toString(),
+  );
+}
+
 /// 초안 15 B(사용자 확정 2026-11-23): 카테고리 → 하위 → 상품 목록 한 화면.
 /// 같은 구획 상위 가로 탭(검정 밑줄) → 하위 동그라미 줄(맨 앞 "☰ 전체") → CATEGORY 배너 → "이 카테고리의 할인
 /// 상품 전체 ›" 가로 줄 → 상품 수·정렬·필터·2열. 내려 보면(D) 동그라미 줄이 그림 든 알약 칩으로 바뀌어 탭 아래 붙는다.

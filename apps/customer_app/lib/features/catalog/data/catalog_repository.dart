@@ -494,30 +494,33 @@ List<CategoryNode> categoriesFromContract(pd.GetCategoryTree200Response r) {
   ];
 }
 
-ProductPage searchFromContract(sr.SearchResult r) => ProductPage(
-  items: arrangeForDisplay(
-    r.items.map(
-      (h) => ProductTile(
-        productId: _required(h.productId, 'SearchHit.productId'),
-        name: _required(h.name, 'SearchHit.name'),
-        imageUrl: h.imageUrl,
-        representativeSku: h.representativeSku,
-        basePrice: h.basePrice,
-        saleState: _saleState(h.saleState?.value),
-        carried: h.carried,
-        soldOut: h.availability?.value == 'SOLD_OUT',
-        rating: h.rating?.toDouble(),
-        reviewCount: h.reviewCount,
-        discount: saleDiscountOf(
-          salePrice: h.salePrice,
-          basePrice: h.basePrice,
-          ratePercent: h.discountRatePercent,
-          name: h.discountName,
-          endsAt: h.discountEndsAt,
-        ),
-      ),
-    ),
+ProductTile _hitTile(sr.SearchHit h) => ProductTile(
+  productId: _required(h.productId, 'SearchHit.productId'),
+  name: _required(h.name, 'SearchHit.name'),
+  imageUrl: h.imageUrl,
+  representativeSku: h.representativeSku,
+  basePrice: h.basePrice,
+  saleState: _saleState(h.saleState?.value),
+  carried: h.carried,
+  soldOut: h.availability?.value == 'SOLD_OUT',
+  rating: h.rating?.toDouble(),
+  reviewCount: h.reviewCount,
+  discount: saleDiscountOf(
+    salePrice: h.salePrice,
+    basePrice: h.basePrice,
+    ratePercent: h.discountRatePercent,
+    name: h.discountName,
+    endsAt: h.discountEndsAt,
   ),
+);
+
+ProductPage searchFromContract(sr.SearchResult r) => ProductPage(
+  items: arrangeForDisplay(r.items.map(_hitTile)),
+  // 0건(교정해도 0건)일 때만 비슷한 상품(search 0.12.0, BR-87). 없거나 비면 null.
+  similarItems: switch (r.similarItems) {
+    final s? when s.isNotEmpty => arrangeForDisplay(s.map(_hitTile)),
+    _ => null,
+  },
   nextCursor: r.page.nextCursor,
   total: r.total,
   correctedQuery: switch (r.correctedQuery?.trim()) {
