@@ -80,6 +80,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-22-backend-sale-list-filters-sort.md` | BR-83 할인 상품 목록 필터(`/search/filters` onSale)·할인율순 정렬 |
 | `rider-app/2026-11-23-backend-delivery-area-change.md` | 라이더 마이페이지 배달 지역 바꾸기(운행 쉴 때만·한 곳·바로 반영 — 앱 반영 #391). 서버 1) 운행 중 변경 409 INVALID_STATE 로 막기 2) 쉬는 동안 남은 operatingMfcId 정리 3) 없는·운영 안 하는 지점 거절 여부 — 회신 대기 |
 | `rider-app/2026-11-23-backend-rider-list-active-deliveries.md` | 라이더 백오피스 라이더 목록 "진행 중 배송 수"(StaffRiderSummary.activeDeliveryCount — 여러 라이더를 한 번에) — 보냄, 회신 대기 |
+| `rider-app/2026-11-23-backend-help-auto-close-on-delivery-end.md` | 배송이 끝나면(완료·반납·취소·실패 확정) 열린 도움요청을 서버가 자동 완료(resolvedBy system:…), 끝난 배송 조회 404 없는지(앱 반영 #431 끝난 배송 보기) — 백엔드 PR #385 로 회신 |
 | `customer-app/2026-11-23-backend-timer-theme-style.md` | BR-84 타이머 테마 머리 모양(timerStyle LABEL·BAND)·백오피스에서 고르기 |
 | `customer-app/2026-11-23-backend-coupon-used-at.md` | BR-85 내 쿠폰 쓴 시각(Coupon.usedAt) |
 | `customer-app/2026-11-23-backend-review-order-writable-count.md` | BR-86 리뷰 쓰기 목록 주문별 쓸 수 있는 품목 수(orderWritableCount) |
