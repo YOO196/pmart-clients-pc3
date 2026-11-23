@@ -2540,6 +2540,94 @@ void reviewFlowShots() {
       await t.pumpAndSettle();
     }
   });
+
+  // 카테고리 화면 전체(레퍼런스 3-3 "1. 카테고리 첫 화면.jpg" 와 같은 1080×4266).
+  testWidgets('category-full', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 4266)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await t.tap(find.text('카테고리').last);
+    await t.pumpAndSettle();
+    // 그림(앱 안 에셋)이 풀릴 때까지 실제 시간으로 잠깐 기다린다.
+    for (final e in find.byType(Image).evaluate()) {
+      final img = e.widget as Image;
+      await t.runAsync(() => precacheImage(img.image, e));
+    }
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/cat-full.png').uri),
+    );
+  });
+
+  // 카테고리 → 하위 카테고리 시트 → 상품 목록(지금 모습 확인용).
+  testWidgets('category-children', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    await t.tap(find.text('카테고리').last);
+    await t.pumpAndSettle();
+    Future<void> shot(String n) async {
+      for (final e in find.byType(Image).evaluate()) {
+        await t.runAsync(() => precacheImage((e.widget as Image).image, e));
+      }
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/$n.png').uri),
+      );
+    }
+
+    await t.tap(find.text('과일·채소·샐러드').first);
+    await t.pumpAndSettle();
+    await shot('cat-sheet');
+    await t.tap(find.byType(ListTile).at(1));
+    await t.pumpAndSettle();
+    await shot('cat-list');
+  });
+
+  // 검색 오타 교정 지금 모습(레퍼런스 3-4 2~4 와 비교용).
+  testWidgets('search-typo-cases', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    for (final (q, name) in [
+      ('우우', 'typo-corrected'),
+      ('서울우유', 'typo-suggested'),
+      ('듀부', 'typo-none'),
+    ]) {
+      await t.tap(find.text('검색').last);
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const ValueKey('search-field')), q);
+      await t.testTextInput.receiveAction(TextInputAction.search);
+      await t.pumpAndSettle();
+      for (final e in find.byType(Image).evaluate()) {
+        await t.runAsync(() => precacheImage((e.widget as Image).image, e));
+      }
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/$name.png').uri),
+      );
+      await t.tap(find.text('홈').last);
+      await t.pumpAndSettle();
+    }
+  });
 }
 
 final class _OutOfArea extends MockAddressRepository {

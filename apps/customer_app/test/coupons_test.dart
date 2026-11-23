@@ -438,6 +438,8 @@ void main() {
       await t.tap(find.byKey(const ValueKey('coupon-tab-past')));
       await t.pumpAndSettle();
       expect(find.text('사용함'), findsOneWidget);
+      // BR-85: 쓴 날(서버 usedAt) — 2026-11-08 12:00 서울.
+      expect(find.text('11.8(일)에 사용'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('coupon-used-order-CPN-MOCK-3')),
         findsOneWidget,

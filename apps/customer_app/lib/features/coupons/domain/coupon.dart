@@ -48,6 +48,7 @@ class Coupon {
     required this.issuedAt,
     required this.validUntil,
     this.usedOrderId,
+    this.usedAt,
   });
 
   final String couponId;
@@ -61,6 +62,9 @@ class Coupon {
   final DateTime issuedAt;
   final DateTime validUntil;
   final String? usedOrderId;
+
+  /// 쓴 시각(promotion 0.2.1 BR-85 — 주문 확정 시각, USED 일 때만). 없으면 null(지어내지 않는다).
+  final DateTime? usedAt;
 }
 
 /// 지금 받을 수 있는 쿠폰 행사(계약 `CouponCampaign`).

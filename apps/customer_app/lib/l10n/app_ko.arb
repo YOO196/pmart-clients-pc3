@@ -2092,6 +2092,8 @@
   "couponAllPartial": "{ok}장 받았어요 · {failed}장은 받지 못했어요",
   "@couponAllPartial": { "placeholders": { "ok": { "type": "int" }, "failed": { "type": "int" } } },
   "couponSeeOrder": "쓴 주문 보기 ›",
+  "couponUsedOn": "{date}에 사용",
+  "@couponUsedOn": { "placeholders": { "date": { "type": "String" } } },
   "couponUseGuide": "쿠폰은 주문서에서 1장 골라 쓸 수 있어요.\n할인 금액은 주문서에서 확인돼요.",
   "couponNoneAvailableGuide": "지금 받을 수 있는 쿠폰이 있는지\n확인해 보세요",
   "couponGoDownload": "쿠폰 받으러 가기",

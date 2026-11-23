@@ -163,6 +163,7 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
           query: widget.baseQuery,
           picked: _filters,
           onToggle: _toggleAttribute,
+          correctedKeyword: list?.correctedQuery,
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
@@ -687,9 +688,14 @@ class _AttributeRows extends ConsumerWidget {
     required this.query,
     required this.picked,
     required this.onToggle,
+    this.correctedKeyword,
   });
 
   final ProductQuery query;
+
+  /// 서버가 고친 검색어(오타 교정 결과). 있으면 속성 값도 그 검색어 기준으로 묻는다 — 원래 검색어로 물으면 0건이라
+  /// 값이 하나도 없는 줄만 남는다.
+  final String? correctedKeyword;
   final Set<String> picked;
   final void Function(FilterAttribute, FilterValue) onToggle;
 
@@ -701,21 +707,24 @@ class _AttributeRows extends ConsumerWidget {
         .watch(
           filtersProvider(
             ProductQuery(
-              keyword: query.keyword,
+              keyword: correctedKeyword ?? query.keyword,
               categoryId: query.categoryId,
               onSale: query.onSale,
             ),
           ),
         )
         .value;
-    // 읽는 중·실패면 줄을 두지 않는다(필터 버튼에서 다시 시도·실패 표시).
-    if (attributes == null || attributes.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    // 고를 수 있는 값(0건이 아님, 또는 이미 고름)이 하나도 없는 줄은 그리지 않는다 — 이름만 있는 빈 줄이 남지 않게.
+    final shown = [
+      for (final a in attributes ?? const <FilterAttribute>[])
+        if (a.values.any((v) => v.count != 0 || picked.contains(a.token(v)))) a,
+    ];
+    // 읽는 중·실패·보일 줄 없음이면 줄을 두지 않는다(필터 버튼에서 다시 시도·실패 표시).
+    if (shown.isEmpty) return const SizedBox.shrink();
     return Column(
       key: const ValueKey('attribute-rows'),
       children: [
-        for (final a in attributes.take(2)) ...[
+        for (final a in shown.take(2)) ...[
           SizedBox(
             height: 52,
             child: Row(

@@ -274,6 +274,7 @@ EligibilityPage eligibilityPageFromContract(
           mfcName: _text(e.mfcName),
           imageUrl: _text(e.imageUrl),
           optionLabel: _text(e.optionLabel),
+          orderWritableCount: e.orderWritableCount,
         ),
   ],
   nextCursor: body.page.nextCursor,

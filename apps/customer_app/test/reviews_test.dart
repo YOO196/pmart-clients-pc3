@@ -572,6 +572,11 @@ void main() {
           .textSpan!
           .toPlainText();
       expect(headText(), contains('바로픽 부산동래'));
+      // BR-86: 주문 머리 수는 서버 orderWritableCount.
+      expect(
+        find.descendant(of: head, matching: find.text('1개')),
+        findsOneWidget,
+      );
       expect(headText(), matches(RegExp(r'^10월 24일 (배송|주문)')));
       expect(find.byKey(const ValueKey('review-option-ol-1')), findsNothing);
       expect(

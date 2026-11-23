@@ -43,7 +43,11 @@ class ReviewEligibility {
     this.mfcName,
     this.imageUrl,
     this.optionLabel,
+    this.orderWritableCount,
   });
+
+  /// 같은 주문에서 지금 쓸 수 있는 품목 수(review 0.6.1 BR-86 — 쪽과 상관없이 주문 기준). 없으면 null.
+  final int? orderWritableCount;
 
   /// 주문 확정 시각·담당 센터 이름(review 0.5.0 — BR-67). 모르면 null(지어내지 않는다) — 주문 묶음 머리에 쓴다.
   final DateTime? orderedAt;

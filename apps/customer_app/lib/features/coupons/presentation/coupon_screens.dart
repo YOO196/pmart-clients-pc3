@@ -1038,6 +1038,9 @@ class _MyCouponList extends ConsumerWidget {
                       CouponStatus.expired => l10n.couponExpiredOn(
                         _md(c.validUntil),
                       ),
+                      // BR-85: 쓴 날(서버 usedAt)이 있으면 "11.8(토)에 사용"(초안 10-D).
+                      CouponStatus.used when c.usedAt != null =>
+                        l10n.couponUsedOn(_md(c.usedAt!)),
                       _ => _minText(l10n, c.minOrderAmount, order: true),
                     }
                   else

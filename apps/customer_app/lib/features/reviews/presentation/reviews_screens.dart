@@ -272,8 +272,10 @@ class _WritableTab extends ConsumerWidget {
               if (i == 0 || list.items[i - 1].orderId != e.orderId)
                 _OrderHead(
                   eligibility: e,
-                  // 이 주문의 품목 수 — 받아 온 쪽 안에서만 센다(쪽 경계면 덜 셀 수 있음).
-                  count: list.items.where((x) => x.orderId == e.orderId).length,
+                  // 이 주문의 품목 수 — 서버 값(BR-86 orderWritableCount), 없으면 받아 온 쪽 안에서 센다.
+                  count:
+                      e.orderWritableCount ??
+                      list.items.where((x) => x.orderId == e.orderId).length,
                 ),
               ReviewPickCard(
                 key: ValueKey('review-writable-${e.orderLineId}'),

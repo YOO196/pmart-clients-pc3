@@ -88,6 +88,7 @@ Coupon couponFromContract(api.Coupon c) => Coupon(
   issuedAt: c.issuedAt,
   validUntil: c.validUntil,
   usedOrderId: c.usedOrderId,
+  usedAt: c.usedAt,
 );
 
 CouponCampaign campaignFromContract(api.CouponCampaign c) => CouponCampaign(
@@ -195,6 +196,7 @@ final class MockCouponRepository implements CouponRepository {
       'issuedAt': '2026-11-02T01:00:00Z',
       'validUntil': '2026-11-09T14:59:59Z',
       'usedOrderId': 'order-seed-1',
+      'usedAt': '2026-11-08T03:00:00Z',
     },
     {
       'couponId': 'CPN-MOCK-4',

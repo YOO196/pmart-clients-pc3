@@ -176,7 +176,22 @@ final class MockReviewsRepository implements ReviewsRepository {
     final end = (start + pageSize).clamp(0, matched.length);
     return eligibilityPageFromContract(
       api.ListMyReviewEligibilities200Response.fromJson({
-        'items': matched.sublist(start, end),
+        // BR-86: 품목마다 그 주문의 지금 쓸 수 있는 품목 수(쪽과 상관없이).
+        'items': [
+          for (final e in matched.sublist(start, end))
+            {
+              ...e,
+              'orderWritableCount': eligibilityJson
+                  .where(
+                    (x) =>
+                        x['orderId'] == e['orderId'] &&
+                        reviewStateFromWire(x['state'] as String?) ==
+                            ReviewState.eligible &&
+                        x['reviewId'] == null,
+                  )
+                  .length,
+            },
+        ],
         'page': {
           'nextCursor': end < matched.length ? '$end' : null,
           'size': pageSize,

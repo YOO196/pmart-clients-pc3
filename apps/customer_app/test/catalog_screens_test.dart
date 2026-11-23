@@ -204,12 +204,21 @@ void main() {
       expect(find.byKey(const ValueKey('search-corrected')), findsOneWidget);
       expect(find.textContaining('검색 결과예요'), findsOneWidget);
       expect(find.byKey(const ValueKey('tile-P-0001')), findsWidgets);
+      // 속성 줄은 고친 검색어 기준 값으로 — 값 없는 빈 줄이 남지 않는다.
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('attribute-rows')),
+          matching: find.byType(InkWell),
+        ),
+        findsWidgets,
+      );
 
       await t.tap(find.byKey(const ValueKey('search-use-original')));
       await t.pumpAndSettle();
-      // 교정 없이 원래 검색어 — 결과 0건, 띠 없음.
+      // 교정 없이 원래 검색어 — 결과 0건, 띠 없음, 고를 값이 없는 속성 줄도 없음.
       expect(find.byKey(const ValueKey('search-corrected')), findsNothing);
       expect(find.text('검색 결과가 없어요'), findsOneWidget);
+      expect(find.byKey(const ValueKey('attribute-rows')), findsNothing);
     });
 
     testWidgets('결과가 적으면 "혹시 ○○를 찾으셨나요?" — 누르면 그 검색어로 새로 찾는다', (t) async {
