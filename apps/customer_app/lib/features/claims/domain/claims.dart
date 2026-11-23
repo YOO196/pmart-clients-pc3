@@ -222,7 +222,11 @@ class ClaimView {
     required this.refunds,
     this.autoCancelled = false,
     this.feePayment,
+    this.openedAt,
   });
+
+  /// 접수 시각(계약 `Claim.openedAt`). 모르면 null — 상세 상태 카드의 "접수" 날짜에 쓴다(초안 08-B).
+  final DateTime? openedAt;
 
   final String claimId;
   final int version;

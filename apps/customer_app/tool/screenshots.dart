@@ -45,6 +45,8 @@ import 'package:customer_app/features/profile/presentation/profile_controller.da
     show profileProvider;
 import 'package:customer_app/features/redelivery/data/mock_redelivery_payments_repository.dart';
 import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart';
+import 'package:customer_app/features/wishlist/data/wishlist_repository.dart'
+    show MockWishlistRepository;
 import 'package:customer_app/features/support/presentation/faq_screens.dart'
     show faqRepositoryProvider;
 import 'package:customer_app/features/support/data/mock_faq_repository.dart';
@@ -2087,6 +2089,225 @@ void reviewFlowShots() {
       find.byType(CustomerApp),
       matchesGoldenFile(File('$_dir/h-out-of-area.png').uri),
     );
+  });
+  // 찜한 상품(초안 07 C + E, 사용자 2026-11-23 "찜한 상품 목록부터 하자").
+  testWidgets('wishlist-c', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    Map<String, Object?> w(String id, String name, int price, String st) => {
+      'productId': id,
+      'addedAt': '2026-11-20T03:00:00Z',
+      'name': name,
+      'imageUrl': null,
+      'price': price,
+      'saleState': st,
+    };
+    Future<void> openList(List<Map<String, Object?>> seed, String name) async {
+      await t.pumpWidget(
+        testApp(
+          const [],
+          wishlist: MockWishlistRepository(latency: Duration.zero, seed: seed),
+        ),
+      );
+      await t.pumpAndSettle();
+      await t.tap(find.text('마이페이지').last);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('my-login')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('login-kakao')));
+      await t.pumpAndSettle();
+      unawaited(
+        GoRouter.of(t.element(find.byType(Scaffold).first))
+            .push('/me/wishlist'),
+      );
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/$name.png').uri),
+      );
+    }
+
+    await openList([
+      w('P-0001', '국산 햇감자 1kg (특품)', 4980, 'ON_SALE'),
+      w('P-0002', '서울우유 나100% 1L 2개 묶음 기획 상품 한정 수량', 5480, 'ON_SALE'),
+      w('P-0004', '무항생제 신선 대란 30구', 8990, 'SOLD_OUT'),
+      w('P-0003', 'CJ 비비고 왕교자 1.05kg', 9980, 'ON_SALE'),
+      w('P-0008', '제주 한라봉 선물세트 3kg', 29000, 'ENDED'),
+    ], 'wish-c');
+  });
+
+  testWidgets('wishlist-empty', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp(
+        const [],
+        wishlist: MockWishlistRepository(
+          latency: Duration.zero,
+          seed: const [],
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/me/wishlist'),
+    );
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/wish-e-empty.png').uri),
+    );
+  });
+
+  testWidgets('wishlist-guest', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/me/wishlist'),
+    );
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/wish-e-guest.png').uri),
+    );
+  });
+
+  // 취소·반품 내역·처리 내역(초안 08 목록 B·D, 상세 B·C·D — 사용자 2026-11-23).
+  testWidgets('claims-08', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    Map<String, Object?> c(
+      String id,
+      String type,
+      String state,
+      String opened, {
+      List<Map<String, Object?>> lines = const [],
+      List<Map<String, Object?>> refunds = const [],
+      Map<String, Object?>? fee,
+    }) => {
+      'claimId': id,
+      'version': 1,
+      'orderId': 'order-seed-1',
+      'type': type,
+      'state': state,
+      'openedAt': opened,
+      'reason': 'CHANGE_OF_MIND',
+      'lines': lines,
+      'refunds': refunds,
+      'feePayment': ?fee,
+    };
+    Map<String, Object?> line(
+      String id,
+      String d, {
+      int? amount,
+      String? why,
+    }) => {
+      'orderLineId': id,
+      'requestedQty': 1,
+      'approvedQty': d == 'APPROVED' ? 1 : 0,
+      'decision': d,
+      'rejectReason': ?why,
+      'refundAmount': ?amount,
+    };
+    final repo = MockClaimsRepository(latency: Duration.zero);
+    repo.claims
+      ..['c-fee'] = c(
+        'c-fee',
+        'RETURN',
+        'FEE_PENDING',
+        '2026-11-22T09:05:00Z',
+        lines: [line('ol-1', 'PENDING')],
+        fee: {
+          'amount': 9000,
+          'state': 'WAITING',
+          'paymentAttemptId': 'PA-1',
+          'deadlineAt': DateTime.now()
+              .toUtc()
+              .add(const Duration(hours: 5, minutes: 12))
+              .toIso8601String(),
+        },
+      )
+      ..['c-prog'] = c(
+        'c-prog',
+        'CANCEL',
+        'IN_PROGRESS',
+        '2026-11-21T00:12:00Z',
+        lines: [
+          line('ol-1', 'APPROVED', amount: 2980),
+          line('ol-2', 'APPROVED', amount: 1980),
+        ],
+        refunds: [
+          {'state': 'PG_PENDING', 'pgResult': 'UNKNOWN', 'amount': 4960},
+        ],
+      )
+      ..['c-done'] = c(
+        'c-done',
+        'CANCEL',
+        'CLOSED',
+        '2026-11-20T05:31:00Z',
+        lines: [
+          line('ol-1', 'APPROVED', amount: 2980),
+          line('ol-2', 'REJECTED', why: '이미 배달을 시작해서 취소할 수 없어요'),
+        ],
+        refunds: [
+          {
+            'state': 'COMPLETED',
+            'pgResult': 'SUCCESS',
+            'amount': 2980,
+            'completedAt': '2026-11-21T06:20:00Z',
+          },
+        ],
+      )
+      ..['c-wd'] = c('c-wd', 'CANCEL', 'WITHDRAWN', '2026-10-30T02:02:00Z');
+    await t.pumpWidget(testApp(const [], claims: repo));
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    Future<void> shot(String name) => expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/cl-$name.png').uri),
+    );
+    unawaited(router.push('/claims'));
+    await t.pumpAndSettle();
+    await shot('list');
+    for (final id in ['c-prog', 'c-fee', 'c-done']) {
+      unawaited(router.push('/claims/$id'));
+      for (var k = 0; k < 6; k++) {
+        await t.pump(const Duration(milliseconds: 300));
+      }
+      await shot(id);
+      router.pop();
+      await t.pump(const Duration(milliseconds: 500));
+    }
   });
 }
 

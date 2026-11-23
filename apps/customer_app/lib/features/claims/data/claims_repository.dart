@@ -243,6 +243,7 @@ ClaimView claimFromContract(api.Claim c) => ClaimView(
   type: claimTypeFromWire(c.type?.value),
   state: claimStateFromWire(c.state?.value),
   autoCancelled: c.reason == api.ClaimReason.FULFILLMENT_REJECTED,
+  openedAt: c.openedAt,
   feePayment: switch (c.feePayment) {
     null => null,
     final f => ReturnFeeView(

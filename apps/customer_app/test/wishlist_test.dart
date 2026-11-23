@@ -147,19 +147,76 @@ void main() {
     await t.pumpAndSettle();
 
     expect(key('wishlist'), findsOneWidget);
-    expect(t.widget<Text>(key('wishlist-count')).data, '전체 2개');
+    String count() =>
+        t.widget<Text>(key('wishlist-count')).textSpan!.toPlainText();
+    expect(count(), '전체 2개');
     expect(t.widget<Text>(key('wish-name-P-0002')).data, '그릭요거트 플레인 400g');
-    expect(t.widget<Text>(key('wish-state-P-0004')).data, '품절');
+    // 초안 07-C: 품절은 사진 아래 띠, 담기 대신 "담을 수 없어요"(눌리지 않음). 판매 중은 [담기].
+    expect(
+      find.descendant(of: key('wish-state-P-0004'), matching: find.text('품절')),
+      findsOneWidget,
+    );
     expect(key('wish-state-P-0002'), findsNothing);
+    expect(
+      t.widget<OutlinedButton>(key('wish-cannot-P-0004')).onPressed,
+      isNull,
+    );
+    expect(key('wish-add-P-0002'), findsOneWidget);
+    expect(key('wish-add-P-0004'), findsNothing);
 
     await t.tap(key('wish-heart-P-0004'));
     await t.pumpAndSettle();
     expect(key('wish-P-0004'), findsNothing);
-    expect(t.widget<Text>(key('wishlist-count')).data, '전체 1개');
+    expect(count(), '전체 1개');
 
     await t.tap(key('wish-P-0002'));
     await t.pumpAndSettle();
     expect(find.byType(ProductDetailScreen), findsOneWidget);
+  });
+
+  // 초안 07-C [담기]: 카드 + 와 같은 규칙 — 옵션을 확인하고 하나면 바로 장바구니에.
+  testWidgets('찜한 상품 [담기]: 옵션 하나면 바로 장바구니에 담는다', (t) async {
+    final repo = repo0();
+    await start(t, repo);
+    await login(t);
+    await t.ensureVisible(key('my-wishlist'));
+    await t.tap(key('my-wishlist'));
+    await t.pumpAndSettle();
+    await t.tap(key('wish-add-P-0002'));
+    await t.pumpAndSettle();
+    expect(find.byType(ProductDetailScreen), findsNothing);
+    expect(find.textContaining('장바구니'), findsWidgets);
+  });
+
+  // 초안 07-E: 빈 상태는 하트 동그라미 + 안내 + [상품 둘러보기], 비회원은 같은 틀에 [로그인].
+  testWidgets('찜한 상품 빈 상태·비회원 안내', (t) async {
+    final repo = repo0(seed: const []);
+    await start(t, repo);
+    unawaited(
+      GoRouter.of(t.element(find.byType(Scaffold).first)).push('/me/wishlist'),
+    );
+    await t.pumpAndSettle();
+    expect(key('wishlist-guest'), findsOneWidget);
+    expect(find.text('로그인하면 찜할 수 있어요'), findsOneWidget);
+    await t.tap(key('wishlist-login'));
+    await t.pumpAndSettle();
+    expect(find.byType(LoginScreen), findsOneWidget);
+    await t.tap(key('login-kakao'));
+    await t.pumpAndSettle();
+    if (key('wishlist').evaluate().isEmpty) {
+      await t.tap(find.text('마이페이지').last);
+      await t.pumpAndSettle();
+    }
+    if (key('wishlist').evaluate().isEmpty) {
+      await t.ensureVisible(key('my-wishlist'));
+      await t.tap(key('my-wishlist'));
+      await t.pumpAndSettle();
+    }
+    expect(key('wishlist-empty'), findsOneWidget);
+    expect(find.text('찜한 상품이 없어요'), findsOneWidget);
+    await t.tap(key('wishlist-browse'));
+    await t.pumpAndSettle();
+    expect(key('wishlist'), findsNothing);
   });
 
   testWidgets('찜한 상품: 상품 정보를 못 읽은 줄은 지어내지 않고 그 말만, 조회 실패는 빈 목록이 아니다', (

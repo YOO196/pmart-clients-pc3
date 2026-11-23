@@ -403,11 +403,16 @@ void main() {
       expect(find.text('확인하고 있어요'), findsOneWidget);
       await next();
       expect(find.text('취소·환불을 진행하고 있어요'), findsOneWidget);
-      expect(find.text('환불 진행 중'), findsOneWidget);
-      expect(find.text('환불 완료'), findsNothing);
+      // 초안 08-B 환불 카드: 상태 칩(진행 중 → PG 성공 뒤에만 완료).
+      Finder inRefund(String text) => find.descendant(
+        of: find.byKey(const ValueKey('refund')),
+        matching: find.text(text),
+      );
+      expect(inRefund('진행 중'), findsOneWidget);
+      expect(inRefund('완료'), findsNothing);
       await next();
       expect(find.text('처리가 끝났어요'), findsOneWidget);
-      expect(find.text('환불 완료'), findsOneWidget);
+      expect(inRefund('완료'), findsOneWidget);
 
       // 끝 상태가 되면 더 조회하지 않는다.
       final calls = claims.getCalls;

@@ -80,15 +80,25 @@ void main() {
     await t.pumpAndSettle();
     await _loginAndOpen(t);
 
-    expect(find.text('환불 완료 12,000원'), findsOneWidget);
-    expect(find.text('환불 진행 중 5,000원'), findsOneWidget);
-    expect(find.text('환불 완료 5,000원'), findsNothing);
+    // 초안 08 목록 B: 선 아래 "환불 완료 · 금액"(진행 중은 보라 금액), 실패는 분홍 띠.
+    List<String> refundOf(String id) => [
+      for (final w
+          in find
+              .descendant(
+                of: find.byKey(ValueKey('my-claim-refund-$id')),
+                matching: find.byType(Text),
+              )
+              .evaluate())
+        (w.widget as Text).data ?? '',
+    ];
+    expect(refundOf('c-done'), ['환불 완료', '12,000원']);
+    expect(refundOf('c-pg'), ['환불 진행 중', '5,000원']);
     expect(find.text('환불에 문제가 있어요. 고객센터에서 도와드릴게요'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('my-claim-refund-c-none')),
       findsNothing,
     ); // 환불 없음은 줄을 붙이지 않는다
-    expect(find.text('반품 요청'), findsOneWidget);
+    expect(find.text('반품'), findsWidgets); // 종류 칩
 
     await t.tap(find.byKey(const ValueKey('my-claim-c-done')));
     await t.pumpAndSettle();

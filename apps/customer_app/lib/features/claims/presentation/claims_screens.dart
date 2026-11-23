@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:pmart_core/pmart_core.dart' show PmartFailure, ProblemCode;
 import 'package:pmart_ui/pmart_ui.dart';
 
@@ -11,6 +12,8 @@ import '../../../shared/order_status.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../checkout/domain/checkout.dart';
 import '../../checkout/presentation/checkout_controller.dart';
+import '../../catalog/presentation/widgets/product_tile_card.dart'
+    show ProductImage;
 import '../../checkout/presentation/delivery_select_screen.dart'
     show seoulDate, slotDayLabel, windowText;
 import '../../orders/domain/orders.dart';
@@ -278,7 +281,225 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
   }
 }
 
-/// SCR-CLAIM-DETAIL-001. 품목별 승인·거절, 환불은 PG 성공 전 "완료" 없음.
+/// 종류 칩(초안 08): 취소 회색 / 반품 연보라 / 그 밖 회색.
+class ClaimTypeChip extends StatelessWidget {
+  const ClaimTypeChip({super.key, required this.type});
+
+  final ClaimType type;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final ret = type == ClaimType.returnItems;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: ret ? scheme.primaryContainer : scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        switch (type) {
+          ClaimType.cancel => l10n.claimChipCancel,
+          ClaimType.returnItems => l10n.claimChipReturn,
+          ClaimType.exchange => l10n.claimChipExchange,
+          ClaimType.unknown => l10n.claimTitle,
+        },
+        style: theme.textTheme.labelSmall?.copyWith(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: ret ? scheme.primary : scheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+/// 단계 막대(초안 08 상세 B) — 상태값으로만 칠한다(서버에 단계별 시각이 없어 시각은 넣지 않는다).
+/// 철회·거절·반품 취소·회수 실패·모르는 상태·교환은 막대 없음(null).
+({List<String> steps, int current})? claimSteps(
+  AppLocalizations l10n,
+  ClaimView c,
+) {
+  final s = c.state;
+  switch (c.type) {
+    case ClaimType.cancel:
+      final i = switch (s) {
+        ClaimState.opened => 0,
+        ClaimState.underReview ||
+        ClaimState.stopPending ||
+        ClaimState.decided => 1,
+        ClaimState.inProgress => 2,
+        ClaimState.closed => 3,
+        _ => null,
+      };
+      if (i == null) return null;
+      return (
+        steps: [
+          l10n.claimStepOpened,
+          l10n.claimStepReview,
+          l10n.claimStepRefunding,
+          l10n.claimStepDone,
+        ],
+        current: i,
+      );
+    case ClaimType.returnItems:
+      // 고객 사유(회수비 있음): 접수 → 회수비 결제 → 회수·검수 → 환불 / 회사 잘못: 접수 → 확인 → 회수·검수 → 환불.
+      final customer = c.feePayment != null;
+      final i = switch (s) {
+        ClaimState.opened => 0,
+        ClaimState.feePending when customer => 1,
+        ClaimState.underReview when !customer => 1,
+        ClaimState.inProgress || ClaimState.decided => 2,
+        ClaimState.closed => 3,
+        _ => null,
+      };
+      if (i == null) return null;
+      return (
+        steps: [
+          l10n.claimStepOpened,
+          customer ? l10n.claimStepFee : l10n.claimStepReview,
+          l10n.claimStepRecovery,
+          l10n.claimStepRefund,
+        ],
+        current: i,
+      );
+    case ClaimType.exchange || ClaimType.unknown:
+      return null;
+  }
+}
+
+class _StepBar extends StatelessWidget {
+  const _StepBar({required this.steps, required this.current});
+
+  final List<String> steps;
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final on = scheme.primary;
+    final off = scheme.outlineVariant;
+    return Column(
+      key: const ValueKey('claim-steps'),
+      children: [
+        SizedBox(
+          height: 18,
+          child: Row(
+            children: [
+              for (var i = 0; i < steps.length; i++) ...[
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 2,
+                          color: i == 0
+                              ? Colors.transparent
+                              : (i <= current ? on : off),
+                        ),
+                      ),
+                      Container(
+                        key: ValueKey('claim-step-$i'),
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: i < current
+                              ? on
+                              : (i == current ? scheme.surface : off),
+                          border: i == current
+                              ? Border.all(color: on, width: 3.5)
+                              : null,
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          height: 2,
+                          color: i == steps.length - 1
+                              ? Colors.transparent
+                              : (i < current ? on : off),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            for (var i = 0; i < steps.length; i++)
+              Expanded(
+                child: Text(
+                  steps[i],
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 12.5,
+                    fontWeight: i == current
+                        ? FontWeight.w700
+                        : FontWeight.w400,
+                    color: i == current
+                        ? on
+                        : (i < current
+                              ? scheme.onSurfaceVariant
+                              : scheme.outline),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// 상세의 흰 카드(회색 바탕 위, 모서리 16).
+class _ClaimBox extends StatelessWidget {
+  const _ClaimBox({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+    padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: child,
+  );
+}
+
+/// 작은 칩(승인·확인 중·거절·요청 수, 환불 상태).
+Widget _chip(
+  BuildContext context,
+  String text, {
+  required Color bg,
+  required Color fg,
+  bool bold = true,
+  Key? key,
+}) => Container(
+  key: key,
+  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+  decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+  child: Text(
+    text,
+    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+      fontSize: 12,
+      fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+      color: fg,
+    ),
+  ),
+);
+
+/// SCR-CLAIM-DETAIL-001 — 초안 08 상세 B(상태 카드 + 단계 막대 · 상품 카드 · 환불 카드), C(회수비 대기 분홍 카드 +
+/// 아래 고정 결제), D(끝남·일부 거절). 품목별 승인·거절, 환불은 PG 성공 전 "완료" 없음.
 class ClaimScreen extends ConsumerStatefulWidget {
   const ClaimScreen({super.key, required this.claimId});
 
@@ -309,9 +530,24 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
     });
   }
 
+  Future<void> _withdraw(ClaimView c) async {
+    setState(() => _withdrawing = true);
+    final s = await ref.read(withdrawClaimProvider)(c);
+    if (!mounted) return;
+    setState(() {
+      _withdrawing = false;
+      _withdrawal = s;
+    });
+    if (s == RequestState.confirmed) {
+      ref.invalidate(claimProvider(widget.claimId));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final provider = claimProvider(widget.claimId);
     ref.listen(provider, (prev, next) {
       if (next.isLoading) return;
@@ -325,123 +561,455 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
         ref.invalidate(orderListProvider);
       }
     });
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.claimTitle)),
-      body: UiStateView<ClaimView>(
-        state: uiStateOf(ref.watch(provider)),
-        onRetry: () => ref.invalidate(provider),
-        ready: (context, c) => RefreshIndicator(
-          onRefresh: () => ref.refresh(provider.future),
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text(
-                claimStateText(l10n, c.state, type: c.type),
-                key: const ValueKey('claim-state'),
-                style: Theme.of(context).textTheme.headlineSmall,
+    final value = ref.watch(provider);
+    final claim = value.value;
+    // 아래 고정: 회수비 결제(초안 C) 또는 [요청 철회](접수 상태).
+    final Widget? bottom = switch (claim) {
+      final c? when c.awaitingFee => ReturnFeePayBar(claim: c),
+      final c? when c.canWithdraw && _withdrawal == null => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: OutlinedButton(
+            key: const ValueKey('withdraw'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+              foregroundColor: scheme.primary,
+              side: BorderSide(color: scheme.outlineVariant),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-              if (c.autoCancelled)
-                Text(
-                  // 주문 취소가 확정되기 전에는 "취소되었어요"라고 하지 않는다
-                  c.state == ClaimState.closed ||
-                          ref
-                                  .watch(orderDetailProvider(c.orderId))
-                                  .value
-                                  ?.status ==
-                              OrderStatus.cancelled
-                      ? l10n.claimAutoCancelled
-                      : l10n.claimAutoCancelling,
-                  key: const ValueKey('claim-auto-cancelled'),
-                )
-              else if (c.state == ClaimState.opened)
-                Text(l10n.claimAcceptedNote),
-              // 반품 회수비(고객 사유 반품 — 고객센터 접수). 결제해야 회수가 시작된다.
-              ReturnFeeSection(claim: c),
-              const SizedBox(height: 12),
-              for (final l in c.lines)
-                ListTile(
-                  key: ValueKey('claim-line-${l.orderLineId}'),
-                  contentPadding: EdgeInsets.zero,
-                  // 클레임 응답에는 이름이 없다(BR-35 회신 §3). 주문 상세의 품목 사본과 orderLineId 로 맞춘다.
-                  title: Text(
-                    ref
-                            .watch(orderDetailProvider(c.orderId))
-                            .value
-                            ?.lines
-                            .where((o) => o.orderLineId == l.orderLineId)
-                            .firstOrNull
-                            ?.title ??
-                        l.sku ??
-                        l.orderLineId,
-                  ),
-                  subtitle: Text(
-                    [
-                      if (l.requestedQty case final q?) l10n.claimRequested(q),
-                      switch (l.decision) {
-                        LineDecision.pending => l10n.decisionPending,
-                        LineDecision.approved => l10n.decisionApproved(
-                          l.approvedQty ?? 0,
+            ),
+            onPressed: _withdrawing ? null : () => _withdraw(c),
+            child: Text(l10n.withdraw),
+          ),
+        ),
+      ),
+      _ => null,
+    };
+    return Scaffold(
+      backgroundColor: scheme.surfaceContainer,
+      appBar: AppBar(title: Text(l10n.claimTitle)),
+      bottomNavigationBar: bottom,
+      body: UiStateView<ClaimView>(
+        state: uiStateOf(value),
+        onRetry: () => ref.invalidate(provider),
+        ready: (context, c) {
+          final order = ref.watch(orderDetailProvider(c.orderId)).value;
+          final steps = claimSteps(l10n, c);
+          final ended =
+              c.state == ClaimState.withdrawn ||
+              c.state == ClaimState.rejected ||
+              c.state == ClaimState.cancelled;
+          String? note;
+          if (c.autoCancelled) {
+            // 주문 취소가 확정되기 전에는 "취소되었어요"라고 하지 않는다
+            note =
+                c.state == ClaimState.closed ||
+                    order?.status == OrderStatus.cancelled
+                ? l10n.claimAutoCancelled
+                : l10n.claimAutoCancelling;
+          } else if (c.state == ClaimState.opened) {
+            note = l10n.claimAcceptedNote;
+          }
+          final productRefunds = [
+            for (final r in c.refunds)
+              if (!r.returnFee) r,
+          ];
+          final feeRefunds = [
+            for (final r in c.refunds)
+              if (r.returnFee) r,
+          ];
+          return RefreshIndicator(
+            onRefresh: () => ref.refresh(provider.future),
+            child: ListView(
+              padding: const EdgeInsets.only(top: 12, bottom: 16),
+              children: [
+                // ① 상태 카드
+                _ClaimBox(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          ClaimTypeChip(type: c.type),
+                          const SizedBox(width: 8),
+                          if (c.openedAt case final t?)
+                            Text(
+                              l10n.claimOpenedOn(
+                                DateFormat(
+                                  'M.d(E)',
+                                  'ko',
+                                ).format(toSeoulWallClock(t)),
+                              ),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 13,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          const Spacer(),
+                          if (order?.orderNumber case final no?)
+                            InkWell(
+                              key: const ValueKey('claim-order-link'),
+                              onTap: () => context.push(
+                                '/orders/${Uri.encodeComponent(c.orderId)}',
+                              ),
+                              child: Text(
+                                l10n.claimOrderNumber(no),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        claimStateText(l10n, c.state, type: c.type),
+                        key: const ValueKey('claim-state'),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w700,
+                          color: ended
+                              ? scheme.onSurfaceVariant
+                              : scheme.onSurface,
                         ),
-                        LineDecision.rejected => l10n.decisionRejected,
-                      },
-                      ?l.rejectReason,
-                    ].join(' · '),
+                      ),
+                      if (note != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            note,
+                            key: c.autoCancelled
+                                ? const ValueKey('claim-auto-cancelled')
+                                : null,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 13.5,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      if (c.state == ClaimState.recoveryFailed)
+                        Container(
+                          margin: const EdgeInsets.only(top: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: scheme.tertiaryContainer,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            l10n.clRecoveryFailed,
+                            style: TextStyle(color: scheme.onTertiaryContainer),
+                          ),
+                        ),
+                      if (steps != null) ...[
+                        const SizedBox(height: 18),
+                        _StepBar(steps: steps.steps, current: steps.current),
+                      ],
+                    ],
                   ),
                 ),
-              for (final r in c.refunds)
-                ListTile(
-                  key: const ValueKey('refund'),
-                  contentPadding: EdgeInsets.zero,
-                  leading: PmartLineIcon(
-                    r.done ? PmartLineIcons.checkCircle : PmartLineIcons.clock,
+                // 반품 회수비(고객 사유 반품). 대기면 분홍 카드, 아니면 결과 한 줄.
+                ReturnFeeSection(claim: c),
+                // ② 상품 카드
+                if (c.lines.isNotEmpty)
+                  _ClaimBox(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              c.type == ClaimType.returnItems
+                                  ? l10n.claimSectionReturnLines
+                                  : l10n.claimSectionCancelLines,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              l10n.claimLineCount(c.lines.length),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        for (final (i, l) in c.lines.indexed) ...[
+                          if (i > 0)
+                            Divider(height: 1, color: scheme.outlineVariant),
+                          _ClaimLineRow(
+                            line: l,
+                            orderLine: order?.lines
+                                .where((o) => o.orderLineId == l.orderLineId)
+                                .firstOrNull,
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-                  title: Text(switch (r) {
-                    _ when r.returnFee && r.done => l10n.refundFeeDone,
-                    _ when r.returnFee => l10n.refundFeeInProgress,
-                    _ when r.done => l10n.refundDone,
-                    RefundView(state: RefundState.failed) => l10n.refundFailed,
-                    RefundView(state: RefundState.unknown) =>
-                      l10n.refundChecking,
-                    _ => l10n.refundInProgress,
-                  }),
-                  trailing: Text(switch (r.amount) {
-                    final int a => formatKrw(a),
-                    null => l10n.amountUnavailable,
-                  }),
+                // ③ 환불 카드
+                if (c.refunds.isNotEmpty)
+                  _ClaimBox(
+                    child: Column(
+                      key: const ValueKey('refund'),
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          l10n.claimSectionRefund,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        for (final r in productRefunds) _RefundBlock(refund: r),
+                        for (final r in feeRefunds) _RefundBlock(refund: r),
+                      ],
+                    ),
+                  ),
+                if (_withdrawal == RequestState.pending ||
+                    _withdrawal == RequestState.unknown)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      l10n.withdrawChecking,
+                      key: const ValueKey('withdraw-checking'),
+                    ),
+                  ),
+                if (_withdrawal == RequestState.rejected)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(l10n.withdrawRejected),
+                  ),
+                Center(
+                  child: TextButton(
+                    key: const ValueKey('claim-help'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: scheme.onSurfaceVariant,
+                    ),
+                    onPressed: () => context.push(
+                      '/orders/${Uri.encodeComponent(c.orderId)}/help',
+                    ),
+                    child: Text(l10n.claimHelp),
+                  ),
                 ),
-              if (_withdrawal == RequestState.pending ||
-                  _withdrawal == RequestState.unknown)
-                Text(
-                  l10n.withdrawChecking,
-                  key: const ValueKey('withdraw-checking'),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// 상품 한 줄: 사진 52 · 이름 · 판정 칩(승인 N개 연보라 / 확인 중 회색 / 거절 회색) + "요청 N개" · 품목 환불액,
+/// 거절이면 서버 거절 사유를 분홍 띠로. 이름·사진은 주문 상세 품목 사본(orderLineId)에서.
+class _ClaimLineRow extends StatelessWidget {
+  const _ClaimLineRow({required this.line, this.orderLine});
+
+  final ClaimLineView line;
+  final OrderLineView? orderLine;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final l = line;
+    return Padding(
+      key: ValueKey('claim-line-${l.orderLineId}'),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              ProductImage(url: orderLine?.imageUrl, size: 52, radius: 8),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      orderLine?.title ?? l.sku ?? l.orderLineId,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 14.5,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        switch (l.decision) {
+                          LineDecision.approved => _chip(
+                            context,
+                            l10n.claimLineApproved(l.approvedQty ?? 0),
+                            bg: scheme.primaryContainer,
+                            fg: scheme.primary,
+                          ),
+                          LineDecision.pending => _chip(
+                            context,
+                            l10n.decisionPending,
+                            bg: scheme.surfaceContainerHigh,
+                            fg: scheme.onSurfaceVariant,
+                          ),
+                          LineDecision.rejected => _chip(
+                            context,
+                            l10n.decisionRejected,
+                            bg: scheme.surfaceContainerHigh,
+                            fg: scheme.onSurfaceVariant,
+                          ),
+                        },
+                        if (l.requestedQty case final q?)
+                          Text(
+                            l10n.claimRequested(q),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 12.5,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
-              if (_withdrawal == RequestState.rejected)
-                Text(l10n.withdrawRejected),
-              if (c.canWithdraw && _withdrawal == null)
+              ),
+              if (l.refundAmount case final a?)
                 Padding(
-                  padding: const EdgeInsets.only(top: 16),
-                  child: OutlinedButton(
-                    key: const ValueKey('withdraw'),
-                    onPressed: _withdrawing
-                        ? null
-                        : () async {
-                            setState(() => _withdrawing = true);
-                            final s = await ref.read(withdrawClaimProvider)(c);
-                            if (!mounted) return;
-                            setState(() {
-                              _withdrawing = false;
-                              _withdrawal = s;
-                            });
-                            if (s == RequestState.confirmed) {
-                              ref.invalidate(provider);
-                            }
-                          },
-                    child: Text(l10n.withdraw),
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Text(
+                    formatKrw(a),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
             ],
           ),
+          if (l.decision == LineDecision.rejected && l.rejectReason != null)
+            Container(
+              margin: const EdgeInsets.only(top: 8, left: 64),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: scheme.tertiaryContainer,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                l.rejectReason!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 13,
+                  color: scheme.onTertiaryContainer,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 환불 한 건: 상태 칩(진행 중 연보라 / 완료 회색 / 실패 분홍 / 확인 중 회색) + 큰 금액(서버 값), 완료면 완료 시각.
+/// 회수비를 돌려받는 환불은 "반품 회수비 환불" 줄로 따로.
+class _RefundBlock extends StatelessWidget {
+  const _RefundBlock({required this.refund});
+
+  final RefundView refund;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final r = refund;
+    final amount = switch (r.amount) {
+      final int a => formatKrw(a),
+      null => l10n.amountUnavailable,
+    };
+    if (r.returnFee) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(
+          children: [
+            Text(
+              r.done ? l10n.refundFeeDone : l10n.refundFeeInProgress,
+              style: theme.textTheme.bodyMedium,
+            ),
+            const Spacer(),
+            Text(amount, style: theme.textTheme.bodyMedium),
+          ],
         ),
+      );
+    }
+    final (String chip, Color bg, Color fg) = switch (r) {
+      _ when r.done => (
+        l10n.claimRefundChipDone,
+        scheme.surfaceContainerHigh,
+        scheme.onSurfaceVariant,
+      ),
+      RefundView(state: RefundState.failed) => (
+        l10n.claimRefundChipFailed,
+        scheme.tertiaryContainer,
+        scheme.onTertiaryContainer,
+      ),
+      RefundView(state: RefundState.unknown) => (
+        l10n.claimRefundChipChecking,
+        scheme.surfaceContainerHigh,
+        scheme.onSurfaceVariant,
+      ),
+      _ => (
+        l10n.claimRefundChipInProgress,
+        scheme.primaryContainer,
+        scheme.primary,
+      ),
+    };
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              _chip(context, chip, bg: bg, fg: fg),
+              const Spacer(),
+              Text(
+                amount,
+                key: const ValueKey('refund-amount'),
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: r.done ? scheme.onSurface : scheme.primary,
+                ),
+              ),
+            ],
+          ),
+          if (r.done && r.completedAt != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Row(
+                children: [
+                  Text(
+                    l10n.claimRefundCompletedAt,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    DateFormat(
+                      'M.d(E) HH:mm',
+                      'ko',
+                    ).format(toSeoulWallClock(r.completedAt!)),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
