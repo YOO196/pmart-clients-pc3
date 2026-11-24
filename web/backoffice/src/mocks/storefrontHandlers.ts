@@ -6,7 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { API_BASE } from '../api/client';
 import type { components } from '../api/generated/storefront';
 import { db } from './db';
-import { expectedVersion, idempotent, operator, problem, unauthorized } from './support';
+import { expectedVersion, idempotent, imageKindOf, operator, problem, unauthorized } from './support';
 
 type Draft = components['schemas']['LayoutDraft'];
 type Body = components['schemas']['LayoutDraftBody'];
@@ -33,6 +33,8 @@ function seed(): { drafts: Map<string, Draft>; images: Set<string>; current: num
 }
 
 export const layouts = seed();
+/** 목에 올린 배너 그림(바이트) */
+const uploaded = new Map<string, { bytes: ArrayBuffer; contentType: string }>();
 export function resetLayouts(): void {
   Object.assign(layouts, seed());
 }
@@ -235,17 +237,23 @@ export const storefrontHandlers = [
     if (denied) return denied;
     const form = await request.formData();
     const file = form.get('file');
-    return idempotent(request, () => {
-      if (!(file instanceof File) || !/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 5 * 1024 * 1024) return problem(422, 'IMAGE_INVALID');
+    return idempotent(request, async () => {
+      // 계약: JPEG·PNG·WEBP(파일 앞부분으로 판정), 5MB 이하. 가로·세로는 막지 않는다
+      const kind = file instanceof Blob ? await imageKindOf(file) : null;
+      if (!(file instanceof Blob) || !kind || file.size > 5 * 1024 * 1024) return problem(422, 'IMAGE_INVALID');
       const imageId = `bimg-${++layouts.seq}`;
       layouts.images.add(imageId);
-      return { status: 201, body: { imageId, url: `/api/v1/storefront/banner-images/${imageId}`, contentType: file.type, width: 720, height: 240 } };
+      // 올린 그림을 그대로 돌려준다(전에는 늘 "새 배너" 그림이라 무엇을 올렸는지 볼 수 없었다)
+      uploaded.set(imageId, { bytes: await file.arrayBuffer(), contentType: kind });
+      return { status: 201, body: { imageId, url: `/api/v1/storefront/banner-images/${imageId}`, contentType: kind, width: null, height: null } };
     });
   }),
 
   http.get(`${API_BASE}/storefront/banner-images/:id`, ({ params }) => {
     const id = String(params['id']);
     if (!layouts.images.has(id)) return problem(404, 'NOT_FOUND');
+    const up = uploaded.get(id);
+    if (up) return new HttpResponse(up.bytes, { headers: { 'Content-Type': up.contentType } });
     return new HttpResponse(bannerSvg(id === SEED_IMAGE ? '겨울 제철 채소' : '새 배너'), { headers: { 'Content-Type': 'image/svg+xml' } });
   }),
 ];

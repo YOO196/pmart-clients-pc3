@@ -14,7 +14,7 @@ import type {
 } from '../api/models';
 import { gs1CheckDigitProblem } from '../features/products/barcode';
 import { db, nextId, timestamp } from './db';
-import { expectedVersion, hash, idempotent, keyOf, operator, problem, unauthorized } from './support';
+import { expectedVersion, hash, idempotent, imageKindOf, keyOf, operator, problem, unauthorized } from './support';
 
 type SourceNode = CategoryTreeDraftRequest['categories'][number];
 const LEVEL = { top: 'TOP', sub: 'SUB', chip1: 'CHIP1', chip2: 'CHIP2' } as const;
@@ -567,6 +567,11 @@ export const catalogHandlers = [
       if (!isFile(file) || !['MAIN', 'DESCRIPTION', 'DETAIL'].includes(role) || (role === 'MAIN' && sortOrder !== 0)) {
         return problem(422, 'IMAGE_INVALID');
       }
+      // 계약: JPEG·PNG·WebP(파일 앞부분으로), 장당 20MB, 초안 1건 100장(2026-11-24 — 목이 아무 파일이나 받던 것)
+      const kind = await imageKindOf(file);
+      if (!kind || file.size > 20 * 1024 * 1024) return problem(422, 'IMAGE_INVALID');
+      const replacing = (d.images ?? []).some((i) => i.role === role && i.sortOrder === sortOrder);
+      if (!replacing && (d.images ?? []).length >= 100) return problem(422, 'IMAGE_INVALID');
       const imageId = nextId('img');
       db.images.set(imageId, { bytes: await file.arrayBuffer(), contentType: file.type || 'image/png' });
       const image = { imageId, role: role as 'MAIN' | 'DESCRIPTION' | 'DETAIL', sortOrder, url: `/api/v1/content-images/${imageId}`, contentType: file.type, width: null, height: null, bytes: file.size, sha256: imageId };

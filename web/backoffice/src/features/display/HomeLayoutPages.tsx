@@ -413,10 +413,16 @@ function BannerCard({
   const upload = useCommand((file: File, key) =>
     request('POST', api.storefront.POST('/storefront/banner-images', { ...commandParams(key), body: { file: '' }, ...multipart({ file }) })),
   );
+  // 바꾸기 전 그림 — 마음에 안 들면 되돌린다(2026-11-24 사용자 "그림 바꾸기 누르고 마음에 안 들면 이전으로"). 편성 저장 전까지는 화면 안의 값이라 되돌려도 서버에 남는 것이 없다
+  const [prevImage, setPrevImage] = useState<string | null>(null);
   const pick = async (file: File | undefined) => {
     if (!file) return;
+    const before = b.imageId ?? null;
     const r = await upload.run(file);
-    if (r.kind === 'done') onChange({ ...b, imageId: r.result.imageId });
+    if (r.kind === 'done') {
+      if (before) setPrevImage((p) => p ?? before); // 여러 번 바꿔도 처음 그림으로 되돌린다
+      onChange({ ...b, imageId: r.result.imageId });
+    }
   };
   const setLink = (linkType: Banner['linkType']) => onChange({ ...b, linkType, linkRef: linkType === 'SECTION' ? (themes[0]?.sectionId ?? '') : linkType === 'NONE' ? null : '' });
 
@@ -426,10 +432,26 @@ function BannerCard({
         <BannerImage imageId={b.imageId} alt={b.altText} className="h-20 w-60 shrink-0 rounded-md" />
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
+            <span className="flex items-center gap-1">
             <label className={`btn btn-sm ${locked || upload.busy ? 'btn-disabled' : ''}`}>
               {upload.busy ? m.uploading : b.imageId ? m.change : m.upload}
               <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp" aria-label={m.image} disabled={locked || upload.busy} onChange={(e) => void pick(e.target.files?.[0])} />
             </label>
+            {prevImage && prevImage !== b.imageId && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={locked || upload.busy}
+                onClick={() => {
+                  onChange({ ...b, imageId: prevImage });
+                  setPrevImage(null);
+                }}
+                data-testid="banner-image-undo"
+              >
+                {m.undoImage}
+              </button>
+            )}
+            </span>
             <Mover i={i} n={n} onMove={onMove} onRemove={onRemove} disabled={locked} />
           </div>
           <span className="text-xs text-base-content/50">{m.imageHint}</span>

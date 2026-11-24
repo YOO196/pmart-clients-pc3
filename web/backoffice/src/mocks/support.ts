@@ -54,3 +54,16 @@ export const hash = (value: unknown) => {
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
   return `h${(h >>> 0).toString(16)}`;
 };
+
+/**
+ * 사진 형식 — 서버처럼 파일 앞부분(매직 바이트)으로 판정(2026-11-24 사용자 "목업 서버에서는 아무 사진이나 다 올라가는데 정상임?" —
+ * 목은 이름표(MIME)만 보고 받아 실서버와 달랐다). JPEG FF D8 FF · PNG 89 50 4E 47 · WEBP "RIFF"…"WEBP". 그 밖은 null.
+ */
+export async function imageKindOf(file: Blob): Promise<'image/jpeg' | 'image/png' | 'image/webp' | null> {
+  const b = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png';
+  const ascii = (from: number, to: number) => String.fromCharCode(...b.slice(from, to));
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'image/webp';
+  return null;
+}

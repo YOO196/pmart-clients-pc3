@@ -3649,6 +3649,7 @@ export const messages = {
     image: '배너 그림',
     upload: '그림 올리기',
     change: '그림 바꾸기',
+    undoImage: '이전 그림으로',
     uploading: '올리는 중…',
     imageHint: '규격: JPEG·PNG·WEBP · 5MB 이하',
     imageInvalid: 'JPEG·PNG·WEBP 5MB 이하만 올릴 수 있어요',
