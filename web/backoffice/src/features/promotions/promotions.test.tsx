@@ -23,7 +23,7 @@ describe('행사·쿠폰', () => {
     expect(coupon).toHaveTextContent('12 / 1,000장 발급 · 4장 사용');
     expect(rows.find((r) => r.textContent?.includes('겨울 과일'))).toHaveTextContent('1곳'); // 서버 problems
     expect(screen.queryByRole('link', { name: '행사 만들기' })).not.toBeInTheDocument();
-    expect(screen.getByTestId('promotion-stage-note')).toHaveTextContent('주문 금액');
+    expect(screen.getByTestId('promotion-stage-note')).toHaveTextContent('쿠폰은 주문서에서 써요'); // 2026-11-24 — 백엔드 적용 끝("다음 단계" 문구 없앰)
   });
 
   it('쿠폰 만들기 → 저장하고 승인 요청(제출 → change-requests PROMOTION) → 만든 본인은 승인 못 하고 다른 마케터가 승인 → 진행 중', async () => {
@@ -93,6 +93,48 @@ describe('행사·쿠폰', () => {
     expect(await screen.findByText('한도라 건너뜀')).toBeInTheDocument();
     // 상담원은 조기 종료 없음(만들기·종료는 MARKETING·OPERATOR_ADMIN)
     expect(screen.queryByRole('form', { name: '조기 종료' })).not.toBeInTheDocument();
+  });
+
+  it('지정 발급: 고객번호로 찾아 더하고 발급 — 화면은 가린 이름·번호, 보내는 값은 고객 ID(2026-11-24)', async () => {
+    const user = userEvent.setup();
+    const view = renderAt('/promotions/PRM-seed-1', as.cs);
+    const finder = await screen.findByRole('form', { name: '받을 고객 찾기' });
+    await user.type(within(finder).getByLabelText('값'), '4829');
+    expect(within(finder).getByText('고객번호는 숫자 6자리예요.')).toBeInTheDocument(); // 모양이 틀리면 묻지 않는다
+    await user.type(within(finder).getByLabelText('값'), '13');
+    await user.click(within(finder).getByRole('button', { name: '찾기' }));
+    const item = await screen.findByTestId('grant-search-item');
+    expect(item).toHaveTextContent('482913');
+    expect(item).not.toHaveTextContent('김고객'); // 원문 이름은 없다
+    await user.click(within(item).getByRole('button', { name: '추가' }));
+    expect(within(item).getByRole('button', { name: '추가됨' })).toBeDisabled();
+    expect(screen.getByTestId('grant-picked')).toHaveTextContent('받을 고객 1명 / 최대 100명');
+    const form = screen.getByRole('form', { name: '쿠폰 지정 발급' });
+    await user.type(within(form).getByLabelText('발급 사유(보상 등, 200자까지)'), '배송 지연 보상');
+    await user.click(within(form).getByRole('button', { name: '발급하기' }));
+    expect(await screen.findByText(/1명 중 1명 발급/)).toBeInTheDocument();
+    const body = (await view.mutations('/coupon-grants')[0]!.clone().json()) as { accountIds: string[] };
+    expect(body.accountIds).toEqual(['CUS-1001']);
+  });
+
+  it('지정 발급: 고객 찾기 권한이 없는 마케팅은 ID 직접 넣기로 안내(403 을 "없음"으로 보이지 않게)', async () => {
+    const user = userEvent.setup();
+    renderAt('/promotions/PRM-seed-1', as.marketing);
+    const finder = await screen.findByRole('form', { name: '받을 고객 찾기' });
+    await user.type(within(finder).getByLabelText('값'), '482913');
+    await user.click(within(finder).getByRole('button', { name: '찾기' }));
+    expect(await screen.findByText(/이 역할은 고객 찾기를 쓸 수 없어요/)).toBeInTheDocument();
+    expect(screen.queryByText('맞는 고객이 없어요.')).not.toBeInTheDocument();
+  });
+
+  it('만들기: 받는 방법마다 어떻게 받는지 — 지정 발급은 "승인 뒤 행사 화면에서 발급"', async () => {
+    const user = userEvent.setup();
+    renderAt('/promotions/new', as.marketing);
+    const form = await screen.findByRole('form', { name: '행사 만들기' });
+    await user.click(within(form).getByRole('radio', { name: /장바구니 쿠폰/ }));
+    await user.selectOptions(within(form).getByLabelText('받는 방법'), 'ADMIN');
+    expect(screen.getByTestId('issue-mode-hint')).toHaveTextContent('승인되고 시작되면 행사 화면에서 고객을 찾아 발급해요');
+    expect(screen.queryByText(/서버 다음 단계/)).not.toBeInTheDocument(); // 낡은 "반영은 다음 단계" 문구 없음
   });
 
   it('조기 종료: 사유 → end-submissions → 승인 요청(END_PROMOTION)', async () => {

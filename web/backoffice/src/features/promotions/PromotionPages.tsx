@@ -12,6 +12,7 @@ import { requestApproval, type ApprovalRequested } from '../../api/approvalFlow'
 import { commandParams, IdempotencyKey } from '../../api/command';
 import { ISSUE_MODES, PROMOTION_KINDS, PROMOTION_STATES, type ApprovalRequestBody, type CouponPolicy, type Promotion, type PromotionInput, type PromotionKind } from '../../api/models';
 import { useApi } from '../../app/ApiContext';
+import { CouponRecipients, type Recipient } from './CouponRecipients';
 import { useSession } from '../../app/SessionContext';
 import { RequestApproval } from '../approvals/RequestApproval';
 import { Person } from '../lookup/parts';
@@ -393,6 +394,7 @@ function PromotionForm({ initial, existing, editable }: { readonly initial: Draf
       {coupon ? (
         <Section title={f.issueMode}>
           <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1">
             <label className={fieldCls}>
               {f.issueMode}
               <select className="select select-sm w-56" value={d.issueMode} disabled={locked} onChange={(e) => set({ issueMode: ISSUE_MODES.find((x) => x === e.target.value) ?? 'DOWNLOAD' })}>
@@ -403,6 +405,11 @@ function PromotionForm({ initial, existing, editable }: { readonly initial: Draf
                 ))}
               </select>
             </label>
+            {/* 받는 방법마다 어떻게 받는지 — 이름표(label) 밖이라 칸 이름은 "받는 방법" 그대로 */}
+            <span className="text-xs text-base-content/55" data-testid="issue-mode-hint">
+              {f.issueModeHint[d.issueMode]}
+            </span>
+            </div>
             <label className={fieldCls}>
               {f.minOrderAmount}
               <input type="number" inputMode="numeric" className="input input-sm w-40" min={0} value={d.minOrderAmount} disabled={locked} onChange={(e) => set({ minOrderAmount: e.target.value })} />
@@ -615,6 +622,14 @@ export function PromotionDetailPage() {
                 </>
               )}
               {canGrant && p.kind === 'COUPON' && p.coupon?.issueMode === 'ADMIN' && p.state === 'APPROVED' && <CouponGrant p={p} />}
+              {/* 승인 전 지정 발급 행사 — 발급 칸이 어디서 열리는지(2026-11-24 "찾는 칸 자체가 없는데") */}
+              {canGrant && p.kind === 'COUPON' && p.coupon?.issueMode === 'ADMIN' && (p.state === 'DRAFT' || p.state === 'SUBMITTED' || p.state === 'REJECTED') && (
+                <Section title={g.title}>
+                  <p className="text-sm text-base-content/70" data-testid="grant-before-approval">
+                    {g.beforeApproval}
+                  </p>
+                </Section>
+              )}
               {canManage && p.state === 'APPROVED' && p.phase !== 'FINISHED' && <EndPromotion p={p} />}
             </>
           );
@@ -710,8 +725,10 @@ function CouponGrant({ p }: { readonly p: Promotion }) {
   const api = useApi();
   const qc = useQueryClient();
   const [text, setText] = useState('');
+  const [picked, setPicked] = useState<Recipient[]>([]);
   const [reason, setReason] = useState('');
-  const ids = accountsOf(text);
+  // 찾아 고른 고객 + 직접 넣은 ID(겹치면 하나)
+  const ids = [...new Set([...picked.map((r) => r.id), ...accountsOf(text)])];
   const tooMany = ids.length > 100;
   const running = p.phase === 'RUNNING';
   const cmd = useCommand(async (v: { accountIds: string[]; reason: string }, key) => {
@@ -721,8 +738,16 @@ function CouponGrant({ p }: { readonly p: Promotion }) {
   });
   return (
     <Section title={g.title}>
+      <p className="mb-2 text-xs text-base-content/60">{g.intro}</p>
+      {!running && (
+        <p role="status" className="mb-2 text-sm text-warning">
+          {g.notRunning}
+        </p>
+      )}
+      {/* 받을 고객 찾기 — 발급 form 밖(찾기는 따로 form) */}
+      <CouponRecipients value={picked} onChange={setPicked} disabled={cmd.busy || !running} max={100} />
       <form
-        className="space-y-2"
+        className="mt-3 space-y-2"
         aria-label={g.title}
         onSubmit={(e) => {
           e.preventDefault();
@@ -732,24 +757,19 @@ function CouponGrant({ p }: { readonly p: Promotion }) {
           }
         }}
       >
-        <p className="text-xs text-base-content/60">
-          {g.intro}{' '}
-          <Link className="link" to="/customers">
-            {g.findCustomer}
-          </Link>
-        </p>
-        {!running && (
-          <p role="status" className="text-sm text-warning">
-            {g.notRunning}
+        <details className="text-sm">
+          <summary className="cursor-pointer text-xs text-base-content/60">{g.manual}</summary>
+          <label className={`${fieldCls} mt-2`}>
+            {g.accounts}
+            <textarea className="textarea textarea-sm w-full max-w-lg font-mono" rows={3} value={text} disabled={cmd.busy || !running} onChange={(e) => setText(e.target.value)} />
+          </label>
+        </details>
+        {/* 합친 수는 직접 넣은 ID 가 있을 때만(찾아 고른 수는 위 "받을 고객 N명") */}
+        {(tooMany || text.trim() !== '') && (
+          <p className={`text-xs ${tooMany ? 'text-error' : 'text-base-content/55'}`} aria-live="polite">
+            {tooMany ? g.tooMany : g.total(ids.length)}
           </p>
         )}
-        <label className={fieldCls}>
-          {g.accounts}
-          <textarea className="textarea textarea-sm w-full max-w-lg font-mono" rows={3} value={text} disabled={cmd.busy || !running} onChange={(e) => setText(e.target.value)} />
-        </label>
-        <p className={`text-xs ${tooMany ? 'text-error' : 'text-base-content/55'}`} aria-live="polite">
-          {tooMany ? g.tooMany : `${ids.length}명`}
-        </p>
         <label className={fieldCls}>
           {g.reason}
           <input className="input input-sm w-full max-w-lg" maxLength={200} value={reason} disabled={cmd.busy || !running} onChange={(e) => setReason(e.target.value)} />
