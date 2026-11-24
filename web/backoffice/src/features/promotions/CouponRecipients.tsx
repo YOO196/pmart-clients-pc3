@@ -31,6 +31,9 @@ export function CouponRecipients({ value, onChange, disabled, max }: { readonly 
     retry: false,
     queryFn: () => request('GET', api.bff.GET('/views/customer-search', { params: { query: asked ? { [asked.by]: asked.by === 'customerNumber' ? asked.value : asked.value.replace(/[\s-]/g, '') } : {} } })),
   });
+  const find = () => {
+    if (text.trim() && !bad) setAsked({ by, value: text.trim() });
+  };
   const has = (id: string) => value.some((r) => r.id === id);
   const add = (r: Recipient) => {
     if (!has(r.id) && value.length < max) onChange([...value, r]);
@@ -38,14 +41,8 @@ export function CouponRecipients({ value, onChange, disabled, max }: { readonly 
   const forbidden = q.error instanceof ProblemFailure && q.error.problem.status === 403;
   return (
     <div className="space-y-2" data-testid="grant-recipients">
-      <form
-        className="flex flex-wrap items-end gap-2"
-        aria-label={m.title}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (text.trim() && !bad) setAsked({ by, value: text.trim() });
-        }}
-      >
+      {/* form 이 아니라 찾기 칸(role=search) — 행사 만들기 form 안에도 들어간다(2026-11-24 만들 때 받을 고객, promotion 0.3.0) */}
+      <div className="flex flex-wrap items-end gap-2" role="search" aria-label={m.title}>
         <label className="flex flex-col gap-1 text-xs font-medium text-base-content/60">
           {m.by}
           <select className="select select-sm w-32" value={by} disabled={disabled} onChange={(e) => setBy(BY.find((x) => x === e.target.value) ?? 'customerNumber')}>
@@ -58,13 +55,27 @@ export function CouponRecipients({ value, onChange, disabled, max }: { readonly 
         </label>
         <label className="flex flex-col gap-1 text-xs font-medium text-base-content/60">
           {m.value}
-          <input className={`input input-sm w-52 ${bad ? 'input-error' : ''}`} inputMode="numeric" maxLength={by === 'phone' ? 20 : 16} placeholder={m.placeholder[by]} value={text} disabled={disabled} onChange={(e) => setText(e.target.value)} />
+          <input
+            className={`input input-sm w-52 ${bad ? 'input-error' : ''}`}
+            inputMode="numeric"
+            maxLength={by === 'phone' ? 20 : 16}
+            placeholder={m.placeholder[by]}
+            value={text}
+            disabled={disabled}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault(); // 바깥 form(행사 만들기)을 보내지 않게
+                find();
+              }
+            }}
+          />
         </label>
-        <button type="submit" className="btn btn-sm" disabled={disabled || !text.trim() || bad}>
+        <button type="button" className="btn btn-sm" disabled={disabled || !text.trim() || bad} onClick={find}>
           {m.find}
         </button>
         {bad && <p className="w-full text-xs text-error">{m.badFormat[by]}</p>}
-      </form>
+      </div>
       {asked && (
         <div className="rounded-box border border-base-300 bg-base-100 px-3 py-2 text-sm" data-testid="grant-search-result" aria-live="polite">
           {q.isPending ? (

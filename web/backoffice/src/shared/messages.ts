@@ -3474,7 +3474,7 @@ export const messages = {
     stateName: { DRAFT: '작성 중', SUBMITTED: '승인 대기', APPROVED: '승인됨', REJECTED: '반려', ENDED: '조기 종료' } as Readonly<Record<string, string>>,
     phaseName: { NOT_APPROVED: '승인 전', SCHEDULED: '시작 전', RUNNING: '진행 중', FINISHED: '끝남' } as Readonly<Record<string, string>>,
     issueModeName: { DOWNLOAD: '앱에서 내려받기', ADMIN: '직원 지정 발급', SIGNUP: '가입 축하(가입하면 자동 발급)' } as Readonly<Record<string, string>>,
-    targetTypeName: { SKU: 'SKU', CATEGORY: '카테고리(그 아래 상품 전부)' } as Readonly<Record<string, string>>,
+    targetTypeName: { SKU: 'SKU', CATEGORY: '카테고리(그 아래 상품 전부)', THEME: '홈 진열 테마(그 테마 상품 전부)' } as Readonly<Record<string, string>>,
     col: { name: '이름', kind: '종류', state: '상태', period: '기간', discount: '할인', coupons: '발급·사용', updatedAt: '바뀐 때' },
     empty: '조건에 맞는 행사가 없어요.',
     more: '더 보기',
@@ -3494,7 +3494,18 @@ export const messages = {
       amountPerUnit: '기간 할인 정액은 상품 1개당 깎는 금액이에요.',
       maxAmount: '최대 할인액(원, 비우면 없음)',
       targets: '대상',
-      targetsHint: '카테고리를 고르면 그 아래 상품 전부(행사 중 새로 들어온 상품 포함). 최대 500개.',
+      targetsHint: '카테고리·테마를 고르면 그 아래 상품 전부(행사 중 바뀐 상품도 따라가요). 최대 500개.',
+      // 0.3.0 테마 대상(2026-11-24)
+      targetTheme: '테마',
+      themeProducts: (n: number) => `상품 ${n}개`,
+      themesEmpty: '고를 수 있는 테마가 없어요(자동 랭킹은 고를 수 없어요).',
+      themesNotSynced: '진열 테마를 아직 받지 못했어요 — 1분쯤 뒤 다시 열어 주세요.',
+      themesFailed: '테마 목록을 불러오지 못했어요.',
+      themeGone: '진열에서 빠짐 — 할인 멈춤',
+      // 0.3.0 만들 때 받을 고객
+      recipients: '받을 고객',
+      recipientsHint: '고르면 승인 뒤 시작 시각에 이 고객들에게 1장씩 자동 발급해요(1인 한도·총 수량). 비워 두면 시작 뒤 행사 화면에서 발급해요.',
+      recipientReason: '발급 사유(보상 등, 200자까지)',
       targetType: '구분',
       targetId: 'SKU 코드',
       targetCategory: '카테고리',
@@ -3505,7 +3516,7 @@ export const messages = {
       // 받는 방법마다 어떻게 받는지(2026-11-24)
       issueModeHint: {
         DOWNLOAD: '고객이 앱 쿠폰 화면에서 직접 받아요.',
-        ADMIN: '승인되고 시작되면 행사 화면에서 고객을 찾아 발급해요.',
+        ADMIN: '아래에서 받을 고객을 고르면 시작 때 자동 발급, 비우면 시작 뒤 행사 화면에서 발급해요.',
         SIGNUP: '새로 가입한 고객에게 자동으로 발급돼요.',
       } as Readonly<Record<string, string>>,
       minOrderAmount: '최소 주문금액(원, 기간 할인 뒤 상품액)',
@@ -3563,6 +3574,9 @@ export const messages = {
       notRunning: '진행 중인 행사에만 발급할 수 있어요.',
       // 승인 전 지정 발급 행사(2026-11-24 "찾는 칸 자체가 없는데") — 발급은 승인되고 시작된 뒤 이 화면에서
       beforeApproval: '승인되고 시작 시각이 되면 이 칸에서 받을 고객을 찾아 발급해요.',
+      recipientsTitle: '만들 때 지정한 받을 고객',
+      reasonLabel: '발급 사유',
+      recipientResult: { PENDING: '시작 때 발급', ISSUED: '발급됨', SKIPPED_LIMIT: '한도라 건너뜀', SOLD_OUT: '수량 소진' } as Readonly<Record<string, string>>,
       manual: '고객 ID 직접 넣기',
       total: (n: number) => `모두 ${n}명(찾은 고객 + 직접 넣은 ID)`,
       pick: {

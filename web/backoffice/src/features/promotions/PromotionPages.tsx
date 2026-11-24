@@ -164,6 +164,9 @@ export function PromotionListPage() {
 }
 
 // ── 만들기·고치기 ──
+/** 대상 종류 — 0.3.0 THEME(진열 편성 테마, 2026-11-24 사용자 "행사 대상에 테마도 추가") */
+type TargetType = 'SKU' | 'CATEGORY' | 'THEME';
+const TARGET_TYPES: readonly TargetType[] = ['SKU', 'CATEGORY', 'THEME'];
 interface Draft {
   readonly kind: PromotionKind;
   readonly name: string;
@@ -172,8 +175,11 @@ interface Draft {
   readonly discountType: 'RATE' | 'AMOUNT';
   readonly value: string;
   readonly maxAmount: string;
-  readonly targets: ReadonlyArray<{ readonly type: 'SKU' | 'CATEGORY'; readonly id: string }>;
+  readonly targets: ReadonlyArray<{ readonly type: TargetType; readonly id: string }>;
   readonly issueMode: CouponPolicy['issueMode'];
+  /** 0.3.0 지정 발급 — 만들 때 받을 고객(시작 때 서버가 발급)·발급 사유 */
+  readonly recipients: readonly Recipient[];
+  readonly recipientReason: string;
   readonly minOrderAmount: string;
   readonly totalQuantity: string;
   readonly perCustomerLimit: string;
@@ -192,6 +198,8 @@ const emptyDraft = (kind: PromotionKind): Draft => ({
   maxAmount: '',
   targets: [],
   issueMode: 'DOWNLOAD',
+  recipients: [],
+  recipientReason: '',
   minOrderAmount: '0',
   totalQuantity: '',
   perCustomerLimit: '1',
@@ -212,6 +220,8 @@ function draftOf(p: Promotion): Draft {
     maxAmount: p.discount.maxAmount ? String(p.discount.maxAmount) : '',
     targets: (p.targets ?? []).map((t) => ({ type: t.type, id: t.id })),
     issueMode: c?.issueMode ?? 'DOWNLOAD',
+    recipients: (c?.recipients?.accountIds ?? []).map((id) => ({ id })),
+    recipientReason: c?.recipients?.reason ?? '',
     minOrderAmount: String(c?.minOrderAmount ?? 0),
     totalQuantity: c?.totalQuantity ? String(c.totalQuantity) : '',
     perCustomerLimit: String(c?.perCustomerLimit ?? 1),
@@ -242,6 +252,8 @@ function inputOf(d: Draft): PromotionInput {
       perCustomerLimit: num(d.perCustomerLimit) ?? 1,
       useDays: d.useMode === 'days' ? num(d.useDays) : null,
       useUntil: d.useMode === 'until' && d.useUntil ? fromLocalInput(d.useUntil) : null,
+      // 지정 발급 + 고른 고객이 있을 때만(사유는 서버가 검사 — 비우면 problems)
+      recipients: d.issueMode === 'ADMIN' && d.recipients.length > 0 ? { accountIds: d.recipients.map((x) => x.id), reason: d.recipientReason.trim() } : null,
     },
   };
 }
@@ -263,6 +275,9 @@ const FIELD_NAME: Readonly<Record<string, string>> = {
   'coupon.perCustomerLimit': f.perCustomerLimit,
   'coupon.useDays': f.usePeriod,
   'coupon.useUntil': f.useUntil,
+  'coupon.recipients': f.recipients,
+  'coupon.recipients.accountIds': f.recipients,
+  'coupon.recipients.reason': f.recipientReason,
 };
 const fieldName = (field: string) => FIELD_NAME[field] ?? FIELD_NAME[field.replace(/\[\d+\].*$/, '')] ?? field;
 
@@ -302,6 +317,8 @@ function PromotionForm({ initial, existing, editable }: { readonly initial: Draf
   const dirty = JSON.stringify(d) !== JSON.stringify(base.draft);
   const set = (patch: Partial<Draft>) => setD((x) => ({ ...x, ...patch }));
   const tree = useQuery({ queryKey: ['product', 'category-tree'], queryFn: () => request('GET', api.product.GET('/categories/tree', {})), enabled: d.kind === 'PRICE_DISCOUNT' });
+  // 고를 수 있는 진열 테마(0.3.0 — promotion 이 1분마다 받아 둔 지금 게시본). 자동 랭킹은 고를 수 없어 목록에서 뺀다
+  const themes = useQuery({ queryKey: ['promotions', 'theme-targets'], queryFn: () => request('GET', api.promotion.GET('/promotions/theme-targets', {})), enabled: d.kind === 'PRICE_DISCOUNT' && d.targets.some((t) => t.type === 'THEME') });
 
   /** 만들기(POST) 또는 고치기(PUT, X-Expected-Version) */
   const put = async (key: IdempotencyKey, now: Draft): Promise<Promotion> => {
@@ -448,6 +465,20 @@ function PromotionForm({ initial, existing, editable }: { readonly initial: Draf
               )}
             </fieldset>
           </div>
+          {/* 지정 발급 — 만들 때 받을 고객(promotion 0.3.0, 2026-11-24 "찾는 칸 자체가 없는데"). 승인 뒤 시작 시각이 되면 서버가 발급 */}
+          {d.issueMode === 'ADMIN' && (
+            <div className="mt-4 space-y-2 border-t border-base-300 pt-4" data-testid="create-recipients">
+              <p className="text-sm font-medium">{f.recipients}</p>
+              <p className="text-xs text-base-content/60">{f.recipientsHint}</p>
+              <CouponRecipients value={d.recipients} onChange={(next) => set({ recipients: next })} disabled={locked} max={100} />
+              {d.recipients.length > 0 && (
+                <label className={fieldCls}>
+                  {f.recipientReason}
+                  <input className="input input-sm w-full max-w-lg" maxLength={200} value={d.recipientReason} disabled={locked} onChange={(e) => set({ recipientReason: e.target.value })} />
+                </label>
+              )}
+            </div>
+          )}
         </Section>
       ) : (
         <Section title={f.targets} aside={<span className="text-base-content/55">{d.targets.length} / 500</span>}>
@@ -462,10 +493,13 @@ function PromotionForm({ initial, existing, editable }: { readonly initial: Draf
                     className="select select-sm w-56"
                     value={t.type}
                     disabled={locked}
-                    onChange={(e) => set({ targets: d.targets.map((x, j) => (j === i ? { type: e.target.value === 'CATEGORY' ? 'CATEGORY' : 'SKU', id: '' } : x)) })}
+                    onChange={(e) => set({ targets: d.targets.map((x, j) => (j === i ? { type: TARGET_TYPES.find((k) => k === e.target.value) ?? 'SKU', id: '' } : x)) })}
                   >
-                    <option value="SKU">{m.targetTypeName.SKU}</option>
-                    <option value="CATEGORY">{m.targetTypeName.CATEGORY}</option>
+                    {TARGET_TYPES.map((k) => (
+                      <option key={k} value={k}>
+                        {m.targetTypeName[k]}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 {t.type === 'SKU' ? (
@@ -473,6 +507,19 @@ function PromotionForm({ initial, existing, editable }: { readonly initial: Draf
                     {f.targetId}
                     <input className="input input-sm w-56 font-mono" maxLength={64} value={t.id} disabled={locked} onChange={(e) => set({ targets: d.targets.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)) })} />
                   </label>
+                ) : t.type === 'THEME' ? (
+                  <div className={fieldCls}>
+                    <span>{f.targetTheme}</span>
+                    <SearchSelect
+                      label={`${f.targetTheme} ${i + 1}`}
+                      className="w-72"
+                      value={t.id}
+                      options={(themes.data?.themes ?? []).filter((x) => x.selectable).map((x) => ({ value: x.sectionId, label: x.title, hint: f.themeProducts(x.productCount), keywords: x.sectionId }))}
+                      loading={themes.isPending}
+                      emptyText={themes.isError ? f.themesFailed : themes.data && !themes.data.syncedAt ? f.themesNotSynced : f.themesEmpty}
+                      onChange={(v) => set({ targets: d.targets.map((x, j) => (j === i ? { ...x, id: v } : x)) })}
+                    />
+                  </div>
                 ) : (
                   <div className={fieldCls}>
                     <span>{f.targetCategory}</span>
@@ -621,6 +668,7 @@ export function PromotionDetailPage() {
                   {(p.state === 'DRAFT' || p.state === 'REJECTED' || p.state === 'SUBMITTED') && <p className="text-xs text-base-content/55">{f.locked}</p>}
                 </>
               )}
+              {p.kind === 'COUPON' && (p.recipientResults ?? []).length > 0 && <RecipientResults p={p} />}
               {canGrant && p.kind === 'COUPON' && p.coupon?.issueMode === 'ADMIN' && p.state === 'APPROVED' && <CouponGrant p={p} />}
               {/* 승인 전 지정 발급 행사 — 발급 칸이 어디서 열리는지(2026-11-24 "찾는 칸 자체가 없는데") */}
               {canGrant && p.kind === 'COUPON' && p.coupon?.issueMode === 'ADMIN' && (p.state === 'DRAFT' || p.state === 'SUBMITTED' || p.state === 'REJECTED') && (
@@ -651,6 +699,30 @@ function CouponPolicyText({ c }: { readonly c: CouponPolicy }) {
   return <span>{parts.join(' · ')}</span>;
 }
 
+/** 만들 때 지정한 받을 고객별 발급 결과(0.3.0) — PENDING = 아직(승인 전·시작 전·시작 전에 끝남). 서버 결과 그대로 */
+function RecipientResults({ p }: { readonly p: Promotion }) {
+  const rows = p.recipientResults ?? [];
+  const issued = rows.filter((x) => x.result === 'ISSUED').length;
+  return (
+    <Section title={g.recipientsTitle} aside={<span className="text-base-content/55">{g.resultCount(issued, rows.length)}</span>}>
+      {p.coupon?.recipients?.reason && <p className="mb-2 text-xs text-base-content/60">{`${g.reasonLabel} · ${p.coupon.recipients.reason}`}</p>}
+      <DataTable>
+        <tbody>
+          {rows.map((x) => (
+            <tr key={x.accountId} data-testid="recipient-result">
+              <td className="font-mono text-xs">{x.accountId}</td>
+              <td>
+                <StatusBadge tone={x.result === 'ISSUED' ? 'success' : x.result === 'PENDING' ? 'ghost' : 'warning'}>{label(g.recipientResult, x.result)}</StatusBadge>
+              </td>
+              <td className="text-xs text-base-content/55">{x.processedAt ? formatSeoul(x.processedAt) : ''}</td>
+            </tr>
+          ))}
+        </tbody>
+      </DataTable>
+    </Section>
+  );
+}
+
 function TargetList({ p }: { readonly p: Promotion }) {
   return (
     <Section title={m.detail.target} aside={<span className="text-base-content/55">{p.targets.length}</span>}>
@@ -660,7 +732,13 @@ function TargetList({ p }: { readonly p: Promotion }) {
         <ul className="flex flex-wrap gap-1.5 text-sm" data-testid="promotion-targets">
           {p.targets.map((t) => (
             <li key={`${t.type}:${t.id}`} className="rounded border border-base-300 px-2 py-0.5">
-              <span className="text-xs text-base-content/55">{t.type === 'SKU' ? 'SKU' : f.targetCategory}</span> <span className="font-mono">{t.id}</span>
+              <span className="text-xs text-base-content/55">{t.type === 'SKU' ? 'SKU' : t.type === 'THEME' ? f.targetTheme : f.targetCategory}</span>{' '}
+              {t.type === 'THEME' ? (
+                // 테마 이름(서버가 받아 둔 값) — 진열에서 빠졌으면 null: ID 와 "진열에서 빠짐"(그동안 할인은 멈춤)
+                t.title ? <span title={t.id}>{t.title}</span> : <span className="font-mono">{t.id} <span className="font-sans text-xs text-warning">{f.themeGone}</span></span>
+              ) : (
+                <span className="font-mono">{t.id}</span>
+              )}
             </li>
           ))}
         </ul>

@@ -15,6 +15,14 @@ const MANAGE = ['MARKETING', 'OPERATOR_ADMIN'];
 const READ = [...MANAGE, 'CS_AGENT'];
 const GRANT = ['MARKETING', 'CS_AGENT', 'OPERATOR_ADMIN'];
 
+/** promotion 0.3.0 — 받아 둔 지금 게시 진열의 테마(목: 고정). RANKING_AUTO 는 고를 수 없다 */
+const THEME_TARGETS = [
+  { sectionId: 'T-WINTER-VEG', kind: 'SEASON' as const, title: '겨울 제철 채소', productCount: 2, selectable: true },
+  { sectionId: 'T-WEEK-PICK', kind: 'WEEKLY_PICK' as const, title: '이번 주 추천', productCount: 6, selectable: true },
+  { sectionId: 'T-RANK-AUTO', kind: 'RANKING_AUTO' as const, title: '실시간 랭킹', productCount: 10, selectable: false },
+];
+const themeTitle = (id: string) => THEME_TARGETS.find((t) => t.sectionId === id)?.title ?? null;
+
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -83,12 +91,19 @@ export function checkPromotion(i: Input): Problem[] {
   if (d.type === 'RATE' && (d.value < 1 || d.value > 90)) out.push({ field: 'discount.value', reason: '정률은 1~90% 예요' });
   if (d.type === 'AMOUNT' && d.value < 1) out.push({ field: 'discount.value', reason: '정액은 1원 이상이에요' });
   if (i.kind === 'PRICE_DISCOUNT') {
-    if (!i.targets?.length) out.push({ field: 'targets', reason: '기간 할인은 대상 SKU·카테고리를 1개 이상 넣어 주세요' });
+    if (!i.targets?.length) out.push({ field: 'targets', reason: '기간 할인은 대상 SKU·카테고리·테마를 1개 이상 넣어 주세요' });
+    (i.targets ?? []).forEach((t, n) => {
+      if (t.type !== 'THEME') return;
+      const th = THEME_TARGETS.find((x) => x.sectionId === t.id);
+      if (!th) out.push({ field: `targets[${n}].id`, reason: '지금 게시된 진열에 없는 테마예요', code: 'THEME_NOT_PUBLISHED' });
+      else if (!th.selectable) out.push({ field: `targets[${n}].id`, reason: '자동 랭킹 테마는 고를 수 없어요', code: 'THEME_AUTO_RANKING' });
+    });
     if (d.maxAmount) out.push({ field: 'discount.maxAmount', reason: '최대 할인액은 정률 쿠폰만 쓸 수 있어요' });
   } else {
     const c = i.coupon;
     if (!c) out.push({ field: 'coupon', reason: '쿠폰 조건을 넣어 주세요' });
     else {
+      if (c.recipients && c.issueMode !== 'ADMIN') out.push({ field: 'coupon.recipients', reason: '받을 고객은 직원 지정 발급만 정할 수 있어요', code: 'RECIPIENTS_NOT_ADMIN' });
       if (!c.useDays === !c.useUntil) out.push({ field: 'coupon.useDays', reason: '사용 기간은 받은 날부터 N일 또는 고정 기한 중 하나만' });
       if (c.perCustomerLimit < 1 || c.perCustomerLimit > 10) out.push({ field: 'coupon.perCustomerLimit', reason: '1인 한도는 1~10장이에요' });
       if (c.useUntil && Date.parse(c.useUntil) < Date.parse(i.endsAt)) out.push({ field: 'coupon.useUntil', reason: '사용 기한은 받기 끝 시각 뒤여야 해요' });
@@ -134,8 +149,10 @@ function save(input: Input, base: Partial<Promotion> & { promotionId: string; ve
     startsAt: input.startsAt,
     endsAt: input.endsAt,
     discount: input.discount,
-    targets: input.kind === 'PRICE_DISCOUNT' ? (input.targets ?? []) : [],
+    targets: input.kind === 'PRICE_DISCOUNT' ? (input.targets ?? []).map((t) => ({ type: t.type, id: t.id, ...(t.type === 'THEME' ? { title: themeTitle(t.id) } : {}) })) : [],
     coupon: input.kind === 'COUPON' ? (input.coupon ?? null) : null,
+    // 0.3.0 받을 고객별 결과 — 승인 뒤 시작 때 발급(목: 넣은 순서로 PENDING)
+    recipientResults: input.kind === 'COUPON' && input.coupon?.issueMode === 'ADMIN' && input.coupon.recipients ? input.coupon.recipients.accountIds.map((accountId) => ({ accountId, result: 'PENDING' as const, couponId: null, processedAt: null })) : [],
     problems: checkPromotion(input),
     state: 'DRAFT',
     phase: 'NOT_APPROVED',
@@ -175,6 +192,11 @@ function approvalRequest(p: Promotion, action: 'ACTIVATE_PROMOTION' | 'END_PROMO
 }
 
 export const promotionHandlers = [
+  http.get(`${API_BASE}/promotions/theme-targets`, ({ request }) => {
+    const { denied } = deny(request, READ);
+    if (denied) return denied;
+    return HttpResponse.json({ layoutVersion: 7, syncedAt: new Date(Date.now() - 40_000).toISOString(), themes: THEME_TARGETS });
+  }),
   http.get(`${API_BASE}/promotions`, ({ request }) => {
     const { denied } = deny(request, READ);
     if (denied) return denied;

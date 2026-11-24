@@ -3,7 +3,37 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
+import { http, HttpResponse } from 'msw';
+
+import { API_BASE } from '../../api/client';
 import { as, renderAt } from '../../test/render';
+import { server } from '../../test/server';
+
+/** 승인 대기 지정 발급 쿠폰 — 만들 때 받을 고객 둘(0.3.0). 응답을 직접 만든다(같은 주소를 다시 부르면 처리기가 자기 자신을 부른다) */
+const WITH_RECIPIENTS = {
+  promotionId: 'PRM-R1',
+  kind: 'COUPON',
+  name: '보상 쿠폰',
+  state: 'APPROVED',
+  phase: 'RUNNING',
+  startsAt: '2026-11-24T00:00:00Z',
+  endsAt: '2099-12-31T00:00:00Z',
+  endedAt: null,
+  discount: { type: 'AMOUNT', value: 2000, maxAmount: null },
+  targets: [],
+  coupon: { issueMode: 'ADMIN', minOrderAmount: 0, totalQuantity: null, perCustomerLimit: 1, useDays: 7, useUntil: null, recipients: { accountIds: ['CUS-1001', 'CUS-1005'], reason: '배송 지연 보상' } },
+  recipientResults: [
+    { accountId: 'CUS-1001', result: 'ISSUED', couponId: 'CPN-1', processedAt: '2026-11-24T01:00:00Z' },
+    { accountId: 'CUS-1005', result: 'PENDING', couponId: null, processedAt: null },
+  ],
+  issuedCount: 1,
+  usedCount: 0,
+  problems: [],
+  approvalId: 'apv-r1',
+  version: 3,
+  createdBy: 'op-admin-1',
+  updatedAt: '2026-11-24T01:00:00Z',
+};
 
 /** datetime-local(서울) 값 — 지금에서 시간 더하기 */
 const local = (hours: number) => {
@@ -98,7 +128,7 @@ describe('행사·쿠폰', () => {
   it('지정 발급: 고객번호로 찾아 더하고 발급 — 화면은 가린 이름·번호, 보내는 값은 고객 ID(2026-11-24)', async () => {
     const user = userEvent.setup();
     const view = renderAt('/promotions/PRM-seed-1', as.cs);
-    const finder = await screen.findByRole('form', { name: '받을 고객 찾기' });
+    const finder = await screen.findByRole('search', { name: '받을 고객 찾기' });
     await user.type(within(finder).getByLabelText('값'), '4829');
     expect(within(finder).getByText('고객번호는 숫자 6자리예요.')).toBeInTheDocument(); // 모양이 틀리면 묻지 않는다
     await user.type(within(finder).getByLabelText('값'), '13');
@@ -120,7 +150,7 @@ describe('행사·쿠폰', () => {
   it('지정 발급: 고객 찾기 권한이 없는 마케팅은 ID 직접 넣기로 안내(403 을 "없음"으로 보이지 않게)', async () => {
     const user = userEvent.setup();
     renderAt('/promotions/PRM-seed-1', as.marketing);
-    const finder = await screen.findByRole('form', { name: '받을 고객 찾기' });
+    const finder = await screen.findByRole('search', { name: '받을 고객 찾기' });
     await user.type(within(finder).getByLabelText('값'), '482913');
     await user.click(within(finder).getByRole('button', { name: '찾기' }));
     expect(await screen.findByText(/이 역할은 고객 찾기를 쓸 수 없어요/)).toBeInTheDocument();
@@ -133,8 +163,56 @@ describe('행사·쿠폰', () => {
     const form = await screen.findByRole('form', { name: '행사 만들기' });
     await user.click(within(form).getByRole('radio', { name: /장바구니 쿠폰/ }));
     await user.selectOptions(within(form).getByLabelText('받는 방법'), 'ADMIN');
-    expect(screen.getByTestId('issue-mode-hint')).toHaveTextContent('승인되고 시작되면 행사 화면에서 고객을 찾아 발급해요');
+    expect(screen.getByTestId('issue-mode-hint')).toHaveTextContent('받을 고객을 고르면 시작 때 자동 발급');
     expect(screen.queryByText(/서버 다음 단계/)).not.toBeInTheDocument(); // 낡은 "반영은 다음 단계" 문구 없음
+  });
+
+  it('기간 할인 대상에 홈 진열 테마(0.3.0): 고를 수 있는 테마만(자동 랭킹 빠짐), 보내는 값 THEME·sectionId, 상세는 테마 이름', async () => {
+    const user = userEvent.setup();
+    const view = renderAt('/promotions/new', as.marketing);
+    const form = await screen.findByRole('form', { name: '행사 만들기' });
+    await user.click(within(form).getByRole('radio', { name: '기간 할인' }));
+    await user.click(within(form).getByRole('button', { name: '대상 더하기' }));
+    await user.selectOptions(within(form).getByLabelText('구분'), 'THEME');
+    await user.click(await within(form).findByRole('combobox', { name: '테마 1' }));
+    const list = await screen.findByRole('listbox', { name: '테마 1' });
+    expect(within(list).queryByText('실시간 랭킹')).not.toBeInTheDocument();
+    await user.click(within(list).getByRole('option', { name: /겨울 제철 채소/ }));
+    await user.click(within(form).getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(view.mutations('/promotions').length).toBeGreaterThan(0));
+    const body = (await view.mutations('/promotions')[0]!.clone().json()) as { targets: { type: string; id: string }[] };
+    expect(body.targets).toEqual([{ type: 'THEME', id: 'T-WINTER-VEG' }]);
+  });
+
+  it('지정 발급 쿠폰은 만들 때 받을 고객을 고른다(0.3.0) — 보내는 값 coupon.recipients, 상세는 고객별 "시작 때 발급"', async () => {
+    const user = userEvent.setup();
+    const view = renderAt('/promotions/new', as.admin);
+    const form = await screen.findByRole('form', { name: '행사 만들기' });
+    await user.click(within(form).getByRole('radio', { name: /장바구니 쿠폰/ }));
+    await user.type(within(form).getByLabelText('이름(고객에게 보여요)'), '보상 쿠폰');
+    fireEvent.change(within(form).getByLabelText('시작'), { target: { value: local(1) } });
+    fireEvent.change(within(form).getByLabelText('받기 끝'), { target: { value: local(72) } });
+    await user.selectOptions(within(form).getByLabelText('할인 방식'), 'AMOUNT');
+    await user.type(within(form).getByLabelText('할인액(원)'), '2000');
+    await user.selectOptions(within(form).getByLabelText('받는 방법'), 'ADMIN');
+    const finder = within(form).getByRole('search', { name: '받을 고객 찾기' });
+    await user.type(within(finder).getByLabelText('값'), '482913{Enter}'); // Enter 는 찾기만 — 행사 저장이 아니다
+    await user.click(within(await screen.findByTestId('grant-search-item')).getByRole('button', { name: '추가' }));
+    expect(view.mutations('/promotions')).toHaveLength(0);
+    await user.type(within(form).getByLabelText('발급 사유(보상 등, 200자까지)'), '배송 지연 보상');
+    await user.click(within(form).getByRole('button', { name: '저장' }));
+    await waitFor(() => expect(view.mutations('/promotions').length).toBeGreaterThan(0));
+    const body = (await view.mutations('/promotions')[0]!.clone().json()) as { coupon: { issueMode: string; recipients: { accountIds: string[]; reason: string } | null } };
+    expect(body.coupon.recipients).toEqual({ accountIds: ['CUS-1001'], reason: '배송 지연 보상' });
+  });
+
+  it('상세: 만들 때 지정한 받을 고객별 결과 — 서버 PENDING 은 "시작 때 발급"', async () => {
+    server.use(http.get(`${API_BASE}/promotions/PRM-R1`, () => HttpResponse.json(WITH_RECIPIENTS)));
+    renderAt('/promotions/PRM-R1', as.admin);
+    const rows = await screen.findAllByTestId('recipient-result');
+    expect(rows[0]).toHaveTextContent('CUS-1001발급됨');
+    expect(rows[1]).toHaveTextContent('CUS-1005시작 때 발급');
+    expect(screen.getByText('발급 사유 · 배송 지연 보상')).toBeInTheDocument();
   });
 
   it('조기 종료: 사유 → end-submissions → 승인 요청(END_PROMOTION)', async () => {
