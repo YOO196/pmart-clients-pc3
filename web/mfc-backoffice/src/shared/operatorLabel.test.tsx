@@ -11,7 +11,7 @@ const labelCalls = (sent: readonly Request[]) => sent.filter((r) => new URL(r.ur
 
 describe('운영자 ID 대신 이름·사번', () => {
   it('배정 목록의 작업자 칸 — 한 화면의 ID 를 모아 한 번에 묻고, 같은 ID 는 한 번만', async () => {
-    const view = renderAt('/c/MFC-BSN-01/assignments');
+    const view = renderAt('/c/MFC-SEED-01/assignments');
     const rows = await screen.findAllByTestId('assignment-row');
     await waitFor(() => expect(within(rows[0]!).getByTestId('operator-label')).toHaveTextContent(/·/));
     expect(screen.getAllByText('김현장').length).toBeGreaterThan(0);
@@ -26,7 +26,7 @@ describe('운영자 ID 대신 이름·사번', () => {
 
   it('모르는 ID 는 "직원", 조회 실패는 "직원(이름 못 읽음)" — 운영자 ID 는 글자로 내지 않는다(ADR-0070 덧붙임)', async () => {
     server.use(http.get(`${API_BASE}/hr/employee-labels`, () => HttpResponse.json({ items: [] })));
-    const first = renderAt('/c/MFC-BSN-01/assignments');
+    const first = renderAt('/c/MFC-SEED-01/assignments');
     await waitFor(() => expect(screen.getAllByTestId('operator-label')[0]).toHaveAttribute('data-fallback', 'unknown'));
     const label = screen.getAllByTestId('operator-label')[0]!;
     expect(label).toHaveTextContent(/^직원$/);
@@ -35,7 +35,7 @@ describe('운영자 ID 대신 이름·사번', () => {
     first.unmount();
 
     server.use(http.get(`${API_BASE}/hr/employee-labels`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-BSN-01/assignments');
+    renderAt('/c/MFC-SEED-01/assignments');
     await waitFor(() => expect(screen.getAllByTestId('operator-label')[0]).toHaveAttribute('data-fallback', 'failed'));
     expect(screen.getAllByText('직원(이름 못 읽음)').length).toBeGreaterThan(0);
   });

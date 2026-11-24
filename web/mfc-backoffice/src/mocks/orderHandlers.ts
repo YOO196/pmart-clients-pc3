@@ -1,14 +1,14 @@
 // 센터 주문 지표 목 — order-service 0.20.0(O-11) `GET /orders/metrics/series`·`/top-products`, product `GET /categories/tree`,
 // 상품 이름은 mfc-inventory `GET /mfcs/{mfcId}/stocks?sku=`(CenterStock.productName). 값은 orderSim(결정적).
 // 서버 규칙 중 화면이 보여 줄 것만: MFC_SUPERVISOR 는 mfcId 필수(400)·토큰 센터만(403), 기간 상한(HOUR·DAY 93일·WEEKDAY_HOUR 366일),
-// 0건 칸 없음, 칸 오름차순, sku·categoryId 로 거르면 approvedAmount null. 목 주문은 부산(MFC-BSN-01)에만 있다.
+// 0건 칸 없음, 칸 오름차순, sku·categoryId 로 거르면 approvedAmount null. 목 주문은 부산(MFC-SEED-01)에만 있다.
 import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { SIM_CATEGORIES, SIM_PRODUCTS, simAt } from './orderSim';
 import { operator, problem, unauthorized } from './support';
 
-const ORDER_CENTER = 'MFC-BSN-01';
+const ORDER_CENTER = 'MFC-SEED-01';
 const seoulNow = () => {
   const now = new Date();
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(now);

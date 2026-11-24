@@ -16,7 +16,7 @@ const employees: Readonly<Record<string, EmployeeSelf>> = {
     name: '정관리',
     mailAddress: 'sup1@pmart.test',
     employmentType: 'REGULAR',
-    affiliation: { type: 'CENTER', code: 'MFC-BSN-01' },
+    affiliation: { type: 'CENTER', code: 'MFC-SEED-01' },
     status: 'ACTIVE',
   },
   'OP-sup-2': {
@@ -34,11 +34,15 @@ const employees: Readonly<Record<string, EmployeeSelf>> = {
 const labels: Readonly<Record<string, Omit<EmployeeLabel, 'operatorId'>>> = {
   'OP-sup-1': { name: '정관리', employeeNo: 'E-2026-0101' },
   'OP-sup-2': { name: '한관리', employeeNo: 'E-2026-0102' },
+  'OP-sup-mk': { name: '목관리', employeeNo: 'E-2026-0103' },
+  'OP-sup-sj': { name: '세관리', employeeNo: 'E-2026-0104' },
+  'OP-sup-cc': { name: '춘관리', employeeNo: 'E-2026-0105' },
+  'OP-sup-bn': { name: '남관리', employeeNo: 'E-2026-0106' },
   'OP-admin-1': { name: '오본사', employeeNo: 'E-2026-0001' },
   'OP-wkr-1': { name: '김현장', employeeNo: 'E-2026-0201' },
   'OP-wkr-2': { name: '이알바', employeeNo: 'E-2026-0202' },
   'OP-wkr-3': { name: '최정지', employeeNo: 'E-2026-0203' },
-  'OP-wkr-5': { name: '송파작업자', employeeNo: 'E-2026-0205' },
+  'OP-wkr-5': { name: '목포작업자', employeeNo: 'E-2026-0205' },
   'OP-wkr-9': { name: '정퇴사', employeeNo: 'E-2026-0209' },
   'OP-day-1': { name: '박일일', employeeNo: 'E-2026-0301' },
 };

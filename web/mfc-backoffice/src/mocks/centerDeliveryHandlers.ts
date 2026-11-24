@@ -24,10 +24,10 @@ interface Row {
 }
 
 const rows: Row[] = [
-  { deliveryId: 'DLV-C-1', orderId: 'ORD-C-1', mfcId: 'MFC-BSN-01', execution: 'UNASSIGNED', dispatch: 'DISPATCH_FAILED', riderId: null, promisedAt: '2026-11-16T01:00:00.000Z', openCases: [{ caseId: 'CASE-DF-1', kind: 'DISPATCH_FAILED', priority: 'P2', overdue: true }] },
-  { deliveryId: 'DLV-C-2', deliveryNumber: 'D20000002', orderId: 'ORD-C-2', orderNumber: '20000002', mfcId: 'MFC-BSN-01', execution: 'PICKED_UP', dispatch: 'PICKED_UP', riderId: 'RD-7', promisedAt: '2099-01-01T00:00:00.000Z', openCases: [] },
-  { deliveryId: 'DLV-C-3', orderId: 'ORD-C-3', mfcId: 'MFC-BSN-01', execution: 'COMPLETED', dispatch: 'CLOSED', riderId: 'RD-8', promisedAt: null, openCases: [] },
-  { deliveryId: 'DLV-S-1', orderId: 'ORD-S-1', mfcId: 'MFC-SEL-01', execution: 'ASSIGNED', dispatch: 'ASSIGNED', riderId: 'RD-9', promisedAt: null, openCases: [] },
+  { deliveryId: 'DLV-C-1', orderId: 'ORD-C-1', mfcId: 'MFC-SEED-01', execution: 'UNASSIGNED', dispatch: 'DISPATCH_FAILED', riderId: null, promisedAt: '2026-11-16T01:00:00.000Z', openCases: [{ caseId: 'CASE-DF-1', kind: 'DISPATCH_FAILED', priority: 'P2', overdue: true }] },
+  { deliveryId: 'DLV-C-2', deliveryNumber: 'D20000002', orderId: 'ORD-C-2', orderNumber: '20000002', mfcId: 'MFC-SEED-01', execution: 'PICKED_UP', dispatch: 'PICKED_UP', riderId: 'RD-7', promisedAt: '2099-01-01T00:00:00.000Z', openCases: [] },
+  { deliveryId: 'DLV-C-3', orderId: 'ORD-C-3', mfcId: 'MFC-SEED-01', execution: 'COMPLETED', dispatch: 'CLOSED', riderId: 'RD-8', promisedAt: null, openCases: [] },
+  { deliveryId: 'DLV-S-1', orderId: 'ORD-S-1', mfcId: 'MFC-MOKPO-01', execution: 'ASSIGNED', dispatch: 'ASSIGNED', riderId: 'RD-9', promisedAt: null, openCases: [] },
 ];
 
 interface MockCase {
@@ -50,7 +50,7 @@ const cases: MockCase[] = [
   {
     caseId: 'CASE-DF-1',
     caseNumber: 'C-1116-0007',
-    centerId: 'MFC-BSN-01',
+    centerId: 'MFC-SEED-01',
     state: 'OPEN',
     priority: 'P2',
     summary: '배차 실패 2번째 — 응답 만료 (10분마다 자동 재배차 중)',
@@ -66,7 +66,7 @@ const cases: MockCase[] = [
   {
     caseId: 'CASE-DF-2',
     caseNumber: 'C-1115-0003',
-    centerId: 'MFC-BSN-01',
+    centerId: 'MFC-SEED-01',
     state: 'CLOSED',
     priority: 'P1',
     summary: '배차 실패 — 시스템 장애',
@@ -80,7 +80,7 @@ const cases: MockCase[] = [
   {
     caseId: 'CASE-DF-S',
     caseNumber: null,
-    centerId: 'MFC-SEL-01',
+    centerId: 'MFC-MOKPO-01',
     state: 'OPEN',
     priority: 'P2',
     summary: '다른 센터 배차 실패',

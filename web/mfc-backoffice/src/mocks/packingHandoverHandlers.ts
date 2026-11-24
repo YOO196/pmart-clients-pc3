@@ -35,14 +35,14 @@ interface ShipRow {
 }
 
 const ships: ShipRow[] = [
-  { shipmentId: 'SHP-1-S1', orderId: 'ORD-P-1', orderNumber: '10000001', mfcId: 'MFC-BSN-01', shipment: 'PREPARING', stage: 'REQUESTED', pick: 'READY', pack: 'WAITING', packages: [], delivery: 'UNASSIGNED', riderId: null },
-  { shipmentId: 'SHP-2-S1', orderId: 'ORD-P-2', orderNumber: '10000002', mfcId: 'MFC-BSN-01', shipment: 'PREPARING', stage: 'PICKING', pick: 'IN_PROGRESS', pack: 'WAITING', packages: [], delivery: 'ASSIGNED', riderId: 'RD-1' },
-  { shipmentId: 'SHP-3-S1', orderId: 'ORD-P-3', orderNumber: '10000003', mfcId: 'MFC-BSN-01', shipment: 'PREPARING', stage: null, pick: 'COMPLETED', pack: 'READY', packages: [], delivery: null, riderId: null },
+  { shipmentId: 'SHP-1-S1', orderId: 'ORD-P-1', orderNumber: '10000001', mfcId: 'MFC-SEED-01', shipment: 'PREPARING', stage: 'REQUESTED', pick: 'READY', pack: 'WAITING', packages: [], delivery: 'UNASSIGNED', riderId: null },
+  { shipmentId: 'SHP-2-S1', orderId: 'ORD-P-2', orderNumber: '10000002', mfcId: 'MFC-SEED-01', shipment: 'PREPARING', stage: 'PICKING', pick: 'IN_PROGRESS', pack: 'WAITING', packages: [], delivery: 'ASSIGNED', riderId: 'RD-1' },
+  { shipmentId: 'SHP-3-S1', orderId: 'ORD-P-3', orderNumber: '10000003', mfcId: 'MFC-SEED-01', shipment: 'PREPARING', stage: null, pick: 'COMPLETED', pack: 'READY', packages: [], delivery: null, riderId: null },
   {
     shipmentId: 'SHP-4-S1',
     orderId: 'ORD-P-4',
     orderNumber: '10000004',
-    mfcId: 'MFC-BSN-01',
+    mfcId: 'MFC-SEED-01',
     shipment: 'PARTIALLY_HANDED_OVER',
     stage: 'PARTIALLY_HANDED_OVER',
     pick: 'COMPLETED',
@@ -55,8 +55,8 @@ const ships: ShipRow[] = [
     delivery: 'PICKED_UP',
     riderId: 'RD-2',
   },
-  { shipmentId: 'SHP-5-S1', orderId: 'ORD-P-5', orderNumber: null, mfcId: 'MFC-BSN-01', shipment: 'CANCELLED', stage: null, pick: 'CANCELLED', pack: null, packages: [], delivery: 'CANCELLED', riderId: null },
-  { shipmentId: 'SHP-9-S1', orderId: 'ORD-P-9', orderNumber: '10000009', mfcId: 'MFC-SEL-01', shipment: 'READY', stage: 'READY_FOR_HANDOVER', pick: 'COMPLETED', pack: 'COMPLETED', packages: [], delivery: 'ASSIGNED', riderId: 'RD-9' },
+  { shipmentId: 'SHP-5-S1', orderId: 'ORD-P-5', orderNumber: null, mfcId: 'MFC-SEED-01', shipment: 'CANCELLED', stage: null, pick: 'CANCELLED', pack: null, packages: [], delivery: 'CANCELLED', riderId: null },
+  { shipmentId: 'SHP-9-S1', orderId: 'ORD-P-9', orderNumber: '10000009', mfcId: 'MFC-MOKPO-01', shipment: 'READY', stage: 'READY_FOR_HANDOVER', pick: 'COMPLETED', pack: 'COMPLETED', packages: [], delivery: 'ASSIGNED', riderId: 'RD-9' },
 ];
 
 const hiddenRider = (riderId: string | null) => (riderId ? { riderId, riderNumber: null, nameMasked: null } : null);

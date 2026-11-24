@@ -15,9 +15,9 @@ const value = (id: string) => screen.findByTestId(`${id}-value`);
 
 describe('작업 현황 — 숫자 카드·다 끝났어요', () => {
   it('상태 카드는 상태마다 서버 목록으로 센 수, 누르면 그 상태로 거른다(주소에 남음)', async () => {
-    const view = renderAt('/c/MFC-BSN-01/tasks');
+    const view = renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(async () => expect(await value('count-IN_PROGRESS')).toHaveTextContent(/^\d+건$/));
-    const inProgress = [...db.tasks.values()].filter((t) => t.mfcId === 'MFC-BSN-01' && t.state === 'IN_PROGRESS').length;
+    const inProgress = [...db.tasks.values()].filter((t) => t.mfcId === 'MFC-SEED-01' && t.state === 'IN_PROGRESS').length;
     expect(await value('count-IN_PROGRESS')).toHaveTextContent(`${inProgress}건`);
     const counted = view.gets('/tasks').map((r) => new URL(r.url).searchParams);
     expect(counted.some((q) => q.getAll('state').join() === 'BLOCKED' && q.get('size') === '50')).toBe(true);
@@ -35,7 +35,7 @@ describe('작업 현황 — 숫자 카드·다 끝났어요', () => {
         return HttpResponse.json({ items: [], page: { nextCursor: null, size: 50 } });
       }),
     );
-    renderAt('/c/MFC-BSN-01/tasks');
+    renderAt('/c/MFC-SEED-01/tasks');
     expect(await value('count-READY')).toHaveTextContent('50건 이상');
     await waitFor(async () => expect(await value('count-BLOCKED')).toHaveTextContent('?'));
     expect(screen.queryByTestId('all-done')).not.toBeInTheDocument();
@@ -43,14 +43,14 @@ describe('작업 현황 — 숫자 카드·다 끝났어요', () => {
 
   it('대기·배정·진행·막힘이 모두 서버에서 0건이면 "수고하셨어요"', async () => {
     server.use(http.get(`${API_BASE}/tasks`, () => HttpResponse.json({ items: [], page: { nextCursor: null, size: 50 } })));
-    renderAt('/c/MFC-BSN-01/tasks');
+    renderAt('/c/MFC-SEED-01/tasks');
     expect(await screen.findByTestId('all-done')).toHaveTextContent('수고하셨어요');
   });
 });
 
 describe('검색 조건 칩·/ 키', () => {
   it('조건을 건 목록은 칩 한 줄로 접히고, / 를 누르면 펼쳐 첫 칸으로', async () => {
-    renderAt('/c/MFC-BSN-01/tasks?state=READY');
+    renderAt('/c/MFC-SEED-01/tasks?state=READY');
     const bar = await screen.findByTestId('search-bar');
     expect(within(bar).getAllByTestId('search-chip').map((c) => c.textContent)).toEqual(['유형전체▾', '상태대기(담당 없음)▾']);
     expect(within(bar).getByRole('form', { hidden: true })).not.toBeVisible();
@@ -61,7 +61,7 @@ describe('검색 조건 칩·/ 키', () => {
 
 describe('최근 봄·목록 순서대로 넘기기·미리보기', () => {
   it('상세는 목록 순서로 이전·n/N·다음, ] 키로 다음 건. 돌아오면 본 줄에 "최근 봄"', async () => {
-    renderAt('/c/MFC-BSN-01/tasks');
+    renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(() => expect(rows()).toHaveLength(3));
     expect(screen.queryByTestId('seen-mark')).not.toBeInTheDocument();
     await userEvent.click(within(rows()[0]!).getByRole('link'));
@@ -75,7 +75,7 @@ describe('최근 봄·목록 순서대로 넘기기·미리보기', () => {
   });
 
   it('줄을 누르면 미리보기, ↓ 로 다음 줄, Enter 로 상세', async () => {
-    renderAt('/c/MFC-BSN-01/tasks');
+    renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(() => expect(rows()).toHaveLength(3));
     await userEvent.click(within(rows()[0]!).getAllByRole('cell')[1]!);
     const drawer = await screen.findByTestId('preview-drawer');
@@ -87,7 +87,7 @@ describe('최근 봄·목록 순서대로 넘기기·미리보기', () => {
   });
 
   it('진행 단계: 진행 중이면 지금 단계 숨쉬기, 앞 단계는 체크', async () => {
-    renderAt('/c/MFC-BSN-01/tasks/TASK-PICK-1');
+    renderAt('/c/MFC-SEED-01/tasks/TASK-PICK-1');
     const steps = await screen.findByTestId('task-steps');
     expect(within(steps).getAllByTestId('step-check')).toHaveLength(2);
     expect(within(steps).getByTestId('step-pulse')).toBeInTheDocument();
@@ -97,7 +97,7 @@ describe('최근 봄·목록 순서대로 넘기기·미리보기', () => {
 
 describe('화면 틀', () => {
   it('탭 제목에 화면 이름, 인터넷이 끊기면 띠', async () => {
-    renderAt('/c/MFC-BSN-01/tasks');
+    renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(() => expect(document.title).toMatch(/^(\(\d+\+?\) )?작업 현황 \| MFC백오피스$/));
     const online = Object.getOwnPropertyDescriptor(Navigator.prototype, 'onLine');
     Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });

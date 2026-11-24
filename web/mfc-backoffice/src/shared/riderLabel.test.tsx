@@ -12,7 +12,7 @@ const nameCalls = (sent: readonly Request[]) =>
 
 describe('라이더 ID 대신 라이더 번호만(R4785, ADR-0085)', () => {
   it('한 화면의 라이더를 모아 한 번에 묻는다(쉼표)', async () => {
-    const view = renderAt('/c/MFC-BSN-01/return-handovers');
+    const view = renderAt('/c/MFC-SEED-01/return-handovers');
     await waitFor(() => expect(screen.getAllByTestId('rider-label').slice(0, 2).map((e) => e.textContent)).toEqual(['R7155', 'R8266']));
     const calls = nameCalls(view.sent);
     expect(calls).toHaveLength(1);
@@ -22,7 +22,7 @@ describe('라이더 ID 대신 라이더 번호만(R4785, ADR-0085)', () => {
 
   it('조회 실패는 "라이더 조회 실패" — ID 를 대신 보이지 않는다', async () => {
     server.use(http.get(`${API_BASE}/riders/display-names`, () => new HttpResponse(null, { status: 503 })));
-    renderAt('/c/MFC-BSN-01/return-handovers');
+    renderAt('/c/MFC-SEED-01/return-handovers');
     await waitFor(() => expect(screen.getAllByTestId('rider-label')[0]).toHaveTextContent('라이더 조회 실패'));
     expect(screen.queryByText(/RD-3/)).not.toBeInTheDocument();
   });

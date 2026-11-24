@@ -14,7 +14,7 @@ const sentBody = async (r: Request) => (await r.clone().json()) as Record<string
 
 describe('운영 제한', () => {
   it('기본은 활성만(activeOnly 를 보내지 않는다), "해제된 것까지"는 activeOnly=false', async () => {
-    const view = renderAt('/c/MFC-BSN-01/restrictions');
+    const view = renderAt('/c/MFC-SEED-01/restrictions');
     await waitFor(() => expect(cards()).toHaveLength(1));
     expect(cards()[0]).toHaveTextContent('수용 축소');
     expect(cards()[0]).toHaveTextContent('ORD-7');
@@ -26,13 +26,13 @@ describe('운영 제한', () => {
 
   it('조회 실패는 빈 목록이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/operation-restrictions`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-BSN-01/restrictions');
+    renderAt('/c/MFC-SEED-01/restrictions');
     await waitFor(() => expect(document.querySelector('[data-state="error"]')).not.toBeNull());
     expect(screen.queryByText('조건에 맞는 운영 제한이 없어요.')).not.toBeInTheDocument();
   });
 
   it('등록: 수용 축소는 단위가 있어야, 승인 근거는 직접 입력 — 시각은 한국 시간 +09:00', async () => {
-    const view = renderAt('/c/MFC-BSN-01/restrictions');
+    const view = renderAt('/c/MFC-SEED-01/restrictions');
     const form = await screen.findByRole('form', { name: '운영 제한 등록' });
     await userEvent.selectOptions(within(form).getByRole('combobox', { name: '종류' }), 'CAPACITY_REDUCE');
     fireEvent.change(within(form).getByLabelText('시작(한국)'), { target: { value: '2026-11-17T10:00' } });
@@ -47,7 +47,7 @@ describe('운영 제한', () => {
     await waitFor(() => expect(cards()).toHaveLength(2));
     const post = view.sent.find((r) => r.method === 'POST')!;
     expect(await sentBody(post)).toEqual({
-      mfcId: 'MFC-BSN-01',
+      mfcId: 'MFC-SEED-01',
       restrictionType: 'CAPACITY_REDUCE',
       approvalRef: 'AP-OPS-9',
       reason: '인력 부족',
@@ -59,7 +59,7 @@ describe('운영 제한', () => {
   });
 
   it('끝이 시작보다 앞이면 보내지 않는다', async () => {
-    renderAt('/c/MFC-BSN-01/restrictions');
+    renderAt('/c/MFC-SEED-01/restrictions');
     const form = await screen.findByRole('form', { name: '운영 제한 등록' });
     fireEvent.change(within(form).getByLabelText('시작(한국)'), { target: { value: '2026-11-17T10:00' } });
     fireEvent.change(within(form).getByLabelText(/끝\(한국/), { target: { value: '2026-11-17T09:00' } });
@@ -69,7 +69,7 @@ describe('운영 제한', () => {
   });
 
   it('해제: 본사 승인 번호·지금 버전으로 보내고, 활성 목록에서 빠진다', async () => {
-    const view = renderAt('/c/MFC-BSN-01/restrictions');
+    const view = renderAt('/c/MFC-SEED-01/restrictions');
     await waitFor(() => expect(cards()).toHaveLength(1));
     const card = cards()[0]!;
     const lift = within(card).getByRole('button', { name: '해제' });
@@ -85,7 +85,7 @@ describe('운영 제한', () => {
   });
 
   it('센터 관리자가 아니면 서버 403 — 권한 문구', async () => {
-    renderAt('/c/MFC-BSN-01/restrictions', as.adminWithCenter);
+    renderAt('/c/MFC-SEED-01/restrictions', as.adminWithCenter);
     const form = await screen.findByRole('form', { name: '운영 제한 등록' });
     fireEvent.change(within(form).getByLabelText('시작(한국)'), { target: { value: '2026-11-17T10:00' } });
     await userEvent.type(within(form).getByRole('textbox', { name: /승인 근거/ }), 'AP-OPS-9');
@@ -96,7 +96,7 @@ describe('운영 제한', () => {
 
 describe('운영 제한 해제 — 늘 본사 승인(AP-1)', () => {
   it('번호 없이 보내면 승인 안내(늘 본사), 이미 쓴 번호는 이유', async () => {
-    renderAt('/c/MFC-BSN-01/restrictions');
+    renderAt('/c/MFC-SEED-01/restrictions');
     await waitFor(() => expect(cards()).toHaveLength(1));
     const card = cards()[0]!;
     await userEvent.click(within(card).getByRole('button', { name: '해제' }));

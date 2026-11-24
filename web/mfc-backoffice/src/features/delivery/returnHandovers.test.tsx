@@ -12,11 +12,11 @@ const reissues = (sent: readonly Request[]) => sent.filter((r) => r.method === '
 
 describe('반납 인증번호(우리 센터)', () => {
   it('주소의 센터로 부르고, 번호·종류·화면 번호·잠김을 보인다(다른 센터 것은 없다)', async () => {
-    const view = renderAt('/c/MFC-BSN-01/return-handovers');
+    const view = renderAt('/c/MFC-SEED-01/return-handovers');
     const cards = await screen.findAllByTestId('return-handover');
     expect(cards).toHaveLength(2);
     expect(screen.queryByText('9999')).not.toBeInTheDocument();
-    expect(new URL(view.gets('/return-handovers')[0]!.url).searchParams.get('mfcId')).toBe('MFC-BSN-01');
+    expect(new URL(view.gets('/return-handovers')[0]!.url).searchParams.get('mfcId')).toBe('MFC-SEED-01');
 
     const claim = cards.find((c) => c.textContent?.includes('D30000001-2'))!;
     expect(within(claim).getByTestId('return-code')).toHaveTextContent('4821');
@@ -33,7 +33,7 @@ describe('반납 인증번호(우리 센터)', () => {
   });
 
   it('잠긴 번호 → 한 번 더 묻고 새 번호(멱등키·출처 헤더), 그만두면 보내지 않는다', async () => {
-    const view = renderAt('/c/MFC-BSN-01/return-handovers');
+    const view = renderAt('/c/MFC-SEED-01/return-handovers');
     const cards = await screen.findAllByTestId('return-handover');
     const locked = cards.find((c) => c.textContent?.includes('1357'))!;
 
@@ -59,7 +59,7 @@ describe('반납 인증번호(우리 센터)', () => {
 
   it('이미 반납이 끝나 409 면 거절로 보이고, 조회 실패는 빈 목록이 아니다', async () => {
     server.use(http.post(`${API_BASE}/return-handovers/:deliveryId/code-reissues`, () => HttpResponse.json({ type: 'about:blank', title: 'Conflict', status: 409, code: 'INVALID_STATE' }, { status: 409, headers: { 'Content-Type': 'application/problem+json' } })));
-    const first = renderAt('/c/MFC-BSN-01/return-handovers');
+    const first = renderAt('/c/MFC-SEED-01/return-handovers');
     const cards = await screen.findAllByTestId('return-handover');
     await userEvent.click(within(cards[0]!).getByRole('button', { name: /번호 재발급|재발급하고/ }));
     await userEvent.click(within(cards[0]!).getByRole('button', { name: '재발급' }));
@@ -67,13 +67,13 @@ describe('반납 인증번호(우리 센터)', () => {
     first.unmount();
 
     server.use(http.get(`${API_BASE}/return-handovers`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-BSN-01/return-handovers');
+    renderAt('/c/MFC-SEED-01/return-handovers');
     await waitFor(() => expect(screen.queryByText('반납을 기다리는 배송이 없어요')).not.toBeInTheDocument());
     expect(await screen.findByRole('button', { name: /다시/ })).toBeInTheDocument();
   });
 
   it('도착한 회수품(반입 대기): 종류·도착 시각·상품 × 수량·라이더 표기 — 이 센터 것만, 시스템 ID 는 시스템 번호 칸에만', async () => {
-    const view = renderAt('/c/MFC-BSN-01/return-handovers');
+    const view = renderAt('/c/MFC-SEED-01/return-handovers');
     const box = await screen.findByTestId('return-arrivals');
     const cards = await within(box).findAllByTestId('return-arrival');
     expect(cards).toHaveLength(2);
@@ -85,6 +85,6 @@ describe('반납 인증번호(우리 센터)', () => {
     expect(cards[0]).not.toHaveTextContent('클레임 없음');
     expect(within(box).queryByText(/DLV-RET|RD-3/)).not.toBeInTheDocument();
     const q = new URL(view.gets('/return-arrivals')[0]!.url).searchParams;
-    expect([q.get('mfcId'), q.get('state')]).toEqual(['MFC-BSN-01', 'WAITING']);
+    expect([q.get('mfcId'), q.get('state')]).toEqual(['MFC-SEED-01', 'WAITING']);
   });
 });

@@ -1,14 +1,12 @@
-// 작업자 점 길찾기 — 벽·랙·포장대를 지나지 않고 문으로만(가상 현장 navgrid 를 옮김).
+// 작업자 점 길찾기 — 센터 다섯 곳 도면(시뮬레이터 평면)에서 벽·랙·탁자를 지나지 않고 문으로만.
 import { describe, expect, it } from 'vitest';
 
-import { buildFloor } from './floorLayout';
+import { mockFloorPlans } from '../../mocks/floorPlans';
+import type { FloorPlan } from '../floor/floorPlan';
 import { NavGrid, type P } from './navGrid';
 
-const floor = buildFloor();
-const grid = new NavGrid(floor);
-
 /** 경로를 0.05m 간격으로 훑어 모두 걸을 수 있는 칸인지 */
-function walkable(from: P, path: readonly P[]) {
+function walkable(grid: NavGrid, from: P, path: readonly P[]) {
   let prev = from;
   for (const p of path) {
     const n = Math.ceil(Math.hypot(p.x - prev.x, p.z - prev.z) / 0.05);
@@ -21,30 +19,31 @@ function walkable(from: P, path: readonly P[]) {
   return true;
 }
 
-describe('작업자 길찾기', () => {
-  it('냉동 통로 → 포장 대기: 길이 있고, 벽·랙을 지나지 않는다(냉동실 문으로 나온다)', () => {
-    const aisle = floor.aisles.find((a) => a.zone === 'FROZEN')!;
-    const from = grid.snapPoint({ x: aisle.cross, z: 5 });
-    const path = grid.findPath(from, floor.points.packQueue);
-    expect(path).not.toBeNull();
-    expect(walkable(from, path!)).toBe(true);
-    // 냉동실 남쪽 벽(z=30.1)의 문(x 5~7)을 지난다 — 벽을 뚫고 동쪽으로 가지 않는다
-    const out = path!.find((p) => p.z > 30.1);
-    expect(out === undefined || (out.x > 4.5 && out.x < 7.5) || path!.some((p) => p.z > 29 && p.x > 4.5 && p.x < 7.5)).toBe(true);
+const plans: readonly FloorPlan[] = mockFloorPlans();
+
+describe('작업자 길찾기 — 센터마다', () => {
+  it('도면은 다섯 센터(실서버 ID)', () => {
+    expect(plans.map((p) => p.centerId).sort()).toEqual(['MFC-BNG-01', 'MFC-CHC-01', 'MFC-MOKPO-01', 'MFC-SEED-01', 'MFC-SEJ-01']);
   });
 
-  it('상온 통로 ↔ 하차 칸 · 휴게실 · 포장대: 모두 걸을 수 있는 길', () => {
-    const aisle = floor.aisles.find((a) => a.zone === 'AMBIENT')!;
-    const from = grid.snapPoint({ x: 30, z: aisle.cross });
-    for (const goal of [floor.points.dock[0]!, floor.points.lounge[0]!, floor.stations[5]!]) {
-      const path = grid.findPath(from, goal);
-      expect(path).not.toBeNull();
-      expect(walkable(from, path!)).toBe(true);
+  it.each(plans.map((p) => [p.centerId, p] as const))('%s: 냉동·냉장·상온 선반 앞 → 포장 대기·포장대·입고 팔레트, 모두 벽·랙을 지나지 않는 길', (_, plan) => {
+    const grid = new NavGrid(plan);
+    for (const temp of ['FROZEN', 'CHILLED', 'AMBIENT'] as const) {
+      const rack = plan.racks.find((r) => r.temp === temp && !r.reserve && r.stand);
+      if (!rack) continue;
+      const from = grid.snapPoint(rack.stand!);
+      for (const goal of [plan.points.packQueue, plan.stations[0]!.stand, plan.reserves[0]?.stand ?? plan.points.truckDoor]) {
+        const path = grid.findPath(from, goal);
+        expect(path, `${plan.centerId} ${temp} ${rack.code} → ${goal.x},${goal.z}`).not.toBeNull();
+        expect(walkable(grid, from, path!)).toBe(true);
+      }
     }
   });
 
   it('랙 위 점은 걸을 수 없다 — 가장 가까운 통로로 옮긴다', () => {
-    const rack = floor.racks[0]!;
+    const plan = plans[0]!;
+    const grid = new NavGrid(plan);
+    const rack = plan.racks.find((r) => !r.reserve)!;
     expect(grid.isFreeAt({ x: rack.cx, z: rack.cz })).toBe(false);
     expect(grid.isFreeAt(grid.snapPoint({ x: rack.cx, z: rack.cz }))).toBe(true);
   });
