@@ -7,6 +7,7 @@ import { addDemoCenterDelays } from './dispatchDelayHandlers';
 import { handlers } from './handlers';
 import { addDemoCenterShipments } from './packingHandoverHandlers';
 import { addDemoCenterArrivals } from './returnArrivalHandlers';
+import { startStockStreamSim } from './stockStreamHandlers';
 
 // 브라우저 목에서만 시연용 칸·작업자를 더하고, 다른 네 센터에도 부산진구 시연 기록을 옮긴다 — 시험 데이터는 그대로
 seedDemoFloor();
@@ -15,6 +16,8 @@ addDemoCenterDeliveries();
 addDemoCenterShipments();
 addDemoCenterDelays();
 addDemoCenterArrivals();
+// 재고 실시간 스트림 시연(§4-16) — 스트림을 받는 센터만 몇 초마다 피킹·취소 복귀
+startStockStreamSim();
 
 const PING = '/__pmart_mock_ping';
 export const worker = setupWorker(http.get(PING, () => HttpResponse.json({ mocked: true })), ...handlers);

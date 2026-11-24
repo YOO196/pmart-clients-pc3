@@ -15,6 +15,7 @@ import { FloorMap, POSITIONS_REFRESH_MS, type FloorPick } from '../dashboard/Flo
 import { fetchAllLocations, type Location } from '../dashboard/floorQueries';
 import { useNow } from '../../shared/motion';
 import { OPS_REFRESH_MS, useOpenTasks } from '../ops/opsQueries';
+import { StockLiveStatus } from '../stock-stream/useStockStream';
 
 const TEMP_OF: Readonly<Record<string, Location['temperatureZone']>> = { A: 'AMBIENT', C: 'CHILLED', F: 'FROZEN' };
 const m = messages.floorPage;
@@ -136,6 +137,9 @@ function RackPanel({ mfcId, code, temp, onClose }: { readonly mfcId: string; rea
   return (
     <div data-testid="rack-panel">
       <PanelHead title={m.rackTitle(code)} sub={m.rackSub} onClose={onClose} />
+      <div className="-mt-2 mb-2">
+        <StockLiveStatus mfcId={mfcId} />
+      </div>
       {locations.isPending || units.isPending ? (
         <p className="text-sm text-base-content/40">…</p>
       ) : locations.isError || units.isError ? (
