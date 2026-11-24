@@ -1,6 +1,6 @@
 // 문의 만족도 모아 보기(case 0.15.0 — 백엔드 요청 all/2026-11-17-request-inquiry-satisfaction, 관리자만).
 // `GET /inquiries/satisfaction-summary?answeredFrom=&answeredTo=`(답변 시각 기준, 92일까지).
-// 사용자 결정 2026-11-17: 상담 평가일 뿐 — 상담원별 순위·이름은 보여 주지 않는다(서버도 주지 않음).
+// 사용자 결정 2026-11-17: 상담 평가일 뿐 — 상담원별로 나누지 않는다 → 2026-11-24 바뀜: 직원별 표(SatisfactionByAgent, case 0.38.0, 관리자만).
 // 비율은 분자·분모를 같이("답변 N건 중 M건 응답"), 분모 0 은 비율 대신 "—". 평균이 없으면(남긴 건 0) "—" — 숫자를 지어내지 않는다.
 // 화면(2026-11-18 사용자 "밋밋하다"): 위 기간 줄 → 숫자 카드 3개(기간·응답·평균 점수) → 점수별 막대(서버 byScore 그대로, 막대 길이는 보기용). 동작은 그대로.
 import { useQuery } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ import { useApi } from '../../app/ApiContext';
 import { messages } from '../../shared/messages';
 import { PageHeader } from '../../shared/admin';
 import { KpiCell, KpiStrip, Meter } from '../../app/Charts';
+import { SatisfactionByAgent } from './SatisfactionByAgent';
 
 const m = messages.satisfaction;
 const MAX_DAYS = 92;
@@ -135,6 +136,7 @@ export function SatisfactionPage() {
                   })}
                 </ul>
               </section>
+              <SatisfactionByAgent answeredFrom={`${from}T00:00:00+09:00`} answeredTo={`${to}T23:59:59+09:00`} period={`${from} ~ ${to}`} />
             </div>
           );
         }}

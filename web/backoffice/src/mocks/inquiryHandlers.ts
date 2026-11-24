@@ -65,7 +65,7 @@ const seed = (): Inquiry[] => [
     customerId: 'CUS-MOCK-3',
     body: '우유 소비기한이 얼마나 남은 상품이 오나요?',
     satisfaction: { score: 4, comment: '빨리 답해 줘서 좋았어요', ratedAt: '2026-11-13T05:00:00Z' },
-    replies: [{ replyId: 'REP-MOCK-1', authorType: 'AGENT', body: '남은 기한을 확인하고 보내 드립니다.', createdAt: '2026-11-13T03:00:00Z' }],
+    replies: [{ replyId: 'REP-MOCK-1', authorType: 'AGENT', authorId: 'op-cs-1', body: '남은 기한을 확인하고 보내 드립니다.', createdAt: '2026-11-13T03:00:00Z' }],
   },
   {
     inquiryId: 'INQ-MOCK-R1',
@@ -101,7 +101,7 @@ const seed = (): Inquiry[] => [
     body: '배송 완료 버튼이 안 눌려요.',
     // case 0.21.0: 라이더가 답변 뒤에 이어 씀 → 다시 RECEIVED
     replies: [
-      { replyId: 'REP-MOCK-R1', authorType: 'AGENT', body: '앱을 다시 켜 주세요.', createdAt: '2026-11-14T04:00:00Z' },
+      { replyId: 'REP-MOCK-R1', authorType: 'AGENT', authorId: 'op-rider-ops-1', body: '앱을 다시 켜 주세요.', createdAt: '2026-11-14T04:00:00Z' },
       { replyId: 'REP-MOCK-R2', authorType: 'RIDER', body: '다시 켜도 안 눌려요.', createdAt: '2026-11-14T05:00:00Z' },
     ],
   },
@@ -181,31 +181,80 @@ const reader = (request: Request): { denied: Response } | { kinds: string[]; adm
   return kinds.length ? { kinds, admin: who.roles.includes('OPERATOR_ADMIN') } : { denied: problem(403, 'FORBIDDEN') };
 };
 
+/** 만족도 모아 보기 공통 — 관리자·기간 92일·고객 문의만(상담원 접수·라이더 문의 제외) */
+function satisfactionScope(request: Request): { denied: Response } | { answered: Inquiry[]; fromText: string | null; toText: string | null } {
+  const who = operator(request);
+  if (!who) return { denied: unauthorized() };
+  if (!who.roles.includes('OPERATOR_ADMIN')) return { denied: problem(403, 'FORBIDDEN') };
+  const q = new URL(request.url).searchParams;
+  const from = Date.parse(q.get('answeredFrom') ?? '');
+  const to = Date.parse(q.get('answeredTo') ?? '');
+  if (Number.isNaN(from) || Number.isNaN(to) || to < from || to - from > 92 * 86_400_000) return { denied: problem(400, 'VALIDATION_FAILED') };
+  const answered = inquiries.filter((i) => kindOf(i) === 'CUSTOMER' && i.answeredAt && Date.parse(i.answeredAt) >= from && Date.parse(i.answeredAt) <= to);
+  return { answered, fromText: q.get('answeredFrom'), toText: q.get('answeredTo') };
+}
+/** 문의 몫 직원 — 평가 직전 마지막 AGENT 답변자(평가 없으면 마지막 AGENT 답변자) */
+function agentOf(i: Inquiry): string | null {
+  const cut = i.satisfaction ? Date.parse(i.satisfaction.ratedAt) : Infinity;
+  const last = [...i.replies].reverse().find((x) => x.authorType === 'AGENT' && Date.parse(x.createdAt ?? '') <= cut);
+  return last?.authorId ?? null;
+}
+
 export const inquiryHandlers = [
   // 만족도 모아 보기는 /inquiries/:inquiryId 보다 먼저(같은 모양 경로)
   // case 0.15.0 만족도 모아 보기 — 관리자만, 답변 시각 기준 92일까지. 상담원별 값 없음
   http.get(`${API_BASE}/inquiries/satisfaction-summary`, ({ request }) => {
-    const who = operator(request);
-    if (!who) return unauthorized();
-    if (!who.roles.includes('OPERATOR_ADMIN')) return problem(403, 'FORBIDDEN');
-    const q = new URL(request.url).searchParams;
-    const from = Date.parse(q.get('answeredFrom') ?? '');
-    const to = Date.parse(q.get('answeredTo') ?? '');
-    if (Number.isNaN(from) || Number.isNaN(to) || to < from || to - from > 92 * 86_400_000) return problem(400, 'VALIDATION_FAILED');
-    const answered = inquiries.filter((i) => i.answeredAt && Date.parse(i.answeredAt) >= from && Date.parse(i.answeredAt) <= to);
+    // 대상 = 고객 문의(계약 — 라이더 문의·상담원 접수 제외). 2026-11-24 전에는 라이더 문의까지 세어 계약과 달랐다
+    const p = satisfactionScope(request);
+    if ('denied' in p) return p.denied;
+    const answered = p.answered;
     const rated = answered.filter((i) => i.satisfaction);
     const byScore: Record<string, number> = { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 };
     for (const i of rated) byScore[String(i.satisfaction?.score)] = (byScore[String(i.satisfaction?.score)] ?? 0) + 1;
     const scoreSum = rated.reduce((s, i) => s + (i.satisfaction?.score ?? 0), 0);
     return HttpResponse.json({
-      answeredFrom: q.get('answeredFrom'),
-      answeredTo: q.get('answeredTo'),
+      answeredFrom: p.fromText,
+      answeredTo: p.toText,
       answeredCount: answered.length,
       ratedCount: rated.length,
       scoreSum,
       averageScore: rated.length ? scoreSum / rated.length : null,
       byScore,
     });
+  }),
+
+  // case 0.38.0 직원별 만족도(2026-11-24) — 관리자만, 전체 요약과 같은 기간·대상(고객 문의만). 몫 = 평가 직전 마지막 AGENT 답변자(평가 없으면 마지막 AGENT 답변자)
+  http.get(`${API_BASE}/inquiries/satisfaction-summary/by-agent`, ({ request }) => {
+    const p = satisfactionScope(request);
+    if ('denied' in p) return p.denied;
+    const rows = new Map<string | null, { answeredCount: number; ratedCount: number; scoreSum: number; byScore: Record<string, number> }>();
+    for (const i of p.answered) {
+      const id = agentOf(i);
+      const row = rows.get(id) ?? { answeredCount: 0, ratedCount: 0, scoreSum: 0, byScore: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 } };
+      row.answeredCount += 1;
+      if (i.satisfaction) {
+        row.ratedCount += 1;
+        row.scoreSum += i.satisfaction.score;
+        row.byScore[String(i.satisfaction.score)] = (row.byScore[String(i.satisfaction.score)] ?? 0) + 1;
+      }
+      rows.set(id, row);
+    }
+    const items = [...rows.entries()]
+      .map(([agentId, x]) => ({ agentId, ...x, averageScore: x.ratedCount ? Math.round((x.scoreSum / x.ratedCount) * 100) / 100 : null }))
+      .sort((a, b) => b.answeredCount - a.answeredCount);
+    return HttpResponse.json({ answeredFrom: p.fromText, answeredTo: p.toText, items });
+  }),
+  http.get(`${API_BASE}/inquiries/satisfaction-ratings`, ({ request }) => {
+    const p = satisfactionScope(request);
+    if ('denied' in p) return p.denied;
+    const q = new URL(request.url).searchParams;
+    const agentId = q.get('agentId') ?? '';
+    if (!agentId) return problem(400, 'VALIDATION_FAILED');
+    const items = p.answered
+      .filter((i) => i.satisfaction && agentOf(i) === agentId)
+      .sort((a, b) => Date.parse(b.satisfaction!.ratedAt) - Date.parse(a.satisfaction!.ratedAt))
+      .map((i) => ({ inquiryId: i.inquiryId, inquiryNumber: mockInquiryNumber(i.inquiryId), score: i.satisfaction!.score, comment: i.satisfaction!.comment ?? null, ratedAt: i.satisfaction!.ratedAt, answeredAt: i.answeredAt! }));
+    return HttpResponse.json({ items, page: { nextCursor: null, size: Number(q.get('size') ?? 20) } });
   }),
 
   http.get(`${API_BASE}/inquiries`, ({ request }) => {
@@ -302,7 +351,7 @@ export const inquiryHandlers = [
       status: 'ANSWERED',
       answeredAt: at,
       version: found.version + 1,
-      replies: [...found.replies, { replyId: `REP-MOCK-${found.replies.length + 2}`, authorType: 'AGENT', body, createdAt: at }],
+      replies: [...found.replies, { replyId: `REP-MOCK-${found.replies.length + 2}`, authorType: 'AGENT', authorId: who.subject, body, createdAt: at }],
     };
     inquiries[index] = next;
     answerers.set(found.inquiryId, who.subject);

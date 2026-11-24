@@ -8,7 +8,7 @@ import { as, renderAt } from '../../test/render';
 describe('문의 만족도', () => {
   it('관리자: 기간의 "답변 N건 중 M건 응답"·평균·점수별 — 서버에 답변 시각 기간으로 묻는다', async () => {
     const view = renderAt('/inquiry-satisfaction?from=2026-11-10&to=2026-11-16', as.admin);
-    expect(await screen.findByTestId('satisfaction-response')).toHaveTextContent('답변 2건 중 1건 응답(1/2)');
+    expect(await screen.findByTestId('satisfaction-response')).toHaveTextContent('답변 1건 중 1건 응답(1/1)'); // 고객 문의만(라이더 문의 제외 — 계약, 2026-11-24 목 바로잡음)
     expect(screen.getByTestId('satisfaction-average')).toHaveTextContent('4.00점');
     const rows = screen.getAllByTestId('satisfaction-score');
     expect(rows.map((r) => r.textContent)).toEqual(['5점0%0건', '4점100%1건', '3점0%0건', '2점0%0건', '1점0%0건']); // 2026-11-20 몫(%) 칸 더함 — 응답 1건 중
@@ -16,6 +16,24 @@ describe('문의 만족도', () => {
     const q = new URL(view.sent.find((r) => new URL(r.url).pathname.endsWith('/satisfaction-summary'))!.url).searchParams;
     expect(q.get('answeredFrom')).toBe('2026-11-10T00:00:00+09:00');
     expect(q.get('answeredTo')).toBe('2026-11-16T23:59:59+09:00');
+  });
+
+  it('직원별(case 0.38.0, 관리자): 답변·응답·평균·점수별, 줄을 열면 그 직원 몫 평가 — 고객 정보 없음', async () => {
+    const user = userEvent.setup();
+    const view = renderAt('/inquiry-satisfaction?from=2026-11-10&to=2026-11-16', as.admin);
+    const row = await screen.findByTestId('by-agent-row');
+    expect(await within(row).findByText(/최상담/)).toBeInTheDocument(); // 이름은 hr employee-labels
+    expect(within(row).getByTestId('by-agent-average')).toHaveTextContent('4.00');
+    expect(row).toHaveTextContent('1(100%)');
+    expect(screen.getAllByTestId('by-agent-row')).toHaveLength(1); // 라이더 문의 답변자는 없다(고객 문의만)
+    await user.click(row);
+    const rating = await screen.findByTestId('agent-rating');
+    expect(rating).toHaveTextContent('4점');
+    expect(rating).toHaveTextContent('빨리 답해 줘서 좋았어요');
+    expect(screen.getByTestId('agent-ratings')).not.toHaveTextContent('CUS-'); // 고객 ID 없음
+    const q = new URL(view.sent.find((r) => new URL(r.url).pathname.endsWith('/satisfaction-ratings'))!.url).searchParams;
+    expect(q.get('agentId')).toBe('op-cs-1');
+    expect(q.get('answeredFrom')).toBe('2026-11-10T00:00:00+09:00');
   });
 
   it('남긴 건이 없으면 평균은 "—"(0 으로 만들지 않음), 92일 넘는 기간은 보낼 수 없다', async () => {

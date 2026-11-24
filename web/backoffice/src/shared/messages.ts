@@ -3765,7 +3765,7 @@ export const messages = {
   },
   satisfaction: {
     title: '문의 만족도',
-    intro: '답변을 받은 고객이 남긴 1~5점이에요. 상담 평가일 뿐 반품·환불 종결이 아니고, 상담원 평가에 쓰지 않아요(상담원별 숫자는 없어요).',
+    intro: '답변을 받은 고객이 남긴 1~5점이에요. 상담 평가일 뿐 반품·환불 종결이 아니에요. 직원별 숫자는 관리자만 봐요(2026-11-24 — 성과 측정·관리).',
     period: '기간',
     from: '시작일',
     to: '종료일',
@@ -3784,7 +3784,23 @@ export const messages = {
     byScore: '점수별',
     scoreLabel: (k: string) => `${k}점`,
     count: (n: number) => `${n}건`,
-    notForAgents: '상담원별 순위·이름은 보여 주지 않아요.',
+    notForAgents: '직원별 숫자는 관리자만 봐요 — 상담원 본인에게는 보이지 않아요.',
+    // 직원별(case 0.38.0, 2026-11-24 사용자 "직원마다 평점 — 관리자가 개인 성과 측정·관리, 고객 개인정보는 가림")
+    byAgent: {
+      title: '직원별',
+      hint: '문의 하나는 평가 직전 마지막으로 답한 직원 몫 · 관리자만',
+      empty: '이 기간에 답변한 문의가 없어요.',
+      col: { agent: '직원', answered: '답변', rated: '응답', average: '평균', open: '평가 보기' },
+      noAgent: '답변 직원 기록 없음',
+      open: '평가 펼치기',
+      close: '평가 접기',
+      noRatings: '이 기간에 이 직원 몫으로 남긴 평가가 없어요.',
+      inquiry: '문의',
+      noComment: '의견 없음',
+      ratedAt: (at: string) => `${at} 평가`,
+      more: '더 보기',
+      privacy: '고객 이름·연락처는 싣지 않아요. 의견 속 전화번호·메일은 서버가 가려요.',
+    },
     // 화면 짜임(2026-11-18) — 숫자 카드 + 점수별 막대(서버 값만)
     outOf: '5점 만점',
     byScoreHint: '응답한 건 기준',
