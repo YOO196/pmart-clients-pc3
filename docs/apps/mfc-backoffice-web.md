@@ -112,6 +112,8 @@
 - API 클라이언트: `api.bff`(`/api/v1/backoffice`)·`api.cases`. 계약 타입은 `gen:api` 의 mfc-backoffice 복사 목록에 backoffice-bff·case 를 더해 만든다(`tools/web-tools/gen-api.mjs`).
 - 목 `mocks/centerDeliveryHandlers.ts`(우리 센터 진행 중 2·끝난 1·다른 센터 1, 사건 열린 1·닫힌 1·다른 센터 1 — 상태 SUSPENDED 로 거르면 배차·사건 원천 실패). 시험 `features/delivery/centerDelivery.test.tsx`(7).
 
+- **배송 통계 탭**(2026-11-23, `features/delivery/DeliveryStats.tsx`, 주소 `?view=stats&range=today|d7|d30`): execution 0.38.0 `GET /delivery-metrics`·dispatch 0.16.0 `GET /metrics/dispatch`(센터 직원은 mfcId 필수 — 이 센터만, 최대 31일). 완료율·지연율·전달 실패율·가동 라이더, 평균 픽업 대기(가게 도착 → 픽업)·배송 소요·배차 소요, 배차 효율(배정 성공률·재배차·제안 수락률·자동 취소·배정 출처·실패 사유), 날짜별·라이더별(번호만) 표, 도움요청 종류별. 평균은 서버 건수로 가중. 배송 통계 실패는 0 대신 안내, 배차 통계만 실패하면 그 칸만.
+
 ### 4-4b. 포장 인계 현황 — bff 0.11.0 `packing-handover` (`features/delivery/PackingHandoverPage.tsx`, 2026-11-17 PC 3)
 - 백엔드 요청 `clients/all/2026-11-17-request-packing-handover.md`(배송 원문 §10.1·§3.1·§3.4·§3.7). 묶음 "배송"의 첫 메뉴 `packing-handover`. **보기만**.
 - bff `GET /backoffice/views/packing-handover?mfcId=<주소의 센터>&state=&size=50&cursor=` — 센터 관리자는 자기 센터 고정(다른 센터 403). 상태(ShipmentState)를 비우면 끝나지 않은 출고(PREPARING·READY·PARTIALLY_HANDED_OVER), 오래된 것부터, `page.nextCursor` 로 다음 쪽. 모니터에 띄워 두는 화면이라 30초마다 다시 읽기.
