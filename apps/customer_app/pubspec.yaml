@@ -13,6 +13,8 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  # 서버 사진 디스크 캐시(로딩 구조 S3 — 사용자 2026-11-25 "응", 서버 이미지는 ID 마다 불변·1년 immutable).
+  cached_network_image: ^4.0.7
   dio: ^5.11.1
   flutter_riverpod: ^3.4.3
   go_router: ^18.1.1
@@ -98,6 +100,8 @@ flutter:
   # 바로픽 시작 그림(원본 branding/splash.png, 사용자 지시 2026-11-19).
   assets:
     - assets/images/splash.jpg
+    # 바로픽 앱 아이콘(쿠폰 카드 왼쪽 표 — 사용자 지시 2026-11-24, 런처 아이콘과 같은 그림)
+    - assets/images/app_icon.png
     # 카테고리 그림(사용자 제공 2026-11-20)
     - assets/images/categories/
   # Pretendard (SIL OFL 1.1, assets/fonts/Pretendard-LICENSE.txt). 사용자 지시 2026-11-11.
@@ -106,6 +110,8 @@ flutter:
       fonts:
         - asset: assets/fonts/Pretendard-Regular.otf
           weight: 400
+        - asset: assets/fonts/Pretendard-Medium.otf
+          weight: 500
         - asset: assets/fonts/Pretendard-SemiBold.otf
           weight: 600
         - asset: assets/fonts/Pretendard-Bold.otf

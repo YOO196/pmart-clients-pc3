@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -705,14 +707,8 @@ class CouponBoxScreen extends ConsumerWidget {
   }
 }
 
-class _CampaignList extends ConsumerStatefulWidget {
-  const _CampaignList();
-
-  @override
-  ConsumerState<_CampaignList> createState() => _CampaignListState();
-}
-
-class _CampaignListState extends ConsumerState<_CampaignList> {
+/// 쿠폰 받기 버튼 상태·하나 받기·한번에 받기(쿠폰함 "받을 수 있는 쿠폰"과 홈 쿠폰 시트가 같이 쓴다).
+mixin _CampaignDownloads<T extends ConsumerStatefulWidget> on ConsumerState<T> {
   /// 받는 중인 행사(버튼 잠금).
   final _busy = <String>{};
   bool _allBusy = false;
@@ -776,7 +772,399 @@ class _CampaignListState extends ConsumerState<_CampaignList> {
           : l10n.couponAllPartial(ok, failed),
     );
   }
+}
 
+/// 행사 한 장(쿠폰함·홈 쿠폰 시트 공통). 조건은 서버 값만.
+Widget _campaignTicket(
+  AppLocalizations l10n,
+  CouponCampaign c, {
+  required bool busy,
+  required VoidCallback onPressed,
+}) => CouponTicket(
+  key: ValueKey('campaign-${c.promotionId}'),
+  discount: c.discount,
+  name: c.name,
+  dim: c.soldOut,
+  lines: [
+    [
+      _minText(l10n, c.minOrderAmount),
+      switch ((c.useDays, c.useUntil)) {
+        (final int d, _) => l10n.couponCondDays(d),
+        // 초안: 조건 줄은 요일 없이 짧게("11.30까지 사용").
+        (null, final DateTime u) => l10n.couponCondUntil(
+          DateFormat('M.d', 'ko').format(toSeoulWallClock(u)),
+        ),
+        _ => null,
+      },
+    ].nonNulls.join(' · '),
+    [
+      l10n.couponCondDownloadBy(_md(c.endsAt)),
+      if (c.remaining case final r? when r > 0) l10n.couponCondRemaining(r),
+    ].join(' · '),
+  ],
+  trailing: _DownloadButton(
+    key: ValueKey('campaign-download-${c.promotionId}'),
+    state: c.reachedLimit
+        ? _DownloadState.done
+        : c.soldOut
+        ? _DownloadState.closed
+        : _DownloadState.open,
+    busy: busy,
+    onPressed: onPressed,
+  ),
+);
+
+/// 홈 쿠폰 줄을 누르면 뜨는 "할인받고 주문해요" 시트(사용자 새 UI 2026-11-24): 모든 쿠폰 + 아래 [한번에 받기].
+/// 묶음 받기 API 가 없어 하나씩 차례로 받는다(쿠폰함 [모두 받기]와 같음).
+/// 크기는 사용자 폰 캡처 실측(1080px = 411dp, 1dp = 2.625px): 제목 18 굵게(왼쪽 20), 카드 좌우 16·모서리 14·받기 칸 51, 글 14/13.
+class CouponCampaignSheet extends ConsumerStatefulWidget {
+  const CouponCampaignSheet({super.key});
+
+  @override
+  ConsumerState<CouponCampaignSheet> createState() =>
+      _CouponCampaignSheetState();
+}
+
+class _CouponCampaignSheetState extends ConsumerState<CouponCampaignSheet>
+    with _CampaignDownloads<CouponCampaignSheet> {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final value = ref.watch(couponCampaignsProvider);
+    final now = ref.watch(clockProvider)();
+    final list = value.value ?? const <CouponCampaign>[];
+    final open = [
+      for (final c in list)
+        if (!c.reachedLimit && !c.soldOut) c,
+    ];
+    final title18 = theme.textTheme.titleMedium?.copyWith(
+      fontSize: 18,
+      height: 1.3,
+      fontWeight: FontWeight.w700,
+    );
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.9,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(19.8, 9, 7, 0),
+              child: Row(
+                children: [
+                  Expanded(child: Text(l10n.couponSheetTitle, style: title18)),
+                  IconButton(
+                    key: const ValueKey('coupon-sheet-close'),
+                    tooltip: MaterialLocalizations.of(context)
+                        .closeButtonTooltip,
+                    icon: const PmartLineIcon(
+                      PmartLineIcons.close,
+                      size: 24,
+                      strokeWidth: 2,
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: UiStateView<List<CouponCampaign>?>(
+                state: uiStateOf(value, isEmpty: (l) => l == null || l.isEmpty),
+                onRetry: () => ref.invalidate(couponCampaignsProvider),
+                loading: (_) => const PmartListSkeleton(rows: 3),
+                empty: (_) => _CouponEmpty(
+                  key: const ValueKey('coupon-sheet-empty'),
+                  title: l10n.couponCampaignsEmpty,
+                ),
+                ready: (context, list) => ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 26, 16, 16),
+                  children: [
+                    Text(l10n.couponSheetAll, style: title18),
+                    const SizedBox(height: 17.6),
+                    for (final c in list!)
+                      _SheetCouponCard(
+                        key: ValueKey('campaign-${c.promotionId}'),
+                        campaign: c,
+                        now: now,
+                        busy: _busy.contains(c.promotionId),
+                        onDownload: () => _download(c.promotionId),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            PmartBottomBar(
+              padding: const EdgeInsets.fromLTRB(12.2, 11, 12.2, 11),
+              child: SizedBox(
+                height: 49,
+                child: FilledButton(
+                  key: const ValueKey('coupon-sheet-all'),
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    textStyle: theme.textTheme.titleMedium?.copyWith(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  onPressed: _allBusy || open.isEmpty
+                      ? null
+                      : () => _downloadAll(open),
+                  child: _allBusy
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(l10n.couponSheetDownloadAll),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 시트의 쿠폰 한 장: 흰 카드(회색 테두리) · 왼쪽 "{할인} {이름}"(할인은 주 색) / "{최소}부터 사용 가능" /
+/// 받기 남은 날(임박이면 빨강), 오른쪽 점선 너머 받기 칸(보라 동그라미 ↓ / 받음 ✓ / 마감). 값은 서버 값만.
+class _SheetCouponCard extends StatelessWidget {
+  const _SheetCouponCard({
+    super.key,
+    required this.campaign,
+    required this.now,
+    required this.busy,
+    required this.onDownload,
+  });
+
+  final CouponCampaign campaign;
+  final DateTime now;
+  final bool busy;
+  final VoidCallback onDownload;
+
+  static const _stub = 51.4;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final c = campaign;
+    final amount = switch (c.discount.type) {
+      CouponDiscountType.amount => formatKrw(c.discount.value),
+      CouponDiscountType.rate => '${c.discount.value}%',
+    };
+    final days = couponDaysLeft(c.endsAt, now);
+    final soon = days <= couponSoonDays;
+    // 회색 줄은 레퍼런스처럼 진한 회색(본문 80%).
+    final line = theme.textTheme.bodySmall?.copyWith(
+      fontSize: 13,
+      height: 1.3,
+      color: scheme.onSurface.withValues(alpha: 0.8),
+    );
+    final stub = c.reachedLimit
+        ? Container(
+            width: 32,
+            height: 32,
+            decoration: const BoxDecoration(
+              color: PmartBrand.lavender,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: PmartLineIcon(
+              PmartLineIcons.check,
+              size: 14,
+              strokeWidth: 2.4,
+              color: scheme.primary,
+            ),
+          )
+        : c.soldOut
+        ? Text(
+            l10n.couponSoldOut,
+            style: theme.textTheme.labelSmall?.copyWith(color: scheme.outline),
+          )
+        : Material(
+            key: ValueKey('campaign-download-${c.promotionId}'),
+            color: scheme.primary,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: busy ? null : onDownload,
+              child: SizedBox.square(
+                dimension: 32,
+                child: Center(
+                  child: busy
+                      ? SizedBox.square(
+                          dimension: 13,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: scheme.onPrimary,
+                          ),
+                        )
+                      : PmartLineIcon(
+                          PmartLineIcons.download,
+                          size: 17,
+                          strokeWidth: 2.4,
+                          color: scheme.onPrimary,
+                        ),
+                ),
+              ),
+            ),
+          );
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 13.3),
+      child: Opacity(
+        opacity: c.soldOut ? 0.5 : 1,
+        child: CustomPaint(
+          painter: _StubBorderPainter(
+            stubWidth: _stub,
+            border: scheme.outlineVariant,
+            fill: scheme.surface,
+          ),
+          // "모든 쿠폰" 카드 실측(1080px = 411dp): 높이 127, 왼쪽 16 에 바로픽 아이콘 36(모서리 7), 글까지 10.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 126.9),
+            child: Row(
+              children: [
+                const SizedBox(width: 15.6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(7),
+                  child: Image.asset(
+                    'assets/images/app_icon.png',
+                    key: const ValueKey('campaign-brand'),
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 10.3),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 16, 8, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(
+                                text: amount,
+                                style: TextStyle(color: scheme.primary),
+                              ),
+                              TextSpan(text: ' ${c.name}'),
+                            ],
+                          ),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontSize: 14,
+                            height: 1.3,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 3.75),
+                        Text(
+                          c.minOrderAmount <= 0
+                              ? l10n.couponCondNoMin
+                              : l10n.couponFromMin(formatKrw(c.minOrderAmount)),
+                          style: line,
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          days <= 0
+                              ? l10n.couponDownloadToday
+                              : l10n.couponDaysLeft(days),
+                          key: ValueKey('campaign-left-${c.promotionId}'),
+                          style: line?.copyWith(
+                            color: soon ? scheme.error : null,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        // 장바구니 쿠폰은 주문 1건에 1장(ADR-0082).
+                        Text(l10n.couponPerOrderOne, style: line),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: _stub,
+                  child: Center(child: stub),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 흰 카드 테두리 + 오른쪽 받기 칸 점선, 점선 위아래 파인 반원.
+class _StubBorderPainter extends CustomPainter {
+  _StubBorderPainter({
+    required this.stubWidth,
+    required this.border,
+    required this.fill,
+  });
+
+  final double stubWidth;
+  final Color border;
+  final Color fill;
+
+  static const _radius = 13.7;
+  static const _notch = 4.6;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final line = Paint()
+      ..color = border
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final r = RRect.fromRectAndRadius(
+      (Offset.zero & size).deflate(0.5),
+      const Radius.circular(_radius),
+    );
+    canvas
+      ..drawRRect(r, Paint()..color = fill)
+      ..drawRRect(r, line);
+    final x = size.width - stubWidth;
+    for (final y in [0.5, size.height - 0.5]) {
+      final c = Offset(x, y);
+      canvas
+        ..drawCircle(c, _notch, Paint()..color = fill)
+        ..drawArc(
+          Rect.fromCircle(center: c, radius: _notch),
+          y < 1 ? 0 : math.pi,
+          math.pi,
+          false,
+          line,
+        );
+    }
+    const dash = 3.0;
+    for (var y = _notch + 3; y < size.height - _notch - 3; y += dash * 2) {
+      canvas.drawLine(
+        Offset(x, y),
+        Offset(x, math.min(y + dash, size.height - _notch - 3)),
+        line,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StubBorderPainter old) =>
+      old.stubWidth != stubWidth || old.border != border || old.fill != fill;
+}
+
+class _CampaignList extends ConsumerStatefulWidget {
+  const _CampaignList();
+
+  @override
+  ConsumerState<_CampaignList> createState() => _CampaignListState();
+}
+
+class _CampaignListState extends ConsumerState<_CampaignList>
+    with _CampaignDownloads<_CampaignList> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -836,39 +1224,11 @@ class _CampaignListState extends ConsumerState<_CampaignList> {
                       ),
               ),
               for (final c in list)
-                CouponTicket(
-                  key: ValueKey('campaign-${c.promotionId}'),
-                  discount: c.discount,
-                  name: c.name,
-                  dim: c.soldOut,
-                  lines: [
-                    [
-                      _minText(l10n, c.minOrderAmount),
-                      switch ((c.useDays, c.useUntil)) {
-                        (final int d, _) => l10n.couponCondDays(d),
-                        // 초안: 조건 줄은 요일 없이 짧게("11.30까지 사용").
-                        (null, final DateTime u) => l10n.couponCondUntil(
-                          DateFormat('M.d', 'ko').format(toSeoulWallClock(u)),
-                        ),
-                        _ => null,
-                      },
-                    ].nonNulls.join(' · '),
-                    [
-                      l10n.couponCondDownloadBy(_md(c.endsAt)),
-                      if (c.remaining case final r? when r > 0)
-                        l10n.couponCondRemaining(r),
-                    ].join(' · '),
-                  ],
-                  trailing: _DownloadButton(
-                    key: ValueKey('campaign-download-${c.promotionId}'),
-                    state: c.reachedLimit
-                        ? _DownloadState.done
-                        : c.soldOut
-                        ? _DownloadState.closed
-                        : _DownloadState.open,
-                    busy: _busy.contains(c.promotionId),
-                    onPressed: () => _download(c.promotionId),
-                  ),
+                _campaignTicket(
+                  l10n,
+                  c,
+                  busy: _busy.contains(c.promotionId),
+                  onPressed: () => _download(c.promotionId),
                 ),
             ],
           ),

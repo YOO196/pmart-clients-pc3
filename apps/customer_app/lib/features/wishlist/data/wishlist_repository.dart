@@ -19,6 +19,9 @@ abstract interface class WishlistRepository {
 
   /// `DELETE /me/wishlist-items/{productId}` — 없어도 204.
   Future<void> remove(String productId, {required IdempotencyKey key});
+
+  /// 상품 찜 수(customer 0.17.0 `GET /product-wish-counts?productIds=` — 토큰 없이, BR-100 R3). 없으면 0.
+  Future<int> wishCount(String productId);
 }
 
 final class ApiWishlistRepository implements WishlistRepository {
@@ -55,6 +58,20 @@ final class ApiWishlistRepository implements WishlistRepository {
         extra: commandOptions(key).extra,
       ),
     );
+  }
+
+  @override
+  Future<int> wishCount(String productId) async {
+    final res = await pmartGuard(
+      () => _api.listProductWishCounts(productIds: productId),
+    );
+    final body =
+        res.data ?? (throw const ContractViolationFailure('찜 수 본문 없음'));
+    return body.items
+            .where((i) => i.productId == productId)
+            .firstOrNull
+            ?.wishCount ??
+        0;
   }
 
   @override
@@ -164,6 +181,16 @@ final class MockWishlistRepository implements WishlistRepository {
       failNextRead = null;
       throw f;
     }
+  }
+
+  /// 시험용: 다른 사람 찜 수(상품 ID → 수). 없으면 0. 내가 찜했으면 1 을 더해 준다(서버 흉내).
+  final Map<String, int> otherWishes = {'P-0001': 1055};
+
+  @override
+  Future<int> wishCount(String productId) async {
+    await _wait();
+    final mine = items.any((w) => w['productId'] == productId) ? 1 : 0;
+    return (otherWishes[productId] ?? 0) + mine;
   }
 
   @override

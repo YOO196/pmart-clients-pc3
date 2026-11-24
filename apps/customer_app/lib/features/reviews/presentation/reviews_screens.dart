@@ -29,16 +29,25 @@ import '../../checkout/presentation/checkout_controller.dart'
     show clockProvider;
 import 'product_reviews_screen.dart' show reviewRelativeDate;
 import 'reviews_controller.dart';
+import '../../../shared/network_image.dart';
 
 export 'product_reviews_screen.dart'
     show ProductReviewsScreen, ReviewPhotosScreen;
 
 /// 별점 표시(읽기 전용).
 class ReviewStars extends StatelessWidget {
-  const ReviewStars({super.key, required this.rating, this.size = 16});
+  const ReviewStars({
+    super.key,
+    required this.rating,
+    this.size = 16,
+    this.color,
+  });
 
   final int rating;
   final double size;
+
+  /// 별 색(기본 주 색). 상품 리뷰 목록은 레퍼런스 노란 별.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +61,7 @@ class ReviewStars extends StatelessWidget {
             Icon(
               i <= rating ? Icons.star : Icons.star_border,
               size: size,
-              color: Theme.of(context).colorScheme.primary,
+              color: color ?? Theme.of(context).colorScheme.primary,
             ),
         ],
       ),
@@ -743,7 +752,7 @@ class _PhotoGrid extends ConsumerWidget {
                         fit: StackFit.expand,
                         children: [
                           switch (urls[i]) {
-                            final u? => Image.network(
+                            final u? => pmartNetworkImage(
                               withImageWidth(u, px)!,
                               fit: BoxFit.cover,
                               cacheWidth: px.round(),
@@ -2162,7 +2171,7 @@ class _PhotoTile extends ConsumerWidget {
                       builder: (context) {
                         final px = 72 * MediaQuery.devicePixelRatioOf(context);
                         // 축소본(?w=)으로 받고 그릴 크기로만 디코딩한다(요청 2026-11-20).
-                        return Image.network(
+                        return pmartNetworkImage(
                           withImageWidth(remote, px)!,
                           fit: BoxFit.cover,
                           cacheWidth: px.round(),
@@ -2316,7 +2325,7 @@ class _ReviewPhotos extends ConsumerWidget {
                               final px =
                                   size * MediaQuery.devicePixelRatioOf(context);
                               // 썸네일은 축소본(?w=240/480)·그릴 크기로만 디코딩(요청 2026-11-20).
-                              return Image.network(
+                              return pmartNetworkImage(
                                 withImageWidth(url, px)!,
                                 fit: BoxFit.cover,
                                 cacheWidth: px.round(),
@@ -2407,7 +2416,7 @@ class _ReviewPhotoViewerState extends State<ReviewPhotoViewer> {
               child: url == null
                   ? failed()
                   // 크게 보기는 축소본 720(요청 2026-11-20), 화면 폭만큼만 디코딩.
-                  : Image.network(
+                  : pmartNetworkImage(
                       withImageWidth(url, 720)!,
                       key: ValueKey('review-photo-viewer-$i'),
                       fit: BoxFit.contain,

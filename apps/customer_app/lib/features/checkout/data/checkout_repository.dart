@@ -213,6 +213,26 @@ List<DeliveryOption> optionsFromContract(api.DeliveryOptions c) => [
         final w? => ArrivalWindow(date: w.date, start: w.start, end: w.end),
         null => null,
       },
+      // order 0.22.0(BR-96): 최소 주문(PolicyValue — NOT_SET 이면 null, 0 으로 바꾸지 않는다)·배달팁 구간·운영 시간.
+      minOrderAmount: switch (o.minOrderAmount) {
+        final m?
+            when m.state == api.DeliveryOptionMinOrderAmountStateEnum.VALUE =>
+          switch (m.value) {
+            final num v => v.toInt(),
+            _ => null,
+          },
+        _ => null,
+      },
+      tipTiers: switch (o.deliveryTip?.tiers) {
+        final ts? when ts.isNotEmpty => [
+          for (final t in ts) (fromAmount: t.fromAmount, tip: t.tip),
+        ],
+        _ => null,
+      },
+      serviceHours: switch (c.serviceHours) {
+        final h? => (start: h.start, end: h.end),
+        null => null,
+      },
     ),
 ];
 

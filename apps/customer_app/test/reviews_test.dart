@@ -908,6 +908,30 @@ void main() {
       expect(find.textContaining('게시됨'), findsNothing);
     });
 
+    testWidgets('내가 쓴 리뷰가 첫 쪽에 없어도(새 주문 품목이 첫 쪽을 채움) 다음 쪽을 이어 읽어 보인다', (
+      t,
+    ) async {
+      // 사용자 2026-11-25: 배달 주소(센터)를 바꿔 새로 주문하자 "작성한 리뷰"가 비어 보였다 —
+      // 자격 목록 첫 쪽(5건)이 모두 쓸 수 있는 품목이고 내 리뷰는 둘째 쪽에 있던 것.
+      final seed = MockReviewsRepository.seedEligibilities();
+      final eligible = seed.firstWhere((e) => e['state'] == 'REV_ELIGIBLE');
+      final repo = MockReviewsRepository(
+        latency: Duration.zero,
+        eligibilities: [
+          for (var i = 0; i < 6; i++) {...eligible, 'orderLineId': 'ol-new-$i'},
+          ...seed,
+        ],
+      );
+      await openManage(t, repo);
+      await t.tap(find.byKey(const ValueKey('review-tab-mine')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('review-mine-empty')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('review-mine-open-rv-mine-1')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('내가 쓴 리뷰 목록 조회 실패는 "쓴 리뷰 없음"이 아니다', (t) async {
       final repo = MockReviewsRepository(latency: Duration.zero);
       await openManage(t, repo);
@@ -1143,9 +1167,16 @@ void main() {
             .push('/products/$id'),
       );
       await t.pumpAndSettle();
+      // 리뷰는 상세 아래쪽(사용자 레퍼런스 2026-11-25) — 그 구획까지 내린다.
+      await t.scrollUntilVisible(
+        find.byKey(const ValueKey('product-reviews')),
+        400,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.pumpAndSettle();
     }
 
-    testWidgets('상품 상세: 별점 아래 리뷰 미리보기 → 전체 보기에서 커서로 더 보기', (t) async {
+    testWidgets('상품 상세: 아래쪽 리뷰 구획(3건) → 전체 보기에서 커서로 더 보기', (t) async {
       final repo = MockReviewsRepository(latency: Duration.zero);
       await openProduct(t, repo, 'P-0002');
       expect(find.byKey(const ValueKey('product-reviews')), findsOneWidget);
@@ -1168,70 +1199,85 @@ void main() {
       await t.scrollUntilVisible(
         find.byKey(const ValueKey('product-review-rv-p2-6')),
         300,
-        scrollable: find.descendant(
-          of: find.byKey(const ValueKey('product-reviews-list')),
-          matching: find.byType(Scrollable),
-        ),
+        // 목록 안에 사진 격자·카드 사진(가로)도 있다 — 바깥 세로 목록(첫째).
+        scrollable: find
+            .descendant(
+              of: find.byKey(const ValueKey('product-reviews-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       expect(
         find.byKey(const ValueKey('product-review-rv-p2-6')),
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('review-load-more')), findsNothing);
-      // 미리보기·전체 목록·사진 리뷰 모음(사진 리뷰만)이 각각 첫 쪽, 전체 목록만 다음 쪽.
-      expect(repo.productCursors, [null, null, null, '5']);
+      // 상세 리뷰 구획(최신순)·사진 격자(사진 리뷰만)가 첫 쪽 — 전체 화면은 같은 조건이라 그 값을 그대로 쓰고 다음 쪽만 읽는다.
+      expect(repo.productCursors, [null, null, '5']);
       expect(repo.productQueries.where((q) => q.photoOnly), hasLength(1));
     });
 
-    testWidgets('전체 보기: 정렬(시트 ✓)·필터(사진 후기만)는 서버 조건으로 다시 읽고, 사진 모음 → 모아보기', (
-      t,
-    ) async {
-      final repo = MockReviewsRepository(latency: Duration.zero);
-      // 사진 5장 — 사진 후기 줄은 4칸이라 넷째 칸이 [+ 더보기]가 된다.
-      repo.reviewJson.first['photos'] = [
-        for (var i = 1; i <= 5; i++)
-          {'photoId': 'rp-$i', 'url': '/api/v1/review-photos/rp-$i'},
-      ];
-      expect(repo.reviewJson.first['productId'], 'P-0002');
-      await openProduct(t, repo, 'P-0002');
-      await t.tap(find.byKey(const ValueKey('product-reviews-all')));
-      await t.pumpAndSettle();
-      expect(find.byKey(const ValueKey('review-average')), findsOneWidget);
-      expect(find.byKey(const ValueKey('review-photo-strip')), findsOneWidget);
+    testWidgets(
+      '전체 보기: 정렬(시트 ✓)·[사진리뷰만]은 서버 조건으로 다시 읽고, 사진 격자 끝 [+ 더보기] → 모아보기',
+      (t) async {
+        final repo = MockReviewsRepository(latency: Duration.zero);
+        // 사진 9장 — 사진 격자(2줄)는 8칸을 넘으면 끝에 [+ 더보기].
+        repo.reviewJson.first['photos'] = [
+          for (var i = 1; i <= 9; i++)
+            {'photoId': 'rp-$i', 'url': '/api/v1/review-photos/rp-$i'},
+        ];
+        expect(repo.reviewJson.first['productId'], 'P-0002');
+        await openProduct(t, repo, 'P-0002');
+        await t.tap(find.byKey(const ValueKey('product-reviews-all')));
+        await t.pumpAndSettle();
+        expect(find.byKey(const ValueKey('review-average')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('review-photo-strip')),
+          findsOneWidget,
+        );
 
-      await t.tap(find.byKey(const ValueKey('review-sort-open')));
-      await t.pumpAndSettle();
-      expect(find.text('정렬'), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('review-sort-ratingAsc')));
-      await t.pumpAndSettle();
-      expect(repo.productQueries.last, (
-        sort: ReviewSort.ratingAsc,
-        photoOnly: false,
-        sku: null,
-      ));
-      expect(find.text('별점 낮은 순'), findsOneWidget);
+        await t.tap(find.byKey(const ValueKey('review-sort-open')));
+        await t.pumpAndSettle();
+        expect(find.text('정렬'), findsOneWidget);
+        await t.tap(find.byKey(const ValueKey('review-sort-ratingAsc')));
+        await t.pumpAndSettle();
+        expect(repo.productQueries.last, (
+          sort: ReviewSort.ratingAsc,
+          photoOnly: false,
+          sku: null,
+        ));
+        expect(find.text('별점 낮은 순'), findsOneWidget);
 
-      await t.tap(find.byKey(const ValueKey('review-filter-open')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('review-filter-photo')));
-      await t.pumpAndSettle();
-      expect(repo.productQueries.last, (
-        sort: ReviewSort.ratingAsc,
-        photoOnly: true,
-        sku: null,
-      ));
-      expect(
-        find.byKey(
-          ValueKey('product-review-${repo.reviewJson.first['reviewId']}'),
-        ),
-        findsOneWidget,
-      );
+        // [✓ 사진리뷰만](사용자 레퍼런스 2026-11-25 — 필터 시트 대신 체크).
+        await t.tap(find.byKey(const ValueKey('review-filter-photo-toggle')));
+        await t.pumpAndSettle();
+        expect(repo.productQueries.last, (
+          sort: ReviewSort.ratingAsc,
+          photoOnly: true,
+          sku: null,
+        ));
+        expect(
+          find.byKey(
+            ValueKey('product-review-${repo.reviewJson.first['reviewId']}'),
+          ),
+          findsOneWidget,
+        );
 
-      await t.tap(find.byKey(const ValueKey('review-photos-more')));
-      await t.pumpAndSettle();
-      expect(find.text('사진리뷰 모아보기'), findsOneWidget);
-      expect(find.byKey(const ValueKey('review-photos-grid')), findsOneWidget);
-    });
+        await t.dragUntilVisible(
+          find.byKey(const ValueKey('review-photos-more')),
+          find.byKey(const ValueKey('review-photo-strip')),
+          const Offset(-200, 0),
+        );
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(const ValueKey('review-photos-more')));
+        await t.pumpAndSettle();
+        expect(find.text('사진리뷰 모아보기'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('review-photos-grid')),
+          findsOneWidget,
+        );
+      },
+    );
     // 사용자 2026-11-20: 같은 계정으로 쓴 리뷰는 상품리뷰 전체 보기에서 고칠 수 있게.
     testWidgets('전체 보기: 내가 쓴 리뷰에만 "수정" — 누르면 내 리뷰 화면, 비회원은 없음', (t) async {
       final repo = MockReviewsRepository(latency: Duration.zero);
@@ -1283,10 +1329,14 @@ void main() {
       expect(find.byKey(const ValueKey('review-edit')), findsOneWidget);
     });
 
-    testWidgets('상품 상세: 리뷰 줄을 눌러도 전체 화면', (t) async {
+    testWidgets('상품 상세: [리뷰 전체 보기] 버튼도 전체 화면', (t) async {
       final repo = MockReviewsRepository(latency: Duration.zero);
       await openProduct(t, repo, 'P-0002');
-      await t.tap(find.byKey(const ValueKey('product-reviews-preview')));
+      await t.ensureVisible(
+        find.byKey(const ValueKey('product-reviews-all-button')),
+      );
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('product-reviews-all-button')));
       await t.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('product-reviews-list')),

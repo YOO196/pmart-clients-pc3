@@ -8,6 +8,8 @@ import 'package:customer_app/features/profile/data/profile_repository.dart';
 import 'package:customer_app/features/profile/domain/profile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:customer_app/features/auth/domain/auth.dart'
+    show SocialProvider;
 import 'package:pmart_api_customer/pmart_api_customer.dart' as api;
 
 import 'support/app_harness.dart';
@@ -166,6 +168,48 @@ void main() {
         '김피마',
       );
     });
+
+    testWidgets(
+      '가입 방식은 서버 프로필(socialProvider) 먼저 — 이메일 옆 배지·"○○로 로그인"·내 정보 배지',
+      (t) async {
+        // 백엔드 요청 2026-11-25: 네이버 계정인데 네이버가 준 연락처 이메일이 gmail 이라 구글처럼 보였다.
+        // 세션 제공자(이 시험은 카카오로 로그인)보다 서버가 아는 가입 제공자를 먼저 쓴다.
+        final profile = MockProfileRepository(latency: Duration.zero)
+          ..name = '홍길동'
+          ..email = 'hong@gmail.com'
+          ..socialProvider = SocialProvider.naver;
+        await t.pumpWidget(testApp(const [], profile: profile));
+        await t.pumpAndSettle();
+        await _loginKakao(t);
+
+        final account = find.byKey(const ValueKey('my-account'));
+        expect(
+          find.descendant(
+            of: account,
+            matching: find.text('홍길동 · hong@gmail.com'),
+          ),
+          findsOneWidget,
+        );
+        final badge = find.byKey(const ValueKey('my-provider-badge'));
+        expect(
+          find.descendant(of: badge, matching: find.text('네이버')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: account, matching: find.text('네이버로 로그인했어요')),
+          findsOneWidget,
+        );
+
+        await t.tap(find.byKey(const ValueKey('my-info')));
+        await t.pumpAndSettle();
+        expect(
+          t
+              .widget<Text>(find.byKey(const ValueKey('info-login-provider')))
+              .data,
+          '네이버',
+        );
+      },
+    );
 
     testWidgets('Google 값이 없으면 기본 아바타·"정보 없음"으로 두고, 계정 줄은 제공자 SDK 계정 표시를 쓴다', (
       t,

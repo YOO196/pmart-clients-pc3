@@ -47,8 +47,6 @@ import 'tracking_map.dart';
 import 'orders_providers.dart';
 import 'receipt_confirmation.dart';
 import '../../../shared/notice.dart';
-import '../../support/domain/inquiry.dart' show InquiryCategory;
-import '../../support/presentation/inquiry_screens.dart' show InquiryFormArgs;
 import '../../redelivery/presentation/redelivery_screens.dart'
     show RedeliveryPaymentsSection;
 
@@ -1306,7 +1304,7 @@ class _OrderBody extends ConsumerWidget {
           ),
           // 주문 상태마다 버튼이 다르다(레퍼런스 9-1·9-2, 사용자 2026-11-21) — 문의는 접수일 뿐 주문을 바꾸지 않는다.
           //  · 취소된 주문: 버튼 없음(9-1 3-1)
-          //  · 배송 완료: [반품·교환] [문의하기](9-2 2) — 반품 접수는 고객센터만이라(claim 0.2.0) 환불 문의로 잇는다
+          //  · 배송 완료: [반품·교환] [문의하기](9-2 2) — 반품·교환 신청 화면(레퍼런스 12, 목 — BR-95)
           //  · 예약 확정(준비 전): [문의하기](9-1 3-2)
           //  · 준비~배달 중: [문의하기] [배달 현황] — 배송 ID 를 몰라도 지도부터 뜬다(BR-61)
           if (switch (orderDetailActions(o)) {
@@ -1323,13 +1321,8 @@ class _OrderBody extends ConsumerWidget {
                     OrderDetailAction.returnExchange => wide(
                       'order-return-exchange',
                       l10n.orderReturnExchange,
-                      () => visit(
-                        '/support/inquiries/new',
-                        extra: InquiryFormArgs(
-                          orderId: o.orderId,
-                          category: InquiryCategory.refund,
-                        ),
-                      ),
+                      // 반품·교환 신청(레퍼런스 12). 실서버는 계약 전이라(BR-95) 그 화면이 고객센터 문의로 잇는다.
+                      () => visit('/orders/${o.orderId}/return-exchange'),
                     ),
                     OrderDetailAction.inquiry => wide(
                       'order-inquiry',

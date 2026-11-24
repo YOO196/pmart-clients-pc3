@@ -153,6 +153,7 @@ Cart cartFromContract(api.Cart c) => Cart(
   mfcId: c.mfcId,
   selectedItemAmount: c.selectedItemAmount,
   selectedDiscountAmount: c.selectedDiscountAmount,
+  selectedListAmount: c.selectedListAmount,
   minOrderAmount: c.minOrderAmount,
   minOrderShortfall: c.minOrderShortfall,
   expiresAt: c.expiresAt,

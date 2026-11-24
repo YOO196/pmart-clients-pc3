@@ -188,6 +188,8 @@ base class MockCartRepository implements CartRepository {
       'items': items,
       'selectedItemAmount': amount,
       'selectedDiscountAmount': discount,
+      // cart 0.5.0(BR-97): 할인 전 합계 = 할인 뒤 + 할인 합계(서버와 같은 기준).
+      'selectedListAmount': amount + discount,
       // 서버 흉내(cart 0.2.0): 최소 15,000원, 부족액 = max(0, 최소 − 선택 합계).
       'minOrderAmount': minOrderAmount,
       'minOrderShortfall': (minOrderAmount - amount).clamp(0, minOrderAmount),

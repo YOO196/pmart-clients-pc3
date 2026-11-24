@@ -42,6 +42,9 @@ class OptionTip {
   final TipReason reason;
 }
 
+/// 배달팁 구간 한 줄: 상품액 [fromAmount] 이상이면 배달팁 [tip](서버 값 — BR-96).
+typedef TipTier = ({int fromAmount, int tip});
+
 /// 배송 방식 선택지. 값은 서버 판정을 그대로 옮긴다.
 @immutable
 class DeliveryOption {
@@ -52,6 +55,9 @@ class DeliveryOption {
     this.eta,
     this.tip,
     this.earliestSlot,
+    this.minOrderAmount,
+    this.tipTiers,
+    this.serviceHours,
   });
 
   final DeliveryMode mode;
@@ -61,7 +67,36 @@ class DeliveryOption {
   final OptionTip? tip;
   final ArrivalWindow? earliestSlot;
 
+  /// 최소 주문 상품액(order 0.22.0 PolicyValue — BR-96). 없거나 NOT_SET 이면 null — 0 으로 만들지 않는다.
+  final int? minOrderAmount;
+
+  /// 배달팁 구간(높은 금액부터 — order 0.22.0 `deliveryTip.tiers`, BR-96). 없으면 기본 배달팁만 보인다.
+  final List<TipTier>? tipTiers;
+
+  /// 실제 배송 운영 시간(`HH:mm`, 서울 — order 0.22.0 `serviceHours`, 응답 전체 값을 방식마다 둔다).
+  final ({String start, String end})? serviceHours;
+
   bool get available => availability == OptionAvailability.available;
+
+  /// 배달팁 0원이 되는 상품액(서버 구간에서 읽기만 — 계산하지 않는다). 모르면 null.
+  int? get freeTipFrom =>
+      tipTiers?.where((t) => t.tip == 0).map((t) => t.fromAmount).firstOrNull;
+
+  DeliveryOption withGuide({
+    int? minOrderAmount,
+    List<TipTier>? tipTiers,
+    ({String start, String end})? serviceHours,
+  }) => DeliveryOption(
+    mode,
+    availability: availability,
+    reason: reason,
+    eta: eta,
+    tip: tip,
+    earliestSlot: earliestSlot,
+    minOrderAmount: minOrderAmount ?? this.minOrderAmount,
+    tipTiers: tipTiers ?? this.tipTiers,
+    serviceHours: serviceHours ?? this.serviceHours,
+  );
 }
 
 /// 도착 구간. 날짜는 Asia/Seoul `YYYY-MM-DD`, 시각은 `HH:mm`.

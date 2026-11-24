@@ -15,6 +15,7 @@ import 'widgets/category_art.dart';
 import 'widgets/product_tile_card.dart';
 import '../../../shared/providers.dart'
     show imageOriginProvider, resolveImageUrl, withImageWidth;
+import '../../../shared/network_image.dart';
 
 /// 카테고리 화면을 연다 — 아래 탭 막대를 둔 채, 들어온 탭 안에서(사용자 2026-11-23 "1,2 하고"):
 /// 홈 탭이면 `/category`, 카테고리 탭이면 `/categories/list`, 그 밖(전체 화면 위 등)은 `/products`(전체 화면).
@@ -689,7 +690,7 @@ class _CategoryPhoto extends ConsumerWidget {
         shape: BoxShape.circle,
         color: Theme.of(context).colorScheme.surfaceContainer,
       ),
-      child: Image.network(
+      child: pmartNetworkImage(
         url,
         fit: BoxFit.contain,
         cacheWidth: px.round(),

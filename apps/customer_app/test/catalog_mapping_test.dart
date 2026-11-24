@@ -159,6 +159,36 @@ void main() {
       expect(p.rating, isNull);
     });
 
+    test(
+      '상품 정보 칸(product-content 0.9.0 BR-100 R1) — 원산지·소비기한·고시 표, 빈 값은 없음',
+      () {
+        final json = MockCatalogRepository.productJson(
+          mockProducts.firstWhere((p) => p.productId == 'P-0006'),
+        );
+        final p = productFromContract(
+          pc.ProductContent.fromJson({
+            ...json,
+            'origin': '국산',
+            'expiryGuide': ' ',
+            'legalInfo': [
+              {'label': '원산지', 'value': '국산'},
+              {'label': null, 'value': '냉장 보관'},
+            ],
+          }),
+        );
+        expect(p.origin, '국산');
+        expect(p.expiryGuide, isNull);
+        expect(p.legalInfo, [
+          (label: '원산지', value: '국산'),
+          (label: null, value: '냉장 보관'),
+        ]);
+        // 옛 응답(칸 없음)은 null — 화면이 notices 줄로 대신한다.
+        final old = productFromContract(pc.ProductContent.fromJson(json));
+        expect(old.origin, isNull);
+        expect(old.legalInfo, isNull);
+      },
+    );
+
     test('일시품절 옵션은 담기를 권하지 않는다', () {
       final p = productFromContract(
         pc.ProductContent.fromJson(

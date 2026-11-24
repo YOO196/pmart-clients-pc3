@@ -94,6 +94,17 @@
 
 리뷰관리(마이 → 리뷰관리)는 `writableReviewsProvider`·`myReviewsProvider` 가 `GET /reviews?state=` 를 읽고, 카드마다 리뷰 본문 `reviewProvider(reviewId)` → `GET /reviews/{id}` 를 따로 부른다.
 
+## 4-1. 결제 — 주문서의 토스 결제위젯 (`lib/features/payment/presentation/pg_widget_session.dart`, `checkout/presentation/order_sheet_screen.dart`)
+사용자 2026-11-25 "주문서형 토스페이먼츠 컴포넌트가 뜨는 게 느리다".
+
+1. 배송 방식 화면 [다음] → `GET /payment-widget-config`(결제위젯 키)를 **초안 만들기와 동시에** 미리 요청(`delivery_select_screen.dart:741`, provider 는 앱이 켜져 있는 동안 유지).
+2. 초안(`prepare` — 견적) 끝 → 주문서 화면.
+3. 주문서가 그려지면 그때 `TossPgWidgetSession` 을 만들고 `renderPaymentMethods`·`renderAgreement` 를 동시에 시작 — SDK 가 **WebView(flutter_inappwebview)** 를 띄우고 토스 서버에서 위젯 페이지·스크립트를 받아 결제수단·약관을 그린다. 둘 다 끝나야 "결제수단 불러오는 중"이 사라지고 결제하기가 열린다.
+4. 금액은 서버 견적 총액(`quote.totalAmount`) — 견적이 있어야 그리기 시작.
+
+- 의심 지점: (P1) 3번이 주문서가 뜬 **뒤에야** 시작 — WebView 엔진 첫 시동(Android Chromium)·토스 위젯 페이지 내려받기가 그대로 기다림이 된다. (P2) debug 빌드의 플랫폼 뷰(WebView) 합성은 느림. (P3) 토스 서버·인터넷 구간(우리 서버 밖).
+- 개선 후보(아직 안 함): ① 배송 방식 화면에서 WebView 엔진을 미리 깨우기(보이지 않는 빈 WebView), ② 결제위젯 세션을 주문서 앞(배송 방식 화면)에서 미리 만들어 그려 두고 견적 금액으로 `updateAmount`(결제 코드 구조 변경 — 금액 불일치 검사는 그대로).
+
 ## 5. 코드로 본 의심 지점 (측정 전 — 확인 필요)
 
 | # | 지점 | 왜 느릴 수 있나 | 확인 방법 |
@@ -108,6 +119,13 @@
 | S8 | 비회원 장바구니 요청마다 보안 저장소 읽기 | Android 보안 저장소 읽기가 느린 기기 있음(장바구니·홈 배달 안내) | 비회원으로 재기 |
 | S9 | 주문 줄 사진이 없을 때 줄마다 상품 조회 | BR-71 이전 응답이면 상품 수×2 요청 | 서버 응답에 `imageUrl` 있는지 |
 | S10 | 상품 상세 구획마다 따로 요청 | 스크롤하면 구획마다 새 요청(검색 2번·리뷰 2번·자격) — 내려갈 때 빈 칸이 잠깐 보임 | 스크롤 중 요청 시각 |
+
+## 7. 진행 (2026-11-25)
+- S2 배너: 서버 축소본(storefront 0.16.0 BR-99) `?w=` 360·720·1080·1440 — 홈 배너·팝업·로딩 화면 그림에 붙임(장당 약 2.2MB → 약 0.1MB).
+- S3 디스크 캐시: `cached_network_image ^4.0.7`(flutter_cache_manager 3.5.0). 모든 서버 사진을 `pmartNetworkImage`(`lib/shared/network_image.dart`)로 — `main.dart` 가 `pmartImageDiskCache = true`, 위젯 시험은 끈 채(플러그인 없음) 기본 NetworkImage. 서버 이미지는 ID 마다 불변·1년 immutable(백엔드 로딩 계획 회신 §5).
+- S4 시작 단계: `startPrefetchProvider` — 프로모션(1.5초는 그대로)이 떠 있는 동안 세션 확인 → 주소록 → 홈 조회를 미리 한다(앱이 listen). 화면 차례는 그대로.
+- S5: 두 번째 요청은 `/prices`(기간 할인·가격 미설정) — 백엔드에 상세에 함께 실어 달라고 요청(R-S5).
+- 아직: S1 profile 측정, S6 리뷰 자격 10쪽, S7 autoDispose 유지 시간, 토스 위젯 미리 띄우기(§4-1).
 
 ## 6. 관련 문서
 - 할 일 메모: 기기 측정(profile) — 이 PC 세션 메모리 `plan-loading-measure`

@@ -354,45 +354,40 @@ void main() {
     await t.pumpWidget(testApp(const [], cart: cart));
     await t.pumpAndSettle();
     await tapTile(t, 'P-0002');
+    // 상세 아래 [구매하기] → 옵션·수량 시트(사용자 레퍼런스 2026-11-25).
+    await t.tap(find.byKey(const ValueKey('product-buy')));
+    await t.pumpAndSettle();
 
-    await t.tap(find.byKey(const ValueKey('add-inc')));
+    // 레퍼런스 7-3 시트: 옵션 줄 수량 칸(0 부터) → [N개 담기]. 담으면 시트를 닫고 알린다.
+    expect(find.text('상품을 선택해 주세요'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('add-inc-E-00000002')));
     await t.pump();
+    expect(find.text('1개 담기'), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('add-to-cart')));
     await t.pumpAndSettle();
-
-    // 화면을 가리는 알림 대신 버튼이 잠깐 "담았어요"(사용자 2026-11-22).
-    expect(find.text('장바구니에 담았어요'), findsNothing);
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('add-to-cart')),
-        matching: find.text('담았어요'),
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('장바구니에 2개 있어요'), findsOneWidget);
-
-    // 잠시 뒤 원래 글자로 돌아온다.
-    await t.pump(const Duration(seconds: 2));
-    await t.pumpAndSettle();
-    expect(find.text('담았어요'), findsNothing);
+    expect(find.byKey(const ValueKey('buy-sheet')), findsNothing);
+    expect(find.text('장바구니에 담았어요'), findsOneWidget);
   });
 
   testWidgets('상세에서 상한 초과는 서버 상한으로 안내한다', (t) async {
     await t.pumpWidget(testApp(const [], cart: cart));
     await t.pumpAndSettle();
     await tapTile(t, 'P-0001');
+    // 상세 아래 [구매하기] → 옵션·수량 시트(사용자 레퍼런스 2026-11-25).
+    await t.tap(find.byKey(const ValueKey('product-buy')));
+    await t.pumpAndSettle();
 
-    // 이미 2개 담겨 있으므로 2개에서 시작한다(절대 수량).
-    expect(find.text('장바구니에 2개 있어요'), findsOneWidget);
-    for (var i = 0; i < 9; i++) {
-      await t.tap(find.byKey(const ValueKey('add-inc')));
+    // 시트는 더할 수량(0 부터). 11개는 서버 상한(낱개 10)을 넘는다.
+    for (var i = 0; i < 11; i++) {
+      await t.tap(find.byKey(const ValueKey('add-inc-E-00000001')));
       await t.pump();
     }
+    expect(find.text('11개 담기'), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('add-to-cart')));
     await t.pumpAndSettle();
 
     expect(find.textContaining('낱개 기준 10개까지'), findsOneWidget);
-    expect(find.text('장바구니에 2개 있어요'), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-sheet')), findsOneWidget);
   });
 
   group('장바구니 구성 보강(레퍼런스 반영 A)', () {

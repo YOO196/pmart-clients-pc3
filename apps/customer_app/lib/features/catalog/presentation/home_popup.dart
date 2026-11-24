@@ -9,6 +9,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/providers.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
+import '../../../shared/network_image.dart';
 
 /// 홈 팝업(storefront 0.9.0 배너 자리 POPUP — 백엔드 요청서 2026-11-21 ②). 서버는 기록하지 않고 앱이 bannerId 로 기억한다.
 /// 사용자 결정(2026-11-21): 가운데 카드(A). "오늘 그만 보기" = 오늘(서울 날짜) 동안 안 보임,
@@ -189,7 +190,15 @@ class _HomePopupDialogState extends ConsumerState<HomePopupDialog> {
                   onPageChanged: (i) => setState(() => _index = i),
                   itemBuilder: (context, i) {
                     final b = banners[i];
-                    final url = resolveImageUrl(b.imageUrl, origin);
+                    // 서버 축소본(BR-99) — 팝업은 화면 폭의 80% 안팎.
+                    final url = resolveImageUrl(
+                      withImageWidth(
+                        b.imageUrl,
+                        MediaQuery.sizeOf(context).width *
+                            MediaQuery.devicePixelRatioOf(context),
+                      ),
+                      origin,
+                    );
                     final canOpen =
                         b.link != BannerLink.none &&
                         (b.linkRef?.isNotEmpty ?? false);
@@ -216,7 +225,7 @@ class _HomePopupDialogState extends ConsumerState<HomePopupDialog> {
                             : null,
                         child: url == null
                             ? fallback
-                            : Image.network(
+                            : pmartNetworkImage(
                                 url,
                                 fit: BoxFit.contain,
                                 cacheWidth:

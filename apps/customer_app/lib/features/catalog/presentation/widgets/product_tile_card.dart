@@ -9,6 +9,7 @@ import '../../domain/catalog.dart';
 import 'discount_price.dart';
 import '../../../wishlist/presentation/wish_heart_button.dart';
 import 'quick_add_button.dart';
+import '../../../../shared/network_image.dart';
 
 /// 상품 이미지. 주소가 없거나 받지 못하면 자리표시를 그린다.
 class ProductImage extends ConsumerWidget {
@@ -52,7 +53,7 @@ class ProductImage extends ConsumerWidget {
       borderRadius: BorderRadius.circular(radius),
       child: u == null
           ? placeholder
-          : Image.network(
+          : pmartNetworkImage(
               u,
               width: size,
               height: h,
@@ -143,7 +144,11 @@ class ProductTileCard extends StatelessWidget {
     this.quickAdd = true,
     this.rail = false,
     this.highlight,
+    this.look = TileLook.standard,
   });
+
+  /// 글자·간격 모양(기본은 지금 그대로). 장바구니 추천 시트는 [TileLook.cartSheet].
+  final TileLook look;
 
   final ProductTile tile;
   final VoidCallback? onTap;
@@ -243,27 +248,42 @@ class ProductTileCard extends StatelessWidget {
           ),
         if (badge != null) Positioned(left: 0, top: 0, child: badge),
         // 찜 하트(customer 0.13.0) — 카드(상세 이동)와 따로 눌린다.
-        Positioned(
-          right: 5,
-          top: 5,
-          child: WishHeartButton(
-            key: ValueKey('tile-wish-${tile.productId}'),
-            productId: tile.productId,
-            size: 16,
-            onImage: true,
+        if (look.showWish)
+          Positioned(
+            right: 5,
+            top: 5,
+            child: WishHeartButton(
+              key: ValueKey('tile-wish-${tile.productId}'),
+              productId: tile.productId,
+              size: 16,
+              onImage: true,
+            ),
           ),
-        ),
         if (quickAdd && QuickAddButton.offeredFor(tile))
-          Positioned(right: 5, bottom: 5, child: QuickAddButton(tile: tile)),
+          Positioned(
+            right: 5,
+            bottom: 5,
+            child: QuickAddButton(
+              tile: tile,
+              size: look.addSize,
+              iconSize: look.addIconSize,
+            ),
+          ),
       ],
     );
     // 레퍼런스(3-2 TOP 30·신상품 카드): 이름 14sp 2줄 → 가격 14sp 굵게 → 회색 "100g당 999원" → 별점
     final info = <Widget>[
       HighlightedName(
-        name: tile.name,
+        // 단어 중간에서 줄을 바꾸지 않게(장바구니 추천 시트 — 레퍼런스는 띄어쓰기에서만 줄바꿈).
+        name: look.keepWords ? keepWordsTogether(tile.name) : tile.name,
         highlight: highlight,
         maxLines: 2,
-        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14, height: 1.25),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontSize: look.nameSize,
+          height: look.nameLineHeight,
+          color: look.dark ? theme.colorScheme.onSurface : null,
+          fontWeight: look.nameWeight,
+        ),
       ),
       const SizedBox(height: 4),
       // 기간 할인(ADR-0082 4단계): 레퍼런스 TOP 30 카드처럼 빨간 할인율 + 할인가(정가 취소선 없음). 서버 값만.
@@ -273,9 +293,10 @@ class ProductTileCard extends StatelessWidget {
           price: d.salePrice,
           ratePercent: d.ratePercent,
           showBase: false,
+          rateColor: look.rateColor ?? discountRateColor,
           style: theme.textTheme.titleMedium?.copyWith(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
+            fontSize: look.priceSize,
+            fontWeight: look.priceWeight,
           ),
         )
       else
@@ -287,8 +308,8 @@ class ProductTileCard extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleMedium?.copyWith(
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
+            fontSize: look.priceSize,
+            fontWeight: look.priceWeight,
           ),
         ),
       if (tile.unitPrice case final u?)
@@ -297,10 +318,25 @@ class ProductTileCard extends StatelessWidget {
           key: ValueKey('tile-unit-price-${tile.productId}'),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodySmall?.copyWith(fontSize: 10),
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontSize: look.unitSize,
+            fontWeight: look.unitWeight,
+            color: look.dark
+                ? theme.colorScheme.onSurface.withValues(alpha: 0.72)
+                : null,
+          ),
         ),
-      const SizedBox(height: 2),
-      RatingLine(rating: tile.rating, count: tile.reviewCount),
+      SizedBox(height: look.ratingGap),
+      // 장바구니 추천 시트는 평점이 없으면 줄을 비운다(레퍼런스).
+      if (!(look.hideNoRating && tile.rating == null))
+        RatingLine(rating: tile.rating, count: tile.reviewCount),
+      // "N개 남음"(BR-100 R7 — 서버가 10개 이하일 때만). 레퍼런스 7-1: 평점 아래 빨간 한 줄
+      // (Pretendard 보통 12, #FA4240). 안내일 뿐 확보가 아니다.
+      if (tile.lowStockQty case final left? when status == null) ...[
+        // 평점 글자 아래 끝 → 빨간 글자 위 끝 18px/1080(레퍼런스 7-1 실측).
+        const SizedBox(height: 2.5),
+        LowStockText(left, key: ValueKey('tile-low-stock-${tile.productId}')),
+      ],
       // 세로 목록(높이 고정 아님)만 아래 줄에 상태를 적는다. 칸 카드는 사진 위에 적었다.
       if (status != null && !rail) ...[
         const SizedBox(height: 4),
@@ -341,7 +377,7 @@ class ProductTileCard extends StatelessWidget {
                         ),
                       ),
                     imageOf(c.maxWidth),
-                    const SizedBox(height: 8),
+                    SizedBox(height: look.imageGap),
                     ...info,
                   ],
                 ),
@@ -460,4 +496,121 @@ class HighlightedName extends StatelessWidget {
       style: base,
     );
   }
+}
+
+/// 상품 칸 카드의 글자·간격 모양. [standard] 는 지금까지의 모양 그대로(홈·검색·카테고리).
+@immutable
+class TileLook {
+  const TileLook({
+    this.showWish = true,
+    this.nameLineHeight = 1.25,
+    this.priceSize = 14,
+    this.imageGap = 8,
+    this.ratingGap = 2,
+    this.addSize = 30,
+    this.addIconSize = 20,
+    this.dark = false,
+    this.unitSize = 10,
+    this.keepWords = false,
+    this.rateColor,
+    this.hideNoRating = false,
+    this.nameWeight,
+    this.priceWeight = FontWeight.w700,
+    this.unitWeight,
+    this.nameSize = 14,
+  });
+
+  static const standard = TileLook();
+
+  /// 장바구니 막대 펼친 시트(사용자 새 UI 2026-11-24, 폰 캡처 px ÷ 2.625 실측): 하트 없음, 사진 → 이름 7.2,
+  /// 이름 줄 21dp, 가격 13, 단위가격 → 평점 4.7, + 동그라미 32.4(+ 22), 이름·단위가격 진한 글자.
+  static const cartSheet = TileLook(
+    showWish: false,
+    nameLineHeight: 1.5,
+    priceSize: 13,
+    imageGap: 7.2,
+    ratingGap: 4.7,
+    addSize: 32.4,
+    addIconSize: 22,
+    dark: true,
+    unitSize: 10,
+    keepWords: true,
+    rateColor: Color(0xFFFF3E3E),
+    hideNoRating: true,
+    // 폰 캡처 3배 확대 비교(획 굵기): 이름은 SemiBold, 가격은 ExtraBold, 단위가격은 SemiBold.
+    nameWeight: FontWeight.w600,
+    priceWeight: FontWeight.w800,
+    unitWeight: FontWeight.w600,
+  );
+
+  /// 상품 상세 "다른 사람들이 함께 본 상품" 가로 진열(레퍼런스 2026-11-25 실측): 이름 15.8 보통·줄 1.25,
+  /// 가격 13.7 굵게, 단위가격 11.3, 하트 없음.
+  static const detailRail = TileLook(
+    showWish: false,
+    nameLineHeight: 1.25,
+    priceSize: 13.7,
+    imageGap: 7,
+    ratingGap: 2,
+    addSize: 32.4,
+    addIconSize: 22,
+    dark: true,
+    unitSize: 11.3,
+    keepWords: true,
+    rateColor: Color(0xFFFF3E3E),
+    hideNoRating: true,
+    nameSize: 15.8,
+    nameWeight: FontWeight.w400,
+    priceWeight: FontWeight.w800,
+    unitWeight: FontWeight.w500,
+  );
+
+  final bool showWish;
+  final double nameLineHeight;
+  final double priceSize;
+  final double imageGap;
+  final double ratingGap;
+  final double addSize;
+  final double addIconSize;
+
+  /// 이름·단위가격을 진한 글자로.
+  final bool dark;
+  final double unitSize;
+
+  /// 띄어쓰기에서만 줄을 바꾼다.
+  final bool keepWords;
+
+  /// 할인율 색(null 이면 기본 [discountRateColor]).
+  final Color? rateColor;
+
+  /// 평점이 없으면 "평점 정보 없음" 대신 줄을 비운다.
+  final bool hideNoRating;
+  final FontWeight? nameWeight;
+  final FontWeight priceWeight;
+  final FontWeight? unitWeight;
+  final double nameSize;
+}
+
+/// 글자 사이에 줄바꿈 금지 문자(U+2060)를 넣어 띄어쓰기에서만 줄이 바뀌게 한다(한글은 글자마다 줄이 바뀐다).
+String keepWordsTogether(String s) =>
+    s.split(' ').map((w) => w.characters.join('⁠')).join(' ');
+
+/// "N개 남음" 빨간 한 줄(레퍼런스 7-1 카드·7-3 구매 시트 — Pretendard 보통 12dp — 폭 103px/1080 실측, #FA4240).
+class LowStockText extends StatelessWidget {
+  const LowStockText(this.count, {super.key});
+
+  final int count;
+
+  static const color = Color(0xFFFA4240);
+
+  @override
+  Widget build(BuildContext context) => Text(
+    AppLocalizations.of(context).stockLeft(count),
+    maxLines: 1,
+    style: const TextStyle(
+      fontSize: 12,
+      height: 1.25,
+      fontWeight: FontWeight.w400,
+      color: color,
+    ),
+  );
 }

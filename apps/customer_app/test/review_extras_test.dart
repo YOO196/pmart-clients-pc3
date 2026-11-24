@@ -72,21 +72,11 @@ void main() {
     expect(repo.productQueries.last.sort, ReviewSort.recommended);
     expect(find.text('도움돼요 많은순'), findsOneWidget);
   });
-  testWidgets('옵션이 2개 이상인 상품만 옵션 필터 — 고르면 그 SKU 로 묻는다', (t) async {
+  testWidgets('새 레퍼런스(2026-11-25)에는 옵션 필터가 없다 — 옵션이 여럿이어도', (t) async {
     final repo = MockReviewsRepository(latency: Duration.zero);
     await open(t, repo, 'P-0001'); // 서울우유: 1개·2개 묶음
-    expect(key('review-option-open'), findsOneWidget);
-    await t.tap(key('review-option-open'));
-    await t.pumpAndSettle();
-    await t.tap(key('review-option-B-00000011'));
-    await t.pumpAndSettle();
-    expect(repo.productQueries.last.sku, 'B-00000011');
-    expect(t.widget<Text>(key('review-option-label')).data, '2개 묶음');
-    await t.tap(key('review-option-open'));
-    await t.pumpAndSettle();
-    await t.tap(key('review-option-all'));
-    await t.pumpAndSettle();
-    expect(repo.productQueries.last.sku, isNull);
+    expect(key('review-option-open'), findsNothing);
+    expect(repo.productQueries.every((q) => q.sku == null), isTrue);
   });
 
   testWidgets('옵션이 하나인 상품은 옵션 필터가 없다', (t) async {
@@ -283,7 +273,7 @@ void main() {
     expect(t.takeException(), isNull);
     expect(key('product-price'), findsOneWidget);
   });
-  testWidgets('리뷰 사진 → 사진 후기 → [구매하기]로 상품 상세, 도움돼요는 카드 오른쪽', (t) async {
+  testWidgets('리뷰 사진 → 사진 후기 → [구매하기]로 상품 상세, 도움돼요는 카드 왼쪽', (t) async {
     final repo = MockReviewsRepository(latency: Duration.zero);
     await open(t, repo, 'P-0001');
     // 만든 리뷰 0번은 사진 리뷰
@@ -301,9 +291,9 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     expect(
-      t.getTopRight(button).dx,
-      closeTo(t.getTopRight(card).dx - 16, 1),
-      reason: '카드 오른쪽 여백(16) 안쪽 끝',
+      t.getTopLeft(button).dx,
+      closeTo(t.getTopLeft(card).dx + 16.7, 1),
+      reason: '사용자 레퍼런스 2026-11-25 — 도움돼요는 카드 왼쪽(여백 16.7)',
     );
     await t.scrollUntilVisible(
       photo,

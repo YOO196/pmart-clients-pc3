@@ -18,9 +18,18 @@ import '../../../../shared/notice.dart';
 
 /// 상품 카드의 `+` 바로 담기(Commerce §6.11). 담기 흐름은 [quickAddProduct].
 class QuickAddButton extends ConsumerStatefulWidget {
-  const QuickAddButton({super.key, required this.tile});
+  const QuickAddButton({
+    super.key,
+    required this.tile,
+    this.size = 30,
+    this.iconSize = 20,
+  });
 
   final ProductTile tile;
+
+  /// 동그라미 지름·+ 크기(기본 30·20). 장바구니 추천 시트는 실측 32.4·22.
+  final double size;
+  final double iconSize;
 
   /// `+` 를 보여도 되는지(안내용). 확정은 장바구니 서버 판정.
   static bool offeredFor(ProductTile t) =>
@@ -48,17 +57,17 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     return SizedBox.square(
-      dimension: 30,
+      dimension: widget.size,
       child: IconButton.filledTonal(
         key: ValueKey('quick-add-${widget.tile.productId}'),
         tooltip: l10n.quickAddTooltip,
         padding: EdgeInsets.zero,
-        iconSize: 20,
+        iconSize: widget.iconSize,
         style: IconButton.styleFrom(
           backgroundColor: scheme.surface,
           elevation: 2,
           shadowColor: Colors.black38,
-          minimumSize: const Size.square(30),
+          minimumSize: Size.square(widget.size),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
         onPressed: _busy ? null : _onPressed,
@@ -68,9 +77,9 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             // 레퍼런스: + 약 13dp, 굵은 선(약 1.7dp)
-            : const PmartLineIcon(
+            : PmartLineIcon(
                 PmartLineIcons.plus,
-                size: 20,
+                size: widget.iconSize,
                 strokeWidth: 2.4,
               ),
       ),

@@ -11,6 +11,7 @@ import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../checkout/presentation/checkout_controller.dart'
     show clockProvider;
+import '../../catalog/presentation/catalog_providers.dart' show homeProvider;
 import '../data/device_consents_repository.dart';
 import '../data/splash_promo.dart';
 import '../data/start_store.dart';
@@ -170,6 +171,17 @@ class SplashHold extends Notifier<bool> {
     state = false;
   }
 }
+
+/// 로딩 화면(프로모션 최소 1.5초)이 떠 있는 동안 홈에 필요한 것을 미리 읽는다 — 예전에는 차례로 기다렸다:
+/// 프로모션 → 세션 확인 → 주소록 → 홈 조회(로딩 구조 S4, 사용자 2026-11-25 "응").
+/// 세션 확인이 끝난 뒤 주소록을(회원·비회원 주소록이 달라 먼저 읽으면 두 번 읽는다), 주소록이 온 뒤 홈을
+/// 읽는다(쇼핑 센터가 정해져야 홈이 한 번에 맞다). 앱(`app.dart`)이 listen 한다 — 결과로 화면을 바꾸지 않는다.
+final startPrefetchProvider = Provider<void>((ref) {
+  if (ref.watch(sessionRestoreProvider).isLoading) return;
+  final book = ref.watch(addressBookProvider);
+  if (!book.hasValue) return;
+  ref.listen(homeProvider, (_, _) {});
+});
 
 final startStepProvider = Provider<StartStep>((ref) {
   if (!ref.watch(startGateEnabledProvider)) return StartStep.ready;

@@ -144,7 +144,7 @@ base class MockCheckoutRepository
       };
     }
 
-    return optionsFromContract(
+    final options = optionsFromContract(
       api.DeliveryOptions.fromJson({
         'mfcId': mfcId,
         'evaluatedAt': now().toUtc().toIso8601String(),
@@ -155,6 +155,18 @@ base class MockCheckoutRepository
         ],
       }),
     );
+    // 계약에 없는 안내 값(BR-96): 최소 주문 15,000·3만 원 이상 배달팁 0원·운영 08:00~24:00 — 서버 정책 흉내.
+    return [
+      for (final o in options)
+        o.withGuide(
+          minOrderAmount: 15000,
+          tipTiers: [
+            (fromAmount: 30000, tip: 0),
+            (fromAmount: 15000, tip: o.tip?.base ?? 0),
+          ],
+          serviceHours: (start: '08:00', end: '24:00'),
+        ),
+    ];
   }
 
   @override

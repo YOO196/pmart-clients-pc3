@@ -86,6 +86,7 @@ class Cart {
     this.mfcId,
     this.selectedItemAmount,
     this.selectedDiscountAmount,
+    this.selectedListAmount,
     this.minOrderAmount,
     this.minOrderShortfall,
     this.expiresAt,
@@ -105,6 +106,9 @@ class Cart {
 
   /// 선택 품목 기간 할인 합계(cart 0.4.0 — [selectedItemAmount] 는 이미 할인 뒤). 없으면 null.
   final int? selectedDiscountAmount;
+
+  /// 선택 품목 기간 할인 **전** 합계(cart 0.5.0 BR-97). 없으면 null.
+  final int? selectedListAmount;
 
   /// 최소 주문 금액(cart 0.2.0, 안내용 — 최종 판정은 주문서 견적).
   final int? minOrderAmount;
@@ -148,6 +152,7 @@ class Cart {
       mfcId: mfcId,
       selectedItemAmount: null,
       selectedDiscountAmount: null,
+      selectedListAmount: null,
       minOrderAmount: minOrderAmount,
       minOrderShortfall: null,
       expiresAt: expiresAt,

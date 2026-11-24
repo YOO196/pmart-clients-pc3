@@ -31,12 +31,17 @@ class ProductTile {
     this.unitPrice,
     this.discount,
     this.soldOut = false,
+    this.lowStockQty,
   });
 
   /// 목록 카드 품절(search 0.10.0 `SearchHit.availability`·storefront 0.13.0 `DisplayItem.availability` = SOLD_OUT —
   /// 그 센터가 취급하는 옵션이 모두 품절). UNKNOWN·null(센터 모름·조회 실패)은 false — 품절이라고 하지 않는다.
   /// 목록 순서는 바꾸지 않는다(백엔드 회신 2026-11-23 "거르지도 줄 세우지도 않는다").
   final bool soldOut;
+
+  /// "N개 남음"(storefront 0.18.0·search 0.14.0 BR-100 R7) — 넉넉한 옵션이 없고 남은 게 적을 때(10개 이하)만.
+  /// 안내일 뿐 확보가 아니다. 없으면 null.
+  final int? lowStockQty;
 
   /// 기간 할인(storefront 0.8.0·search 0.6.0, ADR-0082 4단계). 없으면 정가만 보인다. 결제 금액은 주문서 견적.
   final SaleDiscount? discount;
@@ -435,10 +440,14 @@ class SaleOption {
     this.carried,
     this.unitPrice,
     this.discount,
+    this.lowStockQty,
   });
 
   /// 기간 할인(pricing 0.3.0 `discount`). 없거나 모르면(discountAvailable=false) null — 정가만.
   final SaleDiscount? discount;
+
+  /// 남은 수량(product-content 0.10.0 BR-100 R7 — availability LOW 일 때만, 10개 이하).
+  final int? lowStockQty;
 
   /// "100g당 999원"(product-content `unitPrice`, 서버 계산). 없으면 줄을 그리지 않는다.
   final UnitPrice? unitPrice;
@@ -527,6 +536,9 @@ class ProductDetail {
     this.storageGuide,
     this.returnGuide,
     this.notices = const [],
+    this.origin,
+    this.expiryGuide,
+    this.legalInfo,
     this.categoryPath = const [],
     this.rating,
     this.nutrition,
@@ -577,6 +589,15 @@ class ProductDetail {
   final String? storageGuide;
   final String? returnGuide;
   final List<String> notices;
+
+  /// 원산지 값(product-content 0.9.0 BR-100 R1). 없으면 null.
+  final String? origin;
+
+  /// 소비기한·제조일 안내 값(0.9.0 R1). 없으면 null.
+  final String? expiryGuide;
+
+  /// 상품정보제공고시 표(0.9.0 R1 — notices 줄 순서, ":" 없으면 label null). 옛 응답이면 null.
+  final List<({String? label, String value})>? legalInfo;
   final List<String> categoryPath;
 
   /// 집계 없음·실패는 null. 0점·0건으로 표시하지 않는다.

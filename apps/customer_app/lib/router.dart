@@ -20,6 +20,7 @@ import 'features/checkout/presentation/delivery_select_screen.dart';
 import 'features/checkout/presentation/order_sheet_screen.dart';
 import 'features/claims/presentation/claims_screens.dart';
 import 'features/claims/presentation/my_claims_screen.dart';
+import 'features/claims/presentation/return_request_screens.dart';
 import 'features/catalog/domain/catalog.dart' show ProductTile;
 import 'features/catalog/presentation/category_screen.dart';
 import 'features/notifications/presentation/notifications_screens.dart';
@@ -217,6 +218,29 @@ final routerProvider = Provider<GoRouter>((ref) {
                         builder: (_, state) => OrderHelpScreen(
                           orderId: state.pathParameters['orderId']!,
                         ),
+                      ),
+                      // 반품·교환 신청(레퍼런스 12, BR-95 — 계약 전까지 목). 어떤 처리 → 신청서.
+                      _slide(
+                        parentNavigatorKey: rootNavigatorKey,
+                        path: 'return-exchange',
+                        builder: (_, state) => ReturnExchangeEntryScreen(
+                          orderId: state.pathParameters['orderId']!,
+                        ),
+                        routes: [
+                          _slide(
+                            parentNavigatorKey: rootNavigatorKey,
+                            path: ':type',
+                            redirect: (_, state) =>
+                                rrTypeOfSlug(state.pathParameters['type']) ==
+                                    null
+                                ? '/orders/${state.pathParameters['orderId']}/return-exchange'
+                                : null,
+                            builder: (_, state) => ReturnRequestFormScreen(
+                              orderId: state.pathParameters['orderId']!,
+                              type: rrTypeOfSlug(state.pathParameters['type'])!,
+                            ),
+                          ),
+                        ],
                       ),
                       // 주문 단위 배송 현황 — 배송 ID 를 몰라도 지도부터 뜬다(BR-61).
                       _slide(

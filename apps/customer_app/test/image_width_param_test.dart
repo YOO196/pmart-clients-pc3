@@ -30,4 +30,15 @@ void main() {
     expect(withImageWidth(photo, 720), '$photo?w=720');
     expect(withImageWidth('$photo?w=240', 720), '$photo?w=240');
   });
+
+  // 백엔드 회신 2026-11-25 BR-99(storefront 0.16.0): 배너 그림 축소본 360·720·1080·1440 JPEG.
+  test('배너 그림은 360·720·1080·1440 단계로 ?w= 를 붙인다', () {
+    const banner = '/api/v1/storefront/banner-images/BIMG-1';
+    expect(withImageWidth(banner, 300), '$banner?w=360');
+    expect(withImageWidth(banner, 700), '$banner?w=720');
+    expect(withImageWidth(banner, 1079), '$banner?w=1080');
+    expect(withImageWidth(banner, 1200), '$banner?w=1440');
+    expect(withImageWidth(banner, 3000), '$banner?w=1440');
+    expect(withImageWidth('$banner?w=720', 1080), '$banner?w=720');
+  });
 }

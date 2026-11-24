@@ -220,16 +220,45 @@ abstract class _EligibilityList
   ReviewState? get serverState;
   bool keep(ReviewEligibility e);
 
+  /// 앱이 거르는 목록("작성한 리뷰" — 서버 state 하나로 못 묻는다)은 한 쪽에 남는 것이 적거나 없을 수 있다.
+  /// 그래서 [_fill] 개가 모이거나 끝날 때까지 다음 쪽을 이어 읽는다(최대 [_maxPages] 쪽 — 끝없이 돌지 않게).
+  /// 첫 쪽만 거르던 때는 새 주문(다른 센터 주문 등)의 품목이 첫 쪽을 채우면 내가 쓴 리뷰가 다음 쪽에 있어도
+  /// "작성한 리뷰가 없어요"로 보였다(사용자 2026-11-25 "mfc 바꾸니까 내가 쓴 리뷰 안 보이더라").
+  static const _fill = 10;
+  static const _maxPages = 10;
+
+  Future<
+    ({List<ReviewEligibility> items, String? nextCursor, ReviewCounts? counts})
+  >
+  _readKept(
+    ReviewsRepository repo, {
+    String? cursor,
+    Set<String> seen = const {},
+  }) async {
+    final out = <ReviewEligibility>[];
+    final ids = {...seen};
+    ReviewCounts? counts;
+    var next = cursor;
+    for (var i = 0; i < _maxPages; i++) {
+      final page = await repo.eligibilities(state: serverState, cursor: next);
+      counts ??= page.counts;
+      for (final e in page.items) {
+        if (keep(e) && ids.add(e.orderLineId)) out.add(e);
+      }
+      next = page.nextCursor;
+      if (next == null || out.length >= _fill) break;
+    }
+    return (items: out, nextCursor: next, counts: counts);
+  }
+
   @override
   Future<PagedList<ReviewEligibility>?> build() async {
     if (ref.watch(sessionProvider) is! MemberSession) return null;
-    final page = await ref
-        .watch(reviewsRepositoryProvider)
-        .eligibilities(state: serverState);
+    final r = await _readKept(ref.watch(reviewsRepositoryProvider));
     return PagedList(
-      items: page.items.where(keep).toList(),
-      nextCursor: page.nextCursor,
-      counts: page.counts,
+      items: r.items,
+      nextCursor: r.nextCursor,
+      counts: r.counts,
     );
   }
 
@@ -240,20 +269,16 @@ abstract class _EligibilityList
       current.copyWith(nextCursor: current.nextCursor, loadingMore: true),
     );
     try {
-      final page = await ref
-          .read(reviewsRepositoryProvider)
-          .eligibilities(state: serverState, cursor: current.nextCursor);
+      final r = await _readKept(
+        ref.read(reviewsRepositoryProvider),
+        cursor: current.nextCursor,
+        seen: {for (final e in current.items) e.orderLineId},
+      );
       if (!ref.mounted) return;
-      final seen = {for (final e in current.items) e.orderLineId};
       state = AsyncData(
         current.copyWith(
-          items: [
-            ...current.items,
-            ...page.items.where(
-              (e) => keep(e) && !seen.contains(e.orderLineId),
-            ),
-          ],
-          nextCursor: page.nextCursor,
+          items: [...current.items, ...r.items],
+          nextCursor: r.nextCursor,
         ),
       );
     } on PmartFailure catch (e) {

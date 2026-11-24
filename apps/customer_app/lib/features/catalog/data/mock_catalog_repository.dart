@@ -238,6 +238,9 @@ base class MockCatalogRepository implements CatalogRepository {
     },
   };
 
+  /// 목 "N개 남음" 수(BR-100 R7 — 서버 임계 10 이하).
+  static const lowStockQty = 3;
+
   static Map<String, Object?> displayItemJson(MockProduct p) => {
     'productId': p.productId,
     'name': p.name,
@@ -248,6 +251,8 @@ base class MockCatalogRepository implements CatalogRepository {
     'carried': true,
     // 목록 카드 품절(search 0.10.0·storefront 0.13.0): 모든 옵션 품절이면 SOLD_OUT.
     'availability': p.availability == 'SOLD_OUT' ? 'SOLD_OUT' : 'AVAILABLE',
+    // "N개 남음"(storefront 0.18.0·search 0.14.0 BR-100 R7) — LOW 상품만.
+    if (p.availability == 'LOW') 'lowStockQty': lowStockQty,
     'rating': ?p.rating,
     'reviewCount': ?p.reviewCount,
     'badge': p.newness > 0 ? 'NEW' : 'NONE',
@@ -427,6 +432,24 @@ base class MockCatalogRepository implements CatalogRepository {
         tab == null || tab == HomeTab.home ? homeJson() : tabJson(tab),
       ),
     );
+  }
+
+  /// 목: 같은 카테고리의 다른 상품(가격 낮은 순)으로 흉내 낸다 — 화면 모양 확인용.
+  @override
+  Future<List<ProductTile>> boughtTogether(
+    String productId, {
+    String? mfcId,
+  }) async {
+    final me = mockProducts.where((p) => p.productId == productId).firstOrNull;
+    if (me == null) return const [];
+    final page = await search(
+      ProductQuery(categoryId: me.categoryId, sort: SortKey.priceAsc),
+      mfcId: mfcId,
+    );
+    return [
+      for (final t in page.items)
+        if (t.productId != productId) t,
+    ];
   }
 
   @override
@@ -1063,7 +1086,11 @@ base class MockCatalogRepository implements CatalogRepository {
         'capacityLabel': p.capacity,
         'saleState': p.saleState,
         'price': {'basePrice': p.price, 'priceVersion': 1},
-        'availability': {'carried': true, 'state': p.availability},
+        'availability': {
+          'carried': true,
+          'state': p.availability,
+          if (p.availability == 'LOW') 'lowStockQty': lowStockQty,
+        },
         ...?_unitPriceJson(p),
       },
       if (p.bundleSku != null)

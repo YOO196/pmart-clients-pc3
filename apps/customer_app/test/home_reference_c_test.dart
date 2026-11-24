@@ -136,6 +136,25 @@ base class _CountingCart extends MockCartRepository {
   }
 }
 
+/// 계약 그대로의 배송 방식(최소 주문·배달팁 구간·운영 시간 없음 — BR-96 전 실서버 모양).
+final class _NoGuide extends MockCheckoutRepository {
+  _NoGuide() : super(latency: Duration.zero);
+
+  @override
+  Future<List<DeliveryOption>> options(String mfcId, {int? itemAmount}) async =>
+      [
+        for (final o in await super.options(mfcId, itemAmount: itemAmount))
+          DeliveryOption(
+            o.mode,
+            availability: o.availability,
+            reason: o.reason,
+            eta: o.eta,
+            tip: o.tip,
+            earliestSlot: o.earliestSlot,
+          ),
+      ];
+}
+
 Future<void> _login(WidgetTester t) async {
   await t.tap(find.text('마이페이지').last);
   await t.pumpAndSettle();
@@ -158,41 +177,112 @@ void main() {
   setUpAll(initPmartFormatting);
 
   group('홈 배송 방식 요약', () {
-    testWidgets('서버 예상시간·기본 배달팁·가장 빠른 예약 시간을 그대로 보인다', (t) async {
+    testWidgets('지금 방식(알뜰 먼저)·예상시간·최소주문 한 줄, 배달팁 0원 줄, [배달안내] 시트(서버 값 그대로)', (
+      t,
+    ) async {
+      _tallView(t);
       await t.pumpWidget(testApp(const []));
       await t.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('home-delivery-card')), findsOneWidget);
-      // 예상시간(굵게)과 기본 배달팁(주 색)을 두 줄로 보인다. 값은 서버 값 그대로.
-      for (final text in ['약 30~60분', '기본 배달팁 4,000원']) {
-        expect(
-          find.descendant(
-            of: find.byKey(const ValueKey('home-delivery-single')),
-            matching: find.text(text),
-          ),
-          findsOneWidget,
-        );
-      }
-      // 나머지 방식은 화살표로 펼친다.
-      expect(find.byKey(const ValueKey('home-delivery-bundled')), findsNothing);
-      await t.ensureVisible(find.byKey(const ValueKey('home-delivery-toggle')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const ValueKey('home-delivery-toggle')));
-      await t.pumpAndSettle();
+      final now = find.byKey(const ValueKey('home-delivery-now'));
       expect(
-        find.byKey(const ValueKey('home-delivery-bundled')),
+        find.descendant(of: now, matching: find.textContaining('알뜰배달 60~120분')),
         findsOneWidget,
       );
       expect(
+        find.descendant(of: now, matching: find.textContaining('최소주문 15,000원')),
+        findsOneWidget,
+      );
+      expect(find.text('30,000원부터 배달팁 0원'), findsOneWidget);
+      expect(find.byKey(const ValueKey('home-night-notice')), findsNothing);
+      // 비회원은 쿠폰 줄이 없다.
+      expect(find.byKey(const ValueKey('home-coupon')), findsNothing);
+
+      await t.tap(find.byKey(const ValueKey('home-delivery-guide')));
+      await t.pumpAndSettle();
+      final sheet = find.byKey(const ValueKey('delivery-guide-sheet'));
+      expect(sheet, findsOneWidget);
+      expect(
         find.descendant(
-          of: find.byKey(const ValueKey('home-delivery-scheduled')),
-          matching: find.textContaining('가장 빠른 시간'),
+          of: sheet,
+          matching: find.textContaining('배달 운영 시간 오전 8:00 ~ 오전 12:00'),
         ),
         findsOneWidget,
       );
-      expect(find.byKey(const ValueKey('home-night-notice')), findsNothing);
-      // 상품액 없이 물었으므로 무료로 보이지 않는다.
-      expect(find.textContaining('무료'), findsNothing);
+      expect(
+        find.byKey(const ValueKey('delivery-guide-single')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('delivery-guide-bundled')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: sheet, matching: find.text('30~60분')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: sheet, matching: find.text('배달팁 0원')),
+        findsNWidgets(2),
+      );
+      expect(
+        find.descendant(of: sheet, matching: find.text('4,000원')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: sheet, matching: find.text('3,000원')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('배달팁 구간·최소주문이 없으면(지금 실서버 계약) 그 조각을 빼고 기본 배달팁만', (t) async {
+      _tallView(t);
+      await t.pumpWidget(testApp(const [], checkout: _NoGuide()));
+      await t.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('home-delivery-now')), findsOneWidget);
+      expect(find.byKey(const ValueKey('home-free-tip')), findsNothing);
+      await t.tap(find.byKey(const ValueKey('home-delivery-guide')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('delivery-guide-hours')), findsNothing);
+      expect(find.text('기본 배달팁'), findsNWidgets(2));
+      expect(find.text('배달팁 0원'), findsNothing);
+    });
+
+    testWidgets('회원: 쿠폰 줄을 누르면 "할인받고 주문해요" — [한번에 받기]로 받을 수 있는 쿠폰을 받는다', (
+      t,
+    ) async {
+      _tallView(t);
+      await t.pumpWidget(testApp(const []));
+      await t.pumpAndSettle();
+      await _login(t);
+
+      final row = find.byKey(const ValueKey('home-coupon'));
+      await t.ensureVisible(row);
+      await t.pumpAndSettle();
+      expect(
+        find.descendant(of: row, matching: find.text('[목] 주말 장보기 3천원 할인')),
+        findsOneWidget,
+      );
+      await t.tap(row);
+      await t.pumpAndSettle();
+      expect(find.text('할인받고 주문해요'), findsOneWidget);
+      expect(find.byKey(const ValueKey('campaign-PRM-MOCK-1')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('coupon-sheet-all')));
+      await t.pumpAndSettle();
+      // 받은 뒤에는 받을 쿠폰이 없어 버튼이 잠기고, 홈 쿠폰 줄도 사라진다.
+      expect(
+        t
+            .widget<FilledButton>(
+              find.byKey(const ValueKey('coupon-sheet-all')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await t.tap(find.byKey(const ValueKey('coupon-sheet-close')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('home-coupon')), findsNothing);
     });
 
     testWidgets('심야(NIGHT_TIME)면 예약만 안내하고 가장 빠른 시간을 보인다', (t) async {
@@ -218,12 +308,8 @@ void main() {
         find.descendant(of: notice, matching: find.textContaining('가장 빠른 시간')),
         findsOneWidget,
       );
-      // 막힌 방식 줄은 안내가 대신한다.
-      expect(find.byKey(const ValueKey('home-delivery-single')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('home-delivery-scheduled')),
-        findsOneWidget,
-      );
+      // 막힌 방식 대신 안내가 보인다.
+      expect(find.byKey(const ValueKey('home-delivery-now')), findsNothing);
     });
 
     testWidgets('조회 실패는 0원·무료가 아니라 실패 한 줄이고 다시 확인할 수 있다', (t) async {
@@ -593,11 +679,8 @@ void main() {
       await t.tap(find.byKey(const ValueKey('quick-add-P-0001')));
       await t.pumpAndSettle();
       expect(cart.adds, isEmpty);
-      await t.scrollUntilVisible(
-        find.byKey(const ValueKey('option-B-00000011')),
-        200,
-        scrollable: find.byType(Scrollable).last,
-      );
+      // 상세에서 [구매하기] → 옵션 시트(사용자 레퍼런스 2026-11-25).
+      await t.tap(find.byKey(const ValueKey('product-buy')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('option-B-00000011')), findsOneWidget);
     });

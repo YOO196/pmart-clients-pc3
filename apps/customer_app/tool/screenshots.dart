@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:customer_app/features/auth/domain/auth.dart' show SocialProvider;
 import 'package:customer_app/features/support/data/mock_inquiries_repository.dart';
 import 'package:customer_app/features/support/domain/inquiry.dart';
 import 'package:customer_app/features/support/presentation/inquiry_controller.dart'
@@ -27,6 +28,10 @@ import 'package:customer_app/features/profile/presentation/profile_photo.dart';
 import 'package:customer_app/l10n/gen/app_localizations.dart';
 
 import 'package:customer_app/app.dart';
+import 'package:customer_app/features/catalog/presentation/product_detail_sections.dart';
+import 'package:customer_app/features/catalog/presentation/catalog_providers.dart' show productDetailProvider;
+import 'package:customer_app/shared/cart_recommendations.dart';
+import 'package:customer_app/features/catalog/domain/catalog.dart';
 import 'package:customer_app/features/withdrawal/data/withdrawal_repository.dart';
 import 'package:customer_app/features/withdrawal/presentation/withdrawal_screen.dart';
 import 'package:customer_app/shared/shopping_context.dart'
@@ -108,6 +113,7 @@ Future<void> _loadFonts() async {
   const f = 'assets/fonts';
   await _font('Pretendard', [
     '$f/Pretendard-Regular.otf',
+    '$f/Pretendard-Medium.otf',
     '$f/Pretendard-SemiBold.otf',
     '$f/Pretendard-Bold.otf',
     '$f/Pretendard-ExtraBold.otf',
@@ -1046,6 +1052,45 @@ void main() {
 
   // 카테고리 레퍼런스 3-3 보강(사용자 2026-11-22): 맨 위 CATEGORY 배너, 아래 추천 타일·고객센터.
   // 상품 카드 + 로 담으면 알림 대신 아래 장바구니 막대가 알린다.
+  // "N개 남음"(BR-100 R7) — 목 감귤(LOW, 3개 남음) 검색 결과 카드.
+  testWidgets('low-stock', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 2.625;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    GoRouter.of(t.element(find.byType(Scaffold).first)).go('/search');
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('search-field')), '감귤');
+    await t.tap(find.byKey(const ValueKey('search-submit')));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/low-stock.png').uri),
+    );
+    // 상품페이지 알림(레퍼런스 7-2)·구매 시트(7-3) — 같은 배율(2.625)로 화면 높이 2340.
+    t.view.physicalSize = const Size(1080, 2340);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('tile-P-0003')));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/low-stock-detail.png').uri),
+    );
+    await t.tap(find.byKey(const ValueKey('product-buy')));
+    await t.pumpAndSettle();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/low-stock-sheet.png').uri),
+    );
+    await t.pump(const Duration(seconds: 4));
+    await t.pumpAndSettle();
+  });
+
   testWidgets('category-picks', (t) async {
     if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
     Directory(_dir).createSync(recursive: true);
@@ -1114,7 +1159,10 @@ void main() {
         const [],
         profile: MockProfileRepository(latency: Duration.zero)
           ..nickname = '김피마'
+          ..name = '김피마'
           ..email = 'pmart.user@gmail.com'
+          // 가입 방식 배지(백엔드 요청 2026-11-25) — 네이버 계정에 gmail 연락처 이메일.
+          ..socialProvider = SocialProvider.naver
           // 사진 시트 4항목이 다 보이게 직접 올린 사진 상태로 둔다.
           ..photoSource = ProfilePhotoSource.custom,
       ),
@@ -1134,6 +1182,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('login-kakao')));
     await t.pumpAndSettle();
+    await shot('0-my');
     await t.tap(find.byKey(const ValueKey('my-info')));
     await shot('1-list');
     await t.tap(find.byKey(const ValueKey('info-name-row')));
@@ -1364,6 +1413,408 @@ void main() {
       router.pop();
       await t.pumpAndSettle();
     }
+  });
+  // 상품 상세 1:1(사용자 레퍼런스 2026-11-25 `5. 상품페이지 전체`) — 레퍼런스와 같은 이름·값을 넣어 글자 폭·위치를 그대로 잰다.
+  testWidgets('product-page-ref', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    debugDisableShadows = false;
+    ProductTile tile(
+      String id,
+      String name,
+      int price, {
+      int? sale,
+      int? rate,
+      int? unit,
+      String unitLabel = 'ml',
+      int basis = 10,
+      double? rating,
+      int? reviews,
+    }) => ProductTile(
+      productId: id,
+      name: name,
+      representativeSku: 'SKU-$id',
+      saleState: SaleState.onSale,
+      carried: true,
+      basePrice: price,
+      discount: sale == null
+          ? null
+          : SaleDiscount(salePrice: sale, ratePercent: rate),
+      unitPrice: unit == null
+          ? null
+          : UnitPrice(basis: basis, unitLabel: unitLabel, price: unit),
+      rating: rating,
+      reviewCount: reviews,
+    );
+    final viewed = [
+      tile(
+        'V1',
+        '[냉동]벤앤제리스 초콜릿 칩 쿠키도우 473ml',
+        16990,
+        sale: 10900,
+        rate: 35,
+        unit: 230,
+        rating: 4.8,
+        reviews: 2430,
+      ),
+      tile(
+        'V2',
+        '[냉동]벤앤제리스 카라멜 수트라 코어 473ml',
+        16990,
+        sale: 10900,
+        rate: 35,
+        unit: 230,
+        rating: 4.9,
+        reviews: 4649,
+      ),
+      tile(
+        'V3',
+        '[골라담기] 9월의 신상간식 12종',
+        1490,
+        unit: 186,
+        unitLabel: 'g',
+        rating: 4.9,
+        reviews: 1724,
+      ),
+      tile(
+        'V4',
+        '[냉동]벤앤제리스 뉴욕 슈퍼 퍼지 청크 473ml',
+        16990,
+        sale: 10900,
+        rate: 35,
+        unit: 230,
+        rating: 4.8,
+        reviews: 900,
+      ),
+    ];
+    final rated = [
+      tile(
+        'T1',
+        '[냉동]스키니피그 슈퍼노바 초코 크런치 저당 파인트 아이스크림',
+        7900,
+        sale: 5530,
+        rate: 30,
+        rating: 4.8,
+        reviews: 3956,
+      ),
+      tile(
+        'T2',
+        '[냉동]스키니피그 제주말차 저당 파인트 아이스크림 474ml',
+        7990,
+        sale: 5590,
+        rate: 30,
+        rating: 4.9,
+        reviews: 2503,
+      ),
+      tile(
+        'T3',
+        '[냉동]스키니피그 밀크초코 저당 파인트 아이스크림 474ml',
+        7990,
+        sale: 5590,
+        rate: 30,
+        rating: 4.9,
+        reviews: 2389,
+      ),
+      tile(
+        'T4',
+        '[냉동]스키니피그 쿠키앤크림 저당 파인트',
+        7990,
+        sale: 5590,
+        rate: 30,
+        rating: 4.8,
+        reviews: 1000,
+      ),
+    ];
+    final detail = ProductDetail(
+      productId: 'P-REF',
+      name: '[냉동]벤앤제리스 파인트 10종',
+      options: const [
+        SaleOption(
+          sku: 'SKU-REF',
+          availability: Availability.available,
+          carried: true,
+          basePrice: 16990,
+          discount: SaleDiscount(salePrice: 10900, ratePercent: 35),
+          unitPrice: UnitPrice(basis: 10, unitLabel: 'ml', price: 230),
+        ),
+      ],
+      storageGuide: '냉동',
+      notices: const [
+        '원산지: 상세정보 참고',
+        '제조연월일, 소비기한 또는 품질유지기한: 주문일 기준 432일 이내 제조된 상품, 소비기한 또는 품질유지기한 상세설명 참조 (일부 식품유형 제외)',
+      ],
+      description: '벤앤제리스 모음 1',
+      categoryPath: const ['C-MILK'],
+      rating: const RatingSummary(average: 4.9, count: 1713),
+      returnGuide: '반품·교환 안내',
+    );
+    t.view
+      ..physicalSize = const Size(1080, 15738)
+      ..devicePixelRatio = 2.625;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      testApp([
+        productDetailProvider('P-REF').overrideWith((ref) async => detail),
+        relatedProductsProvider.overrideWith(
+          (ref, k) async =>
+              k.kind == RelatedKind.viewedTogether ? viewed : rated,
+        ),
+        categoryShelfProvider.overrideWith((ref, k) async => rated),
+      ]),
+    );
+    await t.pumpAndSettle();
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    unawaited(router.push('/products/P-REF'));
+    await t.pumpAndSettle();
+    await t.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 150)),
+    );
+    await t.pump();
+    await expectLater(
+      find.byType(CustomerApp),
+      matchesGoldenFile(File('$_dir/ppr-1.png').uri),
+    );
+    debugDisableShadows = true;
+  });
+  // 상품 상세 전체·리뷰 전체 보기(사용자 레퍼런스 2026-11-25) — 폰과 같은 배율, 화면을 레퍼런스 길이만큼 길게.
+  testWidgets('product-page', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    debugDisableShadows = false;
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await t.pump();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/pp-$name.png').uri),
+      );
+    }
+
+    t.view
+      ..physicalSize = const Size(1080, 15738)
+      ..devicePixelRatio = 2.625;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    unawaited(router.push('/products/P-0001'));
+    await shot('1-detail');
+    t.view.physicalSize = const Size(1080, 4535);
+    unawaited(router.push('/products/P-0002/reviews'));
+    await shot('2-reviews');
+    debugDisableShadows = true;
+  });
+  // 장바구니 막대 ^ → 추천 시트(사용자 새 UI 2026-11-24). 사용자 캡처와 같은 상품 이름·값으로 1:1 비교.
+  testWidgets('cart-bar-sheet', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio = 2.625;
+    addTearDown(t.view.reset);
+    debugDisableShadows = false;
+    ProductTile tile(
+      String id,
+      String name,
+      int price, {
+      int? sale,
+      int? rate,
+      int? unit,
+      double? rating,
+      int? reviews,
+    }) => ProductTile(
+      productId: id,
+      name: name,
+      representativeSku: 'SKU-$id',
+      saleState: SaleState.onSale,
+      carried: true,
+      basePrice: price,
+      discount: sale == null
+          ? null
+          : SaleDiscount(salePrice: sale, ratePercent: rate),
+      unitPrice: unit == null
+          ? null
+          : UnitPrice(basis: 100, unitLabel: 'g', price: unit),
+      rating: rating,
+      reviewCount: reviews,
+    );
+    final recs = [
+      tile(
+        'R1',
+        '[냉동]빕스 오리지널 바비큐 폭립 450g',
+        17390,
+        sale: 13390,
+        rate: 23,
+        rating: 4.9,
+        reviews: 1445,
+      ),
+      tile(
+        'R2',
+        '[냉동]고왕 덜 달아 더 맛있는 양념쪽갈비 500g',
+        14900,
+        unit: 2980,
+        rating: 4.9,
+        reviews: 804,
+      ),
+      tile(
+        'R3',
+        '[냉동]고왕 숯불로 구워 더 맛있는 숯불쪽갈비 450g',
+        14860,
+        sale: 12930,
+        rate: 13,
+        unit: 2873,
+        rating: 4.8,
+        reviews: 567,
+      ),
+      tile(
+        'R4',
+        '다올팜 설향 딸기 500g',
+        29840,
+        sale: 19990,
+        rate: 33,
+        unit: 3998,
+        rating: 4.9,
+        reviews: 12500,
+      ),
+      tile('R5', '[냉동]삼원가든 진 갈비탕 600g', 8880, sale: 7990, rate: 10, unit: 1332),
+      tile('R6', '[냉동][배민이지] 맑은 나주식 곰탕 500g', 4990),
+    ];
+    await t.pumpWidget(
+      testApp(
+        [cartRecommendationsProvider.overrideWith(() => _FixedRecs(recs))],
+        cart: MockCartRepository(latency: Duration.zero, minOrderAmount: 0)
+          ..seedLine('E-00000002', 2),
+      ),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await t.pump();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/cb-$name.png').uri),
+      );
+    }
+
+    await shot('1-closed');
+    await t.tap(find.byKey(const ValueKey('home-cart-expand')));
+    await shot('2-open');
+    debugDisableShadows = true;
+  });
+  // 홈 배달 요약·배달 안내 시트·쿠폰 시트(사용자 새 UI 2026-11-24).
+  testWidgets('home-delivery', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    t.view
+      ..physicalSize = const Size(1080, 2340)
+      ..devicePixelRatio =
+          2.625; // 사용자 폰(1080px = 411dp)과 같은 배율 — 폰 캡처와 1:1 로 비교
+    addTearDown(t.view.reset);
+    // 그림자를 실제처럼(시험 기본은 검은 선) — 폰 캡처와 비교하려고.
+    debugDisableShadows = false;
+    // 기간 할인 상품(그릭요거트 33%)을 하나 더 담아 장바구니 막대의 할인 전 금액(줄 긋기)이 보이게.
+    await t.pumpWidget(
+      testApp(
+        const [],
+        cart: MockCartRepository(latency: Duration.zero, minOrderAmount: 0)
+          ..seedLine('E-00000002', 2),
+      ),
+    );
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await t.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await t.pump();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/hd-$name.png').uri),
+      );
+    }
+
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('홈').last);
+    await t.pumpAndSettle();
+    await shot('1-home');
+    await t.tap(find.byKey(const ValueKey('home-delivery-guide')));
+    await shot('2-guide');
+    await t.tap(find.byKey(const ValueKey('delivery-guide-close')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('home-coupon')));
+    await shot('3-coupons');
+    debugDisableShadows = true;
+  });
+  // 반품·교환 신청(레퍼런스 12, BR-95 목) — 어떤 처리 · 신청서 전체 · 상품문제 · 요청사항 시트 · 나가기 확인.
+  testWidgets('return-exchange', (t) async {
+    if (_dir.isEmpty) fail('--dart-define=SHOT_DIR=<절대 경로> 가 필요하다');
+    Directory(_dir).createSync(recursive: true);
+    await t.runAsync(_loadFonts);
+    void size(double h) => t.view
+      ..physicalSize = Size(1080, h)
+      ..devicePixelRatio = 3;
+    size(2180);
+    addTearDown(t.view.reset);
+    await t.pumpWidget(testApp(const []));
+    await t.pumpAndSettle();
+    Future<void> shot(String name) async {
+      await t.pumpAndSettle();
+      await expectLater(
+        find.byType(CustomerApp),
+        matchesGoldenFile(File('$_dir/r-$name.png').uri),
+      );
+    }
+
+    Future<void> tap(String k) async {
+      await t.ensureVisible(find.byKey(ValueKey(k)));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(ValueKey(k)));
+      await t.pumpAndSettle();
+    }
+
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-kakao')));
+    await t.pumpAndSettle();
+    final router = GoRouter.of(t.element(find.byType(Scaffold).first));
+    unawaited(router.push('/orders/order-seed-2/return-exchange'));
+    await shot('1-entry');
+    await tap('rr-go-exchange');
+    await shot('4-pick');
+    size(7270);
+    await t.pumpAndSettle();
+    await tap('rr-line-ol-3');
+    await tap('rr-reason-dislike');
+    await shot('3-full');
+    size(2180);
+    await t.pumpAndSettle();
+    await tap('rr-group-product');
+    await tap('rr-reason-spoiled');
+    await t.ensureVisible(find.byKey(const ValueKey('rr-reason-spoiled')));
+    await shot('5-2-product');
+    await tap('rr-note-pickup');
+    await shot('7-pickup-sheet');
+    await t.tapAt(const Offset(20, 20));
+    await t.pumpAndSettle();
+    await t.pageBack();
+    await shot('2-leave');
   });
   // 취소된 주문 상세 전체(사용자 2026-11-23 "배송 취소 컴포넌트 없애, 처리 내역 디자인 통일").
   testWidgets('order-detail-cancelled-full', (t) async {
@@ -2924,4 +3375,14 @@ final class _NoMemberAddresses extends MockAddressRepository {
       context: const ShoppingContext(version: 1),
     );
   }
+}
+
+/// 캡처용 고정 추천(사용자 캡처와 같은 상품).
+class _FixedRecs extends CartRecommendationsController {
+  _FixedRecs(this.items);
+
+  final List<ProductTile> items;
+
+  @override
+  Future<List<ProductTile>> build() async => items;
 }

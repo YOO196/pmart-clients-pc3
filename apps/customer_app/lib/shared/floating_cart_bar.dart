@@ -9,6 +9,7 @@ import '../features/cart/presentation/cart_controller.dart'
     show cartControllerProvider;
 import '../features/cart/domain/cart.dart' show Cart;
 import '../l10n/gen/app_localizations.dart';
+import 'cart_bar_sheet.dart' show showCartBarSheet;
 import 'notice.dart';
 
 /// 막대에 잠깐 띄울 담기 결과 한 줄. [seq] 가 바뀔 때마다 한 번 보인다.
@@ -105,120 +106,279 @@ class _FloatingCartBarState extends ConsumerState<FloatingCartBar>
   Widget _bar(BuildContext context, AppLocalizations l10n, Cart cart) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final short = cart.minOrderShortfall;
     return Material(
       key: const ValueKey('home-cart-bar'),
       color: scheme.surface,
       elevation: 4,
       shadowColor: Colors.black26,
-      borderRadius: BorderRadius.circular(18),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 10, 10, 10),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (cart.selectedItemAmount case final a?)
+      borderRadius: BorderRadius.circular(21),
+      child: CartBarBody(
+        cart: cart,
+        open: false,
+        message: _message,
+        bump: _bump,
+        onToggle: () => showCartBarSheet(context),
+      ),
+    );
+  }
+}
+
+/// 장바구니 막대 내용(금액·할인 전 금액·^/⌄·주문 가능/부족액 · [장바구니] · 최소 주문 줄). 닫힌 막대와 펼친 시트가 같이 쓴다.
+class CartBarBody extends StatelessWidget {
+  const CartBarBody({
+    super.key,
+    required this.cart,
+    required this.open,
+    this.message,
+    this.bump,
+    this.onToggle,
+    this.rowPadding = const EdgeInsets.fromLTRB(16.4, 8.8, 10, 8.8),
+    this.progressPadding = const EdgeInsets.fromLTRB(10.3, 0, 10, 7.6),
+  });
+
+  final Cart cart;
+
+  /// 펼친 시트 안이면 true(동그라미가 ⌄).
+  final bool open;
+
+  /// 담기 결과 한 줄(닫힌 막대만).
+  final String? message;
+
+  /// 개수 동그라미 통통(닫힌 막대만).
+  final Animation<double>? bump;
+  final VoidCallback? onToggle;
+  final EdgeInsets rowPadding;
+  final EdgeInsets progressPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final short = cart.minOrderShortfall;
+    final fill = minOrderFill(cart);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: rowPadding.copyWith(
+            bottom: fill == null ? rowPadding.top : 8.4,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  key: const ValueKey('home-cart-toggle-area'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onToggle,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (cart.selectedItemAmount case final a?)
+                        // 금액 · 할인 전 금액 · ^ 를 가운데로 맞춘다(레퍼런스: 동그라미가 숫자 가운데 높이).
+                        Row(
+                          children: [
+                            Text(
+                              formatKrw(a),
+                              key: const ValueKey('home-cart-amount'),
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            // 할인 전 금액(줄 긋기, 사용자 지시 2026-11-24) — 서버 할인 전 합계(cart 0.5.0, BR-97)를
+                            // 보이기만 한다. 결제 금액은 주문서 견적.
+                            if (cartListPrice(cart) case final before?) ...[
+                              const SizedBox(width: 5),
+                              Text(
+                                formatKrw(before),
+                                key: const ValueKey('home-cart-before'),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 13,
+                                  color: scheme.outline,
+                                  decoration: TextDecoration.lineThrough,
+                                  decorationColor: scheme.outline,
+                                ),
+                              ),
+                            ],
+                            // ^ / ⌄ 검은 동그라미(실측 12.2dp, 앞 글과 4.6dp) — 누르면 추천 시트를 열고 닫는다.
+                            if (onToggle != null) ...[
+                              const SizedBox(width: 4.6),
+                              _ToggleDot(open: open),
+                            ],
+                          ],
+                        ),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: message != null
+                            ? Text(
+                                message!,
+                                key: const ValueKey('home-cart-pulse'),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: scheme.primary,
+                                ),
+                              )
+                            : Text(
+                                switch (short) {
+                                  final int s when s > 0 =>
+                                    l10n.cartMinOrderShortfall(formatKrw(s)),
+                                  _ => l10n.homeCartOrderable,
+                                },
+                                key: const ValueKey('home-cart-sub'),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: short != null && short > 0
+                                      ? scheme.primary
+                                      : scheme.onSurface,
+                                ),
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              FilledButton(
+                key: const ValueKey('home-cart-go'),
+                onPressed: () => context.push('/cart'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 37.3),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.fromLTRB(12.6, 0, 12, 0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11.4),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // 담을 때 1 → 1.3 → 1 로 통통.
+                    ScaleTransition(
+                      scale:
+                          TweenSequence<double>([
+                            TweenSequenceItem(
+                              tween: Tween(begin: 1, end: 1.3),
+                              weight: 1,
+                            ),
+                            TweenSequenceItem(
+                              tween: Tween(begin: 1.3, end: 1),
+                              weight: 1,
+                            ),
+                          ]).animate(
+                            CurvedAnimation(
+                              parent: bump ?? kAlwaysDismissedAnimation,
+                              curve: Curves.easeOut,
+                            ),
+                          ),
+                      child: Container(
+                        key: const ValueKey('home-cart-count'),
+                        width: 21.7,
+                        height: 21.7,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: Colors.black,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${cart.lines.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
                     Text(
-                      formatKrw(a),
-                      key: const ValueKey('home-cart-amount'),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 18,
+                      l10n.cartTitle,
+                      style: const TextStyle(
+                        fontSize: 14.5,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: _message != null
-                        ? Text(
-                            _message!,
-                            key: const ValueKey('home-cart-pulse'),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: scheme.primary,
-                            ),
-                          )
-                        : Text(
-                            switch (short) {
-                              final int s when s > 0 =>
-                                l10n.cartMinOrderShortfall(formatKrw(s)),
-                              _ => l10n.homeCartOrderable,
-                            },
-                            key: const ValueKey('home-cart-sub'),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 13,
-                              color: short != null && short > 0
-                                  ? scheme.primary
-                                  : scheme.onSurfaceVariant,
-                            ),
-                          ),
-                  ),
-                ],
-              ),
-            ),
-            FilledButton(
-              key: const ValueKey('home-cart-go'),
-              onPressed: () => context.push('/cart'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 46),
-                padding: const EdgeInsets.fromLTRB(10, 0, 18, 0),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  ],
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 담을 때 1 → 1.3 → 1 로 통통.
-                  ScaleTransition(
-                    scale:
-                        TweenSequence<double>([
-                          TweenSequenceItem(
-                            tween: Tween(begin: 1, end: 1.3),
-                            weight: 1,
-                          ),
-                          TweenSequenceItem(
-                            tween: Tween(begin: 1.3, end: 1),
-                            weight: 1,
-                          ),
-                        ]).animate(
-                          CurvedAnimation(parent: _bump, curve: Curves.easeOut),
-                        ),
-                    child: Container(
-                      key: const ValueKey('home-cart-count'),
-                      width: 26,
-                      height: 26,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '${cart.lines.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    l10n.cartTitle,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
+        ),
+        if (fill != null)
+          Padding(
+            padding: progressPadding,
+            child: _MinOrderProgress(fill: fill),
+          ),
+      ],
+    );
+  }
+}
+
+class _ToggleDot extends StatelessWidget {
+  const _ToggleDot({required this.open});
+
+  final bool open;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: ValueKey(open ? 'home-cart-collapse' : 'home-cart-expand'),
+    width: 12.2,
+    height: 12.2,
+    alignment: Alignment.center,
+    decoration: const BoxDecoration(
+      color: Colors.black,
+      shape: BoxShape.circle,
+    ),
+    child: PmartLineIcon(
+      open ? PmartLineIcons.chevronDown : PmartLineIcons.chevronUp,
+      size: 8,
+      strokeWidth: 3,
+      color: Colors.white,
+    ),
+  );
+}
+
+/// 장바구니 막대의 할인 전 금액(줄 긋기). 서버 기간 할인 합계가 0 보다 클 때만 — 둘 중 하나라도 없으면 null.
+/// 서버 할인 전 합계(cart 0.5.0 `selectedListAmount`, BR-97) — 앱이 더하지 않는다.
+int? cartListPrice(Cart cart) =>
+    switch ((cart.selectedListAmount, cart.selectedDiscountAmount)) {
+      (final int list, final int d) when d > 0 => list,
+      _ => null,
+    };
+
+/// 최소 주문 금액까지 얼마나 찼는지(레퍼런스 장바구니 막대 아래 줄). 서버 값으로만 —
+/// 모자람 0 이면 가득, 모자람·최소 금액을 다 알 때만 그 비율. 하나라도 모르면 줄을 그리지 않는다(0 으로 꾸미지 않는다).
+double? minOrderFill(Cart cart) {
+  final short = cart.minOrderShortfall;
+  if (short == null) return null;
+  if (short <= 0) return 1;
+  final min = cart.minOrderAmount;
+  if (min == null || min <= 0) return null;
+  return ((min - short) / min).clamp(0.0, 1.0);
+}
+
+class _MinOrderProgress extends StatelessWidget {
+  const _MinOrderProgress({required this.fill});
+
+  final double fill;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ClipRRect(
+      key: const ValueKey('home-cart-progress'),
+      borderRadius: BorderRadius.circular(2.1),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: fill),
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+        builder: (_, v, _) => LinearProgressIndicator(
+          value: v,
+          minHeight: 4.2,
+          color: scheme.primary,
+          backgroundColor: scheme.surfaceContainerHighest,
         ),
       ),
     );

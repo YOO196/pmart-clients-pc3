@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../auth/presentation/provider_badge.dart';
 import '../../auth/domain/auth.dart' show MemberSession, SocialProvider;
 import '../../auth/presentation/auth_controller.dart' show sessionProvider;
 import '../domain/profile.dart';
@@ -302,11 +303,13 @@ class _MyInfoView extends ConsumerWidget {
       ),
     );
     // 서버 프로필의 로그인 제공자, 없으면 이 기기 세션의 제공자.
-    final providerLabel = switch (profile?.socialProvider ??
+    final signupProvider =
+        profile?.socialProvider ??
         switch (ref.watch(sessionProvider)) {
           MemberSession(:final provider) => provider,
           _ => null,
-        }) {
+        };
+    final providerLabel = switch (signupProvider) {
       SocialProvider.kakao => l10n.loginKakaoShort,
       SocialProvider.naver => l10n.loginNaverShort,
       SocialProvider.apple => l10n.loginAppleShort,
@@ -461,14 +464,11 @@ class _MyInfoView extends ConsumerWidget {
                   ),
                   const SizedBox(width: 12),
                   // 서버 프로필의 로그인 제공자, 없으면 이 기기 세션의 제공자.
-                  if (providerLabel case final p?)
-                    Text(
-                      p,
-                      key: const ValueKey('info-login-provider'),
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  // 마이 화면 이메일 옆과 같은 배지(백엔드 요청 2026-11-25).
+                  if (signupProvider case final p?)
+                    ProviderBadge(
+                      provider: p,
+                      textKey: const ValueKey('info-login-provider'),
                     ),
                 ],
               ),

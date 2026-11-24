@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../address/presentation/logout_flow.dart';
+import '../../auth/presentation/provider_badge.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../profile/domain/profile.dart';
@@ -29,6 +30,12 @@ class MyScreen extends ConsumerWidget {
     final session = ref.watch(sessionProvider);
     final member = session is MemberSession;
     final profile = ref.watch(profileProvider).value;
+    final signupProvider =
+        profile?.socialProvider ??
+        switch (session) {
+          MemberSession(:final provider) => provider,
+          _ => null,
+        };
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     // 레퍼런스(사용자 캡처 2026-11-20 "마이배민"): 회색 바탕, 왼쪽 큰 제목 + 오른쪽 고객센터·설정 아이콘,
@@ -204,7 +211,9 @@ class MyScreen extends ConsumerWidget {
                   Column(
                     children: [
                       Text(
-                        switch (session.provider) {
+                        // 가입한 제공자(GET /me socialProvider) 먼저 — 앱을 다시 켜 복원한 세션은
+                        // session.provider 가 없다(백엔드 요청 2026-11-25 R2).
+                        switch (signupProvider) {
                           final SocialProvider p => l10n.myLoggedInWith(
                             providerName(l10n, p),
                           ),
@@ -214,13 +223,30 @@ class MyScreen extends ConsumerWidget {
                           color: scheme.onSurfaceVariant,
                         ),
                       ),
-                      Text(
-                        providerAccountText(profile) ??
-                            session.accountLabel ??
-                            l10n.myAccountUnknown,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
+                      // 이메일 옆 가입 방식 배지(R1) — 네이버가 준 연락처 이메일이 gmail 이면
+                      // 구글 계정처럼 보이던 것.
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              providerAccountText(profile) ??
+                                  session.accountLabel ??
+                                  l10n.myAccountUnknown,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          if (signupProvider case final p?) ...[
+                            const SizedBox(width: 5),
+                            ProviderBadge(
+                              key: const ValueKey('my-provider-badge'),
+                              provider: p,
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),

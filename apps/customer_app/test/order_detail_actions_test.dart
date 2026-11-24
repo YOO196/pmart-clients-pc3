@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_ui/pmart_ui.dart' show initPmartFormatting;
 
-import 'package:customer_app/features/support/domain/inquiry.dart';
-import 'package:customer_app/features/support/presentation/inquiry_screens.dart';
+import 'package:customer_app/features/claims/presentation/return_request_screens.dart';
 
 import 'support/app_harness.dart';
 
@@ -53,15 +52,16 @@ void main() {
     expect(key('reschedule'), findsNothing);
   });
 
-  testWidgets('배송 완료: [반품·교환][문의하기] — 반품·교환은 환불 문의로', (t) async {
+  testWidgets('배송 완료: [반품·교환][문의하기] — 반품·교환은 신청 화면으로(레퍼런스 12)', (t) async {
     await openDetail(t, 'order-seed-2');
     expect(key('order-track'), findsNothing);
     expect(key('order-inquiry'), findsOneWidget);
     await t.tap(key('order-return-exchange'));
     await t.pumpAndSettle();
-    final form = t.widget<InquiryFormScreen>(find.byType(InquiryFormScreen));
-    expect(form.args.orderId, 'order-seed-2');
-    expect(form.args.category, InquiryCategory.refund);
+    final entry = t.widget<ReturnExchangeEntryScreen>(
+      find.byType(ReturnExchangeEntryScreen),
+    );
+    expect(entry.orderId, 'order-seed-2');
   });
 
   testWidgets('취소된 주문: 버튼 없음', (t) async {

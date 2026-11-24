@@ -8,11 +8,13 @@ import 'package:pmart_core/pmart_core.dart' show trustPmartLanRootCa;
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'app.dart';
-import 'features/address/presentation/map_pick_screen.dart' show kakaoNativeAppKey;
+import 'features/address/presentation/map_pick_screen.dart'
+    show kakaoNativeAppKey;
 import 'features/auth/presentation/auth_controller.dart'
     show sessionExpiryHandlerProvider;
 import 'features/push/presentation/push_controller.dart'
     show pushRegistrationProvider;
+import 'shared/network_image.dart' show pmartImageDiskCache;
 import 'shared/providers.dart'
     show beforeSignOutProvider, onSessionExpiredProvider;
 
@@ -21,6 +23,8 @@ Future<void> main() async {
   await initPmartFormatting();
   // LAN HTTPS 게이트웨이(사설 CA, ADR-0057)를 믿는다 — 운영(release) 빌드에는 넣지 않는다(T6).
   if (!kReleaseMode) trustPmartLanRootCa();
+  // 서버 사진을 기기 디스크에도 둔다(이미지 ID 마다 불변 — 다시 켜도 다시 받지 않는다, 로딩 S3).
+  pmartImageDiskCache = true;
   // 카카오 지도는 키가 있을 때만 켠다(빌드 때 --dart-define-from-file=.secrets/customer.env). 키는 로그에 남기지 않는다.
   if (kakaoNativeAppKey.isNotEmpty) {
     await KakaoMapSdk.instance.initialize(kakaoNativeAppKey);

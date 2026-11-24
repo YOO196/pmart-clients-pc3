@@ -28,8 +28,18 @@ import 'catalog_providers.dart';
 import 'home_popup.dart';
 import 'home_providers.dart';
 import 'category_browse_screen.dart' show openCategoryBrowse;
+import '../../cart/presentation/cart_controller.dart'
+    show cartControllerProvider;
+import '../../coupons/domain/coupon.dart'
+    show CouponCampaign, CouponDiscountType;
+import '../../coupons/presentation/coupon_controller.dart'
+    show couponCampaignsProvider;
+import '../../coupons/presentation/coupon_screens.dart'
+    show CouponCampaignSheet;
 import 'widgets/category_art.dart';
+import 'widgets/delivery_badges.dart';
 import 'widgets/product_tile_card.dart';
+import '../../../shared/network_image.dart';
 
 /// SCR-HOME-001. 영역별 부분 실패는 그 영역만 다시 불러온다.
 /// 위에서부터 결과 불명 결제·진행 중 주문·배송 방식 요약, 고정 탭(홈·랭킹·신상품), 탭 본문 순서다.
@@ -1006,17 +1016,18 @@ class _BannerCard extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     // 서버가 배너 그림을 주면 그 그림을 쓴다. 없거나 받지 못하면 색 바탕 + 대체 문구.
-    final image = resolveImageUrl(
-      banner.imageUrl,
-      ref.watch(imageOriginProvider),
-    );
-    final fallback = _fallback(theme, scheme);
-    if (image == null) return fallback;
     // 화면 폭만큼만 디코딩(원본 크기로 풀면 넘길 때 끊긴다 — 사용자 2026-11-20 스크롤 끊김).
     final px =
         MediaQuery.sizeOf(context).width *
         MediaQuery.devicePixelRatioOf(context);
-    return Image.network(
+    // 서버 축소본(BR-99 `?w=`)을 받는다 — 원본 PNG 를 받지 않게.
+    final image = resolveImageUrl(
+      withImageWidth(banner.imageUrl, px),
+      ref.watch(imageOriginProvider),
+    );
+    final fallback = _fallback(theme, scheme);
+    if (image == null) return fallback;
+    return pmartNetworkImage(
       image,
       fit: BoxFit.cover,
       width: double.infinity,
@@ -1729,24 +1740,20 @@ class _DeliverySummaryCard extends ConsumerWidget {
   }
 }
 
-class _DeliverySummary extends StatefulWidget {
+/// 배달 요약(사용자 새 UI 2026-11-24 — "알뜰배달 29~44분 · 최소주문 15,000원 [배달안내]",
+/// 아래 "30,000원부터 배달팁 0원 ›" 줄과 쿠폰 줄). 값은 서버 값만 — 없으면 그 조각을 빼고 지어내지 않는다.
+/// 최소 주문·배달팁 구간·운영 시간은 `GET /delivery-options` 계약에 없어 목만 채운다(BR-96). 실서버에서는
+/// 최소 주문을 장바구니 서버 값(cart `minOrderAmount`)으로 보이고, 배달팁 0원 줄은 구간이 오기 전까지 숨는다.
+class _DeliverySummary extends ConsumerWidget {
   const _DeliverySummary({required this.options});
 
   final List<DeliveryOption> options;
 
   @override
-  State<_DeliverySummary> createState() => _DeliverySummaryState();
-}
-
-class _DeliverySummaryState extends State<_DeliverySummary> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final options = widget.options;
     final night = options.any(
       (o) => !o.available && o.reason == UnavailableReason.nightTime,
     );
@@ -1754,179 +1761,487 @@ class _DeliverySummaryState extends State<_DeliverySummary> {
         .where((o) => o.mode == DeliveryMode.scheduled)
         .firstOrNull
         ?.earliestSlot;
-    // 심야로 막힌 방식은 머리 띠 안내가 대신한다.
-    final rows = [
-      for (final o in options)
-        if (!(night && o.reason == UnavailableReason.nightTime)) o,
-    ];
-    // 접힌 상태에서는 첫 줄(가능한 방식 우선)만 보인다.
-    final first =
-        rows.where((o) => o.available).firstOrNull ?? rows.firstOrNull;
-    final shown = _open ? rows : [?first];
-    // 사용자 캡처(2026-11-20 홈): 테두리 없이 굵은 한 줄 제목("지금은 예약배달만 가능해요") + 오른쪽 회색 알약 [배달안내],
-    // 아래 회색 둥근 줄(방식·시간·배달팁 — 서버 값). 알약을 누르면 방식 전부를 펼친다.
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-      child: Container(
-        key: const ValueKey('home-delivery-card'),
-        clipBehavior: Clip.antiAlias,
-        decoration: const BoxDecoration(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              key: night ? const ValueKey('home-night-notice') : null,
-              padding: const EdgeInsets.fromLTRB(4, 0, 0, 10),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          night
-                              ? l10n.homeNightNotice
-                              : l10n.homeDeliveryHeadline,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (night && earliest != null)
-                          Text(
-                            l10n.optionEarliestSlot(windowText(earliest)),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  if (rows.length > 1)
-                    ActionChip(
-                      key: const ValueKey('home-delivery-guide'),
-                      label: Text(l10n.homeDeliveryGuide),
-                      labelStyle: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 13,
-                      ),
-                      backgroundColor: scheme.surfaceContainer,
-                      side: BorderSide.none,
-                      shape: const StadiumBorder(),
-                      visualDensity: VisualDensity.compact,
-                      onPressed: () => setState(() => _open = !_open),
-                    ),
-                ],
+    // 지금 받을 수 있는 즉시 방식. 없으면(심야 등) 예약 안내.
+    // 사용자 UI 는 알뜰배달을 먼저 보인다(가능하면 알뜰, 아니면 한집).
+    final now = DeliveryGuideSheet.instantOf(options)
+        .where((o) => o.available)
+        .firstOrNull;
+    final cartMin = ref
+        .watch(cartControllerProvider)
+        .value
+        ?.cart
+        .minOrderAmount;
+    final minOrder = now?.minOrderAmount ?? cartMin;
+    final freeFrom = now?.freeTipFrom;
+    void openGuide() => showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      builder: (_) => DeliveryGuideSheet(options: options),
+    );
+    // 사용자 새 UI 실측(사용자 폰 캡처 1080px = 411dp, 1dp = 2.625px): 제목 15.5 굵게, 최소주문 14, 가운데 점 연회색.
+    final strong = theme.textTheme.titleMedium?.copyWith(
+      fontSize: 15.5,
+      fontWeight: FontWeight.w700,
+    );
+    final minSpan = minOrder == null
+        ? null
+        : TextSpan(
+            children: [
+              TextSpan(
+                text: ' · ',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: 14,
+                  color: scheme.outlineVariant,
+                ),
               ),
-            ),
-            Material(
-              color: scheme.surfaceContainer,
-              borderRadius: BorderRadius.circular(12),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                key: const ValueKey('home-delivery-toggle'),
-                onTap: rows.length > 1
-                    ? () => setState(() => _open = !_open)
-                    : null,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                  child: Row(
+              TextSpan(
+                text: l10n.homeMinOrder(formatKrw(minOrder)),
+                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+              ),
+            ],
+          );
+    final Widget headline;
+    if (night || now == null) {
+      headline = Text(l10n.homeNightNotice, style: strong);
+    } else {
+      final eta = now.eta;
+      final title = switch (eta) {
+        Eta(:final int minMinutes, :final int maxMinutes) when !eta.notSet =>
+          l10n.homeModeEta(modeLabel(l10n, now.mode), minMinutes, maxMinutes),
+        _ => modeLabel(l10n, now.mode),
+      };
+      headline = Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(text: title, style: strong),
+            ?minSpan,
+          ],
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 17, 16, 7),
+      child: Column(
+        key: const ValueKey('home-delivery-card'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            key: night || now == null
+                ? const ValueKey('home-night-notice')
+                : const ValueKey('home-delivery-now'),
+            padding: const EdgeInsets.fromLTRB(3.8, 0, 0, 13.3),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          children: [
-                            for (final (i, o) in shown.indexed)
-                              Padding(
-                                key: ValueKey('home-delivery-${o.mode.name}'),
-                                padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
-                                child: _DeliveryRow(option: o),
-                              ),
-                          ],
-                        ),
-                      ),
-                      if (rows.length > 1)
-                        PmartLineIcon(
-                          _open
-                              ? PmartLineIcons.chevronUp
-                              : PmartLineIcons.chevronRight,
-                          size: 18,
+                      headline,
+                      if ((night || now == null) && earliest != null)
+                        Text(
+                          l10n.optionEarliestSlot(windowText(earliest)),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
                     ],
                   ),
                 ),
-              ),
+                // 작은 회색 알약(실측 약 53×20dp, 글 11.5).
+                Material(
+                  key: const ValueKey('home-delivery-guide'),
+                  color: scheme.surfaceContainer,
+                  shape: const StadiumBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: openGuide,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2.5,
+                      ),
+                      child: Text(
+                        l10n.homeDeliveryGuide,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 11.5,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          if (freeFrom != null)
+            _HomeInfoRow(
+              key: const ValueKey('home-free-tip'),
+              color: scheme.surfaceContainer,
+              icon: const ShieldPercentIcon(),
+              text: Text(
+                l10n.homeFreeTipFrom(formatKrw(freeFrom)),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              trailing: const PmartLineIcon(
+                PmartLineIcons.chevronRight,
+                size: 16,
+                strokeWidth: 2,
+              ),
+              onTap: openGuide,
+            ),
+          const _HomeCouponRow(),
+        ],
       ),
     );
   }
 }
 
-/// 방식 한 줄: 이름 | 예상시간(굵게) / 기본 배달팁(주 색). 불가면 사유. 값은 서버 값만.
-/// 상품액 없이 물었으므로 팁은 기본값만 있다 — 무료 여부는 장바구니·주문서에서 서버가 판정한다.
-class _DeliveryRow extends StatelessWidget {
-  const _DeliveryRow({required this.option});
+/// 회색(또는 연보라) 둥근 한 줄(실측 높이 45dp·모서리 11dp, 안쪽 왼쪽 14dp): 그림 · 글 · 오른쪽 표시.
+class _HomeInfoRow extends StatelessWidget {
+  const _HomeInfoRow({
+    super.key,
+    required this.color,
+    required this.icon,
+    required this.text,
+    required this.trailing,
+    required this.onTap,
+    this.trailingPad = 14,
+  });
 
-  final DeliveryOption option;
+  final Color color;
+  final Widget icon;
+  final Widget text;
+  final Widget trailing;
+  final VoidCallback onTap;
+  final double trailingPad;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10.3),
+    child: Material(
+      color: color,
+      borderRadius: BorderRadius.circular(11.4),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(13.7, 0, trailingPad, 0),
+          child: SizedBox(
+            height: 45.3,
+            child: Row(
+              children: [
+                SizedBox(width: 14.5, child: Center(child: icon)),
+                const SizedBox(width: 8),
+                Expanded(child: text),
+                trailing,
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// 쿠폰 줄(사용자 새 UI): 받을 수 있는 쿠폰 첫 장 이름 + "외 N개", 오른쪽 받기 동그라미 → "할인받고 주문해요" 시트.
+/// 회원만, 받을 수 있는 쿠폰이 있을 때만. 조회 실패·없음이면 줄을 그리지 않는다(홈의 부가 정보).
+class _HomeCouponRow extends ConsumerWidget {
+  const _HomeCouponRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final campaigns =
+        ref.watch(couponCampaignsProvider).value ?? const <CouponCampaign>[];
+    final open = [
+      for (final c in campaigns)
+        if (!c.reachedLimit && !c.soldOut) c,
+    ];
+    if (open.isEmpty) return const SizedBox.shrink();
+    final first = open.first;
+    final style = theme.textTheme.titleSmall?.copyWith(
+      fontSize: 13.5,
+      fontWeight: FontWeight.w700,
+    );
+    final label = open.length > 1
+        ? l10n.homeCouponMore(first.name, open.length - 1)
+        : first.name;
+    // 이름 안의 할인 금액(예 "7,000원")만 주 색 — 이름은 서버 값 그대로.
+    final amount = switch (first.discount.type) {
+      CouponDiscountType.amount => formatKrw(first.discount.value),
+      CouponDiscountType.rate => '${first.discount.value}%',
+    };
+    final at = label.indexOf(amount);
+    return _HomeInfoRow(
+      key: const ValueKey('home-coupon'),
+      // 실측 #EEF0FF 같은 아주 연한 보라(브랜드 주 색 8%).
+      color: Color.alphaBlend(
+        scheme.primary.withValues(alpha: 0.08),
+        scheme.surface,
+      ),
+      icon: const CouponFilledIcon(),
+      trailingPad: 10.7,
+      text: Text.rich(
+        at < 0
+            ? TextSpan(text: label)
+            : TextSpan(
+                children: [
+                  TextSpan(text: label.substring(0, at)),
+                  TextSpan(
+                    text: amount,
+                    style: TextStyle(color: scheme.primary),
+                  ),
+                  TextSpan(text: label.substring(at + amount.length)),
+                ],
+              ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      ),
+      trailing: Container(
+        width: 24,
+        height: 24,
+        decoration: BoxDecoration(
+          color: scheme.primary,
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: PmartLineIcon(
+          PmartLineIcons.download,
+          size: 13.5,
+          strokeWidth: 2.4,
+          color: scheme.onPrimary,
+        ),
+      ),
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useRootNavigator: true,
+        builder: (_) => const CouponCampaignSheet(),
+      ),
+    );
+  }
+}
+
+/// "배달 안내" 시트(사용자 새 UI 2026-11-24): 24시간 주문 가능(운영 시간·새벽은 예약), 방식마다 이름 + 표 + 예상시간 +
+/// 배달팁 구간. 값은 서버 값만 — 구간이 없으면 기본 배달팁 한 줄, 운영 시간이 없으면 그 줄을 뺀다(BR-96).
+/// 간격은 사용자 폰 캡처 실측(1080px = 411dp, 1dp = 2.625px): 좌우 20, 제목 18 굵게, 본문 14, 줄 간격 25.
+class DeliveryGuideSheet extends StatelessWidget {
+  const DeliveryGuideSheet({super.key, required this.options});
+
+  final List<DeliveryOption> options;
+
+  /// `HH:mm`(24:00 포함) → `오전 8:00`. 표시만.
+  static String clock(String hhmm) {
+    final parts = hhmm.split(':').map(int.parse).toList();
+    final hour = parts[0] % 24;
+    final h12 = hour % 12 == 0 ? 12 : hour % 12;
+    final noon = hour < 12 ? '오전' : '오후';
+    return '$noon $h12:${parts[1].toString().padLeft(2, '0')}';
+  }
+
+  /// 사용자 UI 순서: 알뜰 → 한집(예약은 위 "24시간 주문 가능"이 대신한다).
+  static List<DeliveryOption> instantOf(List<DeliveryOption> options) => [
+    for (final m in const [DeliveryMode.bundled, DeliveryMode.single])
+      ...options.where((o) => o.mode == m),
+  ];
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final o = option;
-    final eta = o.eta;
-    final etaText = (eta != null && !eta.notSet)
-        ? switch ((eta.minMinutes, eta.maxMinutes)) {
-            (final int a, final int b) => l10n.optionEta(a, b),
-            _ => null,
-          }
-        : null;
-    final slotText = switch (o.earliestSlot) {
-      final w? => l10n.optionEarliestSlot(windowText(w)),
-      null => null,
-    };
-    final tipText = switch (o.tip?.base) {
-      final int base => l10n.homeTipBase(formatKrw(base)),
-      null => null,
-    };
-    final strong = theme.textTheme.titleSmall?.copyWith(fontSize: 14);
-    return Row(
+    final scheduled = options.any((o) => o.mode == DeliveryMode.scheduled);
+    final hours = options.map((o) => o.serviceHours).nonNulls.firstOrNull;
+    final instant = instantOf(options);
+    final title18 = theme.textTheme.titleMedium?.copyWith(
+      fontSize: 18,
+      height: 1.3,
+      fontWeight: FontWeight.w700,
+    );
+    final body = theme.textTheme.bodyMedium?.copyWith(
+      fontSize: 14,
+      height: 1.47,
+    );
+    final grey = body?.copyWith(color: scheme.onSurfaceVariant);
+    Widget bullet(String text, TextStyle? style, {Key? key}) => Row(
+      key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          width: 70,
-          child: Text(
-            modeLabel(l10n, o.mode),
-            style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
-          ),
-        ),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: o.available
-                ? [
-                    if ((etaText ?? slotText) case final String t)
-                      Text(t, style: strong),
-                    if (etaText != null && slotText != null)
-                      Text(slotText, style: theme.textTheme.bodySmall),
-                    if (tipText != null)
-                      Text(
-                        tipText,
-                        style: strong?.copyWith(color: scheme.primary),
-                      ),
-                  ]
-                : [
-                    Text(
-                      optionSubtitle(l10n, o),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-          ),
+        Text('• ', style: style),
+        Expanded(child: Text(text, style: style)),
+      ],
+    );
+    Widget row(String left, String right, {bool strong = false}) => Row(
+      children: [
+        Expanded(child: Text(left, style: grey)),
+        Text(
+          right,
+          style: body?.copyWith(fontWeight: strong ? FontWeight.w700 : null),
         ),
       ],
+    );
+    List<Widget> tipRows(DeliveryOption o) {
+      final rows = <Widget>[];
+      if (!o.available) {
+        rows.add(row(optionSubtitle(l10n, o), ''));
+      } else if (o.tipTiers case final tiers? when tiers.isNotEmpty) {
+        for (final t in tiers) {
+          rows.add(
+            row(
+              l10n.deliveryGuideFrom(formatKrw(t.fromAmount)),
+              t.tip == 0 ? l10n.deliveryGuideTipFree : formatKrw(t.tip),
+              strong: t.tip == 0,
+            ),
+          );
+        }
+      } else if (o.tip?.base case final int base) {
+        rows.add(row(l10n.deliveryGuideBaseTip, formatKrw(base)));
+      }
+      return [
+        for (final (i, r) in rows.indexed) ...[
+          if (i > 0) const SizedBox(height: 4.5),
+          r,
+        ],
+      ];
+    }
+
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+        ),
+        child: SingleChildScrollView(
+          key: const ValueKey('delivery-guide-sheet'),
+          padding: const EdgeInsets.fromLTRB(19.8, 12.6, 12, 36),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(l10n.deliveryGuideTitle, style: title18),
+                  ),
+                  // 회색 동그라미 닫기(실측 지름 33dp).
+                  Material(
+                    key: const ValueKey('delivery-guide-close'),
+                    color: scheme.surfaceContainer,
+                    shape: const CircleBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      child: SizedBox.square(
+                        dimension: 38,
+                        child: Center(
+                          child: Semantics(
+                            label: MaterialLocalizations.of(context)
+                                .closeButtonTooltip,
+                            button: true,
+                            child: const PmartLineIcon(
+                              PmartLineIcons.close,
+                              size: 22,
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 7.8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (scheduled) ...[
+                      const SizedBox(height: 18.8),
+                      Text(l10n.deliveryGuideAllDay, style: title18),
+                      const SizedBox(height: 11.9),
+                      if (hours != null) ...[
+                        bullet(
+                          l10n.deliveryGuideHours(
+                            clock(hours.start),
+                            clock(hours.end),
+                          ),
+                          body,
+                          key: const ValueKey('delivery-guide-hours'),
+                        ),
+                        const SizedBox(height: 4.5),
+                      ],
+                      bullet(l10n.deliveryGuideNight, body),
+                    ],
+                    for (final (i, o) in instant.indexed) ...[
+                      // 위 글머리 줄 → 방식 이름 25.2dp, 앞 방식 마지막 줄 → 다음 방식 이름 31.3dp(실측).
+                      SizedBox(height: i == 0 ? 25.2 : 31.3),
+                      Row(
+                        key: ValueKey('delivery-guide-${o.mode.name}'),
+                        children: [
+                          Text(modeLabel(l10n, o.mode), style: title18),
+                          const SizedBox(width: 3.5),
+                          if (o.mode == DeliveryMode.bundled)
+                            const BundledBadge()
+                          else
+                            const SingleBadge(),
+                          if (o.eta case Eta(
+                            :final int minMinutes,
+                            :final int maxMinutes,
+                            notSet: false,
+                          ))
+                            Container(
+                              margin: const EdgeInsets.only(left: 7.6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 1.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: scheme.surfaceContainer,
+                                borderRadius: BorderRadius.circular(4.5),
+                              ),
+                              child: Text(
+                                l10n.deliveryGuideEta(minMinutes, maxMinutes),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 5.8),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: scheme.surfaceContainerHigh,
+                      ),
+                      const SizedBox(height: 6.5),
+                      ...tipRows(o),
+                    ],
+                    const SizedBox(height: 24.4),
+                    bullet(l10n.deliveryGuideNote1, grey),
+                    for (final o in instant) ...[
+                      const SizedBox(height: 4.5),
+                      bullet(
+                        o.mode == DeliveryMode.bundled
+                            ? l10n.deliveryGuideNoteBundled
+                            : l10n.deliveryGuideNoteSingle,
+                        grey,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

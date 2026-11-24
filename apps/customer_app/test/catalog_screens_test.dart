@@ -9,8 +9,6 @@ import 'package:customer_app/features/catalog/presentation/product_list_view.dar
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
-import 'package:customer_app/features/cart/presentation/cart_screen.dart'
-    show AddToCartBar;
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/domain/catalog.dart';
 import 'package:customer_app/features/address/presentation/address_screens.dart'
@@ -18,6 +16,9 @@ import 'package:customer_app/features/address/presentation/address_screens.dart'
 import 'package:customer_app/shared/shopping_context.dart'
     show currentMfcIdProvider;
 import 'package:customer_app/features/catalog/presentation/widgets/product_tile_card.dart';
+
+import 'package:customer_app/features/catalog/presentation/product_detail_screen.dart'
+    show lowStockToastDuration;
 
 import 'support/app_harness.dart';
 
@@ -787,12 +788,45 @@ void main() {
       final d0 = find.byKey(const ValueKey('description-image-0'));
       final d1 = find.byKey(const ValueKey('description-image-1'));
       final t0 = find.byKey(const ValueKey('detail-image-0'));
-      await t.scrollUntilVisible(t0, 200);
+      // 상품설명(사용자 레퍼런스 2026-11-25): 설명 사진은 본문에(길면 접힘 — 펼친다), 상세 이미지는 "상세정보 ›" 시트에.
+      final toggle = find.byKey(const ValueKey('product-description-toggle'));
+      await t.scrollUntilVisible(
+        find.byKey(const ValueKey('product-description')),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.pumpAndSettle();
+      if (toggle.evaluate().isNotEmpty) {
+        await t.ensureVisible(toggle);
+        await t.pumpAndSettle();
+        await t.tap(toggle);
+        await t.pumpAndSettle();
+      }
+      await t.scrollUntilVisible(
+        d1,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(d0, findsOneWidget);
       expect(d1, findsOneWidget);
-      expect(find.text('상세 정보'), findsOneWidget);
       expect(t.getTopLeft(d0).dy, lessThan(t.getTopLeft(d1).dy));
-      expect(t.getTopLeft(d1).dy, lessThan(t.getTopLeft(t0).dy));
+      expect(t0, findsNothing);
+      final info = find.byKey(const ValueKey('product-info-row'));
+      await t.scrollUntilVisible(
+        info,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await t.pumpAndSettle();
+      expect(find.text('상세정보'), findsOneWidget);
+      await t.tap(info);
+      await t.pumpAndSettle();
+      await t.scrollUntilVisible(
+        t0,
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      expect(t0, findsOneWidget);
     });
 
     testWidgets('이미지가 없으면 상세 정보 칸을 만들지 않는다', (t) async {
@@ -884,12 +918,70 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('배달 주소를 정하면 살 수 있어요'), findsOneWidget);
-      final add = t.widget<AddToCartBar>(find.byType(AddToCartBar));
-      expect(add.enabled, isFalse);
+      // 담기는 아래 [구매하기] 시트(사용자 레퍼런스 2026-11-25).
+      await t.tap(find.byKey(const ValueKey('product-buy')));
+      await t.pumpAndSettle();
+      // 수량 칸이 막혀 있다(레퍼런스 7-3 시트).
+      await t.tap(find.byKey(const ValueKey('add-inc-E-00000001')));
+      await t.pump();
+      expect(
+        t
+            .widget<FilledButton>(find.byKey(const ValueKey('add-to-cart')))
+            .onPressed,
+        isNull,
+      );
+      // 시트를 닫고 위 안내 줄의 [주소 정하기].
+      await t.tapAt(const Offset(10, 10));
+      await t.pumpAndSettle();
 
       await t.tap(find.byKey(const ValueKey('product-cannot-buy-action')));
       await t.pumpAndSettle();
       expect(find.byType(AddressListScreen), findsOneWidget);
+    });
+
+    testWidgets(
+      'N개 남음(BR-100 R7, 레퍼런스 7-1~7-3): 카드 빨간 줄 · 상세 알림 3초 · 구매 시트 빨간 줄',
+      (t) async {
+        await t.pumpWidget(testApp([]));
+        await t.pumpAndSettle();
+        await t.tap(find.text('검색').last);
+        await t.pumpAndSettle();
+        await _search(t, '감귤');
+        await t.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('tile-low-stock-P-0003')),
+          findsOneWidget,
+        );
+        expect(find.text('3개 남음'), findsOneWidget);
+        await tapTile(t, 'P-0003');
+        expect(
+          find.byKey(const ValueKey('product-low-stock-toast')),
+          findsOneWidget,
+        );
+        expect(find.text('품절까지 3개 남았어요.'), findsOneWidget);
+        await t.tap(find.byKey(const ValueKey('product-buy')));
+        await t.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('option-low-stock-E-00000003')),
+          findsOneWidget,
+        );
+        await t.tapAt(const Offset(10, 10));
+        await t.pumpAndSettle();
+        await t.pump(lowStockToastDuration);
+        await t.pumpAndSettle();
+        expect(find.text('품절까지 3개 남았어요.'), findsNothing);
+      },
+    );
+
+    testWidgets('넉넉한 상품은 N개 남음·알림이 없다', (t) async {
+      await t.pumpWidget(testApp([]));
+      await t.pumpAndSettle();
+      await tapTile(t, 'P-0006');
+      expect(
+        find.byKey(const ValueKey('product-low-stock-toast')),
+        findsNothing,
+      );
+      expect(find.textContaining('개 남음'), findsNothing);
     });
 
     testWidgets('일시품절이면 담기를 열지 않고 품절로 보인다', (t) async {
@@ -902,37 +994,50 @@ void main() {
       await t.pumpAndSettle();
       await tapTile(t, 'P-0004');
 
+      // 담기는 아래 [구매하기] 시트(사용자 레퍼런스 2026-11-25) — 옵션 줄에 일시품절.
+      await t.tap(find.byKey(const ValueKey('product-buy')));
+      await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('option-E-00000004')), findsOneWidget);
       expect(find.textContaining('일시품절'), findsWidgets);
-      final add = t.widget<AddToCartBar>(find.byType(AddToCartBar));
-      expect(add.enabled, isFalse);
+      await t.tap(find.byKey(const ValueKey('add-inc-E-00000004')));
+      await t.pump();
+      expect(
+        t
+            .widget<FilledButton>(find.byKey(const ValueKey('add-to-cart')))
+            .onPressed,
+        isNull,
+      );
     });
 
-    testWidgets('옵션이 하나뿐이면 옵션 선택이 없고 가격·담기만 보인다', (t) async {
+    testWidgets('옵션이 하나뿐이면 그 한 줄(이름·가격·수량 칸)만 보인다', (t) async {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();
       await tapTile(t, 'P-0006');
+      await t.tap(find.byKey(const ValueKey('product-buy')));
+      await t.pumpAndSettle();
 
       expect(find.text('옵션 선택'), findsNothing);
       expect(find.byType(RadioListTile<String>), findsNothing);
       expect(find.byKey(const ValueKey('product-price')), findsOneWidget);
       // 라벨이 없어도 SKU 코드는 보이지 않는다.
       expect(find.textContaining('E-0000'), findsNothing);
-      final add = t.widget<AddToCartBar>(find.byType(AddToCartBar));
-      expect(add.enabled, isTrue);
-      expect(add.sku, 'E-00000006');
+      expect(find.byKey(const ValueKey('option-E-00000006')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('add-inc-E-00000006')));
+      await t.pump();
+      expect(
+        t
+            .widget<FilledButton>(find.byKey(const ValueKey('add-to-cart')))
+            .onPressed,
+        isNotNull,
+      );
     });
 
     testWidgets('묶음 옵션은 별도 SKU 로 보인다', (t) async {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();
       await tapTile(t, 'P-0001');
-      // 큰 가격·단위 가격 줄 아래라 옵션이 화면 밖일 수 있다.
-      await t.scrollUntilVisible(
-        find.byKey(const ValueKey('option-B-00000011')),
-        200,
-        scrollable: find.byType(Scrollable).last,
-      );
+      // 옵션은 [구매하기] 시트(사용자 레퍼런스 2026-11-25).
+      await t.tap(find.byKey(const ValueKey('product-buy')));
       await t.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('option-E-00000001')), findsOneWidget);

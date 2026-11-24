@@ -151,7 +151,8 @@ void main() {
       final bytes = await source.download(now!.imageUrl);
       expect(
         adapter.requests.last.uri.toString(),
-        'http://img.invalid/api/v1/storefront/banner-images/I-1',
+        // 서버 축소본(BR-99) 1440 단계로 받는다.
+        'http://img.invalid/api/v1/storefront/banner-images/I-1?w=1440',
       );
       expect(bytes, isNotEmpty);
     });
@@ -222,6 +223,9 @@ void main() {
       );
       final g = (box.decoration as BoxDecoration).gradient! as LinearGradient;
       expect(g.colors, [const Color(0xFFFF8800), const Color(0xFF113355)]);
+      // 프로모션 최소 1.5초 타이머를 끝낸다(남은 타이머로 시험이 깨지지 않게).
+      await t.pump(const Duration(milliseconds: 1600));
+      await t.pumpAndSettle();
     });
 
     testWidgets('받을 때 그림 위·아래 가장자리 색을 계산해 둔다', (t) async {

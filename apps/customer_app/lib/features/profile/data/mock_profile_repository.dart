@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:pmart_core/pmart_core.dart';
 
+import '../../auth/domain/auth.dart' show SocialProvider;
 import '../domain/profile.dart';
 import 'profile_repository.dart';
 
@@ -31,6 +32,9 @@ final class MockProfileRepository implements ProfileRepository {
   String? email;
   bool? emailVerified;
   String? profileImageUrl;
+
+  /// 시험용: 가입한 제공자(`GET /me` socialProvider). 없으면 null(앱은 세션 제공자로).
+  SocialProvider? socialProvider;
 
   /// `GET /me/profile-image` 가 돌려줄 사진. null 이면 사본 없음(404).
   Uint8List? imageBytes;
@@ -79,6 +83,7 @@ final class MockProfileRepository implements ProfileRepository {
       email: email,
       emailVerified: emailVerified,
       profileImageUrl: profileImageUrl,
+      socialProvider: socialProvider,
       withdrawPending: withdrawPending,
       photoSource: photoSource,
       restriction: restriction,

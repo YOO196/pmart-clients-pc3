@@ -145,7 +145,20 @@ final imageOriginProvider = Provider<String?>(
 /// 서버 콘텐츠 이미지(`/content-images/{id}`, product-content 0.3.0)·리뷰 사진(`/review-photos/{id}`, review 0.4.0 —
 /// 백엔드 요청 2026-11-20 review-photo-thumbnails)에 축소 폭 `?w=`(240·480·720)을 붙인다.
 /// 그릴 폭(물리 화소)보다 크거나 같은 가장 작은 값, 넘으면 720. 다른 주소·이미 쿼리가 있으면 그대로.
+///
+/// 배너 그림(`/storefront/banner-images/{id}`, storefront 0.16.0 BR-99)은 서버가 360·720·1080·1440 단계 JPEG
+/// 축소본을 준다(원본 PNG 약 2MB → 약 0.1MB). 같은 단계로 올려 붙인다(넘으면 1440).
 String? withImageWidth(String? url, double pixels) {
+  if (url != null && url.contains('/banner-images/') && !url.contains('?')) {
+    final w = pixels <= 360
+        ? 360
+        : pixels <= 720
+        ? 720
+        : pixels <= 1080
+        ? 1080
+        : 1440;
+    return '$url?w=$w';
+  }
   if (url == null ||
       !(url.contains('/content-images/') || url.contains('/review-photos/')) ||
       url.contains('?')) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/providers.dart';
+import '../../../../shared/network_image.dart';
 
 /// 상세설명(롱이미지 조각)·상세정보 표 이미지. 화면 폭에 맞추고 높이는 원본 비율을 따른다.
 /// 조각을 위아래로 붙여 한 장처럼 보이게 하려고 간격·모서리를 두지 않는다.
@@ -33,7 +34,7 @@ class ContentImage extends ConsumerWidget {
         final width = c.maxWidth.isFinite
             ? c.maxWidth
             : MediaQuery.sizeOf(context).width;
-        return Image.network(
+        return pmartNetworkImage(
           u,
           width: double.infinity,
           fit: BoxFit.fitWidth,

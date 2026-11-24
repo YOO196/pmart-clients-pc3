@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -13,12 +15,19 @@ import '../../../shared/ui_state_of.dart';
 import '../../wishlist/presentation/wish_heart_button.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
-import '../../reviews/presentation/reviews_screens.dart'
-    show ProductReviewsPreview;
-import '../../cart/presentation/cart_screen.dart' show AddToCartBar;
+import '../../../shared/notice.dart';
+import '../../cart/domain/cart.dart';
+import '../../cart/presentation/cart_controller.dart';
+import '../../cart/presentation/cart_messages.dart';
 import 'widgets/content_image.dart';
 import 'widgets/discount_price.dart';
+import 'widgets/low_stock_toast.dart';
 import 'widgets/product_tile_card.dart';
+import 'home_providers.dart' show homeDeliveryOptionsProvider;
+import 'home_screen.dart' show BannerPager, DeliveryGuideSheet;
+import 'product_detail_sections.dart';
+import 'widgets/delivery_badges.dart';
+import '../../checkout/domain/checkout.dart' show DeliveryMode;
 
 /// SCR-PRODUCT-001·OPTION-001. 가격·가용은 사본이다. 구매 가능 확정은 장바구니·주문서 서버 판정.
 class ProductDetailScreen extends ConsumerStatefulWidget {
@@ -34,8 +43,36 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
       _ProductDetailScreenState();
 }
 
+/// "품절까지 N개 남았어요." 보이는 시간.
+const lowStockToastDuration = Duration(seconds: 3);
+
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   String? _selectedSku;
+
+  /// "품절까지 N개 남았어요."(레퍼런스 7-2) — 화면을 열 때 한 번, 몇 초 보이고 사라진다.
+  int? _lowToast;
+  bool _lowToastChecked = false;
+  Timer? _lowToastTimer;
+
+  void _maybeShowLowToast(ProductDetail p) {
+    if (_lowToastChecked) return;
+    _lowToastChecked = true;
+    final left = lowStockLeft(p);
+    if (left == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _lowToast = left);
+      _lowToastTimer = Timer(lowStockToastDuration, () {
+        if (mounted) setState(() => _lowToast = null);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _lowToastTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -66,6 +103,8 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     };
     return Scaffold(
       appBar: AppBar(
+        // 레퍼런스 상단 막대 높이(약 47dp).
+        toolbarHeight: 47,
         actions: [
           IconButton(
             key: const ValueKey('detail-home'),
@@ -94,24 +133,88 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                 loading: (_) => const PmartDetailSkeleton(),
                 state: uiStateOf(value),
                 onRetry: () => ref.invalidate(provider),
-                ready: (context, p) => _body(context, l10n, p),
+                ready: (context, p) {
+                  _maybeShowLowToast(p);
+                  return Stack(
+                    children: [
+                      Positioned.fill(child: _body(context, l10n, p)),
+                      // 아래 막대 바로 위 가운데(레퍼런스 7-2 — 알약 아래 끝이 막대 위 선에 닿는다).
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: IgnorePointer(
+                          child: AnimatedOpacity(
+                            opacity: _lowToast == null ? 0 : 1,
+                            duration: const Duration(milliseconds: 200),
+                            child: Center(
+                              child: _lowToast == null
+                                  ? const SizedBox.shrink()
+                                  : LowStockToast(
+                                      key: const ValueKey(
+                                        'product-low-stock-toast',
+                                      ),
+                                      count: _lowToast!,
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             },
+      // 아래 막대(레퍼런스): 찜 하트 + [구매하기] — 누르면 옵션·수량·담기 시트.
       bottomNavigationBar: switch (value) {
-        AsyncData(value: final p) => Builder(
-          builder: (context) {
-            final selected = _selected(p);
-            return AddToCartBar(
-              sku: selected?.sku,
-              enabled: selected?.canOfferAdd ?? false,
-              // 찜 하트(customer 0.13.0 — 레퍼런스 4-1 아래 막대 왼쪽)
-              leading: WishHeartButton(
-                key: const ValueKey('detail-wish'),
-                productId: p.productId,
-                size: 26,
+        AsyncData(value: final p) => Material(
+          color: Theme.of(context).colorScheme.surface,
+          shape: Border(
+            top: BorderSide(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 9, 13, 9),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 52,
+                    height: 54,
+                    child: Center(
+                      child: WishHeartWithCount(
+                        heartKey: const ValueKey('detail-wish'),
+                        productId: p.productId,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SizedBox(
+                      height: 54,
+                      child: FilledButton(
+                        key: const ValueKey('product-buy'),
+                        style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          textStyle: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                        onPressed: () => _openBuySheet(p),
+                        child: Text(l10n.productBuy),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         ),
         _ => null,
       },
@@ -122,254 +225,816 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
       p.options.where((o) => o.sku == _selectedSku).firstOrNull ??
       p.options.where((o) => o.canOfferAdd).firstOrNull;
 
+  final _descriptionKey = GlobalKey();
+  final _reviewsKey = GlobalKey();
+  bool _reviewsTab = false;
+
+  void _scrollTo(GlobalKey key, {required bool reviews}) {
+    setState(() => _reviewsTab = reviews);
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  Future<void> _openBuySheet(ProductDetail p) =>
+      showProductBuySheet(context, p);
+
   Widget _body(BuildContext context, AppLocalizations l10n, ProductDetail p) {
     final theme = Theme.of(context);
     final selected = _selected(p);
-    final bodyTone = theme.textTheme.bodyMedium?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
     final scheme = theme.colorScheme;
     // 평점: 상세 응답 rating(product-content 0.3.0 — BR-63, 집계와 같은 값). 비어 오면 그때만 평점 집계를 부른다.
     final rating =
         p.rating ?? ref.watch(productRatingProvider(p.productId)).value;
-
     final hasRating = rating != null;
-    // 사진 아래 내용(좌우 여백 16). 구획 띠([PmartSectionGap])만 화면 폭을 채운다.
     final reason = p.cannotBuyReason;
-    final rest = <Widget>[
-      if (reason != null && reason != CannotBuyReason.soldOut) ...[
-        const SizedBox(height: 14),
-        _CannotBuyNotice(
-          reason: reason,
-          onRetry: () =>
-              ref.invalidate(productDetailProvider(widget.productId)),
-        ),
-      ],
-      const SizedBox(height: 14),
-      Text(
-        p.name,
-        style: theme.textTheme.titleLarge?.copyWith(
-          fontSize: 15,
-          height: 1.35,
-          fontWeight: FontWeight.w400,
-        ),
-      ),
-      const SizedBox(height: 10),
-      // 평점 알약(레퍼런스 4-1): "★ 4.9 리뷰 12,569개 >" — 누르면 리뷰 전체
-      Align(
-        alignment: Alignment.centerLeft,
-        child: Material(
-          color: scheme.surface,
-          shape: StadiumBorder(
-            side: BorderSide(color: scheme.outlineVariant, width: 1.2),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            key: const ValueKey('product-rating-pill'),
-            onTap: hasRating
-                ? () => context.push('/products/${p.productId}/reviews')
-                : null,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 5, 8, 5),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (hasRating) ...[
-                    const Icon(
-                      Icons.star_rounded,
-                      size: 16,
-                      color: Color(0xFFFFB300),
-                    ),
-                    const SizedBox(width: 3),
-                  ],
-                  Flexible(
-                    child: Text.rich(
-                      hasRating
-                          ? TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: rating.average.toStringAsFixed(1),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text:
-                                      ' ${l10n.reviewSectionCount(rating.count)}',
-                                ),
-                              ],
-                            )
-                          : TextSpan(text: l10n.ratingUnavailable),
-                      key: const ValueKey('product-rating'),
-                      semanticsLabel: ratingText(
-                        l10n,
-                        rating?.average,
-                        rating?.count,
-                      ),
-                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12),
-                    ),
-                  ),
-                  if (hasRating)
-                    const PmartLineIcon(PmartLineIcons.chevronRight, size: 16),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-      // 큰 가격 + 단위 가격(레퍼런스 4-1) — 고른 옵션의 서버 값
-      if (selected != null) ...[
-        const SizedBox(height: 12),
-        // 기간 할인(pricing 0.3.0): 빨간 할인율 + 할인가 + 정가 취소선. 할인을 모르면 정가만(서버 값).
-        if ((selected.discount, selected.priceNotSet) case (final d?, false))
-          DiscountPriceText(
-            key: const ValueKey('product-price'),
-            price: d.salePrice,
-            ratePercent: d.ratePercent,
-            base: selected.basePrice,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          )
-        else
-          Text(
-            _priceText(l10n, selected),
-            key: const ValueKey('product-price'),
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        if (selected.unitPrice case final u?)
-          Text(
-            l10n.unitPriceLine('${u.basis}${u.unitLabel}', formatKrw(u.price)),
-            key: const ValueKey('product-unit-price'),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontSize: 11.5,
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-      ],
-      const SizedBox(height: 16),
-      // 옵션이 하나뿐이면 고를 것이 없으니 가격·재고만 보이고, 둘 이상일 때만 옵션 선택을 연다.
-      if (p.options case [final only])
-        _SingleOptionSummary(option: only)
-      else ...[
-        Text(l10n.productOptions, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
-        RadioGroup<String>(
-          groupValue: selected?.sku,
-          onChanged: (sku) => setState(() => _selectedSku = sku),
-          child: Column(
-            children: [
-              for (final o in p.options)
-                _OptionTile(option: o, selected: o.sku == selected?.sku),
-            ],
-          ),
-        ),
-      ],
-      const SizedBox(height: 6),
-      Text(l10n.priceNote, style: theme.textTheme.bodySmall),
-      const SizedBox(height: 20),
-      const PmartSectionGap(),
-      const SizedBox(height: 20),
-      // 리뷰 미리보기(GET /products/{id}/reviews). 실패는 "리뷰 없음"이 아니라 실패로 보인다.
-      ProductReviewsPreview(productId: p.productId),
-      // 초안 14 B(사용자 2026-11-23 "B해줘"): 리뷰 아래 영양·알레르기 구획.
-      const _DetailDivider(),
-      NutritionAllergenSection(nutrition: p.nutrition, allergens: p.allergens),
-      if (p.description != null || p.descriptionImageUrls.isNotEmpty) ...[
-        const _DetailDivider(),
-        Text(l10n.productDescription, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 6),
-        if (p.description case final String d) Text(d, style: bodyTone),
-        if (p.descriptionImageUrls.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          // 롱이미지 조각은 sortOrder 순서로 간격 없이 이어 붙인다.
-          for (final (i, url) in p.descriptionImageUrls.indexed)
-            ContentImage(key: ValueKey('description-image-$i'), url: url),
+    // 대표 카테고리(맨 끝 노드) — 같은 카테고리 진열·"{이름} 인기상품".
+    final categoryId = p.categoryPath.lastOrNull;
+    final categoryName = categoryId == null
+        ? null
+        : ref
+              .watch(categoriesProvider)
+              .value
+              ?.where((c) => c.categoryId == categoryId)
+              .firstOrNull
+              ?.name;
+    // 원산지: 서버 칸 `origin`(product-content 0.9.0 BR-100 R1). 옛 응답이면 notices 의 "원산지:" 줄.
+    final origin =
+        p.origin ??
+        p.notices
+            .map(splitNotice)
+            .where((n) => n.label == '원산지')
+            .firstOrNull
+            ?.value;
+    final freeFrom = ref
+        .watch(homeDeliveryOptionsProvider)
+        .value
+        ?.where((o) => o.available && o.mode != DeliveryMode.scheduled)
+        .map((o) => o.freeTipFrom)
+        .nonNulls
+        .firstOrNull;
+    final pad = const EdgeInsets.symmetric(horizontal: 16.7);
+    Widget padded(Widget w) => Padding(padding: pad, child: w);
+
+    Widget? shelf(
+      String title,
+      AsyncValue<List<ProductTile>?> v,
+      Key key, {
+      String? accent,
+      bool rail = false,
+    }) {
+      final items = v.value;
+      if (items == null || items.isEmpty) return null;
+      return Column(
+        key: key,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DetailSectionTitle(title, accent: accent),
+          if (rail)
+            DetailProductRail(items: items.take(10).toList())
+          else
+            DetailRowGrid(items: items.take(9).toList()),
+          const SizedBox(height: 20),
         ],
-      ],
-      if (p.storageGuide case final String g) ...[
-        const _DetailDivider(),
-        Text(l10n.productStorageGuide, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 6),
-        Text(g, style: bodyTone),
-      ],
-      if (p.returnGuide case final String g) ...[
-        const _DetailDivider(),
-        Text(l10n.productReturnGuide, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 6),
-        Text(g, style: bodyTone),
-      ],
-      if (p.notices.isNotEmpty) ...[
-        const _DetailDivider(),
-        Text(l10n.productNotices, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 6),
-        for (final n in p.notices) Text('· $n', style: bodyTone),
-      ],
-      if (p.detailImageUrls.isNotEmpty) ...[
-        const _DetailDivider(),
-        Text(l10n.productDetailInfo, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
-        for (final (i, url) in p.detailImageUrls.indexed)
-          ContentImage(key: ValueKey('detail-image-$i'), url: url),
-      ],
-    ];
-    // 위 사진 + 나머지 줄. 화면에 들어올 때 만든다(설명 이미지 여러 장을 처음에 다 만들지 않게 — 백엔드 요청 2026-11-19).
-    // 정말 다 팔렸을 때만 사진을 어둡게 덮고 "다 팔렸어요"(레퍼런스 4-1). 주소 없음·재고 조회 실패·배달 안 함은
-    // 품절이 아니라 위 안내 줄로 알린다(백엔드 요청 2026-11-20 availability-display).
-    final soldOut = reason == CannotBuyReason.soldOut;
-    Widget item(int i) {
-      if (i == 0) {
-        return LayoutBuilder(
-          // 레퍼런스: 화면 폭 정사각형(360dp)
-          builder: (context, c) => Stack(
-            children: [
-              ProductImage(
-                url: p.mainImageUrl,
-                size: c.maxWidth,
-                // 넓은 화면에서 사진이 내용을 다 밀어내지 않게 화면 높이 절반까지만
-                height: math.min(
-                  c.maxWidth,
-                  MediaQuery.sizeOf(context).height * 0.5,
-                ),
-                radius: 0,
-              ),
-              if (soldOut)
-                Positioned.fill(
-                  child: ColoredBox(
-                    key: const ValueKey('product-sold-out-cover'),
-                    color: Colors.black.withValues(alpha: 0.42),
-                    child: Center(
-                      child: Text(
-                        l10n.productSoldOutCover,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      }
-      final w = rest[i - 1];
-      return w is PmartSectionGap
-          ? w
-          : Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: w,
-            );
+      );
     }
 
-    return ListView.builder(
+    final viewed = categoryId == null
+        ? null
+        : shelf(
+            l10n.productViewedTogether,
+            ref.watch(
+              relatedProductsProvider((
+                productId: p.productId,
+                categoryId: categoryId,
+                kind: RelatedKind.viewedTogether,
+              )),
+            ),
+            const ValueKey('shelf-viewed-together'),
+            rail: true,
+          );
+    final topRated = categoryId == null
+        ? null
+        : shelf(
+            l10n.productTopRated,
+            ref.watch(
+              categoryShelfProvider((
+                categoryId: categoryId,
+                sort: SortKey.rating,
+                excludeId: p.productId,
+              )),
+            ),
+            const ValueKey('shelf-top-rated'),
+          );
+    final bought = categoryId == null
+        ? null
+        : shelf(
+            l10n.productBoughtTogether,
+            ref.watch(
+              relatedProductsProvider((
+                productId: p.productId,
+                categoryId: categoryId,
+                kind: RelatedKind.boughtTogether,
+              )),
+            ),
+            const ValueKey('shelf-bought-together'),
+          );
+    final popular = categoryId == null
+        ? null
+        : shelf(
+            l10n.productCategoryPopular,
+            ref.watch(
+              categoryShelfProvider((
+                categoryId: categoryId,
+                sort: SortKey.popular,
+                excludeId: p.productId,
+              )),
+            ),
+            const ValueKey('shelf-category-popular'),
+            accent: categoryName,
+          );
+    final banners = ref.watch(productPageBannersProvider).value ?? const [];
+
+    final soldOut = reason == CannotBuyReason.soldOut;
+    final children = <Widget>[
+      // 사진(화면 폭 정사각형, 넓은 화면에서는 화면 높이 절반까지)
+      LayoutBuilder(
+        builder: (context, c) => Stack(
+          children: [
+            ProductImage(
+              url: p.mainImageUrl,
+              size: c.maxWidth,
+              height: math.min(
+                c.maxWidth,
+                MediaQuery.sizeOf(context).height * 0.5,
+              ),
+              radius: 0,
+            ),
+            if (soldOut)
+              Positioned.fill(
+                child: ColoredBox(
+                  key: const ValueKey('product-sold-out-cover'),
+                  color: Colors.black.withValues(alpha: 0.42),
+                  child: Center(
+                    child: Text(
+                      l10n.productSoldOutCover,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      if (reason != null && reason != CannotBuyReason.soldOut)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16.7, 14, 16.7, 0),
+          child: _CannotBuyNotice(
+            reason: reason,
+            onRetry: () =>
+                ref.invalidate(productDetailProvider(widget.productId)),
+          ),
+        ),
+      // 이름 · 원산지 · 평점 칸 · 가격 · 단위가격(레퍼런스 순서)
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16.7, 12, 16.7, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              p.name,
+              key: const ValueKey('product-name'),
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontSize: 16.7,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            if (origin != null)
+              Text(
+                l10n.productOriginLine(origin),
+                key: const ValueKey('product-origin'),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: 16.2,
+                  height: 1.4,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            const SizedBox(height: 8),
+            Material(
+              color: scheme.surface,
+              shape: StadiumBorder(
+                side: BorderSide(color: scheme.outlineVariant, width: 1.2),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                key: const ValueKey('product-rating-pill'),
+                onTap: hasRating
+                    ? () => _scrollTo(_reviewsKey, reviews: true)
+                    : null,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 6, 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (hasRating) ...[
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 17,
+                          color: Color(0xFFFFB300),
+                        ),
+                        const SizedBox(width: 2),
+                      ],
+                      Flexible(
+                        child: Text.rich(
+                          hasRating
+                              ? TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: rating.average.toStringAsFixed(1),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text:
+                                          ' ${l10n.reviewSectionCount(rating.count)}',
+                                    ),
+                                  ],
+                                )
+                              : TextSpan(text: l10n.ratingUnavailable),
+                          key: const ValueKey('product-rating'),
+                          semanticsLabel: ratingText(
+                            l10n,
+                            rating?.average,
+                            rating?.count,
+                          ),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 13.7,
+                          ),
+                        ),
+                      ),
+                      if (hasRating)
+                        const PmartLineIcon(
+                          PmartLineIcons.chevronRight,
+                          size: 15,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (selected != null) ...[
+              const SizedBox(height: 11),
+              if ((selected.discount, selected.priceNotSet) case (
+                final d?,
+                false,
+              ))
+                DiscountPriceText(
+                  key: const ValueKey('product-price'),
+                  price: d.salePrice,
+                  ratePercent: d.ratePercent,
+                  base: selected.basePrice,
+                  rateColor: const Color(0xFFFF3E3E),
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontSize: 19.4,
+                    fontWeight: FontWeight.w800,
+                  ),
+                )
+              else
+                Text(
+                  _priceText(l10n, selected),
+                  key: const ValueKey('product-price'),
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontSize: 19.4,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              if (selected.unitPrice case final u?)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    l10n.unitPriceLine(
+                      '${u.basis}${u.unitLabel}',
+                      formatKrw(u.price),
+                    ),
+                    key: const ValueKey('product-unit-price'),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 13.4,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+      // 배달팁 0원 줄(홈과 같은 값 — BR-96)
+      if (freeFrom != null)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16.7, 22, 16.7, 0),
+          child: Material(
+            color: scheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(11.4),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              key: const ValueKey('product-free-tip'),
+              onTap: () => showModalBottomSheet<void>(
+                context: context,
+                useRootNavigator: true,
+                isScrollControlled: true,
+                builder: (_) => DeliveryGuideSheet(
+                  options:
+                      ref.read(homeDeliveryOptionsProvider).value ?? const [],
+                ),
+              ),
+              child: SizedBox(
+                height: 47,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 12, 0),
+                  child: Row(
+                    children: [
+                      const ShieldPercentIcon(),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          l10n.homeFreeTipFrom(formatKrw(freeFrom)),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontSize: 15.2,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const PmartLineIcon(
+                        PmartLineIcons.chevronRight,
+                        size: 17,
+                        strokeWidth: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      const SizedBox(height: 14),
+      const DetailBand(),
+      ?viewed,
+      if (viewed != null) const DetailBand(),
+      ?topRated,
+      if (banners.isNotEmpty)
+        SizedBox(
+          key: const ValueKey('product-page-banner'),
+          height: 91,
+          child: BannerPager(banners: banners, onOpen: (_) {}),
+        ),
+      // [상품설명 | 리뷰 N] 탭
+      DetailTabs(
+        reviewCount: rating?.count,
+        reviewsSelected: _reviewsTab,
+        onDescription: () => _scrollTo(_descriptionKey, reviews: false),
+        onReviews: () => _scrollTo(_reviewsKey, reviews: true),
+      ),
+      KeyedSubtree(
+        key: _descriptionKey,
+        child: PurchaseNoteBox(product: p, onMore: () => _openInfo(p)),
+      ),
+      if (p.description != null || p.descriptionImageUrls.isNotEmpty)
+        CollapsibleDescription(
+          title: p.name,
+          children: [
+            if (p.description case final String d)
+              padded(
+                Text(
+                  d,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontSize: 15,
+                    height: 1.6,
+                  ),
+                ),
+              ),
+            if (p.descriptionImageUrls.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              for (final (i, url) in p.descriptionImageUrls.indexed)
+                padded(
+                  ContentImage(key: ValueKey('description-image-$i'), url: url),
+                ),
+            ],
+          ],
+        )
+      else
+        const SizedBox(height: 24),
+      const DetailBand(),
+      ?bought,
+      if (bought != null) const DetailBand(),
+      ?popular,
+      if (popular != null) const DetailBand(),
+      // 리뷰는 아래쪽(레퍼런스 — 사용자 2026-11-25 "리뷰 아래로 내려주고")
+      KeyedSubtree(
+        key: _reviewsKey,
+        child: DetailReviewSection(productId: p.productId, rating: rating),
+      ),
+      const DetailBand(),
+      DetailInfoRow(
+        key: const ValueKey('product-info-row'),
+        label: l10n.productDetailInfoRow,
+        onTap: () => _openInfo(p),
+      ),
+      if (p.returnGuide case final String g)
+        DetailInfoRow(
+          key: const ValueKey('product-return-row'),
+          label: l10n.productReturnInfo,
+          onTap: () => showDetailTextSheet(
+            context,
+            title: l10n.productReturnInfo,
+            body: Text(g, style: theme.textTheme.bodyMedium),
+          ),
+        ),
+      const DetailBand(),
+    ];
+    return ListView(
       padding: const EdgeInsets.only(bottom: 24),
-      itemCount: rest.length + 1,
-      itemBuilder: (context, i) => item(i),
+      children: children,
+    );
+  }
+
+  /// 상세정보(영양·알레르기 + 상품정보 표 + 상세 이미지).
+  void _openInfo(ProductDetail p) {
+    final l10n = AppLocalizations.of(context);
+    showDetailTextSheet(
+      context,
+      title: l10n.productDetailInfo,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (p.storageGuide case final String g) ...[
+            Text(
+              l10n.productStorageGuide,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 4),
+            Text(g),
+            const SizedBox(height: 14),
+          ],
+          NutritionAllergenSection(
+            nutrition: p.nutrition,
+            allergens: p.allergens,
+          ),
+          if ((p.legalInfo?.isNotEmpty ?? false) || p.notices.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            NoticeTable(
+              rows: p.legalInfo ?? p.notices.map(splitNotice).toList(),
+            ),
+          ],
+          for (final (i, url) in p.detailImageUrls.indexed)
+            ContentImage(key: ValueKey('detail-image-$i'), url: url),
+        ],
+      ),
+    );
+  }
+}
+
+/// [구매하기] 시트 — 옵션(둘 이상이면 고르기)·수량·담기. 담기는 상세 응답 뒤에만(사본으로 확정하지 않는다).
+/// 상품 상세와 리뷰 전체 보기(사용자 레퍼런스 2026-11-25 — 아래 막대)가 같이 쓴다.
+Future<void> showProductBuySheet(BuildContext context, ProductDetail p) =>
+    showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      builder: (_) => ProductBuySheet(product: p),
+    );
+
+class ProductBuySheet extends ConsumerStatefulWidget {
+  const ProductBuySheet({super.key, required this.product});
+
+  final ProductDetail product;
+
+  @override
+  ConsumerState<ProductBuySheet> createState() => _ProductBuySheetState();
+}
+
+/// 레퍼런스 7-3(사용자 2026-11-25): 옵션마다 사진 58.6 · 이름(보통 13.7) · "N개 남음"(빨강) · 할인율+가격(굵게 14.5) ·
+/// 단위가격(11.8) · 오른쪽 수량 칸(98×35, 0 부터). 아래 [상품을 선택해 주세요](회색) → 고르면 [N개 담기].
+/// 옵션 사진·"최대 N개 구매 가능(1회당)"은 계약에 없어(BR-101) 상품 대표 사진을 쓰고 최대 줄은 뺀다.
+class _ProductBuySheetState extends ConsumerState<ProductBuySheet> {
+  final Map<String, int> _qty = {};
+  bool _busy = false;
+
+  int get _total => _qty.values.fold(0, (a, b) => a + b);
+
+  Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+    final controller = ref.read(cartControllerProvider.notifier);
+    setState(() => _busy = true);
+    String? problem;
+    for (final e in _qty.entries.where((e) => e.value > 0).toList()) {
+      final outcome = await controller.submit(
+        AddItem(sku: e.key, quantity: e.value),
+      );
+      if (outcome is CartChangeApplied) {
+        if (mounted) setState(() => _qty.remove(e.key));
+        continue;
+      }
+      problem = switch (outcome) {
+        CartChangeRejected() => cartRejectionText(l10n, outcome),
+        CartVersionConflict() => l10n.cartNoticeConflict,
+        CartChangeUnknown() => l10n.cartChangeUnknown,
+        CartChangeNotApplied() => l10n.cartNoticeNotApplied,
+        _ => null,
+      };
+      break;
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (problem != null) {
+      messenger.notice(problem);
+      return;
+    }
+    nav.pop();
+    messenger.notice(l10n.cartAdded);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final p = widget.product;
+    final cart = ref.watch(cartControllerProvider).value;
+    final canChange = cart?.canChange ?? false;
+    final total = _total;
+    return SafeArea(
+      child: Column(
+        key: const ValueKey('buy-sheet'),
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 손잡이(39.6×3.8, #E5E6E8) — 시트 위 9.5.
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 9.5, bottom: 3),
+              width: 39.6,
+              height: 3.8,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5E6E8),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: p.options.length,
+              separatorBuilder: (_, _) => const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20.5),
+                child: Divider(
+                  height: 1.1,
+                  thickness: 1.1,
+                  color: Color(0xFFF2F3F4),
+                ),
+              ),
+              itemBuilder: (context, i) {
+                final o = p.options[i];
+                return _BuyOptionRow(
+                  product: p,
+                  option: o,
+                  quantity: _qty[o.sku] ?? 0,
+                  enabled: o.canOfferAdd && canChange && !_busy,
+                  onChanged: (q) => setState(() => _qty[o.sku] = q),
+                );
+              },
+            ),
+          ),
+          Container(
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: Color(0xFFF2F3F4))),
+            ),
+            padding: const EdgeInsets.fromLTRB(12.2, 11.8, 12.2, 10),
+            child: SizedBox(
+              height: 49.5,
+              child: FilledButton(
+                key: const ValueKey('add-to-cart'),
+                style: FilledButton.styleFrom(
+                  disabledBackgroundColor: const Color(0xFFD6D7D9),
+                  disabledForegroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  // 앱 글꼴(Pretendard)을 잃지 않게 테마 글자에서 바꾼다.
+                  textStyle: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontSize: 17.9, fontWeight: FontWeight.w700),
+                ),
+                onPressed: total > 0 && canChange && !_busy ? _submit : null,
+                child: Text(
+                  total == 0 ? l10n.buySheetPick : l10n.buySheetAdd(total),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BuyOptionRow extends StatelessWidget {
+  const _BuyOptionRow({
+    required this.product,
+    required this.option,
+    required this.quantity,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final ProductDetail product;
+  final SaleOption option;
+  final int quantity;
+  final bool enabled;
+  final ValueChanged<int> onChanged;
+
+  static const _dark = Color(0xFF222222);
+  static const _priceStyle = TextStyle(
+    fontSize: 14.5,
+    height: 1.3,
+    fontWeight: FontWeight.w700,
+    color: _dark,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final grey = Theme.of(context).colorScheme.onSurfaceVariant;
+    final o = option;
+    final notes = _optionNotes(
+      l10n,
+      o,
+      withCapacity: o.label != null,
+    ).join(' · ');
+    return Padding(
+      key: ValueKey('option-${o.sku}'),
+      padding: const EdgeInsets.fromLTRB(20.5, 17, 20.2, 17),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          DecoratedBox(
+            position: DecorationPosition.foreground,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(7),
+              border: Border.all(color: const Color(0xFFEDEEF0), width: 0.8),
+            ),
+            child: ProductImage(
+              url: product.mainImageUrl,
+              size: 58.6,
+              radius: 7,
+            ),
+          ),
+          const SizedBox(width: 13.7),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  o.label ?? product.name,
+                  style: const TextStyle(
+                    fontSize: 13.7,
+                    height: 1.35,
+                    color: _dark,
+                  ),
+                ),
+                if (o.lowStockQty case final n?) ...[
+                  const SizedBox(height: 4),
+                  LowStockText(n, key: ValueKey('option-low-stock-${o.sku}')),
+                ],
+                if (notes.isNotEmpty)
+                  Text(
+                    notes,
+                    style: TextStyle(fontSize: 11.8, height: 1.35, color: grey),
+                  ),
+                const SizedBox(height: 9),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (o.discount case final d?)
+                            DiscountPriceText(
+                              price: d.salePrice,
+                              ratePercent: d.ratePercent,
+                              showBase: false,
+                              rateColor: LowStockText.color,
+                              style: _priceStyle,
+                            )
+                          else
+                            Text(_priceText(l10n, o), style: _priceStyle),
+                          if (o.unitPrice case final u?)
+                            Text(
+                              l10n.unitPriceLine(
+                                '${u.basis}${u.unitLabel}',
+                                formatKrw(u.price),
+                              ),
+                              style: TextStyle(
+                                fontSize: 11.8,
+                                height: 1.35,
+                                color: grey,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    _QtyBox(
+                      sku: o.sku,
+                      value: quantity,
+                      enabled: enabled,
+                      onChanged: onChanged,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 수량 칸(레퍼런스 7-3 — 98×35, 테두리 #E5E6E8, [— 0 +], 0 이면 빼기 흐림).
+class _QtyBox extends StatelessWidget {
+  const _QtyBox({
+    required this.sku,
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String sku;
+  final int value;
+  final bool enabled;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    const on = Color(0xFF222222);
+    const off = Color(0xFFD6D7D9);
+    Widget button(String key, PmartLineIcons icon, VoidCallback? tap) =>
+        InkWell(
+          key: ValueKey('$key-$sku'),
+          onTap: tap,
+          child: SizedBox(
+            width: 32,
+            height: 35,
+            child: Center(
+              // 레퍼런스: 13dp, 선 약 1.3dp(+ 는 진하게, 0 일 때 − 는 흐리게).
+              child: PmartLineIcon(
+                icon,
+                size: 15,
+                strokeWidth: 2.2,
+                color: tap == null ? off : on,
+              ),
+            ),
+          ),
+        );
+    return Container(
+      width: 98,
+      height: 35.4,
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFE5E6E8)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          button(
+            'add-dec',
+            PmartLineIcons.minus,
+            enabled && value > 0 ? () => onChanged(value - 1) : null,
+          ),
+          Expanded(
+            child: Text(
+              '$value',
+              key: ValueKey('add-qty-$sku'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14.5, color: on),
+            ),
+          ),
+          button(
+            'add-inc',
+            PmartLineIcons.plus,
+            enabled ? () => onChanged(value + 1) : null,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -443,7 +1108,8 @@ Iterable<String> _optionNotes(
   switch (o.availability) {
     _ when o.carried == false => l10n.notCarried,
     Availability.soldOut => l10n.soldOutTemporarily,
-    Availability.low => l10n.availabilityLow,
+    // 남은 수량이 있으면 이름 아래 빨간 줄(레퍼런스 7-3)로 따로 그린다. 수가 없으면 "남은 수량이 적어요".
+    Availability.low => o.lowStockQty == null ? l10n.availabilityLow : null,
     Availability.unknown => l10n.productStockUnknownShort,
     // 주소가 없어 모르는 것 — 화면 위 안내 줄 하나로 알린다(옵션마다 되풀이하지 않는다).
     Availability.noCenter => null,
@@ -458,95 +1124,6 @@ String _priceText(AppLocalizations l10n, SaleOption o) => switch (o) {
 };
 
 /// 옵션이 하나뿐인 상품: 선택 UI 없이 가격과 재고 상태만 보인다.
-class _SingleOptionSummary extends StatelessWidget {
-  const _SingleOptionSummary({required this.option});
-
-  final SaleOption option;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final notes = _optionNotes(l10n, option).join(' · ');
-    return Column(
-      key: ValueKey('option-${option.sku}'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // 가격은 위 큰 가격 줄에 있다(레퍼런스 4-1). 여기는 재고·용량 보조 문구만.
-        if (notes.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              notes,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// 상세 구획 사이 선(위아래 여백 포함).
-class _DetailDivider extends StatelessWidget {
-  const _DetailDivider();
-
-  @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.symmetric(vertical: 20),
-    child: Divider(),
-  );
-}
-
-class _OptionTile extends StatelessWidget {
-  const _OptionTile({required this.option, required this.selected});
-
-  final SaleOption option;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final o = option;
-    // 라벨이 없으면 용량, 그것도 없으면 "기본". SKU 코드는 보이지 않는다.
-    final title = o.label ?? o.capacityLabel ?? l10n.optionDefault;
-    final notes = _optionNotes(
-      l10n,
-      o,
-      withCapacity: o.label != null,
-    ).join(' · ');
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        clipBehavior: Clip.antiAlias,
-        color: selected ? scheme.surfaceContainer : scheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(
-            color: selected ? scheme.primary : scheme.outlineVariant,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: RadioListTile<String>(
-          key: ValueKey('option-${o.sku}'),
-          value: o.sku,
-          enabled: o.canOfferAdd,
-          contentPadding: const EdgeInsets.only(left: 4, right: 16),
-          title: Text(title),
-          subtitle: notes.isEmpty ? null : Text(notes),
-          secondary: Text(
-            _priceText(l10n, o),
-            style: theme.textTheme.titleMedium,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// 상세 응답 전 카드 값으로 그리는 첫 화면(사진·이름·가격). 응답이 오면 그 값으로 바뀐다.
 class _PreviewBody extends StatelessWidget {
   const _PreviewBody({required this.tile});

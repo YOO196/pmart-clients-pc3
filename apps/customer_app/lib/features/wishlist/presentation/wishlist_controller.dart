@@ -99,6 +99,14 @@ class WishlistIds extends AsyncNotifier<Set<String>?> {
     final now = {...?state.value};
     wished ? now.remove(productId) : now.add(productId);
     state = AsyncData(now);
+    // 하트 아래 찜 수는 서버 값으로 다시 읽는다(앱이 ±1 하지 않는다).
+    ref.invalidate(productWishCountProvider(productId));
     return wished ? const WishRemoved() : const WishAdded();
   }
 }
+
+/// 상품 찜 수(customer 0.17.0 BR-100 R3, 비회원도). 상세·리뷰 전체 보기 하트 아래 숫자.
+final productWishCountProvider = FutureProvider.autoDispose.family<int, String>(
+  (ref, productId) =>
+      ref.watch(wishlistRepositoryProvider).wishCount(productId),
+);

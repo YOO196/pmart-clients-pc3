@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
@@ -122,6 +123,51 @@ class _WishHeartButtonState extends ConsumerState<WishHeartButton> {
       visualDensity: VisualDensity.compact,
       onPressed: _busy ? null : _tap,
       icon: icon,
+    );
+  }
+}
+
+/// 아래 막대의 하트 + 찜 수(레퍼런스 상품페이지·리뷰 전체 보기 "♡ / 1,056" — BR-100 R3).
+/// 수는 서버 값만 — 읽는 중·실패면 숫자 없이 하트만(0 으로 보이지 않는다).
+class WishHeartWithCount extends ConsumerWidget {
+  const WishHeartWithCount({
+    super.key,
+    required this.productId,
+    required this.heartKey,
+  });
+
+  final String productId;
+  final Key heartKey;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(productWishCountProvider(productId)).value;
+    final shown = count != null && count > 0;
+    // 막대 높이(54)를 넘지 않게: 하트를 조금 올리고 숫자는 하트 누르는 칸 아래쪽에 겹쳐 둔다.
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        Transform.translate(
+          offset: Offset(0, shown ? -6 : 0),
+          child: WishHeartButton(key: heartKey, productId: productId, size: 26),
+        ),
+        if (shown)
+          Positioned(
+            bottom: -2,
+            child: IgnorePointer(
+              child: Text(
+                NumberFormat.decimalPattern('ko').format(count),
+                key: ValueKey('wish-count-$productId'),
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.1,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

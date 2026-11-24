@@ -225,6 +225,76 @@ base class MockClaimsRepository
     return id;
   }
 
+  /// 이 주문에서 반품·교환이 이미 차지한 수량(철회·거절·취소된 것은 뺀다) — 목 신청 자격(BR-95).
+  Map<String, int> takenQtyByLine(String orderId) {
+    final out = <String, int>{};
+    for (final c in claims.values) {
+      if (c['orderId'] != orderId) continue;
+      if (c['type'] != 'RETURN' && c['type'] != 'EXCHANGE') continue;
+      if (const {'WITHDRAWN', 'REJECTED', 'CANCELLED'}.contains(c['state'])) {
+        continue;
+      }
+      for (final l in (c['lines'] as List).cast<Map<String, Object?>>()) {
+        final id = l['orderLineId']! as String;
+        out[id] = (out[id] ?? 0) + (l['requestedQty'] as int? ?? 0);
+      }
+    }
+    return out;
+  }
+
+  /// 고객 앱 반품·교환 신청(목 — BR-95). [fee] 가 있으면(단순 변심) 회수비 결제 대기, 없으면(상품·배달 문제) 접수.
+  String fileCustomerReturn({
+    required String orderId,
+    required bool exchange,
+    required List<({String orderLineId, int qty})> lines,
+    required String reason,
+    int? fee,
+  }) {
+    final id = 'claim-${++_seq}';
+    final orderLines = {
+      for (final l
+          in (orders?.orderJson(orderId)?['lines'] as List? ?? const [])
+              .cast<Map<String, Object?>>())
+        l['orderLineId']: l,
+    };
+    claims[id] = <String, Object?>{
+      'claimId': id,
+      'version': 1,
+      'orderId': orderId,
+      'type': exchange ? 'EXCHANGE' : 'RETURN',
+      'state': fee != null ? 'FEE_PENDING' : 'OPENED',
+      'channel': 'CUSTOMER_APP',
+      'reason': reason,
+      'openedAt': _clock.toIso8601String(),
+      'returnDeadlineAt': _clock.add(const Duration(days: 7)).toIso8601String(),
+      if (fee != null) 'fees': {'returnPickupFee': fee},
+      if (fee != null)
+        'feePayment': {
+          'amount': fee,
+          'orderName': exchange ? '교환 배달팁' : '반품 회수비',
+          'paymentAttemptId': 'PAY-RET-$id-1',
+          'state': 'WAITING',
+          'deadlineAt': _clock.add(const Duration(hours: 24)).toIso8601String(),
+        },
+      'lines': [
+        for (final l in lines)
+          {
+            'claimLineId': '$id-${l.orderLineId}',
+            'orderLineId': l.orderLineId,
+            ..._lineCopy(orderLines[l.orderLineId]),
+            'requestedQty': l.qty,
+            'decision': 'PENDING',
+            if (!exchange)
+              'refundAmount':
+                  ((orderLines[l.orderLineId]?['unitPrice'] as int?) ?? 0) *
+                  l.qty,
+          },
+      ],
+      'refunds': <Object?>[],
+    };
+    return id;
+  }
+
   /// 시험용: 서버 상태를 바로 바꾼다(기한 지남 등).
   void setReturnState(String id, String state, {String? feeState}) {
     final c = claims[id]!;

@@ -185,6 +185,49 @@ void main() {
     },
   );
 
+  test('배달 안내 값(order 0.22.0 BR-96): 최소 주문 VALUE 만 숫자로, NOT_SET 은 null(0 아님), 배달팁 구간·운영 시간', () async {
+    final options = await repo(
+      (_) => const FakeReply(
+        200,
+        body: {
+          'mfcId': 'MFC-BJG-01',
+          'serviceHours': {'start': '08:00', 'end': '24:00'},
+          'options': [
+            {
+              'mode': 'SINGLE',
+              'availability': 'AVAILABLE',
+              'minOrderAmount': {'state': 'VALUE', 'value': 15000},
+              'deliveryTip': {
+                'base': 4000,
+                'applied': 4000,
+                'reason': 'STANDARD',
+                'tiers': [
+                  {'fromAmount': 30000, 'tip': 0},
+                  {'fromAmount': 0, 'tip': 4000},
+                ],
+              },
+            },
+            {
+              'mode': 'BUNDLED',
+              'availability': 'AVAILABLE',
+              'minOrderAmount': {'state': 'NOT_SET'},
+            },
+          ],
+        },
+      ),
+    ).options('MFC-BJG-01', itemAmount: 12000);
+    final [single, bundled] = options;
+    expect(single.minOrderAmount, 15000);
+    expect(single.tipTiers, [
+      (fromAmount: 30000, tip: 0),
+      (fromAmount: 0, tip: 4000),
+    ]);
+    expect(single.serviceHours, (start: '08:00', end: '24:00'));
+    expect(bundled.minOrderAmount, isNull);
+    expect(bundled.tipTiers, isNull);
+    expect(bundled.serviceHours, (start: '08:00', end: '24:00'));
+  });
+
   test('초안의 막는 사유(blockers)·부족액·첫 구매 상태를 서버 순서·값 그대로 옮긴다', () async {
     final draft = await repo(
       (_) => const FakeReply(

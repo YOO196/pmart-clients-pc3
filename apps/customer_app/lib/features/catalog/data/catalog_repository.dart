@@ -15,6 +15,10 @@ abstract interface class CatalogRepository {
   /// 자리별 배너(storefront 0.9.0 `GET /storefront/banners?placement=` — POPUP 홈 팝업). sortOrder 순.
   Future<List<HomeBanner>> banners({required String placement});
 
+  /// 함께 산 상품(storefront 0.19.0 `GET /storefront/products/{id}/related?kind=BOUGHT_TOGETHER` — BR-100 R5).
+  /// 최근 30일 확정 주문에 같이 담긴 상품, 많은 순. 없으면 빈 목록.
+  Future<List<ProductTile>> boughtTogether(String productId, {String? mfcId});
+
   /// MD 탭 내용(storefront 0.9.0 `GET /storefront/custom-tabs/{tabKey}`). 기간이 지나면 404 TAB_NOT_FOUND.
   Future<HomeView> customTab(String tabKey, {String? mfcId});
 
@@ -84,6 +88,24 @@ final class ApiCatalogRepository implements CatalogRepository {
       () => _storefront.getCustomTab(tabKey: tabKey, mfcId: mfcId),
     );
     return customTabFromContract(res.data!);
+  }
+
+  @override
+  Future<List<ProductTile>> boughtTogether(
+    String productId, {
+    String? mfcId,
+  }) async {
+    final res = await pmartGuard(
+      () => _storefront.listRelatedProducts(
+        productId: productId,
+        kind: 'BOUGHT_TOGETHER',
+        mfcId: mfcId,
+      ),
+    );
+    return [
+      for (final i in res.data?.items ?? const <sf.DisplayItem>[])
+        _tileFromDisplay(i),
+    ];
   }
 
   @override
@@ -336,6 +358,7 @@ ProductTile _tileFromDisplay(sf.DisplayItem i) => ProductTile(
   saleState: _saleState(i.saleState?.value),
   carried: i.carried,
   soldOut: i.availability?.value == 'SOLD_OUT',
+  lowStockQty: i.lowStockQty,
   rating: i.rating?.toDouble(),
   reviewCount: i.reviewCount,
   badge: switch (i.badge) {
@@ -518,6 +541,7 @@ ProductTile _hitTile(sr.SearchHit h) => ProductTile(
   saleState: _saleState(h.saleState?.value),
   carried: h.carried,
   soldOut: h.availability?.value == 'SOLD_OUT',
+  lowStockQty: h.lowStockQty,
   rating: h.rating?.toDouble(),
   reviewCount: h.reviewCount,
   discount: saleDiscountOf(
@@ -587,6 +611,14 @@ ProductDetail productFromContract(pc.ProductContent c, {OptionPrices? prices}) {
     storageGuide: c.storageGuide,
     returnGuide: c.returnGuide,
     notices: c.notices ?? const [],
+    origin: _text(c.origin),
+    expiryGuide: _text(c.expiryGuide),
+    legalInfo: switch (c.legalInfo) {
+      final rows? => [
+        for (final r in rows) (label: _text(r.label), value: r.value),
+      ],
+      null => null,
+    },
     categoryPath: c.categoryPath ?? const [],
     nutrition: switch (c.nutrition) {
       null => null,
@@ -660,7 +692,11 @@ ProductDetail productFromContract(pc.ProductContent c, {OptionPrices? prices}) {
                       Availability.soldOut,
                     _ => Availability.unknown,
                   },
+            lowStockQty: o.availability?.lowStockQty,
           ),
     ],
   );
 }
+
+/// 빈 글은 없는 것으로(지어내지 않는다).
+String? _text(String? v) => (v == null || v.trim().isEmpty) ? null : v.trim();

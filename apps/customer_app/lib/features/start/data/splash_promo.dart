@@ -6,6 +6,8 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pmart_api_storefront/pmart_api_storefront.dart' as sf;
 
+import '../../../shared/providers.dart' show withImageWidth;
+
 /// 처음 로딩 화면 프로모션(storefront 0.9.0 배너 자리 SPLASH — 백엔드 요청서 2026-11-21 ①).
 /// 서버에 지금 걸린 SPLASH 배너(정렬 순서 첫째). 없으면 null.
 class SplashBannerRef {
@@ -119,7 +121,9 @@ final class ApiSplashBannerSource implements SplashBannerSource {
 
   @override
   Future<Uint8List> download(String url) async {
-    final full = resolveUrl(url) ?? url;
+    // 서버 축소본(BR-99 `?w=`, 1440 단계 — 화면 전체에 보이는 그림). 바뀜 비교는 원래 주소로 한다.
+    final sized = withImageWidth(url, 1440) ?? url;
+    final full = resolveUrl(sized) ?? sized;
     final res = await _dio.get<List<int>>(
       full,
       options: Options(responseType: ResponseType.bytes),

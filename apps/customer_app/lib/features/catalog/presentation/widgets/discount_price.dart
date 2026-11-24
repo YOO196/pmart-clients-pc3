@@ -17,7 +17,11 @@ class DiscountPriceText extends StatelessWidget {
     this.base,
     this.showBase = true,
     this.prefix,
+    this.rateColor = discountRateColor,
   });
+
+  /// 할인율 색(기본 [discountRateColor]). 장바구니 추천 시트는 실측 #FF3E3E.
+  final Color rateColor;
 
   final int price;
   final int? ratePercent;
@@ -40,7 +44,7 @@ class DiscountPriceText extends StatelessWidget {
           if (ratePercent case final r? when r > 0)
             TextSpan(
               text: '$r% ',
-              style: const TextStyle(color: discountRateColor),
+              style: TextStyle(color: rateColor),
             ),
           if (prefix case final p?) TextSpan(text: p),
           TextSpan(text: formatKrw(price)),
