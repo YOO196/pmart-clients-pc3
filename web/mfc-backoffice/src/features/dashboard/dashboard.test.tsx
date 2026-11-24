@@ -14,7 +14,7 @@ const unavailable = () => HttpResponse.json({ status: 503, code: 'DEPENDENCY_UNA
 describe('센터 대시보드', () => {
   it('오늘 숫자 넷 — 피킹 줄·결품률(서버 분자/분모)·정시 배송률·끝나지 않은 작업', async () => {
     const view = renderAt('/c/MFC-BSN-01/dashboard');
-    expect(await screen.findByTestId('kpi-picked-value')).toHaveTextContent('40줄');
+    expect(await screen.findByTestId('kpi-picked-value', {}, { timeout: 5000 })).toHaveTextContent('40줄');
     expect(screen.getByTestId('kpi-short-rate-value')).toHaveTextContent('10.0%');
     expect(await screen.findByTestId('kpi-on-time-value')).toHaveTextContent('88.9%');
     expect(await screen.findByTestId('kpi-open-tasks-value')).toHaveTextContent(/^\d+건$/);

@@ -20,9 +20,11 @@ import { SearchBar } from '../../shared/listParts';
 import { SavedViews } from '../../shared/SavedViews';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
+import { DeliveryStats } from './DeliveryStats';
 
 const m = messages.centerDelivery;
 const f = messages.dispatchFailures;
+const ds = messages.deliveryStats;
 const none = messages.none;
 const sys = messages.displayNumber.system;
 const name = (map: Readonly<Record<string, string>>, v: string | null | undefined) => (v ? (map[v] ?? v) : none);
@@ -74,8 +76,11 @@ export function CenterDeliveriesMenu({ mfcId }: { readonly mfcId: string }) {
     const s = next.state ?? state;
     setParams({ ...(s ? { state: s } : {}), ...(s && next.cursor ? { cursor: next.cursor } : {}) });
   };
+  // 지금 배송 / 배송 통계(execution 0.38.0·dispatch 0.16.0, 2026-11-23) — 주소 ?view=stats
+  const view = params.get('view') === 'stats' ? 'stats' : 'now';
   const query = useQuery({
     queryKey: ['live-delivery', mfcId, state, cursor],
+    enabled: view === 'now',
     refetchInterval: REFRESH_MS,
     queryFn: () =>
       request(
@@ -83,9 +88,27 @@ export function CenterDeliveriesMenu({ mfcId }: { readonly mfcId: string }) {
         api.bff.GET('/views/live-delivery', { params: { query: { mfcId, size: PAGE_SIZE, ...(state ? { state } : {}), ...(cursor ? { cursor } : {}) } } }),
       ),
   });
+  const tabs = (
+    <div role="tablist" className="tabs tabs-box w-fit" data-testid="delivery-tabs">
+      {(['now', 'stats'] as const).map((v) => (
+        <button key={v} type="button" role="tab" aria-selected={view === v} className={`tab ${view === v ? 'tab-active' : ''}`} onClick={() => setParams(v === 'stats' ? { view: 'stats' } : {})}>
+          {v === 'stats' ? ds.tabStats : ds.tabNow}
+        </button>
+      ))}
+    </div>
+  );
+  if (view === 'stats')
+    return (
+      <section className="space-y-4">
+        <h1>{m.title}</h1>
+        {tabs}
+        <DeliveryStats mfcId={mfcId} />
+      </section>
+    );
   return (
     <section className="space-y-4">
       <h1>{m.title}</h1>
+      {tabs}
       <SearchBar
         summary={[[m.state, state ? name(m.executionState, state) : m.activeStates]]}
         startOpen={!state}
