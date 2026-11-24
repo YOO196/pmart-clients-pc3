@@ -505,7 +505,7 @@ export function ClaimDetailPage() {
                   <DataTable>
                     <thead>
                       <tr>
-                        <th>{m.claims.sku}</th>
+                        <th>{m.claims.product}</th>
                         <th className="text-right">{m.claims.requested}</th>
                         <th className="text-right">{m.claims.approved}</th>
                         <th>{m.claims.decision}</th>
@@ -516,7 +516,21 @@ export function ClaimDetailPage() {
                     <tbody>
                       {(c.lines ?? []).map((l, i) => (
                         <tr key={l.claimLineId ?? `line-${i}`} data-testid="claim-line">
-                          <td className="font-mono text-xs">{text(l.sku)}</td>
+                          {/* 상품 이름·옵션(claim 0.14.0 BR-92 — 접수 때 주문 줄 사본, 2026-11-24 사용자 "클레임 화면에 상품 이름 넣어"), 아래 SKU.
+                              이름이 없으면(이 판 전 접수·옛 주문) 예전처럼 SKU 만 — 서버가 SKU 로 채우지 않는다 */}
+                          <td>
+                            {l.productName ? (
+                              <>
+                                <p className="font-medium" data-testid="claim-line-name">
+                                  {l.productName}
+                                  {l.optionLabel && <span className="ml-1 font-normal text-base-content/60">{l.optionLabel}</span>}
+                                </p>
+                                <p className="font-mono text-xs text-base-content/50">{`SKU ${text(l.sku)}`}</p>
+                              </>
+                            ) : (
+                              <span className="font-mono text-xs">{text(l.sku)}</span>
+                            )}
+                          </td>
                           <td className="text-right tabular-nums">{text(l.requestedQty)}</td>
                           <td className="text-right tabular-nums">{text(l.approvedQty)}</td>
                           <td>

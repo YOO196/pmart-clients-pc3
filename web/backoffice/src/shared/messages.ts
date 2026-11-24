@@ -1645,6 +1645,7 @@ export const messages = {
     closedAt: '종료 시각',
     lines: '품목',
     sku: 'SKU',
+    product: '상품',
     requested: '신청',
     approved: '승인',
     decision: '판정',

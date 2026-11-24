@@ -244,7 +244,7 @@ function seed(): OpsState {
         decidedAt: ago(25),
         closedAt: ago(24),
         version: 4,
-        lines: [{ claimLineId: 'CL-1', sku: 'E-00000001', requestedQty: 1, approvedQty: 1, decision: 'APPROVED', refundAmount: 15100 }],
+        lines: [{ claimLineId: 'CL-1', sku: 'E-00000001', productName: '사과 1.5kg', optionLabel: null, imageUrl: null, requestedQty: 1, approvedQty: 1, decision: 'APPROVED', refundAmount: 15100 }],
       },
       {
         claimId: 'CLM-MOCK-2',

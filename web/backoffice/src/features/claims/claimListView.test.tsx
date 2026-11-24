@@ -41,6 +41,20 @@ describe('클레임 조회', () => {
     await waitFor(() => expect(screen.getByTestId('claim-label')).toHaveTextContent(/ 취소 1$/));
   });
 
+  it('클레임 품목은 상품 이름·SKU(claim 0.14.0), 이름이 없는 옛 클레임은 SKU 만(2026-11-24)', async () => {
+    renderAt('/claims/CLM-MOCK-1', as.cs);
+    const line = await screen.findByTestId('claim-line');
+    expect(within(line).getByTestId('claim-line-name')).toHaveTextContent('사과 1.5kg');
+    expect(line).toHaveTextContent('SKU E-00000001');
+  });
+
+  it('상품 이름이 없는 클레임 품목은 예전처럼 SKU 만', async () => {
+    renderAt('/claims/CLM-MOCK-2', as.cs);
+    const line = await screen.findByTestId('claim-line');
+    expect(within(line).queryByTestId('claim-line-name')).not.toBeInTheDocument();
+    expect(line).toHaveTextContent('E-00000001');
+  });
+
   it('단계 카드를 누르면 그 단계만(주소 stage=)', async () => {
     const user = userEvent.setup();
     renderAt('/claims', as.cs);
