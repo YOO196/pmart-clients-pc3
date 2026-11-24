@@ -28,6 +28,17 @@ const allSucceed = async (...args: unknown[]): Promise<UploadOutcome> => {
 };
 
 describe('콘텐츠 등록 — 이미지', () => {
+  it('사진 칸 옆에 규격(형식·20MB·100장), 20MB 넘거나 형식이 다른 파일은 넣지 않고 이름을 알린다(2026-11-24)', async () => {
+    renderAt('/contents/drafts/new');
+    expect(await screen.findByTestId('image-spec')).toHaveTextContent('JPEG·PNG·WebP · 장당 20MB 이하 · 한 초안 100장까지');
+    const big = png('big.png');
+    Object.defineProperty(big, 'size', { value: 20 * 1024 * 1024 + 1 });
+    const gif = new File([new Uint8Array([71, 73, 70])], 'a.gif', { type: 'image/gif' });
+    upload(screen.getByLabelText('상세설명 이미지 추가'), [png('ok.png'), big, gif]);
+    expect(screen.getByTestId('image-refused')).toHaveTextContent('big.png, a.gif');
+    expect(within(screen.getByRole('list', { name: '상세설명 이미지 목록' })).getAllByRole('listitem')).toHaveLength(1);
+  });
+
   it('폼에서 대표 1장·상세설명 2장을 고르고(제거 포함) 초안 저장을 누르면 초안을 만든 뒤 그 초안 ID 로 차례로 올린다', async () => {
     uploadMock.mockReset();
     uploadMock.mockImplementation(allSucceed);

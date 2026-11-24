@@ -252,18 +252,25 @@ const ACCESS_TONE: Readonly<Record<string, Tone>> = { VIEW: 'info', SEARCH: 'neu
 function LogList({ items, search }: { readonly items: readonly Log[]; readonly search: string }) {
   return (
     <ul className="divide-y divide-base-300/70">
-      {items.map((log) => (
+      {items.map((log) => {
+        const to = `/pii-access-logs/${encodeURIComponent(log.piiAccessLogId)}`;
+        return (
         <li key={log.piiAccessLogId} className="grid gap-x-4 gap-y-2 px-4 py-3 text-sm hover:bg-base-200/50 sm:grid-cols-[2.25rem_minmax(0,1fr)_auto]" data-testid="pii-log-row">
           {/* 첫 링크 = 상세(시각) — 넓은 화면에서는 오른쪽 끝에 */}
           <div className="text-xs sm:order-last sm:text-right">
-            <Link className="font-medium text-primary hover:underline" to={`/pii-access-logs/${encodeURIComponent(log.piiAccessLogId)}`} state={{ search }}>
+            <Link className="font-medium text-primary hover:underline" to={to} state={{ search }}>
               {when(log.occurredAt)}
             </Link>
           </div>
-          <ActorAvatar actorId={log.actor.actorId} />
+          {/* 머리글자·이름으로도 상세(2026-11-24 사용자 "이름 또는 아이콘으로 바로 들어가지게 — 지금은 오른쪽 날짜를 눌러야") */}
+          <Link to={to} state={{ search }} tabIndex={-1} aria-hidden="true" className="hidden sm:block">
+            <ActorAvatar actorId={log.actor.actorId} />
+          </Link>
           <div className="min-w-0 space-y-1.5">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <ActorName actorId={log.actor.actorId} />
+              <Link to={to} state={{ search }} className="hover:text-primary hover:underline" data-testid="pii-log-open">
+                <ActorName actorId={log.actor.actorId} />
+              </Link>
               <StatusBadge tone={ACCESS_TONE[log.accessType] ?? 'ghost'}>
                 <CodeLabel code={log.accessType} names={m.accessTypeName} />
               </StatusBadge>
@@ -296,7 +303,8 @@ function LogList({ items, search }: { readonly items: readonly Log[]; readonly s
             </p>
           </div>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }

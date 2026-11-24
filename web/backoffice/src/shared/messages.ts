@@ -2713,6 +2713,9 @@ export const messages = {
       DETAIL: '상세정보 표 이미지',
     } as const,
     addImageButton: '이미지 추가',
+    // 사진 규격(2026-11-24 — 서버 product-content 검사 값. 권장 가로·세로는 정해진 값이 없다)
+    imageSpec: '규격: JPEG·PNG·WebP · 장당 20MB 이하 · 한 초안 100장까지 · 대표 1장',
+    imageRefused: (names: string) => `규격에 맞지 않아 넣지 않았어요(형식·20MB·100장): ${names}`,
     addImage: (role: string) => `${role} 이미지 추가`,
     // 긴 상세 이미지 자르기(2026-11-18)
     slice: {
@@ -3647,7 +3650,7 @@ export const messages = {
     upload: '그림 올리기',
     change: '그림 바꾸기',
     uploading: '올리는 중…',
-    imageHint: 'JPEG·PNG·WEBP, 5MB 이하',
+    imageHint: '규격: JPEG·PNG·WEBP · 5MB 이하',
     imageInvalid: 'JPEG·PNG·WEBP 5MB 이하만 올릴 수 있어요',
     noImage: '그림 없음',
     imageUnavailable: '그림을 불러오지 못했어요',

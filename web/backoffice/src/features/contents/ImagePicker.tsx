@@ -18,6 +18,10 @@ export interface PendingImage {
 }
 
 const ACCEPT = 'image/jpeg,image/png,image/webp';
+/** 서버 규격(product-content POST /content-drafts/{id}/images — 넘으면 서버가 막는다): 장당 20MB, 초안 1건 100장(2026-11-24 사용자 "사진 들어가는 곳 옆에 규격") */
+const MAX_BYTES = 20 * 1024 * 1024;
+const MAX_IMAGES = 100;
+const TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 let seq = 0;
 
 // 미리보기는 있으면 좋은 것이다. 못 만들어도(jsdom 등) 파일 선택은 그대로 된다.
@@ -58,9 +62,16 @@ export function ImagePicker({
   }, [pending]);
   useEffect(() => () => latest.current.forEach((p) => revoke(p.preview)), []);
 
+  // 규격에 안 맞아 넣지 않은 파일(이름) — 올리기 전에 알려 준다(서버도 막는다)
+  const [refused, setRefused] = useState<readonly string[]>([]);
   const add = (files: FileList | null, role: ImageRole) => {
     if (!files || files.length === 0) return;
-    const added = toPending(files, role);
+    const all = [...files];
+    const room = Math.max(0, MAX_IMAGES - existing.length - pending.filter((p) => !(role === 'MAIN' && p.role === 'MAIN')).length);
+    const okFiles = all.filter((f) => TYPES.includes(f.type) && f.size <= MAX_BYTES).slice(0, room);
+    setRefused(all.filter((f) => !okFiles.includes(f)).map((f) => f.name));
+    if (okFiles.length === 0) return;
+    const added = toPending(okFiles, role);
     if (role === 'MAIN') {
       // 대표는 1장. 이미 고른 대표는 새것으로 바꾼다.
       pending.filter((p) => p.role === 'MAIN').forEach((p) => revoke(p.preview));
@@ -105,7 +116,13 @@ export function ImagePicker({
 
   return (
     // 놓인 칸 폭에 맞춰(좁은 오른쪽 열이면 한 줄씩, 넓으면 세 칸) — 화면 폭이 아니라 칸 폭 기준(2026-11-18)
-    <div className="@container">
+    <div className="@container space-y-2">
+    <p className="text-xs text-base-content/60" data-testid="image-spec">{m.contents.imageSpec}</p>
+    {refused.length > 0 && (
+      <p role="alert" className="text-xs text-error" data-testid="image-refused">
+        {m.contents.imageRefused(refused.join(', '))}
+      </p>
+    )}
     <div className="grid gap-3 @xl:grid-cols-2 @3xl:grid-cols-3">
       {IMAGE_ROLES.map((role) => (
         <RoleSection
