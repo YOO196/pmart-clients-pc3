@@ -26,7 +26,7 @@ const themeTitle = (id: string) => THEME_TARGETS.find((t) => t.sectionId === id)
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
-function seed(): { items: Map<string, Promotion>; seq: number; grants: Map<string, Map<string, number>> } {
+function seed(): { items: Map<string, Promotion>; seq: number; grants: Map<string, Map<string, number>>; records: CouponRecord[] } {
   const now = Date.now();
   const running: Promotion = {
     promotionId: 'PRM-seed-1',
@@ -66,10 +66,17 @@ function seed(): { items: Map<string, Promotion>; seq: number; grants: Map<strin
     createdBy: 'op-marketing-1',
     updatedAt: iso(now - DAY),
   };
-  return { items: new Map([running, draft].map((p) => [p.promotionId, p])), seq: 2, grants: new Map() };
+  // promotion 0.3.1 쿠폰 발급 기록(2026-11-24 PRM-1) — 고객·행사 기준 조회용 씨앗
+  const records: CouponRecord[] = [
+    { couponId: 'CPN-seed-1', promotionId: running.promotionId, promotionName: running.name, customerId: 'CUS-1001', status: 'USED', source: 'STAFF', issuedBy: 'op-cs-1', issueReason: '배송 지연 보상', issuedAt: iso(now - 2 * DAY), validUntil: iso(now + 5 * DAY), orderId: 'ORD-MOCK-1001', usedAt: iso(now - DAY), discount: running.discount },
+    { couponId: 'CPN-seed-2', promotionId: running.promotionId, promotionName: running.name, customerId: 'CUS-1005', status: 'AVAILABLE', source: 'STAFF', issuedBy: 'op-cs-1', issueReason: '상품 누락 사과', issuedAt: iso(now - 0.5 * DAY), validUntil: iso(now + 6.5 * DAY), orderId: null, usedAt: null, discount: running.discount },
+    { couponId: 'CPN-seed-3', promotionId: 'PRM-COMP', promotionName: '배차 불가 보상 2천원', customerId: 'CUS-1001', status: 'EXPIRED', source: 'COMPENSATION', issuedBy: null, issueReason: '배차 불가로 주문 취소', issuedAt: iso(now - 40 * DAY), validUntil: iso(now - 10 * DAY), orderId: null, usedAt: null, discount: { type: 'AMOUNT', value: 2000, maxAmount: null } },
+  ];
+  return { items: new Map([running, draft].map((p) => [p.promotionId, p])), seq: 2, grants: new Map(), records };
 }
 
 const store = seed();
+type CouponRecord = components['schemas']['CouponRecord'];
 export function resetPromotions(): void {
   Object.assign(store, seed());
 }
@@ -192,6 +199,19 @@ function approvalRequest(p: Promotion, action: 'ACTIVATE_PROMOTION' | 'END_PROMO
 }
 
 export const promotionHandlers = [
+  // 0.3.1 쿠폰 발급 기록 — customerId·promotionId 중 하나 이상(없으면 400), 받은 시각 최근 순, 고객 이름 없음
+  http.get(`${API_BASE}/promotions/coupons`, ({ request }) => {
+    const { denied } = deny(request, READ);
+    if (denied) return denied;
+    const q = new URL(request.url).searchParams;
+    const customerId = q.get('customerId');
+    const promotionId = q.get('promotionId');
+    if (!customerId && !promotionId) return problem(400, 'VALIDATION_FAILED');
+    const items = store.records
+      .filter((x) => (!customerId || x.customerId === customerId) && (!promotionId || x.promotionId === promotionId) && (!q.get('status') || x.status === q.get('status')) && (!q.get('source') || x.source === q.get('source')))
+      .sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
+    return HttpResponse.json({ items, page: { nextCursor: null, size: Number(q.get('size') ?? 20) } });
+  }),
   http.get(`${API_BASE}/promotions/theme-targets`, ({ request }) => {
     const { denied } = deny(request, READ);
     if (denied) return denied;
@@ -262,7 +282,7 @@ export const promotionHandlers = [
     });
   }),
   http.post(`${API_BASE}/promotions/:id/coupon-grants`, async ({ request, params }) => {
-    const { denied } = deny(request, GRANT);
+    const { denied, who } = deny(request, GRANT);
     if (denied) return denied;
     const body = (await request.json()) as { accountIds: string[]; reason: string };
     return idempotent(request, () => {
@@ -278,7 +298,10 @@ export const promotionHandlers = [
         if (had >= (p.coupon?.perCustomerLimit ?? 1)) return { accountId, result: 'SKIPPED_LIMIT' as const, couponId: null };
         mine.set(accountId, had + 1);
         issued += 1;
-        return { accountId, result: 'ISSUED' as const, couponId: `CPN-${p.promotionId}-${issued}` };
+        const couponId = `CPN-${p.promotionId}-${issued}`;
+        const now = Date.now();
+        store.records.unshift({ couponId, promotionId: p.promotionId, promotionName: p.name, customerId: accountId, status: 'AVAILABLE', source: 'STAFF', issuedBy: who?.subject ?? null, issueReason: body.reason, issuedAt: new Date(now).toISOString(), validUntil: new Date(now + (p.coupon?.useDays ?? 7) * DAY).toISOString(), orderId: null, usedAt: null, discount: p.discount });
+        return { accountId, result: 'ISSUED' as const, couponId };
       });
       store.grants.set(p.promotionId, mine);
       store.items.set(p.promotionId, { ...p, issuedCount: issued });

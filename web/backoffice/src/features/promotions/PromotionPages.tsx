@@ -13,6 +13,7 @@ import { commandParams, IdempotencyKey } from '../../api/command';
 import { ISSUE_MODES, PROMOTION_KINDS, PROMOTION_STATES, type ApprovalRequestBody, type CouponPolicy, type Promotion, type PromotionInput, type PromotionKind } from '../../api/models';
 import { useApi } from '../../app/ApiContext';
 import { CouponRecipients, type Recipient } from './CouponRecipients';
+import { CouponRecords } from './CouponRecords';
 import { useSession } from '../../app/SessionContext';
 import { RequestApproval } from '../approvals/RequestApproval';
 import { Person } from '../lookup/parts';
@@ -678,6 +679,8 @@ export function PromotionDetailPage() {
                   </p>
                 </Section>
               )}
+              {/* 발급 내역(promotion 0.3.1 PRM-1) — 승인된 쿠폰 행사부터(그 전에는 발급이 없다) */}
+              {p.kind === 'COUPON' && (p.state === 'APPROVED' || p.state === 'ENDED') && <CouponRecords by={{ promotionId: p.promotionId }} testId="promotion-coupons" />}
               {canManage && p.state === 'APPROVED' && p.phase !== 'FINISHED' && <EndPromotion p={p} />}
             </>
           );

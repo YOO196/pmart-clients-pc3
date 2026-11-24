@@ -26,6 +26,7 @@ import { CopyButton } from '../../shared/CopyButton';
 import { CustomerNotes } from './CustomerNotes';
 import { CustomerRestriction, RestrictionBadge } from './CustomerRestriction';
 import { isCustomerNumber, isOrderNumber } from '../../shared/numberLookups';
+import { CouponRecords } from '../promotions/CouponRecords';
 
 const m = messages.customers;
 type Detail = components['schemas']['ComposedView'] & components['schemas']['CustomerDetailView'];
@@ -293,6 +294,9 @@ function CustomerDetail({ d }: { readonly d: Detail }) {
           </DataTable>
         )}
       </Part>
+
+      {/* 받은 쿠폰(promotion 0.3.1 PRM-1, 2026-11-24) — 상담 중 "쿠폰 언제 받았어요?"·보상 쿠폰 확인 */}
+      <CouponRecords by={{ customerId: c.customerId }} testId="customer-coupons" />
 
       <Part title={m.deliveries} part={d.deliveries} testId="customer-deliveries">
         {(items) => (

@@ -139,6 +139,14 @@ export const customerHandlers = [
     });
   }),
 
+  // customer GET /customers?customerIds= — 쉼표로 50개까지, 가린 값만(쿠폰 발급 내역의 고객 표시 2026-11-24). 다른 찾기 인자는 bff 쪽 목이 쓴다
+  http.get(`${API_BASE}/customers`, ({ request }) => {
+    const denied = deny(request);
+    if (denied) return denied;
+    const ids = (new URL(request.url).searchParams.get('customerIds') ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+    if (ids.length === 0 || ids.length > 50) return problem(400, 'VALIDATION_FAILED');
+    return HttpResponse.json({ items: MOCK_CUSTOMERS.filter((c) => ids.includes(c.customerId)).map(summary) });
+  }),
   http.get(`${API_BASE}/customers/:customerId/restrictions`, ({ request, params }) => {
     const denied = deny(request);
     if (denied) return denied;

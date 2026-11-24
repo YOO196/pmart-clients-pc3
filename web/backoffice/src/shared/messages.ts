@@ -3598,6 +3598,23 @@ export const messages = {
         remove: (who: string) => `${who} 빼기`,
       },
     },
+    // 쿠폰 발급 기록(promotion 0.3.1 PRM-1, 2026-11-24) — 고객 상세 "쿠폰"·행사 상세 "발급 내역"
+    records: {
+      titleCustomer: '쿠폰',
+      titlePromotion: '발급 내역',
+      status: '상태',
+      source: '받은 경로',
+      all: '전체',
+      statusName: { AVAILABLE: '보유', HELD: '결제 중', USED: '사용', EXPIRED: '기한 지남' } as const,
+      sourceName: { DOWNLOAD: '내려받기', STAFF: '직원 지정 발급', SIGNUP: '가입 축하', COMPENSATION: '보상' } as const,
+      col: { promotion: '행사·할인', customer: '고객', status: '상태', source: '받은 경로', issuedAt: '받은 시각', validUntil: '사용 기한', used: '쓴 주문' },
+      heldOrder: '결제 중 주문',
+      usedOrder: '주문 보기',
+      emptyCustomer: '이 고객이 받은 쿠폰이 없어요.',
+      emptyPromotion: '이 행사로 발급된 쿠폰이 없어요.',
+      emptyFiltered: '조건에 맞는 쿠폰이 없어요.',
+      more: '더 보기',
+    },
   },
   homeLayout: {
     title: '홈 진열 편성',
