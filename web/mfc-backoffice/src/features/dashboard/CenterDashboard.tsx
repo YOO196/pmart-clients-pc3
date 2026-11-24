@@ -24,7 +24,8 @@ import { useOps } from '../ops/OpsBoard';
 import { OPS_REFRESH_MS } from '../ops/opsQueries';
 import { minutesText, promiseRows, seoulToday } from '../ops/opsRules';
 import { AreaChart, BarList, Heatmap, PieChart, type Column, type PieSlice, type StackSeries } from './charts';
-import { seriesKey, useOrderTrend, type OrderFilter } from './orderQueries';
+import { seriesKey, useOrderSeries, useOrderTrend, type OrderFilter } from './orderQueries';
+import { shipDay } from './shipSim';
 import { FloorMap } from './FloorMap';
 import { env } from '../../env';
 import {
@@ -36,7 +37,7 @@ import {
   daysIn,
   DAYS,
   defaultUnit,
-  hourShare,
+  partialOf,
   lastDays,
   MAX_RANGE,
   ON_TIME_CHUNK,
@@ -108,8 +109,7 @@ function useTrend(mfcId: string, r: Range, unit: Unit) {
     queryKey: ['dashboard', mfcId, 'by-sku', sr.from, sr.to],
     queryFn: () => request('GET', api.fulfillment.GET('/metrics/picking-lines/by-sku', { params: { query: { from: sr.from, to: sr.to, mfcId, sort: 'shortLines', limit: 5 } } })),
   });
-  const onTime = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'on-time', r.from, r.to], queryFn: () => fetchOnTime(api, mfcId, r) });
-  return { picking, bySku, onTime };
+  return { picking, bySku };
 }
 
 function useDashboard(mfcId: string) {
@@ -142,10 +142,12 @@ export function DashboardMenu({ mfcId }: { readonly mfcId: string }) {
 }
 
 // 요일·시간(열지도)·상품 비중(원 그래프)도 탭으로(2026-11-24 사용자 "표 옵션에 넣어 줘, 아래에 넣지 말고")
-type ChartKind = 'orders' | 'sales' | 'heat' | 'share' | 'picked' | 'shortRate' | 'onTime';
-const KINDS: readonly ChartKind[] = ['orders', 'sales', 'heat', 'share', 'picked', 'shortRate', 'onTime'];
+// 정시 배송률 추이는 뺐다(2026-11-24 사용자 — 배차·라이더가 섞인 결과라 센터가 움직일 수 없음, 위 카드에만). 대신 센터가 책임지는 출하 약속 준수율
+type ChartKind = 'orders' | 'sales' | 'heat' | 'share' | 'picked' | 'shortRate' | 'ship';
+const KINDS: readonly ChartKind[] = ['orders', 'sales', 'heat', 'share', 'picked', 'shortRate', 'ship'];
 
 function Dashboard({ mfcId }: { readonly mfcId: string }) {
+  const api = useApi();
   const { nowMs, today, days, picking, onTime, workers, live, ops, delays } = useDashboard(mfcId);
   const { tasks, damages, handovers } = ops;
   // 주문·매출(order 0.20.0 O-11)이 기본
@@ -159,8 +161,8 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
 
   // 추이 기간·칸 단위 — URL(?from=&to=&unit=), 맞지 않으면 기본 14일·일. 바꿀 때마다 앞 상태를 쌓아 Ctrl+Z 로 되돌린다
   const [params, setParams] = useSearchParams();
-  // 시간 칸 — 주문·매출(order 0.20.0)·피킹 줄·결품(fulfillment 0.34.0)은 서버, 정시율은 목에서만(시간 칸 DD-6 대기)
-  const hourOk = env.isMock || chart !== 'onTime';
+  // 시간 칸 — 주문·매출(order 0.20.0)·피킹 줄·결품(fulfillment 0.34.0)은 서버. 출하 준수(목 시뮬레이션)는 날짜 칸만
+  const hourOk = chart !== 'ship';
   const range: Range = validRange(params.get('from'), params.get('to'), today) ?? { from: days[0] ?? today, to: today };
   const span = spanDays(range);
   const allowed = unitsFor(span, hourOk);
@@ -207,7 +209,6 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const tBuckets = buckets(range, unit, today, nowHour);
   // 피킹은 서버가 센 칸(bucket) 그대로 — key 가 칸 key 와 같다
   const tPick = new Map((trend.picking.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [pickingKey(i, unit), i]));
-  const tOnTime = new Map((trend.onTime.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [i.date, i]));
 
   // 날짜별 — 피킹은 줄이 없으면 0줄(계약), 정시 배송은 줄이 없으면 due 0(비율 "—")
   const pickRow = new Map((picking.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [i.date, i]));
@@ -220,24 +221,29 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
     const r = pickRow.get(d);
     return rate(r?.shortLines ?? 0, r?.pickedLines ?? 0) ?? 0;
   });
-  // 칸마다 합 — 피킹은 서버 칸 값(줄 없으면 0줄), 정시 배송은 서버 일 합계를 더하고 시간은(목만) 그날 합계를 시간 곡선으로 나눈다
+  // 칸마다 합 — 피킹은 서버 칸 값(줄 없으면 0줄), 출하 약속은 목 시뮬레이션(shipSim — API 없음)의 날짜 값을 더한다
   const sumOf = (b: Bucket) => {
     const p = tPick.get(b.key);
-    const acc = { picked: p?.pickedLines ?? 0, short: p?.shortLines ?? 0, onTime: 0, due: 0, late: 0, days: 0 };
-    for (let d = b.from; d <= b.to; d = addDays(d, 1)) {
-      const o = tOnTime.get(d);
-      const last = d === today ? nowHour : 23;
-      const part = (v: number) => (b.hour === undefined ? v : hourShare(v, b.hour, last));
-      acc.onTime += part(o?.onTime ?? 0);
-      acc.due += part(o?.due ?? 0);
-      acc.late += part(o?.late ?? 0);
-      acc.days += 1;
-    }
+    const acc = { picked: p?.pickedLines ?? 0, short: p?.shortLines ?? 0, onTime: 0, due: 0, late: 0, shipDays: 0 };
+    if (env.isMock && b.hour === undefined)
+      for (let d = b.from; d <= b.to; d = addDays(d, 1)) {
+        const s = shipDay(mfcId, d, today);
+        if (!s) continue;
+        acc.shipDays += 1;
+        acc.onTime += s.onTime;
+        acc.due += s.due;
+        acc.late += s.late;
+      }
     return acc;
   };
   const sums = tBuckets.map((b) => ({ b, t: sumOf(b) }));
   const tipLabel = (b: Bucket) => (b.hour !== undefined ? `${shortDate(b.from)} ${b.hour}시` : b.from === b.to ? shortDate(b.from) : `${b.label} (${shortDate(b.from)}–${shortDate(b.to)})`);
-  const tPickedCols: Column[] = sums.map(({ b, t }) => ({ key: b.key, label: b.label, value: t.picked, tip: m.pickTip(tipLabel(b), t.picked, t.short) }));
+  // 기간 끝이 잘린 주·월 칸 — 옅은 막대 + 말풍선에 "n일 중 m일만"
+  const cut = (b: Bucket, c: Column): Column => {
+    const p = partialOf(b, unit);
+    return p ? { ...c, partial: true, tip: `${c.tip} · ${m.chart.partial(p.full, p.days)}` } : c;
+  };
+  const tPickedCols: Column[] = sums.map(({ b, t }) => cut(b, { key: b.key, label: b.label, value: t.picked, tip: m.pickTip(tipLabel(b), t.picked, t.short) }));
   // 결품 — 사유별 쌓은 막대(드문 사건이라 비율 선보다 "몇 줄·왜"). 사유 합은 결품 줄보다 클 수 있다(계약)
   const REASONS = ['SHORT', 'DAMAGED', 'SPOILED', 'BLOCKED'] as const;
   const reasonSeries: StackSeries[] = REASONS.map((k) => ({ key: k, name: m.chart.reason[k], color: REASON_COLOR[k] }));
@@ -246,7 +252,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
     const vals = reasonVals[i]!;
     const total = vals.reduce((a, c) => a + c, 0);
     const parts = REASONS.map((k, j) => (vals[j]! > 0 ? `${m.chart.reason[k]} ${vals[j]}` : '')).filter(Boolean).join(' · ');
-    return { key: b.key, label: b.label, value: total, tip: m.chart.shortBarTip(tipLabel(b), parts, total) };
+    return cut(b, { key: b.key, label: b.label, value: total, tip: m.chart.shortBarTip(tipLabel(b), parts, total) });
   });
   const periodShort = sums.reduce((a, { t }) => ({ s: a.s + t.short, p: a.p + t.picked }), { s: 0, p: 0 });
 
@@ -274,12 +280,14 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const topRows = orderQ.top.data ?? [];
   const picked = sku ? (topRows.find((x) => x.sku === sku) ?? null) : null;
   // 칸 값 — 0건 칸은 오지 않는다(계약) → 0. 상품이면 수량, 거르면 그 줄 금액(승인 금액은 null)
-  const orderByKey = new Map((orderQ.series.data ?? []).flatMap((x) => (x.start ? [[seriesKey(x.start, unit), x] as const] : [])));
-  const orderSum = (b: Bucket) => {
+  type SeriesRow = NonNullable<typeof orderQ.series.data>[number];
+  const byKeyOf = (rows: readonly SeriesRow[] | undefined) => new Map((rows ?? []).flatMap((x) => (x.start ? [[seriesKey(x.start, unit), x] as const] : [])));
+  const orderByKey = byKeyOf(orderQ.series.data);
+  const orderSum = (b: Bucket, byKey = orderByKey) => {
     const keys = b.hour !== undefined ? [b.key] : daysIn(b);
     const acc = { orders: 0, amount: 0 };
     for (const k of keys) {
-      const x = orderByKey.get(k);
+      const x = byKey.get(k);
       if (!x) continue;
       acc.orders += sku ? x.qty : x.orderCount;
       acc.amount += filtered ? x.lineAmount : (x.approvedAmount ?? 0);
@@ -289,9 +297,12 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const orderCols: Column[] = ordersView
     ? tBuckets.map((b) => {
         const v = orderSum(b);
-        return chart === 'sales'
-          ? { key: b.key, label: b.label, value: v.amount, tip: m.chart.salesTip(tipLabel(b), v.amount) }
-          : { key: b.key, label: b.label, value: v.orders, tip: sku ? m.chart.qtyTip(tipLabel(b), v.orders) : m.chart.orderTip(tipLabel(b), v.orders) };
+        return cut(
+          b,
+          chart === 'sales'
+            ? { key: b.key, label: b.label, value: v.amount, tip: m.chart.salesTip(tipLabel(b), v.amount) }
+            : { key: b.key, label: b.label, value: v.orders, tip: sku ? m.chart.qtyTip(tipLabel(b), v.orders) : m.chart.orderTip(tipLabel(b), v.orders) },
+        );
       })
     : [];
   // 요일 × 시간대 평균 — 서버 평균(avg…), 승인 금액·상품 수량 평균은 합 ÷ 그 요일 날 수. 없는 칸은 0
@@ -319,10 +330,37 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
       : []),
   ].filter((x) => x.value > 0);
 
-  const onTimeCols: Column[] = sums.map(({ b, t }) => {
-    const v = rate(t.onTime, t.due);
-    return { key: b.key, label: b.label, value: v, tip: m.onTimeTip(tipLabel(b), rateText(v), t.onTime, t.due, t.late) };
+  // 출하 약속 준수율(목 시뮬레이션) — 출하가 없는 칸은 null(옅은 칸), 기간 평균 = 건수 합 ÷, 아래는 늦은 출하 많은 칸
+  const shipCols: Column[] = sums.map(({ b, t }) => {
+    const v = t.shipDays === 0 ? null : rate(t.onTime, t.due);
+    return { key: b.key, label: b.label, value: v, tip: v === null ? m.chart.shipNone(tipLabel(b)) : m.chart.shipTip(tipLabel(b), rateText(v), t.onTime, t.due, t.late) };
   });
+  const rangeShip = sums.reduce((a, { t }) => ({ onTime: a.onTime + t.onTime, due: a.due + t.due }), { onTime: 0, due: 0 });
+  const avgShip = rate(rangeShip.onTime, rangeShip.due);
+  const lateRows = sums
+    .filter(({ t }) => t.late > 0)
+    .sort((a, b) => b.t.late - a.t.late)
+    .slice(0, 5)
+    .map(({ b, t }) => ({ key: b.key, label: tipLabel(b), value: t.late, text: m.chart.lateShipOf(t.late, t.due) }));
+
+  // 지난 기간(바로 앞 같은 길이) — 주문·매출·피킹 줄 비교선. 칸 순서대로 맞춘다
+  const prevRange: Range = { from: addDays(range.from, -span), to: addDays(range.from, -1) };
+  const prevBuckets = buckets(prevRange, unit, today, 23);
+  const prevLabel = m.chart.prevLabel(shortDate(prevRange.from), shortDate(prevRange.to));
+  const prevOrders = useOrderSeries(mfcId, prevRange, unit, orderFilter, chart === 'orders' || chart === 'sales');
+  const prevOrderByKey = byKeyOf(prevOrders.data);
+  const prevOrderVals = prevBuckets.map((b) => {
+    const v = orderSum(b, prevOrderByKey);
+    return chart === 'sales' ? v.amount : v.orders;
+  });
+  const prevPick = useQuery({
+    refetchInterval: OPS_REFRESH_MS,
+    enabled: chart === 'picked',
+    queryKey: ['dashboard', mfcId, 'picking-lines', prevRange.from, prevRange.to, unit],
+    queryFn: () => fetchPicking(api, mfcId, prevRange, unit),
+  });
+  const prevPickMap = new Map((prevPick.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [pickingKey(i, unit), i]));
+  const prevPickVals = prevBuckets.map((b) => prevPickMap.get(b.key)?.pickedLines ?? 0);
 
   // 끌어서 고른 칸 → 첫 칸 시작일 ~ 끝 칸 끝날(시간 칸이면 그날). 하루 안이면 그날 시간대별로
   const zoom = (fromKey: string, toKey: string) => {
@@ -406,7 +444,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const feedPartial = tasks.isError || delays.isError || handovers.isError || damages.isError;
 
   const asOf = picking.data?.asOf ?? tasks.data?.asOf ?? null;
-  const refetchAll = () => [picking, trend.picking, trend.bySku, trend.onTime, onTime, workers, live, tasks, damages, handovers, delays].forEach((q) => void q.refetch());
+  const refetchAll = () => [picking, trend.picking, trend.bySku, onTime, workers, live, tasks, damages, handovers, delays].forEach((q) => void q.refetch());
 
   return (
     <section className="@container space-y-3">
@@ -487,8 +525,8 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           className="@5xl:col-span-5"
           title={m.chart.trend(shortDate(range.from), shortDate(range.to), span, m.range.unit[unit])}
           sub={
-            chart === 'onTime'
-              ? m.chart.onTimeNote
+            chart === 'ship'
+              ? m.chart.shipSub
               : chart === 'heat'
                 ? m.chart.heatSub
                 : chart === 'share'
@@ -499,8 +537,8 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
                   ? m.chart.shortSub(rateText(rate(periodShort.s, periodShort.p)))
                   : m.chart.pickSub
           }
-          {...(chart === 'onTime' ? { help: m.chart.onTimeHelp } : {})}
-          q={chart === 'onTime' ? trend.onTime : chart === 'heat' ? orderQ.heat : chart === 'share' ? orderQ.top : ordersView ? orderQ.series : trend.picking}
+          {...(chart === 'ship' ? { help: m.chart.shipHelp } : {})}
+          q={chart === 'ship' ? { isPending: false, isError: false } : chart === 'heat' ? orderQ.heat : chart === 'share' ? orderQ.top : ordersView ? orderQ.series : trend.picking}
           toolbar={
             <>
               {/* 볼 것 고르기 — 7개라 제목 옆이 아니라 제목 아래 줄(제목이 잘리지 않게) */}
@@ -515,13 +553,13 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
                       share: m.chart.shareShort,
                       picked: m.chart.pickedShort,
                       shortRate: m.chart.shortRateShort,
-                      onTime: m.chart.onTimeShort,
+                      ship: m.chart.shipShort,
                     }[k]
                   }
                 </button>
               ))}
               </div>
-              <RangeBar range={range} unit={unit} units={allowed} hourOk={hourOk} today={today} canBack={wider !== null} onChange={applyRange} onBack={widen} />
+              <RangeBar range={range} unit={unit} units={allowed} hourOk={hourOk} today={today} canBack={wider !== null} onChange={applyRange} onBack={widen} graph={chart !== 'heat' && chart !== 'share'} />
             </>
           }
         >
@@ -613,13 +651,39 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
                 format={(v) => (chart === 'sales' ? won(v) : sku ? `${v.toLocaleString('ko-KR')}개` : m.count(v))}
                 testId={chart === 'sales' ? 'chart-sales' : 'chart-orders'}
                 onRange={zoom}
+                {...(prevOrders.data && !sku ? { compare: { values: prevOrderVals, label: prevLabel } } : {})}
               />
               )}
             </>
-          ) : chart === 'onTime' ? (
-            <AreaChart key={`o-${range.from}-${range.to}-${unit}`} title={m.chart.onTime(span)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} onRange={zoom} />
+          ) : chart === 'ship' ? (
+            env.isMock ? (
+              <>
+                <span className="badge badge-primary badge-sm mb-2">{m.chart.shipSimBadge}</span>
+                <AreaChart
+                  key={`s-${range.from}-${range.to}-${unit}`}
+                  title={m.chart.ship(span)}
+                  columns={shipCols}
+                  format={(v) => rateText(v)}
+                  testId="chart-ship"
+                  onRange={zoom}
+                  rate={{ avg: avgShip, avgLabel: m.chart.onTimeAvg(rateText(avgShip)) }}
+                />
+              </>
+            ) : (
+              <p className="rounded-field border border-dashed border-base-300 px-4 py-8 text-center text-sm text-base-content/60" data-testid="ship-no-api">
+                {m.chart.shipNoApi}
+              </p>
+            )
           ) : chart === 'picked' ? (
-            <AreaChart key={`p-${range.from}-${range.to}-${unit}`} title={m.chart.picked(span)} columns={tPickedCols} format={(v) => m.lines(v)} testId="chart-picked" onRange={zoom} />
+            <AreaChart
+              key={`p-${range.from}-${range.to}-${unit}`}
+              title={m.chart.picked(span)}
+              columns={tPickedCols}
+              format={(v) => m.lines(v)}
+              testId="chart-picked"
+              onRange={zoom}
+              {...(prevPick.data ? { compare: { values: prevPickVals, label: prevLabel } } : {})}
+            />
           ) : (
             <AreaChart
               key={`s-${range.from}-${range.to}-${unit}`}
@@ -631,7 +695,13 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
               stack={{ series: reasonSeries, values: reasonVals }}
             />
           )}
-          {!ordersView && (
+          {chart === 'ship' ? (
+            env.isMock && (
+              <SubList title={m.chart.lateShipDays(span)} q={{ isPending: false, isError: false }} link={{ to: centerPath(mfcId, 'tasks'), text: m.chart.toTasks }}>
+                {lateRows.length === 0 ? <p className="text-sm text-base-content/55">{m.chart.noLateShip}</p> : <BarList testId="late-ship" rows={lateRows} />}
+              </SubList>
+            )
+          ) : !ordersView && (
           <SubList title={m.chart.topShort(spanDays(skuRangeOf(range)))} q={trend.bySku} link={{ to: centerPath(mfcId, 'inventory'), text: m.toInventory }}>
             {(trend.bySku.data?.items ?? []).length === 0 ? (
               <p className="text-sm text-base-content/55">{m.noShort}</p>
@@ -860,7 +930,10 @@ function RangeBar({
   canBack,
   onChange,
   onBack,
+  graph,
 }: {
+  /** 시간 축 그래프(끌어 확대·칸 단위가 뜻 있음) — 요일·시간·상품 비중이면 false */
+  readonly graph: boolean;
   readonly range: Range;
   readonly unit: Unit;
   readonly units: readonly Unit[];
@@ -891,21 +964,18 @@ function RangeBar({
             </button>
           ))}
         </div>
-        <div className="pm-seg" role="group" aria-label={r.unitLabel}>
-          {UNITS.map((u) => (
-            <button
-              key={u}
-              type="button"
-              aria-pressed={unit === u}
-              disabled={!units.includes(u)}
-              title={u === 'hour' && !hourOk ? r.hourNoApi : !units.includes(u) ? r.unitNotFit : undefined}
-              className="disabled:cursor-not-allowed disabled:opacity-35"
-              onClick={() => onChange(range, u)}
-            >
-              {r.unit[u]}
-            </button>
-          ))}
-        </div>
+        {/* 칸 단위 — 고를 수 있는 것만 보인다(꺼진 칩은 그리지 않음, 2026-11-24 사용자). 시간 축 그래프가 아니면 칸 단위 자체가 없다 */}
+        {graph && (
+          <div className="pm-seg" role="group" aria-label={r.unitLabel} title={!hourOk ? r.hourNoApi : undefined}>
+            {UNITS.filter((u) => units.includes(u)).map((u) => (
+              <button key={u} type="button" aria-pressed={unit === u} onClick={() => onChange(range, u)}>
+                {r.unit[u]}
+              </button>
+            ))}
+          </div>
+        )}
+        {/* 날짜 두 칸은 한 묶음 — 줄이 바뀌어도 "–" 를 사이에 두고 갈라지지 않게 */}
+        <span className="inline-flex items-center gap-1.5">
         <input
           type="date"
           className="input input-xs pm-mono w-[8.6rem]"
@@ -928,19 +998,25 @@ function RangeBar({
             if (e.target.value) pick(range.from, e.target.value);
           }}
         />
+        </span>
       </div>
-      <div className="flex min-h-6 items-center justify-between gap-2">
-        {error ? (
-          <p role="alert" className="text-xs text-error">
-            {error}
-          </p>
-        ) : (
-          <p className="truncate text-[11px] text-base-content/45">{r.hint}</p>
-        )}
-        <button type="button" className="btn btn-xs btn-ghost shrink-0" disabled={!canBack} onClick={onBack} title={r.backHint} data-testid="range-back">
-          ⤢ {r.back}
-        </button>
-      </div>
+      {(error || graph) && (
+        <div className="flex min-h-6 items-center justify-between gap-2">
+          {error ? (
+            <p role="alert" className="text-xs text-error">
+              {error}
+            </p>
+          ) : (
+            <p className="truncate text-[11px] text-base-content/45">{r.hint}</p>
+          )}
+          {/* 넓게 보기 — 되돌릴 확대가 있을 때만 */}
+          {graph && canBack && (
+            <button type="button" className="btn btn-xs btn-ghost shrink-0" onClick={onBack} title={r.backHint} data-testid="range-back">
+              ⤢ {r.back}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

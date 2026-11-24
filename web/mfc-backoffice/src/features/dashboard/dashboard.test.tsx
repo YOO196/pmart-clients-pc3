@@ -26,17 +26,25 @@ describe('센터 대시보드', () => {
     expect(lastDays(q.get('to')!, 14)[0]).toBe(q.get('from'));
   });
 
-  it('14일 막대 — 날짜마다 한 칸, 줄 없는 날은 정시율 "—"(0% 아님), 마우스를 올리면 말풍선', async () => {
+  it('14일 출하 준수(목 시뮬레이션) — 날짜마다 한 칸, 출하 없는 날은 옅은 칸·"출하 없음"(0% 아님), 기간 평균 점선, 아래는 늦은 출하 많은 때 · 정시율 추이 탭은 없음', async () => {
     renderAt('/c/MFC-BJG-01/dashboard');
-    // B안: 추이 패널에서 정시율을 골라 본다
     await screen.findByTestId('chart-orders');
-    await userEvent.click(screen.getByRole('button', { name: '정시율' }));
-    const chart = await screen.findByTestId('chart-on-time');
-    expect(within(chart).getAllByTestId('chart-on-time-col')).toHaveLength(14);
-    // 목은 일요일 줄이 없다(오늘은 늘 있음) → 14일 중 오늘이 아닌 일요일 수
+    // 정시 배송률은 위 카드(배송 결과)에만 — 추이 탭은 센터 몫인 출하 준수
+    expect(screen.queryByRole('button', { name: '정시율' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('kpi-on-time')).toHaveTextContent('배송 결과(배차·라이더 포함)');
+    await userEvent.click(screen.getByRole('button', { name: '출하 준수' }));
+    const chart = await screen.findByTestId('chart-ship');
+    expect(within(chart).getAllByTestId('chart-ship-col')).toHaveLength(14);
+    // 목 시뮬레이션은 일요일 출하가 없다(오늘은 늘 있음) → 14일 중 오늘이 아닌 일요일 수
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
     const sundays = lastDays(today, 14).filter((d) => d !== today && new Date(`${d}T00:00:00Z`).getUTCDay() === 0).length;
-    expect(within(chart).getAllByText('—')).toHaveLength(sundays);
+    expect(within(chart).queryAllByTestId('chart-ship-gap')).toHaveLength(sundays);
+    expect(within(chart).getAllByRole('button', { name: /출하 없음/ })).toHaveLength(sundays);
+    expect(within(chart).queryByText('0.0%')).not.toBeInTheDocument();
+    expect(within(chart).getByTestId('chart-ship-avg')).toBeInTheDocument();
+    expect(within(chart).getByText(/^기간 평균 \d+\.\d%$/)).toBeInTheDocument();
+    expect(screen.queryByTestId('top-short')).not.toBeInTheDocument();
+    expect(screen.getByTestId('late-ship')).toHaveTextContent(/늦음 \d+건 \/ 약속 \d+건/);
     await userEvent.click(screen.getByRole('button', { name: '피킹 줄' }));
     await userEvent.hover(within(await screen.findByTestId('chart-picked')).getAllByTestId('chart-picked-col').at(-1)!);
     expect(screen.getByTestId('chart-picked-tip')).toHaveTextContent('피킹 40줄 · 결품 4줄');
@@ -134,6 +142,9 @@ describe('센터 대시보드', () => {
     const heat = await screen.findByTestId('order-heat');
     expect(screen.queryByTestId('chart-orders')).not.toBeInTheDocument();
     expect(within(heat).getAllByTestId('order-heat-cell')).toHaveLength(7 * 24);
+    // 시간 축 그래프가 아니면 칸 단위·넓게 보기 칩은 없다(꺼진 칩도 그리지 않음)
+    expect(within(screen.getByTestId('range-bar')).queryByRole('group', { name: '칸 단위' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('range-back')).not.toBeInTheDocument();
     expect(within(heat).getByTestId('order-heat-tip')).toHaveTextContent(/가장 많은 때 [월화수목금토일] \d+시/);
     // 카테고리 → 서버가 거른다(series·top-products 에 categoryId), 상품 목록도 그 카테고리만
     await userEvent.selectOptions(await screen.findByLabelText('카테고리'), 'DAIRY');
@@ -145,6 +156,12 @@ describe('센터 대시보드', () => {
     const share = await screen.findByTestId('order-share');
     await waitFor(() => expect(within(share).getAllByTestId('top-sold-row')[0]).not.toHaveTextContent(/^SKU-/));
     expect(within(share).getAllByTestId('order-share-slice').length).toBeGreaterThan(0);
+    // 가운데 글씨 — 평소 "상품", 범례 줄에 마우스를 올리면 그 상품 이름
+    expect(within(share).getByTestId('order-share-center')).toHaveTextContent('상품');
+    const first = within(share).getAllByTestId('top-sold-row')[0]!;
+    await userEvent.hover(first);
+    expect(within(share).getByTestId('order-share-center')).toHaveTextContent(first.querySelector('.truncate')!.textContent);
+    await userEvent.unhover(first);
     const pcts = within(share).getAllByRole('button').map((b) => Number(/([\d.]+)%/.exec(b.textContent ?? '')?.[1] ?? 0));
     expect(Math.abs(pcts.reduce((a, b) => a + b, 0) - 100)).toBeLessThan(0.6);
     // 조각(범례 줄)을 누르면 그 상품(sku)만 — 주문 탭의 판매 수량 추이

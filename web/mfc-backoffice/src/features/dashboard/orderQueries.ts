@@ -27,12 +27,13 @@ export const seriesKey = (start: string, unit: Unit) => (unit === 'hour' ? start
 
 const filterQuery = (f: OrderFilter) => ({ ...(f.sku ? { sku: f.sku } : f.categoryId ? { categoryId: f.categoryId } : {}) });
 
-export function useOrderTrend(mfcId: string, r: Range, unit: Unit, f: OrderFilter, enabled: boolean) {
+/** 추이(series)만 — 지난 기간 비교선에도 쓴다 */
+export function useOrderSeries(mfcId: string, r: Range, unit: Unit, f: OrderFilter, enabled: boolean) {
   const api = useApi();
-  const common = { refetchInterval: OPS_REFRESH_MS, enabled } as const;
   const bucket = unit === 'hour' ? ('HOUR' as const) : ('DAY' as const);
-  const series = useQuery({
-    ...common,
+  return useQuery({
+    refetchInterval: OPS_REFRESH_MS,
+    enabled,
     queryKey: ['dashboard', mfcId, 'order-series', r.from, r.to, bucket, f.sku, f.categoryId],
     queryFn: async () => {
       const parts = await Promise.all(
@@ -41,6 +42,12 @@ export function useOrderTrend(mfcId: string, r: Range, unit: Unit, f: OrderFilte
       return parts.flatMap((p) => p.items);
     },
   });
+}
+
+export function useOrderTrend(mfcId: string, r: Range, unit: Unit, f: OrderFilter, enabled: boolean) {
+  const api = useApi();
+  const common = { refetchInterval: OPS_REFRESH_MS, enabled } as const;
+  const series = useOrderSeries(mfcId, r, unit, f, enabled);
   const heat = useQuery({
     ...common,
     queryKey: ['dashboard', mfcId, 'order-heat', r.from, r.to, f.sku, f.categoryId],

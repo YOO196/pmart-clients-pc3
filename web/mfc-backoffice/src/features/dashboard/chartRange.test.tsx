@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { env } from '../../env';
 import { renderAt } from '../../test/render';
-import { addDays, buckets, pickingKey, presetFrom, zoomOut, chunks, daysIn, defaultUnit, hourShare, unitsFor, validRange } from './dashboardRules';
+import { addDays, buckets, partialOf, pickingKey, presetFrom, zoomOut, chunks, daysIn, defaultUnit, hourShare, unitsFor, validRange } from './dashboardRules';
 
 const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
 
@@ -40,20 +40,46 @@ describe('추이 그래프 기간', () => {
     expect(parts.at(-1)!.to).toBe(t);
   });
 
-  it('빠른 단추 30일 → 30칸, 정시율은 31일 상한이라 나눠 읽는다(90일 = 3번)', async () => {
+  it('빠른 단추 30일 → 30칸·지난 30일 비교선, 90일 출하 준수(목 시뮬레이션) 90칸', async () => {
     const view = renderAt('/c/MFC-BJG-01/dashboard');
     await openPicked();
     const bar = screen.getByTestId('range-bar');
     await userEvent.click(within(bar).getByRole('button', { name: '30일' }));
     await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(30));
     expect(screen.getByRole('heading', { name: /추이 · .* \(30일 · 일별\)/ })).toBeInTheDocument();
+    // 30칸이라 막대, 지난 30일(바로 앞 같은 길이)을 같이 읽어 옅은 점선
+    expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-bar').length).toBeGreaterThan(0);
+    const picks = view.gets('/metrics/picking-lines').map((r) => new URL(r.url).searchParams);
+    await waitFor(() => expect(view.gets('/metrics/picking-lines').some((r) => new URL(r.url).searchParams.get('to') === addDays(today(), -30))).toBe(true));
+    expect(picks.length).toBeGreaterThan(0);
+    await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getByTestId('chart-picked-prev')).toBeInTheDocument());
     await userEvent.click(within(bar).getByRole('button', { name: '90일' }));
-    await userEvent.click(screen.getByRole('button', { name: '정시율' }));
-    await waitFor(() => expect(within(screen.getByTestId('chart-on-time')).getAllByTestId('chart-on-time-col')).toHaveLength(90));
-    const asked = view.gets('/metrics/on-time-deliveries').map((r) => new URL(r.url).searchParams);
-    const wide = asked.filter((q) => q.get('to') === today() && (q.get('from') ?? '') > addDays(today(), -31));
-    expect(wide.length).toBeGreaterThan(0);
-    for (const q of asked) expect(daysIn({ from: q.get('from')!, to: q.get('to')! }).length).toBeLessThanOrEqual(31);
+    // 90일은 기본이 주 단위(일별은 요일 톱니) — 주 칸 막대
+    const weeks = buckets({ from: presetFrom(90, today()), to: today() }, 'week', today(), 0).length;
+    await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(weeks));
+    expect(screen.getByRole('heading', { name: /\(90일 · 주별\)/ })).toBeInTheDocument();
+    // 기간 끝에 잘린 주(첫 주·이번 주)는 옅은 막대, 말풍선에 "n일 중 m일만"
+    const partials = buckets({ from: presetFrom(90, today()), to: today() }, 'week', today(), 0).filter((b) => daysIn(b).length < 7);
+    expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-bar').filter((r) => r.hasAttribute('data-partial')).length).toBeLessThanOrEqual(partials.length);
+    if (partials.length > 0) {
+      const lastCol = within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col').at(-1)!;
+      if (daysIn(partials.at(-1)!).length < 7 && partials.at(-1)!.to === today()) expect(lastCol).toHaveAccessibleName(/7일 중 \d일만/);
+    }
+    // 일 단위로 바꾸면 90칸 — 막대가 아니라 면 없는 선
+    await userEvent.click(within(bar).getByRole('button', { name: '일' }));
+    await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(90));
+    expect(within(screen.getByTestId('chart-picked')).queryAllByTestId('chart-picked-bar')).toHaveLength(0);
+    await userEvent.click(screen.getByRole('button', { name: '출하 준수' }));
+    await waitFor(() => expect(within(screen.getByTestId('chart-ship')).getAllByTestId('chart-ship-col')).toHaveLength(90));
+    expect(screen.getByText('출하 약속 준수율 — 목 시뮬레이션(API 요청함)')).toBeInTheDocument();
+  });
+
+  it('기간 끝에 잘린 주·월 칸 — 며칠만 들었나(일·시간 칸은 해당 없음)', () => {
+    expect(partialOf({ from: '2026-11-23', to: '2026-11-24' }, 'week')).toEqual({ days: 2, full: 7 });
+    expect(partialOf({ from: '2026-11-16', to: '2026-11-22' }, 'week')).toBeNull();
+    expect(partialOf({ from: '2026-02-10', to: '2026-02-28' }, 'month')).toEqual({ days: 19, full: 28 });
+    expect(partialOf({ from: '2026-11-01', to: '2026-11-30' }, 'month')).toBeNull();
+    expect(partialOf({ from: '2026-11-24', to: '2026-11-24' }, 'day')).toBeNull();
   });
 
   it('한 단계 넓게 규칙 — 1일 → 7일 → 30일 → 90일 → 1년, 가운데 중심, 오늘을 넘지 않음', () => {
@@ -100,6 +126,8 @@ describe('추이 그래프 기간', () => {
     expect(defaultUnit(1, true)).toBe('hour');
     expect(defaultUnit(1, false)).toBe('day');
     expect(defaultUnit(365, true)).toBe('month');
+    expect(defaultUnit(31, true)).toBe('day');
+    expect(defaultUnit(90, true)).toBe('week');
     expect(buckets({ from: '2026-11-20', to: '2026-11-20' }, 'hour', t, 14)).toHaveLength(24);
     expect(buckets({ from: t, to: t }, 'hour', t, 14)).toHaveLength(15);
     const weeks = buckets({ from: '2026-11-05', to: t }, 'week', t, 14);
@@ -123,14 +151,14 @@ describe('추이 그래프 기간', () => {
     expect(screen.getByRole('heading', { name: /월별/ })).toBeInTheDocument();
     await userEvent.click(within(bar).getByRole('button', { name: '주' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: /주별/ })).toBeInTheDocument());
-    expect(within(bar).getByRole('button', { name: '시간' })).toBeDisabled();
+    expect(within(bar).queryByRole('button', { name: '시간' })).not.toBeInTheDocument();
     await userEvent.click(within(bar).getByRole('button', { name: '1일' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: /\(1일 · 시간별\)/ })).toBeInTheDocument());
     // 1일 → Ctrl+Z → 7일(일별), 1년이면 단추가 꺼진다
     fireEvent.keyDown(window, { key: 'z', ctrlKey: true });
     await waitFor(() => expect(screen.getByRole('heading', { name: /\(7일 · 일별\)/ })).toBeInTheDocument());
     await userEvent.click(within(bar).getByRole('button', { name: '1년' }));
-    await waitFor(() => expect(screen.getByTestId('range-back')).toBeDisabled());
+    await waitFor(() => expect(screen.queryByTestId('range-back')).not.toBeInTheDocument());
   });
 
   it('하루 칸 안을 끌면 그날 시간별', async () => {
@@ -167,14 +195,15 @@ describe('추이 그래프 기간', () => {
       const bar = screen.getByTestId('range-bar');
       await userEvent.click(within(bar).getByRole('button', { name: '1년' }));
       await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(12));
-      const month = asked(view).filter((q) => q.get('bucket') === 'MONTH');
+      // 이번 기간만(지난 기간 비교선 요청은 빼고 센다)
+      const month = asked(view).filter((q) => q.get('bucket') === 'MONTH' && q.get('to') === today());
       expect(month).toHaveLength(1);
       expect(month[0]!.get('from')).toBe(presetFrom(365, today()));
       await userEvent.click(within(bar).getByRole('button', { name: '주' }));
       await waitFor(() => expect(asked(view).some((q) => q.get('bucket') === 'WEEK')).toBe(true));
       await userEvent.click(within(bar).getByRole('button', { name: '1일' }));
       await waitFor(() => expect(screen.getByRole('heading', { name: /\(1일 · 시간별\)/ })).toBeInTheDocument());
-      const hour = asked(view).filter((q) => q.get('bucket') === 'HOUR');
+      const hour = asked(view).filter((q) => q.get('bucket') === 'HOUR' && q.get('to') === today());
       expect(hour.at(-1)!.get('from')).toBe(today());
       // 목의 오늘 합계 40줄 — 시간 칸 말풍선을 더하면 같다(서버 칸 값 그대로 그림)
       const cols = within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col');
@@ -190,12 +219,12 @@ describe('추이 그래프 기간', () => {
       const view = renderAt(`/c/MFC-BJG-01/dashboard?from=${addDays(today(), -119)}&to=${today()}&unit=day`);
       await openPicked();
       await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(120));
-      const day = asked(view).filter((q) => q.get('bucket') === 'DAY' && q.get('to') !== null);
+      const day = asked(view).filter((q) => q.get('bucket') === 'DAY' && q.get('to') !== null && q.get('from')! >= addDays(today(), -119));
       const long = day.filter((q) => q.get('from')! < addDays(today(), -13));
       expect(long.map((q) => daysIn({ from: q.get('from')!, to: q.get('to')! }).length).sort((a, b) => a - b)).toEqual([28, 92]);
     });
 
-    it('실서버 — 주문·피킹 줄·결품은 시간 칸이 켜지고, 정시율은 꺼진다(시간 칸 DD-6 대기)', async () => {
+    it('실서버 — 주문·피킹 줄·결품은 시간 칸이 켜지고, 출하 준수는 API 없음(목만)', async () => {
       env.isMock = false;
       renderAt('/c/MFC-BJG-01/dashboard');
       // 실서버도 주문(order 0.20.0)이 기본 — 1일이면 시간별
@@ -207,10 +236,11 @@ describe('추이 그래프 기간', () => {
       await userEvent.click(within(bar).getByRole('button', { name: '1일' }));
       await waitFor(() => expect(screen.getByRole('heading', { name: /\(1일 · 시간별\)/ })).toBeInTheDocument());
       await userEvent.click(screen.getByRole('button', { name: '결품' }));
-      expect(within(bar).getByRole('button', { name: '시간' })).toBeEnabled();
-      await userEvent.click(screen.getByRole('button', { name: '정시율' }));
-      await waitFor(() => expect(within(bar).getByRole('button', { name: '시간' })).toBeDisabled());
-      expect(screen.getByRole('heading', { name: /\(1일 · 일별\)/ })).toBeInTheDocument();
+      expect(within(bar).getByRole('button', { name: '시간' })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: '출하 준수' }));
+      await waitFor(() => expect(within(bar).queryByRole('button', { name: '시간' })).not.toBeInTheDocument());
+      expect(screen.getByTestId('ship-no-api')).toHaveTextContent('API 가 아직 없어요');
+      expect(screen.queryByTestId('chart-ship')).not.toBeInTheDocument();
     });
   });
 });
