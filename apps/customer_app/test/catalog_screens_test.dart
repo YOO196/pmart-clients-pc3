@@ -138,6 +138,22 @@ final class _SlowCategories extends MockCatalogRepository {
   }
 }
 
+/// 속성 필터 줄 조회를 [release] 가 끝날 때까지 늦추는 서버.
+final class _SlowFilters extends MockCatalogRepository {
+  _SlowFilters() : super(latency: Duration.zero);
+
+  final release = Completer<void>();
+
+  @override
+  Future<List<FilterAttribute>> filters(
+    ProductQuery query, {
+    String? mfcId,
+  }) async {
+    await release.future;
+    return super.filters(query, mfcId: mfcId);
+  }
+}
+
 /// 할인 상품 줄(onSale)만 [release] 가 끝날 때까지 늦추는 서버.
 final class _SlowSaleRow extends MockCatalogRepository {
   _SlowSaleRow() : super(latency: Duration.zero);
@@ -643,6 +659,44 @@ void main() {
         expect(find.byKey(const ValueKey('category-sale')), findsNothing);
       },
     );
+
+    testWidgets('속성 필터 줄이 정해질 때까지 격자는 뼈대 — 오면 줄과 격자를 함께(사용자 2026-11-24)', (
+      t,
+    ) async {
+      final catalog = _SlowFilters();
+      await t.pumpWidget(testApp(const [], catalog: catalog));
+      await t.pumpAndSettle();
+      final router = GoRouter.of(t.element(find.byType(Navigator).first));
+      unawaited(router.push('/products?categoryId=C-MILK'));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 500));
+      expect(find.byType(ProductGrid), findsNothing);
+      expect(find.byKey(const ValueKey('attribute-rows')), findsNothing);
+
+      catalog.release.complete();
+      await t.pumpAndSettle();
+      expect(find.byType(ProductGrid), findsOneWidget);
+      expect(find.byKey(const ValueKey('attribute-rows')), findsOneWidget);
+    });
+
+    testWidgets('속성 필터 줄이 1초 안에 안 오면 줄 없이 격자, 늦게 와도 끼어들지 않는다(사용자 2026-11-24)', (
+      t,
+    ) async {
+      final catalog = _SlowFilters();
+      await t.pumpWidget(testApp(const [], catalog: catalog));
+      await t.pumpAndSettle();
+      final router = GoRouter.of(t.element(find.byType(Navigator).first));
+      unawaited(router.push('/products?categoryId=C-MILK'));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 1200));
+      await t.pumpAndSettle();
+      expect(find.byType(ProductGrid), findsOneWidget);
+      expect(find.byKey(const ValueKey('attribute-rows')), findsNothing);
+
+      catalog.release.complete();
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('attribute-rows')), findsNothing);
+    });
 
     testWidgets('다음 묶음 실패는 받은 목록을 지우지 않는다', (t) async {
       await t.pumpWidget(testApp(const [], catalog: _SecondPageDown()));

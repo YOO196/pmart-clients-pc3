@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -64,6 +66,50 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
   /// 검색어·카테고리가 바뀌면 쓰지 않는다(다른 조건의 결과를 보이지 않는다).
   ProductListState? _last;
   ProductQuery? _lastBase;
+
+  /// 속성 필터 줄을 기다리는 가장 긴 시간(사용자 2026-11-24 "필터 줄이 깜빡이면서 뒤늦게 생긴다").
+  static const _attrHoldMax = Duration(milliseconds: 1000);
+
+  /// 속성 줄이 정해진(또는 기다림을 끝낸) 속성 조회 조건. 이 조건이 아니면 줄이 정해질 때까지 격자 자리에 뼈대를 둔다 —
+  /// 상품이 먼저 보이고 필터 줄이 뒤늦게 끼어들어 목록이 밀리지 않게.
+  ProductQuery? _attrsReleasedFor;
+  ProductQuery? _attrHoldFor;
+  Timer? _attrHold;
+
+  /// 놓을 때 줄이 정해져 있었는지. 늦게 온 줄은 이 조건을 보는 동안 숨긴다(필터 버튼은 그대로).
+  bool _showAttrs = true;
+
+  @override
+  void dispose() {
+    _attrHold?.cancel();
+    super.dispose();
+  }
+
+  /// [aq] 조건의 속성 줄이 정해졌거나 [_attrHoldMax] 가 지났으면 true.
+  bool _attrsReleased(ProductQuery aq) {
+    if (_attrsReleasedFor == aq) return true;
+    final attrs = ref.watch(filtersProvider(aq));
+    if (attrs.hasValue || attrs.hasError) {
+      _attrHold?.cancel();
+      _attrHoldFor = null;
+      _attrsReleasedFor = aq;
+      _showAttrs = true;
+      return true;
+    }
+    if (_attrHoldFor != aq) {
+      _attrHold?.cancel();
+      _attrHoldFor = aq;
+      _attrHold = Timer(_attrHoldMax, () {
+        if (!mounted || _attrHoldFor != aq) return;
+        setState(() {
+          _attrHoldFor = null;
+          _attrsReleasedFor = aq;
+          _showAttrs = false;
+        });
+      });
+    }
+    return false;
+  }
 
   ProductQuery get _query =>
       widget.baseQuery.copyWith(sort: _sort, filters: _filters);
@@ -199,6 +245,15 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
     final hasCart =
         ref.watch(cartControllerProvider).value?.cart.lines.isNotEmpty ?? false;
     final search = keyword != null && keyword.isNotEmpty;
+    // 속성 줄은 목록과 따로 읽는다(검색은 고친 검색어 기준 — 목록이 와야 조건이 정해진다).
+    final attrsReady = _attrsReleased(
+      ProductQuery(
+        keyword: list?.correctedQuery ?? widget.baseQuery.keyword,
+        categoryId: widget.baseQuery.categoryId,
+        onSale: widget.baseQuery.onSale,
+      ),
+    );
+    final hold = widget.holdList || !attrsReady;
     final attributes = _AttributeRows(
       query: widget.baseQuery,
       picked: _filters,
@@ -259,7 +314,7 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
       children: [
         ?widget.header,
         if (search) countRow,
-        attributes,
+        if (_showAttrs) attributes,
         if (!search) countRow,
         if (search && !widget.baseQuery.onSale)
           _KeywordSaleStrip(
@@ -290,7 +345,7 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
                       const Expanded(child: PmartGridSkeleton()),
                     ],
                   ),
-                  state: widget.holdList
+                  state: hold
                       ? UiLoading<ProductListState>()
                       : uiStateOf(
                           value,
