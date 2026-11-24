@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { operator, problem, unauthorized } from './support';
+import { addToArray } from './demoCenters';
 
 const minutesFromNow = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
 
@@ -82,3 +83,8 @@ export const dispatchDelayHandlers = [
     return HttpResponse.json(claim(claimId), { status: 201 });
   }),
 ];
+
+/** 브라우저 목 — 다른 네 센터에도 배차 지연(부산진구 것을 옮김, demoCenters) */
+export function addDemoCenterDelays(): void {
+  addToArray(delays);
+}

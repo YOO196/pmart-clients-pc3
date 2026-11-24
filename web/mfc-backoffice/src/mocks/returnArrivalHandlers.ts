@@ -5,10 +5,11 @@ import { http, HttpResponse } from 'msw';
 import { API_BASE } from '../api/client';
 import type { components } from '../api/generated/mfc-inbound';
 import { operator, problem, unauthorized } from './support';
+import { addToArray } from './demoCenters';
 
 type ReturnArrival = components['schemas']['ReturnArrival'];
 
-const arrivals: readonly ReturnArrival[] = [
+const arrivals: ReturnArrival[] = [
   {
     arrivalId: 'DLV-RET-0',
     mfcId: 'MFC-SEED-01',
@@ -66,3 +67,8 @@ export const returnArrivalHandlers = [
     return HttpResponse.json({ items: arrivals.filter((a) => a.mfcId === mfcId && a.state === state) });
   }),
 ];
+
+/** 브라우저 목 — 다른 네 센터에도 반품 도착(부산진구 것을 옮김, demoCenters) */
+export function addDemoCenterArrivals(): void {
+  addToArray(arrivals);
+}

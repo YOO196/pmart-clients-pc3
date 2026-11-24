@@ -5,6 +5,7 @@ import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { operator, problem, unauthorized } from './support';
+import { hasDemoData } from './demoCenters';
 
 const CENTER = 'MFC-SEED-01';
 const RIDERS = ['RD-1', 'RD-2', 'RD-7', 'RD-31'] as const;
@@ -44,11 +45,14 @@ export const deliveryStatsHandlers = [
     const g = guard(request, 7);
     if (g instanceof Response) return g;
     const [from, to, mfcId] = g;
-    const mine = !mfcId || mfcId === CENTER;
+    const mine = !mfcId || hasDemoData(mfcId);
+    const at = mfcId ?? CENTER;
+    // 다른 센터(브라우저 목)는 센터 ID 를 섞어 다른 값
+    const salt = at === CENTER ? '' : at;
     const rows = mine
       ? [...days(from, to)].flatMap((date) =>
           RIDERS.flatMap((riderId) => {
-            const k = num(`${date}${riderId}`);
+            const k = num(`${date}${riderId}${salt}`);
             const assigned = k % 9;
             if (assigned === 0) return [];
             const failed = k % 7 === 0 ? 1 : 0;
@@ -58,7 +62,7 @@ export const deliveryStatsHandlers = [
             return [
               {
                 date,
-                mfcId: CENTER,
+                mfcId: at,
                 riderId,
                 assigned,
                 completed,
@@ -89,17 +93,18 @@ export const deliveryStatsHandlers = [
     const g = guard(request, 1);
     if (g instanceof Response) return g;
     const [from, to, mfcId] = g;
-    const mine = !mfcId || mfcId === CENTER;
+    const mine = !mfcId || hasDemoData(mfcId);
+    const at = mfcId ?? CENTER;
     const rows = mine
       ? [...days(from, to)].flatMap((date) => {
-          const k = num(date);
+          const k = num(`${date}${at === CENTER ? '' : at}`);
           const created = 10 + (k % 14);
           const assigned = created - (k % 3);
           const sent = assigned + 4 + (k % 5);
           return [
             {
               date,
-              mfcId: CENTER,
+              mfcId: at,
               created,
               assigned,
               avgAssignSeconds: 60 + (k % 240),

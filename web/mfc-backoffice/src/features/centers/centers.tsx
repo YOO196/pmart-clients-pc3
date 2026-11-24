@@ -7,7 +7,7 @@ import { centerDisplayName } from '@pmart/web-core';
 import { useSession } from '../../app/SessionContext';
 import { messages as m } from '../../shared/messages';
 
-/** 센터가 둘 이상일 때만 고르기가 보인다. 바꾸면 같은 메뉴의 다른 센터로 간다. */
+/** 센터가 둘 이상이면 센터 이름이 드롭다운 — 바꾸면 같은 메뉴의 다른 센터로 간다. 하나면 이름만. */
 export function CenterSwitcher({ centers, current, segment }: { readonly centers: readonly string[]; readonly current: string; readonly segment: string }) {
   const { session } = useSession();
   const navigate = useNavigate();
@@ -24,15 +24,18 @@ export function CenterSwitcher({ centers, current, segment }: { readonly centers
       </div>
     );
   }
+  // 여러 센터 — 센터 이름 자체가 드롭다운(2026-11-24 사용자 "센터 명 클릭하면 다른 지점 웹 볼 수 있는 드롭다운"). 고르면 같은 메뉴의 그 센터로 간다.
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <label className="flex items-center gap-2">
-        <span className="hidden opacity-70 sm:inline">{m.center.choose}</span>
+    <div className="flex min-w-0 items-center gap-1.5 text-sm">
+      <label className="flex min-w-0 items-center gap-1">
+        <span className="hidden opacity-70 sm:inline">{m.center.label}</span>
         <select
           aria-label={m.center.choose}
-          className="select select-sm w-auto max-w-[7rem] sm:max-w-none"
+          title={m.center.switchHint(centers.length)}
+          className="select select-sm select-ghost w-auto max-w-[8rem] cursor-pointer pr-7 font-bold sm:max-w-none"
           value={current}
           onChange={(e) => void navigate(`/c/${encodeURIComponent(e.target.value)}/${segment}`)}
+          data-testid="center-switcher"
         >
           {centers.map((c) => (
             <option key={c} value={c}>

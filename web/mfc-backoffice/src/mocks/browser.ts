@@ -1,11 +1,20 @@
 import { http, HttpResponse } from 'msw';
 import { setupWorker } from 'msw/browser';
 
-import { seedDemoFloor } from './db';
+import { addDemoCenterDeliveries } from './centerDeliveryHandlers';
+import { seedDemoCenters, seedDemoFloor } from './db';
+import { addDemoCenterDelays } from './dispatchDelayHandlers';
 import { handlers } from './handlers';
+import { addDemoCenterShipments } from './packingHandoverHandlers';
+import { addDemoCenterArrivals } from './returnArrivalHandlers';
 
-// 브라우저 목에서만 시연용 칸을 더한다(대시보드 구역 칸 지도) — 시험 데이터는 그대로
+// 브라우저 목에서만 시연용 칸·작업자를 더하고, 다른 네 센터에도 부산진구 시연 기록을 옮긴다 — 시험 데이터는 그대로
 seedDemoFloor();
+seedDemoCenters();
+addDemoCenterDeliveries();
+addDemoCenterShipments();
+addDemoCenterDelays();
+addDemoCenterArrivals();
 
 const PING = '/__pmart_mock_ping';
 export const worker = setupWorker(http.get(PING, () => HttpResponse.json({ mocked: true })), ...handlers);

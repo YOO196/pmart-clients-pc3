@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { operator, problem, unauthorized } from './support';
+import { addToArray } from './demoCenters';
 
 const BFF = `${API_BASE}/backoffice`;
 const ACTIVE = ['UNASSIGNED', 'ASSIGNED', 'ARRIVED_AT_STORE', 'PICKED_UP', 'ARRIVED_AT_CUSTOMER', 'FAILURE_REPORTED', 'SUSPENDED', 'RETURN_IN_PROGRESS', 'RETURN_PICKED_UP'];
@@ -167,3 +168,9 @@ export const centerDeliveryHandlers = [
   http.post(`${API_BASE}/cases/:caseId/assignments`, () => problem(403, 'FORBIDDEN')),
   http.post(`${API_BASE}/cases/:caseId/closures`, () => problem(403, 'FORBIDDEN')),
 ];
+
+/** 브라우저 목 — 다른 네 센터에도 배송·배차 실패 사건(부산진구 것을 옮김, demoCenters) */
+export function addDemoCenterDeliveries(): void {
+  addToArray(rows);
+  addToArray(cases);
+}

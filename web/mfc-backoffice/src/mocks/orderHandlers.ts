@@ -7,8 +7,11 @@ import { http, HttpResponse } from 'msw';
 import { API_BASE } from '../api/client';
 import { SIM_CATEGORIES, SIM_PRODUCTS, simAt } from './orderSim';
 import { operator, problem, unauthorized } from './support';
+import { DEMO_HOME, demoScale, hasDemoData, scaled } from './demoCenters';
 
-const ORDER_CENTER = 'MFC-SEED-01';
+// 다른 센터(브라우저 목)는 부산진구 식에 센터 규모를 곱한다(demoCenters)
+const scaleSim = (v: { orders: number; amount: number; qty: number }, mfcId: string | null) =>
+  mfcId === null || mfcId === DEMO_HOME ? v : { orders: scaled(v.orders, mfcId), amount: Math.round(v.amount * demoScale(mfcId)), qty: scaled(v.qty, mfcId) };
 const seoulNow = () => {
   const now = new Date();
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(now);
@@ -57,7 +60,7 @@ export const orderHandlers = [
     const filtered = !!(f.sku || f.category);
     const mfcId = q.get('mfcId');
     const base = { from, to, mfcId, bucket, sku: f.sku, categoryId: f.category };
-    if (mfcId && mfcId !== ORDER_CENTER) return HttpResponse.json({ ...base, items: [] });
+    if (mfcId && !hasDemoData(mfcId)) return HttpResponse.json({ ...base, items: [] });
     type Acc = { orderCount: number; amount: number; qty: number };
     const acc = new Map<string, Acc & { days?: number; weekday?: number; hour?: number }>();
     const add = (key: string, v: { orders: number; amount: number; qty: number }, extra: { weekday?: number; hour?: number } = {}) => {
@@ -73,7 +76,7 @@ export const orderHandlers = [
       const wd = (new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7; // 월 0
       weekdayDays[wd]! += 1;
       for (const h of hoursOf(d)) {
-        const v = simAt(d, h, f);
+        const v = scaleSim(simAt(d, h, f), mfcId);
         const hh = String(h).padStart(2, '0');
         if (bucket === 'HOUR') add(`${d}T${hh}:00:00+09:00`, v);
         else if (bucket === 'DAY') add(`${d}T00:00:00+09:00`, v);
@@ -112,14 +115,14 @@ export const orderHandlers = [
     const limit = Math.min(50, Math.max(1, Number(q.get('limit') ?? 10)));
     const category = q.get('categoryId');
     const base = { from, to, mfcId, limit };
-    if (mfcId && mfcId !== ORDER_CENTER) return HttpResponse.json({ ...base, items: [] });
+    if (mfcId && !hasDemoData(mfcId)) return HttpResponse.json({ ...base, items: [] });
     const items = SIM_PRODUCTS.filter((p) => !category || p.category === category)
       .map((p) => {
         let qty = 0;
         let amount = 0;
         for (let d = from; d <= to; d = addDays(d, 1))
           for (const h of hoursOf(d)) {
-            const v = simAt(d, h, { sku: p.sku });
+            const v = scaleSim(simAt(d, h, { sku: p.sku }), mfcId);
             qty += v.qty;
             amount += v.amount;
           }
