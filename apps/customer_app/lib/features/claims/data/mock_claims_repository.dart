@@ -110,6 +110,12 @@ base class MockClaimsRepository
               .cast<Map<String, Object?>>())
         l['orderLineId']: l['unitPrice'] as int? ?? 0,
     };
+    final orderLines = {
+      for (final l
+          in (order?['lines'] as List? ?? const [])
+              .cast<Map<String, Object?>>())
+        l['orderLineId']: l,
+    };
     final json = <String, Object?>{
       'claimId': id,
       'version': 1,
@@ -123,6 +129,7 @@ base class MockClaimsRepository
           {
             'claimLineId': '$id-${l.orderLineId}',
             'orderLineId': l.orderLineId,
+            ..._lineCopy(orderLines[l.orderLineId]),
             'requestedQty': l.qty,
             'decision': 'PENDING',
             'refundAmount': (priceByLine[l.orderLineId] ?? 0) * l.qty,
@@ -160,6 +167,7 @@ base class MockClaimsRepository
             {
               'claimLineId': '$id-${l['orderLineId']}',
               'orderLineId': l['orderLineId'],
+              ..._lineCopy(l),
               'requestedQty': l['unfulfilledQty'],
               'decision': 'PENDING',
               'refundAmount':
@@ -207,6 +215,7 @@ base class MockClaimsRepository
           {
             'claimLineId': '$id-${line['orderLineId']}',
             'orderLineId': line['orderLineId'],
+            ..._lineCopy(line),
             'requestedQty': 1,
             'decision': 'PENDING',
           },
@@ -511,3 +520,11 @@ base class MockClaimsRepository
     return RequestState.confirmed;
   }
 }
+
+/// 서버처럼 접수 때 주문 줄의 sku·상품명·옵션·사진을 클레임 품목에 복사한다(claim 0.14.0, BR-92).
+Map<String, Object?> _lineCopy(Map<String, Object?>? orderLine) => {
+  'sku': ?orderLine?['sku'],
+  'productName': ?orderLine?['productName'],
+  'optionLabel': ?orderLine?['optionLabel'],
+  'imageUrl': ?orderLine?['imageUrl'],
+};

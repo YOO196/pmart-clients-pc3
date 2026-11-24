@@ -814,9 +814,9 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
 }
 
 /// 상품 한 줄: 사진 52 · 이름 · 판정 칩(승인 N개 연보라 / 확인 중 회색 / 거절 회색) + "요청 N개" · 품목 환불액,
-/// 거절이면 서버 거절 사유를 분홍 띠로. 이름·사진은 주문 상세 품목 사본(orderLineId)에서.
-/// 고객에게 SKU 를 보이지 않는다(사용자 2026-11-24): 주문을 읽는 중이면 회색 막대, 이름을 못 찾으면 안내 문구
-/// (주문 조회 실패면 옆에 "다시 시도").
+/// 거절이면 서버 거절 사유를 분홍 띠로. 이름·사진은 클레임 품목 사본(claim 0.14.0, BR-92)을 먼저, 없으면(옛 클레임)
+/// 주문 상세 품목(orderLineId)에서. 고객에게 SKU 를 보이지 않는다(사용자 2026-11-24): 주문을 읽는 중이면 회색 막대,
+/// 이름을 못 찾으면 안내 문구(주문 조회 실패면 옆에 "다시 시도").
 class _ClaimLineRow extends StatelessWidget {
   const _ClaimLineRow({
     required this.line,
@@ -848,14 +848,26 @@ class _ClaimLineRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              ProductImage(url: orderLine?.imageUrl, size: 52, radius: 8),
+              ProductImage(
+                url: l.imageUrl ?? orderLine?.imageUrl,
+                size: 52,
+                radius: 8,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    switch (orderLine) {
-                      final o? when o.productName != null => Text(
+                    switch ((l.productName, orderLine)) {
+                      (final name?, _) => Text(
+                        [name, ?l.optionLabel].join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 14.5,
+                        ),
+                      ),
+                      (_, final o?) when o.productName != null => Text(
                         o.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

@@ -35,6 +35,9 @@ class ClaimLineView {
     required this.orderLineId,
     required this.decision,
     this.sku,
+    this.productName,
+    this.optionLabel,
+    this.imageUrl,
     this.requestedQty,
     this.approvedQty,
     this.rejectReason,
@@ -42,7 +45,15 @@ class ClaimLineView {
   });
 
   final String orderLineId;
+
+  /// 고객 화면에는 보이지 않는다(사용자 2026-11-24).
   final String? sku;
+
+  /// 접수 때 주문 줄의 상품명·옵션·대표 사진 사본(claim 0.14.0, BR-92). 옛 주문·그 판 전 클레임은 null —
+  /// 그때는 주문 상세 품목에서 붙인다.
+  final String? productName;
+  final String? optionLabel;
+  final String? imageUrl;
   final int? requestedQty;
   final int? approvedQty;
   final LineDecision decision;

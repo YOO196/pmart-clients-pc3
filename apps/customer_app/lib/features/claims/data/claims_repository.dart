@@ -277,6 +277,9 @@ ClaimView claimFromContract(api.Claim c) => ClaimView(
         ClaimLineView(
           orderLineId: l.orderLineId!,
           sku: l.sku,
+          productName: _blankToNull(l.productName),
+          optionLabel: _blankToNull(l.optionLabel),
+          imageUrl: _blankToNull(l.imageUrl),
           requestedQty: l.requestedQty,
           approvedQty: l.approvedQty,
           decision: switch (l.decision?.value) {
@@ -311,3 +314,9 @@ ClaimView claimFromContract(api.Claim c) => ClaimView(
       ),
   ],
 );
+
+/// 빈 글자는 없는 값으로 본다.
+String? _blankToNull(String? v) => switch (v?.trim()) {
+  final t? when t.isNotEmpty => t,
+  _ => null,
+};

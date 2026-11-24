@@ -88,6 +88,29 @@ void main() {
     );
   });
 
+  test('클레임 품목의 상품명·옵션·사진 사본을 읽고, 빈 글자는 없는 값(claim 0.14.0, BR-92)', () {
+    final lines = claimFromContract(
+      api.Claim.fromJson({
+        'claimId': 'c-1',
+        'lines': [
+          {
+            'orderLineId': 'ol-1',
+            'sku': 'E-1',
+            'productName': '서울우유 1L',
+            'optionLabel': '2개 묶음',
+            'imageUrl': 'https://img.test/p1',
+          },
+          {'orderLineId': 'ol-2', 'sku': 'E-2', 'productName': ' '},
+        ],
+      }),
+    ).lines;
+    expect(lines[0].productName, '서울우유 1L');
+    expect(lines[0].optionLabel, '2개 묶음');
+    expect(lines[0].imageUrl, 'https://img.test/p1');
+    expect(lines[1].productName, isNull);
+    expect(lines[1].imageUrl, isNull);
+  });
+
   group('취소 요청', () {
     test('일부만 보내면 서버가 PARTIAL_CANCEL_NOT_ALLOWED 로 거절한다', () async {
       final outcome = await CancelRequester(claims).submit('order-seed-4', [
@@ -409,13 +432,43 @@ void main() {
       );
     });
 
+    testWidgets('주문을 못 읽어도 클레임 품목 사본(claim 0.14.0, BR-92)으로 이름', (t) async {
+      final flaky = _DetailDownOrders();
+      orders = flaky;
+      claims = MockClaimsRepository(orders: flaky, latency: Duration.zero);
+      final c = (await t.runAsync(cancelSeed4))!;
+      flaky.down = true;
+      await openOrder(t, 'order-seed-4');
+      final router = GoRouter.of(t.element(find.byType(Navigator).first));
+      unawaited(router.push('/claims/${c.claimId}'));
+      await t.pumpAndSettle();
+      final row = find.byKey(const ValueKey('claim-line-ol-5'));
+      expect(
+        find.descendant(of: row, matching: find.text('그릭요거트 플레인 400g')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('claim-line-name-unavailable')),
+        findsNothing,
+      );
+    });
+
     testWidgets(
-      '주문을 못 읽으면 SKU 대신 "상품 정보를 불러오지 못했어요" + 다시 시도 → 이름(사용자 2026-11-24)',
+      '옛 클레임(사본 없음)에 주문도 못 읽으면 SKU 대신 "상품 정보를 불러오지 못했어요" + 다시 시도 → 이름(사용자 2026-11-24)',
       (t) async {
         final flaky = _DetailDownOrders();
         orders = flaky;
         claims = MockClaimsRepository(orders: flaky, latency: Duration.zero);
         final c = (await t.runAsync(cancelSeed4))!;
+        // claim 0.14.0 전에 접수된 클레임처럼 품목 사본을 지운다.
+        for (final l
+            in (claims.claims[c.claimId]!['lines']! as List)
+                .cast<Map<String, Object?>>()) {
+          l
+            ..remove('productName')
+            ..remove('optionLabel')
+            ..remove('imageUrl');
+        }
         flaky.down = true; // 주문 상세를 한 번도 못 읽는다(예: 삭제한 주문·네트워크)
         await openOrder(t, 'order-seed-4');
         final router = GoRouter.of(t.element(find.byType(Navigator).first));
