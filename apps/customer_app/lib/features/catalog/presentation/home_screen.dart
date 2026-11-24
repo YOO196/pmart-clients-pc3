@@ -862,10 +862,11 @@ class BannerPager extends StatefulWidget {
 
 class _BannerPagerState extends State<BannerPager> {
   /// 끝없이 넘기려고 가운데쯤에서 시작한다(쪽 번호는 배너 수로 나눈 나머지).
-  static const _loopStart = 10000;
+  /// 시작 쪽은 배너 수의 배수여야 첫 배너부터 보인다 — 10000 으로 고정했더니 6장이면 5번째부터 보였다(사용자 2026-11-24).
+  static int _loopStart(int count) => count > 1 ? count * 1000 : 0;
 
   late final PageController _controller = PageController(
-    initialPage: widget.banners.length > 1 ? _loopStart : 0,
+    initialPage: _loopStart(widget.banners.length),
   );
   late int _index = _controller.initialPage;
   Timer? _timer;
@@ -887,6 +888,11 @@ class _BannerPagerState extends State<BannerPager> {
   @override
   void didUpdateWidget(BannerPager old) {
     super.didUpdateWidget(old);
+    if (old.banners.length != widget.banners.length) {
+      // 배너 수가 바뀌면(새로고침 등) 새 수의 배수로 옮겨 첫 배너부터 다시 보인다.
+      _index = _loopStart(_count);
+      if (_controller.hasClients) _controller.jumpToPage(_index);
+    }
     if (old.intervalSeconds != widget.intervalSeconds ||
         old.banners.length != widget.banners.length) {
       _schedule();

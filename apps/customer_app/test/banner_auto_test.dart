@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_api_storefront/pmart_api_storefront.dart' as sf;
 import 'package:pmart_ui/pmart_ui.dart' show initPmartFormatting;
@@ -6,6 +7,8 @@ import 'package:pmart_ui/pmart_ui.dart' show initPmartFormatting;
 import 'package:customer_app/features/catalog/data/catalog_repository.dart';
 import 'package:customer_app/features/catalog/data/mock_catalog_repository.dart';
 import 'package:customer_app/features/catalog/domain/catalog.dart';
+import 'package:customer_app/features/catalog/presentation/home_screen.dart'
+    show BannerPager;
 
 import 'support/app_harness.dart';
 
@@ -42,6 +45,33 @@ void main() {
     await t.pump(const Duration(seconds: 4));
     await t.pumpAndSettle();
     expect(page(t), '1 / 2');
+  });
+
+  testWidgets('배너가 몇 장이든 첫 장부터(6장이 5번째부터 보이던 것, 사용자 2026-11-24)', (t) async {
+    List<HomeBanner> banners(int n) => [
+      for (var i = 0; i < n; i++) HomeBanner(bannerId: 'B-$i'),
+    ];
+    Widget pager(int n) => ProviderScope(
+      child: MaterialApp(
+        home: Scaffold(
+          body: BannerPager(banners: banners(n), onOpen: (_) {}),
+        ),
+      ),
+    );
+    String shown() => t.widget<Text>(key('banner-page')).data!;
+    for (final n in [3, 6, 7]) {
+      await t.pumpWidget(pager(n));
+      await t.pump();
+      expect(shown(), '1 / $n', reason: '$n장');
+      await t.pumpWidget(const SizedBox());
+    }
+    // 배너 수가 바뀌어도(새로고침) 첫 장부터 다시.
+    await t.pumpWidget(pager(2));
+    await t.pump();
+    await t.pumpWidget(pager(6));
+    await t.pump();
+    expect(shown(), '1 / 6');
+    await t.pumpWidget(const SizedBox());
   });
 
   testWidgets('서버 간격(bannerIntervalSeconds)을 따른다', (t) async {
