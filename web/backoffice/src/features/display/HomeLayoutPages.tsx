@@ -27,6 +27,7 @@ import { LeaveGuard } from '../../shared/LeaveGuard';
 import { messages } from '../../shared/messages';
 import { SearchSelect } from '../../shared/SearchSelect';
 import { DateTimeField } from '../../shared/DateTimeField';
+import { BANNER_SPEC, fitWarning } from '../../shared/imageFit';
 
 const m = messages.homeLayout;
 type Draft = components['schemas']['LayoutDraft'];
@@ -275,7 +276,7 @@ function Field({ label, children, className = '' }: { readonly label: string; re
 }
 
 /** 배너 그림 — 게시 전 그림은 운영자 토큰으로만 열린다(<img src> 는 토큰을 못 보내 blob URL) */
-function BannerImage({ imageId, alt, className }: { readonly imageId: string; readonly alt: string; readonly className?: string }) {
+function BannerImage({ imageId, alt, className, onSize }: { readonly imageId: string; readonly alt: string; readonly className?: string; readonly onSize?: (w: number, h: number) => void }) {
   const api = useApi();
   const q = useQuery({
     queryKey: ['storefront', 'banner-image', imageId],
@@ -287,7 +288,8 @@ function BannerImage({ imageId, alt, className }: { readonly imageId: string; re
   if (!imageId) return <div className={`grid place-items-center bg-base-200 text-xs text-base-content/50 ${className ?? ''}`}>{m.noImage}</div>;
   if (q.isPending) return <div className={`skeleton ${className ?? ''}`} />;
   if (q.isError) return <div className={`grid place-items-center bg-base-200 text-xs text-error ${className ?? ''}`}>{m.imageUnavailable}</div>;
-  return <img src={q.data} alt={alt} className={`object-cover ${className ?? ''}`} />;
+  // 실제 가로·세로(권장 규격 경고용 — 2026-11-24)
+  return <img src={q.data} alt={alt} className={`object-cover ${className ?? ''}`} onLoad={(e) => onSize?.(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)} />;
 }
 
 function ProductName({ id }: { readonly id: string }) {
@@ -415,6 +417,9 @@ function BannerCard({
   );
   // 바꾸기 전 그림 — 마음에 안 들면 되돌린다(2026-11-24 사용자 "그림 바꾸기 누르고 마음에 안 들면 이전으로"). 편성 저장 전까지는 화면 안의 값이라 되돌려도 서버에 남는 것이 없다
   const [prevImage, setPrevImage] = useState<string | null>(null);
+  // 보이는 그림의 실제 크기 → 이 자리 권장과 다르면 경고(막지 않음, 2026-11-24 사용자 "1번으로")
+  const [size, setSize] = useState<{ id: string; w: number; h: number } | null>(null);
+  const fit = size && size.id === b.imageId ? fitWarning(size.w, size.h, BANNER_SPEC[b.placement]) : null;
   const pick = async (file: File | undefined) => {
     if (!file) return;
     const before = b.imageId ?? null;
@@ -429,7 +434,7 @@ function BannerCard({
   return (
     <li className={`space-y-3 rounded-box border p-3 ${why.length ? 'border-error/50' : 'border-base-300'}`} data-testid="layout-banner">
       <div className="flex items-start gap-3">
-        <BannerImage imageId={b.imageId} alt={b.altText} className="h-20 w-60 shrink-0 rounded-md" />
+        <BannerImage imageId={b.imageId} alt={b.altText} className="h-20 w-60 shrink-0 rounded-md" onSize={(w, h) => setSize({ id: b.imageId, w, h })} />
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-1">
@@ -458,6 +463,11 @@ function BannerCard({
           {m.imageSize[b.placement] && (
             <span className="text-xs text-base-content/50" data-testid="banner-image-size">
               {m.imageSize[b.placement]}
+            </span>
+          )}
+          {fit && (
+            <span className="text-xs text-warning" data-testid="banner-image-fit">
+              {fit}
             </span>
           )}
           <WhyText items={whyOf(why, 'imageId')} />

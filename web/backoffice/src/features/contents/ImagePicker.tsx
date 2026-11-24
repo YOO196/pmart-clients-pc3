@@ -8,6 +8,7 @@ import { IMAGE_ROLES, type ContentImage, type ImageRole } from '../../api/models
 import { messages as m } from '../../shared/messages';
 import { AuthedImage } from './AuthedImage';
 import { DEFAULT_SLICE_HEIGHT, SLICE_HEIGHTS, sliceImage, type SliceResult } from './sliceImage';
+import { CONTENT_SPEC, fitWarning } from '../../shared/imageFit';
 
 export interface PendingImage {
   readonly id: string;
@@ -159,6 +160,8 @@ function RoleSection({
   readonly onSlice?: (file: File, pieceHeight: number, replaceIds?: readonly string[]) => Promise<{ readonly result: SliceResult; readonly ids: readonly string[] } | null>;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  // 고른 그림의 실제 크기가 이 역할 권장과 다르면 아래에 경고(막지 않음 — 2026-11-24 사용자 "1번으로")
+  const [fits, setFits] = useState<Readonly<Record<string, string>>>({});
   const label = m.contents.imageRole[role];
   const hint = m.contents.imageRoleHint[role];
   const addLabel = m.contents.addImage(label);
@@ -219,7 +222,20 @@ function RoleSection({
               aria-label={m.contents.pendingImage(p.file.name)}
             >
               {p.preview ? (
-                <img src={p.preview} alt={p.file.name} className="h-full w-full object-contain" />
+                <img
+                  src={p.preview}
+                  alt={p.file.name}
+                  className="h-full w-full object-contain"
+                  onLoad={(e) => {
+                    const w = fitWarning(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight, CONTENT_SPEC[role]);
+                    setFits((cur) => {
+                      const next = { ...cur };
+                      if (w) next[p.id] = w;
+                      else delete next[p.id];
+                      return next;
+                    });
+                  }}
+                />
               ) : (
                 <span className="flex h-full items-center justify-center p-1 text-center text-[10px] break-all">{p.file.name}</span>
               )}
@@ -235,6 +251,13 @@ function RoleSection({
                 ✕
               </button>
             </li>
+          ))}
+        </ul>
+      )}
+      {pending.some((p) => fits[p.id]) && (
+        <ul className="space-y-0.5 text-xs text-warning" data-testid="image-fit">
+          {pending.filter((p) => fits[p.id]).map((p) => (
+            <li key={p.id} className="break-all">{`${p.file.name}: ${fits[p.id]}`}</li>
           ))}
         </ul>
       )}
