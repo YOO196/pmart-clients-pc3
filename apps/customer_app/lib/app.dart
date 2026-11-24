@@ -6,6 +6,8 @@ import 'package:pmart_ui/pmart_ui.dart';
 import 'package:pmart_core/pmart_core.dart' show PmartEnv;
 
 import 'features/auth/presentation/auth_controller.dart';
+import 'features/catalog/presentation/catalog_providers.dart'
+    show categoriesProvider;
 import 'features/push/presentation/push_controller.dart'
     show pushRegistrationProvider;
 import 'l10n/gen/app_localizations.dart';
@@ -25,6 +27,9 @@ class CustomerApp extends ConsumerWidget {
     ref.watch(sessionRestoreProvider);
     // 휴대폰 푸시: 회원이 되면 알림 권한·토큰 등록, 비회원이 되면 단말 토큰을 버린다.
     ref.watch(pushRegistrationProvider);
+    // 카테고리 트리를 앱이 뜰 때 미리 읽어 둔다 — 홈 타일·배너·알림으로 카테고리 화면에 바로 들어가도
+    // 위 탭·하위 줄이 늦게 끼어들지 않게(사용자 2026-11-24). listen 이라 결과가 와도 앱 전체를 다시 그리지 않는다.
+    ref.listen(categoriesProvider, (_, _) {});
     // 세션이 끝났을 때 한 번 알린다: 조용히 이어졌으면 짧게, 안 됐으면 "다시 로그인" 버튼과 함께.
     ref.listen(sessionNoticeProvider, (_, notice) {
       if (notice == null) return;

@@ -23,7 +23,8 @@ class CategoryScreen extends ConsumerWidget {
       // 레퍼런스 3-3: ← 제목 + 오른쪽 홈·검색·장바구니
       appBar: AppBar(
         centerTitle: false,
-        titleSpacing: pmartLeftTitleSpacing,
+        // 아래 탭으로 열면 ← 가 없어 제목이 왼쪽 끝에 붙는다 — 아래 구획 제목·홈과 같은 16 을 띄운다(사용자 2026-11-24).
+        titleSpacing: context.canPop() ? pmartLeftTitleSpacing : 16,
         title: Text(l10n.categoryTitle),
         actions: [
           IconButton(

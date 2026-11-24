@@ -80,11 +80,45 @@ abstract final class DevTestAddress {
   static const geo = (lat: 35.1529, lng: 129.0596);
 }
 
-/// 개발 빌드 전용 목포 시험 주소(2호점 `MFC-MOKPO-01` 시험 권역 "목포 시내" 안, 사용자 2026-11-23).
-/// 백엔드 LAN 목포 시험 고객이 쓰는 주소(→ 쇼핑 센터 MFC-MOKPO-01 확인, pmart-backend lan-test-accounts §3).
+/// 개발 빌드 전용 센터별 시험 주소 하나 — 그 센터 LAN 시험 배송 권역 안의 실제 도로명주소.
 /// 좌표·우편번호는 넣지 않는다 — 버튼을 누르면 주소 검색처럼 서버 주소 변환으로 핀을 잡는다.
-abstract final class DevTestAddressMokpo {
-  static const roadAddress = '전남 목포시 평화로83번길 16';
+@immutable
+class DevTestArea {
+  const DevTestArea({
+    required this.id,
+    required this.center,
+    required this.roadAddress,
+  });
+
+  /// 버튼 키(`dev-test-geo-<id>`).
+  final String id;
+
+  /// 버튼에 보일 센터 이름(개발 빌드 전용).
+  final String center;
+  final String roadAddress;
+}
+
+/// 부산진(1호점)은 [DevTestAddress](좌표 고정, 에뮬레이터용). 나머지 센터(사용자 2026-11-23 목포, 2026-11-24 세종·그 밖):
+/// - 목포 `MFC-MOKPO-01` 권역 "목포 시내" — LAN 목포 시험 고객 주소(pmart-backend lan-test-accounts §2-1).
+/// - 세종 `MFC-SEJ-01` 권역 `Z-SEED-SEJONG`(127.23~127.32·36.46~36.54) — 세종시청(사용자 본인 계정 쇼핑 주소와 같은 곳).
+/// - 춘천 `MFC-CHC-01` 권역 `Z-SEED-CHUNCHEON`(127.69~127.78·37.84~37.91) — 춘천시청.
+/// - 부산 남구 `MFC-BNG-01` 권역 `Z-SEED-BUSANNAMGU`(129.081~129.13·35.10~35.15) — 부경대 대연캠퍼스.
+/// 권역 출처: pmart-backend docs/handoff/simulator/mfc/2026-11-23~24 센터 요청서 §작업 표.
+abstract final class DevTestAreas {
+  static const all = [
+    DevTestArea(id: 'mokpo', center: '목포점', roadAddress: '전남 목포시 평화로83번길 16'),
+    DevTestArea(id: 'sejong', center: '세종점', roadAddress: '세종특별자치시 한누리대로 2130'),
+    DevTestArea(
+      id: 'chuncheon',
+      center: '춘천점',
+      roadAddress: '강원특별자치도 춘천시 중앙로 1',
+    ),
+    DevTestArea(
+      id: 'busan-namgu',
+      center: '부산 남구점',
+      roadAddress: '부산 남구 용소로 45',
+    ),
+  ];
 }
 
 /// 계약 `AddressInput` maxLength. 화면 입력 상한으로만 쓴다(서버가 최종 검증).

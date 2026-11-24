@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -65,15 +67,70 @@ class _CategoryBrowseScreenState extends ConsumerState<CategoryBrowseScreen> {
   /// 동그라미 줄 높이쯤 내려가면 알약 칩 줄로 바꾼다.
   static const _collapseAt = 92.0;
 
+  /// 배너·할인 줄을 기다리는 가장 긴 시간. 넘으면 그 칸 없이 상품을 보인다(사용자 2026-11-24 C).
+  static const _holdMax = Duration(milliseconds: 1000);
+
+  /// 상품 격자를 보이기 시작한 목록(categoryId). 이 목록이 아니면 머리(배너·할인 줄)가 정해질 때까지
+  /// 격자 자리에 뼈대를 둔다 — 머리가 늦게 끼어들어 상품이 아래로 밀리지 않게.
+  String? _releasedFor;
+  String? _holdFor;
+  Timer? _hold;
+
+  /// 놓을 때 이미 정해졌던 칸만 보인다. 늦게 온 칸은 이 목록을 보는 동안 숨긴다(밀림 없음).
+  bool _showBanner = false;
+  bool _showSale = false;
+
   void _pick(String id) => setState(() {
     _picked = id;
     _collapsed = false;
   });
 
   @override
+  void dispose() {
+    _hold?.cancel();
+    super.dispose();
+  }
+
+  static bool _settled(AsyncValue<Object?> v) => v.hasValue || v.hasError;
+
+  static ProductQuery _saleQuery(String listId) =>
+      ProductQuery(categoryId: listId, onSale: true);
+
+  void _release(String listId) {
+    _hold?.cancel();
+    _hold = null;
+    _holdFor = null;
+    _releasedFor = listId;
+    // 배너는 목록마다 같아 한 번 보이면 그대로 둔다.
+    _showBanner = _showBanner || _settled(ref.read(categoryBannersProvider));
+    _showSale = _settled(ref.read(productListProvider(_saleQuery(listId))));
+  }
+
+  /// [listId] 목록의 격자를 지금 보여도 되는지. 머리 두 칸이 정해졌거나 [_holdMax] 가 지났으면 놓는다.
+  bool _gridReleased(String listId) {
+    if (_releasedFor == listId) return true;
+    final banner = ref.watch(categoryBannersProvider);
+    final sale = ref.watch(productListProvider(_saleQuery(listId)));
+    if ((_showBanner || _settled(banner)) && _settled(sale)) {
+      _release(listId);
+      return true;
+    }
+    if (_holdFor != listId) {
+      _hold?.cancel();
+      _holdFor = listId;
+      _hold = Timer(_holdMax, () {
+        if (!mounted || _holdFor != listId) return;
+        setState(() => _release(listId));
+      });
+    }
+    return false;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final nodes = ref.watch(categoriesProvider).value;
+    final tree = ref.watch(categoriesProvider);
+    final nodes = tree.value;
     final current = _picked ?? widget.categoryId;
     final byId = {
       for (final n in nodes ?? const <CategoryNode>[]) n.categoryId: n,
@@ -109,7 +166,15 @@ class _CategoryBrowseScreenState extends ConsumerState<CategoryBrowseScreen> {
         const SizedBox(width: 6),
       ],
     );
-    // 트리를 아직 못 읽었거나 없는 id 면 그 카테고리 단독 목록(지금까지의 모습).
+    // 트리를 읽는 중이면 위 탭·하위 줄 자리를 같은 높이의 뼈대로 먼저 잡는다 — 다 읽은 뒤 두 줄이 끼어들어
+    // 화면이 밀리지 않게(사용자 2026-11-24 A).
+    if (nodes == null && tree.isLoading) {
+      return Scaffold(
+        appBar: appBar,
+        body: const _BrowseSkeleton(key: ValueKey('category-browse-skeleton')),
+      );
+    }
+    // 트리를 못 읽었거나 없는 id 면 그 카테고리 단독 목록(지금까지의 모습).
     if (root == null) {
       return Scaffold(
         appBar: appBar,
@@ -122,6 +187,7 @@ class _CategoryBrowseScreenState extends ConsumerState<CategoryBrowseScreen> {
         .toList();
     final children = all.where((c) => c.parentId == root!.categoryId).toList();
     final listId = child?.categoryId ?? root.categoryId;
+    final released = _gridReleased(listId);
     return Scaffold(
       appBar: appBar,
       body: Column(
@@ -147,6 +213,7 @@ class _CategoryBrowseScreenState extends ConsumerState<CategoryBrowseScreen> {
               child: ProductListView(
                 key: ValueKey('category-list-$listId'),
                 baseQuery: ProductQuery(categoryId: listId),
+                holdList: !released,
                 header: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -157,8 +224,9 @@ class _CategoryBrowseScreenState extends ConsumerState<CategoryBrowseScreen> {
                         selected: child?.categoryId,
                         onPick: _pick,
                       ),
-                    const _CategoryBannerSlot(),
-                    _CategorySaleRow(categoryId: listId),
+                    if (released && _showBanner) const _CategoryBannerSlot(),
+                    if (released && _showSale)
+                      _CategorySaleRow(categoryId: listId),
                   ],
                 ),
               ),
@@ -627,6 +695,76 @@ class _CategoryPhoto extends ConsumerWidget {
         cacheWidth: px.round(),
         errorBuilder: (_, _, _) => art,
       ),
+    );
+  }
+}
+
+/// 카테고리 트리를 읽는 동안의 자리 표시 — 위 탭(46)·하위 동그라미 줄(96 + 회색 8)·상품 격자를 같은 높이로
+/// 잡아 다 읽은 뒤 화면이 밀리지 않게 한다. 반짝임은 위 두 줄 하나, 격자 하나.
+class _BrowseSkeleton extends StatelessWidget {
+  const _BrowseSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        PmartShimmer(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: scheme.outlineVariant),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < 5; i++) ...[
+                      if (i > 0) const SizedBox(width: 18),
+                      const PmartBone(width: 44, height: 15),
+                    ],
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 96,
+                child: ClipRect(
+                  child: OverflowBox(
+                    alignment: Alignment.topLeft,
+                    maxWidth: double.infinity,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 12, 10, 0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var i = 0; i < 6; i++)
+                            const SizedBox(
+                              width: 66,
+                              child: Column(
+                                children: [
+                                  PmartBone(height: 56, circle: true),
+                                  SizedBox(height: 8),
+                                  PmartBone(width: 40, height: 12),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Container(height: 8, color: scheme.surfaceContainer),
+        const Expanded(child: PmartGridSkeleton()),
+      ],
     );
   }
 }

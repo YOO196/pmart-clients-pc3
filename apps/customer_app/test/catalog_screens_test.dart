@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:customer_app/features/catalog/presentation/product_list_view.dart'
-    show hasBatchim, rieulOrNoBatchim;
+    show ProductGrid, hasBatchim, rieulOrNoBatchim;
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
@@ -121,6 +121,37 @@ final class _SecondPageDown extends MockCatalogRepository {
     if (cursor != null) {
       throw const NetworkFailure(DioExceptionType.connectionError);
     }
+    return super.search(query, mfcId: mfcId, cursor: cursor);
+  }
+}
+
+/// 카테고리 트리를 [release] 가 끝날 때까지 늦추는 서버.
+final class _SlowCategories extends MockCatalogRepository {
+  _SlowCategories() : super(latency: Duration.zero);
+
+  final release = Completer<void>();
+
+  @override
+  Future<List<CategoryNode>> categories() async {
+    await release.future;
+    return super.categories();
+  }
+}
+
+/// 할인 상품 줄(onSale)만 [release] 가 끝날 때까지 늦추는 서버.
+final class _SlowSaleRow extends MockCatalogRepository {
+  _SlowSaleRow() : super(latency: Duration.zero);
+
+  final release = Completer<void>();
+
+  @override
+  Future<ProductPage> search(
+    ProductQuery query, {
+    String? mfcId,
+    String? cursor,
+    CancelToken? cancelToken,
+  }) async {
+    if (query.onSale) await release.future;
     return super.search(query, mfcId: mfcId, cursor: cursor);
   }
 }
@@ -545,6 +576,73 @@ void main() {
       );
       expect(circle.style?.fontWeight, FontWeight.w700);
     });
+
+    testWidgets('카테고리 트리를 읽는 동안 위 탭·하위 줄 자리 뼈대, 다 읽으면 두 줄(사용자 2026-11-24 A)', (
+      t,
+    ) async {
+      final catalog = _SlowCategories();
+      await t.pumpWidget(testApp(const [], catalog: catalog));
+      await t.pump(const Duration(milliseconds: 100));
+      final router = GoRouter.of(t.element(find.byType(Navigator).first));
+      unawaited(router.push('/products?categoryId=C-FRUIT'));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 500));
+      expect(
+        find.byKey(const ValueKey('category-browse-skeleton')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('category-tabs')), findsNothing);
+
+      catalog.release.complete();
+      await t.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('category-browse-skeleton')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('category-tabs')), findsOneWidget);
+      expect(find.byKey(const ValueKey('category-children')), findsOneWidget);
+    });
+
+    testWidgets('할인 줄이 정해질 때까지 상품 격자는 뼈대 — 오면 줄과 격자를 함께(사용자 2026-11-24 C)', (
+      t,
+    ) async {
+      final catalog = _SlowSaleRow();
+      await t.pumpWidget(testApp(const [], catalog: catalog));
+      await t.pumpAndSettle();
+      final router = GoRouter.of(t.element(find.byType(Navigator).first));
+      unawaited(router.push('/products?categoryId=C-VEG'));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 500));
+      expect(find.byType(PmartGridSkeleton), findsOneWidget);
+      expect(find.byType(ProductGrid), findsNothing);
+
+      catalog.release.complete();
+      await t.pumpAndSettle();
+      expect(find.byType(PmartGridSkeleton), findsNothing);
+      expect(find.byType(ProductGrid), findsOneWidget);
+      expect(find.byKey(const ValueKey('category-sale')), findsOneWidget);
+    });
+
+    testWidgets(
+      '할인 줄이 1초 안에 안 오면 그 줄 없이 격자, 늦게 와도 끼어들지 않는다(사용자 2026-11-24 C)',
+      (t) async {
+        final catalog = _SlowSaleRow();
+        await t.pumpWidget(testApp(const [], catalog: catalog));
+        await t.pumpAndSettle();
+        final router = GoRouter.of(t.element(find.byType(Navigator).first));
+        unawaited(router.push('/products?categoryId=C-VEG'));
+        await t.pump(const Duration(milliseconds: 500));
+        expect(find.byType(ProductGrid), findsNothing);
+        await t.pump(const Duration(milliseconds: 700));
+        await t.pumpAndSettle();
+        expect(find.byType(ProductGrid), findsOneWidget);
+        expect(find.byKey(const ValueKey('category-sale')), findsNothing);
+
+        catalog.release.complete();
+        await t.pumpAndSettle();
+        expect(find.byKey(const ValueKey('category-sale')), findsNothing);
+      },
+    );
 
     testWidgets('다음 묶음 실패는 받은 목록을 지우지 않는다', (t) async {
       await t.pumpWidget(testApp(const [], catalog: _SecondPageDown()));

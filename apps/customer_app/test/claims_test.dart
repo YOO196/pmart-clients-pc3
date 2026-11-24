@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart' show DioExceptionType;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 import 'package:pmart_api_claim/pmart_api_claim.dart' as api;
@@ -17,6 +20,8 @@ import 'package:customer_app/features/claims/presentation/claims_screens.dart'
     show rescheduleReasonText;
 import 'package:customer_app/l10n/gen/app_localizations.dart';
 import 'package:customer_app/features/orders/data/mock_orders_repository.dart';
+import 'package:customer_app/features/orders/domain/orders.dart'
+    show OrderDetail;
 
 import 'support/app_harness.dart';
 
@@ -386,6 +391,60 @@ void main() {
       ]);
     });
 
+    testWidgets('처리 내역 상품은 SKU 가 아니라 주문의 상품 이름(사용자 2026-11-24)', (t) async {
+      await openOrder(t, 'order-seed-4');
+      await t.tap(find.byKey(const ValueKey('cancel-order')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('cancel-submit')));
+      await t.pumpAndSettle();
+      final row = find.byKey(const ValueKey('claim-line-ol-5'));
+      expect(row, findsOneWidget);
+      expect(
+        find.descendant(of: row, matching: find.textContaining('E-0000')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('claim-line-name-unavailable')),
+        findsNothing,
+      );
+    });
+
+    testWidgets(
+      '주문을 못 읽으면 SKU 대신 "상품 정보를 불러오지 못했어요" + 다시 시도 → 이름(사용자 2026-11-24)',
+      (t) async {
+        final flaky = _DetailDownOrders();
+        orders = flaky;
+        claims = MockClaimsRepository(orders: flaky, latency: Duration.zero);
+        final c = (await t.runAsync(cancelSeed4))!;
+        flaky.down = true; // 주문 상세를 한 번도 못 읽는다(예: 삭제한 주문·네트워크)
+        await openOrder(t, 'order-seed-4');
+        final router = GoRouter.of(t.element(find.byType(Navigator).first));
+        unawaited(router.push('/claims/${c.claimId}'));
+        await t.pumpAndSettle();
+        final row = find.byKey(const ValueKey('claim-line-ol-5'));
+        expect(
+          find.descendant(of: row, matching: find.text('상품 정보를 불러오지 못했어요')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: row, matching: find.textContaining('E-0000')),
+          findsNothing,
+        );
+
+        flaky.down = false;
+        await t.tap(find.byKey(const ValueKey('claim-line-name-retry')));
+        await t.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('claim-line-name-unavailable')),
+          findsNothing,
+        );
+        expect(
+          find.descendant(of: row, matching: find.textContaining('E-0000')),
+          findsNothing,
+        );
+      },
+    );
+
     testWidgets('처리 내역은 스스로 다시 조회하고, PG 환불 성공 뒤에만 "환불 완료"', (t) async {
       await openOrder(t, 'order-seed-4');
       await t.tap(find.byKey(const ValueKey('cancel-order')));
@@ -683,6 +742,19 @@ void main() {
 }
 
 /// 처리 내역 목록 조회만 실패하는 목.
+/// 주문 상세 조회를 [down] 동안 실패시키는 목.
+final class _DetailDownOrders extends MockOrdersRepository {
+  _DetailDownOrders() : super(latency: Duration.zero);
+
+  bool down = false;
+
+  @override
+  Future<OrderDetail> get(String orderId) async {
+    if (down) throw const NetworkFailure(DioExceptionType.connectionError);
+    return super.get(orderId);
+  }
+}
+
 final class _ListDownClaims extends MockClaimsRepository {
   _ListDownClaims({super.orders}) : super(latency: Duration.zero);
 

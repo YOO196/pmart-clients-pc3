@@ -34,7 +34,12 @@ class ProductListView extends ConsumerStatefulWidget {
     required this.baseQuery,
     this.onKeyword,
     this.header,
+    this.holdList = false,
   });
+
+  /// true 면 목록이 와도 격자 자리에 뼈대를 둔다 — 카테고리 화면이 머리(배너·할인 줄)가 정해질 때까지
+  /// 기다릴 때(사용자 2026-11-24). 목록 조회는 그동안에도 진행한다.
+  final bool holdList;
 
   /// 목록과 함께 넘어가는 머리(초안 15 B 카테고리: 하위 동그라미·배너·할인 줄). 주면 속성 줄·상품 수 줄도
   /// 그 아래에서 함께 넘어간다(빈 목록·읽는 중에도 머리는 보인다).
@@ -285,10 +290,13 @@ class _ProductListViewState extends ConsumerState<ProductListView> {
                       const Expanded(child: PmartGridSkeleton()),
                     ],
                   ),
-                  state: uiStateOf(
-                    value,
-                    isEmpty: (s) => s.items.isEmpty && s.similarItems == null,
-                  ),
+                  state: widget.holdList
+                      ? UiLoading<ProductListState>()
+                      : uiStateOf(
+                          value,
+                          isEmpty: (s) =>
+                              s.items.isEmpty && s.similarItems == null,
+                        ),
                   onRetry: () => ref.invalidate(provider),
                   empty: (_) => widget.header == null
                       ? Center(child: emptyText)

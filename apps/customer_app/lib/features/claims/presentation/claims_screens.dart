@@ -594,7 +594,11 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
         state: uiStateOf(value),
         onRetry: () => ref.invalidate(provider),
         ready: (context, c) {
-          final order = ref.watch(orderDetailProvider(c.orderId)).value;
+          final orderValue = ref.watch(orderDetailProvider(c.orderId));
+          final order = orderValue.value;
+          // 품목 이름·사진은 주문 상세에서 붙인다(ClaimLine 에 이름이 없다 — BR 요청). 읽는 중·실패를 구분한다.
+          final orderLoading = order == null && orderValue.isLoading;
+          final orderFailed = order == null && orderValue.hasError;
           final steps = claimSteps(l10n, c);
           final ended =
               c.state == ClaimState.withdrawn ||
@@ -744,6 +748,12 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
                             orderLine: order?.lines
                                 .where((o) => o.orderLineId == l.orderLineId)
                                 .firstOrNull,
+                            orderLoading: orderLoading,
+                            onRetryOrder: orderFailed
+                                ? () => ref.invalidate(
+                                    orderDetailProvider(c.orderId),
+                                  )
+                                : null,
                           ),
                         ],
                       ],
@@ -805,11 +815,24 @@ class _ClaimScreenState extends ConsumerState<ClaimScreen> {
 
 /// 상품 한 줄: 사진 52 · 이름 · 판정 칩(승인 N개 연보라 / 확인 중 회색 / 거절 회색) + "요청 N개" · 품목 환불액,
 /// 거절이면 서버 거절 사유를 분홍 띠로. 이름·사진은 주문 상세 품목 사본(orderLineId)에서.
+/// 고객에게 SKU 를 보이지 않는다(사용자 2026-11-24): 주문을 읽는 중이면 회색 막대, 이름을 못 찾으면 안내 문구
+/// (주문 조회 실패면 옆에 "다시 시도").
 class _ClaimLineRow extends StatelessWidget {
-  const _ClaimLineRow({required this.line, this.orderLine});
+  const _ClaimLineRow({
+    required this.line,
+    this.orderLine,
+    this.orderLoading = false,
+    this.onRetryOrder,
+  });
 
   final ClaimLineView line;
   final OrderLineView? orderLine;
+
+  /// 이름을 붙일 주문 상세를 아직 읽는 중.
+  final bool orderLoading;
+
+  /// 주문 상세를 못 읽었을 때 다시 읽기. null 이면 버튼 없음.
+  final VoidCallback? onRetryOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -831,14 +854,55 @@ class _ClaimLineRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      orderLine?.title ?? l.sku ?? l.orderLineId,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 14.5,
+                    switch (orderLine) {
+                      final o? when o.productName != null => Text(
+                        o.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 14.5,
+                        ),
                       ),
-                    ),
+                      _ when orderLoading => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 2),
+                        child: PmartBone(
+                          key: ValueKey('claim-line-name-loading'),
+                          width: 140,
+                          height: 15,
+                        ),
+                      ),
+                      _ => Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              l10n.claimLineNameUnavailable,
+                              key: const ValueKey(
+                                'claim-line-name-unavailable',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: 14,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          if (onRetryOrder case final retry?)
+                            TextButton(
+                              key: const ValueKey('claim-line-name-retry'),
+                              onPressed: retry,
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                              ),
+                              child: Text(l10n.claimLineNameRetry),
+                            ),
+                        ],
+                      ),
+                    },
                     const SizedBox(height: 5),
                     Wrap(
                       spacing: 6,

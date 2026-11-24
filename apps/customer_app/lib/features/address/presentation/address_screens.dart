@@ -1079,22 +1079,26 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                   _pin = _PinState.picked;
                 }),
               ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                key: const ValueKey('dev-test-geo-mokpo'),
-                icon: const Icon(Icons.science_outlined),
-                label: Text(l10n.devTestGeoMokpoButton),
-                onPressed: () {
-                  setState(() {
-                    _road.text = DevTestAddressMokpo.roadAddress;
-                    _postalCode = null;
-                    _geo = null;
-                    _preview = null;
-                    _jibun = null;
-                  });
-                  unawaited(_geocode());
-                },
-              ),
+              for (final a in DevTestAreas.all) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: ValueKey('dev-test-geo-${a.id}'),
+                  icon: const Icon(Icons.science_outlined),
+                  label: Text(
+                    l10n.devTestGeoAreaButton(a.center, a.roadAddress),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _road.text = a.roadAddress;
+                      _postalCode = null;
+                      _geo = null;
+                      _preview = null;
+                      _jibun = null;
+                    });
+                    unawaited(_geocode());
+                  },
+                ),
+              ],
             ],
           ],
         ),
