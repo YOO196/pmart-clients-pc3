@@ -16,6 +16,8 @@ export interface Column {
   readonly value: number | null;
   /** 말풍선·표 한 줄 */
   readonly tip: string;
+  /** 기간 끝이 잘려 며칠만 든 칸(주·월) — 막대를 옅게(2026-11-24 사용자) */
+  readonly partial?: boolean;
 }
 
 export function ColumnChart({ title, columns, format, testId }: { readonly title: string; readonly columns: readonly Column[]; readonly format: (v: number) => string; readonly testId: string }) {
@@ -134,6 +136,8 @@ export function AreaChart({
   fixedMax,
   onRange,
   stack,
+  rate,
+  compare,
 }: {
   readonly title: string;
   readonly columns: readonly Column[];
@@ -145,6 +149,13 @@ export function AreaChart({
   readonly onRange?: (fromKey: string, toKey: string) => void;
   /** 주면 영역 대신 쌓은 막대(칸마다 계열 값, 합 = column.value) — 드문 사건(결품)처럼 선보다 "몇 건"이 읽히는 값 */
   readonly stack?: { readonly series: readonly StackSeries[]; readonly values: readonly (readonly number[])[] };
+  /**
+   * 비율 모양(정시율, 2026-11-24 사용자 "정시율 그래프 저게 최선?") — 면 없이 선·점, 세로축은 값 근처~100%로 좁히고,
+   * 기간 평균을 점선으로. 값이 없는 칸(셀 배송 없음)은 바닥 "—" 대신 그 칸을 옅게 칠한다
+   */
+  readonly rate?: { readonly avg: number | null; readonly avgLabel: string };
+  /** 지난 기간(바로 앞 같은 길이) — 칸 순서대로 맞춘 값, 옅은 점선(2026-11-24 사용자 "비교 기준") */
+  readonly compare?: { readonly values: readonly (number | null)[]; readonly label: string };
 }) {
   const [hover, setHover] = useState<number | null>(null);
   // 끌기: 누른 자리(a)부터 지금 자리(b)까지 — 판 폭 비율(0–1)로 따라가 띠가 픽셀 단위로 부드럽게 움직이고, 놓을 때 칸에 맞춘다
@@ -162,17 +173,23 @@ export function AreaChart({
   const hi = colOf(fHi);
   // 6px 넘게 끌어야 고르기(그냥 누름과 구분). 한 칸 안이어도 끌었으면 그 칸 하나(예: 하루 → 그날 시간별)
   const dragging = drag !== null && (fHi - fLo) * drag.px > 6;
-  const max = Math.max(0, ...columns.map((c) => c.value ?? 0));
+  const max = Math.max(0, ...columns.map((c) => c.value ?? 0), ...(compare?.values ?? []).map((v) => v ?? 0));
+  // 건수는 칸이 적으면(31칸까지) 막대 — 하루하루 따로 떨어진 값. 많으면 면 없는 선(2026-11-24 사용자 "등고선 그래프가 최선이니?")
+  const asBars = !rate && !stack && n <= 31;
+
   // 눈금 끝은 보기 좋은 수(1·2·2.5·5 × 10ⁿ)로 올림 — 비율은 fixedMax(1 = 100%)
   const nice = (v: number) => {
     const p = 10 ** Math.floor(Math.log10(v));
     return ([1, 2, 2.5, 5, 10].find((k) => k * p >= v) ?? 10) * p;
   };
-  const top = fixedMax ?? (max > 0 ? nice(max * 1.08) : 1);
+  const top = rate ? 1 : (fixedMax ?? (max > 0 ? nice(max * 1.08) : 1));
+  // 비율 모양: 바닥 = 가장 낮은 값(평균 포함)보다 조금 아래를 5% 단위로 내림
+  const rateVals = columns.flatMap((c) => (c.value === null ? [] : [c.value]));
+  const bottom = rate && rateVals.length > 0 ? Math.max(0, Math.floor((Math.min(...rateVals, rate.avg ?? 1) - 0.03) * 20) / 20) : 0;
   const W = 600;
   const H = 180;
   const x = (i: number) => ((i + 0.5) / n) * W;
-  const y = (v: number) => H - (v / top) * H;
+  const y = (v: number) => H - ((v - bottom) / (top - bottom || 1)) * H;
   // null 에서 끊긴 조각들
   const segs: Array<Array<readonly [number, number]>> = [[]];
   columns.forEach((c, i) => {
@@ -181,9 +198,16 @@ export function AreaChart({
   });
   const parts = segs.filter((p) => p.length > 0);
   const line = (p: ReadonlyArray<readonly [number, number]>) => p.map(([px, py], k) => `${k ? 'L' : 'M'}${px.toFixed(1)},${py.toFixed(1)}`).join('');
-  const area = (p: ReadonlyArray<readonly [number, number]>) => (p.length > 1 ? `${line(p)}L${p[p.length - 1]![0].toFixed(1)},${H}L${p[0]![0].toFixed(1)},${H}Z` : '');
+  // 지난 기간 — null 에서 끊긴 조각
+  const cSegs: Array<Array<readonly [number, number]>> = [[]];
+  (compare?.values ?? []).forEach((v, i) => {
+    if (i >= n) return;
+    if (v === null) cSegs.push([]);
+    else cSegs[cSegs.length - 1]!.push([x(i), y(v)]);
+  });
+  const cParts = cSegs.filter((p) => p.length > 0);
   const shown = hover === null ? null : columns[hover];
-  const gid = `pm-area-${testId}`;
+  const shownPrev = hover === null ? undefined : compare?.values[hover];
   const ticks = new Set([0, Math.floor((n - 1) / 2), n - 1]);
   return (
     <figure className="space-y-2" data-testid={testId}>
@@ -197,11 +221,28 @@ export function AreaChart({
               </span>
             ))}
           </span>
+        ) : compare ? (
+          <span className="flex flex-wrap gap-x-3 gap-y-0.5" data-testid={`${testId}-legend`}>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-[2px] bg-primary" aria-hidden="true" />
+              {m.thisPeriod}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="w-3 border-t border-dashed border-base-content/50" aria-hidden="true" />
+              {compare.label}
+            </span>
+          </span>
         ) : (
           <span />
         )}
         <span className="min-h-4 tabular-nums text-base-content/85" aria-live="polite" data-testid={`${testId}-tip`}>
-          {dragging ? (lo === hi ? m.zoomOne(columns[lo]!.label) : m.zoomTip(columns[lo]!.label, columns[hi]!.label, hi - lo + 1)) : shown ? shown.tip : ''}
+          {dragging
+            ? lo === hi
+              ? m.zoomOne(columns[lo]!.label)
+              : m.zoomTip(columns[lo]!.label, columns[hi]!.label, hi - lo + 1)
+            : shown
+              ? `${shown.tip}${compare && shownPrev !== undefined && shownPrev !== null ? ` · ${m.prevShort} ${format(shownPrev)}` : ''}`
+              : ''}
         </span>
       </div>
       <div
@@ -233,16 +274,10 @@ export function AreaChart({
         {/* 세로 눈금(0 · 중간 · 끝) */}
         {[0, 0.5, 1].map((g) => (
           <span key={g} className="pm-mono pointer-events-none absolute -left-12 w-11 -translate-y-1/2 truncate text-right text-[10.5px] text-base-content/45" style={{ top: `${(1 - g) * 100}%` }}>
-            {axisText(format, top * g)}
+            {axisText(format, bottom + (top - bottom) * g)}
           </span>
         ))}
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible text-primary" role="img" aria-label={title}>
-          <defs>
-            <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="currentColor" stopOpacity="0.5" />
-              <stop offset="1" stopColor="currentColor" stopOpacity="0" />
-            </linearGradient>
-          </defs>
           {[0, 0.5].map((g) => (
             <line key={g} x1="0" x2={W} y1={H * g} y2={H * g} className="stroke-base-content/10" strokeWidth="1" vectorEffect="non-scaling-stroke" />
           ))}
@@ -255,7 +290,7 @@ export function AreaChart({
               const gap = Math.min(slot * 0.18, 4);
               let acc = 0;
               return (
-                <g key={`b${i}`} opacity={hover !== null && hover !== i ? 0.5 : 1}>
+                <g key={`b${i}`} opacity={(columns[i]?.partial ? 0.45 : 1) * (hover !== null && hover !== i ? 0.5 : 1)}>
                   {vals.map((v, k) => {
                     if (v <= 0) return null;
                     const y0 = y(acc);
@@ -275,17 +310,61 @@ export function AreaChart({
                 </g>
               );
             })}
-          {!stack && parts.map((p, k) => (
-            <path key={`a${k}`} d={area(p)} fill={`url(#${gid})`} className="pm-chart-fill" />
-          ))}
-          {!stack && parts.map((p, k) => (
+          {asBars &&
+            columns.map((c, i) => {
+              if (c.value === null || c.value <= 0) return null;
+              const slot = W / n;
+              const gap = Math.min(slot * 0.3, 10);
+              return (
+                <rect
+                  key={`v${i}`}
+                  x={i * slot + gap / 2}
+                  width={slot - gap}
+                  y={y(c.value)}
+                  height={Math.max(0, H - y(c.value))}
+                  fill="currentColor"
+                  opacity={(c.partial ? 0.4 : 0.9) * (hover !== null && hover !== i ? 0.5 : 1)}
+                  {...(c.partial ? { 'data-partial': true } : {})}
+                  data-testid={`${testId}-bar`}
+                />
+              );
+            })}
+          {/* 기간 평균(점선) */}
+          {rate && rate.avg !== null && (
+            <line x1="0" x2={W} y1={y(rate.avg)} y2={y(rate.avg)} className="stroke-base-content/45" strokeWidth="1" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" data-testid={`${testId}-avg`} />
+          )}
+          {!stack && !asBars && parts.map((p, k) => (
             <path key={`g${k}`} d={line(p)} fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="6" vectorEffect="non-scaling-stroke" />
           ))}
-          {!stack && parts.map((p, k) => (
+          {!stack && !asBars && parts.map((p, k) => (
             <path key={`l${k}`} d={line(p)} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
           ))}
+          {/* 지난 기간(옅은 점선) */}
+          {cParts.map((p, k) =>
+            p.length > 1 ? (
+              <path key={`c${k}`} d={line(p)} fill="none" className="stroke-base-content/45" strokeWidth="1.5" strokeDasharray="5 4" strokeLinejoin="round" vectorEffect="non-scaling-stroke" data-testid={`${testId}-prev`} />
+            ) : null,
+          )}
           </g>
         </svg>
+        {/* 비율 모양: 값이 없는 칸은 옅게, 값마다 점, 평균 글 */}
+        {rate &&
+          columns.map((c, i) =>
+            c.value === null ? (
+              <span key={`n${i}`} className="pointer-events-none absolute inset-y-0 bg-base-content/[0.04]" style={{ left: `${(i / n) * 100}%`, width: `${100 / n}%` }} data-testid={`${testId}-gap`} />
+            ) : (
+              <span
+                key={`d${i}`}
+                className="pointer-events-none absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary"
+                style={{ left: `${((i + 0.5) / n) * 100}%`, top: `${(y(c.value) / H) * 100}%` }}
+              />
+            ),
+          )}
+        {rate && rate.avg !== null && (
+          <span className="pm-mono pointer-events-none absolute right-0 -translate-y-full rounded bg-base-100/80 px-1 text-[10.5px] text-base-content/65" style={{ top: `${(y(rate.avg) / H) * 100}%` }}>
+            {rate.avgLabel}
+          </span>
+        )}
         {/* 끌어서 고르는 구간 */}
         {dragging && (
           <>
@@ -302,7 +381,7 @@ export function AreaChart({
           </>
         )}
         {/* 십자선·점(HTML — 늘어난 SVG 위에서도 둥글게) */}
-        {!stack && !dragging && shown && shown.value !== null && hover !== null && (
+        {!stack && !asBars && !dragging && shown && shown.value !== null && hover !== null && (
           <>
             <span className="pointer-events-none absolute inset-y-0 w-px border-l border-dashed border-primary/60" style={{ left: `${((hover + 0.5) / n) * 100}%` }} />
             <span
@@ -323,7 +402,7 @@ export function AreaChart({
               onBlur={() => setHover(null)}
               data-testid={`${testId}-col`}
             >
-              {c.value === null && <span className="text-xs text-base-content/35">—</span>}
+              {c.value === null && !rate && <span className="text-xs text-base-content/35">—</span>}
             </button>
           ))}
         </div>
@@ -518,8 +597,16 @@ export function PieChart({
               ) : null,
             )}
           </g>
-          <text x="50" y="47" textAnchor="middle" className="fill-base-content/55" style={{ fontSize: 7 }}>
-            {m.pie.center}
+          {/* 가운데 위 줄 — 평소 "상품", 조각·범례에 마우스를 올리면 그 상품 이름(2026-11-24 사용자). 도넛 안에 들게 길면 글씨를 줄이고 9자 넘으면 줄임표 */}
+          <text
+            x="50"
+            y="47"
+            textAnchor="middle"
+            className={shown ? 'fill-base-content' : 'fill-base-content/55'}
+            style={{ fontSize: shown ? ([...shown.label].length > 6 ? 5.4 : 6.6) : 7, fontWeight: shown ? 700 : 400 }}
+            data-testid={`${testId}-center`}
+          >
+            {shown ? ([...shown.label].length > 9 ? `${[...shown.label].slice(0, 8).join('')}…` : shown.label) : m.pie.center}
           </text>
           <text x="50" y="58" textAnchor="middle" className="fill-base-content" style={{ fontSize: 10, fontWeight: 800 }}>
             {shown ? pct(shown.value) : slices.filter((x) => x.pickable).length}

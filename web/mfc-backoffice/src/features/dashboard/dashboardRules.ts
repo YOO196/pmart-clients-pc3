@@ -79,11 +79,19 @@ export function unitsFor(span: number, hourOk: boolean): Unit[] {
   return UNITS.filter((u) => (u === 'hour' ? hourOk && span <= 7 : u === 'week' ? span >= 14 : u === 'month' ? span >= 60 : true));
 }
 
-/** 기간 길이의 기본 단위 — 1일 시간, 7일~92일 일, 그 위 주, 1년 가까이 월 */
+/** 기간 길이의 기본 단위 — 1일 시간, 31일까지 일, 그 위 주(2026-11-24 사용자 — 90일 일별은 요일 톱니가 심함), 1년 가까이 월. 단위는 바꿀 수 있다 */
 export function defaultUnit(span: number, hourOk: boolean): Unit {
   if (span <= 1) return hourOk ? 'hour' : 'day';
-  if (span <= 92) return 'day';
+  if (span <= 31) return 'day';
   return span >= 300 ? 'month' : 'week';
+}
+
+/** 주·월 칸이 기간 끝에 잘려 며칠만 들었나 — { days, full }, 다 들었거나 일·시간 칸이면 null */
+export function partialOf(b: { readonly from: string; readonly to: string; readonly hour?: number }, unit: Unit): { readonly days: number; readonly full: number } | null {
+  if (unit !== 'week' && unit !== 'month') return null;
+  const days = daysIn(b).length;
+  const full = unit === 'week' ? 7 : new Date(Date.UTC(Number(b.from.slice(0, 4)), Number(b.from.slice(5, 7)), 0)).getUTCDate();
+  return days < full ? { days, full } : null;
 }
 
 export interface Bucket {
