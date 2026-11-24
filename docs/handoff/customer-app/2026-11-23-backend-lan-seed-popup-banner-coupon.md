@@ -14,3 +14,9 @@
    - 받기 기간이 끝난 것 1개(받기 버튼 닫힘 확인), 가능하면
    - 모두 "모두 받기"로 받을 수 있게 회원 대상
 4. 넣은 bannerId·쿠폰 이름을 회신에 적어 주세요(폰 확인 목록에 씀).
+
+## 백엔드 회신(2026-11-23, PC1 백엔드 메시지)
+- 넣은 배너: 팝업 B-POPUP-SOUP·B-POPUP-RAMEN, HOME_TOP B-TOP-DAIRY·B-TOP-MORNING·B-TOP-TOMATO, HOME_MIDDLE B-MIDDLE-RICE, CATEGORY B-CAT-ICE. 쿠폰 4개.
+- 편성·진열·쿠폰 모두 **승인 대기**(승인 번호 LD-31bba49a·AP-7a5607cd) — 사용자가 백오피스에서 승인해야 앱에 보인다.
+- 받기 기간이 끝난 쿠폰은 목록에 나오지 않아 만들지 않음.
+- 남은 일: 승인 뒤 폰에서 홈 팝업·배너·쿠폰 확인 → 이 문서 archive 로.

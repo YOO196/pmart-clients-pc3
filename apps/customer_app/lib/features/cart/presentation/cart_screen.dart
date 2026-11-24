@@ -348,7 +348,19 @@ class _CartLineTileState extends ConsumerState<_CartLineTile> {
     try {
       while (mounted) {
         final target = _selectTarget;
-        if (target == null || target == line.selected) break;
+        // 비교는 장바구니의 지금 값(서버 반영본)과 한다. 위젯의 [line] 은 다시 그려지기 전까지 옛 값이라,
+        // 응답이 바로 오면 같은 변경을 끝없이 다시 보냈다(시험에서 메모리 20GB — 2026-11-23).
+        final current =
+            ref
+                .read(cartControllerProvider)
+                .value
+                ?.cart
+                .lines
+                .where((l) => l.cartItemId == line.cartItemId)
+                .firstOrNull
+                ?.selected ??
+            line.selected;
+        if (target == null || target == current) break;
         final outcome = await controller.submitWhenReady(
           SetSelected(cartItemId: line.cartItemId, selected: target),
         );
