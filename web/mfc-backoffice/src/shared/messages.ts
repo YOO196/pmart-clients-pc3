@@ -355,7 +355,6 @@ export const messages = {
       planFailed: '도면을 읽지 못했어요.',
       locFailed: '칸 상태 조회 실패',
       counting: (n: number) => `실사 잠김 ${n}칸`,
-      closed: (n: number) => `닫힘 ${n}칸`,
       hint: '점에 마우스를 올리면 작업자',
       tip: (name: string, role: string, code: string, minutes: number) => `${name} · ${role} · ${code} · ${minutes < 1 ? '방금' : `${minutes}분 전`}`,
       noName: '이름 없음',
