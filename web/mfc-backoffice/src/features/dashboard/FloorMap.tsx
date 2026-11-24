@@ -1,6 +1,6 @@
 // 센터 도면(위에서 본) + 작업자 점 — 대시보드 가운데·센터 도면 화면(2026-11-21 사용자 "mfc 시뮬레이션 참고해서 위에서 본 도면에 작업자 이동이 점으로").
 // - 도면: 센터마다(features/floor/floorPlan — 시뮬레이터 평면, 서버 칸 좌표와 같은 배치). 도면이 없는 센터는 "도면 없음".
-// - 칸 상태: mfc-location `GET /locations?state=` — 실사 잠김·닫힘 수(배지), 그 칸에 서버 position 이 있으면 도면에 표시.
+// - 칸 상태: 실사 잠김 수만 배지(mfc-location `GET /locations?state=COUNT_LOCKED`). 닫힘 수·칸 점은 보이지 않는다(2026-11-24 사용자 — 실서버 닫힘은 도면 변경으로 닫힌 칸).
 // - 작업자 점: mfc-capacity 0.34.0 `GET /mfcs/{mfcId}/worker-positions`(2026-11-24, 회신 mfc-backoffice/2026-11-21-reply-worker-floor-positions) —
 //   작업자마다 "마지막으로 스캔한 칸"(실내 측위가 아님). 새 스캔이 오면 앞 자리에서 통로를 따라 걸어가게 그린다(걷는 길은 화면의 그림, 서버 값이 아니다).
 //   피킹·포장·재고 이동·입고가 칸을 스캔할 때마다 움직이므로 시뮬레이터 가상 작업자·실제 PDA 작업과 같이 움직인다.
@@ -187,9 +187,7 @@ function FloorView({ mfcId, plan, full, picked, onPick }: { readonly mfcId: stri
   const { workers, positions, dots, byId } = useWorkerDots(mfcId, plan);
   // 실사 잠김·닫힘 칸 — 상태로 걸러 끝까지(칸이 수천 개라 첫 쪽만 세면 모자란다)
   const lockedQ = useQuery({ queryKey: ['dashboard', mfcId, 'locations', 'COUNT_LOCKED'], refetchInterval: OPS_REFRESH_MS, queryFn: () => fetchAllLocations(api, mfcId, { state: 'COUNT_LOCKED' }) });
-  const closedQ = useQuery({ queryKey: ['dashboard', mfcId, 'locations', 'CLOSED'], refetchInterval: OPS_REFRESH_MS, queryFn: () => fetchAllLocations(api, mfcId, { state: 'CLOSED' }) });
   const [hover, setHover] = useState<string | null>(null);
-  const marked = [...(lockedQ.data ?? []), ...(closedQ.data ?? [])].filter((l) => l.position);
   const roleOfDot = (d: Dot) => roleOf(d.activity, byId.get(d.id)?.onBreak === true);
   const count = (r: Role) => dots.filter((d) => roleOfDot(d) === r).length;
   const hovered = dots.find((d) => d.id === hover);
@@ -216,12 +214,11 @@ function FloorView({ mfcId, plan, full, picked, onPick }: { readonly mfcId: stri
             {m.unplaced(unplaced.length)}
           </span>
         )}
-        {lockedQ.isError || closedQ.isError ? (
+        {lockedQ.isError ? (
           <span className="badge badge-ghost badge-sm">{m.locFailed}</span>
         ) : (
           <>
             {(lockedQ.data?.length ?? 0) > 0 && <span className="badge badge-info badge-sm">{m.counting(lockedQ.data!.length)}</span>}
-            {(closedQ.data?.length ?? 0) > 0 && <span className="badge badge-warning badge-sm">{m.closed(closedQ.data!.length)}</span>}
           </>
         )}
         <span className={`min-h-4 truncate text-base-content/70 ${full ? 'rounded-full bg-base-100/80 px-2.5 py-0.5 backdrop-blur' : 'ml-auto'}`} aria-live="polite" data-testid="floor-tip">
@@ -311,12 +308,7 @@ function FloorView({ mfcId, plan, full, picked, onPick }: { readonly mfcId: stri
                 </g>
               );
             })}
-          {/* 실사 잠김·닫힘 칸(서버 position) */}
-          {marked.map((l) => (
-            <rect key={l.locationId ?? l.locationCode} x={l.position!.xM - 0.3} y={l.position!.zM - 0.3} width="0.6" height="0.6" rx="0.12" className={l.state === 'CLOSED' ? 'fill-warning' : 'fill-info pm-pulse'} data-testid="floor-cell-mark">
-              <title>{`${l.locationCode} · ${m.state[l.state ?? ''] ?? l.state ?? ''}`}</title>
-            </rect>
-          ))}
+          {/* 칸 상태(닫힘·실사 잠김) 점은 그리지 않는다(2026-11-24 사용자 — 실서버 닫힘 7천여 칸은 도면 다시 설계·넓은 칸 합침으로 닫힌 칸이라 운영 정보가 아니고 화면만 어지럽힘). 칸 상태는 랙 패널·위치(칸) 메뉴에서 */}
           {/* 작업자 점 — 마지막 스캔 칸(서버) 쪽으로 걷는다 */}
           {dots.map((d) => {
             const role = roleOfDot(d);

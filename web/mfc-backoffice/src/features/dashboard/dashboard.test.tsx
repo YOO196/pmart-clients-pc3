@@ -107,7 +107,9 @@ describe('센터 대시보드', () => {
     await waitFor(() => expect(within(map).getAllByTestId('floor-worker')).toHaveLength(3));
     expect(within(map).getAllByTestId('floor-worker').filter((d) => d.getAttribute('data-role') === 'break')).toHaveLength(1);
     expect(within(map).getByText('작업자 위치 = 마지막 스캔 칸')).toBeInTheDocument();
-    expect(within(map).getByText('닫힘 2칸')).toBeInTheDocument();
+    // 닫힘 칸 수·칸 점은 도면에 없다(실서버 닫힘은 도면 변경으로 닫힌 칸 — 사용자 2026-11-24)
+    expect(within(map).queryByText(/닫힘 \d+칸/)).not.toBeInTheDocument();
+    expect(within(map).queryAllByTestId('floor-cell-mark')).toHaveLength(0);
     expect(view.gets('/mfcs/MFC-BJG-01/worker-positions').length).toBeGreaterThan(0);
   });
 
