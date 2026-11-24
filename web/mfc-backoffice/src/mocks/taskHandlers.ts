@@ -7,6 +7,7 @@ import { API_BASE } from '../api/client';
 import { hourShare } from '../features/dashboard/dashboardRules';
 import { db, type MockShipment, type MockTask } from './db';
 import { idempotent, operator, problem, unauthorized } from './support';
+import { DEMO_HOME, hasDemoData, scaled } from './demoCenters';
 
 const canAccess = (request: Request, mfcId: string) => operator(request)?.centers.includes(mfcId) ?? false;
 const isSupervisor = (request: Request) => operator(request)?.roles.includes('MFC_SUPERVISOR') ?? false;
@@ -106,9 +107,12 @@ export const taskHandlers = [
     const limit = { HOUR: 7, DAY: 92, WEEK: 366, MONTH: 366 }[bucket];
     if (!limit) return problem(400, 'VALIDATION_FAILED');
     if (from && to && (Date.parse(to) - Date.parse(from)) / 86_400_000 + 1 > limit) return problem(400, 'VALIDATION_FAILED');
-    const v = pickingLines[mfcId];
+    const sc = <T extends Record<string, number>>(x: T): T => Object.fromEntries(Object.entries(x).map(([k, n]) => [k, scaled(n, mfcId)])) as T;
+    // 다른 센터(브라우저 목) — 부산진구 값에 센터 규모를 곱한다
+    const v = pickingLines[mfcId] ?? (hasDemoData(mfcId) ? sc(pickingLines[DEMO_HOME]!) : undefined);
+    const home = mfcId === DEMO_HOME;
     // 날마다 값(오늘은 위 표 그대로). 일요일은 0건 → 줄 없음(계약)
-    const daily = v ? pastDays(today, 400).filter((d) => from <= d && d <= to).flatMap((d) => (d === today ? [{ d, x: v }] : pastPicking(d) ? [{ d, x: pastPicking(d)! }] : [])) : [];
+    const daily = v ? pastDays(today, 400).filter((d) => from <= d && d <= to).flatMap((d) => (d === today ? [{ d, x: v }] : pastPicking(d) ? [{ d, x: home ? pastPicking(d)! : sc(pastPicking(d)!) }] : [])) : [];
     type Acc = { date: string; hour: string | null; picked: number; SHORT: number; DAMAGED: number; SPOILED: number; BLOCKED: number };
     const acc = new Map<string, Acc>();
     const add = (key: string, date: string, hour: string | null, x: (typeof pickingLines)[string], part: (n: number) => number) => {

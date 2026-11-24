@@ -783,6 +783,7 @@ export const messages = {
   center: {
     label: '센터',
     choose: '센터 고르기',
+    switchHint: (n: number) => `눌러서 다른 센터로(맡은 센터 ${n}곳)`,
     /** 세션 centers 가 비었다 — 서버가 센터 API 를 모두 403 으로 막는다 */
     none: '맡은 센터가 없어요. 센터 관리자(MFC_SUPERVISOR) 권한을 센터와 함께 받아야 이 화면을 쓸 수 있어요.',
     /** 주소의 센터가 세션 centers 에 없다 */

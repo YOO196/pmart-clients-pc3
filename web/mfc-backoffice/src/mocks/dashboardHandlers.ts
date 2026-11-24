@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { operator, problem, unauthorized } from './support';
+import { hasDemoData, scaled } from './demoCenters';
 
 const canAccess = (request: Request, mfcId: string) => operator(request)?.centers.includes(mfcId) ?? false;
 
@@ -27,9 +28,11 @@ export const dashboardHandlers = [
     const q = new URL(request.url).searchParams;
     const mfcId = q.get('mfcId') ?? '';
     if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
-    if (mfcId !== 'MFC-SEED-01') return HttpResponse.json({ items: [], sort: 'shortLines', minPickedLines: null, asOf: new Date().toISOString() });
+    if (!hasDemoData(mfcId)) return HttpResponse.json({ items: [], sort: 'shortLines', minPickedLines: null, asOf: new Date().toISOString() });
+    const sc = (n: number) => scaled(n, mfcId);
     const limit = Number(q.get('limit') ?? 10);
-    const items = SKUS.map(({ SHORT, DAMAGED, SPOILED, BLOCKED, ...s }) => ({ ...s, shortLines: SHORT + DAMAGED + SPOILED + BLOCKED, shortLinesByReason: { SHORT, DAMAGED, SPOILED, BLOCKED } }))
+    const items = SKUS.map(({ SHORT: s1, DAMAGED: s2, SPOILED: s3, BLOCKED: s4, ...s }) => ({ s, SHORT: sc(s1), DAMAGED: sc(s2), SPOILED: sc(s3), BLOCKED: sc(s4) }))
+      .map(({ s, SHORT, DAMAGED, SPOILED, BLOCKED }) => ({ ...s, pickedLines: sc(s.pickedLines), shortLines: SHORT + DAMAGED + SPOILED + BLOCKED, shortLinesByReason: { SHORT, DAMAGED, SPOILED, BLOCKED } }))
       .sort((a, b) => b.shortLines - a.shortLines)
       .slice(0, limit);
     return HttpResponse.json({ items, sort: 'shortLines', minPickedLines: null, asOf: new Date().toISOString() });
@@ -43,13 +46,13 @@ export const dashboardHandlers = [
     const list = days(q.get('from') ?? today, q.get('to') ?? today);
     if (list.length > 31) return problem(400, 'VALIDATION_FAILED');
     // 일요일은 셀 배송 없음(줄 없음 — 0건 날짜) — 오늘은 요일과 상관없이 있다(피킹 목과 같게, 일요일에 시험이 깨지지 않게). 오늘은 약속 전(pending)이 남아 있다.
-    const items = mfcId !== 'MFC-SEED-01' ? [] : list
+    const items = !hasDemoData(mfcId) ? [] : list
       .filter((d) => d === today || new Date(`${d}T00:00:00Z`).getUTCDay() !== 0)
       .map((d) => {
         const n = Number(d.slice(8, 10));
-        const due = d === today ? 18 : 60 + ((n * 13) % 40);
-        const late = d === today ? 2 : 2 + (n % 6);
-        return { date: d, mfcId, due, onTime: due - late, late, unjudged: n % 4, pending: d === today ? 9 : 0 };
+        const due = scaled(d === today ? 18 : 60 + ((n * 13) % 40), mfcId);
+        const late = Math.min(due, scaled(d === today ? 2 : 2 + (n % 6), mfcId));
+        return { date: d, mfcId, due, onTime: due - late, late, unjudged: n % 4, pending: scaled(d === today ? 9 : 0, mfcId) };
       });
     return HttpResponse.json({ items, asOf: new Date().toISOString() });
   }),

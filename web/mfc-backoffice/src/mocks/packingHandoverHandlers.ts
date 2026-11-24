@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { operator, problem, unauthorized } from './support';
+import { addToArray } from './demoCenters';
 
 const BFF = `${API_BASE}/backoffice`;
 const OPEN_SHIPMENTS = ['PREPARING', 'READY', 'PARTIALLY_HANDED_OVER'];
@@ -117,3 +118,8 @@ export const packingHandoverHandlers = [
     });
   }),
 ];
+
+/** 브라우저 목 — 다른 네 센터에도 포장 인계(부산진구 것을 옮김, demoCenters) */
+export function addDemoCenterShipments(): void {
+  addToArray(ships);
+}

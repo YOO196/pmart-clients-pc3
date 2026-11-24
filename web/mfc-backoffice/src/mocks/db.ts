@@ -1,5 +1,6 @@
 // 목 서버 상태(메모리). 테스트마다 resetDb() 로 되돌린다.
 import type { components as CapacitySchemas } from '../api/generated/mfc-capacity';
+import { addToArray, addToMap, enableDemoCenters } from './demoCenters';
 import { mockFloorPlans } from './floorPlans';
 import type { components as FulfillmentSchemas } from '../api/generated/mfc-fulfillment';
 import type { components as InboundSchemas } from '../api/generated/mfc-inbound';
@@ -616,6 +617,7 @@ export interface MockGrant {
 export const mockLogins = [
   { operatorId: 'OP-sup-1', label: '센터 관리자(MFC 1곳)' },
   { operatorId: 'OP-sup-2', label: '센터 관리자(MFC 2곳)' },
+  { operatorId: 'OP-sup-all', label: '센터 관리자 — 전 센터(claude-mfc-sup)' },
   { operatorId: 'OP-sup-mk', label: '센터 관리자 — 목포' },
   { operatorId: 'OP-sup-sj', label: '센터 관리자 — 세종' },
   { operatorId: 'OP-sup-cc', label: '센터 관리자 — 춘천' },
@@ -628,6 +630,8 @@ function seedGrants(): Array<[string, MockGrant]> {
   return [
     ['OP-sup-1', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-SEED-01'] }],
     ['OP-sup-2', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-SEED-01', 'MFC-MOKPO-01'] }],
+    // 다섯 센터 모두(LAN claude-mfc-sup 을 전 센터로 — 요청 handoff mfc-backoffice/2026-11-24-backend-mfc-sup-all-centers)
+    ['OP-sup-all', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-SEED-01', 'MFC-MOKPO-01', 'MFC-SEJ-01', 'MFC-CHC-01', 'MFC-BNG-01'] }],
     // 센터마다 관리자 한 명 — 실서버 claude-mfc-sup-mk·sj·cc·bn 처럼 자기 센터만(lan-test-accounts.md)
     ['OP-sup-mk', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-MOKPO-01'] }],
     ['OP-sup-sj', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-SEJ-01'] }],
@@ -991,4 +995,32 @@ function seedDemoTasks() {
     });
     db.tasks.set(id, t);
   });
+}
+
+/**
+ * 브라우저 목 — 다른 네 센터(목포·세종·춘천·부산남구)에도 시연 기록(2026-11-24 사용자 "목 웹 다른 센터들에도 목 데이터 넣어줘").
+ * 부산진구 기록을 센터마다 옮긴다(demoCenters.cloneForCenter — 센터·기록 ID·화면 번호·작업자·선반 칸을 그 센터 것으로).
+ * 칸·재고·작업자는 seedDemoFloor 가 센터마다 따로 만든다. seedDemoFloor 뒤에 부른다. 시험에서는 부르지 않는다.
+ */
+export function seedDemoCenters() {
+  enableDemoCenters();
+  addToMap(db.staffContacts);
+  addToMap(db.incidents);
+  addToArray(db.returnHandovers);
+  addToMap(db.restrictions);
+  addToMap(db.decisions);
+  addToMap(db.disposals);
+  addToMap(db.countSessions);
+  addToArray(db.policies);
+  addToArray(db.handlings);
+  addToArray(db.unshippable);
+  addToMap(db.inboundTasks);
+  addToArray(db.initialLoads);
+  addToMap(db.returnReceipts);
+  addToMap(db.supplyRequests);
+  addToMap(db.tasks);
+  addToMap(db.shipments);
+  addToMap(db.shifts);
+  addToArray(db.assignments);
+  addToMap(db.moves);
 }
