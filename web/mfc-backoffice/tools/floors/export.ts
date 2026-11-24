@@ -12,7 +12,7 @@ import { applyWideCells } from 'sim/domain/wideCells';
 
 /** 실서버 센터 ID → 시뮬레이터 평면(시뮬레이터 config MFC_SITES 와 같음) */
 const SITES: ReadonlyArray<{ id: string; name: string; build: () => Layout }> = [
-  { id: 'MFC-SEED-01', name: '부산진구 MFC', build: buildBusanjinLayout },
+  { id: 'MFC-BJG-01', name: '부산진구 MFC', build: buildBusanjinLayout },
   { id: 'MFC-MOKPO-01', name: '목포 MFC', build: () => applyMokpo(buildLayout()) },
   { id: 'MFC-SEJ-01', name: '세종 MFC', build: buildSejongLayout },
   { id: 'MFC-CHC-01', name: '춘천 MFC', build: buildChuncheonLayout },

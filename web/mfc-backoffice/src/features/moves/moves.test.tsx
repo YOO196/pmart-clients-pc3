@@ -16,16 +16,16 @@ const problem = (status: number, code: string) =>
 
 describe('이동 목록', () => {
   it('기본은 진행 중(서버 기본 — state 를 보내지 않는다), 최근 순, 이 센터만', async () => {
-    const view = renderAt('/c/MFC-SEED-01/moves');
+    const view = renderAt('/c/MFC-BJG-01/moves');
     await waitFor(() => expect(rows()).toHaveLength(3));
     expect(rows().map((r) => within(r).getAllByRole('cell')[0]!.textContent)).toEqual(['자동 보충', '재배치긴급', '재배치']);
     expect(within(rows()[2]!).getByText('카트 정리 대기')).toBeInTheDocument();
     const q = new URL(view.gets('/move-orders')[0]!.url).searchParams;
-    expect([q.get('mfcId'), q.get('state')]).toEqual(['MFC-SEED-01', null]);
+    expect([q.get('mfcId'), q.get('state')]).toEqual(['MFC-BJG-01', null]);
   });
 
   it('상태 거르기(끝남)는 URL 쿼리 → 서버로', async () => {
-    const view = renderAt('/c/MFC-SEED-01/moves');
+    const view = renderAt('/c/MFC-BJG-01/moves');
     await waitFor(() => expect(rows()).toHaveLength(3));
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'COMPLETED');
     await waitFor(() => expect(rows()).toHaveLength(1));
@@ -34,7 +34,7 @@ describe('이동 목록', () => {
 
   it('조회 실패는 빈 목록이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/move-orders`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-SEED-01/moves');
+    renderAt('/c/MFC-BJG-01/moves');
     expect(await screen.findByRole('alert')).toHaveAttribute('data-state', 'error');
     expect(screen.queryByText('조건에 맞는 이동 지시가 없어요.')).not.toBeInTheDocument();
   });
@@ -42,7 +42,7 @@ describe('이동 목록', () => {
 
 describe('이동 상세·취소', () => {
   it('취소: 사유가 있어야 보내고, 서버가 돌려준 상태(취소됨)를 보인다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/moves/MOVE-1');
+    const view = renderAt('/c/MFC-BJG-01/moves/MOVE-1');
     expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('긴급');
     const button = screen.getByRole('button', { name: '이동 취소' });
     expect(button).toBeDisabled();
@@ -60,7 +60,7 @@ describe('이동 상세·취소', () => {
 
   it('카트에 실린 몫이 있으면 취소 뒤 "카트 정리 대기" — 끝났다고 하지 않는다', async () => {
     db.moves.set('MOVE-1', { ...db.moves.get('MOVE-1')!, pickedQty: 2, onCartQty: 2, cartLocation: 'CRT-C-02' });
-    renderAt('/c/MFC-SEED-01/moves/MOVE-1');
+    renderAt('/c/MFC-BJG-01/moves/MOVE-1');
     await screen.findByRole('heading', { level: 1 });
     await userEvent.type(screen.getByRole('textbox', { name: '취소 사유' }), '중단');
     await userEvent.click(screen.getByRole('button', { name: '이동 취소' }));
@@ -70,15 +70,15 @@ describe('이동 상세·취소', () => {
   });
 
   it('카트 정리 대기·자동 보충: 안내만, 취소 버튼 없음, 지시한 사람은 "시스템"', async () => {
-    renderAt('/c/MFC-SEED-01/moves/MOVE-3');
+    renderAt('/c/MFC-BJG-01/moves/MOVE-3');
     expect(await screen.findByText('취소했지만 카트에 남은 물건이 있어요. 작업자가 출발 칸에 내려놓아야 끝나요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '이동 취소' })).not.toBeInTheDocument();
-    renderAt('/c/MFC-SEED-01/moves/MOVE-2');
+    renderAt('/c/MFC-BJG-01/moves/MOVE-2');
     expect(await screen.findByText('시스템')).toBeInTheDocument();
   });
 
   it('센터 관리자가 아니면 서버 403 — 권한 문구', async () => {
-    renderAt('/c/MFC-SEED-01/moves/MOVE-1', as.adminWithCenter);
+    renderAt('/c/MFC-BJG-01/moves/MOVE-1', as.adminWithCenter);
     await screen.findByRole('heading', { level: 1 });
     await userEvent.type(screen.getByRole('textbox', { name: '취소 사유' }), '중단');
     await userEvent.click(screen.getByRole('button', { name: '이동 취소' }));
@@ -89,7 +89,7 @@ describe('이동 상세·취소', () => {
 
 describe('이동 지시', () => {
   it('재고에서 출발(위치·LOT)을, 후보에서 도착을 고르고 → 지시 → 만든 이동 상세', async () => {
-    const view = renderAt('/c/MFC-SEED-01/moves/new');
+    const view = renderAt('/c/MFC-BJG-01/moves/new');
     await userEvent.type(await screen.findByRole('textbox', { name: '상품 코드(SKU)' }), 'sku-milk-1');
     await userEvent.click(screen.getByRole('button', { name: '재고 보기' }));
     const stock = await screen.findAllByTestId('stock-row');
@@ -107,7 +107,7 @@ describe('이동 지시', () => {
     expect(await screen.findByText('이동을 지시했어요.')).toBeInTheDocument();
     const post = view.sent.find((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith('/move-orders'))!;
     expect(await sentBody(post)).toEqual({
-      mfcId: 'MFC-SEED-01',
+      mfcId: 'MFC-BJG-01',
       sku: 'SKU-MILK-1',
       lotId: 'LOT-MILK-A',
       fromLocation: 'A-P1-01-1-01',
@@ -120,7 +120,7 @@ describe('이동 지시', () => {
   });
 
   it('서버 거절(카테고리 칸) — 코드 문구, 지시가 생기지 않는다', async () => {
-    renderAt('/c/MFC-SEED-01/moves/new');
+    renderAt('/c/MFC-BJG-01/moves/new');
     await userEvent.type(await screen.findByRole('textbox', { name: '상품 코드(SKU)' }), 'SKU-RAMEN-5');
     await userEvent.type(screen.getByRole('textbox', { name: 'LOT' }), 'LOT-RAMEN-1');
     await userEvent.type(screen.getByRole('textbox', { name: '출발 칸' }), 'F-S2-02-1-03');
@@ -142,7 +142,7 @@ describe('이동 지시', () => {
         return undefined;
       }),
     );
-    const view = renderAt('/c/MFC-SEED-01/moves/new');
+    const view = renderAt('/c/MFC-BJG-01/moves/new');
     await userEvent.type(await screen.findByRole('textbox', { name: '상품 코드(SKU)' }), 'SKU-MILK-1');
     await userEvent.type(screen.getByRole('textbox', { name: 'LOT' }), 'LOT-MILK-B');
     await userEvent.type(screen.getByRole('textbox', { name: '출발 칸' }), 'RCV-C-01');
@@ -160,7 +160,7 @@ describe('이동 지시', () => {
 
   it('재고 조회 실패는 "재고 없음"이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/mfcs/:mfcId/stock`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-SEED-01/moves/new');
+    renderAt('/c/MFC-BJG-01/moves/new');
     await userEvent.type(await screen.findByRole('textbox', { name: '상품 코드(SKU)' }), 'SKU-MILK-1');
     await userEvent.click(screen.getByRole('button', { name: '재고 보기' }));
     await waitFor(() => expect(document.querySelector('[data-state="error"]')).not.toBeNull());

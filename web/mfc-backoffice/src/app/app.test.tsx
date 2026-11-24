@@ -42,7 +42,7 @@ describe('로그인', () => {
     await userEvent.click(await screen.findByRole('button', { name: '센터 관리자(MFC 1곳)' }));
     // 센터 첫 화면은 센터 운영판(2026-11-19)
     expect(await screen.findByRole('heading', { name: '오늘 센터 현황' })).toBeInTheDocument();
-    expect(await screen.findByText('부산진구 MFC (MFC-SEED-01)')).toBeInTheDocument();
+    expect(await screen.findByText('부산진구 MFC (MFC-BJG-01)')).toBeInTheDocument();
   });
 });
 
@@ -50,15 +50,15 @@ describe('센터', () => {
   it('센터가 하나면 고르지 않고 그 센터로 — 이름은 세션 응답 centerDetails(0.9.0)에서, GET /centers 는 부르지 않는다', async () => {
     const view = renderAt('/');
     expect(await screen.findByRole('heading', { name: '오늘 센터 현황' })).toBeInTheDocument();
-    expect(await screen.findByText('부산진구 MFC (MFC-SEED-01)')).toBeInTheDocument();
+    expect(await screen.findByText('부산진구 MFC (MFC-BJG-01)')).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: '센터 고르기' })).not.toBeInTheDocument();
     expect(view.gets('/centers')).toHaveLength(0);
   });
 
   it('센터가 둘 이상이면 위에서 고른다 — 세션 centers 만(전체 목록의 다른 센터는 없다), 바꾸면 같은 메뉴', async () => {
-    renderAt('/c/MFC-SEED-01/inventory', as.sup2);
+    renderAt('/c/MFC-BJG-01/inventory', as.sup2);
     const select = await screen.findByRole('combobox', { name: '센터 고르기' });
-    await waitFor(() => expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['부산진구 MFC (MFC-SEED-01)', '목포 MFC (MFC-MOKPO-01)']));
+    await waitFor(() => expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['부산진구 MFC (MFC-BJG-01)', '목포 MFC (MFC-MOKPO-01)']));
     await userEvent.selectOptions(select, 'MFC-MOKPO-01');
     expect(await screen.findByRole('heading', { name: '재고' })).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: '센터 고르기' })).toHaveValue('MFC-MOKPO-01');
@@ -75,24 +75,24 @@ describe('센터', () => {
           issuedAt: '2026-11-16T00:00:00Z',
           expiresAt: '2026-11-16T00:15:00Z',
           roles: ['MFC_SUPERVISOR'],
-          centers: ['MFC-SEED-01', 'MFC-MOKPO-01'],
+          centers: ['MFC-BJG-01', 'MFC-MOKPO-01'],
           centerDetails: [
-            { centerId: 'MFC-SEED-01', name: '부산진구 MFC' },
+            { centerId: 'MFC-BJG-01', name: '부산진구 MFC' },
             { centerId: 'MFC-MOKPO-01', name: null },
           ],
         }),
       ),
     );
-    renderAt('/c/MFC-SEED-01/workers', as.sup2);
+    renderAt('/c/MFC-BJG-01/workers', as.sup2);
     const select = await screen.findByRole('combobox', { name: '센터 고르기' });
-    await waitFor(() => expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['부산진구 MFC (MFC-SEED-01)', 'MFC-MOKPO-01']));
+    await waitFor(() => expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['부산진구 MFC (MFC-BJG-01)', 'MFC-MOKPO-01']));
     expect(screen.getByText('센터 이름을 불러오지 못해 센터 코드로만 보여요.')).toBeInTheDocument();
   });
 
   it('맡지 않은 센터 주소는 "이 센터 권한이 없습니다" + 맡은 센터로 가는 링크', async () => {
     renderAt('/c/MFC-SEJ-01/workers');
     expect(await screen.findByRole('alert')).toHaveTextContent('이 센터 권한이 없습니다');
-    expect(screen.getByRole('link', { name: 'MFC-SEED-01' })).toHaveAttribute('href', '/c/MFC-SEED-01/workers');
+    expect(screen.getByRole('link', { name: 'MFC-BJG-01' })).toHaveAttribute('href', '/c/MFC-BJG-01/workers');
     expect(screen.queryByRole('heading', { name: '작업자' })).not.toBeInTheDocument();
   });
 });
@@ -109,11 +109,11 @@ describe('세션 응답(sessions/current 0.6.0) — 토큰을 풀지 않는다',
           issuedAt: '2026-11-15T00:00:00Z',
           expiresAt: '2026-11-15T00:15:00Z',
           roles: ['MFC_SUPERVISOR'],
-          centers: ['MFC-SEED-01', 'MFC-MOKPO-01'],
+          centers: ['MFC-BJG-01', 'MFC-MOKPO-01'],
         }),
       ),
     );
-    renderAt('/c/MFC-SEED-01/workers', as.sup);
+    renderAt('/c/MFC-BJG-01/workers', as.sup);
     const select = await screen.findByRole('combobox', { name: '센터 고르기' });
     expect(within(select).getAllByRole('option')).toHaveLength(2);
   });
@@ -140,7 +140,7 @@ describe('역할', () => {
     renderAt('/', as.worker);
     expect(await screen.findByRole('alert')).toHaveTextContent('센터 관리자만 쓰는 화면입니다');
     expect(screen.queryByText('작업자 관리')).not.toBeInTheDocument();
-    renderAt('/c/MFC-SEED-01/workers', as.worker);
+    renderAt('/c/MFC-BJG-01/workers', as.worker);
     expect(screen.queryByRole('heading', { name: '작업자' })).not.toBeInTheDocument();
   });
 
@@ -151,7 +151,7 @@ describe('역할', () => {
   });
 
   it('센터 관리자가 아닌 역할 + 센터: 막지 않고 안내만(판정은 서버)', async () => {
-    renderAt('/c/MFC-SEED-01/locations', as.adminWithCenter);
+    renderAt('/c/MFC-BJG-01/locations', as.adminWithCenter);
     expect(await screen.findByRole('heading', { name: '위치(칸)' })).toBeInTheDocument();
     expect(screen.getByRole('note')).toHaveTextContent('센터 관리자(MFC_SUPERVISOR) 권한이 없어요');
   });
@@ -168,7 +168,7 @@ describe('메뉴', () => {
     for (const label of ['홈', '센터 대시보드', '센터 도면', '작업자 목록', '배정', '작업 현황', '이동·보충', '입고', '재고', '품질', '위치(칸)', '운영 제한', '포장 인계', '배송 현황', '배차 실패', '배차 지연', '반납 인증번호']) {
       // 작업 현황 옆에는 늦음·막힘 수 배지가 붙을 수 있다
       const link = screen.getByRole('link', { name: (name) => name === label || (label === '작업 현황' && /^작업 현황 \d+\+?$/.test(name)) });
-      expect(link.getAttribute('href')).toMatch(/^\/c\/MFC-SEED-01\//);
+      expect(link.getAttribute('href')).toMatch(/^\/c\/MFC-BJG-01\//);
     }
   });
 
@@ -187,14 +187,14 @@ describe('메뉴', () => {
   });
 
   it('세션이 없으면 로그인으로(돌아올 경로를 들고)', async () => {
-    renderAt('/c/MFC-SEED-01/quality', null);
+    renderAt('/c/MFC-BJG-01/quality', null);
     expect(await screen.findByRole('button', { name: '센터 관리자(MFC 1곳)' })).toBeInTheDocument();
   });
 });
 
 describe('머리줄 앱 바꾸기(⋮⋮⋮, 2026-11-20 — 요청 all/2026-11-17-request-app-launcher §3-2)', () => {
   it('4개 앱, MFC 센터가 지금 앱, 다른 앱은 링크', async () => {
-    renderAt('/c/MFC-SEED-01/inventory', as.sup);
+    renderAt('/c/MFC-BJG-01/inventory', as.sup);
     await userEvent.click(await screen.findByRole('button', { name: '앱 바꾸기' }));
     expect(screen.getByRole('navigation', { name: '앱 바꾸기' })).toHaveTextContent('라이더 운영');
     expect(screen.getByText('MFC 센터', { selector: '[aria-current="page"]' })).toBeInTheDocument();

@@ -10,12 +10,12 @@ const calls = (sent: readonly Request[]) =>
 
 describe('포장 인계 현황(우리 센터)', () => {
   it('주소의 센터로 고정해 끝나지 않은 출고만 — 주문번호·단계·포장별 인계·배송', async () => {
-    const view = renderAt('/c/MFC-SEED-01/packing-handover');
+    const view = renderAt('/c/MFC-BJG-01/packing-handover');
     const rows = await screen.findAllByTestId('packing-row');
     expect(rows).toHaveLength(4); // 취소 출고·다른 센터 출고는 없다
     expect(screen.queryByText('10000009')).not.toBeInTheDocument();
     const q = calls(view.sent)[0]!;
-    expect([q.get('mfcId'), q.get('size'), q.getAll('state'), q.get('cursor')]).toEqual(['MFC-SEED-01', '50', [], null]);
+    expect([q.get('mfcId'), q.get('size'), q.getAll('state'), q.get('cursor')]).toEqual(['MFC-BJG-01', '50', [], null]);
 
     const row = (orderNumber: string) => rows.find((r) => r.textContent?.includes(orderNumber))!;
     expect(within(row('10000001')).getByTestId('stage')).toHaveTextContent('출고요청');
@@ -44,7 +44,7 @@ describe('포장 인계 현황(우리 센터)', () => {
   });
 
   it('상태를 고르면 state 로 부르고, 배송 원천을 못 읽으면 "모름(조회 실패)"와 경고(배송 없음과 구분)', async () => {
-    const view = renderAt('/c/MFC-SEED-01/packing-handover');
+    const view = renderAt('/c/MFC-BJG-01/packing-handover');
     await screen.findAllByTestId('packing-row');
     await userEvent.selectOptions(screen.getByLabelText('출고 상태'), 'CANCELLED');
     expect(await screen.findByRole('alert')).toHaveTextContent('delivery-execution-service');

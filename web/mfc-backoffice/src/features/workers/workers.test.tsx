@@ -17,7 +17,7 @@ const heading = () => screen.findByRole('heading', { level: 1 });
 
 describe('작업자 목록', () => {
   it('기본은 재직·정지(서버 기본 — state 를 보내지 않는다). 지금 배정 조건·휴게·오늘 출근은 서버 값', async () => {
-    const view = renderAt('/c/MFC-SEED-01/workers');
+    const view = renderAt('/c/MFC-BJG-01/workers');
     await waitFor(() => expect(names()).toEqual(['김현장', '박일일', '이알바', '최정지']));
     const [kim, park, lee] = rows();
     expect(within(kim!).getByText('피패킹')).toBeInTheDocument();
@@ -27,7 +27,7 @@ describe('작업자 목록', () => {
   });
 
   it('퇴사 거르기는 URL 쿼리 → 서버로', async () => {
-    const view = renderAt('/c/MFC-SEED-01/workers');
+    const view = renderAt('/c/MFC-BJG-01/workers');
     await waitFor(() => expect(rows()).toHaveLength(4));
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'LEFT');
     await waitFor(() => expect(names()).toEqual(['정퇴사']));
@@ -36,7 +36,7 @@ describe('작업자 목록', () => {
 
   it('조회 실패는 빈 목록이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/mfcs/:mfcId/workers`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-SEED-01/workers');
+    renderAt('/c/MFC-BJG-01/workers');
     expect(await screen.findByRole('alert')).toHaveAttribute('data-state', 'error');
     expect(screen.queryByText('조건에 맞는 작업자가 없어요.')).not.toBeInTheDocument();
   });
@@ -44,7 +44,7 @@ describe('작업자 목록', () => {
 
 describe('작업자 등록', () => {
   it('운영자 ID·이름·업무 → 등록(자격은 생략 = 서버 기본) → 상세', async () => {
-    const view = renderAt('/c/MFC-SEED-01/workers/new');
+    const view = renderAt('/c/MFC-BJG-01/workers/new');
     await userEvent.type(await screen.findByRole('textbox', { name: /운영자 ID/ }), 'OP-new-1');
     await userEvent.type(screen.getByRole('textbox', { name: '이름' }), '한신입');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '고용 형태' }), 'PART_TIME');
@@ -61,7 +61,7 @@ describe('작업자 등록', () => {
   });
 
   it('이미 등록된 사람이면 WORKER_ALREADY_REGISTERED 문구', async () => {
-    renderAt('/c/MFC-SEED-01/workers/new');
+    renderAt('/c/MFC-BJG-01/workers/new');
     await userEvent.type(await screen.findByRole('textbox', { name: /운영자 ID/ }), 'OP-wkr-9');
     await userEvent.type(screen.getByRole('textbox', { name: '이름' }), '정퇴사');
     await userEvent.click(screen.getByRole('checkbox', { name: '피패킹' }));
@@ -72,7 +72,7 @@ describe('작업자 등록', () => {
 
 describe('작업자 상세', () => {
   it('업무 바꾸기: 지금 업무 버전으로 보내고, 맞지 않게 된 진행 중 배정을 알린다(지우지 않음)', async () => {
-    const view = renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    const view = renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     expect(await heading()).toHaveTextContent('김현장');
     const form = screen.getByRole('form', { name: '맡은 일(업무) 바꾸기' });
     await userEvent.click(within(form).getByRole('checkbox', { name: '피패킹' }));
@@ -88,10 +88,10 @@ describe('작업자 상세', () => {
   });
 
   it('다른 사람이 먼저 업무를 바꿨으면 VERSION_CONFLICT 문구', async () => {
-    renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     await heading();
-    const w = db.workers.get('MFC-SEED-01/OP-wkr-1')!;
-    db.workers.set('MFC-SEED-01/OP-wkr-1', { ...w, duties: [{ ...w.duties[0]!, dutyVersion: 3 }] });
+    const w = db.workers.get('MFC-BJG-01/OP-wkr-1')!;
+    db.workers.set('MFC-BJG-01/OP-wkr-1', { ...w, duties: [{ ...w.duties[0]!, dutyVersion: 3 }] });
     const form = screen.getByRole('form', { name: '맡은 일(업무) 바꾸기' });
     await userEvent.type(within(form).getByRole('textbox', { name: '맡은 일(업무) 바꾸기 사유' }), '변경');
     await userEvent.click(within(form).getByRole('button', { name: '저장' }));
@@ -99,7 +99,7 @@ describe('작업자 상세', () => {
   });
 
   it('상태 정지: 사유 필수, 이력에 남고 진행 중 배정을 알린다', async () => {
-    renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     await heading();
     const form = screen.getByRole('form', { name: '상태 바꾸기' });
     await userEvent.selectOptions(within(form).getByRole('combobox', { name: '상태' }), 'SUSPENDED');
@@ -112,7 +112,7 @@ describe('작업자 상세', () => {
   });
 
   it('속도 배율은 0.5~2.0 만 보낼 수 있다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    const view = renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     await heading();
     const form = screen.getByRole('form', { name: '속도 배율 바꾸기' });
     const input = within(form).getByRole('spinbutton', { name: '속도 배율' });
@@ -128,7 +128,7 @@ describe('작업자 상세', () => {
   });
 
   it('휴게 중이면 "휴게 끝" → 끝내고 다시 읽는다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/workers/OP-wkr-2');
+    const view = renderAt('/c/MFC-BJG-01/workers/OP-wkr-2');
     expect(await heading()).toHaveTextContent('휴게 중');
     await userEvent.click(screen.getByRole('button', { name: '휴게 끝' }));
     expect(await screen.findByText('휴게를 끝냈어요.')).toBeInTheDocument();
@@ -137,7 +137,7 @@ describe('작업자 상세', () => {
   });
 
   it('일일크루: 오늘 출근 등록(날짜는 보내지 않는다 — 서버가 오늘로) → 지금 배정 조건이 생긴다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/workers/OP-day-1');
+    const view = renderAt('/c/MFC-BJG-01/workers/OP-day-1');
     await heading();
     expect(screen.getByText('지금 받을 수 있는 작업이 없어요.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '오늘 출근 등록' }));
@@ -148,13 +148,13 @@ describe('작업자 상세', () => {
   });
 
   it('일일크루가 아니면 출근 등록 단추가 없다', async () => {
-    renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     await heading();
     expect(screen.queryByRole('button', { name: '오늘 출근 등록' })).not.toBeInTheDocument();
   });
 
   it('근무 등록은 한국 시간(+09:00)으로 보내고, 겹치면 SHIFT_OVERLAP 문구', async () => {
-    const view = renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    const view = renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     await heading();
     await waitFor(() => expect(screen.getAllByTestId('shift-row')).toHaveLength(1));
     const form = screen.getByRole('form', { name: '근무 등록' });
@@ -172,7 +172,7 @@ describe('작업자 상세', () => {
   });
 
   it('근무 휴게 구간(0.20.0): 둘 다 적어야 보내고(한쪽만이면 막음), 목록에 휴게 표시', async () => {
-    const view = renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    const view = renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     await heading();
     await waitFor(() => expect(screen.getAllByTestId('shift-row')).toHaveLength(1));
     const form = screen.getByRole('form', { name: '근무 등록' });
@@ -195,7 +195,7 @@ describe('작업자 상세', () => {
   });
 
   it('근무 밖 휴게 구간은 서버 400 — 등록되지 않음', async () => {
-    renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     await heading();
     const form = screen.getByRole('form', { name: '근무 등록' });
     fireEvent.change(within(form).getByLabelText('시작'), { target: { value: '2026-11-18T09:00' } });
@@ -208,7 +208,7 @@ describe('작업자 상세', () => {
   });
 
   it('근무 취소: 사유를 적어야 보내고, 목록에서 빠진다', async () => {
-    renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     await heading();
     const row = (await screen.findAllByTestId('shift-row'))[0]!;
     expect(within(row).getByRole('button', { name: '취소' })).toBeDisabled();
@@ -219,17 +219,17 @@ describe('작업자 상세', () => {
   });
 
   it('센터 관리자가 아니면 서버 403 — 권한 문구, 바뀌지 않음', async () => {
-    renderAt('/c/MFC-SEED-01/workers/OP-wkr-1', as.adminWithCenter);
+    renderAt('/c/MFC-BJG-01/workers/OP-wkr-1', as.adminWithCenter);
     await heading();
     const form = screen.getByRole('form', { name: '상태 바꾸기' });
     await userEvent.selectOptions(within(form).getByRole('combobox', { name: '상태' }), 'SUSPENDED');
     await userEvent.type(within(form).getByRole('textbox', { name: '상태 바꾸기 사유' }), '정지');
     await userEvent.click(within(form).getByRole('button', { name: '저장' }));
     expect(await screen.findByText('이 센터 권한이 없습니다.')).toBeInTheDocument();
-    expect(db.workers.get('MFC-SEED-01/OP-wkr-1')!.state).toBe('ACTIVE');
+    expect(db.workers.get('MFC-BJG-01/OP-wkr-1')!.state).toBe('ACTIVE');
   });
   it('맡은 일(업무)·할 수 있는 일(자격) 차이 안내와 지금 값, 저장 전 미리 경고(사용자 2026-11-16)', async () => {
-    renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     const guide = await screen.findByTestId('duty-qualification-guide');
     expect(guide).toHaveTextContent('실제 배정되는 일 = 맡은 일(업무) 중 할 수 있는 일(자격)');
     expect(guide).toHaveTextContent(/할 수 있는 일 .*적치/);
@@ -247,7 +247,7 @@ describe('작업자 상세', () => {
 
 describe('작업자 업무 내역(capacity 0.17.0)', () => {
   it('펼칠 때만 부르고, 시각 순 내역·종류별 합계(거절은 빨강), 날짜를 고르면 그 날로', async () => {
-    const view = renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    const view = renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     await heading();
     expect(view.gets('/activities')).toHaveLength(0);
     const box = screen.getByTestId('activities');
@@ -271,7 +271,7 @@ describe('작업자 업무 내역(capacity 0.17.0)', () => {
   });
 
   it('못 읽은 원장은 빈 내역으로 두지 않고 경고', async () => {
-    renderAt('/c/MFC-SEED-01/workers/OP-wkr-1');
+    renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     await heading();
     const box = screen.getByTestId('activities');
     const details = box.closest('details')!;
@@ -285,7 +285,7 @@ describe('작업자 업무 내역(capacity 0.17.0)', () => {
 
 describe('센터 휴게 번호(capacity 0.20.0)', () => {
   it('처음엔 미설정 → 두 번 같게 넣어야 정함(숫자 4자리만) → 번호는 다시 보이지 않고 "정해 둠"', async () => {
-    const view = renderAt('/c/MFC-SEED-01/workers');
+    const view = renderAt('/c/MFC-BJG-01/workers');
     const card = await screen.findByTestId('break-pin');
     expect(await within(card).findByText('아직 정하지 않았어요 — 작업자가 PDA 로 휴게를 켤 수 없어요.')).toBeInTheDocument();
     const pin = within(card).getByLabelText('새 번호(숫자 4자리)');
@@ -305,19 +305,19 @@ describe('센터 휴게 번호(capacity 0.20.0)', () => {
     const put = view.sent.find((r) => r.method === 'PUT' && new URL(r.url).pathname.endsWith('/break-pin'))!;
     expect(await sentBody(put)).toEqual({ pin: '1234' });
     expect(put.headers.get('Idempotency-Key')).toBeTruthy();
-    expect(db.breakPins.get('MFC-SEED-01')!.pin).toBe('1234');
+    expect(db.breakPins.get('MFC-BJG-01')!.pin).toBe('1234');
   });
 
   it('정해 둔 번호면 목록 위에 "관리자 번호 변경"만 — 누르면 입력 칸, "번호 바꾸기"로 바꾸면 다시 단추만, "닫기"로 접는다', async () => {
-    db.breakPins.set('MFC-SEED-01', { pin: '1111', updatedBy: 'OP-sup-1', updatedAt: '2026-11-19T00:00:00.000Z' });
-    renderAt('/c/MFC-SEED-01/workers');
+    db.breakPins.set('MFC-BJG-01', { pin: '1111', updatedBy: 'OP-sup-1', updatedAt: '2026-11-19T00:00:00.000Z' });
+    renderAt('/c/MFC-BJG-01/workers');
     await userEvent.click(await screen.findByRole('button', { name: '관리자 번호 변경' }));
     await userEvent.type(screen.getByLabelText('새 번호(숫자 4자리)'), '2468');
     await userEvent.type(screen.getByLabelText('한 번 더'), '2468');
     await userEvent.click(screen.getByRole('button', { name: '번호 바꾸기' }));
     expect(await screen.findByRole('button', { name: '관리자 번호 변경' })).toBeInTheDocument();
     expect(screen.queryByLabelText('새 번호(숫자 4자리)')).not.toBeInTheDocument();
-    expect(db.breakPins.get('MFC-SEED-01')!.pin).toBe('2468');
+    expect(db.breakPins.get('MFC-BJG-01')!.pin).toBe('2468');
     await userEvent.click(screen.getByRole('button', { name: '관리자 번호 변경' }));
     await userEvent.click(screen.getByRole('button', { name: '닫기' }));
     expect(screen.queryByLabelText('새 번호(숫자 4자리)')).not.toBeInTheDocument();
@@ -325,24 +325,24 @@ describe('센터 휴게 번호(capacity 0.20.0)', () => {
   });
 
   it('센터 관리자가 아니면 서버 403 — 정해지지 않음', async () => {
-    renderAt('/c/MFC-SEED-01/workers', as.adminWithCenter);
+    renderAt('/c/MFC-BJG-01/workers', as.adminWithCenter);
     const card = await screen.findByTestId('break-pin');
     await userEvent.type(within(card).getByLabelText('새 번호(숫자 4자리)'), '1234');
     await userEvent.type(within(card).getByLabelText('한 번 더'), '1234');
     await userEvent.click(within(card).getByRole('button', { name: '번호 정하기' }));
     expect(await within(card).findByText('이 센터 권한이 없습니다.')).toBeInTheDocument();
-    expect(db.breakPins.has('MFC-SEED-01')).toBe(false);
+    expect(db.breakPins.has('MFC-BJG-01')).toBe(false);
   });
 });
 
 describe('작업자 목록 쪽 넘김(사용자 2026-11-20)', () => {
   it('15명씩 — 위·아래 쪽 넘김, 다음 쪽, 거르기를 바꾸면 1쪽', async () => {
-    const base = db.workers.get('MFC-SEED-01/OP-wkr-1')!;
+    const base = db.workers.get('MFC-BJG-01/OP-wkr-1')!;
     for (let i = 1; i <= 17; i++) {
       const id = `OP-many-${String(i).padStart(2, '0')}`;
-      db.workers.set(`MFC-SEED-01/${id}`, { ...base, workerId: id, displayName: `작업자${i}` });
+      db.workers.set(`MFC-BJG-01/${id}`, { ...base, workerId: id, displayName: `작업자${i}` });
     }
-    renderAt('/c/MFC-SEED-01/workers');
+    renderAt('/c/MFC-BJG-01/workers');
     await waitFor(() => expect(screen.getAllByTestId('worker-row')).toHaveLength(15));
     const top = screen.getByTestId('worker-pager-top');
     const total = Number(/(\d+)명 중 1–15/.exec(top.textContent ?? '')?.[1]);

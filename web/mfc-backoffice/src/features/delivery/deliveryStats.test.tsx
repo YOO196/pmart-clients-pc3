@@ -14,7 +14,7 @@ const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' })
 const unavailable = () => HttpResponse.json({ status: 503, code: 'DEPENDENCY_UNAVAILABLE', type: 'about:blank' }, { status: 503, headers: { 'content-type': 'application/problem+json' } });
 const row = (date: string, riderId: string, x: Partial<Record<string, number | null>>) => ({
   date,
-  mfcId: 'MFC-SEED-01',
+  mfcId: 'MFC-BJG-01',
   riderId,
   assigned: 0,
   completed: 0,
@@ -31,12 +31,12 @@ const row = (date: string, riderId: string, x: Partial<Record<string, number | n
 
 describe('배송 통계', () => {
   it('배송 현황의 "배송 통계" 탭 — 이 센터(mfcId)·최근 7일로 두 원천을 묻는다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/deliveries');
+    const view = renderAt('/c/MFC-BJG-01/deliveries');
     await userEvent.click(await screen.findByRole('tab', { name: '배송 통계' }));
     await screen.findByTestId('tile-completion');
     for (const path of ['/delivery-metrics', '/metrics/dispatch']) {
       const q = new URL(view.gets(path).at(-1)!.url).searchParams;
-      expect(q.get('mfcId')).toBe('MFC-SEED-01');
+      expect(q.get('mfcId')).toBe('MFC-BJG-01');
       expect(q.get('to')).toBe(today());
       expect(q.get('from')).toBe(addDays(today(), -6));
     }
@@ -68,7 +68,7 @@ describe('배송 통계', () => {
       ),
       http.get(`${API_BASE}/metrics/dispatch`, () => HttpResponse.json({ from: d, to: d, rows: [], failureReasons: [] })),
     );
-    renderAt('/c/MFC-SEED-01/deliveries?view=stats');
+    renderAt('/c/MFC-BJG-01/deliveries?view=stats');
     // 완료 4 / (완료 4 + 실패 1) = 80%, 지연 1 / 판정 3, 픽업 대기 (300×3 + 900×1) ÷ 4 = 450초 = 8분
     expect(await screen.findByTestId('tile-completion')).toHaveTextContent('80%');
     expect(screen.getByTestId('tile-late')).toHaveTextContent('33.3%');
@@ -81,7 +81,7 @@ describe('배송 통계', () => {
 
   it('배송 통계 조회 실패는 0 이 아니라 실패 안내, 배차 통계만 실패하면 그 칸만', async () => {
     server.use(http.get(`${API_BASE}/delivery-metrics`, unavailable));
-    renderAt('/c/MFC-SEED-01/deliveries?view=stats');
+    renderAt('/c/MFC-BJG-01/deliveries?view=stats');
     const stats = await screen.findByTestId('delivery-stats');
     await waitFor(() => expect(within(stats).getAllByRole('alert').length).toBeGreaterThan(0));
     expect(screen.queryByTestId('tile-completion')).not.toBeInTheDocument();
@@ -90,7 +90,7 @@ describe('배송 통계', () => {
 
   it('배차 통계만 실패 — 배송 품질은 보이고 배차 칸에 안내', async () => {
     server.use(http.get(`${API_BASE}/metrics/dispatch`, unavailable));
-    renderAt('/c/MFC-SEED-01/deliveries?view=stats');
+    renderAt('/c/MFC-BJG-01/deliveries?view=stats');
     expect(await screen.findByTestId('tile-completion')).toBeInTheDocument();
     await waitFor(() => expect(within(screen.getByTestId('stats-dispatch')).getByRole('alert')).toHaveTextContent('배차 통계를 불러오지 못했어요'));
     await waitFor(() => expect(screen.getByTestId('tile-assign')).toHaveTextContent('조회 실패'));

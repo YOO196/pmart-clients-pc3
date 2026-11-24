@@ -15,19 +15,19 @@ const unavailable = () => HttpResponse.json({ status: 503, code: 'DEPENDENCY_UNA
 
 describe('센터 대시보드', () => {
   it('오늘 숫자 넷 — 피킹 줄·결품률(서버 분자/분모)·정시 배송률·끝나지 않은 작업', async () => {
-    const view = renderAt('/c/MFC-SEED-01/dashboard');
+    const view = renderAt('/c/MFC-BJG-01/dashboard');
     expect(await screen.findByTestId('kpi-picked-value', {}, { timeout: 5000 })).toHaveTextContent('40줄');
     expect(screen.getByTestId('kpi-short-rate-value')).toHaveTextContent('10.0%');
     expect(await screen.findByTestId('kpi-on-time-value')).toHaveTextContent('88.9%');
     expect(await screen.findByTestId('kpi-open-tasks-value')).toHaveTextContent(/^\d+건$/);
     const q = new URL(view.gets('/metrics/picking-lines')[0]!.url).searchParams;
-    expect(q.get('mfcId')).toBe('MFC-SEED-01');
+    expect(q.get('mfcId')).toBe('MFC-BJG-01');
     expect(q.get('to')).toBe(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()));
     expect(lastDays(q.get('to')!, 14)[0]).toBe(q.get('from'));
   });
 
   it('14일 막대 — 날짜마다 한 칸, 줄 없는 날은 정시율 "—"(0% 아님), 마우스를 올리면 말풍선', async () => {
-    renderAt('/c/MFC-SEED-01/dashboard');
+    renderAt('/c/MFC-BJG-01/dashboard');
     // B안: 추이 패널에서 정시율을 골라 본다
     await screen.findByTestId('chart-orders');
     await userEvent.click(screen.getByRole('button', { name: '정시율' }));
@@ -43,7 +43,7 @@ describe('센터 대시보드', () => {
   });
 
   it('결품 많은 상품 상위 5 — sort=shortLines·limit=5', async () => {
-    const view = renderAt('/c/MFC-SEED-01/dashboard');
+    const view = renderAt('/c/MFC-BJG-01/dashboard');
     await userEvent.click(await screen.findByRole('button', { name: '결품' }));
     const rows = await screen.findAllByTestId('top-short-row');
     expect(rows).toHaveLength(5);
@@ -54,23 +54,23 @@ describe('센터 대시보드', () => {
 
   it('원천 하나가 실패해도 나머지는 보이고, 실패한 칸은 0 이 아니라 "조회 실패"', async () => {
     server.use(http.get(`${API_BASE}/metrics/on-time-deliveries`, unavailable));
-    renderAt('/c/MFC-SEED-01/dashboard');
+    renderAt('/c/MFC-BJG-01/dashboard');
     expect(await screen.findByTestId('kpi-picked-value')).toHaveTextContent('40줄');
     await waitFor(() => expect(screen.getByTestId('kpi-on-time')).toHaveTextContent('조회 실패'));
     expect(screen.queryByTestId('kpi-on-time-value')).not.toBeInTheDocument();
   });
 
   it('우선 확인 칩 — 서버 값으로 센 급한 일, 누르면 그 화면으로', async () => {
-    renderAt('/c/MFC-SEED-01/dashboard');
+    renderAt('/c/MFC-BJG-01/dashboard');
     const bar = await screen.findByTestId('priority-bar');
     await waitFor(() => expect(within(bar).getByRole('link', { name: /출하 약속 초과/ })).toHaveTextContent('3건'));
     await waitFor(() => expect(within(bar).getByRole('link', { name: /배차 지연/ })).toHaveTextContent('2건'));
-    expect(within(bar).getByRole('link', { name: /배차 지연/ })).toHaveAttribute('href', '/c/MFC-SEED-01/dispatch-delays');
-    expect(within(bar).getByRole('link', { name: /막힌 작업/ })).toHaveAttribute('href', '/c/MFC-SEED-01/tasks?state=BLOCKED');
+    expect(within(bar).getByRole('link', { name: /배차 지연/ })).toHaveAttribute('href', '/c/MFC-BJG-01/dispatch-delays');
+    expect(within(bar).getByRole('link', { name: /막힌 작업/ })).toHaveAttribute('href', '/c/MFC-BJG-01/tasks?state=BLOCKED');
   });
 
   it('알림 피드 — 긴급(약속 초과·지난 배차 지연)이 먼저, 5줄까지 + 나머지 건수', async () => {
-    renderAt('/c/MFC-SEED-01/dashboard');
+    renderAt('/c/MFC-BJG-01/dashboard');
     await waitFor(() => expect(screen.getAllByTestId('alert-feed-row').length).toBe(5));
     const rows = screen.getAllByTestId('alert-feed-row');
     expect(rows[0]).toHaveTextContent('긴급');
@@ -80,7 +80,7 @@ describe('센터 대시보드', () => {
   });
 
   it('결품은 비율 선이 아니라 사유별 쌓은 막대(서버 shortLinesByReason) + 범례, 기간 결품률은 한 숫자', async () => {
-    renderAt('/c/MFC-SEED-01/dashboard');
+    renderAt('/c/MFC-BJG-01/dashboard');
     await screen.findByTestId('chart-orders');
     await userEvent.click(screen.getByRole('button', { name: '결품' }));
     const chart = await screen.findByTestId('chart-short');
@@ -93,19 +93,19 @@ describe('센터 대시보드', () => {
   });
 
   it('센터 도면 — 그 센터 도면에 작업자마다 마지막 스캔 칸(worker-positions) 점, 휴게는 휴게 역할', async () => {
-    const view = renderAt('/c/MFC-SEED-01/dashboard');
+    const view = renderAt('/c/MFC-BJG-01/dashboard');
     const map = await screen.findByTestId('floor-map');
-    expect(map).toHaveAttribute('data-center', 'MFC-SEED-01');
+    expect(map).toHaveAttribute('data-center', 'MFC-BJG-01');
     await waitFor(() => expect(within(map).getAllByTestId('floor-worker')).toHaveLength(3));
     expect(within(map).getAllByTestId('floor-worker').filter((d) => d.getAttribute('data-role') === 'break')).toHaveLength(1);
     expect(within(map).getByText('작업자 위치 = 마지막 스캔 칸')).toBeInTheDocument();
     expect(within(map).getByText('닫힘 2칸')).toBeInTheDocument();
-    expect(view.gets('/mfcs/MFC-SEED-01/worker-positions').length).toBeGreaterThan(0);
+    expect(view.gets('/mfcs/MFC-BJG-01/worker-positions').length).toBeGreaterThan(0);
   });
 
   it('작업자 위치 조회 실패는 0명이 아니라 "조회 실패"(범례 –)', async () => {
     server.use(http.get(`${API_BASE}/mfcs/:mfcId/worker-positions`, unavailable));
-    renderAt('/c/MFC-SEED-01/dashboard');
+    renderAt('/c/MFC-BJG-01/dashboard');
     const map = await screen.findByTestId('floor-map');
     expect(await within(map).findByTestId('floor-positions-failed', {}, { timeout: 5000 })).toHaveTextContent('작업자 위치 조회 실패');
     expect(within(map).getByTestId('floor-legend-pick')).toHaveTextContent('피킹 –');
@@ -113,37 +113,48 @@ describe('센터 대시보드', () => {
   });
 
   it('도면이 없는 센터는 다른 센터 도면으로 대신하지 않는다', async () => {
-    db.grants.set('OP-sup-1', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-SEED-01', 'MFC-NEW-99'] });
-    renderAt('/c/MFC-NEW-99/dashboard', mockOperatorToken({ sub: 'OP-sup-1', roles: ['MFC_SUPERVISOR'], centers: ['MFC-SEED-01', 'MFC-NEW-99'], exp: 4_000_000_000 }));
+    db.grants.set('OP-sup-1', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-BJG-01', 'MFC-NEW-99'] });
+    renderAt('/c/MFC-NEW-99/dashboard', mockOperatorToken({ sub: 'OP-sup-1', roles: ['MFC_SUPERVISOR'], centers: ['MFC-BJG-01', 'MFC-NEW-99'], exp: 4_000_000_000 }));
     expect(await screen.findByTestId('floor-none', {}, { timeout: 5000 })).toHaveTextContent('MFC-NEW-99 센터 도면이 아직 없어요');
   });
 
-  it('주문·매출(order 0.20.0 O-11) — 센터·칸 단위로 묻고, 요일×시간 열지도, 카테고리·상품 거르기(URL), 많이 팔린 상품을 누르면 그 상품 추이', async () => {
-    const view = renderAt('/c/MFC-SEED-01/dashboard');
+  it('주문·매출(order 0.20.0 O-11) — 센터·칸 단위로 묻고, 요일·시간 탭 열지도, 상품 비중 탭 원 그래프, 카테고리·상품 거르기(URL), 조각을 누르면 그 상품 추이', async () => {
+    const view = renderAt('/c/MFC-BJG-01/dashboard');
     const chart = await screen.findByTestId('chart-orders');
     expect(within(chart).getAllByTestId('chart-orders-col')).toHaveLength(14);
     const series = () => view.gets('/orders/metrics/series').map((r) => new URL(r.url).searchParams);
     await waitFor(() => expect(series().some((q) => q.get('bucket') === 'WEEKDAY_HOUR')).toBe(true));
     const day = series().find((q) => q.get('bucket') === 'DAY')!;
-    expect(day.get('mfcId')).toBe('MFC-SEED-01');
+    expect(day.get('mfcId')).toBe('MFC-BJG-01');
     expect(day.get('sku')).toBeNull();
+    // 요일·시간·많이 팔린 상품은 차트 아래가 아니라 탭에(2026-11-24)
+    expect(screen.queryByTestId('order-heat')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('order-share')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '요일·시간' }));
     const heat = await screen.findByTestId('order-heat');
+    expect(screen.queryByTestId('chart-orders')).not.toBeInTheDocument();
     expect(within(heat).getAllByTestId('order-heat-cell')).toHaveLength(7 * 24);
     expect(within(heat).getByTestId('order-heat-tip')).toHaveTextContent(/가장 많은 때 [월화수목금토일] \d+시/);
-    // 많이 팔린 상품 이름은 센터 재고(stocks)에서
-    await waitFor(() => expect(screen.getAllByTestId('top-sold-row')[0]).not.toHaveTextContent(/^SKU-/));
     // 카테고리 → 서버가 거른다(series·top-products 에 categoryId), 상품 목록도 그 카테고리만
     await userEvent.selectOptions(await screen.findByLabelText('카테고리'), 'DAIRY');
     await waitFor(() => expect(series().some((q) => q.get('categoryId') === 'DAIRY')).toBe(true));
     expect(view.gets('/orders/metrics/top-products').some((r) => new URL(r.url).searchParams.get('categoryId') === 'DAIRY')).toBe(true);
     await waitFor(() => expect(within(screen.getByLabelText('상품')).getAllByRole('option').map((o) => o.textContent).sort()).toEqual(['국산콩 두부 300g', '서울우유 1L', '전체 상품', '플레인 요거트 4입'].sort()));
-    // 많이 팔린 상품 누르면 그 상품(sku)만 — 판매 수량 추이
-    const rows = screen.getAllByTestId('top-sold-row');
-    await userEvent.click(rows[0]!);
+    // 상품 비중 — 원 그래프, 상품 이름은 센터 재고(stocks)에서, 비중 % 합이 100 가까이
+    await userEvent.click(screen.getByRole('button', { name: '상품 비중' }));
+    const share = await screen.findByTestId('order-share');
+    await waitFor(() => expect(within(share).getAllByTestId('top-sold-row')[0]).not.toHaveTextContent(/^SKU-/));
+    expect(within(share).getAllByTestId('order-share-slice').length).toBeGreaterThan(0);
+    const pcts = within(share).getAllByRole('button').map((b) => Number(/([\d.]+)%/.exec(b.textContent ?? '')?.[1] ?? 0));
+    expect(Math.abs(pcts.reduce((a, b) => a + b, 0) - 100)).toBeLessThan(0.6);
+    // 조각(범례 줄)을 누르면 그 상품(sku)만 — 주문 탭의 판매 수량 추이
+    await userEvent.click(within(share).getAllByTestId('top-sold-row')[0]!);
     await waitFor(() => expect(series().some((q) => q.get('sku') !== null && q.get('categoryId') === null)).toBe(true));
-    await waitFor(() => expect(screen.getAllByTestId('top-sold-row')[0]).toHaveAttribute('aria-pressed', 'true'));
     await userEvent.hover(within(await screen.findByTestId('chart-orders')).getAllByTestId('chart-orders-col').at(-2)!);
     expect(screen.getByTestId('chart-orders-tip')).toHaveTextContent(/판매 [\d,]+개/);
+    await userEvent.click(screen.getByRole('button', { name: '상품 비중' }));
+    await waitFor(() => expect(screen.getAllByTestId('top-sold-row').some((r) => r.getAttribute('aria-pressed') === 'true')).toBe(true));
+    await userEvent.click(screen.getByRole('button', { name: '주문' }));
     // 매출로 바꾸면 원 — 거른 동안은 그 상품 줄 금액(승인 금액은 서버가 null)
     await userEvent.click(screen.getByRole('button', { name: '매출' }));
     expect(screen.getByText('고른 상품 줄 금액만(할인 뺀 값)')).toBeInTheDocument();
@@ -168,7 +179,7 @@ describe('센터 대시보드', () => {
         });
       }),
     );
-    renderAt('/c/MFC-SEED-01/dashboard');
+    renderAt('/c/MFC-BJG-01/dashboard');
     const cols = within(await screen.findByTestId('chart-orders')).getAllByTestId('chart-orders-col');
     expect(cols).toHaveLength(14);
     await userEvent.hover(cols.at(-1)!);
@@ -185,7 +196,7 @@ describe('센터 대시보드', () => {
   });
 
   it('메뉴에 있고 누르면 대시보드', async () => {
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     await userEvent.click(await screen.findByRole('link', { name: '센터 대시보드' }));
     expect(await screen.findByRole('heading', { level: 1, name: '센터 대시보드' })).toBeInTheDocument();
   });

@@ -7,11 +7,11 @@ import { server } from './server';
 const token = (sub: string, roles: readonly string[], centers: readonly string[]) => mockOperatorToken({ sub, roles, centers, exp: 4_000_000_000 });
 
 export const as = {
-  sup: token('OP-sup-1', ['MFC_SUPERVISOR'], ['MFC-SEED-01']),
-  sup2: token('OP-sup-2', ['MFC_SUPERVISOR'], ['MFC-SEED-01', 'MFC-MOKPO-01']),
-  worker: token('OP-wkr-1', ['MFC_WORKER'], ['MFC-SEED-01']),
+  sup: token('OP-sup-1', ['MFC_SUPERVISOR'], ['MFC-BJG-01']),
+  sup2: token('OP-sup-2', ['MFC_SUPERVISOR'], ['MFC-BJG-01', 'MFC-MOKPO-01']),
+  worker: token('OP-wkr-1', ['MFC_WORKER'], ['MFC-BJG-01']),
   admin: token('OP-admin-1', ['OPERATOR_ADMIN'], []),
-  adminWithCenter: token('OP-admin-2', ['OPERATOR_ADMIN'], ['MFC-SEED-01']),
+  adminWithCenter: token('OP-admin-2', ['OPERATOR_ADMIN'], ['MFC-BJG-01']),
 };
 
 /** 화면 + 보낸 요청 기록(헤더·본문 확인용) */

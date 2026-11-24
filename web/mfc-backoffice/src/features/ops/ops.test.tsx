@@ -26,7 +26,7 @@ const task = (t: T) => ({
   taskType: t.taskType ?? 'PICK',
   state: t.state ?? 'IN_PROGRESS',
   version: 1,
-  mfcId: 'MFC-SEED-01',
+  mfcId: 'MFC-BJG-01',
   fulfillmentId: `FUL-${t.taskId}`,
   shipmentId: t.shipmentId === undefined ? `SHP-${t.taskId}` : t.shipmentId,
   orderNumber: t.orderNumber ?? null,
@@ -99,12 +99,12 @@ describe('센터 운영판', () => {
     standard();
     renderAt('/');
     expect(await screen.findByRole('heading', { name: '오늘 센터 현황' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '홈' })).toHaveAttribute('href', '/c/MFC-SEED-01/ops');
+    expect(screen.getByRole('link', { name: '홈' })).toHaveAttribute('href', '/c/MFC-BJG-01/ops');
   });
 
   it('내 할 일 숫자 칸: 출하 약속(서버 약속 시각) · 결품·파손(서버 지표) · 인계 확인 필요 — 작업 목록은 끝나지 않은 상태를 모두, 큰 쪽으로', async () => {
     standard();
-    const view = renderAt('/c/MFC-SEED-01/ops');
+    const view = renderAt('/c/MFC-BJG-01/ops');
     expect(await value('tile-overdue')).toHaveTextContent('1건');
     expect(await value('tile-due')).toHaveTextContent('1건');
     expect(screen.getByTestId('ops-rules')).toHaveTextContent('임박 = 약속 시각까지 15분 안');
@@ -117,14 +117,14 @@ describe('센터 운영판', () => {
     // 이상 N 한 줄(서버 숫자) — 약속 초과·인계 확인·파손 사고
     expect(await screen.findByTestId('ops-status')).toHaveTextContent('이상 3');
     const q = new URL(view.gets('/tasks')[0]!.url).searchParams;
-    expect([q.get('mfcId'), q.getAll('state'), q.get('size')]).toEqual(['MFC-SEED-01', ['WAITING', 'READY', 'ASSIGNED', 'IN_PROGRESS', 'BLOCKED'], '200']);
+    expect([q.get('mfcId'), q.getAll('state'), q.get('size')]).toEqual(['MFC-BJG-01', ['WAITING', 'READY', 'ASSIGNED', 'IN_PROGRESS', 'BLOCKED'], '200']);
     const m = new URL(view.gets('/metrics/picking-lines')[0]!.url).searchParams;
     expect(m.get('from')).toBe(m.get('to'));
   });
 
   it('숫자 칸을 누르면 같은 화면 예외 목록이 그 유형만 — 행은 상세 화면으로 이어진다', async () => {
     standard();
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     await waitFor(() => expect(rows().length).toBeGreaterThanOrEqual(4));
 
     // 출하 약속: 초과(30분 지남) → 임박(10분 남음), 작업 상세로
@@ -138,7 +138,7 @@ describe('센터 운영판', () => {
     expect(rows()[1]).toHaveTextContent('출하 약속 임박');
     expect(rows()[1]).toHaveTextContent('10분 남음');
     expect(rows()[1]).toHaveTextContent('정보 없음'); // 주문번호 없음
-    expect(within(rows()[0]!).getByRole('link', { name: '작업 상세 — 재배정·작업 풀기' })).toHaveAttribute('href', '/c/MFC-SEED-01/tasks/TASK-PICK-1');
+    expect(within(rows()[0]!).getByRole('link', { name: '작업 상세 — 재배정·작업 풀기' })).toHaveAttribute('href', '/c/MFC-BJG-01/tasks/TASK-PICK-1');
 
     // 결품·파손: 피킹 결품 보고로 열린 파손 사고만(직접 등록 사고 제외), 결품 건별 목록은 계약 없음 안내
     await userEvent.click(screen.getByTestId('tile-damaged'));
@@ -148,7 +148,7 @@ describe('센터 운영판', () => {
     // LOT 은 화면 번호(inventory lot-numbers) — 시스템 LOT ID 는 내지 않는다
     await waitFor(() => expect(rows()[0]).toHaveTextContent('L261107000497'));
     expect(rows()[0]).not.toHaveTextContent('LOT-MILK-A');
-    expect(within(rows()[0]!).getByRole('link', { name: '품질 사고 — 격리·폐기' })).toHaveAttribute('href', '/c/MFC-SEED-01/quality?tab=incidents&incidentId=QI-1');
+    expect(within(rows()[0]!).getByRole('link', { name: '품질 사고 — 격리·폐기' })).toHaveAttribute('href', '/c/MFC-BJG-01/quality?tab=incidents&incidentId=QI-1');
     expect(screen.getByText(/결품\(SHORT\) 건별 목록은 서버에 센터 조회가 없어/)).toBeInTheDocument();
 
     // 인계 확인: 확인 필요 포장 화면으로(확인 버튼은 그 화면)
@@ -157,7 +157,7 @@ describe('센터 운영판', () => {
     expect(rows()).toHaveLength(1);
     // 목록에는 화면 표기만(포장대 위치) — 포장 시스템 ID 는 내지 않는다(ADR-0070 덧붙임)
     expect(rows()[0]).not.toHaveTextContent('PKG-1');
-    expect(within(rows()[0]!).getByRole('link', { name: '확인 필요 포장 — 실물 확인' })).toHaveAttribute('href', '/c/MFC-SEED-01/tasks#handover-checks');
+    expect(within(rows()[0]!).getByRole('link', { name: '확인 필요 포장 — 실물 확인' })).toHaveAttribute('href', '/c/MFC-BJG-01/tasks#handover-checks');
     expect(screen.queryByRole('button', { name: '포장대에 있음' })).not.toBeInTheDocument();
 
     // 상세로 이동 — 작업 상세(작업 풀기는 그 화면)
@@ -169,7 +169,7 @@ describe('센터 운영판', () => {
 
   it('필터는 URL 에 — 주소로 바로 열어도 그 유형', async () => {
     standard();
-    renderAt('/c/MFC-SEED-01/ops?type=handover');
+    renderAt('/c/MFC-BJG-01/ops?type=handover');
     await waitFor(() => expect(rows()).toHaveLength(1));
     expect(rows()[0]!.dataset.group).toBe('handover');
     expect(screen.getByRole('button', { name: '인계 확인' })).toHaveAttribute('aria-pressed', 'true');
@@ -178,7 +178,7 @@ describe('센터 운영판', () => {
   it('작업이 많으면 끝까지 읽되 상한을 넘으면 "N건 이상" — 첫 쪽만 세지 않는다', async () => {
     const page = (n: number) => Array.from({ length: 3 }, (_, i) => task({ taskId: `T-${n}-${i}`, shipmentId: `S-${n}-${i}`, promisedReadyAt: at(-5) }));
     withTasks([page(0), page(1), page(2), page(3), page(4), page(5)]);
-    const view = renderAt('/c/MFC-SEED-01/ops');
+    const view = renderAt('/c/MFC-BJG-01/ops');
     expect(await value('tile-overdue')).toHaveTextContent('15건 이상');
     expect(view.gets('/tasks')).toHaveLength(5);
     expect(screen.getByText(/앞의 15건까지만 읽었어요/)).toBeInTheDocument();
@@ -187,7 +187,7 @@ describe('센터 운영판', () => {
   it('조회 실패는 0건이 아니다 — 실패한 원천만 "조회 실패", 나머지는 보인다', async () => {
     standard();
     server.use(http.get(`${API_BASE}/packages`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     const tile = screen.getByTestId('tile-handover');
     expect(await within(tile).findByText('조회 실패')).toBeInTheDocument();
     expect(within(tile).queryByText('0건')).not.toBeInTheDocument();
@@ -203,7 +203,7 @@ describe('센터 운영판', () => {
       http.get(`${API_BASE}/quality-incidents`, () => HttpResponse.json({ items: [], nextCursor: null })),
       http.get(`${API_BASE}/metrics/picking-lines`, () => HttpResponse.json({ items: [], asOf: NOW })),
     );
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     expect(await value('tile-overdue')).toHaveTextContent('0건');
     expect(await value('tile-due')).toHaveTextContent('0건');
     expect(await value('tile-short')).toHaveTextContent('0줄');
@@ -215,7 +215,7 @@ describe('센터 운영판', () => {
 
   it('센터를 바꾸면 이전 센터 예외가 잠깐도 남지 않는다', async () => {
     standard();
-    renderAt('/c/MFC-SEED-01/ops', as.sup2);
+    renderAt('/c/MFC-BJG-01/ops', as.sup2);
     await waitFor(() => expect(rows().length).toBeGreaterThan(0));
     // 목포는 늦게 온다 — 오는 동안 부산진 값이 보이면 안 된다.
     server.use(
@@ -232,7 +232,7 @@ describe('센터 운영판', () => {
   });
 
   it('권한: 작업자 전용 계정은 막고, 맡지 않은 센터는 운영판을 부르지 않는다', async () => {
-    renderAt('/c/MFC-SEED-01/ops', as.worker);
+    renderAt('/c/MFC-BJG-01/ops', as.worker);
     expect(await screen.findByRole('alert')).toHaveTextContent(/PDA/);
     const view = renderAt('/c/MFC-SEJ-01/ops');
     expect(await screen.findAllByText(/이 센터 권한이 없습니다/)).not.toHaveLength(0);
@@ -243,7 +243,7 @@ describe('센터 운영판', () => {
 describe('홈 보탬 — 작업 흐름·작업자 지금·최근 본 것, 메뉴 배지, 단축키 안내', () => {
   it('작업 흐름: 유형별 단계 수(서버 목록), 먼저 확인, 누르면 작업 현황이 그 조건으로', async () => {
     standard();
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     const board = await screen.findByTestId('flow-board');
     await waitFor(() => expect(within(board).getByTestId('flow-PICK-doing')).toHaveTextContent(/^3$/));
     expect(within(board).getByTestId('flow-PICK-wait')).toHaveTextContent(/^1$/);
@@ -251,19 +251,19 @@ describe('홈 보탬 — 작업 흐름·작업자 지금·최근 본 것, 메뉴
     expect(within(board).getByTestId('flow-RETURN-doing')).toHaveTextContent(/^1$/);
     expect(within(board).getByTestId('flow-first-unassigned')).toHaveTextContent(/1$/);
     expect(within(board).getByTestId('flow-first-blocked')).toHaveTextContent(/0$/);
-    expect(within(board).getByTestId('flow-PICK-wait')).toHaveAttribute('href', '/c/MFC-SEED-01/tasks?type=PICK&state=READY');
+    expect(within(board).getByTestId('flow-PICK-wait')).toHaveAttribute('href', '/c/MFC-BJG-01/tasks?type=PICK&state=READY');
   });
 
   it('쪽 상한에 걸려 다 못 읽었으면 단계 수는 "N+"', async () => {
     withTasks(Array.from({ length: 6 }, (_, p) => [task({ taskId: `T-${p}`, shipmentId: null })]));
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     const board = await screen.findByTestId('flow-board');
     await waitFor(() => expect(within(board).getByTestId('flow-PICK-doing')).toHaveTextContent(/^5\+$/));
   });
 
   it('작업자 지금: 재직 작업자마다 맡은 작업 수, 쉬지 않는데 맡은 일 없으면 표시', async () => {
     standard();
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     const box = await screen.findByTestId('worker-load');
     await waitFor(() => expect(within(box).getAllByTestId('worker-load-row')).toHaveLength(3));
     const row = (name: string) => within(box).getAllByTestId('worker-load-row').find((r) => r.textContent?.includes(name))!;
@@ -275,7 +275,7 @@ describe('홈 보탬 — 작업 흐름·작업자 지금·최근 본 것, 메뉴
 
   it('작업 목록을 못 읽으면 "맡은 일 없음"이라 하지 않는다', async () => {
     server.use(http.get(`${API_BASE}/tasks`, () => HttpResponse.json({ status: 503, code: 'DEPENDENCY_UNAVAILABLE', type: 'about:blank' }, { status: 503, headers: { 'content-type': 'application/problem+json' } })));
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     const box = await screen.findByTestId('worker-load');
     await waitFor(() => expect(within(box).getAllByTestId('worker-load-row')[0]).toHaveTextContent('맡은 작업 모름'));
     expect(within(box).queryByTestId('worker-free')).not.toBeInTheDocument();
@@ -283,7 +283,7 @@ describe('홈 보탬 — 작업 흐름·작업자 지금·최근 본 것, 메뉴
 
   it('최근 본 것: 상세를 열면 이 센터 홈에 화면 표기로 남는다(시스템 ID 없이)', async () => {
     standard();
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     expect(await screen.findByTestId('recent-panel')).toHaveTextContent('최근 연 상세가 없어요');
     await waitFor(() => expect(rows().length).toBeGreaterThan(0));
     await userEvent.click(within(rows()[0]!).getByRole('link'));
@@ -296,7 +296,7 @@ describe('홈 보탬 — 작업 흐름·작업자 지금·최근 본 것, 메뉴
 
   it('메뉴 "작업 현황" 옆 늦음·막힘 수, "?" 로 단축키 안내', async () => {
     withTasks([[{ ...task({ taskId: 'L-1' }), late: true }, task({ taskId: 'B-1', state: 'BLOCKED' }), task({ taskId: 'N-1' })]]);
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     expect(await screen.findByTestId('menu-alert-tasks')).toHaveTextContent(/^2$/);
     await userEvent.keyboard('?');
     expect(await screen.findByTestId('shortcut-help')).toHaveTextContent('이전 건·다음 건');

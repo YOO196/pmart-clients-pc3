@@ -16,7 +16,7 @@ const heading = () => screen.findByRole('heading', { level: 1 });
 
 describe('입고 작업 목록', () => {
   it('화면 기본은 대기(state=READY 를 보낸다), "전체"는 state 없이', async () => {
-    const view = renderAt('/c/MFC-SEED-01/inbound');
+    const view = renderAt('/c/MFC-BJG-01/inbound');
     await waitFor(() => expect(rows()).toHaveLength(3));
     expect(new URL(view.gets('/inbound-tasks')[0]!.url).searchParams.get('state')).toBe('READY');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'ALL');
@@ -26,20 +26,20 @@ describe('입고 작업 목록', () => {
 
   it('조회 실패는 빈 목록이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/inbound-tasks`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-SEED-01/inbound');
+    renderAt('/c/MFC-BJG-01/inbound');
     await waitFor(() => expect(document.querySelector('[data-state="error"]')).not.toBeNull());
     expect(screen.queryByText('조건에 맞는 입고 작업이 없어요.')).not.toBeInTheDocument();
   });
 
   it('입고 예정(TRF) 탭은 계약만 있다는 안내', async () => {
-    renderAt('/c/MFC-SEED-01/inbound?tab=promises');
+    renderAt('/c/MFC-BJG-01/inbound?tab=promises');
     expect(await screen.findByRole('note')).toHaveTextContent('501');
   });
 });
 
 describe('품질검사·적치', () => {
   it('품질검사: 결과를 여러 줄(정상 LOT·격리)로 보내고, 반영되면 만든 적치 작업을 알린다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/inbound/tasks/ITK-1');
+    const view = renderAt('/c/MFC-BJG-01/inbound/tasks/ITK-1');
     await heading();
     const form = screen.getByRole('form', { name: '품질검사 결과' });
     const row1 = within(form).getByRole('group', { name: '1번째 결과' });
@@ -62,7 +62,7 @@ describe('품질검사·적치', () => {
   });
 
   it('합계가 남은 수량보다 많으면 보내지 않는다', async () => {
-    renderAt('/c/MFC-SEED-01/inbound/tasks/ITK-1');
+    renderAt('/c/MFC-BJG-01/inbound/tasks/ITK-1');
     await heading();
     const form = screen.getByRole('form', { name: '품질검사 결과' });
     await userEvent.type(within(form).getByRole('spinbutton'), '7');
@@ -71,7 +71,7 @@ describe('품질검사·적치', () => {
   });
 
   it('담당이 따로 있으면 서버가 NOT_ASSIGNEE 로 거절', async () => {
-    renderAt('/c/MFC-SEED-01/inbound/tasks/ITK-2');
+    renderAt('/c/MFC-BJG-01/inbound/tasks/ITK-2');
     await heading();
     // 담당 안내에 운영자 ID 를 내지 않는다(ADR-0070 — 담당은 위 칸에 이름 · 사번)
     expect(screen.getByText(/^담당만 실행할 수 있어요/)).toBeInTheDocument();
@@ -82,7 +82,7 @@ describe('품질검사·적치', () => {
   });
 
   it('적치: 재고가 거절(REJECTED)하면 사유를 보이고 잔량은 그대로', async () => {
-    renderAt('/c/MFC-SEED-01/inbound/tasks/ITK-3');
+    renderAt('/c/MFC-BJG-01/inbound/tasks/ITK-3');
     await heading();
     const form = screen.getByRole('form', { name: '적치' });
     await userEvent.type(within(form).getByRole('textbox', { name: '적치할 선반 위치' }), 'RCV-C-01');
@@ -92,7 +92,7 @@ describe('품질검사·적치', () => {
   });
 
   it('적치: 후보에서 고른 선반으로 남은 수량을 다 놓으면 끝남', async () => {
-    const view = renderAt('/c/MFC-SEED-01/inbound/tasks/ITK-3');
+    const view = renderAt('/c/MFC-BJG-01/inbound/tasks/ITK-3');
     await heading();
     const form = screen.getByRole('form', { name: '적치' });
     expect(within(form).getByRole('spinbutton')).toHaveValue(3);
@@ -115,7 +115,7 @@ describe('품질검사·적치', () => {
         return undefined;
       }),
     );
-    const view = renderAt('/c/MFC-SEED-01/inbound/tasks/ITK-3');
+    const view = renderAt('/c/MFC-BJG-01/inbound/tasks/ITK-3');
     await heading();
     const form = screen.getByRole('form', { name: '적치' });
     await userEvent.type(within(form).getByRole('textbox', { name: '적치할 선반 위치' }), 'C-S1-03-2-04');
@@ -131,7 +131,7 @@ describe('품질검사·적치', () => {
 
 describe('초기 보유·회수품·공급 요청', () => {
   it('초기 보유: 승인 ID 로 찾고, 이 센터 것만 받는다 — 접수 뒤 상태를 다시 읽어 보인다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/inbound?tab=initial');
+    const view = renderAt('/c/MFC-BJG-01/inbound?tab=initial');
     await userEvent.type(await screen.findByRole('textbox', { name: '승인 ID' }), 'AP-INIT-1');
     await userEvent.click(within(screen.getByRole('form', { name: '승인 ID' })).getByRole('button', { name: '열기' }));
     const cards = await screen.findAllByTestId('initial-load');
@@ -152,7 +152,7 @@ describe('초기 보유·회수품·공급 요청', () => {
   });
 
   it('회수품 반입 → 반입 ID 로 상태(반영·검수 대기)를 연다', async () => {
-    renderAt('/c/MFC-SEED-01/inbound?tab=returns');
+    renderAt('/c/MFC-BJG-01/inbound?tab=returns');
     const form = await screen.findByRole('form', { name: '반입 등록' });
     await userEvent.type(within(form).getByRole('textbox', { name: '클레임 ID' }), 'CLM-1');
     await userEvent.type(within(form).getByRole('textbox', { name: '회수 ID(배송)' }), 'RPU-1');
@@ -166,7 +166,7 @@ describe('초기 보유·회수품·공급 요청', () => {
   });
 
   it('공급 요청 → 요청 화면(제출됨) → 철회', async () => {
-    const view = renderAt('/c/MFC-SEED-01/inbound?tab=supply');
+    const view = renderAt('/c/MFC-BJG-01/inbound?tab=supply');
     const form = await screen.findByRole('form', { name: '공급 요청' });
     fireEvent.change(within(form).getByLabelText('희망 사용준비 시각(한국)'), { target: { value: '2026-11-18T09:00' } });
     await userEvent.type(within(form).getByRole('textbox', { name: '사유' }), '주말 수요');
@@ -176,7 +176,7 @@ describe('초기 보유·회수품·공급 요청', () => {
     const card = await screen.findByTestId('supply-request');
     expect(card).toHaveTextContent('제출됨');
     expect(await sentBody(postsTo(view.sent, '/supply-requests')[0]!)).toEqual({
-      mfcId: 'MFC-SEED-01',
+      mfcId: 'MFC-BJG-01',
       requestedReadyAt: '2026-11-18T09:00:00+09:00',
       urgency: 'NORMAL',
       reason: '주말 수요',

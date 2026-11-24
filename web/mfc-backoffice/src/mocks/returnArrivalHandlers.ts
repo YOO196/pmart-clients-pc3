@@ -12,7 +12,7 @@ type ReturnArrival = components['schemas']['ReturnArrival'];
 const arrivals: ReturnArrival[] = [
   {
     arrivalId: 'DLV-RET-0',
-    mfcId: 'MFC-SEED-01',
+    mfcId: 'MFC-BJG-01',
     purpose: 'CLAIM_RETURN',
     claimId: 'CLM-1',
     caseId: null,
@@ -29,7 +29,7 @@ const arrivals: ReturnArrival[] = [
   },
   {
     arrivalId: 'DLV-RET-3',
-    mfcId: 'MFC-SEED-01',
+    mfcId: 'MFC-BJG-01',
     purpose: 'MISDELIVERY_RECOVERY',
     claimId: null,
     caseId: 'CASE-MD-1',

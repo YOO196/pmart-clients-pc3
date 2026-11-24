@@ -23,7 +23,7 @@ import { useDispatchDelays } from '../delivery/DispatchDelayPage';
 import { useOps } from '../ops/OpsBoard';
 import { OPS_REFRESH_MS } from '../ops/opsQueries';
 import { minutesText, promiseRows, seoulToday } from '../ops/opsRules';
-import { AreaChart, BarList, Heatmap, type Column, type StackSeries } from './charts';
+import { AreaChart, BarList, Heatmap, PieChart, type Column, type PieSlice, type StackSeries } from './charts';
 import { seriesKey, useOrderTrend, type OrderFilter } from './orderQueries';
 import { FloorMap } from './FloorMap';
 import { env } from '../../env';
@@ -141,14 +141,21 @@ export function DashboardMenu({ mfcId }: { readonly mfcId: string }) {
   return <Dashboard key={mfcId} mfcId={mfcId} />;
 }
 
-type ChartKind = 'orders' | 'sales' | 'picked' | 'shortRate' | 'onTime';
-const KINDS: readonly ChartKind[] = ['orders', 'sales', 'picked', 'shortRate', 'onTime'];
+// 요일·시간(열지도)·상품 비중(원 그래프)도 탭으로(2026-11-24 사용자 "표 옵션에 넣어 줘, 아래에 넣지 말고")
+type ChartKind = 'orders' | 'sales' | 'heat' | 'share' | 'picked' | 'shortRate' | 'onTime';
+const KINDS: readonly ChartKind[] = ['orders', 'sales', 'heat', 'share', 'picked', 'shortRate', 'onTime'];
 
 function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const { nowMs, today, days, picking, onTime, workers, live, ops, delays } = useDashboard(mfcId);
   const { tasks, damages, handovers } = ops;
   // 주문·매출(order 0.20.0 O-11)이 기본
   const [chart, setChart] = useState<ChartKind>('orders');
+  // 요일·시간·상품 비중을 무엇으로 볼까 — 주문(수·수량) 또는 매출. 주문·매출 탭을 고르면 따라간다
+  const [metric, setMetric] = useState<'orders' | 'sales'>('orders');
+  const pickKind = (k: ChartKind) => {
+    setChart(k);
+    if (k === 'orders' || k === 'sales') setMetric(k);
+  };
 
   // 추이 기간·칸 단위 — URL(?from=&to=&unit=), 맞지 않으면 기본 14일·일. 바꿀 때마다 앞 상태를 쌓아 Ctrl+Z 로 되돌린다
   const [params, setParams] = useSearchParams();
@@ -259,7 +266,8 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
       },
       { replace: true },
     );
-  const ordersView = chart === 'orders' || chart === 'sales';
+  const ordersView = chart === 'orders' || chart === 'sales' || chart === 'heat' || chart === 'share';
+  const salesView = chart === 'sales' || ((chart === 'heat' || chart === 'share') && metric === 'sales');
   const orderQ = useOrderTrend(mfcId, range, unit, orderFilter, ordersView);
   const filtered = !!(orderFilter.sku || orderFilter.categoryId);
   const nameOf = (s: string) => orderQ.names.data?.get(s) ?? s;
@@ -294,14 +302,22 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
       if (!x.weekday || x.hour === null || x.hour === undefined) continue;
       const days = x.days ?? 0;
       const per = (n: number) => (days > 0 ? n / days : 0);
-      const v = chart === 'sales' ? (filtered ? (x.avgLineAmount ?? 0) : per(x.approvedAmount ?? 0)) : sku ? per(x.qty) : (x.avgOrderCount ?? 0);
+      const v = salesView ? (filtered ? (x.avgLineAmount ?? 0) : per(x.approvedAmount ?? 0)) : sku ? per(x.qty) : (x.avgOrderCount ?? 0);
       cells[x.weekday - 1]![x.hour] = Math.round(v);
     }
     return cells;
   })();
-  // 많이 팔린 상품 — 매출은 서버 순서(금액), 주문은 수량 순
-  const topSold = (chart === 'sales' ? topRows : [...topRows].sort((a, b) => b.qty - a.qty)).slice(0, 5);
   const won = (v: number) => (v >= 10_000 ? `${Math.round(v / 10_000).toLocaleString('ko-KR')}만원` : `${v.toLocaleString('ko-KR')}원`);
+  // 많이 팔린 상품 비중(원 그래프) — 매출은 서버 순서(금액), 주문은 수량 순. 상위 5 + 그 밖(서버 상위 목록 안에서)
+  const ranked = salesView ? topRows : [...topRows].sort((a, b) => b.qty - a.qty);
+  const valueOf = (x: (typeof topRows)[number]) => (salesView ? x.amount : x.qty);
+  const rest = ranked.slice(5);
+  const shareSlices: PieSlice[] = [
+    ...ranked.slice(0, 5).map((x) => ({ key: x.sku, label: nameOf(x.sku), value: valueOf(x), sub: `${x.qty.toLocaleString('ko-KR')}개 · ${won(x.amount)}`, pickable: true })),
+    ...(rest.length > 0
+      ? [{ key: '__other', label: m.chart.shareOther(rest.length), value: rest.reduce((n, x) => n + valueOf(x), 0), sub: `${rest.reduce((n, x) => n + x.qty, 0).toLocaleString('ko-KR')}개 · ${won(rest.reduce((n, x) => n + x.amount, 0))}`, pickable: false }]
+      : []),
+  ].filter((x) => x.value > 0);
 
   const onTimeCols: Column[] = sums.map(({ b, t }) => {
     const v = rate(t.onTime, t.due);
@@ -473,25 +489,30 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           sub={
             chart === 'onTime'
               ? m.chart.onTimeNote
-              : ordersView
+              : chart === 'heat'
+                ? m.chart.heatSub
+                : chart === 'share'
+                  ? m.chart.shareSub(spanDays(orderQ.tr), topRows.length)
+                  : ordersView
                 ? m.chart.ordersSub
                 : chart === 'shortRate'
                   ? m.chart.shortSub(rateText(rate(periodShort.s, periodShort.p)))
                   : m.chart.pickSub
           }
           {...(chart === 'onTime' ? { help: m.chart.onTimeHelp } : {})}
-          q={chart === 'onTime' ? trend.onTime : ordersView ? orderQ.series : trend.picking}
+          q={chart === 'onTime' ? trend.onTime : chart === 'heat' ? orderQ.heat : chart === 'share' ? orderQ.top : ordersView ? orderQ.series : trend.picking}
           toolbar={
-            <RangeBar range={range} unit={unit} units={allowed} hourOk={hourOk} today={today} canBack={wider !== null} onChange={applyRange} onBack={widen} />
-          }
-          aside={
-            <div className="pm-seg" role="group" aria-label={m.chart.pickToggle}>
+            <>
+              {/* 볼 것 고르기 — 7개라 제목 옆이 아니라 제목 아래 줄(제목이 잘리지 않게) */}
+              <div className="pm-seg mb-2 flex-wrap" role="group" aria-label={m.chart.pickToggle}>
               {KINDS.map((k) => (
-                <button key={k} type="button" aria-pressed={chart === k} onClick={() => setChart(k)}>
+                <button key={k} type="button" aria-pressed={chart === k} onClick={() => pickKind(k)}>
                   {
                     {
                       orders: m.chart.ordersShort,
                       sales: m.chart.salesShort,
+                      heat: m.chart.heatShort,
+                      share: m.chart.shareShort,
                       picked: m.chart.pickedShort,
                       shortRate: m.chart.shortRateShort,
                       onTime: m.chart.onTimeShort,
@@ -499,7 +520,9 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
                   }
                 </button>
               ))}
-            </div>
+              </div>
+              <RangeBar range={range} unit={unit} units={allowed} hourOk={hourOk} today={today} canBack={wider !== null} onChange={applyRange} onBack={widen} />
+            </>
           }
         >
           {/* key 에 기간 — 기간이 바뀌면 새로 그려 가로축에서 다시 차오른다 */}
@@ -520,6 +543,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
                     </option>
                   ))}
                 </select>
+                {chart !== 'share' && (
                 <select className="select select-xs w-auto max-w-[11rem]" aria-label={m.chart.product} value={sku ?? ''} onChange={(e) => setFilter({ sku: e.target.value || null })}>
                   <option value="">{m.chart.allProducts}</option>
                   {sku && !picked && <option value={sku}>{nameOf(sku)}</option>}
@@ -529,8 +553,59 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
                     </option>
                   ))}
                 </select>
-                {filtered && chart === 'sales' && <span className="text-xs text-base-content/55">{m.chart.lineAmountNote}</span>}
+                )}
+                {(chart === 'heat' || chart === 'share') && (
+                  <div className="pm-seg ml-auto" role="group" aria-label={m.chart.metric}>
+                    <button type="button" aria-pressed={metric === 'orders'} onClick={() => setMetric('orders')}>
+                      {chart === 'share' || sku ? m.chart.metricQty : m.chart.metricOrders}
+                    </button>
+                    <button type="button" aria-pressed={metric === 'sales'} onClick={() => setMetric('sales')}>
+                      {m.chart.metricSales}
+                    </button>
+                  </div>
+                )}
+                {filtered && salesView && <span className="text-xs text-base-content/55">{m.chart.lineAmountNote}</span>}
               </div>
+              {chart === 'heat' ? (
+                orderQ.heat.isError ? (
+                  <p role="alert" className="text-sm font-semibold text-error">
+                    {m.chart.heatFailed}
+                  </p>
+                ) : heat ? (
+                  <Heatmap
+                    title={m.chart.heatTitle(salesView ? m.chart.salesShort : sku ? m.chart.qtyShort : m.chart.ordersShort)}
+                    cells={heat}
+                    format={(v) => (salesView ? won(v) : m.count(v))}
+                    testId="order-heat"
+                  />
+                ) : (
+                  <p className="text-sm text-base-content/40">…</p>
+                )
+              ) : chart === 'share' ? (
+                orderQ.top.isError ? (
+                  <p role="alert" className="text-sm font-semibold text-error">
+                    {m.failed}
+                  </p>
+                ) : orderQ.top.isPending ? (
+                  <p className="text-sm text-base-content/40">…</p>
+                ) : shareSlices.length === 0 ? (
+                  <p className="text-sm text-base-content/55">{m.chart.noSales}</p>
+                ) : (
+                  // key — 기간·기준·카테고리가 바뀌면 다시 펼친다
+                  <PieChart
+                    key={`${salesView}-${orderQ.tr.from}-${orderQ.tr.to}-${cat ?? ''}`}
+                    title={m.chart.shareTitle(salesView ? m.chart.metricSales : m.chart.metricQty)}
+                    slices={shareSlices}
+                    picked={sku}
+                    onPick={(k) => {
+                      // 누르면 그 상품 추이(주문 = 판매 수량, 매출 = 줄 금액)
+                      setFilter({ sku: k });
+                      pickKind(salesView ? 'sales' : 'orders');
+                    }}
+                    testId="order-share"
+                  />
+                )
+              ) : (
               <AreaChart
                 key={`${chart}-${range.from}-${range.to}-${unit}-${cat ?? ''}-${sku ?? ''}`}
                 title={chart === 'sales' ? m.chart.sales(span) : sku ? m.chart.qty(span) : m.chart.orders(span)}
@@ -539,6 +614,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
                 testId={chart === 'sales' ? 'chart-sales' : 'chart-orders'}
                 onRange={zoom}
               />
+              )}
             </>
           ) : chart === 'onTime' ? (
             <AreaChart key={`o-${range.from}-${range.to}-${unit}`} title={m.chart.onTime(span)} columns={onTimeCols} format={(v) => rateText(v)} testId="chart-on-time" fixedMax={1} onRange={zoom} />
@@ -555,59 +631,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
               stack={{ series: reasonSeries, values: reasonVals }}
             />
           )}
-          {ordersView ? (
-            <div className="mt-4 space-y-4 border-t border-base-300 pt-3">
-              {orderQ.heat.isError ? (
-                <p role="alert" className="text-sm font-semibold text-error">
-                  {m.chart.heatFailed}
-                </p>
-              ) : heat ? (
-                <Heatmap
-                  title={m.chart.heatTitle(chart === 'sales' ? m.chart.salesShort : sku ? m.chart.qtyShort : m.chart.ordersShort)}
-                  cells={heat}
-                  format={(v) => (chart === 'sales' ? won(v) : m.count(v))}
-                  testId="order-heat"
-                />
-              ) : (
-                <p className="text-sm text-base-content/40">…</p>
-              )}
-              <div>
-                <p className="mb-1.5 flex items-baseline justify-between text-xs">
-                  <span className="font-semibold text-base-content/80">{m.chart.topSold(spanDays(orderQ.tr))}</span>
-                  <span className="text-base-content/45">{m.chart.topSoldHint}</span>
-                </p>
-                {orderQ.top.isError ? (
-                  <p role="alert" className="text-sm font-semibold text-error">
-                    {m.failed}
-                  </p>
-                ) : orderQ.top.isPending ? (
-                  <p className="text-sm text-base-content/40">…</p>
-                ) : topSold.length === 0 ? (
-                  <p className="text-sm text-base-content/55">{m.chart.noSales}</p>
-                ) : (
-                  <ul className="space-y-1" data-testid="top-sold">
-                    {topSold.map((x) => (
-                      <li key={x.sku}>
-                        <button
-                          type="button"
-                          className={`grid w-full grid-cols-[1fr_auto] items-center gap-2 rounded-field px-1.5 py-0.5 text-left text-sm transition-colors hover:bg-primary/8 ${sku === x.sku ? 'bg-primary/12' : ''}`}
-                          aria-pressed={sku === x.sku}
-                          title={x.categoryName ?? undefined}
-                          onClick={() => setFilter({ sku: sku === x.sku ? null : x.sku })}
-                          data-testid="top-sold-row"
-                        >
-                          <span className="truncate">{nameOf(x.sku)}</span>
-                          <span className="pm-mono text-xs text-base-content/70">
-                            {x.qty.toLocaleString('ko-KR')}개 · {won(x.amount)}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          ) : (
+          {!ordersView && (
           <SubList title={m.chart.topShort(spanDays(skuRangeOf(range)))} q={trend.bySku} link={{ to: centerPath(mfcId, 'inventory'), text: m.toInventory }}>
             {(trend.bySku.data?.items ?? []).length === 0 ? (
               <p className="text-sm text-base-content/55">{m.noShort}</p>

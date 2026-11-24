@@ -8,16 +8,16 @@ const sejong = DEMO_OTHERS.find((c) => c.id === 'MFC-SEJ-01')!;
 
 describe('다른 센터 시연 기록', () => {
   it('시험에서는 부산진구만 데이터가 있다(브라우저 목에서만 켬)', () => {
-    expect(hasDemoData('MFC-SEED-01')).toBe(true);
+    expect(hasDemoData('MFC-BJG-01')).toBe(true);
     expect(hasDemoData('MFC-SEJ-01')).toBe(false);
-    expect(scaled(10, 'MFC-SEED-01')).toBe(10);
+    expect(scaled(10, 'MFC-BJG-01')).toBe(10);
     expect(scaled(10, 'MFC-SEJ-01')).toBe(13);
   });
 
   it('센터·기록 ID·작업자·선반 칸을 그 센터 것으로 바꾸고, 상품·LOT·라이더는 그대로', () => {
     const task = {
       taskId: 'TASK-1',
-      mfcId: 'MFC-SEED-01',
+      mfcId: 'MFC-BJG-01',
       sku: 'SKU-MILK-1',
       lotId: 'LOT-MILK-A',
       riderId: 'RD-7',
@@ -42,6 +42,6 @@ describe('다른 센터 시연 기록', () => {
     // 같은 사람·칸은 늘 같은 것으로
     expect(cloneForCenter(task, sejong)).toEqual(out);
     // 원본은 그대로
-    expect(task.mfcId).toBe('MFC-SEED-01');
+    expect(task.mfcId).toBe('MFC-BJG-01');
   });
 });

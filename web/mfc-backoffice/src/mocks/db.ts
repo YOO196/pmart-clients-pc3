@@ -21,7 +21,7 @@ function seedDecisions(): Array<[string, MockDecision]> {
       'QD-1',
       {
         qualityDecisionId: 'QD-1',
-        mfcId: 'MFC-SEED-01',
+        mfcId: 'MFC-BJG-01',
         decisionType: 'RELEASE',
         decidedBy: 'OP-wkr-1',
         reason: 'INSPECTION_PASS',
@@ -52,8 +52,8 @@ function seedDisposals(): Array<[string, MockDisposal]> {
     remainingQty: approved - executed,
   });
   return [
-    ['DSP-1', { disposalApprovalId: 'DSP-1', mfcId: 'MFC-SEED-01', version: 1, state: 'REQUESTED', requesterId: 'OP-wkr-1', approverId: null, approvalRef: null, sourceRef: 'QD-0', lines: [line(2, 0, 0)], executions: [], reason: '파손', requestedAt: '2026-11-16T00:50:00.000Z', decidedAt: null }],
-    ['DSP-2', { disposalApprovalId: 'DSP-2', mfcId: 'MFC-SEED-01', version: 2, state: 'APPROVED', requesterId: 'OP-wkr-1', approverId: 'OP-sup-2', approvalRef: 'AP-LOSS-1', sourceRef: 'QD-0', lines: [line(3, 3, 0)], executions: [], reason: '유통기한 경과', requestedAt: '2026-11-15T23:00:00.000Z', decidedAt: '2026-11-15T23:30:00.000Z' }],
+    ['DSP-1', { disposalApprovalId: 'DSP-1', mfcId: 'MFC-BJG-01', version: 1, state: 'REQUESTED', requesterId: 'OP-wkr-1', approverId: null, approvalRef: null, sourceRef: 'QD-0', lines: [line(2, 0, 0)], executions: [], reason: '파손', requestedAt: '2026-11-16T00:50:00.000Z', decidedAt: null }],
+    ['DSP-2', { disposalApprovalId: 'DSP-2', mfcId: 'MFC-BJG-01', version: 2, state: 'APPROVED', requesterId: 'OP-wkr-1', approverId: 'OP-sup-2', approvalRef: 'AP-LOSS-1', sourceRef: 'QD-0', lines: [line(3, 3, 0)], executions: [], reason: '유통기한 경과', requestedAt: '2026-11-15T23:00:00.000Z', decidedAt: '2026-11-15T23:30:00.000Z' }],
   ];
 }
 
@@ -67,7 +67,7 @@ function seedRestrictions(): Array<[string, MockRestriction]> {
       'RST-1',
       {
         restrictionId: 'RST-1',
-        mfcId: 'MFC-SEED-01',
+        mfcId: 'MFC-BJG-01',
         restrictionType: 'CAPACITY_REDUCE',
         state: 'ACTIVE',
         version: 1,
@@ -84,7 +84,7 @@ function seedRestrictions(): Array<[string, MockRestriction]> {
       'RST-0',
       {
         restrictionId: 'RST-0',
-        mfcId: 'MFC-SEED-01',
+        mfcId: 'MFC-BJG-01',
         restrictionType: 'INTAKE_STOP',
         state: 'LIFTED',
         version: 2,
@@ -128,9 +128,9 @@ function worker(workerId: string, displayName: string, extra: Partial<MockWorker
   const taskTypes = extra.taskTypes ?? ['PICK', 'PACK'];
   const at = '2026-11-10T00:00:00.000Z';
   return [
-    `${extra.mfcId ?? 'MFC-SEED-01'}/${workerId}`,
+    `${extra.mfcId ?? 'MFC-BJG-01'}/${workerId}`,
     {
-      mfcId: 'MFC-SEED-01',
+      mfcId: 'MFC-BJG-01',
       workerId,
       displayName,
       employmentType: 'REGULAR',
@@ -148,7 +148,7 @@ function worker(workerId: string, displayName: string, extra: Partial<MockWorker
   ];
 }
 
-/** 목 작업자: MFC-SEED-01 에 정규직(자격이 업무보다 넓음)·알바(휴게 중)·일일크루(출근 전)·정지·퇴사, MFC-MOKPO-01 에 1명 */
+/** 목 작업자: MFC-BJG-01 에 정규직(자격이 업무보다 넓음)·알바(휴게 중)·일일크루(출근 전)·정지·퇴사, MFC-MOKPO-01 에 1명 */
 function seedWorkers(): Array<[string, MockWorker]> {
   return [
     worker('OP-wkr-1', '김현장', {
@@ -170,16 +170,16 @@ function seedWorkers(): Array<[string, MockWorker]> {
 
 function seedShifts(): Array<[string, MockShift]> {
   return [
-    ['SHIFT-1', { shiftId: 'SHIFT-1', mfcId: 'MFC-SEED-01', workerId: 'OP-wkr-1', startAt: '2026-11-17T00:00:00.000Z', endAt: '2026-11-17T09:00:00.000Z', state: 'PLANNED', note: '오전 근무', createdBy: 'OP-sup-1', cancelReason: null, breakStartAt: null, breakEndAt: null }],
+    ['SHIFT-1', { shiftId: 'SHIFT-1', mfcId: 'MFC-BJG-01', workerId: 'OP-wkr-1', startAt: '2026-11-17T00:00:00.000Z', endAt: '2026-11-17T09:00:00.000Z', state: 'PLANNED', note: '오전 근무', createdBy: 'OP-sup-1', cancelReason: null, breakStartAt: null, breakEndAt: null }],
   ];
 }
 
 function seedAssignments(): MockAssignment[] {
   return [
-    { assignmentId: 'ASG-1', mfcId: 'MFC-SEED-01', taskId: 'TASK-PICK-1', taskType: 'PICK', workerId: 'OP-wkr-1', assignmentVersion: 1, state: 'ACTIVE', assignedAt: '2026-11-16T00:30:00.000Z', source: 'MANUAL', assignedBy: 'OP-sup-1', warnings: [] },
-    { assignmentId: 'ASG-2', mfcId: 'MFC-SEED-01', taskId: 'TASK-PACK-1', taskType: 'PACK', workerId: 'OP-wkr-2', assignmentVersion: 1, state: 'ACTIVE', assignedAt: '2026-11-16T00:42:00.000Z', source: 'SYSTEM', assignedBy: null, warnings: ['OFF_SHIFT'] },
-    { assignmentId: 'ASG-3', mfcId: 'MFC-SEED-01', taskId: 'TASK-PICK-3', taskType: 'PICK', workerId: 'OP-wkr-3', assignmentVersion: 2, state: 'ACTIVE', assignedAt: '2026-11-16T00:31:00.000Z', source: 'MANUAL', assignedBy: 'OP-sup-1', warnings: [] },
-    { assignmentId: 'ASG-0', mfcId: 'MFC-SEED-01', taskId: 'TASK-PICK-3', taskType: 'PICK', workerId: 'OP-wkr-1', assignmentVersion: 1, state: 'SUPERSEDED', assignedAt: '2026-11-16T00:30:30.000Z', source: 'MANUAL', assignedBy: 'OP-sup-1', warnings: [] },
+    { assignmentId: 'ASG-1', mfcId: 'MFC-BJG-01', taskId: 'TASK-PICK-1', taskType: 'PICK', workerId: 'OP-wkr-1', assignmentVersion: 1, state: 'ACTIVE', assignedAt: '2026-11-16T00:30:00.000Z', source: 'MANUAL', assignedBy: 'OP-sup-1', warnings: [] },
+    { assignmentId: 'ASG-2', mfcId: 'MFC-BJG-01', taskId: 'TASK-PACK-1', taskType: 'PACK', workerId: 'OP-wkr-2', assignmentVersion: 1, state: 'ACTIVE', assignedAt: '2026-11-16T00:42:00.000Z', source: 'SYSTEM', assignedBy: null, warnings: ['OFF_SHIFT'] },
+    { assignmentId: 'ASG-3', mfcId: 'MFC-BJG-01', taskId: 'TASK-PICK-3', taskType: 'PICK', workerId: 'OP-wkr-3', assignmentVersion: 2, state: 'ACTIVE', assignedAt: '2026-11-16T00:31:00.000Z', source: 'MANUAL', assignedBy: 'OP-sup-1', warnings: [] },
+    { assignmentId: 'ASG-0', mfcId: 'MFC-BJG-01', taskId: 'TASK-PICK-3', taskType: 'PICK', workerId: 'OP-wkr-1', assignmentVersion: 1, state: 'SUPERSEDED', assignedAt: '2026-11-16T00:30:30.000Z', source: 'MANUAL', assignedBy: 'OP-sup-1', warnings: [] },
   ];
 }
 
@@ -215,7 +215,7 @@ function task(taskId: string, extra: Partial<MockTask>): [string, MockTask] {
       taskType: 'PICK',
       state: 'ASSIGNED',
       version: 1,
-      mfcId: 'MFC-SEED-01',
+      mfcId: 'MFC-BJG-01',
       fulfillmentId: `FUL-${taskId}`,
       shipmentId: 'SHP-1',
       assignment: { workerId: 'OP-wkr-1', assignmentVersion: 1, asOf: { asOf: '2026-11-16T01:00:00.000Z', freshness: 'CURRENT' } },
@@ -265,7 +265,7 @@ function seedShipments(): Array<[string, MockShipment]> {
       'SHP-1',
       {
         shipmentId: 'SHP-1',
-        mfcId: 'MFC-SEED-01',
+        mfcId: 'MFC-BJG-01',
         fulfillmentId: 'FUL-1',
         orderId: 'ORD-1',
         orderNumber: '20000001',
@@ -331,7 +331,7 @@ function inboundTask(taskId: string, extra: Partial<MockInboundTask>): [string, 
     {
       taskId,
       taskType: 'INSPECT',
-      mfcId: 'MFC-SEED-01',
+      mfcId: 'MFC-BJG-01',
       receiptId: 'RCPT-1',
       parentTaskId: null,
       sku: 'SKU-MILK-1',
@@ -365,7 +365,7 @@ function seedInitialLoads(): MockInitialLoad[] {
     {
       receiptId: 'RCPT-9',
       approvalId: 'AP-INIT-1',
-      mfcId: 'MFC-SEED-01',
+      mfcId: 'MFC-BJG-01',
       state: 'EXPECTED',
       receivingLocation: null,
       receivedAt: null,
@@ -417,7 +417,7 @@ function move(moveId: string, extra: Partial<MockMove>): [string, MockMove] {
     {
       moveId,
       kind: 'MOVE',
-      mfcId: 'MFC-SEED-01',
+      mfcId: 'MFC-BJG-01',
       sku: 'SKU-MILK-1',
       productName: '서울우유 1L',
       barcodes: ['8801115114154'],
@@ -479,7 +479,7 @@ export interface MockUnshippable {
 }
 
 function seedCountSessions(): Array<[string, MockCountSession]> {
-  const base = { mfcId: 'MFC-SEED-01', reason: '순환 실사', baselineAt: '2026-11-16T00:00:00.000Z', approverId: null, approvalRef: null, commitId: null, updatedAt: '2026-11-16T00:30:00.000Z' };
+  const base = { mfcId: 'MFC-BJG-01', reason: '순환 실사', baselineAt: '2026-11-16T00:00:00.000Z', approverId: null, approvalRef: null, commitId: null, updatedAt: '2026-11-16T00:30:00.000Z' };
   const sheet = [{ locationCode: 'A-P1-01-1-01', sku: 'SKU-MILK-1', productName: '서울우유 1L', barcodes: [], lotId: 'LOT-MILK-A', expiryDate: '2026-11-25' }];
   return [
     [
@@ -502,7 +502,7 @@ function seedCountSessions(): Array<[string, MockCountSession]> {
 }
 
 function seedPolicies(): MockPolicy[] {
-  return [{ mfcId: 'MFC-SEED-01', locationCode: 'A-P1-01-1-01', sku: 'SKU-MILK-1', minQty: 3, targetQty: 10, unitQty: 2, updatedBy: 'OP-sup-1', updatedAt: '2026-11-15T00:00:00.000Z' }];
+  return [{ mfcId: 'MFC-BJG-01', locationCode: 'A-P1-01-1-01', sku: 'SKU-MILK-1', minQty: 3, targetQty: 10, unitQty: 2, updatedBy: 'OP-sup-1', updatedAt: '2026-11-15T00:00:00.000Z' }];
 }
 
 function seedHandlings(): MockHandling[] {
@@ -520,14 +520,14 @@ function seedHandlings(): MockHandling[] {
 
 function seedUnshippable(): MockUnshippable[] {
   return [
-    { mfcId: 'MFC-SEED-01', sku: 'SKU-MILK-1', lotId: 'LOT-MILK-OLD', expiryDate: '2026-11-17', manufactureDate: null, locationCode: 'C-S1-03-2-04', locationCategoryId: 'CAT-DAIRY', onMiscShelf: false, qty: 3 },
-    { mfcId: 'MFC-SEED-01', sku: 'SKU-RAMEN-5', lotId: 'LOT-RAMEN-OLD', expiryDate: '2026-11-20', manufactureDate: null, locationCode: 'A-P1-01-1-01', locationCategoryId: null, onMiscShelf: true, qty: 1 },
+    { mfcId: 'MFC-BJG-01', sku: 'SKU-MILK-1', lotId: 'LOT-MILK-OLD', expiryDate: '2026-11-17', manufactureDate: null, locationCode: 'C-S1-03-2-04', locationCategoryId: 'CAT-DAIRY', onMiscShelf: false, qty: 3 },
+    { mfcId: 'MFC-BJG-01', sku: 'SKU-RAMEN-5', lotId: 'LOT-RAMEN-OLD', expiryDate: '2026-11-20', manufactureDate: null, locationCode: 'A-P1-01-1-01', locationCategoryId: null, onMiscShelf: true, qty: 1 },
   ];
 }
 
 function seedStock(): MockStockUnit[] {
   const unit = (locationCode: string, lotId: string, qty: number, qualityState: MockStockUnit['qualityState'] = 'NORMAL'): MockStockUnit => ({
-    mfcId: 'MFC-SEED-01',
+    mfcId: 'MFC-BJG-01',
     sku: 'SKU-MILK-1',
     locationCode,
     lotId,
@@ -584,15 +584,15 @@ function location(
   ];
 }
 
-/** 목 위치: MFC-SEED-01 에 상태별로 하나씩(닫힘 + 재고 있음 = 폐지 거절), MFC-MOKPO-01 에 하나 */
+/** 목 위치: MFC-BJG-01 에 상태별로 하나씩(닫힘 + 재고 있음 = 폐지 거절), MFC-MOKPO-01 에 하나 */
 function seedLocations(): Array<[string, MockLocation]> {
   return [
-    location('LOC-1', 'MFC-SEED-01', 'C-S1-03-2-04', 'STORAGE', 'CHILLED', { pickSequence: 12, position: { xM: 4.5, zM: 12 }, categoryId: 'CAT-DAIRY', stockUnits: 8 }),
-    location('LOC-2', 'MFC-SEED-01', 'A-P1-01-1-01', 'PICKING', 'AMBIENT', { pickSequence: 1, highTurnover: true, stockUnits: 30 }),
-    location('LOC-3', 'MFC-SEED-01', 'RCV-C-01', 'RECEIVING', 'CHILLED'),
-    location('LOC-4', 'MFC-SEED-01', 'F-S2-02-1-03', 'STORAGE', 'FROZEN', { state: 'CLOSED', stateReason: '냉동고 점검' }),
-    location('LOC-5', 'MFC-SEED-01', 'QRT-A-01', 'QUARANTINE', 'AMBIENT', { state: 'CLOSED', stateReason: '구역 정리', stockUnits: 2 }),
-    location('LOC-6', 'MFC-SEED-01', 'OLD-SHELF-7', 'STORAGE', 'AMBIENT', { state: 'RETIRED', stateReason: '폐지' }),
+    location('LOC-1', 'MFC-BJG-01', 'C-S1-03-2-04', 'STORAGE', 'CHILLED', { pickSequence: 12, position: { xM: 4.5, zM: 12 }, categoryId: 'CAT-DAIRY', stockUnits: 8 }),
+    location('LOC-2', 'MFC-BJG-01', 'A-P1-01-1-01', 'PICKING', 'AMBIENT', { pickSequence: 1, highTurnover: true, stockUnits: 30 }),
+    location('LOC-3', 'MFC-BJG-01', 'RCV-C-01', 'RECEIVING', 'CHILLED'),
+    location('LOC-4', 'MFC-BJG-01', 'F-S2-02-1-03', 'STORAGE', 'FROZEN', { state: 'CLOSED', stateReason: '냉동고 점검' }),
+    location('LOC-5', 'MFC-BJG-01', 'QRT-A-01', 'QUARANTINE', 'AMBIENT', { state: 'CLOSED', stateReason: '구역 정리', stockUnits: 2 }),
+    location('LOC-6', 'MFC-BJG-01', 'OLD-SHELF-7', 'STORAGE', 'AMBIENT', { state: 'RETIRED', stateReason: '폐지' }),
     location('LOC-7', 'MFC-MOKPO-01', 'A-S1-01-1-01', 'STORAGE', 'AMBIENT'),
   ];
 }
@@ -628,16 +628,16 @@ export const mockLogins = [
 
 function seedGrants(): Array<[string, MockGrant]> {
   return [
-    ['OP-sup-1', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-SEED-01'] }],
-    ['OP-sup-2', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-SEED-01', 'MFC-MOKPO-01'] }],
+    ['OP-sup-1', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-BJG-01'] }],
+    ['OP-sup-2', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-BJG-01', 'MFC-MOKPO-01'] }],
     // 다섯 센터 모두(LAN claude-mfc-sup 을 전 센터로 — 요청 handoff mfc-backoffice/2026-11-24-backend-mfc-sup-all-centers)
-    ['OP-sup-all', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-SEED-01', 'MFC-MOKPO-01', 'MFC-SEJ-01', 'MFC-CHC-01', 'MFC-BNG-01'] }],
+    ['OP-sup-all', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-BJG-01', 'MFC-MOKPO-01', 'MFC-SEJ-01', 'MFC-CHC-01', 'MFC-BNG-01'] }],
     // 센터마다 관리자 한 명 — 실서버 claude-mfc-sup-mk·sj·cc·bn 처럼 자기 센터만(lan-test-accounts.md)
     ['OP-sup-mk', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-MOKPO-01'] }],
     ['OP-sup-sj', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-SEJ-01'] }],
     ['OP-sup-cc', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-CHC-01'] }],
     ['OP-sup-bn', { roles: ['MFC_SUPERVISOR'], centers: ['MFC-BNG-01'] }],
-    ['OP-wkr-1', { roles: ['MFC_WORKER'], centers: ['MFC-SEED-01'] }],
+    ['OP-wkr-1', { roles: ['MFC_WORKER'], centers: ['MFC-BJG-01'] }],
     ['OP-admin-1', { roles: ['OPERATOR_ADMIN'], centers: [] }],
   ];
 }
@@ -657,8 +657,8 @@ export interface MockReturnHandover {
 }
 
 const seedReturnHandovers = (): MockReturnHandover[] => [
-  { mfcId: 'MFC-SEED-01', deliveryId: 'DLV-RET-1', deliveryNumber: 'D30000001-2', purpose: 'CLAIM_RETURN', state: 'RETURN_PICKED_UP', riderId: 'RD-31', code: '4821', failedAttempts: 2, locked: false, issuedAt: '2026-11-19T01:00:00.000Z' },
-  { mfcId: 'MFC-SEED-01', deliveryId: 'DLV-RET-2', deliveryNumber: null, purpose: 'FAILED_DELIVERY_RETURN', state: 'ASSIGNED', riderId: 'RD-32', code: '1357', failedAttempts: 5, locked: true, issuedAt: '2026-11-19T00:20:00.000Z' },
+  { mfcId: 'MFC-BJG-01', deliveryId: 'DLV-RET-1', deliveryNumber: 'D30000001-2', purpose: 'CLAIM_RETURN', state: 'RETURN_PICKED_UP', riderId: 'RD-31', code: '4821', failedAttempts: 2, locked: false, issuedAt: '2026-11-19T01:00:00.000Z' },
+  { mfcId: 'MFC-BJG-01', deliveryId: 'DLV-RET-2', deliveryNumber: null, purpose: 'FAILED_DELIVERY_RETURN', state: 'ASSIGNED', riderId: 'RD-32', code: '1357', failedAttempts: 5, locked: true, issuedAt: '2026-11-19T00:20:00.000Z' },
   { mfcId: 'MFC-MOKPO-01', deliveryId: 'DLV-RET-9', deliveryNumber: 'D30000009-2', purpose: 'MISDELIVERY_RECOVERY', state: 'RETURN_PICKED_UP', riderId: 'RD-39', code: '9999', failedAttempts: 0, locked: false, issuedAt: '2026-11-19T00:00:00.000Z' },
 ];
 
@@ -682,11 +682,11 @@ export interface MockIncident {
 const seedIncidents = (): Array<[string, MockIncident]> => [
   [
     'QI-1',
-    { incidentId: 'QI-1', mfcId: 'MFC-SEED-01', kind: 'DAMAGE', origin: 'AUTO', description: null, openedBy: null, openedAt: '2026-11-19T00:10:00.000Z', sourceEvent: 'LineShortageReported', sourceRef: 'EVT-SHORT-1', affectedLots: [{ sku: 'SKU-MILK-1', lotId: 'LOT-MILK-A', qty: 2 }], seedResolved: {}, closed: null, version: 1 },
+    { incidentId: 'QI-1', mfcId: 'MFC-BJG-01', kind: 'DAMAGE', origin: 'AUTO', description: null, openedBy: null, openedAt: '2026-11-19T00:10:00.000Z', sourceEvent: 'LineShortageReported', sourceRef: 'EVT-SHORT-1', affectedLots: [{ sku: 'SKU-MILK-1', lotId: 'LOT-MILK-A', qty: 2 }], seedResolved: {}, closed: null, version: 1 },
   ],
   [
     'QI-2',
-    { incidentId: 'QI-2', mfcId: 'MFC-SEED-01', kind: 'CONTAMINATION', origin: 'MANUAL', description: '포장 겉면 오염', openedBy: 'OP-sup-2', openedAt: '2026-11-18T23:00:00.000Z', sourceEvent: null, sourceRef: null, affectedLots: [{ sku: 'SKU-MILK-1', lotId: 'LOT-MILK-B', qty: 5 }], seedResolved: { 'LOT-MILK-B': 'DSP-9' }, closed: null, version: 1 },
+    { incidentId: 'QI-2', mfcId: 'MFC-BJG-01', kind: 'CONTAMINATION', origin: 'MANUAL', description: '포장 겉면 오염', openedBy: 'OP-sup-2', openedAt: '2026-11-18T23:00:00.000Z', sourceEvent: null, sourceRef: null, affectedLots: [{ sku: 'SKU-MILK-1', lotId: 'LOT-MILK-B', qty: 5 }], seedResolved: { 'LOT-MILK-B': 'DSP-9' }, closed: null, version: 1 },
   ],
   [
     'QI-9',
@@ -706,7 +706,7 @@ export interface MockStaffContact {
 
 /** 센터 직원 연락처(mfc-capacity 0.21.0) — 목 값 */
 const seedStaffContacts = (): Array<[string, MockStaffContact]> => [
-  ['MFC-SEED-01/OP-wkr-1', { mfcId: 'MFC-SEED-01', operatorId: 'OP-wkr-1', name: null, phone: '010-0000-0201', email: null, version: 1, updatedAt: '2026-11-18T01:00:00.000Z' }],
+  ['MFC-BJG-01/OP-wkr-1', { mfcId: 'MFC-BJG-01', operatorId: 'OP-wkr-1', name: null, phone: '010-0000-0201', email: null, version: 1, updatedAt: '2026-11-18T01:00:00.000Z' }],
   ['MFC-MOKPO-01/OP-sup-2', { mfcId: 'MFC-MOKPO-01', operatorId: 'OP-sup-2', name: '센터장 한관리', phone: null, email: 'sel-desk@pmart.test', version: 2, updatedAt: '2026-11-18T02:00:00.000Z' }],
 ];
 
@@ -793,7 +793,7 @@ export function resetDb(): void {
     returnReceiptId: 'RR-1',
     claimId: 'CLM-1',
     returnPickupId: 'RPU-1',
-    mfcId: 'MFC-SEED-01',
+    mfcId: 'MFC-BJG-01',
     inventoryApplyStatus: 'APPLIED',
     inventoryCommitId: 'CMT-RR-1',
     inspectionState: 'PENDING',
@@ -828,7 +828,7 @@ export function seedDemoFloor() {
     const [k, v] = location(`LOC-D-${mfcId}-${code}`, mfcId, code, zone, temp, extra);
     db.locations.set(k, v);
   };
-  const SEED = 'MFC-SEED-01';
+  const SEED = 'MFC-BJG-01';
   ['RCV-A-01', 'RCV-C-02'].forEach((c) => add(SEED, c, 'RECEIVING', c.includes('-C-') ? 'CHILLED' : 'AMBIENT'));
   ['PAK-A-01', 'PAK-A-02', 'PAK-A-03', 'PAK-C-04'].forEach((c, i) => add(SEED, c, 'PACKING', c.includes('-C-') ? 'CHILLED' : 'AMBIENT', i === 2 ? { state: 'CLOSED', stateReason: '포장대 수리' } : {}));
   ['DSP-A-01', 'DSP-A-02', 'DSP-C-03'].forEach((c) => add(SEED, c, 'DISPATCH_STAGING', c.includes('-C-') ? 'CHILLED' : 'AMBIENT'));

@@ -13,20 +13,20 @@ describe('왼쪽 메뉴 접기', () => {
 
   it('넓은 화면은 펴서 시작 → "메뉴 접기"로 접으면 묶음 아이콘만, 다시 열어도 접힌 채(기억)', async () => {
     narrowScreen(false);
-    const first = renderAt('/c/MFC-SEED-01/ops');
+    const first = renderAt('/c/MFC-BJG-01/ops');
     const side = await screen.findByTestId('side-menu');
     expect(side).toHaveAttribute('data-collapsed', 'false');
     await userEvent.click(within(side).getByRole('button', { name: '메뉴 접기' }));
     expect(side).toHaveAttribute('data-collapsed', 'true');
-    expect(within(side).getByRole('link', { name: '출고 운영' })).toHaveAttribute('href', '/c/MFC-SEED-01/tasks');
+    expect(within(side).getByRole('link', { name: '출고 운영' })).toHaveAttribute('href', '/c/MFC-BJG-01/tasks');
     first.unmount();
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     expect(await screen.findByTestId('side-menu')).toHaveAttribute('data-collapsed', 'true');
   });
 
   it('좁은 화면(1023px 이하)은 접어서 시작 — "메뉴 펴기"로 편다', async () => {
     narrowScreen(true);
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     const side = await screen.findByTestId('side-menu');
     expect(side).toHaveAttribute('data-collapsed', 'true');
     await userEvent.click(within(side).getByRole('button', { name: '메뉴 펴기' }));

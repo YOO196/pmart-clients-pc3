@@ -13,7 +13,7 @@ const posts = (sent: Request[]) => sent.filter((r) => r.method === 'POST' && new
 
 describe('배차 지연', () => {
   it('우리 센터 것만, 약속 이른 순 — 배송 번호(묶음 조회), 라이더 없음, 약속 대비 지난 분', async () => {
-    const view = renderAt('/c/MFC-SEED-01/dispatch-delays');
+    const view = renderAt('/c/MFC-BJG-01/dispatch-delays');
     await waitFor(() => expect(rows()).toHaveLength(2));
     await waitFor(() => expect(within(rows()[0]!).getAllByTestId('display-number')[0]).toHaveTextContent('D35726513'));
     expect(rows()[0]).toHaveTextContent('라이더 찾는 중');
@@ -23,13 +23,13 @@ describe('배차 지연', () => {
     expect(within(rows()[1]!).getAllByTestId('display-number')[0]).toHaveTextContent(/^번호 없음$/);
     expect(within(rows()[1]!).getByTestId('delay-minutes')).toHaveTextContent(/분 남음/);
     const q = new URL(view.gets('/dispatch-delays')[0]!.url).searchParams;
-    expect(q.get('mfcId')).toBe('MFC-SEED-01');
+    expect(q.get('mfcId')).toBe('MFC-BJG-01');
     const n = new URL(view.gets('/deliveries')[0]!.url).searchParams;
-    expect([n.get('mfcId'), n.get('deliveryIds')]).toEqual(['MFC-SEED-01', 'DLV-DD-1,DLV-DD-2']);
+    expect([n.get('mfcId'), n.get('deliveryIds')]).toEqual(['MFC-BJG-01', 'DLV-DD-1,DLV-DD-2']);
   });
 
   it('배차 불가로 취소 — 확인 상자에서 "취소하기"를 눌러야 보낸다: lines 없이 {orderId, CANCEL, DISPATCH_UNAVAILABLE, OPERATOR}', async () => {
-    const view = renderAt('/c/MFC-SEED-01/dispatch-delays');
+    const view = renderAt('/c/MFC-BJG-01/dispatch-delays');
     await waitFor(() => expect(rows()).toHaveLength(2));
     await userEvent.click(within(rows()[0]!).getByRole('button', { name: '배차 불가로 취소' }));
     const dialog = screen.getByTestId('dispatch-cancel-confirm');
@@ -51,7 +51,7 @@ describe('배차 지연', () => {
 
   it('이미 라이더에게 넘겼으면(422 ORDER_NOT_CANCELLABLE) 반품 안내', async () => {
     server.use(http.post(`${API_BASE}/claims`, () => HttpResponse.json({ status: 422, code: 'ORDER_NOT_CANCELLABLE', type: 'about:blank' }, { status: 422, headers: { 'content-type': 'application/problem+json' } })));
-    renderAt('/c/MFC-SEED-01/dispatch-delays');
+    renderAt('/c/MFC-BJG-01/dispatch-delays');
     await waitFor(() => expect(rows()).toHaveLength(2));
     await userEvent.click(within(rows()[0]!).getByRole('button', { name: '배차 불가로 취소' }));
     await userEvent.click(within(screen.getByTestId('dispatch-cancel-confirm')).getByRole('button', { name: '취소하기' }));
@@ -61,24 +61,24 @@ describe('배차 지연', () => {
 
   it('번호 조회가 실패하면 "번호 확인 불가"(번호 없음과 구분), 목록 실패는 빈 목록이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/deliveries`, () => HttpResponse.json({ status: 503, code: 'DEPENDENCY_UNAVAILABLE', type: 'about:blank' }, { status: 503, headers: { 'content-type': 'application/problem+json' } })));
-    renderAt('/c/MFC-SEED-01/dispatch-delays');
+    renderAt('/c/MFC-BJG-01/dispatch-delays');
     await waitFor(() => expect(within(rows()[0]!).getAllByTestId('display-number')[0]).toHaveTextContent('번호 확인 불가'));
     server.use(http.get(`${API_BASE}/dispatch-delays`, () => HttpResponse.json({ status: 503, code: 'DEPENDENCY_UNAVAILABLE', type: 'about:blank' }, { status: 503, headers: { 'content-type': 'application/problem+json' } })));
-    renderAt('/c/MFC-SEED-01/dispatch-delays');
+    renderAt('/c/MFC-BJG-01/dispatch-delays');
     await waitFor(() => expect(screen.getAllByRole('button', { name: /다시/ }).length).toBeGreaterThan(0));
   });
 
   it('없으면 "수고하셨어요"', async () => {
     server.use(http.get(`${API_BASE}/dispatch-delays`, () => HttpResponse.json({ items: [] })));
-    renderAt('/c/MFC-SEED-01/dispatch-delays');
+    renderAt('/c/MFC-BJG-01/dispatch-delays');
     expect(await screen.findByTestId('all-done')).toHaveTextContent('배차가 늦어지는 배송이 없어요');
   });
 });
 
 describe('홈 배차 지연 칸', () => {
   it('서버 배차 지연 수, 누르면 배차 지연 메뉴', async () => {
-    renderAt('/c/MFC-SEED-01/ops');
+    renderAt('/c/MFC-BJG-01/ops');
     expect(await screen.findByTestId('tile-dispatch-delay-value')).toHaveTextContent(/^2건$/);
-    expect(screen.getByTestId('tile-dispatch-delay')).toHaveAttribute('href', '/c/MFC-SEED-01/dispatch-delays');
+    expect(screen.getByTestId('tile-dispatch-delay')).toHaveAttribute('href', '/c/MFC-BJG-01/dispatch-delays');
   });
 });

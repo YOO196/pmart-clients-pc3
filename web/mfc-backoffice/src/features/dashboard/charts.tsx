@@ -418,3 +418,150 @@ export function Heatmap({
     </figure>
   );
 }
+
+export interface PieSlice {
+  readonly key: string;
+  readonly label: string;
+  readonly value: number;
+  /** 부가 글(수량·금액 등) */
+  readonly sub: string;
+  /** 누를 수 있나(그 밖 묶음은 못 누름) */
+  readonly pickable: boolean;
+}
+
+/** 범주 색 — dataviz 팔레트 1~5(index.css --pm-cat-*), "그 밖"은 회색 */
+const PIE_COLOR = ['var(--pm-cat-1)', 'var(--pm-cat-2)', 'var(--pm-cat-3)', 'var(--pm-cat-4)', 'var(--pm-cat-5)'];
+const OTHER_COLOR = 'color-mix(in oklab, var(--color-base-content) 28%, var(--color-base-200))';
+
+/**
+ * 원 그래프(도넛) — 많이 팔린 상품 비중(2026-11-24 사용자 "원 그래프로, 로딩될 때 시계방향으로 부채 펼쳐지듯").
+ * 3시에서 시계방향으로 조각을 놓고, 처음 그릴 때 가림막(굵은 원 테두리)이 시계방향으로 그려지며 조각이 드러난다(.pm-pie-sweep, 움직임 줄이기면 바로).
+ * 조각·범례 줄에 마우스·초점이면 말풍선, 누르면 onPick, 아래 "표로 보기".
+ */
+export function PieChart({
+  title,
+  slices,
+  picked,
+  onPick,
+  testId,
+}: {
+  readonly title: string;
+  readonly slices: readonly PieSlice[];
+  readonly picked: string | null;
+  readonly onPick: (key: string) => void;
+  readonly testId: string;
+}) {
+  const [hover, setHover] = useState<string | null>(null);
+  const total = slices.reduce((n, x) => n + x.value, 0);
+  const pct = (v: number) => (total > 0 ? `${((v / total) * 100).toFixed(1)}%` : '0%');
+  const color = (i: number, x: PieSlice) => (x.pickable ? (PIE_COLOR[i % PIE_COLOR.length] ?? OTHER_COLOR) : OTHER_COLOR);
+  const R = 46;
+  const r0 = 27;
+  // 앞 조각들의 합 → 시작·끝 각도
+  const starts = slices.map((_, i) => slices.slice(0, i).reduce((n, x) => n + x.value, 0));
+  const angle = (v: number) => (v / Math.max(1, total)) * Math.PI * 2;
+  const arcs = slices.map((x, i) => ({ x, i, a0: angle(starts[i]!), a1: angle(starts[i]! + x.value) }));
+  // 3시에서 시계방향(2026-11-24 사용자 "3시부터", 화면 y 는 아래) — 각도 a 의 점 = (cos a, sin a)
+  const pt = (rad: number, a: number) => `${(50 + rad * Math.cos(a)).toFixed(3)} ${(50 + rad * Math.sin(a)).toFixed(3)}`;
+  const path = (a0: number, a1: number) => {
+    if (a1 - a0 >= Math.PI * 2 - 1e-6) return `M ${pt(R, 0)} A ${R} ${R} 0 1 1 ${pt(R, Math.PI)} A ${R} ${R} 0 1 1 ${pt(R, 0)} M ${pt(r0, 0)} A ${r0} ${r0} 0 1 0 ${pt(r0, Math.PI)} A ${r0} ${r0} 0 1 0 ${pt(r0, 0)} Z`;
+    const big = a1 - a0 > Math.PI ? 1 : 0;
+    return `M ${pt(R, a0)} A ${R} ${R} 0 ${big} 1 ${pt(R, a1)} L ${pt(r0, a1)} A ${r0} ${r0} 0 ${big} 0 ${pt(r0, a0)} Z`;
+  };
+  const focus = hover ?? picked;
+  const shown = slices.find((x) => x.key === focus);
+  // 가림막 — 반지름 (R+r0)/2 원 테두리(굵기 R−r0+2)를 3시에서 시계방향으로 그려 펼친다(원 테두리는 3시에서 시작)
+  const mr = (R + r0) / 2;
+  const C = 2 * Math.PI * mr;
+  const maskId = `${testId}-sweep`;
+  return (
+    <figure className="space-y-2" data-testid={testId}>
+      <div className="flex items-baseline justify-between gap-2 text-xs">
+        <span className="font-semibold text-base-content/80">{title}</span>
+        <span className="min-h-4 truncate tabular-nums text-base-content/75" aria-live="polite" data-testid={`${testId}-tip`}>
+          {shown ? `${shown.label} · ${pct(shown.value)} · ${shown.sub}` : m.pie.hint}
+        </span>
+      </div>
+      <div className="grid grid-cols-[minmax(0,15rem)_minmax(0,1fr)] items-center gap-4">
+        <svg viewBox="0 0 100 100" className="aspect-square w-full" role="img" aria-label={title} onMouseLeave={() => setHover(null)}>
+          <defs>
+            <mask id={maskId}>
+              <circle
+                cx="50"
+                cy="50"
+                r={mr}
+                fill="none"
+                stroke="#fff"
+                strokeWidth={R - r0 + 2}
+                strokeDasharray={`${C} ${C}`}
+                className="pm-pie-sweep"
+                style={{ ['--pm-pie-c' as string]: `${C}` }}
+              />
+            </mask>
+          </defs>
+          <g mask={`url(#${maskId})`}>
+            {arcs.map(({ x, i, a0, a1 }) =>
+              x.value > 0 ? (
+                <path
+                  key={x.key}
+                  d={path(a0, a1)}
+                  style={{ fill: color(i, x) }}
+                  className={`stroke-base-100 transition-opacity ${x.pickable ? 'cursor-pointer' : ''}`}
+                  strokeWidth="0.8"
+                  opacity={focus && focus !== x.key ? 0.45 : 1}
+                  onMouseEnter={() => setHover(x.key)}
+                  onClick={() => (x.pickable ? onPick(x.key) : undefined)}
+                  data-testid={`${testId}-slice`}
+                >
+                  <title>{`${x.label} · ${pct(x.value)}`}</title>
+                </path>
+              ) : null,
+            )}
+          </g>
+          <text x="50" y="47" textAnchor="middle" className="fill-base-content/55" style={{ fontSize: 7 }}>
+            {m.pie.center}
+          </text>
+          <text x="50" y="58" textAnchor="middle" className="fill-base-content" style={{ fontSize: 10, fontWeight: 800 }}>
+            {shown ? pct(shown.value) : slices.filter((x) => x.pickable).length}
+          </text>
+        </svg>
+        <ul className="space-y-0.5" data-testid="top-sold">
+          {arcs.map(({ x, i }) => (
+            <li key={x.key}>
+              <button
+                type="button"
+                disabled={!x.pickable}
+                className={`grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-field px-1.5 py-1 text-left text-sm transition-colors enabled:hover:bg-primary/8 disabled:cursor-default ${picked === x.key ? 'bg-primary/12' : ''}`}
+                {...(x.pickable ? { 'aria-pressed': picked === x.key } : {})}
+                onMouseEnter={() => setHover(x.key)}
+                onMouseLeave={() => setHover(null)}
+                onFocus={() => setHover(x.key)}
+                onBlur={() => setHover(null)}
+                onClick={() => (x.pickable ? onPick(x.key) : undefined)}
+                data-testid={x.pickable ? 'top-sold-row' : 'top-sold-other'}
+              >
+                <i className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: color(i, x) }} aria-hidden="true" />
+                <span className="truncate">{x.label}</span>
+                <span className="pm-mono text-xs text-base-content/70">{pct(x.value)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <details className="text-xs">
+        <summary className="cursor-pointer text-base-content/60">{m.asTable}</summary>
+        <table className="mt-1 w-full tabular-nums text-base-content/75">
+          <tbody>
+            {slices.map((x) => (
+              <tr key={x.key}>
+                <td className="py-0.5 pr-2">{x.label}</td>
+                <td className="pr-2 text-right">{pct(x.value)}</td>
+                <td className="text-right">{x.sub}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </figure>
+  );
+}

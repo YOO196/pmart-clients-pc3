@@ -23,7 +23,7 @@ const plans: readonly FloorPlan[] = mockFloorPlans();
 
 describe('작업자 길찾기 — 센터마다', () => {
   it('도면은 다섯 센터(실서버 ID)', () => {
-    expect(plans.map((p) => p.centerId).sort()).toEqual(['MFC-BNG-01', 'MFC-CHC-01', 'MFC-MOKPO-01', 'MFC-SEED-01', 'MFC-SEJ-01']);
+    expect(plans.map((p) => p.centerId).sort()).toEqual(['MFC-BJG-01', 'MFC-BNG-01', 'MFC-CHC-01', 'MFC-MOKPO-01', 'MFC-SEJ-01']);
   });
 
   it.each(plans.map((p) => [p.centerId, p] as const))('%s: 냉동·냉장·상온 선반 앞 → 포장 대기·포장대·입고 팔레트, 모두 벽·랙을 지나지 않는 길', (_, plan) => {
