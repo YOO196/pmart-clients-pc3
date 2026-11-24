@@ -90,6 +90,16 @@ export const messages = {
     register: '직원 등록',
     departments: '본사 부서',
     permissions: '권한 관리',
+    // 메뉴 묶음(2026-11-24 사용자 "인사 쪽 메뉴바 허전") — 통합 백오피스처럼 묶음 + 할 일 숫자
+    groupEmployees: '직원',
+    groupOrg: '조직',
+    groupAccess: '권한',
+    countFailed: (n: string) => `계정 발급 실패 ${n}명 — 다시 시도가 필요해요`,
+    countGrant: (n: string) => `권한 승인 대기 ${n}명`,
+    countUnknown: '숫자를 못 읽었어요',
+    legendTitle: '메뉴 숫자 보는 법',
+    legendTodo: '할 일',
+    legendFailed: '실패',
   },
 
   /** 본사 부서(hr 0.3.0 GET·PUT /hr/departments) */

@@ -10,7 +10,7 @@ describe('직원 등록 — 떠날 때 경고', () => {
     const user = userEvent.setup();
     renderAt('/employees/new');
     await user.type(await screen.findByLabelText('이름'), '김신입');
-    await user.click(screen.getByRole('link', { name: '직원 목록' }));
+    await user.click(screen.getByRole('link', { name: /^직원 목록/ }));
     const box = await screen.findByTestId('leave-guard');
     await user.click(within(box).getByRole('button', { name: '계속 작성' }));
     expect(screen.getByLabelText('이름')).toHaveValue('김신입');
@@ -20,7 +20,7 @@ describe('직원 등록 — 떠날 때 경고', () => {
     const user = userEvent.setup();
     renderAt('/employees/new');
     await screen.findByLabelText('이름');
-    await user.click(screen.getByRole('link', { name: '직원 목록' }));
+    await user.click(screen.getByRole('link', { name: /^직원 목록/ }));
     expect(screen.queryByTestId('leave-guard')).not.toBeInTheDocument();
   });
 });

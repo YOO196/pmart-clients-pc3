@@ -133,7 +133,7 @@ function AddDepartment() {
 export function DepartmentsPage() {
   const departments = useDepartments();
   return (
-    <section className="max-w-3xl space-y-4">
+    <section className="space-y-4">
       <PageHeader title={m.departments.title} description={m.departments.intro} />
       <QueryState state={toUiState(departments, (d) => d.length === 0)} onRetry={() => void departments.refetch()} emptyText={m.departments.empty}>
         {(items) => (

@@ -19,6 +19,7 @@ import { RequireSession, SessionProvider, useSession } from './SessionContext';
 import { useMenuCollapsed } from '../shared/sideMenu';
 import { HomePage } from './HomePage';
 import { LiveClock, RoleChips } from './HeaderContext';
+import { MenuCount, MenuLegend } from './MenuCounts';
 import { QuickFind } from './QuickFind';
 import { ThemeToggle } from './ThemeToggle';
 import { Toasts } from './Toasts';
@@ -30,6 +31,13 @@ const nav: ReadonlyArray<readonly [string, string]> = [
   ['/departments', m.nav.departments],
   ['/permissions', m.nav.permissions],
 ];
+
+/** 펼친 메뉴의 묶음 제목 옆 아이콘 */
+const groupIcon = (d: string | undefined) => (
+  <svg viewBox="0 0 24 24" className="fill-none stroke-current" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={d} />
+  </svg>
+);
 
 /** 접힌 메뉴(64px)의 메뉴별 아이콘 — 인사팀은 묶음이 하나라 백오피스처럼 묶음 아이콘만 남기면 쓸 데가 없어 메뉴마다 하나씩 */
 const RAIL_ICON: Readonly<Record<string, string>> = {
@@ -61,13 +69,19 @@ function Layout() {
   const current = [...nav].sort((x, y) => y[0].length - x[0].length).find(([to]) => pathname === to || pathname.startsWith(`${to}/`));
   useDocumentTitle(current?.[1] ?? null);
   // 2026-11-20 AWS 콘솔 모양(백오피스와 같은 공용 틀 @pmart/web-ui/console ConsoleShell) — 흰 머리줄·흰 왼쪽 메뉴·위치 줄
+  // 묶음(2026-11-24 사용자 "인사 쪽 메뉴바 허전") — 첫 화면은 맨 위 굵게(통합의 대시보드처럼), 직원·조직·권한 묶음, 할 일 숫자
+  const hr = !!session?.roles.includes('HR_ADMIN');
+  const item = (to: string, badge?: ReactNode) => {
+    const label = nav.find(([t]) => t === to)?.[1] ?? to;
+    return { to, label, ...(RAIL_ICON[to] ? { icon: RAIL_ICON[to] } : {}), testId: to === '/' ? 'home' : to.slice(1).replace('/', '-'), ...(badge ? { badge } : {}) };
+  };
   const groups: ConsoleNavGroup[] = [
-    {
-      id: 'hr',
-      label: m.nav.group,
-      items: nav.map(([to, label]) => ({ to, label, ...(RAIL_ICON[to] ? { icon: RAIL_ICON[to] } : {}), testId: to === '/' ? 'home' : to.slice(1).replace('/', '-') })),
-    },
+    { id: 'home', label: '', items: [item('/')] },
+    { id: 'employees', label: m.nav.groupEmployees, icon: groupIcon(RAIL_ICON['/employees']), items: [item('/employees', <MenuCount kind="failed" enabled={hr} />), item('/employees/new')] },
+    { id: 'org', label: m.nav.groupOrg, icon: groupIcon(RAIL_ICON['/departments']), items: [item('/departments')] },
+    { id: 'access', label: m.nav.groupAccess, icon: groupIcon(RAIL_ICON['/permissions']), items: [item('/permissions', <MenuCount kind="grant" enabled={hr} />)] },
   ];
+  const currentGroup = groups.find((g) => g.label && g.items.some((i) => i.to === current?.[0]));
   return (
     <>
       <ScrollToTopOnNavigate />
@@ -75,17 +89,19 @@ function Layout() {
         title={m.appTitle}
         homeLabel={m.goHome}
         groups={groups}
+        activePath={pathname}
+        // 직원 바로 찾기(Ctrl+K, 2026-11-19) — 로그인했을 때만, 로고 옆(2026-11-24 통합 백오피스처럼)
+        headerStart={session && <QuickFind />}
+        menuFooter={hr && <MenuLegend />}
         collapsed={collapsed}
         onToggleMenu={toggleMenu}
         expandLabel={m.nav.expand}
         collapseLabel={m.nav.collapse}
-        location={<ConsoleBreadcrumb group={{ label: m.nav.group, to: '/' }} current={current?.[1]} />}
+        location={<ConsoleBreadcrumb {...(currentGroup?.items[0] ? { group: { label: currentGroup.label, to: currentGroup.items[0].to } } : {})} current={current?.[1]} />}
         locationAside={session && <RoleChips roles={session.roles} />}
         banner={<ConnectionBanner />}
         tools={
           <>
-            {/* 직원 바로 찾기(Ctrl+K, 2026-11-19) — 로그인했을 때만 */}
-            {session && <QuickFind />}
             {session && <LiveClock />}
             {env.isMock && <span className="badge badge-accent badge-sm">{m.mockBadge}</span>}
             <ThemeToggle />

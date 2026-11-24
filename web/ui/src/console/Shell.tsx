@@ -35,6 +35,7 @@ const railSvg = (d: string | undefined) => (
 export function ConsoleShell({
   title,
   homeLabel,
+  headerStart,
   tools,
   groups,
   collapsed,
@@ -52,6 +53,8 @@ export function ConsoleShell({
 }: {
   readonly title: string;
   readonly homeLabel: string;
+  /** 머리줄 로고 바로 옆(찾기 칸 등 — 2026-11-24, 통합 백오피스처럼 찾기를 왼쪽에) */
+  readonly headerStart?: ReactNode;
   /** 머리줄 오른쪽(시계·찾기·테마·내 세션·앱 바꾸기 등) */
   readonly tools: ReactNode;
   readonly groups: readonly ConsoleNavGroup[];
@@ -64,7 +67,7 @@ export function ConsoleShell({
   readonly navLabel?: string;
   /** 접은 메뉴: items = 메뉴마다 아이콘(기본), groups = 묶음마다 아이콘 하나(그 묶음 첫 메뉴로) */
   readonly rail?: 'items' | 'groups';
-  /** 지금 주소(rail='groups' 에서 켜진 묶음을 고를 때) */
+  /** 지금 주소 — rail='groups' 에서 켜진 묶음을 고를 때, 펼친 메뉴에서는 상세 화면(/employees/OP-1)도 그 메뉴(/employees)를 켤 때(가장 길게 맞는 메뉴 하나) */
   readonly activePath?: string;
   /** 위치 줄 — 보통 ConsoleBreadcrumb */
   readonly location?: ReactNode;
@@ -76,6 +79,13 @@ export function ConsoleShell({
   readonly menuFooter?: ReactNode;
   readonly children: ReactNode;
 }) {
+  // 지금 주소를 가장 길게 덮는 메뉴(2026-11-24 — 전에는 주소가 메뉴와 똑같을 때만 켜져 상세 화면에서 메뉴 표시가 사라졌다)
+  const here = activePath
+    ? groups
+        .flatMap((g) => g.items)
+        .filter((it) => activePath === it.to || (it.to !== '/' && activePath.startsWith(`${it.to}/`)))
+        .sort((a, b) => b.to.length - a.to.length)[0]?.to
+    : undefined;
   return (
     <div className="flex min-h-screen flex-col bg-base-200">
       <header className="flex h-11 shrink-0 items-center gap-3 border-b border-base-300 bg-base-100 px-4">
@@ -85,6 +95,7 @@ export function ConsoleShell({
           </span>
           <span className="truncate text-[15px]">{title}</span>
         </Link>
+        {headerStart && <div className="ml-3 flex min-w-0 items-center text-sm">{headerStart}</div>}
         <div className="ml-auto flex items-center gap-2 text-sm">{tools}</div>
       </header>
       <div className="flex min-w-0 flex-1">
@@ -129,7 +140,7 @@ export function ConsoleShell({
                       end={it.end ?? true}
                       aria-label={it.label}
                       title={it.label}
-                      className={({ isActive }) => `flex w-16 flex-col items-center gap-1 rounded-lg px-1 py-2 text-[11px] transition-colors ${isActive ? 'bg-primary/10 font-semibold text-primary' : 'text-base-content/70 hover:bg-base-200 hover:text-base-content'}`}
+                      className={({ isActive }) => `flex w-16 flex-col items-center gap-1 rounded-lg px-1 py-2 text-[11px] transition-colors ${isActive || here === it.to ? 'bg-primary/10 font-semibold text-primary' : 'text-base-content/70 hover:bg-base-200 hover:text-base-content'}`}
                       {...(it.testId ? { 'data-testid': `nav-rail-${it.testId}` } : {})}
                     >
                       {it.iconNode ?? railSvg(it.icon)}
@@ -154,7 +165,7 @@ export function ConsoleShell({
                           <NavLink
                             to={it.to}
                             end={it.end ?? true}
-                            className={({ isActive }) => `flex items-center justify-between gap-2 py-[5px] ${g.label ? 'pl-7' : 'pl-4 font-bold'} pr-4 text-sm transition-colors ${isActive ? 'font-semibold text-primary' : g.label ? 'text-base-content/80 hover:text-primary' : 'text-base-content hover:text-primary'}`}
+                            className={({ isActive }) => `flex items-center justify-between gap-2 py-[5px] ${g.label ? 'pl-7' : 'pl-4 font-bold'} pr-4 text-sm transition-colors ${isActive || here === it.to ? 'font-semibold text-primary' : g.label ? 'text-base-content/80 hover:text-primary' : 'text-base-content hover:text-primary'}`}
                           >
                             <span className="truncate">{it.label}</span>
                             {it.badge}

@@ -59,3 +59,22 @@ describe('머리줄 맥락(2026-11-19 관제 형식)', () => {
     expect(screen.getByTestId('header-clock')).toHaveTextContent(/\d{2}:\d{2}:\d{2}/);
   });
 });
+
+describe('메뉴 묶음·할 일 숫자(2026-11-24 "메뉴바 허전")', () => {
+  it('첫 화면 아래 직원·조직·권한 묶음, 직원 목록에 계정 발급 실패 수(서버 집계), 아래에 보는 법', async () => {
+    renderAt('/employees');
+    const menu = await screen.findByTestId('side-menu');
+    expect([...menu.querySelectorAll('[data-group-label]')].map((x) => x.textContent)).toEqual(['직원', '조직', '권한']);
+    expect(await screen.findByTestId('menu-count-failed')).toHaveTextContent('1');
+    expect(screen.queryByTestId('menu-count-grant')).not.toBeInTheDocument(); // 승인 대기 0 이면 칩 없음
+    expect(screen.getByTestId('menu-legend')).toBeInTheDocument();
+  });
+
+  it('직원 상세에서도 "직원 목록" 메뉴가 켜져 있고 위치 줄은 "직원 / 직원 목록"', async () => {
+    renderAt('/employees/OP-fail-1');
+    await screen.findByTestId('side-menu');
+    expect(screen.getByRole('link', { name: /^직원 목록/ }).className).toContain('font-semibold');
+    expect(screen.getByRole('link', { name: '직원 등록' }).className).not.toContain('font-semibold');
+    expect(screen.getByTestId('page-title')).toHaveTextContent('직원/직원 목록');
+  });
+});

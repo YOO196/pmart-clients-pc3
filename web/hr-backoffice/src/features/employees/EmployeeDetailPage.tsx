@@ -342,7 +342,7 @@ export function EmployeeDetailPage() {
 
   const backTo = useQueueFrom(operatorId);
   return (
-    <section className="max-w-4xl space-y-4">
+    <section className="space-y-4">
       {/* 보던 목록 순서대로 이전·다음(2026-11-19) — 목록으로 돌아가기는 아래 상세 머리 "‹ 직원 목록"(보던 목록이 있으면 그 조건으로) */}
       <QueueNav id={operatorId} />
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>

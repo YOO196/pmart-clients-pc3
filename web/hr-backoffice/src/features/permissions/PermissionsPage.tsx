@@ -41,7 +41,7 @@ export function PermissionsPage() {
     setParams(draft.trim() ? { q: draft.trim() } : {});
   };
   return (
-    <section className="max-w-4xl space-y-4">
+    <section className="space-y-4">
       <PageHeader title={m.permissions.title} description={m.permissions.intro} />
       {/* 관리자 형식(2026-11-18): 검색 조건 상자 — 줄마다 왼쪽 항목명 */}
       <SearchPanel onSubmit={onSubmit} onReset={() => setDraft('')} submitLabel={m.permissions.search} resetLabel={m.list.reset}>
@@ -470,7 +470,7 @@ export function PermissionDetailPage() {
   const [extendFrom, setExtendFrom] = useState<EmployeeGrant | undefined>(undefined);
 
   return (
-    <section className="max-w-5xl space-y-4">
+    <section className="space-y-4">
       <QueryState state={toUiState(employee)} onRetry={() => void employee.refetch()}>
         {(e) => {
           const pending = (e.requestedGrants ?? []).some((g) => g.submission === 'PENDING' || g.submission === 'SUBMITTED');
