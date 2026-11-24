@@ -433,6 +433,11 @@ function BannerCard({
             <Mover i={i} n={n} onMove={onMove} onRemove={onRemove} disabled={locked} />
           </div>
           <span className="text-xs text-base-content/50">{m.imageHint}</span>
+          {m.imageSize[b.placement] && (
+            <span className="text-xs text-base-content/50" data-testid="banner-image-size">
+              {m.imageSize[b.placement]}
+            </span>
+          )}
           <WhyText items={whyOf(why, 'imageId')} />
           {upload.phase.kind === 'rejected' &&
             (upload.phase.failure instanceof ProblemFailure && upload.phase.failure.problem.code === 'IMAGE_INVALID' ? <p className="text-xs text-error">{m.imageInvalid}</p> : <FailureAlert failure={upload.phase.failure} />)}

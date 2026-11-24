@@ -612,12 +612,19 @@ export function CaseListPage() {
                           <PriorityBadge p={c.priority} />
                         </td>
                         <td className="max-w-md">
-                          {/* 줄 어디를 눌러도 오른쪽 미리보기(2026-11-20 — 이름만 상세로 가서 누른 자리마다 달랐다). 상세는 미리보기 "상세 열기"·Enter */}
+                          {/* 줄을 누르면 오른쪽 미리보기(2026-11-20), 요약(이름)은 바로 상세(2026-11-24 사용자 결정). 미리보기 "상세 열기"·Enter 도 그대로 */}
                           {/* 2026-11-20 AWS 한 줄 줄: 요약 · 화면 번호 · 맡기를 한 줄에(번호는 ADR-0070 화면 번호 — 시스템 ID 는 보이지 않는다) */}
                           <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-                            <span className="truncate font-medium" data-testid="case-summary">
-                              {c.summary ? caseSummaryText(c.summary) : label(m.cases.kindName, c.kind)}
-                            </span>
+                            {/* 요약(이름)은 바로 상세(2026-11-24 사용자 "이름으로 바로 들어가지게" — 11-20 "줄 어디나 미리보기"를 바꿈), 줄 나머지는 미리보기 */}
+                            {c.caseId ? (
+                              <Link className="truncate font-medium hover:text-primary hover:underline" data-testid="case-summary" to={`/cases/${encodeURIComponent(c.caseId)}`} onClick={(e) => e.stopPropagation()}>
+                                {c.summary ? caseSummaryText(c.summary) : label(m.cases.kindName, c.kind)}
+                              </Link>
+                            ) : (
+                              <span className="truncate font-medium" data-testid="case-summary">
+                                {c.summary ? caseSummaryText(c.summary) : label(m.cases.kindName, c.kind)}
+                              </span>
+                            )}
                             {c.caseNumber && (
                               <span className="shrink-0 font-mono text-xs text-base-content/50" data-testid="case-number">
                                 {c.caseNumber}

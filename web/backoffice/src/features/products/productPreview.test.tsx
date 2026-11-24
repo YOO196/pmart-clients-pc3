@@ -6,11 +6,12 @@ import { describe, expect, it } from 'vitest';
 import { as, renderAt } from '../../test/render';
 
 describe('상품 조회 미리보기', () => {
-  it('이름을 눌러도 상세로 가지 않고 미리보기가 열린다 — SKU·단위·중량·보관·바코드·가격·버전', async () => {
+  it('이름은 바로 상세 링크(2026-11-24), 줄의 다른 곳을 누르면 미리보기 — SKU·단위·중량·보관·바코드·가격·버전', async () => {
     const user = userEvent.setup();
     renderAt('/products', as.md);
-    const apple = await screen.findByText('사과 1.5kg', { selector: '[data-testid="product-name"]' });
-    await user.click(apple);
+    const row = (await screen.findAllByTestId('product-row')).find((r) => r.textContent?.includes('사과 1.5kg'))!;
+    expect(within(within(row).getByTestId('product-name')).getByRole('link', { name: '사과 1.5kg' })).toHaveAttribute('href', '/products/P-00000001');
+    await user.click(within(row).getByTestId('product-category'));
     const preview = await screen.findByTestId('product-preview');
     expect(screen.getByRole('heading', { level: 1, name: '상품 조회' })).toBeInTheDocument(); // 상세로 넘어가지 않음
     const sku = within(preview).getByTestId('preview-sku');
@@ -27,7 +28,8 @@ describe('상품 조회 미리보기', () => {
   it('가격이 없는 SKU 는 0원이 아니라 "가격 미설정"', async () => {
     const user = userEvent.setup();
     renderAt('/products', as.md);
-    await user.click(await screen.findByText('소고기 미역국 500g', { selector: '[data-testid="product-name"]' }));
+    const row = (await screen.findAllByTestId('product-row')).find((r) => r.textContent?.includes('소고기 미역국 500g'))!;
+    await user.click(within(row).getByTestId('product-category'));
     const preview = await screen.findByTestId('product-preview');
     await waitFor(() => expect(within(preview).getByTestId('preview-sku-price')).toHaveTextContent('가격 미설정'));
   });

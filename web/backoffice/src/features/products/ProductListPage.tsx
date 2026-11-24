@@ -363,11 +363,23 @@ export function ProductListPage() {
                           <tr key={p.productId ?? i} data-testid="product-row" {...pv.row(p.productId)}>
                             <td className="max-w-xl">
                               <div className="flex items-center gap-3">
-                                <Thumb card={p.productId ? cardOf.get(p.productId) : undefined} name={p.internalName ?? ''} />
+                                {/* 사진·이름은 바로 상세(2026-11-24 사용자 "이름 또는 아이콘으로 바로 들어가지게" — 11-20 "줄 어디나 미리보기"를 바꿈), 줄 나머지는 오른쪽 미리보기 */}
+                                {p.productId ? (
+                                  <Link to={`/products/${encodeURIComponent(p.productId)}`} onClick={(e) => e.stopPropagation()} tabIndex={-1} aria-hidden="true">
+                                    <Thumb card={cardOf.get(p.productId)} name={p.internalName ?? ''} />
+                                  </Link>
+                                ) : (
+                                  <Thumb card={undefined} name={p.internalName ?? ''} />
+                                )}
                                 <div className="min-w-0">
-                                  {/* 이름도 줄과 같게 — 누르면 오른쪽 미리보기(2026-11-20 사용자 "어떤 건 미리보기, 어떤 건 상세 — 일관성 없다") */}
                                   <p className="truncate font-semibold" title={p.internalName ?? undefined} data-testid="product-name">
-                                    {p.internalName ?? m.none}
+                                    {p.productId ? (
+                                      <Link className="hover:text-primary hover:underline" to={`/products/${encodeURIComponent(p.productId)}`} onClick={(e) => e.stopPropagation()}>
+                                        {p.internalName ?? m.none}
+                                      </Link>
+                                    ) : (
+                                      (p.internalName ?? m.none)
+                                    )}
                                   </p>
                                   {(() => {
                                     const c = p.productId ? cardOf.get(p.productId) : undefined;

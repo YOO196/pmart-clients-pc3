@@ -2708,13 +2708,13 @@ export const messages = {
     images: '이미지',
     imageRole: { MAIN: '대표', DESCRIPTION: '상세설명', DETAIL: '상세정보 표' } as const,
     imageRoleHint: {
-      MAIN: '카드·상세 맨 위 사진. 1장(다시 올리면 바꿔요)',
-      DESCRIPTION: '상세설명 이미지. 여러 장, 고른 순서대로',
-      DETAIL: '상세정보 표 이미지',
+      MAIN: '1장 · 권장 1080×1080',
+      DESCRIPTION: '권장 가로 1080',
+      DETAIL: '권장 가로 1080',
     } as const,
     addImageButton: '이미지 추가',
     // 사진 규격(2026-11-24 — 서버 product-content 검사 값. 권장 가로·세로는 정해진 값이 없다)
-    imageSpec: '규격: JPEG·PNG·WebP · 장당 20MB 이하 · 한 초안 100장까지 · 대표 1장',
+    imageSpec: 'JPEG·PNG·WebP · 장당 20MB · 100장까지',
     imageRefused: (names: string) => `규격에 맞지 않아 넣지 않았어요(형식·20MB·100장): ${names}`,
     addImage: (role: string) => `${role} 이미지 추가`,
     // 긴 상세 이미지 자르기(2026-11-18)
@@ -3657,6 +3657,16 @@ export const messages = {
     placement: '자리',
     // 2026-11-21 점검: "홈 가운데"·"홈 중간 묶음"이 같은 말로 읽혀 — 고정 자리와 홈 순서 안 자리로 나눠 부른다
     placementName: { HOME_TOP: '홈 맨 위', HOME_MIDDLE: '홈 가운데(고정)', HOME_INLINE: '홈 순서 안 묶음', CATEGORY: '카테고리 화면 맨 위', POPUP: '앱 첫 화면 팝업', SPLASH: '처음 로딩 화면' } as Readonly<Record<string, string>>,
+    // 자리별 권장 크기(2026-11-24 사용자 "권장 가로 세로 비율 — 사진이 들어가는 곳마다"). 서버는 막지 않는다 — 고객 앱이 그리는 모양에서(1080px = 360dp):
+    // 홈 위·중간·홈 순서 묶음·카테고리 = BannerPager 화면 폭 × 폭÷2.8(가운데 잘라 채움), 팝업 = 4:5, 로딩 화면 = 화면 전체·그림 다 보이게(세로 9:16)
+    imageSize: {
+      HOME_TOP: '권장 1080×386px(가로:세로 2.8:1) — 화면 폭에 맞추고 넘치면 가운데만 보여요',
+      HOME_MIDDLE: '권장 1080×386px(가로:세로 2.8:1) — 화면 폭에 맞추고 넘치면 가운데만 보여요',
+      HOME_INLINE: '권장 1080×386px(가로:세로 2.8:1) — 화면 폭에 맞추고 넘치면 가운데만 보여요',
+      CATEGORY: '권장 1080×386px(가로:세로 2.8:1) — 화면 폭에 맞추고 넘치면 가운데만 보여요',
+      POPUP: '권장 1080×1350px(가로:세로 4:5)',
+      SPLASH: '권장 1080×1920px(세로 9:16) — 그림 전체가 보이고 남는 위·아래는 가장자리 색',
+    } as Readonly<Record<string, string>>,
     placementHint: {
       HOME_MIDDLE: '테마 사이 정해진 자리예요(예전 앱 방식). 자리를 직접 정하려면 "홈 순서 안 묶음"을 고르세요.',
       CATEGORY: '모든 카테고리 화면 맨 위에 같이 보여요(카테고리마다 따로가 아니에요). 홈에는 나오지 않아요.',
