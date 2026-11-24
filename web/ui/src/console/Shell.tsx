@@ -153,6 +153,7 @@ export function ConsoleShell({
               : groups.map((g) => (
                   <div key={g.id} className="mb-2" data-testid={`nav-group-${g.id}`}>
                     {/* 이름 없는 묶음(홈 등)은 제목 없이 */}
+                    {/* 묶음 아이콘이 있으면 메뉴 글자를 묶음 이름 글자에 맞춘다(px-4 + 아이콘 16 + 사이 8 = 40px, 2026-11-24) */}
                     {g.label && (
                       <p className="flex items-center gap-2 px-4 py-[5px] text-sm font-bold text-base-content">
                         {g.icon && <span className="text-base-content/60 [&_svg]:h-4 [&_svg]:w-4">{g.icon}</span>}
@@ -165,7 +166,7 @@ export function ConsoleShell({
                           <NavLink
                             to={it.to}
                             end={it.end ?? true}
-                            className={({ isActive }) => `flex items-center justify-between gap-2 py-[5px] ${g.label ? 'pl-7' : 'pl-4 font-bold'} pr-4 text-sm transition-colors ${isActive || here === it.to ? 'font-semibold text-primary' : g.label ? 'text-base-content/80 hover:text-primary' : 'text-base-content hover:text-primary'}`}
+                            className={({ isActive }) => `flex items-center justify-between gap-2 py-[5px] ${g.label ? (g.icon ? 'pl-10' : 'pl-7') : 'pl-4 font-bold'} pr-4 text-sm transition-colors ${isActive || here === it.to ? 'font-semibold text-primary' : g.label ? 'text-base-content/80 hover:text-primary' : 'text-base-content hover:text-primary'}`}
                           >
                             <span className="truncate">{it.label}</span>
                             {it.badge}
