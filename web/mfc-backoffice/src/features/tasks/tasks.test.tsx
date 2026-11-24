@@ -18,7 +18,7 @@ const problem = (status: number, code: string) =>
 
 describe('작업 목록', () => {
   it('기본은 담당·진행 중(서버 기본 — state 를 보내지 않는다), 생긴 순. 늦음·멈춤은 서버 표시값', async () => {
-    const view = renderAt('/c/MFC-BSN-01/tasks');
+    const view = renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(() => expect(firstCells()).toEqual(['복귀', '피킹', '포장']));
     expect(within(rows()[0]!).getByText('늦음')).toBeInTheDocument();
     expect(within(rows()[1]!).getByText('멈춤(30분 실적 없음)')).toBeInTheDocument();
@@ -26,11 +26,11 @@ describe('작업 목록', () => {
     expect(screen.getByText(/담당 기준/)).toBeInTheDocument();
     // 목록 요청(상태 카드·운영 조회는 state 를 보낸다)
     const q = view.gets('/tasks').map((r) => new URL(r.url).searchParams).find((p) => p.getAll('state').length === 0)!;
-    expect(q.get('mfcId')).toBe('MFC-BSN-01');
+    expect(q.get('mfcId')).toBe('MFC-SEED-01');
   });
 
   it('상태(대기)·유형 거르기는 URL 쿼리 → 서버로', async () => {
-    const view = renderAt('/c/MFC-BSN-01/tasks');
+    const view = renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(() => expect(rows()).toHaveLength(3));
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'READY');
     await waitFor(() => expect(rows()).toHaveLength(1));
@@ -43,13 +43,13 @@ describe('작업 목록', () => {
 
   it('조회 실패는 빈 목록이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/tasks`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-BSN-01/tasks');
+    renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(() => expect(document.querySelector('[data-state="error"]')).not.toBeNull());
     expect(screen.queryByText('조건에 맞는 작업이 없어요.')).not.toBeInTheDocument();
   });
 
   it('확인 필요 포장(MB-3): 센터 관리자도 목록을 보고, 가져감은 한 번 더 물은 뒤 보낸다', async () => {
-    const view = renderAt('/c/MFC-BSN-01/tasks');
+    const view = renderAt('/c/MFC-SEED-01/tasks');
     const box = await screen.findByTestId('handover-checks');
     const row = (await within(box).findAllByTestId('handover-check-row'))[0]!;
     // 포장 시스템 ID 는 접힌 시스템 번호 칸에만, 라이더는 화면 표기 — 표기 조회에 없는 라이더는 "라이더"(ID 를 글자로 내지 않는다)
@@ -58,7 +58,7 @@ describe('작업 목록', () => {
     expect(within(row).getByTestId('check-numbers')).toHaveTextContent('인계 번호 3817 · 주문 20000001');
     await waitFor(() => expect(within(row).getByTestId('rider-label')).toHaveTextContent(/^라이더$/));
     const req = view.gets('/packages')[0]!;
-    expect(Object.fromEntries(new URL(req.url).searchParams)).toEqual({ mfcId: 'MFC-BSN-01', checkRequired: 'true' });
+    expect(Object.fromEntries(new URL(req.url).searchParams)).toEqual({ mfcId: 'MFC-SEED-01', checkRequired: 'true' });
 
     // 취소하면 보내지 않는다.
     await userEvent.click(within(row).getByRole('button', { name: '포장대에 없음(라이더가 가져감)' }));
@@ -78,7 +78,7 @@ describe('작업 목록', () => {
 
   it('확인 필요 포장: 허가가 아직 살아 있으면(409 FENCE_ACTIVE) 거절 안내', async () => {
     server.use(http.post(`${API_BASE}/packages/:id/handover-checks`, () => HttpResponse.json({ status: 409, code: 'FENCE_ACTIVE', title: 'x', type: 'about:blank' }, { status: 409, headers: { 'content-type': 'application/problem+json' } })));
-    renderAt('/c/MFC-BSN-01/tasks');
+    renderAt('/c/MFC-SEED-01/tasks');
     const row = (await screen.findAllByTestId('handover-check-row'))[0]!;
     await userEvent.click(within(row).getByRole('button', { name: '포장대에 있음' }));
     await userEvent.click(within(row).getByRole('button', { name: '보내기' }));
@@ -88,7 +88,7 @@ describe('작업 목록', () => {
 
 describe('작업 상세', () => {
   it('줄·출하·포장, 인계 판정은 누를 때만 부른다', async () => {
-    const view = renderAt('/c/MFC-BSN-01/tasks/TASK-PICK-1');
+    const view = renderAt('/c/MFC-SEED-01/tasks/TASK-PICK-1');
     await heading();
     expect(screen.getAllByTestId('task-line')).toHaveLength(2);
     expect(screen.getByText('최단 경로')).toBeInTheDocument();
@@ -105,7 +105,7 @@ describe('작업 상세', () => {
   });
 
   it('작업 내놓기: 지금 담당을 보내고, 서버가 대기로 돌려주면 그렇게 보인다', async () => {
-    const view = renderAt('/c/MFC-BSN-01/tasks/TASK-PICK-1');
+    const view = renderAt('/c/MFC-SEED-01/tasks/TASK-PICK-1');
     await heading();
     await userEvent.type(screen.getByRole('textbox', { name: '내놓는 사유(선택)' }), '교대');
     await userEvent.click(screen.getByRole('button', { name: '작업 내놓기' }));
@@ -118,7 +118,7 @@ describe('작업 상세', () => {
   });
 
   it('재고 확정 대기 실적이 있으면 안내, 내놓기는 서버가 EXECUTION_IN_FLIGHT 로 거절', async () => {
-    renderAt('/c/MFC-BSN-01/tasks/TASK-RET-1');
+    renderAt('/c/MFC-SEED-01/tasks/TASK-RET-1');
     await heading();
     expect(screen.getByText(/재고 확정을 기다리는 실적이 1건/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: '작업 내놓기' }));
@@ -137,7 +137,7 @@ describe('작업 상세', () => {
         return undefined;
       }),
     );
-    const view = renderAt('/c/MFC-BSN-01/tasks/TASK-PACK-1');
+    const view = renderAt('/c/MFC-SEED-01/tasks/TASK-PACK-1');
     await heading();
     await userEvent.click(screen.getByRole('button', { name: '작업 내놓기' }));
     expect(await screen.findByText('처리 결과를 확인하고 있어요')).toBeInTheDocument();
@@ -150,7 +150,7 @@ describe('작업 상세', () => {
   });
 
   it('막힌 작업: 막힌 이유를 보이고 내놓기 단추가 없다', async () => {
-    renderAt('/c/MFC-BSN-01/tasks/TASK-PICK-3');
+    renderAt('/c/MFC-SEED-01/tasks/TASK-PICK-3');
     await heading();
     expect(screen.getByText('결품 보고 — 신라면 5입')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '작업 내놓기' })).not.toBeInTheDocument();
@@ -158,7 +158,7 @@ describe('작업 상세', () => {
 
   it('출하 조회 실패는 "포장 없음"이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/shipments/:shipmentId`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-BSN-01/tasks/TASK-PICK-1');
+    renderAt('/c/MFC-SEED-01/tasks/TASK-PICK-1');
     await heading();
     await waitFor(() => expect(document.querySelector('[data-state="error"]')).not.toBeNull());
     expect(screen.queryByText('아직 포장이 없어요.')).not.toBeInTheDocument();
@@ -170,7 +170,7 @@ describe('작업 목록 행 조치', () => {
   const rowOf = (type: string) => rows().find((r) => within(r).getAllByRole('cell')[0]!.textContent === type)!;
 
   it('늦음·멈춤 행이 위로, 진행 중·배정됨은 담당 바꾸기·내려놓기', async () => {
-    renderAt('/c/MFC-BSN-01/tasks');
+    renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(() => expect(rows()).toHaveLength(3));
     // 복귀(늦음)·피킹(멈춤)이 포장보다 위
     expect(firstCells()).toEqual(['복귀', '피킹', '포장']);
@@ -180,7 +180,7 @@ describe('작업 목록 행 조치', () => {
   });
 
   it('담당 바꾸기: 그 유형을 맡을 수 있는 재직 작업자만(휴게 중 표시), 진행 중이면 현장 주의, 지금 배정 버전·사유를 보낸다', async () => {
-    const view = renderAt('/c/MFC-BSN-01/tasks');
+    const view = renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(() => expect(rows()).toHaveLength(3));
     await userEvent.click(within(rowOf('피킹')).getByRole('button', { name: '담당 바꾸기' }));
     const form = await screen.findByRole('form', { name: /담당 바꾸기/ });
@@ -201,13 +201,13 @@ describe('작업 목록 행 조치', () => {
     const post = view.sent.find((r) => r.method === 'POST' && r.url.endsWith('/assignments'))!;
     expect(post.headers.get('X-Expected-Version')).toBe('1');
     expect(post.headers.get('Idempotency-Key')).toBeTruthy();
-    expect(await post.clone().json()).toEqual({ mfcId: 'MFC-BSN-01', taskId: 'TASK-PICK-1', taskType: 'PICK', workerId: 'OP-wkr-2', reason: '교대' });
+    expect(await post.clone().json()).toEqual({ mfcId: 'MFC-SEED-01', taskId: 'TASK-PICK-1', taskType: 'PICK', workerId: 'OP-wkr-2', reason: '교대' });
     // 목록을 다시 읽어 새 담당이 보인다
     await waitFor(() => expect(within(rowOf('피킹')).getByText(/이알바|OP-wkr-2/)).toBeInTheDocument());
   });
 
   it('포장 담당 바꾸기: 그 주문을 피킹한 사람이 맨 위("피킹한 사람")', async () => {
-    renderAt('/c/MFC-BSN-01/tasks');
+    renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(() => expect(rows()).toHaveLength(3));
     await userEvent.click(within(rowOf('포장')).getByRole('button', { name: '담당 바꾸기' }));
     const form = await screen.findByRole('form', { name: /담당 바꾸기/ });
@@ -222,7 +222,7 @@ describe('작업 목록 행 조치', () => {
 
   it('담당 바꾸기: 그 사이 다른 배정(409 VERSION_CONFLICT)이면 거절 안내', async () => {
     server.use(http.post(`${API_BASE}/assignments`, () => problem(409, 'VERSION_CONFLICT')));
-    renderAt('/c/MFC-BSN-01/tasks');
+    renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(() => expect(rows()).toHaveLength(3));
     await userEvent.click(within(rowOf('피킹')).getByRole('button', { name: '담당 바꾸기' }));
     const form = await screen.findByRole('form', { name: /담당 바꾸기/ });
@@ -235,7 +235,7 @@ describe('작업 목록 행 조치', () => {
   });
 
   it('내려놓기: 사유를 받아 지금 담당으로 보내고 대기로, 실적이 처리 중이면(409 EXECUTION_IN_FLIGHT) 안내', async () => {
-    const view = renderAt('/c/MFC-BSN-01/tasks');
+    const view = renderAt('/c/MFC-SEED-01/tasks');
     await waitFor(() => expect(rows()).toHaveLength(3));
     await userEvent.click(within(rowOf('피킹')).getByRole('button', { name: '내려놓기' }));
     const form = await screen.findByRole('form', { name: /내려놓기/ });

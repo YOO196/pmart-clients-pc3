@@ -18,7 +18,7 @@ describe('내 정보', () => {
     expect(within(profile).getByText('E-2026-0101')).toBeInTheDocument();
     expect(within(profile).getByText('sup1@pmart.test')).toBeInTheDocument();
     expect(within(profile).getByText('정규직')).toBeInTheDocument();
-    expect(within(profile).getByText('센터 MFC-BSN-01')).toBeInTheDocument();
+    expect(within(profile).getByText('센터 MFC-SEED-01')).toBeInTheDocument();
     expect(within(profile).getByText('재직')).toBeInTheDocument();
     expect(screen.getByText('회사 메일은 로그인 ID 이자 사서함이라 인사팀만 바꿔요.')).toBeInTheDocument();
     expect(view.sent.filter((r) => r.method !== 'GET' && new URL(r.url).pathname.includes('/hr/'))).toHaveLength(0);
@@ -32,7 +32,7 @@ describe('내 정보', () => {
     await userEvent.type(within(card).getByLabelText('한 번 더'), '1234');
     await userEvent.click(within(card).getByRole('button', { name: '번호 정하기' }));
     expect(await within(card).findByText(/휴게 번호를 정했어요/)).toBeInTheDocument();
-    const put = view.sent.find((r) => r.method === 'PUT' && new URL(r.url).pathname.endsWith('/mfcs/MFC-BSN-01/break-pin'))!;
+    const put = view.sent.find((r) => r.method === 'PUT' && new URL(r.url).pathname.endsWith('/mfcs/MFC-SEED-01/break-pin'))!;
     expect(put.headers.get('Idempotency-Key')).toBeTruthy();
   });
 
@@ -53,7 +53,7 @@ describe('내 정보', () => {
     const puts = () => view.sent.filter((r) => r.method === 'PUT' && new URL(r.url).pathname.endsWith('/staff-contacts/me'));
     await waitFor(() => expect(puts()).toHaveLength(1));
     const put = puts()[0]!;
-    expect(new URL(put.url).pathname).toContain('/mfcs/MFC-BSN-01/');
+    expect(new URL(put.url).pathname).toContain('/mfcs/MFC-SEED-01/');
     expect(put.headers.get('X-Expected-Version')).toBe('0');
     expect(await put.clone().json()).toEqual({ name: '센터장 정관리', phone: '010-1234-5678', email: null });
     expect(await within(await screen.findByTestId('me-contact')).findByText(/^마지막 저장/)).toBeInTheDocument();
@@ -70,7 +70,7 @@ describe('내 정보', () => {
     const row = await within(list).findByTestId('center-contact-row');
     expect(row).toHaveTextContent('010-0000-0201');
     expect(await within(row).findByText(/김현장/)).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText('센터'), 'MFC-SEL-01');
+    await userEvent.selectOptions(screen.getByLabelText('센터'), 'MFC-MOKPO-01');
     expect(await within(screen.getByTestId('center-contacts')).findByText('센터장 한관리')).toBeInTheDocument();
     expect(screen.getByTestId('center-contacts')).toHaveTextContent('sel-desk@pmart.test');
   });

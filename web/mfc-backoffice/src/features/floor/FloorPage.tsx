@@ -1,8 +1,8 @@
 // 센터 도면(실시간 관제 메뉴, 2026-11-21 사용자) — 위에서 본 도면을 크게, 랙·작업자를 눌러 오른쪽에서 본다.
-// - 랙: 칸 코드 앞부분(가정 연결 — floorLayout.ts)으로 mfc-inventory `GET /mfcs/{mfcId}/stock-units?locationPrefix=`(0.33.0) — 단·칸별 지금 놓인 상품·수량·LOT·품질,
+// - 랙: 칸 코드 앞부분(센터 도면 floorPlan — 시뮬레이터 평면의 랙 = 서버 칸 코드 앞부분)으로 mfc-inventory `GET /mfcs/{mfcId}/stock-units?locationPrefix=`(0.33.0) — 단·칸별 지금 놓인 상품·수량·LOT·품질,
 //   mfc-location 칸(상태·진열 카테고리·고회전). 등록된 칸이 없으면 그렇게 말한다(빈 랙으로 꾸미지 않는다).
 // - 작업자: capacity 작업자(이름·사번·고용·휴게·업무) + 끝나지 않은 작업(fulfillment — 진행 중 = IN_PROGRESS, 예정 = ASSIGNED·READY·WAITING 중 이 사람 담당).
-//   점의 위치·역할 색은 목 시뮬레이션(위치 API 없음 — handoff 2026-11-21-backend-worker-floor-positions).
+//   마지막 스캔 칸·시각은 capacity 0.34.0 worker-positions(도면 점과 같은 조회).
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
 
@@ -11,7 +11,7 @@ import { formatSeoul } from '@pmart/web-ui';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
-import { FloorMap, type FloorPick } from '../dashboard/FloorMap';
+import { FloorMap, POSITIONS_REFRESH_MS, type FloorPick } from '../dashboard/FloorMap';
 import { fetchAllLocations, type Location } from '../dashboard/floorQueries';
 import { useNow } from '../../shared/motion';
 import { OPS_REFRESH_MS, useOpenTasks } from '../ops/opsQueries';
@@ -242,6 +242,12 @@ function WorkerPanel({ mfcId, workerId, onClose }: { readonly mfcId: string; rea
     queryFn: async () => (await request('GET', api.capacity.GET('/mfcs/{mfcId}/workers', { params: { path: { mfcId }, query: { state: 'ACTIVE' } } }))).items ?? [],
   });
   const tasks = useOpenTasks(mfcId);
+  const positions = useQuery({
+    queryKey: ['dashboard', mfcId, 'worker-positions'],
+    refetchInterval: POSITIONS_REFRESH_MS,
+    queryFn: () => request('GET', api.capacity.GET('/mfcs/{mfcId}/worker-positions', { params: { path: { mfcId }, query: { sinceMinutes: 480 } } })),
+  });
+  const last = positions.data?.items.find((x) => x.workerId === workerId) ?? positions.data?.unplaced.find((x) => x.workerId === workerId);
   const w = workers.data?.find((x) => x.workerId === workerId);
   const mine = (tasks.data?.items ?? []).filter((t) => t.assignment?.workerId === workerId);
   const running = mine.filter((t) => t.state === 'IN_PROGRESS' || t.state === 'BLOCKED');
@@ -265,6 +271,21 @@ function WorkerPanel({ mfcId, workerId, onClose }: { readonly mfcId: string; rea
             <dd>{messages.workers.employment[w.employmentType ?? ''] ?? w.employmentType ?? messages.none}</dd>
             <dt className="text-base-content/55">{m.now}</dt>
             <dd>{w.onBreak ? <span className="badge badge-warning badge-sm">{m.onBreak}</span> : running.length > 0 ? <span className="badge badge-primary badge-sm">{m.working}</span> : <span className="badge badge-ghost badge-sm">{m.idle}</span>}</dd>
+            <dt className="text-base-content/55">{m.lastScan}</dt>
+            <dd data-testid="worker-last-scan">
+              {positions.isError ? (
+                <span className="text-error">{m.lastScanFailed}</span>
+              ) : positions.isPending ? (
+                '…'
+              ) : last ? (
+                <>
+                  <span className="pm-mono">{last.locationCode}</span> · {messages.tasks.taskType[last.activityType] ?? last.activityType}
+                  <span className="block text-xs text-base-content/55">{formatSeoul(last.at)}</span>
+                </>
+              ) : (
+                <span className="text-base-content/55">{m.noScan}</span>
+              )}
+            </dd>
             <dt className="text-base-content/55">{m.areas}</dt>
             <dd>{(w.workAreas ?? []).map((a) => messages.workers.area[a] ?? a).join(' · ') || messages.none}</dd>
             <dt className="text-base-content/55">{m.duties}</dt>

@@ -7,6 +7,7 @@ import { API_BASE } from '../api/client';
 import type { components } from '../api/generated/mfc-capacity';
 import { db, nextSeq, timestamp, type MockAssignment, type MockShift, type MockWorker, type TaskType } from './db';
 import { expectedVersion, idempotent, operator, problem, unauthorized } from './support';
+import { mockWorkerPositions } from './workerPositionSim';
 
 type Cap = components['schemas'];
 
@@ -102,6 +103,17 @@ function countWindowsOf(mfcId: string) {
 }
 
 export const workerHandlers = [
+  // 0.34.0 작업자 위치(마지막 스캔 칸) — 목은 시간으로 정한 스캔 순서(workerPositionSim). 권한: 그 센터 관리자 또는 OPERATOR_ADMIN
+  http.get(`${API_BASE}/mfcs/:mfcId/worker-positions`, ({ request, params }) => {
+    if (!operator(request)) return unauthorized();
+    const mfcId = String(params.mfcId);
+    if (!canAccess(request, mfcId) || !isSupervisor(request)) return problem(403, 'FORBIDDEN');
+    const raw = new URL(request.url).searchParams.get('sinceMinutes');
+    const since = raw === null ? 480 : Number(raw);
+    if (!Number.isInteger(since) || since < 1 || since > 1440) return problem(400, 'VALIDATION_FAILED');
+    return HttpResponse.json(mockWorkerPositions(mfcId, [...db.workers.values()].filter((w) => w.mfcId === mfcId), Date.now(), since));
+  }),
+
   http.get(base, ({ request, params }) => {
     if (!operator(request)) return unauthorized();
     const mfcId = String(params.mfcId);

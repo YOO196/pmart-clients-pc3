@@ -27,7 +27,7 @@ export const dashboardHandlers = [
     const q = new URL(request.url).searchParams;
     const mfcId = q.get('mfcId') ?? '';
     if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
-    if (mfcId !== 'MFC-BSN-01') return HttpResponse.json({ items: [], sort: 'shortLines', minPickedLines: null, asOf: new Date().toISOString() });
+    if (mfcId !== 'MFC-SEED-01') return HttpResponse.json({ items: [], sort: 'shortLines', minPickedLines: null, asOf: new Date().toISOString() });
     const limit = Number(q.get('limit') ?? 10);
     const items = SKUS.map(({ SHORT, DAMAGED, SPOILED, BLOCKED, ...s }) => ({ ...s, shortLines: SHORT + DAMAGED + SPOILED + BLOCKED, shortLinesByReason: { SHORT, DAMAGED, SPOILED, BLOCKED } }))
       .sort((a, b) => b.shortLines - a.shortLines)
@@ -43,7 +43,7 @@ export const dashboardHandlers = [
     const list = days(q.get('from') ?? today, q.get('to') ?? today);
     if (list.length > 31) return problem(400, 'VALIDATION_FAILED');
     // 일요일은 셀 배송 없음(줄 없음 — 0건 날짜) — 오늘은 요일과 상관없이 있다(피킹 목과 같게, 일요일에 시험이 깨지지 않게). 오늘은 약속 전(pending)이 남아 있다.
-    const items = mfcId !== 'MFC-BSN-01' ? [] : list
+    const items = mfcId !== 'MFC-SEED-01' ? [] : list
       .filter((d) => d === today || new Date(`${d}T00:00:00Z`).getUTCDay() !== 0)
       .map((d) => {
         const n = Number(d.slice(8, 10));

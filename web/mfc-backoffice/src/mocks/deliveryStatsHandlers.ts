@@ -1,12 +1,12 @@
 // 배송 통계 목 — delivery-execution 0.38.0 `GET /delivery-metrics`, delivery-dispatch 0.16.0 `GET /metrics/dispatch`.
 // 서버 규칙 중 화면이 보여 줄 것만: 관리자(OPERATOR_ADMIN·RIDER_OPS·CS_AGENT)가 아니면 mfcId 필수(400)·그 센터만(403), 최대 31일(400),
-// 0건 묶음은 줄 없음. 값은 날짜·라이더로 정해지는 결정적인 수(목 배송은 부산 MFC-BSN-01 에만).
+// 0건 묶음은 줄 없음. 값은 날짜·라이더로 정해지는 결정적인 수(목 배송은 부산 MFC-SEED-01 에만).
 import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { operator, problem, unauthorized } from './support';
 
-const CENTER = 'MFC-BSN-01';
+const CENTER = 'MFC-SEED-01';
 const RIDERS = ['RD-1', 'RD-2', 'RD-7', 'RD-31'] as const;
 const ALL_CENTERS = ['OPERATOR_ADMIN', 'RIDER_OPS', 'CS_AGENT'];
 const iso = /^\d{4}-\d{2}-\d{2}$/;

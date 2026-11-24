@@ -1,6 +1,6 @@
-// 보행 격자와 A* 길찾기 — 가상 현장(../pmart-mfc-simulation/src/domain/navgrid.ts, 2026-11-21 읽어 옮김).
-// 셀 0.25m, 8방향(모서리 끼기 금지), 시야선으로 경로 다듬기. 벽·랙·포장대는 막고 문 자리만 열린다 — 작업자 점이 벽·랙을 지나가지 않게.
-import type { Floor, Rect } from './floorLayout';
+// 보행 격자와 A* 길찾기 — 가상 현장(../pmart-mfc-simulation/src/domain/navgrid.ts, 2026-11-21 읽어 옮김, 2026-11-24 센터별 도면).
+// 셀 0.25m, 8방향(모서리 끼기 금지), 시야선으로 경로 다듬기. 벽·랙·포장대·팔레트는 막고 문 자리만 열린다 — 작업자 점이 벽·랙을 지나가지 않게.
+import type { FloorPlan, Rect } from '../floor/floorPlan';
 
 export interface P {
   readonly x: number;
@@ -14,21 +14,23 @@ export class NavGrid {
   readonly rows: number;
   private readonly free: Uint8Array;
 
-  constructor(floor: Floor) {
-    this.cols = Math.ceil(floor.width / CELL);
-    this.rows = Math.ceil(floor.depth / CELL);
+  constructor(floor: FloorPlan) {
+    const [yx0, yx1] = floor.yardX;
+    this.cols = Math.ceil(Math.max(floor.width, yx1 + 0.5, floor.bounds.x1 + 0.5) / CELL);
+    this.rows = Math.ceil(Math.max(floor.depth, floor.bounds.z1 + 0.5) / CELL);
     this.free = new Uint8Array(this.cols * this.rows);
     const BD = floor.buildingDepth;
+    const inYard = (x: number, z: number) => floor.outsideYards.some((y) => x >= y.x0 && x <= y.x1 && z >= y.z0 && z <= y.z1);
     for (let r = 0; r < this.rows; r++)
       for (let c = 0; c < this.cols; c++) {
         const x = (c + 0.5) * CELL;
         const z = (r + 0.5) * CELL;
-        // 건물 안 + 남쪽 앞마당(출하대기·라이더 대기)
-        this.free[r * this.cols + c] = z < BD || (x > 20.15 && x < 39.85) ? 1 : 0;
+        // 건물 안(시작 x 부터) + 남쪽 앞마당 + 바깥 마당(라이더 대기 등)
+        this.free[r * this.cols + c] = (z < BD && x >= floor.floorX0) || (x > yx0 && x < yx1) || inYard(x, z) ? 1 : 0;
       }
     // 벽은 실제보다 두껍게(0.1m씩) 막아 대각선으로 새지 않게
     for (const w of floor.walls) this.block(w, 0.1);
-    for (const t of floor.tables) this.block(t, 0.05);
+    for (const o of floor.obstacles) this.block(o, 0.05);
     for (const rk of floor.racks) {
       const hx = rk.along === 'x' ? 0.625 : 0.225;
       const hz = rk.along === 'x' ? 0.225 : 0.625;

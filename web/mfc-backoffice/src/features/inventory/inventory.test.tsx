@@ -19,7 +19,7 @@ async function lookup(sku: string) {
 
 describe('상품별 재고·정정', () => {
   it('상품 코드로 LOT 요약과 위치·상태별 재고를 본다', async () => {
-    renderAt('/c/MFC-BSN-01/inventory');
+    renderAt('/c/MFC-SEED-01/inventory');
     await lookup('sku-milk-1');
     await waitFor(() => expect(screen.getAllByTestId('unit-row')).toHaveLength(3));
     expect(screen.getAllByTestId('lot-row')).toHaveLength(2);
@@ -28,13 +28,13 @@ describe('상품별 재고·정정', () => {
 
   it('조회 실패는 "재고 없음"이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/mfcs/:mfcId/stock`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-BSN-01/inventory?sku=SKU-MILK-1');
+    renderAt('/c/MFC-SEED-01/inventory?sku=SKU-MILK-1');
     await waitFor(() => expect(document.querySelector('[data-state="error"]')).not.toBeNull());
     expect(screen.queryByText('이 센터에 이 상품 재고가 없어요.')).not.toBeInTheDocument();
   });
 
   it('정정: 본사 승인 번호를 넣고 보내면 반영 뒤 재고를 다시 읽는다', async () => {
-    const view = renderAt('/c/MFC-BSN-01/inventory?sku=SKU-MILK-1');
+    const view = renderAt('/c/MFC-SEED-01/inventory?sku=SKU-MILK-1');
     const row = (await screen.findAllByTestId('unit-row'))[0]!;
     await userEvent.click(within(row).getByRole('button', { name: '정정' }));
     const form = screen.getByRole('form', { name: '정정' });
@@ -57,7 +57,7 @@ describe('상품별 재고·정정', () => {
   });
 
   it('보이는 수량보다 많으면 단추가 꺼지고, 그 사이 재고가 줄었으면 서버가 INSUFFICIENT_STOCK', async () => {
-    renderAt('/c/MFC-BSN-01/inventory?sku=SKU-MILK-1');
+    renderAt('/c/MFC-SEED-01/inventory?sku=SKU-MILK-1');
     const row = (await screen.findAllByTestId('unit-row'))[1]!;
     await userEvent.click(within(row).getByRole('button', { name: '정정' }));
     const form = screen.getByRole('form', { name: '정정' });
@@ -79,7 +79,7 @@ describe('상품별 재고·정정', () => {
 
 describe('순환 실사', () => {
   it('실사 잠금이 안 된 칸이면 서버가 LOCATION_NOT_LOCKED 로 거절', async () => {
-    renderAt('/c/MFC-BSN-01/inventory?tab=counts');
+    renderAt('/c/MFC-SEED-01/inventory?tab=counts');
     await userEvent.type(await screen.findByRole('textbox', { name: /실사할 칸/ }), 'C-S1-03-2-04');
     await userEvent.click(screen.getByRole('button', { name: '실사 시작' }));
     expect(await screen.findByText(/실사 잠금이 안 된 칸이 있어요/)).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('순환 실사', () => {
 
   it('잠긴 칸이면 시작 → 그 실사를 연다(계수 중에는 차이를 숨긴다)', async () => {
     db.locations.set('LOC-1', { ...db.locations.get('LOC-1')!, state: 'COUNT_LOCKED' });
-    const view = renderAt('/c/MFC-BSN-01/inventory?tab=counts');
+    const view = renderAt('/c/MFC-SEED-01/inventory?tab=counts');
     await userEvent.type(await screen.findByRole('textbox', { name: /실사할 칸/ }), 'c-s1-03-2-04, C-S1-03-2-04');
     await userEvent.type(screen.getByRole('textbox', { name: '사유(선택)' }), '월간 실사');
     await userEvent.click(screen.getByRole('button', { name: '실사 시작' }));
@@ -98,7 +98,7 @@ describe('순환 실사', () => {
   });
 
   it('승인 대기 실사: 차이를 보이고, 승인 번호와 함께 승인 — 조정 반영', async () => {
-    const view = renderAt('/c/MFC-BSN-01/inventory?tab=counts&sessionId=CNT-1');
+    const view = renderAt('/c/MFC-SEED-01/inventory?tab=counts&sessionId=CNT-1');
     const card = await screen.findByTestId('count-session');
     expect(within(card).getByTestId('diff-row')).toHaveTextContent('-2');
     const approve = within(card).getByRole('button', { name: '승인(조정 반영)' });
@@ -112,7 +112,7 @@ describe('순환 실사', () => {
 
   it('직접 시작한 실사는 승인할 수 없다(SELF_APPROVAL)', async () => {
     db.countSessions.set('CNT-2', { ...db.countSessions.get('CNT-2')!, state: 'PENDING_APPROVAL', differences: [] });
-    renderAt('/c/MFC-BSN-01/inventory?tab=counts&sessionId=CNT-2');
+    renderAt('/c/MFC-SEED-01/inventory?tab=counts&sessionId=CNT-2');
     const card = await screen.findByTestId('count-session');
     await userEvent.type(within(card).getByRole('textbox', { name: /본사 승인 번호/ }), 'AP-CNT-2');
     await userEvent.click(within(card).getByRole('button', { name: '승인(조정 반영)' }));
@@ -120,7 +120,7 @@ describe('순환 실사', () => {
   });
 
   it('반려는 승인 근거 없이 — 재고는 그대로', async () => {
-    renderAt('/c/MFC-BSN-01/inventory?tab=counts&sessionId=CNT-1');
+    renderAt('/c/MFC-SEED-01/inventory?tab=counts&sessionId=CNT-1');
     const card = await screen.findByTestId('count-session');
     await userEvent.click(within(card).getByRole('button', { name: '반려' }));
     expect(await screen.findByText('반려했어요. 재고는 그대로예요.')).toBeInTheDocument();
@@ -130,7 +130,7 @@ describe('순환 실사', () => {
 
 describe('출하 부적격·보충 기준·상품 취급', () => {
   it('출하 부적격 LOT → "이동 지시"는 이동 화면을 값으로 채워 연다(이미 기타 칸이면 단추 없음)', async () => {
-    renderAt('/c/MFC-BSN-01/inventory?tab=unshippable');
+    renderAt('/c/MFC-SEED-01/inventory?tab=unshippable');
     const rows = await screen.findAllByTestId('unshippable-row');
     expect(rows).toHaveLength(2);
     expect(within(rows[1]!).getByText('이미 기타 칸')).toBeInTheDocument();
@@ -143,7 +143,7 @@ describe('출하 부적격·보충 기준·상품 취급', () => {
   });
 
   it('보충 기준: 고회전 선반이 아니면 거절, 맞으면 저장, 삭제', async () => {
-    const view = renderAt('/c/MFC-BSN-01/inventory?tab=policies');
+    const view = renderAt('/c/MFC-SEED-01/inventory?tab=policies');
     await waitFor(() => expect(screen.getAllByTestId('policy-row')).toHaveLength(1));
     const form = screen.getByRole('form', { name: '기준 저장' });
     const fill = async (loc: string, sku: string, min: string, target: string, unit: string) => {
@@ -178,7 +178,7 @@ describe('출하 부적격·보충 기준·상품 취급', () => {
   });
 
   it('상품 취급: 켜기는 지금 버전으로 보내고, 판매 중지 상품은 SKU_INACTIVE 문구', async () => {
-    const view = renderAt('/c/MFC-BSN-01/inventory?tab=handlings');
+    const view = renderAt('/c/MFC-SEED-01/inventory?tab=handlings');
     await waitFor(() => expect(screen.getAllByTestId('handling-row')).toHaveLength(6));
     const ramen = screen.getAllByTestId('handling-row').find((r) => r.textContent?.includes('SKU-RAMEN-5'))!;
     await userEvent.click(within(ramen).getByRole('button', { name: '켜기' }));
@@ -194,7 +194,7 @@ describe('출하 부적격·보충 기준·상품 취급', () => {
 
 describe('본사 승인 번호(AP-1)', () => {
   it('정정이 기준 이상이면 승인 안내(걸린 기준, 요청 본문은 쏟지 않음) → 번호를 넣어 같은 키로 다시 → 안 된 번호는 이유', async () => {
-    const view = renderAt('/c/MFC-BSN-01/inventory?sku=SKU-MILK-1');
+    const view = renderAt('/c/MFC-SEED-01/inventory?sku=SKU-MILK-1');
     const row = (await screen.findAllByTestId('unit-row')).find((r) => r.textContent?.includes('A-P1-01-1-01'))!;
     await userEvent.click(within(row).getByRole('button', { name: '정정' }));
     const form = screen.getByRole('form', { name: '정정' });
@@ -226,7 +226,7 @@ describe('본사 승인 번호(AP-1)', () => {
   });
 
   it('실사 승인은 번호 없이도 보낸다(기준 아래면 서버가 받음)', async () => {
-    const view = renderAt('/c/MFC-BSN-01/inventory?tab=counts&sessionId=CNT-1');
+    const view = renderAt('/c/MFC-SEED-01/inventory?tab=counts&sessionId=CNT-1');
     const card = await screen.findByTestId('count-session');
     await userEvent.click(within(card).getByRole('button', { name: '승인(조정 반영)' }));
     expect(await screen.findByText('승인했어요. 조정이 반영됐어요.')).toBeInTheDocument();
@@ -236,7 +236,7 @@ describe('본사 승인 번호(AP-1)', () => {
 
 describe('본사 승인 요청 보내기(approval-service)', () => {
   it('승인 필요 → 요청 보내기(초안·제출) → 번호가 칸에 → 상태 확인(심사 중 → 승인) → 같은 키로 다시 보내 정정', async () => {
-    const view = renderAt('/c/MFC-BSN-01/inventory?sku=SKU-MILK-1');
+    const view = renderAt('/c/MFC-SEED-01/inventory?sku=SKU-MILK-1');
     const row = (await screen.findAllByTestId('unit-row')).find((r) => r.textContent?.includes('A-P1-01-1-01'))!;
     await userEvent.click(within(row).getByRole('button', { name: '정정' }));
     const form = screen.getByRole('form', { name: '정정' });
@@ -257,7 +257,7 @@ describe('본사 승인 요청 보내기(approval-service)', () => {
     const cr = postsTo(view.sent, '/change-requests')[0]!;
     const crBody = await sentBody(cr);
     expect([crBody.type, crBody.targetService]).toEqual(['MFC_STOCK_ADJUSTMENT', 'mfc-inventory-service']);
-    expect(String(crBody.targetRef)).toMatch(/^MFC-BSN-01:CORRECTION:/);
+    expect(String(crBody.targetRef)).toMatch(/^MFC-SEED-01:CORRECTION:/);
     expect(postsTo(view.sent, '/submissions')[0]!.headers.get('X-Expected-Version')).toBe('1');
 
     await userEvent.click(within(requested).getByRole('button', { name: '승인 상태 확인' }));
@@ -273,7 +273,7 @@ describe('본사 승인 요청 보내기(approval-service)', () => {
   });
 
   it('승인 전에 다시 보내면 "아직 승인되지 않았어요"', async () => {
-    renderAt('/c/MFC-BSN-01/inventory?sku=SKU-MILK-1');
+    renderAt('/c/MFC-SEED-01/inventory?sku=SKU-MILK-1');
     const row = (await screen.findAllByTestId('unit-row')).find((r) => r.textContent?.includes('A-P1-01-1-01'))!;
     await userEvent.click(within(row).getByRole('button', { name: '정정' }));
     const form = screen.getByRole('form', { name: '정정' });

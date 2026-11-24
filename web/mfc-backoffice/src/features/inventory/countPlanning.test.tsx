@@ -16,14 +16,14 @@ const sentTo = (sent: Request[], method: string, suffix: string) => sent.filter(
 
 describe('재고 실사 시간대', () => {
   it('바꾼 적 없으면 기본값 07:00–08:00 · 20:00–21:00 과 "기본값" 꼬리표', async () => {
-    renderAt('/c/MFC-BSN-01/inventory?tab=counts');
+    renderAt('/c/MFC-SEED-01/inventory?tab=counts');
     const card = await screen.findByTestId('count-windows');
     expect(await within(card).findByTestId('count-windows-text')).toHaveTextContent('07:00–08:00 · 20:00–21:00');
     expect(within(card).getByText('기본값')).toBeInTheDocument();
   });
 
   it('바꾸기 → 목록 통째로 X-Expected-Version 0 으로 보내고 응답으로 다시 그린다', async () => {
-    const view = renderAt('/c/MFC-BSN-01/inventory?tab=counts');
+    const view = renderAt('/c/MFC-SEED-01/inventory?tab=counts');
     const card = await screen.findByTestId('count-windows');
     await userEvent.click(await within(card).findByRole('button', { name: '바꾸기' }));
     const start1 = within(card).getByLabelText('1번째 시작');
@@ -40,7 +40,7 @@ describe('재고 실사 시간대', () => {
     expect(put.headers.get('X-Expected-Version')).toBe('0');
     expect(put.headers.get('Idempotency-Key')).toBeTruthy();
     expect(await sentBody(put)).toEqual({ windows: [{ startTime: '06:30', endTime: '07:30' }, { startTime: '20:00', endTime: '21:00' }] });
-    expect(db.countWindows.get('MFC-BSN-01')!.version).toBe(1);
+    expect(db.countWindows.get('MFC-SEED-01')!.version).toBe(1);
   });
 
   it('미리 검사: 시작 ≥ 끝, 겹침, 7개 이상', () => {
@@ -52,7 +52,7 @@ describe('재고 실사 시간대', () => {
 
   it('그 사이 다른 관리자가 바꿨으면(409) 거절 안내 + 다시 읽기', async () => {
     server.use(http.put(`${API_BASE}/mfcs/:mfcId/count-windows`, () => problem(409, 'VERSION_CONFLICT')));
-    const view = renderAt('/c/MFC-BSN-01/inventory?tab=counts');
+    const view = renderAt('/c/MFC-SEED-01/inventory?tab=counts');
     const card = await screen.findByTestId('count-windows');
     await userEvent.click(await within(card).findByRole('button', { name: '바꾸기' }));
     await userEvent.click(within(card).getByRole('button', { name: '시간대 저장' }));
@@ -63,7 +63,7 @@ describe('재고 실사 시간대', () => {
 
 describe('순환 실사 시작', () => {
   it('칸 수 → "다음"에서 잠김 확인 → 시작하기: rotationSize 만 보내고 고른 칸을 보인다', async () => {
-    const view = renderAt('/c/MFC-BSN-01/inventory?tab=counts');
+    const view = renderAt('/c/MFC-SEED-01/inventory?tab=counts');
     const box = await screen.findByTestId('rotation-count');
     await userEvent.click(within(box).getByRole('button', { name: '순환 실사 시작' }));
     const size = within(box).getByLabelText('칸 수(1~200)');
@@ -82,7 +82,7 @@ describe('순환 실사 시작', () => {
 
   it('고를 칸이 없으면(422 NO_COUNT_LOCATIONS) 그 이유', async () => {
     server.use(http.post(`${API_BASE}/mfcs/:mfcId/count-plans`, () => problem(422, 'NO_COUNT_LOCATIONS')));
-    renderAt('/c/MFC-BSN-01/inventory?tab=counts');
+    renderAt('/c/MFC-SEED-01/inventory?tab=counts');
     const box = await screen.findByTestId('rotation-count');
     await userEvent.click(within(box).getByRole('button', { name: '순환 실사 시작' }));
     await userEvent.click(within(box).getByRole('button', { name: '다음' }));
@@ -91,7 +91,7 @@ describe('순환 실사 시작', () => {
   });
 
   it('칸 수 0·201 은 막는다', async () => {
-    renderAt('/c/MFC-BSN-01/inventory?tab=counts');
+    renderAt('/c/MFC-SEED-01/inventory?tab=counts');
     const box = await screen.findByTestId('rotation-count');
     await userEvent.click(within(box).getByRole('button', { name: '순환 실사 시작' }));
     const size = within(box).getByLabelText('칸 수(1~200)');
