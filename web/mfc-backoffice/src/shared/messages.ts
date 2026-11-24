@@ -988,6 +988,13 @@ export const messages = {
   },
 
   /** 재고 — mfc-inventory-service 0.16.0 */
+  /** 재고 실시간 반영(inventory 0.46.0 stock-stream, §4-16) — 재고 화면 머리의 연결 상태 */
+  stockStream: {
+    live: '실시간',
+    connecting: '실시간 연결 중',
+    reconnecting: '다시 연결 중',
+    off: '실시간 끊김 — 60초 갱신',
+  },
   inventory: {
     /** 실사 시간대·순환 실사(capacity 0.33.0·inventory 0.42.0, 백엔드 지침 2026-11-20) */
     countPlan: {

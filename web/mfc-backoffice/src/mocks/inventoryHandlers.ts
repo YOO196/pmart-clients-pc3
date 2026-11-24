@@ -8,6 +8,7 @@ import { http, HttpResponse } from 'msw';
 import { API_BASE } from '../api/client';
 import { db, nextSeq, timestamp, type MockCountSession } from './db';
 import { approvalProblem, expectedVersion, idempotent, operator, problem, unauthorized } from './support';
+import { emitStockChange } from './stockStreamHandlers';
 
 const canAccess = (request: Request, mfcId: string) => operator(request)?.centers.includes(mfcId) ?? false;
 const isSupervisor = (request: Request) => operator(request)?.roles.includes('MFC_SUPERVISOR') ?? false;
@@ -66,6 +67,19 @@ export const inventoryHandlers = [
           return rest > 0 ? [{ ...u, qty: rest }, moved] : [moved];
         });
       }
+      // 재고 실시간 스트림(0.46.0) — 정정도 확정 단위 하나(CORRECTION)
+      emitStockChange(
+        mfcId,
+        'CORRECTION',
+        body.lines.flatMap((l) => {
+          const from = { sku: l.sku, lotId: l.lotId, locationCode: l.fromLocation, qualityState: l.qualityState, workState: l.workState };
+          const to = { ...from, locationCode: l.toLocation || l.fromLocation, lotId: l.toSourceLotRef ? `LOT-${l.toSourceLotRef}` : l.lotId };
+          return [
+            { ...from, delta: -l.qty },
+            { ...to, delta: l.qty },
+          ];
+        }),
+      );
       return { status: 201, body: { status: 'APPLIED', requestId: keyOf(request), resultId: `CMT-${nextSeq()}` } };
     });
   }),

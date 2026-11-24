@@ -25,6 +25,7 @@ import { riderHandlers } from './riderHandlers';
 import { returnArrivalHandlers } from './returnArrivalHandlers';
 import { orderHandlers } from './orderHandlers';
 import { deliveryStatsHandlers } from './deliveryStatsHandlers';
+import { stockStreamHandlers } from './stockStreamHandlers';
 import { operator, unauthorized } from './support';
 
 /** 게이트웨이 공개 경로(계약 security: []) */
@@ -38,4 +39,4 @@ const gateway = http.all(`${API_BASE}/*`, ({ request }) => {
 });
 
 // 센터 이름은 sessions/current 의 centerDetails(0.9.0)로 온다 — GET /centers 목은 두지 않는다(authHandlers 의 mockCenterNames).
-export const handlers = [gateway, ...authHandlers, ...locationHandlers, ...moveHandlers, ...workerHandlers, ...taskHandlers, ...assignmentHandlers, ...inboundHandlers, ...inventoryHandlers, ...qualityHandlers, ...restrictionHandlers, ...centerDeliveryHandlers, ...packingHandoverHandlers, ...approvalHandlers, ...meHandlers, ...listHandlers, ...returnHandoverHandlers, ...incidentHandlers, ...staffContactHandlers, ...dispatchDelayHandlers, ...dashboardHandlers, ...riderHandlers, ...returnArrivalHandlers, ...orderHandlers, ...deliveryStatsHandlers];
+export const handlers = [gateway, ...authHandlers, ...locationHandlers, ...moveHandlers, ...workerHandlers, ...taskHandlers, ...assignmentHandlers, ...inboundHandlers, ...inventoryHandlers, ...qualityHandlers, ...restrictionHandlers, ...centerDeliveryHandlers, ...packingHandoverHandlers, ...approvalHandlers, ...meHandlers, ...listHandlers, ...returnHandoverHandlers, ...incidentHandlers, ...staffContactHandlers, ...dispatchDelayHandlers, ...dashboardHandlers, ...riderHandlers, ...returnArrivalHandlers, ...orderHandlers, ...deliveryStatsHandlers, ...stockStreamHandlers];
