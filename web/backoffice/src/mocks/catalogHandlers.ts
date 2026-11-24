@@ -500,6 +500,20 @@ export const catalogHandlers = [
       }));
     return HttpResponse.json({ items, page: { nextCursor: null, size: items.length } });
   }),
+  // product-content 0.8.0 상품 사진 규격(서버 값 그대로 — 2026-11-24). /content-drafts/:id 보다 먼저
+  http.get(`${API_BASE}/content-drafts/image-specs`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    return HttpResponse.json({
+      maxBytes: 20 * 1024 * 1024,
+      contentTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      maxImagesPerDraft: 100,
+      items: [
+        { role: 'MAIN', ratioLabel: '1:1', ratioTolerance: 0.1, recommendedWidth: 1000, recommendedHeight: 1000, maxCount: 1 },
+        { role: 'DESCRIPTION', ratioLabel: null, ratioTolerance: null, recommendedWidth: 1000, recommendedHeight: null, maxCount: null },
+        { role: 'DETAIL', ratioLabel: null, ratioTolerance: null, recommendedWidth: 1000, recommendedHeight: null, maxCount: null },
+      ],
+    });
+  }),
   http.get(`${API_BASE}/content-drafts/:id`, ({ params }) => {
     const d = db.contentDrafts.get(String(params['id']));
     return d ? HttpResponse.json(viewContent(d)) : problem(404, 'NOT_FOUND');

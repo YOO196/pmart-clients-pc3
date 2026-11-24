@@ -27,12 +27,13 @@ import { LeaveGuard } from '../../shared/LeaveGuard';
 import { messages } from '../../shared/messages';
 import { SearchSelect } from '../../shared/SearchSelect';
 import { DateTimeField } from '../../shared/DateTimeField';
-import { BANNER_SPEC, fitWarning } from '../../shared/imageFit';
+import { fitWarning, formatText, specText, useBannerSpecs } from '../../shared/imageFit';
 
 const m = messages.homeLayout;
 type Draft = components['schemas']['LayoutDraft'];
 type Body = components['schemas']['LayoutDraftBody'];
 type Banner = components['schemas']['LayoutBanner'];
+type LayoutWarning = components['schemas']['LayoutDraftWarning'];
 type Theme = components['schemas']['LayoutTheme'];
 type Tab = components['schemas']['LayoutTab'];
 type State = Draft['state'];
@@ -392,6 +393,7 @@ function BannerCard({
   groups,
   locked,
   why,
+  serverWarning = null,
   onChange,
   onMove,
   onRemove,
@@ -404,11 +406,15 @@ function BannerCard({
   readonly groups: readonly string[];
   readonly locked: boolean;
   readonly why: readonly Why[];
+  /** 서버 규격 경고(저장된 그대로일 때) */
+  readonly serverWarning?: LayoutWarning | null;
   readonly onChange: (b: Banner) => void;
   readonly onMove: (to: number) => void;
   readonly onRemove: () => void;
 }) {
   const api = useApi();
+  const specs = useBannerSpecs();
+  const spec = specs.data?.by[b.placement];
   // 홈 중간 묶음이면 묶음 하나에 넣는다(없으면 새 묶음), 다른 자리면 groupId 를 비운다(INVALID_GROUP)
   const setPlacement = (placement: Banner['placement']) =>
     onChange(placement === 'HOME_INLINE' ? { ...b, placement, groupId: b.groupId ?? groups[0] ?? `G-${shortId()}` } : { ...b, placement, groupId: null });
@@ -419,7 +425,7 @@ function BannerCard({
   const [prevImage, setPrevImage] = useState<string | null>(null);
   // 보이는 그림의 실제 크기 → 이 자리 권장과 다르면 경고(막지 않음, 2026-11-24 사용자 "1번으로")
   const [size, setSize] = useState<{ id: string; w: number; h: number } | null>(null);
-  const fit = size && size.id === b.imageId ? fitWarning(size.w, size.h, BANNER_SPEC[b.placement]) : null;
+  const fit = serverWarning ? (serverWarning.detail ?? m.warningCode[serverWarning.code] ?? serverWarning.code) : size && size.id === b.imageId ? fitWarning(size.w, size.h, spec) : null;
   const pick = async (file: File | undefined) => {
     if (!file) return;
     const before = b.imageId ?? null;
@@ -459,10 +465,11 @@ function BannerCard({
             </span>
             <Mover i={i} n={n} onMove={onMove} onRemove={onRemove} disabled={locked} />
           </div>
-          <span className="text-xs text-base-content/50">{m.imageHint}</span>
-          {m.imageSize[b.placement] && (
+          {/* 규격은 서버 값(storefront banner-image-specs) — 못 읽으면 형식·용량만 */}
+          <span className="text-xs text-base-content/50">{specs.data ? `${m.specPrefix} ${formatText(specs.data.contentTypes, specs.data.maxBytes)}` : m.imageHint}</span>
+          {spec && (
             <span className="text-xs text-base-content/50" data-testid="banner-image-size">
-              {m.imageSize[b.placement]}
+              {specText(spec, true)}
             </span>
           )}
           {fit && (
@@ -934,6 +941,16 @@ function Editor({ draft }: { readonly draft: Draft }) {
   const [body, setBody] = useState<Body>(() => bodyOf(draft));
   // 마지막으로 서버에 저장한 본문·버전 — 제출이 검사에 걸려도 저장은 이미 됐으니, 다음 저장은 그 버전으로(옛 버전이면 409)
   const [base, setBase] = useState(() => ({ version: draft.version, body: withOrder(bodyOf(draft)) }));
+  // 서버 규격 경고(storefront 0.15.0 — 막지 않음). 마지막으로 저장한 본문 기준(field banners[i].imageId)
+  const [warnings, setWarnings] = useState<readonly LayoutWarning[]>(() => draft.warnings ?? []);
+  /** 이 배너의 서버 경고 — 저장한 뒤 그림·자리를 바꾸지 않았을 때만(바꿨으면 화면 미리 경고가 대신) */
+  const serverWarnOf = (b: Banner): LayoutWarning | null => {
+    const saved = base.body.banners ?? [];
+    const j = saved.findIndex((x) => x.bannerId === b.bannerId);
+    const sb = saved[j];
+    if (j < 0 || !sb || sb.imageId !== b.imageId || sb.placement !== b.placement) return null;
+    return warnings.find((w) => w.field === `banners[${j}].imageId`) ?? null;
+  };
   const editable = draft.state === 'DRAFT' || draft.state === 'REJECTED';
   const dirty = useMemo(() => JSON.stringify(withOrder(body)) !== JSON.stringify(base.body), [body, base]);
   const banners = body.banners ?? [];
@@ -954,6 +971,7 @@ function Editor({ draft }: { readonly draft: Draft }) {
     const sent = withOrder(now);
     const saved = await request('PUT', api.storefront.PUT('/storefront/layout-drafts/{draftId}', { ...commandParams(key, { path: { draftId: draft.draftId }, version: base.version }), body: sent }));
     setBase({ version: saved.version, body: sent });
+    setWarnings(saved.warnings ?? []);
     void qc.invalidateQueries({ queryKey: ['storefront', 'layout-drafts'] });
   };
   // 저장도 명령 — 다시 누르기(같은 시도)는 같은 키(PR #282 검토 댓글)
@@ -1107,6 +1125,7 @@ function Editor({ draft }: { readonly draft: Draft }) {
                     groups={groups}
                     locked={locked}
                     why={problems.at(`banners[${i}]`)}
+                    serverWarning={serverWarnOf(b)}
                     onChange={(x) => setBanner(i, x)}
                     onMove={(to) => setBody((x) => ({ ...x, banners: move(x.banners ?? [], i, to) }))}
                     onRemove={() => setBody((x) => ({ ...x, banners: (x.banners ?? []).filter((_, j) => j !== i) }))}

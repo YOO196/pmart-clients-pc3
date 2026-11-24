@@ -1,35 +1,98 @@
-// 사진 권장 규격 경고(2026-11-24 사용자 "1번으로" — 규격이 다르면 화면에서 경고만, 올리기는 막지 않는다. 서버는 형식·용량만 막는다).
-// 권장 값은 고객 앱이 실제로 그리는 모양에서(1080px = 360dp): 배너 2.8:1(가운데 잘라 채움)·팝업 4:5·로딩 화면 9:16(다 보이게)·상품 대표 1:1, 가로 1080.
-// 비율은 ±10% 안이면 맞는 것으로 본다. 가로가 1080 보다 작으면 흐려 보일 수 있다고 알린다.
+// 사진 권장 규격 — 서버가 준 값(2026-11-24 사용자 "규격 값은 백엔드 값으로", "서버에서 막지 않고 경고만 표시").
+// 배너: storefront `GET /storefront/banner-image-specs`(자리별 비율·권장·최소), 상품 사진: product-content `GET /content-drafts/image-specs`(역할별).
+// 화면은 값을 지어내지 않는다 — 못 읽으면 권장 안내·미리 경고를 띄우지 않는다(서버 초안 warnings 는 그대로 보인다).
+// 미리 경고: 그림을 불러올 때 실제 크기를 읽어 비율이 ±tolerance 밖이면 "잘려요", 최소(배너)·권장 가로(상품)보다 작으면 "흐릴 수 있어요". 올리기·제출은 막지 않는다.
+import { useQuery } from '@tanstack/react-query';
+
+import { request } from '@pmart/web-core';
+import { useApi } from '../app/ApiContext';
 
 export interface ImageSpec {
-  /** 가로 ÷ 세로(없으면 비율은 보지 않는다 — 상세설명처럼 세로 자유) */
+  /** 가로 ÷ 세로(없으면 비율은 보지 않는다 — 상세 사진처럼 세로 자유) */
   readonly ratio?: number;
-  /** 화면에 쓰는 비율 이름(2.8:1, 4:5 …) */
   readonly ratioLabel?: string;
-  /** cover = 칸을 채우고 넘치는 쪽을 잘라 냄, contain = 그림을 다 보이고 남는 곳을 채움 */
-  readonly fit?: 'cover' | 'contain';
+  readonly tolerance: number;
+  /** cover = 칸을 채우고 넘치는 쪽을 잘라 냄, contain = 그림을 다 보이고 남는 곳을 채움(고객 앱 로딩 화면) */
+  readonly fit: 'cover' | 'contain';
+  readonly recommendedWidth: number;
+  readonly recommendedHeight: number | null;
+  /** 이보다 작으면 흐릴 수 있다(배너는 서버 최소, 상품 사진은 권장 가로) */
   readonly minWidth: number;
+  readonly minHeight: number | null;
 }
 
-const BANNER: ImageSpec = { ratio: 2.8, ratioLabel: '2.8:1', fit: 'cover', minWidth: 1080 };
-/** 배너 자리별(storefront placement) */
-export const BANNER_SPEC: Readonly<Record<string, ImageSpec>> = {
-  HOME_TOP: BANNER,
-  HOME_MIDDLE: BANNER,
-  HOME_INLINE: BANNER,
-  CATEGORY: BANNER,
-  POPUP: { ratio: 4 / 5, ratioLabel: '4:5', fit: 'cover', minWidth: 1080 },
-  SPLASH: { ratio: 9 / 16, ratioLabel: '9:16', fit: 'contain', minWidth: 1080 },
-};
-/** 상품 콘텐츠 사진 역할별 */
-export const CONTENT_SPEC: Readonly<Record<string, ImageSpec>> = {
-  MAIN: { ratio: 1, ratioLabel: '1:1', fit: 'cover', minWidth: 1080 },
-  DESCRIPTION: { minWidth: 1080 },
-  DETAIL: { minWidth: 1080 },
+/** "1:1"·"2.8:1"·"4:5"·"9:16" → 가로 ÷ 세로 */
+const ratioOf = (label: string | null | undefined): number | undefined => {
+  const r = /^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/.exec(label ?? '');
+  return r ? Number(r[1]) / Number(r[2]) : undefined;
 };
 
-const TOLERANCE = 0.1;
+/** 배너 자리별 규격(서버 값) — 못 읽었으면 data 가 없다 */
+export function useBannerSpecs() {
+  const api = useApi();
+  return useQuery({
+    queryKey: ['storefront', 'banner-image-specs'],
+    staleTime: 10 * 60_000,
+    queryFn: async () => {
+      const r = await request('GET', api.storefront.GET('/storefront/banner-image-specs', {}));
+      const by: Record<string, ImageSpec> = {};
+      for (const x of r.items) {
+        by[x.placement] = {
+          ratio: x.ratio,
+          ratioLabel: x.ratioLabel,
+          tolerance: r.ratioTolerance,
+          // 로딩 화면은 고객 앱이 그림을 다 보이고 남는 곳을 색으로 채운다(start_screens BoxFit.contain)
+          fit: x.placement === 'SPLASH' ? 'contain' : 'cover',
+          recommendedWidth: x.recommendedWidth,
+          recommendedHeight: x.recommendedHeight,
+          minWidth: x.minWidth,
+          minHeight: x.minHeight,
+        };
+      }
+      return { maxBytes: r.maxBytes, contentTypes: r.contentTypes, by };
+    },
+  });
+}
+
+/** 상품 사진 역할별 규격(서버 값) */
+export function useContentSpecs() {
+  const api = useApi();
+  return useQuery({
+    queryKey: ['product-content', 'image-specs'],
+    staleTime: 10 * 60_000,
+    queryFn: async () => {
+      const r = await request('GET', api.content.GET('/content-drafts/image-specs', {}));
+      const by: Record<string, ImageSpec & { readonly maxCount: number | null }> = {};
+      for (const x of r.items) {
+        const ratio = ratioOf(x.ratioLabel);
+        by[x.role] = {
+          ...(ratio !== undefined ? { ratio, ratioLabel: x.ratioLabel ?? '' } : {}),
+          tolerance: x.ratioTolerance ?? 0.1,
+          fit: 'cover',
+          recommendedWidth: x.recommendedWidth,
+          recommendedHeight: x.recommendedHeight ?? null,
+          minWidth: x.recommendedWidth,
+          minHeight: x.recommendedHeight ?? null,
+          maxCount: x.maxCount ?? null,
+        };
+      }
+      return { maxBytes: r.maxBytes, contentTypes: r.contentTypes, maxImages: r.maxImagesPerDraft, by };
+    },
+  });
+}
+
+/** 권장 안내 한 줄 — 권장 1960×700(2.8:1) · 최소 1080×386 / 권장 가로 1000 */
+export function specText(s: ImageSpec | undefined, withMin: boolean): string | null {
+  if (!s) return null;
+  const rec = s.recommendedHeight ? `권장 ${s.recommendedWidth}×${s.recommendedHeight}${s.ratioLabel ? `(${s.ratioLabel})` : ''}` : `권장 가로 ${s.recommendedWidth}`;
+  return withMin && s.minHeight ? `${rec} · 최소 ${s.minWidth}×${s.minHeight}` : rec;
+}
+
+/** 형식·용량 한 줄 — JPEG·PNG·WEBP · 5MB 이하 */
+export function formatText(contentTypes: readonly string[], maxBytes: number): string {
+  const names = contentTypes.map((t) => t.replace(/^image\//, '').toUpperCase()).join('·');
+  return `${names} · ${Math.round(maxBytes / 1024 / 1024)}MB 이하`;
+}
 
 /** 권장과 다른 점(없으면 null). w·h 는 그림의 실제 픽셀 */
 export function fitWarning(w: number, h: number, spec: ImageSpec | undefined): string | null {
@@ -37,11 +100,11 @@ export function fitWarning(w: number, h: number, spec: ImageSpec | undefined): s
   const parts: string[] = [];
   if (spec.ratio !== undefined) {
     const r = w / h;
-    if (Math.abs(r - spec.ratio) / spec.ratio > TOLERANCE) {
+    if (Math.abs(r - spec.ratio) / spec.ratio > spec.tolerance) {
       const how = spec.fit === 'contain' ? '남는 곳은 색으로 채워요' : r > spec.ratio ? '양옆이 잘려요' : '위아래가 잘려요';
       parts.push(`${spec.ratioLabel ?? ''}과 달라 ${how}`);
     }
   }
-  if (w < spec.minWidth) parts.push(`${spec.minWidth}px보다 작아 흐릴 수 있어요`);
+  if (w < spec.minWidth || (spec.minHeight !== null && h < spec.minHeight)) parts.push(`${spec.minHeight !== null ? `${spec.minWidth}×${spec.minHeight}` : `가로 ${spec.minWidth}px`}보다 작아 흐릴 수 있어요`);
   return parts.length ? `${w}×${h} — ${parts.join(' · ')}` : null;
 }

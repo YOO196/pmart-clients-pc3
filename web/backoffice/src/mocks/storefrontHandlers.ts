@@ -35,6 +35,30 @@ function seed(): { drafts: Map<string, Draft>; images: Set<string>; current: num
 export const layouts = seed();
 /** 목에 올린 배너 그림(바이트) */
 const uploaded = new Map<string, { bytes: ArrayBuffer; contentType: string }>();
+/** 배너 그림 크기(PNG 는 머리에서 읽음 — 시험은 직접 넣는다). 없으면 경고 없음 */
+export const bannerDims = new Map<string, { w: number; h: number }>();
+const BANNER_MIN: Readonly<Record<string, { ratio: number; label: string; minW: number; minH: number }>> = {
+  HOME_TOP: { ratio: 2.8, label: '2.8:1', minW: 1080, minH: 386 },
+  HOME_MIDDLE: { ratio: 2.8, label: '2.8:1', minW: 1080, minH: 386 },
+  HOME_INLINE: { ratio: 2.8, label: '2.8:1', minW: 1080, minH: 386 },
+  CATEGORY: { ratio: 2.8, label: '2.8:1', minW: 1080, minH: 386 },
+  POPUP: { ratio: 0.8, label: '4:5', minW: 720, minH: 900 },
+  SPLASH: { ratio: 0.5625, label: '9:16', minW: 720, minH: 1280 },
+};
+/** storefront 0.15.0 초안 warnings — 막지 않는 배너 그림 규격 경고(서버와 같은 뜻: 비율 ±10%, 최소 크기) */
+const withWarnings = (d: Draft): Draft => ({
+  ...d,
+  warnings: (d.banners ?? []).flatMap((b, i) => {
+    const dim = bannerDims.get(b.imageId);
+    const spec = BANNER_MIN[b.placement];
+    if (!dim || !spec) return [];
+    const field = `banners[${i}].imageId`;
+    const out: { field: string; code: 'BANNER_IMAGE_RATIO' | 'BANNER_IMAGE_TOO_SMALL'; detail: string }[] = [];
+    if (Math.abs(dim.w / dim.h - spec.ratio) / spec.ratio > 0.1) out.push({ field, code: 'BANNER_IMAGE_RATIO', detail: `지금 ${dim.w}×${dim.h} — ${b.placement} 권장 ${spec.label}` });
+    else if (dim.w < spec.minW || dim.h < spec.minH) out.push({ field, code: 'BANNER_IMAGE_TOO_SMALL', detail: `지금 ${dim.w}×${dim.h} — 최소 ${spec.minW}×${spec.minH}` });
+    return out;
+  }),
+});
 export function resetLayouts(): void {
   Object.assign(layouts, seed());
 }
@@ -153,7 +177,7 @@ export const storefrontHandlers = [
     if (denied) return denied;
     const state = new URL(request.url).searchParams.get('state');
     const items = [...layouts.drafts.values()].filter((d) => !state || d.state === state).sort((a, b) => (b.updatedAt ?? b.createdAt).localeCompare(a.updatedAt ?? a.createdAt));
-    return HttpResponse.json({ items, currentLayoutVersion: layouts.current });
+    return HttpResponse.json({ items: items.map(withWarnings), currentLayoutVersion: layouts.current });
   }),
 
   http.post(`${API_BASE}/storefront/layout-drafts`, async ({ request }) => {
@@ -168,7 +192,7 @@ export const storefrontHandlers = [
       const draftId = `LD-${++layouts.seq}`;
       const d: Draft = { ...src, draftId, state: 'DRAFT', version: 0, draftHash: null, approvalId: null, layoutVersion: null, rejectionReason: null, createdBy: who.subject, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
       layouts.drafts.set(draftId, d);
-      return { status: 201, body: d };
+      return { status: 201, body: withWarnings(d) };
     });
   }),
 
@@ -176,7 +200,7 @@ export const storefrontHandlers = [
     const denied = canRead(request);
     if (denied) return denied;
     const d = layouts.drafts.get(String(params['id']));
-    return d ? HttpResponse.json(d) : problem(404, 'NOT_FOUND');
+    return d ? HttpResponse.json(withWarnings(d)) : problem(404, 'NOT_FOUND');
   }),
 
   http.put(`${API_BASE}/storefront/layout-drafts/:id`, async ({ request, params }) => {
@@ -198,7 +222,7 @@ export const storefrontHandlers = [
       if (bad.length > 0) return problem(400, 'VALIDATION_FAILED', bad);
       const next: Draft = { ...d, ...bodyOf(body), state: 'DRAFT', version: d.version + 1, updatedAt: new Date().toISOString() };
       layouts.drafts.set(d.draftId, next);
-      return { status: 200, body: next };
+      return { status: 200, body: withWarnings(next) };
     });
   }),
 
@@ -232,6 +256,24 @@ export const storefrontHandlers = [
     });
   }),
 
+  // storefront 0.15.0 배너 자리별 규격(서버 값 그대로 — 2026-11-24)
+  http.get(`${API_BASE}/storefront/banner-image-specs`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    const banner = (placement: string) => ({ placement, ratio: 2.8, ratioLabel: '2.8:1', recommendedWidth: 1960, recommendedHeight: 700, minWidth: 1080, minHeight: 386 });
+    return HttpResponse.json({
+      ratioTolerance: 0.1,
+      maxBytes: 5 * 1024 * 1024,
+      contentTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      items: [
+        banner('HOME_TOP'),
+        banner('HOME_MIDDLE'),
+        banner('HOME_INLINE'),
+        banner('CATEGORY'),
+        { placement: 'POPUP', ratio: 0.8, ratioLabel: '4:5', recommendedWidth: 1080, recommendedHeight: 1350, minWidth: 720, minHeight: 900 },
+        { placement: 'SPLASH', ratio: 0.5625, ratioLabel: '9:16', recommendedWidth: 1080, recommendedHeight: 1920, minWidth: 720, minHeight: 1280 },
+      ],
+    });
+  }),
   http.post(`${API_BASE}/storefront/banner-images`, async ({ request }) => {
     const denied = canManage(request);
     if (denied) return denied;
@@ -244,7 +286,12 @@ export const storefrontHandlers = [
       const imageId = `bimg-${++layouts.seq}`;
       layouts.images.add(imageId);
       // 올린 그림을 그대로 돌려준다(전에는 늘 "새 배너" 그림이라 무엇을 올렸는지 볼 수 없었다)
-      uploaded.set(imageId, { bytes: await file.arrayBuffer(), contentType: kind });
+      const bytes = await file.arrayBuffer();
+      uploaded.set(imageId, { bytes, contentType: kind });
+      if (kind === 'image/png' && bytes.byteLength >= 24) {
+        const v = new DataView(bytes);
+        bannerDims.set(imageId, { w: v.getUint32(16), h: v.getUint32(20) });
+      }
       return { status: 201, body: { imageId, url: `/api/v1/storefront/banner-images/${imageId}`, contentType: kind, width: null, height: null } };
     });
   }),

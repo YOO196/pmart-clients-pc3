@@ -6,6 +6,9 @@ import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ImagePicker, type PendingImage } from './ImagePicker';
+
+// 이 시험은 앱 틀 없이 사진 칸만 그린다 — 서버 규격 조회(2026-11-24)는 "아직 못 읽음"으로 둔다(권장 안내·미리 경고 없음)
+vi.mock('../../shared/imageFit', async (orig) => ({ ...(await orig<typeof import('../../shared/imageFit')>()), useContentSpecs: () => ({ data: undefined }) }));
 import { pieceName, slicePlan, type SliceResult } from './sliceImage';
 
 const png = (name: string) => new File([new Uint8Array([137, 80, 78, 71])], name, { type: 'image/png' });

@@ -312,6 +312,17 @@ function DraftImages({ draft }: { readonly draft: ContentDraft }) {
   return (
     <div className="space-y-2">
       <ImagePicker pending={pending} onChange={onChange} existing={draft.images ?? []} disabled={upload.busy} />
+      {/* 서버 사진 규격 경고(product-content 0.8.0, 막지 않음 — 2026-11-24 사용자 "서버에서 막지 않고 경고만") */}
+      {(draft.warnings ?? []).length > 0 && (
+        <div className="rounded-box border border-warning/40 bg-warning/5 px-3 py-2 text-xs" data-testid="content-image-warnings">
+          <p className="mb-1 font-semibold text-warning">{m.contents.warningsTitle}</p>
+          <ul className="space-y-0.5">
+            {(draft.warnings ?? []).map((w, i) => (
+              <li key={`${w.field}-${i}`}>{`${w.field ?? ''} — ${w.detail ?? m.contents.warningCode[w.code] ?? w.code}`}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {progress && (
         <p role="status" className="text-sm">
           {m.contents.imageUploading(progress.done, progress.total)}

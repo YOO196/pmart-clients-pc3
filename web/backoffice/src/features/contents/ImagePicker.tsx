@@ -8,7 +8,7 @@ import { IMAGE_ROLES, type ContentImage, type ImageRole } from '../../api/models
 import { messages as m } from '../../shared/messages';
 import { AuthedImage } from './AuthedImage';
 import { DEFAULT_SLICE_HEIGHT, SLICE_HEIGHTS, sliceImage, type SliceResult } from './sliceImage';
-import { CONTENT_SPEC, fitWarning } from '../../shared/imageFit';
+import { fitWarning, formatText, specText, useContentSpecs } from '../../shared/imageFit';
 
 export interface PendingImage {
   readonly id: string;
@@ -19,7 +19,7 @@ export interface PendingImage {
 }
 
 const ACCEPT = 'image/jpeg,image/png,image/webp';
-/** 서버 규격(product-content POST /content-drafts/{id}/images — 넘으면 서버가 막는다): 장당 20MB, 초안 1건 100장(2026-11-24 사용자 "사진 들어가는 곳 옆에 규격") */
+/** 서버가 막는 한도(product-content POST /content-drafts/{id}/images): 장당 20MB, 초안 1건 100장. 규격 조회(image-specs)를 읽으면 그 값으로(2026-11-24) */
 const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_IMAGES = 100;
 const TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -65,11 +65,15 @@ export function ImagePicker({
 
   // 규격에 안 맞아 넣지 않은 파일(이름) — 올리기 전에 알려 준다(서버도 막는다)
   const [refused, setRefused] = useState<readonly string[]>([]);
+  const specs = useContentSpecs();
+  const maxBytes = specs.data?.maxBytes ?? MAX_BYTES;
+  const maxImages = specs.data?.maxImages ?? MAX_IMAGES;
+  const types = specs.data?.contentTypes ?? TYPES;
   const add = (files: FileList | null, role: ImageRole) => {
     if (!files || files.length === 0) return;
     const all = [...files];
-    const room = Math.max(0, MAX_IMAGES - existing.length - pending.filter((p) => !(role === 'MAIN' && p.role === 'MAIN')).length);
-    const okFiles = all.filter((f) => TYPES.includes(f.type) && f.size <= MAX_BYTES).slice(0, room);
+    const room = Math.max(0, maxImages - existing.length - pending.filter((p) => !(role === 'MAIN' && p.role === 'MAIN')).length);
+    const okFiles = all.filter((f) => types.includes(f.type) && f.size <= maxBytes).slice(0, room);
     setRefused(all.filter((f) => !okFiles.includes(f)).map((f) => f.name));
     if (okFiles.length === 0) return;
     const added = toPending(okFiles, role);
@@ -118,7 +122,9 @@ export function ImagePicker({
   return (
     // 놓인 칸 폭에 맞춰(좁은 오른쪽 열이면 한 줄씩, 넓으면 세 칸) — 화면 폭이 아니라 칸 폭 기준(2026-11-18)
     <div className="@container space-y-2">
-    <p className="text-xs text-base-content/60" data-testid="image-spec">{m.contents.imageSpec}</p>
+    <p className="text-xs text-base-content/60" data-testid="image-spec">
+      {specs.data ? `${formatText(specs.data.contentTypes, specs.data.maxBytes)} · ${m.contents.imageMax(specs.data.maxImages)}` : m.contents.imageSpec}
+    </p>
     {refused.length > 0 && (
       <p role="alert" className="text-xs text-error" data-testid="image-refused">
         {m.contents.imageRefused(refused.join(', '))}
@@ -162,8 +168,10 @@ function RoleSection({
   const input = useRef<HTMLInputElement>(null);
   // 고른 그림의 실제 크기가 이 역할 권장과 다르면 아래에 경고(막지 않음 — 2026-11-24 사용자 "1번으로")
   const [fits, setFits] = useState<Readonly<Record<string, string>>>({});
+  // 역할별 권장(서버 값 — product-content image-specs). 못 읽으면 권장 안내·미리 경고 없음
+  const spec = useContentSpecs().data?.by[role];
   const label = m.contents.imageRole[role];
-  const hint = m.contents.imageRoleHint[role];
+  const hint = [m.contents.imageRoleHint[role], specText(spec, false)].filter(Boolean).join(' · ');
   const addLabel = m.contents.addImage(label);
   const empty = existing.length === 0 && pending.length === 0;
   const open = () => {
@@ -227,7 +235,7 @@ function RoleSection({
                   alt={p.file.name}
                   className="h-full w-full object-contain"
                   onLoad={(e) => {
-                    const w = fitWarning(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight, CONTENT_SPEC[role]);
+                    const w = fitWarning(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight, spec);
                     setFits((cur) => {
                       const next = { ...cur };
                       if (w) next[p.id] = w;
