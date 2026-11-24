@@ -17,3 +17,6 @@
 
 ## 확인 부탁
 - 끝나면 `lan-test-accounts.md` §1 센터 칸 갱신, 이 파일에 회신 위치를 적어 주면 PC 3 이 LAN 에서 다섯 센터 전환을 확인한다.
+
+## 끝남 (2026-11-24)
+- PC 1 백엔드가 LAN 에서 `claude-mfc-sup` 을 다섯 센터로 등록·승인했다. PC 3(MFC 프론트)이 토큰·`sessions/current`·`worker-positions` 다섯 센터 모두 200 을 확인했다(PC1 백엔드 세션 전달).
