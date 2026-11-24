@@ -8,6 +8,8 @@ import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 import 'package:pmart_api_claim/pmart_api_claim.dart' as api;
 
+import 'package:customer_app/features/catalog/presentation/product_detail_screen.dart'
+    show ProductDetailScreen;
 import 'package:customer_app/features/checkout/data/mock_checkout_repository.dart';
 import 'package:customer_app/features/checkout/domain/checkout.dart';
 import 'package:customer_app/features/checkout/presentation/checkout_controller.dart';
@@ -430,6 +432,11 @@ void main() {
         find.byKey(const ValueKey('claim-line-name-unavailable')),
         findsNothing,
       );
+
+      // 사진·이름을 누르면 상품 상세(사용자 2026-11-24).
+      await t.tap(find.byKey(const ValueKey('claim-line-open-ol-5')));
+      await t.pumpAndSettle();
+      expect(find.byType(ProductDetailScreen), findsOneWidget);
     });
 
     testWidgets('주문을 못 읽어도 클레임 품목 사본(claim 0.14.0, BR-92)으로 이름', (t) async {

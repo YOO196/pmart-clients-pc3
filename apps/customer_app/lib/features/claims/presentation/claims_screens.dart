@@ -846,124 +846,137 @@ class _ClaimLineRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              ProductImage(
-                url: l.imageUrl ?? orderLine?.imageUrl,
-                size: 52,
-                radius: 8,
+          // 사진·이름을 누르면 상품 상세(사용자 2026-11-24, 주문 상세 품목과 같게). 상품 ID 는 주문 상세 품목에서 —
+          // 주문을 아직 못 읽었거나 상품 ID 가 없는 옛 주문 줄이면 누를 수 없다.
+          InkWell(
+            key: ValueKey('claim-line-open-${l.orderLineId}'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: switch (orderLine?.productId) {
+              final id? => () => context.push(
+                '/products/${Uri.encodeComponent(id)}',
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    switch ((l.productName, orderLine)) {
-                      (final name?, _) => Text(
-                        [name, ?l.optionLabel].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 14.5,
+              null => null,
+            },
+            child: Row(
+              children: [
+                ProductImage(
+                  url: l.imageUrl ?? orderLine?.imageUrl,
+                  size: 52,
+                  radius: 8,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      switch ((l.productName, orderLine)) {
+                        (final name?, _) => Text(
+                          [name, ?l.optionLabel].join(' · '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 14.5,
+                          ),
                         ),
-                      ),
-                      (_, final o?) when o.productName != null => Text(
-                        o.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 14.5,
+                        (_, final o?) when o.productName != null => Text(
+                          o.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 14.5,
+                          ),
                         ),
-                      ),
-                      _ when orderLoading => const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 2),
-                        child: PmartBone(
-                          key: ValueKey('claim-line-name-loading'),
-                          width: 140,
-                          height: 15,
+                        _ when orderLoading => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 2),
+                          child: PmartBone(
+                            key: ValueKey('claim-line-name-loading'),
+                            width: 140,
+                            height: 15,
+                          ),
                         ),
-                      ),
-                      _ => Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              l10n.claimLineNameUnavailable,
-                              key: const ValueKey(
-                                'claim-line-name-unavailable',
+                        _ => Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                l10n.claimLineNameUnavailable,
+                                key: const ValueKey(
+                                  'claim-line-name-unavailable',
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontSize: 14,
+                                  color: scheme.onSurfaceVariant,
+                                ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontSize: 14,
+                            ),
+                            if (onRetryOrder case final retry?)
+                              TextButton(
+                                key: const ValueKey('claim-line-name-retry'),
+                                onPressed: retry,
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                ),
+                                child: Text(l10n.claimLineNameRetry),
+                              ),
+                          ],
+                        ),
+                      },
+                      const SizedBox(height: 5),
+                      Wrap(
+                        spacing: 6,
+                        children: [
+                          switch (l.decision) {
+                            LineDecision.approved => _chip(
+                              context,
+                              l10n.claimLineApproved(l.approvedQty ?? 0),
+                              bg: scheme.primaryContainer,
+                              fg: scheme.primary,
+                            ),
+                            LineDecision.pending => _chip(
+                              context,
+                              l10n.decisionPending,
+                              bg: scheme.surfaceContainerHigh,
+                              fg: scheme.onSurfaceVariant,
+                            ),
+                            LineDecision.rejected => _chip(
+                              context,
+                              l10n.decisionRejected,
+                              bg: scheme.surfaceContainerHigh,
+                              fg: scheme.onSurfaceVariant,
+                            ),
+                          },
+                          if (l.requestedQty case final q?)
+                            Text(
+                              l10n.claimRequested(q),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 12.5,
                                 color: scheme.onSurfaceVariant,
                               ),
                             ),
-                          ),
-                          if (onRetryOrder case final retry?)
-                            TextButton(
-                              key: const ValueKey('claim-line-name-retry'),
-                              onPressed: retry,
-                              style: TextButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                              ),
-                              child: Text(l10n.claimLineNameRetry),
-                            ),
                         ],
                       ),
-                    },
-                    const SizedBox(height: 5),
-                    Wrap(
-                      spacing: 6,
-                      children: [
-                        switch (l.decision) {
-                          LineDecision.approved => _chip(
-                            context,
-                            l10n.claimLineApproved(l.approvedQty ?? 0),
-                            bg: scheme.primaryContainer,
-                            fg: scheme.primary,
-                          ),
-                          LineDecision.pending => _chip(
-                            context,
-                            l10n.decisionPending,
-                            bg: scheme.surfaceContainerHigh,
-                            fg: scheme.onSurfaceVariant,
-                          ),
-                          LineDecision.rejected => _chip(
-                            context,
-                            l10n.decisionRejected,
-                            bg: scheme.surfaceContainerHigh,
-                            fg: scheme.onSurfaceVariant,
-                          ),
-                        },
-                        if (l.requestedQty case final q?)
-                          Text(
-                            l10n.claimRequested(q),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 12.5,
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              if (l.refundAmount case final a?)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Text(
-                    formatKrw(a),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    ],
                   ),
                 ),
-            ],
+                if (l.refundAmount case final a?)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Text(
+                      formatKrw(a),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           if (l.decision == LineDecision.rejected && l.rejectReason != null)
             Container(
