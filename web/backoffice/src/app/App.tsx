@@ -121,14 +121,16 @@ function NavGroupMenu({ group, pathname, open, onToggle }: { readonly group: Nav
           e.preventDefault(); // 브라우저가 따로 열고 닫지 않게 — 열림은 위(Layout 의 열린 묶음 모음)에서 정한다
           onToggle();
         }}
-        className="flex cursor-pointer list-none items-center gap-1.5 px-4 py-[5px] text-sm font-bold text-base-content transition-colors hover:text-primary"
+        className="flex cursor-pointer list-none items-center gap-2 px-4 py-[5px] text-sm font-bold text-base-content transition-colors hover:text-primary"
       >
-        <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 shrink-0 fill-none stroke-current transition-transform ${open ? 'rotate-90' : ''}`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-testid="nav-group-chevron">
-          <path d="m9 6 6 6-6 6" />
-        </svg>
+        {/* 묶음 아이콘 + 이름(2026-11-24 사용자 "인사 쪽을 저렇게 했으면 백오피스도" — 인사·MFC·라이더 공용 메뉴와 같은 모양), 접힘 화살표는 오른쪽 끝 */}
+        <GroupIcon id={group.id} className="h-4 w-4 shrink-0 text-base-content/60" />
         <span data-group-label>{group.label}</span>
         <span className="ml-auto flex items-center gap-2" aria-hidden="true">
           <MenuGroupAlert items={group.items} open={open} />
+          <svg viewBox="0 0 24 24" className={`h-3.5 w-3.5 shrink-0 fill-none stroke-current text-base-content/50 transition-transform ${open ? 'rotate-90' : ''}`} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" data-testid="nav-group-chevron">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
         </span>
       </summary>
       <ul className="pb-1">
@@ -140,7 +142,7 @@ function NavGroupMenu({ group, pathname, open, onToggle }: { readonly group: Nav
               end
               data-active={here === item.to && pathname !== item.to ? 'alias' : undefined}
               className={({ isActive }) =>
-                `flex items-center gap-1 py-[5px] pl-9 pr-3 text-sm transition-colors ${isActive || here === item.to ? 'font-semibold text-primary' : 'text-base-content/85 hover:text-primary'}`
+                `flex items-center gap-1 py-[5px] pl-10 pr-3 text-sm transition-colors ${isActive || here === item.to ? 'font-semibold text-primary' : 'text-base-content/85 hover:text-primary'}`
               }
             >
               {item.label}

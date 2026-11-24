@@ -164,14 +164,15 @@ describe('앱 바꾸기 — 이 앱 메뉴 칸(알림과 함께)', () => {
   });
 });
 
-describe('묶음 이름(2026-11-20 AWS — 굵은 제목 + 왼쪽 펼침 화살표)', () => {
+describe('묶음 이름(2026-11-20 AWS 굵은 제목, 2026-11-24 아이콘 + 오른쪽 펼침 화살표)', () => {
   it('묶음 이름은 굵게, 누르면 화살표가 돈다', async () => {
     const user = userEvent.setup();
     renderAt('/approvals', as.admin);
     const support = await screen.findByTestId('nav-group-support');
     const summary = support.querySelector('summary')!;
     expect(summary.className).toContain('font-bold');
-    expect(summary.firstElementChild).toBe(within(support).getByTestId('nav-group-chevron')); // 화살표가 이름 앞
+    expect(summary.firstElementChild?.tagName.toLowerCase()).toBe('svg'); // 묶음 아이콘이 이름 앞(2026-11-24 — 인사·MFC·라이더와 같게)
+    expect(summary.lastElementChild).toContainElement(within(support).getByTestId('nav-group-chevron')); // 화살표는 오른쪽 끝
     expect(within(support).getByTestId('nav-group-chevron').getAttribute('class')).not.toContain('rotate-90');
     await user.click(within(support).getByText('지원센터'));
     expect(within(support).getByTestId('nav-group-chevron').getAttribute('class')).toContain('rotate-90');
