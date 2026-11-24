@@ -92,3 +92,4 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 | `customer-app/2026-11-23-backend-faq-feedback.md` | BR-91 FAQ 답 의견(도움이 되었어요/수정이 필요해요) |
 | `customer-app/2026-11-23-backend-lan-seed-popup-banner-coupon.md` | LAN 시험 데이터 — 홈 팝업 2·배너 몇 개·쿠폰 몇 개(계약 변경 아님) |
 | `backoffice/2026-11-24-backend-employee-label-status.md` | HR-5 이어서 — 직원 이름표에 재직 상태(status) — 사번으로 고를 때 정지(SUSPENDED) 직원은 보이되 경고(사용자 결정) — PC 1 백엔드로, 회신 대기 |
+| `backoffice/2026-11-24-backend-satisfaction-by-agent.md` | 문의 만족도를 답변한 직원별로(관리자 — 개인 성과 측정·관리, 고객 개인정보 가림) — 2026-11-17 "상담원별로 나누지 않는다" 결정을 사용자가 바꿈. 답변 authorId·직원별 집계·직원 평가 목록 — 회신 대기 |
