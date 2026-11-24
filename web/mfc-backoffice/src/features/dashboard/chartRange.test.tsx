@@ -41,7 +41,7 @@ describe('추이 그래프 기간', () => {
   });
 
   it('빠른 단추 30일 → 30칸, 정시율은 31일 상한이라 나눠 읽는다(90일 = 3번)', async () => {
-    const view = renderAt('/c/MFC-SEED-01/dashboard');
+    const view = renderAt('/c/MFC-BJG-01/dashboard');
     await openPicked();
     const bar = screen.getByTestId('range-bar');
     await userEvent.click(within(bar).getByRole('button', { name: '30일' }));
@@ -68,7 +68,7 @@ describe('추이 그래프 기간', () => {
   });
 
   it('그래프를 끌면 그 구간(첫 칸~끝 칸)으로 확대, Ctrl+Z 면 앞 상태가 아니라 한 단계 넓게', async () => {
-    renderAt('/c/MFC-SEED-01/dashboard');
+    renderAt('/c/MFC-BJG-01/dashboard');
     await openPicked();
     // 14칸, 칸 폭 600/14 ≈ 42.9px — 2번째 칸(50px)부터 6번째 칸(250px)까지 = 5일
     drag(sized(screen.getByTestId('chart-picked-plot')), 50, 250);
@@ -86,7 +86,7 @@ describe('추이 그래프 기간', () => {
   });
 
   it('한 칸만 누르면(끌지 않으면) 기간은 그대로', async () => {
-    renderAt('/c/MFC-SEED-01/dashboard');
+    renderAt('/c/MFC-BJG-01/dashboard');
     await openPicked();
     drag(sized(screen.getByTestId('chart-picked-plot')), 50, 54);
     expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(14);
@@ -111,7 +111,7 @@ describe('추이 그래프 기간', () => {
     // 새벽(곡선 0)에도 합계를 버리지 않는다
     expect(Array.from({ length: 3 }, (_, h) => hourShare(40, h, 2))).toEqual([0, 0, 40]);
 
-    renderAt('/c/MFC-SEED-01/dashboard');
+    renderAt('/c/MFC-BJG-01/dashboard');
     await openPicked();
     const bar = screen.getByTestId('range-bar');
     await userEvent.click(within(bar).getByRole('button', { name: '1년' }));
@@ -134,7 +134,7 @@ describe('추이 그래프 기간', () => {
   });
 
   it('하루 칸 안을 끌면 그날 시간별', async () => {
-    renderAt('/c/MFC-SEED-01/dashboard');
+    renderAt('/c/MFC-BJG-01/dashboard');
     await openPicked();
     // 14칸 중 마지막 칸(오늘) 안에서 10px 끌기
     drag(sized(screen.getByTestId('chart-picked-plot')), 580, 592);
@@ -143,7 +143,7 @@ describe('추이 그래프 기간', () => {
   });
 
   it('주소의 기간(?from=&to=)으로 열고, 맞지 않는 기간이면 기본 14일', async () => {
-    renderAt(`/c/MFC-SEED-01/dashboard?from=${addDays(today(), -6)}&to=${today()}`);
+    renderAt(`/c/MFC-BJG-01/dashboard?from=${addDays(today(), -6)}&to=${today()}`);
     await openPicked();
     await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(7));
   });
@@ -162,7 +162,7 @@ describe('추이 그래프 기간', () => {
     });
 
     it('단위마다 서버가 센다 — 1년 월별은 한 번(MONTH), 주별 WEEK, 1일 시간별은 HOUR, 시간 칸 합 = 그날 합', async () => {
-      const view = renderAt('/c/MFC-SEED-01/dashboard');
+      const view = renderAt('/c/MFC-BJG-01/dashboard');
       await openPicked();
       const bar = screen.getByTestId('range-bar');
       await userEvent.click(within(bar).getByRole('button', { name: '1년' }));
@@ -187,7 +187,7 @@ describe('추이 그래프 기간', () => {
     });
 
     it('92일 넘는 일별은 92일씩 나눠 읽는다(DAY)', async () => {
-      const view = renderAt(`/c/MFC-SEED-01/dashboard?from=${addDays(today(), -119)}&to=${today()}&unit=day`);
+      const view = renderAt(`/c/MFC-BJG-01/dashboard?from=${addDays(today(), -119)}&to=${today()}&unit=day`);
       await openPicked();
       await waitFor(() => expect(within(screen.getByTestId('chart-picked')).getAllByTestId('chart-picked-col')).toHaveLength(120));
       const day = asked(view).filter((q) => q.get('bucket') === 'DAY' && q.get('to') !== null);
@@ -197,7 +197,7 @@ describe('추이 그래프 기간', () => {
 
     it('실서버 — 주문·피킹 줄·결품은 시간 칸이 켜지고, 정시율은 꺼진다(시간 칸 DD-6 대기)', async () => {
       env.isMock = false;
-      renderAt('/c/MFC-SEED-01/dashboard');
+      renderAt('/c/MFC-BJG-01/dashboard');
       // 실서버도 주문(order 0.20.0)이 기본 — 1일이면 시간별
       await screen.findByTestId('chart-orders');
       await userEvent.click(within(screen.getByTestId('range-bar')).getByRole('button', { name: '1일' }));

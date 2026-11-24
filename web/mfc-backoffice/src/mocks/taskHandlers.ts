@@ -78,7 +78,7 @@ function resolutionOf(s: MockShipment, p: Pkg) {
 /** 결품 지표 목(0.19.0, bucket 0.34.0): 오늘 피킹 시작 줄·결품 줄(사유별). 0건 날짜는 줄이 없다(계약) — 서울 센터는 줄 없음. */
 const seoulToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
 const pickingLines: Readonly<Record<string, { readonly pickedLines: number; readonly SHORT: number; readonly DAMAGED: number; readonly SPOILED: number; readonly BLOCKED: number }>> = {
-  'MFC-SEED-01': { pickedLines: 40, SHORT: 2, DAMAGED: 1, SPOILED: 1, BLOCKED: 0 },
+  'MFC-BJG-01': { pickedLines: 40, SHORT: 2, DAMAGED: 1, SPOILED: 1, BLOCKED: 0 },
 };
 
 const pastDays = (today: string, n: number) => {

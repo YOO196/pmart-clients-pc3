@@ -10,7 +10,7 @@ const bodyOf = async (r: Request) => (await r.clone().json()) as Record<string, 
 
 describe('품질 사고', () => {
   it('목록은 이 센터의 끝나지 않은 사고(처리 중·닫기 대기) — 자동/직접·남은 LOT 은 서버 값', async () => {
-    const view = renderAt('/c/MFC-SEED-01/quality?tab=incidents');
+    const view = renderAt('/c/MFC-BJG-01/quality?tab=incidents');
     const list = await screen.findByTestId('list-incidents');
     const rows = await within(list).findAllByTestId('list-incidents-row');
     expect(rows).toHaveLength(2);
@@ -25,7 +25,7 @@ describe('품질 사고', () => {
     expect(manual).toHaveTextContent('직접 등록');
     // 목록 요청(숫자 카드는 state 를 보낸다)
     const q = view.gets('/quality-incidents').find((r) => new URL(r.url).searchParams.getAll('state').length === 0)!;
-    expect(new URL(q.url).searchParams.get('mfcId')).toBe('MFC-SEED-01');
+    expect(new URL(q.url).searchParams.get('mfcId')).toBe('MFC-BJG-01');
     expect(new URL(q.url).searchParams.getAll('state')).toEqual([]);
     // 상태 숫자 카드(서버 목록으로 셈)
     expect(await screen.findByTestId('count-OPEN-value')).toHaveTextContent(/1건$/);
@@ -33,7 +33,7 @@ describe('품질 사고', () => {
   });
 
   it('남은 LOT 이 있으면 닫기 대신 안내, "격리 요청"은 격리·해제 탭에 사고 번호·LOT 을 채워 판정에 잇는다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/quality?tab=incidents&incidentId=QI-1');
+    const view = renderAt('/c/MFC-BJG-01/quality?tab=incidents&incidentId=QI-1');
     const card = await screen.findByTestId('incident');
     expect(card).toHaveTextContent('남은 LOT 1개');
     expect(within(card).queryByRole('button', { name: '사고 닫기' })).not.toBeInTheDocument();
@@ -51,7 +51,7 @@ describe('품질 사고', () => {
   });
 
   it('모두 처리됐으면 사유를 적고 한 번 더 확인한 뒤 닫는다(지금 버전으로)', async () => {
-    const view = renderAt('/c/MFC-SEED-01/quality?tab=incidents&incidentId=QI-2');
+    const view = renderAt('/c/MFC-BJG-01/quality?tab=incidents&incidentId=QI-2');
     const card = await screen.findByTestId('incident');
     expect(within(card).getByTestId('incident-lot')).toHaveTextContent('처리됨');
     const close = within(card).getByRole('button', { name: '사고 닫기' });
@@ -69,7 +69,7 @@ describe('품질 사고', () => {
   });
 
   it('직접 등록: 이 센터에 없는 LOT 은 422 로 거절, 있는 LOT 이면 등록 뒤 상세를 연다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/quality?tab=incidents');
+    const view = renderAt('/c/MFC-BJG-01/quality?tab=incidents');
     const form = await screen.findByRole('form', { name: '품질 사고 등록' });
     await userEvent.selectOptions(within(form).getByLabelText('종류'), 'SPOILAGE');
     await userEvent.type(within(form).getByLabelText('설명(300자)'), '냉장 우유 변질 냄새');
@@ -86,13 +86,13 @@ describe('품질 사고', () => {
     expect(card).toHaveTextContent('냉장 우유 변질 냄새');
     expect(card).toHaveTextContent('직접 등록');
     const sent = posts(view.sent, '/quality-incidents').at(-1)!;
-    expect(await bodyOf(sent)).toEqual({ mfcId: 'MFC-SEED-01', kind: 'SPOILAGE', description: '냉장 우유 변질 냄새', affectedLots: [{ lotId: 'LOT-MILK-B', qty: 1 }] });
+    expect(await bodyOf(sent)).toEqual({ mfcId: 'MFC-BJG-01', kind: 'SPOILAGE', description: '냉장 우유 변질 냄새', affectedLots: [{ lotId: 'LOT-MILK-B', qty: 1 }] });
   });
 });
 
 describe('상품 취급 — 단종·신상품(inventory 0.27.0)', () => {
   it('맨 위 배너에 정하지 않은 새 상품 수(서버 totalCount), 누르면 그 상품만', async () => {
-    const view = renderAt('/c/MFC-SEED-01/inventory?tab=handlings');
+    const view = renderAt('/c/MFC-BJG-01/inventory?tab=handlings');
     const banner = await screen.findByTestId('new-products-banner');
     expect(banner).toHaveTextContent('새 상품 2개가 들어왔어요');
     const count = view.gets('/sku-handlings').map((r) => new URL(r.url).searchParams).find((p) => p.get('undecided') === 'true')!;
@@ -103,7 +103,7 @@ describe('상품 취급 — 단종·신상품(inventory 0.27.0)', () => {
   });
 
   it('본사 단종 상품은 "본사 단종"이고 켜기를 막는다, 정하면 배너에서 빠진다', async () => {
-    renderAt('/c/MFC-SEED-01/inventory?tab=handlings');
+    renderAt('/c/MFC-BJG-01/inventory?tab=handlings');
     await waitFor(() => expect(screen.getAllByTestId('handling-row')).toHaveLength(6));
     const disc = screen.getAllByTestId('handling-row').find((r) => r.textContent?.includes('SKU-DISC-3'))!;
     expect(disc).toHaveTextContent('본사 단종');

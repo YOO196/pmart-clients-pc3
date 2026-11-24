@@ -24,14 +24,14 @@ const sentBody = async (r: Request) => (await r.clone().json()) as Record<string
 
 describe('칸 목록', () => {
   it('그 센터의 칸만, 코드 순 — 다른 센터 칸은 없다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/locations');
+    const view = renderAt('/c/MFC-BJG-01/locations');
     await waitFor(() => expect(rows()).toHaveLength(6));
     expect(codes()).toEqual(['A-P1-01-1-01', 'C-S1-03-2-04', 'F-S2-02-1-03', 'OLD-SHELF-7', 'QRT-A-01', 'RCV-C-01']);
-    expect(new URL(view.gets('/locations')[0]!.url).searchParams.get('mfcId')).toBe('MFC-SEED-01');
+    expect(new URL(view.gets('/locations')[0]!.url).searchParams.get('mfcId')).toBe('MFC-BJG-01');
   });
 
   it('거르기는 URL 쿼리로 서버에 보낸다(상태 = 닫힘)', async () => {
-    const view = renderAt('/c/MFC-SEED-01/locations?state=CLOSED');
+    const view = renderAt('/c/MFC-BJG-01/locations?state=CLOSED');
     await waitFor(() => expect(codes()).toEqual(['F-S2-02-1-03', 'QRT-A-01']));
     expect(new URL(view.gets('/locations').at(-1)!.url).searchParams.get('state')).toBe('CLOSED');
     // 조건을 건 목록은 검색 조건이 칩 한 줄로 접혀 있다 — 칩에 지금 조건, "검색 열기"로 펼친다
@@ -50,7 +50,7 @@ describe('칸 목록', () => {
       const base = db.locations.get('LOC-3')!;
       db.locations.set(id, { ...base, locationId: id, locationCode: `PAK-A-${n}`, zone: 'PACKING', temperatureZone: 'AMBIENT' });
     }
-    renderAt('/c/MFC-SEED-01/locations');
+    renderAt('/c/MFC-BJG-01/locations');
     await waitFor(() => expect(rows()).toHaveLength(LOCATION_PAGE_SIZE));
     await userEvent.click(screen.getByRole('button', { name: '더 보기' }));
     await waitFor(() => expect(rows()).toHaveLength(LOCATION_PAGE_SIZE + 6));
@@ -59,7 +59,7 @@ describe('칸 목록', () => {
 
   it('조회 실패는 빈 목록이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/locations`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-SEED-01/locations');
+    renderAt('/c/MFC-BJG-01/locations');
     expect(await screen.findByRole('alert')).toHaveAttribute('data-state', 'error');
     expect(screen.queryByText('조건에 맞는 칸이 없어요.')).not.toBeInTheDocument();
   });
@@ -70,14 +70,14 @@ describe('칸 목록', () => {
         HttpResponse.json({ type: 'about:blank', status: 403, code: 'FORBIDDEN' }, { status: 403, headers: { 'content-type': 'application/problem+json' } }),
       ),
     );
-    renderAt('/c/MFC-SEED-01/locations', as.adminWithCenter);
+    renderAt('/c/MFC-BJG-01/locations', as.adminWithCenter);
     await waitFor(() => expect(document.querySelector('[data-state="forbidden"]')).not.toBeNull());
   });
 });
 
 describe('칸 등록', () => {
   it('등록 → 키·출처 헤더를 붙여 보내고, 만든 칸 상세로', async () => {
-    const view = renderAt('/c/MFC-SEED-01/locations/new');
+    const view = renderAt('/c/MFC-BJG-01/locations/new');
     await userEvent.type(await screen.findByRole('textbox', { name: /칸 코드/ }), 'c-s1-04-1-01');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '온도대' }), 'CHILLED');
     await userEvent.type(screen.getByRole('spinbutton', { name: '슬롯 수' }), '6');
@@ -86,12 +86,12 @@ describe('칸 등록', () => {
     const post = view.sent.find((r) => r.method === 'POST' && r.url.endsWith('/locations'))!;
     expect(post.headers.get('Idempotency-Key')).toBeTruthy();
     expect(post.headers.get('X-Source-System')).toBe('mfc-backoffice-web');
-    expect(await sentBody(post)).toMatchObject({ mfcId: 'MFC-SEED-01', locationCode: 'C-S1-04-1-01', zone: 'STORAGE', temperatureZone: 'CHILLED', dimensions: { slotCount: 6 }, position: null });
+    expect(await sentBody(post)).toMatchObject({ mfcId: 'MFC-BJG-01', locationCode: 'C-S1-04-1-01', zone: 'STORAGE', temperatureZone: 'CHILLED', dimensions: { slotCount: 6 }, position: null });
     expect([...db.locations.values()].some((l) => l.locationCode === 'C-S1-04-1-01')).toBe(true);
   });
 
   it('같은 코드가 있으면 LOCATION_CODE_DUPLICATE 문구', async () => {
-    renderAt('/c/MFC-SEED-01/locations/new');
+    renderAt('/c/MFC-BJG-01/locations/new');
     await userEvent.type(await screen.findByRole('textbox', { name: /칸 코드/ }), 'RCV-C-01');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '구역 종류' }), 'RECEIVING');
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '온도대' }), 'CHILLED');
@@ -100,7 +100,7 @@ describe('칸 등록', () => {
   });
 
   it('도면 좌표는 둘 다 넣거나 둘 다 비운다', async () => {
-    renderAt('/c/MFC-SEED-01/locations/new');
+    renderAt('/c/MFC-BJG-01/locations/new');
     await userEvent.type(await screen.findByRole('textbox', { name: /칸 코드/ }), 'A-S1-01-1-02');
     await userEvent.type(screen.getByRole('spinbutton', { name: /도면 x/ }), '3');
     expect(screen.getByText('도면 x 와 z 는 둘 다 넣거나 둘 다 비워 주세요.')).toBeInTheDocument();
@@ -110,7 +110,7 @@ describe('칸 등록', () => {
 
 describe('칸 상세', () => {
   it('속성 변경은 전체 교체 + X-Expected-Version — 고치지 않은 도면 좌표도 다시 보낸다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/locations/LOC-1');
+    const view = renderAt('/c/MFC-BJG-01/locations/LOC-1');
     expect(await screen.findByRole('heading', { name: /C-S1-03-2-04/ })).toBeInTheDocument();
     await userEvent.click(screen.getByText('속성 고치기'));
     expect(screen.getByRole('textbox', { name: /칸 코드/ })).toHaveAttribute('readonly');
@@ -126,7 +126,7 @@ describe('칸 상세', () => {
   });
 
   it('다른 사람이 먼저 바꿨으면 VERSION_CONFLICT 문구', async () => {
-    renderAt('/c/MFC-SEED-01/locations/LOC-1');
+    renderAt('/c/MFC-BJG-01/locations/LOC-1');
     await screen.findByRole('heading', { name: /C-S1-03-2-04/ });
     db.locations.set('LOC-1', { ...db.locations.get('LOC-1')!, version: 5 });
     await userEvent.click(screen.getByText('속성 고치기'));
@@ -135,7 +135,7 @@ describe('칸 상세', () => {
   });
 
   it('닫기: 사유가 있어야 보낸다 → 닫힘으로 다시 읽는다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/locations/LOC-3');
+    const view = renderAt('/c/MFC-BJG-01/locations/LOC-3');
     await screen.findByRole('heading', { name: /RCV-C-01/ });
     const close = screen.getByRole('button', { name: '닫기' });
     expect(close).toBeDisabled();
@@ -157,7 +157,7 @@ describe('칸 상세', () => {
         HttpResponse.json({ requestId: params.requestId, status: 'APPLIED', fromState: 'ACTIVE', toState: 'CLOSED', newVersion: 2 }),
       ),
     );
-    const view = renderAt('/c/MFC-SEED-01/locations/LOC-3');
+    const view = renderAt('/c/MFC-BJG-01/locations/LOC-3');
     await screen.findByRole('heading', { name: /RCV-C-01/ });
     await userEvent.type(screen.getByRole('textbox', { name: '닫기 사유' }), '점검');
     await userEvent.click(screen.getByRole('button', { name: '닫기' }));
@@ -175,7 +175,7 @@ describe('칸 상세', () => {
       }),
       http.get(`${API_BASE}/locations/:locationId/state-changes/:requestId`, () => new HttpResponse(null, { status: 404 })),
     );
-    const view = renderAt('/c/MFC-SEED-01/locations/LOC-3');
+    const view = renderAt('/c/MFC-BJG-01/locations/LOC-3');
     await screen.findByRole('heading', { name: /RCV-C-01/ });
     await userEvent.type(screen.getByRole('textbox', { name: '닫기 사유' }), '점검');
     await userEvent.click(screen.getByRole('button', { name: '닫기' }));
@@ -190,7 +190,7 @@ describe('칸 상세', () => {
   });
 
   it('닫힌 칸: 다시 열기와 폐지(확인 표시를 해야 누를 수 있다) — 폐지되면 바꿀 수 없다', async () => {
-    renderAt('/c/MFC-SEED-01/locations/LOC-4');
+    renderAt('/c/MFC-BJG-01/locations/LOC-4');
     await screen.findByRole('heading', { name: /F-S2-02-1-03/ });
     expect(screen.getByRole('button', { name: '다시 열기' })).toBeInTheDocument();
     const retire = screen.getByRole('button', { name: '폐지' });
@@ -204,7 +204,7 @@ describe('칸 상세', () => {
   });
 
   it('재고가 남은 칸 폐지는 서버가 INVALID_STATE 로 거절 — 거절 문구', async () => {
-    renderAt('/c/MFC-SEED-01/locations/LOC-5');
+    renderAt('/c/MFC-BJG-01/locations/LOC-5');
     await screen.findByRole('heading', { name: /QRT-A-01/ });
     await userEvent.click(screen.getByRole('checkbox', { name: /이 칸을 폐지합니다/ }));
     await userEvent.click(screen.getByRole('button', { name: '폐지' }));
@@ -220,7 +220,7 @@ describe('칸 상세', () => {
         return HttpResponse.json({ status: 'ACCEPTED', requestId: request.headers.get('Idempotency-Key') }, { status: 202 });
       }),
     );
-    const view = renderAt('/c/MFC-SEED-01/locations/LOC-4');
+    const view = renderAt('/c/MFC-BJG-01/locations/LOC-4');
     await screen.findByRole('heading', { name: /F-S2-02-1-03/ });
     const before = view.gets('/locations/LOC-4').length;
     await userEvent.click(screen.getByRole('checkbox', { name: /이 칸을 폐지합니다/ }));
@@ -231,7 +231,7 @@ describe('칸 상세', () => {
 
   it('실사 잠금 칸은 이 화면에서 풀지 않는다', async () => {
     db.locations.set('LOC-3', { ...db.locations.get('LOC-3')!, state: 'COUNT_LOCKED' });
-    renderAt('/c/MFC-SEED-01/locations/LOC-3');
+    renderAt('/c/MFC-BJG-01/locations/LOC-3');
     expect(await screen.findByText('실사 중이라 잠겼어요. 실사가 끝나면 풀려요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '닫기' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '다시 열기' })).not.toBeInTheDocument();

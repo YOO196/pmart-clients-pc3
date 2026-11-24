@@ -1,10 +1,10 @@
-// 목 — 부산진구(MFC-SEED-01) 말고 다른 네 센터에도 시연 데이터(2026-11-24 사용자 "목 웹 다른 센터들에도 목 데이터 넣어줘").
+// 목 — 부산진구(MFC-BJG-01) 말고 다른 네 센터에도 시연 데이터(2026-11-24 사용자 "목 웹 다른 센터들에도 목 데이터 넣어줘").
 // 브라우저 목(seedDemoFloor → enableDemoCenters)에서만 켠다 — 시험(vitest)은 부산진구 데이터만 보고, 다른 센터는 예전처럼 비어 있다.
 // 목록 데이터는 부산진구 기록을 센터마다 옮겨 만든다(cloneForCenter): 센터 ID·기록 ID·화면 번호·작업자(그 센터 시연 작업자)·선반 칸 코드(그 센터 도면 랙)를 바꾼다.
 // 숫자 지표(피킹·결품·정시·주문·배송 통계)는 같은 식에 센터 규모(scale)를 곱한다.
 import { mockFloorPlan } from './floorPlans';
 
-export const DEMO_HOME = 'MFC-SEED-01';
+export const DEMO_HOME = 'MFC-BJG-01';
 
 export interface DemoCenter {
   readonly id: string;

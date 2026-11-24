@@ -377,6 +377,19 @@ html[data-theme='pmart-dark'] [data-testid='side-menu'] nav ul a > span:first-ch
   .pm-chart-rise, .pm-chart-fill { animation: none; }
 }
 
+/* 원 그래프 — 3시에서 시계방향으로 부채 펼치듯(2026-11-24 사용자). 가림막 원 테두리가 그려지며 조각이 드러난다 */
+.pm-pie-sweep {
+  stroke-dashoffset: 0;
+  animation: pm-pie-sweep 0.9s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes pm-pie-sweep {
+  from { stroke-dashoffset: var(--pm-pie-c); }
+  to { stroke-dashoffset: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pm-pie-sweep { animation: none; }
+}
+
 /* 끌기 — 맞춰질 칸 표시는 칸이 바뀔 때 부드럽게 미끄러진다(띠 자체는 손을 그대로 따라감) */
 .pm-brush-snap {
   transition: left 0.12s ease-out, width 0.12s ease-out;

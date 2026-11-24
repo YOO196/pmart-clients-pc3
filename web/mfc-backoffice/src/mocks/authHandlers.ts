@@ -30,7 +30,7 @@ function issue(s: MockSession) {
 
 /** 목 센터 이름 — 실서버 LAN 센터 다섯 곳과 같은 ID(2026-11-24, 시뮬레이터 MFC_SITES)(서버는 center-master 이름을 10분 캐시) — 없는 센터는 name: null(서버가 못 읽은 경우와 같다) */
 export const mockCenterNames: ReadonlyMap<string, string> = new Map([
-  ['MFC-SEED-01', '부산진구 MFC'],
+  ['MFC-BJG-01', '부산진구 MFC'],
   ['MFC-MOKPO-01', '목포 MFC'],
   ['MFC-SEJ-01', '세종 MFC'],
   ['MFC-CHC-01', '춘천 MFC'],

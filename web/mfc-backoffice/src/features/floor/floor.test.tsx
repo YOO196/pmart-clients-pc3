@@ -12,7 +12,7 @@ describe('센터 도면', () => {
     const base = db.locations.get('LOC-2')!;
     db.locations.set('LOC-T', { ...base, locationId: 'LOC-T', locationCode: 'A-C1-01-1-01' });
     db.stockUnits.push({ ...db.stockUnits.find((u) => u.locationCode === 'A-P1-01-1-01')!, locationCode: 'A-C1-01-1-01' });
-    const view = renderAt('/c/MFC-SEED-01/floor');
+    const view = renderAt('/c/MFC-BJG-01/floor');
     const rack = await waitFor(() => {
       const r = document.querySelector('[data-testid="floor-rack"][data-code="A-C1-01"]');
       if (!r) throw new Error('rack');
@@ -39,12 +39,12 @@ describe('센터 도면', () => {
   });
 
   it('등록된 칸이 없는 랙은 빈 랙으로 꾸미지 않고 그렇게 말한다', async () => {
-    renderAt('/c/MFC-SEED-01/floor?rack=F-P3-09');
+    renderAt('/c/MFC-BJG-01/floor?rack=F-P3-09');
     expect(await screen.findByTestId('rack-empty')).toHaveTextContent('F-P3-09 로 시작하는 등록된 칸이 없어요');
   });
 
   it('작업자 점을 누르면 정보 · 진행 중 작업 · 예정 작업, 작업자 상세 링크', async () => {
-    renderAt('/c/MFC-SEED-01/floor');
+    renderAt('/c/MFC-BJG-01/floor');
     await waitFor(() => expect(screen.getAllByTestId('floor-worker').length).toBe(3));
     const dot = screen.getAllByRole('button', { name: /김현장/ })[0]!;
     await userEvent.click(dot);
@@ -52,12 +52,12 @@ describe('센터 도면', () => {
     expect(panel).toHaveTextContent('김현장');
     await waitFor(() => expect(within(screen.getByTestId('worker-running')).getAllByRole('link').length).toBeGreaterThan(0));
     const actions = screen.getByTestId('floor-actions');
-    expect(within(actions).getByRole('link', { name: '작업자 상세로' })).toHaveAttribute('href', '/c/MFC-SEED-01/workers/OP-wkr-1');
-    expect(within(actions).getByRole('link', { name: '이 작업자 배정 내역' })).toHaveAttribute('href', '/c/MFC-SEED-01/assignments?workerId=OP-wkr-1');
+    expect(within(actions).getByRole('link', { name: '작업자 상세로' })).toHaveAttribute('href', '/c/MFC-BJG-01/workers/OP-wkr-1');
+    expect(within(actions).getByRole('link', { name: '이 작업자 배정 내역' })).toHaveAttribute('href', '/c/MFC-BJG-01/assignments?workerId=OP-wkr-1');
   });
 
   it('대시보드 도면을 누르면 센터 도면으로', async () => {
-    renderAt('/c/MFC-SEED-01/dashboard');
-    expect(await screen.findByTestId('floor-open')).toHaveAttribute('href', '/c/MFC-SEED-01/floor');
+    renderAt('/c/MFC-BJG-01/dashboard');
+    expect(await screen.findByTestId('floor-open')).toHaveAttribute('href', '/c/MFC-BJG-01/floor');
   });
 });

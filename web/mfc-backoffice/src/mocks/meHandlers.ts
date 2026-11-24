@@ -16,7 +16,7 @@ const employees: Readonly<Record<string, EmployeeSelf>> = {
     name: '정관리',
     mailAddress: 'sup1@pmart.test',
     employmentType: 'REGULAR',
-    affiliation: { type: 'CENTER', code: 'MFC-SEED-01' },
+    affiliation: { type: 'CENTER', code: 'MFC-BJG-01' },
     status: 'ACTIVE',
   },
   'OP-sup-2': {
@@ -70,7 +70,7 @@ const employees: Readonly<Record<string, EmployeeSelf>> = {
     name: '전관리',
     mailAddress: 'sup-all@pmart.test',
     employmentType: 'REGULAR',
-    affiliation: { type: 'CENTER', code: 'MFC-SEED-01' },
+    affiliation: { type: 'CENTER', code: 'MFC-BJG-01' },
     status: 'ACTIVE',
   },
 };

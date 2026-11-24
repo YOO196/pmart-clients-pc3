@@ -25,8 +25,8 @@ interface MockDelay {
 
 function seedDispatchDelays(): MockDelay[] {
   return [
-    { deliveryId: 'DLV-DD-1', orderId: 'ORD-DD-1', mfcId: 'MFC-SEED-01', deliverySeq: 1, state: 'DISPATCHING', riderId: null, promisedAt: minutesFromNow(-74), delayAlertedAt: minutesFromNow(-90), createdAt: minutesFromNow(-124), deliveryNumber: 'D35726513' },
-    { deliveryId: 'DLV-DD-2', orderId: 'ORD-DD-2', mfcId: 'MFC-SEED-01', deliverySeq: 1, state: 'ASSIGNED', riderId: 'RD-41', promisedAt: minutesFromNow(8), delayAlertedAt: minutesFromNow(-5), createdAt: minutesFromNow(-42), deliveryNumber: null },
+    { deliveryId: 'DLV-DD-1', orderId: 'ORD-DD-1', mfcId: 'MFC-BJG-01', deliverySeq: 1, state: 'DISPATCHING', riderId: null, promisedAt: minutesFromNow(-74), delayAlertedAt: minutesFromNow(-90), createdAt: minutesFromNow(-124), deliveryNumber: 'D35726513' },
+    { deliveryId: 'DLV-DD-2', orderId: 'ORD-DD-2', mfcId: 'MFC-BJG-01', deliverySeq: 1, state: 'ASSIGNED', riderId: 'RD-41', promisedAt: minutesFromNow(8), delayAlertedAt: minutesFromNow(-5), createdAt: minutesFromNow(-42), deliveryNumber: null },
     { deliveryId: 'DLV-DD-S', orderId: 'ORD-DD-S', mfcId: 'MFC-MOKPO-01', deliverySeq: 1, state: 'CREATED', riderId: null, promisedAt: minutesFromNow(-10), delayAlertedAt: minutesFromNow(-20), createdAt: minutesFromNow(-60), deliveryNumber: 'D40000001' },
   ];
 }

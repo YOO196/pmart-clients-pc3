@@ -22,13 +22,13 @@ async function fillLine(form: HTMLElement, sku: string, lot: string, loc: string
 
 describe('격리·해제', () => {
   it('격리: 바로 반영 — 보낸 뒤 판정을 열어 "반영됨"', async () => {
-    const view = renderAt('/c/MFC-SEED-01/quality');
+    const view = renderAt('/c/MFC-BJG-01/quality');
     const form = await screen.findByRole('form', { name: '판정 보내기' });
     await fillLine(form, 'SKU-MILK-1', 'LOT-MILK-A', 'A-P1-01-1-01', '2');
     await userEvent.click(within(form).getByRole('button', { name: '판정 보내기' }));
     expect(await screen.findByTestId('decision')).toHaveTextContent('반영됨');
     expect(await sentBody(postsTo(view.sent, '/quality-decisions')[0]!)).toEqual({
-      mfcId: 'MFC-SEED-01',
+      mfcId: 'MFC-BJG-01',
       decisionType: 'QUARANTINE',
       reason: 'DAMAGE',
       lines: [{ sku: 'SKU-MILK-1', lotId: 'LOT-MILK-A', locationCode: 'A-P1-01-1-01', qty: 2, workState: 'STORED' }],
@@ -36,7 +36,7 @@ describe('격리·해제', () => {
   });
 
   it('해제: 요청만(승인 대기) — 요청한 본인은 승인할 수 없다(SELF_APPROVAL)', async () => {
-    renderAt('/c/MFC-SEED-01/quality');
+    renderAt('/c/MFC-BJG-01/quality');
     const form = await screen.findByRole('form', { name: '판정 보내기' });
     await userEvent.selectOptions(within(form).getByRole('combobox', { name: '판정' }), 'RELEASE');
     await userEvent.selectOptions(within(form).getByRole('combobox', { name: '사유' }), 'INSPECTION_PASS');
@@ -49,7 +49,7 @@ describe('격리·해제', () => {
   });
 
   it('다른 사람이 요청한 해제를 승인하면 재고 반영, 반려하면 반려', async () => {
-    renderAt('/c/MFC-SEED-01/quality?decisionId=QD-1');
+    renderAt('/c/MFC-BJG-01/quality?decisionId=QD-1');
     const d = await screen.findByTestId('decision');
     await userEvent.click(within(d).getByRole('button', { name: '해제 승인' }));
     expect(await screen.findByText('해제를 승인했어요. 재고에 반영됐어요.')).toBeInTheDocument();
@@ -58,7 +58,7 @@ describe('격리·해제', () => {
   });
 
   it('해제 반려', async () => {
-    renderAt('/c/MFC-SEED-01/quality?decisionId=QD-1');
+    renderAt('/c/MFC-BJG-01/quality?decisionId=QD-1');
     const d = await screen.findByTestId('decision');
     await userEvent.click(within(d).getByRole('button', { name: '해제 반려' }));
     expect(await screen.findByText('해제를 반려했어요.')).toBeInTheDocument();
@@ -67,12 +67,12 @@ describe('격리·해제', () => {
 
   it('판정 조회 실패는 오류', async () => {
     server.use(http.get(`${API_BASE}/quality-decisions/:id`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-SEED-01/quality?decisionId=QD-1');
+    renderAt('/c/MFC-BJG-01/quality?decisionId=QD-1');
     await waitFor(() => expect(document.querySelector('[data-state="error"]')).not.toBeNull());
   });
 
   it('품질 사고 탭은 이제 목록·등록(0.6.0 — 자세한 시험은 incidents.test.tsx), 계약만 있다는 안내는 없다', async () => {
-    renderAt('/c/MFC-SEED-01/quality?tab=incidents');
+    renderAt('/c/MFC-BJG-01/quality?tab=incidents');
     expect(await screen.findByTestId('list-incidents')).toBeInTheDocument();
     expect(screen.getByRole('form', { name: '품질 사고 등록' })).toBeInTheDocument();
     expect(screen.queryByText(/501/)).not.toBeInTheDocument();
@@ -81,7 +81,7 @@ describe('격리·해제', () => {
 
 describe('폐기', () => {
   it('폐기 요청 → 승인 대기로 연다', async () => {
-    renderAt('/c/MFC-SEED-01/quality?tab=disposals');
+    renderAt('/c/MFC-BJG-01/quality?tab=disposals');
     const form = await screen.findByRole('form', { name: '폐기 요청' });
     await fillLine(form, 'SKU-MILK-1', 'LOT-MILK-A', 'QRT-A-01', '2');
     await userEvent.click(within(form).getByRole('button', { name: '폐기 요청' }));
@@ -90,7 +90,7 @@ describe('폐기', () => {
   });
 
   it('폐기 승인(본사 승인 번호 선택) — 지금 버전으로 보낸다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/quality?tab=disposals&disposalId=DSP-1');
+    const view = renderAt('/c/MFC-BJG-01/quality?tab=disposals&disposalId=DSP-1');
     const card = await screen.findByTestId('disposal');
     const approve = within(card).getByRole('button', { name: '폐기 승인' });
     expect(approve).toBeEnabled(); // 본사 승인 번호는 선택(AP-1)
@@ -100,11 +100,11 @@ describe('폐기', () => {
     await waitFor(() => expect(screen.getByTestId('disposal')).toHaveTextContent('승인됨'));
     const post = postsTo(view.sent, '/disposal-approvals')[0]!;
     expect(post.headers.get('X-Expected-Version')).toBe('1');
-    expect(await sentBody(post)).toEqual({ action: 'APPROVE', mfcId: 'MFC-SEED-01', disposalApprovalId: 'DSP-1', approvalRef: 'AP-LOSS-9' });
+    expect(await sentBody(post)).toEqual({ action: 'APPROVE', mfcId: 'MFC-BJG-01', disposalApprovalId: 'DSP-1', approvalRef: 'AP-LOSS-9' });
   });
 
   it('승인된 폐기를 나눠 실행 — 일부 실행·남은 양', async () => {
-    const view = renderAt('/c/MFC-SEED-01/quality?tab=disposals&disposalId=DSP-2');
+    const view = renderAt('/c/MFC-BJG-01/quality?tab=disposals&disposalId=DSP-2');
     const card = await screen.findByTestId('disposal');
     const qty = within(card).getByRole('spinbutton', { name: /실행 수량/ });
     expect(qty).toHaveValue(3);
@@ -120,7 +120,7 @@ describe('폐기', () => {
 
 describe('회수품 검수', () => {
   it('반입을 불러와 줄마다 판정 — 냉장 재판매는 막고, 폐기로 바꾸면 보낸다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/quality?tab=inspections&returnReceiptId=RR-1');
+    const view = renderAt('/c/MFC-BJG-01/quality?tab=inspections&returnReceiptId=RR-1');
     const form = await screen.findByRole('form', { name: '검수 결과 보내기' });
     const ramen = within(form).getByRole('group', { name: 'SKU-RAMEN-5 × 2' });
     const milk = within(form).getByRole('group', { name: 'SKU-MILK-1 × 1' });
@@ -136,7 +136,7 @@ describe('회수품 검수', () => {
     expect(insp).toHaveTextContent('재판매 2 · 폐기 1');
     expect(insp).toHaveTextContent('폐기 승인 요청');
     const body = await sentBody(postsTo(view.sent, '/return-inspections')[0]!);
-    expect(body).toMatchObject({ mfcId: 'MFC-SEED-01', claimId: 'CLM-1', returnReceiptId: 'RR-1', inspectedBy: 'OP-sup-1' });
+    expect(body).toMatchObject({ mfcId: 'MFC-BJG-01', claimId: 'CLM-1', returnReceiptId: 'RR-1', inspectedBy: 'OP-sup-1' });
     expect(body.lines).toEqual([
       { orderLineId: 'OL-1', sku: 'SKU-RAMEN-5', lotId: 'RET-CLM-1', qty: 2, verdict: 'RESALE', temperatureZone: 'AMBIENT', opened: false, fresh: false },
       { orderLineId: 'OL-2', sku: 'SKU-MILK-1', lotId: 'RET-CLM-1', qty: 1, verdict: 'DISPOSE', temperatureZone: 'CHILLED', opened: false, fresh: false, disposeReason: 'TEMPERATURE_ZONE' },
@@ -145,7 +145,7 @@ describe('회수품 검수', () => {
 
   it('반입한 사람이 검수하면 서버가 거절(SELF_APPROVAL)', async () => {
     db.returnReceipts.set('RR-1', { ...db.returnReceipts.get('RR-1')!, receivedBy: 'OP-sup-1' });
-    renderAt('/c/MFC-SEED-01/quality?tab=inspections&returnReceiptId=RR-1');
+    renderAt('/c/MFC-BJG-01/quality?tab=inspections&returnReceiptId=RR-1');
     const form = await screen.findByRole('form', { name: '검수 결과 보내기' });
     await userEvent.click(within(form).getByRole('button', { name: '검수 결과 보내기' }));
     expect(await within(form).findByRole('alert')).toHaveTextContent('직접 요청·시작·계수·반입한 사람은 승인할 수 없어요.');
@@ -154,7 +154,7 @@ describe('회수품 검수', () => {
 
 describe('격리 해제 승인 — 본사 승인 번호(quality 0.3.0 새 칸)', () => {
   it('넣으면 APPROVE 본문에 approvalRef, 비우면 보내지 않는다', async () => {
-    const view = renderAt('/c/MFC-SEED-01/quality?decisionId=QD-1');
+    const view = renderAt('/c/MFC-BJG-01/quality?decisionId=QD-1');
     const d = await screen.findByTestId('decision');
     await userEvent.type(within(d).getByRole('textbox', { name: /본사 승인 번호/ }), 'AP-REL-1');
     await userEvent.click(within(d).getByRole('button', { name: '해제 승인' }));
