@@ -60,6 +60,7 @@ describe('재고 화면 실시간 반영', () => {
     const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1');
     await waitFor(() => expect(screen.getByTestId('stock-live')).toHaveAttribute('data-status', 'live'));
     expect(screen.getByTestId('stock-live')).toHaveTextContent('실시간');
+    expect(view.gets('/stock-stream')[0]!.headers.get('Accept')).toBe('text/event-stream');
     await screen.findAllByTestId('unit-row');
     await wait(400);
     const before = stockGets(view.sent).length;
