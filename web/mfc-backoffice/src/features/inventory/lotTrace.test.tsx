@@ -3,19 +3,34 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import { renderAt } from '../../test/render';
-import { lotCode } from './LotTraceTab';
+import { pageList } from '../../shared/Pager';
+import { openFilter, renderAt } from '../../test/render';
+import { looksLikeLotCode, lotCode } from './LotTraceTab';
 
 describe('LOT 추적', () => {
-  it('LOT 번호 전에는 묻지 않고 한 줄 안내', async () => {
+  it('LOT 번호를 몰라도 센터 LOT 목록(소비기한 이른 순) — 상품명·코드로 찾기, 품질 필터는 서버로, LOT 을 누르면 추적', async () => {
     const view = renderAt('/c/MFC-BJG-01/inventory?tab=lotTrace');
-    expect(await screen.findByText('LOT 번호를 넣고 조회해요.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByTestId('lot-row').length).toBeGreaterThan(1));
     expect(view.gets('/lot-resolutions')).toHaveLength(0);
+    // 글자 찾기 — 받은 목록 안에서(상품명·상품 코드·LOT 번호)
+    await userEvent.type(screen.getByRole('searchbox', { name: '상품명·상품 코드·LOT 번호' }), 'milk');
+    await userEvent.click(screen.getByRole('button', { name: '조회' }));
+    await waitFor(() => expect(screen.getAllByTestId('lot-row').every((r) => r.textContent?.includes('SKU-MILK-1'))).toBe(true));
+    // 품질 필터 — stock-units qualityState 로 서버에
+    await openFilter();
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: '품질' }), 'QUARANTINED');
+    await waitFor(() => expect(view.gets('/stock-units').some((r) => new URL(r.url).searchParams.get('qualityState') === 'QUARANTINED')).toBe(true));
+    await waitFor(() => expect(screen.getAllByTestId('lot-row')).toHaveLength(1));
+    // LOT 을 누르면 그 LOT 추적, ‹ 로 목록
+    await userEvent.click(within(screen.getAllByTestId('lot-row')[0]!).getAllByRole('button')[0]!);
+    expect(await screen.findByTestId('lot-card')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'LOT 목록' }));
+    expect(await screen.findByTestId('lot-list')).toBeInTheDocument();
   });
 
   it('LOT 번호 → (10) 괄호 꼴로 찾고, LOT 정보·지금 있는 칸·이 LOT 이 지나온 길(서버 값)', async () => {
     const view = renderAt('/c/MFC-BJG-01/inventory?tab=lotTrace');
-    await userEvent.type(await screen.findByRole('searchbox', { name: 'LOT 번호·라벨 바코드' }), 'l261107000497');
+    await userEvent.type(await screen.findByRole('searchbox', { name: '상품명·상품 코드·LOT 번호' }), 'l261107000497');
     await userEvent.click(screen.getByRole('button', { name: '조회' }));
     const card = await screen.findByTestId('lot-card');
     expect(card).toHaveTextContent('L261107000497');
@@ -32,6 +47,9 @@ describe('LOT 추적', () => {
     await waitFor(() => expect(handover).toHaveTextContent('20000001'));
     expect(handover).not.toHaveTextContent('ORD-1');
     expect(handover).not.toHaveTextContent('OP-wkr-1');
+    // 출처는 서비스 이름만(포장 번호 PKG-… 같은 시스템 번호는 줄에 내지 않는다)
+    expect(handover).toHaveTextContent('출고 작업');
+    expect(handover).not.toHaveTextContent('PKG-20000001');
   });
 
   it('없는 LOT 은 404 — 빈 화면이 아니라 오류', async () => {
@@ -45,5 +63,14 @@ describe('LOT 추적', () => {
     expect(lotCode('(01)08801115114154(10)L261107000497')).toBe('(01)08801115114154(10)L261107000497');
     expect(lotCode('LOT:LOT-MILK-A')).toBe('LOT:LOT-MILK-A');
     expect(lotCode('0108801115114154')).toBe('0108801115114154');
+    // 찾기 칸: LOT 번호·바코드면 바로 추적, 상품명 글자는 목록 거르기
+    expect(looksLikeLotCode('L261107000497')).toBe(true);
+    expect(looksLikeLotCode('(10)L261107000497')).toBe(true);
+    expect(looksLikeLotCode('서울우유')).toBe(false);
+    expect(looksLikeLotCode('SKU-MILK-1')).toBe(false);
+    // 쪽이 많으면 첫·끝·지금 앞뒤만(사이 …) — 75쪽 목록이 화면을 넘치지 않게
+    expect(pageList(1, 5)).toEqual([1, 2, 3, 4, 5]);
+    expect(pageList(10, 75)).toEqual([1, null, 9, 10, 11, null, 75]);
+    expect(pageList(1, 75)).toEqual([1, 2, null, 75]);
   });
 });

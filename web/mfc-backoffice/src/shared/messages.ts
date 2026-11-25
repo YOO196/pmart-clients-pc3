@@ -1045,8 +1045,18 @@ export const messages = {
     /** LOT 추적 — LOT 찾기(lot-resolutions) + 지금 있는 칸(stock) + 이 LOT 줄만 이력(stock-ledger lotId) */
     lotTrace: {
       search: 'LOT 추적',
-      placeholder: 'LOT 번호·라벨 바코드',
+      placeholder: '상품명·상품 코드·LOT 번호',
       needLot: 'LOT 번호를 넣고 조회해요.',
+      // LOT 목록(센터 재고 stock-units 를 LOT 별로 — 지금 보유가 있는 LOT 만)
+      listEmpty: '조건에 맞는 LOT 이 없어요.',
+      quality: '품질',
+      temperature: '온도대',
+      all: '전체',
+      backToList: 'LOT 목록',
+      more: (n: number) => `센터 재고가 많아 앞 ${n}줄까지만 묶었어요.`,
+      lcol: { lot: 'LOT 번호', product: '상품', expiry: '소비기한', places: '칸', qty: '수량', quality: '품질' },
+      placesText: (first: string, n: number) => (n > 1 ? `${first} 외 ${n - 1}칸` : first),
+      quarantined: (n: number) => `격리 ${n}`,
       notFound: '이 LOT 을 찾지 못했어요.',
       product: '상품',
       lotNo: 'LOT 번호',
@@ -1082,6 +1092,15 @@ export const messages = {
       actor: '처리한 사람',
       system: '시스템',
       commit: '확정 번호',
+      sourceName: {
+        'mfc-fulfillment': '출고 작업',
+        'mfc-inbound': '입고·이동',
+        'mfc-quality': '품질',
+        'mfc-inventory': '재고',
+        'mfc-backoffice': '센터 관리자',
+        'mfc-app': '현장 PDA',
+        'order-orchestration': '주문',
+      } as Readonly<Record<string, string>>,
       more: '더 보기',
       causeName: {
         TIN: '입고 수령',

@@ -43,11 +43,11 @@ function seed(): Stored[] {
   const r = (delta: number): Entry => ({ symbol: 'R', delta, lotId: null, lotNo: null, expiryDate: null, locationCode: null, qualityState: null, workState: null });
   seq = 0;
   return [
-    at('SKU-MILK-1', 'TIN', 50, 'mfc-inbound', 'RCP-2026-0101', [h(5, 'RCV-C-01', 'LOT-MILK-B', 'UNSTOWED'), e(5, 'RCV-C-01', 'LOT-MILK-B')]),
-    at('SKU-MILK-1', 'TASK_EXECUTION', 40, 'mfc-inbound', 'TASK-PUT-0042', [h(-3, 'RCV-C-01'), h(3, 'A-P1-01-1-01')], null, 'OP-wkr-1'),
-    at('SKU-MILK-1', 'RESERVE', 30, 'mfc-fulfillment', 'RSV-20000001', [r(1)], 'ORD-1'),
-    at('SKU-MILK-1', 'HANDOVER', 26, 'mfc-fulfillment', 'PKG-20000001', [h(-1, 'A-P1-01-1-01'), e(-1, 'A-P1-01-1-01'), r(-1)], 'ORD-1', 'OP-wkr-1'),
-    at('SKU-MILK-1', 'QUALITY_QUARANTINE', 20, 'mfc-quality', 'QD-0007', [h(-2, 'A-P1-01-1-01'), h(2, 'QRT-A-01'), e(-2, 'A-P1-01-1-01'), q(2, 'QRT-A-01')]),
+    at('SKU-MILK-1', 'TIN', 50, 'mfc-inbound-service', 'RCP-2026-0101', [h(5, 'RCV-C-01', 'LOT-MILK-B', 'UNSTOWED'), e(5, 'RCV-C-01', 'LOT-MILK-B')]),
+    at('SKU-MILK-1', 'TASK_EXECUTION', 40, 'mfc-inbound-service', 'TASK-PUT-0042', [h(-3, 'RCV-C-01'), h(3, 'A-P1-01-1-01')], null, 'OP-wkr-1'),
+    at('SKU-MILK-1', 'RESERVE', 30, 'order-orchestration-service', 'RSV-20000001', [r(1)], 'ORD-1'),
+    at('SKU-MILK-1', 'HANDOVER', 26, 'mfc-fulfillment-service', 'PKG-20000001', [h(-1, 'A-P1-01-1-01'), e(-1, 'A-P1-01-1-01'), r(-1)], 'ORD-1', 'OP-wkr-1'),
+    at('SKU-MILK-1', 'QUALITY_QUARANTINE', 20, 'mfc-quality-service', 'QD-0007', [h(-2, 'A-P1-01-1-01'), h(2, 'QRT-A-01'), e(-2, 'A-P1-01-1-01'), q(2, 'QRT-A-01')]),
     at('SKU-MILK-1', 'CORRECTION', 3, 'mfc-backoffice', 'COR-0003', [h(-1, 'A-P1-01-1-01'), h(1, 'A-P1-01-1-01', 'LOT-MILK-B')], null, 'OP-sup-1'),
   ];
 }

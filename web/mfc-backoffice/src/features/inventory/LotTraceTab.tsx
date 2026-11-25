@@ -9,14 +9,17 @@ import { useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
 import { formatSeoul, QueryState, toUiState } from '@pmart/web-ui';
-import type { components } from '../../api/generated/mfc-inventory';
+import type { components, paths as InvPaths } from '../../api/generated/mfc-inventory';
 import { useApi } from '../../app/ApiContext';
+import { BackButton } from '../../shared/DetailHead';
 import { SystemNumbers } from '../../shared/displayNumber';
+import { LotLabel } from '../../shared/LotLabel';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 import { OrderNo } from '../../shared/OrderNo';
-import { InlineFields, ResultBar, SearchPanel } from '../../shared/simList';
-import { causeName } from './StockLedgerTab';
+import { Pager, usePage } from '../../shared/Pager';
+import { InlineFields, ResultBar, SearchPanel, SearchRow } from '../../shared/simList';
+import { causeName, sourceName } from './StockLedgerTab';
 
 const m = messages.inventory.lotTrace;
 const inv = messages.inventory;
@@ -54,34 +57,42 @@ function lotSummary(c: Commit, lotId: string) {
   return { moves: moves || messages.none, states: [states, r].filter(Boolean).join(' · ') || messages.none };
 }
 
+/** 찾기 칸 글자가 LOT 번호·바코드(괄호 꼴·스캐너 원문·LOT:)면 바로 그 LOT 으로, 아니면 목록 거르기 글자로 */
+export function looksLikeLotCode(v: string): boolean {
+  const t = v.trim();
+  // LOT 번호 꼴(영문 한 글자 + 숫자 9자리 넘게, 예 L261107000497)도 바로 그 LOT 으로
+  return t.startsWith('(') || t.startsWith('LOT:') || t.startsWith(']C1') || t.includes(String.fromCharCode(29)) || /^\d{14,}/.test(t) || /^[A-Za-z]\d{9,}$/.test(t);
+}
+
 export function LotTraceTab({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
   const [params, setParams] = useSearchParams();
   const code = params.get('lot') ?? '';
-  const [draft, setDraft] = useState(code);
+  const q = params.get('q') ?? '';
+  const quality = params.get('quality') ?? '';
+  const temp = params.get('temp') ?? '';
+  const [draft, setDraft] = useState(q);
+  const set = (patch: Record<string, string>) => {
+    const next = new URLSearchParams(params);
+    for (const [k, v] of Object.entries(patch)) {
+      if (v) next.set(k, v);
+      else next.delete(k);
+    }
+    next.delete('page');
+    setParams(next, { replace: true });
+  };
   const lot = useQuery({
     queryKey: ['lot-resolve', mfcId, code],
     enabled: !!code,
     queryFn: () => request('GET', api.inventory.GET('/mfcs/{mfcId}/lot-resolutions', { params: { path: { mfcId }, query: { code: lotCode(code) } } })),
   });
-  return (
-    <div className="space-y-4" data-testid="lot-trace">
-      <SearchPanel
-        label={m.search}
-        submitLabel={inv.lookup}
-        onSubmit={(e) => {
-          e.preventDefault();
-          const next = new URLSearchParams(params);
-          if (draft.trim()) next.set('lot', draft.trim());
-          else next.delete('lot');
-          setParams(next, { replace: true });
-        }}
-        onReset={() => setDraft('')}
-        search={<input type="search" className="input input-sm w-56 font-mono" maxLength={120} value={draft} placeholder={m.placeholder} aria-label={m.placeholder} onChange={(e) => setDraft(e.target.value)} />}
-      />
-      {!code ? (
-        <p className="pm-empty-line">{m.needLot}</p>
-      ) : (
+  if (code)
+    return (
+      <div className="space-y-4" data-testid="lot-trace">
+        <div className="flex items-center gap-2">
+          <BackButton onClick={() => set({ lot: '' })} label={m.backToList} />
+          <span className="text-sm text-base-content/60">{m.backToList}</span>
+        </div>
         <QueryState state={toUiState(lot)} onRetry={() => void lot.refetch()}>
           {(l) => (
             <>
@@ -91,8 +102,176 @@ export function LotTraceTab({ mfcId }: { readonly mfcId: string }) {
             </>
           )}
         </QueryState>
-      )}
+      </div>
+    );
+  return (
+    <div className="space-y-4" data-testid="lot-trace">
+      {/* LOT 번호를 몰라도 — 센터에 지금 있는 LOT 목록(상품명·상품 코드·LOT 번호로 찾기, 품질·온도대 필터). 라벨 바코드를 찍으면 바로 그 LOT */}
+      <SearchPanel
+        label={m.search}
+        submitLabel={inv.lookup}
+        onSubmit={(e) => {
+          e.preventDefault();
+          const t = draft.trim();
+          if (looksLikeLotCode(t)) set({ lot: t, q: '' });
+          else set({ q: t });
+        }}
+        onReset={() => {
+          setDraft('');
+          set({ q: '', quality: '', temp: '' });
+        }}
+        summary={[
+          [m.quality, quality ? (mv.quality[quality] ?? quality) : '', () => set({ quality: '' })],
+          [m.temperature, temp ? (messages.locations.temperature[temp] ?? temp) : '', () => set({ temp: '' })],
+        ]}
+        search={<input type="search" className="input input-sm w-60" maxLength={120} value={draft} placeholder={m.placeholder} aria-label={m.placeholder} onChange={(e) => setDraft(e.target.value)} />}
+      >
+        <SearchRow label={m.quality}>
+          <select className="select select-sm w-36" aria-label={m.quality} value={quality} onChange={(e) => set({ quality: e.target.value })}>
+            <option value="">{m.all}</option>
+            {QUALITIES.map((x) => (
+              <option key={x} value={x}>
+                {mv.quality[x] ?? x}
+              </option>
+            ))}
+          </select>
+        </SearchRow>
+        <SearchRow label={m.temperature}>
+          <select className="select select-sm w-36" aria-label={m.temperature} value={temp} onChange={(e) => set({ temp: e.target.value })}>
+            <option value="">{m.all}</option>
+            {TEMPS.map((x) => (
+              <option key={x} value={x}>
+                {messages.locations.temperature[x] ?? x}
+              </option>
+            ))}
+          </select>
+        </SearchRow>
+      </SearchPanel>
+      <LotList mfcId={mfcId} q={q} quality={quality} temp={temp} onOpen={(c) => set({ lot: c })} />
     </div>
+  );
+}
+
+const QUALITIES = ['NORMAL', 'QUARANTINED'] as const;
+const TEMPS = ['AMBIENT', 'CHILLED', 'FROZEN'] as const;
+/** 센터 재고 한 번에 읽는 상한 — stock-units 한 쪽 200줄 × 20쪽 */
+const LIST_PAGE = 200;
+const LIST_MAX_PAGES = 20;
+const LOT_ROWS = 20;
+
+type StockUnitRow = InvPaths['/mfcs/{mfcId}/stock-units']['get']['responses']['200']['content']['application/json']['items'][number];
+
+interface LotRow {
+  readonly lotId: string;
+  readonly lotNo: string | null;
+  readonly sku: string;
+  readonly productName: string | null;
+  readonly expiryDate: string | null;
+  readonly places: readonly string[];
+  readonly qty: number;
+  readonly quarantined: number;
+}
+
+/** 단위 행 → LOT 별 한 줄(칸·수량·격리 합), 글자 거르기(상품명·상품 코드·LOT 번호), 소비기한 이른 순 */
+function groupLots(rows: readonly StockUnitRow[], q: string): LotRow[] {
+  const needle = q.trim().toLowerCase();
+  const by = new Map<string, LotRow>();
+  for (const u of rows) {
+    const prev = by.get(u.lotId);
+    by.set(u.lotId, {
+      lotId: u.lotId,
+      lotNo: prev?.lotNo ?? u.lotNo ?? null,
+      sku: u.sku,
+      productName: prev?.productName ?? u.productName ?? null,
+      expiryDate: prev?.expiryDate ?? u.expiryDate ?? null,
+      places: prev ? (prev.places.includes(u.locationCode) ? prev.places : [...prev.places, u.locationCode]) : [u.locationCode],
+      qty: (prev?.qty ?? 0) + u.qty,
+      quarantined: (prev?.quarantined ?? 0) + (u.qualityState === 'QUARANTINED' ? u.qty : 0),
+    });
+  }
+  return [...by.values()]
+    .filter((r) => !needle || [r.productName, r.sku, r.lotNo].some((x) => x?.toLowerCase().includes(needle)))
+    .sort((x, y) => (x.expiryDate ?? '9999').localeCompare(y.expiryDate ?? '9999') || (x.productName ?? x.sku).localeCompare(y.productName ?? y.sku));
+}
+
+/** LOT 목록 — `GET /mfcs/{mfcId}/stock-units`(0.26.0, 수량 > 0 인 단위 행)를 LOT 별로 묶는다. 품질·온도대는 서버 거르기, 글자는 받은 목록 안에서. 소비기한 이른 순 */
+function LotList({ mfcId, q, quality, temp, onOpen }: { readonly mfcId: string; readonly q: string; readonly quality: string; readonly temp: string; readonly onOpen: (code: string) => void }) {
+  const api = useApi();
+  // 'list','stock-units',mfcId 로 시작 — 재고 실시간 반영이 같이 다시 읽는다
+  const units = useQuery({
+    queryKey: ['list', 'stock-units', mfcId, 'lots', quality, temp],
+    queryFn: async () => {
+      const rows: StockUnitRow[] = [];
+      let cursor: string | undefined;
+      let pages = 0;
+      do {
+        const page = await request(
+          'GET',
+          api.inventory.GET('/mfcs/{mfcId}/stock-units', {
+            params: {
+              path: { mfcId },
+              query: {
+                size: LIST_PAGE,
+                ...(quality ? { qualityState: quality as StockUnitRow['qualityState'] } : {}),
+                ...(temp ? { temperatureZone: temp } : {}),
+                ...(cursor ? { cursor } : {}),
+              },
+            },
+          }),
+        );
+        rows.push(...page.items);
+        cursor = page.nextCursor ?? undefined;
+        pages += 1;
+      } while (cursor && pages < LIST_MAX_PAGES);
+      return { rows, cut: !!cursor };
+    },
+  });
+  const lotsOf = (rows: readonly StockUnitRow[]) => groupLots(rows, q);
+  const lots = units.data ? lotsOf(units.data.rows) : [];
+  const paging = usePage(lots.length, LOT_ROWS);
+  return (
+    <QueryState state={toUiState(units, (d) => lotsOf(d.rows).length === 0)} onRetry={() => void units.refetch()} emptyText={m.listEmpty}>
+      {(d) => (
+        <>
+          <div className="pm-list-box" data-testid="lot-list">
+            <ResultBar count={lots.length} />
+            <div className="overflow-x-auto" data-list-part="table">
+              <table className="table table-sm">
+                <thead>
+                  <tr>
+                    <th>{m.lcol.lot}</th>
+                    <th>{m.lcol.product}</th>
+                    <th>{m.lcol.expiry}</th>
+                    <th>{m.lcol.places}</th>
+                    <th className="text-right">{m.lcol.qty}</th>
+                    <th>{m.lcol.quality}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lots.slice(paging.from, paging.to).map((r) => (
+                    <tr key={r.lotId} data-testid="lot-row">
+                      <td>
+                        {/* LOT 번호를 누르면 그 LOT 추적(번호를 모르면 라벨 값 LOT:{id} — 화면에는 번호만) */}
+                        <button type="button" className="cursor-pointer underline decoration-dotted underline-offset-2 hover:text-primary" onClick={() => onOpen(r.lotNo ?? `LOT:${r.lotId}`)}>
+                          <LotLabel lotId={r.lotId} lotNo={r.lotNo} />
+                        </button>
+                      </td>
+                      <td>{r.productName ? `${r.productName} (${r.sku})` : r.sku}</td>
+                      <td>{r.expiryDate ?? messages.none}</td>
+                      <td className="font-mono text-xs">{m.placesText(r.places[0] ?? messages.none, r.places.length)}</td>
+                      <td className="text-right">{r.qty}</td>
+                      <td>{r.quarantined > 0 ? <span className="badge badge-sm badge-warning">{m.quarantined(r.quarantined)}</span> : <span className="badge badge-sm badge-success">{mv.quality.NORMAL}</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <Pager testId="lot-pager" page={paging.page} pageCount={paging.pageCount} total={lots.length} from={paging.from} to={paging.to} onChange={paging.set} />
+          {d.cut && <p className="text-xs text-base-content/60">{m.more(d.rows.length)}</p>}
+        </>
+      )}
+    </QueryState>
   );
 }
 
@@ -206,7 +385,7 @@ function History({ mfcId, lot: l }: { readonly mfcId: string; readonly lot: Lot 
                             <OrderNo orderId={c.orderId} />
                           </td>
                           <td>{c.actorOperatorId ? <Who id={c.actorOperatorId} /> : messages.none}</td>
-                          <td className="font-mono text-xs">{c.sourceRef ?? c.sourceSystem}</td>
+                          <td>{sourceName(c.sourceSystem)}</td>
                         </tr>
                       );
                     })}

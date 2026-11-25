@@ -33,6 +33,11 @@ export function causeName(code: string): string {
   return prefix ? m.causePrefix[prefix]! : code;
 }
 
+/** 출처 — 어느 서비스 일인지 이름만(시스템 번호 sourceRef 는 펼침의 "시스템 번호"에, ADR-0070). 모르는 서비스는 그대로 */
+export function sourceName(system: string): string {
+  return m.sourceName[system.replace(/-service$/, '')] ?? system;
+}
+
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : messages.none);
 /** 날짜 칸(한국 날짜) → 그날 0시(+09:00). to 는 그다음 날 0시(서버 to 는 포함 안 함) */
 const dayStart = (d: string) => `${d}T00:00:00+09:00`;
@@ -171,7 +176,7 @@ export function StockLedgerTab({ mfcId }: { readonly mfcId: string }) {
                               <td className="text-right">{signed(c.delta.E)}</td>
                               <td className="text-right">{signed(c.delta.R)}</td>
                               <td className="text-right font-semibold">{c.after.availableQty}</td>
-                              <td className="font-mono text-xs">{c.sourceRef ?? c.sourceSystem}</td>
+                              <td>{sourceName(c.sourceSystem)}</td>
                             </tr>
                             {open && (
                               <InlineDetail colSpan={8} testId="ledger-inline">
@@ -260,7 +265,7 @@ function CommitDetail({ commit: c }: { readonly commit: Commit }) {
           [messages.inventory.lot.available, a.availableQty],
           [m.order, <OrderNo key="o" orderId={c.orderId} />],
           [m.actor, c.actorOperatorId ? <Who key="a" id={c.actorOperatorId} /> : messages.none],
-          [m.col.source, c.sourceSystem],
+          [m.col.source, sourceName(c.sourceSystem)],
         ]}
       />
       <SystemNumbers
