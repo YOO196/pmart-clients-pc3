@@ -19,6 +19,7 @@ import type { paths as LocationPaths } from './generated/mfc-location';
 import type { paths as QualityPaths } from './generated/mfc-quality';
 import type { paths as OrderPaths } from './generated/order';
 import type { paths as ProductPaths } from './generated/product';
+import type { paths as ProductContentPaths } from './generated/product-content';
 import type { paths as RiderPaths } from './generated/rider';
 
 export { SOURCE_SYSTEM };
@@ -58,6 +59,8 @@ export function createApi(pmartFetch: PmartFetch, baseUrl = API_BASE) {
     // 센터 대시보드 주문 수·매출(order 0.20.0 O-11 — MFC_SUPERVISOR 는 토큰 센터만)·카테고리 목록(product 공개 categories/tree)
     order: createClient<OrderPaths>(options),
     product: createClient<ProductPaths>(options),
+    // 상품 사진·고객용 상품명 카드(product-content /product-contents — 상품 관리 카드형, 2026-11-25)
+    content: createClient<ProductContentPaths>(options),
   };
 }
 
@@ -71,3 +74,12 @@ export const api: Api = createApi(
     refresh: () => refreshEmployeeTokens(api, tokens),
   }),
 );
+
+/** 콘텐츠 이미지 경로(계약: 상대 경로 `/api/v1/content-images/{id}`) → 화면에서 쓸 주소. LAN 은 화면(:8445)과 게이트웨이(:8443) 출처가 달라 게이트웨이 출처를 붙인다. w = 축소본 폭(240·480·720) */
+export function contentImageUrl(url: string | null | undefined, w: 240 | 480 | 720): string | null {
+  if (!url) return null;
+  if (/^(data:|blob:)/.test(url)) return url;
+  const abs = new URL(url, new URL(API_BASE).origin);
+  abs.searchParams.set('w', String(w));
+  return abs.toString();
+}

@@ -105,6 +105,8 @@ export const messages = {
     cancel: '취소',
     remove: (n: string) => `${n} 보기 지우기`,
   },
+  /** 상품 사진·목록/카드 보기(shared/productCards, 2026-11-25) */
+  productCards: { viewLabel: '보기', view: { list: '목록', card: '카드' } },
   /** 목록 공통 부품(숫자 카드·검색 칩·다 끝났어요) */
   listParts: {
     count: (n: number) => `${n}건`,

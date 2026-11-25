@@ -11,6 +11,7 @@ import { CommandFeedback, QueryState, toUiState, useCommand } from '@pmart/web-u
 import { commandParams } from '../../api/command';
 import { useApi } from '../../app/ApiContext';
 import { messages } from '../../shared/messages';
+import { ProductThumb, useProductCards, useProductView, ViewToggle } from '../../shared/productCards';
 import { ResultBar, SearchPanel, SearchRow } from '../../shared/simList';
 
 const m = messages.inventory.catalog;
@@ -59,6 +60,9 @@ export function CatalogImport({ mfcId, onClose }: { readonly mfcId: string; read
   });
   const on = useHandlingOn(mfcId);
   const rows = (products.data?.pages ?? []).flatMap((p) => p.items ?? []);
+  // 상품 사진·고객용 이름(product-content), 목록/카드 보기 — 상품 관리 목록과 같은 ?view
+  const cards = useProductCards(rows.map((p) => p.productId));
+  const [view, setView] = useProductView();
   const toggle = (id: string) =>
     setPicked((prev) => {
       const next = new Set(prev);
@@ -114,9 +118,39 @@ export function CatalogImport({ mfcId, onClose }: { readonly mfcId: string; read
           </select>
         </SearchRow>
       </SearchPanel>
+      <div className="flex justify-end">
+        <ViewToggle view={view} onChange={setView} />
+      </div>
       <QueryState state={toUiState(products, (d) => d.pages.every((p) => (p.items ?? []).length === 0))} onRetry={() => void products.refetch()} emptyText={m.empty}>
         {() => (
           <>
+            {view === 'card' ? (
+              <ul className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3" data-testid="catalog-cards">
+                {rows.map((p) => {
+                  const id = p.productId ?? '';
+                  const discontinued = p.saleState === 'SALE_STOPPED';
+                  const here = on.data?.get(id) ?? 0;
+                  const info = cards.data?.get(id);
+                  return (
+                    <li key={id} data-testid="catalog-card">
+                      <label className={`flex h-full cursor-pointer flex-col gap-2 rounded-box border p-3 ${picked.has(id) ? 'border-primary' : 'border-base-300'} ${discontinued ? 'cursor-not-allowed opacity-60' : ''}`}>
+                        <span className="relative">
+                          <ProductThumb info={info} fallback={p.internalName ?? id} size="card" />
+                          <input type="checkbox" className="checkbox checkbox-sm absolute top-2 left-2 bg-base-100" aria-label={m.pickLabel(p.internalName ?? id)} disabled={discontinued} checked={picked.has(id)} onChange={() => toggle(id)} />
+                        </span>
+                        <span className="line-clamp-2 font-semibold" title={p.internalName ?? id}>
+                          {p.internalName}
+                        </span>
+                        <span className="mt-auto flex flex-wrap items-center gap-1 text-xs">
+                          <span className={`badge badge-sm ${discontinued ? 'badge-error' : p.saleState === 'TEMPORARILY_SOLD_OUT' ? 'badge-warning' : 'badge-ghost'}`}>{m.saleName[p.saleState ?? ''] ?? p.saleState}</span>
+                          {on.data && (here > 0 ? <span className="badge badge-sm badge-success">{m.here}</span> : <span className="badge badge-sm badge-ghost">{m.notHere}</span>)}
+                        </span>
+                      </label>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
             <div className="pm-list-box">
               <ResultBar count={rows.length} more={products.hasNextPage} />
               <div className="overflow-x-auto" data-list-part="table">
@@ -139,7 +173,12 @@ export function CatalogImport({ mfcId, onClose }: { readonly mfcId: string; read
                           <td>
                             <input type="checkbox" className="checkbox checkbox-sm" aria-label={m.pickLabel(p.internalName ?? id)} disabled={discontinued} checked={picked.has(id)} onChange={() => toggle(id)} />
                           </td>
-                          <td>{p.internalName}</td>
+                          <td>
+                            <span className="flex items-center gap-2">
+                              <ProductThumb info={cards.data?.get(id)} fallback={p.internalName ?? id} size="row" />
+                              {p.internalName}
+                            </span>
+                          </td>
                           <td>
                             <span className={`badge badge-sm ${discontinued ? 'badge-error' : p.saleState === 'TEMPORARILY_SOLD_OUT' ? 'badge-warning' : 'badge-ghost'}`}>{m.saleName[p.saleState ?? ''] ?? p.saleState}</span>
                           </td>
@@ -151,6 +190,7 @@ export function CatalogImport({ mfcId, onClose }: { readonly mfcId: string; read
                 </table>
               </div>
             </div>
+            )}
             {products.hasNextPage && (
               <button type="button" className="btn btn-sm" disabled={products.isFetchingNextPage} onClick={() => void products.fetchNextPage()}>
                 {m.more}
