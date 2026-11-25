@@ -92,7 +92,7 @@ describe('품질 사고', () => {
 
 describe('상품 취급 — 단종·신상품(inventory 0.27.0)', () => {
   it('맨 위 배너에 정하지 않은 새 상품 수(서버 totalCount), 누르면 그 상품만', async () => {
-    const view = renderAt('/c/MFC-BJG-01/inventory?tab=handlings');
+    const view = renderAt('/c/MFC-BJG-01/products');
     const banner = await screen.findByTestId('new-products-banner');
     expect(banner).toHaveTextContent('새 상품 2개가 들어왔어요');
     const count = view.gets('/sku-handlings').map((r) => new URL(r.url).searchParams).find((p) => p.get('undecided') === 'true')!;
@@ -103,7 +103,7 @@ describe('상품 취급 — 단종·신상품(inventory 0.27.0)', () => {
   });
 
   it('본사 단종 상품은 "본사 단종"이고 켜기를 막는다, 정하면 배너에서 빠진다', async () => {
-    renderAt('/c/MFC-BJG-01/inventory?tab=handlings');
+    renderAt('/c/MFC-BJG-01/products');
     await waitFor(() => expect(screen.getAllByTestId('handling-row')).toHaveLength(14));
     const disc = screen.getAllByTestId('handling-row').find((r) => r.textContent?.includes('SKU-DISC-3'))!;
     expect(disc).toHaveTextContent('본사 단종');

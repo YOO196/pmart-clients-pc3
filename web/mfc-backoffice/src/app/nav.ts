@@ -125,7 +125,15 @@ export const navGroups: readonly MenuGroup[] = [
         key: 'inventory',
         segment: 'inventory',
         ready: true,
-        apiReady: ['센터 전체 재고 목록', '상품별 재고', '위치·LOT 정정', '순환 실사 만들기·입력·승인·목록', '보충 기준', '출하 부적격 LOT', '상품 취급'],
+        apiReady: ['센터 전체 재고 목록', '상품별 재고', '재고 이력', 'LOT 추적', '위치·LOT 정정', '순환 실사 만들기·입력·승인·목록', '보충 기준', '출하 부적격 LOT'],
+        apiMissing: [],
+      },
+      {
+        // 상품 관리(2026-11-25 사용자 "재고탭에서 빼서 상품관리 탭으로 밖에 두자. 센터 취급물품에 대한 거") — 이 센터 취급 상품·본사 상품 불러오기
+        key: 'products',
+        segment: 'products',
+        ready: true,
+        apiReady: ['센터 상품 취급 ON/OFF·새 상품', '본사 상품 목록(product-service)', '취급 일괄 켜기'],
         apiMissing: [],
       },
       {
