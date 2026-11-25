@@ -65,7 +65,24 @@ final class GoogleSocialTokenSource implements SocialTokenSource {
       if (idToken == null || idToken.isEmpty) {
         throw const SocialProviderMisconfigured();
       }
-      return SocialCredential(idToken, accountLabel: account.email);
+      // 탈퇴 재인증이면 서버가 구글 연결을 끊을 수 있게 접근 토큰도 받는다(BR-105). 묻지 않고 받을 수 있을 때만 —
+      // 못 받으면 없이 보낸다(앱의 기기 disconnect 는 그대로).
+      String? accessToken;
+      if (withdrawal) {
+        try {
+          accessToken =
+              (await account.authorizationClient.authorizationForScopes(const [
+                'email',
+              ]))?.accessToken;
+        } on Object {
+          accessToken = null;
+        }
+      }
+      return SocialCredential(
+        idToken,
+        accountLabel: account.email,
+        accessToken: accessToken,
+      );
     } on GoogleSignInException catch (e) {
       return googleSignInFailure(e.code);
     }

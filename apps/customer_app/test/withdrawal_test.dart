@@ -119,6 +119,21 @@ void main() {
     expect(await store.ids(), isNotEmpty);
   });
 
+  testWidgets('구글 탈퇴는 재인증 때 받은 접근 토큰을 탈퇴 요청에 싣는다(BR-105 — 서버가 연결을 끊음)', (
+    t,
+  ) async {
+    final (:repo, profile: _) = await open(
+      t,
+      source: _GoogleWithAccess(),
+      loginKey: 'login-google',
+    );
+    await t.tap(key('wd-agree'));
+    await t.pump();
+    await t.tap(key('wd-submit'));
+    await t.pumpAndSettle();
+    expect(repo.accessTokens.single, 'access-google');
+  });
+
   group('제공자 연결 끊기(백엔드 요청 2026-11-21 — 동의는 처음 가입 때만)', () {
     testWidgets('탈퇴가 받아들여지면 로그인 제공자에 연결 끊기를 부른다', (t) async {
       final source = MockSocialTokenSource();
@@ -347,4 +362,26 @@ final class _CancelAfterFirst implements SocialTokenSource {
   Future<void> forget(SocialProvider provider, {bool revoke = false}) async {
     if (revoke) revoked = true;
   }
+}
+
+/// 구글: 탈퇴 재인증이면 접근 토큰도 준다.
+final class _GoogleWithAccess implements SocialTokenSource {
+  @override
+  Future<void> abandonSignup(SocialProvider provider) async {}
+
+  @override
+  Future<SocialCredential?> obtain(
+    SocialProvider provider, {
+    bool withdrawal = false,
+  }) async => SocialCredential(
+    'token-${provider.name}',
+    accessToken: withdrawal ? 'access-${provider.name}' : null,
+  );
+
+  @override
+  Future<SocialCredential?> obtainSilently(SocialProvider provider) async =>
+      null;
+
+  @override
+  Future<void> forget(SocialProvider provider, {bool revoke = false}) async {}
 }

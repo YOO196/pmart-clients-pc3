@@ -20,6 +20,7 @@ abstract interface class WithdrawalRepository {
     String? reasonCode,
     String? reasonText,
     required IdempotencyKey key,
+    String? providerAccessToken,
   });
 
   /// `POST /me/withdrawals/{id}/revocations` — 대기 중일 때만. 끝난 탈퇴는 409.
@@ -52,6 +53,7 @@ final class ApiWithdrawalRepository implements WithdrawalRepository {
     String? reasonCode,
     String? reasonText,
     required IdempotencyKey key,
+    String? providerAccessToken,
   }) async {
     final res = await pmartGuard(
       () => _api.requestWithdrawal(
@@ -71,6 +73,10 @@ final class ApiWithdrawalRepository implements WithdrawalRepository {
           providerToken: providerToken,
           reasonCode: reasonCode,
           reasonText: reasonText,
+          // 구글만(customer 0.18.0 BR-105) — 서버가 구글 연결을 끊는다. 다른 제공자는 보내지 않는다.
+          providerAccessToken: provider == SocialProvider.google
+              ? providerAccessToken
+              : null,
         ),
         extra: commandOptions(key).extra,
       ),
@@ -163,6 +169,9 @@ final class MockWithdrawalRepository implements WithdrawalRepository {
   final revokeKeys = <String>[];
 
   /// 접수에 실려 온 값(시험 확인용 — 토큰은 남기지 않는다).
+  /// 시험용: 탈퇴 요청마다 실린 구글 접근 토큰(BR-105, 없으면 null).
+  final accessTokens = <String?>[];
+
   final requests =
       <({SocialProvider provider, String? reasonCode, String? reasonText})>[];
   final _byKey = <String, Map<String, Object?>>{};
@@ -191,9 +200,11 @@ final class MockWithdrawalRepository implements WithdrawalRepository {
     String? reasonCode,
     String? reasonText,
     required IdempotencyKey key,
+    String? providerAccessToken,
   }) async {
     await _wait();
     requestKeys.add(key.value);
+    accessTokens.add(providerAccessToken);
     if (failNext case final f?) {
       failNext = null;
       throw f;

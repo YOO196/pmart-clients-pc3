@@ -43,25 +43,27 @@ void main() {
               .read(sessionProvider)
           is MemberSession;
 
-  testWidgets('[예]: 로그아웃하고 그 주소의 도로명만 비회원 배송지로 옮겨 고른다(상세 주소는 옮기지 않음)', (
-    t,
-  ) async {
-    final (:secure, :address) = await login(t);
-    await t.tap(key('logout'));
-    await t.pumpAndSettle();
-    expect(find.text('지금 주소로 계속 둘러볼까요?'), findsOneWidget);
+  testWidgets(
+    '[예]: 로그아웃하고 그 주소의 도로명·상세 주소를 비회원 배송지로 옮겨 고른다(받는 분·연락처는 옮기지 않음)',
+    (t) async {
+      final (:secure, :address) = await login(t);
+      await t.tap(key('logout'));
+      await t.pumpAndSettle();
+      expect(find.text('지금 주소로 계속 둘러볼까요?'), findsOneWidget);
 
-    await t.tap(key('logout-keep-address-yes'));
-    await t.pumpAndSettle();
-    expect(member(t), isFalse);
-    final store = GuestAddressStore(secure);
-    final ids = await store.ids();
-    expect(ids, hasLength(1));
-    expect(await store.selected(), ids.single);
-    final guest = (await t.runAsync(() => address.guest(ids.single)))!;
-    expect(guest.detailAddress, isEmpty);
-    expect(guest.roadAddress, isNotEmpty);
-  });
+      await t.tap(key('logout-keep-address-yes'));
+      await t.pumpAndSettle();
+      expect(member(t), isFalse);
+      final store = GuestAddressStore(secure);
+      final ids = await store.ids();
+      expect(ids, hasLength(1));
+      expect(await store.selected(), ids.single);
+      final guest = (await t.runAsync(() => address.guest(ids.single)))!;
+      // 상세 주소도 옮긴다 — 다시 로그인할 때 그대로 회원 주소로(사용자 2026-11-25).
+      expect(guest.detailAddress, '전포 한빛아파트 103동 1203호');
+      expect(guest.roadAddress, isNotEmpty);
+    },
+  );
 
   testWidgets('[아니요]: 로그아웃만 — 비회원 배송지를 만들지 않는다', (t) async {
     final (:secure, address: _) = await login(t);

@@ -14,6 +14,11 @@ import 'package:customer_app/features/start/data/device_consents_repository.dart
 import 'package:customer_app/features/start/presentation/current_location_flow.dart';
 import 'package:customer_app/features/start/presentation/start_controller.dart';
 
+import 'package:customer_app/features/address/presentation/address_controller.dart'
+    show addressBookProvider;
+import 'package:customer_app/features/auth/presentation/auth_controller.dart'
+    show sessionProvider;
+import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 import 'support/app_harness.dart';
 
 /// 처음 실행: 환영·약관 → 로그인/둘러보기 → 주소(필수) → 홈. 레퍼런스 2. 처음 다운로드 시 ….
@@ -227,8 +232,9 @@ void main() {
       expect(saved.detailAddress, '12층');
       expect(saved.receiverName, '김피마');
       expect(book.shoppingAddress?.addressId, saved.addressId);
-      // 이 기기의 비회원 배송지 기록은 지웠다(탈퇴·재가입 뒤 옛 주소가 다시 뜨지 않게).
-      expect(await t.runAsync(store.ids), isEmpty);
+      // 비회원 때 쓰던 주소는 이 기기에 남는다 — 로그아웃·탈퇴하면 그 주소로 되돌아간다.
+      expect(await t.runAsync(store.ids), [guest.addressId]);
+      expect(await t.runAsync(store.selected), guest.addressId);
     },
   );
 
@@ -286,6 +292,42 @@ void main() {
       expect(find.text('부산 부산진구 중앙대로 672'), findsWidgets);
     },
   );
+
+  testWidgets('비회원 주소로 로그인했다가 로그아웃하면 그 비회원 주소로 되돌아간다(사용자 2026-11-25)', (
+    t,
+  ) async {
+    final secure = MemoryKeyValueStore();
+    await secure.write('pmart.start.welcome', 'at=x');
+    final empty = _EmptyAddressRepository();
+    final guest = await t.runAsync(
+      () => empty.addGuest(
+        const AddressDraft(
+          roadAddress: '부산 부산진구 중앙대로 672',
+          detailAddress: '12층',
+        ),
+        key: IdempotencyKey.generate(),
+      ),
+    );
+    final store = GuestAddressStore(secure);
+    await store.add(guest!.addressId);
+    await store.select(guest.addressId);
+    await t.pumpWidget(
+      testApp([], address: empty, startGate: true, secure: secure),
+    );
+    await t.pumpAndSettle();
+    await t.tap(key('login-kakao'));
+    await t.pumpAndSettle();
+    final container = ProviderScope.containerOf(
+      t.element(find.byType(Scaffold).first),
+    );
+    await t.runAsync(() => container.read(sessionProvider.notifier).signOut());
+    await t.pumpAndSettle();
+    final book = await t.runAsync(
+      () => container.read(addressBookProvider.future),
+    );
+    expect(book!.shoppingAddress?.addressId, guest.addressId);
+    expect(key('start-address'), findsNothing);
+  });
 
   testWidgets('마케팅 거부도 서버 처리 결과로 거부 안내', (t) async {
     final consents = MockDeviceConsentsRepository(

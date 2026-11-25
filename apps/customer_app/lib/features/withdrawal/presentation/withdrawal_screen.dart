@@ -76,6 +76,9 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
       };
 
   /// 재인증해 받은 토큰으로 [send] 를 보낸다. 고객이 로그인 화면을 닫으면 아무 일도 없다(null).
+  /// 구글 탈퇴 재인증 때 받은 접근 토큰(BR-105) — 같은 탈퇴 재전송에 같이 쓴다. 로그 금지.
+  String? _accessToken;
+
   Future<Withdrawal?> _reauthAndSend(
     Future<Withdrawal> Function(
       SocialProvider provider,
@@ -95,15 +98,17 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
       _error = null;
     });
     try {
-      final token =
-          _token ??
-          (await ref
-                  .read(socialTokenSourceProvider)
-                  // 네이버는 서버가 교환 뒤 앱 연결을 끊는다(auth 0.11.0, BR-74).
-                  .obtain(provider, withdrawal: true))
-              ?.token;
+      if (_token == null) {
+        final credential = await ref
+            .read(socialTokenSourceProvider)
+            // 네이버는 서버가 교환 뒤 앱 연결을 끊는다(auth 0.11.0, BR-74).
+            .obtain(provider, withdrawal: true);
+        _token = credential?.token;
+        // 구글은 접근 토큰도 — 서버가 연결을 끊는다(BR-105). 없으면 없이.
+        _accessToken = credential?.accessToken;
+      }
+      final token = _token;
       if (token == null) return null; // 로그인 화면을 닫음
-      _token = token;
       final key = _key ??= IdempotencyKey.generate();
       Withdrawal w;
       try {
@@ -113,6 +118,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
       }
       _key = null;
       _token = null;
+      _accessToken = null;
       return w;
     } on SocialProviderDown {
       _error = l10n.wdReauthFailed;
@@ -122,6 +128,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
       // 서버가 답했다 — 다음 시도는 새 키·새 토큰으로.
       _key = null;
       _token = null;
+      _accessToken = null;
       switch (f.problem.code) {
         case WithdrawalProblemCode.providerRejected:
           _error = l10n.wdReauthRejected;
@@ -162,6 +169,7 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
             reasonCode: _reason?.code,
             reasonText: text.isEmpty ? null : text,
             key: key,
+            providerAccessToken: _accessToken,
           ),
     );
     if (w == null || !mounted) return;

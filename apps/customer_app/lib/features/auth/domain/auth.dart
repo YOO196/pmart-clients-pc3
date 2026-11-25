@@ -264,10 +264,18 @@ final class MemberSession extends Session {
 /// 제공자 SDK 결과: 서버에 보낼 토큰과 화면 표시용 계정 이름.
 @immutable
 final class SocialCredential {
-  const SocialCredential(this.token, {this.accountLabel, this.profileImageUrl});
+  const SocialCredential(
+    this.token, {
+    this.accountLabel,
+    this.profileImageUrl,
+    this.accessToken,
+  });
 
   final String token;
   final String? accountLabel;
+
+  /// 구글 탈퇴 재인증 때만 — 서버가 구글 연결을 끊는 데 쓰는 OAuth 접근 토큰(customer 0.18.0 BR-105). 로그 금지.
+  final String? accessToken;
 
   /// 네이버만(auth 0.10.1) — 서버가 코드 교환 때 읽어 준 프로필 사진 주소. 로그인 본문에 그대로 실어 보낸다.
   final String? profileImageUrl;

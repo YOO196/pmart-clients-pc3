@@ -16,7 +16,7 @@ import 'address_controller.dart';
 /// 로그아웃(customer 0.14.0 — 백엔드 요청 2026-11-20 logout-keep-browsing-address).
 ///
 /// 이 기기에 비회원 배송지가 없고 회원의 쇼핑 주소가 있으면 "지금 주소로 계속 둘러볼까요?"를 묻는다.
-/// - [예]: 로그아웃한 뒤 그 주소의 **도로명·우편번호·좌표만** 비회원 배송지로 만든다(상세 주소·받는 분·연락처·출입 메모는
+/// - [예]: 로그아웃한 뒤 그 주소의 **도로명·상세 주소·우편번호·좌표**를 비회원 배송지로 만든다(받는 분·연락처·출입 메모는
 ///   옮기지 않는다 — 공용 기기에 개인정보를 남기지 않기). 만든 배송지를 이 기기에 기억하고 고른다.
 /// - [아니요]: 지금처럼 로그아웃만(다음 화면에서 주소를 고른다).
 /// - 창을 닫으면 로그아웃하지 않는다.
@@ -112,8 +112,9 @@ Future<void> _keepAsGuest(
 ) async {
   final draft = AddressDraft(
     roadAddress: shopping.roadAddress,
-    // 상세 주소는 옮기지 않는다(비회원 배송지는 선택 — 0.14.0).
-    detailAddress: '',
+    // 상세 주소도 옮긴다 — 다시 로그인·가입할 때 그대로 회원 주소로 옮겨 상세를 다시 묻지 않게(사용자 2026-11-25).
+    // 받는 분·연락처·출입 메모는 옮기지 않는다(공용 기기).
+    detailAddress: shopping.detailAddress,
     postalCode: saved?.postalCode,
     geo: saved?.geo,
   );
@@ -143,7 +144,7 @@ Future<void> _keepAsGuest(
 /// 로그인해 회원이 되면(가입 포함) 비회원 때 쓰던 주소를 묻지 않고 회원 주소록으로 옮기고 쇼핑 주소로 정한다 —
 /// 비회원으로 주소를 넣고 주문하다 로그인했는데 주소를 다시 고르라던 것(사용자 2026-11-25 "장난하냐?").
 /// - 회원 주소록이 비어 있고, 비회원 때 고른 주소에 상세 주소가 있으면(회원 주소는 상세 필수) 그 주소만 옮긴다.
-/// - 그 뒤 이 기기의 비회원 배송지 기록은 지운다 — 탈퇴·재가입 뒤 옛 주소들이 "로그인 전에 입력한 주소"로 다시 뜨던 것.
+/// - 비회원 때 쓰던 주소 하나는 이 기기에 남긴다(로그아웃·탈퇴하면 그 주소로 되돌아간다). 옛 비회원 주소만 지운다.
 /// 옮기는 동안은 주소 입력 화면으로 보내지 않는다([logoutKeepingAddressProvider]).
 Future<void> carryGuestAddressOnLogin(ProviderContainer container) async {
   final store = container.read(guestAddressStoreProvider);
@@ -153,7 +154,6 @@ Future<void> carryGuestAddressOnLogin(ProviderContainer container) async {
   try {
     final repo = container.read(addressRepositoryProvider);
     final book = await container.read(addressBookProvider.future);
-    var moved = book != null && book.addresses.isNotEmpty;
     if (book != null && book.addresses.isEmpty) {
       final selected = await store.selected();
       final id = (selected != null && ids.contains(selected))
@@ -163,23 +163,16 @@ Future<void> carryGuestAddressOnLogin(ProviderContainer container) async {
         final guest = await repo.guest(id);
         if (guest.detailAddress.trim().isNotEmpty) {
           final draft = await repo.guestDraft(id);
-          final outcome = await container
-              .read(addressBookProvider.notifier)
-              .add(draft);
-          moved = outcome is AddressSaved;
+          await container.read(addressBookProvider.notifier).add(draft);
         }
       } on PmartFailure {
         // 못 옮겼다 — 주소 화면에서 고르게 된다.
       }
     }
-    // 옮겼거나 회원 주소가 이미 있으면 비회원 기록을 지운다. 못 옮겼으면(상세 주소 없음 등) 남겨 두고 주소 화면이
-    // 그 주소를 먼저 보이며 상세 주소만 받는다(검색부터 다시 하지 않게 — 사용자 2026-11-25).
-    if (moved) {
-      await store.retain(const []);
-    } else {
-      final keep = await store.selected();
-      await store.retain([?keep]);
-    }
+    // 비회원 때 쓰던(고른) 주소 하나는 이 기기에 남긴다 — 로그아웃·탈퇴하면 그 비회원 주소로 되돌아간다
+    // (사용자 2026-11-25 "로그아웃이든 탈퇴든 비회원 주소를 원복"). 그 밖의 옛 비회원 주소만 지운다.
+    final keep = await store.selected();
+    await store.retain([?keep]);
   } on Object {
     // 주소록을 못 읽었다 — 다음 화면이 실패를 보인다.
   } finally {
