@@ -161,7 +161,7 @@ class _CategoryBrowseScreenState extends ConsumerState<CategoryBrowseScreen> {
           visualDensity: VisualDensity.compact,
           tooltip: l10n.searchTitle,
           icon: const PmartLineIcon(PmartLineIcons.search, size: 23),
-          onPressed: () => context.go('/search'),
+          onPressed: () => context.push('/search'),
         ),
         const CartIconButton(),
         const SizedBox(width: 6),

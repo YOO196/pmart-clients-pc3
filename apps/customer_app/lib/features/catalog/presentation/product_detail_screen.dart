@@ -118,7 +118,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             visualDensity: VisualDensity.compact,
             tooltip: l10n.searchTitle,
             icon: const PmartLineIcon(PmartLineIcons.search, size: 23),
-            onPressed: () => context.go('/search'),
+            onPressed: () => context.push('/search'),
           ),
           const CartIconButton(key: ValueKey('detail-cart')),
           const SizedBox(width: 6),
@@ -633,6 +633,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         )
       else
         const SizedBox(height: 24),
+      const DetailBand(),
+      // "우리동네 바로픽 마트, 이렇게 관리해요"(레퍼런스 5 — 사용자 2026-11-25 이름 "우리동네 바로픽 마트").
+      const TownCareSection(),
       const DetailBand(),
       ?bought,
       if (bought != null) const DetailBand(),

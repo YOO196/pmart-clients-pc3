@@ -929,7 +929,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
             const SizedBox(height: 18),
             OutlinedButton(
               key: const ValueKey('orders-empty-search-go'),
-              onPressed: () => context.go('/search'),
+              onPressed: () => context.push('/search'),
               style: OutlinedButton.styleFrom(
                 shape: const StadiumBorder(),
                 minimumSize: const Size(0, 44),

@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart' show Scaffold;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart' show GoRouter;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:pmart_core/pmart_core.dart';
@@ -229,5 +231,13 @@ Future<void> tapTile(WidgetTester t, String productId) async {
   await t.ensureVisible(tile);
   await t.pumpAndSettle();
   await t.tap(tile);
+  await t.pumpAndSettle();
+}
+
+
+/// 검색 화면 열기 — 하단 탭에서 검색이 빠졌다(가운데 = 찜, 2026-11-25). 화면 위 검색과 같은 경로를 push 한다.
+Future<void> openSearchScreen(WidgetTester t) async {
+  await t.pumpAndSettle();
+  GoRouter.of(t.element(find.byType(Scaffold).first)).push('/search').ignore();
   await t.pumpAndSettle();
 }

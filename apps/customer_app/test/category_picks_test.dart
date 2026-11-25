@@ -81,7 +81,7 @@ void main() {
 
   testWidgets('할인율순은 다른 목록 정렬에 없다(서버가 onSale 과 함께만 받음)', (t) async {
     await openCategories(t);
-    await t.tap(find.text('검색').last);
+    await openSearchScreen(t);
     await t.pumpAndSettle();
     await t.enterText(key('search-field'), '우유');
     await t.tap(key('search-submit'));

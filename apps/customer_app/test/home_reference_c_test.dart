@@ -574,7 +574,7 @@ void main() {
 
   group('상품 카드 + 바로 담기', () {
     Future<void> openSearch(WidgetTester t, String keyword) async {
-      await t.tap(find.text('검색').last);
+      await openSearchScreen(t);
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const ValueKey('search-field')), keyword);
       await t.tap(find.byKey(const ValueKey('search-submit')));

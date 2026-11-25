@@ -71,7 +71,7 @@ void main() {
     expect(find.byKey(const ValueKey('my-orders')), findsOneWidget);
   });
 
-  for (final tab in ['카테고리', '검색', '주문내역', '마이페이지']) {
+  for (final tab in ['카테고리', '찜', '주문내역', '마이페이지']) {
     testWidgets('$tab 탭에서 뒤로 → 홈 탭(앱을 닫지 않음)', (t) async {
       await t.pumpWidget(testApp(const []));
       await t.pumpAndSettle();

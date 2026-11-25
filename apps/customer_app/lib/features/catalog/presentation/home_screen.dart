@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
@@ -223,7 +224,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         scrolledUnderElevation: 0,
         // 홈 탭바 A안(사용자 2026-11-21 확정, 초안 `../고객앱 ui/05_홈_탭바`): 상단바와 탭 사이 선을 없앤다 — 선은 탭 줄 아래 한 줄만.
         // 내리면 위에 붙는 검색창이 옅은 그림자로 경계를 보인다.
-        toolbarHeight: 58,
+        // 레퍼런스 2026-11-25 홈: 배너 위까지 245px/1080(탭 글자 아래 → 배너 32px).
+        toolbarHeight: 52.3,
         centerTitle: false,
         titleSpacing: 16,
         title: const _AddressChip(),
@@ -233,6 +235,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             icon: const PmartLineIcon(PmartLineIcons.bell, size: 26),
             tooltip: l10n.noticeTitle,
             onPressed: () => context.push('/notifications'),
+          ),
+          // 하단 탭에서 검색이 빠져(가운데 = 찜) 상단바에 돋보기(레퍼런스 홈: 홈·검색·장바구니).
+          IconButton(
+            key: const ValueKey('home-top-search'),
+            icon: const PmartLineIcon(PmartLineIcons.search, size: 26),
+            tooltip: l10n.navSearch,
+            onPressed: () => context.push('/search'),
           ),
           const CartIconButton(key: ValueKey('home-top-cart'), size: 26),
           const SizedBox(width: 6),
@@ -407,7 +416,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 for (final (i, w) in <Widget>[
                                   if (isHome) ...[
                                     const _CategoryShortcuts(),
-                                    const SizedBox(height: 14),
+                                    // 레퍼런스: 둘째 줄 이름 아래 → 회색 띠 98px/1080.
+                                    const SizedBox(height: 23.9),
                                     const PmartSectionGap(height: 10),
                                     // 레퍼런스: 섹션마다 회색 띠(약 8dp)로 나눈다.
                                     for (final (i, s)
@@ -590,7 +600,7 @@ class _HomeTabsState extends State<_HomeTabs> {
       child: Container(
         key: on ? _selectedKey : null,
         // 상단바와 탭 글자 사이 숨 쉴 간격(A안 약 12 = 위 4 + 여기 8).
-        padding: const EdgeInsets.fromLTRB(11, 8, 11, 10),
+        padding: const EdgeInsets.fromLTRB(11, 8, 11, 7.4),
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
@@ -938,7 +948,9 @@ class _BannerPagerState extends State<BannerPager> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
       child: SizedBox(
-        height: MediaQuery.sizeOf(context).width / 2.8,
+        // 사용자 레퍼런스 2026-11-25 홈: 359px/1080 폭(3.008:1).
+        // 캡처로 잰 배너 칸이 8px 컸다(탭 아래 선·아래 여백 포함) — 3dp 줄여 359px 에 맞춘다.
+        height: MediaQuery.sizeOf(context).width / 3.008 - 3,
         child: ClipRRect(
           borderRadius: BorderRadius.zero,
           child: Stack(
@@ -1096,7 +1108,8 @@ class _BannerCard extends ConsumerWidget {
 class _PinnedSearchBar extends SliverPersistentHeaderDelegate {
   const _PinnedSearchBar();
 
-  static const extent = 66.0;
+  // 레퍼런스 2026-11-25: 위 16.6 + 칸 45.7 + 아래 4.
+  static const extent = 66.3;
 
   @override
   double get minExtent => extent;
@@ -1131,16 +1144,16 @@ class _HomeSearchBar extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+      padding: const EdgeInsets.fromLTRB(16, 16.6, 16, 4),
       child: InkWell(
         key: const ValueKey('home-search'),
-        borderRadius: BorderRadius.circular(22),
-        onTap: () => context.go('/search'),
+        borderRadius: BorderRadius.circular(22.85),
+        onTap: () => context.push('/search'),
         child: Container(
-          height: 44,
+          height: 45.7,
           padding: const EdgeInsets.only(left: 18, right: 14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(22.85),
             border: Border.all(color: scheme.onSurface, width: 1.1),
           ),
           child: Row(
@@ -1175,18 +1188,19 @@ class _CategoryShortcuts extends ConsumerWidget {
         .where((n) => n.depth == 1)
         .toList();
     if (roots.isEmpty) return const SizedBox.shrink();
-    final labelHeight = MediaQuery.textScalerOf(context).scale(16);
-    final cell = 48 + 5 + labelHeight + 10; // 원 + 간격 + 이름 + 줄 사이
+    // 사용자 레퍼런스 2026-11-25 홈(1080px 실측): 원 50 · 칸 폭 67.8 · 줄 간격 76.1 · 검색창 아래 16 · 이름 9.8.
+    final labelHeight = MediaQuery.textScalerOf(context).scale(12);
+    final cell = math.max(76.1, 50 + 3.5 + labelHeight + 10);
     final twoRows = roots.length > 5;
     return SizedBox(
-      height: (twoRows ? cell * 2 : cell) + 14,
+      height: (twoRows ? cell * 2 : cell) + 12,
       child: GridView.builder(
         key: const ValueKey('home-categories'),
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(12, 14, 12, 0),
+        padding: const EdgeInsets.fromLTRB(10.1, 12, 10.1, 0),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: twoRows ? 2 : 1,
-          mainAxisExtent: 66,
+          mainAxisExtent: 67.8,
           mainAxisSpacing: 0,
         ),
         itemCount: roots.length,
@@ -1200,14 +1214,14 @@ class _CategoryShortcuts extends ConsumerWidget {
             child: Column(
               children: [
                 // 사용자 캡처(2026-11-20 홈): 동그란 그림 약 44dp
-                CategoryArt(name: c.name, size: 46, radius: 23),
-                const SizedBox(height: 5),
+                CategoryArt(name: c.name, size: 50, radius: 25),
+                const SizedBox(height: 3.5),
                 Text(
                   c.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.labelSmall?.copyWith(
-                    fontSize: 10.5,
+                    fontSize: 9.8,
                     fontWeight: FontWeight.w400,
                     height: 1.2,
                   ),
@@ -1821,7 +1835,7 @@ class _DeliverySummary extends ConsumerWidget {
       );
     }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 17, 16, 7),
+      padding: const EdgeInsets.fromLTRB(16, 13.6, 16, 7),
       child: Column(
         key: const ValueKey('home-delivery-card'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1931,7 +1945,8 @@ class _HomeInfoRow extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.fromLTRB(13.7, 0, trailingPad, 0),
           child: SizedBox(
-            height: 45.3,
+            // 레퍼런스 121px/1080.
+            height: 46.1,
             child: Row(
               children: [
                 SizedBox(width: 14.5, child: Center(child: icon)),

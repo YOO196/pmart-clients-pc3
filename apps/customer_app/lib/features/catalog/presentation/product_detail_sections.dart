@@ -1071,3 +1071,95 @@ class NoticeTable extends StatelessWidget {
     );
   }
 }
+
+/// "우리동네 바로픽 마트, 이렇게 관리해요"(레퍼런스 5 상품페이지 — 사용자 2026-11-25 "우리동네 바로픽 마트 라고 적어").
+/// 옆으로 넘기는 카드 268.6×245(바탕 #F4F5F7·모서리 7.6·사이 12): 위 그림 152 → 제목(굵게) → 설명 두 줄.
+/// 그림은 아직 없어 레퍼런스 빈 그림처럼 회색 바탕에 흐린 "바로픽".
+class TownCareSection extends StatelessWidget {
+  const TownCareSection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final cards = [
+      (l10n.townCareInspectTitle, l10n.townCareInspectBody),
+      (l10n.townCareTempTitle, l10n.townCareTempBody),
+    ];
+    return Column(
+      key: const ValueKey('town-care'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        DetailSectionTitle(l10n.townCareTitle),
+        SizedBox(
+          height: 245,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16.7),
+            itemCount: cards.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12.2),
+            itemBuilder: (context, i) {
+              final (title, body) = cards[i];
+              return Container(
+                width: 268.6,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F5F7),
+                  borderRadius: BorderRadius.circular(7.6),
+                  border: Border.all(color: const Color(0xFFECEDEF)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      height: 152,
+                      width: double.infinity,
+                      child: Center(
+                        child: Text(
+                          l10n.brandName,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFFD9DADC),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16.7, 17, 16.7, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontSize: 15.5,
+                              height: 1.3,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            body,
+                            maxLines: 2,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontSize: 13.3,
+                              height: 1.45,
+                              // 레퍼런스: 설명도 진한 글자(가장 진한 화소 #18191B).
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 22),
+      ],
+    );
+  }
+}

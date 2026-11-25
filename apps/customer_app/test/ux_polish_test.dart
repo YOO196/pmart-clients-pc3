@@ -55,7 +55,7 @@ void main() {
     tall(t);
     await t.pumpWidget(testApp(const []));
     await t.pumpAndSettle();
-    await t.tap(find.text('검색').last);
+    await openSearchScreen(t);
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('search-field')), '우유');
     await t.tap(find.byKey(const ValueKey('search-submit')));
@@ -106,7 +106,7 @@ void main() {
     );
     await t.pump(const Duration(seconds: 2));
     await t.pumpAndSettle();
-    await t.tap(find.text('검색').last);
+    await openSearchScreen(t);
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('search-field')), '우유');
     await t.tap(find.byKey(const ValueKey('search-submit')));

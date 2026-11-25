@@ -296,7 +296,7 @@ class _ProductReviewsScreenState extends ConsumerState<ProductReviewsScreen> {
             key: const ValueKey('review-go-search'),
             tooltip: l10n.navSearch,
             icon: const PmartLineIcon(PmartLineIcons.search, size: 24),
-            onPressed: () => context.go('/search'),
+            onPressed: () => context.push('/search'),
           ),
           const CartIconButton(),
           const SizedBox(width: 4),

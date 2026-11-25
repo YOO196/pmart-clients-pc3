@@ -280,7 +280,7 @@ void main() {
       (t) async {
         await t.pumpWidget(testApp([]));
         await t.pumpAndSettle();
-        await t.tap(find.text('검색').last);
+        await openSearchScreen(t);
         await t.pumpAndSettle();
         await _search(t, '우우');
         await t.pumpAndSettle();
@@ -317,7 +317,7 @@ void main() {
     testWidgets('속성 줄 위에서 세로로 끌면 목록이 함께 내려간다(사용자 2026-11-23)', (t) async {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();
-      await t.tap(find.text('검색').last);
+      await openSearchScreen(t);
       await t.pumpAndSettle();
       await _search(t, '우유');
       await t.pumpAndSettle();
@@ -341,7 +341,7 @@ void main() {
     testWidgets('결과가 적으면 "혹시 ○○를 찾으셨나요?" — 누르면 그 검색어로 새로 찾는다', (t) async {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();
-      await t.tap(find.text('검색').last);
+      await openSearchScreen(t);
       await t.pumpAndSettle();
       await _search(t, '지방 우유');
       await t.pumpAndSettle();
@@ -361,7 +361,7 @@ void main() {
     testWidgets('정상 상품명(서울우유)은 결과가 적어도 제안하지 않는다(BR-88)', (t) async {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();
-      await t.tap(find.text('검색').last);
+      await openSearchScreen(t);
       await t.pumpAndSettle();
       await _search(t, '서울우유');
       await t.pumpAndSettle();
@@ -373,7 +373,7 @@ void main() {
     ) async {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();
-      await t.tap(find.text('검색').last);
+      await openSearchScreen(t);
       await t.pumpAndSettle();
       await _search(t, '우유킥');
       await t.pumpAndSettle();
@@ -387,7 +387,7 @@ void main() {
 
     Future<void> openSearch(WidgetTester t) async {
       await t.pumpAndSettle();
-      await t.tap(find.text('검색').last);
+      await openSearchScreen(t);
       await t.pumpAndSettle();
     }
 
@@ -944,7 +944,7 @@ void main() {
       (t) async {
         await t.pumpWidget(testApp([]));
         await t.pumpAndSettle();
-        await t.tap(find.text('검색').last);
+        await openSearchScreen(t);
         await t.pumpAndSettle();
         await _search(t, '감귤');
         await t.pumpAndSettle();
@@ -988,7 +988,7 @@ void main() {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();
       // 일시품절은 진열 맨 뒤라 화면 밖이다. 검색으로 찾는다.
-      await t.tap(find.text('검색').last);
+      await openSearchScreen(t);
       await t.pumpAndSettle();
       await _search(t, '토마토');
       await t.pumpAndSettle();

@@ -152,9 +152,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
+          // 가운데 탭 = 찜(사용자 2026-11-25 "하단바 가운데 검색을 찜으로"). 검색은 위 검색창·돋보기로 연다.
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/search', builder: (_, _) => const SearchScreen()),
+              GoRoute(path: '/wish', builder: (_, _) => const WishlistScreen()),
             ],
           ),
           StatefulShellBranch(
@@ -377,6 +378,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         path: '/me/terms',
         builder: (_, _) => const TermsListScreen(),
+      ),
+      // 검색(하단 탭에서 빠짐 — 2026-11-25). 홈 검색창·화면 위 돋보기가 push 한다.
+      _slide(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/search',
+        builder: (_, _) => const SearchScreen(),
       ),
       // 찜한 상품(customer 0.13.0, ADR-0081)
       _slide(
@@ -637,8 +644,10 @@ class _TabShell extends StatelessWidget {
               label: l10n.navCategory,
             ),
             NavigationDestination(
-              icon: const PmartLineIcon(PmartLineIcons.search),
-              label: l10n.navSearch,
+              key: const ValueKey('nav-wish'),
+              icon: const PmartLineIcon(PmartLineIcons.heart),
+              selectedIcon: const PmartLineIcon(PmartLineIcons.heartFilled),
+              label: l10n.navWish,
             ),
             NavigationDestination(
               icon: const PmartLineIcon(PmartLineIcons.receipt),

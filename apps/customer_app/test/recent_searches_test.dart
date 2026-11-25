@@ -20,7 +20,7 @@ Future<void> _login(WidgetTester t) async {
 }
 
 Future<void> _openSearch(WidgetTester t) async {
-  await t.tap(find.text('검색').last);
+  await openSearchScreen(t);
   await t.pumpAndSettle();
 }
 
