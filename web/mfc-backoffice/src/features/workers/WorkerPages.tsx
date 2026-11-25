@@ -21,8 +21,8 @@ import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
-import { StatCard } from '../../shared/listParts';
-import { Caret, expandRowProps, InlineDetail, SearchPanel, SearchRow, useInlineOpen } from '../../shared/simList';
+import { StatCard, StatStrip } from '../../shared/listParts';
+import { Caret, expandRowProps, InlineDetail, ResultBar, SearchPanel, SearchRow, useInlineOpen } from '../../shared/simList';
 import { Pager, usePage } from '../../shared/Pager';
 import { useOperatorLabel, WhoAt } from '../../shared/OperatorLabel';
 import { assignTaskName } from '../../shared/pickPack';
@@ -32,7 +32,7 @@ import { SeenMark } from '../../shared/SeenMark';
 import { DetailTop, useGoBack } from '../../shared/DetailHead';
 import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
 import { QueueNav, useRememberQueue } from '../../shared/workQueue';
-import { BreakPinCard } from './BreakPinCard';
+import { BreakPinButton } from './BreakPinCard';
 
 const m = messages.workers;
 
@@ -137,15 +137,19 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
   useRememberQueue('worker', mfcId, shown ? ids : undefined, `${pathname}${search}`);
   return (
     <section className="space-y-4">
-      {/* 머리: 제목 + 주 동작 하나(작업자 등록) */}
+      {/* 머리: 제목 · 오른쪽 저장한 보기·휴게 번호·주 동작(작업자 등록) — 라이더처럼 목록 시작을 밀어내지 않게(2026-11-25 3차) */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1>{messages.menus.workers}</h1>
-        <Link to={workersPath(mfcId, 'new')} className="btn btn-sm btn-primary">
-          {m.register}
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <SavedViews listKey={`workers.${mfcId}`} />
+          <BreakPinButton mfcId={mfcId} />
+          <Link to={workersPath(mfcId, 'new')} className="btn btn-sm btn-primary">
+            {m.register}
+          </Link>
+        </div>
       </div>
-      {/* 숫자 칸 넷이 아래 표 너비를 꽉 채우게 4칸 격자(사용자 2026-11-20 — 공용 StatStrip 은 한 줄 5칸이라 오른쪽이 비었다). 누르면 그 상태로 거른다 */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4" role="group" aria-label={m.ui.countsLabel} data-testid="worker-counts">
+      {/* 숫자 띠 하나(라이더 StatStrip — 칸 사이 1px 선, 고른 칸은 아래 파란 줄). 누르면 그 상태로 거른다 */}
+      <StatStrip label={m.ui.countsLabel} testId="worker-counts">
         <StatCard
           testId="count-ACTIVE"
           label={m.state.ACTIVE}
@@ -164,11 +168,9 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
         />
         <StatCard testId="count-break" label={m.onBreak} value={cell((w) => !!w.onBreak)} hint={m.ui.breakHint} />
         <StatCard testId="count-daily" label={m.ui.dailyNotEnrolled} value={cell((w) => w.employmentType === 'DAILY' && !w.todayEnrollment)} hint={m.ui.dailyHint} />
-      </div>
-      <SavedViews listKey={`workers.${mfcId}`} />
-      {/* 목록 묶음 — 휴게 번호(정해 두었으면 왼쪽 위 작은 "관리자 번호 변경"만) → 찾기 줄 → 결과 줄 → 표 → 쪽 넘김 */}
-      <div className="space-y-2" data-testid="worker-list">
-        <BreakPinCard mfcId={mfcId} compact />
+      </StatStrip>
+      {/* 목록 묶음 — 찾기 줄(숫자 띠에서 28px) → 표 상자(건수 머리줄 + 표, 16px) → 쪽 넘김(표 아래 한 곳) */}
+      <div className="space-y-4" data-testid="worker-list">
         {/* 찾기 줄(목록 한 틀): [이름·사번][찾기][필터 → 상태][건 조건 칩 ✕] */}
         <SearchPanel
           label={m.ui.searchLabel}
@@ -214,12 +216,10 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
             const rows = match(data);
             return (
               <>
-                {/* 결과 줄: 몇 명 · 쪽 넘김 */}
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm" data-testid="worker-result">
-                  <span className="font-semibold">{m.ui.result(rows.length)}</span>
-                  <Pager testId="worker-pager-top" page={paging.page} pageCount={paging.pageCount} total={rows.length} from={paging.from} to={paging.to} onChange={paging.set} />
-                </div>
-                <div className="overflow-x-auto rounded-box bg-base-100">
+                {/* 표 상자: 머리줄 왼쪽 건수(라이더 ResultBar) + 표 — 한 상자(data-list-part 로 붙음) */}
+                <div className="pm-list-box" data-testid="worker-result">
+                  <ResultBar count={rows.length} unit="명" />
+                  <div className="overflow-x-auto" data-list-part="table">
                   <table className="table table-sm">
                     <thead>
                       <tr>
@@ -268,6 +268,7 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 </div>
                 <Pager testId="worker-pager-bottom" page={paging.page} pageCount={paging.pageCount} total={rows.length} from={paging.from} to={paging.to} onChange={paging.set} />
               </>

@@ -42,9 +42,9 @@ describe('작업자 목록', () => {
     renderAt('/c/MFC-BJG-01/workers');
     await waitFor(() => expect(rows()).toHaveLength(4));
     await userEvent.type(screen.getByRole('searchbox', { name: '이름·사번' }), '박일');
-    await userEvent.click(screen.getByRole('button', { name: '찾기' }));
+    await userEvent.click(screen.getByRole('button', { name: '조회' }));
     await waitFor(() => expect(names()).toEqual(['박일일']));
-    expect(screen.getByTestId('worker-result')).toHaveTextContent('1명');
+    expect(screen.getByTestId('result-count')).toHaveTextContent('1명');
     await userEvent.click(within(rows()[0]!).getAllByRole('cell')[2]!);
     const inline = await screen.findByTestId('worker-inline');
     expect(within(inline).getByText('할 수 있는 일(자격)')).toBeInTheDocument();
@@ -314,6 +314,8 @@ describe('작업자 업무 내역(capacity 0.17.0)', () => {
 describe('센터 휴게 번호(capacity 0.20.0)', () => {
   it('처음엔 미설정 → 두 번 같게 넣어야 정함(숫자 4자리만) → 번호는 다시 보이지 않고 "정해 둠"', async () => {
     const view = renderAt('/c/MFC-BJG-01/workers');
+    // 머리 오른쪽 단추(아직이면 "휴게 번호 정하기" + 주황 점) → 아래로 카드(2026-11-25 3차 — 목록 시작을 밀어내지 않게)
+    await userEvent.click(await screen.findByRole('button', { name: /휴게 번호 정하기/ }));
     const card = await screen.findByTestId('break-pin');
     expect(await within(card).findByText('아직 정하지 않았어요 — 작업자가 PDA 로 휴게를 켤 수 없어요.')).toBeInTheDocument();
     const pin = within(card).getByLabelText('새 번호(숫자 4자리)');
@@ -326,7 +328,7 @@ describe('센터 휴게 번호(capacity 0.20.0)', () => {
     await userEvent.clear(again);
     await userEvent.type(again, '1234');
     await userEvent.click(within(card).getByRole('button', { name: '번호 정하기' }));
-    // 작업자 목록 위에서는 정한 뒤 카드가 접히고 왼쪽 위 작은 "관리자 번호 변경" 단추만 남는다(사용자 2026-11-20)
+    // 정한 뒤 머리 단추는 "관리자 번호 변경"(사용자 2026-11-20 이름), 카드는 "정해 둠" 한 줄로 접힌다
     expect(await screen.findByRole('button', { name: '관리자 번호 변경' })).toBeInTheDocument();
     expect(screen.getByText('휴게 번호를 정했어요. 5번 틀려 잠긴 작업자도 바로 풀려요.')).toBeInTheDocument();
     expect(screen.queryByLabelText('새 번호(숫자 4자리)')).not.toBeInTheDocument();
@@ -340,20 +342,22 @@ describe('센터 휴게 번호(capacity 0.20.0)', () => {
     db.breakPins.set('MFC-BJG-01', { pin: '1111', updatedBy: 'OP-sup-1', updatedAt: '2026-11-19T00:00:00.000Z' });
     renderAt('/c/MFC-BJG-01/workers');
     await userEvent.click(await screen.findByRole('button', { name: '관리자 번호 변경' }));
+    await userEvent.click(within(await screen.findByTestId('break-pin')).getByRole('button', { name: '바꾸기' }));
     await userEvent.type(screen.getByLabelText('새 번호(숫자 4자리)'), '2468');
     await userEvent.type(screen.getByLabelText('한 번 더'), '2468');
     await userEvent.click(screen.getByRole('button', { name: '번호 바꾸기' }));
     expect(await screen.findByRole('button', { name: '관리자 번호 변경' })).toBeInTheDocument();
     expect(screen.queryByLabelText('새 번호(숫자 4자리)')).not.toBeInTheDocument();
     expect(db.breakPins.get('MFC-BJG-01')!.pin).toBe('2468');
-    await userEvent.click(screen.getByRole('button', { name: '관리자 번호 변경' }));
-    await userEvent.click(screen.getByRole('button', { name: '닫기' }));
-    expect(screen.queryByLabelText('새 번호(숫자 4자리)')).not.toBeInTheDocument();
+    // 닫기 → 카드가 닫히고 머리 단추만
+    await userEvent.click(within(screen.getByRole('dialog', { name: '휴게 번호' })).getAllByRole('button', { name: '닫기' }).at(-1)!);
+    expect(screen.queryByTestId('break-pin')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '관리자 번호 변경' })).toBeInTheDocument();
   });
 
   it('센터 관리자가 아니면 서버 403 — 정해지지 않음', async () => {
     renderAt('/c/MFC-BJG-01/workers', as.adminWithCenter);
+    await userEvent.click(await screen.findByRole('button', { name: /휴게 번호 정하기/ }));
     const card = await screen.findByTestId('break-pin');
     await userEvent.type(within(card).getByLabelText('새 번호(숫자 4자리)'), '1234');
     await userEvent.type(within(card).getByLabelText('한 번 더'), '1234');
@@ -364,7 +368,7 @@ describe('센터 휴게 번호(capacity 0.20.0)', () => {
 });
 
 describe('작업자 목록 쪽 넘김(사용자 2026-11-20)', () => {
-  it('15명씩 — 위·아래 쪽 넘김, 다음 쪽, 거르기를 바꾸면 1쪽', async () => {
+  it('15명씩 — 쪽 넘김은 표 아래 한 곳(2026-11-25 3차), 다음 쪽, 거르기를 바꾸면 1쪽', async () => {
     const base = db.workers.get('MFC-BJG-01/OP-wkr-1')!;
     for (let i = 1; i <= 17; i++) {
       const id = `OP-many-${String(i).padStart(2, '0')}`;
@@ -372,15 +376,16 @@ describe('작업자 목록 쪽 넘김(사용자 2026-11-20)', () => {
     }
     renderAt('/c/MFC-BJG-01/workers');
     await waitFor(() => expect(screen.getAllByTestId('worker-row')).toHaveLength(15));
-    const top = screen.getByTestId('worker-pager-top');
+    const top = screen.getByTestId('worker-pager-bottom');
+    expect(screen.queryByTestId('worker-pager-top')).not.toBeInTheDocument();
     const total = Number(/(\d+)명 중 1–15/.exec(top.textContent ?? '')?.[1]);
     expect(total).toBeGreaterThan(15);
-    expect(screen.getByTestId('worker-pager-bottom')).toHaveTextContent(`${total}명 중 1–15`);
+    expect(screen.getByTestId('result-count')).toHaveTextContent(`${total}명`);
     expect(within(top).getByRole('button', { name: /이전/ })).toBeDisabled();
     await userEvent.click(within(screen.getByTestId('worker-pager-bottom')).getByRole('button', { name: /다음/ }));
     await waitFor(() => expect(screen.getAllByTestId('worker-row')).toHaveLength(total - 15));
-    expect(within(screen.getByTestId('worker-pager-top')).getByRole('button', { name: '2쪽' })).toHaveAttribute('aria-current', 'page');
+    expect(within(screen.getByTestId('worker-pager-bottom')).getByRole('button', { name: '2쪽' })).toHaveAttribute('aria-current', 'page');
     await userEvent.click(screen.getByTestId('count-ACTIVE'));
-    await waitFor(() => expect(within(screen.getByTestId('worker-pager-top')).getByRole('button', { name: '1쪽' })).toHaveAttribute('aria-current', 'page'));
+    await waitFor(() => expect(within(screen.getByTestId('worker-pager-bottom')).getByRole('button', { name: '1쪽' })).toHaveAttribute('aria-current', 'page'));
   });
 });

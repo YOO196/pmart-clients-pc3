@@ -1503,7 +1503,7 @@ export const messages = {
       noEmployeeNo: '사번 못 읽음',
       searchLabel: '작업자 찾기',
       searchPlaceholder: '이름·사번',
-      find: '찾기',
+      find: '조회', // 찾기 줄 단추 글자는 "조회"로 통일(2026-11-25 사용자 — 네 백오피스)
       result: (n: number) => `${n}명`,
     },
     intro: '센터 작업자의 업무·자격·상태·근무를 관리해요. 로그인 계정과 센터 권한은 인사팀(직원 계정)이 다뤄요 — 여기서는 바꾸지 않아요.',
@@ -1640,7 +1640,9 @@ export const messages = {
     // 센터 휴게 번호(capacity 0.20.0)
     breakPin: {
       title: '휴게 번호',
-      intro: '작업자가 PDA 에서 휴게를 켤 때 넣는 4자리 번호예요(로그인 비밀번호 아님). 서버는 번호를 보여 주지 않아요 — 잊으면 새로 정해요.',
+      intro: 'PDA 휴게 때 넣는 4자리(로그인 비밀번호 아님) · 다시 볼 수 없어요 · 5번 틀리면 15분 잠김, 새로 정하면 풀려요.',
+      setButton: '휴게 번호 정하기',
+      notSetShort: '아직 안 정함',
       set: '정해 둠',
       notSet: '아직 정하지 않았어요 — 작업자가 PDA 로 휴게를 켤 수 없어요.',
       newPin: '새 번호(숫자 4자리)',
