@@ -239,7 +239,7 @@ function DecisionsTab({ mfcId }: { readonly mfcId: string }) {
     return r;
   });
   return (
-    <div className="max-w-4xl space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <form
         className="space-y-2 rounded-box bg-base-100 p-4"
         aria-label={m.submitDecision}
@@ -416,7 +416,7 @@ function DisposalsTab({ mfcId }: { readonly mfcId: string }) {
     return r;
   });
   return (
-    <div className="max-w-4xl space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <form
         className="space-y-2 rounded-box bg-base-100 p-4"
         aria-label={m.requestDisposal}
@@ -648,7 +648,7 @@ function InspectionsTab({ mfcId }: { readonly mfcId: string }) {
   const [receiptId, setReceiptId] = useParam('returnReceiptId');
   const [inspectionId, setInspectionId] = useParam('inspectionId');
   return (
-    <div className="max-w-4xl space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <p className="text-xs opacity-70">{m.inspectionHint}</p>
       <LookupForm key={`r-${receiptId}`} label={m.receiptId} value={receiptId} onSubmit={setReceiptId} />
       {receiptId && <InspectReceipt key={receiptId} mfcId={mfcId} receiptId={receiptId} onInspected={setInspectionId} />}

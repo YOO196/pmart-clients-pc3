@@ -42,7 +42,7 @@ export function RestrictionsMenu({ mfcId }: { readonly mfcId: string }) {
       (await request('GET', api.capacity.GET('/operation-restrictions', { params: { query: { mfcId, ...(all ? { activeOnly: false } : {}) } } }))).items ?? [],
   });
   return (
-    <section className="max-w-5xl space-y-4">
+    <section className="space-y-4">
       <h1>{messages.menus.restrictions}</h1>
       {notice && (
         <p role="status" className="text-success text-sm">

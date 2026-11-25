@@ -395,7 +395,7 @@ function CountsTab({ mfcId }: { readonly mfcId: string }) {
     return s;
   });
   return (
-    <div className="max-w-4xl space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       {/* 실사 시간대·순환 실사(백엔드 지침 2026-11-20) — 실사 목록 위 */}
       <CountWindowsCard mfcId={mfcId} />
       <RotationCountStart mfcId={mfcId} />
@@ -688,7 +688,7 @@ function PoliciesTab({ mfcId }: { readonly mfcId: string }) {
     </label>
   );
   return (
-    <div className="max-w-4xl space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <p className="text-xs opacity-70">{m.policiesHint}</p>
       {notice && (
         <p role="status" className="text-success">
@@ -833,7 +833,7 @@ export function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
   // 본사 상품 불러오기(2026-11-25 사용자) — 본사 상품 목록에서 골라 이 센터 취급을 한꺼번에 켠다
   const [importOpen, setImportOpen] = useState(false);
   return (
-    <div className="max-w-4xl space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <div className="flex justify-end">
         <button type="button" className="btn btn-sm btn-primary" aria-expanded={importOpen} onClick={() => setImportOpen((o) => !o)}>
           {m.catalog.open}
