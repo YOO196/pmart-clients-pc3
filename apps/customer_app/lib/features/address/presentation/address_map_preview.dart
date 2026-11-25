@@ -16,7 +16,8 @@ class AddressMapPreview extends ConsumerWidget {
   /// 큰 지도 화면을 연다. null 이면 버튼을 숨긴다(위치를 못 찾았을 때).
   final VoidCallback? onOpen;
 
-  static const height = 94.0;
+  // 사용자 폰 캡처(2026-11-25, 1080px = 411dp): 지도 높이 100.
+  static const height = 100.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,17 +44,25 @@ class AddressMapPreview extends ConsumerWidget {
             )
           else
             ColoredBox(color: theme.colorScheme.surfaceContainerHighest),
-          const Center(
-            child: Padding(
-              // 핀 끝이 가운데에 오게 핀 높이만큼 올린다.
-              padding: EdgeInsets.only(bottom: 34),
-              child: SizedBox(width: 34, height: 40, child: _Pin()),
+          // 핀(사용자 레퍼런스 그림 36.5×47.2, 위에서 25.9).
+          Positioned(
+            top: 25.9,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Image.asset(
+                'assets/images/address_pin.png',
+                key: const ValueKey('address-map-pin'),
+                width: 36.5,
+                height: 47.2,
+              ),
             ),
           ),
           if (onOpen case final open?)
+            // "지도에서 위치 확인": 높이 21, 오른쪽 13·아래 9.5, 글자 12.5 굵게.
             Positioned(
-              right: 12,
-              bottom: 9,
+              right: 13,
+              bottom: 9.5,
               child: Material(
                 color: const Color(0xE6333333),
                 shape: const StadiumBorder(),
@@ -61,17 +70,17 @@ class AddressMapPreview extends ConsumerWidget {
                   key: const ValueKey('address-map'),
                   customBorder: const StadiumBorder(),
                   onTap: open,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 3,
-                    ),
+                  child: Container(
+                    height: 21,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 9),
                     child: Text(
                       AppLocalizations.of(context).addressMapCheck,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 12.5,
+                        height: 1,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -82,41 +91,4 @@ class AddressMapPreview extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// 진한 물방울 핀(레퍼런스 핀 모양 — 그림은 직접 그린다).
-class _Pin extends StatelessWidget {
-  const _Pin();
-
-  @override
-  Widget build(BuildContext context) => CustomPaint(painter: _PinPainter());
-}
-
-class _PinPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final r = w / 2;
-    final body = Path()
-      ..moveTo(w / 2, h)
-      ..quadraticBezierTo(w * 0.12, h * 0.62, 0, r)
-      ..arcToPoint(Offset(w, r), radius: Radius.circular(r))
-      ..quadraticBezierTo(w * 0.88, h * 0.62, w / 2, h)
-      ..close();
-    canvas
-      ..drawShadow(body, Colors.black, 2, false)
-      ..drawPath(body, Paint()..color = const Color(0xFF3A3A3C))
-      ..drawCircle(
-        Offset(w / 2, r),
-        r * 0.42,
-        Paint()
-          ..color = Colors.white
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.2,
-      );
-  }
-
-  @override
-  bool shouldRepaint(_PinPainter oldDelegate) => false;
 }

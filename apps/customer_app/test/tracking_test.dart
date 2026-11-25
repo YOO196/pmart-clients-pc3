@@ -512,7 +512,7 @@ void main() {
       expect(key('eta-failed'), findsOneWidget);
       expect(key('track-live-fallback'), findsOneWidget);
       expect(find.text('배송하지 못함'), findsNothing);
-      expect(find.text('배달 완료'), findsNothing);
+      expect(find.text('배달완료'), findsNothing);
     });
 
     testWidgets('화면을 닫으면 구독을 닫는다, 앱이 가려져도 닫는다', (t) async {
@@ -556,7 +556,9 @@ void main() {
       // 목 모드는 카카오 지도를 쓰지 않는다(지도 대신 안내 칸).
       expect(key('track-map-unavailable'), findsOneWidget);
       expect(find.text('12분 남음'), findsOneWidget);
-      expect(key('track-rider-at'), findsOneWidget);
+      // 새 위치면 위치 시각 칸 없음(사용자 레퍼런스 2026-11-25), 시트 오른쪽은 라이더 그림.
+      expect(key('track-rider-at'), findsNothing);
+      expect(key('track-art-rider'), findsOneWidget);
       expect(key('track-step-current-delivering'), findsOneWidget);
       expect(key('track-map-inquiry'), findsOneWidget);
       // 지도 화면에서도 "배달 완료"로 앞당기지 않는다.
@@ -701,7 +703,7 @@ void main() {
       await t.pumpAndSettle();
       expect(map(t).riderStale, isFalse);
       expect(key('track-rider-locating'), findsNothing);
-      expect(key('track-rider-at'), findsOneWidget);
+      expect(key('track-rider-at'), findsNothing);
     });
 
     testWidgets('구독이 위치 없이(null) 오면 라이더 마커만 숨긴다 — 내 배송지 지도·도착 예정은 그대로', (

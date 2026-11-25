@@ -20,6 +20,7 @@ final class StartStore {
 
   static const _welcomeKey = 'pmart.start.welcome';
   static const _entryKey = 'pmart.start.entry';
+  static const _lastLoginKey = 'pmart.login.last';
 
   final SecureKeyValueStore _store;
 
@@ -36,4 +37,10 @@ final class StartStore {
 
   /// 주소 단계에서 뒤로 — 로그인/둘러보기를 다시 고르게 한다.
   Future<void> reopenEntry() => _store.delete(_entryKey);
+
+  /// 이 기기에서 마지막으로 로그인한 소셜(로그인 화면 "최근 로그인" 표시 — 사용자 폰 캡처 2026-11-25).
+  Future<String?> lastLogin() => _store.read(_lastLoginKey);
+
+  Future<void> saveLastLogin(String provider) =>
+      _store.write(_lastLoginKey, provider);
 }

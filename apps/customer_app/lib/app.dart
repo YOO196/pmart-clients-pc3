@@ -121,8 +121,9 @@ class CustomerApp extends ConsumerWidget {
   Widget _app(WidgetRef ref) => MaterialApp.router(
     scaffoldMessengerKey: rootScaffoldMessengerKey,
     onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-    theme: PmartCustomerTheme.light(fontFamily: 'Pretendard'),
-    darkTheme: PmartCustomerTheme.dark(fontFamily: 'Pretendard'),
+    // 폰 기본 글꼴(사용자 결정 2026-11-26 — 레퍼런스 캡처와 같은 글꼴. 11-11 의 Pretendard 를 바꿈).
+    theme: PmartCustomerTheme.light(),
+    darkTheme: PmartCustomerTheme.dark(),
     locale: const Locale('ko'),
     supportedLocales: AppLocalizations.supportedLocales,
     localizationsDelegates: const [

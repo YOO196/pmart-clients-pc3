@@ -2770,13 +2770,23 @@ class TrackMapLayout extends StatelessWidget {
                             horizontal: 16,
                             vertical: 10,
                           ),
-                          // 레퍼런스: 글자만 있는 흰 알약 "문의하기"
-                          child: Text(
-                            l10n.orderInquiry,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
+                          // 사용자 레퍼런스(2026-11-25): 흰 알약에 헤드셋 + "문의하기"
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const PmartLineIcon(
+                                PmartLineIcons.headset,
+                                size: 19,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                l10n.orderInquiry,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -2910,7 +2920,8 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
     };
     final Widget sheet = switch (value) {
       _ when o != null => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        // 사용자 레퍼런스(2026-11-25): 좌우 18, 손잡이 위 11.
+        padding: const EdgeInsets.fromLTRB(18, 11, 18, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -2936,6 +2947,7 @@ class _OrderTrackingScreenState extends ConsumerState<OrderTrackingScreen>
                   children: [
                     TrackSheetHead(
                       mode: deliveryModeText(l10n, o.deliveryMode),
+                      single: o.deliveryMode == 'SINGLE',
                       headline: phase.title,
                       headlineKey: 'order-track-status',
                       subtitle: reserved ? null : phase.subtitle,
@@ -3099,7 +3111,7 @@ class _TrackBody extends StatelessWidget {
         (e.delayedBySeconds ?? 0) > 0 && e.status == EtaStatus.available;
     // 초안 13-B·E(사용자 2026-11-23): 머리 아래 작은 줄을 쌓지 않고 정보 칸 최대 2개.
     // 우선순위: 늦어짐(분홍) → 실시간 끊김(+기준 시각) → 라이더 위치 시각 / 확인 중 → 기준 시각 → 예약 변경 안내.
-    final infos = <Widget>[
+    final infos = <Widget?>[
       if (delayed)
         TrackInfo(
           key: const ValueKey('eta-delayed'),
@@ -3116,22 +3128,19 @@ class _TrackBody extends StatelessWidget {
           tone: TrackInfoTone.muted,
         )
       // 위치가 없거나(서버가 주지 않음) 받은 지 60초가 넘었으면 지어내지 않고 확인 중이라고만.
+      // 위치가 새것이면 칸을 두지 않는다(사용자 레퍼런스 2026-11-25 — 머리 아래 바로 단계).
       else if (rider case final r? when !r.stale && r.recordedAt != null)
-        TrackInfo(
-          key: const ValueKey('track-rider-at'),
-          text: l10n.trackRiderLocationAt(formatSeoulTime(r.recordedAt!)),
-        )
+        null
       else if (_isDelivering(e.stage))
         TrackInfo(
           key: const ValueKey('track-rider-locating'),
           text: l10n.trackRiderLocating,
           tone: TrackInfoTone.muted,
         )
-      else if (e.asOf case final t?)
+      // 기준 시각은 오래된 값일 때만(지금 값이면 칸 없음 — 레퍼런스).
+      else if (e.asOf case final t? when e.freshness != Freshness.current)
         TrackInfo(
-          text: e.freshness == Freshness.current
-              ? l10n.asOfTime(formatSeoulTime(t))
-              : l10n.sourceStale(formatSeoulTime(t)),
+          text: l10n.sourceStale(formatSeoulTime(t)),
           tone: TrackInfoTone.muted,
         ),
       // 예약 확정(준비 전): 설명 줄 대신 변경 안내를 정보 칸으로(초안 13-B-4).
@@ -3142,13 +3151,14 @@ class _TrackBody extends StatelessWidget {
           o != null &&
           canRequestTimeChange(o))
         TrackInfo(text: l10n.trackRescheduleNote, tone: TrackInfoTone.muted),
-    ].take(2).toList();
+    ].nonNulls.take(2).toList();
     final modeName = deliveryModeText(l10n, o?.deliveryMode);
     final children = <Widget>[
       // 시트 머리(레퍼런스 8-2·8-4·8-5): 배달 방식 → 큰 제목("N분 남음 오후 6:50" 또는 단계 제목) → 한 줄 설명.
       if (sheet) ...[
         TrackSheetHead(
           // 묶음배달 도착 구간은 시트 맨 아래 줄 대신 방식 옆에(초안 13-B).
+          single: o?.deliveryMode == 'SINGLE',
           mode: !scheduled && window != null && modeName != null
               ? '$modeName · ${windowText(window)}'
               : modeName,
@@ -3162,9 +3172,9 @@ class _TrackBody extends StatelessWidget {
               : phase != null
               ? 'track-phase'
               : 'eta-line',
-          // 초안 13 "오후 6:50 도착"(사용자 2026-11-23 추천대로 — 무슨 시각인지 분명하게).
+          // 사용자 레퍼런스(2026-11-25): "20분 남음 오후 6:50" — 시각만.
           time: remainingMin != null && e.etaAt != null
-              ? l10n.trackArriveAtTime(formatSeoulTime(e.etaAt!))
+              ? formatSeoulTime(e.etaAt!)
               : null,
           subtitle: reservedHead
               ? null
@@ -3311,7 +3321,7 @@ class _TrackBody extends StatelessWidget {
     ];
     if (sheet) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        padding: const EdgeInsets.fromLTRB(18, 11, 18, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: children,
@@ -3323,15 +3333,24 @@ class _TrackBody extends StatelessWidget {
 }
 
 /// 4단계 진행 표시. 서버 상태로 정한 [TrackProgress] 만 그린다(멈춤이면 어느 단계도 진행으로 칠하지 않는다).
+///
+/// 사용자 레퍼런스(2026-11-25, 1872px 시트 = 411dp 에서 잼): 점 지름 11, 선 굵기 3.3, 점과 선 사이 6.8,
+/// 지금 단계는 라이더 아이콘 13×17.4(선과 6), 단계 사이 105.6 — 첫 점은 내용 왼쪽에서 29.
+/// 이름 16, 점 가운데에서 이름 글자 위까지 20.4, 지금 단계만 진하고 굵게, 나머지 옅은 회색.
 class _TrackSteps extends StatelessWidget {
   const _TrackSteps({required this.progress});
 
   final TrackProgress progress;
 
+  static const _dot = 11.0;
+  static const _icon = Size(13, 17.4);
+  static const _row = 18.0;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final current = progress.halted ? null : progress.step;
     final labels = {
       TrackStep.confirmed: l10n.trackStepConfirmed,
@@ -3339,100 +3358,102 @@ class _TrackSteps extends StatelessWidget {
       TrackStep.delivering: l10n.trackStepDelivering,
       TrackStep.delivered: l10n.trackStepDelivered,
     };
+    const off = Color(0xFFE4E6E8);
+    final steps = TrackStep.values;
     return Column(
       key: const ValueKey('track-steps'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 레퍼런스 8-5: 점을 선으로 잇고, 지난 단계는 채운 점, 지금 단계는 오토바이, 남은 단계는 회색 점.
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final step in TrackStep.values)
-              Expanded(
-                child: Column(
-                  children: [
-                    SizedBox(
-                      height: 26,
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: step.index == 0
-                                ? const SizedBox()
-                                : _StepLine(
-                                    on:
-                                        current != null &&
-                                        step.index <= current.index,
-                                  ),
-                          ),
-                          _StepDot(
-                            done: current != null && step.index < current.index,
-                            current: step == current,
-                          ),
-                          Expanded(
-                            child: step.index == TrackStep.values.length - 1
-                                ? const SizedBox()
-                                : _StepLine(
-                                    on:
-                                        current != null &&
-                                        step.index < current.index,
-                                  ),
-                          ),
-                        ],
+        LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth;
+            // 레퍼런스 비율: 첫 점 29/375, 간격 105.6/375(내용 폭 375dp 기준).
+            double cx(int i) => w * (29 + i * 105.6) / 375;
+            double half(TrackStep s) =>
+                (s == current ? _icon.width : _dot) / 2 +
+                (s == current ? 6 : 6.8);
+            return SizedBox(
+              height: _row + 9.5 + 19,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  for (var i = 0; i < steps.length - 1; i++)
+                    Positioned(
+                      left: cx(i) + half(steps[i]),
+                      width:
+                          cx(i + 1) -
+                          cx(i) -
+                          half(steps[i]) -
+                          half(steps[i + 1]),
+                      top: (_row - 3.3) / 2,
+                      height: 3.3,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: current != null && i < current.index
+                              ? scheme.primary
+                              : off,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      labels[step]!,
-                      key: ValueKey(
-                        step == current
-                            ? 'track-step-current-${step.name}'
-                            : 'track-step-${step.name}',
-                      ),
-                      textAlign: TextAlign.center,
-                      // 초안 13-B: 단계 이름 13, 지금 단계는 진한 색 + 굵게.
-                      style: step == current
-                          ? theme.textTheme.titleSmall?.copyWith(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            )
-                          : theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 13,
-                              color: theme.colorScheme.outline,
-                            ),
-                    ),
-                    // 레퍼런스 8-5: 배달 중이면 지금 단계 아래 말풍선 "내 주소로 오는 중"
-                    // 말풍선은 단계 칸(폭 1/4)보다 넓을 수 있어 칸 밖으로 넘치게 둔다(가운데 맞춤 — 초안 13-B).
-                    if (step == current && step == TrackStep.delivering)
-                      SizedBox(
-                        height: 26,
-                        child: OverflowBox(
-                          maxWidth: 200,
-                          child: Container(
-                            key: const ValueKey('track-step-bubble'),
-                            margin: const EdgeInsets.only(top: 4),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              l10n.trackStepComingBubble,
-                              maxLines: 1,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontSize: 11.5,
-                                color: theme.colorScheme.onPrimary,
-                              ),
-                            ),
+                  for (final step in steps) ...[
+                    if (step == current)
+                      Positioned(
+                        left: cx(step.index) - _icon.width / 2,
+                        top: (_row - _icon.height) / 2,
+                        child: Image.asset(
+                          'assets/images/tracking/step_rider.png',
+                          key: const ValueKey('track-step-icon'),
+                          width: _icon.width,
+                          height: _icon.height,
+                          color: scheme.primary,
+                        ),
+                      )
+                    else
+                      Positioned(
+                        left: cx(step.index) - _dot / 2,
+                        top: (_row - _dot) / 2,
+                        child: Container(
+                          width: _dot,
+                          height: _dot,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: current != null && step.index < current.index
+                                ? scheme.primary
+                                : off,
                           ),
                         ),
                       ),
+                    Positioned(
+                      left: cx(step.index) - 50,
+                      width: 100,
+                      top: _row + 9.5,
+                      child: Text(
+                        labels[step]!,
+                        key: ValueKey(
+                          step == current
+                              ? 'track-step-current-${step.name}'
+                              : 'track-step-${step.name}',
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 15.5,
+                          height: 1.2,
+                          fontWeight: step == current
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                          color: step == current
+                              ? scheme.onSurface
+                              : const Color(0xFFD5D7D9),
+                        ),
+                      ),
+                    ),
                   ],
-                ),
+                ],
               ),
-          ],
+            );
+          },
         ),
         if (current == null && !progress.halted)
           Padding(
@@ -3449,50 +3470,6 @@ class _TrackSteps extends StatelessWidget {
   }
 }
 
-class _StepLine extends StatelessWidget {
-  const _StepLine({required this.on});
-
-  final bool on;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      height: 3,
-      decoration: BoxDecoration(
-        color: on ? scheme.primary : scheme.outlineVariant,
-        borderRadius: BorderRadius.circular(2),
-      ),
-    );
-  }
-}
-
-class _StepDot extends StatelessWidget {
-  const _StepDot({required this.done, required this.current});
-
-  final bool done;
-  final bool current;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    if (current) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2),
-        child: ScooterGlyph(size: 26, color: scheme.primary),
-      );
-    }
-    return Container(
-      width: 13,
-      height: 13,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: done ? scheme.primary : scheme.outlineVariant,
-      ),
-    );
-  }
-}
-
 /// 주문 `deliveryMode`(SINGLE·BUNDLED·SCHEDULED) → 화면 이름. 모르는 값·없음이면 null(보이지 않는다).
 String? deliveryModeText(AppLocalizations l10n, String? mode) => switch (mode) {
   'SINGLE' => l10n.modeSingle,
@@ -3505,6 +3482,7 @@ String? deliveryModeText(AppLocalizations l10n, String? mode) => switch (mode) {
 class TrackSheetHead extends StatelessWidget {
   const TrackSheetHead({
     super.key,
+    this.single = false,
     required this.headline,
     required this.headlineKey,
     this.mode,
@@ -3520,6 +3498,9 @@ class TrackSheetHead extends StatelessWidget {
   /// 예약 확정(준비 전)이면 오른쪽 그림이 달력(초안 13-B-4, 사용자 2026-11-23). [receipt] 보다 먼저.
   final bool calendar;
 
+  /// 한집배달이면 방식 이름 옆에 "1" 집 아이콘(사용자 지시 2026-11-25).
+  final bool single;
+
   final String? mode;
   final String headline;
   final String headlineKey;
@@ -3534,9 +3515,9 @@ class TrackSheetHead extends StatelessWidget {
       children: [
         Center(
           child: Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: 20),
+            width: 44,
+            height: 4.4,
+            margin: const EdgeInsets.only(bottom: 23),
             decoration: BoxDecoration(
               color: theme.colorScheme.outlineVariant,
               borderRadius: BorderRadius.circular(2),
@@ -3551,15 +3532,31 @@ class TrackSheetHead extends StatelessWidget {
                 children: [
                   if (mode case final m?)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      // 초안 13-B(사용자 2026-11-23): 방식 13 회색 · 제목 23 굵게 · 시각 14 회색 · 설명 15 회색.
-                      child: Text(
-                        m,
+                      padding: const EdgeInsets.only(bottom: 6),
+                      // 사용자 레퍼런스(2026-11-25, 908px 시트 = 411dp): 방식 16 굵게 진한 색 ·
+                      // 제목 26 굵게 · 시각 16 · 설명 16 진한 회색.
+                      child: Text.rich(
+                        TextSpan(
+                          text: m,
+                          children: [
+                            if (single)
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.middle,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 3),
+                                  child: SingleHomeIcon(
+                                    key: const ValueKey('track-mode-single'),
+                                    color: theme.colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                         key: const ValueKey('track-mode'),
                         style: theme.textTheme.titleSmall?.copyWith(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w400,
-                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -3571,20 +3568,20 @@ class TrackSheetHead extends StatelessWidget {
                         headline,
                         key: ValueKey(headlineKey),
                         style: theme.textTheme.headlineMedium?.copyWith(
-                          fontSize: 23,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
                           height: 1.3,
                         ),
                       ),
                       if (time case final t?)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
+                          padding: const EdgeInsets.only(bottom: 1.5),
                           child: Text(
                             t,
                             style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w400,
+                              color: theme.colorScheme.onSurface,
                             ),
                           ),
                         ),
@@ -3592,13 +3589,13 @@ class TrackSheetHead extends StatelessWidget {
                   ),
                   if (subtitle case final sub?)
                     Padding(
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: 5.5),
                       child: Text(
                         sub,
                         key: const ValueKey('eta-stage'),
                         style: theme.textTheme.bodyLarge?.copyWith(
-                          fontSize: 15,
-                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 16,
+                          color: theme.colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -3606,32 +3603,32 @@ class TrackSheetHead extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // 오른쪽 배달 그림(직접 그린 선 그림 — 레퍼런스 캐릭터 그림은 쓰지 않는다).
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: calendar || receipt
-                  ? PmartLineIcon(
-                      calendar
-                          ? PmartLineIcons.calendar
-                          : PmartLineIcons.receipt,
-                      key: ValueKey(
-                        calendar ? 'track-art-calendar' : 'track-art-receipt',
-                      ),
-                      size: 40,
-                      strokeWidth: 1.6,
-                      color: theme.colorScheme.primary,
-                    )
-                  : ScooterGlyph(size: 44, color: theme.colorScheme.primary),
-            ),
+            // 오른쪽 그림: 배달 중이면 동그라미 없이 오토바이 탄 라이더(사용자 레퍼런스 2026-11-25, 약 76dp —
+            // 직접 그린 그림, 레퍼런스 캐릭터는 쓰지 않는다). 배차 전·예약은 영수증·달력.
+            if (calendar || receipt)
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: PmartLineIcon(
+                  calendar ? PmartLineIcons.calendar : PmartLineIcons.receipt,
+                  key: ValueKey(
+                    calendar ? 'track-art-calendar' : 'track-art-receipt',
+                  ),
+                  size: 40,
+                  strokeWidth: 1.6,
+                  color: theme.colorScheme.primary,
+                ),
+              )
+            else
+              const RiderArt(key: ValueKey('track-art-rider')),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 9),
       ],
     );
   }
@@ -3729,7 +3726,7 @@ class TrackSheetLoading extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       key: const ValueKey('track-sheet-loading'),
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+      padding: const EdgeInsets.fromLTRB(18, 11, 18, 32),
       child: PmartShimmer(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3813,50 +3810,49 @@ class _OrderSheetDetailsState extends State<OrderSheetDetails> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 24),
-        // "배달정보 자세히 ∨" — 회색 둥근 칸, 누르면 배달주소·요청사항.
-        Material(
-          color: theme.colorScheme.surfaceContainerHigh,
-          shape: const StadiumBorder(),
-          child: InkWell(
-            key: const ValueKey('track-delivery-info'),
-            customBorder: const StadiumBorder(),
-            onTap: () => setState(() => _open = !_open),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    l10n.trackDeliveryInfo,
-                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+        const SizedBox(height: 23),
+        // 사용자 레퍼런스(2026-11-25): 집 아이콘 + "배달주소" 굵게, 오른쪽 끝 ∨ — 누르면 주소·요청사항.
+        InkWell(
+          key: const ValueKey('track-delivery-info'),
+          onTap: () => setState(() => _open = !_open),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(5, 8, 2, 8),
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/images/tracking/home_filled.png',
+                  key: const ValueKey('track-address-icon'),
+                  width: 12,
+                  height: 12.7,
+                  color: const Color(0xFF4B4D4F),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n.trackAddress,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF4B4D4F),
+                    ),
                   ),
-                  const SizedBox(width: 4),
-                  PmartLineIcon(
-                    _open
-                        ? PmartLineIcons.chevronUp
-                        : PmartLineIcons.chevronDown,
-                    size: 18,
-                  ),
-                ],
-              ),
+                ),
+                PmartLineIcon(
+                  _open ? PmartLineIcons.chevronUp : PmartLineIcons.chevronDown,
+                  size: 20,
+                  color: const Color(0xFF7E8082),
+                ),
+              ],
             ),
           ),
         ),
         if (_open)
           Padding(
             key: const ValueKey('track-delivery-info-body'),
-            padding: const EdgeInsets.fromLTRB(4, 16, 4, 0),
+            padding: const EdgeInsets.fromLTRB(25, 4, 4, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  l10n.trackAddress,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
                 ShippingAddressView(address: o.shippingAddress),
                 const SizedBox(height: 14),
                 Text(

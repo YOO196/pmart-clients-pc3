@@ -45,6 +45,11 @@ final startStoreProvider = Provider<StartStore>(
   (ref) => StartStore(ref.watch(secureStoreProvider)),
 );
 
+/// 이 기기에서 마지막으로 로그인한 소셜 이름(`kakao`·`naver`·`google`). 없으면 null.
+final lastLoginProviderNameProvider = FutureProvider<String?>(
+  (ref) => ref.watch(startStoreProvider).lastLogin(),
+);
+
 /// 지금 시각(시험에서 바꿔 끼운다).
 final startClockProvider = Provider<DateTime Function()>((_) => DateTime.now);
 

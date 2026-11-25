@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart'
-    show PmartBrand, PmartLineIcon, PmartLineIcons, keepWords;
+    show PmartBrand, PmartLineIcon, PmartLineIcons, formatKrw, keepWords;
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../data/auth_repository.dart' show consentTypeOf;
@@ -14,8 +14,17 @@ import 'package:pmart_core/pmart_core.dart' show PmartEnv, ProblemCode;
 
 import '../../../shared/providers.dart' show envProvider;
 import '../../start/presentation/start_controller.dart'
-    show StartRoutes, leaveApp, startFlagsProvider;
+    show
+        StartRoutes,
+        lastLoginProviderNameProvider,
+        leaveApp,
+        startFlagsProvider,
+        startStoreProvider;
 import 'auth_controller.dart';
+import '../../coupons/domain/coupon.dart'
+    show CouponCampaign, CouponDiscountType;
+import '../../coupons/presentation/coupon_controller.dart'
+    show couponCampaignsProvider;
 import 'identity_view.dart';
 
 /// SCR-AUTH-001·CONSENT-001. 로그인되면 `true` 로 돌아간다. 취소·실패는 원래 화면을 그대로 둔다.
@@ -90,6 +99,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     ref.listen(provider, (_, next) {
       if (next case LoginSettled(outcome: LoginMember(:final newAccount))) {
+        // "최근 로그인" 표시용으로 이 기기에 남긴다(토큰 아님 — 소셜 이름만).
+        if (controller.provider case final p?) {
+          ref.read(startStoreProvider).saveLastLogin(p.name).then((_) {
+            ref.invalidate(lastLoginProviderNameProvider);
+          });
+        }
         _afterLogin(newAccount: newAccount);
       }
       if (next case LoginSettled(outcome: LoginCancelled())) {
@@ -434,7 +449,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _ => null,
     };
     final theme = Theme.of(context);
-    // 레퍼런스 2-3: 가운데 로고, 아래 동그란 소셜 단추 가로 한 줄(지름 약 53dp + 이름), 맨 아래 회색 "둘러보기"
+    final scheme = theme.colorScheme;
+    final last = ref.watch(lastLoginProviderNameProvider).value;
+    // 사용자 폰 캡처(2026-11-25, 1080px = 411dp): 동그라미 47.6, 가운데 사이 67.8, 이름 13.6(동그라미 아래 9),
+    // 마지막 로그인 위에 "최근 로그인" 알약(55.5×15.6).
     Widget round(SocialProvider p) {
       final (bg, fg, glyph, border) = switch (p) {
         SocialProvider.kakao => (
@@ -458,155 +476,271 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ),
       };
       final working = workingProvider == p;
-      return Semantics(
-        button: true,
-        label: _providerLabel(l10n, p),
-        excludeSemantics: true,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Material(
-              color: bg,
-              shape: CircleBorder(
-                side: border
-                    ? BorderSide(color: theme.colorScheme.outlineVariant)
-                    : BorderSide.none,
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                key: ValueKey('login-${p.name}'),
-                // 제한 중에는 다시 누를 수 없다(남은 시간은 서버 값).
-                onTap: (busy || outcome is LoginRestricted)
-                    ? null
-                    : () => controller.start(p),
-                child: SizedBox.square(
-                  dimension: 53,
-                  child: Center(
-                    child: working
-                        ? SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: fg,
-                            ),
-                          )
-                        : glyph == null
-                        // 카카오: 말풍선
-                        ? CustomPaint(
-                            size: const Size(24, 22),
-                            painter: _BubblePainter(fg),
-                          )
-                        : Text(
-                            glyph,
-                            style: TextStyle(
-                              color: fg,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
+      return SizedBox(
+        width: 67.8,
+        child: Semantics(
+          button: true,
+          label: _providerLabel(l10n, p),
+          excludeSemantics: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.topCenter,
+                children: [
+                  Material(
+                    color: bg,
+                    shape: CircleBorder(
+                      side: border
+                          ? const BorderSide(color: Color(0xFFE1E2E4))
+                          : BorderSide.none,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      key: ValueKey('login-${p.name}'),
+                      // 제한 중에는 다시 누를 수 없다(남은 시간은 서버 값).
+                      onTap: (busy || outcome is LoginRestricted)
+                          ? null
+                          : () => controller.start(p),
+                      child: SizedBox.square(
+                        dimension: 47.6,
+                        child: Center(
+                          child: working
+                              ? SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: fg,
+                                  ),
+                                )
+                              : p == SocialProvider.google
+                              // 구글: 네 색 G(사용자 폰 캡처에서 자른 그림, 약 20dp)
+                              ? Image.asset(
+                                  'assets/images/login_google.png',
+                                  width: 19.8,
+                                  height: 20.5,
+                                )
+                              : glyph == null
+                              // 카카오: 말풍선
+                              ? CustomPaint(
+                                  size: const Size(22, 20),
+                                  painter: _BubblePainter(fg),
+                                )
+                              : Text(
+                                  glyph,
+                                  style: TextStyle(
+                                    color: fg,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
                   ),
+                  if (last == p.name)
+                    Positioned(
+                      top: -16.6,
+                      child: Container(
+                        key: const ValueKey('login-recent'),
+                        width: 55.5,
+                        height: 15.6,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: scheme.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          l10n.loginRecent,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontSize: 10,
+                            height: 1,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.onPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 5.4),
+              Text(
+                _providerShort(l10n, p),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: 13.6,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1B1D1E),
                 ),
               ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _providerShort(l10n, p),
-              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12),
-            ),
-          ],
+            ],
+          ),
         ),
+      );
+    }
+
+    // 위 머리(사용자 폰 캡처): 브랜드 18 굵게 → 큰 제목 두 줄 26 굵게(두 번째 줄은 서버 쿠폰 이름, 금액만 보라) →
+    // 쿠폰 그림 73×49.5, 뒤에 연보라 둥근 빛(지름 약 230). 쿠폰 행사를 못 읽거나 없으면 제목·그림 없이 브랜드만.
+    final campaigns = ref.watch(couponCampaignsProvider).value;
+    final CouponCampaign? promo = (campaigns == null || campaigns.isEmpty)
+        ? null
+        : campaigns.first;
+    final headStyle = theme.textTheme.headlineSmall?.copyWith(
+      fontSize: 26,
+      height: 1.29,
+      fontWeight: FontWeight.w800,
+      color: const Color(0xFF1B1D1E),
+    );
+    TextSpan promoLine(CouponCampaign c) {
+      final amount = c.discount.type == CouponDiscountType.amount
+          ? formatKrw(c.discount.value)
+          : null;
+      final i = amount == null ? -1 : c.name.indexOf(amount);
+      if (i < 0) return TextSpan(text: c.name);
+      return TextSpan(
+        children: [
+          TextSpan(text: c.name.substring(0, i)),
+          TextSpan(
+            text: amount,
+            style: const TextStyle(color: Color(0xFF5B2EF0)),
+          ),
+          TextSpan(text: c.name.substring(i + amount!.length)),
+        ],
       );
     }
 
     final body = LayoutBuilder(
       builder: (context, c) => SingleChildScrollView(
         child: ConstrainedBox(
-          // 폭도 화면 전체로 — 본문이 좁으면(실기기: 목 안내 문장 없음) 왼쪽에 붙던 것(사용자 2026-11-20)
           constraints: BoxConstraints(
             minHeight: c.maxHeight,
             minWidth: c.maxWidth,
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  l10n.appTitle,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontSize: 40,
-                    fontWeight: FontWeight.w900,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                if (widget.purpose == LoginPurpose.checkout) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    keepWords(l10n.loginForCheckout),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 64),
-                if (message != null) ...[
-                  Text(
-                    message,
-                    key: const ValueKey('login-message'),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: theme.colorScheme.error),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                if (outcome is LoginUnknown)
-                  OutlinedButton(
-                    key: const ValueKey('login-check-again'),
-                    onPressed: busy ? null : controller.checkAgain,
-                    child: Text(l10n.loginCheckAgain),
-                  )
-                else
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: [
-                      for (final p in ref.watch(loginProvidersProvider))
-                        round(p),
-                    ],
-                  ),
-                if (widget.entry) ...[
-                  const SizedBox(height: 40),
-                  TextButton(
-                    key: const ValueKey('login-browse'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: theme.colorScheme.onSurfaceVariant,
-                      textStyle: theme.textTheme.bodyMedium?.copyWith(
-                        fontSize: 12,
+          child: Stack(
+            alignment: Alignment.topCenter,
+            children: [
+              if (promo != null)
+                Positioned(
+                  top: 79,
+                  child: IgnorePointer(
+                    child: Container(
+                      width: 230,
+                      height: 230,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [Color(0xFFE4DAFF), Color(0x00FFFFFF)],
+                          stops: [0.0, 1.0],
+                        ),
                       ),
                     ),
-                    onPressed: busy
-                        ? null
-                        : () => ref
-                              .read(startFlagsProvider.notifier)
-                              .completeEntry(),
-                    child: Text(l10n.loginBrowse),
                   ),
-                ],
-                if (ref.watch(envProvider) == PmartEnv.mock) ...[
-                  const SizedBox(height: 24),
-                  Text(
-                    keepWords(l10n.loginMockNotice),
-                    key: const ValueKey('login-mock-notice'),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.outline,
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 137, 24, 24),
+                child: Column(
+                  children: [
+                    Text(
+                      l10n.appTitle,
+                      key: const ValueKey('login-brand'),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontSize: 18,
+                        height: 1.2,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF1B1D1E),
+                      ),
                     ),
-                  ),
-                ],
-              ],
-            ),
+                    if (promo != null) ...[
+                      const SizedBox(height: 9),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: '${l10n.loginPromoLead}\n'),
+                            promoLine(promo),
+                          ],
+                        ),
+                        key: const ValueKey('login-promo'),
+                        textAlign: TextAlign.center,
+                        style: headStyle,
+                      ),
+                      const SizedBox(height: 24.5),
+                      Image.asset(
+                        'assets/images/login_coupon.png',
+                        key: const ValueKey('login-promo-art'),
+                        width: 73,
+                        height: 49.5,
+                      ),
+                    ] else
+                      const SizedBox(height: 120),
+                    if (widget.purpose == LoginPurpose.checkout) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        keepWords(l10n.loginForCheckout),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 43.6),
+                    if (message != null) ...[
+                      Text(
+                        message,
+                        key: const ValueKey('login-message'),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: scheme.error),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    if (outcome is LoginUnknown)
+                      OutlinedButton(
+                        key: const ValueKey('login-check-again'),
+                        onPressed: busy ? null : controller.checkAgain,
+                        child: Text(l10n.loginCheckAgain),
+                      )
+                    else
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (final p in ref.watch(loginProvidersProvider))
+                            round(p),
+                        ],
+                      ),
+                    if (widget.entry) ...[
+                      const SizedBox(height: 38),
+                      TextButton(
+                        key: const ValueKey('login-browse'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color(0xFF7C8081),
+                          textStyle: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 13.6,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        onPressed: busy
+                            ? null
+                            : () => ref
+                                  .read(startFlagsProvider.notifier)
+                                  .completeEntry(),
+                        child: Text(l10n.loginBrowse),
+                      ),
+                    ],
+                    if (ref.watch(envProvider) == PmartEnv.mock) ...[
+                      const SizedBox(height: 24),
+                      Text(
+                        keepWords(l10n.loginMockNotice),
+                        key: const ValueKey('login-mock-notice'),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.outline,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

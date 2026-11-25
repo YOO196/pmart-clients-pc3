@@ -115,6 +115,7 @@
 | BR-105 | 보통 | 고객 | 탈퇴 때 구글 연결(동의)을 서버가 끊기 — 탈퇴 본문 선택 `providerAccessToken`(구글 접근 토큰) → 서버가 oauth2 revoke(키 불필요, 보관 안 함). 요청서 `docs/handoff/customer-app/2026-11-25-backend-google-revoke-on-withdrawal.md` | 회신(customer 0.18.0 — LAN 배포 전): 앱 반영(구글 탈퇴 때 providerAccessToken, 기기 disconnect 유지) |
 | BR-106 | 보통 | 고객 | 비회원 주소를 그대로 회원 주소록에(상세 주소 선택, 주문 때만 상세 요구) — 요청서 `docs/handoff/customer-app/2026-11-25-backend-member-address-without-detail.md` | 회신(customer 0.20.0·order 0.23.0 — LAN 배포 전): 앱 반영(상세 없이도 옮김, 주문서 DETAIL_ADDRESS_REQUIRED → 상세 입력) |
 | BR-107 | 보통 | 고객 | 실명(name)을 고객이 입력·수정(PATCH /me name, 로그인 때 덮지 않음) — 가입 "이름" 입력이 지금은 nickname 에 저장되는 어긋남. 요청서 `docs/handoff/customer-app/2026-11-25-backend-real-name-edit.md` | 요청(앱 내 정보: 이름 보기만·닉네임 수정) |
+| BR-108 | 보통 | 고객 | 주소에 라이더 요청사항(riderRequest) 저장·기본 문구 목록·주문 deliveryNote 기본값 — 레퍼런스 주소 편집 회색 줄·주소 상세 펼침 목록. 요청서 `docs/handoff/customer-app/2026-11-26-backend-address-rider-request.md` | 요청(앱 미표시) |
 
 ---
 

@@ -362,7 +362,14 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
       appBar: AppBar(
         centerTitle: false,
         titleSpacing: pmartLeftTitleSpacing,
-        title: Text(l10n.addressEditTitle),
+        // 사용자 폰 캡처(2026-11-25, 1080px = 411dp): 제목 18.4 굵게.
+        title: Text(
+          l10n.addressEditTitle,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontSize: 18.4,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
       body: UiStateView<AddressBook?>(
         state: uiStateOf(value),
@@ -370,63 +377,80 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
         ready: (context, book) {
           final addresses = book?.addresses ?? const <Address>[];
           if (addresses.isEmpty) return Center(child: Text(l10n.addressEmpty));
-          // 레퍼런스 3-1 2-3 의 작은 [수정]·[삭제]: 높이 약 24, 모서리 8, 진한 회색 테두리, 13.5 중간 굵기, 검은 글자
-          // (사용자 2026-11-21 "버튼들 너무 기본형" — 테마 기본 테두리 버튼 모양이 그대로였다).
+          // 사용자 폰 캡처(2026-11-25): [수정]·[삭제] 높이 25.9, 안쪽 좌우 10.3, 사이 8, 모서리 10,
+          // 회색 테두리, 13.5 굵게.
           final smallButton = OutlinedButton.styleFrom(
             foregroundColor: theme.colorScheme.onSurface,
-            minimumSize: const Size(0, 30),
-            padding: const EdgeInsets.symmetric(horizontal: 9),
+            minimumSize: const Size(0, 25.9),
+            fixedSize: const Size.fromHeight(25.9),
+            padding: const EdgeInsets.symmetric(horizontal: 10.3),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             visualDensity: VisualDensity.compact,
-            side: BorderSide(color: theme.colorScheme.outline, width: 1.2),
+            side: const BorderSide(color: Color(0xFFCBCDD0), width: 1.2),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(10),
             ),
             textStyle: theme.textTheme.labelLarge?.copyWith(
               fontSize: 13.5,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w700,
             ),
           );
+          // 한 주소 칸: 제목 16.2 굵게 → 주소 14 → [수정][삭제], 칸 사이 옅은 선(좌우 16).
           return ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             itemCount: addresses.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
+            separatorBuilder: (_, _) => const Divider(
+              height: 1,
+              thickness: 1,
+              color: Color(0xFFF0F0F2),
+            ),
             itemBuilder: (context, i) {
               final a = addresses[i];
               final current = a.addressId == book!.context.shoppingAddressId;
               return Padding(
                 key: ValueKey('address-edit-${a.addressId}'),
-                padding: const EdgeInsets.symmetric(vertical: 18),
+                padding: const EdgeInsets.fromLTRB(3, 18, 0, 16.4),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2, right: 14),
-                      child: PmartLineIcon(PmartLineIcons.pin, size: 22),
+                    // 지금 주소는 채운 핀, 나머지는 선 핀(사용자 폰 캡처).
+                    Padding(
+                      padding: const EdgeInsets.only(top: 9, right: 9.6),
+                      child: current
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CustomPaint(painter: _FilledPinPainter()),
+                            )
+                          : const PmartLineIcon(PmartLineIcons.pin, size: 22),
                     ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Wrap(
-                            spacing: 6,
+                            spacing: 8,
                             runSpacing: 4,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
-                              // 레퍼런스 3-1 2-3: 제목 15sp 굵게, 표시 칩 작게, 둘째 줄 진하게
                               Text(
                                 a.label ?? a.roadAddress,
                                 style: theme.textTheme.titleSmall?.copyWith(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16.2,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
+                              // "현재 설정된 주소" 알약: 높이 17.5, 연한 바탕 + 진한 글자 11 굵게.
                               if (current)
                                 Container(
                                   key: const ValueKey('address-current-badge'),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 5,
-                                    vertical: 1,
+                                  height: 17.5,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    6,
+                                    3.2,
+                                    6,
+                                    0,
                                   ),
                                   decoration: BoxDecoration(
                                     color: theme.colorScheme.primaryContainer,
@@ -435,25 +459,27 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                                   child: Text(
                                     l10n.addressCurrent,
                                     style: theme.textTheme.labelSmall?.copyWith(
-                                      fontSize: 9,
+                                      fontSize: 11,
+                                      height: 1,
                                       color: theme.colorScheme.primary,
-                                      fontWeight: FontWeight.w600,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 4.2),
                           Text(
-                            '${a.roadAddress} ${a.detailAddress}',
+                            '${a.roadAddress} ${a.detailAddress}'.trim(),
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 12,
-                              color: theme.colorScheme.onSurface,
+                              fontSize: 14,
+                              height: 1.4,
+                              color: const Color(0xFF1B1D1E),
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 18),
                           Wrap(
-                            spacing: 6,
+                            spacing: 8,
                             children: [
                               // 레퍼런스 3-1 2-3: 모든 주소에 작은 [수정] → 주소 상세(값 채움)
                               OutlinedButton(
@@ -767,7 +793,8 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     FormFieldValidator<String>? validator,
   }) {
     final theme = Theme.of(context);
-    // 레퍼런스 2-7-1: 칸 높이 약 45dp, 칸 사이 19dp, 모서리 10dp
+    // 사용자 폰 캡처(2026-11-25, 1080px = 411dp): 칸 높이 49.8, 안쪽 좌우 16.7, 글자 16, 테두리 #D4D6D5,
+    // 칸 이름 14.4 진회색(칸 위 11).
     return Padding(
       padding: EdgeInsets.only(bottom: gap),
       child: Column(
@@ -775,12 +802,13 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
         children: [
           if (label != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: 7.2),
               child: Text(
                 label,
                 style: theme.textTheme.bodyLarge?.copyWith(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 14.4,
+                  height: 1.4,
+                  color: const Color(0xFF434343),
                 ),
               ),
             ),
@@ -793,21 +821,30 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               LengthLimitingTextInputFormatter(max),
               ...?formatters,
             ],
-            style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+            style: theme.textTheme.bodyLarge?.copyWith(
+              fontSize: 16,
+              height: 1.2,
+              color: const Color(0xFF0E0F11),
+            ),
             decoration: InputDecoration(
               // 칸 이름은 위에 따로 둔다 — 칸 안에는 예시만.
               hintText: hint ?? label,
+              hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                fontSize: 16,
+                height: 1.2,
+                color: const Color(0xFF757678),
+              ),
               isDense: true,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFD4D6D5)),
               ),
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 15,
-                vertical: 13,
+                horizontal: 16.7,
+                vertical: 15.3,
               ),
             ),
             validator: validator ?? (required ? _required : null),
@@ -843,45 +880,36 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
         ),
       );
     }
+    // 사용자 폰 캡처(2026-11-25): 도로명 19 굵게, 지번 16 진하게(중간 굵기), 왼쪽 4.5 안으로. 다시 찾는 돋보기는 없다
+    // (주소를 바꾸려면 뒤로 가서 검색).
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 10, 0, 14),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(4.5, 9.3, 0, 9.9),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  road,
-                  key: const ValueKey('f-road'),
-                  // 레퍼런스 2-4: 크기는 같고 굵기는 조금 더 굵다(2026-11-21 비교).
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (_jibun case final j?) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    j,
-                    key: const ValueKey('address-jibun'),
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      fontSize: 14,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ],
+          Text(
+            road,
+            key: const ValueKey('f-road'),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 19,
+              height: 1.3,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0E0F11),
             ),
           ),
-          // 레퍼런스: "변경" 글자 없이 — 도로명 줄 오른쪽 돋보기로 다시 찾기
-          IconButton(
-            key: const ValueKey('address-search'),
-            tooltip: l10n.addressChange,
-            onPressed: _search,
-            icon: const PmartLineIcon(PmartLineIcons.search, size: 22),
-          ),
+          if (_jibun case final j?) ...[
+            const SizedBox(height: 2),
+            Text(
+              j,
+              key: const ValueKey('address-jibun'),
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontSize: 16,
+                height: 1.3,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF0E0F11),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -918,14 +946,15 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
   /// 고른 알약을 다시 누르면 풀린다.
   Widget _aliasChips(AppLocalizations l10n) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    // 사용자 폰 캡처(2026-11-25): 높이 38, 모서리 12, 사이 8.4, 안쪽 왼쪽 12.6·오른쪽 14.5, 아이콘과 글 사이 7.6,
+    // 글 15. 고른 알약은 진한 테두리 2 + 굵게.
     Widget chip(_Alias a, PmartLineIcons icon, String text) {
       final on = _alias == a;
       return Padding(
-        padding: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.only(right: 8.4),
         child: InkWell(
           key: ValueKey('address-alias-${a.name}'),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           onTap: () => setState(() {
             _alias = on ? _Alias.none : a;
             _labelAutofocus = _alias == _Alias.custom;
@@ -934,24 +963,32 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
             selected: on,
             button: true,
             child: Container(
-              height: 35,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              height: 38,
+              padding: const EdgeInsets.fromLTRB(12.6, 0, 14.5, 0),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: on ? scheme.onSurface : scheme.outlineVariant,
-                  width: on ? 1.5 : 1,
+                  color: on ? const Color(0xFF0E0F11) : const Color(0xFFD4D6D5),
+                  width: on ? 2 : 1.2,
                 ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  PmartLineIcon(icon, size: 18, color: scheme.onSurface),
-                  const SizedBox(width: 6),
+                  PmartLineIcon(
+                    icon,
+                    size: 16,
+                    strokeWidth: on ? 2 : 1.6,
+                    color: const Color(0xFF0E0F11),
+                  ),
+                  const SizedBox(width: 7.6),
                   Text(
                     text,
-                    // 레퍼런스 3-1/2-5 를 재어 보니 입력칸 글(15)보다 작다
-                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 13),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontSize: 15,
+                      fontWeight: on ? FontWeight.w700 : FontWeight.w400,
+                      color: const Color(0xFF0E0F11),
+                    ),
                   ),
                 ],
               ),
@@ -962,7 +999,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 10.3),
       child: Row(
         children: [
           chip(_Alias.home, PmartLineIcons.home, l10n.addressAliasHome),
@@ -978,20 +1015,34 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final chosen = _road.text.trim().isNotEmpty;
+    // 사용자 폰 캡처(2026-11-25, 1080px = 411dp): 지도 아래 안내 10 회색(#777), 아래 안내 12 회색(#757575)
+    // 줄 간격 15.2.
     final small = theme.textTheme.bodySmall?.copyWith(
-      fontSize: 9,
-      color: theme.colorScheme.onSurfaceVariant,
+      fontSize: 10,
+      height: 1.4,
+      color: const Color(0xFF777777),
+    );
+    final foot = theme.textTheme.bodySmall?.copyWith(
+      fontSize: 12,
+      height: 1.27,
+      color: const Color(0xFF757575),
     );
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
         titleSpacing: pmartLeftTitleSpacing,
-        title: Text(l10n.addressDetailTitle),
+        title: Text(
+          l10n.addressDetailTitle,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontSize: 18.4,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
       body: Form(
         key: _form,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(15, 12, 15, 24),
+          padding: const EdgeInsets.fromLTRB(16, 15.6, 16, 24),
           children: [
             if (chosen) ...[
               AddressMapPreview(
@@ -1000,7 +1051,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                     ? null
                     : _openMap,
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4.6),
             ],
             Text(
               switch (_pin) {
@@ -1014,15 +1065,13 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               key: const ValueKey('address-pin-state'),
               style: small,
             ),
-            const SizedBox(height: 4),
             _addressHeader(l10n),
             _field(
               'f-detail',
               _detail,
               hint: l10n.addressDetailHint,
               max: AddressLimits.detailAddress,
-              // 레퍼런스 3-1/2-5: 상세 주소 칸과 별칭 알약 사이 약 10dp
-              gap: _aliasEnabled ? 10 : 19,
+              gap: _aliasEnabled ? 10.3 : 17.5,
             ),
             // 별칭은 회원 주소만(사용자 2026-11-21 "비회원은 안 되고 회원만").
             if (_aliasEnabled) ...[
@@ -1034,7 +1083,10 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                   hint: l10n.addressLabelHint,
                   max: AddressLimits.label,
                   autofocus: _labelAutofocus,
-                ),
+                  gap: 17.5,
+                )
+              else
+                const SizedBox(height: 7.2),
             ],
             _field(
               'f-entrance-password',
@@ -1044,6 +1096,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               max: AddressLimits.entranceNote,
               required: false,
               validator: _noteLength,
+              gap: 11.8,
             ),
             _field(
               'f-note',
@@ -1053,15 +1106,16 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               max: AddressLimits.entranceNote,
               required: false,
               validator: _noteLength,
+              gap: 9.2,
             ),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(2, 0, 6, 0),
-                  child: Text('•', style: small),
+                  padding: const EdgeInsets.fromLTRB(1.5, 0, 5.4, 0),
+                  child: Text('•', style: foot),
                 ),
-                Expanded(child: Text(l10n.addressEntranceGuide, style: small)),
+                Expanded(child: Text(l10n.addressEntranceGuide, style: foot)),
               ],
             ),
             // 개발 빌드 전용: 카카오 지도가 안 되는 x86 에뮬레이터에서 시험할 때 권역 안 실제 도로명주소를 넣는다.
@@ -1104,15 +1158,14 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
         ),
       ),
       // 레퍼런스: 아래 고정 "주소 등록"(위에 얇은 선).
+      // 사용자 폰 캡처: 위 얇은 선, 버튼 좌우 12·위 11.4·아래 5, 높이 49.5, 글자 16 굵게. 새 주소·고치기 모두 "주소 등록".
       bottomNavigationBar: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: theme.colorScheme.outlineVariant),
-          ),
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(color: Color(0xFFEDEEF0))),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            padding: const EdgeInsets.fromLTRB(12, 11.4, 12, 5),
             // 레퍼런스 2-7-1: 상세주소가 비어 있으면 [주소 등록]을 끈다(사용자 결정 2026-11-20).
             child: ListenableBuilder(
               listenable: _detail,
@@ -1122,21 +1175,24 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                   style: (theme.filledButtonTheme.style ?? const ButtonStyle())
                       .copyWith(
                         minimumSize: const WidgetStatePropertyAll(
-                          Size.fromHeight(47),
+                          Size.fromHeight(49.5),
+                        ),
+                        shape: WidgetStatePropertyAll(
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         textStyle: WidgetStatePropertyAll(
                           theme.textTheme.labelLarge?.copyWith(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                 ),
                 child: CommandButton(
                   key: const ValueKey('address-save'),
-                  label: widget.editAddressId == null
-                      ? l10n.addressRegister
-                      : l10n.addressModifySave,
+                  label: l10n.addressRegister,
                   onPressed: _detail.text.trim().isEmpty || _loadingEdit
                       ? null
                       : _save,
@@ -1152,3 +1208,25 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
 
 /// 주소 별칭 알약.
 enum _Alias { none, home, work, custom }
+
+/// 지금 설정된 주소의 채운 핀(사용자 폰 캡처 2026-11-25): 진한 물방울 + 가운데 흰 점. 22dp 판, 그림 약 14×16.
+class _FilledPinPainter extends CustomPainter {
+  const _FilledPinPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 22, size.height / 22);
+    final pin = Path()
+      ..moveTo(11, 19.5)
+      ..cubicTo(8, 16, 4.5, 12.5, 4.5, 8.5)
+      ..arcToPoint(const Offset(17.5, 8.5), radius: const Radius.circular(6.5))
+      ..cubicTo(17.5, 12.5, 14, 16, 11, 19.5)
+      ..close();
+    canvas
+      ..drawPath(pin, Paint()..color = const Color(0xFF1B1D1E))
+      ..drawCircle(const Offset(11, 8.5), 2.3, Paint()..color = Colors.white);
+  }
+
+  @override
+  bool shouldRepaint(_FilledPinPainter oldDelegate) => false;
+}

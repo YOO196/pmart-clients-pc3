@@ -60,15 +60,17 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
   static kakao.LatLng _ll(GeoPoint p) => kakao.LatLng(p.lat, p.lng);
 
   Future<void> _onReady(kakao.KakaoMapController map) async {
-    final scheme = Theme.of(context).colorScheme;
+    // 그림 마커는 미리 읽어 둬야 위젯을 그림으로 바꿀 때 빈칸이 되지 않는다.
+    await precacheImage(const AssetImage(RiderMarker.asset), context);
+    if (!mounted) return;
     final riderIcon = await kakao.KImage.fromWidget(
-      RiderMarker(color: scheme.primary),
+      const RiderMarker(),
       RiderMarker.size,
       context: context,
     );
     if (!mounted) return;
     final riderDimIcon = await kakao.KImage.fromWidget(
-      const RiderMarker(color: Color(0xFF9E9EA6), stale: true),
+      const RiderMarker(stale: true),
       RiderMarker.size,
       context: context,
     );
@@ -84,7 +86,7 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
     _riderDimStyle = kakao.PoiStyle(icon: riderDimIcon, anchor: center);
     _homeStyle = kakao.PoiStyle(
       icon: homeIcon,
-      anchor: const kakao.KPoint(0.5, 1),
+      anchor: const kakao.KPoint(0.5, 0.5),
     );
     _map = map;
     await _syncHome();
@@ -208,60 +210,53 @@ class _TrackingMapState extends ConsumerState<TrackingMap> {
 
 /// 라이더 마커: 브랜드색 옅은 원(후광) 위 흰 원판 + 그림자, 안에 채운 오토바이. 오래된 위치면 회색·흐리게.
 class RiderMarker extends StatelessWidget {
-  const RiderMarker({super.key, required this.color, this.stale = false});
+  const RiderMarker({super.key, this.stale = false});
 
-  final Color color;
   final bool stale;
 
-  // 레퍼런스 8-5: 라이더 그림 약 25×30dp(1080px 캡처에서 75×90px) — 후광 포함 34dp.
-  static const size = Size(34, 34);
+  /// 사용자 제작 캐릭터(위에서 본 라이더, 브랜드색) — 레퍼런스 지도 핀 약 58dp(1080px = 411dp 캡처에서 약 150px).
+  static const asset = 'assets/images/tracking/rider_pin.png';
+  static const size = Size(58, 60);
 
   @override
-  Widget build(BuildContext context) => Opacity(
-    opacity: stale ? 0.6 : 1,
-    child: SizedBox.fromSize(
-      size: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.18),
-              shape: BoxShape.circle,
-            ),
-          ),
-          Container(
-            width: 25,
-            height: 25,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: color, width: 1.6),
-              boxShadow: const [
-                BoxShadow(
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                  color: Color(0x33000000),
-                ),
-              ],
-            ),
-            alignment: Alignment.center,
-            child: ScooterGlyph(size: 16, color: color),
-          ),
-        ],
+  Widget build(BuildContext context) {
+    final img = Image.asset(asset, width: size.width, height: size.height);
+    if (!stale) return img;
+    // 오래된 위치(60초 넘음): 흑백 + 흐리게.
+    return Opacity(
+      opacity: 0.6,
+      child: ColorFiltered(
+        colorFilter: const ColorFilter.matrix(<double>[
+          0.2126, 0.7152, 0.0722, 0, 0, //
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0, 0, 0, 1, 0,
+        ]),
+        child: img,
       ),
-    ),
-  );
+    );
+  }
 }
 
-/// 내 배송지 마커: 진한 물방울 핀(아래 끝이 배송지) 안에 흰 집, 땅에 작은 그림자.
+/// 시트 오른쪽 라이더 캐릭터(사용자 제작, 브랜드색). 레퍼런스 약 72×62dp.
+class RiderArt extends StatelessWidget {
+  const RiderArt({super.key, this.width = 72});
+
+  final double width;
+
+  static const asset = 'assets/images/tracking/rider_sheet.png';
+
+  @override
+  Widget build(BuildContext context) =>
+      Image.asset(asset, width: width, height: width * 284 / 329);
+}
+
+/// 내 배송지 마커(사용자 레퍼런스 2026-11-25): 진한 동그라미 안에 흰 집, 그림자.
 class HomeMarker extends StatelessWidget {
   const HomeMarker({super.key});
 
-  // 라이더 마커와 같은 눈높이(약 28×35dp). 그림은 48×60 판에 그리고 줄인다.
-  static const size = Size(28, 35);
+  // 레퍼런스 약 30dp(908px 시트 = 411dp 에서 66px).
+  static const size = Size(30, 30);
 
   @override
   Widget build(BuildContext context) => SizedBox.fromSize(
@@ -273,39 +268,26 @@ class HomeMarker extends StatelessWidget {
 class _HomePinPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.scale(size.width / 48, size.height / 60);
-    const w = 48.0;
-    const h = 60.0;
-    // 땅 그림자
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(w / 2, h - 3), width: 16, height: 5),
-      Paint()..color = const Color(0x33000000),
-    );
-    // 물방울 핀(원 + 아래 뾰족)
-    const r = 19.0;
-    final c = Offset(w / 2, r + 2);
-    final pin = Path()
-      ..moveTo(w / 2, h - 4)
-      ..quadraticBezierTo(w / 2 - 9, c.dy + r * 0.85, c.dx - r, c.dy)
-      ..arcToPoint(Offset(c.dx + r, c.dy), radius: const Radius.circular(r))
-      ..quadraticBezierTo(w / 2 + 9, c.dy + r * 0.85, w / 2, h - 4)
-      ..close();
+    canvas.scale(size.width / 32, size.height / 32);
+    final circle = Path()
+      ..addOval(Rect.fromCircle(center: const Offset(16, 16), radius: 15));
     canvas
-      ..drawShadow(pin, Colors.black, 3, false)
-      ..drawPath(pin, Paint()..color = const Color(0xFF1B1B1F));
+      ..drawShadow(circle, Colors.black, 2.5, false)
+      ..drawPath(circle, Paint()..color = const Color(0xFF1B1B1F));
     // 흰 집(지붕 + 몸통, 문은 비움)
+    const c = Offset(16, 16.5);
     final house = Path()
-      ..moveTo(c.dx, c.dy - 9)
-      ..lineTo(c.dx + 9, c.dy - 1)
-      ..lineTo(c.dx + 6.5, c.dy - 1)
-      ..lineTo(c.dx + 6.5, c.dy + 8)
-      ..lineTo(c.dx + 2, c.dy + 8)
-      ..lineTo(c.dx + 2, c.dy + 3)
-      ..lineTo(c.dx - 2, c.dy + 3)
-      ..lineTo(c.dx - 2, c.dy + 8)
-      ..lineTo(c.dx - 6.5, c.dy + 8)
-      ..lineTo(c.dx - 6.5, c.dy - 1)
-      ..lineTo(c.dx - 9, c.dy - 1)
+      ..moveTo(c.dx, c.dy - 7.5)
+      ..lineTo(c.dx + 7.5, c.dy - 1)
+      ..lineTo(c.dx + 5.4, c.dy - 1)
+      ..lineTo(c.dx + 5.4, c.dy + 6.5)
+      ..lineTo(c.dx + 1.7, c.dy + 6.5)
+      ..lineTo(c.dx + 1.7, c.dy + 2.4)
+      ..lineTo(c.dx - 1.7, c.dy + 2.4)
+      ..lineTo(c.dx - 1.7, c.dy + 6.5)
+      ..lineTo(c.dx - 5.4, c.dy + 6.5)
+      ..lineTo(c.dx - 5.4, c.dy - 1)
+      ..lineTo(c.dx - 7.5, c.dy - 1)
       ..close();
     canvas.drawPath(house, Paint()..color = Colors.white);
   }
@@ -314,73 +296,74 @@ class _HomePinPainter extends CustomPainter {
   bool shouldRepaint(_HomePinPainter oldDelegate) => false;
 }
 
-/// 채운 배달 오토바이(짐 상자·안장·몸통·앞 기둥·손잡이·두 바퀴). 마커·시트 그림·지금 단계에 같이 쓴다.
-class ScooterGlyph extends StatelessWidget {
-  const ScooterGlyph({super.key, required this.size, required this.color});
+/// 한집배달 아이콘(사용자 제공 그림 2026-11-25): 채운 집 안에 "1" 을 뚫은 모양. 34×31 판에 그린다.
+class SingleHomeIcon extends StatelessWidget {
+  const SingleHomeIcon({super.key, required this.color, this.width = 15});
 
-  final double size;
   final Color color;
+  final double width;
 
   @override
-  Widget build(BuildContext context) => SizedBox.square(
-    dimension: size,
-    child: CustomPaint(painter: _ScooterPainter(color)),
+  Widget build(BuildContext context) => SizedBox(
+    width: width,
+    height: width * 31 / 34,
+    child: CustomPaint(painter: _SingleHomePainter(color)),
   );
 }
 
-class _ScooterPainter extends CustomPainter {
-  const _ScooterPainter(this.color);
+class _SingleHomePainter extends CustomPainter {
+  const _SingleHomePainter(this.color);
 
   final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.scale(size.width / 24, size.height / 24);
-    final fill = Paint()..color = color;
-    final stroke = Paint()
+    canvas
+      ..scale(size.width / 34, size.height / 31)
+      ..saveLayer(const Rect.fromLTWH(0, 0, 34, 31), Paint());
+    final fill = Paint()
       ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round;
-    // 짐 상자
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(2.6, 4.4, 7.8, 6.2),
-        const Radius.circular(1.4),
-      ),
-      fill,
-    );
-    // 안장 + 뒤 몸통
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(4, 11.4, 9.2, 4.2),
-        const Radius.circular(2),
-      ),
-      fill,
-    );
-    // 발판에서 앞 기둥으로
-    canvas.drawPath(
-      Path()
-        ..moveTo(12, 15.6)
-        ..lineTo(15.6, 15.6)
-        ..lineTo(17.2, 7.6),
-      stroke,
-    );
-    // 손잡이
-    canvas.drawLine(const Offset(15.4, 7), const Offset(19.4, 7), stroke);
-    // 앞 바퀴 축
-    canvas.drawLine(const Offset(17.2, 7.6), const Offset(19, 17.6), stroke);
-    // 바퀴(흰 축)
-    final hub = Paint()..color = Colors.white;
-    for (final x in const [6.4, 19.0]) {
-      canvas
-        ..drawCircle(Offset(x, 18), 3.4, fill)
-        ..drawCircle(Offset(x, 18), 1.2, hub);
-    }
+      ..strokeJoin = StrokeJoin.round;
+    final house = Path()
+      ..moveTo(0.6, 12.6)
+      ..lineTo(17, 0.6)
+      ..lineTo(33.4, 12.6)
+      ..lineTo(33.4, 13.6)
+      ..lineTo(29.6, 13.6)
+      ..lineTo(29.6, 29.4)
+      ..lineTo(4.6, 29.4)
+      ..lineTo(4.6, 13.6)
+      ..lineTo(0.6, 13.6)
+      ..close();
+    canvas
+      ..drawPath(house, fill)
+      // 모서리를 조금 둥글게
+      ..drawPath(
+        house,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.2
+          ..strokeJoin = StrokeJoin.round,
+      );
+    // "1" 뚫기: 세로 획(아래까지) + 왼쪽 위 깃.
+    final one = Path()
+      ..moveTo(15.2, 10.8)
+      ..lineTo(19.6, 10.8)
+      ..lineTo(19.6, 31)
+      ..lineTo(15.2, 31)
+      ..lineTo(15.2, 17)
+      ..lineTo(14, 17)
+      ..lineTo(10.8, 17)
+      ..lineTo(10.8, 14.6)
+      ..close();
+    canvas
+      ..drawPath(one, Paint()..blendMode = BlendMode.clear)
+      ..restore();
   }
 
   @override
-  bool shouldRepaint(_ScooterPainter old) => old.color != color;
+  bool shouldRepaint(_SingleHomePainter old) => old.color != color;
 }
 
 /// 아래 시트에 가려지지 않게 맞출 점들. 실제 점들의 남북 폭 아래로 [sheetFraction] 만큼 빈 점을 하나 더해,

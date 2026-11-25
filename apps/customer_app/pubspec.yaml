@@ -104,6 +104,15 @@ flutter:
     - assets/images/app_icon.png
     # 카테고리 그림(사용자 제공 2026-11-20)
     - assets/images/categories/
+    # 배송현황 캐릭터·아이콘(사용자 제작 레퍼런스, 브랜드색으로 바꿈 — 사용자 지시 2026-11-25)
+    - assets/images/tracking/
+    # 첫 화면 약관 그림(사용자 레퍼런스 2026-11-25)
+    - assets/images/start_unicorn.png
+    # 로그인 화면 쿠폰 그림(사용자 레퍼런스 2026-11-25)
+    - assets/images/login_coupon.png
+    - assets/images/login_google.png
+    # 주소 상세 지도 핀(사용자 레퍼런스 2026-11-25)
+    - assets/images/address_pin.png
   # Pretendard (SIL OFL 1.1, assets/fonts/Pretendard-LICENSE.txt). 사용자 지시 2026-11-11.
   fonts:
     - family: Pretendard

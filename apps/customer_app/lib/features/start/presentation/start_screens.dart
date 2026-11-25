@@ -234,62 +234,70 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
     VoidCallback? onOpen,
   }) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    // 사용자 폰 캡처(2026-11-25, 1080px = 411dp): 체크 22dp(테두리 1.9·모서리 5), 글자 14 중간 굵기,
+    // 체크와 글자 사이 5, 오른쪽 > 는 끝에서 7. 설명은 글자 아래 12 회색.
     return InkWell(
       key: ValueKey(key),
       onTap: () => onChanged(!value),
       child: Padding(
-        // 레퍼런스 2-1: 줄 높이 약 41dp, 체크 20dp, 글자 14sp
-        padding: const EdgeInsets.symmetric(vertical: 10.5),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        padding: const EdgeInsets.fromLTRB(1, 10.5, 0, 10.5),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox.square(
-              dimension: 20,
-              child: Checkbox(
-                value: value,
-                onChanged: (v) => onChanged(v ?? false),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                side: BorderSide(color: theme.colorScheme.outline, width: 1.5),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.bodyLarge?.copyWith(fontSize: 12),
+            Row(
+              children: [
+                SizedBox.square(
+                  dimension: 22,
+                  child: Checkbox(
+                    value: value,
+                    onChanged: (v) => onChanged(v ?? false),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    side: const BorderSide(
+                      color: Color(0xFFD5D6DA),
+                      width: 1.9,
+                    ),
                   ),
-                  if (hint != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Text(
-                        hint,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 13,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                ),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF161A1B),
+                    ),
+                  ),
+                ),
+                if (onOpen != null)
+                  InkResponse(
+                    key: ValueKey('$key-open'),
+                    onTap: onOpen,
+                    radius: 20,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: PmartLineIcon(
+                        PmartLineIcons.chevronRight,
+                        size: 20,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
-            if (onOpen != null)
-              InkResponse(
-                key: ValueKey('$key-open'),
-                onTap: onOpen,
-                radius: 20,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: PmartLineIcon(
-                    PmartLineIcons.chevronRight,
-                    size: 20,
-                    color: theme.colorScheme.onSurfaceVariant,
+            if (hint != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 27, top: 2),
+                child: Text(
+                  hint,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 12,
+                    color: const Color(0xFF7E807F),
                   ),
                 ),
               ),
@@ -326,17 +334,19 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
             children: [
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(14, 60, 14, 16),
+                  // 사용자 폰 캡처(2026-11-25): 제목 21 굵게·줄 간격 28, 좌우 15.
+                  padding: const EdgeInsets.fromLTRB(15, 73, 15, 16),
                   children: [
                     Text(
                       l10n.startWelcomeTitle,
                       style: theme.textTheme.headlineSmall?.copyWith(
-                        fontSize: 18,
-                        height: 1.3,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 21.4,
+                        height: 1.32,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF161A1B),
                       ),
                     ),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 30.7),
                     _check(
                       key: 'start-agree-all',
                       value: all,
@@ -346,7 +356,33 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                       }),
                       label: l10n.startAgreeAll,
                     ),
-                    const Divider(height: 12),
+                    // 전체동의 줄 오른쪽, 구분선 위에 선 그림(사용자 레퍼런스 2026-11-25): 100×80dp, 오른쪽에서 7.
+                    SizedBox(
+                      height: 21,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Positioned.fill(
+                            child: Divider(
+                              height: 21,
+                              thickness: 1,
+                              color: Color(0xFFE5E6E8),
+                            ),
+                          ),
+                          Positioned(
+                            right: 6.8,
+                            bottom: 10,
+                            child: Image.asset(
+                              'assets/images/start_unicorn.png',
+                              key: const ValueKey('start-welcome-art'),
+                              width: 99.7,
+                              height: 79.9,
+                              color: const Color(0xFF161A1B),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     _check(
                       key: 'start-agree-location',
                       value: _location,
@@ -354,13 +390,14 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                       label: l10n.startLocationTerms,
                       onOpen: _opener(terms, ConsentWire.location),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 1.4),
                     _check(
                       key: 'start-agree-marketing',
                       value: _marketing,
                       onChanged: (v) => _choose(() => _marketing = v),
                       label: l10n.startMarketingPush,
-                      onOpen: _opener(terms, ConsentWire.marketing),
+                      // 사용자 폰 캡처: 마케팅 줄은 > 없이 아래 설명 한 줄.
+                      hint: l10n.startMarketingHint,
                     ),
                     if (termsValue.hasError && !termsValue.isLoading) ...[
                       const SizedBox(height: 16),
@@ -390,17 +427,20 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(9, 0, 9, 9),
+                // 사용자 폰 캡처: 좌우 10, 아래 7, 높이 50, 모서리 4, 글자 18 굵게. 못 누르면 회색 바탕 흰 글자.
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 7),
                 child: FilledButton(
                   key: const ValueKey('start-begin'),
                   style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(45),
+                    minimumSize: const Size.fromHeight(50),
+                    disabledBackgroundColor: const Color(0xFFD6D7D9),
+                    disabledForegroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(4),
                     ),
                     textStyle: theme.textTheme.titleMedium?.copyWith(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   // 약관 버전을 읽어야 보낼 수 있다. 위치 약관은 고르지 않아도 된다(현재 위치 기능에서만 필수).
@@ -710,14 +750,16 @@ class MarketingConsentResultDialog extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final when = DateFormat('y년 M월 d일 H시', 'ko').format(toSeoulWallClock(at));
-    // 레퍼런스 2-1: 제목 15sp 중간 굵기, 본문 14sp
+    // 사용자 폰 캡처(2026-11-25, 1080px = 411dp): 창 폭 299.5(좌우 56), 안쪽 21, 제목 16.5 굵게,
+    // 본문 15.5 줄 간격 22.3, 안내 13.5 회색 줄 간격 21.3, "확인" 16 굵게·칸 높이 48.7.
     final line = theme.textTheme.bodyLarge?.copyWith(
-      fontSize: 14,
-      height: 1.45,
+      fontSize: 15.5,
+      height: 1.43,
+      color: const Color(0xFF181A19),
     );
     return Dialog(
       key: const ValueKey('start-marketing-result'),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 39),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 55.7),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
       backgroundColor: theme.colorScheme.surface,
       surfaceTintColor: Colors.transparent,
@@ -726,7 +768,7 @@ class MarketingConsentResultDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(19, 30, 19, 0),
+            padding: const EdgeInsets.fromLTRB(21, 30, 21, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -735,11 +777,12 @@ class MarketingConsentResultDialog extends StatelessWidget {
                       ? l10n.startMarketingResultTitleAgreed
                       : l10n.startMarketingResultTitleRefused,
                   style: theme.textTheme.titleMedium?.copyWith(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF181A19),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 15.3),
                 if (senderName case final s?)
                   Text(l10n.startMarketingResultSender(s), style: line),
                 Text(
@@ -755,17 +798,18 @@ class MarketingConsentResultDialog extends StatelessWidget {
                       : l10n.startMarketingResultDoneRefused,
                   style: line,
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 15.3),
                 Divider(height: 1, color: theme.colorScheme.outlineVariant),
-                const SizedBox(height: 16),
+                const SizedBox(height: 15.3),
                 Text(
                   l10n.startMarketingResultNote,
                   style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 13.5,
-                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.58,
+                    color: const Color(0xFF7E807F),
                   ),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 25.1),
               ],
             ),
           ),
@@ -774,14 +818,14 @@ class MarketingConsentResultDialog extends StatelessWidget {
             key: const ValueKey('start-marketing-result-ok'),
             onTap: () => Navigator.of(context).pop(),
             child: SizedBox(
-              height: 47,
+              height: 48.7,
               child: Center(
                 child: Text(
                   l10n.startConfirm,
-                  // 레퍼런스 2-1·2-2: 안내 창 "확인"은 중간 굵기.
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontSize: 16,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF181A19),
                   ),
                 ),
               ),
