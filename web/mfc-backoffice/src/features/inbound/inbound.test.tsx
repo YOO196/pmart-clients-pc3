@@ -34,7 +34,7 @@ describe('입고 작업 목록', () => {
 
   it('입고 예정(TRF) 탭은 계약만 있다는 안내', async () => {
     renderAt('/c/MFC-BJG-01/inbound?tab=promises');
-    expect(await screen.findByRole('note')).toHaveTextContent('501');
+    expect(await screen.findByRole('note')).toHaveTextContent('입고 예정은 아직 서버에 없어요.');
   });
 });
 

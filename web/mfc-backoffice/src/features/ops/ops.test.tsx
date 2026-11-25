@@ -149,7 +149,7 @@ describe('센터 운영판', () => {
     await waitFor(() => expect(rows()[0]).toHaveTextContent('L261107000497'));
     expect(rows()[0]).not.toHaveTextContent('LOT-MILK-A');
     expect(within(rows()[0]!).getByRole('link', { name: '품질 사고 — 격리·폐기' })).toHaveAttribute('href', '/c/MFC-BJG-01/quality?tab=incidents&incidentId=QI-1');
-    expect(screen.getByText(/결품\(SHORT\) 건별 목록은 서버에 센터 조회가 없어/)).toBeInTheDocument();
+    expect(screen.getByText('결품 건별 목록은 아직 없어요.')).toBeInTheDocument();
 
     // 인계 확인: 확인 필요 포장 화면으로(확인 버튼은 그 화면)
     await userEvent.click(screen.getByTestId('tile-handover'));

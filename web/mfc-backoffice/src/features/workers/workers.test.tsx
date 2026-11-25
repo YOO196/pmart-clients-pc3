@@ -259,7 +259,7 @@ describe('작업자 상세', () => {
   it('맡은 일(업무)·할 수 있는 일(자격) 차이 안내와 지금 값, 저장 전 미리 경고(사용자 2026-11-16)', async () => {
     renderAt('/c/MFC-BJG-01/workers/OP-wkr-1');
     const guide = await screen.findByTestId('duty-qualification-guide');
-    expect(guide).toHaveTextContent('실제 배정되는 일 = 맡은 일(업무) 중 할 수 있는 일(자격)');
+    expect(guide).toHaveTextContent('실제 배정 = 맡은 일 ∩ 할 수 있는 일');
     expect(guide).toHaveTextContent(/할 수 있는 일 .*적치/);
     // 맡은 일에 자격 없는 일(검사)을 넣으면 배정되지 않는다고 미리 알린다
     const duty = screen.getByRole('form', { name: '맡은 일(업무) 바꾸기' });

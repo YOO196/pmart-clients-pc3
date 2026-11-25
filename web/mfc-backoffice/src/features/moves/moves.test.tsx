@@ -72,7 +72,7 @@ describe('이동 상세·취소', () => {
 
   it('카트 정리 대기·자동 보충: 안내만, 취소 버튼 없음, 지시한 사람은 "시스템"', async () => {
     renderAt('/c/MFC-BJG-01/moves/MOVE-3');
-    expect(await screen.findByText('취소했지만 카트에 남은 물건이 있어요. 작업자가 출발 칸에 내려놓아야 끝나요.')).toBeInTheDocument();
+    expect(await screen.findByText('카트에 남은 물건이 있어요.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '이동 취소' })).not.toBeInTheDocument();
     renderAt('/c/MFC-BJG-01/moves/MOVE-2');
     expect(await screen.findByText('시스템')).toBeInTheDocument();

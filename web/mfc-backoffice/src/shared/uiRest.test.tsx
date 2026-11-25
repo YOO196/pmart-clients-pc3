@@ -22,9 +22,12 @@ describe('나머지 메뉴도 같은 틀', () => {
     const bar = await screen.findByTestId('search-bar');
     expect(within(bar).getByTestId('search-chip').querySelector('button')?.title).toMatch(/상태/);
     expect(within(bar).getByRole('form', { hidden: true })).not.toBeVisible();
+    // "저장한 보기 ▾" 고르기 하나(공용과 같은 모양, 2026-11-25) — 열어서 지금 조건 저장
+    await userEvent.click(screen.getByTestId('saved-views-toggle'));
     await userEvent.click(within(screen.getByTestId('saved-views')).getByRole('button', { name: '+ 지금 조건 저장' }));
     await userEvent.type(screen.getByRole('textbox', { name: '보기 이름' }), '배정됨');
     await userEvent.click(screen.getByRole('button', { name: '저장' }));
+    if (!within(screen.getByTestId('saved-views')).queryByRole('link', { name: '배정됨' })) await userEvent.click(screen.getByTestId('saved-views-toggle'));
     expect(within(screen.getByTestId('saved-views')).getByRole('link', { name: '배정됨' })).toHaveAttribute('href', '/c/MFC-BJG-01/deliveries?state=ASSIGNED');
   });
 

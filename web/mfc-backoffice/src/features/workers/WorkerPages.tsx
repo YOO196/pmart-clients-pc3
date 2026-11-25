@@ -166,8 +166,8 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
           active={state === 'SUSPENDED'}
           onClick={() => setState(state === 'SUSPENDED' ? '' : 'SUSPENDED')}
         />
-        <StatCard testId="count-break" label={m.onBreak} value={cell((w) => !!w.onBreak)} hint={m.ui.breakHint} />
-        <StatCard testId="count-daily" label={m.ui.dailyNotEnrolled} value={cell((w) => w.employmentType === 'DAILY' && !w.todayEnrollment)} hint={m.ui.dailyHint} />
+        <StatCard testId="count-break" label={m.onBreak} value={cell((w) => !!w.onBreak)} />
+        <StatCard testId="count-daily" label={m.ui.dailyNotEnrolled} value={cell((w) => w.employmentType === 'DAILY' && !w.todayEnrollment)} />
       </StatStrip>
       {/* 목록 묶음 — 찾기 줄(숫자 띠에서 28px) → 표 상자(건수 머리줄 + 표, 16px) → 쪽 넘김(표 아래 한 곳) */}
       <div className="space-y-4" data-testid="worker-list">
