@@ -6,16 +6,16 @@ import { messages } from './messages';
 
 const m = messages.pager;
 
-/** 지금 쪽(1부터, 범위 밖이면 끝 쪽으로)과 바꾸기. 거르기가 바뀌면 부르는 쪽이 `page` 를 지워 1쪽으로 돌린다. */
-export function usePage(total: number, size: number) {
+/** 지금 쪽(1부터, 범위 밖이면 끝 쪽으로)과 바꾸기. 거르기가 바뀌면 부르는 쪽이 `page` 를 지워 1쪽으로 돌린다. key = 한 화면에 쪽 넘김이 여럿일 때 쿼리 이름 */
+export function usePage(total: number, size: number, key = 'page') {
   const [params, setParams] = useSearchParams();
   const pageCount = Math.max(1, Math.ceil(total / size));
-  const raw = Number(params.get('page') ?? '1');
+  const raw = Number(params.get(key) ?? '1');
   const page = Number.isInteger(raw) && raw >= 1 ? Math.min(raw, pageCount) : 1;
   const set = (p: number) => {
     const next = new URLSearchParams(params);
-    if (p <= 1) next.delete('page');
-    else next.set('page', String(p));
+    if (p <= 1) next.delete(key);
+    else next.set(key, String(p));
     setParams(next, { replace: true });
   };
   return { page, pageCount, set, from: (page - 1) * size, to: Math.min(page * size, total) };
@@ -43,6 +43,7 @@ export function Pager({
   to,
   onChange,
   testId,
+  unit = '명',
 }: {
   readonly page: number;
   readonly pageCount: number;
@@ -51,10 +52,12 @@ export function Pager({
   readonly to: number;
   readonly onChange: (page: number) => void;
   readonly testId: string;
+  /** 세는 말(기본 명 — 작업자 목록) */
+  readonly unit?: string;
 }) {
   return (
     <nav className="flex flex-wrap items-center justify-between gap-2 text-sm" aria-label={m.label} data-testid={testId}>
-      <span className="text-xs text-base-content/60">{total === 0 ? m.none : m.range(from + 1, to, total)}</span>
+      <span className="text-xs text-base-content/60">{total === 0 ? m.none(unit) : m.range(from + 1, to, total, unit)}</span>
       <div className="join">
         <button type="button" className="btn btn-sm join-item" disabled={page <= 1} onClick={() => onChange(page - 1)}>
           {`‹ ${m.prev}`}

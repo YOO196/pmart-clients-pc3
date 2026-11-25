@@ -62,7 +62,7 @@ describe('센터 목록(MB-1)', () => {
     expect(screen.getByTestId('result-count')).toHaveTextContent(`${skus}`);
     const milk = screen.getAllByTestId('stock-product-row').find((r) => r.textContent?.includes('SKU-MILK-1'))!;
     await userEvent.click(within(milk).getByRole('button'));
-    await waitFor(() => expect(screen.getAllByTestId('unit-row').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByTestId('lot-row').length).toBeGreaterThan(0));
   });
 
   it('다음 쪽이 있으면 더 보기로 이어 읽는다(같은 거르기, 커서)', async () => {

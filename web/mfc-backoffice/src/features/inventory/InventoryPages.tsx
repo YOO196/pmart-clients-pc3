@@ -28,6 +28,7 @@ import { CountSessionList } from '../lists/CenterLists';
 import { CountWindowsCard, RotationCountStart } from './CountPlanning';
 import { ProductThumb, useProductCards, useProductView, ViewToggle, type ProductCardInfo, type ProductView } from '../../shared/productCards';
 import { BackButton } from '../../shared/DetailHead';
+import { Pager, usePage } from '../../shared/Pager';
 import { CatalogImport } from './CatalogImport';
 import { StockProductInfo, StockProductList } from './StockProducts';
 import { LotTraceTab } from './LotTraceTab';
@@ -142,8 +143,6 @@ function StockTab({ mfcId }: { readonly mfcId: string }) {
     enabled: !!sku,
     queryFn: () => request('GET', api.inventory.GET('/mfcs/{mfcId}/stock', { params: { path: { mfcId }, query: { sku } } })),
   });
-  const l = m.lot;
-  const u = m.unit;
   // 상품 코드가 없으면 상품별 목록(목록·카드, 2026-11-25 사용자) — 누르면 그 상품의 정보·LOT·위치
   if (!sku) return <StockProductList mfcId={mfcId} onOpen={setSku} />;
   return (
@@ -162,79 +161,15 @@ function StockTab({ mfcId }: { readonly mfcId: string }) {
         <QueryState state={toUiState(query, (s) => s.units.length === 0 && s.lots.length === 0)} onRetry={() => void query.refetch()} emptyText={m.stockEmpty}>
           {(s) => (
             <div className="space-y-3">
-              <div className="rounded-box bg-base-100 p-4">
-                <h2 className="mb-2 font-semibold">{m.lots}</h2>
-                <div className="overflow-x-auto">
-                <table className="table table-xs">
-                  <thead>
-                    <tr>
-                      {[l.lotId, l.tracking, l.expiry, l.manufacture, l.onHand, l.quarantined, l.sellable, l.reserved, l.available].map((h) => (
-                        <th key={h}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {s.lots.map((lot) => (
-                      <tr key={lot.lotId} data-testid="lot-row">
-                        <td>
-                    <LotLabel lotId={lot.lotId} />
-                  </td>
-                        <td>{m.tracking[lot.tracking ?? ''] ?? lot.tracking}</td>
-                        <td>{lot.expiryDate ?? messages.none}</td>
-                        <td>{lot.manufactureDate ?? messages.none}</td>
-                        <td>{lot.onHand}</td>
-                        <td>{lot.quarantined}</td>
-                        <td>{lot.sellable}</td>
-                        <td>{lot.reserved}</td>
-                        <td>{lot.available}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                </div>
-              </div>
-              <div className="rounded-box bg-base-100 p-4">
-                <h2 className="mb-2 font-semibold">{m.units}</h2>
-                <div className="overflow-x-auto">
-                <table className="table table-xs">
-                  <thead>
-                    <tr>
-                      <th>{u.location}</th>
-                      <th>{u.lotId}</th>
-                      <th>{u.quality}</th>
-                      <th>{u.work}</th>
-                      <th>{u.qty}</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {s.units.map((unit, i) => (
-                      <tr key={`${unit.locationCode ?? ''}-${unit.lotId ?? ''}-${unit.qualityState ?? ''}-${i}`} data-testid="unit-row">
-                        <td className="font-mono">{unit.locationCode}</td>
-                        <td>
-                    <LotLabel lotId={unit.lotId} />
-                  </td>
-                        <td>{mv.quality[unit.qualityState ?? ''] ?? unit.qualityState}</td>
-                        <td>{mv.work[unit.workState ?? ''] ?? unit.workState}</td>
-                        <td>{unit.qty}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="btn btn-xs"
-                            onClick={() => {
-                              setNotice(null);
-                              setEditing(unit);
-                            }}
-                          >
-                            {m.correct}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                </div>
-              </div>
+              {/* LOT별·위치별은 칩으로 바꿔 본다(2026-11-25 사용자), 길면 쪽으로 나눔 */}
+              <StockParts
+                lots={s.lots}
+                units={s.units}
+                onCorrect={(unit) => {
+                  setNotice(null);
+                  setEditing(unit);
+                }}
+              />
               {editing && (
                 <CorrectionForm
                   key={`${editing.locationCode ?? ''}-${editing.lotId ?? ''}-${editing.qualityState ?? ''}`}
@@ -251,6 +186,111 @@ function StockTab({ mfcId }: { readonly mfcId: string }) {
             </div>
           )}
         </QueryState>
+      )}
+    </div>
+  );
+}
+
+type StockLot = Inv['CenterStock']['lots'][number];
+const PART_ROWS = 20;
+
+/** 상품 상세의 LOT별·위치별 — 칩(radiogroup)으로 하나씩, 각 20줄씩 쪽 나눔(쿼리 part·lpage·upage) */
+function StockParts({ lots, units, onCorrect }: { readonly lots: readonly StockLot[]; readonly units: readonly StockUnit[]; readonly onCorrect: (u: StockUnit) => void }) {
+  const [params, setParams] = useSearchParams();
+  const part = params.get('part') === 'units' ? 'units' : 'lots';
+  const setPart = (v: 'lots' | 'units') => {
+    const next = new URLSearchParams(params);
+    if (v === 'units') next.set('part', 'units');
+    else next.delete('part');
+    setParams(next, { replace: true });
+  };
+  const lp = usePage(lots.length, PART_ROWS, 'lpage');
+  const up = usePage(units.length, PART_ROWS, 'upage');
+  const l = m.lot;
+  const u = m.unit;
+  const sp = m.stockProducts;
+  return (
+    <div className="space-y-3">
+      <div role="radiogroup" aria-label={sp.partLabel} className="flex gap-2" data-testid="stock-parts">
+        {(
+          [
+            ['lots', sp.partLots(lots.length)],
+            ['units', sp.partUnits(units.length)],
+          ] as const
+        ).map(([v, label]) => (
+          <button key={v} type="button" role="radio" aria-checked={part === v} className={`btn btn-sm rounded-full ${part === v ? '' : 'btn-ghost border border-base-300'}`} onClick={() => setPart(v)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {part === 'lots' ? (
+        <div className="rounded-box bg-base-100 p-4">
+          <div className="overflow-x-auto">
+            <table className="table table-xs">
+              <thead>
+                <tr>
+                  {[l.lotId, l.tracking, l.expiry, l.manufacture, l.onHand, l.quarantined, l.sellable, l.reserved, l.available].map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {lots.slice(lp.from, lp.to).map((lot) => (
+                  <tr key={lot.lotId} data-testid="lot-row">
+                    <td>
+                      <LotLabel lotId={lot.lotId} />
+                    </td>
+                    <td>{m.tracking[lot.tracking ?? ''] ?? lot.tracking}</td>
+                    <td>{lot.expiryDate ?? messages.none}</td>
+                    <td>{lot.manufactureDate ?? messages.none}</td>
+                    <td>{lot.onHand}</td>
+                    <td>{lot.quarantined}</td>
+                    <td>{lot.sellable}</td>
+                    <td>{lot.reserved}</td>
+                    <td>{lot.available}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pager testId="lot-pager" unit="개" page={lp.page} pageCount={lp.pageCount} total={lots.length} from={lp.from} to={lp.to} onChange={lp.set} />
+        </div>
+      ) : (
+        <div className="rounded-box bg-base-100 p-4">
+          <div className="overflow-x-auto">
+            <table className="table table-xs">
+              <thead>
+                <tr>
+                  <th>{u.location}</th>
+                  <th>{u.lotId}</th>
+                  <th>{u.quality}</th>
+                  <th>{u.work}</th>
+                  <th>{u.qty}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {units.slice(up.from, up.to).map((unit, i) => (
+                  <tr key={`${unit.locationCode ?? ''}-${unit.lotId ?? ''}-${unit.qualityState ?? ''}-${i}`} data-testid="unit-row">
+                    <td className="font-mono">{unit.locationCode}</td>
+                    <td>
+                      <LotLabel lotId={unit.lotId} />
+                    </td>
+                    <td>{mv.quality[unit.qualityState ?? ''] ?? unit.qualityState}</td>
+                    <td>{mv.work[unit.workState ?? ''] ?? unit.workState}</td>
+                    <td>{unit.qty}</td>
+                    <td>
+                      <button type="button" className="btn btn-xs" onClick={() => onCorrect(unit)}>
+                        {m.correct}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pager testId="unit-pager" unit="줄" page={up.page} pageCount={up.pageCount} total={units.length} from={up.from} to={up.to} onChange={up.set} />
+        </div>
       )}
     </div>
   );

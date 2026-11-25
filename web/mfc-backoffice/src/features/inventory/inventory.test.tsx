@@ -22,20 +22,40 @@ describe('상품별 재고·정정', () => {
     await userEvent.click(screen.getByRole('button', { name: '카드' }));
     await userEvent.click(within((await screen.findAllByTestId('stock-product-card'))[0]!).getByText('SKU-MILK-1'));
     expect(await screen.findByTestId('stock-product-info')).toHaveTextContent('SKU-MILK-1');
+    // LOT별이 먼저(칩), 위치별은 칩을 눌러 바꾼다 — 한 번에 하나만
+    await waitFor(() => expect(screen.getAllByTestId('lot-row')).toHaveLength(2));
+    expect(screen.queryByTestId('unit-row')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('radio', { name: /위치별/ }));
     await waitFor(() => expect(screen.getAllByTestId('unit-row')).toHaveLength(3));
-    expect(screen.getAllByTestId('lot-row')).toHaveLength(2);
+    expect(screen.queryByTestId('lot-row')).not.toBeInTheDocument();
     expect(within(screen.getAllByTestId('unit-row')[2]!).getByText('격리')).toBeInTheDocument();
+  });
+
+  it('LOT·위치가 많으면 20줄씩 쪽으로 — LOT 과 위치는 쪽 번호를 따로 기억', async () => {
+    const lots = Array.from({ length: 45 }, (_, i) => ({ lotId: `LOT-T-${i}`, tracking: 'TRACKED', expiryDate: '2027-01-01', manufactureDate: null, onHand: 1, quarantined: 0, sellable: 1, reserved: 0, available: 1 }));
+    const units = Array.from({ length: 30 }, (_, i) => ({ locationCode: `C-B1-${String(i).padStart(2, '0')}-1-01`, lotId: `LOT-T-${i}`, qualityState: 'NORMAL', workState: 'STORED', qty: 1 }));
+    server.use(http.get(`${API_BASE}/mfcs/:mfcId/stock`, () => HttpResponse.json({ mfcId: 'MFC-BJG-01', sku: 'SKU-TOFU', productName: '국산콩 두부 300g', lots, units })));
+    renderAt('/c/MFC-BJG-01/inventory?sku=SKU-TOFU');
+    await waitFor(() => expect(screen.getAllByTestId('lot-row')).toHaveLength(20));
+    expect(screen.getByTestId('lot-pager')).toHaveTextContent('45개 중 1–20');
+    await userEvent.click(within(screen.getByTestId('lot-pager')).getByRole('button', { name: '3쪽' }));
+    await waitFor(() => expect(screen.getAllByTestId('lot-row')).toHaveLength(5));
+    await userEvent.click(screen.getByRole('radio', { name: '위치별 30' }));
+    expect(await screen.findByTestId('unit-pager')).toHaveTextContent('30줄 중 1–20');
+    // 위치별을 봐도 LOT 쪽(3쪽)은 따로 남는다
+    await userEvent.click(screen.getByRole('radio', { name: 'LOT별 45' }));
+    await waitFor(() => expect(screen.getByTestId('lot-pager')).toHaveTextContent('45개 중 41–45'));
   });
 
   it('조회 실패는 "재고 없음"이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/mfcs/:mfcId/stock`, () => new HttpResponse(null, { status: 500 })));
-    renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1');
+    renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1&part=units');
     await waitFor(() => expect(document.querySelector('[data-state="error"]')).not.toBeNull());
     expect(screen.queryByText('이 센터에 이 상품 재고가 없어요.')).not.toBeInTheDocument();
   });
 
   it('정정: 본사 승인 번호를 넣고 보내면 반영 뒤 재고를 다시 읽는다', async () => {
-    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1');
+    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1&part=units');
     const row = (await screen.findAllByTestId('unit-row'))[0]!;
     await userEvent.click(within(row).getByRole('button', { name: '정정' }));
     const form = screen.getByRole('form', { name: '정정' });
@@ -58,7 +78,7 @@ describe('상품별 재고·정정', () => {
   });
 
   it('보이는 수량보다 많으면 단추가 꺼지고, 그 사이 재고가 줄었으면 서버가 INSUFFICIENT_STOCK', async () => {
-    renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1');
+    renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1&part=units');
     const row = (await screen.findAllByTestId('unit-row'))[1]!;
     await userEvent.click(within(row).getByRole('button', { name: '정정' }));
     const form = screen.getByRole('form', { name: '정정' });
@@ -195,7 +215,7 @@ describe('출하 부적격·보충 기준·상품 취급', () => {
 
 describe('본사 승인 번호(AP-1)', () => {
   it('정정이 기준 이상이면 승인 안내(걸린 기준, 요청 본문은 쏟지 않음) → 번호를 넣어 같은 키로 다시 → 안 된 번호는 이유', async () => {
-    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1');
+    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1&part=units');
     const row = (await screen.findAllByTestId('unit-row')).find((r) => r.textContent?.includes('A-P1-01-1-01'))!;
     await userEvent.click(within(row).getByRole('button', { name: '정정' }));
     const form = screen.getByRole('form', { name: '정정' });
@@ -237,7 +257,7 @@ describe('본사 승인 번호(AP-1)', () => {
 
 describe('본사 승인 요청 보내기(approval-service)', () => {
   it('승인 필요 → 요청 보내기(초안·제출) → 번호가 칸에 → 상태 확인(심사 중 → 승인) → 같은 키로 다시 보내 정정', async () => {
-    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1');
+    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1&part=units');
     const row = (await screen.findAllByTestId('unit-row')).find((r) => r.textContent?.includes('A-P1-01-1-01'))!;
     await userEvent.click(within(row).getByRole('button', { name: '정정' }));
     const form = screen.getByRole('form', { name: '정정' });
@@ -274,7 +294,7 @@ describe('본사 승인 요청 보내기(approval-service)', () => {
   });
 
   it('승인 전에 다시 보내면 "아직 승인되지 않았어요"', async () => {
-    renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1');
+    renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1&part=units');
     const row = (await screen.findAllByTestId('unit-row')).find((r) => r.textContent?.includes('A-P1-01-1-01'))!;
     await userEvent.click(within(row).getByRole('button', { name: '정정' }));
     const form = screen.getByRole('form', { name: '정정' });

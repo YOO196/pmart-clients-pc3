@@ -217,7 +217,7 @@ export function StockProductList({ mfcId, onOpen }: { readonly mfcId: string; re
                 </div>
               </div>
             )}
-            <Pager testId="stock-product-pager" page={paging.page} pageCount={paging.pageCount} total={products.length} from={paging.from} to={paging.to} onChange={paging.set} />
+            <Pager testId="stock-product-pager" unit="개" page={paging.page} pageCount={paging.pageCount} total={products.length} from={paging.from} to={paging.to} onChange={paging.set} />
             {d.cut && <p className="text-xs text-base-content/60">{m.more(d.rows.length)}</p>}
           </>
         )}
