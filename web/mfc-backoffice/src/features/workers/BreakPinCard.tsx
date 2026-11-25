@@ -13,11 +13,8 @@ import { Who } from '../../shared/OperatorLabel';
 const m = messages.workers;
 
 /** 작업자가 PDA 로 휴게를 켤 때 넣는 4자리. 서버는 정했는지·언제만 준다 — 번호는 화면에도 다시 보이지 않는다. */
-/**
- * [compact] 면(작업자 목록 위) 정해 두었을 때 카드 대신 작은 "관리자 번호 변경" 단추만 — 누르면 입력 칸(사용자 2026-11-20).
- * 아직 안 정했으면 어느 쪽이든 카드 전체.
- */
-export function BreakPinCard({ mfcId, canEdit = true, compact = false }: { readonly mfcId: string; readonly canEdit?: boolean; readonly compact?: boolean }) {
+/** 카드 — "내 정보"에 그대로, 작업자 목록은 머리 오른쪽 단추(BreakPinButton)를 누르면 아래에 연다(2026-11-25 3차 — 목록 시작을 밀어내지 않게). */
+export function BreakPinCard({ mfcId, canEdit = true }: { readonly mfcId: string; readonly canEdit?: boolean }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const bp = m.breakPin;
@@ -42,28 +39,6 @@ export function BreakPinCard({ mfcId, canEdit = true, compact = false }: { reado
   const isSet = query.data?.set === true;
   // 아직 안 정했으면(또는 조회 전·실패) 입력 칸을 그대로 보인다 — 정해 두었을 때만 접는다.
   const showForm = canEdit && (!isSet || editing);
-  if (compact && isSet && canEdit && !editing)
-    return (
-      <div className="flex items-center gap-2" data-testid="break-pin">
-        <button
-          type="button"
-          className="btn btn-xs"
-          onClick={() => {
-            setEditing(true);
-            if (save.phase.kind !== 'idle' && save.phase.kind !== 'running') save.reset();
-          }}
-        >
-          {bp.adminChange}
-        </button>
-        <CommandFeedback command={save}>
-          {() => (
-            <p role="status" className="text-xs">
-              {bp.saved}
-            </p>
-          )}
-        </CommandFeedback>
-      </div>
-    );
   return (
     <div className="space-y-2 rounded-box bg-base-100 p-3 text-sm" data-testid="break-pin">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -145,11 +120,47 @@ export function BreakPinCard({ mfcId, canEdit = true, compact = false }: { reado
               </p>
             )}
           </form>
-          <p className="text-xs opacity-70">{bp.lockNote}</p>
         </>
       )}
       {canEdit && <CommandFeedback command={save}>{() => <p role="status">{bp.saved}</p>}</CommandFeedback>}
       {!canEdit && !isSet && <p className="text-xs opacity-70">{bp.supervisorOnly}</p>}
+    </div>
+  );
+}
+
+/**
+ * 작업자 목록 머리 오른쪽 단추 — 정해 두었으면 "관리자 번호 변경", 아직이면 "휴게 번호 정하기"(주황 점 + 이름에 "아직 안 정함" — 정보는 빼지 않는다).
+ * 누르면 단추 아래로 카드가 뜬다(바깥을 누르거나 닫기로 닫힘).
+ */
+export function BreakPinButton({ mfcId }: { readonly mfcId: string }) {
+  const api = useApi();
+  const bp = m.breakPin;
+  const [open, setOpen] = useState(false);
+  const query = useQuery({
+    queryKey: ['break-pin', mfcId],
+    queryFn: () => request('GET', api.capacity.GET('/mfcs/{mfcId}/break-pin', { params: { path: { mfcId } } })),
+  });
+  const notSet = query.data?.set === false;
+  return (
+    <div className="relative">
+      <button type="button" className="btn btn-sm" aria-expanded={open} title={notSet ? bp.notSet : undefined} onClick={() => setOpen((o) => !o)} data-testid="break-pin-button">
+        {notSet && <span aria-hidden="true" className="h-[7px] w-[7px] rounded-full bg-warning" />}
+        {query.data?.set ? bp.adminChange : bp.setButton}
+        {notSet && <span className="sr-only">{` (${bp.notSetShort})`}</span>}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-20" aria-hidden="true" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full z-30 mt-2 w-[28rem] max-w-[90vw] rounded-box border border-base-300 bg-base-100" role="dialog" aria-label={bp.title}>
+            <BreakPinCard mfcId={mfcId} />
+            <div className="flex justify-end px-3 pb-3">
+              <button type="button" className="btn btn-sm" onClick={() => setOpen(false)}>
+                {bp.cancelChange}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

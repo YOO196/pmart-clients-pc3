@@ -68,30 +68,7 @@ main section:has(> [data-testid='detail-top']) dl.grid > div > dd {
 
 /* ---- 2차(2026-11-25 PC5 — 사용자 "제목과 내용 간격, 밑줄/점선 통일 안 됨") ---- */
 
-/* 불러오기 실패·권한 없음·결과 확인 중 상자(공용 QueryState) — 라이더 sim-look.css 그대로: 위에서 아래로 제목 → 한 줄 설명 → 다시 시도 */
-main [role='alert'][data-state]:is(.alert) {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.25rem;
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
-  text-align: left;
-}
-main [role='alert'][data-state] > h2 {
-  font-size: 0.875rem;
-}
-main [role='alert'][data-state] > p {
-  color: var(--pm-sub);
-  word-break: keep-all;
-}
-main [role='alert'][data-state] > .btn {
-  margin-top: 0.25rem;
-}
-main [role='alert'][data-state] > p.select-all {
-  word-break: break-all;
-  font-size: 0.8125rem;
-}
+/* 불러오기 실패 상자는 공용 QueryState·standard.css 가 그린다(2026-11-25 PC2 17809797 — 예전 CSS 사본이 "다시 시도"를 4px 내렸다) */
 
 /* 상태 탭(라이더 support StateTabs) — 16px 굵게, 고른 탭은 파랑 글자 + 파란 3px 밑줄, 탭 줄 아래 2px 선. daisyUI tabs-box 상자 모양을 걷는다 */
 main [role='tablist'].tabs.tabs-box {
@@ -143,7 +120,27 @@ main a.btn {
 }
 
 /* 찾기 줄은 숫자 띠에서 28px 띄움(라이더 sim-look main form.pm-fbar) */
-main :is(.pm-stat-strip, [data-testid$='-counts']) ~ .pm-fbar,
-main :is(.pm-stat-strip, [data-testid$='-counts']) ~ * > .pm-fbar {
+main :is(.pm-stat-strip, [data-testid$='-counts']) ~ .pm-fbar {
   margin-top: 28px;
+}
+/* 목록 묶음(space-y-4) 첫 줄이 찾기 줄이면 바깥 16px + 12px = 28px(공용 form.pm-fbar 28px 이 겹쳐 44px 가 되던 것) */
+main .space-y-4 > .space-y-4 > .pm-fbar:first-child {
+  margin-top: 12px;
+}
+
+/* 3차(2026-11-25 PC5 비교 — 라이더 "라이더 관리"와 같은 폭에서 나란히) */
+/* 표 상자: 머리줄 왼쪽 건수(ResultBar) + 표를 한 상자로 */
+main .pm-list-box {
+  overflow: hidden;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background: var(--color-base-100);
+}
+main .pm-list-box > [data-list-part='mid'] {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--color-base-300);
+}
+/* 표 머리 칸 글자 — 보조 글색 600 13px */
+main table th {
+  font-size: 13px;
 }

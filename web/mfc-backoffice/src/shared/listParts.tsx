@@ -40,20 +40,23 @@ export function StatCard({
   const ch = useStatChange(value);
   // 2026-11-20 공용 콘솔 모양: 색은 뜻만(경고·위험) — info 파랑 숫자는 글자색으로. 고른 칸은 띠가 아래 파란 줄(console.css)
   const valueCls = tone === 'error' ? 'text-error' : tone === 'warning' ? 'text-[color-mix(in_oklab,var(--color-warning)_60%,var(--color-base-content))]' : '';
-  // 2026-11-25 백오피스 통일 2차(PC5 — 라이더 숫자 칸): 이름은 위쪽 한 줄 굵게(칸마다 같은 높이로 일직선), 숫자는 그 아래 크게. 설명은 맨 아래 작게
+  // 2026-11-25 백오피스 통일 3차(PC5 — 라이더 숫자 띠 StatCard layout="row"): 이름 왼쪽 위 굵게(보조 한 줄은 그 밑 작게), 숫자 오른쪽 28px.
+  // 칸은 숫자 띠(StatStrip) 안에서 1px 선으로만 나뉜다. 고른 칸은 aria-current(띠 아래 파란 줄 — standard/console.css)
   const body = (
-    <span className="flex h-full flex-col gap-1">
-      <span className="block truncate text-sm font-semibold text-base-content">{label}</span>
-      <span className={`pm-stat-value block text-[28px] font-semibold leading-tight tracking-tight ${value === '?' ? 'text-base-content/40' : valueCls}`} data-testid={testId ? `${testId}-value` : undefined}>
+    <span className="flex items-start justify-between gap-3">
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold text-base-content">{label}</span>
+        {hint && <span className="mt-0.5 block truncate text-xs text-base-content/55">{hint}</span>}
+      </span>
+      <span className={`pm-stat-value shrink-0 text-[28px] font-semibold leading-none tracking-tight ${value === '?' ? 'text-base-content/40' : valueCls}`} data-testid={testId ? `${testId}-value` : undefined}>
         {value}
         {ch.badge}
       </span>
-      {hint && <span className="block truncate text-xs text-base-content/55">{hint}</span>}
     </span>
   );
-  const cls = `pm-stat block min-h-20 w-full rounded-box border px-4 py-4 text-left ${active ? 'border-primary bg-primary/5' : 'border-base-300 bg-base-100'} ${ch.cls}`;
+  const cls = `pm-stat block min-h-20 w-full rounded-box border border-base-300 bg-base-100 px-4 py-4 text-left ${ch.cls}`;
   return onClick ? (
-    <button type="button" className={`${cls} transition hover:border-primary/60`} onClick={onClick} aria-pressed={active} data-testid={testId}>
+    <button type="button" className={`${cls} transition hover:border-primary/60`} onClick={onClick} aria-pressed={active} aria-current={active ? 'true' : undefined} data-testid={testId}>
       {body}
     </button>
   ) : (
