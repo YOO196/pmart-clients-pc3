@@ -135,7 +135,7 @@ function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonl
       <SearchBar
         summary={[
           [m.filters.state, m.state[state ?? 'ACTIVE'] ?? state ?? '', state ? () => set('state', '') : undefined],
-          [m.filters.date, date, () => set('date', '')],
+          // 날짜는 팝업 칸에 그대로 보여 칩·개수에 넣지 않는다(요청서 2차 5)
           [m.filters.worker, workerId ? (workerName?.name ?? workerName?.displayName ?? m.filters.someone) : '', () => set('workerId', '')],
           [m.filters.task, taskId ? m.filters.oneTask : '', () => set('taskId', '')],
         ]}

@@ -5,6 +5,7 @@
 import { type ReactNode, type RefObject, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { BackButton } from './DetailHead';
 import { messages } from './messages';
 
 export const DETAIL_BAR_SLOT = 'detail-bar-slot';
@@ -22,11 +23,13 @@ export function useScrolledPast(ref: RefObject<HTMLElement | null>): boolean {
   return past;
 }
 
-export function StickyTitle({ show, title, badges }: { readonly show: boolean; readonly title: ReactNode; readonly badges?: ReactNode }) {
+export function StickyTitle({ show, title, badges, onBack, backLabel }: { readonly show: boolean; readonly title: ReactNode; readonly badges?: ReactNode; readonly onBack?: () => void; readonly backLabel?: string }) {
   const slot = typeof document === 'undefined' ? null : document.getElementById(DETAIL_BAR_SLOT);
   if (!show || !slot) return null;
   return createPortal(
     <div className="flex items-center gap-3 border-b border-base-300 bg-base-100/95 px-6 py-2 shadow-sm backdrop-blur" data-testid="sticky-title">
+      {/* 내려가 제목이 안 보여도 뒤로 갈 수 있게(2026-11-25 백오피스 통일 — 라이더 백오피스와 같음) */}
+      {onBack && <BackButton onClick={onBack} label={backLabel ?? ''} small />}
       <p className="min-w-0 truncate text-sm font-semibold">{title}</p>
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">{badges}</div>
       <button

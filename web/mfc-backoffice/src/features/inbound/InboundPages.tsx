@@ -25,6 +25,7 @@ import { Who } from '../../shared/OperatorLabel';
 import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
 import { SavedViews } from '../../shared/SavedViews';
 import { SeenMark } from '../../shared/SeenMark';
+import { DetailTop, useGoBack } from '../../shared/DetailHead';
 import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
 import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 import { InitialStockTab, ReturnReceiptTab, SupplyRequestTab } from './InboundOtherTabs';
@@ -230,27 +231,25 @@ function InboundTaskPage({ mfcId }: { readonly mfcId: string }) {
   });
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const past = useScrolledPast(titleRef);
+  const goBack = useGoBack(inboundPath(mfcId));
+  const d = query.data;
   // 화면 표기(ADR-0070 덧붙임 "작업 지시 = 종류 · 시각") — 시스템 ID 는 시스템 번호 칸에만
   const title = (t: { readonly taskType: string; readonly createdAt?: string }) => `${m.taskType[t.taskType] ?? t.taskType} · ${t.createdAt ? formatSeoul(t.createdAt) : messages.none}`;
   useRecordRecent('inboundTask', mfcId, taskId, query.data ? title(query.data) : null);
   return (
     <section className="max-w-4xl space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link to={inboundPath(mfcId)} className="link text-sm">
-          {m.back}
-        </Link>
-        <div className="ml-auto">
-          <QueueNav kind="inboundTask" mfcId={mfcId} id={taskId} />
-        </div>
-      </div>
+      <DetailTop onBack={goBack} backLabel={m.back} nav={<QueueNav kind="inboundTask" mfcId={mfcId} id={taskId} />}>
+        {d && (
+          <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
+            {title(d)}
+            <span className={`badge badge-sm ${d.state === 'READY' ? 'badge-info' : 'badge-success'}`}>{m.taskState[d.state] ?? d.state}</span>
+          </h1>
+        )}
+      </DetailTop>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(t) => (
           <>
-            <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
-              {title(t)}
-              <span className={`badge badge-sm ${t.state === 'READY' ? 'badge-info' : 'badge-success'}`}>{m.taskState[t.state] ?? t.state}</span>
-            </h1>
-            <StickyTitle show={past} title={title(t)} badges={<span className={`badge badge-sm ${t.state === 'READY' ? 'badge-info' : 'badge-success'}`}>{m.taskState[t.state] ?? t.state}</span>} />
+            <StickyTitle show={past} onBack={goBack} backLabel={m.back} title={title(t)} badges={<span className={`badge badge-sm ${t.state === 'READY' ? 'badge-info' : 'badge-success'}`}>{m.taskState[t.state] ?? t.state}</span>} />
             {notice && (
               <p role="status" className={`text-sm ${notice.kind === 'ok' ? 'text-success' : notice.kind === 'warn' ? 'text-warning' : 'text-error'}`}>
                 {notice.text}

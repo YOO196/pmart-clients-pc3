@@ -1,406 +1,5 @@
-/* 목록 한 틀(2026-11-25 백오피스 UI 통일, PC5 요청) — 라이더 백오피스 src/sim-list.css 의 찾기 줄·필터 팝업·조건 칩·ⓘ·줄 아래 펼침 부분을 옮김(shared/simList.tsx 모양). */
-/* ① 찾기 줄: [찾기 칸][찾기][깔때기][칩 ✕][초기화] 왼쪽으로 모음 */
-.pm-fbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.pm-fbar-q {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.pm-fbar-q .input {
-  height: 36px;
-  border-radius: 8px;
-  border-color: var(--color-base-300);
-  background: var(--color-base-100);
-}
-.pm-fbar-q .input:focus,
-.pm-fbar-q .input:focus-within {
-  border-color: var(--color-primary);
-  outline: none;
-}
-.pm-fbar > .btn,
-.pm-fbar-q + .btn {
-  height: 36px;
-  min-height: 36px;
-  border-radius: 8px;
-}
-.pm-fwrap {
-  position: relative;
-}
-.pm-funnel {
-  position: relative;
-  /* 글자 "필터"(2026-11-24) — 정사각 대신 글자 폭 */
-  min-width: 36px;
-  padding: 0 12px;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  border: 1px solid var(--color-base-300);
-  background: var(--color-base-100);
-  color: var(--pm-sub);
-  cursor: pointer;
-}
-.pm-funnel:hover {
-  color: var(--color-base-content);
-}
-/* 2026-11-24 사용자 "필터 이렇게 뜨는 거 좀 세련되지 못하네" — 꽉 찬 파랑 + 떠 있는 검은 점 대신 테두리·옅은 바탕, 개수는 글자 옆 작은 알약 */
-.pm-funnel.on {
-  background: color-mix(in oklab, var(--color-primary) 8%, var(--color-base-100));
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-.pm-funnel-n {
-  position: static;
-  margin-left: 6px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 9999px;
-  background: var(--color-primary);
-  color: var(--color-primary-content);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 16px;
-  text-align: center;
-}
-.pm-pop-back {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-}
-.pm-pop {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 31;
-  width: max-content;
-  max-width: min(760px, calc(100vw - 32px));
-  max-height: min(70vh, 560px);
-  overflow: auto;
-  padding: 10px;
-  border-radius: 10px;
-  background: var(--color-base-100);
-  border: 1px solid var(--color-base-300);
-  box-shadow: 0 10px 28px color-mix(in oklab, var(--color-base-content) 22%, transparent);
-}
-.pm-pop-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 6px 14px;
-  min-width: min(520px, calc(100vw - 52px));
-}
-.pm-pop-sec {
-  min-width: 0;
-}
-.pm-pop-h {
-  margin: 4px 6px 4px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--pm-sub);
-}
-.pm-pop-body {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.pm-pop-body label {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 2px;
-  padding: 0 6px;
-  font-size: 12px;
-}
-.pm-pop-body .input,
-.pm-pop-body .select {
-  width: 100%;
-}
-.pm-pop-foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--color-base-300);
-}
-
-/* 팝업 안 고르기(ChipGroup) — 붙은 단추 줄 대신 시뮬레이터 목록: ✓ + 이름 + 건수 */
-.pm-pop [role='radiogroup'] {
-  display: flex;
-  flex-direction: column;
-  border: 0;
-  border-radius: 0;
-  overflow: visible;
-}
-main .pm-pop [role='radiogroup'] > [role='radio'],
-.pm-pop [role='radiogroup'] > [role='radio'] {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  box-shadow: none;
-  color: var(--color-base-content);
-  font-size: 13px;
-  font-weight: 400;
-  text-align: left;
-}
-.pm-pop [role='radiogroup'] > [role='radio']::before {
-  content: '';
-  color: var(--color-primary);
-  font-weight: 800;
-}
-main .pm-pop [role='radiogroup'] > [role='radio'][aria-checked='true'] {
-  background: var(--pm-soft);
-  color: var(--color-base-content);
-  box-shadow: none;
-  font-weight: 700;
-}
-.pm-pop [role='radiogroup'] > [role='radio'][aria-checked='true']::before {
-  content: '✓';
-}
-.pm-pop [role='radiogroup'] > [role='radio']:hover {
-  background: var(--pm-soft);
-}
-main .pm-pop [role='radiogroup'] > [role='radio'] > span {
-  color: var(--pm-sub);
-  margin: 0;
-}
-
-/* 건 조건 칩 — 옅은 파랑 판 + ✕ */
-.pm-fchip {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px 4px 3px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--color-base-300);
-  background: var(--color-base-100);
-  color: var(--color-base-content);
-  font-size: 13px;
-  font-weight: 600;
-}
-.pm-fchip-k {
-  color: var(--pm-sub);
-  font-weight: 500;
-}
-.pm-fchip-x {
-  width: 20px;
-  height: 20px;
-  border-radius: 9999px;
-  color: var(--pm-sub);
-  font-size: 11px;
-}
-.pm-fchip-x:hover {
-  background: color-mix(in oklab, var(--color-primary) 22%, transparent);
-  color: var(--color-base-content);
-}
-.pm-fbar-reset {
-  font-size: 13px;
-  color: var(--pm-sub);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.pm-fbar-reset:hover {
-  color: var(--color-primary);
-}
-
-/* ② 화면 설명 ⓘ·화면 안내 — 상자 대신 작은 한 줄(누르면 원래 문장) */
-.pm-info-btn {
-  width: 22px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9999px;
-  color: var(--pm-sub);
-  font-size: 15px;
-  line-height: 1;
-}
-.pm-info-btn:hover,
-.pm-info-btn[aria-expanded='true'] {
-  color: var(--color-primary);
-}
-.pm-info-text {
-  max-width: 72ch;
-  font-size: 13px;
-  color: var(--pm-sub);
-}
-.pm-guide-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--pm-sub);
-}
-.pm-guide-btn:hover,
-.pm-guide-btn[aria-expanded='true'] {
-  color: var(--color-primary);
-}
-.pm-guide[data-tone='warning'] .pm-guide-btn {
-  color: var(--color-warning);
-}
-.pm-guide-caret {
-  font-size: 10px;
-}
-.pm-guide-list {
-  margin-top: 6px;
-  padding: 8px 12px 8px 26px;
-  max-width: 80ch;
-  list-style: disc;
-  border-left: 2px solid var(--color-base-300);
-  font-size: 13px;
-  color: var(--pm-sub);
-}
-.pm-guide[data-tone='warning'] .pm-guide-list {
-  border-left-color: var(--color-warning);
-}
-.pm-guide-list > li + li {
-  margin-top: 2px;
-}
-
-/* ③ 줄 아래 펼침 상세(.md-inline) — 펼친 줄은 옅은 판 + 아래 파랑 2px, 상세는 같은 옅은 판 */
-main table tbody tr[aria-expanded] {
-  cursor: pointer;
-}
-main table tbody tr[aria-expanded]:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
-}
-main table tbody tr[data-open] > td {
-  background-color: var(--pm-soft);
-}
-main table tbody tr.pm-inline-row > td {
-  padding: 0;
-  background-color: var(--pm-soft);
-  border-bottom: 2px solid var(--color-primary);
-  white-space: normal;
-}
-main table tbody tr.pm-inline-row:hover > td {
-  background-color: var(--pm-soft);
-}
-.pm-inline {
-  position: relative;
-  padding: 14px 20px 16px 34px;
-  font-size: 13px;
-}
-.pm-inline-bar {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin: -2px 0 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--color-base-300);
-}
-.pm-inline-cols {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-.pm-inline-side {
-  min-width: 0;
-  padding-left: 24px;
-  border-left: 1px solid var(--color-base-300);
-}
-.pm-inline h4 {
-  margin: 0 0 8px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--pm-sub);
-}
-.pm-caret {
-  display: inline-block;
-  width: 16px;
-  font-size: 11px;
-  color: var(--pm-sub);
-}
-@media (max-width: 1100px) {
-  .pm-inline-cols {
-    grid-template-columns: 1fr;
-  }
-  .pm-inline-side {
-    padding-left: 0;
-    padding-top: 12px;
-    border-left: 0;
-    border-top: 1px solid var(--color-base-300);
-  }
-}
-@media (max-width: 640px) {
-  .pm-inline {
-    padding: 12px 12px 14px;
-  }
-  .pm-pop-grid {
-    min-width: 0;
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ⑦ 찾기 줄 크기 한 체계(2026-11-21 사용자 "버튼 크기도 제각각인데 붙어있어서 뭐가 뭔지 모르겠잖아") —
-   한 줄의 입력·단추·깔때기·칩·붙은 고르기 단추 줄 모두 높이 36px, 찾기 단추는 찾기 칸에 붙이고 거르기와는 세로 선으로 떼어 둔다 */
-.pm-fbar {
-  --pm-h: 36px;
-}
-.pm-fbar-q .input,
-.pm-fbar > .btn,
-.pm-fbar .pm-funnel {
-  height: var(--pm-h);
-  min-height: var(--pm-h);
-}
-.pm-fbar > .btn {
-  margin-left: -4px;
-}
-.pm-fbar-q ~ .pm-fwrap,
-.pm-fbar-q ~ .pm-fbar-filters {
-  margin-left: 8px;
-  padding-left: 12px;
-  border-left: 1px solid var(--color-base-300);
-}
-.pm-fbar-filters {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.pm-fbar-filters-l {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--pm-sub);
-}
-.pm-fbar-filters [role='radiogroup'] {
-  height: var(--pm-h);
-  flex-wrap: nowrap;
-}
-.pm-fbar-filters [role='radiogroup'] > [role='radio'] {
-  height: calc(var(--pm-h) - 2px);
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-}
-.pm-fchip {
-  height: var(--pm-h);
-  padding-left: 12px;
-}
-/* 찾기 칸 안 × — 글자 지우기(브라우저 기본 search 지우기 단추를 보이게) */
-.pm-fbar-q input[type='search']::-webkit-search-cancel-button {
-  -webkit-appearance: searchfield-cancel-button;
-  appearance: auto;
-  cursor: pointer;
-}
-
+/* 목록 한 틀(2026-11-25 백오피스 UI 통일, PC5 요청) — 찾기 줄·필터 팝업·조건 칩·ⓘ·줄 아래 펼침의 기본 모양은 공용 ../../ui/src/standard.css(index.css 에서 먼저 읽음).
+   이 파일은 MFC 에만 있는 것(SearchBar 팝업 칸·기본값 칩·글자 없는 ▸·상세 dt·상태 탭·밑줄 규칙)만. */
 
 /* 번호·이름 링크(상세로) — 점선 밑줄(라이더 백오피스와 같음: 누르면 상세로 간다는 표시). 단추 모양 링크는 제외 */
 main a.pm-id-link:not(.btn) {
@@ -450,4 +49,101 @@ main table tbody td a.link:not(.btn) {
 }
 .pm-caret[data-open]::before {
   content: '▾';
+}
+
+/* 상세 화면 항목/값(2026-11-25 요청서 §5-1, 라이더 FieldList 와 같은 읽힘) — 항목명은 작은 보조 글, 값은 조금 크고 굵게.
+   상세 화면(제목 머리 DetailTop 이 있는 section)의 dl 만 — 대시보드·관제실 숫자 칸은 건드리지 않는다 */
+main section:has(> [data-testid='detail-top']) dl.grid > dt:not([class*='text-info']),
+main section:has(> [data-testid='detail-top']) dl.grid > div > dt:not([class*='text-info']) {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pm-sub);
+  opacity: 1;
+}
+main section:has(> [data-testid='detail-top']) dl.grid > dd,
+main section:has(> [data-testid='detail-top']) dl.grid > div > dd {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ---- 2차(2026-11-25 PC5 — 사용자 "제목과 내용 간격, 밑줄/점선 통일 안 됨") ---- */
+
+/* 불러오기 실패·권한 없음·결과 확인 중 상자(공용 QueryState) — 라이더 sim-look.css 그대로: 위에서 아래로 제목 → 한 줄 설명 → 다시 시도 */
+main [role='alert'][data-state]:is(.alert) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  text-align: left;
+}
+main [role='alert'][data-state] > h2 {
+  font-size: 0.875rem;
+}
+main [role='alert'][data-state] > p {
+  color: var(--pm-sub);
+  word-break: keep-all;
+}
+main [role='alert'][data-state] > .btn {
+  margin-top: 0.25rem;
+}
+main [role='alert'][data-state] > p.select-all {
+  word-break: break-all;
+  font-size: 0.8125rem;
+}
+
+/* 상태 탭(라이더 support StateTabs) — 16px 굵게, 고른 탭은 파랑 글자 + 파란 3px 밑줄, 탭 줄 아래 2px 선. daisyUI tabs-box 상자 모양을 걷는다 */
+main [role='tablist'].tabs.tabs-box {
+  gap: 0.5rem;
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid var(--color-base-300);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+main [role='tablist'].tabs.tabs-box > .tab {
+  height: auto;
+  margin-bottom: -2px;
+  padding: 0.625rem 1.25rem;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 1rem;
+  font-weight: 700;
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+main [role='tablist'].tabs.tabs-box > .tab:hover {
+  color: var(--color-base-content);
+}
+main [role='tablist'].tabs.tabs-box > .tab.tab-active {
+  border-bottom-color: var(--color-primary);
+  background: transparent;
+  color: var(--color-primary);
+}
+
+/* 밑줄 한 규칙: 상세로 가는 이름·번호 링크 = 점선(표 칸·펼친 줄·상세 값), 단추 모양 링크 = 없음, 그 밖 글자 링크 = 없음 */
+main a.link:not(.btn) {
+  text-decoration-line: none;
+}
+main a.link:not(.btn):hover {
+  color: var(--color-primary);
+}
+main :is(table tbody td, .pm-inline, dd) a.link:not(.btn),
+main a.pm-id-link:not(.btn) {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+main a.btn {
+  text-decoration-line: none;
+}
+
+/* 찾기 줄은 숫자 띠에서 28px 띄움(라이더 sim-look main form.pm-fbar) */
+main :is(.pm-stat-strip, [data-testid$='-counts']) ~ .pm-fbar,
+main :is(.pm-stat-strip, [data-testid$='-counts']) ~ * > .pm-fbar {
+  margin-top: 28px;
 }

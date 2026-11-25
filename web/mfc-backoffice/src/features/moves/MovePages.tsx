@@ -26,6 +26,7 @@ import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
 import { SavedViews } from '../../shared/SavedViews';
 import { SeenMark } from '../../shared/SeenMark';
 import { Caret, expandRowProps, InlineDetail, InlineFields, useInlineOpen } from '../../shared/simList';
+import { DetailTop, useGoBack } from '../../shared/DetailHead';
 import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
 import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 
@@ -212,26 +213,24 @@ function MoveDetailPage({ mfcId }: { readonly mfcId: string }) {
   });
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const past = useScrolledPast(titleRef);
+  const goBack = useGoBack(movesPath(mfcId));
+  const d = query.data;
   useRecordRecent('move', mfcId, moveId, query.data ? moveTitle(query.data) : null);
   return (
     <section className="max-w-3xl space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link to={movesPath(mfcId)} className="link text-sm">
-          {m.back}
-        </Link>
-        <div className="ml-auto">
-          <QueueNav kind="move" mfcId={mfcId} id={moveId} />
-        </div>
-      </div>
+      <DetailTop onBack={goBack} backLabel={m.back} nav={<QueueNav kind="move" mfcId={mfcId} id={moveId} />}>
+        {d && (
+          <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
+            {moveTitle(d)}
+            <StateBadge state={d.state} />
+            {d.urgent && <span className="badge badge-sm badge-error">{m.fields.urgent}</span>}
+          </h1>
+        )}
+      </DetailTop>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(o) => (
           <>
-            <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
-              {moveTitle(o)}
-              <StateBadge state={o.state} />
-              {o.urgent && <span className="badge badge-sm badge-error">{m.fields.urgent}</span>}
-            </h1>
-            <StickyTitle show={past} title={moveTitle(o)} badges={<StateBadge state={o.state} />} />
+            <StickyTitle show={past} onBack={goBack} backLabel={m.back} title={moveTitle(o)} badges={<StateBadge state={o.state} />} />
             <ProgressSteps
               steps={m.ui.steps}
               place={movePlace(o.state)}
@@ -417,12 +416,12 @@ function MoveCreatePage({ mfcId }: { readonly mfcId: string }) {
       />
     </label>
   );
+  const goBack = useGoBack(movesPath(mfcId));
   return (
     <section className="max-w-4xl space-y-4">
-      <Link to={movesPath(mfcId)} className="link text-sm">
-        {m.back}
-      </Link>
-      <h1 className="text-xl font-bold">{m.create}</h1>
+      <DetailTop onBack={goBack} backLabel={m.back}>
+        <h1 className="text-xl font-bold">{m.create}</h1>
+      </DetailTop>
       <form
         className="space-y-3 rounded-box bg-base-100 p-4 text-sm"
         onSubmit={(e) => {

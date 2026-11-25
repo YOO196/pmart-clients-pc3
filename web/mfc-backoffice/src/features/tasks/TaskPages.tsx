@@ -25,6 +25,7 @@ import { ProgressSteps, type StepPlace } from '../../shared/ProgressSteps';
 import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
 import { SavedViews } from '../../shared/SavedViews';
 import { SeenMark } from '../../shared/SeenMark';
+import { DetailTop, useGoBack } from '../../shared/DetailHead';
 import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
 import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 import { DUE_SOON_MINUTES } from '../ops/opsRules';
@@ -342,27 +343,27 @@ function TaskDetailPage({ mfcId }: { readonly mfcId: string }) {
   });
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const past = useScrolledPast(titleRef);
+  const goBack = useGoBack(tasksPath(mfcId));
+  const d = query.data;
   useRecordRecent('task', mfcId, taskId, query.data ? taskTitle(query.data) : null);
   return (
     <section className="max-w-5xl space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link to={tasksPath(mfcId)} className="link text-sm">
-          {m.back}
-        </Link>
-        <div className="ml-auto">
-          <QueueNav kind="task" mfcId={mfcId} id={taskId} />
-        </div>
-      </div>
+      <DetailTop onBack={goBack} backLabel={m.back} nav={<QueueNav kind="task" mfcId={mfcId} id={taskId} />}>
+        {d && (
+          <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
+            {taskTitle(d)}
+            <StateBadge state={d.state} />
+            <Flags task={d} />
+          </h1>
+        )}
+      </DetailTop>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(t) => (
           <>
-            <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
-              {taskTitle(t)}
-              <StateBadge state={t.state} />
-              <Flags task={t} />
-            </h1>
             <StickyTitle
               show={past}
+              onBack={goBack}
+              backLabel={m.back}
               title={taskTitle(t)}
               badges={
                 <>
