@@ -95,12 +95,12 @@ export const navGroups: readonly MenuGroup[] = [
         apiMissing: ['거래처·차량·기사·노선'],
       },
       {
-        // 상품 발주 + 공급사 관리(사용자 2026-11-26) — 진짜 공급사 없이 가짜 공급사가 회신·ASN, 입고 확정하면 재고에 더한다
+        // 상품 발주 + 공급사 관리(사용자 2026-11-26) — 페이지만, 입고하면 발주 수량만큼 재고에 더하는 단순 구현(목 전용)
         key: 'purchase',
         segment: 'purchase',
         ready: true,
         apiReady: [],
-        apiMissing: ['발주·공급사·ASN 입고(procurement·supplier·cdc-inbound 3단계 자리표시자 — 목 모드에서만 동작, 백엔드 계약 요청 중)'],
+        apiMissing: ['발주·공급사(목 모드에서만 동작하는 단순 구현)'],
       },
       {
         key: 'inbound',
