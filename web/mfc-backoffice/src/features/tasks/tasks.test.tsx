@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { API_BASE } from '../../api/client';
 import { db } from '../../mocks/db';
-import { renderAt } from '../../test/render';
+import { openFilter, renderAt } from '../../test/render';
 import { server } from '../../test/server';
 
 const rows = () => screen.getAllByTestId('task-row');
@@ -32,6 +32,7 @@ describe('작업 목록', () => {
   it('상태(대기)·유형 거르기는 URL 쿼리 → 서버로', async () => {
     const view = renderAt('/c/MFC-BJG-01/tasks');
     await waitFor(() => expect(rows()).toHaveLength(3));
+    await openFilter();
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'READY');
     await waitFor(() => expect(rows()).toHaveLength(1));
     expect(within(rows()[0]!).getByText('없음')).toBeInTheDocument();

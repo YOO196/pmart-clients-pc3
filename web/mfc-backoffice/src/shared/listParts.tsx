@@ -5,8 +5,8 @@
 // - 숫자 카드: 서버가 센 수만. 읽는 중 "…", 못 읽으면 "?"(0 이 아님), 한 쪽에 다 못 세면 "N건 이상".
 // - 안내 상자: 화면이 이미 쓰는 업무 문구만(새 규칙을 만들지 않는다). 접은 것은 이 브라우저에 기억.
 // - 다 끝났어요 띠: 서버가 0건이라고 확인했을 때만(읽는 중·실패에는 그리지 않는다 — 부르는 쪽이 성공일 때만).
-// - 검색 조건: 조건을 건 뒤에는 한 줄 칩으로 접고 "검색 열기"로 펼친다. '/' 키는 이 칸의 첫 입력으로 간다(app/PageChrome).
-import { type ComponentProps, type ReactNode, useState } from 'react';
+// - 검색 조건(2026-11-25 목록 한 틀): [필터 → 팝업(고르기)][건 조건 칩 ✕] 한 줄. '/' 키는 팝업을 열어 첫 입력으로 간다(app/PageChrome).
+import { type ComponentProps, type ReactNode, useEffect, useId, useState } from 'react';
 
 import { AllDone as UiAllDone } from '@pmart/web-ui';
 
@@ -73,64 +73,81 @@ export function AllDone({ title = m.allDone, ...rest }: Omit<ComponentProps<type
   return <UiAllDone title={title} {...rest} />;
 }
 
+/** [이름, 값(빈 문자열 = 안 걸림)] 또는 [이름, 값, 풀기] — 풀기가 있으면 칩에 ✕ */
+export type SearchSummary = readonly [string, string] | readonly [string, string, (() => void) | undefined];
+
 /**
- * 검색 조건 — 맨 위 연회색 띠에 [이름 값] 칩, 펼치면 아래 흰 칸에 입력들. 조건이 하나도 없으면 처음부터 펼친다(입력해야 하니까).
- * 이 앱 목록은 고르는 즉시 거른다(조회 단추 없음) — 접기·펼치기만 한다.
+ * 검색 조건(2026-11-25 백오피스 UI 통일 — 라이더 백오피스 simList SearchPanel 모양): 한 줄 [필터 → 팝업(children 고르기)][건 조건 칩 ✕] … [extra].
+ * 이 앱 목록은 고르는 즉시 거른다(조회 단추 없음). 팝업은 늘 닫힌 채 시작하고, 건 조건은 칩으로 늘 보인다(정보는 줄이지 않음).
+ * 폼은 하나(aria-label=label, data-list-part="top") — '/' 키가 팝업을 열고 첫 칸으로(app/PageChrome).
  */
 export function SearchBar({
   summary,
   children,
   label = m.search,
   extra,
-  startOpen,
 }: {
-  readonly summary: ReadonlyArray<readonly [string, string]>;
+  readonly summary: ReadonlyArray<SearchSummary>;
   readonly children: ReactNode;
   readonly label?: string;
   readonly extra?: ReactNode;
-  /** 처음에 펼칠지 — 기본은 "건 조건이 없으면 펼침". 화면 기본값이 칩에 보이는 목록(예: 대기)은 부르는 쪽이 정한다 */
+  /** 예전 이름 — 팝업은 늘 닫힌 채 시작한다(받기만 한다) */
   readonly startOpen?: boolean;
 }) {
   const active = summary.filter(([, v]) => v !== '');
-  const [open, setOpen] = useState(startOpen ?? active.length === 0);
+  // 필터 개수는 풀 수 있는(기본이 아닌) 조건만 — 기본값 칩("진행 중" 등)은 보이기만
+  const set = active.filter(([, , clear]) => !!clear).length;
+  const [open, setOpen] = useState(false);
+  const popId = useId();
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
   return (
-    <div data-testid="search-bar">
-      <div className={`flex flex-wrap items-center gap-2 rounded-box border border-base-300 bg-base-200/60 px-4 py-2.5 ${open ? 'rounded-b-none' : ''}`}>
-        <span className="inline-flex items-center gap-1.5 text-sm font-bold">
-          <svg viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
-            <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 2-4-4" />
-          </svg>
-          {label}
-        </span>
-        {summary.map(([k, v]) => (
-          <button
-            key={k}
-            type="button"
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${v ? 'border-primary bg-base-100' : 'border-base-300 bg-base-100 text-base-content/60'}`}
-            onClick={() => setOpen(true)}
-            data-testid="search-chip"
-          >
-            <span className="font-semibold">{k}</span>
-            <span className={v ? 'text-primary' : ''}>{v || m.all}</span>
-            <span aria-hidden="true">▾</span>
-          </button>
-        ))}
-        <span className="ml-auto flex items-center gap-2">
-          {extra}
-          <button type="button" className="btn btn-ghost btn-xs border border-base-300 bg-base-100" aria-expanded={open} onClick={() => setOpen((o) => !o)} data-testid="search-toggle">
-            {open ? m.close : m.open}
-          </button>
-        </span>
+    <div className="pm-fbar" data-testid="search-bar">
+      <div className="pm-fwrap">
+        <button
+          type="button"
+          className={`pm-funnel ${set > 0 ? 'on' : ''}`}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={popId}
+          aria-label={m.filterOpen(set)}
+          title={label}
+          onClick={() => setOpen((o) => !o)}
+          data-testid="search-toggle"
+        >
+          <span aria-hidden="true">{m.filter}</span>
+          {set > 0 && <span className="pm-funnel-n">{set}</span>}
+        </button>
+        {open && <div className="pm-pop-back" onClick={() => setOpen(false)} aria-hidden="true" />}
+        <form id={popId} className="pm-pop" aria-label={label} data-list-part="top" data-testid="search-popup" hidden={!open} onSubmit={(e) => e.preventDefault()}>
+          <div className="pm-pop-grid pm-pop-fields">{children}</div>
+          <div className="pm-pop-foot">
+            <button type="button" className="btn btn-sm" onClick={() => setOpen(false)}>
+              {m.close}
+            </button>
+          </div>
+        </form>
       </div>
-      <form
-        className="flex flex-wrap items-end gap-x-5 gap-y-3 rounded-box rounded-t-none border border-t-0 border-base-300 bg-base-100 px-4 py-3.5 text-sm"
-        onSubmit={(e) => e.preventDefault()}
-        aria-label={label}
-        data-list-part="top"
-        hidden={!open}
-      >
-        {children}
-      </form>
+      {active.map(([k, v, clear]) => (
+        <span key={k} className={`pm-fchip ${clear ? '' : 'pm-fchip-def'}`} data-testid="search-chip">
+          {/* 값만("상태 닫힘" 처럼 되풀이하지 않게) — 무슨 조건인지는 올려 보면(title)·읽기 도구 이름 */}
+          <button type="button" className="pm-fchip-l" aria-label={m.change(k, v)} title={k} onClick={() => setOpen(true)}>
+            {v}
+          </button>
+          {clear && (
+            <button type="button" className="pm-fchip-x" aria-label={m.clear(k)} onClick={clear}>
+              ✕
+            </button>
+          )}
+        </span>
+      ))}
+      {extra && <span className="ml-auto flex items-center gap-2">{extra}</span>}
     </div>
   );
 }

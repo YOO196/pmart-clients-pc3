@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { API_BASE } from '../../api/client';
 import { db } from '../../mocks/db';
-import { renderAt } from '../../test/render';
+import { openFilter, renderAt } from '../../test/render';
 import { server } from '../../test/server';
 
 const rows = () => screen.getAllByTestId('assignment-row');
@@ -53,6 +53,7 @@ describe('배정 목록', () => {
   it('상태(바뀜) 거르기는 URL 쿼리 → 서버로', async () => {
     const view = renderAt('/c/MFC-BJG-01/assignments');
     await waitFor(() => expect(rows()).toHaveLength(3));
+    await openFilter();
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'SUPERSEDED');
     await waitFor(() => expect(rows()).toHaveLength(1));
     expect(new URL(view.gets('/assignments').at(-1)!.url).searchParams.get('state')).toBe('SUPERSEDED');

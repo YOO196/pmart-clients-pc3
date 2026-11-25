@@ -5,7 +5,7 @@
 // - 추천 `POST /assignment-plans` {mfcId, horizonMinutes} → 계획(PROPOSED 등) — 배정은 바뀌지 않는다. 확정 `POST …/{planId}/commits`(전부 또는 전무, 409 PLAN_STALE → 다시 읽어 낡은 이유).
 // - 지난 추천 목록 `GET /assignment-plans?mfcId=&date=&state=`(MB-1) — 추천 탭 아래, 열기 = 추천 화면.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
@@ -20,6 +20,7 @@ import { SearchSelect } from '../../shared/SearchSelect';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
 import { Who } from '../../shared/OperatorLabel';
+import { Caret, expandRowProps, InlineDetail, InlineFields, useInlineOpen } from '../../shared/simList';
 import { assignTaskName, isPickPack } from '../../shared/pickPack';
 import { PlanList } from '../lists/CenterLists';
 import { StartWork, UnassignedTasks } from './StartWork';
@@ -122,6 +123,7 @@ function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonl
     setParams(next, { replace: true });
   };
   const rows = query.data?.items ?? [];
+  const inline = useInlineOpen();
   // 작업자 거르기는 이름으로 쳐서 찾기(초성) — 운영자 ID 는 숨은 찾기 낱말(ADR-0070: 화면에 ID 를 내지 않는다)
   const workers = useQuery({
     queryKey: ['workers', mfcId, 'DEFAULT'],
@@ -132,10 +134,10 @@ function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonl
     <div className="space-y-3">
       <SearchBar
         summary={[
-          [m.filters.state, m.state[state ?? 'ACTIVE'] ?? state ?? ''],
-          [m.filters.date, date],
-          [m.filters.worker, workerId ? (workerName?.name ?? workerName?.displayName ?? m.filters.someone) : ''],
-          [m.filters.task, taskId ? m.filters.oneTask : ''],
+          [m.filters.state, m.state[state ?? 'ACTIVE'] ?? state ?? '', state ? () => set('state', '') : undefined],
+          [m.filters.date, date, () => set('date', '')],
+          [m.filters.worker, workerId ? (workerName?.name ?? workerName?.displayName ?? m.filters.someone) : '', () => set('workerId', '')],
+          [m.filters.task, taskId ? m.filters.oneTask : '', () => set('taskId', '')],
         ]}
         startOpen={!state && !date && !workerId && !taskId}
         extra={query.data?.asOf?.asOf && <span className="text-xs text-base-content/60">{m.asOf(formatSeoul(query.data.asOf.asOf))}</span>}
@@ -191,31 +193,55 @@ function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonl
               </tr>
             </thead>
             <tbody>
-              {rows.map((a) => (
-                <tr key={a.assignmentId} data-testid="assignment-row">
-                  <td>
-                    <TaskLink mfcId={mfcId} taskId={a.taskId} taskType={a.taskType} />
-                  </td>
-                  <td>{assignTaskName(a.taskType)}</td>
-                  <td>
-                    <Who id={a.workerId} />
-                  </td>
-                  <td>{a.assignmentVersion}</td>
-                  <td>{m.source[a.source ?? ''] ?? a.source ?? messages.none}</td>
-                  <td>{a.assignedAt ? formatSeoul(a.assignedAt) : messages.none}</td>
-                  <td>{a.warnings?.length ? a.warnings.map((w) => m.warning[w] ?? w).join(', ') : messages.none}</td>
-                  <td>
-                    <Eligibility code={a.workerEligibility} />
-                  </td>
-                  <td>
-                    {a.state === 'ACTIVE' && (
-                      <button type="button" className="btn btn-xs" onClick={() => onReassign(a)}>
-                        {m.reassign}
-                      </button>
+              {rows.map((a) => {
+                const k = a.assignmentId ?? '';
+                const isOpen = inline.isOpen(k);
+                return (
+                  <Fragment key={k}>
+                    {/* 줄을 누르면 아래에 배정한 사람·상태·시스템 번호(2026-11-25 목록 한 틀). 작업 링크는 작업 상세로 */}
+                    <tr data-testid="assignment-row" {...expandRowProps(isOpen, () => inline.toggle(k))}>
+                      <td>
+                        <Caret open={isOpen} />
+                        <TaskLink mfcId={mfcId} taskId={a.taskId} taskType={a.taskType} />
+                      </td>
+                      <td>{assignTaskName(a.taskType)}</td>
+                      <td>
+                        <Who id={a.workerId} />
+                      </td>
+                      <td>{a.assignmentVersion}</td>
+                      <td>{m.source[a.source ?? ''] ?? a.source ?? messages.none}</td>
+                      <td>{a.assignedAt ? formatSeoul(a.assignedAt) : messages.none}</td>
+                      <td>{a.warnings?.length ? a.warnings.map((w) => m.warning[w] ?? w).join(', ') : messages.none}</td>
+                      <td>
+                        <Eligibility code={a.workerEligibility} />
+                      </td>
+                      <td>
+                        {a.state === 'ACTIVE' && (
+                          <button type="button" className="btn btn-xs" onClick={() => onReassign(a)}>
+                            {m.reassign}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                    {isOpen && (
+                      <InlineDetail colSpan={9} testId="assignment-inline">
+                        <InlineFields
+                          rows={[
+                            [m.fields.assignedBy, a.assignedBy ? <Who id={a.assignedBy} /> : messages.none],
+                            [m.filters.state, m.state[a.state ?? ''] ?? a.state ?? messages.none],
+                          ]}
+                        />
+                        <SystemNumbers
+                          ids={[
+                            { label: m.fields.assignment, id: a.assignmentId },
+                            { label: m.planLabel, id: a.planId },
+                          ]}
+                        />
+                      </InlineDetail>
                     )}
-                  </td>
-                </tr>
-              ))}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
           </div>

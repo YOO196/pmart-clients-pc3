@@ -3,7 +3,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import { renderAt } from '../test/render';
+import { openFilter, renderAt } from '../test/render';
 
 describe('나머지 메뉴도 같은 틀', () => {
   it.each(['assignments', 'deliveries', 'packing-handover', 'return-handovers', 'inbound', 'inventory', 'locations', 'quality', 'restrictions', 'moves', 'tasks', 'dispatch-delays'])(
@@ -20,7 +20,7 @@ describe('나머지 메뉴도 같은 틀', () => {
   it('배송 현황: 상태를 고르면 칩으로 접히고 내 보기로 저장할 수 있다', async () => {
     renderAt('/c/MFC-BJG-01/deliveries?state=ASSIGNED');
     const bar = await screen.findByTestId('search-bar');
-    expect(within(bar).getByTestId('search-chip')).toHaveTextContent(/상태/);
+    expect(within(bar).getByTestId('search-chip').querySelector('button')?.title).toMatch(/상태/);
     expect(within(bar).getByRole('form', { hidden: true })).not.toBeVisible();
     await userEvent.click(within(screen.getByTestId('saved-views')).getByRole('button', { name: '+ 지금 조건 저장' }));
     await userEvent.type(screen.getByRole('textbox', { name: '보기 이름' }), '배정됨');
@@ -30,6 +30,7 @@ describe('나머지 메뉴도 같은 틀', () => {
 
   it('배정: 작업자 거르기는 이름으로 쳐서 찾기(운영자 ID 를 치지 않는다)', async () => {
     const view = renderAt('/c/MFC-BJG-01/assignments');
+    await openFilter();
     const box = await screen.findByRole('combobox', { name: '작업자' });
     await userEvent.click(box);
     await userEvent.type(box, 'ㄱㅎㅈ');

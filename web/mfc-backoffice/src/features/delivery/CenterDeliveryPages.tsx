@@ -110,7 +110,7 @@ export function CenterDeliveriesMenu({ mfcId }: { readonly mfcId: string }) {
       <h1>{m.title}</h1>
       {tabs}
       <SearchBar
-        summary={[[m.state, state ? name(m.executionState, state) : m.activeStates]]}
+        summary={[[m.state, state ? name(m.executionState, state) : m.activeStates, state ? () => set({ state: '' }) : undefined]]}
         startOpen={!state}
         extra={
           <>

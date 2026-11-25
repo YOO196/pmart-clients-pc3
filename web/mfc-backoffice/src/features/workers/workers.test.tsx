@@ -10,7 +10,7 @@ import { as, renderAt } from '../../test/render';
 import { server } from '../../test/server';
 
 const rows = () => screen.getAllByTestId('worker-row');
-const names = () => rows().map((r) => within(r).getAllByRole('cell')[0]!.textContent);
+const names = () => rows().map((r) => within(r).getByTestId('worker-name').textContent?.split(' · ')[0]);
 const sentBody = async (r: Request) => (await r.clone().json()) as Record<string, unknown>;
 const posts = (sent: Request[], part: string) => sent.filter((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith(part));
 const heading = () => screen.findByRole('heading', { level: 1 });
@@ -29,9 +29,26 @@ describe('작업자 목록', () => {
   it('퇴사 거르기는 URL 쿼리 → 서버로', async () => {
     const view = renderAt('/c/MFC-BJG-01/workers');
     await waitFor(() => expect(rows()).toHaveLength(4));
+    // 찾기 줄의 "필터" 팝업 안에 상태 고르기, 고르면 칩(✕ 로 풀기)
+    await userEvent.click(screen.getByTestId('search-toggle'));
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'LEFT');
     await waitFor(() => expect(names()).toEqual(['정퇴사']));
     expect(new URL(view.gets('/workers').at(-1)!.url).searchParams.get('state')).toBe('LEFT');
+    await userEvent.click(screen.getByRole('button', { name: '상태 조건 풀기' }));
+    await waitFor(() => expect(rows()).toHaveLength(4));
+  });
+
+  it('이름·사번 찾기는 받은 목록 안에서 거르고, 줄을 누르면 아래에 펼친다(전체 상세 ›)', async () => {
+    renderAt('/c/MFC-BJG-01/workers');
+    await waitFor(() => expect(rows()).toHaveLength(4));
+    await userEvent.type(screen.getByRole('searchbox', { name: '이름·사번' }), '박일');
+    await userEvent.click(screen.getByRole('button', { name: '찾기' }));
+    await waitFor(() => expect(names()).toEqual(['박일일']));
+    expect(screen.getByTestId('worker-result')).toHaveTextContent('1명');
+    await userEvent.click(within(rows()[0]!).getAllByRole('cell')[2]!);
+    const inline = await screen.findByTestId('worker-inline');
+    expect(within(inline).getByText('할 수 있는 일(자격)')).toBeInTheDocument();
+    expect(within(inline).getByRole('link', { name: '전체 상세 ›' })).toHaveAttribute('href', expect.stringContaining('/c/MFC-BJG-01/workers/'));
   });
 
   it('조회 실패는 빈 목록이 아니라 오류', async () => {

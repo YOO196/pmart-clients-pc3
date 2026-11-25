@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { API_BASE } from '../../api/client';
 import { db } from '../../mocks/db';
-import { as, renderAt } from '../../test/render';
+import { as, openFilter, renderAt } from '../../test/render';
 import { server } from '../../test/server';
 
 const cards = () => screen.getAllByTestId('restriction');
@@ -19,6 +19,7 @@ describe('운영 제한', () => {
     expect(cards()[0]).toHaveTextContent('수용 축소');
     expect(cards()[0]).toHaveTextContent('ORD-7');
     expect(new URL(view.gets('/operation-restrictions')[0]!.url).searchParams.get('activeOnly')).toBeNull();
+    await openFilter();
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '보기' }), '1');
     await waitFor(() => expect(cards()).toHaveLength(2));
     expect(new URL(view.gets('/operation-restrictions').at(-1)!.url).searchParams.get('activeOnly')).toBe('false');

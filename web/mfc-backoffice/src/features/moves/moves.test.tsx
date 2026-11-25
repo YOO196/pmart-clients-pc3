@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { API_BASE } from '../../api/client';
 import { db } from '../../mocks/db';
-import { as, renderAt } from '../../test/render';
+import { as, openFilter, renderAt } from '../../test/render';
 import { server } from '../../test/server';
 
 const rows = () => screen.getAllByTestId('move-row');
@@ -27,6 +27,7 @@ describe('이동 목록', () => {
   it('상태 거르기(끝남)는 URL 쿼리 → 서버로', async () => {
     const view = renderAt('/c/MFC-BJG-01/moves');
     await waitFor(() => expect(rows()).toHaveLength(3));
+    await openFilter();
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'COMPLETED');
     await waitFor(() => expect(rows()).toHaveLength(1));
     expect(new URL(view.gets('/move-orders').at(-1)!.url).searchParams.get('state')).toBe('COMPLETED');

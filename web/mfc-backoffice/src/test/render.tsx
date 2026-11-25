@@ -1,4 +1,5 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { mockOperatorToken } from '@pmart/web-core';
 import { App } from '../app/App';
@@ -27,4 +28,10 @@ export function renderAt(path: string, accessToken: string | null = as.sup) {
     sent,
     gets: (pathPart: string) => sent.filter((r) => r.method === 'GET' && new URL(r.url).pathname.includes(pathPart)),
   };
+}
+
+/** 목록 찾기 줄의 "필터" 팝업을 연다(이미 열렸으면 그대로) — 고르기 칸은 팝업 안에 있다(2026-11-25 목록 한 틀) */
+export async function openFilter() {
+  const toggle = await screen.findByTestId('search-toggle');
+  if (toggle.getAttribute('aria-expanded') !== 'true') await userEvent.click(toggle);
 }

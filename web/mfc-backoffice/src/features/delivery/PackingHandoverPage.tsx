@@ -64,7 +64,7 @@ export function PackingHandoverMenu({ mfcId }: { readonly mfcId: string }) {
     <section className="space-y-4">
       <h1>{m.title}</h1>
       <SearchBar
-        summary={[[m.state, state ? name(m.shipmentState, state) : m.activeStates]]}
+        summary={[[m.state, state ? name(m.shipmentState, state) : m.activeStates, state ? () => set({ state: '' }) : undefined]]}
         startOpen={!state}
         extra={
           <>
