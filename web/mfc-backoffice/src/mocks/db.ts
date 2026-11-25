@@ -515,6 +515,10 @@ function seedHandlings(): MockHandling[] {
     // 신상품(R8) — 이 센터가 아직 정하지 않음
     { sku: 'SKU-NEW-1', handlingEnabled: false, version: 0, skuState: 'ACTIVE', saleState: 'ON_SALE', introducedAt: '2026-11-19T00:00:00.000Z' },
     { sku: 'SKU-NEW-2', handlingEnabled: false, version: 0, skuState: 'ACTIVE', saleState: 'ON_SALE', introducedAt: '2026-11-18T03:00:00.000Z' },
+    // 본사 상품 목(mocks/catalog.ts)의 나머지 SKU — 재고가 있는 것은 켜 둠, 생수·콜라는 아직 정한 적 없음
+    ...['SKU-TOFU', 'SKU-ICE', 'SKU-CHICKEN', 'SKU-DUMPLING', 'SKU-PIZZA'].map((sku) => ({ sku, handlingEnabled: true, version: 1, skuState: 'ACTIVE' as const, saleState: 'ON_SALE' as const })),
+    ...['SKU-WATER-2L', 'SKU-WATER-6'].map((sku) => ({ sku, handlingEnabled: false, version: 0, skuState: 'ACTIVE' as const, saleState: 'ON_SALE' as const })),
+    { sku: 'SKU-COLA-1', handlingEnabled: false, version: 0, skuState: 'ACTIVE', saleState: 'TEMP_OUT' },
   ];
 }
 

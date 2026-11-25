@@ -26,6 +26,7 @@ import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 import { CountSessionList, StockUnitList } from '../lists/CenterLists';
 import { CountWindowsCard, RotationCountStart } from './CountPlanning';
+import { CatalogImport } from './CatalogImport';
 import { LotTraceTab } from './LotTraceTab';
 import { StockLedgerTab } from './StockLedgerTab';
 import { StockLiveStatus } from '../stock-stream/useStockStream';
@@ -819,8 +820,16 @@ function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
     getNextPageParam: (last) => last.page?.nextCursor ?? undefined,
   });
   const rows = (query.data?.pages ?? []).flatMap((p) => p.items ?? []);
+  // 본사 상품 불러오기(2026-11-25 사용자) — 본사 상품 목록에서 골라 이 센터 취급을 한꺼번에 켠다
+  const [importOpen, setImportOpen] = useState(false);
   return (
     <div className="max-w-4xl space-y-3 text-sm">
+      <div className="flex justify-end">
+        <button type="button" className="btn btn-sm btn-primary" aria-expanded={importOpen} onClick={() => setImportOpen((o) => !o)}>
+          {m.catalog.open}
+        </button>
+      </div>
+      {importOpen && <CatalogImport mfcId={mfcId} onClose={() => setImportOpen(false)} />}
       <NewProductsBanner mfcId={mfcId} onShow={() => setEnabled('new')} />
       <p className="text-xs opacity-70">{m.handlingsHint}</p>
       <label className="flex w-fit flex-col gap-1 rounded-box bg-base-100 p-3">
