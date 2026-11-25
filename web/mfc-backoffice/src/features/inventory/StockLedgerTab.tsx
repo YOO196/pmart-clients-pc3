@@ -13,6 +13,8 @@ import { SystemNumbers } from '../../shared/displayNumber';
 import { StatCard, StatStrip } from '../../shared/listParts';
 import { LotLabel } from '../../shared/LotLabel';
 import { messages } from '../../shared/messages';
+import { Who } from '../../shared/OperatorLabel';
+import { OrderNo } from '../../shared/OrderNo';
 import { Caret, expandRowProps, InlineDetail, InlineFields, ResultBar, SearchPanel, SearchRow, useInlineOpen } from '../../shared/simList';
 
 const m = messages.inventory.ledger;
@@ -256,6 +258,8 @@ function CommitDetail({ commit: c }: { readonly commit: Commit }) {
           [m.symbol.E!, a.sellableQty],
           [m.symbol.R!, a.reservedQty],
           [messages.inventory.lot.available, a.availableQty],
+          [m.order, <OrderNo key="o" orderId={c.orderId} />],
+          [m.actor, c.actorOperatorId ? <Who key="a" id={c.actorOperatorId} /> : messages.none],
           [m.col.source, c.sourceSystem],
         ]}
       />
