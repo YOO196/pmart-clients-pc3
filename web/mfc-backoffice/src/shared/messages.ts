@@ -5,6 +5,8 @@ export const messages = {
   appTitle: 'PMart MFC',
   goHome: 'PMart MFC 백오피스 홈으로',
   mockBadge: '목 데이터',
+  /** 주문 ID 는 있는데 화면 번호를 못 찾음(번호 전 주문·조회 실패) — ID 를 대신 내지 않는다 */
+  orderNoUnknown: '주문 번호 없음',
   /** 밝은/어두운 화면 단추(2026-11-20 — 인사·라이더·통합과 같게) */
   theme: { toDark: '어두운 화면으로', toLight: '밝은 화면으로' },
   ...uiMessages,
@@ -1039,7 +1041,24 @@ export const messages = {
     /** 시스템 번호 칸 이름(ADR-0070 — 상세 머리에서 뺀 시스템 ID) */
     sys: { session: '실사' },
     intro: '상품별 재고를 보고 다뤄요.',
-    tabs: { stock: '상품별 재고', ledger: '재고 이력', counts: '순환 실사', unshippable: '출하 부적격 LOT', policies: '보충 기준', handlings: '상품 취급' },
+    tabs: { stock: '상품별 재고', ledger: '재고 이력', lotTrace: 'LOT 추적', counts: '순환 실사', unshippable: '출하 부적격 LOT', policies: '보충 기준', handlings: '상품 취급' },
+    /** LOT 추적 — LOT 찾기(lot-resolutions) + 지금 있는 칸(stock) + 이 LOT 줄만 이력(stock-ledger lotId) */
+    lotTrace: {
+      search: 'LOT 추적',
+      placeholder: 'LOT 번호·라벨 바코드',
+      needLot: 'LOT 번호를 넣고 조회해요.',
+      notFound: '이 LOT 을 찾지 못했어요.',
+      product: '상품',
+      lotNo: 'LOT 번호',
+      sourceLotRef: '제조사 LOT',
+      received: '납입',
+      onHand: '이 센터 보유',
+      where: '지금 있는 곳',
+      whereEmpty: '이 센터에 남은 수량이 없어요.',
+      history: '이 LOT 이 지나온 길',
+      historyEmpty: '이 LOT 의 이력이 없어요.',
+      col: { at: '시각', cause: '원인', move: '칸·수량', state: '판매 가능·격리·예약', order: '주문', actor: '처리한 사람', source: '출처' },
+    },
     /** 재고 이력 — inventory 0.48.0 stock-ledger(확정 단위별 증감·그 뒤 합계) */
     ledger: {
       search: '재고 이력 찾기',
@@ -1059,6 +1078,9 @@ export const messages = {
       entry: { symbol: '구분', delta: '증감', location: '칸', lot: 'LOT', expiry: '소비기한', state: '품질·업무' },
       symbol: { H: '보유', Q: '격리', E: '판매 가능', R: '예약' } as Readonly<Record<string, string>>,
       afterLabel: '그 뒤 합계',
+      order: '주문',
+      actor: '처리한 사람',
+      system: '시스템',
       commit: '확정 번호',
       more: '더 보기',
       causeName: {
