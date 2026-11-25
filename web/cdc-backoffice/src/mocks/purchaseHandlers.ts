@@ -161,7 +161,8 @@ export const resetPurchase = () => {
 };
 
 const stamp = () => new Date().toISOString();
-const ymd = () => stamp().slice(0, 10).replaceAll('-', '');
+/** 번호용 서울 날짜(YYYYMMDD) */
+const ymd = () => new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10).replaceAll('-', '');
 
 /** 가짜 공급사: 예정 시각이 지났으면 회신 → ASN 으로 진행 */
 function advance(s: StoredPo) {
