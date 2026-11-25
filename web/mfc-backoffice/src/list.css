@@ -120,13 +120,7 @@ main a.btn {
 }
 
 /* 찾기 줄은 숫자 띠에서 28px 띄움(라이더 sim-look main form.pm-fbar) */
-main :is(.pm-stat-strip, [data-testid$='-counts']) ~ .pm-fbar {
-  margin-top: 28px;
-}
-/* 목록 묶음(space-y-4) 첫 줄이 찾기 줄이면 바깥 16px + 12px = 28px(공용 form.pm-fbar 28px 이 겹쳐 44px 가 되던 것) */
-main .space-y-4 > .space-y-4 > .pm-fbar:first-child {
-  margin-top: 12px;
-}
+
 
 /* 3차(2026-11-25 PC5 비교 — 라이더 "라이더 관리"와 같은 폭에서 나란히) */
 /* 표 상자: 머리줄 왼쪽 건수(ResultBar) + 표를 한 상자로 */
@@ -143,4 +137,23 @@ main .pm-list-box > [data-list-part='mid'] {
 /* 표 머리 칸 글자 — 보조 글색 600 13px */
 main table th {
   font-size: 13px;
+}
+
+/* 4차(2026-11-25 PC5 #531 확인) */
+/* 숫자 띠 → 찾기 줄 28px — 찾기 줄이 목록 묶음 첫 줄이면 위 여백이 바깥과 겹쳐(마진 겹침) 18px 로 보였다. 띠 아래 여백으로 준다 */
+main .pm-stat-strip:has(+ .pm-fbar, + * > .pm-fbar:first-child) {
+  margin-block-end: 28px;
+}
+main .pm-stat-strip + .pm-fbar,
+main .pm-stat-strip + * > .pm-fbar:first-child {
+  margin-top: 0;
+}
+/* 표 상자 머리 건수 — 알약 바탕 없이 굵은 글자 13px 600(라이더 "2건") */
+main .pm-list-box .pm-count-pill {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-base-content);
 }

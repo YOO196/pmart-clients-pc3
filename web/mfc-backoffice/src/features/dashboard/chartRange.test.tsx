@@ -239,7 +239,7 @@ describe('추이 그래프 기간', () => {
       expect(within(bar).getByRole('button', { name: '시간' })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: '출하 준수' }));
       await waitFor(() => expect(within(bar).queryByRole('button', { name: '시간' })).not.toBeInTheDocument());
-      expect(screen.getByTestId('ship-no-api')).toHaveTextContent('API 가 아직 없어요');
+      expect(screen.getByTestId('ship-no-api')).toHaveTextContent('출하 약속 준수율은 아직 없어요.');
       expect(screen.queryByTestId('chart-ship')).not.toBeInTheDocument();
     });
   });

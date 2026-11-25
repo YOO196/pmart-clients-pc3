@@ -138,7 +138,7 @@ describe('세션 응답(sessions/current 0.6.0) — 토큰을 풀지 않는다',
 describe('역할', () => {
   it('MFC_WORKER 만 있으면 "센터 관리자만 쓰는 화면" — 메뉴 없음', async () => {
     renderAt('/', as.worker);
-    expect(await screen.findByRole('alert')).toHaveTextContent('센터 관리자만 쓰는 화면입니다');
+    expect(await screen.findByRole('alert')).toHaveTextContent('현장 작업은 PDA 앱에서 해 주세요.');
     expect(screen.queryByText('작업자 관리')).not.toBeInTheDocument();
     renderAt('/c/MFC-BJG-01/workers', as.worker);
     expect(screen.queryByRole('heading', { name: '작업자' })).not.toBeInTheDocument();
@@ -153,7 +153,7 @@ describe('역할', () => {
   it('센터 관리자가 아닌 역할 + 센터: 막지 않고 안내만(판정은 서버)', async () => {
     renderAt('/c/MFC-BJG-01/locations', as.adminWithCenter);
     expect(await screen.findByRole('heading', { name: '위치(칸)' })).toBeInTheDocument();
-    expect(screen.getByRole('note')).toHaveTextContent('센터 관리자(MFC_SUPERVISOR) 권한이 없어요');
+    expect(screen.getByRole('note')).toHaveTextContent('센터 관리자 권한이 없어요.');
   });
 });
 
