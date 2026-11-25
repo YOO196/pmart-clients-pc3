@@ -3,7 +3,9 @@ import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { operator, problem, unauthorized } from './support';
+import { hourShare } from '../features/dashboard/dashboardRules';
 import { hasDemoData, scaled } from './demoCenters';
+import { shipDay } from './shipSim';
 
 const canAccess = (request: Request, mfcId: string) => operator(request)?.centers.includes(mfcId) ?? false;
 
@@ -23,6 +25,44 @@ const days = (from: string, to: string) => {
 };
 
 export const dashboardHandlers = [
+  // 출하 약속 준수율(fulfillment 0.35.0) — 칸 = 약속 시각(서울)을 bucket 으로 내린 값, 0건 칸은 줄 없음. 상한은 picking-lines 와 같다
+  http.get(`${API_BASE}/metrics/ship-promises`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    const q = new URL(request.url).searchParams;
+    const mfcId = q.get('mfcId') ?? '';
+    if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
+    const from = q.get('from') ?? '';
+    const to = q.get('to') ?? '';
+    const bucket = q.get('bucket') ?? 'DAY';
+    const limit = ({ HOUR: 7, DAY: 92, WEEK: 366, MONTH: 366 } as Record<string, number>)[bucket];
+    if (!limit) return problem(400, 'VALIDATION_FAILED');
+    if (from && to && (Date.parse(to) - Date.parse(from)) / 86_400_000 + 1 > limit) return problem(400, 'VALIDATION_FAILED');
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date());
+    const nowHour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', hourCycle: 'h23' }).format(new Date()));
+    type Acc = { date: string; hour: string | null; onTime: number; late: number };
+    const acc = new Map<string, Acc>();
+    const add = (key: string, date: string, hour: string | null, onTime: number, late: number) => {
+      const a = acc.get(key) ?? { date, hour, onTime: 0, late: 0 };
+      a.onTime += onTime;
+      a.late += late;
+      acc.set(key, a);
+    };
+    if (hasDemoData(mfcId) || mfcId === 'MFC-BJG-01')
+      for (const d of days(from, to)) {
+        const s = shipDay(mfcId, d, today);
+        if (!s) continue;
+        if (bucket === 'HOUR') {
+          const last = d === today ? nowHour : 23;
+          for (let h = 0; h <= last; h++) add(`${d}T${h}`, d, `${d}T${String(h).padStart(2, '0')}:00:00+09:00`, hourShare(s.onTime, h, last), hourShare(s.late, h, last));
+        } else if (bucket === 'WEEK') {
+          const monday = new Date(Date.parse(`${d}T00:00:00Z`) - ((new Date(`${d}T00:00:00Z`).getUTCDay() + 6) % 7) * 86_400_000).toISOString().slice(0, 10);
+          add(monday, monday, null, s.onTime, s.late);
+        } else if (bucket === 'MONTH') add(d.slice(0, 7), `${d.slice(0, 7)}-01`, null, s.onTime, s.late);
+        else add(d, d, null, s.onTime, s.late);
+      }
+    const items = [...acc.values()].filter((a) => a.onTime + a.late > 0).map((a) => ({ date: a.date, hour: a.hour, mfcId, due: a.onTime + a.late, onTime: a.onTime, late: a.late, pending: 0 }));
+    return HttpResponse.json({ items, asOf: new Date().toISOString() });
+  }),
   http.get(`${API_BASE}/metrics/picking-lines/by-sku`, ({ request }) => {
     if (!operator(request)) return unauthorized();
     const q = new URL(request.url).searchParams;
