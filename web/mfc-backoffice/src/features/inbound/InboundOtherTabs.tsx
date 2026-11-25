@@ -79,7 +79,7 @@ export function InitialStockTab({ mfcId }: { readonly mfcId: string }) {
     queryFn: async () => (await request('GET', api.inbound.GET('/initial-stock-loads', { params: { query: { approvalId } } }))).items,
   });
   return (
-    <div className="max-w-4xl space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <p className="text-xs opacity-70">{m.initialHint}</p>
       <InitialLoadList mfcId={mfcId} />
       <LookupForm label={m.approvalId} value={approvalId} onSubmit={setApprovalId} />
@@ -247,7 +247,7 @@ export function ReturnReceiptTab({ mfcId }: { readonly mfcId: string }) {
   });
   const set = (i: number, patch: Partial<ReturnLine>) => setLines((prev) => prev.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   return (
-    <div className="max-w-4xl space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <p className="text-xs opacity-70">{m.returnsHint}</p>
       <ReturnReceiptList mfcId={mfcId} />
       <form
@@ -451,7 +451,7 @@ export function SupplyRequestTab({ mfcId }: { readonly mfcId: string }) {
     return r;
   });
   return (
-    <div className="max-w-4xl space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <p className="text-xs opacity-70">{m.supplyHint}</p>
       <SupplyRequestList mfcId={mfcId} />
       <form

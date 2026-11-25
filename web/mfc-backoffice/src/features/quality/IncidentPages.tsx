@@ -38,7 +38,7 @@ const MAX_LOTS = 50;
 export function IncidentsTab({ mfcId }: { readonly mfcId: string }) {
   const [openId, setOpenId] = useQueryParam('incidentId');
   return (
-    <div className="max-w-4xl space-y-3 text-sm">
+    <div className="space-y-3 text-sm">
       <p className="opacity-70">{m.intro}</p>
       <IncidentCounts mfcId={mfcId} />
       <IncidentList mfcId={mfcId} />
