@@ -973,6 +973,15 @@ void main() {
       },
     );
 
+    testWidgets('위 평점 칸(리뷰 N개 ›)을 누르면 바로 상품리뷰 전체 보기', (t) async {
+      await t.pumpWidget(testApp([]));
+      await t.pumpAndSettle();
+      await tapTile(t, 'P-0001');
+      await t.tap(find.byKey(const ValueKey('product-rating-pill')));
+      await t.pumpAndSettle();
+      expect(find.text('상품리뷰 전체 보기'), findsOneWidget);
+    });
+
     testWidgets('넉넉한 상품은 N개 남음·알림이 없다', (t) async {
       await t.pumpWidget(testApp([]));
       await t.pumpAndSettle();

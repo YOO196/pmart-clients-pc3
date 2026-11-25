@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:go_router/go_router.dart';
@@ -437,8 +438,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 key: const ValueKey('product-rating-pill'),
+                // 누르면 바로 상품리뷰 전체 보기(사용자 2026-11-25). 아래 [리뷰] 탭은 이 화면의 리뷰 구획으로.
                 onTap: hasRating
-                    ? () => _scrollTo(_reviewsKey, reviews: true)
+                    ? () => context.push('/products/${p.productId}/reviews')
                     : null,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 6, 4),
@@ -666,6 +668,10 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     ];
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
+      // 구획을 화면 밖으로 내려도 버리지 않는다(사용자 2026-11-25 폰: 내렸다 올리면 "막힌다" — 버린 선반이
+      // 다시 읽는 동안 높이 0 이었다가 커지며 위치가 튀었다. [리뷰] 탭도 만들어지지 않은 리뷰 구획으로는
+      // 이동하지 못했다). 상세 한 장이라 모두 붙잡아도 된다.
+      scrollCacheExtent: const ScrollCacheExtent.pixels(100000),
       children: children,
     );
   }
