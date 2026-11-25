@@ -24,10 +24,12 @@ import { SystemNumbers } from '../../shared/displayNumber';
 
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
-import { CountSessionList, StockUnitList } from '../lists/CenterLists';
+import { CountSessionList } from '../lists/CenterLists';
 import { CountWindowsCard, RotationCountStart } from './CountPlanning';
 import { ProductThumb, useProductCards, useProductView, ViewToggle, type ProductCardInfo, type ProductView } from '../../shared/productCards';
+import { BackButton } from '../../shared/DetailHead';
 import { CatalogImport } from './CatalogImport';
+import { StockProductInfo, StockProductList } from './StockProducts';
 import { LotTraceTab } from './LotTraceTab';
 import { StockLedgerTab } from './StockLedgerTab';
 import { StockLiveStatus } from '../stock-stream/useStockStream';
@@ -142,10 +144,15 @@ function StockTab({ mfcId }: { readonly mfcId: string }) {
   });
   const l = m.lot;
   const u = m.unit;
+  // 상품 코드가 없으면 상품별 목록(목록·카드, 2026-11-25 사용자) — 누르면 그 상품의 정보·LOT·위치
+  if (!sku) return <StockProductList mfcId={mfcId} onOpen={setSku} />;
   return (
     <div className="space-y-3 text-sm">
-      <StockUnitList mfcId={mfcId} />
-      <LookupForm key={sku} label={m.sku} value={sku} button={m.lookup} onSubmit={setSku} />
+      <div className="flex items-center gap-2">
+        <BackButton onClick={() => setSku('')} label={m.stockProducts.backToList} />
+        <span className="text-sm text-base-content/60">{m.stockProducts.backToList}</span>
+      </div>
+      <StockProductInfo mfcId={mfcId} sku={sku} stockName={query.data?.productName ?? null} />
       {notice && (
         <p role="status" className="text-success">
           {notice}

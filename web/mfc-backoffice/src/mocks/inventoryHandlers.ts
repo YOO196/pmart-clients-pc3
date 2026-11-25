@@ -328,6 +328,15 @@ export const inventoryHandlers = [
     const items = all.slice(start, start + size).map((p) => ({ productId: p.productId, baseProductId: `BP-${p.productId}`, internalName: p.name, primaryCategoryId: p.categoryId, saleState: p.saleState, version: 1 }));
     return HttpResponse.json({ items, page: { nextCursor: start + size < all.length ? String(start + size) : null, size: items.length } });
   }),
+  // SKU 상세(product-service) — 판매 단위·중량·바코드. 목 상품에 없는 SKU 는 404
+  http.get(`${API_BASE}/skus/:sku`, ({ request, params }) => {
+    if (!operator(request)) return unauthorized();
+    const sku = String(params.sku);
+    const p = productOfSku(sku);
+    if (!p) return problem(404, 'NOT_FOUND');
+    const multi = sku === 'SKU-WATER-6';
+    return HttpResponse.json({ sku, productId: p.productId, baseProductId: `BP-${p.productId}`, unitType: multi ? 'B' : 'E', unitsPerSku: multi ? 6 : 1, weightG: 1000, volumeMl: null, saleState: p.saleState, barcodes: [`880${String(MOCK_PRODUCTS.indexOf(p)).padStart(10, '0')}`], version: 1 });
+  }),
   http.get(`${API_BASE}/products/:productId`, ({ request, params }) => {
     if (!operator(request)) return unauthorized();
     const p = MOCK_PRODUCTS.find((x) => x.productId === String(params.productId));
