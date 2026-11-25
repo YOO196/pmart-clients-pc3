@@ -14,6 +14,10 @@ import 'package:customer_app/features/cart/domain/cart_merge.dart';
 import 'package:customer_app/features/cart/presentation/cart_merge_screen.dart';
 import 'package:customer_app/shared/providers.dart' show sourceSystem;
 
+import 'package:customer_app/features/cart/presentation/cart_controller.dart';
+import 'package:customer_app/features/cart/presentation/guest_cart_carry.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'support/app_harness.dart';
 
 /// 주문서 로그인 뒤 비회원 장바구니 병합(SCR-CART-MERGE-001, BR-50 회신 — cart 0.2.2). 목 모드.
@@ -54,6 +58,35 @@ void main() {
 
   // 로그인(·병합) 뒤에는 장바구니로 돌아와 수령방법을 고른다(사용자 결정 2026-11-20 — 배송 방식 화면을 장바구니에 합침).
   bool onDelivery() => key('cart-receive').evaluate().isNotEmpty;
+
+  test('로그인하면 비회원 장바구니를 모두 회원 장바구니로(사용자 2026-11-25 — [주문하기] 밖 로그인)', () async {
+    final container = ProviderContainer(
+      overrides: [
+        cartMergeRepositoryProvider.overrideWithValue(merges),
+        cartControllerProvider.overrideWith(_MemberCart.new),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.read(lastGuestCartIdProvider.notifier).set('cart-guest-1');
+    await carryGuestCartOnLogin(container);
+    final lines = (await member.get(MockCartRepository.cartId)).lines;
+    expect(lines.map((l) => l.sku), containsAll(['E-00000002', 'E-00000003']));
+    expect(container.read(lastGuestCartIdProvider), isNull);
+  });
+
+  test('[주문하기] 로그인 중이면(병합 화면이 한다) 자동으로 옮기지 않는다', () async {
+    final container = ProviderContainer(
+      overrides: [
+        cartMergeRepositoryProvider.overrideWithValue(merges),
+        cartControllerProvider.overrideWith(_MemberCart.new),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.read(lastGuestCartIdProvider.notifier).set('cart-guest-1');
+    container.read(checkoutLoginPendingProvider.notifier).set(true);
+    await carryGuestCartOnLogin(container);
+    expect(container.read(lastGuestCartIdProvider), 'cart-guest-1');
+  });
 
   testWidgets('비회원 장바구니가 비어 있으면 병합 화면 없이 바로 주문서', (t) async {
     guest = MockCartRepository(latency: Duration.zero, seeded: false);
@@ -348,4 +381,12 @@ void main() {
       expect(adapter.requests.length, greaterThanOrEqualTo(2));
     });
   });
+}
+
+/// 시험: 회원 장바구니(비회원과 다른 ID).
+class _MemberCart extends CartController {
+  @override
+  Future<CartState> build() async => const CartState(
+    cart: Cart(cartId: 'cart-member-1', version: 1, isMember: true, lines: []),
+  );
 }

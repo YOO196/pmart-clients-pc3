@@ -186,7 +186,8 @@ void main() {
         expect(
           find.descendant(
             of: account,
-            matching: find.text('홍길동 · hong@gmail.com'),
+            // 앱 이름이 없어 위 줄이 계정 이름, 아래 줄은 이메일만(이름 두 번 안 보이게).
+            matching: find.text('hong@gmail.com'),
           ),
           findsOneWidget,
         );
@@ -232,7 +233,8 @@ void main() {
         ..email = 'hong@naver.com';
       await t.pump(const Duration(seconds: 2));
       await t.pumpAndSettle();
-      expect(find.text('홍길동 · hong@naver.com'), findsOneWidget);
+      expect(find.text('hong@naver.com'), findsOneWidget);
+      expect(find.textContaining('홍길동'), findsOneWidget);
     });
 
     testWidgets('Google 값이 없으면 기본 아바타·"정보 없음"으로 두고, 계정 줄은 제공자 SDK 계정 표시를 쓴다', (

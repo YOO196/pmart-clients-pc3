@@ -80,7 +80,22 @@ class AddressBookController extends AsyncNotifier<AddressBook?> {
     final session = ref.watch(sessionProvider);
     final repo = ref.watch(addressRepositoryProvider);
     if (session is! MemberSession) return _guestBook(repo);
-    return repo.book();
+    final book = await repo.book();
+    // 회원 주소는 있는데 쇼핑 주소(배달 주소)가 정해지지 않았으면 첫 주소로 정한다 — 처음 로그인·가입 뒤 홈이
+    // "배달 주소를 골라 주세요"이던 것(사용자 2026-11-25 "디폴트로 하나 지정"). 실패하면 그대로(홈이 고르게 한다).
+    if (book.shoppingAddress == null && book.addresses.isNotEmpty) {
+      try {
+        await repo.select(
+          book.addresses.first.addressId,
+          expectedVersion: book.context.version,
+          key: IdempotencyKey.generate(),
+        );
+        return await repo.book();
+      } on PmartFailure {
+        return book;
+      }
+    }
+    return book;
   }
 
   /// 비회원 배송지는 기기에 둔 ID 로 하나씩 조회한다. 서버에 없는(404) 것만 지우고, 조회 실패는 실패로 둔다.
@@ -133,6 +148,11 @@ class AddressBookController extends AsyncNotifier<AddressBook?> {
           await _guestStore.select(saved.addressId);
         }
         await _reload();
+        // 회원인데 쇼핑 주소가 아직 없으면 방금 저장한 주소로 정한다 — 저장하고도 홈이 "주소를 설정해 주세요"
+        // 이던 것(사용자 2026-11-25).
+        if (!_guest && state.value?.shoppingAddress == null) {
+          await select(saved.addressId);
+        }
         return AddressSaved(saved);
       } on UnknownResultFailure catch (f) {
         // 같은 키 재전송은 중복 저장이 아니다(계약 IdempotencyKey).

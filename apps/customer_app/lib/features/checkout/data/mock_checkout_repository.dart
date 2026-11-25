@@ -104,6 +104,10 @@ base class MockCheckoutRepository
 
   /// 초안 조회 횟수(시험용: 중복 조회가 없는지).
   int getDraftCalls = 0;
+
+  /// 시험용: 결제가 끝난(취소·실패) 뒤에도 이 횟수만큼은 조회가 아직 "결제 진행 중"(PAYMENT_PENDING)을 준다 —
+  /// 서버가 확보분을 푸는 데 걸리는 시간 흉내.
+  int stillPayingReads = 0;
   final _byKey = <String, String>{};
   final checkoutKeys = <String>[];
   int _seq = 0;
@@ -481,6 +485,18 @@ base class MockCheckoutRepository
     if (approvesWithoutReturn && d.json['status'] == 'PAYMENT_PENDING') {
       approvesWithoutReturn = false;
       _approve(d);
+    }
+    if (stillPayingReads > 0) {
+      stillPayingReads--;
+      final saved = (d.json['status'], d.json['nextAction']);
+      d.json
+        ..['status'] = 'PAYMENT_PENDING'
+        ..['nextAction'] = 'WAIT';
+      final out = _out(d);
+      d.json
+        ..['status'] = saved.$1
+        ..['nextAction'] = saved.$2;
+      return out;
     }
     return _out(d);
   }

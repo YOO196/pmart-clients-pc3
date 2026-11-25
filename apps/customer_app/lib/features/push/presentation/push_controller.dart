@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 
+import '../../start/presentation/start_controller.dart'
+    show StartStep, startStepProvider;
 import '../../../router.dart' show routerProvider;
 import '../../../shared/providers.dart';
 import '../../auth/domain/auth.dart';
@@ -116,7 +118,14 @@ class PushRegistrationController extends Notifier<PushStatus> {
         _source.opened.listen((data) {
           if (!ref.mounted) return;
           if (_member) ref.invalidate(inboxProvider);
-          ref.read(routerProvider).push(pushRoute(data));
+          // 앱이 꺼져 있다가 알림으로 켜졌으면 시작 화면(로딩·주소 등)이 끝난 뒤 그 화면을 연다 — 시작이 홈으로
+          // 보내며 배송 현황이 묻히던 것(사용자 2026-11-25 "배송 출발 알림을 누르니 첫 화면").
+          final route = pushRoute(data);
+          if (ref.read(startStepProvider) == StartStep.ready) {
+            ref.read(routerProvider).push(route);
+          } else {
+            ref.read(pendingPushRouteProvider.notifier).set(route);
+          }
         }, onError: (Object _) {}),
       )
       // 앱을 보고 있을 때 온 푸시 — 상태표시줄 알림은 Firebase 구현이 로컬 알림으로 띄우고, 여기서는 알림함(안 읽음 수)을 다시 읽는다.
@@ -165,4 +174,16 @@ class PushRegistrationController extends Notifier<PushStatus> {
       // 서버에서 못 지웠다 — 뒤이어 단말 토큰을 버리므로([_stop]) 그 토큰으로는 오지 않는다.
     }
   }
+}
+
+/// 시작 화면이 끝나기를 기다리는 푸시 목적지. 앱(`app.dart`)이 시작이 끝나면 연다.
+final pendingPushRouteProvider = NotifierProvider<PendingPushRoute, String?>(
+  PendingPushRoute.new,
+);
+
+class PendingPushRoute extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void set(String? route) => state = route;
 }

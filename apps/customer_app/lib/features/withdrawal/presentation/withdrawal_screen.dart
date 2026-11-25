@@ -4,6 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
+import '../../address/presentation/logout_flow.dart'
+    show prepareKeepAddressAsGuest;
+import '../../start/presentation/start_controller.dart'
+    show logoutKeepingAddressProvider;
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/notice.dart';
 import '../../../shared/providers.dart';
@@ -145,6 +149,10 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
     final router = GoRouter.of(context);
     final text = _text.text.trim();
     final provider = _provider();
+    final container = ProviderScope.containerOf(context, listen: false);
+    // 탈퇴 뒤에도 지금 주소로 둘러보게 — 회원 토큰이 있을 때 주소를 읽어 둔다(탈퇴가 끝나면 읽을 수 없다).
+    final keepAddress = await prepareKeepAddressAsGuest(context, ref);
+    if (!mounted) return;
     final w = await _reauthAndSend(
       (provider, token, key) => ref
           .read(withdrawalRepositoryProvider)
@@ -166,7 +174,15 @@ class _WithdrawalScreenState extends ConsumerState<WithdrawalScreen> {
     }
     if (w.state.done) {
       // 서버가 세션을 끊었다 — 이 기기의 로그인 정보만 지운다(서버에 더 묻지 않는다).
-      await ref.read(sessionProvider.notifier).forgetLocalSession();
+      // 주소 옮기기가 끝날 때까지 주소 입력 화면으로 보내지 않는다(로그아웃과 같다).
+      final hold = container.read(logoutKeepingAddressProvider.notifier)
+        ..set(true);
+      try {
+        await ref.read(sessionProvider.notifier).forgetLocalSession();
+        await keepAddress?.call();
+      } finally {
+        hold.set(false);
+      }
       router.go('/');
       messenger.notice(l10n.wdCompleted);
       return;

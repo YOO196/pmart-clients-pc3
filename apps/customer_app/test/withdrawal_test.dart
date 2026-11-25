@@ -18,6 +18,9 @@ import 'package:customer_app/features/withdrawal/data/withdrawal_repository.dart
 import 'package:customer_app/features/withdrawal/domain/withdrawal.dart';
 import 'package:customer_app/features/withdrawal/presentation/withdrawal_screen.dart';
 
+import 'package:customer_app/features/address/presentation/address_controller.dart'
+    show guestAddressStoreProvider;
+
 import 'support/app_harness.dart';
 
 /// 회원 탈퇴(customer 0.12.0, ADR-0077 — 백엔드 요청 2026-11-20 customer-withdrawal).
@@ -109,6 +112,11 @@ void main() {
     expect(key('withdrawal'), findsNothing);
     expect(member(t), isFalse);
     expect(find.text('탈퇴가 완료됐어요'), findsOneWidget);
+    // 탈퇴 뒤에도 지금 주소로 둘러본다 — 그 주소가 비회원 배송지로(주소 검색 화면 아님, 사용자 2026-11-25).
+    final store = ProviderScope.containerOf(
+      t.element(find.byType(Scaffold).first),
+    ).read(guestAddressStoreProvider);
+    expect(await store.ids(), isNotEmpty);
   });
 
   group('제공자 연결 끊기(백엔드 요청 2026-11-21 — 동의는 처음 가입 때만)', () {

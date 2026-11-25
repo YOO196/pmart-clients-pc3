@@ -6,13 +6,22 @@ import 'package:pmart_ui/pmart_ui.dart';
 import 'package:pmart_core/pmart_core.dart' show PmartEnv;
 
 import 'features/auth/domain/auth.dart' show MemberSession;
+import 'features/address/presentation/logout_flow.dart'
+    show carryGuestAddressOnLogin;
 import 'features/auth/presentation/auth_controller.dart';
+import 'features/cart/presentation/cart_controller.dart'
+    show cartControllerProvider;
+import 'features/cart/presentation/guest_cart_carry.dart';
 import 'features/catalog/presentation/catalog_providers.dart'
     show categoriesProvider;
 import 'features/start/presentation/start_controller.dart'
-    show startFlagsProvider, startPrefetchProvider;
+    show
+        StartStep,
+        startFlagsProvider,
+        startPrefetchProvider,
+        startStepProvider;
 import 'features/push/presentation/push_controller.dart'
-    show pushRegistrationProvider;
+    show pendingPushRouteProvider, pushRegistrationProvider;
 import 'l10n/gen/app_localizations.dart';
 import 'router.dart';
 import 'shared/notice.dart';
@@ -37,9 +46,33 @@ class CustomerApp extends ConsumerWidget {
     ref.listen(startPrefetchProvider, (_, _) {});
     // 한 번이라도 회원이 되면(로그인·세션 복원) 첫 로그인/둘러보기 화면은 본 것으로 둔다 — 로그아웃할 때 그 화면이
     // 다시 뜨던 것(사용자 2026-11-25). 전에는 그 화면에서 로그인한 경우만 기록했다(마이페이지 로그인은 빠짐).
-    ref.listen(sessionProvider, (_, next) {
+    // 비회원 장바구니 ID 를 기억해 둔다(품목이 있을 때) — 로그인하면 옮긴다.
+    ref.listen(cartControllerProvider, (_, next) {
+      final cart = next.value?.cart;
+      if (cart != null && !cart.isMember && cart.lines.isNotEmpty) {
+        ref.read(lastGuestCartIdProvider.notifier).set(cart.cartId);
+      }
+    });
+    // 시작 화면이 끝나면 기다리던 푸시 목적지(배송 현황 등)를 연다.
+    ref.listen(startStepProvider, (_, step) {
+      final route = ref.read(pendingPushRouteProvider);
+      if (step == StartStep.ready && route != null) {
+        ref.read(pendingPushRouteProvider.notifier).set(null);
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => ref.read(routerProvider).push(route),
+        );
+      }
+    });
+    ref.listen(sessionProvider, (prev, next) {
       if (next is MemberSession) {
         ref.read(startFlagsProvider.notifier).completeEntry();
+        // 비회원 → 회원(로그인·가입)일 때 쓰던 주소를 옮긴다(세션 복원은 비회원 기록이 없어 할 일 없음).
+        if (prev is! MemberSession) {
+          final container = ProviderScope.containerOf(context);
+          carryGuestAddressOnLogin(container);
+          // 비회원 장바구니도 옮긴다([주문하기] 로그인은 그 흐름의 병합 화면이 한다).
+          carryGuestCartOnLogin(container);
+        }
       }
     });
     // 세션이 끝났을 때 한 번 알린다: 조용히 이어졌으면 짧게, 안 됐으면 "다시 로그인" 버튼과 함께.

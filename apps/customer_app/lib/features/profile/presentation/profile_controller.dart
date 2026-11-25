@@ -72,8 +72,14 @@ class ProfileController extends AsyncNotifier<Profile?> {
   /// 소셜 로그인 계정인데 이름·이메일이 둘 다 없거나 사진이 없으면 정해 둔 간격으로 몇 번 조용히 다시 읽는다
   /// (사용자 2026-11-25 "처음 로그인 뒤 다시 로그인해야 이메일이 뜬다"). 실패는 무시(앞 값 유지).
   void _refreshWhileIncomplete(Profile p) {
+    // 가입 직후에는 서버 프로필의 socialProvider 도 아직 비어 있다(이름·이메일과 같이 채워진다) — 이 기기
+    // 세션이 아는 로그인 제공자로 본다.
+    final session = ref.read(sessionProvider);
+    final social =
+        p.socialProvider != null ||
+        (session is MemberSession && session.provider != null);
     bool incomplete(Profile q) =>
-        q.socialProvider != null &&
+        social &&
         ((q.name == null && q.email == null) || q.profileImageUrl == null);
     if (!incomplete(p)) return;
     final timers = <Timer>[];
@@ -95,6 +101,18 @@ class ProfileController extends AsyncNotifier<Profile?> {
           }
         }),
       );
+    }
+  }
+
+  /// 화면을 열 때 조용히 다시 읽는다(읽는 동안 앞 값 유지, 실패는 무시). 서버는 로그인 사건·사진 사본을
+  /// 나중에 반영하므로 한 번 읽은 값이 오래 남지 않게 한다(사용자 2026-11-25 — 사진을 바꾸고서야 이메일이 보였다).
+  Future<void> refreshQuietly() async {
+    if (ref.read(sessionProvider) is! MemberSession) return;
+    try {
+      final p = await _repo.get();
+      if (ref.mounted) state = AsyncData(p);
+    } on PmartFailure {
+      // 앞 값 유지
     }
   }
 

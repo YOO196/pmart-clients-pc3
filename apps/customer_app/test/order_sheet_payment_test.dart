@@ -237,6 +237,36 @@ void main() {
     expect(find.text('주문이 완료됐어요'), findsOneWidget);
   });
 
+  testWidgets('결제창을 닫은 뒤 서버가 아직 "결제 중"이어도 다시 읽어 [결제하기]가 열린다(사용자 2026-11-25)', (
+    t,
+  ) async {
+    final checkout = MockCheckoutRepository(
+      latency: Duration.zero,
+      now: () => now,
+    );
+    // 결제창을 닫는 순간부터 서버가 확보분을 푸는 동안(3번 읽기) 아직 "결제 중".
+    final pg = _CancelThenStillPaying(checkout, reads: 3);
+    await toOrderSheet(
+      t,
+      checkout,
+      overrides: [
+        pgLauncherProvider.overrideWithValue(pg),
+        draftReturnPollIntervalProvider.overrideWithValue(
+          const Duration(milliseconds: 100),
+        ),
+      ],
+    );
+    await t.tap(find.byKey(const ValueKey('pay')));
+    await t.pump();
+    for (var i = 0; i < 12; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    await t.pumpAndSettle();
+    expect(find.text('결제를 취소했어요'), findsOneWidget);
+    expect(find.text('결제를 준비하고 있어요'), findsNothing);
+    expect(payOnPressed(t), isNotNull);
+  });
+
   testWidgets('결제 진입이 ACCOUNT_NOT_PURCHASABLE 로 거절되면 사유를 보이고 결제창을 열지 않는다', (
     t,
   ) async {
@@ -298,4 +328,18 @@ final class _HoldingLauncher implements PgLauncher {
       (_pending = Completer<PgReturn>()).future;
 
   void finish(PgReturn ret) => _pending?.complete(ret);
+}
+
+/// 결제창을 닫고(취소) 그 뒤 [reads] 번의 초안 조회는 아직 "결제 중"을 주게 한다.
+final class _CancelThenStillPaying implements PgLauncher {
+  _CancelThenStillPaying(this.checkout, {required this.reads});
+
+  final MockCheckoutRepository checkout;
+  final int reads;
+
+  @override
+  Future<PgReturn> launch(PaymentEntry entry) async {
+    checkout.stillPayingReads = reads;
+    return const PgCancelled();
+  }
 }

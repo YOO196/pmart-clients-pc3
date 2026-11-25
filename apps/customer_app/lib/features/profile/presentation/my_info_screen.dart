@@ -17,7 +17,9 @@ import '../../auth/presentation/signup_steps.dart';
 /// 마이 목록에 보일 한 줄 요약(이름 · 가린 번호). 번호는 등록된 것이 있을 때만 붙인다
 /// (연락처 등록은 서버가 아직 열지 않아 "번호 없음"을 따로 보이지 않는다, 2026-11-03 안내).
 String myInfoSummary(AppLocalizations l10n, Profile p) {
-  final name = p.nickname?.trim() ?? '';
+  // 앱에서 정한 이름이 없으면 로그인 계정 이름(서버 name — 사용자 2026-11-25 네이버 "이름 없음").
+  final nick = p.nickname?.trim() ?? '';
+  final name = nick.isNotEmpty ? nick : (p.name?.trim() ?? '');
   if (name.isEmpty && !p.hasPhone) return l10n.infoNotSet;
   return [
     name.isEmpty ? l10n.infoNameNotSet : name,
@@ -45,6 +47,15 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
   final _name = TextEditingController();
   bool _filled = false;
   ProfileChangeOutcome? _last;
+
+  @override
+  void initState() {
+    super.initState();
+    // 열 때마다 서버 최신 값(로그인 계정 이름·이메일·사진은 서버가 나중에 반영한다).
+    Future.microtask(() {
+      if (mounted) ref.read(profileProvider.notifier).refreshQuietly();
+    });
+  }
 
   @override
   void dispose() {

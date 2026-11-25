@@ -293,6 +293,12 @@ class DraftRenewing extends Notifier<bool> {
   void set(bool value) => state = value;
 }
 
+/// 결제 시도가 끝난 뒤 초안이 결제 대기로 돌아오는지 다시 읽는 간격·횟수.
+final draftReturnPollIntervalProvider = Provider<Duration>(
+  (_) => const Duration(seconds: 1),
+);
+final draftReturnPollTimesProvider = Provider<int>((_) => 10);
+
 final draftControllerProvider =
     AsyncNotifierProvider<DraftController, DraftState?>(DraftController.new);
 
@@ -455,6 +461,21 @@ class DraftController extends AsyncNotifier<DraftState?> {
   }
 
   /// 초안을 다시 조회한다. 견적이 바뀌었으면 재동의 전까지 결제를 막는다.
+  /// 결제창을 닫았거나 실패한 뒤 — 서버가 확보분을 풀고 초안을 결제 대기로 돌리는 데 잠깐 걸린다. 한 번만 읽으면
+  /// 아직 "결제 진행 중"이라 [결제하기]가 막힌 채 "결제를 준비하고 있어요"가 남았다(사용자 2026-11-25).
+  /// 결제 대기로 돌아올 때까지 1초마다 다시 읽는다(최대 [draftReturnPollTimes] 번).
+  Future<void> refreshUntilPayable() async {
+    final times = ref.read(draftReturnPollTimesProvider);
+    for (var i = 0; i < times; i++) {
+      await refresh();
+      if (!ref.mounted) return;
+      final now = _current;
+      if (now == null || now.lastStart is! CheckoutAccepted) return;
+      await Future<void>.delayed(ref.read(draftReturnPollIntervalProvider));
+      if (!ref.mounted) return;
+    }
+  }
+
   Future<void> refresh() async {
     final current = _current;
     if (current == null) return;

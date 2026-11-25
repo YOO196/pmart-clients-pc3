@@ -76,6 +76,31 @@ Future<void> logoutKeepingAddress(BuildContext context, WidgetRef ref) async {
   }
 }
 
+/// 탈퇴처럼 묻지 않고 비회원으로 돌아갈 때 — **회원 토큰이 있을 때** 미리 불러 주소(도로명·우편번호·좌표)를 읽어 두고,
+/// 로그인 정보를 지운 뒤 돌려준 함수를 부르면 그 주소를 비회원 배송지로 만든다(로그아웃 [예] 와 같다 — 사용자 2026-11-25
+/// "탈퇴하고 나서 주소 검색이 떠, 비회원으로 돌아갈 때 주소 기억하지 않아?"). 이미 비회원 배송지가 있거나 쇼핑 주소가
+/// 없으면 null(할 일 없음).
+Future<Future<void> Function()?> prepareKeepAddressAsGuest(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final l10n = AppLocalizations.of(context);
+  final messenger = ScaffoldMessenger.of(context);
+  final container = ProviderScope.containerOf(context, listen: false);
+  final store = ref.read(guestAddressStoreProvider);
+  final repo = ref.read(addressRepositoryProvider);
+  final shopping = ref.read(addressBookProvider).value?.shoppingAddress;
+  if (shopping == null || (await store.ids()).isNotEmpty) return null;
+  AddressDraft? saved;
+  try {
+    saved = await repo.draft(shopping.addressId);
+  } on PmartFailure {
+    saved = null;
+  }
+  return () =>
+      _keepAsGuest(container, store, repo, shopping, saved, messenger, l10n);
+}
+
 Future<void> _keepAsGuest(
   ProviderContainer container,
   GuestAddressStore store,
@@ -112,5 +137,41 @@ Future<void> _keepAsGuest(
   } on PmartFailure {
     // 로그아웃은 끝났다 — 주소만 못 옮겼다. 다음 화면에서 주소를 고르게 된다.
     messenger.notice(l10n.logoutKeepAddressFailed);
+  }
+}
+
+/// 로그인해 회원이 되면(가입 포함) 비회원 때 쓰던 주소를 묻지 않고 회원 주소록으로 옮기고 쇼핑 주소로 정한다 —
+/// 비회원으로 주소를 넣고 주문하다 로그인했는데 주소를 다시 고르라던 것(사용자 2026-11-25 "장난하냐?").
+/// - 회원 주소록이 비어 있고, 비회원 때 고른 주소에 상세 주소가 있으면(회원 주소는 상세 필수) 그 주소만 옮긴다.
+/// - 그 뒤 이 기기의 비회원 배송지 기록은 지운다 — 탈퇴·재가입 뒤 옛 주소들이 "로그인 전에 입력한 주소"로 다시 뜨던 것.
+/// 옮기는 동안은 주소 입력 화면으로 보내지 않는다([logoutKeepingAddressProvider]).
+Future<void> carryGuestAddressOnLogin(ProviderContainer container) async {
+  final store = container.read(guestAddressStoreProvider);
+  final ids = await store.ids();
+  if (ids.isEmpty) return;
+  final hold = container.read(logoutKeepingAddressProvider.notifier)..set(true);
+  try {
+    final repo = container.read(addressRepositoryProvider);
+    final book = await container.read(addressBookProvider.future);
+    if (book != null && book.addresses.isEmpty) {
+      final selected = await store.selected();
+      final id = (selected != null && ids.contains(selected))
+          ? selected
+          : ids.first;
+      try {
+        final guest = await repo.guest(id);
+        if (guest.detailAddress.trim().isNotEmpty) {
+          final draft = await repo.guestDraft(id);
+          await container.read(addressBookProvider.notifier).add(draft);
+        }
+      } on PmartFailure {
+        // 못 옮겼다 — 주소 화면에서 고르게 된다.
+      }
+    }
+    await store.retain(const []);
+  } on Object {
+    // 주소록을 못 읽었다 — 다음 화면이 실패를 보인다.
+  } finally {
+    hold.set(false);
   }
 }

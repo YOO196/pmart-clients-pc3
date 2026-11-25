@@ -21,6 +21,9 @@ import 'package:customer_app/features/orders/presentation/orders_screens.dart'
     show OrderDetailScreen;
 import 'package:customer_app/shared/providers.dart';
 
+import 'package:customer_app/features/start/presentation/start_controller.dart'
+    show StartStep, startStepProvider;
+
 import 'support/app_harness.dart';
 
 /// 단말 쪽 푸시를 흉내 낸다(Firebase 없음).
@@ -198,6 +201,34 @@ void main() {
     expect(detail.orderId, 'order-seed-1');
   });
 
+  testWidgets(
+    '시작 화면 중에 누른 푸시는 시작이 끝난 뒤 그 화면을 연다(사용자 2026-11-25 — 배송 알림이 첫 화면으로)',
+    (t) async {
+      final source = FakePushSource();
+      final repo = MockPushTokensRepository();
+      final step = _StepNotifier();
+      await loginAsMember(t, [
+        ...pushOverrides(source, repo),
+        _stepProvider.overrideWith(() => step),
+        startStepProvider.overrideWith((ref) => ref.watch(_stepProvider)),
+      ]);
+      step.set(StartStep.loading);
+      await t.pump();
+      source.opens.add({
+        'destinationType': 'ORDER',
+        'destinationRef': 'order-seed-1',
+      });
+      await t.pumpAndSettle();
+      expect(find.byType(OrderDetailScreen), findsNothing);
+      step.set(StartStep.ready);
+      await t.pumpAndSettle();
+      final detail = t.widget<OrderDetailScreen>(
+        find.byType(OrderDetailScreen),
+      );
+      expect(detail.orderId, 'order-seed-1');
+    },
+  );
+
   testWidgets('목적지를 모르는 푸시는 알림함이 열린다', (t) async {
     final source = FakePushSource();
     final repo = MockPushTokensRepository();
@@ -357,4 +388,15 @@ void main() {
       );
     });
   });
+}
+
+final _stepProvider = NotifierProvider<_StepNotifier, StartStep>(
+  _StepNotifier.new,
+);
+
+class _StepNotifier extends Notifier<StartStep> {
+  @override
+  StartStep build() => StartStep.ready;
+
+  void set(StartStep v) => state = v;
 }

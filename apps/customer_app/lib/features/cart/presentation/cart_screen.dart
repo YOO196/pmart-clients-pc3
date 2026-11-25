@@ -28,6 +28,8 @@ import '../../checkout/presentation/delivery_select_screen.dart'
         proceedToCheckout,
         showSlotSheet;
 import 'cart_controller.dart';
+import 'guest_cart_carry.dart'
+    show carryGuestCartOnLogin, checkoutLoginPendingProvider;
 import 'cart_messages.dart';
 
 /// SCR-CART-001. 화면은 서버가 확정한 장바구니만 그린다(낙관적 반영 없음).
@@ -1171,8 +1173,22 @@ Future<void> _order(BuildContext context, WidgetRef ref) async {
     // 로그인하면 회원 장바구니를 다시 읽느라 이 버튼(context)이 새로 그려진다 — 라우터·컨테이너를 붙잡아 이어 간다.
     final router = GoRouter.of(context);
     final container = ProviderScope.containerOf(context);
-    final ok = await router.push<bool>('/login?purpose=checkout');
-    if (ok != true) return;
+    // 이 로그인에서는 아래 병합 확인 화면이 옮긴다 — 자동으로 옮기지 않게 표시(두 번 옮기지 않게).
+    final pending = container.read(checkoutLoginPendingProvider.notifier)
+      ..set(true);
+    final bool? ok;
+    try {
+      ok = await router.push<bool>('/login?purpose=checkout');
+    } finally {
+      pending.set(false);
+    }
+    if (ok != true) {
+      // 가입 흐름 등으로 이 화면에 돌아오지 않았지만 회원이 됐다 — 담아 둔 것을 그대로 옮긴다.
+      if (container.read(sessionProvider) is MemberSession) {
+        await carryGuestCartOnLogin(container);
+      }
+      return;
+    }
     if (guestCartId != null) {
       final go = await router.push<bool>('/cart/merge', extra: guestCartId);
       if (go != true) return;

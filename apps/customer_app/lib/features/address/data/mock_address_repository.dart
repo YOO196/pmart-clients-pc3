@@ -27,6 +27,9 @@ base class MockAddressRepository implements AddressRepository {
   ];
   final _addedByKey = <String, Map<String, Object?>>{};
   String? _shoppingAddressId = 'addr-1';
+
+  /// 시험용: 쇼핑 주소를 정하지 않은 회원(주소는 있음).
+  void clearShoppingAddress() => _shoppingAddressId = null;
   String? _mfcId = homeMfcId;
   int contextVersion = 1;
   int _seq = 1;

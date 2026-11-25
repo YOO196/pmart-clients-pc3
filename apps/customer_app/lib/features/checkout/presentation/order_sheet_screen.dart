@@ -343,7 +343,7 @@ class _SheetState extends ConsumerState<_Sheet> {
         prev?.phase != PaymentPhase.failed) {
       // 이번 결제 시도는 끝났다. 초안을 다시 읽어 결제 버튼을 새 키로 다시 연다.
       setState(() => _flowStarted = false);
-      ref.read(draftControllerProvider.notifier).refresh();
+      ref.read(draftControllerProvider.notifier).refreshUntilPayable();
       return;
     }
     if (_handoff(next) && !_navigated) {
@@ -467,7 +467,9 @@ class _SheetState extends ConsumerState<_Sheet> {
             child: Text(l10n.checkoutCheckAgain),
           ),
         ),
-      if (state.lastStart is CheckoutAccepted)
+      // 결제창을 닫았거나 실패했으면(이번 시도 끝) "준비하고 있어요"를 같이 보이지 않는다.
+      if (state.lastStart is CheckoutAccepted &&
+          flow.phase != PaymentPhase.failed)
         _Banner(
           key: const ValueKey('checkout-accepted'),
           icon: PmartLineIcons.receipt,

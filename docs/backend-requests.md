@@ -112,6 +112,7 @@
 | BR-102 | 보통 | 고객·백오피스 | 상품페이지 "우리동네 PMart, 이렇게 관리해요" 카드(그림·제목·설명·순서)를 백오피스에서 관리 — 고객 조회 API + 편성 화면. 요청서 `docs/handoff/customer-app/2026-11-25-backend-care-cards.md` | 회신(storefront 0.20.0 `GET /storefront/care-cards` — LAN 배포 전, 백오피스 편성 요청됨): 앱 반영(비면 구획 뺌) |
 | BR-103 | 높음 | 고객 | 네이버 첫 가입 뒤 이름·이메일·프로필 사진이 비어 있음(다시 로그인해야 이메일만) — 첫 가입 완료 때 10분 보관 만료 의심·사진 전달 확인. 요청서 `docs/handoff/customer-app/2026-11-25-backend-naver-profile-missing.md` | 회신(2026-11-25 `…/2026-11-25-reply-br103-naver-profile.md`): 사진 서버 결함(1.45MB 원본 → ?type=s256) 고침·배포, 이름·이메일은 완료 약 1초 뒤 반영 → 앱이 2.5초·6초 뒤 다시 읽게 고침, 내 정보 이름 줄 name 대체 |
 | BR-104 | 보통 | 고객 | 비회원도 홈 쿠폰 행사 목록 읽기(받기는 회원만) — 요청서 `docs/handoff/customer-app/2026-11-25-backend-guest-coupon-campaigns.md` | 요청(앱은 비회원 고정 안내 → 로그인) |
+| BR-105 | 보통 | 고객 | 탈퇴 때 구글 연결(동의)을 서버가 끊기 — 탈퇴 본문 선택 `providerAccessToken`(구글 접근 토큰) → 서버가 oauth2 revoke(키 불필요, 보관 안 함). 요청서 `docs/handoff/customer-app/2026-11-25-backend-google-revoke-on-withdrawal.md` | 요청(앱은 기기 disconnect 유지) |
 
 ---
 

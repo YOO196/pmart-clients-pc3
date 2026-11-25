@@ -190,46 +190,64 @@ void main() {
     expect(key('start-guest-address'), findsNothing);
   });
 
-  testWidgets('비회원으로 주소를 넣었던 사람이 로그인하면 그 주소를 저장할지 묻고, 저장하면 바로 홈', (t) async {
+  testWidgets(
+    '비회원으로 주소를 넣었던 사람이 로그인하면 묻지 않고 그 주소를 옮겨 쇼핑 주소로 — 바로 홈(사용자 2026-11-25)',
+    (t) async {
+      final secure = MemoryKeyValueStore();
+      await secure.write('pmart.start.welcome', 'at=x');
+      final empty = _EmptyAddressRepository();
+      final guest = await t.runAsync(
+        () => empty.addGuest(
+          const AddressDraft(
+            roadAddress: '부산 부산진구 중앙대로 672',
+            detailAddress: '12층',
+            receiverName: '김피마',
+            receiverPhone: '010-1234-5678',
+            entranceNote: '1층 공동현관',
+          ),
+          key: IdempotencyKey.generate(),
+        ),
+      );
+      final store = GuestAddressStore(secure);
+      await store.add(guest!.addressId);
+      await store.select(guest.addressId);
+
+      await t.pumpWidget(
+        testApp([], address: empty, startGate: true, secure: secure),
+      );
+      await t.pumpAndSettle();
+      await t.tap(key('login-kakao'));
+      await t.pumpAndSettle();
+
+      // 주소를 다시 고르라고 하지 않는다 — 비회원 때 쓰던 주소가 회원 주소록·쇼핑 주소로.
+      expect(key('start-address'), findsNothing);
+      final book = await t.runAsync(empty.book);
+      final saved = book!.addresses.single;
+      expect(saved.roadAddress, '부산 부산진구 중앙대로 672');
+      expect(saved.detailAddress, '12층');
+      expect(saved.receiverName, '김피마');
+      expect(book.shoppingAddress?.addressId, saved.addressId);
+      // 이 기기의 비회원 배송지 기록은 지웠다(탈퇴·재가입 뒤 옛 주소가 다시 뜨지 않게).
+      expect(await t.runAsync(store.ids), isEmpty);
+    },
+  );
+
+  testWidgets('회원 주소는 있는데 배달 주소가 안 정해졌으면 로그인 때 첫 주소로 정한다(사용자 2026-11-25)', (
+    t,
+  ) async {
     final secure = MemoryKeyValueStore();
     await secure.write('pmart.start.welcome', 'at=x');
-    final empty = _EmptyAddressRepository();
-    final guest = await t.runAsync(
-      () => empty.addGuest(
-        const AddressDraft(
-          roadAddress: '부산 부산진구 중앙대로 672',
-          detailAddress: '12층',
-          receiverName: '김피마',
-          receiverPhone: '010-1234-5678',
-          entranceNote: '1층 공동현관',
-        ),
-        key: IdempotencyKey.generate(),
-      ),
-    );
-    final store = GuestAddressStore(secure);
-    await store.add(guest!.addressId);
-    await store.select(guest.addressId);
-
+    final address = MockAddressRepository(latency: Duration.zero)
+      ..clearShoppingAddress();
     await t.pumpWidget(
-      testApp([], address: empty, startGate: true, secure: secure),
+      testApp([], address: address, startGate: true, secure: secure),
     );
     await t.pumpAndSettle();
     await t.tap(key('login-kakao'));
     await t.pumpAndSettle();
-
-    // 회원 주소록은 비었지만 로그인 전 주소를 먼저 보인다
-    expect(key('start-address'), findsOneWidget);
-    expect(key('start-guest-address'), findsOneWidget);
-    expect(find.text('부산 부산진구 중앙대로 672'), findsOneWidget);
-    await t.tap(key('start-guest-address-save-${guest.addressId}'));
-    await t.pumpAndSettle();
-
+    final book = await t.runAsync(address.book);
+    expect(book!.shoppingAddress, isNotNull);
     expect(key('start-address'), findsNothing);
-    final book = await t.runAsync(empty.book);
-    final saved = book!.addresses.single;
-    expect(saved.roadAddress, '부산 부산진구 중앙대로 672');
-    expect(saved.detailAddress, '12층');
-    expect(saved.receiverName, '김피마');
   });
 
   testWidgets('마케팅 거부도 서버 처리 결과로 거부 안내', (t) async {
@@ -610,7 +628,10 @@ final class _EmptyAddressRepository extends MockAddressRepository {
         for (final a in b.addresses)
           if (a.addressId != 'addr-1') a,
       ],
-      context: const ShoppingContext(version: 1),
+      // 처음 심어 둔 addr-1 만 뺀다 — 그 뒤 고른 쇼핑 주소는 그대로 보인다.
+      context: b.context.shoppingAddressId == 'addr-1'
+          ? ShoppingContext(version: b.context.version)
+          : b.context,
     );
   }
 }
