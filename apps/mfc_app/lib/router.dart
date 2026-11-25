@@ -8,6 +8,7 @@ import 'features/manage/presentation/move_admin_screens.dart';
 import 'features/auth/domain/employee_auth.dart';
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/auth/presentation/login_screen.dart';
+import 'features/cdc/presentation/cdc_home.dart';
 import 'features/device/presentation/device_setup_screens.dart';
 import 'features/handover/presentation/handover_screens.dart';
 import 'features/inbound/presentation/inbound_screen.dart';
@@ -112,7 +113,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/',
-        pageBuilder: (_, s) => _page(s, const HomeScreen()),
+        pageBuilder: (_, s) => _page(s, const _RoleHome()),
         routes: [
           // 메인 위에 쌓인다(뒤로 → 메인).
           GoRoute(
@@ -156,6 +157,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/manage/workers',
         pageBuilder: (_, s) => _page(s, const CenterWorkersScreen()),
+      ),
+      // DC 직원 업무(사용자 2026-11-26) — 업무 화면 자리
+      GoRoute(
+        path: '/cdc/work/:area',
+        redirect: (_, s) =>
+            CdcWorkArea.values.any((a) => a.name == s.pathParameters['area'])
+            ? null
+            : '/',
+        pageBuilder: (_, s) => _page(
+          s,
+          CdcWorkScreen(
+            area: CdcWorkArea.values.byName(s.pathParameters['area']!),
+          ),
+        ),
       ),
       GoRoute(
         path: '/work/:area',
@@ -296,3 +311,15 @@ Page<void> _page(GoRouterState s, Widget child) => CustomTransitionPage<void>(
   },
   child: child,
 );
+
+/// 로그인 역할로 홈을 고른다 — DC 직원(`CDC_WORKER`·`CDC_SUPERVISOR`)은 DC 업무 메뉴, 그 밖은 MFC 홈
+/// (사용자 2026-11-26 "cdc 직원도 들어가면 … 다른 메뉴 뜨도록").
+class _RoleHome extends ConsumerWidget {
+  const _RoleHome();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) =>
+      (ref.watch(employeeSessionProvider)?.isCdc ?? false)
+      ? const CdcHomeScreen()
+      : const HomeScreen();
+}

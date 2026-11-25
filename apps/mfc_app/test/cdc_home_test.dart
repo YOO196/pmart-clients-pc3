@@ -1,0 +1,114 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:pmart_core/pmart_core.dart';
+import 'package:pmart_ui/pmart_ui.dart';
+
+import 'package:mfc_app/app.dart';
+import 'package:mfc_app/features/auth/data/auth_repository.dart';
+import 'package:mfc_app/features/auth/domain/employee_auth.dart';
+import 'package:mfc_app/features/auth/presentation/auth_controller.dart';
+import 'package:mfc_app/features/tasks/data/mock_task_repository.dart';
+import 'package:mfc_app/features/tasks/presentation/task_controllers.dart';
+import 'package:mfc_app/features/work/data/mock_work_repository.dart';
+import 'package:mfc_app/features/work/presentation/work_controller.dart';
+import 'package:mfc_app/shared/providers.dart';
+
+/// DC 직원은 로그인하면 DC 업무 메뉴가 뜨고 MFC 업무·도구는 없다(사용자 2026-11-26).
+void main() {
+  setUpAll(initPmartFormatting);
+
+  Future<void> pump(WidgetTester t, EmployeeSession session) async {
+    t.view
+      ..physicalSize = const Size(412, 915)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final tasks = MockTaskRepository(latency: Duration.zero);
+    await t.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [
+          envProvider.overrideWithValue(PmartEnv.mock),
+          authRepositoryProvider.overrideWithValue(
+            MockAuthRepository(session: session),
+          ),
+          taskRepositoryProvider.overrideWithValue(tasks),
+          workRepositoryProvider.overrideWithValue(
+            MockWorkRepository(tasks: tasks, latency: Duration.zero),
+          ),
+          secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+        ],
+        child: const MfcApp(),
+      ),
+    );
+    await t.pumpAndSettle();
+  }
+
+  testWidgets('DC 작업자 — DC 업무 다섯 가지, MFC 업무·도구 없음', (t) async {
+    await pump(
+      t,
+      const EmployeeSession(
+        operatorId: 'OP-cdcw-fc-01',
+        roles: [EmployeeSession.cdcWorkerRole],
+        centers: ['CDC01'],
+      ),
+    );
+    expect(find.byKey(const ValueKey('cdc-home')), findsOneWidget);
+    expect(find.textContaining('DC CDC01', findRichText: true), findsOneWidget);
+    for (final k in ['pick', 'sort', 'inspect', 'load', 'putaway']) {
+      expect(find.byKey(ValueKey('cdc-area-$k')), findsOneWidget);
+    }
+    expect(find.byKey(const ValueKey('area-pickPack')), findsNothing);
+    expect(find.byKey(const ValueKey('menu-handover')), findsNothing);
+    expect(find.byKey(const ValueKey('manage-menu')), findsNothing);
+
+    await t.tap(find.byKey(const ValueKey('cdc-area-load')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cdc-work-preparing')), findsOneWidget);
+    expect(find.text('상차'), findsOneWidget);
+  });
+
+  testWidgets('DC 관리자도 DC 메뉴', (t) async {
+    await pump(
+      t,
+      const EmployeeSession(
+        operatorId: 'OP-cdc-sup',
+        roles: [EmployeeSession.cdcSupervisorRole],
+        centers: ['CDC01'],
+      ),
+    );
+    expect(find.byKey(const ValueKey('cdc-home')), findsOneWidget);
+    expect(find.byKey(const ValueKey('manage-menu')), findsNothing);
+  });
+
+  testWidgets('MFC 작업자는 그대로 MFC 홈', (t) async {
+    await pump(t, MockAuthRepository.mockSession);
+    expect(find.byKey(const ValueKey('cdc-home')), findsNothing);
+    expect(find.byKey(const ValueKey('area-pickPack')), findsOneWidget);
+  });
+
+  test('목 로그인 — DC 시험 계정은 DC 역할·센터', () async {
+    final repo = MockPasswordAuthRepository();
+    final w = await repo.loginWithPassword(
+      loginId: 'cdcw-fk-03',
+      password: 'x',
+    );
+    expect(w.roles, [EmployeeSession.cdcWorkerRole]);
+    expect(w.centers, ['CDC01']);
+    expect(w.isCdc, isTrue);
+    final s = await repo.loginWithPassword(
+      loginId: 'claude-cdc-sup',
+      password: 'x',
+    );
+    expect(s.roles, [EmployeeSession.cdcSupervisorRole]);
+    expect(
+      () => repo.loginWithPassword(loginId: 'cdcw-fk-04', password: 'x'),
+      throwsA(isA<LoginFailure>()),
+    );
+    final m = await repo.loginWithPassword(
+      loginId: 'mfcw-pp-01',
+      password: 'x',
+    );
+    expect(m.isCdc, isFalse);
+  });
+}

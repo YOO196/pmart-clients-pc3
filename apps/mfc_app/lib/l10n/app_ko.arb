@@ -1389,5 +1389,18 @@
   "putawayDropTitle": "추천 칸에 적치하세요",
   "putawayDropReady": "수량을 확인하고 적치하세요",
   "mockAppStrip": "목업 앱 · 시험 데이터 — 실서버가 아니에요",
-  "countTimeBand": "지금은 재고 실사 시간이에요 — 재고 실사 업무를 고르세요"
+  "countTimeBand": "지금은 재고 실사 시간이에요 — 재고 실사 업무를 고르세요",
+  "cdcHomeCenter": "DC {center}",
+  "@cdcHomeCenter": {"placeholders": {"center": {"type": "String"}}},
+  "cdcAreaPick": "피킹",
+  "cdcAreaPickDesc": "선반에서 TRF 상품을 집어요(FC·DPS)",
+  "cdcAreaSort": "분배·라인",
+  "cdcAreaSortDesc": "집은 상품을 MFC 별로 나눠요",
+  "cdcAreaInspect": "검품",
+  "cdcAreaInspectDesc": "출고 전 수량·상태를 확인해요",
+  "cdcAreaLoad": "상차",
+  "cdcAreaLoadDesc": "출하 차량에 실어요",
+  "cdcAreaPutaway": "지게차 적치",
+  "cdcAreaPutawayDesc": "입고 팔레트를 보관 칸에 옮겨요",
+  "cdcWorkPreparing": "이 업무 화면은 준비 중이에요."
 }
