@@ -160,11 +160,10 @@ Future<void> carryGuestAddressOnLogin(ProviderContainer container) async {
           ? selected
           : ids.first;
       try {
-        final guest = await repo.guest(id);
-        if (guest.detailAddress.trim().isNotEmpty) {
-          final draft = await repo.guestDraft(id);
-          await container.read(addressBookProvider.notifier).add(draft);
-        }
+        // 상세 주소가 없어도 그대로 옮긴다(customer 0.20.0 BR-106 — 상세는 주문할 때만 받는다). 서버가
+        // 아직 막으면(배포 전) 옮기지 못하고 주소 화면이 그 주소로 상세만 받는다.
+        final draft = await repo.guestDraft(id);
+        await container.read(addressBookProvider.notifier).add(draft);
       } on PmartFailure {
         // 못 옮겼다 — 주소 화면에서 고르게 된다.
       }

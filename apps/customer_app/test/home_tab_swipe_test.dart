@@ -21,7 +21,7 @@ void main() {
   }
 
   // 배너 아래 배송 안내 칸 — 가로 목록이 아닌 곳을 끈다.
-  Finder plain() => find.text('지금 주문하면 이렇게 받아요');
+  Finder plain() => find.byKey(const ValueKey('home-delivery-card'));
 
   testWidgets('왼쪽으로 길게 끌면 다음 탭, 오른쪽이면 이전 탭', (t) async {
     await openHome(t);

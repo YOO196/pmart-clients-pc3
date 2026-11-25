@@ -230,11 +230,9 @@ class MyScreen extends ConsumerWidget {
                         children: [
                           Flexible(
                             child: Text(
-                              // 위 줄이 이미 로그인 계정 이름을 보이면(앱 이름 없음) 여기는 이메일만 —
-                              // 이름이 두 번 뜨던 것(사용자 2026-11-25).
-                              ((profile?.nickname?.trim().isNotEmpty ?? false)
-                                      ? providerAccountText(profile)
-                                      : profile?.email?.trim().nullIfEmpty) ??
+                              // 아래 줄은 이메일만 — 위 줄에 이름(닉네임)이 이미 있어 이름이 두 번
+                              // 보이지 않게(사용자 2026-11-25).
+                              profile?.email?.trim().nullIfEmpty ??
                                   session.accountLabel ??
                                   l10n.myAccountUnknown,
                               overflow: TextOverflow.ellipsis,

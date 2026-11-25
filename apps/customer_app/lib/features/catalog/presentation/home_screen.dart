@@ -1972,9 +1972,18 @@ class _HomeCouponRow extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final campaigns =
+        ref.watch(couponCampaignsProvider).value ?? const <CouponCampaign>[];
+    final open = [
+      for (final c in campaigns)
+        if (!c.reachedLimit && !c.soldOut) c,
+    ];
+    final guest = ref.watch(sessionProvider) is! MemberSession;
     // 비회원도 쿠폰 줄을 보인다(사용자 2026-11-25 "로그인 안 해도 첫 화면에 쿠폰 버튼"). 쿠폰 행사 조회는
     // 회원만 되는 계약이라(promotion — BR-104 요청) 이름 대신 고정 안내, 누르면 로그인.
-    if (ref.watch(sessionProvider) is! MemberSession) {
+    // 비회원: 쿠폰 이름을 못 읽었으면(배포 전·실패) 고정 안내(promotion 0.4.0 BR-104 — 읽으면 이름을 보이고
+    // 누르면 로그인).
+    if (guest && open.isEmpty) {
       return _HomeInfoRow(
         key: const ValueKey('home-coupon-guest'),
         color: Color.alphaBlend(
@@ -2010,12 +2019,6 @@ class _HomeCouponRow extends ConsumerWidget {
         onTap: () => context.push('/login'),
       );
     }
-    final campaigns =
-        ref.watch(couponCampaignsProvider).value ?? const <CouponCampaign>[];
-    final open = [
-      for (final c in campaigns)
-        if (!c.reachedLimit && !c.soldOut) c,
-    ];
     if (open.isEmpty) return const SizedBox.shrink();
     final first = open.first;
     final style = theme.textTheme.titleSmall?.copyWith(
@@ -2072,12 +2075,15 @@ class _HomeCouponRow extends ConsumerWidget {
           color: scheme.onPrimary,
         ),
       ),
-      onTap: () => showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useRootNavigator: true,
-        builder: (_) => const CouponCampaignSheet(),
-      ),
+      // 비회원은 받을 수 없다(받기는 회원만) — 로그인으로.
+      onTap: guest
+          ? () => context.push('/login')
+          : () => showModalBottomSheet<void>(
+              context: context,
+              isScrollControlled: true,
+              useRootNavigator: true,
+              builder: (_) => const CouponCampaignSheet(),
+            ),
     );
   }
 }

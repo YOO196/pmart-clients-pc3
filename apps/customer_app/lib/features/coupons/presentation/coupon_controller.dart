@@ -7,6 +7,14 @@ import '../../auth/presentation/auth_controller.dart';
 import '../data/coupon_repository.dart';
 import '../domain/coupon.dart';
 
+/// 비회원 쿠폰 행사 목록용(비회원 토큰 — guestDio). 받기는 부르지 않는다.
+final guestCouponRepositoryProvider = Provider<CouponRepository>(
+  (ref) => switch (ref.watch(envProvider)) {
+    PmartEnv.mock => ref.watch(couponRepositoryProvider),
+    PmartEnv.local => ApiCouponRepository(ref.watch(guestDioProvider)),
+  },
+);
+
 final couponRepositoryProvider = Provider<CouponRepository>(
   (ref) => switch (ref.watch(envProvider)) {
     PmartEnv.mock => MockCouponRepository(),
@@ -40,7 +48,10 @@ final pastCouponsProvider = FutureProvider.autoDispose<List<Coupon>?>((
 /// 지금 받을 수 있는 쿠폰 행사. 비회원이면 null.
 final couponCampaignsProvider =
     FutureProvider.autoDispose<List<CouponCampaign>?>((ref) async {
-      if (ref.watch(sessionProvider) is! MemberSession) return null;
+      // 비회원도 비회원 토큰으로 목록만 읽는다(promotion 0.4.0 BR-104). 받기는 회원만 — 화면이 로그인 안내.
+      if (ref.watch(sessionProvider) is! MemberSession) {
+        return ref.watch(guestCouponRepositoryProvider).campaigns();
+      }
       return ref.watch(couponRepositoryProvider).campaigns();
     });
 

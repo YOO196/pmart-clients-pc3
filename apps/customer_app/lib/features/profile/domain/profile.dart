@@ -14,6 +14,7 @@ class Profile {
     this.phone,
     this.phoneVerified = false,
     this.name,
+    this.providerNickname,
     this.email,
     this.emailVerified,
     this.profileImageUrl,
@@ -50,6 +51,9 @@ class Profile {
 
   /// 로그인 제공자(Google) 프로필 이름. 없을 수 있다.
   final String? name;
+
+  /// 로그인 제공자 닉네임(customer 0.19.0) — 카카오 닉네임·네이버 별명, 없으면 제공자 이름. 고객이 정한 [nickname] 과 다르다.
+  final String? providerNickname;
 
   /// 로그인 제공자가 준 이메일. 없을 수 있다.
   final String? email;

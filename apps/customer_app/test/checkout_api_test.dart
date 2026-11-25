@@ -248,6 +248,8 @@ void main() {
           'blockers': [
             {'code': 'MIN_ORDER_AMOUNT'},
             {'code': 'SLOT_REQUIRED'},
+            // order 0.23.0 BR-106 — 쇼핑 주소에 상세 주소가 없다.
+            {'code': 'DETAIL_ADDRESS_REQUIRED'},
           ],
         },
       ),
@@ -256,6 +258,7 @@ void main() {
     expect(draft.blockers, [
       DraftBlocker.minOrderAmount,
       DraftBlocker.slotRequired,
+      DraftBlocker.detailAddressRequired,
     ]);
     expect(draft.quote?.minOrderShortfall, 6000);
     expect(draft.quote?.minOrderAmount, 15000);

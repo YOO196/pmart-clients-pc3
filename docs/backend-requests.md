@@ -111,9 +111,10 @@
 | BR-101 | 낮음 | 고객 | 구매 시트(레퍼런스 7-3) 옵션 사진 `SaleOption.imageUrl`·1회 최대 구매 수량 — 요청서 `docs/handoff/customer-app/2026-11-25-backend-buy-sheet-option-image-max.md` | 회신(product-content 0.11.0 — LAN 배포 전): R2 `purchaseLimitUnits`(상품 단위 합) 앱 반영 — 시트 "최대 N개"·+ 막기. R1 옵션 사진은 자료 없음(대표 사진 유지) |
 | BR-102 | 보통 | 고객·백오피스 | 상품페이지 "우리동네 PMart, 이렇게 관리해요" 카드(그림·제목·설명·순서)를 백오피스에서 관리 — 고객 조회 API + 편성 화면. 요청서 `docs/handoff/customer-app/2026-11-25-backend-care-cards.md` | 회신(storefront 0.20.0 `GET /storefront/care-cards` — LAN 배포 전, 백오피스 편성 요청됨): 앱 반영(비면 구획 뺌) |
 | BR-103 | 높음 | 고객 | 네이버 첫 가입 뒤 이름·이메일·프로필 사진이 비어 있음(다시 로그인해야 이메일만) — 첫 가입 완료 때 10분 보관 만료 의심·사진 전달 확인. 요청서 `docs/handoff/customer-app/2026-11-25-backend-naver-profile-missing.md` | 회신(2026-11-25 `…/2026-11-25-reply-br103-naver-profile.md`): 사진 서버 결함(1.45MB 원본 → ?type=s256) 고침·배포, 이름·이메일은 완료 약 1초 뒤 반영 → 앱이 2.5초·6초 뒤 다시 읽게 고침, 내 정보 이름 줄 name 대체 |
-| BR-104 | 보통 | 고객 | 비회원도 홈 쿠폰 행사 목록 읽기(받기는 회원만) — 요청서 `docs/handoff/customer-app/2026-11-25-backend-guest-coupon-campaigns.md` | 요청(앱은 비회원 고정 안내 → 로그인) |
+| BR-104 | 보통 | 고객 | 비회원도 홈 쿠폰 행사 목록 읽기(받기는 회원만) — 요청서 `docs/handoff/customer-app/2026-11-25-backend-guest-coupon-campaigns.md` | 회신(promotion 0.4.0 — LAN 배포 전): 앱 반영(비회원 목록 guestDio, 누르면 로그인) |
 | BR-105 | 보통 | 고객 | 탈퇴 때 구글 연결(동의)을 서버가 끊기 — 탈퇴 본문 선택 `providerAccessToken`(구글 접근 토큰) → 서버가 oauth2 revoke(키 불필요, 보관 안 함). 요청서 `docs/handoff/customer-app/2026-11-25-backend-google-revoke-on-withdrawal.md` | 회신(customer 0.18.0 — LAN 배포 전): 앱 반영(구글 탈퇴 때 providerAccessToken, 기기 disconnect 유지) |
-| BR-106 | 보통 | 고객 | 비회원 주소를 그대로 회원 주소록에(상세 주소 선택, 주문 때만 상세 요구) — 요청서 `docs/handoff/customer-app/2026-11-25-backend-member-address-without-detail.md` | 요청(앱은 상세 없으면 그 도로명으로 상세만 받음) |
+| BR-106 | 보통 | 고객 | 비회원 주소를 그대로 회원 주소록에(상세 주소 선택, 주문 때만 상세 요구) — 요청서 `docs/handoff/customer-app/2026-11-25-backend-member-address-without-detail.md` | 회신(customer 0.20.0·order 0.23.0 — LAN 배포 전): 앱 반영(상세 없이도 옮김, 주문서 DETAIL_ADDRESS_REQUIRED → 상세 입력) |
+| BR-107 | 보통 | 고객 | 실명(name)을 고객이 입력·수정(PATCH /me name, 로그인 때 덮지 않음) — 가입 "이름" 입력이 지금은 nickname 에 저장되는 어긋남. 요청서 `docs/handoff/customer-app/2026-11-25-backend-real-name-edit.md` | 요청(앱 내 정보: 이름 보기만·닉네임 수정) |
 
 ---
 

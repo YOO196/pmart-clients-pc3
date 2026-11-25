@@ -19,6 +19,7 @@ import 'package:customer_app/features/address/presentation/address_controller.da
 import 'package:customer_app/features/auth/presentation/auth_controller.dart'
     show sessionProvider;
 import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
+
 import 'support/app_harness.dart';
 
 /// 처음 실행: 환영·약관 → 로그인/둘러보기 → 주소(필수) → 홈. 레퍼런스 2. 처음 다운로드 시 ….
@@ -256,42 +257,33 @@ void main() {
     expect(key('start-address'), findsNothing);
   });
 
-  testWidgets(
-    '비회원 주소에 상세 주소가 없으면 로그인 뒤 검색부터가 아니라 그 주소로 상세만 받는다(사용자 2026-11-25)',
-    (t) async {
-      final secure = MemoryKeyValueStore();
-      await secure.write('pmart.start.welcome', 'at=x');
-      final empty = _EmptyAddressRepository();
-      final guest = await t.runAsync(
-        () => empty.addGuest(
-          const AddressDraft(
-            roadAddress: '부산 부산진구 중앙대로 672',
-            detailAddress: '',
-          ),
-          key: IdempotencyKey.generate(),
-        ),
-      );
-      final store = GuestAddressStore(secure);
-      await store.add(guest!.addressId);
-      await store.select(guest.addressId);
+  testWidgets('비회원 주소에 상세 주소가 없어도 로그인하면 그대로 회원 주소로(BR-106)', (t) async {
+    final secure = MemoryKeyValueStore();
+    await secure.write('pmart.start.welcome', 'at=x');
+    final empty = _EmptyAddressRepository();
+    final guest = await t.runAsync(
+      () => empty.addGuest(
+        const AddressDraft(roadAddress: '부산 부산진구 중앙대로 672', detailAddress: ''),
+        key: IdempotencyKey.generate(),
+      ),
+    );
+    final store = GuestAddressStore(secure);
+    await store.add(guest!.addressId);
+    await store.select(guest.addressId);
 
-      await t.pumpWidget(
-        testApp([], address: empty, startGate: true, secure: secure),
-      );
-      await t.pumpAndSettle();
-      await t.tap(key('login-kakao'));
-      await t.pumpAndSettle();
+    await t.pumpWidget(
+      testApp([], address: empty, startGate: true, secure: secure),
+    );
+    await t.pumpAndSettle();
+    await t.tap(key('login-kakao'));
+    await t.pumpAndSettle();
 
-      expect(key('start-address'), findsOneWidget);
-      expect(find.text('부산 부산진구 중앙대로 672'), findsOneWidget);
-      expect(find.text('상세 주소만 넣고 시작하기'), findsOneWidget);
-      await t.tap(key('start-guest-address-save-${guest.addressId}'));
-      await t.pumpAndSettle();
-      // 주소 입력 화면이 그 도로명으로 열린다(검색 없이 상세만).
-      expect(key('f-detail'), findsOneWidget);
-      expect(find.text('부산 부산진구 중앙대로 672'), findsWidgets);
-    },
-  );
+    // 상세 주소가 없어도 그대로 회원 주소로 옮긴다(customer 0.20.0 BR-106 — 상세는 주문 때만).
+    expect(key('start-address'), findsNothing);
+    final book = await t.runAsync(empty.book);
+    expect(book!.addresses.single.roadAddress, '부산 부산진구 중앙대로 672');
+    expect(book.shoppingAddress, isNotNull);
+  });
 
   testWidgets('비회원 주소로 로그인했다가 로그아웃하면 그 비회원 주소로 되돌아간다(사용자 2026-11-25)', (
     t,

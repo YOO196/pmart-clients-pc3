@@ -196,8 +196,8 @@ void main() {
       );
       expect(find.text('30,000원부터 배달팁 0원'), findsOneWidget);
       expect(find.byKey(const ValueKey('home-night-notice')), findsNothing);
-      // 비회원은 쿠폰 줄이 없다.
-      expect(find.byKey(const ValueKey('home-coupon')), findsNothing);
+      // 비회원도 쿠폰 줄이 보인다(사용자 2026-11-25, promotion 0.4.0 BR-104 — 누르면 로그인).
+      expect(find.byKey(const ValueKey('home-coupon')), findsOneWidget);
 
       await t.tap(find.byKey(const ValueKey('home-delivery-guide')));
       await t.pumpAndSettle();

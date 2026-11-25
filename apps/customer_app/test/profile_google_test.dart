@@ -117,7 +117,7 @@ void main() {
       expect(
         find.descendant(
           of: account,
-          matching: find.text('홍길동 · hong@example.com'),
+          matching: find.text('hong@example.com'),
         ),
         findsOneWidget,
       );
@@ -157,7 +157,14 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('홍길동'), findsNothing);
+      // 이름 줄은 로그인 계정 이름(서버 name, 보기만), 닉네임 줄은 앱 이름(2026-11-25 나눔).
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('info-real-name-row')),
+          matching: find.text('홍길동'),
+        ),
+        findsOneWidget,
+      );
       await t.tap(find.byKey(const ValueKey('info-name-row')));
       await t.pumpAndSettle();
       expect(

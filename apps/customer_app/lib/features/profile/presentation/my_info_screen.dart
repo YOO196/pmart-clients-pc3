@@ -16,10 +16,19 @@ import '../../auth/presentation/signup_steps.dart';
 
 /// 마이 목록에 보일 한 줄 요약(이름 · 가린 번호). 번호는 등록된 것이 있을 때만 붙인다
 /// (연락처 등록은 서버가 아직 열지 않아 "번호 없음"을 따로 보이지 않는다, 2026-11-03 안내).
+/// 보이는 이름 — 닉네임 → 소셜 닉네임 → 실명. 다 없으면 null.
+String? displayNameOf(Profile p) {
+  for (final v in [p.nickname, p.providerNickname, p.name]) {
+    final t = v?.trim();
+    if (t != null && t.isNotEmpty) return t;
+  }
+  return null;
+}
+
 String myInfoSummary(AppLocalizations l10n, Profile p) {
-  // 앱에서 정한 이름이 없으면 로그인 계정 이름(서버 name — 사용자 2026-11-25 네이버 "이름 없음").
-  final nick = p.nickname?.trim() ?? '';
-  final name = nick.isNotEmpty ? nick : (p.name?.trim() ?? '');
+  // 보이는 이름: 고객이 정한 닉네임 → 소셜 닉네임(providerNickname) → 실명(name)
+  // (백엔드 요청 2026-11-25 provider-nickname — customer 0.19.0).
+  final name = displayNameOf(p) ?? '';
   if (name.isEmpty && !p.hasPhone) return l10n.infoNotSet;
   return [
     name.isEmpty ? l10n.infoNameNotSet : name,
@@ -140,7 +149,7 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
                   key: const ValueKey('info-name'),
                   controller: _name,
                   maxLength: NameInput.maxLength,
-                  decoration: InputDecoration(labelText: l10n.infoName),
+                  decoration: InputDecoration(labelText: l10n.infoNickname),
                   validator: (v) =>
                       NameInput.valid(v ?? '') ? null : l10n.infoNameInvalid,
                 ),
@@ -397,16 +406,34 @@ class _MyInfoView extends ConsumerWidget {
               const SizedBox(height: 16),
             ],
             card([
+              // 이름 = 로그인 계정 이름(서버 `name` — 소셜이 준 값, 로그인마다 최신). 지금 계약은 바꿀 수 없다
+              // (BR-107 요청) — 보이기만. 닉네임 = 앱에서 정하는 이름(`nickname`, 고칠 수 있음).
+              // 사용자 2026-11-25 "이름이랑 닉네임 내 정보에서 수정".
+              row(
+                key: const ValueKey('info-real-name-row'),
+                title: l10n.infoName,
+                trailing: Text(
+                  switch (profile.name?.trim()) {
+                    final n? when n.isNotEmpty => n,
+                    _ => l10n.infoNameNotSet,
+                  },
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: valueStyle,
+                ),
+              ),
               row(
                 key: const ValueKey('info-name-row'),
-                title: l10n.infoName,
-                // 앱에서 정한 이름(nickname)이 없으면 로그인 계정 이름(서버 `name` — 네이버·카카오·Google 이
-                // 준 회원 이름). 둘 다 없을 때만 "이름 없음"(사용자 2026-11-25 네이버 로그인인데 이름 없음).
+                title: l10n.infoNickname,
+                // 정한 닉네임이 없으면 소셜 닉네임을 보인다(고치면 그때부터 내 닉네임).
                 trailing: Text(
-                  switch ((profile.nickname?.trim(), profile.name?.trim())) {
+                  switch ((
+                    profile.nickname?.trim(),
+                    profile.providerNickname?.trim(),
+                  )) {
                     (final n?, _) when n.isNotEmpty => n,
                     (_, final n?) when n.isNotEmpty => n,
-                    _ => l10n.infoNameNotSet,
+                    _ => l10n.infoNicknameNotSet,
                   },
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

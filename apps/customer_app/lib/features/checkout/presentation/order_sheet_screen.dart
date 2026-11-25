@@ -63,6 +63,7 @@ String blockerText(AppLocalizations l10n, DraftBlocker b) => switch (b) {
   DraftBlocker.slotRequired => l10n.blockerSlotRequired,
   DraftBlocker.slotUnavailable => l10n.blockerSlotUnavailable,
   DraftBlocker.contactRequired => l10n.blockerContactRequired,
+  DraftBlocker.detailAddressRequired => l10n.blockerDetailAddressRequired,
   DraftBlocker.couponNotApplicable => l10n.blockerCouponNotApplicable,
   DraftBlocker.unknown => l10n.blockerUnknown,
 };
@@ -445,6 +446,22 @@ class _SheetState extends ConsumerState<_Sheet> {
                     key: const ValueKey('coupon-remove-blocker'),
                     onPressed: () => ctl.changeCoupon(null),
                     child: Text(l10n.couponRemove),
+                  )
+                : b == DraftBlocker.detailAddressRequired
+                ? TextButton(
+                    key: const ValueKey('detail-address-enter'),
+                    // 그 쇼핑 주소의 수정 화면 → 돌아오면 초안을 다시 만든다(BR-106).
+                    onPressed: () async {
+                      final id = ref
+                          .read(addressBookProvider)
+                          .value
+                          ?.shoppingAddress
+                          ?.addressId;
+                      if (id == null) return;
+                      await context.push('/addresses/edit/$id');
+                      await ctl.contactChanged();
+                    },
+                    child: Text(l10n.detailAddressEnter),
                   )
                 : b == DraftBlocker.contactRequired
                 ? TextButton(

@@ -398,6 +398,8 @@ OrderDraft draftFromContract(api.OrderDraft d) {
             DraftBlocker.slotUnavailable,
           api.DraftBlockerCodeEnum.CONTACT_REQUIRED =>
             DraftBlocker.contactRequired,
+          api.DraftBlockerCodeEnum.DETAIL_ADDRESS_REQUIRED =>
+            DraftBlocker.detailAddressRequired,
           api.DraftBlockerCodeEnum.COUPON_NOT_APPLICABLE =>
             DraftBlocker.couponNotApplicable,
         },

@@ -1,11 +1,13 @@
 {
   "dart": {
-    "backendCommit": "ffd0b3c2ad676847095220998f7b8c308c146687",
+    "backendCommit": "349b4bb46844576935137f442daa5133c81681e1",
     "backendContractsDirty": false,
-    "generatedAt": "2026-11-25T07:56:40.352698Z",
+    "generatedAt": "2026-11-25T08:51:27.590430Z",
     "generator": "openapi-generator-cli 7.26.0 (dart-dio, json_serializable)",
     "regenerated": [
-      "customer-service"
+      "customer-service",
+      "order-service",
+      "promotion-service"
     ],
     "services": {
       "auth-service": [

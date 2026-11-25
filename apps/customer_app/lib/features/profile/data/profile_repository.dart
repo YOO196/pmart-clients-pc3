@@ -169,6 +169,7 @@ Profile profileFromContract(api.Profile p) {
     phone: text(p.phone),
     phoneVerified: p.phoneVerified ?? false,
     name: text(p.name),
+    providerNickname: text(p.providerNickname),
     email: text(p.email),
     emailVerified: p.emailVerified,
     profileImageUrl: text(p.profileImageUrl),

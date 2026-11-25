@@ -254,6 +254,9 @@ enum DraftBlocker {
   /// 받는 분 연락처가 없다(주소에도 프로필에도) — "내 연락처"를 받아 프로필에 저장하고 초안을 다시 만든다(BR-60 R2).
   contactRequired,
 
+  /// 쇼핑 주소에 상세 주소가 없다(order 0.23.0 BR-106) — 그 주소의 상세를 받아 고치고 초안을 다시 만든다.
+  detailAddressRequired,
+
   /// 고른 쿠폰을 쓸 수 없다(order 0.18.0) — 쿠폰을 빼고 주문서를 다시 만든다. 사유는 견적 `coupon.reason`.
   couponNotApplicable,
   unknown,
