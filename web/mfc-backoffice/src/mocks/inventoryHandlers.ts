@@ -8,6 +8,7 @@ import { http, HttpResponse } from 'msw';
 import { API_BASE } from '../api/client';
 import { db, nextSeq, timestamp, type MockCountSession } from './db';
 import { approvalProblem, expectedVersion, idempotent, operator, problem, unauthorized } from './support';
+import { MOCK_PRODUCTS, productOfSku } from './catalog';
 import { emitStockChange } from './stockStreamHandlers';
 
 const canAccess = (request: Request, mfcId: string) => operator(request)?.centers.includes(mfcId) ?? false;
@@ -259,9 +260,72 @@ export const inventoryHandlers = [
       .filter((h) => enabled === null || String(h.handlingEnabled) === enabled)
       .filter((h) => !undecided || (h.version === 0 && h.offReason !== 'DISCONTINUED' && h.saleState !== 'DISCONTINUED'))
       .filter((h) => !since || (!!h.introducedAt && h.introducedAt >= since))
-      .map((h) => ({ sku: h.sku, handlingEnabled: h.handlingEnabled, version: h.version, skuState: h.skuState, productId: null, changedBy: h.offReason === 'DISCONTINUED' ? 'product-service' : null, reason: h.offReason === 'DISCONTINUED' ? '본사 단종' : null, updatedAt: null, saleState: h.saleState ?? null, offReason: h.offReason ?? null, introducedAt: h.introducedAt ?? null }));
+      .map((h) => ({ sku: h.sku, handlingEnabled: h.handlingEnabled, version: h.version, skuState: h.skuState, productId: productOfSku(h.sku)?.productId ?? null, changedBy: h.offReason === 'DISCONTINUED' ? 'product-service' : null, reason: h.offReason === 'DISCONTINUED' ? '본사 단종' : null, updatedAt: null, saleState: h.saleState ?? null, offReason: h.offReason ?? null, introducedAt: h.introducedAt ?? null }));
     const items = all.slice(0, size);
     return HttpResponse.json({ centerId: mfcId, items, totalCount: all.length, page: { nextCursor: null, size: items.length } });
+  }),
+
+  // 일괄(전부 또는 전무, 최대 500행) — 행 규칙은 단건과 같다(없음 SKU_NOT_FOUND·INACTIVE·단종). 하나라도 틀리면 422 + details[].field = items[i]
+  http.post(`${base}/sku-handling-batches`, async ({ request, params }) => {
+    const mfcId = gate(request, params);
+    if (mfcId instanceof Response) return mfcId;
+    if (!isSupervisor(request)) return problem(403, 'FORBIDDEN');
+    const body = (await request.json()) as { reason?: string; items: { sku: string; enabled: boolean; expectedVersion?: number }[] };
+    return idempotent(request, () => {
+      if (body.items.length === 0 || body.items.length > 500 || new Set(body.items.map((i) => i.sku)).size !== body.items.length) return problem(400, 'VALIDATION_FAILED');
+      const bad = body.items.flatMap((it, i) => {
+        const h = db.handlings.find((x) => x.sku === it.sku);
+        const reason = !h
+          ? 'SKU_NOT_FOUND'
+          : it.expectedVersion !== undefined && it.expectedVersion !== h.version
+            ? 'VERSION_CONFLICT'
+            : it.enabled && h.skuState === 'INACTIVE'
+              ? 'SKU_INACTIVE'
+              : it.enabled && (h.offReason === 'DISCONTINUED' || h.saleState === 'DISCONTINUED')
+                ? 'SKU_DISCONTINUED'
+                : null;
+        return reason ? [{ field: `items[${i}]`, reason }] : [];
+      });
+      if (bad.length > 0) return problem(422, 'SKU_HANDLING_BATCH_REJECTED', bad);
+      let changedCount = 0;
+      const items = body.items.map((it) => {
+        const h = db.handlings.find((x) => x.sku === it.sku)!;
+        const changed = h.handlingEnabled !== it.enabled;
+        if (changed) changedCount += 1;
+        const next = changed ? { ...h, handlingEnabled: it.enabled, version: h.version + 1, offReason: it.enabled ? null : ('CENTER' as const) } : h;
+        db.handlings = db.handlings.map((x) => (x === h ? next : x));
+        return { sku: next.sku, handlingEnabled: next.handlingEnabled, version: next.version, skuState: next.skuState, productId: productOfSku(next.sku)?.productId ?? null, changedBy: actor(request), reason: body.reason ?? null, updatedAt: timestamp() };
+      });
+      return { status: 200, body: { status: 'APPLIED', requestId: keyOf(request), occurredAt: timestamp(), changedCount, items } };
+    });
+  }),
+
+  // 본사 상품 목록·상세(product-service 0.5.0 — q = 관리용 명칭 부분 일치 또는 SKU·바코드 완전 일치)
+  http.get(`${API_BASE}/products`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    const q = new URL(request.url).searchParams;
+    const text = (q.get('q') ?? '').replace(/\s/g, '').toLowerCase();
+    const sale = q.get('saleState');
+    const size = Math.min(Number(q.get('size') ?? 50) || 50, 200);
+    const start = Number(q.get('cursor') ?? 0) || 0;
+    const all = MOCK_PRODUCTS.filter((p) => (!sale || p.saleState === sale) && (!text || p.name.replace(/\s/g, '').toLowerCase().includes(text) || p.skus.some((s) => s.toLowerCase() === text)));
+    const items = all.slice(start, start + size).map((p) => ({ productId: p.productId, baseProductId: `BP-${p.productId}`, internalName: p.name, primaryCategoryId: p.categoryId, saleState: p.saleState, version: 1 }));
+    return HttpResponse.json({ items, page: { nextCursor: start + size < all.length ? String(start + size) : null, size: items.length } });
+  }),
+  http.get(`${API_BASE}/products/:productId`, ({ request, params }) => {
+    if (!operator(request)) return unauthorized();
+    const p = MOCK_PRODUCTS.find((x) => x.productId === String(params.productId));
+    if (!p) return problem(404, 'NOT_FOUND');
+    return HttpResponse.json({
+      productId: p.productId,
+      baseProductId: `BP-${p.productId}`,
+      internalName: p.name,
+      primaryCategoryId: p.categoryId,
+      saleState: p.saleState,
+      version: 1,
+      categoryIds: [p.categoryId],
+      skus: p.skus.map((sku) => ({ sku, productId: p.productId, baseProductId: `BP-${p.productId}`, unitType: 'E', unitsPerSku: 1, saleState: p.saleState, version: 1 })),
+    });
   }),
 
   http.post(`${base}/sku-handlings`, async ({ request, params }) => {
