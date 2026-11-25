@@ -180,6 +180,7 @@ export const messages = {
     moves: '이동·보충',
     inbound: '입고',
     inventory: '재고',
+    products: '상품 관리',
     quality: '품질',
     locations: '위치(칸)',
     restrictions: '운영 제한',

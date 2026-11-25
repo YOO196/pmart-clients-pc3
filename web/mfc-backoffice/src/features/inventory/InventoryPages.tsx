@@ -10,7 +10,7 @@
 // 본사 승인 번호(approvalRef)는 선택(AP-1, 0.22.0) — 기준 이상이면 422 APPROVAL_REQUIRED(shared/approval.tsx). 정정은 승인 뒤 같은 Idempotency-Key 로 다시.
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, Navigate, useSearchParams } from 'react-router';
 
 import { CommandRejectedFailure, type IdempotencyKey, request, requestNoContent, UnknownResultFailure, type CommandResponse } from '@pmart/web-core';
 import { CommandFeedback, formatSeoul, QueryState, toUiState, useCommand } from '@pmart/web-ui';
@@ -39,8 +39,9 @@ type StockUnit = Inv['CenterStock']['units'][number];
 type CountSession = Inv['CountSession'];
 type SkuHandling = Inv['SkuHandling'];
 
-type Tab = 'stock' | 'ledger' | 'lotTrace' | 'counts' | 'unshippable' | 'policies' | 'handlings';
-const TABS: readonly Tab[] = ['stock', 'ledger', 'lotTrace', 'counts', 'unshippable', 'policies', 'handlings'];
+// 상품 취급은 2026-11-25 메뉴 "상품 관리"로 옮겼다(features/products) — 예전 주소 ?tab=handlings 는 그리로 넘긴다
+type Tab = 'stock' | 'ledger' | 'lotTrace' | 'counts' | 'unshippable' | 'policies';
+const TABS: readonly Tab[] = ['stock', 'ledger', 'lotTrace', 'counts', 'unshippable', 'policies'];
 
 /** CommandResponse 를 확정으로: REJECTED 는 거절, UNKNOWN_RESULT 는 결과 불명(같은 키) */
 function checkCommand(r: CommandResponse): CommandResponse {
@@ -53,6 +54,12 @@ function checkCommand(r: CommandResponse): CommandResponse {
 export function InventoryMenu({ mfcId }: { readonly mfcId: string }) {
   const [params, setParams] = useSearchParams();
   const raw = params.get('tab');
+  if (raw === 'handlings') {
+    const rest = new URLSearchParams(params);
+    rest.delete('tab');
+    const q = rest.toString();
+    return <Navigate to={`${centerPath(mfcId, 'products')}${q ? `?${q}` : ''}`} replace />;
+  }
   const tab: Tab = (TABS as readonly string[]).includes(raw ?? '') ? (raw as Tab) : 'stock';
   return (
     <section className="space-y-4">
@@ -81,7 +88,6 @@ export function InventoryMenu({ mfcId }: { readonly mfcId: string }) {
       {tab === 'counts' && <CountsTab mfcId={mfcId} />}
       {tab === 'unshippable' && <UnshippableTab mfcId={mfcId} />}
       {tab === 'policies' && <PoliciesTab mfcId={mfcId} />}
-      {tab === 'handlings' && <HandlingsTab mfcId={mfcId} />}
     </section>
   );
 }
@@ -794,7 +800,7 @@ function NewProductsBanner({ mfcId, onShow }: { readonly mfcId: string; readonly
   );
 }
 
-function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
+export function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
   const [enabledRaw, setEnabled] = useParam('enabled');
   /** `enabled=new` = 신상품(정한 적 없음)만 */

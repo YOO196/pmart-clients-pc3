@@ -9,12 +9,19 @@ import { renderAt } from '../../test/render';
 const rows = () => screen.getAllByTestId('catalog-row');
 const rowOf = (name: string) => rows().find((r) => within(r).getAllByRole('cell')[1]!.textContent === name)!;
 const open = async () => {
-  renderAt('/c/MFC-BJG-01/inventory?tab=handlings');
+  renderAt('/c/MFC-BJG-01/products');
   await userEvent.click(await screen.findByRole('button', { name: '본사 상품 불러오기' }));
   await waitFor(() => expect(rows().length).toBeGreaterThan(0));
 };
 
 describe('본사 상품 불러오기', () => {
+  it('상품 관리는 재고 탭이 아니라 따로 메뉴 — 예전 주소(재고 ?tab=handlings)는 상품 관리로 넘긴다', async () => {
+    renderAt('/c/MFC-BJG-01/inventory?tab=handlings&enabled=new');
+    expect(await screen.findByRole('heading', { level: 1, name: '상품 관리' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '상품 관리' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('tab', { name: '상품 취급' })).not.toBeInTheDocument();
+  });
+
   it('본사 판매 중 상품 목록 + 이 센터 취급 여부(켜진 SKU 의 상품)', async () => {
     await open();
     expect(within(rowOf('서울우유 1L')).getByText('취급 중')).toBeInTheDocument();
@@ -24,7 +31,7 @@ describe('본사 상품 불러오기', () => {
   });
 
   it('고른 상품의 SKU 를 한꺼번에 켠다(일괄, 같은 키·출처 헤더) — 여러 SKU 상품은 모두', async () => {
-    const view = renderAt('/c/MFC-BJG-01/inventory?tab=handlings');
+    const view = renderAt('/c/MFC-BJG-01/products');
     await userEvent.click(await screen.findByRole('button', { name: '본사 상품 불러오기' }));
     await waitFor(() => expect(rows().length).toBeGreaterThan(0));
     await userEvent.click(within(rowOf('생수 2L')).getByRole('checkbox'));
@@ -51,7 +58,7 @@ describe('본사 상품 불러오기', () => {
   });
 
   it('상품명 찾기는 product-service q 로', async () => {
-    const view = renderAt('/c/MFC-BJG-01/inventory?tab=handlings');
+    const view = renderAt('/c/MFC-BJG-01/products');
     await userEvent.click(await screen.findByRole('button', { name: '본사 상품 불러오기' }));
     await userEvent.type(await screen.findByRole('searchbox', { name: '상품명·상품 코드·바코드' }), '우유');
     await userEvent.click(within(screen.getByTestId('catalog-import')).getByRole('button', { name: '조회' }));

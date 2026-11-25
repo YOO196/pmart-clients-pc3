@@ -13,6 +13,7 @@ import { PackingHandoverMenu } from '../features/delivery/PackingHandoverPage';
 import { ReturnHandoversMenu } from '../features/delivery/ReturnHandoverPage';
 import { InboundMenu } from '../features/inbound/InboundPages';
 import { InventoryMenu } from '../features/inventory/InventoryPages';
+import { ProductsMenu } from '../features/products/ProductsMenu';
 import { LocationsMenu } from '../features/locations/LocationPages';
 import { MovesMenu } from '../features/moves/MovePages';
 import { OpsMenu } from '../features/ops/OpsBoard';
@@ -207,6 +208,7 @@ const menuPages: Partial<Record<MenuKey, ComponentType<{ readonly mfcId: string 
   returnHandovers: ReturnHandoversMenu,
   inbound: InboundMenu,
   inventory: InventoryMenu,
+  products: ProductsMenu,
   quality: QualityMenu,
   restrictions: RestrictionsMenu,
 };
