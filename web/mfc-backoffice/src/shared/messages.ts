@@ -1043,6 +1043,27 @@ export const messages = {
     sys: { session: '실사' },
     intro: '상품별 재고를 보고 다뤄요.',
     tabs: { stock: '상품별 재고', ledger: '재고 이력', lotTrace: 'LOT 추적', counts: '순환 실사', unshippable: '출하 부적격 LOT', policies: '보충 기준', handlings: '상품 취급' },
+    /** 상품별 재고 — 센터 재고(stock-units)를 상품별로 묶은 목록(목록·카드) → 누르면 상품 정보 + LOT·위치 */
+    stockProducts: {
+      search: '상품 찾기',
+      placeholder: '상품명·상품 코드',
+      quality: '품질',
+      location: '위치(앞부분)',
+      all: '전체',
+      empty: '조건에 맞는 상품 재고가 없어요.',
+      more: (n: number) => `센터 재고가 많아 앞 ${n}줄까지만 묶었어요.`,
+      col: { product: '상품', qty: '보유', lots: 'LOT', places: '칸', quality: '품질' },
+      lotsText: (n: number) => `LOT ${n}`,
+      placesText: (n: number) => `칸 ${n}`,
+      quarantined: (n: number) => `격리 ${n}`,
+      backToList: '상품 목록',
+      info: '상품 정보',
+      fields: { sku: '상품 코드', unit: '판매 단위', weight: '중량', volume: '용량', sale: '본사 판매 상태', barcodes: '바코드', handling: '이 센터 취급' },
+      unitText: (type: string, n: number) => (type === 'B' ? `묶음 · ${n}개입` : '낱개'),
+      handlingOn: 'ON',
+      handlingOff: 'OFF',
+      infoFailed: '상품 정보를 읽지 못했어요(재고는 아래에 그대로).',
+    },
     /** LOT 추적 — LOT 찾기(lot-resolutions) + 지금 있는 칸(stock) + 이 LOT 줄만 이력(stock-ledger lotId) */
     lotTrace: {
       search: 'LOT 추적',

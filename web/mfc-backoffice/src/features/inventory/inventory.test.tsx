@@ -12,15 +12,16 @@ import { server } from '../../test/server';
 const sentBody = async (r: Request) => (await r.clone().json()) as Record<string, unknown>;
 const postsTo = (sent: Request[], suffix: string, method = 'POST') => sent.filter((r) => r.method === method && new URL(r.url).pathname.endsWith(suffix));
 
-async function lookup(sku: string) {
-  await userEvent.type(await screen.findByRole('textbox', { name: '상품 코드(SKU)' }), sku);
-  await userEvent.click(screen.getByRole('button', { name: '조회' }));
-}
-
 describe('상품별 재고·정정', () => {
-  it('상품 코드로 LOT 요약과 위치·상태별 재고를 본다', async () => {
+  it('상품별 목록에서 상품을 누르면 상품 정보·LOT 요약·위치·상태별 재고(목록·카드 둘 다)', async () => {
     renderAt('/c/MFC-BJG-01/inventory');
-    await lookup('sku-milk-1');
+    await userEvent.type(await screen.findByRole('searchbox', { name: '상품명·상품 코드' }), 'milk');
+    await userEvent.click(screen.getByRole('button', { name: '조회' }));
+    await waitFor(() => expect(screen.getAllByTestId('stock-product-row')).toHaveLength(1));
+    // 카드형으로도
+    await userEvent.click(screen.getByRole('button', { name: '카드' }));
+    await userEvent.click(within((await screen.findAllByTestId('stock-product-card'))[0]!).getByText('SKU-MILK-1'));
+    expect(await screen.findByTestId('stock-product-info')).toHaveTextContent('SKU-MILK-1');
     await waitFor(() => expect(screen.getAllByTestId('unit-row')).toHaveLength(3));
     expect(screen.getAllByTestId('lot-row')).toHaveLength(2);
     expect(within(screen.getAllByTestId('unit-row')[2]!).getByText('격리')).toBeInTheDocument();

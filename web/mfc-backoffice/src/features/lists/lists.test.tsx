@@ -55,13 +55,13 @@ describe('센터 목록(MB-1)', () => {
     expect(rows[0]).toHaveTextContent('승인 대기');
   });
 
-  it('센터 전체 재고 — 상품 코드 없이, 열기는 그 상품 재고', async () => {
+  it('센터 전체 재고 — 상품 코드 없이 상품별 목록(stock-units 를 상품마다), 누르면 그 상품 재고', async () => {
     renderAt('/c/MFC-BJG-01/inventory');
-    const list = await screen.findByTestId('list-stock-units');
-    const rows = await within(list).findAllByTestId('list-stock-units-row');
-    expect(rows.length).toBe(db.stockUnits.filter((u) => u.mfcId === 'MFC-BJG-01').length);
-    const milk = rows.find((r) => r.textContent?.includes('SKU-MILK-1'))!;
-    await userEvent.click(within(milk).getByRole('button', { name: '열기' }));
+    await waitFor(() => expect(screen.getAllByTestId('stock-product-row').length).toBeGreaterThan(0));
+    const skus = new Set(db.stockUnits.filter((u) => u.mfcId === 'MFC-BJG-01').map((u) => u.sku)).size;
+    expect(screen.getByTestId('result-count')).toHaveTextContent(`${skus}`);
+    const milk = screen.getAllByTestId('stock-product-row').find((r) => r.textContent?.includes('SKU-MILK-1'))!;
+    await userEvent.click(within(milk).getByRole('button'));
     await waitFor(() => expect(screen.getAllByTestId('unit-row').length).toBeGreaterThan(0));
   });
 
