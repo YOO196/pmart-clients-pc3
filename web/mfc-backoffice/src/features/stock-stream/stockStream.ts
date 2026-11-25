@@ -64,6 +64,8 @@ export function openStockStream(options: StockStreamOptions): () => void {
             query: { mfcId: [mfcId] },
             ...(resume && lastEventId ? { header: { 'Last-Event-ID': lastEventId } } : {}),
           },
+          // 기본 Accept(application/json)면 LAN 게이트웨이가 406 을 줄 수 있다(PC1 PR 세션 2026-11-25) — SSE 를 받는다고 밝힌다
+          headers: { Accept: 'text/event-stream' },
           parseAs: 'stream',
           signal: conn.signal,
         }),
