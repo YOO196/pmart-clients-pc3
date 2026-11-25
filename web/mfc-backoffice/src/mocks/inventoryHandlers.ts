@@ -300,6 +300,22 @@ export const inventoryHandlers = [
     });
   }),
 
+  // 상품 카드(product-content — 고객용 이름·대표 사진). 목 사진은 상품마다 색 타일 SVG(data:) — 화면은 data: 주소를 그대로 쓴다. 미게시(옛 묶음 상품)는 missing
+  http.get(`${API_BASE}/product-contents`, ({ request }) => {
+    const ids = (new URL(request.url).searchParams.get('productIds') ?? '').split(',').filter(Boolean);
+    const shown = MOCK_PRODUCTS.filter((p) => ids.includes(p.productId) && p.productId !== 'PRD-OLD');
+    const tile = (name: string, i: number) => {
+      const hue = (i * 47) % 360;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480"><rect width="480" height="480" fill="hsl(${hue} 45% 82%)"/><text x="240" y="270" font-size="72" text-anchor="middle" font-family="sans-serif" fill="hsl(${hue} 40% 30%)">${name.slice(0, 4)}</text></svg>`;
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    };
+    return HttpResponse.json({
+      items: shown.map((p) => ({ productId: p.productId, name: p.name, mainImage: { imageId: `IMG-${p.productId}`, url: tile(p.name, MOCK_PRODUCTS.indexOf(p)), role: 'MAIN', sortOrder: 0 } })),
+      missing: ids.filter((id) => !shown.some((p) => p.productId === id)),
+      asOf: new Date().toISOString(),
+    });
+  }),
+
   // 본사 상품 목록·상세(product-service 0.5.0 — q = 관리용 명칭 부분 일치 또는 SKU·바코드 완전 일치)
   http.get(`${API_BASE}/products`, ({ request }) => {
     if (!operator(request)) return unauthorized();

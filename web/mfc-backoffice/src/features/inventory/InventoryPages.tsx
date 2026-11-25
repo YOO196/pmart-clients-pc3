@@ -26,6 +26,7 @@ import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 import { CountSessionList, StockUnitList } from '../lists/CenterLists';
 import { CountWindowsCard, RotationCountStart } from './CountPlanning';
+import { ProductThumb, useProductCards, useProductView, ViewToggle, type ProductCardInfo, type ProductView } from '../../shared/productCards';
 import { CatalogImport } from './CatalogImport';
 import { LotTraceTab } from './LotTraceTab';
 import { StockLedgerTab } from './StockLedgerTab';
@@ -826,6 +827,9 @@ export function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
     getNextPageParam: (last) => last.page?.nextCursor ?? undefined,
   });
   const rows = (query.data?.pages ?? []).flatMap((p) => p.items ?? []);
+  // 상품 사진·이름(product-content), 목록/카드 보기(2026-11-25 사용자)
+  const cards = useProductCards(rows.map((h) => h.productId));
+  const [view, setView] = useProductView();
   // 본사 상품 불러오기(2026-11-25 사용자) — 본사 상품 목록에서 골라 이 센터 취급을 한꺼번에 켠다
   const [importOpen, setImportOpen] = useState(false);
   return (
@@ -852,18 +856,29 @@ export function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
           {notice}
         </p>
       )}
+      <div className="flex justify-end">
+        <ViewToggle view={view} onChange={setView} />
+      </div>
       <QueryState state={toUiState(query, () => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.handlingsEmpty}>
         {() => (
           <div className="space-y-2">
+            {view === 'card' ? (
+              <ul className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3" data-testid="handling-cards">
+                {rows.map((h) => (
+                  <HandlingRow key={`${h.sku}-${h.version}`} mfcId={mfcId} handling={h} onDone={setNotice} info={h.productId ? cards.data?.get(h.productId) : undefined} layout="card" />
+                ))}
+              </ul>
+            ) : (
             <div className="overflow-x-auto rounded-box bg-base-100">
             <table className="table table-sm">
               <tbody>
                 {rows.map((h) => (
-                  <HandlingRow key={`${h.sku}-${h.version}`} mfcId={mfcId} handling={h} onDone={setNotice} />
+                  <HandlingRow key={`${h.sku}-${h.version}`} mfcId={mfcId} handling={h} onDone={setNotice} info={h.productId ? cards.data?.get(h.productId) : undefined} />
                 ))}
               </tbody>
             </table>
             </div>
+            )}
             {query.hasNextPage && (
               <button type="button" className="btn btn-sm" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>
                 {m.more}
@@ -876,7 +891,7 @@ export function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
   );
 }
 
-function HandlingRow({ mfcId, handling: h, onDone }: { readonly mfcId: string; readonly handling: SkuHandling; readonly onDone: (t: string | null) => void }) {
+function HandlingRow({ mfcId, handling: h, onDone, info, layout = 'list' }: { readonly mfcId: string; readonly handling: SkuHandling; readonly onDone: (t: string | null) => void; readonly info?: ProductCardInfo | undefined; readonly layout?: ProductView }) {
   const { sku, version, skuState } = h;
   const enabled = h.handlingEnabled;
   // 본사 단종(0.27.0 R7): 모든 센터에서 꺼지고 켤 수 없다(서버도 409 SKU_DISCONTINUED)
@@ -891,19 +906,16 @@ function HandlingRow({ mfcId, handling: h, onDone }: { readonly mfcId: string; r
     await queryClient.invalidateQueries({ queryKey: ['handlings-new-count', mfcId] });
     return r;
   });
-  return (
-    <tr data-testid="handling-row">
-      <td className="font-mono">{sku}</td>
-      <td>
-        <span className={`badge badge-sm ${enabled ? 'badge-success' : 'badge-ghost'}`}>{enabled ? m.on : m.off}</span>
-      </td>
-      <td>
+  const stateText = (
+    <>
         {m.skuState[skuState ?? ''] ?? skuState ?? messages.none}
         {discontinued && <span className="badge badge-sm badge-error ml-1">{m.discontinued}</span>}
         {!discontinued && h.offReason === 'CENTER' && <span className="ml-1 text-xs opacity-70">{m.offByCenter}</span>}
         {h.introducedAt && <span className="ml-1 text-xs opacity-70">{m.introducedAt(formatSeoul(h.introducedAt))}</span>}
-      </td>
-      <td>
+    </>
+  );
+  const action = (
+    <>
         {discontinued && !enabled && <p className="text-xs opacity-70">{m.discontinuedNote}</p>}
         <button
           type="button"
@@ -917,7 +929,40 @@ function HandlingRow({ mfcId, handling: h, onDone }: { readonly mfcId: string; r
           {enabled ? m.turnOff : m.turnOn}
         </button>
         <CommandFeedback command={toggle} />
+    </>
+  );
+  // 카드형 — 대표 사진·상품명 위, ON/OFF·상태·켜기/끄기 아래(2026-11-25 사용자)
+  if (layout === 'card')
+    return (
+      <li className="flex flex-col gap-2 rounded-box border border-base-300 bg-base-100 p-3" data-testid="handling-card">
+        <ProductThumb info={info} fallback={sku} size="card" />
+        <div className="min-w-0">
+          <p className="truncate font-semibold" title={info?.name ?? sku}>{info?.name ?? sku}</p>
+          <p className="font-mono text-xs text-base-content/60">{sku}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-1 text-xs">
+          <span className={`badge badge-sm ${enabled ? 'badge-success' : 'badge-ghost'}`}>{enabled ? m.on : m.off}</span>
+          {stateText}
+        </div>
+        <div className="mt-auto">{action}</div>
+      </li>
+    );
+  return (
+    <tr data-testid="handling-row">
+      <td>
+        <span className="flex items-center gap-2">
+          <ProductThumb info={info} fallback={sku} size="row" />
+          <span className="min-w-0">
+            {info?.name && <span className="block truncate font-medium">{info.name}</span>}
+            <span className="font-mono text-xs">{sku}</span>
+          </span>
+        </span>
       </td>
+      <td>
+        <span className={`badge badge-sm ${enabled ? 'badge-success' : 'badge-ghost'}`}>{enabled ? m.on : m.off}</span>
+      </td>
+      <td>{stateText}</td>
+      <td>{action}</td>
     </tr>
   );
 }

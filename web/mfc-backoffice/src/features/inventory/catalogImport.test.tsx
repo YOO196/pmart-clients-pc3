@@ -7,7 +7,8 @@ import { db } from '../../mocks/db';
 import { renderAt } from '../../test/render';
 
 const rows = () => screen.getAllByTestId('catalog-row');
-const rowOf = (name: string) => rows().find((r) => within(r).getAllByRole('cell')[1]!.textContent === name)!;
+// 상품 칸 = 사진(없으면 첫 글자) + 이름 — 이름으로 끝나는 칸
+const rowOf = (name: string) => rows().find((r) => within(r).getAllByRole('cell')[1]!.textContent?.endsWith(name))!;
 const open = async () => {
   renderAt('/c/MFC-BJG-01/products');
   await userEvent.click(await screen.findByRole('button', { name: '본사 상품 불러오기' }));
@@ -62,7 +63,26 @@ describe('본사 상품 불러오기', () => {
     await userEvent.click(await screen.findByRole('button', { name: '본사 상품 불러오기' }));
     await userEvent.type(await screen.findByRole('searchbox', { name: '상품명·상품 코드·바코드' }), '우유');
     await userEvent.click(within(screen.getByTestId('catalog-import')).getByRole('button', { name: '조회' }));
-    await waitFor(() => expect(rows().map((r) => within(r).getAllByRole('cell')[1]!.textContent)).toEqual(['서울우유 1L']));
+    await waitFor(() => expect(rows()).toHaveLength(1));
+    expect(rows()[0]).toHaveTextContent('서울우유 1L');
     expect(view.gets('/products').some((r) => new URL(r.url).searchParams.get('q') === '우유')).toBe(true);
+  });
+
+  it('목록/카드 두 가지 보기 — 카드는 대표 사진(product-content)과 이름, 고르기·켜기는 같다', async () => {
+    const view = renderAt('/c/MFC-BJG-01/products');
+    await userEvent.click(await screen.findByRole('button', { name: '본사 상품 불러오기' }));
+    await waitFor(() => expect(rows().length).toBeGreaterThan(0));
+    // 목록에도 사진(게시된 상품)
+    await waitFor(() => expect(rowOf('서울우유 1L').querySelector('img')).not.toBeNull());
+    expect(view.gets('/product-contents').length).toBeGreaterThan(0);
+    await userEvent.click(within(screen.getByTestId('catalog-import')).getByRole('button', { name: '카드' }));
+    const cards = await screen.findAllByTestId('catalog-card');
+    const water = cards.find((c) => c.textContent?.includes('생수 2L'))!;
+    expect(water.querySelector('img')).not.toBeNull();
+    await userEvent.click(within(water).getByRole('checkbox'));
+    await userEvent.click(screen.getByRole('button', { name: '선택한 1개 이 센터에서 판매' }));
+    expect(await screen.findByText('2개 SKU 중 2개를 켰어요(이미 켜진 것은 그대로).')).toBeInTheDocument();
+    // 상품 관리 목록도 같은 보기(?view=card) — 카드형
+    expect(screen.getAllByTestId('handling-card').length).toBeGreaterThan(0);
   });
 });
