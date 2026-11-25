@@ -4,6 +4,7 @@ import { API_BASE } from '../api/client';
 import { authHandlers } from './authHandlers';
 import { meHandlers } from './meHandlers';
 import { outboundHandlers } from './outboundHandlers';
+import { purchaseHandlers } from './purchaseHandlers';
 import { stockHandlers } from './stockHandlers';
 import { operator, unauthorized } from './support';
 
@@ -18,4 +19,4 @@ const gateway = http.all(`${API_BASE}/*`, ({ request }) => {
 });
 
 // DC 이름은 sessions/current 의 centerDetails 로 온다(authHandlers 의 mockCenterNames).
-export const handlers = [gateway, ...authHandlers, ...meHandlers, ...outboundHandlers, ...stockHandlers];
+export const handlers = [gateway, ...authHandlers, ...meHandlers, ...outboundHandlers, ...stockHandlers, ...purchaseHandlers];
