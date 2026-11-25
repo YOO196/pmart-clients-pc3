@@ -29,6 +29,7 @@ import { assignTaskName } from '../../shared/pickPack';
 import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
 import { SavedViews } from '../../shared/SavedViews';
 import { SeenMark } from '../../shared/SeenMark';
+import { DetailTop, useGoBack } from '../../shared/DetailHead';
 import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
 import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 import { BreakPinCard } from './BreakPinCard';
@@ -386,12 +387,12 @@ function WorkerRegisterPage({ mfcId }: { readonly mfcId: string }) {
     if (created.workerId) void navigate(workersPath(mfcId, encodeURIComponent(created.workerId)), { state: { created: true } });
     return created;
   });
+  const goBack = useGoBack(workersPath(mfcId));
   return (
     <section className="max-w-3xl space-y-4">
-      <Link to={workersPath(mfcId)} className="link text-sm">
-        {m.back}
-      </Link>
-      <h1 className="text-xl font-bold">{m.register}</h1>
+      <DetailTop onBack={goBack} backLabel={m.back}>
+        <h1 className="text-xl font-bold">{m.register}</h1>
+      </DetailTop>
       <form
         className="space-y-3 rounded-box bg-base-100 p-4 text-sm"
         onSubmit={(e) => {
@@ -468,28 +469,28 @@ function WorkerDetailPage({ mfcId }: { readonly mfcId: string }) {
   });
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const past = useScrolledPast(titleRef);
+  const goBack = useGoBack(workersPath(mfcId));
+  const d = query.data;
   useRecordRecent('worker', mfcId, workerId, query.data?.displayName);
   return (
     <section className="max-w-4xl space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link to={workersPath(mfcId)} className="link text-sm">
-          {m.back}
-        </Link>
-        <div className="ml-auto">
-          <QueueNav kind="worker" mfcId={mfcId} id={workerId} />
-        </div>
-      </div>
+      <DetailTop onBack={goBack} backLabel={m.back} nav={<QueueNav kind="worker" mfcId={mfcId} id={workerId} />}>
+        {d && (
+          <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
+            <WorkerName worker={d} />
+            <StateBadge state={d.state} />
+            {d.onBreak && <span className="badge badge-sm badge-info">{m.onBreak}</span>}
+          </h1>
+        )}
+      </DetailTop>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(w) => (
           <>
             {/* 직원 표기 = 이름 · 사번(ADR-0070) — 운영자 ID 는 시스템 번호 칸에만 */}
-            <h1 ref={titleRef} className="flex flex-wrap items-center gap-2">
-              <WorkerName worker={w} />
-              <StateBadge state={w.state} />
-              {w.onBreak && <span className="badge badge-sm badge-info">{m.onBreak}</span>}
-            </h1>
             <StickyTitle
               show={past}
+              onBack={goBack}
+              backLabel={m.back}
               title={<WorkerName worker={w} />}
               badges={
                 <>

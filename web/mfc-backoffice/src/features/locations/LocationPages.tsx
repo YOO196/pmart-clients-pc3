@@ -22,6 +22,7 @@ import { SystemNumbers } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
 import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
 import { SeenMark } from '../../shared/SeenMark';
+import { DetailTop, useGoBack } from '../../shared/DetailHead';
 import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
 import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 
@@ -427,12 +428,12 @@ function LocationRegisterPage({ mfcId }: { readonly mfcId: string }) {
     }
     return created;
   });
+  const goBack = useGoBack(locationsPath(mfcId));
   return (
     <section className="max-w-3xl space-y-4">
-      <Link to={locationsPath(mfcId)} className="link text-sm">
-        {m.back}
-      </Link>
-      <h1>{m.register}</h1>
+      <DetailTop onBack={goBack} backLabel={m.back}>
+        <h1>{m.register}</h1>
+      </DetailTop>
       <LocationForm
         initial={formFrom(undefined)}
         codeEditable
@@ -469,26 +470,24 @@ function LocationDetailPage({ mfcId }: { readonly mfcId: string }) {
   const [notice, setNotice] = useState<string | null>((location.state as { created?: boolean } | null)?.created ? m.created : null);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const past = useScrolledPast(titleRef);
+  const goBack = useGoBack(locationsPath(mfcId));
+  const d = query.data;
   // 칸 코드(A-H2-01)가 화면 표기 — 칸 ID 는 시스템 번호 칸에만
   useRecordRecent('location', mfcId, locationId, query.data?.locationCode);
   return (
     <section className="max-w-3xl space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link to={locationsPath(mfcId)} className="link text-sm">
-          {m.back}
-        </Link>
-        <div className="ml-auto">
-          <QueueNav kind="location" mfcId={mfcId} id={locationId} />
-        </div>
-      </div>
+      <DetailTop onBack={goBack} backLabel={m.back} nav={<QueueNav kind="location" mfcId={mfcId} id={locationId} />}>
+        {d && (
+          <h1 ref={titleRef} className="flex items-center gap-2">
+            <span className="font-mono">{d.locationCode}</span>
+            <StateBadge state={d.state} />
+          </h1>
+        )}
+      </DetailTop>
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(l) => (
           <>
-            <h1 ref={titleRef} className="flex items-center gap-2">
-              <span className="font-mono">{l.locationCode}</span>
-              <StateBadge state={l.state} />
-            </h1>
-            <StickyTitle show={past} title={l.locationCode} badges={<StateBadge state={l.state} />} />
+            <StickyTitle show={past} onBack={goBack} backLabel={m.back} title={l.locationCode} badges={<StateBadge state={l.state} />} />
             {notice && (
               <p role="status" className="text-success text-sm">
                 {notice}

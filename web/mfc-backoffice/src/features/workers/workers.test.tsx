@@ -51,6 +51,17 @@ describe('작업자 목록', () => {
     expect(within(inline).getByRole('link', { name: '전체 상세 ›' })).toHaveAttribute('href', expect.stringContaining('/c/MFC-BJG-01/workers/'));
   });
 
+  it('상세 머리: 제목 왼쪽 둥근 ‹(이름은 aria-label), 누르면 방금 보던 목록(찾기 조건 그대로)', async () => {
+    renderAt('/c/MFC-BJG-01/workers?state=LEFT');
+    await waitFor(() => expect(names()).toEqual(['정퇴사']));
+    await userEvent.click(within(rows()[0]!).getByRole('link'));
+    expect(await heading()).toHaveTextContent('정퇴사');
+    // 제목 위 "작업자 목록" 글자 링크 대신 둥근 ‹ 단추(왼쪽 메뉴의 같은 이름 링크는 그대로)
+    expect(within(screen.getByTestId('detail-top')).queryByRole('link')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '작업자 목록' }));
+    await waitFor(() => expect(names()).toEqual(['정퇴사']));
+  });
+
   it('조회 실패는 빈 목록이 아니라 오류', async () => {
     server.use(http.get(`${API_BASE}/mfcs/:mfcId/workers`, () => new HttpResponse(null, { status: 500 })));
     renderAt('/c/MFC-BJG-01/workers');
