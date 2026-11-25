@@ -15,6 +15,7 @@ import { InventoryMenu } from '../features/inventory/InventoryPages';
 import { MasterMenu } from '../features/master/MasterPages';
 import { PreparingPage } from '../features/menus/PreparingPage';
 import { PickingMenu } from '../features/picking/PickingPage';
+import { PurchaseMenu } from '../features/purchase/PurchasePages';
 import { ShippingMenu } from '../features/shipping/ShippingPage';
 import { TasksMenu } from '../features/tasks/TaskPages';
 import { TrfWaveMenu } from '../features/trf-wave/TrfWavePages';
@@ -195,6 +196,7 @@ const menuPages: Partial<Record<MenuKey, ComponentType<{ readonly cdcId: string 
   trfWave: TrfWaveMenu,
   tasks: TasksMenu,
   master: MasterMenu,
+  purchase: PurchaseMenu,
   inventory: InventoryMenu,
   shipping: ShippingMenu,
   picking: PickingMenu,
