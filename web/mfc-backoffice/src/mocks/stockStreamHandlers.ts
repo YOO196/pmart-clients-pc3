@@ -6,6 +6,7 @@ import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
 import { db } from './db';
+import { recordLedger } from './stockLedgerHandlers';
 import { operator, problem, unauthorized } from './support';
 
 export interface StockUnitChange {
@@ -54,6 +55,7 @@ const frame = (event: string, data: unknown, id?: string) => `event: ${event}\n$
 /** db.stockUnits 를 바꾼 **뒤** 부른다(서버: 커밋 뒤). 그 센터를 받는 연결에 stock-changed(+ 0 경계면 summary-changed). */
 export function emitStockChange(mfcId: string, cause: string, units: readonly StockUnitChange[]) {
   if (units.length === 0) return;
+  recordLedger(mfcId, cause, units);
   const skus = [...new Set(units.map((u) => u.sku))];
   const items = skus.map((sku) => {
     const now = centerValues(mfcId, sku);

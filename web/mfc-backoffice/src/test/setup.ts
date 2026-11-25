@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeAll } from 'vitest';
 
 import { resetDb } from '../mocks/db';
 import { resetDispatchCancels } from '../mocks/dispatchDelayHandlers';
+import { resetStockLedger } from '../mocks/stockLedgerHandlers';
 import { resetStockStream } from '../mocks/stockStreamHandlers';
 import { server } from './server';
 
@@ -14,6 +15,7 @@ afterEach(() => {
   resetDb();
   resetDispatchCancels();
   resetStockStream();
+  resetStockLedger();
   cleanup();
   // 세션 복원 보관(refresh token)·로그인 시작 기록이 다음 테스트로 새지 않게
   sessionStorage.clear();
