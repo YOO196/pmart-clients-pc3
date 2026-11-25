@@ -5,7 +5,7 @@
 // - 집어 올리기·내려놓기는 현장(PDA) 일이라 이 화면에 없다.
 // - 출발·도착 고르기는 돕기만: mfc-inventory `GET /mfcs/{id}/stock?sku=`(위치·LOT 별), mfc-location `GET /putaway-candidates`. 판정은 서버.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { Link, Route, Routes, useLocation as useRouterLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
@@ -25,6 +25,7 @@ import { ProgressSteps, type StepPlace } from '../../shared/ProgressSteps';
 import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
 import { SavedViews } from '../../shared/SavedViews';
 import { SeenMark } from '../../shared/SeenMark';
+import { Caret, expandRowProps, InlineDetail, InlineFields, useInlineOpen } from '../../shared/simList';
 import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
 import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 
@@ -86,6 +87,7 @@ function MoveListPage({ mfcId }: { readonly mfcId: string }) {
   const ids = (query.data ?? []).map((o) => o.moveId ?? '').filter(Boolean);
   const fresh = useNewIds(query.data ? ids : undefined, state ?? '');
   const seen = useSeenIds('move', mfcId);
+  const inline = useInlineOpen();
   useRememberQueue('move', mfcId, query.data ? ids : undefined, `${pathname}${search}`);
   return (
     <section className="space-y-4">
@@ -107,7 +109,7 @@ function MoveListPage({ mfcId }: { readonly mfcId: string }) {
         />
         <StatCard testId="count-urgent" label={m.fields.urgent} value={cell((o) => !!o.urgent)} tone={has((o) => !!o.urgent) ? 'error' : undefined} hint={m.ui.urgentHint} />
       </StatStrip>
-      <SearchBar summary={[[m.stateFilter, state ? (m.state[state] ?? state) : m.inProgress]]} startOpen={!state}>
+      <SearchBar summary={[[m.stateFilter, state ? (m.state[state] ?? state) : m.inProgress, state ? () => setState('') : undefined]]} startOpen={!state}>
         <label className="flex flex-col gap-1">
         {m.stateFilter}
         <select className="select select-sm w-44" value={state ?? ''} onChange={(e) => setState(e.target.value)}>
@@ -140,31 +142,54 @@ function MoveListPage({ mfcId }: { readonly mfcId: string }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((o) => (
-                <tr key={o.moveId} data-testid="move-row" className={fresh.has(o.moveId ?? '') ? 'row-new' : undefined}>
-                  <td>
-                    <Link className="link" to={movesPath(mfcId, encodeURIComponent(o.moveId ?? ''))}>
-                      {m.kind[o.kind ?? ''] ?? o.kind}
-                    </Link>
-                    {o.urgent && <span className="badge badge-sm badge-error ml-1">{m.fields.urgent}</span>}
-                    <SeenMark seen={seen.has(o.moveId ?? '')} />
-                  </td>
-                  <td>{product(o)}</td>
-                  <td>
-                    <LotLabel lotId={o.lotId} />
-                  </td>
-                  <td className="font-mono text-xs">{`${o.fromLocation ?? ''} → ${o.toLocation ?? ''}`}</td>
-                  <td>{o.qty}</td>
-                  <td>{m.progress(o.pickedQty ?? 0, o.droppedQty ?? 0, o.onCartQty ?? 0)}</td>
-                  <td>
-                    <StateBadge state={o.state} />
-                  </td>
-                  <td>
-                  <Who id={o.assigneeId} />
-                </td>
-                  <td>{o.createdAt ? formatSeoul(o.createdAt) : messages.none}</td>
-                </tr>
-              ))}
+              {rows.map((o) => {
+                const k = o.moveId ?? '';
+                const isOpen = inline.isOpen(k);
+                const path = movesPath(mfcId, encodeURIComponent(k));
+                return (
+                  <Fragment key={k}>
+                    {/* 줄을 누르면 아래에 바코드·카트·사유·집은 사람·만든 사람(2026-11-25 목록 한 틀), 종류 링크·"전체 상세 ›"는 상세로 */}
+                    <tr data-testid="move-row" className={fresh.has(k) ? 'row-new' : undefined} {...expandRowProps(isOpen, () => inline.toggle(k))}>
+                      <td>
+                        <Caret open={isOpen} />
+                        <Link className="link" to={path}>
+                          {m.kind[o.kind ?? ''] ?? o.kind}
+                        </Link>
+                        {o.urgent && <span className="badge badge-sm badge-error ml-1">{m.fields.urgent}</span>}
+                        <SeenMark seen={seen.has(k)} />
+                      </td>
+                      <td>{product(o)}</td>
+                      <td>
+                        <LotLabel lotId={o.lotId} />
+                      </td>
+                      <td className="font-mono text-xs">{`${o.fromLocation ?? ''} → ${o.toLocation ?? ''}`}</td>
+                      <td>{o.qty}</td>
+                      <td>{m.progress(o.pickedQty ?? 0, o.droppedQty ?? 0, o.onCartQty ?? 0)}</td>
+                      <td>
+                        <StateBadge state={o.state} />
+                      </td>
+                      <td>
+                        <Who id={o.assigneeId} />
+                      </td>
+                      <td>{o.createdAt ? formatSeoul(o.createdAt) : messages.none}</td>
+                    </tr>
+                    {isOpen && (
+                      <InlineDetail colSpan={9} to={path} testId="move-inline">
+                        <InlineFields
+                          rows={[
+                            [m.fields.barcodes, o.barcodes?.length ? o.barcodes.join(', ') : messages.none],
+                            [m.fields.cart, o.cartLocation ?? messages.none],
+                            [m.fields.reason, o.reason ?? messages.none],
+                            [m.fields.pickedBy, <Who id={o.pickedBy} />],
+                            [m.fields.createdBy, o.createdBy === 'SYSTEM' ? m.system : <Who id={o.createdBy} />],
+                            [m.fields.updatedAt, o.updatedAt ? formatSeoul(o.updatedAt) : messages.none],
+                          ]}
+                        />
+                      </InlineDetail>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
           </div>

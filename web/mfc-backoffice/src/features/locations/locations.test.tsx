@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pollConfig } from '@pmart/web-core';
 import { API_BASE } from '../../api/client';
 import { db } from '../../mocks/db';
-import { as, renderAt } from '../../test/render';
+import { as, openFilter, renderAt } from '../../test/render';
 import { server } from '../../test/server';
 import { LOCATION_PAGE_SIZE } from './LocationPages';
 
@@ -19,7 +19,7 @@ beforeEach(() => {
 afterEach(() => Object.assign(pollConfig, saved));
 
 const rows = () => screen.getAllByTestId('location-row');
-const codes = () => rows().map((r) => within(r).getAllByRole('cell')[0]!.textContent);
+const codes = () => rows().map((r) => within(r).getAllByRole('link')[0]!.textContent);
 const sentBody = async (r: Request) => (await r.clone().json()) as Record<string, unknown>;
 
 describe('칸 목록', () => {
@@ -30,13 +30,22 @@ describe('칸 목록', () => {
     expect(new URL(view.gets('/locations')[0]!.url).searchParams.get('mfcId')).toBe('MFC-BJG-01');
   });
 
+  it('줄을 누르면 아래에 크기·슬롯 등이 펼쳐지고 "전체 상세 ›"는 상세로', async () => {
+    renderAt('/c/MFC-BJG-01/locations');
+    await waitFor(() => expect(rows().length).toBeGreaterThan(0));
+    await userEvent.click(within(rows()[0]!).getAllByRole('cell')[1]!);
+    const inline = await screen.findByTestId('location-inline');
+    expect(within(inline).getByText('슬롯 수')).toBeInTheDocument();
+    expect(within(inline).getByRole('link', { name: '전체 상세 ›' })).toHaveAttribute('href', expect.stringContaining('/c/MFC-BJG-01/locations/'));
+  });
+
   it('거르기는 URL 쿼리로 서버에 보낸다(상태 = 닫힘)', async () => {
     const view = renderAt('/c/MFC-BJG-01/locations?state=CLOSED');
     await waitFor(() => expect(codes()).toEqual(['F-S2-02-1-03', 'QRT-A-01']));
     expect(new URL(view.gets('/locations').at(-1)!.url).searchParams.get('state')).toBe('CLOSED');
     // 조건을 건 목록은 검색 조건이 칩 한 줄로 접혀 있다 — 칩에 지금 조건, "검색 열기"로 펼친다
-    expect(screen.getAllByTestId('search-chip').map((c) => c.textContent)).toContain('상태닫힘▾');
-    await userEvent.click(screen.getByTestId('search-toggle'));
+    expect(screen.getAllByTestId('search-chip').map((c) => c.textContent)).toContain('닫힘✕');
+    await openFilter();
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '온도대' }), 'FROZEN');
     await waitFor(() => expect(codes()).toEqual(['F-S2-02-1-03']));
     const last = new URL(view.gets('/locations').at(-1)!.url).searchParams;

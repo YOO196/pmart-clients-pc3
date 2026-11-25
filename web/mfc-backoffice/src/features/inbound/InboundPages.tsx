@@ -6,7 +6,7 @@
 //   applyStatus APPLIED = 반영, CAPTURED = 기록만(완료 아님), REJECTED = 재고 거절(rejectReason, 잔량 그대로), UNKNOWN_RESULT·503 = 결과 불명(같은 키로 다시).
 //   담당(assigneeId)이 있으면 담당만 — 409 NOT_ASSIGNEE. 합계 ≤ 남은 수량은 화면에서도 막고 서버가 판정한다.
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { Link, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router';
 
 import { request, UnknownResultFailure } from '@pmart/web-core';
@@ -19,6 +19,7 @@ import { LotLabel } from '../../shared/LotLabel';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
 import { SearchBar } from '../../shared/listParts';
+import { Caret, expandRowProps, InlineDetail, useInlineOpen } from '../../shared/simList';
 import { useNewIds } from '../../shared/motion';
 import { Who } from '../../shared/OperatorLabel';
 import { useRecordRecent, useSeenIds } from '../../shared/recentViews';
@@ -116,15 +117,16 @@ function InboundTaskList({ mfcId }: { readonly mfcId: string }) {
   const ids = (query.data ?? []).map((t) => t.taskId);
   const fresh = useNewIds(query.data ? ids : undefined, `${taskType ?? ''}|${state ?? ''}|${receiptId}`);
   const seen = useSeenIds('inboundTask', mfcId);
+  const inline = useInlineOpen();
   useRememberQueue('inboundTask', mfcId, query.data ? ids : undefined, `${pathname}${search}`);
   const stateText = rawState === 'COMPLETED' ? m.taskState.COMPLETED : rawState === 'ALL' ? m.filters.all : m.taskState.READY;
   return (
     <div className="space-y-3">
       <SearchBar
         summary={[
-          [m.filters.type, taskType ? (m.taskType[taskType] ?? taskType) : ''],
-          [m.filters.state, stateText ?? ''],
-          [m.filters.receipt, receiptId],
+          [m.filters.type, taskType ? (m.taskType[taskType] ?? taskType) : '', () => set('taskType', '')],
+          [m.filters.state, stateText ?? '', rawState ? () => set('state', '') : undefined],
+          [m.filters.receipt, receiptId, () => set('receiptId', '')],
         ]}
         startOpen={!rawType && !rawState && !receiptId}
       >
@@ -167,27 +169,46 @@ function InboundTaskList({ mfcId }: { readonly mfcId: string }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((t) => (
-                <tr key={t.taskId} data-testid="inbound-task-row" className={fresh.has(t.taskId) ? 'row-new' : undefined}>
-                  <td>
-                    <Link className="link" to={inboundPath(mfcId, `tasks/${encodeURIComponent(t.taskId)}`)}>
-                      {m.taskType[t.taskType] ?? t.taskType}
-                    </Link>
-                    <SeenMark seen={seen.has(t.taskId)} />
-                  </td>
-                  <td>{t.productName ? `${t.productName} (${t.sku})` : t.sku}</td>
-                  <td>
-                    <LotLabel lotId={t.lotId} />
-                  </td>
-                  <td className="font-mono text-xs">{t.locationCode}</td>
-                  <td>{m.qty(t.plannedQty, t.doneQty)}</td>
-                  <td>{m.taskState[t.state] ?? t.state}</td>
-                  <td>
-                  <Who id={t.assigneeId} />
-                </td>
-                  <td>{t.createdAt ? formatSeoul(t.createdAt) : messages.none}</td>
-                </tr>
-              ))}
+              {rows.map((t) => {
+                const isOpen = inline.isOpen(t.taskId);
+                const path = inboundPath(mfcId, `tasks/${encodeURIComponent(t.taskId)}`);
+                return (
+                  <Fragment key={t.taskId}>
+                    {/* 줄을 누르면 아래에 시스템 번호(작업·입고·상위 작업, 2026-11-25 목록 한 틀), 유형 링크·"전체 상세 ›"는 상세(검수·적치)로 */}
+                    <tr data-testid="inbound-task-row" className={fresh.has(t.taskId) ? 'row-new' : undefined} {...expandRowProps(isOpen, () => inline.toggle(t.taskId))}>
+                      <td>
+                        <Caret open={isOpen} />
+                        <Link className="link" to={path}>
+                          {m.taskType[t.taskType] ?? t.taskType}
+                        </Link>
+                        <SeenMark seen={seen.has(t.taskId)} />
+                      </td>
+                      <td>{t.productName ? `${t.productName} (${t.sku})` : t.sku}</td>
+                      <td>
+                        <LotLabel lotId={t.lotId} />
+                      </td>
+                      <td className="font-mono text-xs">{t.locationCode}</td>
+                      <td>{m.qty(t.plannedQty, t.doneQty)}</td>
+                      <td>{m.taskState[t.state] ?? t.state}</td>
+                      <td>
+                        <Who id={t.assigneeId} />
+                      </td>
+                      <td>{t.createdAt ? formatSeoul(t.createdAt) : messages.none}</td>
+                    </tr>
+                    {isOpen && (
+                      <InlineDetail colSpan={8} to={path} testId="inbound-inline">
+                        <SystemNumbers
+                          ids={[
+                            { label: m.ui.task, id: t.taskId },
+                            { label: m.fields.receipt, id: t.receiptId },
+                            { label: m.fields.parent, id: t.parentTaskId },
+                          ]}
+                        />
+                      </InlineDetail>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
           </div>

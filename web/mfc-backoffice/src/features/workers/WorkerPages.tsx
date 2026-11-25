@@ -10,7 +10,7 @@
 // - (0.20.0) 센터 휴게 번호 `GET·PUT /mfcs/{mfcId}/break-pin` — 작업자가 PDA 로 휴게를 켤 때 넣는 4자리. 서버는 번호를 돌려주지 않는다.
 // - 지금 배정 조건(effectiveTaskTypes)·PDA 업무(workAreas)는 서버 값을 보이기만 한다(계산하지 않음).
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { Link, Route, Routes, useLocation as useRouterLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
@@ -21,7 +21,8 @@ import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
 import { SystemNumbers } from '../../shared/displayNumber';
-import { SearchBar, StatCard } from '../../shared/listParts';
+import { StatCard } from '../../shared/listParts';
+import { Caret, expandRowProps, InlineDetail, SearchPanel, SearchRow, useInlineOpen } from '../../shared/simList';
 import { Pager, usePage } from '../../shared/Pager';
 import { useOperatorLabel, WhoAt } from '../../shared/OperatorLabel';
 import { assignTaskName } from '../../shared/pickPack';
@@ -103,10 +104,12 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
   const { pathname, search } = useRouterLocation();
   const raw = params.get('state');
   const state = isState(raw) ? raw : undefined;
+  // 이름·사번 찾기(2026-11-25 목록 한 틀) — 서버는 쪽 나눔 없이 전부 주므로 받은 목록 안에서만 거른다(서버 값을 바꾸지 않음)
+  const q = params.get('q') ?? '';
+  const [draft, setDraft] = useState(q);
   const query = useQuery({
     queryKey: ['workers', mfcId, state ?? 'DEFAULT'],
-    queryFn: async () =>
-      (await request('GET', api.capacity.GET('/mfcs/{mfcId}/workers', { params: { path: { mfcId }, query: state ? { state } : {} } }))).items ?? [],
+    queryFn: async () => (await request('GET', api.capacity.GET('/mfcs/{mfcId}/workers', { params: { path: { mfcId }, query: state ? { state } : {} } }))).items ?? [],
   });
   // 숫자 카드: 서버 기본 목록(재직·정지 — 쪽 나눔 없이 전부)을 센다. 거르기와 상관없이 같은 숫자(같은 조회 키라 두 번 읽지 않는다)
   const all = useQuery({
@@ -114,30 +117,42 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
     queryFn: async () => (await request('GET', api.capacity.GET('/mfcs/{mfcId}/workers', { params: { path: { mfcId }, query: {} } }))).items ?? [],
   });
   const cell = (pick: (w: Worker) => boolean) => (all.data ? m.ui.count(all.data.filter(pick).length) : all.isError ? '?' : '…');
-  const setState = (v: string) => {
+  const setParam = (k: 'state' | 'q', v: string) => {
     const next = new URLSearchParams(params);
-    if (v) next.set('state', v);
-    else next.delete('state');
+    if (v) next.set(k, v);
+    else next.delete(k);
     next.delete('page'); // 거르기가 바뀌면 1쪽부터
     setParams(next, { replace: true });
   };
+  const setState = (v: string) => setParam('state', v);
+  const needle = q.trim().toLowerCase();
+  const match = (data: readonly Worker[]) => (needle ? data.filter((w) => [w.name, w.displayName, w.employeeNo].some((x) => x?.toLowerCase().includes(needle))) : data);
+  const shown = query.data ? match(query.data) : undefined;
   const seen = useSeenIds('worker', mfcId);
+  const inline = useInlineOpen();
   // 한 쪽 15명, 목록 위·아래에 쪽 넘김(사용자 2026-11-20) — 서버는 쪽 나눔 없이 전부 준다
-  const paging = usePage(query.data?.length ?? 0, WORKER_PAGE_SIZE);
-  const ids = (query.data ?? []).map((w) => w.workerId ?? '').filter(Boolean);
-  useRememberQueue('worker', mfcId, query.data ? ids : undefined, `${pathname}${search}`);
+  const paging = usePage(shown?.length ?? 0, WORKER_PAGE_SIZE);
+  const ids = (shown ?? []).map((w) => w.workerId ?? '').filter(Boolean);
+  useRememberQueue('worker', mfcId, shown ? ids : undefined, `${pathname}${search}`);
   return (
     <section className="space-y-4">
-      {/* 쪽 제목은 "작업자 목록"(사용자 2026-11-20), 안내 상자는 두지 않는다 */}
+      {/* 머리: 제목 + 주 동작 하나(작업자 등록) */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1>{messages.menus.workers}</h1>
         <Link to={workersPath(mfcId, 'new')} className="btn btn-sm btn-primary">
           {m.register}
         </Link>
       </div>
-      {/* 숫자 칸 넷이 아래 표 너비를 꽉 채우게 4칸 격자(사용자 2026-11-20 — 공용 StatStrip 은 한 줄 5칸이라 오른쪽이 비었다) */}
+      {/* 숫자 칸 넷이 아래 표 너비를 꽉 채우게 4칸 격자(사용자 2026-11-20 — 공용 StatStrip 은 한 줄 5칸이라 오른쪽이 비었다). 누르면 그 상태로 거른다 */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4" role="group" aria-label={m.ui.countsLabel} data-testid="worker-counts">
-        <StatCard testId="count-ACTIVE" label={m.state.ACTIVE} value={cell((w) => w.state === 'ACTIVE')} tone="info" active={state === 'ACTIVE'} onClick={() => setState(state === 'ACTIVE' ? '' : 'ACTIVE')} />
+        <StatCard
+          testId="count-ACTIVE"
+          label={m.state.ACTIVE}
+          value={cell((w) => w.state === 'ACTIVE')}
+          tone="info"
+          active={state === 'ACTIVE'}
+          onClick={() => setState(state === 'ACTIVE' ? '' : 'ACTIVE')}
+        />
         <StatCard
           testId="count-SUSPENDED"
           label={m.state.SUSPENDED}
@@ -150,68 +165,144 @@ function WorkerListPage({ mfcId }: { readonly mfcId: string }) {
         <StatCard testId="count-daily" label={m.ui.dailyNotEnrolled} value={cell((w) => w.employmentType === 'DAILY' && !w.todayEnrollment)} hint={m.ui.dailyHint} />
       </div>
       <SavedViews listKey={`workers.${mfcId}`} />
-      {/* 목록 묶음 — 휴게 번호(정해 두었으면 왼쪽 위 작은 "관리자 번호 변경"만) → 검색 → 쪽 넘김 → 표 → 쪽 넘김을 붙여서 */}
+      {/* 목록 묶음 — 휴게 번호(정해 두었으면 왼쪽 위 작은 "관리자 번호 변경"만) → 찾기 줄 → 결과 줄 → 표 → 쪽 넘김 */}
       <div className="space-y-2" data-testid="worker-list">
         <BreakPinCard mfcId={mfcId} compact />
-        <SearchBar summary={[[m.stateFilter, state ? (m.state[state] ?? state) : m.defaultFilter]]} startOpen={!state}>
-        <label className="flex flex-col gap-1">
-          {m.stateFilter}
-          <select className="select select-sm w-44" value={state ?? ''} onChange={(e) => setState(e.target.value)}>
-            <option value="">{m.defaultFilter}</option>
-            {STATES.map((s) => (
-              <option key={s} value={s}>
-                {m.state[s]}
-              </option>
-            ))}
-          </select>
-        </label>
-      </SearchBar>
-        <QueryState state={toUiState(query, (rows) => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.empty}>
-        {(rows) => (
-          <>
-          <Pager testId="worker-pager-top" page={paging.page} pageCount={paging.pageCount} total={rows.length} from={paging.from} to={paging.to} onChange={paging.set} />
-          <div className="overflow-x-auto rounded-box bg-base-100">
-          <table className="table table-sm">
-            <thead>
-              <tr>
-                <th>{m.ui.employee}</th>
-                <th>{m.fields.employmentType}</th>
-                <th>{m.fields.state}</th>
-                <th>{m.fields.effective}</th>
-                <th>{m.fields.onBreak}</th>
-                <th>{m.fields.today}</th>
-                <th>{m.fields.speed}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.slice(paging.from, paging.to).map((w) => (
-                <tr key={w.workerId} data-testid="worker-row">
-                  <td>
-                    {/* 직원 표기 = 이름 · 사번(ADR-0070) — 운영자 ID 는 상세의 시스템 번호 칸에만 */}
-                    <Link className="link" to={workersPath(mfcId, encodeURIComponent(w.workerId ?? ''))}>
-                      <WorkerName worker={w} />
-                    </Link>
-                    <SeenMark seen={seen.has(w.workerId ?? '')} />
-                  </td>
-                  <td>{m.employment[w.employmentType ?? ''] ?? w.employmentType ?? messages.none}</td>
-                  <td>
-                    <StateBadge state={w.state} />
-                  </td>
-                  <td>{tasks(w.effectiveTaskTypes)}</td>
-                  <td>{w.onBreak ? <span className="badge badge-sm badge-info">{m.onBreak}</span> : messages.none}</td>
-                  <td>{todayText(w)}</td>
-                  <td>{w.speedFactor ?? messages.none}</td>
-                </tr>
+        {/* 찾기 줄(목록 한 틀): [이름·사번][찾기][필터 → 상태][건 조건 칩 ✕] */}
+        <SearchPanel
+          label={m.ui.searchLabel}
+          submitLabel={m.ui.find}
+          onSubmit={(e) => {
+            e.preventDefault();
+            setParam('q', draft.trim());
+          }}
+          onReset={() => {
+            setDraft('');
+            const next = new URLSearchParams(params);
+            next.delete('q');
+            next.delete('state');
+            next.delete('page');
+            setParams(next, { replace: true });
+          }}
+          summary={[[m.stateFilter, state ? (m.state[state] ?? state) : '', () => setState('')]]}
+          search={
+            <input
+              type="search"
+              className="input input-sm w-48"
+              maxLength={40}
+              value={draft}
+              placeholder={m.ui.searchPlaceholder}
+              aria-label={m.ui.searchPlaceholder}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+          }
+        >
+          <SearchRow label={m.stateFilter}>
+            <select className="select select-sm w-44" aria-label={m.stateFilter} value={state ?? ''} onChange={(e) => setState(e.target.value)}>
+              <option value="">{m.defaultFilter}</option>
+              {STATES.map((s) => (
+                <option key={s} value={s}>
+                  {m.state[s]}
+                </option>
               ))}
-            </tbody>
-          </table>
-          </div>
-          <Pager testId="worker-pager-bottom" page={paging.page} pageCount={paging.pageCount} total={rows.length} from={paging.from} to={paging.to} onChange={paging.set} />
-          </>
-        )}
+            </select>
+          </SearchRow>
+        </SearchPanel>
+        <QueryState state={toUiState(query, (data) => match(data).length === 0)} onRetry={() => void query.refetch()} emptyText={m.empty}>
+          {(data) => {
+            const rows = match(data);
+            return (
+              <>
+                {/* 결과 줄: 몇 명 · 쪽 넘김 */}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm" data-testid="worker-result">
+                  <span className="font-semibold">{m.ui.result(rows.length)}</span>
+                  <Pager testId="worker-pager-top" page={paging.page} pageCount={paging.pageCount} total={rows.length} from={paging.from} to={paging.to} onChange={paging.set} />
+                </div>
+                <div className="overflow-x-auto rounded-box bg-base-100">
+                  <table className="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>{m.ui.employee}</th>
+                        <th>{m.fields.employmentType}</th>
+                        <th>{m.fields.state}</th>
+                        <th>{m.fields.effective}</th>
+                        <th>{m.fields.onBreak}</th>
+                        <th>{m.fields.today}</th>
+                        <th>{m.fields.speed}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.slice(paging.from, paging.to).map((w) => {
+                        const k = w.workerId ?? '';
+                        const isOpen = inline.isOpen(k);
+                        const path = workersPath(mfcId, encodeURIComponent(k));
+                        return (
+                          <Fragment key={k}>
+                            {/* 줄을 누르면 바로 아래 펼침(맡은 일·자격·PDA 업무·등록), 이름 링크·"전체 상세 ›"는 상세(바꾸기)로 */}
+                            <tr data-testid="worker-row" {...expandRowProps(isOpen, () => inline.toggle(k))}>
+                              <td>
+                                <Caret open={isOpen} />
+                                {/* 직원 표기 = 이름 · 사번(ADR-0070) — 운영자 ID 는 상세의 시스템 번호 칸에만 */}
+                                <Link className="pm-id-link" to={path}>
+                                  <WorkerName worker={w} />
+                                </Link>
+                                <SeenMark seen={seen.has(k)} />
+                              </td>
+                              <td>{m.employment[w.employmentType ?? ''] ?? w.employmentType ?? messages.none}</td>
+                              <td>
+                                <StateBadge state={w.state} />
+                              </td>
+                              <td>{tasks(w.effectiveTaskTypes)}</td>
+                              <td>{w.onBreak ? <span className="badge badge-sm badge-info">{m.onBreak}</span> : messages.none}</td>
+                              <td>{todayText(w)}</td>
+                              <td>{w.speedFactor ?? messages.none}</td>
+                            </tr>
+                            {isOpen && (
+                              <InlineDetail colSpan={7} to={path} testId="worker-inline">
+                                <WorkerInline worker={w} />
+                              </InlineDetail>
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <Pager testId="worker-pager-bottom" page={paging.page} pageCount={paging.pageCount} total={rows.length} from={paging.from} to={paging.to} onChange={paging.set} />
+              </>
+            );
+          }}
         </QueryState>
       </div>
     </section>
+  );
+}
+
+/** 줄 아래 펼침 — 표에 없는 서버 값(맡은 일·자격·자격 만료·PDA 업무·등록). 바꾸기는 상세에서 */
+function WorkerInline({ worker: w }: { readonly worker: Worker }) {
+  const q = w.qualification;
+  const rows: ReadonlyArray<readonly [string, ReactNode]> = [
+    [m.fields.duty, tasks(w.duty?.taskTypes)],
+    [
+      m.fields.qualification,
+      <>
+        {tasks(q?.taskTypes)}
+        {q?.expired && <span className="badge badge-sm badge-error ml-2">{m.expired}</span>}
+      </>,
+    ],
+    [m.fields.expiresAt, q?.expiresAt ? formatSeoul(q.expiresAt) : m.noExpiry],
+    [m.fields.workAreas, w.workAreas?.length ? w.workAreas.map((a) => m.area[a] ?? a).join(', ') : messages.none],
+    [m.fields.registered, w.registeredAt ? <WhoAt id={w.registeredBy} at={formatSeoul(w.registeredAt)} /> : messages.none],
+  ];
+  return (
+    <dl className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-6 gap-y-3 text-sm">
+      {rows.map(([k, v]) => (
+        <div key={k} className="min-w-0">
+          <dt className="text-xs text-base-content/60">{k}</dt>
+          <dd className="font-medium">{v}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -222,11 +313,7 @@ function WorkerName({ worker: w }: { readonly worker: Worker }) {
   return (
     <span data-testid="worker-name">
       {w.name ?? w.displayName ?? label.data?.name ?? messages.none}
-      {no ? (
-        <span className="text-base-content/60">{` · ${no}`}</span>
-      ) : label.isError ? (
-        <span className="ml-1 text-xs text-warning">{m.ui.noEmployeeNo}</span>
-      ) : null}
+      {no ? <span className="text-base-content/60">{` · ${no}`}</span> : label.isError ? <span className="ml-1 text-xs text-warning">{m.ui.noEmployeeNo}</span> : null}
     </span>
   );
 }
@@ -461,9 +548,7 @@ function DutyQualificationGuide({ worker: w }: { readonly worker: WorkerDetail }
   return (
     <div role="note" className="space-y-1 rounded-box border border-info/40 bg-info/10 p-3 text-sm" data-testid="duty-qualification-guide">
       <p>{m.howItWorks}</p>
-      <p className="text-xs">
-        {m.howItWorksNow(tasks(w.duty?.taskTypes), tasks(w.qualification?.taskTypes), w.effectiveTaskTypes?.length ? tasks(w.effectiveTaskTypes) : m.noEffective)}
-      </p>
+      <p className="text-xs">{m.howItWorksNow(tasks(w.duty?.taskTypes), tasks(w.qualification?.taskTypes), w.effectiveTaskTypes?.length ? tasks(w.effectiveTaskTypes) : m.noEffective)}</p>
       {w.qualification?.expired && <p className="text-xs text-warning">{m.qualificationExpiredNote}</p>}
     </div>
   );
@@ -840,9 +925,7 @@ function Shifts({ mfcId, workerId, notify }: { readonly mfcId: string; readonly 
             {rows.map((s) => (
               <li key={s.shiftId} data-testid="shift-row" className="flex flex-wrap items-center gap-2">
                 <span>{`${s.startAt ? formatSeoul(s.startAt) : ''} ~ ${s.endAt ? formatSeoul(s.endAt) : ''}`}</span>
-                {s.breakStartAt && s.breakEndAt && (
-                  <span className="badge badge-sm badge-info">{m.shiftBreak(formatSeoul(s.breakStartAt), formatSeoul(s.breakEndAt))}</span>
-                )}
+                {s.breakStartAt && s.breakEndAt && <span className="badge badge-sm badge-info">{m.shiftBreak(formatSeoul(s.breakStartAt), formatSeoul(s.breakEndAt))}</span>}
                 {s.note && <span className="opacity-70">{s.note}</span>}
                 <CancelShift mfcId={mfcId} workerId={workerId} shiftId={s.shiftId ?? ''} label={s.startAt ? formatSeoul(s.startAt) : ''} notify={notify} onDone={refresh} />
               </li>
@@ -956,8 +1039,7 @@ function Activities({ mfcId, workerId }: { readonly mfcId: string; readonly work
   const query = useQuery({
     queryKey: ['worker-activities', mfcId, workerId, date],
     enabled: open,
-    queryFn: () =>
-      request('GET', api.capacity.GET('/mfcs/{mfcId}/workers/{workerId}/activities', { params: { path: { mfcId, workerId }, query: date ? { date } : {} } })),
+    queryFn: () => request('GET', api.capacity.GET('/mfcs/{mfcId}/workers/{workerId}/activities', { params: { path: { mfcId, workerId }, query: date ? { date } : {} } })),
   });
   const name = (map: Readonly<Record<string, string>>, v: string | null | undefined) => (v ? (map[v] ?? v) : messages.none);
   return (
@@ -990,24 +1072,24 @@ function Activities({ mfcId, workerId }: { readonly mfcId: string; readonly work
                   <div>
                     <h3 className="font-semibold">{a.totals}</h3>
                     <div className="overflow-x-auto">
-                    <table className="table table-xs w-fit">
-                      <thead>
-                        <tr>
-                          <th>{a.col.type}</th>
-                          <th>{a.col.count}</th>
-                          <th>{a.col.qty}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {r.totals.map((t) => (
-                          <tr key={`${t.source}-${t.activityType}`} data-testid="activity-total">
-                            <td>{name(a.type, t.activityType)}</td>
-                            <td>{t.count}</td>
-                            <td>{t.qty}</td>
+                      <table className="table table-xs w-fit">
+                        <thead>
+                          <tr>
+                            <th>{a.col.type}</th>
+                            <th>{a.col.count}</th>
+                            <th>{a.col.qty}</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {r.totals.map((t) => (
+                            <tr key={`${t.source}-${t.activityType}`} data-testid="activity-total">
+                              <td>{name(a.type, t.activityType)}</td>
+                              <td>{t.count}</td>
+                              <td>{t.qty}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                     <p className="text-xs opacity-70">{a.rejectedNote}</p>
                   </div>
@@ -1018,30 +1100,30 @@ function Activities({ mfcId, workerId }: { readonly mfcId: string; readonly work
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
-                  <table className="table table-xs">
-                    <thead>
-                      <tr>
-                        <th>{a.col.at}</th>
-                        <th>{a.col.type}</th>
-                        <th>{a.col.ref}</th>
-                        <th>{a.col.sku}</th>
-                        <th>{a.col.qty}</th>
-                        <th>{a.col.result}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {r.items.map((it, i) => (
-                        <tr key={`${it.source}-${it.refId}-${i}`} data-testid="activity-row" className={it.result === 'REJECTED' ? 'text-error' : ''}>
-                          <td>{formatSeoul(it.at)}</td>
-                          <td>{name(a.type, it.activityType)}</td>
-                          <td className="font-mono">{it.taskId ?? it.refId}</td>
-                          <td className="font-mono">{it.sku ?? messages.none}</td>
-                          <td>{it.qty ?? messages.none}</td>
-                          <td>{name(a.result, it.result)}</td>
+                    <table className="table table-xs">
+                      <thead>
+                        <tr>
+                          <th>{a.col.at}</th>
+                          <th>{a.col.type}</th>
+                          <th>{a.col.ref}</th>
+                          <th>{a.col.sku}</th>
+                          <th>{a.col.qty}</th>
+                          <th>{a.col.result}</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {r.items.map((it, i) => (
+                          <tr key={`${it.source}-${it.refId}-${i}`} data-testid="activity-row" className={it.result === 'REJECTED' ? 'text-error' : ''}>
+                            <td>{formatSeoul(it.at)}</td>
+                            <td>{name(a.type, it.activityType)}</td>
+                            <td className="font-mono">{it.taskId ?? it.refId}</td>
+                            <td className="font-mono">{it.sku ?? messages.none}</td>
+                            <td>{it.qty ?? messages.none}</td>
+                            <td>{name(a.result, it.result)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>

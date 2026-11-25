@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { API_BASE } from '../../api/client';
 import { db } from '../../mocks/db';
-import { renderAt } from '../../test/render';
+import { openFilter, renderAt } from '../../test/render';
 import { server } from '../../test/server';
 
 const rows = () => screen.getAllByTestId('inbound-task-row');
@@ -19,6 +19,7 @@ describe('입고 작업 목록', () => {
     const view = renderAt('/c/MFC-BJG-01/inbound');
     await waitFor(() => expect(rows()).toHaveLength(3));
     expect(new URL(view.gets('/inbound-tasks')[0]!.url).searchParams.get('state')).toBe('READY');
+    await openFilter();
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'ALL');
     await waitFor(() => expect(rows()).toHaveLength(4));
     expect(new URL(view.gets('/inbound-tasks').at(-1)!.url).searchParams.get('state')).toBeNull();

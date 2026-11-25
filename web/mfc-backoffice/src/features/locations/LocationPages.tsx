@@ -6,7 +6,7 @@
 // - COUNT_LOCKED 는 실사 잠금(실사 세션이 건다) — 이 화면에서 걸거나 풀지 않는다.
 // 권한 판정은 서버(그 센터 centers — 403 은 "이 센터 권한이 없습니다").
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState, type ReactNode } from 'react';
+import { Fragment, useRef, useState, type ReactNode } from 'react';
 import { Link, Route, Routes, useLocation as useRouterLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { CommandRejectedFailure, request, settleCommand, UnknownResultFailure, type CommandResponse, type IdempotencyKey } from '@pmart/web-core';
@@ -16,6 +16,7 @@ import type { components } from '../../api/generated/mfc-location';
 import { useApi } from '../../app/ApiContext';
 import { centerPath } from '../../app/nav';
 import { SearchBar } from '../../shared/listParts';
+import { Caret, expandRowProps, InlineDetail, useInlineOpen } from '../../shared/simList';
 import { SavedViews } from '../../shared/SavedViews';
 import { SystemNumbers } from '../../shared/displayNumber';
 import { messages } from '../../shared/messages';
@@ -90,6 +91,7 @@ function LocationListPage({ mfcId }: { readonly mfcId: string }) {
   const rows = (query.data?.pages ?? []).flatMap((p) => p.items ?? []);
   const state$ = toUiState(query, () => rows.length === 0);
   const seen = useSeenIds('location', mfcId);
+  const inline = useInlineOpen();
   const { pathname, search } = useRouterLocation();
   useRememberQueue('location', mfcId, query.data ? rows.map((l) => l.locationId ?? '').filter(Boolean) : undefined, `${pathname}${search}`);
 
@@ -104,9 +106,9 @@ function LocationListPage({ mfcId }: { readonly mfcId: string }) {
       <SearchBar
         label={m.filter}
         summary={[
-          [m.fields.zone, zone ? (m.zone[zone] ?? zone) : ''],
-          [m.fields.temperatureZone, temperatureZone ? (m.temperature[temperatureZone] ?? temperatureZone) : ''],
-          [m.fields.state, state ? (m.state[state] ?? state) : ''],
+          [m.fields.zone, zone ? (m.zone[zone] ?? zone) : '', () => setFilter('zone', '')],
+          [m.fields.temperatureZone, temperatureZone ? (m.temperature[temperatureZone] ?? temperatureZone) : '', () => setFilter('temperatureZone', '')],
+          [m.fields.state, state ? (m.state[state] ?? state) : '', () => setFilter('state', '')],
         ]}
       >
         <FilterSelect label={m.fields.zone} value={zone ?? ''} options={ZONES} names={m.zone} onChange={(v) => setFilter('zone', v)} />
@@ -132,26 +134,40 @@ function LocationListPage({ mfcId }: { readonly mfcId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((l) => (
-                  <tr key={l.locationId} data-testid="location-row">
-                    <td>
-                      <Link className="link font-mono" to={locationsPath(mfcId, encodeURIComponent(l.locationId ?? ''))}>
-                        {l.locationCode}
-                      </Link>
-                      <SeenMark seen={seen.has(l.locationId ?? '')} />
-                    </td>
-                    <td>{m.zone[l.zone] ?? l.zone}</td>
-                    <td>{m.temperature[l.temperatureZone] ?? l.temperatureZone}</td>
-                    <td>{l.areaCode ?? messages.none}</td>
-                    <td>
-                      <StateBadge state={l.state} />
-                      {l.stateReason && <span className="ml-1 text-xs opacity-70">{l.stateReason}</span>}
-                    </td>
-                    <td>{l.pickSequence ?? messages.none}</td>
-                    <td>{l.highTurnover ? m.yes : messages.none}</td>
-                    <td>{l.updatedAt ? formatSeoul(l.updatedAt) : messages.none}</td>
-                  </tr>
-                ))}
+                {rows.map((l) => {
+                  const k = l.locationId ?? '';
+                  const isOpen = inline.isOpen(k);
+                  const path = locationsPath(mfcId, encodeURIComponent(k));
+                  return (
+                    <Fragment key={k}>
+                      {/* 줄을 누르면 아래에 크기·슬롯·무게·카테고리·좌표(2026-11-25 목록 한 틀), 칸 코드·"전체 상세 ›"는 상세(바꾸기)로 */}
+                      <tr data-testid="location-row" {...expandRowProps(isOpen, () => inline.toggle(k))}>
+                        <td>
+                          <Caret open={isOpen} />
+                          <Link className="link font-mono" to={path}>
+                            {l.locationCode}
+                          </Link>
+                          <SeenMark seen={seen.has(k)} />
+                        </td>
+                        <td>{m.zone[l.zone] ?? l.zone}</td>
+                        <td>{m.temperature[l.temperatureZone] ?? l.temperatureZone}</td>
+                        <td>{l.areaCode ?? messages.none}</td>
+                        <td>
+                          <StateBadge state={l.state} />
+                          {l.stateReason && <span className="ml-1 text-xs opacity-70">{l.stateReason}</span>}
+                        </td>
+                        <td>{l.pickSequence ?? messages.none}</td>
+                        <td>{l.highTurnover ? m.yes : messages.none}</td>
+                        <td>{l.updatedAt ? formatSeoul(l.updatedAt) : messages.none}</td>
+                      </tr>
+                      {isOpen && (
+                        <InlineDetail colSpan={8} to={path} testId="location-inline">
+                          <LocationInline location={l} />
+                        </InlineDetail>
+                      )}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
             </div>
@@ -492,6 +508,31 @@ function LocationDetailPage({ mfcId }: { readonly mfcId: string }) {
         )}
       </QueryState>
     </section>
+  );
+}
+
+/** 줄 아래 펼침 — 표에 없는 서버 값(크기·슬롯·최대 무게·카테고리·좌표). 바꾸기는 상세에서 */
+function LocationInline({ location: l }: { readonly location: Location }) {
+  const d = l.dimensions ?? {};
+  const rows: ReadonlyArray<readonly [string, ReactNode]> = [
+    [m.fields.widthMm, d.widthMm ?? messages.none],
+    [m.fields.depthMm, d.depthMm ?? messages.none],
+    [m.fields.heightMm, d.heightMm ?? messages.none],
+    [m.fields.slotCount, d.slotCount ?? messages.none],
+    [m.fields.maxWeightG, d.maxWeightG ?? messages.none],
+    [m.fields.categoryId, l.categoryId ?? messages.none],
+    [m.fields.positionX, l.position ? l.position.xM : messages.none],
+    [m.fields.positionZ, l.position ? l.position.zM : messages.none],
+  ];
+  return (
+    <dl className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-x-6 gap-y-3 text-sm">
+      {rows.map(([k, v]) => (
+        <div key={k} className="min-w-0">
+          <dt>{k}</dt>
+          <dd className="font-medium">{v}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

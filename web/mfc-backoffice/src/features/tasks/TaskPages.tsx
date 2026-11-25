@@ -152,8 +152,8 @@ function TaskListPage({ mfcId }: { readonly mfcId: string }) {
       <HandoverChecks mfcId={mfcId} />
       <SearchBar
         summary={[
-          [m.type, type ? (m.taskType[type] ?? type) : ''],
-          [m.state, state ? (m.taskState[state] ?? state) : m.defaultState],
+          [m.type, type ? (m.taskType[type] ?? type) : '', () => setFilter('type', '')],
+          [m.state, state ? (m.taskState[state] ?? state) : m.defaultState, state ? () => setFilter('state', '') : undefined],
         ]}
         startOpen={!type && !state}
         extra={asOf && <span className="text-xs text-base-content/60">{m.asOf(formatSeoul(asOf))}</span>}

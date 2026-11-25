@@ -52,7 +52,7 @@ describe('검색 조건 칩·/ 키', () => {
   it('조건을 건 목록은 칩 한 줄로 접히고, / 를 누르면 펼쳐 첫 칸으로', async () => {
     renderAt('/c/MFC-BJG-01/tasks?state=READY');
     const bar = await screen.findByTestId('search-bar');
-    expect(within(bar).getAllByTestId('search-chip').map((c) => c.textContent)).toEqual(['유형전체▾', '상태대기(담당 없음)▾']);
+    expect(within(bar).getAllByTestId('search-chip').map((c) => c.textContent)).toEqual(['대기(담당 없음)✕']);
     expect(within(bar).getByRole('form', { hidden: true })).not.toBeVisible();
     await userEvent.keyboard('/');
     await waitFor(() => expect(within(bar).getByRole('combobox', { name: '유형' })).toHaveFocus());
