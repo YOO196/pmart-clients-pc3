@@ -28,6 +28,9 @@ describe('재고 이력', () => {
     expect(screen.getByTestId('ledger-now-available-value')).toHaveTextContent(/^\d+$/);
     // 원인 칸에 코드도 남는다(올려 보면)
     expect(within(rows()[1]!).getAllByRole('cell')[1]).toHaveAttribute('title', 'QUALITY_QUARANTINE');
+    // 출처는 서비스 이름만 — 시스템 번호(QD-0007 등)는 줄에 내지 않는다(ADR-0070, 펼침의 시스템 번호)
+    expect(rows()[1]).toHaveTextContent('품질');
+    expect(rows()[1]).not.toHaveTextContent('QD-0007');
   });
 
   it('원인 거르기는 cause 로 서버에, 칩 ✕ 로 풀린다', async () => {

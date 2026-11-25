@@ -74,7 +74,12 @@ export const listHandlers = [
     const rows = db.stockUnits
       .filter((u) => u.mfcId === mfcId && match('sku', u.sku) && match('lotId', u.lotId) && match('locationCode', u.locationCode) && match('qualityState', u.qualityState) && match('workState', u.workState))
       .filter((u) => !q.get('locationPrefix') || u.locationCode.startsWith(q.get('locationPrefix') ?? ''))
-      .map((u) => ({ sku: u.sku, productName: u.productName ?? null, lotId: u.lotId, lotNo: u.lotNo ?? null, locationCode: u.locationCode, qty: u.qty, qualityState: u.qualityState, workState: u.workState, expiryDate: u.expiryDate ?? null }));
+      .map((u) => {
+        // (0.33.0) 위치 사본의 구역·온도대 — 목 위치(db.locations)에 없는 칸은 null(그 둘로 거르면 빠진다, 계약과 같다)
+        const loc = [...db.locations.values()].find((l) => l.mfcId === mfcId && l.locationCode === u.locationCode);
+        return { sku: u.sku, productName: u.productName ?? null, lotId: u.lotId, lotNo: u.lotNo ?? null, locationCode: u.locationCode, qty: u.qty, qualityState: u.qualityState, workState: u.workState, expiryDate: u.expiryDate ?? null, zone: loc?.zone ?? null, temperatureZone: loc?.temperatureZone ?? null };
+      })
+      .filter((u) => match('zone', u.zone ?? '') && match('temperatureZone', u.temperatureZone ?? ''));
     return listPage(request, mfcId, rows);
   }),
 ];

@@ -21,6 +21,20 @@ export function usePage(total: number, size: number) {
   return { page, pageCount, set, from: (page - 1) * size, to: Math.min(page * size, total) };
 }
 
+/** 쪽 단추 — 7쪽 이하는 모두, 넘으면 첫·끝 쪽과 지금 쪽 앞뒤 하나씩(사이는 …) — 쪽이 많아도 줄이 넘치지 않게(2026-11-25 LOT 목록 75쪽) */
+export function pageList(page: number, pageCount: number): (number | null)[] {
+  if (pageCount <= 7) return Array.from({ length: pageCount }, (_, i) => i + 1);
+  const keep = new Set([1, pageCount, page - 1, page, page + 1].filter((p) => p >= 1 && p <= pageCount));
+  const out: (number | null)[] = [];
+  let last = 0;
+  for (const p of [...keep].sort((x, y) => x - y)) {
+    if (p - last > 1) out.push(null);
+    out.push(p);
+    last = p;
+  }
+  return out;
+}
+
 export function Pager({
   page,
   pageCount,
@@ -45,18 +59,24 @@ export function Pager({
         <button type="button" className="btn btn-sm join-item" disabled={page <= 1} onClick={() => onChange(page - 1)}>
           {`‹ ${m.prev}`}
         </button>
-        {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => (
-          <button
-            key={p}
-            type="button"
-            className={`btn btn-sm join-item ${p === page ? 'btn-primary' : ''}`}
-            aria-current={p === page ? 'page' : undefined}
-            aria-label={m.goTo(p)}
-            onClick={() => onChange(p)}
-          >
-            {p}
-          </button>
-        ))}
+        {pageList(page, pageCount).map((p, i) =>
+          p === null ? (
+            <span key={`gap-${i}`} className="btn btn-sm join-item btn-disabled" aria-hidden="true">
+              …
+            </span>
+          ) : (
+            <button
+              key={p}
+              type="button"
+              className={`btn btn-sm join-item ${p === page ? 'btn-primary' : ''}`}
+              aria-current={p === page ? 'page' : undefined}
+              aria-label={m.goTo(p)}
+              onClick={() => onChange(p)}
+            >
+              {p}
+            </button>
+          ),
+        )}
         <button type="button" className="btn btn-sm join-item" disabled={page >= pageCount} onClick={() => onChange(page + 1)}>
           {`${m.next} ›`}
         </button>
