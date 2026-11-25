@@ -335,6 +335,49 @@ void main() {
       ),
     );
 
+    test(
+      '상세가 할인·미설정을 함께 주면(product-content 0.11.0, 로딩 S5) /prices 를 부르지 않는다',
+      () async {
+        final paths = <String>[];
+        final adapter = FakeAdapter((options, _) async {
+          paths.add(options.uri.path);
+          return const FakeReply(
+            200,
+            body: {
+              'productId': 'PRD-1',
+              'name': '고추장짜글이',
+              'purchaseLimitUnits': 10,
+              'options': [
+                {
+                  'sku': 'E-00000017',
+                  'saleState': 'ON_SALE',
+                  'price': {
+                    'basePrice': 5000,
+                    'priceVersion': 3,
+                    'discount': {'salePrice': 4000, 'ratePercent': 20},
+                  },
+                  'priceNotSet': false,
+                  'availability': {'carried': true, 'state': 'AVAILABLE'},
+                },
+                {
+                  'sku': 'B-00000099',
+                  'saleState': 'ON_SALE',
+                  'priceNotSet': true,
+                  'availability': {'carried': true, 'state': 'AVAILABLE'},
+                },
+              ],
+            },
+          );
+        });
+        final p = await repoWith(adapter).product('PRD-1', mfcId: 'MFC-1');
+        expect(paths, ['/api/v1/product-contents/PRD-1']);
+        expect(p.purchaseLimitUnits, 10);
+        expect(p.options.first.basePrice, 5000);
+        expect(p.options.first.discount?.salePrice, 4000);
+        expect(p.options.last.priceNotSet, isTrue);
+      },
+    );
+
     test('옵션 가격이 비어 오면 GET /prices?skus= 로 채우고, 미설정은 판매 불가', () async {
       final adapter = FakeAdapter((options, _) async {
         if (options.uri.path == '/api/v1/prices') {

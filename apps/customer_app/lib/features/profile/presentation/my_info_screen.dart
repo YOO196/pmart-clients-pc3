@@ -389,10 +389,14 @@ class _MyInfoView extends ConsumerWidget {
               row(
                 key: const ValueKey('info-name-row'),
                 title: l10n.infoName,
+                // 앱에서 정한 이름(nickname)이 없으면 로그인 계정 이름(서버 `name` — 네이버·카카오·Google 이
+                // 준 회원 이름). 둘 다 없을 때만 "이름 없음"(사용자 2026-11-25 네이버 로그인인데 이름 없음).
                 trailing: Text(
-                  (profile.nickname?.trim().isNotEmpty ?? false)
-                      ? profile.nickname!.trim()
-                      : l10n.infoNameNotSet,
+                  switch ((profile.nickname?.trim(), profile.name?.trim())) {
+                    (final n?, _) when n.isNotEmpty => n,
+                    (_, final n?) when n.isNotEmpty => n,
+                    _ => l10n.infoNameNotSet,
+                  },
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: valueStyle,

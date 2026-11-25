@@ -81,6 +81,7 @@ Widget testApp(
 
   /// 처음 실행 단계를 켤지(기본 끔 — 홈에서 시작).
   bool startGate = false,
+  List<Duration> profileRefreshDelays = const [],
 
   /// 기기 보안 저장소(앱을 다시 켜는 시험에서 같은 것을 넘긴다). 기본은 새 메모리 저장소.
   MemoryKeyValueStore? secure,
@@ -153,6 +154,8 @@ Widget testApp(
       profileRepositoryProvider.overrideWithValue(
         profile ?? MockProfileRepository(latency: Duration.zero),
       ),
+      // 시험은 프로필 다시 읽기 타이머를 두지 않는다(남은 타이머로 깨지지 않게). 다시 읽기 시험은 따로 바꿔 끼운다.
+      profileRefreshDelaysProvider.overrideWithValue(profileRefreshDelays),
       wishlistRepositoryProvider.overrideWithValue(
         wishlist ?? MockWishlistRepository(latency: Duration.zero),
       ),
@@ -233,7 +236,6 @@ Future<void> tapTile(WidgetTester t, String productId) async {
   await t.tap(tile);
   await t.pumpAndSettle();
 }
-
 
 /// 검색 화면 열기 — 하단 탭에서 검색이 빠졌다(가운데 = 찜, 2026-11-25). 화면 위 검색과 같은 경로를 push 한다.
 Future<void> openSearchScreen(WidgetTester t) async {

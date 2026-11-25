@@ -369,25 +369,30 @@ void main() {
     expect(find.text('장바구니에 담았어요'), findsOneWidget);
   });
 
-  testWidgets('상세에서 상한 초과는 서버 상한으로 안내한다', (t) async {
+  testWidgets('구매 시트: "최대 10개 구매 가능(1회당)"(BR-101) — 합이 상한이면 + 가 막힌다', (
+    t,
+  ) async {
     await t.pumpWidget(testApp(const [], cart: cart));
     await t.pumpAndSettle();
     await tapTile(t, 'P-0001');
-    // 상세 아래 [구매하기] → 옵션·수량 시트(사용자 레퍼런스 2026-11-25).
     await t.tap(find.byKey(const ValueKey('product-buy')));
     await t.pumpAndSettle();
 
-    // 시트는 더할 수량(0 부터). 11개는 서버 상한(낱개 10)을 넘는다.
-    for (var i = 0; i < 11; i++) {
+    expect(find.text('최대 10개 구매 가능(1회당)'), findsWidgets);
+    // 2개 묶음 4개(낱개 8) + 낱개 2 = 10 → 더는 못 더한다(묶음은 2 를 넘는다).
+    for (var i = 0; i < 4; i++) {
+      await t.tap(find.byKey(const ValueKey('add-inc-B-00000011')));
+      await t.pump();
+    }
+    for (var i = 0; i < 3; i++) {
       await t.tap(find.byKey(const ValueKey('add-inc-E-00000001')));
       await t.pump();
     }
-    expect(find.text('11개 담기'), findsOneWidget);
-    await t.tap(find.byKey(const ValueKey('add-to-cart')));
-    await t.pumpAndSettle();
-
-    expect(find.textContaining('낱개 기준 10개까지'), findsOneWidget);
-    expect(find.byKey(const ValueKey('buy-sheet')), findsOneWidget);
+    expect(find.text('6개 담기'), findsOneWidget);
+    final inc = t.widget<InkWell>(
+      find.byKey(const ValueKey('add-inc-B-00000011')),
+    );
+    expect(inc.onTap, isNull);
   });
 
   group('장바구니 구성 보강(레퍼런스 반영 A)', () {

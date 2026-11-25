@@ -15,6 +15,9 @@ abstract interface class CatalogRepository {
   /// 자리별 배너(storefront 0.9.0 `GET /storefront/banners?placement=` — POPUP 홈 팝업). sortOrder 순.
   Future<List<HomeBanner>> banners({required String placement});
 
+  /// 상품페이지 관리 카드(storefront 0.20.0 `GET /storefront/care-cards`, BR-102). sortOrder 순.
+  Future<CareCards> careCards();
+
   /// 함께 산 상품(storefront 0.19.0 `GET /storefront/products/{id}/related?kind=BOUGHT_TOGETHER` — BR-100 R5).
   /// 최근 30일 확정 주문에 같이 담긴 상품, 많은 순. 없으면 빈 목록.
   Future<List<ProductTile>> boughtTogether(String productId, {String? mfcId});
@@ -106,6 +109,27 @@ final class ApiCatalogRepository implements CatalogRepository {
       for (final i in res.data?.items ?? const <sf.DisplayItem>[])
         _tileFromDisplay(i),
     ];
+  }
+
+  @override
+  Future<CareCards> careCards() async {
+    final res = await pmartGuard(() => _storefront.listCareCards());
+    final body = res.data;
+    if (body == null) return const CareCards();
+    final items = [...body.items]
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return CareCards(
+      title: _text(body.title),
+      items: [
+        for (final c in items)
+          CareCard(
+            cardId: c.cardId,
+            title: c.title,
+            body: c.body,
+            imageUrl: _text(c.imageUrl),
+          ),
+      ],
+    );
   }
 
   @override
@@ -234,7 +258,48 @@ final class ApiCatalogRepository implements CatalogRepository {
       () => _contents.getProductContent(productId: productId, mfcId: mfcId),
     );
     final content = _body(res.data, 'ProductContent');
-    return productFromContract(content, prices: await _pricesFor(content));
+    // product-content 0.11.0(로딩 S5): 상세가 기간 할인·가격 미설정을 함께 주면 `/prices` 를 따로 부르지 않는다.
+    // 옛 응답(값 없음)이면 지금처럼 묻는다.
+    return productFromContract(
+      content,
+      prices: _pricesInContent(content) ?? await _pricesFor(content),
+    );
+  }
+
+  /// 상세 옵션에 실린 가격(product-content 0.11.0 `price.discount`·`priceNotSet`). 모든 옵션에 `priceNotSet`
+  /// 이 있어야(서버가 가격을 붙였다) 쓴다 — 하나라도 없으면 null(따로 묻는다).
+  OptionPrices? _pricesInContent(pc.ProductContent c) {
+    final options = [
+      for (final o in c.options ?? const <pc.SaleOption>[])
+        if (o.sku != null) o,
+    ];
+    if (options.isEmpty || options.any((o) => o.priceNotSet == null)) {
+      return null;
+    }
+    return OptionPrices(
+      prices: {
+        for (final o in options)
+          if ((o.price?.basePrice, o.price?.priceVersion) case (
+            final int b,
+            final int v,
+          ))
+            o.sku!: (basePrice: b, priceVersion: v),
+      },
+      discounts: {
+        for (final o in options)
+          if (o.price?.discount case final d? when d.salePrice != null)
+            o.sku!: SaleDiscount(
+              salePrice: d.salePrice!,
+              ratePercent: d.ratePercent,
+              name: d.name,
+              endsAt: d.endsAt,
+            ),
+      },
+      notSet: {
+        for (final o in options)
+          if (o.priceNotSet == true) o.sku!,
+      },
+    );
   }
 
   /// 표시 가격·기간 할인을 `GET /prices?skus=` 로 읽는다(pricing 0.3.0 — 할인은 product-content 에 없어 모든 옵션을 묻는다).
@@ -611,6 +676,7 @@ ProductDetail productFromContract(pc.ProductContent c, {OptionPrices? prices}) {
     storageGuide: c.storageGuide,
     returnGuide: c.returnGuide,
     notices: c.notices ?? const [],
+    purchaseLimitUnits: c.purchaseLimitUnits,
     origin: _text(c.origin),
     expiryGuide: _text(c.expiryGuide),
     legalInfo: switch (c.legalInfo) {

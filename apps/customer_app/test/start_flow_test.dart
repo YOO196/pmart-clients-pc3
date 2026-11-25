@@ -141,6 +141,24 @@ void main() {
     expect(key('start-address'), findsOneWidget);
   });
 
+  testWidgets('마이페이지에서 로그인해도 첫 로그인/둘러보기는 본 것으로 — 로그아웃 뒤 그 화면이 다시 안 뜬다', (
+    t,
+  ) async {
+    // 사용자 2026-11-25 "로그아웃할 때 다시 로그인 화면 뜨는 건 뭐야".
+    final secure = MemoryKeyValueStore();
+    await secure.write('pmart.start.welcome', 'at=x');
+    await t.pumpWidget(testApp([], secure: secure));
+    await t.pumpAndSettle();
+    expect(await secure.read('pmart.start.entry'), isNull);
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(key('my-login'));
+    await t.pumpAndSettle();
+    await t.tap(key('login-kakao'));
+    await t.pumpAndSettle();
+    expect(await secure.read('pmart.start.entry'), isNotNull);
+  });
+
   testWidgets('로그인한 회원은 주소가 있으면 바로 홈', (t) async {
     final secure = MemoryKeyValueStore();
     await secure.write('pmart.start.welcome', 'at=x');

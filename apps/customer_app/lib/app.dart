@@ -5,11 +5,12 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import 'package:pmart_core/pmart_core.dart' show PmartEnv;
 
+import 'features/auth/domain/auth.dart' show MemberSession;
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/catalog/presentation/catalog_providers.dart'
     show categoriesProvider;
 import 'features/start/presentation/start_controller.dart'
-    show startPrefetchProvider;
+    show startFlagsProvider, startPrefetchProvider;
 import 'features/push/presentation/push_controller.dart'
     show pushRegistrationProvider;
 import 'l10n/gen/app_localizations.dart';
@@ -34,6 +35,13 @@ class CustomerApp extends ConsumerWidget {
     ref.listen(categoriesProvider, (_, _) {});
     // 로딩 화면이 떠 있는 동안 주소록·홈을 미리 읽는다(차례로 기다리지 않게 — 로딩 S4).
     ref.listen(startPrefetchProvider, (_, _) {});
+    // 한 번이라도 회원이 되면(로그인·세션 복원) 첫 로그인/둘러보기 화면은 본 것으로 둔다 — 로그아웃할 때 그 화면이
+    // 다시 뜨던 것(사용자 2026-11-25). 전에는 그 화면에서 로그인한 경우만 기록했다(마이페이지 로그인은 빠짐).
+    ref.listen(sessionProvider, (_, next) {
+      if (next is MemberSession) {
+        ref.read(startFlagsProvider.notifier).completeEntry();
+      }
+    });
     // 세션이 끝났을 때 한 번 알린다: 조용히 이어졌으면 짧게, 안 됐으면 "다시 로그인" 버튼과 함께.
     ref.listen(sessionNoticeProvider, (_, notice) {
       if (notice == null) return;

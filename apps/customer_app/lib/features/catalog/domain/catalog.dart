@@ -537,6 +537,7 @@ class ProductDetail {
     this.returnGuide,
     this.notices = const [],
     this.origin,
+    this.purchaseLimitUnits,
     this.expiryGuide,
     this.legalInfo,
     this.categoryPath = const [],
@@ -593,6 +594,9 @@ class ProductDetail {
   /// 원산지 값(product-content 0.9.0 BR-100 R1). 없으면 null.
   final String? origin;
 
+  /// 1회 최대 구매 낱개 수 — 이 상품 모든 옵션 합(product-content 0.11.0 BR-101). 확정은 서버 거절. 없으면 null.
+  final int? purchaseLimitUnits;
+
   /// 소비기한·제조일 안내 값(0.9.0 R1). 없으면 null.
   final String? expiryGuide;
 
@@ -603,4 +607,30 @@ class ProductDetail {
   /// 집계 없음·실패는 null. 0점·0건으로 표시하지 않는다.
   final RatingSummary? rating;
   final List<SaleOption> options;
+}
+
+/// 상품페이지 관리 카드 묶음(storefront 0.20.0 BR-102). [title] 이 없거나 [items] 가 비면 앱은 구획을 뺀다.
+@immutable
+class CareCards {
+  const CareCards({this.title, this.items = const []});
+
+  final String? title;
+  final List<CareCard> items;
+}
+
+@immutable
+class CareCard {
+  const CareCard({
+    required this.cardId,
+    required this.title,
+    required this.body,
+    this.imageUrl,
+  });
+
+  final String cardId;
+  final String title;
+
+  /// 줄바꿈(`\n`) 그대로.
+  final String body;
+  final String? imageUrl;
 }

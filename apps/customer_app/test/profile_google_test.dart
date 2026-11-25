@@ -211,6 +211,30 @@ void main() {
       },
     );
 
+    testWidgets('가입 직후 서버가 이름·이메일을 늦게 넣으면(약 1초 뒤) 앱이 조금 뒤 다시 읽어 보인다(BR-103)', (
+      t,
+    ) async {
+      final profile = MockProfileRepository(latency: Duration.zero)
+        ..socialProvider = SocialProvider.naver;
+      await t.pumpWidget(
+        testApp(
+          const [],
+          profile: profile,
+          profileRefreshDelays: const [Duration(seconds: 2)],
+        ),
+      );
+      await t.pumpAndSettle();
+      await _loginKakao(t);
+      expect(find.textContaining('hong@naver.com'), findsNothing);
+      // 서버 사건 반영 뒤
+      profile
+        ..name = '홍길동'
+        ..email = 'hong@naver.com';
+      await t.pump(const Duration(seconds: 2));
+      await t.pumpAndSettle();
+      expect(find.text('홍길동 · hong@naver.com'), findsOneWidget);
+    });
+
     testWidgets('Google 값이 없으면 기본 아바타·"정보 없음"으로 두고, 계정 줄은 제공자 SDK 계정 표시를 쓴다', (
       t,
     ) async {

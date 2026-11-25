@@ -1963,7 +1963,7 @@ class _HomeInfoRow extends StatelessWidget {
 }
 
 /// 쿠폰 줄(사용자 새 UI): 받을 수 있는 쿠폰 첫 장 이름 + "외 N개", 오른쪽 받기 동그라미 → "할인받고 주문해요" 시트.
-/// 회원만, 받을 수 있는 쿠폰이 있을 때만. 조회 실패·없음이면 줄을 그리지 않는다(홈의 부가 정보).
+/// 회원: 받을 수 있는 쿠폰이 있을 때만(조회 실패·없음이면 줄 없음). 비회원: 고정 안내 → 로그인.
 class _HomeCouponRow extends ConsumerWidget {
   const _HomeCouponRow();
 
@@ -1972,6 +1972,44 @@ class _HomeCouponRow extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    // 비회원도 쿠폰 줄을 보인다(사용자 2026-11-25 "로그인 안 해도 첫 화면에 쿠폰 버튼"). 쿠폰 행사 조회는
+    // 회원만 되는 계약이라(promotion — BR-104 요청) 이름 대신 고정 안내, 누르면 로그인.
+    if (ref.watch(sessionProvider) is! MemberSession) {
+      return _HomeInfoRow(
+        key: const ValueKey('home-coupon-guest'),
+        color: Color.alphaBlend(
+          scheme.primary.withValues(alpha: 0.08),
+          scheme.surface,
+        ),
+        icon: const CouponFilledIcon(),
+        trailingPad: 10.7,
+        text: Text(
+          l10n.homeCouponGuest,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        trailing: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: scheme.primary,
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: PmartLineIcon(
+            PmartLineIcons.download,
+            size: 13.5,
+            strokeWidth: 2.4,
+            color: scheme.onPrimary,
+          ),
+        ),
+        onTap: () => context.push('/login'),
+      );
+    }
     final campaigns =
         ref.watch(couponCampaignsProvider).value ?? const <CouponCampaign>[];
     final open = [

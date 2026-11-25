@@ -740,6 +740,12 @@ class _ProductBuySheetState extends ConsumerState<ProductBuySheet> {
 
   int get _total => _qty.values.fold(0, (a, b) => a + b);
 
+  /// 고른 낱개 수 합(묶음 옵션은 묶음 수 × 개수) — 1회 최대(BR-101 `purchaseLimitUnits`)와 비교한다.
+  int get _units => [
+    for (final o in widget.product.options)
+      (_qty[o.sku] ?? 0) * (o.unitsPerSku ?? 1),
+  ].fold(0, (a, b) => a + b);
+
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
@@ -814,10 +820,14 @@ class _ProductBuySheetState extends ConsumerState<ProductBuySheet> {
               ),
               itemBuilder: (context, i) {
                 final o = p.options[i];
+                final limit = p.purchaseLimitUnits;
                 return _BuyOptionRow(
                   product: p,
                   option: o,
                   quantity: _qty[o.sku] ?? 0,
+                  // 1회 최대를 넘게는 더하지 않는다(확정은 서버 거절 — BR-101).
+                  canIncrease:
+                      limit == null || _units + (o.unitsPerSku ?? 1) <= limit,
                   enabled: o.canOfferAdd && canChange && !_busy,
                   onChanged: (q) => setState(() => _qty[o.sku] = q),
                 );
@@ -863,12 +873,14 @@ class _BuyOptionRow extends StatelessWidget {
     required this.quantity,
     required this.enabled,
     required this.onChanged,
+    this.canIncrease = true,
   });
 
   final ProductDetail product;
   final SaleOption option;
   final int quantity;
   final bool enabled;
+  final bool canIncrease;
   final ValueChanged<int> onChanged;
 
   static const _dark = Color(0xFF222222);
@@ -924,6 +936,20 @@ class _BuyOptionRow extends StatelessWidget {
                   const SizedBox(height: 4),
                   LowStockText(n, key: ValueKey('option-low-stock-${o.sku}')),
                 ],
+                // "최대 N개 구매 가능(1회당)"(레퍼런스 7-3 — 보통 12, #7E807F, product-content 0.11.0
+                // `purchaseLimitUnits` — 상품 단위 합).
+                if (product.purchaseLimitUnits case final max?) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.buySheetMax(max),
+                    key: ValueKey('option-max-${o.sku}'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: Color(0xFF7E807F),
+                    ),
+                  ),
+                ],
                 if (notes.isNotEmpty)
                   Text(
                     notes,
@@ -966,6 +992,7 @@ class _BuyOptionRow extends StatelessWidget {
                       sku: o.sku,
                       value: quantity,
                       enabled: enabled,
+                      canIncrease: canIncrease,
                       onChanged: onChanged,
                     ),
                   ],
@@ -986,11 +1013,13 @@ class _QtyBox extends StatelessWidget {
     required this.value,
     required this.enabled,
     required this.onChanged,
+    this.canIncrease = true,
   });
 
   final String sku;
   final int value;
   final bool enabled;
+  final bool canIncrease;
   final ValueChanged<int> onChanged;
 
   @override
@@ -1040,7 +1069,7 @@ class _QtyBox extends StatelessWidget {
           button(
             'add-inc',
             PmartLineIcons.plus,
-            enabled ? () => onChanged(value + 1) : null,
+            enabled && canIncrease ? () => onChanged(value + 1) : null,
           ),
         ],
       ),

@@ -1072,25 +1072,32 @@ class NoticeTable extends StatelessWidget {
   }
 }
 
-/// "우리동네 바로픽 마트, 이렇게 관리해요"(레퍼런스 5 상품페이지 — 사용자 2026-11-25 "우리동네 바로픽 마트 라고 적어").
+/// "우리동네 PMart, 이렇게 관리해요"(레퍼런스 5 상품페이지 — 사용자 2026-11-25 이름 PMart).
 /// 옆으로 넘기는 카드 268.6×245(바탕 #F4F5F7·모서리 7.6·사이 12): 위 그림 152 → 제목(굵게) → 설명 두 줄.
-/// 그림은 아직 없어 레퍼런스 빈 그림처럼 회색 바탕에 흐린 "바로픽".
-class TownCareSection extends StatelessWidget {
+/// 그림은 아직 없어 레퍼런스 빈 그림처럼 회색 바탕에 흐린 "PMart"(고정 문구 — 서버·백오피스 설정 없음).
+/// 관리 카드(storefront 0.20.0 `GET /storefront/care-cards`, BR-102 — 백오피스 편성). 목은 고정 2장(그림 없음).
+final careCardsProvider = FutureProvider.autoDispose<CareCards>((ref) {
+  ref.keepAlive();
+  return ref.watch(catalogRepositoryProvider).careCards();
+});
+
+class TownCareSection extends ConsumerWidget {
   const TownCareSection({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final cards = [
-      (l10n.townCareInspectTitle, l10n.townCareInspectBody),
-      (l10n.townCareTempTitle, l10n.townCareTempBody),
-    ];
+    final origin = ref.watch(imageOriginProvider);
+    final value = ref.watch(careCardsProvider).value;
+    // 읽는 중·실패·빈 목록이면 구획을 뺀다(지어내지 않는다).
+    if (value == null || value.items.isEmpty) return const SizedBox.shrink();
+    final cards = value.items;
+    final px = 268.6 * MediaQuery.devicePixelRatioOf(context);
     return Column(
       key: const ValueKey('town-care'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DetailSectionTitle(l10n.townCareTitle),
+        DetailSectionTitle(value.title ?? ''),
         SizedBox(
           height: 245,
           child: ListView.separated(
@@ -1099,7 +1106,11 @@ class TownCareSection extends StatelessWidget {
             itemCount: cards.length,
             separatorBuilder: (_, _) => const SizedBox(width: 12.2),
             itemBuilder: (context, i) {
-              final (title, body) = cards[i];
+              final card = cards[i];
+              final image = resolveImageUrl(
+                withImageWidth(card.imageUrl, px),
+                origin,
+              );
               return Container(
                 width: 268.6,
                 clipBehavior: Clip.antiAlias,
@@ -1114,16 +1125,15 @@ class TownCareSection extends StatelessWidget {
                     SizedBox(
                       height: 152,
                       width: double.infinity,
-                      child: Center(
-                        child: Text(
-                          l10n.brandName,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFFD9DADC),
-                          ),
-                        ),
-                      ),
+                      child: image == null
+                          ? _CarePlaceholder(theme: theme)
+                          : pmartNetworkImage(
+                              image,
+                              fit: BoxFit.cover,
+                              cacheWidth: px.round(),
+                              errorBuilder: (_, _, _) =>
+                                  _CarePlaceholder(theme: theme),
+                            ),
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16.7, 17, 16.7, 0),
@@ -1131,7 +1141,7 @@ class TownCareSection extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            title,
+                            card.title,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontSize: 15.5,
                               height: 1.3,
@@ -1140,7 +1150,7 @@ class TownCareSection extends StatelessWidget {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            body,
+                            card.body,
                             maxLines: 2,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontSize: 13.3,
@@ -1162,4 +1172,23 @@ class TownCareSection extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 그림이 없거나 못 받았을 때(레퍼런스 빈 그림처럼 회색 + 흐린 "PMart").
+class _CarePlaceholder extends StatelessWidget {
+  const _CarePlaceholder({required this.theme});
+
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Text(
+      'PMart',
+      style: theme.textTheme.titleLarge?.copyWith(
+        fontSize: 26,
+        fontWeight: FontWeight.w800,
+        color: const Color(0xFFD9DADC),
+      ),
+    ),
+  );
 }

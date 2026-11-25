@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -50,13 +52,50 @@ final profileProvider = AsyncNotifierProvider<ProfileController, Profile?>(
   ProfileController.new,
 );
 
+/// 로그인 계정 값(이름·이메일·사진)이 아직 없을 때 다시 읽는 간격. 서버는 가입·로그인 완료 약 1초 뒤 사건으로
+/// 이름·이메일을, 사진은 사본을 만든 뒤 몇 초 더 걸려 넣는다(백엔드 회신 2026-11-25 BR-103). 시험은 비운다.
+final profileRefreshDelaysProvider = Provider<List<Duration>>(
+  (_) => const [Duration(milliseconds: 2500), Duration(seconds: 6)],
+);
+
 class ProfileController extends AsyncNotifier<Profile?> {
   ProfileRepository get _repo => ref.read(profileRepositoryProvider);
 
   @override
   Future<Profile?> build() async {
     if (ref.watch(sessionProvider) is! MemberSession) return null;
-    return ref.watch(profileRepositoryProvider).get();
+    final p = await ref.watch(profileRepositoryProvider).get();
+    _refreshWhileIncomplete(p);
+    return p;
+  }
+
+  /// 소셜 로그인 계정인데 이름·이메일이 둘 다 없거나 사진이 없으면 정해 둔 간격으로 몇 번 조용히 다시 읽는다
+  /// (사용자 2026-11-25 "처음 로그인 뒤 다시 로그인해야 이메일이 뜬다"). 실패는 무시(앞 값 유지).
+  void _refreshWhileIncomplete(Profile p) {
+    bool incomplete(Profile q) =>
+        q.socialProvider != null &&
+        ((q.name == null && q.email == null) || q.profileImageUrl == null);
+    if (!incomplete(p)) return;
+    final timers = <Timer>[];
+    ref.onDispose(() {
+      for (final t in timers) {
+        t.cancel();
+      }
+    });
+    for (final d in ref.read(profileRefreshDelaysProvider)) {
+      timers.add(
+        Timer(d, () async {
+          final now = state.value;
+          if (!ref.mounted || now == null || !incomplete(now)) return;
+          try {
+            final fresh = await _repo.get();
+            if (ref.mounted) state = AsyncData(fresh);
+          } on PmartFailure {
+            // 다음 기회에(앞 값 유지)
+          }
+        }),
+      );
+    }
   }
 
   Future<void> _reload() async {

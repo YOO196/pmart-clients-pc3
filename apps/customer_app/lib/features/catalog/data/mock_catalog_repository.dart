@@ -452,6 +452,27 @@ base class MockCatalogRepository implements CatalogRepository {
     ];
   }
 
+  /// 목 관리 카드(BR-102 흉내) — 그림 없이 2장.
+  @override
+  Future<CareCards> careCards() async {
+    await _wait();
+    return const CareCards(
+      title: '우리동네 PMart, 이렇게 관리해요',
+      items: [
+        CareCard(
+          cardId: 'CARE-1',
+          title: '사전 품질 검수',
+          body: '입고 전 상품을 검수해, 품질 기준을\n통과한 상품만 판매해요.',
+        ),
+        CareCard(
+          cardId: 'CARE-2',
+          title: '온도 맞춤 보관',
+          body: '상품별 최적의 온도로\n보관해요.',
+        ),
+      ],
+    );
+  }
+
   @override
   Future<List<HomeBanner>> banners({required String placement}) async {
     await _wait();
@@ -1065,6 +1086,8 @@ base class MockCatalogRepository implements CatalogRepository {
   static Map<String, Object?> productJson(MockProduct p) => {
     'productId': p.productId,
     'name': p.name,
+    // 1회 최대 낱개(product-content 0.11.0 BR-101) — 장바구니 목 상한과 같은 10.
+    'purchaseLimitUnits': 10,
     // 영양·알레르기(product-content 0.6.0) — 둘 다 있음 / 하나만 / 둘 다 없음을 보이려고 몇 상품만.
     ...?_nutritionAllergenJson[p.productId],
     'contentVersion': 2,
