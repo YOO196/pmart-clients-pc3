@@ -1,7 +1,5 @@
-// 출하 약속 준수율 — ⚠ 목 모드(env.isMock)에서만 쓰는 시뮬레이션(2026-11-24 사용자 "정시율 대신 센터가 움직일 수 있는 지표, 목으로 먼저").
-// 뜻: 출하 약속 시각이 지난 작업(포장·인계) 중 약속 안에 인계까지 끝낸 비율. 날짜 = 출하 약속 날짜(한국).
-// 계약에 이 지표 API 가 없다 — 요청 handoff mfc-backoffice/2026-11-24-backend-ship-promise-metrics. 실서버에서는 부르지 않고 "API 없음"을 보인다.
-// API 가 생기면 이 파일은 mocks/ 로 옮기고 화면은 서버 값만 쓴다.
+// 출하 약속 준수율 목 — mfc-fulfillment 0.35.0 `GET /metrics/ship-promises` 의 날짜 값을 만드는 시뮬레이션(2026-11-25 화면은 서버 값으로 바꿈, 이 파일은 목 서버 전용).
+// 뜻(회신 2026-11-24-reply-ship-promise-metrics): 약속 = 배차 요청 때 알린 예상 준비 시각, 끝 = 포장 끝. due = onTime + late.
 
 export interface ShipDay {
   readonly date: string;

@@ -40,7 +40,7 @@ describe('추이 그래프 기간', () => {
     expect(parts.at(-1)!.to).toBe(t);
   });
 
-  it('빠른 단추 30일 → 30칸·지난 30일 비교선, 90일 출하 준수(목 시뮬레이션) 90칸', async () => {
+  it('빠른 단추 30일 → 30칸·지난 30일 비교선, 90일 출하 준수(서버 ship-promises) 90칸', async () => {
     const view = renderAt('/c/MFC-BJG-01/dashboard');
     await openPicked();
     const bar = screen.getByTestId('range-bar');
@@ -71,7 +71,8 @@ describe('추이 그래프 기간', () => {
     expect(within(screen.getByTestId('chart-picked')).queryAllByTestId('chart-picked-bar')).toHaveLength(0);
     await userEvent.click(screen.getByRole('button', { name: '출하 준수' }));
     await waitFor(() => expect(within(screen.getByTestId('chart-ship')).getAllByTestId('chart-ship-col')).toHaveLength(90));
-    expect(screen.getByText('출하 약속 준수율 — 목 시뮬레이션(API 요청함)')).toBeInTheDocument();
+    // 서버 지표(fulfillment 0.35.0)를 같은 단위로 읽는다
+    expect(view.gets('/metrics/ship-promises').some((r) => new URL(r.url).searchParams.get('bucket') === 'DAY')).toBe(true);
   });
 
   it('기간 끝에 잘린 주·월 칸 — 며칠만 들었나(일·시간 칸은 해당 없음)', () => {
@@ -224,7 +225,7 @@ describe('추이 그래프 기간', () => {
       expect(long.map((q) => daysIn({ from: q.get('from')!, to: q.get('to')! }).length).sort((a, b) => a - b)).toEqual([28, 92]);
     });
 
-    it('실서버 — 주문·피킹 줄·결품은 시간 칸이 켜지고, 출하 준수는 API 없음(목만)', async () => {
+    it('실서버 — 주문·피킹 줄·결품·출하 준수 모두 시간 칸(출하 준수 fulfillment 0.35.0)', async () => {
       env.isMock = false;
       renderAt('/c/MFC-BJG-01/dashboard');
       // 실서버도 주문(order 0.20.0)이 기본 — 1일이면 시간별
@@ -238,9 +239,8 @@ describe('추이 그래프 기간', () => {
       await userEvent.click(screen.getByRole('button', { name: '결품' }));
       expect(within(bar).getByRole('button', { name: '시간' })).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: '출하 준수' }));
-      await waitFor(() => expect(within(bar).queryByRole('button', { name: '시간' })).not.toBeInTheDocument());
-      expect(screen.getByTestId('ship-no-api')).toHaveTextContent('출하 약속 준수율은 아직 없어요.');
-      expect(screen.queryByTestId('chart-ship')).not.toBeInTheDocument();
+      expect(within(bar).getByRole('button', { name: '시간' })).toBeInTheDocument();
+      expect(await screen.findByTestId('chart-ship')).toBeInTheDocument();
     });
   });
 });

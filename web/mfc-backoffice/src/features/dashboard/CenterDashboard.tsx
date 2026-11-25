@@ -25,9 +25,7 @@ import { OPS_REFRESH_MS } from '../ops/opsQueries';
 import { minutesText, promiseRows, seoulToday } from '../ops/opsRules';
 import { AreaChart, BarList, Heatmap, PieChart, type Column, type PieSlice, type StackSeries } from './charts';
 import { seriesKey, useOrderSeries, useOrderTrend, type OrderFilter } from './orderQueries';
-import { shipDay } from './shipSim';
 import { FloorMap } from './FloorMap';
-import { env } from '../../env';
 import {
   addDays,
   buckets,
@@ -95,11 +93,20 @@ async function fetchPicking(api: Api, mfcId: string, r: Range, unit: Unit) {
   return { items: parts.flatMap((x) => x.items ?? []), asOf: parts.map((x) => x.asOf).sort()[0] };
 }
 
+/** 출하 약속 준수율(mfc-fulfillment 0.35.0 `/metrics/ship-promises`) — 피킹 줄과 같은 단위·상한·칸 모양이라 같은 방식으로 나눠 읽는다 */
+async function fetchShip(api: Api, mfcId: string, r: Range, unit: Unit) {
+  const bucket = PICKING_BUCKET[unit];
+  const parts = await Promise.all(
+    chunks(r, PICKING_LIMIT[unit]).map((c) => request('GET', api.fulfillment.GET('/metrics/ship-promises', { params: { query: { from: c.from, to: c.to, mfcId, bucket } } }))),
+  );
+  return { items: parts.flatMap((x) => x.items ?? []), asOf: parts.map((x) => x.asOf).sort()[0] };
+}
+
 /** 결품 많은 상품은 기간을 나눠 합칠 수 없다(상위 5 가 조각마다 다름) — 92일을 넘으면 끝날까지 최근 92일 */
 const skuRangeOf = (r: Range): Range => (spanDays(r) > PICKING_CHUNK ? { from: addDays(r.to, -(PICKING_CHUNK - 1)), to: r.to } : r);
 
 /** 추이 패널 — 고른 기간 */
-function useTrend(mfcId: string, r: Range, unit: Unit) {
+function useTrend(mfcId: string, r: Range, unit: Unit, shipOn: boolean) {
   const api = useApi();
   const common = { refetchInterval: OPS_REFRESH_MS } as const;
   const picking = useQuery({ ...common, queryKey: ['dashboard', mfcId, 'picking-lines', r.from, r.to, unit], queryFn: () => fetchPicking(api, mfcId, r, unit) });
@@ -109,7 +116,9 @@ function useTrend(mfcId: string, r: Range, unit: Unit) {
     queryKey: ['dashboard', mfcId, 'by-sku', sr.from, sr.to],
     queryFn: () => request('GET', api.fulfillment.GET('/metrics/picking-lines/by-sku', { params: { query: { from: sr.from, to: sr.to, mfcId, sort: 'shortLines', limit: 5 } } })),
   });
-  return { picking, bySku };
+  // 출하 약속은 그 탭을 볼 때만 읽는다
+  const ship = useQuery({ ...common, enabled: shipOn, queryKey: ['dashboard', mfcId, 'ship-promises', r.from, r.to, unit], queryFn: () => fetchShip(api, mfcId, r, unit) });
+  return { picking, bySku, ship };
 }
 
 function useDashboard(mfcId: string) {
@@ -161,8 +170,8 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
 
   // 추이 기간·칸 단위 — URL(?from=&to=&unit=), 맞지 않으면 기본 14일·일. 바꿀 때마다 앞 상태를 쌓아 Ctrl+Z 로 되돌린다
   const [params, setParams] = useSearchParams();
-  // 시간 칸 — 주문·매출(order 0.20.0)·피킹 줄·결품(fulfillment 0.34.0)은 서버. 출하 준수(목 시뮬레이션)는 날짜 칸만
-  const hourOk = chart !== 'ship';
+  // 시간 칸 — 주문·매출(order 0.20.0)·피킹 줄·결품(fulfillment 0.34.0)·출하 약속(0.35.0) 모두 서버가 센다
+  const hourOk = true;
   const range: Range = validRange(params.get('from'), params.get('to'), today) ?? { from: days[0] ?? today, to: today };
   const span = spanDays(range);
   const allowed = unitsFor(span, hourOk);
@@ -204,7 +213,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
-  const trend = useTrend(mfcId, range, unit);
+  const trend = useTrend(mfcId, range, unit, chart === 'ship');
   const nowHour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Seoul', hour: '2-digit', hourCycle: 'h23' }).format(nowMs));
   const tBuckets = buckets(range, unit, today, nowHour);
   // 피킹은 서버가 센 칸(bucket) 그대로 — key 가 칸 key 와 같다
@@ -221,20 +230,13 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
     const r = pickRow.get(d);
     return rate(r?.shortLines ?? 0, r?.pickedLines ?? 0) ?? 0;
   });
-  // 칸마다 합 — 피킹은 서버 칸 값(줄 없으면 0줄), 출하 약속은 목 시뮬레이션(shipSim — API 없음)의 날짜 값을 더한다
+  // 출하 약속도 서버 칸 그대로(줄 없으면 약속 지난 출고 0 — 비율 "—")
+  const tShip = new Map((trend.ship.data?.items ?? []).filter((i) => i.mfcId === mfcId).map((i) => [pickingKey(i, unit), i]));
+  // 칸마다 — 피킹은 서버 칸 값(줄 없으면 0줄), 출하 약속은 서버 칸 값(배차 요청이 없는 출고는 서버가 세지 않는다)
   const sumOf = (b: Bucket) => {
     const p = tPick.get(b.key);
-    const acc = { picked: p?.pickedLines ?? 0, short: p?.shortLines ?? 0, onTime: 0, due: 0, late: 0, shipDays: 0 };
-    if (env.isMock && b.hour === undefined)
-      for (let d = b.from; d <= b.to; d = addDays(d, 1)) {
-        const s = shipDay(mfcId, d, today);
-        if (!s) continue;
-        acc.shipDays += 1;
-        acc.onTime += s.onTime;
-        acc.due += s.due;
-        acc.late += s.late;
-      }
-    return acc;
+    const sp = tShip.get(b.key);
+    return { picked: p?.pickedLines ?? 0, short: p?.shortLines ?? 0, onTime: sp?.onTime ?? 0, due: sp?.due ?? 0, late: sp?.late ?? 0, shipDays: sp && sp.due > 0 ? 1 : 0 };
   };
   const sums = tBuckets.map((b) => ({ b, t: sumOf(b) }));
   const tipLabel = (b: Bucket) => (b.hour !== undefined ? `${shortDate(b.from)} ${b.hour}시` : b.from === b.to ? shortDate(b.from) : `${b.label} (${shortDate(b.from)}–${shortDate(b.to)})`);
@@ -538,7 +540,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
                   : m.chart.pickSub
           }
           {...(chart === 'ship' ? { help: m.chart.shipHelp } : {})}
-          q={chart === 'ship' ? { isPending: false, isError: false } : chart === 'heat' ? orderQ.heat : chart === 'share' ? orderQ.top : ordersView ? orderQ.series : trend.picking}
+          q={chart === 'ship' ? trend.ship : chart === 'heat' ? orderQ.heat : chart === 'share' ? orderQ.top : ordersView ? orderQ.series : trend.picking}
           toolbar={
             <>
               {/* 볼 것 고르기 — 7개라 제목 옆이 아니라 제목 아래 줄(제목이 잘리지 않게) */}
@@ -656,24 +658,15 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
               )}
             </>
           ) : chart === 'ship' ? (
-            env.isMock ? (
-              <>
-                <span className="badge badge-primary badge-sm mb-2">{m.chart.shipSimBadge}</span>
-                <AreaChart
-                  key={`s-${range.from}-${range.to}-${unit}`}
-                  title={m.chart.ship(span)}
-                  columns={shipCols}
-                  format={(v) => rateText(v)}
-                  testId="chart-ship"
-                  onRange={zoom}
-                  rate={{ avg: avgShip, avgLabel: m.chart.onTimeAvg(rateText(avgShip)) }}
-                />
-              </>
-            ) : (
-              <p className="rounded-field border border-dashed border-base-300 px-4 py-8 text-center text-sm text-base-content/60" data-testid="ship-no-api">
-                {m.chart.shipNoApi}
-              </p>
-            )
+            <AreaChart
+              key={`s-${range.from}-${range.to}-${unit}`}
+              title={m.chart.ship(span)}
+              columns={shipCols}
+              format={(v) => rateText(v)}
+              testId="chart-ship"
+              onRange={zoom}
+              rate={{ avg: avgShip, avgLabel: m.chart.onTimeAvg(rateText(avgShip)) }}
+            />
           ) : chart === 'picked' ? (
             <AreaChart
               key={`p-${range.from}-${range.to}-${unit}`}
@@ -696,11 +689,9 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
             />
           )}
           {chart === 'ship' ? (
-            env.isMock && (
-              <SubList title={m.chart.lateShipDays(span)} q={{ isPending: false, isError: false }} link={{ to: centerPath(mfcId, 'tasks'), text: m.chart.toTasks }}>
-                {lateRows.length === 0 ? <p className="text-sm text-base-content/55">{m.chart.noLateShip}</p> : <BarList testId="late-ship" rows={lateRows} />}
-              </SubList>
-            )
+            <SubList title={m.chart.lateShipDays(span)} q={trend.ship} link={{ to: centerPath(mfcId, 'tasks'), text: m.chart.toTasks }}>
+              {lateRows.length === 0 ? <p className="text-sm text-base-content/55">{m.chart.noLateShip}</p> : <BarList testId="late-ship" rows={lateRows} />}
+            </SubList>
           ) : !ordersView && (
           <SubList title={m.chart.topShort(spanDays(skuRangeOf(range)))} q={trend.bySku} link={{ to: centerPath(mfcId, 'inventory'), text: m.toInventory }}>
             {(trend.bySku.data?.items ?? []).length === 0 ? (
