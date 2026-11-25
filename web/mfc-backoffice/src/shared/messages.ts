@@ -1057,6 +1057,9 @@ export const messages = {
       placesText: (n: number) => `칸 ${n}`,
       quarantined: (n: number) => `격리 ${n}`,
       backToList: '상품 목록',
+      partLabel: '보기',
+      partLots: (n: number) => `LOT별 ${n}`,
+      partUnits: (n: number) => `위치별 ${n}`,
       info: '상품 정보',
       fields: { sku: '상품 코드', unit: '판매 단위', weight: '중량', volume: '용량', sale: '본사 판매 상태', barcodes: '바코드', handling: '이 센터 취급' },
       unitText: (type: string, n: number) => (type === 'B' ? `묶음 · ${n}개입` : '낱개'),
@@ -1606,8 +1609,8 @@ export const messages = {
     prev: '이전',
     next: '다음',
     goTo: (p: number) => `${p}쪽`,
-    range: (from: number, to: number, total: number) => `${total}명 중 ${from}–${to}`,
-    none: '0명',
+    range: (from: number, to: number, total: number, unit = '명') => `${total}${unit} 중 ${from}–${to}`,
+    none: (unit = '명') => `0${unit}`,
   },
 
   /** 작업자 — mfc-capacity-service 0.14.0 workers */

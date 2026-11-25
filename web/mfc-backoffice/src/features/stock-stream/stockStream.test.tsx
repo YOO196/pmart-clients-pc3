@@ -57,7 +57,7 @@ describe('재고 조회 고르기', () => {
 
 describe('재고 화면 실시간 반영', () => {
   it('연결되면 "실시간", 재고가 바뀌면 그 상품 재고를 다시 읽는다', async () => {
-    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1');
+    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1&part=units');
     await waitFor(() => expect(screen.getByTestId('stock-live')).toHaveAttribute('data-status', 'live'));
     expect(screen.getByTestId('stock-live')).toHaveTextContent('실시간');
     expect(view.gets('/stock-stream')[0]!.headers.get('Accept')).toBe('text/event-stream');
@@ -80,7 +80,7 @@ describe('재고 화면 실시간 반영', () => {
   });
 
   it('다른 상품이 바뀌면 이 상품 재고는 다시 읽지 않는다', async () => {
-    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1');
+    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1&part=units');
     await waitFor(() => expect(screen.getByTestId('stock-live')).toHaveAttribute('data-status', 'live'));
     await screen.findAllByTestId('unit-row');
     await wait(400);
@@ -130,7 +130,7 @@ describe('재고 화면 실시간 반영', () => {
         }),
       ),
     );
-    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1');
+    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1&part=units');
     await screen.findAllByTestId('unit-row');
     await waitFor(() => expect(screen.getByTestId('stock-live')).toHaveAttribute('data-status', 'live'));
     const before = stockGets(view.sent).length;
@@ -175,7 +175,7 @@ describe('재고 화면 실시간 반영', () => {
         });
       }),
     );
-    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1');
+    const view = renderAt('/c/MFC-BJG-01/inventory?sku=SKU-MILK-1&part=units');
     await screen.findAllByTestId('unit-row');
     await waitFor(() => expect(screen.getByTestId('stock-live')).toHaveAttribute('data-status', 'reconnecting'));
     const before = stockGets(view.sent).length;
