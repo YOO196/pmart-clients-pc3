@@ -215,23 +215,19 @@ final loginGuestAddressesProvider = FutureProvider.autoDispose<List<Address>>((
   if (ref.watch(sessionProvider) is! MemberSession) return const [];
   final store = ref.watch(guestAddressStoreProvider);
   final repo = ref.watch(addressRepositoryProvider);
+  // 비회원일 때 쓰던(고른) 주소 하나만 — 옛 비회원 주소들을 늘어놓지 않는다(사용자 2026-11-25).
+  final ids = await store.ids();
   final selected = await store.selected();
-  final found = <Address>[];
-  for (final id in await store.ids()) {
-    try {
-      final a = await repo.guest(id);
-      // 상세 주소 없는 둘러보기 배송지(로그아웃 때 옮긴 것)는 회원 주소록으로 옮길 수 없다(회원은 상세 주소 필수) — 묻지 않는다.
-      if (a.detailAddress.trim().isNotEmpty) found.add(a);
-    } on ProblemFailure catch (f) {
-      if (f.problem.code != ProblemCode.notFound) rethrow;
-    }
+  final id = (selected != null && ids.contains(selected))
+      ? selected
+      : ids.firstOrNull;
+  if (id == null) return const [];
+  try {
+    return [await repo.guest(id)];
+  } on ProblemFailure catch (f) {
+    if (f.problem.code != ProblemCode.notFound) rethrow;
+    return const [];
   }
-  // 비회원일 때 쓰던(고른) 주소를 맨 앞에.
-  found.sort(
-    (a, b) =>
-        (b.addressId == selected ? 1 : 0) - (a.addressId == selected ? 1 : 0),
-  );
-  return found;
 });
 
 /// 처음 실행 단계 화면 경로.

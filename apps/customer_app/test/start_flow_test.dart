@@ -250,6 +250,43 @@ void main() {
     expect(key('start-address'), findsNothing);
   });
 
+  testWidgets(
+    '비회원 주소에 상세 주소가 없으면 로그인 뒤 검색부터가 아니라 그 주소로 상세만 받는다(사용자 2026-11-25)',
+    (t) async {
+      final secure = MemoryKeyValueStore();
+      await secure.write('pmart.start.welcome', 'at=x');
+      final empty = _EmptyAddressRepository();
+      final guest = await t.runAsync(
+        () => empty.addGuest(
+          const AddressDraft(
+            roadAddress: '부산 부산진구 중앙대로 672',
+            detailAddress: '',
+          ),
+          key: IdempotencyKey.generate(),
+        ),
+      );
+      final store = GuestAddressStore(secure);
+      await store.add(guest!.addressId);
+      await store.select(guest.addressId);
+
+      await t.pumpWidget(
+        testApp([], address: empty, startGate: true, secure: secure),
+      );
+      await t.pumpAndSettle();
+      await t.tap(key('login-kakao'));
+      await t.pumpAndSettle();
+
+      expect(key('start-address'), findsOneWidget);
+      expect(find.text('부산 부산진구 중앙대로 672'), findsOneWidget);
+      expect(find.text('상세 주소만 넣고 시작하기'), findsOneWidget);
+      await t.tap(key('start-guest-address-save-${guest.addressId}'));
+      await t.pumpAndSettle();
+      // 주소 입력 화면이 그 도로명으로 열린다(검색 없이 상세만).
+      expect(key('f-detail'), findsOneWidget);
+      expect(find.text('부산 부산진구 중앙대로 672'), findsWidgets);
+    },
+  );
+
   testWidgets('마케팅 거부도 서버 처리 결과로 거부 안내', (t) async {
     final consents = MockDeviceConsentsRepository(
       now: () => DateTime.utc(2026, 11, 19, 5),

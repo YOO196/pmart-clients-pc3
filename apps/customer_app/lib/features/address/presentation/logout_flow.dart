@@ -153,6 +153,7 @@ Future<void> carryGuestAddressOnLogin(ProviderContainer container) async {
   try {
     final repo = container.read(addressRepositoryProvider);
     final book = await container.read(addressBookProvider.future);
+    var moved = book != null && book.addresses.isNotEmpty;
     if (book != null && book.addresses.isEmpty) {
       final selected = await store.selected();
       final id = (selected != null && ids.contains(selected))
@@ -162,13 +163,23 @@ Future<void> carryGuestAddressOnLogin(ProviderContainer container) async {
         final guest = await repo.guest(id);
         if (guest.detailAddress.trim().isNotEmpty) {
           final draft = await repo.guestDraft(id);
-          await container.read(addressBookProvider.notifier).add(draft);
+          final outcome = await container
+              .read(addressBookProvider.notifier)
+              .add(draft);
+          moved = outcome is AddressSaved;
         }
       } on PmartFailure {
         // 못 옮겼다 — 주소 화면에서 고르게 된다.
       }
     }
-    await store.retain(const []);
+    // 옮겼거나 회원 주소가 이미 있으면 비회원 기록을 지운다. 못 옮겼으면(상세 주소 없음 등) 남겨 두고 주소 화면이
+    // 그 주소를 먼저 보이며 상세 주소만 받는다(검색부터 다시 하지 않게 — 사용자 2026-11-25).
+    if (moved) {
+      await store.retain(const []);
+    } else {
+      final keep = await store.selected();
+      await store.retain([?keep]);
+    }
   } on Object {
     // 주소록을 못 읽었다 — 다음 화면이 실패를 보인다.
   } finally {

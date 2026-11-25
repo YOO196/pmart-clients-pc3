@@ -454,50 +454,62 @@ class _StartAddressScreenState extends ConsumerState<StartAddressScreen> {
     }
   }
 
-  Widget _guestCard(AppLocalizations l10n, ThemeData theme, Address a) =>
-      Container(
-        key: ValueKey('start-guest-address-${a.addressId}'),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        decoration: BoxDecoration(
-          border: Border.all(color: theme.colorScheme.outlineVariant),
-          borderRadius: BorderRadius.circular(14),
+  Widget _guestCard(
+    AppLocalizations l10n,
+    ThemeData theme,
+    Address a,
+  ) => Container(
+    key: ValueKey('start-guest-address-${a.addressId}'),
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+    decoration: BoxDecoration(
+      border: Border.all(color: theme.colorScheme.outlineVariant),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          a.roadAddress,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontSize: 15.5,
+            fontWeight: FontWeight.w500,
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              a.roadAddress,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontSize: 15.5,
-                fontWeight: FontWeight.w500,
+        if (a.detailAddress.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              a.detailAddress,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-            if (a.detailAddress.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Text(
-                  a.detailAddress,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            const SizedBox(height: 12),
-            FilledButton(
-              key: ValueKey('start-guest-address-save-${a.addressId}'),
-              onPressed: _saving == null ? () => _saveGuest(a) : null,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(42),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: Text(l10n.startGuestAddressSave),
+          ),
+        const SizedBox(height: 12),
+        FilledButton(
+          key: ValueKey('start-guest-address-save-${a.addressId}'),
+          // 상세 주소가 없으면(회원 주소는 상세 필수) 이 주소로 입력 화면을 열어 상세만 받는다 — 검색부터 다시 하지 않게.
+          onPressed: _saving != null
+              ? null
+              : a.detailAddress.trim().isEmpty
+              ? () => _open(PostcodeResult(roadAddress: a.roadAddress))
+              : () => _saveGuest(a),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(42),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
-          ],
+          ),
+          child: Text(
+            a.detailAddress.trim().isEmpty
+                ? l10n.startGuestAddressDetail
+                : l10n.startGuestAddressSave,
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   Future<void> _open(PostcodeResult? picked) async {
     if (picked == null || !mounted) return;
