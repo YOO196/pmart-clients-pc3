@@ -26,6 +26,8 @@ export function isStockQuery(mfcId: string, key: readonly unknown[], pending?: P
   if (a === 'stock' && b === mfcId) return all || pending.skus.has(String(c));
   if (a === 'list' && b === 'stock-units' && c === mfcId) return true;
   if (a === 'unshippable' && b === mfcId) return true;
+  // 재고 이력(inventory 0.48.0) — 바뀐 상품의 이력만
+  if (a === 'stock-ledger' && b === mfcId) return all || pending.skus.has(String(c));
   if (a === 'floor' && b === mfcId && c === 'stock-units') return all || [...pending.locations].some((l) => l.startsWith(String(d)));
   return false;
 }

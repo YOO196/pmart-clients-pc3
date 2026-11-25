@@ -26,6 +26,7 @@ import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 import { CountSessionList, StockUnitList } from '../lists/CenterLists';
 import { CountWindowsCard, RotationCountStart } from './CountPlanning';
+import { StockLedgerTab } from './StockLedgerTab';
 import { StockLiveStatus } from '../stock-stream/useStockStream';
 
 const m = messages.inventory;
@@ -36,8 +37,8 @@ type StockUnit = Inv['CenterStock']['units'][number];
 type CountSession = Inv['CountSession'];
 type SkuHandling = Inv['SkuHandling'];
 
-type Tab = 'stock' | 'counts' | 'unshippable' | 'policies' | 'handlings';
-const TABS: readonly Tab[] = ['stock', 'counts', 'unshippable', 'policies', 'handlings'];
+type Tab = 'stock' | 'ledger' | 'counts' | 'unshippable' | 'policies' | 'handlings';
+const TABS: readonly Tab[] = ['stock', 'ledger', 'counts', 'unshippable', 'policies', 'handlings'];
 
 /** CommandResponse 를 확정으로: REJECTED 는 거절, UNKNOWN_RESULT 는 결과 불명(같은 키) */
 function checkCommand(r: CommandResponse): CommandResponse {
@@ -56,7 +57,7 @@ export function InventoryMenu({ mfcId }: { readonly mfcId: string }) {
       <div className="flex items-baseline gap-3">
         <h1>{messages.menus.inventory}</h1>
         {/* 재고 실시간 반영(§4-16) — 재고 수량을 보이는 탭에서만 스트림을 연다 */}
-        {(tab === 'stock' || tab === 'unshippable') && <StockLiveStatus mfcId={mfcId} />}
+        {(tab === 'stock' || tab === 'ledger' || tab === 'unshippable') && <StockLiveStatus mfcId={mfcId} />}
       </div>
       <div role="tablist" className="tabs tabs-box w-fit">
         {TABS.map((t) => (
@@ -73,6 +74,7 @@ export function InventoryMenu({ mfcId }: { readonly mfcId: string }) {
         ))}
       </div>
       {tab === 'stock' && <StockTab mfcId={mfcId} />}
+      {tab === 'ledger' && <StockLedgerTab mfcId={mfcId} />}
       {tab === 'counts' && <CountsTab mfcId={mfcId} />}
       {tab === 'unshippable' && <UnshippableTab mfcId={mfcId} />}
       {tab === 'policies' && <PoliciesTab mfcId={mfcId} />}
