@@ -24,6 +24,14 @@ final class EmployeeSession {
 
   static const mfcSupervisorRole = 'MFC_SUPERVISOR';
 
+  /// DC(CDC) 직원(`CDC_WORKER`·`CDC_SUPERVISOR`, 백엔드 staff-roles.md) — 홈에 DC 업무 메뉴를 보인다
+  /// (사용자 2026-11-26 "cdc 직원도 들어가면 … 다른 메뉴 뜨도록"). 판정은 서버.
+  bool get isCdc =>
+      roles.contains(cdcWorkerRole) || roles.contains(cdcSupervisorRole);
+
+  static const cdcWorkerRole = 'CDC_WORKER';
+  static const cdcSupervisorRole = 'CDC_SUPERVISOR';
+
   /// access token 의 클레임(`sub`·`roles`·`centers`)을 읽는다. 서명은 검증하지 않는다(안내용).
   /// 형식이 아니면 null. 토큰 값을 오류 문구·로그에 남기지 않는다.
   static EmployeeSession? fromAccessToken(String token) {

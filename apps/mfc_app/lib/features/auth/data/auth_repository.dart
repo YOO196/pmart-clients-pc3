@@ -348,6 +348,21 @@ final class MockPasswordAuthRepository extends MockAuthRepository
 
   static final _account = RegExp(r'^mfcw-(pp|rcv|qc|mv|rtn)-(\d{2})$');
 
+  /// LAN 시험 DC 작업자(칠곡 `CDC01`, 백엔드 lan-test-accounts.md §2-5) — FC 피킹 10·분배/라인 5·검품 5·상차 5·지게차 3.
+  static final _cdcAccount = RegExp(r'^cdcw-(fc|dl|qc|ld|fk)-(\d{2})$');
+  static const _cdcCount = {'fc': 10, 'dl': 5, 'qc': 5, 'ld': 5, 'fk': 3};
+
+  /// LAN 시험 DC 관리자 계정(`CDC_SUPERVISOR`).
+  static const cdcSupervisorAccount = 'claude-cdc-sup';
+
+  /// 시험 DC 작업자 계정 아이디인지.
+  static bool isCdcTestWorker(String loginId) {
+    final m = _cdcAccount.firstMatch(loginId);
+    if (m == null) return false;
+    final n = int.parse(m.group(2)!);
+    return n >= 1 && n <= _cdcCount[m.group(1)]!;
+  }
+
   /// LAN 시험 센터 관리자 계정.
   static const supervisorAccount = 'claude-mfc-sup';
 
@@ -381,7 +396,10 @@ final class MockPasswordAuthRepository extends MockAuthRepository
   }) async {
     loginCalls += 1;
     final supervisor = loginId == supervisorAccount;
-    if (!(supervisor || isTestWorker(loginId)) || password.isEmpty) {
+    final cdcSupervisor = loginId == cdcSupervisorAccount;
+    final cdcWorker = isCdcTestWorker(loginId);
+    if (!(supervisor || cdcSupervisor || cdcWorker || isTestWorker(loginId)) ||
+        password.isEmpty) {
       throw const LoginFailure(LoginError.badCredentials);
     }
     signedIn = true;
@@ -389,8 +407,12 @@ final class MockPasswordAuthRepository extends MockAuthRepository
       operatorId: 'OP-mock-$loginId',
       roles: supervisor
           ? const [EmployeeSession.mfcSupervisorRole]
+          : cdcSupervisor
+          ? const [EmployeeSession.cdcSupervisorRole]
+          : cdcWorker
+          ? const [EmployeeSession.cdcWorkerRole]
           : session.roles,
-      centers: session.centers,
+      centers: cdcSupervisor || cdcWorker ? const ['CDC01'] : session.centers,
     );
   }
 
