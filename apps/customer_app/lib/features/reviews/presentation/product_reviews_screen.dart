@@ -462,12 +462,24 @@ class ProductReviewCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      r.authorMasked ?? l10n.reviewAuthorUnknown,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            r.authorMasked ?? l10n.reviewAuthorUnknown,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        // 재구매(review 0.9.0 repurchased — 서버가 true 일 때만).
+                        if (r.repurchased == true) ...[
+                          const SizedBox(width: 6),
+                          ReviewRepurchasedTag(reviewId: r.reviewId),
+                        ],
+                      ],
                     ),
                     Row(
                       children: [
@@ -573,6 +585,11 @@ class _ReviewAuthor extends StatelessWidget {
           review.authorMasked ?? l10n.reviewAuthorUnknown,
           style: theme.textTheme.bodyLarge?.copyWith(fontSize: fontSize),
         ),
+        // 재구매(review 0.9.0 repurchased — 서버가 true 일 때만).
+        if (review.repurchased == true) ...[
+          const SizedBox(width: 6),
+          ReviewRepurchasedTag(reviewId: review.reviewId),
+        ],
         const SizedBox(width: 8),
         ReviewStars(rating: review.rating, size: 14),
       ],
@@ -1454,6 +1471,34 @@ class _ReviewReportSheetState extends ConsumerState<ReviewReportSheet> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "재구매" 작은 표(review 0.9.0 `repurchased` true — 작성자가 이 상품을 서로 다른 주문 2번 이상 받음).
+class ReviewRepurchasedTag extends StatelessWidget {
+  const ReviewRepurchasedTag({super.key, required this.reviewId});
+
+  final String reviewId;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      key: ValueKey('review-repurchased-$reviewId'),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        AppLocalizations.of(context).reviewRepurchased,
+        style: theme.textTheme.labelSmall?.copyWith(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: theme.colorScheme.primary,
         ),
       ),
     );

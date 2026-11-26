@@ -691,6 +691,8 @@ final class MockReviewsRepository implements ReviewsRepository {
     'productId': productId,
     'sku': sku,
     'authorMasked': '${'김이박최정'[i % 5]}**',
+    // review 0.9.0 재구매 — 네 번째마다 true.
+    'repurchased': i % 4 == 0,
     'rating': rate(i),
     'text': '[목] $name 후기 ${i + 1}',
     if (i % 3 == 0)

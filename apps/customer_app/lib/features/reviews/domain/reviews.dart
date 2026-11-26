@@ -138,7 +138,11 @@ class ReviewView {
     this.helpfulCount,
     this.helpedByMe,
     this.reportedByMe,
+    this.repurchased,
   });
+
+  /// 작성자가 이 상품을 서로 다른 주문 2번 이상 받았는지(review 0.9.0 — 상품 리뷰 목록만, 그 밖 null).
+  final bool? repurchased;
 
   /// 내가 이 리뷰를 신고했는지(review 0.7.0 BR-90 — 회원 토큰일 때만, 그 밖 null).
   final bool? reportedByMe;
@@ -184,6 +188,8 @@ class ReviewView {
     updatedAt: updatedAt,
     helpfulCount: r.count,
     helpedByMe: r.helped,
+    reportedByMe: reportedByMe,
+    repurchased: repurchased,
   );
 
   /// 고칠 수 있다 — 서버 상태 `PUBLISHED` 일 때만(등록 후 3일이 지나면 서버가 `LOCKED` 로 준다).

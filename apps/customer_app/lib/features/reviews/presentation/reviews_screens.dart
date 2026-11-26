@@ -27,7 +27,8 @@ import '../../claims/presentation/claims_controller.dart'
 import '../domain/reviews.dart';
 import '../../checkout/presentation/checkout_controller.dart'
     show clockProvider;
-import 'product_reviews_screen.dart' show reviewRelativeDate;
+import 'product_reviews_screen.dart'
+    show ReviewRepurchasedTag, reviewRelativeDate;
 import 'reviews_controller.dart';
 import '../../../shared/network_image.dart';
 
@@ -2453,6 +2454,10 @@ Widget _reviewItem(BuildContext context, AppLocalizations l10n, ReviewView r) {
               ].join(' · '),
               style: theme.textTheme.bodySmall,
             ),
+            if (r.repurchased == true) ...[
+              const SizedBox(width: 6),
+              ReviewRepurchasedTag(reviewId: r.reviewId),
+            ],
           ],
         ),
         if (r.text case final t? when t.isNotEmpty) Text(t),

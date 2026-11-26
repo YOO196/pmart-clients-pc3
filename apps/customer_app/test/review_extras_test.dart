@@ -284,6 +284,9 @@ void main() {
       scrollable: find.byType(Scrollable).last,
     );
     final card = key('product-review-rv-gen-P-0001-0');
+    // 재구매(review 0.9.0 repurchased) — 0번은 true, 1번은 false.
+    expect(key('review-repurchased-rv-gen-P-0001-0'), findsOneWidget);
+    expect(key('review-repurchased-rv-gen-P-0001-1'), findsNothing);
     final button = key('product-review-helpful-rv-gen-P-0001-0');
     await t.scrollUntilVisible(
       button,

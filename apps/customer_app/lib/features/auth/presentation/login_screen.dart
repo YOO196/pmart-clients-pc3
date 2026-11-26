@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +18,8 @@ import '../../../shared/providers.dart' show envProvider;
 import '../../start/presentation/start_controller.dart'
     show
         StartRoutes,
+        StartStep,
+        startStepProvider,
         lastLoginProviderNameProvider,
         leaveApp,
         startFlagsProvider,
@@ -74,13 +78,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// 이 동의 대기에 대해 고객이 고른 선택 항목(기본 해제). 동의 대기가 바뀌면 비운다.
   String? _consentFor;
 
+  /// 처음 단계(startStep)가 ready 가 될 때까지(최대 5초) 기다린 뒤 한 프레임 더.
+  Future<void> _waitStartSettled() async {
+    final done = Completer<void>();
+    void check(StartStep s) {
+      if (s == StartStep.ready && !done.isCompleted) done.complete();
+    }
+
+    final sub = ref.listenManual(
+      startStepProvider,
+      (_, s) => check(s),
+      fireImmediately: true,
+    );
+    await done.future.timeout(const Duration(seconds: 5), onTimeout: () {});
+    sub.close();
+    await WidgetsBinding.instance.endOfFrame;
+    await WidgetsBinding.instance.endOfFrame;
+  }
+
   /// 새로 가입한 계정은 내 정보(이름·휴대폰 번호)부터 받는다(소셜 로그인이 번호를 주지 않음). 끝나면 원래 화면으로.
   Future<void> _afterLogin({required bool newAccount}) async {
     if (widget.entry) {
       await ref.read(startFlagsProvider.notifier).completeEntry();
       if (!mounted) return;
     }
-    if (newAccount) await context.push<bool>('/me/info?from=signup');
+    if (newAccount) {
+      // 회원이 되면 주소록·처음 단계가 잠깐 다시 정해지고 그때 라우터가 화면 목록을 다시 맞춘다 — 그 사이에 넣은
+      // 화면은 빠질 수 있다(실기기 2026-11-26: "내 정보 등록"이 안 떠 로그인 버튼을 한 번 더 누르게 됨).
+      // 처음 단계가 끝나(ready) 한 프레임 지난 뒤에 연다.
+      await _waitStartSettled();
+      if (!mounted) return;
+      await context.push<bool>('/me/info?from=signup');
+    }
     if (!mounted) return;
     if (widget.entry) {
       // 처음 실행 단계: 다음 단계(주소 또는 홈)는 라우터가 정한다.

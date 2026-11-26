@@ -391,6 +391,35 @@ base class MockOrdersRepository implements OrdersRepository {
   /// 다음 목록 조회를 실패시킨다(시험용).
   bool failNextList = false;
 
+  /// 목 자주 산 상품(시험이 바꿔 끼운다). 기본 두 줄.
+  List<FrequentItem> frequent = const [
+    FrequentItem(
+      sku: 'E-00000001',
+      productId: 'P-0001',
+      productName: '서울우유 1L',
+      orderCount: 3,
+    ),
+    FrequentItem(
+      sku: 'E-00000003',
+      productId: 'P-0003',
+      productName: '제주 감귤 1kg',
+      orderCount: 2,
+    ),
+  ];
+
+  @override
+  Future<List<FrequentItem>> frequentItems({
+    int windowDays = 180,
+    int minOrders = 2,
+    int limit = 20,
+  }) async {
+    await _wait();
+    return frequent
+        .where((f) => f.orderCount >= minOrders)
+        .take(limit)
+        .toList();
+  }
+
   @override
   Future<OrderPage> list({
     String? cursor,

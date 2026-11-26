@@ -44,6 +44,13 @@ abstract interface class OrdersRepository {
   /// 되돌리기 없음. 이미 숨긴 주문도 APPLIED. 같은 키 재전송은 같은 결과.
   Future<CommandStatus> hide(String orderId, {required IdempotencyKey key});
 
+  /// 자주 산 상품(order 0.24.0 — 회원만). 기본 180일·2번 이상·20개.
+  Future<List<FrequentItem>> frequentItems({
+    int windowDays = 180,
+    int minOrders = 2,
+    int limit = 20,
+  });
+
   Future<OrderDetail> get(String orderId);
 
   /// `GET /deliveries/{id}/eta`. 실시간 구독이 끊겼을 때 주기 조회에도 쓴다.
@@ -181,6 +188,35 @@ final class ApiOrdersRepository implements OrdersRepository {
     return orderPageFromContract(
       res.data ?? (throw const ContractViolationFailure('주문 목록 본문 없음')),
     );
+  }
+
+  @override
+  Future<List<FrequentItem>> frequentItems({
+    int windowDays = 180,
+    int minOrders = 2,
+    int limit = 20,
+  }) async {
+    final res = await pmartGuard(
+      () => _orders.listFrequentItems(
+        windowDays: windowDays,
+        minOrders: minOrders,
+        limit: limit,
+      ),
+    );
+    final body =
+        res.data ?? (throw const ContractViolationFailure('자주 산 상품 본문 없음'));
+    String? text(String? v) => (v == null || v.trim().isEmpty) ? null : v;
+    return [
+      for (final i in body.items)
+        FrequentItem(
+          sku: i.sku,
+          productId: text(i.productId),
+          productName: text(i.productName),
+          optionLabel: text(i.optionLabel),
+          orderCount: i.orderCount,
+          imageUrl: text(i.imageUrl),
+        ),
+    ];
   }
 
   @override

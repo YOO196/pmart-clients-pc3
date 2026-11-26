@@ -3104,7 +3104,8 @@ class _RankGridState extends State<_RankGrid> {
   }
 }
 
-/// 가로 진열(사용자 폰 캡처 2026-11-26): 칸 폭 103.9 · 사이 8.4 · 좌우 16. 6개 이상이면 두 줄로 넘긴다.
+/// 가로 진열(사용자 폰 캡처 2026-11-26): 칸 폭 103.9 · 사이 8.4 · 좌우 16. 두 줄로 나눠도 화면을 넘칠 만큼(8개 이상)일
+/// 때만 두 줄. 칸이 적어 화면 폭을 다 못 채우면(사용자 2026-11-26 "왼쪽으로 몰림") 칸을 넓혀 화면 폭에 맞춘다.
 class _Rail extends StatelessWidget {
   const _Rail({required this.items, required this.rank});
 
@@ -3112,21 +3113,27 @@ class _Rail extends StatelessWidget {
   final bool rank;
 
   static const width = 103.9;
+  static const gap = 8.4;
+  static const side = 16.0;
 
   @override
   Widget build(BuildContext context) {
-    final height = ProductTileCard.heightFor(context, width, rank: rank);
-    final rows = items.length >= 6 ? 2 : 1;
+    final rows = items.length >= 8 ? 2 : 1;
+    final columns = (items.length / rows).ceil();
+    final avail = MediaQuery.sizeOf(context).width - side * 2;
+    final fill = (avail - gap * (columns - 1)) / columns;
+    final cell = fill > width ? fill : width;
+    final height = ProductTileCard.heightFor(context, cell, rank: rank);
     const rowGap = 16.0;
     return SizedBox(
       height: height * rows + rowGap * (rows - 1),
       child: GridView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: side),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: rows,
-          mainAxisExtent: width,
-          mainAxisSpacing: 8.4,
+          mainAxisExtent: cell,
+          mainAxisSpacing: gap,
           crossAxisSpacing: rowGap,
         ),
         itemCount: items.length,

@@ -18,6 +18,7 @@ abstract interface class ProfileRepository {
   Future<ProfileChangeOutcome> changeProfile({
     String? nickname,
     String? phone,
+    String? realName,
     required int expectedVersion,
     required IdempotencyKey key,
   });
@@ -67,6 +68,7 @@ final class ApiProfileRepository implements ProfileRepository {
   Future<ProfileChangeOutcome> changeProfile({
     String? nickname,
     String? phone,
+    String? realName,
     required int expectedVersion,
     required IdempotencyKey key,
   }) async {
@@ -79,6 +81,8 @@ final class ApiProfileRepository implements ProfileRepository {
           changeMyProfileRequest: api.ChangeMyProfileRequest(
             nickname: nickname,
             phone: phone,
+            // customer 0.21.0 BR-107 실명. 빈 문자열 = 로그인 계정 이름으로 되돌리기.
+            name: realName,
           ),
           extra: commandOptions(key, expectedVersion: expectedVersion).extra,
         ),
@@ -170,6 +174,7 @@ Profile profileFromContract(api.Profile p) {
     phoneVerified: p.phoneVerified ?? false,
     name: text(p.name),
     providerNickname: text(p.providerNickname),
+    nameFromCustomer: p.nameSource == api.ProfileNameSourceEnum.CUSTOMER,
     email: text(p.email),
     emailVerified: p.emailVerified,
     profileImageUrl: text(p.profileImageUrl),

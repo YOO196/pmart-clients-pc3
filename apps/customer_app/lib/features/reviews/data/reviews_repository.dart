@@ -353,6 +353,7 @@ ReviewView reviewFromContract(api.Review r) => ReviewView(
   updatedAt: r.updatedAt,
   // review 0.6.0(BR-76): 도움돼요 수·내가 눌렀는지(회원 토큰이 있을 때만 — 비회원은 null).
   helpfulCount: r.helpfulCount,
+  repurchased: r.repurchased,
   helpedByMe: r.helpedByMe,
   reportedByMe: r.reportedByMe,
 );

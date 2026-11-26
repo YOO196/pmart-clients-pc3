@@ -207,6 +207,8 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('이름을 입력해 주세요(30자 이내)'), findsOneWidget);
 
+    // 이름(실명, BR-107)은 꼭, 닉네임은 함께.
+    await t.enterText(find.byKey(const ValueKey('info-real-name')), '김피마');
     await t.enterText(find.byKey(const ValueKey('info-name')), ' 김피마 ');
     await t.tap(find.byKey(const ValueKey('info-save')));
     await t.pumpAndSettle();
@@ -264,11 +266,18 @@ void main() {
     await t.tap(find.byKey(const ValueKey('consent-submit')));
     await t.pumpAndSettle();
 
+    await t.enterText(find.byKey(const ValueKey('info-real-name')), '김피마');
     await t.enterText(find.byKey(const ValueKey('info-name')), '김피마');
     await t.tap(find.byKey(const ValueKey('info-save')));
     await t.pumpAndSettle();
     expect(find.text('내 정보 저장은 아직 준비 중이에요'), findsOneWidget);
 
+    // 이름 칸이 늘어 버튼이 아래로 밀렸다.
+    await t.drag(
+      find.byKey(const ValueKey('info-real-name')),
+      const Offset(0, -400),
+    );
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('info-later')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('my-account')), findsOneWidget);

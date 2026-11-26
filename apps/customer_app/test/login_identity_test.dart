@@ -251,6 +251,28 @@ void main() {
     // 로그인 → 동의 완료 → "보냈어요" — 셋 다 같은 주소
     expect(auth.profileImageUrls, [photo, photo, photo]);
   });
+  // 사용자 2026-11-26 "처음 소셜 로그인으로 가입할 때 한 번 더 눌러야" — 동의 → 휴대폰 확인 → 회원이 되면
+  // 바로 "내 정보 등록"이 떠야 한다(로그인 버튼 화면에 남지 않는다).
+  testWidgets('새 가입: 동의 → 휴대폰 확인 → 바로 내 정보 등록', (t) async {
+    final auth = MockAuthRepository(latency: Duration.zero)
+      ..requireIdentity = true;
+    await openLogin(t, auth);
+    await t.tap(find.byKey(const ValueKey('login-naver')));
+    await t.pumpAndSettle();
+    for (final c in MockAuthRepository.requiredConsents) {
+      await t.tap(find.byKey(ValueKey('consent-$c')));
+      await t.pump();
+    }
+    await t.tap(find.byKey(const ValueKey('consent-submit')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('login-identity')), findsOneWidget);
+    await enterPhone(t);
+    await t.tap(find.byKey(const ValueKey('id-sent')));
+    await t.pumpAndSettle();
+    expect(member(t), isTrue);
+    expect(find.text('내 정보 등록'), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-naver')), findsNothing);
+  });
 }
 
 /// 프로필 사진 주소가 딸린 제공자 응답(네이버 교환 결과처럼).

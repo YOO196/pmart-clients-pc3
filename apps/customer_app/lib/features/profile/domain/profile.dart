@@ -15,6 +15,7 @@ class Profile {
     this.phoneVerified = false,
     this.name,
     this.providerNickname,
+    this.nameFromCustomer = false,
     this.email,
     this.emailVerified,
     this.profileImageUrl,
@@ -73,9 +74,25 @@ class Profile {
 
   bool get hasPhone => phoneMasked?.isNotEmpty ?? false;
 
-  /// 본인에게만 주는 가리지 않은 번호(숫자, customer 0.7.0 — BR-32). 배송지 받는 분 연락처를 채울 때만 쓴다.
-  /// 본인 확인을 거치지 않은 번호다(`phoneVerified=false`). 로그·화면 문자열에 남기지 않는다. 없으면 null.
+  /// 본인에게만 주는 가리지 않은 번호(숫자, customer 0.7.0 — BR-32). 로그에 남기지 않는다. 없으면 null.
   final String? phone;
+
+  /// 실명이 고객이 넣은 값인지(customer 0.21.0 BR-107 `nameSource` CUSTOMER — 로그인이 덮지 않는다).
+  /// false 면 로그인 계정 이름(PROVIDER).
+  final bool nameFromCustomer;
+
+  /// 화면에 보일 번호. 고객앱은 본인만 보므로 가리지 않는다(사용자 2026-11-26) — [phone] 을 010-1234-5678 로,
+  /// 없으면 서버가 가린 [phoneMasked].
+  String? get phoneDisplay {
+    final d = phone?.replaceAll(RegExp(r'\D'), '') ?? '';
+    if (d.length == 11) {
+      return '${d.substring(0, 3)}-${d.substring(3, 7)}-${d.substring(7)}';
+    }
+    if (d.length == 10) {
+      return '${d.substring(0, 3)}-${d.substring(3, 6)}-${d.substring(6)}';
+    }
+    return phoneMasked;
+  }
 
   /// 휴대폰 번호를 OCTOMO 로 확인했는지(customer 0.9.0). 번호를 바꾸면 다시 false.
   final bool phoneVerified;

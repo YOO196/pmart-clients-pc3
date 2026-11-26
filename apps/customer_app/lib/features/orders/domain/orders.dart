@@ -448,3 +448,26 @@ class DeliveryProof {
   /// 놓은 곳 설명(라이더가 쓴 글). 없으면 null.
   final String? placementDetail;
 }
+
+/// 자주 산 상품 한 줄(order 0.24.0 `GET /orders/frequent-items`, 백엔드 요청 2026-11-26).
+/// 이름·옵션은 가장 최근 주문 당시 사본, 사진은 지금 대표 사진(없으면 null).
+@immutable
+class FrequentItem {
+  const FrequentItem({
+    required this.sku,
+    required this.orderCount,
+    this.productId,
+    this.productName,
+    this.optionLabel,
+    this.imageUrl,
+  });
+
+  final String sku;
+  final String? productId;
+  final String? productName;
+  final String? optionLabel;
+
+  /// 서로 다른 주문 수(한 주문에 2개 = 1번).
+  final int orderCount;
+  final String? imageUrl;
+}

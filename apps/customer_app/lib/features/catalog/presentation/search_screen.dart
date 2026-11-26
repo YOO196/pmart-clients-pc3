@@ -1,6 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../auth/domain/auth.dart' show MemberSession;
+import '../../auth/presentation/auth_controller.dart' show sessionProvider;
+import '../../orders/domain/orders.dart' show FrequentItem;
+import '../../orders/presentation/orders_providers.dart'
+    show ordersRepositoryProvider;
+import 'widgets/product_tile_card.dart' show ProductImage;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart' show IdempotencyKey, PmartFailure;
 import 'package:pmart_ui/pmart_ui.dart';
@@ -319,7 +328,69 @@ class _RecentSearchesState extends ConsumerState<_RecentSearches> {
           const SizedBox(height: 8),
           body,
         ],
+        // 자주 산 상품(order 0.24.0, 백엔드 요청 2026-11-26 F1) — 회원·있을 때만, 실패도 숨김.
+        _FrequentItems(spaceAbove: showRecent),
         _PopularKeywords(onPick: widget.onPick, spaceAbove: showRecent),
+      ],
+    );
+  }
+}
+
+/// 자주 산 상품(검색어를 넣기 전) — 180일 안 2번 이상 산 상품. 칩을 누르면 그 상품 상세.
+/// 상품 ID·이름이 없는 줄은 뺀다(SKU 를 화면에 보이지 않는다). 비회원·빈 목록·조회 실패는 영역을 숨긴다.
+final frequentItemsProvider = FutureProvider.autoDispose<List<FrequentItem>>((
+  ref,
+) async {
+  if (ref.watch(sessionProvider) is! MemberSession) return const [];
+  return ref.watch(ordersRepositoryProvider).frequentItems();
+});
+
+class _FrequentItems extends ConsumerWidget {
+  const _FrequentItems({required this.spaceAbove});
+
+  final bool spaceAbove;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final items = (ref.watch(frequentItemsProvider).value ?? const [])
+        .where((f) => f.productId != null && f.productName != null)
+        .toList();
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      key: const ValueKey('frequent-items'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (spaceAbove) const SizedBox(height: 28),
+        Text(
+          l10n.searchFrequentTitle,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            for (final f in items)
+              ActionChip(
+                key: ValueKey('frequent-${f.sku}'),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                visualDensity: VisualDensity.compact,
+                avatar: f.imageUrl == null
+                    ? null
+                    : ProductImage(url: f.imageUrl, size: 22, radius: 11),
+                label: Text(
+                  f.optionLabel == null
+                      ? f.productName!
+                      : '${f.productName!} · ${f.optionLabel}',
+                ),
+                onPressed: () => context.push('/products/${f.productId}'),
+              ),
+          ],
+        ),
       ],
     );
   }

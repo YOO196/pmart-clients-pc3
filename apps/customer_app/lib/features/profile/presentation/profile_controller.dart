@@ -127,18 +127,23 @@ class ProfileController extends AsyncNotifier<Profile?> {
 
   /// 내 정보 저장. 바뀐 항목만 보낸다(이름은 앞뒤 공백 제거, 번호는 숫자만).
   /// 버튼 한 번 = 키 하나, 결과 불명 재전송은 같은 키·같은 본문.
+  ///
+  /// [name] 은 닉네임(nickname), [realName] 은 실명(customer 0.21.0 BR-107, 빈 문자열 = 로그인 계정 이름으로).
   Future<ProfileChangeOutcome> changeProfile({
     String? name,
     String? phone,
+    String? realName,
   }) async {
     final current = state.value ?? await future;
     if (current == null) return const ProfileChangeRejected('NOT_MEMBER');
     final nickname = name?.trim();
     final digits = phone == null ? null : PhoneInput.normalize(phone);
     final key = IdempotencyKey.generate();
+    final real = realName?.trim();
     Future<ProfileChangeOutcome> send() => _repo.changeProfile(
       nickname: nickname,
       phone: digits,
+      realName: real,
       expectedVersion: current.version,
       key: key,
     );

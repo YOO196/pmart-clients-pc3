@@ -204,7 +204,8 @@ class _PhoneVerificationScreenState
           _tick?.cancel();
           ref.invalidate(profileProvider);
           setState(() {
-            _verifiedPhone = s.phoneMasked;
+            // 본인이 넣은 번호 그대로(가리지 않음 — 사용자 2026-11-26).
+            _verifiedPhone = PhoneNumberFormatter.format(_digits);
             _step = _Step.done;
             _error = null;
           });

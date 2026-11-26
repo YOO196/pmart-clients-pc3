@@ -32,7 +32,7 @@ String myInfoSummary(AppLocalizations l10n, Profile p) {
   if (name.isEmpty && !p.hasPhone) return l10n.infoNotSet;
   return [
     name.isEmpty ? l10n.infoNameNotSet : name,
-    if (p.hasPhone) p.phoneMasked!,
+    if (p.hasPhone) p.phoneDisplay!,
   ].join(' · ');
 }
 
@@ -54,6 +54,9 @@ class MyInfoScreen extends ConsumerStatefulWidget {
 class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
+
+  /// 가입 폼의 실명 칸(BR-107) — 로그인 계정 이름으로 채운다(사용자 2026-11-26).
+  final _realName = TextEditingController();
   bool _filled = false;
   ProfileChangeOutcome? _last;
 
@@ -69,6 +72,7 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
   @override
   void dispose() {
     _name.dispose();
+    _realName.dispose();
     super.dispose();
   }
 
@@ -80,15 +84,25 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final name = _name.text.trim();
-    // 바뀐 항목만 보낸다. 번호는 서버가 아직 받지 않으므로 보내지 않는다.
+    final realName = _realName.text.trim();
+    // 바뀐 항목만 보낸다. 번호는 휴대폰 확인에서 이미 정했다.
     final nameChanged = name != (current?.nickname?.trim() ?? '');
-    if (!nameChanged) {
+    final realChanged = realName != (current?.name?.trim() ?? '');
+    if (!nameChanged && !realChanged) {
+      // 가입: 로그인 계정 이름 그대로 두고 닉네임도 비웠다 — 저장할 것 없이 마친다.
+      if (widget.signup) {
+        context.pop(true);
+        return;
+      }
       messenger.notice(l10n.infoNothingChanged);
       return;
     }
     final outcome = await ref
         .read(profileProvider.notifier)
-        .changeProfile(name: name);
+        .changeProfile(
+          name: nameChanged ? name : null,
+          realName: realChanged ? realName : null,
+        );
     if (!mounted) return;
     setState(() => _last = outcome);
     if (outcome is ProfileChangeApplied) {
@@ -116,6 +130,8 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
     if (!_filled && profile != null) {
       _filled = true;
       _name.text = profile.nickname ?? '';
+      // 소셜 로그인이 준 이름이 있으면 이름 칸에 채운다(사용자 2026-11-26).
+      _realName.text = profile.name ?? '';
     }
     final hasPhone = profile?.hasPhone ?? false;
     final message = _message(l10n);
@@ -145,20 +161,38 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
                 const SizedBox(height: 16),
                 Text(widget.signup ? l10n.infoSignupGuide : l10n.infoGuide),
                 const SizedBox(height: 16),
+                // 이름(실명, BR-107) — 로그인 계정 이름으로 채워 둔다. 꼭 넣는다.
+                TextFormField(
+                  key: const ValueKey('info-real-name'),
+                  controller: _realName,
+                  maxLength: NameInput.maxLength,
+                  decoration: InputDecoration(labelText: l10n.infoName),
+                  validator: (v) => NameInput.valid(v ?? '')
+                      ? null
+                      : l10n.infoRealNameInvalid,
+                ),
+                const SizedBox(height: 8),
+                // 닉네임 — 비워 두면 이름(또는 소셜 닉네임)으로 보인다. 가입 직후에는 여기부터 입력
+                // (휴대폰은 확인을 마쳐 고칠 수 없다 — 사용자 2026-11-26).
                 TextFormField(
                   key: const ValueKey('info-name'),
                   controller: _name,
+                  autofocus: widget.signup,
                   maxLength: NameInput.maxLength,
                   decoration: InputDecoration(labelText: l10n.infoNickname),
-                  validator: (v) =>
-                      NameInput.valid(v ?? '') ? null : l10n.infoNameInvalid,
+                  validator: (v) {
+                    final t = v?.trim() ?? '';
+                    return t.isEmpty || NameInput.valid(t)
+                        ? null
+                        : l10n.infoNameInvalid;
+                  },
                 ),
                 const SizedBox(height: 8),
                 // 휴대폰 번호는 "번호 확인"(OCTOMO) 화면에서 넣고 확인한다(customer 0.9.0). 여기서는 보이기만.
                 TextFormField(
-                  key: ValueKey('info-phone-${profile.phoneMasked}'),
+                  key: ValueKey('info-phone-${profile.phoneDisplay}'),
                   enabled: false,
-                  initialValue: hasPhone ? profile.phoneMasked : '',
+                  initialValue: hasPhone ? profile.phoneDisplay : '',
                   decoration: InputDecoration(
                     labelText: l10n.infoPhone,
                     helperText: !hasPhone
@@ -406,12 +440,13 @@ class _MyInfoView extends ConsumerWidget {
               const SizedBox(height: 16),
             ],
             card([
-              // 이름 = 로그인 계정 이름(서버 `name` — 소셜이 준 값, 로그인마다 최신). 지금 계약은 바꿀 수 없다
-              // (BR-107 요청) — 보이기만. 닉네임 = 앱에서 정하는 이름(`nickname`, 고칠 수 있음).
+              // 이름 = 실명(서버 `name` — 처음엔 소셜이 준 값, 고치면 로그인이 덮지 않음 — customer 0.21.0 BR-107).
+              // 닉네임 = 앱에서 정하는 이름(`nickname`). 둘 다 눌러서 고친다.
               // 사용자 2026-11-25 "이름이랑 닉네임 내 정보에서 수정".
               row(
                 key: const ValueKey('info-real-name-row'),
                 title: l10n.infoName,
+                onTap: () => _editName(context, profile, real: true),
                 trailing: Text(
                   switch (profile.name?.trim()) {
                     final n? when n.isNotEmpty => n,
@@ -450,7 +485,7 @@ class _MyInfoView extends ConsumerWidget {
                     Flexible(
                       child: Text(
                         profile.hasPhone
-                            ? profile.phoneMasked!
+                            ? profile.phoneDisplay!
                             : l10n.infoPhoneNotSet,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -546,13 +581,16 @@ class _MyInfoView extends ConsumerWidget {
     );
   }
 
-  Future<void> _editName(BuildContext context, Profile profile) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        builder: (_) => _NameSheet(profile: profile),
-      );
+  Future<void> _editName(
+    BuildContext context,
+    Profile profile, {
+    bool real = false,
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => _NameSheet(profile: profile, real: real),
+  );
 }
 
 /// 번호 확인 칩: 확인됨 = 연보라 바탕·주 색, 확인 안 됨 = 분홍 바탕(서버 값).
@@ -585,15 +623,20 @@ class _VerifyChip extends StatelessWidget {
 
 /// 이름 바꾸기 시트(F-2): 입력칸(30자) + [저장]. 서버가 확정(APPLIED)해야 닫힌다. 그 밖의 결과는 시트에 안내.
 class _NameSheet extends ConsumerStatefulWidget {
-  const _NameSheet({required this.profile});
+  const _NameSheet({required this.profile, this.real = false});
   final Profile profile;
+
+  /// true 면 실명(BR-107), 아니면 닉네임.
+  final bool real;
   @override
   ConsumerState<_NameSheet> createState() => _NameSheetState();
 }
 
 class _NameSheetState extends ConsumerState<_NameSheet> {
   final _form = GlobalKey<FormState>();
-  late final _name = TextEditingController(text: widget.profile.nickname ?? '');
+  late final _name = TextEditingController(
+    text: (widget.real ? widget.profile.name : widget.profile.nickname) ?? '',
+  );
   ProfileChangeOutcome? _last;
 
   @override
@@ -607,14 +650,25 @@ class _NameSheetState extends ConsumerState<_NameSheet> {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final name = _name.text.trim();
-    if (name == (widget.profile.nickname?.trim() ?? '')) {
+    final before = widget.real ? widget.profile.name : widget.profile.nickname;
+    if (name == (before?.trim() ?? '')) {
       Navigator.of(context).pop();
       messenger.notice(l10n.infoNothingChanged);
       return;
     }
+    await _send(name);
+  }
+
+  /// [value] 를 보낸다. 실명에 빈 문자열이면 로그인 계정 이름으로 되돌리기(BR-107).
+  Future<void> _send(String value) async {
+    final l10n = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final outcome = await ref
         .read(profileProvider.notifier)
-        .changeProfile(name: name);
+        .changeProfile(
+          name: widget.real ? null : value,
+          realName: widget.real ? value : null,
+        );
     if (!mounted) return;
     setState(() => _last = outcome);
     if (outcome is ProfileChangeApplied) {
@@ -651,7 +705,9 @@ class _NameSheetState extends ConsumerState<_NameSheet> {
               children: [
                 Expanded(
                   child: Text(
-                    l10n.infoNameSheetTitle,
+                    widget.real
+                        ? l10n.infoRealNameSheetTitle
+                        : l10n.infoNameSheetTitle,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontSize: 19,
                       fontWeight: FontWeight.w700,
@@ -668,7 +724,7 @@ class _NameSheetState extends ConsumerState<_NameSheet> {
             ),
             const SizedBox(height: 4),
             Text(
-              l10n.infoNameSheetBody,
+              widget.real ? l10n.infoRealNameSheetBody : l10n.infoNameSheetBody,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -679,10 +735,25 @@ class _NameSheetState extends ConsumerState<_NameSheet> {
               controller: _name,
               autofocus: true,
               maxLength: NameInput.maxLength,
-              decoration: InputDecoration(labelText: l10n.infoName),
-              validator: (v) =>
-                  NameInput.valid(v ?? '') ? null : l10n.infoNameInvalid,
+              decoration: InputDecoration(
+                labelText: widget.real ? l10n.infoName : l10n.infoNickname,
+              ),
+              validator: (v) => NameInput.valid(v ?? '')
+                  ? null
+                  : widget.real
+                  ? l10n.infoRealNameInvalid
+                  : l10n.infoNameInvalid,
             ),
+            // 고객이 넣은 실명이면 로그인 계정 이름으로 되돌릴 수 있다(BR-107 R2).
+            if (widget.real && widget.profile.nameFromCustomer)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  key: const ValueKey('info-real-name-reset'),
+                  onPressed: () => _send(''),
+                  child: Text(l10n.infoRealNameReset),
+                ),
+              ),
             if (message != null) ...[
               const SizedBox(height: 4),
               Text(message, key: const ValueKey('info-message')),

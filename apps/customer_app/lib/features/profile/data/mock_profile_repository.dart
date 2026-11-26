@@ -54,6 +54,10 @@ final class MockProfileRepository implements ProfileRepository {
   int imageReads = 0;
   int _version = 1;
 
+  /// 실명이 고객이 넣은 값인지(BR-107), 되돌릴 때 쓰는 로그인 계정 이름.
+  bool nameFromCustomer = false;
+  String? providerName;
+
   /// 다음 변경을 501(미구현)로 만든다.
   bool unsupported = false;
 
@@ -80,6 +84,7 @@ final class MockProfileRepository implements ProfileRepository {
       phone: phone,
       phoneVerified: phoneVerified,
       name: name,
+      nameFromCustomer: nameFromCustomer,
       email: email,
       emailVerified: emailVerified,
       profileImageUrl: profileImageUrl,
@@ -102,6 +107,7 @@ final class MockProfileRepository implements ProfileRepository {
   Future<ProfileChangeOutcome> changeProfile({
     String? nickname,
     String? phone,
+    String? realName,
     required int expectedVersion,
     required IdempotencyKey key,
   }) async {
@@ -124,6 +130,12 @@ final class MockProfileRepository implements ProfileRepository {
       this.phone = next;
     }
     if (nickname != null) this.nickname = nickname;
+    // BR-107: 빈 문자열 = 로그인 계정 이름으로(목은 그 이름을 [providerName] 에 둔다).
+    if (realName != null) {
+      final v = realName.trim();
+      nameFromCustomer = v.isNotEmpty;
+      name = v.isEmpty ? providerName : v;
+    }
     _version++;
     return const ProfileChangeApplied();
   }
