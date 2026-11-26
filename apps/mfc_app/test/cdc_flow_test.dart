@@ -126,12 +126,26 @@ void main() {
     expect(find.text('칸 1 · MFC-BJG-01'), findsWidgets);
     await tap(t, 'cdc-put-TRF-mock-1');
     expect(find.text('나눔 34 / 집음 52'), findsOneWidget);
+    // 칸이 덜 찼으면 다시 상품 스캔 — 칸마다 남은 수는 보기만
     expect(find.text('넣음 24개 · 남음 12개'), findsOneWidget);
-    await tap(t, 'cdc-close-TRF-mock-1');
+    expect(find.byKey(const ValueKey('cdc-dist-box-scan')), findsNothing);
+    await scan(t, 'cdc-dist-item-scan', 'SKU-1002');
+    await tap(t, 'cdc-put-TRF-mock-1');
+    // 다 찬 칸은 저절로 BOX 닫기
+    expect(find.text('칸 1 BOX 바코드를 스캔하세요'), findsOneWidget);
     await scan(t, 'cdc-dist-box-scan', 'BOX-D1');
     expect(find.text('칸 1 BOX 를 닫았어요.'), findsOneWidget);
     final box = (await repo.lpns('', 'TRF-mock-1')).single;
-    expect([box.lpn, box.qty], ['BOX-D1', 24]);
+    expect([box.lpn, box.qty], ['BOX-D1', 36]);
+    await scan(t, 'cdc-dist-item-scan', 'SKU-2001');
+    await tap(t, 'cdc-put-TRF-mock-2');
+    await scan(t, 'cdc-dist-box-scan', 'BOX-D2');
+    // 다 나누면 스캔 칸 없이 끝 — 다음은 검품
+    expect(find.byKey(const ValueKey('cdc-dist-done')), findsOneWidget);
+    expect(find.byKey(const ValueKey('cdc-dist-item-scan')), findsNothing);
+    await tap(t, 'cdc-go-inspect');
+    // 분배가 끝난 TRF(SORTED)가 검품에 나온다
+    expect(find.byKey(const ValueKey('cdc-trf-TRF-mock-1')), findsOneWidget);
   });
 
   testWidgets('검품: 출고대기 자리 → BOX 스캔 → 온도·불합격 사유 → 서버 판정, 재포장 안내', (t) async {

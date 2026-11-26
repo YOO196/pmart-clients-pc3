@@ -1438,7 +1438,7 @@
   "cdcShortOther": "기타",
   "cdcLoadFailed": "불러오지 못했어요.",
   "cdcTrfEmpty": "피킹이 끝난 TRF 가 없어요.",
-  "cdcTrfChoose": "피킹이 끝난 TRF 예요. 작업할 TRF 를 고르세요.",
+  "cdcTrfChoose": "작업할 TRF 를 고르세요.",
   "cdcTrfPicked": "집은 수량 {n}",
   "@cdcTrfPicked": {"placeholders": {"n": {"type": "int"}}},
   "cdcErrLpnSealed": "이미 등록된 BOX 번호예요. 다른 BOX 를 쓰세요.",
@@ -1726,5 +1726,17 @@
   "handoverNoStop": "이 송장을 싣고 온 운행 정차를 찾지 못해 인계를 기록하지 못했어요. 수령은 계속할 수 있어요.",
   "handoverNotArrived": "차량 도착이 아직 등록되지 않아 인계를 기록하지 못했어요. 수령은 계속할 수 있어요.",
   "handoverRejected": "운행 인계를 기록하지 못했어요. 수령은 계속할 수 있어요.",
-  "handoverRetry": "인계 다시 보내기"
+  "handoverRetry": "인계 다시 보내기",
+  "cdcTrfEmptySort": "담을 TRF 가 없어요. 피킹이 끝나면 여기 나와요.",
+  "cdcTrfEmptyInspect": "검품할 TRF 가 없어요. 분배·패킹(BOX 닫기)이 끝나면 여기 나와요.",
+  "cdcGoInspect": "검품하러 가기",
+  "cdcGoLoad": "상차하러 가기",
+  "cdcInspectNextLoad": "합격 BOX 는 이제 상차할 수 있어요.",
+  "cdcDistAllDone": "이 묶음 분배를 마쳤어요",
+  "cdcDistNextInspect": "닫은 BOX 는 출고대기에서 검품해요.",
+  "cdcDistOtherWave": "다른 묶음",
+  "cdcDistPutTitle": "아래 칸에 수량만큼 넣고 눌러 주세요",
+  "cdcDistCloseHelp": "{mfc} 몫을 다 넣었어요 · {n}개 — BOX 바코드를 스캔해 닫아요",
+  "@cdcDistCloseHelp": {"placeholders": {"mfc": {"type": "String"}, "n": {"type": "int"}}},
+  "cdcSortAllIn": "남은 상품을 이 BOX 에 다 담았어요 — 봉인 등록을 눌러 닫아요."
 }

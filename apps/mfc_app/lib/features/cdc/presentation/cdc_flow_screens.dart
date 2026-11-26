@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
@@ -32,9 +33,18 @@ String _contents(CdcLpn l) =>
 
 /// 피킹 끝난 TRF 고르기(분배·검품·상차 첫 단계)
 class _TrfPick extends ConsumerStatefulWidget {
-  const _TrfPick({required this.steps, required this.onPick});
+  const _TrfPick({
+    required this.steps,
+    required this.onPick,
+    required this.states,
+    required this.emptyText,
+  });
 
   final List<String> steps;
+
+  /// 이 화면이 다루는 TRF 상태(분배·패킹 PICKED·SORTED, 검품 SORTED·INSPECTED)
+  final List<String> states;
+  final String emptyText;
   final ValueChanged<CdcTrf> onPick;
 
   @override
@@ -53,8 +63,9 @@ class _TrfPickState extends ConsumerState<_TrfPick> {
   Future<void> _load() async {
     setState(() => _trfs = const AsyncLoading());
     final v = await AsyncValue.guard(
-      () =>
-          ref.read(cdcFlowRepositoryProvider).pickedTransfers(cdcCenterOf(ref)),
+      () => ref
+          .read(cdcFlowRepositoryProvider)
+          .transfers(cdcCenterOf(ref), widget.states),
     );
     if (mounted) setState(() => _trfs = v);
   }
@@ -66,7 +77,7 @@ class _TrfPickState extends ConsumerState<_TrfPick> {
       AsyncData(:final value) when value.isEmpty => CdcCenterNotice(
         key: const ValueKey('cdc-empty'),
         icon: Icons.hourglass_empty,
-        text: l10n.cdcTrfEmpty,
+        text: widget.emptyText,
         action: FilledButton(
           key: const ValueKey('cdc-reload'),
           onPressed: _load,
@@ -387,6 +398,8 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
       onBack: _back,
       child: trf == null
           ? _TrfPick(
+              states: const ['PICKED', 'SORTED'],
+              emptyText: l10n.cdcTrfEmptySort,
               steps: steps,
               onPick: (t) {
                 setState(() => _trf = t);
@@ -447,8 +460,13 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
           message: l10n.cdcSortBoxes(lpns.length),
         ),
       );
-      actions.add(
+      actions.addAll([
         FilledButton(
+          key: const ValueKey('cdc-go-inspect'),
+          onPressed: () => context.pushReplacement('/cdc/work/inspect'),
+          child: Text(l10n.cdcGoInspect),
+        ),
+        OutlinedButton(
           key: const ValueKey('cdc-other-trf'),
           onPressed: () => setState(() {
             _trf = null;
@@ -456,7 +474,7 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
           }),
           child: Text(l10n.cdcOtherTrf),
         ),
-      );
+      ]);
       return cdcStepBody(step: step, body: body, actions: actions);
     }
     if (_box == null) {
@@ -554,18 +572,29 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
           );
         }
       }
+      // 이 TRF 에 남은 것을 다 담았으면 스캔 칸을 치우고 닫기만(사용자 2026-11-26 "다 담았는데 상품 바코드 칸이 남아 덜 담은 줄")
+      final allIn = left.every((i) => (_inBox[i.key] ?? 0) >= i.remaining);
+      if (allIn) {
+        body.add(
+          NoticeBox(
+            text: l10n.cdcSortAllIn,
+            textKey: const ValueKey('cdc-sort-all-in'),
+          ),
+        );
+      }
       actions.addAll([
-        ScanInput(
-          id: 'cdc-sort-item-scan',
-          label: l10n.cdcScanItem,
-          cameraTitle: l10n.cdcCameraItem,
-          continuous: false,
-          testValues: [
-            for (final i in left) TestScan(i.productName ?? i.sku, i.sku),
-            TestScan(l10n.tsWrong, 'SKU-0000'),
-          ],
-          onScan: (code) => _scanItem(items, code),
-        ),
+        if (!allIn)
+          ScanInput(
+            id: 'cdc-sort-item-scan',
+            label: l10n.cdcScanItem,
+            cameraTitle: l10n.cdcCameraItem,
+            continuous: false,
+            testValues: [
+              for (final i in left) TestScan(i.productName ?? i.sku, i.sku),
+              TestScan(l10n.tsWrong, 'SKU-0000'),
+            ],
+            onScan: (code) => _scanItem(items, code),
+          ),
         if (resendButton(context) case final b?)
           b
         else
@@ -755,6 +784,8 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
       onBack: _back,
       child: trf == null
           ? _TrfPick(
+              states: const ['SORTED', 'INSPECTED'],
+              emptyText: l10n.cdcTrfEmptyInspect,
               steps: steps,
               onPick: (t) {
                 setState(() => _trf = t);
@@ -843,14 +874,30 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
         ),
       );
     } else if (box == null) {
+      final allPassed = done == lpns.length && lpns.every((l) => l.passed);
       body.add(
-        ScanPrompt(
-          text: done == lpns.length
-              ? l10n.cdcInspectAllDone
-              : l10n.cdcInspectScanTitle,
-          detail: l10n.cdcInspectScanHelp,
-        ),
+        allPassed
+            ? DoneMark(
+                key: const ValueKey('cdc-inspect-done'),
+                title: l10n.cdcInspectAllDone,
+                message: l10n.cdcInspectNextLoad,
+              )
+            : ScanPrompt(
+                text: done == lpns.length
+                    ? l10n.cdcInspectAllDone
+                    : l10n.cdcInspectScanTitle,
+                detail: l10n.cdcInspectScanHelp,
+              ),
       );
+      if (allPassed) {
+        actions.add(
+          FilledButton(
+            key: const ValueKey('cdc-go-load'),
+            onPressed: () => context.pushReplacement('/cdc/work/load'),
+            child: Text(l10n.cdcGoLoad),
+          ),
+        );
+      }
       for (final l in lpns) {
         body.add(_BoxLine(lpn: l));
       }
@@ -1498,7 +1545,7 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
   Future<void> _loadTrfs() async {
     setState(() => _trfs = const AsyncLoading());
     final v = await AsyncValue.guard(
-      () => _repo.pickedTransfers(cdcCenterOf(ref)),
+      () => _repo.transfers(cdcCenterOf(ref), const ['PICKED', 'SORTED']),
     );
     if (mounted) setState(() => _trfs = v);
   }
@@ -1765,6 +1812,11 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
     ),
   );
 
+  /// 칸(TRF)에 넣을 것이 남았나 — 다 넣었고 넣은 것이 있으면 BOX 를 닫을 차례
+  bool _slotFull(String trfId, Map<String, List<CdcSortItem>> all) =>
+      _putCount(trfId) > 0 &&
+      (all[trfId] ?? const <CdcSortItem>[]).every((i) => _left(trfId, i) == 0);
+
   Widget _work(AppLocalizations l10n, Map<String, List<CdcSortItem>> all) {
     final slots = _slots;
     final picked = all.values
@@ -1774,14 +1826,28 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
         all.values.expand((l) => l).fold<int>(0, (a, i) => a + i.sortedQty) +
         [for (final t in slots) _putCount(t.trfId)]
             .fold<int>(0, (a, b) => a + b);
+    final leftAll = [
+      for (final e in all.entries)
+        for (final i in e.value)
+          if (_left(e.key, i) > 0) i,
+    ];
+    // 한 번에 한 단계만(사용자 2026-11-26 "BOX 닫기·담기·칸·묶음이 왔다갔다 해서 헷갈려"):
+    // 다 찬 칸이 있으면 그 칸 BOX 닫기 → 상품을 골랐으면 그 상품 넣기 → 아니면 상품 스캔 → 남은 것이 없으면 끝.
+    final closing =
+        slots.where((t) => t.trfId == _closing).firstOrNull ??
+        slots.where((t) => _slotFull(t.trfId, all)).firstOrNull;
+    final item = closing == null ? _item : null;
+    final finished = leftAll.isEmpty && closing == null;
     final body = <Widget>[];
     final actions = <Widget>[];
-    final closing = _closing == null
-        ? null
-        : slots.where((t) => t.trfId == _closing).firstOrNull;
-    final item = _item;
-    final step = closing != null ? 3 : (item == null ? 1 : 2);
-    body.add(StepHeader(names: _steps(l10n), current: step));
+    if (!finished) {
+      body.add(
+        StepHeader(
+          names: _steps(l10n),
+          current: closing != null ? 3 : (item == null ? 1 : 2),
+        ),
+      );
+    }
     body.add(
       ProgressLine(
         textKey: const ValueKey('cdc-dist-progress'),
@@ -1793,12 +1859,44 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
     if (_notice case final n?) {
       body.add(NoticeBox(text: n, textKey: const ValueKey('cdc-notice')));
     }
-    if (closing != null) {
+    String step;
+    if (finished) {
+      step = 'done';
+      body.add(
+        DoneMark(
+          key: const ValueKey('cdc-dist-done'),
+          title: l10n.cdcDistAllDone,
+          message: l10n.cdcDistNextInspect,
+        ),
+      );
+      actions.addAll([
+        FilledButton(
+          key: const ValueKey('cdc-go-inspect'),
+          onPressed: () => context.pushReplacement('/cdc/work/inspect'),
+          child: Text(l10n.cdcGoInspect),
+        ),
+        OutlinedButton(
+          key: const ValueKey('cdc-other-wave'),
+          onPressed: () => setState(() {
+            _wave = null;
+            _put.clear();
+            _notice = null;
+            _items = const AsyncLoading();
+            _loadTrfs();
+          }),
+          child: Text(l10n.cdcDistOtherWave),
+        ),
+      ]);
+    } else if (closing != null) {
+      step = 'close-${closing.trfId}';
       final n = slots.indexOf(closing) + 1;
       body.add(
         ScanPrompt(
           text: l10n.cdcDistCloseTitle(n),
-          detail: l10n.cdcDistPutCount(_putCount(closing.trfId)),
+          detail: l10n.cdcDistCloseHelp(
+            closing.mfcId,
+            _putCount(closing.trfId),
+          ),
         ),
       );
       actions.add(
@@ -1812,12 +1910,27 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
         ),
       );
     } else if (item == null) {
-      final left = [
-        for (final e in all.entries)
-          for (final i in e.value)
-            if (_left(e.key, i) > 0) i,
-      ];
+      step = 'item';
       body.add(ScanPrompt(text: l10n.cdcDistScanItem));
+      // 칸마다 남은 수는 보기만(단추 없음)
+      for (final (k, t) in slots.indexed) {
+        final left = (all[t.trfId] ?? const <CdcSortItem>[]).fold<int>(
+          0,
+          (a, i) => a + _left(t.trfId, i),
+        );
+        body.add(
+          _slotCard(
+            l10n,
+            k + 1,
+            t,
+            keyPrefix: 'cdc-slot-sum',
+            detail: l10n.cdcDistSlotState(_putCount(t.trfId), left),
+            trailing: left == 0
+                ? const Icon(Icons.check_circle, color: PdaColors.primary)
+                : const SizedBox.shrink(),
+          ),
+        );
+      }
       actions.add(
         ScanInput(
           id: 'cdc-dist-item-scan',
@@ -1825,7 +1938,7 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
           cameraTitle: l10n.cdcDistItemLabel,
           continuous: false,
           testValues: [
-            for (final i in {for (final i in left) i.key: i}.values)
+            for (final i in {for (final i in leftAll) i.key: i}.values)
               TestScan(i.productName ?? i.sku, i.sku),
             TestScan(l10n.tsWrong, 'SKU-0000'),
           ],
@@ -1833,6 +1946,7 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
         ),
       );
     } else {
+      step = item;
       final first = all.values
           .expand((l) => l)
           .firstWhere((i) => i.key == item);
@@ -1846,32 +1960,29 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
             for (final e in all.entries)
               for (final i in e.value)
                 if (i.key == item) _left(e.key, i),
-          ].fold(0, (a, b) => a + b),
+          ].fold<int>(0, (a, b) => a + b),
           emphasize: true,
         ),
       );
+      body.add(ScanPrompt(text: l10n.cdcDistPutTitle));
       for (final (k, t) in slots.indexed) {
         final i = (all[t.trfId] ?? const <CdcSortItem>[])
             .where((i) => i.key == item)
             .firstOrNull;
         if (i == null) continue;
         final left = _left(t.trfId, i);
+        if (left == 0) continue;
         body.add(
           _slotCard(
             l10n,
             k + 1,
             t,
-            strong: left > 0,
-            trailing: left > 0
-                ? FilledButton(
-                    key: ValueKey('cdc-put-${t.trfId}'),
-                    onPressed: () => _putAll(t.trfId, i),
-                    child: Text(l10n.cdcDistPut(left)),
-                  )
-                : Text(
-                    l10n.cdcDistPutDone,
-                    style: const TextStyle(color: PdaColors.primary),
-                  ),
+            strong: true,
+            trailing: FilledButton(
+              key: ValueKey('cdc-put-${t.trfId}'),
+              onPressed: () => _putAll(t.trfId, i),
+              child: Text(l10n.cdcDistPut(left)),
+            ),
           ),
         );
       }
@@ -1883,31 +1994,6 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
         ),
       );
     }
-    if (closing == null) {
-      for (final (k, t) in slots.indexed) {
-        final n = _putCount(t.trfId);
-        final left = (all[t.trfId] ?? const <CdcSortItem>[]).fold<int>(
-          0,
-          (a, i) => a + _left(t.trfId, i),
-        );
-        body.add(
-          _slotCard(
-            l10n,
-            k + 1,
-            t,
-            keyPrefix: 'cdc-slot-sum',
-            detail: l10n.cdcDistSlotState(n, left),
-            trailing: OutlinedButton(
-              key: ValueKey('cdc-close-${t.trfId}'),
-              onPressed: n == 0 || busy
-                  ? null
-                  : () => setState(() => _closing = t.trfId),
-              child: Text(l10n.cdcDistClose),
-            ),
-          ),
-        );
-      }
-    }
     if (resendButton(context) case final b?) actions.add(b);
     if (_scanError case final e?) {
       actions.insert(0, CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
@@ -1915,10 +2001,6 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
     if (failText case final f?) {
       actions.insert(0, CdcErrorLine(f, key: const ValueKey('cdc-message')));
     }
-    return cdcStepBody(
-      step: closing != null ? 'close-$_closing' : (item ?? 'item'),
-      body: body,
-      actions: actions,
-    );
+    return cdcStepBody(step: step, body: body, actions: actions);
   }
 }
