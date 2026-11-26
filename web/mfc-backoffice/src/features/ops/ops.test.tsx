@@ -154,6 +154,9 @@ describe('센터 운영판', () => {
     expect(await value('tile-handover')).toHaveTextContent('1건');
     // 확인할 일 N가지 한 줄(서버 숫자) — 약속 초과·인계 확인·파손 사고 세 종류(건수가 아니다)
     expect(await screen.findByTestId('ops-status')).toHaveTextContent('확인할 일 3가지');
+    // 건수는 위 숫자 칸 — 요약 줄은 종류만
+    expect(screen.getByTestId('ops-status')).toHaveTextContent('출하 약속 초과인계 확인 필요피킹 파손·변질 사고');
+    expect(screen.getByTestId('ops-status')).not.toHaveTextContent(/\d+건/);
     expect(new URL(view.gets('/shipments/promise-summary')[0]!.url).searchParams.get('dueWithinMinutes')).toBe('15');
     const q = new URL(view.gets('/tasks')[0]!.url).searchParams;
     expect([q.get('mfcId'), q.getAll('state'), q.get('size')]).toEqual(['MFC-BJG-01', ['WAITING', 'READY', 'ASSIGNED', 'IN_PROGRESS', 'BLOCKED'], '200']);

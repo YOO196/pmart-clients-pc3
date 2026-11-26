@@ -345,6 +345,12 @@ function FloorView({ mfcId, plan, full, picked, onPick }: { readonly mfcId: stri
                 {/* 고른 작업자는 점에서 조금 떨어진 얇은 흰 고리 */}
                 {on ? <circle r="0.62" className="pm-floor-ring fill-none stroke-white" strokeWidth="0.06" /> : <circle r="0.6" style={{ fill: ROLE_COLOR[role] }} opacity="0.22" />}
                 <circle r="0.3" style={{ fill: ROLE_COLOR[role] }} className="pm-floor-core stroke-base-100" strokeWidth="0.09" />
+                {/* 오래된 점(마지막 스캔 15분 넘음)은 도면 위에서도 경과를 바로(2026-11-26 표 검토) */}
+                {stale && full && (
+                  <text y="-0.8" textAnchor="middle" fontSize="0.5" className="pm-floor-stale fill-base-content" style={{ paintOrder: 'stroke', stroke: 'var(--color-base-100)', strokeWidth: 0.12 }} data-testid="floor-stale-label">
+                    {m.staleAgo(ago(now, d.at))}
+                  </text>
+                )}
                 <title>{`${tipOf(d)} · ${formatSeoul(d.at)}`}</title>
               </g>
             );

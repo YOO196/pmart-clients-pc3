@@ -144,10 +144,19 @@ export function DispatchDelaysMenu({ mfcId }: { readonly mfcId: string }) {
                       </td>
                       <td>{formatSeoul(d.delayAlertedAt)}</td>
                       <td className="min-w-64 space-y-1.5" data-testid="delay-next">
-                        <p className="text-xs">{m.next[kind]}</p>
-                        {kind === 'SEARCH' && over !== null && (
-                          <p className="text-xs text-base-content/60">{over >= AUTO_CANCEL_MIN ? m.autoCancelDue : m.autoCancelIn(AUTO_CANCEL_MIN - over)}</p>
-                        )}
+                        {/* 첫 줄은 짧게(2026-11-26 표 검토 "다음 할 일이 길어 행끼리 비교가 어렵다") — 판단 근거·자동 취소는 펼쳐서 */}
+                        <p className="font-semibold" data-testid="delay-summary">
+                          <span className={over === null ? '' : over >= 0 ? 'text-error' : 'text-warning'}>{over === null ? m.noPromise : over >= 0 ? m.overShort(over) : m.left(-over)}</span>
+                          {' · '}
+                          {d.riderId ? m.riderAssigned : m.riderMissing}
+                        </p>
+                        <details className="text-xs">
+                          <summary className="cursor-pointer text-base-content/60">{m.why}</summary>
+                          <p className="mt-1">{m.next[kind]}</p>
+                          {kind === 'SEARCH' && over !== null && (
+                            <p className="mt-1 text-base-content/60">{over >= AUTO_CANCEL_MIN ? m.autoCancelDue : m.autoCancelIn(AUTO_CANCEL_MIN - over)}</p>
+                          )}
+                        </details>
                         {failure ? (
                           <p className="text-xs">
                             <Link className={`link ${failure.overdue ? 'text-error' : ''}`} to={centerPath(mfcId, `dispatch-failures/${encodeURIComponent(failure.caseId)}`)} data-testid="delay-failure-link">

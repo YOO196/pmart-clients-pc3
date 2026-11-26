@@ -20,6 +20,8 @@ describe('센터 대시보드', () => {
     expect(screen.getByTestId('kpi-short-rate-value')).toHaveTextContent('10.0%');
     expect(await screen.findByTestId('kpi-on-time-value')).toHaveTextContent('88.9%');
     expect(await screen.findByTestId('kpi-open-tasks-value')).toHaveTextContent(/^\d+건$/);
+    // 숫자 옆 상태명(대기 · 진행 · 막힘)
+    expect(screen.getByTestId('kpi-open-tasks')).toHaveTextContent(/대기\d+·진행\d+·막힘\d+/);
     const q = new URL(view.gets('/metrics/picking-lines')[0]!.url).searchParams;
     expect(q.get('mfcId')).toBe('MFC-BJG-01');
     expect(q.get('to')).toBe(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()));

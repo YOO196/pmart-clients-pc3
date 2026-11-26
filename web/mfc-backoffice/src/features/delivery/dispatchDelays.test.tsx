@@ -59,6 +59,9 @@ describe('배차 지연', () => {
     await waitFor(() => expect(rows()).toHaveLength(2));
     expect(within(rows()[0]!).getByTestId('delay-kind')).toHaveTextContent('배차 탐색 지연');
     expect(within(rows()[0]!).getByTestId('delay-next')).toHaveTextContent('자동 취소 대상');
+    // 첫 줄은 짧은 요약 — 판단 근거는 펼쳐서
+    expect(within(rows()[0]!).getByTestId('delay-summary')).toHaveTextContent(/^\d+분 초과 · 라이더 미배정$/);
+    expect(within(rows()[1]!).getByTestId('delay-summary')).toHaveTextContent(/^\d+분 (남음|초과) · 라이더 배정$/);
     expect(await within(rows()[0]!).findByTestId('delay-failure-link')).toHaveTextContent('C-1126-0007');
     expect(within(rows()[1]!).getByTestId('delay-kind')).toHaveTextContent('픽업 지연');
     expect(within(rows()[1]!).getByTestId('delay-next')).toHaveTextContent('라이더가 배정돼 오는 중');
