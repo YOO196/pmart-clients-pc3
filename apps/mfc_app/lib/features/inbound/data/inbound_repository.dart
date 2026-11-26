@@ -25,6 +25,7 @@ abstract interface class InboundRepository {
     String trfId, {
     required int version,
     required List<(InboundLine, ReceiptCount)> counts,
+    required Map<String, String> toLocations,
     required DateTime receivedAt,
     required String receivedBy,
     required IdempotencyKey key,
@@ -89,6 +90,7 @@ final class ApiInboundRepository implements InboundRepository {
     String trfId, {
     required int version,
     required List<(InboundLine, ReceiptCount)> counts,
+    required Map<String, String> toLocations,
     required DateTime receivedAt,
     required String receivedBy,
     required IdempotencyKey key,
@@ -109,6 +111,8 @@ final class ApiInboundRepository implements InboundRepository {
               normalQty: c.normal,
               quarantinedQty: c.quarantined,
               pendingQty: c.pending,
+              // (0.16.0) 수령 위치(입고칸) — 서버 필수(없으면 400, 시뮬레이터 C-6)
+              toLocationCode: toLocations[l.key],
               discrepancyReason: switch (c.reasonFor(l.expectedQty)) {
                 null => null,
                 final r =>
@@ -192,7 +196,10 @@ final class ApiInboundRepository implements InboundRepository {
     } on PmartFailure catch (f) {
       return switch (f) {
         UnknownResultFailure() || NetworkFailure() => const InboundUnknown(),
-        ProblemFailure(:final problem) => InboundRejected(problem.code),
+        ProblemFailure(:final problem) => InboundRejected(
+          problem.code,
+          problem.detail,
+        ),
         _ => throw f,
       };
     }
@@ -262,6 +269,7 @@ InboundPromiseView promiseFromContract(ib.InboundPromise p) =>
                 l.expectedQty ??
                 (throw const ContractViolationFailure('expectedQty 없음')),
             receivedQty: l.receivedQty ?? 0,
+            temperatureZone: l.temperatureZone,
             quarantinedQty: l.quarantinedQty ?? 0,
             pendingQty: l.pendingQty ?? 0,
             productName: switch (l.productName?.trim()) {
