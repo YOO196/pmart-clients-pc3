@@ -1843,7 +1843,7 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
                       Text(
                         e.value.first.waveNumber ?? e.key,
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
                       ),

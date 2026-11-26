@@ -85,7 +85,7 @@ class _MoveProductCard extends StatelessWidget {
                   child: Text(
                     name,
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontSize: 19,
+                      fontSize: 17,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

@@ -654,11 +654,11 @@ class _AreaFlight extends StatelessWidget {
   final Animation<double> animation;
 
   // 칸([_AreaTile] — 가로로 긴 한 줄)과 카드([AreaHeroCard])의 치수 — 두 쪽을 바꾸면 여기도 맞춘다.
-  static const _tileHeight = 80.0;
+  static const _tileHeight = 68.0;
   static const _tilePad = 16.0;
-  static const _tileGap = 14.0;
-  static const _tileCircle = 52.0;
-  static const _tileIcon = 28.0;
+  static const _tileGap = 12.0;
+  static const _tileCircle = 44.0;
+  static const _tileIcon = 23.0;
   static const _cardCircle = 84.0;
   static const _cardIcon = 46.0;
   static const _cardPad = 15.0;
@@ -889,7 +889,7 @@ class _AreaTileText extends StatelessWidget {
           softWrap: false,
           style: TextStyle(
             color: allowed ? PdaColors.ink : PdaColors.muted,
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.3,
           ),
@@ -1665,7 +1665,7 @@ class _HomeTitle extends StatelessWidget {
               text: l10n.homeHello(who.displayName ?? who.workerId),
               style: const TextStyle(
                 color: PdaColors.ink,
-                fontSize: 19,
+                fontSize: 17,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.5,
               ),

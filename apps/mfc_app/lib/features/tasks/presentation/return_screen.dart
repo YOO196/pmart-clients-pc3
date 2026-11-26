@@ -485,7 +485,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                             Text(
                               p.line.productName ?? p.line.sku,
                               style: theme.textTheme.titleMedium?.copyWith(
-                                fontSize: 19,
+                                fontSize: 17,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
