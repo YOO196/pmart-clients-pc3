@@ -192,4 +192,19 @@ void main() {
       ],
     );
   });
+
+  testWidgets('센터 관리자는 관리 메뉴에서 바로 하차(작업자 정보가 없어도)', (t) async {
+    await pump(
+      t,
+      const EmployeeSession(
+        operatorId: 'OP-sup',
+        roles: [EmployeeSession.mfcSupervisorRole],
+        centers: ['MFC-MOCK-01'],
+      ),
+    );
+    expect(find.byKey(const ValueKey('manage-unload')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('manage-unload')));
+    await t.pumpAndSettle();
+    expect(find.text('도착한 차량을 고르세요'), findsOneWidget);
+  });
 }
