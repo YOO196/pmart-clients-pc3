@@ -1308,6 +1308,34 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
         ),
       );
       if (ok != true || !mounted) return;
+    } else {
+      // 다 실었어도 한 번 더 묻는다(사용자 2026-11-27 "상차완료할 거냐고 한 번 더 확인") — 되돌릴 수 없는 운행 확정
+      final l10n = AppLocalizations.of(context);
+      final boxes = all.values
+          .expand((l) => l)
+          .where((l) => l.loaded && l.tripId == trip.tripId)
+          .length;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          key: const ValueKey('cdc-load-confirm-dialog'),
+          title: Text(l10n.cdcLoadConfirmTitle),
+          content: Text(l10n.cdcLoadConfirmBody(boxes, all.length)),
+          actions: [
+            TextButton(
+              key: const ValueKey('cdc-load-confirm-cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(l10n.cancel),
+            ),
+            FilledButton(
+              key: const ValueKey('cdc-load-confirm-ok'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(l10n.cdcLoadConfirmGo),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
     }
     bool mine(CdcLpn l) => l.loaded && l.tripId == trip.tripId;
     // BOX 만 — 그릇(R/T·PLT)은 개수로(MFC 인계 비교는 BOX 끼리)

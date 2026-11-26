@@ -193,7 +193,7 @@ class _ScanInputState extends ConsumerState<ScanInput>
               );
             },
             child: SizedBox(
-              height: 50,
+              height: 46,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -336,7 +336,7 @@ class _ScanButton extends StatelessWidget {
                   children: [
                     // 스캐너(총) 그림 대신 바코드 그림(사용자 2026-11-20).
                     BarcodeIcon(
-                      size: 24,
+                      size: 22,
                       color: secondary ? PdaColors.primary : Colors.white,
                     ),
                     const SizedBox(width: 12),
