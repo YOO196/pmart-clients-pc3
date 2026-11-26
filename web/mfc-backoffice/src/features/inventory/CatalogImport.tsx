@@ -252,12 +252,13 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
                 })}
               </ul>
             ) : (
-              <div className="overflow-x-auto rounded-box border border-base-300 bg-base-100">
-                <table className="table table-sm">
+              // 상품 칸이 화면 폭만큼 늘어나지 않게 — 표는 내용 폭(2026-11-26 사용자 "상품 칸 좁혀")
+              <div className="w-fit max-w-full overflow-x-auto rounded-box border border-base-300 bg-base-100">
+                <table className="table table-sm w-auto">
                   <thead>
                     <tr>
                       <th className="w-10" aria-label={m.col.pick} />
-                      <th>{m.col.name}</th>
+                      <th className="min-w-64">{m.col.name}</th>
                       <th className="w-32">{m.col.sale}</th>
                       <th className="w-56">{m.col.here}</th>
                     </tr>
@@ -275,7 +276,7 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
                             <span className="flex items-center gap-3">
                               <ProductThumb info={cards.data?.get(id)} fallback={name} size="row" />
                               <span className="min-w-0">
-                                <span className="block truncate font-medium">{name}</span>
+                                <span className="block max-w-80 truncate font-medium" title={name}>{name}</span>
                                 <span className="font-mono text-xs text-base-content/60">{id}</span>
                               </span>
                             </span>
