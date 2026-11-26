@@ -15,7 +15,7 @@ Flutter 앱은 **Android 만** 개발한다. iOS 는 중단(`ios/` 는 두되 �
 | `web/hr-backoffice` | React SPA (Vite + TS) | 인사팀(`HR_ADMIN`) — 직원 등록·계정 발급·정지/퇴사 | 구현·LAN 배포(`https://192.168.0.40:8444`, 2026-11-13) | `docs/apps/hr-backoffice-web.md` |
 | `web/mfc-backoffice` | React SPA (Vite + TS) | 센터 관리자(`MFC_SUPERVISOR`) — 작업자·배정·작업·입고·재고·품질·위치·운영 제한 | 메뉴 11개 화면(PC 2, 2026-11-16) — **2026-11-17 부터 PC 3** — LAN `https://192.168.0.40:8445` | `docs/apps/mfc-backoffice-web.md` |
 | `web/rider-backoffice` | React SPA (Vite + TS) | 라이더 운영·지원센터(`RIDER_OPS`) — 관제·라이더·배송·접수 건(예정) | 뼈대·로그인만(PC 1, 2026-11-17), 메뉴 화면은 **PC 5** — LAN `https://192.168.0.40:8446` | `docs/apps/rider-backoffice-web.md` |
-| `web/cdc-backoffice` | React SPA (Vite + TS) | DC 관리자(`CDC_SUPERVISOR`)·운영 관리자 — 출고 관제·TRF·Wave·작업·재고·실사·상품 발주 | 2026-11-25 새 앱(#562) — **PC 5**(사용자 2026-11-26, #574 발주 화면은 사용자 지시로 PC 3 작업) — LAN `https://192.168.0.40:8447` | `docs/apps/cdc-backoffice-web.md` |
+| `web/cdc-backoffice` | React SPA (Vite + TS) | DC 관리자(`CDC_SUPERVISOR`)·운영 관리자 — 출고 관제·TRF·Wave·작업·재고·실사·상품 발주 | 2026-11-25 새 앱(#562) — **PC 5**(사용자 2026-11-26, #574 발주 화면은 사용자 지시로 PC 3 작업), 서버 cdc-* 는 PC 1 별도 세션(`D:\development\pmart-project\pmart-backend-cdc`) — LAN `https://192.168.0.40:8447` | `docs/apps/cdc-backoffice-web.md` |
 | (예약) `apps/driver_app` | Flutter | 간선기사(TMS) | 2단계 | `docs/apps/driver-app.md` |
 
 ## 구조

@@ -1,6 +1,6 @@
 # DC 백오피스 웹 (`web/cdc-backoffice`)
 
-담당: **PC 5**(사용자 2026-11-25 "너는 이제부터 DC백오피스 화면 세션도 담당한다"). 서버(employee-auth 앱·게이트웨이 CORS·PC 4 서빙·cdc-* API)는 백엔드 PC 1.
+담당: **PC 5**(사용자 2026-11-25 "너는 이제부터 DC백오피스 화면 세션도 담당한다"). 서버(employee-auth 앱·게이트웨이 CORS·PC 4 서빙)는 백엔드 PC 1, **cdc-* API 는 PC 1 의 별도 CDC 세션**(`D:\development\pmart-project\pmart-backend-cdc` — pmart-backend 같은 저장소 `cdc/*` 가지, 사용자 2026-11-26).
 
 - 근거: 백엔드 요청 `../pmart-backend/docs/handoff/clients/all/2026-11-25-request-cdc-backoffice.md`, 계획 `../pmart-backend/docs/cdc/cdc-backoffice-plan.md`.
 - 사용자: DC 관리자(`CDC_SUPERVISOR` — 토큰 centers 의 DC 만), 운영 관리자(`OPERATOR_ADMIN`). `CDC_WORKER` 만 있으면 "PDA 에서" 안내. 그 밖 역할은 막지 않고 안내만(판정은 서버).
