@@ -41,12 +41,6 @@ class CdcGuideScreen extends StatelessWidget {
         (Icons.qr_code_scanner, l10n.cdcGuidePick3),
         (Icons.report_problem_outlined, l10n.cdcGuidePick4),
       ],
-      CdcWorkArea.sort => [
-        (Icons.list_alt, l10n.cdcGuideSort1),
-        (Icons.inventory_2_outlined, l10n.cdcGuideSort2),
-        (Icons.qr_code_scanner, l10n.cdcGuideSort3),
-        (Icons.verified_outlined, l10n.cdcGuideSort4),
-      ],
       CdcWorkArea.inspect => [
         (Icons.list_alt, l10n.cdcGuideInspect1),
         (Icons.qr_code_scanner, l10n.cdcGuideInspect2),

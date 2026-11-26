@@ -192,10 +192,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       // DC 분배·검품·상차·지게차 적치(사용자 2026-11-26 "업무화면 다 만들어")
       GoRoute(
-        path: '/cdc/work/sort',
-        pageBuilder: (_, s) => _page(s, const CdcSortScreen()),
-      ),
-      GoRoute(
         path: '/cdc/work/inspect',
         pageBuilder: (_, s) => _page(s, const CdcInspectScreen()),
       ),

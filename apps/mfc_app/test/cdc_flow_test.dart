@@ -86,8 +86,10 @@ void main() {
   testWidgets(
     '패킹(박스 닫기): TRF → 빈 BOX 스캔 → 상품 스캔·수량 → 봉인 등록, 쓴 BOX 는 거절, 다 담으면 끝',
     (t) async {
-      await pump(t, 'sort');
-      await tap(t, 'cdc-trf-TRF-mock-1');
+      // 분배·패킹 한 메뉴 — MFC 한 곳 몫 묶음은 칸 나누기 없이 바로 BOX 에 담기
+      await pump(t, 'distribute');
+      expect(find.text('MFC 한 곳(MFC-SEJ-01) · 바로 BOX 에 담아요'), findsOneWidget);
+      await tap(t, 'cdc-wave-WAV-mock-2');
       expect(find.byKey(const ValueKey('step-1')), findsOneWidget);
       await scan(t, 'cdc-box-scan', 'BOX-A1');
       expect(find.byKey(const ValueKey('step-2')), findsOneWidget);
@@ -110,6 +112,9 @@ void main() {
       }
       await tap(t, 'cdc-sort-go');
       expect(find.byKey(const ValueKey('cdc-sort-done')), findsOneWidget);
+      // 다른 묶음 → 분배·패킹 묶음 목록으로
+      await tap(t, 'cdc-other-trf');
+      expect(find.byKey(const ValueKey('cdc-wave-WAV-mock-1')), findsOneWidget);
     },
   );
 
@@ -193,9 +198,17 @@ void main() {
     await scan(t, 'cdc-load-scan', 'BOX-26112600001');
     expect(find.text('이미 스캔한 BOX 예요'), findsOneWidget);
     await tap(t, 'cdc-load-go');
-    final l = (await repo.lpns('', 'TRF-mock-2')).single;
+    final l = (await repo.lpns('', 'TRF-mock-2')).first;
     expect([l.loaded, l.tripId], [true, 'TRIP-mock-1']);
+    // 덜 실었으면 상차완료 전에 확인 — 계속 싣기를 고르면 그대로
     await tap(t, 'cdc-load-complete');
+    expect(find.text('아직 안 실은 BOX 가 1개 있어요'), findsOneWidget);
+    await tap(t, 'cdc-load-partial-cancel');
+    expect((await repo.trip('TRIP-mock-1')).state, 'CHECKED_IN');
+    await scan(t, 'cdc-load-scan', 'RT-26112600001');
+    await tap(t, 'cdc-load-go');
+    await tap(t, 'cdc-load-complete');
+    expect(find.byKey(const ValueKey('cdc-load-partial-dialog')), findsNothing);
     expect(find.byKey(const ValueKey('cdc-load-done')), findsOneWidget);
     expect(find.text('상차는 출발이 아니에요. 출발은 따로 확정돼요'), findsOneWidget);
     expect((await repo.trip('TRIP-mock-1')).state, 'LOADED');
