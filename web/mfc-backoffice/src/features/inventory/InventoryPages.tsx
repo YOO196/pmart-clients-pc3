@@ -29,7 +29,6 @@ import { CountWindowsCard, RotationCountStart } from './CountPlanning';
 import { ProductThumb, useProductCards, useProductView, ViewToggle, type ProductCardInfo, type ProductView } from '../../shared/productCards';
 import { BackButton } from '../../shared/DetailHead';
 import { Pager, usePage } from '../../shared/Pager';
-import { CatalogImport } from './CatalogImport';
 import { StockProductInfo, StockProductList } from './StockProducts';
 import { LotTraceTab } from './LotTraceTab';
 import { StockLedgerTab } from './StockLedgerTab';
@@ -823,7 +822,7 @@ function PoliciesTab({ mfcId }: { readonly mfcId: string }) {
  */
 const NEW_SINCE = '2000-01-01T00:00:00Z';
 
-function NewProductsBanner({ mfcId, onShow }: { readonly mfcId: string; readonly onShow: () => void }) {
+export function NewProductsBanner({ mfcId, onShow }: { readonly mfcId: string; readonly onShow: () => void }) {
   const api = useApi();
   const query = useQuery({
     queryKey: ['handlings-new-count', mfcId],
@@ -877,17 +876,8 @@ export function HandlingsTab({ mfcId }: { readonly mfcId: string }) {
   // 상품 사진·이름(product-content), 목록/카드 보기(2026-11-25 사용자)
   const cards = useProductCards(rows.map((h) => h.productId));
   const [view, setView] = useProductView();
-  // 본사 상품 불러오기(2026-11-25 사용자) — 본사 상품 목록에서 골라 이 센터 취급을 한꺼번에 켠다
-  const [importOpen, setImportOpen] = useState(false);
   return (
     <div className="space-y-3 text-sm">
-      <div className="flex justify-end">
-        <button type="button" className="btn btn-sm btn-primary" aria-expanded={importOpen} onClick={() => setImportOpen((o) => !o)}>
-          {m.catalog.open}
-        </button>
-      </div>
-      {importOpen && <CatalogImport mfcId={mfcId} onClose={() => setImportOpen(false)} />}
-      <NewProductsBanner mfcId={mfcId} onShow={() => setEnabled('new')} />
       <p className="text-xs opacity-70">{m.handlingsHint}</p>
       <label className="flex w-fit flex-col gap-1 rounded-box bg-base-100 p-3">
         {m.enabledFilter}
