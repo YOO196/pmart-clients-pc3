@@ -17,6 +17,9 @@ abstract final class PdaColors {
   static const body = Color(0xFF3A3741);
   static const line = Color(0xFFE9E8EE);
   static const paper = Colors.white;
+
+  /// 화면 바탕(연회색) — 그 위에 테두리 없는 흰 둥근 카드(사용자 2026-11-27 "PPT 처럼 각지다, 부드럽게" — 참고 화면).
+  static const canvas = Color(0xFFF4F5F8);
   static const dark = Color(0xFF3F2A66);
   static const primary = Color(0xFF6B45B0);
 
@@ -42,11 +45,11 @@ abstract final class PdaColors {
   /// 거절·오류 칩 바탕(옅은 빨강).
   static const dangerSoft = Color(0xFFFBE6E3);
 
-  /// 상단바 — 채도 낮은 어두운 회색에 보라를 조금(사용자 2026-11-20). 글자·그림은 흰색.
-  static const bar = Color(0xFF37333F);
+  /// 상단바 — 흰 바탕 + 진한 글씨(사용자 2026-11-27 참고 화면. 전에는 어두운 회색).
+  static const bar = Colors.white;
 
-  /// 상단바 위 보조 글씨(흰색 70%).
-  static const onBarMuted = Color(0xB3FFFFFF);
+  /// 상단바 위 보조 글씨(회색).
+  static const onBarMuted = Color(0xFF8A8793);
 }
 
 abstract final class PdaTheme {
@@ -78,7 +81,7 @@ abstract final class PdaTheme {
           inverseSurface: PdaColors.dark,
         );
     final shape10 = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(14),
     );
     // 글자 모양은 기본 글꼴 묶음에서 이어 받는다(글꼴 이름을 비워 두면 화면마다 글꼴이 달라진다).
     // PDA 는 팔 길이에서 본다 — 작은 글씨를 한 단계 키운다(본문 15, 작은 글씨 13).
@@ -91,9 +94,9 @@ abstract final class PdaTheme {
     ).textTheme;
     const w4 = FontWeight.w400, w6 = FontWeight.w600, w7 = FontWeight.w700;
     final base = m3.copyWith(
-      headlineLarge: m3.headlineLarge!.copyWith(fontWeight: FontWeight.w800),
-      headlineMedium: m3.headlineMedium!.copyWith(fontWeight: FontWeight.w800),
-      headlineSmall: m3.headlineSmall!.copyWith(fontWeight: FontWeight.w800),
+      headlineLarge: m3.headlineLarge!.copyWith(fontWeight: w7),
+      headlineMedium: m3.headlineMedium!.copyWith(fontWeight: w7),
+      headlineSmall: m3.headlineSmall!.copyWith(fontWeight: w7),
       titleLarge: m3.titleLarge!.copyWith(fontWeight: w7),
       titleMedium: m3.titleMedium!.copyWith(fontWeight: w7),
       titleSmall: m3.titleSmall!.copyWith(fontWeight: w6),
@@ -118,23 +121,23 @@ abstract final class PdaTheme {
       useMaterial3: true,
       fontFamily: fontFamily,
       textTheme: base,
-      scaffoldBackgroundColor: PdaColors.paper,
+      scaffoldBackgroundColor: PdaColors.canvas,
       visualDensity: VisualDensity.standard,
-      // 상단바: 보라빛 어두운 회색 바탕 + 흰 글자·그림, 상태 표시줄 그림도 흰색(사용자 2026-11-20).
+      // 상단바: 흰 바탕 + 진한 글씨·그림, 상태 표시줄 그림은 어둡게(사용자 2026-11-27 참고 화면).
       appBarTheme: AppBarTheme(
         backgroundColor: PdaColors.bar,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
-        actionsIconTheme: const IconThemeData(color: Colors.white),
+        foregroundColor: PdaColors.ink,
+        iconTheme: const IconThemeData(color: PdaColors.ink),
+        actionsIconTheme: const IconThemeData(color: PdaColors.ink),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         titleTextStyle: base.titleMedium!.copyWith(
-          color: Colors.white,
+          color: PdaColors.ink,
           fontSize: 17,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           letterSpacing: -0.3,
         ),
       ),
@@ -142,18 +145,17 @@ abstract final class PdaTheme {
         color: Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        margin: const EdgeInsets.only(top: 14),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(13),
-          side: const BorderSide(color: PdaColors.line),
-        ),
+        margin: const EdgeInsets.only(top: 12),
+        // 테두리 없이 둥근 흰 카드 — 연회색 바탕 위에 떠 보이게
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),
       dividerTheme: const DividerThemeData(color: PdaColors.line, space: 1),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(64, 56),
+          elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
           // 스캔 단추와 같은 글자 — 20·700(단추 높이 56~58 에 맞는 비율, 사용자 2026-11-20 "글자가 작다").
           textStyle: bold.copyWith(
@@ -180,9 +182,9 @@ abstract final class PdaTheme {
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: Colors.white,
-        side: const BorderSide(color: PdaColors.line),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+        backgroundColor: PdaColors.canvas,
+        side: BorderSide.none,
+        shape: const StadiumBorder(),
         labelStyle: bold.copyWith(fontSize: 14, color: PdaColors.ink),
         selectedColor: PdaColors.dark,
         secondaryLabelStyle: bold.copyWith(fontSize: 14, color: Colors.white),
@@ -191,7 +193,7 @@ abstract final class PdaTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: Colors.white,
@@ -205,11 +207,11 @@ abstract final class PdaTheme {
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: PdaColors.line),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: PdaColors.line),
         ),
       ),
