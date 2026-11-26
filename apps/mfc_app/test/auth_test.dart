@@ -278,19 +278,31 @@ void main() {
       expect(await run(const FakeReply(503)), (LoginError.network, 1));
     });
 
-    test('티켓 교환 응답에 refresh token 이 없으면(COOKIE — PDA 설정 오류) 토큰을 보관하지 않고 일시 오류', () async {
-      final adapter = FakeAdapter(
-        (_, _) async => FakeReply(200, body: {..._loginResult(), 'tokens': _pair(refresh: null)}),
-      );
-      final t = _repo(_FakeBrowser(_ticketBack), adapter);
-      await expectLater(
-        t.repo.login(),
-        throwsA(isA<LoginFailure>().having((f) => f.error, 'error', LoginError.temporary)),
-      );
-      expect(t.tokens.accessToken, isNull);
-      expect(await t.tokens.readRefreshToken(), isNull);
-      expect(adapter.requests, hasLength(1)); // 같은 티켓을 다시 보내지 않는다
-    });
+    test(
+      '티켓 교환 응답에 refresh token 이 없으면(COOKIE — PDA 설정 오류) 토큰을 보관하지 않고 일시 오류',
+      () async {
+        final adapter = FakeAdapter(
+          (_, _) async => FakeReply(
+            200,
+            body: {..._loginResult(), 'tokens': _pair(refresh: null)},
+          ),
+        );
+        final t = _repo(_FakeBrowser(_ticketBack), adapter);
+        await expectLater(
+          t.repo.login(),
+          throwsA(
+            isA<LoginFailure>().having(
+              (f) => f.error,
+              'error',
+              LoginError.temporary,
+            ),
+          ),
+        );
+        expect(t.tokens.accessToken, isNull);
+        expect(await t.tokens.readRefreshToken(), isNull);
+        expect(adapter.requests, hasLength(1)); // 같은 티켓을 다시 보내지 않는다
+      },
+    );
   });
 
   group('토큰 갱신', () {
@@ -322,11 +334,24 @@ void main() {
       },
     );
 
-    test('갱신 응답에 refresh token 이 없으면(COOKIE) 세션 종료(null)가 아니라 계약 위반으로 올린다', () async {
-      final adapter = FakeAdapter((_, _) async => FakeReply(200, body: _pair(refresh: null)));
-      final refresh = employeeAuthRefresher(baseUrl: _base, sourceSystem: sourceSystem, deviceId: device(), adapter: adapter);
-      await expectLater(refresh('rt-1'), throwsA(isA<ContractViolationFailure>()));
-    });
+    test(
+      '갱신 응답에 refresh token 이 없으면(COOKIE) 세션 종료(null)가 아니라 계약 위반으로 올린다',
+      () async {
+        final adapter = FakeAdapter(
+          (_, _) async => FakeReply(200, body: _pair(refresh: null)),
+        );
+        final refresh = employeeAuthRefresher(
+          baseUrl: _base,
+          sourceSystem: sourceSystem,
+          deviceId: device(),
+          adapter: adapter,
+        );
+        await expectLater(
+          refresh('rt-1'),
+          throwsA(isA<ContractViolationFailure>()),
+        );
+      },
+    );
 
     test('401 이면 세션 종료(null) — 갱신 거절은 "만료"로 남긴다(정지·퇴사도 TOKEN_INVALID 로 온다). 네트워크 오류는 세션 종료가 아니다', () async {
       Future<(AuthTokens?, SessionEnd?)> run(FakeReply reply) async {
@@ -725,7 +750,10 @@ void main() {
       }
       expect(MockPasswordAuthRepository.isTestWorker('mfcw-pp-30'), isTrue);
       expect(MockPasswordAuthRepository.isTestWorker('mfcw-rtn-10'), isTrue);
-      expect(MockPasswordAuthRepository.isTestWorker('mfcw-all'), isTrue); // 전 업무 시험 계정
+      expect(
+        MockPasswordAuthRepository.isTestWorker('mfcw-all'),
+        isTrue,
+      ); // 전 업무 시험 계정
     });
 
     testWidgets('시험용 로그인 화면을 닫으면 실서버(Custom Tab 닫기)처럼 "취소" 안내', (t) async {
