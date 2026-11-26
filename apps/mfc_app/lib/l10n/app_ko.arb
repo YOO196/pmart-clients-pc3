@@ -1023,7 +1023,7 @@
   "loginSubtitle": "MFC 현장 작업용 단말",
   "loginMockNote": "목 데이터 모드 · 시험용 작업자로 들어가요",
   "loginIdLabel": "아이디",
-  "loginIdHint": "예: mfcw-pp-01",
+  "loginIdHint": "예: mfcw-pp-01 · DC 는 cdcw-fc-01",
   "loginPasswordLabel": "비밀번호",
   "loginPasswordShow": "비밀번호 보기",
   "loginPasswordHide": "비밀번호 가리기",
