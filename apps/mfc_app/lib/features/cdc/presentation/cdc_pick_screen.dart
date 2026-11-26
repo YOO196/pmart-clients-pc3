@@ -6,6 +6,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/field_widgets.dart';
 import '../../../shared/location_guide.dart';
+import '../../../shared/pda_motion.dart';
 import '../../../shared/pda_theme.dart';
 import '../../../shared/providers.dart';
 import '../../../shared/scanner/scan_input.dart';
@@ -353,10 +354,16 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
       }
     } else if (!_locOk) {
       body.add(
-        LocationGuide(
-          code: line.locationCode,
-          codeKey: const ValueKey('cdc-pick-location'),
-          detail: l10n.cdcPickLineOf(t.lines.indexOf(line) + 1, t.lines.length),
+        EnterFade(
+          key: ValueKey('cdc-stop-${line.key}'),
+          child: LocationGuide(
+            code: line.locationCode,
+            codeKey: const ValueKey('cdc-pick-location'),
+            detail: l10n.cdcPickLineOf(
+              t.lines.indexOf(line) + 1,
+              t.lines.length,
+            ),
+          ),
         ),
       );
       body.add(const SizedBox(height: 12));

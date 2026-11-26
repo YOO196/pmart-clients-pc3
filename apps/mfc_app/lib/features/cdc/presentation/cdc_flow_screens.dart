@@ -6,6 +6,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/field_widgets.dart';
 import '../../../shared/location_guide.dart';
+import '../../../shared/pda_motion.dart';
 import '../../../shared/pda_theme.dart';
 import '../../../shared/providers.dart';
 import '../../../shared/scanner/scan_input.dart';
@@ -84,11 +85,14 @@ class _TrfPickState extends ConsumerState<_TrfPick> {
       AsyncData(:final value) => _stepBody([
         StepHeader(names: widget.steps, current: 0),
         ScanPrompt(text: l10n.cdcTrfTitle, detail: l10n.cdcTrfChoose),
-        for (final t in value)
-          _TrfCard(
-            key: ValueKey('cdc-trf-${t.trfId}'),
-            trf: t,
-            onTap: () => widget.onPick(t),
+        for (final (i, t) in value.indexed)
+          EnterFade(
+            index: i,
+            child: _TrfCard(
+              key: ValueKey('cdc-trf-${t.trfId}'),
+              trf: t,
+              onTap: () => widget.onPick(t),
+            ),
           ),
       ], const []),
       AsyncError() => CdcCenterNotice(
@@ -117,55 +121,57 @@ class _TrfCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: PdaColors.line),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(15),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      child: Pressable(
+        child: Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: PdaColors.line),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(15),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          trf.label,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${trf.mfcId} · ${l10n.cdcPickDue(formatSeoulDateTime(trf.dueAt))}',
+                          style: const TextStyle(color: PdaColors.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        trf.label,
-                        style: theme.textTheme.titleLarge?.copyWith(
+                        '${trf.pickedQty}',
+                        style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 2),
                       Text(
-                        '${trf.mfcId} · ${l10n.cdcPickDue(formatSeoulDateTime(trf.dueAt))}',
+                        l10n.cdcTrfPickedLabel,
                         style: const TextStyle(color: PdaColors.muted),
                       ),
                     ],
                   ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${trf.pickedQty}',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    Text(
-                      l10n.cdcTrfPickedLabel,
-                      style: const TextStyle(color: PdaColors.muted),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 6),
-                const Icon(Icons.chevron_right, color: PdaColors.muted),
-              ],
+                  const SizedBox(width: 6),
+                  const Icon(Icons.chevron_right, color: PdaColors.muted),
+                ],
+              ),
             ),
           ),
         ),
@@ -423,15 +429,18 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
           detail: l10n.cdcSortBoxNth(lpns.length + 1),
         ),
       );
-      for (final i in left) {
+      for (final (n, i) in left.indexed) {
         body.add(
-          CdcItemCard(
-            key: ValueKey('cdc-sort-${i.sku}'),
-            name: i.productName ?? i.sku,
-            sku: i.sku,
-            lot: i.lot,
-            qty: i.remaining,
-            qtyLabel: l10n.cdcLeftUnit,
+          EnterFade(
+            index: n,
+            child: CdcItemCard(
+              key: ValueKey('cdc-sort-${i.sku}'),
+              name: i.productName ?? i.sku,
+              sku: i.sku,
+              lot: i.lot,
+              qty: i.remaining,
+              qtyLabel: l10n.cdcLeftUnit,
+            ),
           ),
         );
       }
@@ -711,8 +720,13 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
           detail: l10n.cdcInspectScanHelp,
         ),
       );
-      for (final l in lpns) {
-        body.add(_BoxLine(lpn: l));
+      for (final (i, l) in lpns.indexed) {
+        body.add(
+          EnterFade(
+            index: i,
+            child: _BoxLine(lpn: l),
+          ),
+        );
       }
       actions.add(
         ScanInput(
@@ -735,14 +749,18 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
           detail: l10n.cdcInspectCheckHelp(box.lpn),
         ),
       );
-      for (final c in box.contents) {
+      for (final (i, c) in box.contents.indexed) {
         body.add(
-          CdcItemCard(
-            name: c.sku,
-            sku: c.sku,
-            lot: c.lot,
-            qty: c.qty,
-            qtyLabel: l10n.cdcQtyUnit,
+          EnterFade(
+            key: ValueKey('cdc-insp-${box.lpn}-$i'),
+            index: i,
+            child: CdcItemCard(
+              name: c.sku,
+              sku: c.sku,
+              lot: c.lot,
+              qty: c.qty,
+              qtyLabel: l10n.cdcQtyUnit,
+            ),
           ),
         );
       }
@@ -809,8 +827,10 @@ class _BoxLine extends StatelessWidget {
             'FAILED' => (l10n.cdcInspectFailed, PdaColors.danger),
             _ => (l10n.cdcInspectNone, PdaColors.muted),
           };
-    return Container(
+    return AnimatedContainer(
       key: ValueKey('cdc-lpn-${lpn.lpn}'),
+      duration: PdaMotion.of(context, PdaMotion.base),
+      curve: PdaMotion.standard,
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
@@ -826,7 +846,9 @@ class _BoxLine extends StatelessWidget {
           if (checked)
             const Padding(
               padding: EdgeInsets.only(right: 10),
-              child: Icon(Icons.check_circle, color: PdaColors.primary),
+              child: PopIn(
+                child: Icon(Icons.check_circle, color: PdaColors.primary),
+              ),
             ),
           Expanded(
             child: Column(
@@ -1088,8 +1110,13 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
           detail: l10n.cdcLoadVehicleIs(_vehicle!, _trip!),
         ),
       );
-      for (final l in passed) {
-        body.add(_BoxLine(lpn: l, checked: _scanned.contains(l.lpn)));
+      for (final (i, l) in passed.indexed) {
+        body.add(
+          EnterFade(
+            index: i,
+            child: _BoxLine(lpn: l, checked: _scanned.contains(l.lpn)),
+          ),
+        );
       }
       actions.addAll([
         ScanInput(
@@ -1314,11 +1341,14 @@ class _CdcPutawayScreenState extends ConsumerState<CdcPutawayScreen>
         );
       } else if (_loc == null) {
         body.add(
-          LocationGuide(
-            code: row.location,
-            codeKey: const ValueKey('cdc-pa-location'),
-            title: l10n.cdcPutawayGoTitle,
-            detail: t.taskId,
+          EnterFade(
+            key: ValueKey('cdc-pa-stop-${row.key}'),
+            child: LocationGuide(
+              code: row.location,
+              codeKey: const ValueKey('cdc-pa-location'),
+              title: l10n.cdcPutawayGoTitle,
+              detail: t.taskId,
+            ),
           ),
         );
         body.add(const SizedBox(height: 12));

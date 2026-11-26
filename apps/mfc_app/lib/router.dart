@@ -168,9 +168,19 @@ final routerProvider = Provider<GoRouter>((ref) {
             CdcWorkArea.values.any((a) => a.name == s.pathParameters['area'])
             ? null
             : '/',
-        pageBuilder: (_, s) => _page(
-          s,
-          CdcGuideScreen(
+        // MFC 안내 화면과 같은 넘김 — 바탕은 앞 절반에 덮고, 뒤 절반은 칸이 커지는 모습(Hero)만 보인다.
+        pageBuilder: (_, s) => CustomTransitionPage<void>(
+          key: s.pageKey,
+          transitionDuration: const Duration(milliseconds: 380),
+          reverseTransitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (_, animation, _, child) => FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: const Interval(0, 0.45, curve: Curves.easeOut),
+            ),
+            child: child,
+          ),
+          child: CdcGuideScreen(
             area: CdcWorkArea.values.byName(s.pathParameters['area']!),
           ),
         ),
