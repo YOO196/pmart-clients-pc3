@@ -154,9 +154,9 @@ void main() {
     expect(find.byKey(const ValueKey('cdc-putaway-error')), findsOneWidget);
     await scan(t, 'cdc-pa-scan', 'PA-mock-1');
     expect(find.byKey(const ValueKey('cdc-pa-location')), findsOneWidget);
-    await scan(t, 'cdc-pa-loc-scan', 'CDC01-R-6-09-01-1-1');
+    await scan(t, 'cdc-pa-loc-scan', 'CDC01-C-5-03-10-2-1');
     await tap(t, 'cdc-pa-reason-LOCATION_FULL');
-    expect(find.text('다른 칸 · CDC01-R-6-09-01-1-1'), findsOneWidget);
+    expect(find.text('다른 칸 · CDC01-C-5-03-10-2-1'), findsOneWidget);
     await tap(t, 'cdc-putaway-go');
     expect(find.byKey(const ValueKey('cdc-pa-done')), findsOneWidget);
     expect(find.text('상태: 완료'), findsOneWidget);

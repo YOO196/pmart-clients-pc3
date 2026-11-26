@@ -5,7 +5,6 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/field_widgets.dart';
-import '../../../shared/location_guide.dart';
 import '../../../shared/pda_motion.dart';
 import '../../../shared/pda_theme.dart';
 import '../../../shared/providers.dart';
@@ -14,6 +13,7 @@ import '../../../shared/scanner/scanner.dart';
 import '../data/cdc_flow_repository.dart';
 import '../domain/cdc_flow.dart';
 import 'cdc_home.dart';
+import 'cdc_location.dart';
 import 'cdc_widgets.dart';
 
 /// DC 분배·검품·상차·지게차 적치 — MFC 업무 화면과 같은 흐름(단계 알약·진행 막대·큰 지시·스캔 칸·완료 표시).
@@ -1414,7 +1414,7 @@ class _CdcPutawayScreenState extends ConsumerState<CdcPutawayScreen>
         );
       } else if (_loc == null) {
         body.add(
-          LocationGuide(
+          CdcLocationGuide(
             code: row.location,
             codeKey: const ValueKey('cdc-pa-location'),
             title: l10n.cdcPutawayGoTitle,
@@ -1440,7 +1440,7 @@ class _CdcPutawayScreenState extends ConsumerState<CdcPutawayScreen>
             autofocus: false,
             testValues: [
               TestScan(l10n.tsLocation, row.location),
-              TestScan(l10n.cdcTsOtherLoc, 'CDC01-R-6-09-01-1-1'),
+              TestScan(l10n.cdcTsOtherLoc, 'CDC01-C-5-03-10-2-1'),
             ],
             onScan: (code) {
               _scanLoc(row, code);
