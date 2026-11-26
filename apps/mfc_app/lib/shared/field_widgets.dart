@@ -119,9 +119,9 @@ class ScanPrompt extends StatelessWidget {
             Text(
               text,
               style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: -1.2,
-                height: 1.25,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.6,
+                height: 1.3,
               ),
             ),
             if (detail case final d?)
@@ -214,17 +214,8 @@ class ActionBar extends StatelessWidget {
     return ActionScope(
       secondaryScan: hasCommand,
       child: DecoratedBox(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: PdaColors.line)),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0x0A000000),
-              blurRadius: 20,
-              offset: Offset(0, -5),
-            ),
-          ],
-        ),
+        // 바탕 위에 단추만 — 선·흰 띠 없이(사용자 2026-11-27 "부드럽게")
+        decoration: const BoxDecoration(color: PdaColors.canvas),
         child: SafeArea(
           top: false,
           child: Padding(

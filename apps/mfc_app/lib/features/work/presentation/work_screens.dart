@@ -811,7 +811,7 @@ class _AreaTile extends StatelessWidget {
             color: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: PdaColors.line),
+              side: BorderSide.none,
             ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
@@ -923,7 +923,7 @@ class _Tile extends StatelessWidget {
       color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: PdaColors.line),
+        side: BorderSide.none,
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -1664,9 +1664,9 @@ class _HomeTitle extends StatelessWidget {
             TextSpan(
               text: l10n.homeHello(who.displayName ?? who.workerId),
               style: const TextStyle(
-                color: Colors.white,
+                color: PdaColors.ink,
                 fontSize: 19,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 letterSpacing: -0.5,
               ),
             ),

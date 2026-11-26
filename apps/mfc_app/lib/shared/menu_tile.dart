@@ -39,7 +39,7 @@ class MenuTile extends StatelessWidget {
           color: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: PdaColors.line),
+            side: BorderSide.none,
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
