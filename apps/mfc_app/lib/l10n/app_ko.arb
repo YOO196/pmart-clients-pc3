@@ -1023,7 +1023,7 @@
   "loginSubtitle": "MFC 현장 작업용 단말",
   "loginMockNote": "목 데이터 모드 · 시험용 작업자로 들어가요",
   "loginIdLabel": "아이디",
-  "loginIdHint": "예: mfcw-pp-01 · DC 는 cdcw-fc-01",
+  "loginIdHint": "예: mfcw-pp-01 · DC 는 cdcw-fc-01 · 둘 다 dcmfc-all",
   "loginPasswordLabel": "비밀번호",
   "loginPasswordShow": "비밀번호 보기",
   "loginPasswordHide": "비밀번호 가리기",
@@ -1809,5 +1809,14 @@
   "@cdcPickAutoDistribute": {"placeholders": {"seconds": {"type": "int"}}},
   "cdcLoadFinish": "끝 — 홈으로",
   "unloadBand": "도착한 DC 차량 {n}대 — 하차하기",
-  "@unloadBand": {"placeholders": {"n": {"type": "int"}}}
+  "@unloadBand": {"placeholders": {"n": {"type": "int"}}},
+  "workplaceTitle": "어디서 일할까요?",
+  "workplaceHelp": "DC 와 MFC 권한이 모두 있어요. 할 곳을 고르세요 — 위의 바꾸기(⇄)로 언제든 바꿀 수 있어요.",
+  "workplaceDc": "DC 작업",
+  "workplaceDcDesc": "피킹·분배·패킹·검품·상차 · {center}",
+  "@workplaceDcDesc": {"placeholders": {"center": {"type": "String"}}},
+  "workplaceMfc": "MFC 작업",
+  "workplaceMfcDesc": "피패킹·입고·하차·검품·재고 · {center}",
+  "@workplaceMfcDesc": {"placeholders": {"center": {"type": "String"}}},
+  "workplaceSwitch": "DC·MFC 바꾸기"
 }

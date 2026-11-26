@@ -370,6 +370,9 @@ final class MockPasswordAuthRepository extends MockAuthRepository
   /// 목의 작업자 업무는 계정과 상관없이 전부지만, 시험용임을 알아보기 쉽게 따로 둔다.
   static const allWorkAccount = 'mfcw-all';
 
+  /// DC·MFC 두 권한 시험 계정(사용자 2026-11-26 "둘 다 권한 있는 계정이면 고르게") — 로그인하면 작업장 고르기부터.
+  static const bothAccount = 'dcmfc-all';
+
   /// 시험 작업자 계정 아이디인지.
   static bool isTestWorker(String loginId) {
     if (loginId == allWorkAccount) return true;
@@ -398,21 +401,32 @@ final class MockPasswordAuthRepository extends MockAuthRepository
     final supervisor = loginId == supervisorAccount;
     final cdcSupervisor = loginId == cdcSupervisorAccount;
     final cdcWorker = isCdcTestWorker(loginId);
-    if (!(supervisor || cdcSupervisor || cdcWorker || isTestWorker(loginId)) ||
+    final both = loginId == bothAccount;
+    if (!(supervisor ||
+            cdcSupervisor ||
+            cdcWorker ||
+            both ||
+            isTestWorker(loginId)) ||
         password.isEmpty) {
       throw const LoginFailure(LoginError.badCredentials);
     }
     signedIn = true;
     return _current = EmployeeSession(
       operatorId: 'OP-mock-$loginId',
-      roles: supervisor
+      roles: both
+          ? const [EmployeeSession.mfcWorkerRole, EmployeeSession.cdcWorkerRole]
+          : supervisor
           ? const [EmployeeSession.mfcSupervisorRole]
           : cdcSupervisor
           ? const [EmployeeSession.cdcSupervisorRole]
           : cdcWorker
           ? const [EmployeeSession.cdcWorkerRole]
           : session.roles,
-      centers: cdcSupervisor || cdcWorker ? const ['CDC01'] : session.centers,
+      centers: both
+          ? [...session.centers, 'CDC01']
+          : cdcSupervisor || cdcWorker
+          ? const ['CDC01']
+          : session.centers,
     );
   }
 

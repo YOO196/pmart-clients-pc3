@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
+import '../../auth/presentation/workplace.dart';
 import '../../unload/presentation/unload_screen.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../../l10n/gen/app_localizations.dart';
@@ -210,6 +211,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         actions: [
           // 목업 표시는 화면 맨 위 주황 띠가 한다 — 홈 상단바는 이름 자리를 남긴다.
           if (barMe case final me?) _StatusChip(onBreak: me.onBreak),
+          const WorkplaceSwitchButton(),
           IconButton(
             key: const ValueKey('logout'),
             tooltip: l10n.logout,

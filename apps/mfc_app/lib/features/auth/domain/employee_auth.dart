@@ -31,6 +31,25 @@ final class EmployeeSession {
 
   static const cdcWorkerRole = 'CDC_WORKER';
   static const cdcSupervisorRole = 'CDC_SUPERVISOR';
+  static const mfcWorkerRole = 'MFC_WORKER';
+
+  /// MFC 직원(`MFC_WORKER`·`MFC_SUPERVISOR`)
+  bool get isMfc =>
+      roles.contains(mfcWorkerRole) || roles.contains(mfcSupervisorRole);
+
+  /// DC·MFC 두 권한 — 홈에 오기 전에 오늘 작업장을 고른다(사용자 2026-11-26)
+  bool get hasBoth => isCdc && isMfc;
+
+  /// DC 센터(`CDC01` 처럼 CDC 로 시작) — 토큰 centers 에 MFC 센터와 함께 올 수 있다
+  static bool isCdcCenter(String c) => c.toUpperCase().startsWith('CDC');
+  List<String> get cdcCenters => [
+    for (final c in centers)
+      if (isCdcCenter(c)) c,
+  ];
+  List<String> get mfcCenters => [
+    for (final c in centers)
+      if (!isCdcCenter(c)) c,
+  ];
 
   /// access token 의 클레임(`sub`·`roles`·`centers`)을 읽는다. 서명은 검증하지 않는다(안내용).
   /// 형식이 아니면 null. 토큰 값을 오류 문구·로그에 남기지 않는다.

@@ -151,4 +151,45 @@ void main() {
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('cdc-home')), findsOneWidget);
   });
+
+  testWidgets('DC·MFC 두 권한이면 작업장부터 고른다 — DC/MFC 홈, 위 바꾸기로 다시 고르기', (t) async {
+    await pump(
+      t,
+      const EmployeeSession(
+        operatorId: 'OP-both',
+        roles: [EmployeeSession.mfcWorkerRole, EmployeeSession.cdcWorkerRole],
+        centers: ['MFC-MOCK-01', 'CDC01'],
+      ),
+    );
+    expect(find.byKey(const ValueKey('workplace-choice')), findsOneWidget);
+    expect(find.textContaining('CDC01'), findsOneWidget);
+    expect(find.textContaining('MFC-MOCK-01'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('workplace-dc')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cdc-home')), findsOneWidget);
+    // DC 홈의 센터는 DC 센터만
+    expect(find.textContaining('DC CDC01', findRichText: true), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('switch-workplace')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('workplace-mfc')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cdc-home')), findsNothing);
+    expect(find.byKey(const ValueKey('menu-handover')), findsOneWidget);
+    expect(find.byKey(const ValueKey('switch-workplace')), findsOneWidget);
+  });
+
+  test('목 로그인 dcmfc-all — DC·MFC 두 권한·두 센터', () async {
+    final s = await MockPasswordAuthRepository().loginWithPassword(
+      loginId: MockPasswordAuthRepository.bothAccount,
+      password: 'x',
+    );
+    expect(
+      [s.hasBoth, s.cdcCenters, s.mfcCenters.isNotEmpty],
+      [
+        true,
+        ['CDC01'],
+        true,
+      ],
+    );
+  });
 }
