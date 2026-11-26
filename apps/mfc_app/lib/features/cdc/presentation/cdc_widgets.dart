@@ -17,7 +17,7 @@ import 'cdc_home.dart';
 
 /// 로그인 세션의 DC — 하나일 때만(여럿·없음이면 빈 값)
 String cdcCenterOf(WidgetRef ref) {
-  final c = ref.read(employeeSessionProvider)?.centers ?? const [];
+  final c = ref.read(employeeSessionProvider)?.cdcCenters ?? const [];
   return c.length == 1 ? c.single : '';
 }
 

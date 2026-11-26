@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/auth/presentation/workplace.dart';
 import 'features/unload/presentation/unload_screen.dart';
 import 'features/manage/presentation/count_admin_screens.dart';
 import 'features/manage/presentation/manage_screens.dart';
@@ -354,8 +355,16 @@ class _RoleHome extends ConsumerWidget {
   const _RoleHome();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      (ref.watch(employeeSessionProvider)?.isCdc ?? false)
-      ? const CdcHomeScreen()
-      : const HomeScreen();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(employeeSessionProvider);
+    // DC·MFC 두 권한이면 오늘 작업장부터 고른다(사용자 2026-11-26)
+    if (s?.hasBoth ?? false) {
+      return switch (ref.watch(workplaceProvider)) {
+        null => const WorkplaceChoiceScreen(),
+        Workplace.dc => const CdcHomeScreen(),
+        Workplace.mfc => const HomeScreen(),
+      };
+    }
+    return (s?.isCdc ?? false) ? const CdcHomeScreen() : const HomeScreen();
+  }
 }

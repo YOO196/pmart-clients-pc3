@@ -6,6 +6,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/pda_motion.dart';
 import '../../../shared/pda_theme.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../auth/presentation/workplace.dart';
 
 /// DC(CDC) 직원 업무 — 계약 cdc-outbound `next-tasks` 의 kind(PICK·SORT·INSPECT·LOAD)와 cdc-inbound 적치(지게차).
 /// 백엔드 staff-roles.md: `CDC_WORKER` = 자기 CDC 센터의 FC 피킹·분배/라인·검품·상차·지게차 작업.
@@ -67,7 +68,7 @@ class CdcHomeScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final session = ref.watch(employeeSessionProvider);
-    final centers = session?.centers ?? const [];
+    final centers = session?.cdcCenters ?? const [];
     return Scaffold(
       appBar: AppBar(
         title: Text.rich(
@@ -100,6 +101,7 @@ class CdcHomeScreen extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          const WorkplaceSwitchButton(),
           IconButton(
             key: const ValueKey('logout'),
             tooltip: l10n.logout,
