@@ -38,6 +38,8 @@ import 'features/support/presentation/inquiry_screens.dart';
 import 'features/orders/presentation/my_screen.dart';
 import 'features/profile/presentation/consents_screens.dart';
 import 'features/orders/presentation/order_help_screen.dart';
+import 'features/orders/presentation/frequent_items_screen.dart'
+    show BoughtItemsScreen;
 import 'features/orders/presentation/orders_screens.dart';
 import 'features/catalog/presentation/home_providers.dart' show SectionRef;
 import 'features/catalog/presentation/home_screen.dart';
@@ -384,6 +386,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         path: '/search',
         builder: (_, _) => const SearchScreen(),
+      ),
+      // 내가 산 상품 한 번에 담기(홈 "내가 1번 구매한 상품 보기", order 0.24.0 — 사용자 2026-11-26)
+      _slide(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/me/bought-items',
+        builder: (_, _) => const BoughtItemsScreen(),
       ),
       // 찜한 상품(customer 0.13.0, ADR-0081)
       _slide(

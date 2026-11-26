@@ -203,12 +203,24 @@ void main() {
     expect(find.byKey(const ValueKey('signup-steps-3')), findsOneWidget);
     expect(find.byKey(const ValueKey('info-later')), findsNothing);
     expect(find.byKey(const ValueKey('info-phone-verify')), findsOneWidget);
-    await t.tap(find.byKey(const ValueKey('info-save')));
-    await t.pumpAndSettle();
-    expect(find.text('이름을 입력해 주세요(30자 이내)'), findsOneWidget);
+    // 이름이 비면 저장할 수 없다(사용자 2026-11-26).
+    expect(
+      t
+          .widget<CommandButton>(find.byKey(const ValueKey('info-save')))
+          .onPressed,
+      isNull,
+    );
 
-    // 이름(실명, BR-107)은 꼭, 닉네임은 함께.
+    // 이름을 넣으면 닉네임이 따라온다(직접 고치기 전까지).
     await t.enterText(find.byKey(const ValueKey('info-real-name')), '김피마');
+    await t.pump();
+    expect(
+      t
+          .widget<TextFormField>(find.byKey(const ValueKey('info-name')))
+          .controller!
+          .text,
+      '김피마',
+    );
     await t.enterText(find.byKey(const ValueKey('info-name')), ' 김피마 ');
     await t.tap(find.byKey(const ValueKey('info-save')));
     await t.pumpAndSettle();

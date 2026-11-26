@@ -131,7 +131,7 @@ void main() {
     expect(of(null).timerStyle, TimerStyle.label);
   });
 
-  testWidgets('띠형: 시·분·초 칸이 1초마다 줄고, 0 이 되면 영역을 숨긴다', (t) async {
+  testWidgets('띠형: 상품마다 빨간 "할인 남은 시간" 띠가 1초마다 줄고, 0 이 되면 영역을 숨긴다', (t) async {
     var now = DateTime.utc(2026, 11, 21, 3);
     final catalog = MockCatalogRepository(latency: Duration.zero)
       ..timedSections['S-NEW'] = now.add(
@@ -142,21 +142,53 @@ void main() {
     final band = key('section-timer-band-S-NEW');
     expect(band, findsOneWidget);
     expect(key('section-timer-S-NEW'), findsNothing);
-    expect(find.text('남은 시간'), findsOneWidget);
-    String sec() => t
-        .widgetList<Text>(
-          find.descendant(of: band, matching: find.byType(Text)),
-        )
-        .map((w) => w.data)
-        .where((d) => d != null && RegExp(r'^\d\d$').hasMatch(d))
-        .last!;
-    expect(sec(), '30');
+    final first = find.descendant(
+      of: band,
+      matching: find.textContaining('할인 05:12:'),
+    );
+    expect(
+      find.descendant(of: band, matching: find.text('할인 05:12:30')),
+      findsWidgets,
+    );
+    expect(first, findsWidgets);
     now = now.add(const Duration(seconds: 1));
     await t.pump(const Duration(seconds: 1));
-    expect(sec(), '29');
+    expect(
+      find.descendant(of: band, matching: find.text('할인 05:12:29')),
+      findsWidgets,
+    );
     now = now.add(const Duration(hours: 6));
     await t.pump(const Duration(hours: 6));
     expect(band, findsNothing);
+  });
+
+  testWidgets('띠형: 한 쪽에 2개, [>] 로 다음 쪽', (t) async {
+    final now = DateTime.utc(2026, 11, 21, 3);
+    final catalog = MockCatalogRepository(latency: Duration.zero)
+      ..timedSections['S-NEW'] = now.add(const Duration(hours: 5))
+      ..bandTimerSections.add('S-NEW');
+    await open(t, catalog, () => now);
+    final band = key('section-timer-band-S-NEW');
+    Iterable<String> ids() => t
+        .widgetList(
+          find.descendant(
+            of: band,
+            matching: find.byWidgetPredicate(
+              (w) =>
+                  w.key is ValueKey<String> &&
+                  (w.key! as ValueKey<String>).value.startsWith('deal-item-'),
+            ),
+          ),
+        )
+        .map((w) => (w.key! as ValueKey<String>).value);
+    final before = ids().toList();
+    expect(before, hasLength(2));
+    final next = key('deal-S-NEW-next');
+    if (next.evaluate().isEmpty) return; // 상품이 2개 이하면 쪽 단추 없음
+    await t.ensureVisible(next);
+    await t.tap(next);
+    await t.pump();
+    expect(ids().toList(), isNot(before));
   });
 
   // search 0.10.0·storefront 0.13.0 목록 availability(백엔드 회신 2026-11-23 §1): SOLD_OUT 만 품절, UNKNOWN·없음은 표시 없음.

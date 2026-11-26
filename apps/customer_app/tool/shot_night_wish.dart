@@ -38,9 +38,9 @@ Future<void> _fonts() async {
 void _view(WidgetTester t) {
   t.view
     ..physicalSize = const Size(1080, 2340)
-    ..devicePixelRatio = 1080 / 411
-    ..padding = const FakeViewPadding(top: 99, bottom: 48)
-    ..viewPadding = const FakeViewPadding(top: 99, bottom: 48);
+    ..devicePixelRatio = 2.8125
+    ..padding = const FakeViewPadding(top: 88, bottom: 48)
+    ..viewPadding = const FakeViewPadding(top: 88, bottom: 48);
   addTearDown(t.view.reset);
 }
 

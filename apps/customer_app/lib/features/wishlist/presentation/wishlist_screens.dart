@@ -661,15 +661,7 @@ class _WishEmpty extends StatelessWidget {
     // 사용자 폰 캡처(2026-11-26): 점선 사과 그림 69.6×62.8, 그 아래 62 띄우고 굵은 두 줄 15(줄 간격 21.3),
     // 그 아래 19.8 띄우고 테두리 알약 버튼(높이 38, 글 14.5 + ›).
     final text = title == null ? body : '$title\n$body';
-    // 가로는 화면 가운데(사용자 2026-11-26 "왼쪽으로 치우쳐" — 폭을 꽉 채워 가운데 맞춤), 세로는 사과 그림 위가
-    // 화면 위에서 412.5dp(캡처 실측) — 상태 막대·머리줄 높이를 빼서 본문 안 위치로.
-    // 본문 안에서는 상태 막대 높이가 빠져 있어 화면(View)에서 읽는다.
-    final view = View.of(context);
-    final statusBar = view.padding.top / view.devicePixelRatio;
-    final top = (412.5 - statusBar - kToolbarHeight).clamp(
-      24.0,
-      double.infinity,
-    );
+    // 가로·세로 모두 본문 가운데(사용자 2026-11-26 "화면 중앙에" — 전에는 캡처 실측 412.5dp 로 내려 아래로 치우쳤다).
     return LayoutBuilder(
       builder: (context, c) => SingleChildScrollView(
         child: ConstrainedBox(
@@ -678,8 +670,9 @@ class _WishEmpty extends StatelessWidget {
             minWidth: c.maxWidth,
           ),
           child: Padding(
-            padding: EdgeInsets.fromLTRB(24, top, 24, 24),
+            padding: const EdgeInsets.all(24),
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Image.asset(

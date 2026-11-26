@@ -10,10 +10,12 @@ import '../../../shared/shopping_context.dart' show currentMfcIdProvider;
 import '../../../shared/big_button_text.dart';
 import '../../../shared/notice.dart';
 import '../../../shared/ui_state_of.dart';
-import '../../catalog/domain/catalog.dart' show SaleState;
+import '../../../shared/cart_recommendations.dart'
+    show cartRecommendationsProvider;
+import '../../catalog/domain/catalog.dart' show ProductTile, SaleState;
 import '../../catalog/presentation/widgets/discount_price.dart';
 import '../../catalog/presentation/widgets/product_tile_card.dart'
-    show ProductImage;
+    show ProductImage, ProductTileCard, TileLook;
 import '../domain/cart.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -43,10 +45,23 @@ class CartScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: scheme.surfaceContainer,
+      // 레퍼런스 장바구니(2026-11-26, 폰 1080px = 384dp — px ÷ 2.8125): 제목 굵게, 제목 가운데가 상태 표시줄
+      // 아래 23.8dp. 비었을 때 회색 띠는 제목 아래 끝에서 제목→탭 글자 사이만큼(67px) 띄워 시작(상태 표시줄 아래 55.1dp, 사용자 2026-11-26).
       appBar: AppBar(
-        title: Text(l10n.cartTitle),
+        title: Text(
+          l10n.cartTitle,
+          style: Theme.of(context).textTheme.titleLarge
+              ?.copyWith(fontSize: 15.5, fontWeight: FontWeight.w700),
+        ),
+        toolbarHeight: 46,
         centerTitle: true,
         backgroundColor: scheme.surface,
+        bottom: value.value?.cart.lines.isEmpty == true
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(9.1),
+                child: SizedBox.shrink(),
+              )
+            : null,
       ),
       body: UiStateView<CartState>(
         loading: (_) => const PmartListSkeleton(thumb: true, rows: 4),
@@ -106,17 +121,7 @@ class _CartBody extends ConsumerWidget {
           ),
         Expanded(
           child: lines.isEmpty
-              ? Center(
-                  key: const ValueKey('cart-empty'),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(l10n.cartEmpty),
-                      const SizedBox(height: 12),
-                      const _AddMoreButton(),
-                    ],
-                  ),
-                )
+              ? const _EmptyCart()
               : RefreshIndicator(
                   onRefresh: controller.refresh,
                   child: ListView(
@@ -158,10 +163,130 @@ class _CartBody extends ConsumerWidget {
                 ),
         ),
         // 알림(스낵바)이 주문 단추를 덮지 않게 이 막대 위로 띄운다.
-        NoticeClearance(
-          child: _CartSummaryBar(cart: cart, state: state),
-        ),
+        // 비었으면 아래 막대 없음(레퍼런스 빈 장바구니 2026-11-26).
+        if (lines.isNotEmpty)
+          NoticeClearance(
+            child: _CartSummaryBar(cart: cart, state: state),
+          ),
       ],
+    );
+  }
+}
+
+/// 빈 장바구니(레퍼런스 2026-11-26, 1080px = 384dp 실측 — 위 탭 3개는 빼기로 함):
+/// 회색 띠(높이 172.8) 안에 굵은 안내 세 줄 + [바로픽 둘러보기], 그 아래 흰 바탕에 추천 상품 3칸 × 2줄.
+/// 추천은 장바구니 시트와 같은 출처(홈 편성 첫 상품 영역 — 개인 추천 API 없음, BR-98). 조회 중·실패면 추천만 비운다
+/// (빈 장바구니 안내는 장바구니 조회 결과라 그대로).
+class _EmptyCart extends ConsumerWidget {
+  const _EmptyCart();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final recs = ref.watch(cartRecommendationsProvider);
+    final items = recs.value ?? const <ProductTile>[];
+    final line = theme.textTheme.titleMedium?.copyWith(
+      fontSize: 13.6,
+      height: 1.52,
+      fontWeight: FontWeight.w800,
+      color: scheme.onSurface,
+    );
+    // 띠 아래는 흰 바탕(화면 바탕은 회색).
+    return ColoredBox(
+      color: scheme.surface,
+      child: CustomScrollView(
+        key: const ValueKey('cart-empty'),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Container(
+              height: 172.8,
+              color: scheme.surfaceContainer,
+              padding: const EdgeInsets.only(top: 26.9),
+              child: Column(
+                children: [
+                  Text.rich(
+                    TextSpan(
+                      style: line,
+                      children: [
+                        TextSpan(text: l10n.cartEmptyTitle),
+                        const TextSpan(text: '\n'),
+                        TextSpan(
+                          text: l10n.cartEmptyPick,
+                          style: TextStyle(color: scheme.primary),
+                        ),
+                        TextSpan(text: l10n.cartEmptyPickTail),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20.2),
+                  SizedBox(
+                    height: 34.8,
+                    child: OutlinedButton(
+                      key: const ValueKey('cart-empty-browse'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: scheme.onSurface,
+                        side: const BorderSide(
+                          color: Color(0xFFD6D7DA),
+                          width: 1.2,
+                        ),
+                        shape: const StadiumBorder(),
+                        padding: const EdgeInsets.symmetric(horizontal: 12.8),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () => context.go('/'),
+                      child: Text.rich(
+                        TextSpan(
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontSize: 11.7,
+                            fontWeight: FontWeight.w400,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: l10n.brandName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            TextSpan(text: ' ${l10n.cartEmptyBrowse}'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (items.isNotEmpty)
+            SliverPadding(
+              // 실측(÷2.8125): 띠 아래 → 사진 위 18.8, 좌우 14.9, 칸 사이 7.8, 줄 간격 = 사진(칸 폭) + 72.2.
+              padding: const EdgeInsets.fromLTRB(14.9, 18.8, 14.9, 24),
+              sliver: SliverLayoutBuilder(
+                builder: (context, c) => SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 7.8,
+                    mainAxisExtent: (c.crossAxisExtent - 15.6) / 3 + 72.2,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    childCount: items.length,
+                    (context, i) => ProductTileCard(
+                      key: ValueKey('cart-empty-reco-${items[i].productId}'),
+                      tile: items[i],
+                      rail: true,
+                      look: TileLook.emptyCart,
+                      onTap: () =>
+                          context.push('/products/${items[i].productId}'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

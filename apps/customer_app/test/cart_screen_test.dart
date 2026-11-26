@@ -445,6 +445,21 @@ void main() {
       expect(sentNow, hasLength(2));
       expect(sentNow, everyElement(isA<RemoveItem>()));
       expect(find.byKey(const ValueKey('cart-empty')), findsOneWidget);
+      // 빈 장바구니(레퍼런스 2026-11-26): 안내 + [둘러보기] + 추천 상품, 아래 주문 막대 없음.
+      expect(
+        find.textContaining('담은 상품이 없어요.', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('cart-empty-browse')), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('cart-empty-reco-'),
+        ),
+        findsWidgets,
+      );
+      expect(find.byKey(const ValueKey('cart-order')), findsNothing);
     });
 
     testWidgets('선택 삭제 중 반영되지 않은 결과(버전 충돌)가 나오면 멈추고 안내한다', (t) async {

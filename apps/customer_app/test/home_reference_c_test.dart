@@ -388,6 +388,27 @@ void main() {
       expect(find.text('지금 많이 사는 상품'), findsOneWidget);
     });
 
+    testWidgets('신상품 탭: 제일 나중에 등록한 상품 10개(검색 NEWEST)', (t) async {
+      final catalog = MockCatalogRepository(latency: Duration.zero);
+      await t.pumpWidget(testApp(const [], catalog: catalog));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const ValueKey('home-tab-isNew')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('section-NEWEST')), findsOneWidget);
+      expect(find.text('가장 최근에 등록한 상품'), findsOneWidget);
+      final tiles = find.descendant(
+        of: find.byKey(const ValueKey('section-NEWEST')),
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is InkWell &&
+              w.key is ValueKey<String> &&
+              (w.key! as ValueKey<String>).value.startsWith('tile-'),
+        ),
+      );
+      expect(tiles, findsWidgets);
+      expect(t.widgetList(tiles).length, lessThanOrEqualTo(10));
+    });
+
     testWidgets('탭 조회 실패는 빈 탭이 아니라 실패 한 줄이다', (t) async {
       await t.pumpWidget(testApp(const [], catalog: _RankingDown()));
       await t.pumpAndSettle();

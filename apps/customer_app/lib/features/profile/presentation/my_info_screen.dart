@@ -58,6 +58,14 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
   /// 가입 폼의 실명 칸(BR-107) — 로그인 계정 이름으로 채운다(사용자 2026-11-26).
   final _realName = TextEditingController();
   bool _filled = false;
+
+  /// 고객이 닉네임 칸을 직접 고쳤다 — 그 전까지는 닉네임이 이름을 따라간다(사용자 2026-11-26).
+  bool _nickTouched = false;
+
+  void _followName() {
+    if (!_nickTouched) _name.text = _realName.text;
+  }
+
   ProfileChangeOutcome? _last;
 
   @override
@@ -71,6 +79,7 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
 
   @override
   void dispose() {
+    _realName.removeListener(_followName);
     _name.dispose();
     _realName.dispose();
     super.dispose();
@@ -129,9 +138,13 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
     // 서버 값으로 한 번만 채운다(입력 중에 덮어쓰지 않는다).
     if (!_filled && profile != null) {
       _filled = true;
-      _name.text = profile.nickname ?? '';
       // 소셜 로그인이 준 이름이 있으면 이름 칸에 채운다(사용자 2026-11-26).
       _realName.text = profile.name ?? '';
+      // 이미 정한 닉네임이 있으면 그대로, 없으면 이름을 따라간다(사용자 2026-11-26).
+      final nick = profile.nickname?.trim() ?? '';
+      _nickTouched = nick.isNotEmpty;
+      _name.text = _nickTouched ? nick : _realName.text;
+      _realName.addListener(_followName);
     }
     final hasPhone = profile?.hasPhone ?? false;
     final message = _message(l10n);
@@ -165,6 +178,8 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
                 TextFormField(
                   key: const ValueKey('info-real-name'),
                   controller: _realName,
+                  // 이름이 비었으면(카카오 등) 이름 칸부터, 채워졌으면 닉네임 칸부터.
+                  autofocus: widget.signup && _realName.text.trim().isEmpty,
                   maxLength: NameInput.maxLength,
                   decoration: InputDecoration(labelText: l10n.infoName),
                   validator: (v) => NameInput.valid(v ?? '')
@@ -177,7 +192,9 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
                 TextFormField(
                   key: const ValueKey('info-name'),
                   controller: _name,
-                  autofocus: widget.signup,
+                  autofocus: widget.signup && _realName.text.trim().isNotEmpty,
+                  // 직접 고치면 그때부터 이름을 따라가지 않는다.
+                  onChanged: (_) => _nickTouched = true,
                   maxLength: NameInput.maxLength,
                   decoration: InputDecoration(labelText: l10n.infoNickname),
                   validator: (v) {
@@ -216,10 +233,16 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
                   Text(message, key: const ValueKey('info-message')),
                 ],
                 const SizedBox(height: 16),
-                CommandButton(
-                  key: const ValueKey('info-save'),
-                  label: l10n.infoSave,
-                  onPressed: () => _save(profile),
+                // 이름이 비어 있으면 저장할 수 없다(사용자 2026-11-26).
+                ListenableBuilder(
+                  listenable: _realName,
+                  builder: (context, _) => CommandButton(
+                    key: const ValueKey('info-save'),
+                    label: l10n.infoSave,
+                    onPressed: _realName.text.trim().isEmpty
+                        ? null
+                        : () => _save(profile),
+                  ),
                 ),
                 if (widget.signup && _canSkip)
                   TextButton(

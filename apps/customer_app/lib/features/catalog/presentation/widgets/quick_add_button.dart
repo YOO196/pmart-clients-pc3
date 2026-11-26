@@ -23,6 +23,7 @@ class QuickAddButton extends ConsumerStatefulWidget {
     required this.tile,
     this.size = 30,
     this.iconSize = 20,
+    this.strokeWidth = 2.4,
   });
 
   final ProductTile tile;
@@ -30,6 +31,9 @@ class QuickAddButton extends ConsumerStatefulWidget {
   /// 동그라미 지름·+ 크기(기본 30·20). 장바구니 추천 시트는 실측 32.4·22.
   final double size;
   final double iconSize;
+
+  /// + 선 굵기.
+  final double strokeWidth;
 
   /// `+` 를 보여도 되는지(안내용). 확정은 장바구니 서버 판정.
   static bool offeredFor(ProductTile t) =>
@@ -65,8 +69,8 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
         iconSize: widget.iconSize,
         style: IconButton.styleFrom(
           backgroundColor: scheme.surface,
-          elevation: 2,
-          shadowColor: Colors.black38,
+          // 테두리·그림자 없음 — 사진에 그려진 동그라미 그림자를 그대로 쓴다(사용자 2026-11-26).
+          elevation: 0,
           minimumSize: Size.square(widget.size),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
@@ -80,7 +84,7 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
             : PmartLineIcon(
                 PmartLineIcons.plus,
                 size: widget.iconSize,
-                strokeWidth: 2.4,
+                strokeWidth: widget.strokeWidth,
               ),
       ),
     );

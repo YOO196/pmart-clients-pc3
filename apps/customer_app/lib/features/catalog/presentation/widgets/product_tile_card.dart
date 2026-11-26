@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -231,16 +233,42 @@ class ProductTileCard extends StatelessWidget {
               child: Center(
                 child: Padding(
                   padding: const EdgeInsets.all(6),
-                  child: Text(
-                    status,
-                    key: ValueKey('tile-status-${tile.productId}'),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  // 사진에 박힌 "일시품절"은 글꼴이 달라 가장자리가 비친다 — 아래를 흐린 덮개로 가리고 흰 글자
+                  // (사용자 2026-11-26). 크기는 사진 폭 비율(그려진 글자 높이와 같게).
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // 사진 속 글자 자리(폭 0.345·높이 0.084)를 덮개 색으로 흐리게 덮는다 — 가장자리는 번져
+                      // 테두리처럼 보이지 않는다(사용자 2026-11-26 "그라데이션으로 자연스럽게").
+                      IgnorePointer(
+                        child: ImageFiltered(
+                          imageFilter: ui.ImageFilter.blur(
+                            sigmaX: size * 0.03,
+                            sigmaY: size * 0.03,
+                          ),
+                          child: Container(
+                            width: size * 0.38,
+                            height: size * 0.105,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF403C3A),
+                              borderRadius: BorderRadius.circular(size * 0.05),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        status,
+                        key: ValueKey('tile-status-${tile.productId}'),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontSize: size * _soldTextRatio,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -259,14 +287,17 @@ class ProductTileCard extends StatelessWidget {
               onImage: true,
             ),
           ),
+        // 상품 사진(서버 그림)에 + 동그라미가 그려져 있다 — 같은 자리·같은 크기로 덮어 겹쳐 보이지 않게(사용자
+        // 2026-11-26, 폰 캡처 실측: 지름 = 사진 폭 × 0.242, 오른쪽·아래 여백 × 0.038, + 길이 = 지름 × 0.47).
         if (quickAdd && QuickAddButton.offeredFor(tile))
           Positioned(
-            right: 5,
-            bottom: 5,
+            right: size * _addInsetRatio,
+            bottom: size * _addInsetRatio,
             child: QuickAddButton(
               tile: tile,
-              size: look.addSize,
-              iconSize: look.addIconSize,
+              size: size * _addSizeRatio,
+              iconSize: size * _addSizeRatio * 0.47,
+              strokeWidth: size * _addSizeRatio * 0.035,
             ),
           ),
       ],
@@ -285,7 +316,7 @@ class ProductTileCard extends StatelessWidget {
           fontWeight: look.nameWeight,
         ),
       ),
-      const SizedBox(height: 4),
+      SizedBox(height: look.priceGap),
       // 기간 할인(ADR-0082 4단계): 레퍼런스 TOP 30 카드처럼 빨간 할인율 + 할인가(정가 취소선 없음). 서버 값만.
       if (tile.discount case final d?)
         DiscountPriceText(
@@ -312,7 +343,7 @@ class ProductTileCard extends StatelessWidget {
             fontWeight: look.priceWeight,
           ),
         ),
-      if (tile.unitPrice case final u?)
+      if (tile.unitPrice case final u? when !look.compact)
         Text(
           l10n.unitPriceLine('${u.basis}${u.unitLabel}', formatKrw(u.price)),
           key: ValueKey('tile-unit-price-${tile.productId}'),
@@ -326,9 +357,9 @@ class ProductTileCard extends StatelessWidget {
                 : null,
           ),
         ),
-      SizedBox(height: look.ratingGap),
+      if (!look.compact) SizedBox(height: look.ratingGap),
       // 장바구니 추천 시트는 평점이 없으면 줄을 비운다(레퍼런스).
-      if (!(look.hideNoRating && tile.rating == null))
+      if (!look.compact && !(look.hideNoRating && tile.rating == null))
         RatingLine(rating: tile.rating, count: tile.reviewCount),
       // "N개 남음"(BR-100 R7 — 서버가 10개 이하일 때만). 레퍼런스 7-1: 평점 아래 빨간 한 줄
       // (Pretendard 보통 12, #FA4240). 안내일 뿐 확보가 아니다.
@@ -363,7 +394,9 @@ class ProductTileCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 순위 진열은 사진 위에 굵은 숫자(레퍼런스 TOP 30)
-                    if (tile.badge == DisplayBadge.rank && tile.rank != null)
+                    if (tile.badge == DisplayBadge.rank &&
+                        tile.rank != null &&
+                        !look.compact)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 4),
                         child: Text(
@@ -498,6 +531,12 @@ class HighlightedName extends StatelessWidget {
   }
 }
 
+/// 사진에 그려진 + 동그라미·"일시품절" 글자와 같은 크기·자리(사진 폭에 대한 비율, 폰 캡처 2026-11-26 실측:
+/// 서버 사진 475px 에 지름 115px·여백 18px·+ 54px·선 4px, 글자 높이 40px·가운데).
+const _addSizeRatio = 0.242;
+const _addInsetRatio = 0.038;
+const _soldTextRatio = 0.107;
+
 /// 상품 칸 카드의 글자·간격 모양. [standard] 는 지금까지의 모양 그대로(홈·검색·카테고리).
 @immutable
 class TileLook {
@@ -518,7 +557,15 @@ class TileLook {
     this.priceWeight = FontWeight.w700,
     this.unitWeight,
     this.nameSize = 14,
+    this.compact = false,
+    this.priceGap = 4,
   });
+
+  /// 이름 → 가격 사이.
+  final double priceGap;
+
+  /// 이름·가격·"N개 남음"만(단위가격·평점·순위 숫자 없음) — 빈 장바구니 추천(레퍼런스 2026-11-26).
+  final bool compact;
 
   static const standard = TileLook();
 
@@ -541,6 +588,27 @@ class TileLook {
     nameWeight: FontWeight.w600,
     priceWeight: FontWeight.w800,
     unitWeight: FontWeight.w600,
+  );
+
+  /// 빈 장바구니 아래 추천(레퍼런스 2026-11-26, 1080px = 384dp 실측): 하트 없음, 이름 11.6 보통·줄 1.43,
+  /// 가격 11.4 아주 굵게, + 동그라미 30.3.
+  static const emptyCart = TileLook(
+    showWish: false,
+    nameLineHeight: 1.43,
+    nameSize: 11.6,
+    priceSize: 11.4,
+    imageGap: 5.1,
+    priceGap: 0,
+    ratingGap: 2,
+    addSize: 30.3,
+    addIconSize: 20.6,
+    dark: true,
+    keepWords: true,
+    rateColor: Color(0xFFFF3E3E),
+    hideNoRating: true,
+    nameWeight: FontWeight.w400,
+    priceWeight: FontWeight.w800,
+    compact: true,
   );
 
   /// 상품 상세 "다른 사람들이 함께 본 상품" 가로 진열(레퍼런스 2026-11-25 실측): 이름 15.8 보통·줄 1.25,

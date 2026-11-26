@@ -1,3 +1,4 @@
+import '../../../shared/shopping_context.dart' show currentMfcIdProvider;
 import '../../../shared/choice_sheet.dart';
 import 'product_list_view.dart' show sortLabel;
 
@@ -45,6 +46,7 @@ import '../../coupons/presentation/coupon_screens.dart'
 import 'widgets/category_art.dart';
 import 'widgets/delivery_badges.dart';
 import 'widgets/product_tile_card.dart';
+import 'widgets/quick_add_button.dart';
 import '../../../shared/network_image.dart';
 
 /// SCR-HOME-001. 영역별 부분 실패는 그 영역만 다시 불러온다.
@@ -868,6 +870,19 @@ bool _isLastOfMany(List<HomeSection> all, HomeSection s) {
   return list.length > 1 && identical(list.last, s);
 }
 
+/// 신상품 탭: 지금 주소 센터에서 파는 상품 중 제일 나중에 등록한 10개(search `sort=NEWEST` 첫 쪽의 앞 10개 — 서버 순서 그대로).
+final _newestProductsProvider = FutureProvider.autoDispose<List<ProductTile>>((
+  ref,
+) async {
+  final page = await ref
+      .watch(catalogRepositoryProvider)
+      .search(
+        const ProductQuery(sort: SortKey.newest),
+        mfcId: ref.watch(currentMfcIdProvider),
+      );
+  return page.items.take(10).toList();
+});
+
 /// 랭킹·신상품 탭 본문. 실패는 이 탭만 오류로 보인다(빈 탭으로 바꾸지 않는다).
 class _TabBody extends ConsumerWidget {
   const _TabBody({super.key, required this.tab});
@@ -877,6 +892,35 @@ class _TabBody extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    // 신상품 탭은 제일 나중에 등록한 상품 10개(검색 NEWEST — 사용자 2026-11-26 "제일 나중에 등록한 상품 10개").
+    if (tab == HomeTab.isNew) {
+      return switch (ref.watch(_newestProductsProvider)) {
+        AsyncData(:final value) when value.isEmpty => Padding(
+          key: const ValueKey('home-tab-empty'),
+          padding: const EdgeInsets.all(16),
+          child: Text(l10n.sectionEmpty),
+        ),
+        AsyncData(:final value) => _SectionView(
+          key: const ValueKey('section-NEWEST'),
+          section: HomeSection(
+            sectionId: 'NEWEST',
+            kind: SectionKind.isNew,
+            title: l10n.homeNewestTitle,
+            subtitle: l10n.homeNewestSubtitle,
+            available: true,
+            items: value,
+          ),
+          layoutVersion: 0,
+          vertical: true,
+        ),
+        AsyncError() => _InlineFailure(
+          key: const ValueKey('home-tab-failed'),
+          text: l10n.sectionUnavailable,
+          onRetry: () => ref.invalidate(_newestProductsProvider),
+        ),
+        _ => const _SkeletonRail(),
+      };
+    }
     final provider = homeTabProvider(tab);
     return switch (ref.watch(provider)) {
       AsyncData(:final value) when value.sections.isEmpty => Padding(
@@ -1488,53 +1532,18 @@ class _SectionView extends ConsumerWidget {
       '/sections/${shown.sectionId}',
       extra: SectionRef(shown, layoutVersion),
     );
-    // 초안 06-D 띠형(timerStyle BAND): 머리를 연분홍 띠로, 전체보기는 상품 줄 아래 넓은 버튼.
+    // 띠형(timerStyle BAND) — 레퍼런스 "오늘 하루만 이 가격!"(사용자 2026-11-26): 연분홍 그라데이션 머리 + 한 쪽에
+    // 2개씩 세로 줄(사진 위 빨간 할인 시간 띠) + [<] 1 / N [>].
     if (endsAt != null && section.timerStyle == TimerStyle.band) {
-      final band = Padding(
-        padding: const EdgeInsets.only(top: 6, bottom: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _TimerBandHeader(
-              key: ValueKey('section-timer-band-${section.sectionId}'),
-              title: section.title,
-              subtitle: section.subtitle,
-              endsAt: endsAt,
-            ),
-            const SizedBox(height: 12),
-            body,
-            if (hasViewAll)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: OutlinedButton(
-                  key: ValueKey('section-view-all-${section.sectionId}'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(44),
-                    foregroundColor: scheme.onSurface,
-                    side: BorderSide(color: scheme.outlineVariant),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    textStyle: Theme.of(context).textTheme.bodyMedium
-                        ?.copyWith(fontSize: 14),
-                  ),
-                  onPressed: openAll,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(l10n.sectionViewAll),
-                      const PmartLineIcon(
-                        PmartLineIcons.chevronRight,
-                        size: 15,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
+      return SectionExpiry(
+        endsAt: endsAt,
+        child: _TimerDealList(
+          key: ValueKey('section-timer-band-${section.sectionId}'),
+          section: shown,
+          endsAt: endsAt,
+          onViewAll: hasViewAll ? openAll : null,
         ),
       );
-      return SectionExpiry(endsAt: endsAt, child: band);
     }
     final view = Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 20),
@@ -2815,25 +2824,31 @@ class _SectionCountdownState extends ConsumerState<SectionCountdown> {
   }
 }
 
-/// 초안 06-D 띠형 머리: 연분홍(tertiaryContainer) 띠 — 왼쪽 제목(2줄까지)·부제, 오른쪽 시·분·초 흰 칸 + "남은 시간".
-class _TimerBandHeader extends ConsumerStatefulWidget {
-  const _TimerBandHeader({
+/// 띠형 타이머 테마(레퍼런스 "오늘 하루만 이 가격! 일일특가", 폰 1080px = 384dp 실측 ÷2.8125):
+/// 위 회색 칸 9.2 → 연분홍(#FFE7E7) → 흰색 그라데이션, 제목 17.3 굵게(왼쪽 15.3)·오른쪽 "전체 보기 >",
+/// 부제 12.5 회색, 상품은 한 쪽에 2개 — 왼쪽 카드 154.7(빨간 띠 20.3 "할인 남은 시간" + 사진 높이 134.4, 카드 사이 15.3), 오른쪽 이름·할인가·평점,
+/// 아래 [<] 현재 / 전체 [>] 네모 단추(52 × 35). 남은 시간·가격은 서버 값(끝 시각·할인가)만.
+class _TimerDealList extends ConsumerStatefulWidget {
+  const _TimerDealList({
     super.key,
-    required this.title,
+    required this.section,
     required this.endsAt,
-    this.subtitle,
+    this.onViewAll,
   });
 
-  final String title;
-  final String? subtitle;
+  final HomeSection section;
   final DateTime endsAt;
+  final VoidCallback? onViewAll;
 
   @override
-  ConsumerState<_TimerBandHeader> createState() => _TimerBandHeaderState();
+  ConsumerState<_TimerDealList> createState() => _TimerDealListState();
 }
 
-class _TimerBandHeaderState extends ConsumerState<_TimerBandHeader> {
+class _TimerDealListState extends ConsumerState<_TimerDealList> {
+  static const _perPage = 2;
+  static const _red = Color(0xFFFF3E3E);
   Timer? _tick;
+  int _page = 0;
 
   @override
   void initState() {
@@ -2854,95 +2869,275 @@ class _TimerBandHeaderState extends ConsumerState<_TimerBandHeader> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final parts = remainingClock(
+    final items = widget.section.items;
+    final pages = (items.length / _perPage).ceil().clamp(1, 999);
+    final page = _page.clamp(0, pages - 1);
+    final shown = items.skip(page * _perPage).take(_perPage).toList();
+    final left = remainingClock(
       widget.endsAt.difference(ref.read(homeClockProvider)()),
-    ).split(':');
-    final digit = theme.textTheme.titleMedium?.copyWith(
-      fontSize: 17,
+    );
+    final priceStyle = theme.textTheme.titleLarge?.copyWith(
+      fontSize: 15.8,
       fontWeight: FontWeight.w800,
-      color: scheme.tertiary,
-      fontFeatures: const [FontFeature.tabularFigures()],
     );
-    Widget box(String v) => Container(
-      width: 34,
-      height: 32,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(6),
+    Widget pagerButton(String key, bool left, bool on, int to) => SizedBox(
+      width: 52,
+      height: 35,
+      child: OutlinedButton(
+        key: ValueKey('deal-${widget.section.sectionId}-$key'),
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          foregroundColor: scheme.onSurface,
+          side: const BorderSide(color: Color(0xFFC9CACD)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        onPressed: on ? () => setState(() => _page = to) : null,
+        child: RotatedBox(
+          quarterTurns: left ? 2 : 0,
+          child: const PmartLineIcon(
+            PmartLineIcons.chevronRight,
+            size: 19,
+            strokeWidth: 1.8,
+          ),
+        ),
       ),
-      child: Text(v, style: digit),
     );
-    final colon = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 3),
-      child: Text(':', style: digit),
-    );
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
-      decoration: BoxDecoration(
-        color: scheme.tertiaryContainer,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                    height: 1.3,
-                    color: scheme.onTertiaryContainer,
-                  ),
-                ),
-                if (widget.subtitle case final s? when s.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(height: 9.2, color: const Color(0xFFF4F5F7)),
+        Container(
+          padding: const EdgeInsets.fromLTRB(15.3, 4.7, 8, 14),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFFFE7E7), Color(0xFFFFFFFF)],
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
                     child: Text(
-                      s,
-                      maxLines: 1,
+                      widget.section.title,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 13,
-                        color: scheme.onTertiaryContainer,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontSize: 17.3,
+                        height: 1.25,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  box(parts[0]),
-                  colon,
-                  box(parts[1]),
-                  colon,
-                  box(parts[2]),
+                  if (widget.onViewAll != null)
+                    TextButton(
+                      key: ValueKey(
+                        'section-view-all-${widget.section.sectionId}',
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: scheme.onSurface,
+                        textStyle: theme.textTheme.bodyMedium?.copyWith(
+                          fontSize: 14,
+                        ),
+                      ),
+                      onPressed: widget.onViewAll,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(l10n.sectionViewAll),
+                          const PmartLineIcon(
+                            PmartLineIcons.chevronRight,
+                            size: 15,
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                l10n.sectionTimeLeftCaption,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 11.5,
-                  color: scheme.onTertiaryContainer,
+              if (widget.section.subtitle case final sub?) ...[
+                const SizedBox(height: 4),
+                Text(
+                  sub,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 12.5,
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
-        ],
-      ),
+        ),
+        for (final tile in shown)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(15, 0, 15, 15.3),
+            child: InkWell(
+              key: ValueKey('deal-item-${tile.productId}'),
+              onTap: () =>
+                  context.push('/products/${tile.productId}', extra: tile),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 154.7,
+                    child: DecoratedBox(
+                      position: DecorationPosition.foreground,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: scheme.outlineVariant,
+                          width: 0.8,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Column(
+                          children: [
+                            Container(
+                              height: 20.3,
+                              color: _red,
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const PmartLineIcon(
+                                    PmartLineIcons.clock,
+                                    size: 12,
+                                    color: Colors.white,
+                                    strokeWidth: 2.4,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    l10n.dealTimeLeft(left),
+                                    key: ValueKey(
+                                      'deal-time-${tile.productId}',
+                                    ),
+                                    style: theme.textTheme.labelMedium
+                                        ?.copyWith(
+                                          fontSize: 12,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                          fontFeatures: const [
+                                            FontFeature.tabularFigures(),
+                                          ],
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Stack(
+                              children: [
+                                ProductImage(
+                                  url: tile.imageUrl,
+                                  size: 154.7,
+                                  height: 134.4,
+                                  radius: 0,
+                                ),
+                                if (QuickAddButton.offeredFor(tile))
+                                  Positioned(
+                                    right: 154.7 * 0.038,
+                                    bottom: 154.7 * 0.038,
+                                    child: QuickAddButton(
+                                      tile: tile,
+                                      size: 154.7 * 0.242,
+                                      iconSize: 154.7 * 0.242 * 0.47,
+                                      strokeWidth: 154.7 * 0.242 * 0.035,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 9.6),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tile.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: 12.4,
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (tile.discount case final d?)
+                          // 할인율과 가격 사이 4.3px 글자 간격(실측 — 공백 한 칸보다 좁다).
+                          Text.rich(
+                            TextSpan(
+                              style: priceStyle,
+                              children: [
+                                if (d.ratePercent case final r?) ...[
+                                  TextSpan(
+                                    text: '$r%',
+                                    style: const TextStyle(color: _red),
+                                  ),
+                                  const WidgetSpan(child: SizedBox(width: 2.2)),
+                                ],
+                                TextSpan(text: formatKrw(d.salePrice)),
+                              ],
+                            ),
+                          )
+                        else
+                          Text(switch (tile.basePrice) {
+                            final int p => formatKrw(p),
+                            null => l10n.priceUnavailable,
+                          }, style: priceStyle),
+                        const SizedBox(height: 4),
+                        RatingLine(
+                          rating: tile.rating,
+                          count: tile.reviewCount,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        if (pages > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 1.7, bottom: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // 레퍼런스: 첫 쪽에서도 [<] 가 켜져 있다 — 끝 쪽으로 돈다.
+                pagerButton('prev', true, true, (page - 1 + pages) % pages),
+                SizedBox(
+                  width: 113.6,
+                  child: Text.rich(
+                    TextSpan(
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontSize: 15.5,
+                      ),
+                      children: [
+                        TextSpan(text: '${page + 1}'),
+                        TextSpan(
+                          text: ' / $pages',
+                          style: TextStyle(color: scheme.outline),
+                        ),
+                      ],
+                    ),
+                    key: ValueKey('deal-${widget.section.sectionId}-page'),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                pagerButton('next', false, true, (page + 1) % pages),
+              ],
+            ),
+          )
+        else
+          const SizedBox(height: 8),
+        Container(height: 9.2, color: const Color(0xFFF4F5F7)),
+      ],
     );
   }
 }
@@ -3392,7 +3587,7 @@ final _boughtBeforeProvider = FutureProvider.autoDispose<OrderPage?>((
 });
 
 /// 홈 "상품 고르는 시간도 아끼고 싶다면? / 내가 1번 구매한 상품 보기 ›" 카드(사용자 폰 캡처 2026-11-26).
-/// 주문이 있는 회원만(최근 주문의 첫 상품 사진). 사 본 상품만 모은 목록 API 가 계약에 없어(BR-109) 누르면 주문내역으로 간다.
+/// 주문이 있는 회원만(최근 주문의 첫 상품 사진). 누르면 산 상품 한 번에 담기 화면(order 0.24.0 frequent-items).
 /// 실측: 좌우 11, 모서리 16, 옅은 테두리, 사진 60(모서리 10), 글 왼쪽 13, 위 줄 14.5 회색 · 아래 줄 19 굵게("1번 구매한" 보라).
 class _BoughtBeforeCard extends ConsumerWidget {
   const _BoughtBeforeCard();
@@ -3421,7 +3616,8 @@ class _BoughtBeforeCard extends ConsumerWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             key: const ValueKey('home-bought-before'),
-            onTap: () => context.go('/orders'),
+            // 산 상품을 한 번에 담는 화면(order 0.24.0 frequent-items, 사용자 2026-11-26).
+            onTap: () => context.push('/me/bought-items'),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
               child: Row(
@@ -3544,10 +3740,11 @@ class _SaleTabBodyState extends ConsumerState<_SaleTabBody> {
       required Widget art,
       required String label,
       required VoidCallback onTap,
-    }) => InkWell(
+    }) => GestureDetector(
+      // 누를 때 회색 물결·배경 없음 — 고르면 진한 테두리만(사용자 2026-11-26).
       key: key,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      behavior: HitTestBehavior.opaque,
       child: SizedBox(
         width: 70,
         child: Column(
