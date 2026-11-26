@@ -8,6 +8,7 @@ import 'features/manage/presentation/move_admin_screens.dart';
 import 'features/auth/domain/employee_auth.dart';
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/auth/presentation/login_screen.dart';
+import 'features/cdc/presentation/cdc_flow_screens.dart';
 import 'features/cdc/presentation/cdc_home.dart';
 import 'features/cdc/presentation/cdc_pick_screen.dart';
 import 'features/device/presentation/device_setup_screens.dart';
@@ -164,19 +165,22 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/cdc/work/pick',
         pageBuilder: (_, s) => _page(s, const CdcPickScreen()),
       ),
-      // DC 직원 업무(사용자 2026-11-26) — 업무 화면 자리
+      // DC 분배·검품·상차·지게차 적치(사용자 2026-11-26 "업무화면 다 만들어")
       GoRoute(
-        path: '/cdc/work/:area',
-        redirect: (_, s) =>
-            CdcWorkArea.values.any((a) => a.name == s.pathParameters['area'])
-            ? null
-            : '/',
-        pageBuilder: (_, s) => _page(
-          s,
-          CdcWorkScreen(
-            area: CdcWorkArea.values.byName(s.pathParameters['area']!),
-          ),
-        ),
+        path: '/cdc/work/sort',
+        pageBuilder: (_, s) => _page(s, const CdcSortScreen()),
+      ),
+      GoRoute(
+        path: '/cdc/work/inspect',
+        pageBuilder: (_, s) => _page(s, const CdcInspectScreen()),
+      ),
+      GoRoute(
+        path: '/cdc/work/load',
+        pageBuilder: (_, s) => _page(s, const CdcLoadScreen()),
+      ),
+      GoRoute(
+        path: '/cdc/work/putaway',
+        pageBuilder: (_, s) => _page(s, const CdcPutawayScreen()),
       ),
       GoRoute(
         path: '/work/:area',

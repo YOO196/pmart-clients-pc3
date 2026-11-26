@@ -64,8 +64,9 @@ void main() {
 
     await t.tap(find.byKey(const ValueKey('cdc-area-load')));
     await t.pumpAndSettle();
-    expect(find.byKey(const ValueKey('cdc-work-preparing')), findsOneWidget);
+    // 상차는 피킹 끝난 TRF 고르기부터
     expect(find.text('상차'), findsOneWidget);
+    expect(find.byKey(const ValueKey('cdc-trf-TRF-mock-1')), findsOneWidget);
   });
 
   testWidgets('DC 관리자도 DC 메뉴', (t) async {

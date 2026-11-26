@@ -251,29 +251,3 @@ class _CdcAreaTile extends StatelessWidget {
     );
   }
 }
-
-/// DC 업무 화면 자리 — 작업 받기·실행 화면은 다음 차례(계약은 있다: cdc-outbound next-tasks·starts·pick-results 등).
-class CdcWorkScreen extends StatelessWidget {
-  const CdcWorkScreen({super.key, required this.area});
-
-  final CdcWorkArea area;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Scaffold(
-      appBar: AppBar(title: Text(cdcAreaText(l10n, area))),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            l10n.cdcWorkPreparing,
-            key: const ValueKey('cdc-work-preparing'),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
-      ),
-    );
-  }
-}
