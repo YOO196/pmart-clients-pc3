@@ -214,11 +214,8 @@ void main() {
     expect(find.text('주문하신 주소로 가고 있어요.'), findsOneWidget);
     expect(find.byKey(const ValueKey('track-sheet-remaining')), findsOneWidget);
     expect(find.byKey(const ValueKey('eta-delayed')), findsOneWidget);
-    // 초안 13: 남은 시간 옆 시각은 "오후 6:50 도착"(사용자 2026-11-23).
-    expect(
-      find.textContaining(RegExp(r'^(오전|오후) \d+:\d\d 도착$')),
-      findsOneWidget,
-    );
+    // 남은 시간 옆 시각은 "오후 6:50"(사용자 레퍼런스 2026-11-25 — "도착" 뺌).
+    expect(find.textContaining(RegExp(r'^(오전|오후) \d+:\d\d$')), findsOneWidget);
 
     orders.etaFails = true;
     await t.tap(

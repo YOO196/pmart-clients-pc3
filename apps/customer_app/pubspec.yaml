@@ -113,6 +113,10 @@ flutter:
     - assets/images/login_google.png
     # 주소 상세 지도 핀(사용자 레퍼런스 2026-11-25)
     - assets/images/address_pin.png
+    # 찜 빈 화면 그림(사용자 레퍼런스 2026-11-26)
+    - assets/images/wish_empty.png
+    # 카테고리 추천 타일 그림(사용자 레퍼런스 2026-11-26)
+    - assets/images/category_picks/
   # Pretendard (SIL OFL 1.1, assets/fonts/Pretendard-LICENSE.txt). 사용자 지시 2026-11-11.
   fonts:
     - family: Pretendard

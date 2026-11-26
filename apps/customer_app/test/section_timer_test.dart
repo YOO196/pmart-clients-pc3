@@ -202,6 +202,14 @@ void main() {
       MockCatalogRepository(latency: Duration.zero),
       () => DateTime.utc(2026, 11, 21, 3),
     );
-    expect(find.textContaining('남음'), findsNothing);
+    // "N개 남음"(재고 적음, BR-100 R7)은 타이머가 아니다 — 타이머 알약 키로만 본다.
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w.key is ValueKey<String> &&
+            (w.key! as ValueKey<String>).value.startsWith('section-timer-'),
+      ),
+      findsNothing,
+    );
   });
 }

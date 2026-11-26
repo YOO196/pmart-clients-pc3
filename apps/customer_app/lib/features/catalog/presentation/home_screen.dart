@@ -1,3 +1,6 @@
+import '../../../shared/choice_sheet.dart';
+import 'product_list_view.dart' show sortLabel;
+
 import 'dart:math' as math;
 import 'dart:async';
 
@@ -20,9 +23,11 @@ import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../checkout/domain/checkout.dart';
 import '../../checkout/presentation/delivery_select_screen.dart'
-    show modeLabel, optionSubtitle, windowText;
+    show modeLabel, optionSubtitle;
 import '../../../shared/order_status.dart' show OrderStatus;
 import '../../orders/domain/orders.dart';
+import '../../orders/presentation/orders_providers.dart'
+    show ordersRepositoryProvider;
 import '../../payment/presentation/payment_controller.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
@@ -86,7 +91,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final home = ref.read(homeProvider).value;
     final now = ref.read(homeClockProvider)();
     setState(() {
-      if (req.firstCustom) {
+      if (req.sale) {
+        _customTab = saleTabKey;
+      } else if (req.firstCustom) {
         // 지금 기간 안 첫 MD 탭, 없으면 홈.
         _customTab = home?.customTabs
             .where(
@@ -229,9 +236,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         centerTitle: false,
         titleSpacing: 16,
         title: const _AddressChip(),
+        // 사용자 폰 캡처(2026-11-26): 아이콘 가운데 사이 알림→돋보기 40.3, 돋보기→장바구니 38.4, 장바구니 가운데는
+        // 오른쪽 끝에서 26.2.
         actions: [
           IconButton(
             key: const ValueKey('home-notifications'),
+            constraints: const BoxConstraints.tightFor(width: 42.2, height: 48),
+            padding: EdgeInsets.zero,
             icon: const PmartLineIcon(PmartLineIcons.bell, size: 26),
             tooltip: l10n.noticeTitle,
             onPressed: () => context.push('/notifications'),
@@ -239,12 +250,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           // 하단 탭에서 검색이 빠져(가운데 = 찜) 상단바에 돋보기(레퍼런스 홈: 홈·검색·장바구니).
           IconButton(
             key: const ValueKey('home-top-search'),
+            constraints: const BoxConstraints.tightFor(width: 38.4, height: 48),
+            padding: EdgeInsets.zero,
             icon: const PmartLineIcon(PmartLineIcons.search, size: 26),
             tooltip: l10n.navSearch,
             onPressed: () => context.push('/search'),
           ),
-          const CartIconButton(key: ValueKey('home-top-cart'), size: 26),
-          const SizedBox(width: 6),
+          const CartIconButton(
+            key: ValueKey('home-top-cart'),
+            size: 26,
+            width: 38.4,
+          ),
+          const SizedBox(width: 7),
           if (mock)
             Padding(
               padding: const EdgeInsets.only(right: 12),
@@ -269,18 +286,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     .where((c) => c.tabKey == _customTab)
                     .firstOrNull;
                 final tab = home.tabs.contains(_tab) ? _tab : HomeTab.home;
-                final isHome = custom == null && tab == HomeTab.home;
-                // 탭 순서: 고정 탭 → MD 탭. 바뀌었으면 미끄럼 방향을 정한다(첫 그림은 미끄럼 없음).
+                // 할인 탭(앱이 둔다 — storefront 할인 탭은 1차 제외라 search onSale 목록, 사용자 2026-11-26).
+                final sale = _customTab == saleTabKey;
+                final isHome = !sale && custom == null && tab == HomeTab.home;
+                // 탭 순서: 홈 → 할인 → 나머지 고정 탭 → MD 탭. 바뀌었으면 미끄럼 방향을 정한다(첫 그림은 미끄럼 없음).
                 final order = <Object>[
-                  ...home.tabs,
+                  for (final t in home.tabs) ...[
+                    t,
+                    if (t == HomeTab.home) saleTabKey,
+                  ],
                   ...customs.map((c) => c.tabKey),
                 ];
-                final index = order.indexOf(custom?.tabKey ?? tab);
+                final index = order.indexOf(
+                  sale ? saleTabKey : (custom?.tabKey ?? tab),
+                );
                 if (_tabIndex != null && index != _tabIndex) {
                   _slideFrom = index > _tabIndex! ? 1 : -1;
                 }
                 _tabIndex = index;
-                final slideKey = custom?.tabKey ?? tab.name;
+                final slideKey = sale
+                    ? saleTabKey
+                    : (custom?.tabKey ?? tab.name);
                 void goTo(int i) {
                   if (i < 0 || i >= order.length) return;
                   final next = order[i];
@@ -355,21 +381,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     _InProgressOrderCard(),
                                   ],
                                 ),
-                                if (home.tabs.length > 1 || customs.isNotEmpty)
-                                  _HomeTabs(
-                                    key: const ValueKey('home-tabs'),
-                                    tabs: home.tabs,
-                                    selected: custom == null ? tab : null,
-                                    onSelected: (t) => setState(() {
-                                      _tab = t;
-                                      _customTab = null;
-                                    }),
-                                    customTabs: customs,
-                                    selectedCustom: custom?.tabKey,
-                                    onSelectedCustom: (k) =>
-                                        setState(() => _customTab = k),
-                                    onCustomGone: _dropCustomTab,
-                                  ),
+                                _HomeTabs(
+                                  key: const ValueKey('home-tabs'),
+                                  tabs: home.tabs,
+                                  selected: custom == null && !sale
+                                      ? tab
+                                      : null,
+                                  saleSelected: sale,
+                                  onSale: () =>
+                                      setState(() => _customTab = saleTabKey),
+                                  onSelected: (t) => setState(() {
+                                    _tab = t;
+                                    _customTab = null;
+                                  }),
+                                  customTabs: customs,
+                                  selectedCustom: custom?.tabKey,
+                                  onSelectedCustom: (k) =>
+                                      setState(() => _customTab = k),
+                                  onCustomGone: _dropCustomTab,
+                                ),
                                 if (isHome)
                                   _SlideIn(
                                     key: ValueKey('slide-top-$slideKey'),
@@ -419,6 +449,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     // 레퍼런스: 둘째 줄 이름 아래 → 회색 띠 98px/1080.
                                     const SizedBox(height: 23.9),
                                     const PmartSectionGap(height: 10),
+                                    // "내가 1번 구매한 상품 보기"(사용자 폰 캡처 2026-11-26) — 주문이 있는 회원만.
+                                    const _BoughtBeforeCard(),
                                     // 레퍼런스: 섹션마다 회색 띠(약 8dp)로 나눈다.
                                     for (final (i, s)
                                         in home.sections.indexed) ...[
@@ -465,7 +497,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           layoutVersion: home.layoutVersion,
                                         ),
                                     ],
-                                  ] else if (custom != null)
+                                  ] else if (sale)
+                                    const _SaleTabBody(
+                                      key: ValueKey('home-tab-body-sale'),
+                                    )
+                                  else if (custom != null)
                                     _CustomTabBody(
                                       key: ValueKey(
                                         'home-tab-body-${custom.tabKey}',
@@ -505,7 +541,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             _InProgressOrderCard(floating: true),
-                            FloatingCartBar(),
+                            // 예약배달만 받는 때(심야)는 장바구니 막대 대신 안내(사용자 2026-11-26).
+                            _HomeCartBarOrNight(),
                           ],
                         ),
                       ),
@@ -537,7 +574,13 @@ class _HomeTabs extends StatefulWidget {
     this.selectedCustom,
     this.onSelectedCustom,
     this.onCustomGone,
+    this.saleSelected = false,
+    this.onSale,
   });
+
+  /// 할인 탭(앱이 둔다)을 골랐다.
+  final bool saleSelected;
+  final VoidCallback? onSale;
 
   final List<HomeTab> tabs;
 
@@ -561,6 +604,7 @@ class _HomeTabsState extends State<_HomeTabs> {
   void didUpdateWidget(_HomeTabs old) {
     super.didUpdateWidget(old);
     if (old.selected != widget.selected ||
+        old.saleSelected != widget.saleSelected ||
         old.selectedCustom != widget.selectedCustom) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final c = _selectedKey.currentContext;
@@ -636,13 +680,21 @@ class _HomeTabsState extends State<_HomeTabs> {
           // 타이머가 붙은 탭만 위로 높다 — 이름은 아래 줄에 맞춘다(레퍼런스 탭 줄).
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            for (final t in tabs)
+            for (final t in tabs) ...[
               tab(
                 key: ValueKey('home-tab-${t.name}'),
                 label: homeTabLabel(l10n, t),
                 on: t == selected,
                 onTap: () => onSelected(t),
               ),
+              if (t == HomeTab.home && widget.onSale != null)
+                tab(
+                  key: const ValueKey('home-tab-sale'),
+                  label: l10n.tabSale,
+                  on: widget.saleSelected,
+                  onTap: widget.onSale!,
+                ),
+            ],
             for (final c in customTabs)
               _TabExpiry(
                 key: ValueKey('home-tab-expiry-${c.tabKey}'),
@@ -810,6 +862,12 @@ class _CustomTabBody extends ConsumerWidget {
   }
 }
 
+/// 랭킹 탭에서 마지막 영역(영역이 둘 이상일 때만)은 2칸 세로 격자.
+bool _isLastOfMany(List<HomeSection> all, HomeSection s) {
+  final list = all.where((x) => x.kind != SectionKind.banner).toList();
+  return list.length > 1 && identical(list.last, s);
+}
+
 /// 랭킹·신상품 탭 본문. 실패는 이 탭만 오류로 보인다(빈 탭으로 바꾸지 않는다).
 class _TabBody extends ConsumerWidget {
   const _TabBody({super.key, required this.tab});
@@ -842,7 +900,10 @@ class _TabBody extends ConsumerWidget {
                 key: ValueKey('section-${s.sectionId}'),
                 section: s,
                 layoutVersion: value.layoutVersion,
-                vertical: true,
+                // 사용자 폰 캡처(2026-11-26 랭킹 탭): 첫 영역은 순위 3칸 격자(< 1/5 > 넘김), 가운데는 두 줄 가로,
+                // 마지막은 2칸 세로 격자. 신상품 탭은 모두 2칸 세로 격자.
+                vertical:
+                    tab != HomeTab.ranking || _isLastOfMany(value.sections, s),
               ),
         ],
       ),
@@ -1178,11 +1239,24 @@ class _HomeSearchBar extends StatelessWidget {
 
 /// 상위 카테고리 바로가기(동그란 칸 + 이름, 가로로 넘긴다). 카테고리 그림이 계약에 없어 첫 글자를 넣는다.
 /// 조회 중·실패면 그리지 않는다(카테고리 탭이 상태를 직접 보인다).
-class _CategoryShortcuts extends ConsumerWidget {
+class _CategoryShortcuts extends ConsumerStatefulWidget {
   const _CategoryShortcuts();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_CategoryShortcuts> createState() => _CategoryShortcutsState();
+}
+
+class _CategoryShortcutsState extends ConsumerState<_CategoryShortcuts> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final roots = (ref.watch(categoriesProvider).value ?? const [])
         .where((n) => n.depth == 1)
@@ -1192,10 +1266,11 @@ class _CategoryShortcuts extends ConsumerWidget {
     final labelHeight = MediaQuery.textScalerOf(context).scale(12);
     final cell = math.max(76.1, 50 + 3.5 + labelHeight + 10);
     final twoRows = roots.length > 5;
-    return SizedBox(
+    final grid = SizedBox(
       height: (twoRows ? cell * 2 : cell) + 12,
       child: GridView.builder(
         key: const ValueKey('home-categories'),
+        controller: _scroll,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(10.1, 12, 10.1, 0),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -1231,6 +1306,61 @@ class _CategoryShortcuts extends ConsumerWidget {
           );
         },
       ),
+    );
+    // 넘김 표시(사용자 폰 캡처 2026-11-26): 이름 아래 가운데 짧은 막대 — 길이 44.5·굵기 2.3, 진한 부분은 보이는 비율만큼
+    // 지금 위치에. 다 보이면(넘길 것 없음) 그리지 않는다.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        grid,
+        AnimatedBuilder(
+          animation: _scroll,
+          builder: (context, _) {
+            if (!_scroll.hasClients ||
+                !_scroll.position.hasContentDimensions ||
+                _scroll.position.maxScrollExtent <= 0) {
+              return const SizedBox.shrink();
+            }
+            final pos = _scroll.position;
+            final total = pos.maxScrollExtent + pos.viewportDimension;
+            const track = 44.5;
+            final thumb = track * (pos.viewportDimension / total);
+            final left =
+                (track - thumb) *
+                (pos.pixels / pos.maxScrollExtent).clamp(0.0, 1.0);
+            return Padding(
+              key: const ValueKey('home-categories-indicator'),
+              padding: const EdgeInsets.only(top: 11),
+              child: SizedBox(
+                width: track,
+                height: 2.3,
+                child: Stack(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE6E7E9),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Positioned(
+                      left: left,
+                      width: thumb,
+                      top: 0,
+                      bottom: 0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1B1D1E),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
@@ -1288,7 +1418,10 @@ class _SectionView extends ConsumerWidget {
             )
           // 홈의 순위 진열(자동 랭킹 테마): 레퍼런스 "16. 지금 TOP 30" — 순위 숫자를 단 3칸 × 2줄, 나머지는 전체 보기.
           : !vertical && shown.ranked
-          ? _RankGrid(items: shown.items.take(rankGridCount).toList())
+          ? _RankGrid(
+              key: ValueKey('rankgrid-section-${shown.sectionId}'),
+              items: shown.items,
+            )
           : vertical
           ? Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1316,30 +1449,7 @@ class _SectionView extends ConsumerWidget {
                 ],
               ),
             )
-          : SizedBox(
-              height: ProductTileCard.heightFor(
-                context,
-                ProductTileCard.railWidthOf(context),
-                rank: hasRank,
-              ),
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                itemCount: shown.items.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 8),
-                itemBuilder: (context, i) => SizedBox(
-                  width: ProductTileCard.railWidthOf(context),
-                  child: ProductTileCard(
-                    rail: true,
-                    tile: shown.items[i],
-                    onTap: () => context.push(
-                      '/products/${shown.items[i].productId}',
-                      extra: shown.items[i],
-                    ),
-                  ),
-                ),
-              ),
-            );
+          : _Rail(items: shown.items, rank: hasRank);
     } else {
       final loading = retry?.isLoading ?? false;
       body = Padding(
@@ -1786,7 +1896,9 @@ class _DeliverySummary extends ConsumerWidget {
         ?.cart
         .minOrderAmount;
     final minOrder = now?.minOrderAmount ?? cartMin;
-    final freeFrom = now?.freeTipFrom;
+    // 예약만 받는 때(심야)도 배달팁 0원 구간은 서버 값으로 보인다(사용자 폰 캡처 2026-11-26).
+    final freeFrom =
+        (now ?? DeliveryGuideSheet.instantOf(options).firstOrNull)?.freeTipFrom;
     void openGuide() => showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1816,7 +1928,13 @@ class _DeliverySummary extends ConsumerWidget {
             ],
           );
     final Widget headline;
-    if (night || now == null) {
+    if ((night || now == null) && earliest != null) {
+      // 사용자 폰 캡처(2026-11-26): "지금 주문하면 오전 8:00 부터 배달해요" 16 굵게 — 시각은 서버의 가장 빠른 예약 시작.
+      headline = Text(
+        l10n.homeNightFrom(DeliveryGuideSheet.clock(earliest.start)),
+        style: strong?.copyWith(fontSize: 16.2),
+      );
+    } else if (night || now == null) {
       headline = Text(l10n.homeNightNotice, style: strong);
     } else {
       final eta = now.eta;
@@ -1835,7 +1953,8 @@ class _DeliverySummary extends ConsumerWidget {
       );
     }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 13.6, 16, 7),
+      // 배너 아래 → 첫 줄 글자 위 20dp(사용자 폰 캡처 2026-11-26 실측).
+      padding: const EdgeInsets.fromLTRB(16, 6.5, 16, 7),
       child: Column(
         key: const ValueKey('home-delivery-card'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1850,16 +1969,7 @@ class _DeliverySummary extends ConsumerWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      headline,
-                      if ((night || now == null) && earliest != null)
-                        Text(
-                          l10n.optionEarliestSlot(windowText(earliest)),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                    ],
+                    children: [headline],
                   ),
                 ),
                 // 작은 회색 알약(실측 약 53×20dp, 글 11.5).
@@ -2148,9 +2258,10 @@ class DeliveryGuideSheet extends StatelessWidget {
     );
     List<Widget> tipRows(DeliveryOption o) {
       final rows = <Widget>[];
-      if (!o.available) {
+      final tiers = o.tipTiers;
+      if (!o.available && (tiers == null || tiers.isEmpty)) {
         rows.add(row(optionSubtitle(l10n, o), ''));
-      } else if (o.tipTiers case final tiers? when tiers.isNotEmpty) {
+      } else if (tiers != null && tiers.isNotEmpty) {
         for (final t in tiers) {
           rows.add(
             row(
@@ -2888,35 +2999,143 @@ class _SectionExpiryState extends ConsumerState<SectionExpiry> {
 /// 홈 순위 진열에 보이는 칸 수(3칸 × 2줄, 레퍼런스 "16. 지금 TOP 30").
 const rankGridCount = 6;
 
-/// 순위 숫자를 단 3칸 격자(좌우 16, 칸 사이 8).
-class _RankGrid extends StatelessWidget {
-  const _RankGrid({required this.items});
+/// 순위 숫자를 단 3칸 × 2줄 격자(좌우 16, 칸 사이 8.4) + 아래 넘김 "‹ 1 / 5 ›"(사용자 폰 캡처 2026-11-26:
+/// 단추 56×37.6, 옅은 회색 테두리, 모서리 4, 가운데 "1" 진하게 "/ 5" 회색 15). 한 쪽은 6개, 쪽 수는 받은 상품으로.
+class _RankGrid extends StatefulWidget {
+  const _RankGrid({super.key, required this.items});
 
   final List<ProductTile> items;
 
   @override
+  State<_RankGrid> createState() => _RankGridState();
+}
+
+class _RankGridState extends State<_RankGrid> {
+  int _page = 0;
+
+  @override
   Widget build(BuildContext context) {
-    final width = (MediaQuery.sizeOf(context).width - 16 * 2 - 8 * 2) / 3;
+    final theme = Theme.of(context);
+    final width = (MediaQuery.sizeOf(context).width - 16 * 2 - 8.4 * 2) / 3;
     final height = ProductTileCard.heightFor(context, width, rank: true);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 16,
-        children: [
-          for (final tile in items)
-            SizedBox(
-              key: ValueKey('rank-grid-${tile.productId}'),
-              width: width,
-              height: height,
-              child: ProductTileCard(
-                rail: true,
-                tile: tile,
-                onTap: () =>
-                    context.push('/products/${tile.productId}', extra: tile),
-              ),
+    final pages = (widget.items.length / rankGridCount).ceil();
+    final page = _page.clamp(0, pages - 1);
+    final shown = widget.items
+        .skip(page * rankGridCount)
+        .take(rankGridCount)
+        .toList();
+    Widget pagerButton(bool next) => SizedBox(
+      width: 56,
+      height: 37.6,
+      child: OutlinedButton(
+        key: ValueKey(next ? 'rankpager-next' : 'rankpager-prev'),
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          foregroundColor: theme.colorScheme.onSurface,
+          side: const BorderSide(color: Color(0xFFD6D7D9)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        ),
+        onPressed: (next ? page < pages - 1 : page > 0)
+            ? () => setState(() => _page = page + (next ? 1 : -1))
+            : null,
+        child: Transform.flip(
+          flipX: !next,
+          child: const PmartLineIcon(PmartLineIcons.chevronRight, size: 18),
+        ),
+      ),
+    );
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Wrap(
+            spacing: 8.4,
+            runSpacing: 16,
+            children: [
+              for (final tile in shown)
+                SizedBox(
+                  key: ValueKey('rank-grid-${tile.productId}'),
+                  width: width,
+                  height: height,
+                  child: ProductTileCard(
+                    rail: true,
+                    tile: tile,
+                    onTap: () => context.push(
+                      '/products/${tile.productId}',
+                      extra: tile,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (pages > 1)
+          Padding(
+            key: const ValueKey('rankpager'),
+            padding: const EdgeInsets.only(top: 9),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                pagerButton(false),
+                const SizedBox(width: 45),
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(
+                        text: '${page + 1}',
+                        style: const TextStyle(color: Color(0xFF1B1D1E)),
+                      ),
+                      TextSpan(
+                        text: ' / $pages',
+                        style: const TextStyle(color: Color(0xFF9A9CA0)),
+                      ),
+                    ],
+                  ),
+                  key: const ValueKey('rankpager-page'),
+                  style: theme.textTheme.titleMedium?.copyWith(fontSize: 15),
+                ),
+                const SizedBox(width: 45),
+                pagerButton(true),
+              ],
             ),
-        ],
+          ),
+      ],
+    );
+  }
+}
+
+/// 가로 진열(사용자 폰 캡처 2026-11-26): 칸 폭 103.9 · 사이 8.4 · 좌우 16. 6개 이상이면 두 줄로 넘긴다.
+class _Rail extends StatelessWidget {
+  const _Rail({required this.items, required this.rank});
+
+  final List<ProductTile> items;
+  final bool rank;
+
+  static const width = 103.9;
+
+  @override
+  Widget build(BuildContext context) {
+    final height = ProductTileCard.heightFor(context, width, rank: rank);
+    final rows = items.length >= 6 ? 2 : 1;
+    const rowGap = 16.0;
+    return SizedBox(
+      height: height * rows + rowGap * (rows - 1),
+      child: GridView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: rows,
+          mainAxisExtent: width,
+          mainAxisSpacing: 8.4,
+          crossAxisSpacing: rowGap,
+        ),
+        itemCount: items.length,
+        itemBuilder: (context, i) => ProductTileCard(
+          rail: true,
+          tile: items[i],
+          onTap: () =>
+              context.push('/products/${items[i].productId}', extra: items[i]),
+        ),
       ),
     );
   }
@@ -2959,4 +3178,527 @@ class _SlideInState extends State<_SlideIn>
       child: FadeTransition(opacity: _c, child: widget.child),
     ),
   );
+}
+
+/// 지금 예약배달만 받는다(심야 — 즉시 방식이 NIGHT_TIME 으로 막힘). 가장 빠른 예약 시작(서버)이 있을 때만.
+ArrivalWindow? _nightEarliest(List<DeliveryOption>? options) {
+  if (options == null || options.isEmpty) return null;
+  final night = options.any(
+    (o) => !o.available && o.reason == UnavailableReason.nightTime,
+  );
+  if (!night) return null;
+  return options
+      .where((o) => o.mode == DeliveryMode.scheduled)
+      .firstOrNull
+      ?.earliestSlot;
+}
+
+/// 심야 안내 한 줄을 ✕ 로 닫았다(앱을 켜 둔 동안).
+final _nightBarClosedProvider = NotifierProvider<_NightBarClosed, bool>(
+  _NightBarClosed.new,
+);
+
+class _NightBarClosed extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void close() => state = true;
+}
+
+/// 홈 맨 아래: 평소엔 장바구니 막대. 예약배달만 받는 때는 진한 안내를 먼저 두고, 장바구니가 담겨 있으면 그 아래
+/// 장바구니 막대(비어 있으면 안내만 — 사용자 2026-11-26). 안내는 — 처음 잠깐(3초) 두 줄 상자(⚠ + 시각 + "지금은 예약배달만 가능해요"),
+/// 그 뒤로는 한 줄 막대("지금 주문하면 오전 8:00부터 배달 가능" + ✕). 시각은 서버의 가장 빠른 예약 시작.
+class _HomeCartBarOrNight extends ConsumerStatefulWidget {
+  const _HomeCartBarOrNight();
+
+  @override
+  ConsumerState<_HomeCartBarOrNight> createState() =>
+      _HomeCartBarOrNightState();
+}
+
+class _HomeCartBarOrNightState extends ConsumerState<_HomeCartBarOrNight> {
+  Timer? _timer;
+  bool _compact = false;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final earliest = _nightEarliest(
+      ref.watch(homeDeliveryOptionsProvider).value,
+    );
+    if (earliest == null) return const FloatingCartBar();
+    // 장바구니가 비면 안내만, 담겨 있으면 안내 아래 장바구니 막대(사용자 2026-11-26 캡처 — 사이 10.7).
+    if (ref.watch(_nightBarClosedProvider)) return const FloatingCartBar();
+    _timer ??= Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _compact = true);
+    });
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final time = DeliveryGuideSheet.clock(earliest.start);
+    final full = Container(
+      key: const ValueKey('home-night-toast'),
+      padding: const EdgeInsets.fromLTRB(17.8, 11.8, 16, 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF191A1C),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          // 흰 채운 세모 안 진한 느낌표(캡처 실측 약 15×13.5, 글자까지 11).
+          const SizedBox(
+            width: 15.5,
+            height: 14,
+            child: CustomPaint(painter: _WarnTrianglePainter()),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.homeNightToastTitle(time),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 15.8,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.homeNightToastBody,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 12.5,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    // 한 줄 막대(캡처 실측): 높이 40, 모서리 16, 안쪽 왼쪽 16.4, 글 15.3 보통 흰색, 오른쪽 ✕ 11dp(끝에서 18).
+    final compact = Container(
+      key: const ValueKey('home-night-bar'),
+      height: 40,
+      padding: const EdgeInsets.only(left: 16.4, right: 3.5),
+      decoration: BoxDecoration(
+        color: const Color(0xFF191A1C),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              l10n.homeNightToastTitle(time),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontSize: 15.3,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('home-night-bar-close'),
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+            visualDensity: VisualDensity.compact,
+            onPressed: () => ref.read(_nightBarClosedProvider.notifier).close(),
+            icon: const PmartLineIcon(
+              PmartLineIcons.close,
+              size: 20,
+              strokeWidth: 2,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+    final hasCart =
+        ref.watch(cartControllerProvider).value?.cart.lines.isNotEmpty ?? false;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: _compact ? compact : full,
+        ),
+        if (hasCart) ...[const SizedBox(height: 3.9), const FloatingCartBar()],
+      ],
+    );
+  }
+}
+
+class _WarnTrianglePainter extends CustomPainter {
+  const _WarnTrianglePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final tri = Path()
+      ..moveTo(w / 2, 0.5)
+      ..lineTo(w - 0.5, h - 0.5)
+      ..lineTo(0.5, h - 0.5)
+      ..close();
+    canvas.drawPath(
+      tri,
+      Paint()
+        ..color = Colors.white
+        ..strokeJoin = StrokeJoin.round
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawPath(
+      tri,
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..strokeJoin = StrokeJoin.round,
+    );
+    final dark = Paint()
+      ..color = const Color(0xFF191A1C)
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+    canvas
+      ..drawLine(Offset(w / 2, h * 0.36), Offset(w / 2, h * 0.64), dark)
+      ..drawCircle(Offset(w / 2, h * 0.8), 1.3, dark);
+  }
+
+  @override
+  bool shouldRepaint(_WarnTrianglePainter oldDelegate) => false;
+}
+
+/// 홈 카드용 최근 주문 한 쪽(주문내역 탭의 목록 조회와 따로 — 필터 상태를 붙잡지 않게).
+final _boughtBeforeProvider = FutureProvider.autoDispose<OrderPage?>((
+  ref,
+) async {
+  if (ref.watch(sessionProvider) is! MemberSession) return null;
+  return ref.watch(ordersRepositoryProvider).list();
+});
+
+/// 홈 "상품 고르는 시간도 아끼고 싶다면? / 내가 1번 구매한 상품 보기 ›" 카드(사용자 폰 캡처 2026-11-26).
+/// 주문이 있는 회원만(최근 주문의 첫 상품 사진). 사 본 상품만 모은 목록 API 가 계약에 없어(BR-109) 누르면 주문내역으로 간다.
+/// 실측: 좌우 11, 모서리 16, 옅은 테두리, 사진 60(모서리 10), 글 왼쪽 13, 위 줄 14.5 회색 · 아래 줄 19 굵게("1번 구매한" 보라).
+class _BoughtBeforeCard extends ConsumerWidget {
+  const _BoughtBeforeCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final page = ref.watch(_boughtBeforeProvider).value;
+    final first = page?.items
+        .expand((o) => o.lines)
+        .where((l) => l.imageUrl != null)
+        .firstOrNull;
+    if (page == null || page.items.isEmpty) return const SizedBox.shrink();
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return ColoredBox(
+      color: scheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(11, 0, 11, 10),
+        child: Material(
+          color: scheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFFEDEEF0)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: const ValueKey('home-bought-before'),
+            onTap: () => context.go('/orders'),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+              child: Row(
+                children: [
+                  ProductImage(url: first?.imageUrl, size: 60, radius: 10),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.homeBoughtLead,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontSize: 14.5,
+                            color: const Color(0xFF3B3D40),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text.rich(
+                          TextSpan(
+                            children: [
+                              TextSpan(text: l10n.homeBoughtTitleA),
+                              TextSpan(
+                                text: l10n.homeBoughtTitleB,
+                                style: TextStyle(color: scheme.primary),
+                              ),
+                              TextSpan(text: l10n.homeBoughtTitleC),
+                            ],
+                          ),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 할인 탭 키(MD 탭 키 `X-…` 와 겹치지 않는다).
+const saleTabKey = '_SALE';
+
+/// 할인 탭 본문(사용자 폰 캡처 2026-11-26 "할인" 탭 아래쪽 — 카테고리 동그라미 · "총 N개 상품" · 정렬 · 2칸 격자).
+/// 상품은 search onSale(BR-82, 기간 할인 중인 상품만). 프로모션 종류 칩·일일특가·할인율 칩은 계약에 없어 넣지 않는다(BR-110).
+/// 끝 가까이 내리면 다음 묶음을 부른다.
+class _SaleTabBody extends ConsumerStatefulWidget {
+  const _SaleTabBody({super.key});
+
+  @override
+  ConsumerState<_SaleTabBody> createState() => _SaleTabBodyState();
+}
+
+class _SaleTabBodyState extends ConsumerState<_SaleTabBody> {
+  String? _category;
+  SortKey _sort = SortKey.relevance;
+  ScrollPosition? _position;
+
+  ProductQuery get _query =>
+      ProductQuery(onSale: true, categoryId: _category, sort: _sort);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final pos = Scrollable.maybeOf(context)?.position;
+    if (pos != _position) {
+      _position?.removeListener(_nearEnd);
+      _position = pos?..addListener(_nearEnd);
+    }
+  }
+
+  @override
+  void dispose() {
+    _position?.removeListener(_nearEnd);
+    super.dispose();
+  }
+
+  void _nearEnd() {
+    final pos = _position;
+    if (pos == null || !pos.hasContentDimensions) return;
+    if (pos.pixels > pos.maxScrollExtent - 900) {
+      ref.read(productListProvider(_query).notifier).loadMore();
+    }
+  }
+
+  Future<void> _pickSort() async {
+    final l10n = AppLocalizations.of(context);
+    final picked = await showChoiceSheet<SortKey>(
+      context,
+      title: l10n.sortTitle,
+      closeKey: const ValueKey('sort-close'),
+      selected: _sort,
+      options: [
+        for (final s in SortKey.values)
+          (s, sortLabel(l10n, s), ValueKey('sort-${s.name}')),
+      ],
+    );
+    if (picked != null && mounted) setState(() => _sort = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final roots = (ref.watch(categoriesProvider).value ?? const [])
+        .where((n) => n.depth == 1)
+        .toList();
+    final list = ref.watch(productListProvider(_query));
+    // 카테고리 동그라미(지름 56, 고른 것은 진한 테두리 2) + 이름 13(고른 것 굵게).
+    Widget circle({
+      required Key key,
+      required bool on,
+      required Widget art,
+      required String label,
+      required VoidCallback onTap,
+    }) => InkWell(
+      key: key,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 70,
+        child: Column(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: on
+                    ? Border.all(color: const Color(0xFF17191A), width: 2)
+                    : null,
+              ),
+              alignment: Alignment.center,
+              child: art,
+            ),
+            const SizedBox(height: 5),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 13,
+                fontWeight: on ? FontWeight.w700 : FontWeight.w400,
+                color: const Color(0xFF17191A),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    final value = list.value;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 영역 제목(사용자 폰 캡처: 22 굵게, 왼쪽 16).
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 14),
+          child: Text(
+            l10n.saleTitle,
+            key: const ValueKey('sale-title'),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontSize: 21,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 86,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            children: [
+              circle(
+                key: const ValueKey('sale-category-all'),
+                on: _category == null,
+                art: const PmartLineIcon(PmartLineIcons.grid, size: 26),
+                label: l10n.saleAll,
+                onTap: () => setState(() => _category = null),
+              ),
+              for (final c in roots)
+                circle(
+                  key: ValueKey('sale-category-${c.categoryId}'),
+                  on: _category == c.categoryId,
+                  art: CategoryArt(
+                    name: c.name,
+                    size: _category == c.categoryId ? 50 : 56,
+                    radius: 28,
+                  ),
+                  label: c.name,
+                  onTap: () => setState(() => _category = c.categoryId),
+                ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  switch (value?.total) {
+                    final int n => l10n.saleTotal(n),
+                    null => '',
+                  },
+                  key: const ValueKey('sale-total'),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 14,
+                    color: const Color(0xFF9A9CA0),
+                  ),
+                ),
+              ),
+              SizedBox(
+                height: 32,
+                child: OutlinedButton(
+                  key: const ValueKey('sale-sort'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF17191A),
+                    side: const BorderSide(color: Color(0xFFD6D7D9)),
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    textStyle: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 14,
+                    ),
+                  ),
+                  onPressed: _pickSort,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const PmartLineIcon(PmartLineIcons.sort, size: 15),
+                      const SizedBox(width: 4),
+                      Text(sortLabel(l10n, _sort)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        switch (list) {
+          AsyncData(:final value) when value.items.isEmpty => Padding(
+            key: const ValueKey('sale-empty'),
+            padding: const EdgeInsets.all(24),
+            child: Text(l10n.sectionEmpty, textAlign: TextAlign.center),
+          ),
+          AsyncData(:final value) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 20,
+              children: [
+                for (final tile in value.items)
+                  SizedBox(
+                    width: ProductTileCard.gridWidthOf(context),
+                    height: ProductTileCard.heightFor(
+                      context,
+                      ProductTileCard.gridWidthOf(context),
+                    ),
+                    child: ProductTileCard(
+                      rail: true,
+                      tile: tile,
+                      onTap: () => context.push(
+                        '/products/${tile.productId}',
+                        extra: tile,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          AsyncError() => _InlineFailure(
+            key: const ValueKey('sale-failed'),
+            text: l10n.sectionUnavailable,
+            onRetry: () => ref.invalidate(productListProvider(_query)),
+          ),
+          _ => const _SkeletonRail(),
+        },
+      ],
+    );
+  }
 }

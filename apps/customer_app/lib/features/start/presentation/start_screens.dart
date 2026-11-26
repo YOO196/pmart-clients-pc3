@@ -752,9 +752,11 @@ class MarketingConsentResultDialog extends StatelessWidget {
     final when = DateFormat('y년 M월 d일 H시', 'ko').format(toSeoulWallClock(at));
     // 사용자 폰 캡처(2026-11-25, 1080px = 411dp): 창 폭 299.5(좌우 56), 안쪽 21, 제목 16.5 굵게,
     // 본문 15.5 줄 간격 22.3, 안내 13.5 회색 줄 간격 21.3, "확인" 16 굵게·칸 높이 48.7.
+    // 본문·안내는 중간 굵기(사용자 폰 캡처 2026-11-26 비교 — 보통 굵기보다 진하다).
     final line = theme.textTheme.bodyLarge?.copyWith(
       fontSize: 15.5,
       height: 1.43,
+      fontWeight: FontWeight.w500,
       color: const Color(0xFF181A19),
     );
     return Dialog(
@@ -806,6 +808,7 @@ class MarketingConsentResultDialog extends StatelessWidget {
                   style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 13.5,
                     height: 1.58,
+                    fontWeight: FontWeight.w500,
                     color: const Color(0xFF7E807F),
                   ),
                 ),

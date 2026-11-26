@@ -300,14 +300,24 @@ void main() {
 
       final notice = find.byKey(const ValueKey('home-night-notice'));
       expect(notice, findsOneWidget);
+      // 사용자 폰 캡처(2026-11-26): 가장 빠른 예약 시작 시각으로 "지금 주문하면 … 부터 배달해요" + 아래 진한 안내 상자.
       expect(
-        find.descendant(of: notice, matching: find.text('지금은 예약배달만 받을 수 있어요')),
+        find.descendant(
+          of: notice,
+          matching: find.textContaining(RegExp(r'^지금 주문하면 .+ 부터 배달해요$')),
+        ),
         findsOneWidget,
       );
-      expect(
-        find.descendant(of: notice, matching: find.textContaining('가장 빠른 시간')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey('home-night-toast')), findsOneWidget);
+      expect(find.text('지금은 예약배달만 가능해요'), findsOneWidget);
+      // 예약배달만 받는 때는 안내(장바구니가 비면 안내만). 3초 뒤 한 줄 막대 + ✕(사용자 2026-11-26).
+      await t.pump(const Duration(seconds: 3));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('home-night-toast')), findsNothing);
+      expect(find.byKey(const ValueKey('home-night-bar')), findsOneWidget);
+      await t.tap(find.byKey(const ValueKey('home-night-bar-close')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const ValueKey('home-night-bar')), findsNothing);
       // 막힌 방식 대신 안내가 보인다.
       expect(find.byKey(const ValueKey('home-delivery-now')), findsNothing);
     });

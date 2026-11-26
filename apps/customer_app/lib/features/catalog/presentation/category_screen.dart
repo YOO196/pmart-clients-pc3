@@ -59,8 +59,8 @@ class CategoryScreen extends ConsumerWidget {
             (groups[r.section] ??= []).add(r);
           }
           final theme = Theme.of(context);
-          // 레퍼런스(사용자 제공 카테고리 그림 2026-11-20): 줄 간격 약 46dp, 그림 32dp, 글자 15sp
-          final rowHeight = MediaQuery.textScalerOf(context).scale(20) + 30;
+          // 사용자 폰 캡처(2026-11-26, 1080px = 411dp): 줄 간격 52, 그림 36(둥근 네모), 글자 14, 두 칸 사이 12.2.
+          final rowHeight = MediaQuery.textScalerOf(context).scale(20) + 32;
           return ListView(
             padding: const EdgeInsets.only(bottom: 24),
             children: [
@@ -85,10 +85,10 @@ class CategoryScreen extends ConsumerWidget {
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    crossAxisSpacing: 8,
+                    crossAxisSpacing: 12.2,
                     mainAxisExtent: rowHeight,
                   ),
                   itemCount: items.length,
@@ -101,16 +101,17 @@ class CategoryScreen extends ConsumerWidget {
                       onTap: () => _open(context, root),
                       child: Row(
                         children: [
-                          // 레퍼런스 3-3: 동그란 그림 칸.
-                          CategoryArt(name: root.name, size: 34, radius: 17),
-                          const SizedBox(width: 12),
+                          CategoryArt(name: root.name, size: 36, radius: 10),
+                          const SizedBox(width: 10.8),
                           Expanded(
                             child: Text(
                               root.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodyMedium?.copyWith(
-                                fontSize: 12.5,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF17191A),
                               ),
                             ),
                           ),
@@ -160,22 +161,24 @@ class _Picks extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    void openHome({HomeTab? tab, bool firstCustom = false}) {
+    void openHome({HomeTab? tab, bool firstCustom = false, bool sale = false}) {
       ref
           .read(homeTabRequestProvider.notifier)
-          .open(tab: tab, firstCustom: firstCustom);
+          .open(tab: tab, firstCustom: firstCustom, sale: sale);
       context.go('/');
     }
 
+    // 사용자 폰 캡처(2026-11-26): 타일 83.7×69.6(모서리 12, 사이 6.5, 가로로 넘김), 그림 약 24(위 12),
+    // 글 14 굵게(위 47). 그림은 캡처에서 자른 것.
     Widget tile({
       required String key,
-      required PmartLineIcons icon,
+      required String art,
       required String label,
       required Color background,
       required Color color,
       required VoidCallback onTap,
-    }) => Expanded(
+    }) => Padding(
+      padding: const EdgeInsets.only(right: 6.5),
       child: Material(
         color: background,
         borderRadius: BorderRadius.circular(12),
@@ -184,16 +187,22 @@ class _Picks extends ConsumerWidget {
           key: ValueKey(key),
           onTap: onTap,
           child: SizedBox(
-            height: 74,
+            width: 83.7,
+            height: 69.6,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                PmartLineIcon(icon, size: 24, color: color),
-                const SizedBox(height: 6),
+                const SizedBox(height: 10.5),
+                Image.asset(
+                  'assets/images/category_picks/$art.png',
+                  height: 25,
+                ),
+                const SizedBox(height: 7),
                 Text(
                   label,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontSize: 13,
+                    fontSize: 14,
+                    height: 1.2,
+                    fontWeight: FontWeight.w700,
                     color: color,
                   ),
                 ),
@@ -205,64 +214,60 @@ class _Picks extends ConsumerWidget {
     );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(15, 22, 15, 20),
+      padding: const EdgeInsets.fromLTRB(0, 24, 0, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            l10n.categoryPicksTitle,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontSize: 15.5,
-              fontWeight: FontWeight.w400,
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Text(
+              l10n.categoryPicksTitle,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              tile(
-                key: 'category-pick-discount',
-                icon: PmartLineIcons.percent,
-                label: l10n.categoryPickDiscount,
-                background: scheme.tertiaryContainer,
-                color: scheme.tertiary,
-                onTap: () => context.push(
-                  Uri(
-                    path: '/products',
-                    queryParameters: {
-                      'onSale': 'true',
-                      'title': l10n.categoryPickDiscountTitle,
-                    },
-                  ).toString(),
+          const SizedBox(height: 16),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                tile(
+                  key: 'category-pick-discount',
+                  art: 'discount',
+                  label: l10n.categoryPickDiscount,
+                  background: const Color(0xFFFEEEEF),
+                  color: const Color(0xFF5A2221),
+                  onTap: () => openHome(sale: true),
                 ),
-              ),
-              const SizedBox(width: 8),
-              tile(
-                key: 'category-pick-event',
-                icon: PmartLineIcons.tag,
-                label: l10n.categoryPickEvent,
-                background: scheme.primaryContainer,
-                color: scheme.primary,
-                onTap: () => openHome(firstCustom: true),
-              ),
-              const SizedBox(width: 8),
-              tile(
-                key: 'category-pick-popular',
-                icon: PmartLineIcons.trophy,
-                label: l10n.categoryPickPopular,
-                background: scheme.secondaryContainer,
-                color: scheme.secondary,
-                onTap: () => openHome(tab: HomeTab.ranking),
-              ),
-              const SizedBox(width: 8),
-              tile(
-                key: 'category-pick-new',
-                icon: PmartLineIcons.sparkle,
-                label: l10n.categoryPickNew,
-                background: PmartBrand.lavenderMist,
-                color: scheme.primary,
-                onTap: () => openHome(tab: HomeTab.isNew),
-              ),
-            ],
+                tile(
+                  key: 'category-pick-event',
+                  art: 'event',
+                  label: l10n.categoryPickEvent,
+                  background: const Color(0xFFEEF0FF),
+                  color: const Color(0xFF140B40),
+                  onTap: () => openHome(firstCustom: true),
+                ),
+                tile(
+                  key: 'category-pick-popular',
+                  art: 'popular',
+                  label: l10n.categoryPickPopular,
+                  background: const Color(0xFFFFF3E5),
+                  color: const Color(0xFF643501),
+                  onTap: () => openHome(tab: HomeTab.ranking),
+                ),
+                tile(
+                  key: 'category-pick-new',
+                  art: 'new',
+                  label: l10n.categoryPickNew,
+                  background: const Color(0xFFFFF9E6),
+                  color: const Color(0xFF654E00),
+                  onTap: () => openHome(tab: HomeTab.isNew),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -279,27 +284,29 @@ class _SupportBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    // 사용자 폰 캡처(2026-11-26): 회색 바탕(#F4F5F7) 안 테두리 상자(#E5E6E8, 좌우 15), 글 13.5 회색(#7E7F81)
+    // 줄 간격 18.3, 안쪽 12.
     final sub = theme.textTheme.bodySmall?.copyWith(
-      fontSize: 12.5,
-      color: scheme.onSurfaceVariant,
+      fontSize: 13.5,
+      height: 1.35,
+      color: const Color(0xFF7E7F81),
     );
     return ColoredBox(
-      color: scheme.surfaceContainer,
+      color: const Color(0xFFF4F5F7),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(15, 16, 15, 24),
+        padding: const EdgeInsets.fromLTRB(15, 20, 15, 32),
         child: Material(
-          color: scheme.surface,
+          color: const Color(0xFFF4F5F7),
           shape: RoundedRectangleBorder(
-            side: BorderSide(color: scheme.outlineVariant),
-            borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(color: Color(0xFFE5E6E8)),
+            borderRadius: BorderRadius.circular(4),
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             key: const ValueKey('category-support'),
             onTap: () => context.push('/support'),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              padding: const EdgeInsets.fromLTRB(12, 14, 12, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -310,10 +317,10 @@ class _SupportBox extends StatelessWidget {
                   Row(
                     children: [
                       Text(l10n.categorySupportGo, style: sub),
-                      PmartLineIcon(
+                      const PmartLineIcon(
                         PmartLineIcons.chevronRight,
                         size: 14,
-                        color: scheme.onSurfaceVariant,
+                        color: Color(0xFF7E7F81),
                       ),
                     ],
                   ),

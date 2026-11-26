@@ -27,15 +27,16 @@ void main() {
     await openHome(t);
     await t.drag(plain(), const Offset(-160, 0));
     await t.pumpAndSettle();
-    expect(key('home-tab-body-ranking'), findsOneWidget);
+    // 홈 다음은 할인 탭(사용자 2026-11-26).
+    expect(key('home-tab-body-sale'), findsOneWidget);
 
-    // 탭 줄 바로 아래(랭킹 내용 위쪽)에서 오른쪽으로.
+    // 탭 줄 바로 아래(할인 내용 위쪽)에서 오른쪽으로.
     await t.dragFrom(
       t.getBottomLeft(key('home-tabs')) + const Offset(100, 40),
       const Offset(160, 0),
     );
     await t.pumpAndSettle();
-    expect(key('home-tab-body-ranking'), findsNothing);
+    expect(key('home-tab-body-sale'), findsNothing);
     expect(plain(), findsOneWidget);
   });
 

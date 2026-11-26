@@ -9,6 +9,7 @@ import '../../../shared/ui_state_of.dart';
 import '../../auth/domain/auth.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../../shared/floating_cart_bar.dart';
+import '../../../shared/cart_icon_button.dart';
 import '../../../shared/notice.dart';
 import '../../cart/domain/cart.dart';
 import '../../cart/presentation/cart_controller.dart';
@@ -110,7 +111,29 @@ class _WishlistScreenState extends ConsumerState<WishlistScreen> {
     final member = ref.watch(sessionProvider) is MemberSession;
     return Scaffold(
       key: const ValueKey('wishlist'),
-      appBar: AppBar(title: Text(l10n.wishTitle)),
+      // 사용자 폰 캡처(2026-11-26, 1080px = 411dp): 왼쪽 "찜" 굵게, 오른쪽 돋보기·장바구니(수).
+      appBar: AppBar(
+        centerTitle: false,
+        titleSpacing: 20.5,
+        automaticallyImplyLeading: false,
+        title: Text(
+          l10n.navWish,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        actions: [
+          IconButton(
+            key: const ValueKey('wishlist-search'),
+            tooltip: l10n.searchTitle,
+            onPressed: () => context.push('/search'),
+            icon: const PmartLineIcon(PmartLineIcons.search, size: 24),
+          ),
+          const CartIconButton(size: 24),
+          const SizedBox(width: 8),
+        ],
+      ),
       // 초안 07-E: 비회원도 빈 상태와 같은 틀(하트 동그라미 + 안내 + [로그인]).
       body: !member
           ? _WishEmpty(
@@ -635,76 +658,85 @@ class _WishEmpty extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(32, 0, 32, 64),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: scheme.tertiaryContainer,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: PmartLineIcon(
-                PmartLineIcons.heart,
-                size: 34,
-                color: scheme.tertiary,
-              ),
-            ),
-            const SizedBox(height: 18),
-            if (title case final t?) ...[
-              Text(
-                t,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+    // 사용자 폰 캡처(2026-11-26): 점선 사과 그림 69.6×62.8, 그 아래 62 띄우고 굵은 두 줄 15(줄 간격 21.3),
+    // 그 아래 19.8 띄우고 테두리 알약 버튼(높이 38, 글 14.5 + ›).
+    final text = title == null ? body : '$title\n$body';
+    // 가로는 화면 가운데(사용자 2026-11-26 "왼쪽으로 치우쳐" — 폭을 꽉 채워 가운데 맞춤), 세로는 사과 그림 위가
+    // 화면 위에서 412.5dp(캡처 실측) — 상태 막대·머리줄 높이를 빼서 본문 안 위치로.
+    // 본문 안에서는 상태 막대 높이가 빠져 있어 화면(View)에서 읽는다.
+    final view = View.of(context);
+    final statusBar = view.padding.top / view.devicePixelRatio;
+    final top = (412.5 - statusBar - kToolbarHeight).clamp(
+      24.0,
+      double.infinity,
+    );
+    return LayoutBuilder(
+      builder: (context, c) => SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: c.maxHeight,
+            minWidth: c.maxWidth,
+          ),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(24, top, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/images/wish_empty.png',
+                  key: const ValueKey('wishlist-empty-art'),
+                  width: 69.6,
+                  height: 62.8,
+                  color: const Color(0xFF111214),
                 ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontSize: 14,
-                height: 1.5,
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (filled)
-              FilledButton(
-                key: const ValueKey('wishlist-login'),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                const SizedBox(height: 58),
+                Text(
+                  text,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontSize: 15,
+                    height: 1.42,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF111214),
                   ),
                 ),
-                onPressed: onAction,
-                child: Text(action),
-              )
-            else
-              OutlinedButton(
-                key: const ValueKey('wishlist-browse'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 44),
-                  foregroundColor: scheme.onSurface,
-                  side: BorderSide(color: scheme.outlineVariant),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                const SizedBox(height: 16.5),
+                SizedBox(
+                  height: 38,
+                  child: OutlinedButton(
+                    key: ValueKey(
+                      filled ? 'wishlist-login' : 'wishlist-browse',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF111214),
+                      side: const BorderSide(
+                        color: Color(0xFFD4D6D8),
+                        width: 1.2,
+                      ),
+                      shape: const StadiumBorder(),
+                      padding: const EdgeInsets.fromLTRB(16.7, 0, 12, 0),
+                      textStyle: theme.textTheme.bodyLarge?.copyWith(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onPressed: onAction,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(action),
+                        const SizedBox(width: 6),
+                        const PmartLineIcon(
+                          PmartLineIcons.chevronRight,
+                          size: 16,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                onPressed: onAction,
-                child: Text(action),
-              ),
-          ],
+              ],
+            ),
+          ),
         ),
       ),
     );

@@ -109,7 +109,7 @@ class SectionRetry extends Notifier<AsyncValue<HomeSection>?> {
 }
 
 /// 홈에서 열 탭 요청. [firstCustom] 이면 지금 기간 안 첫 MD 탭(없으면 홈), 아니면 고정 탭 [tab].
-typedef HomeTabRequest = ({int seq, HomeTab? tab, bool firstCustom});
+typedef HomeTabRequest = ({int seq, HomeTab? tab, bool firstCustom, bool sale});
 
 /// 다른 화면(카테고리 추천 타일)이 홈의 탭을 고르고 홈으로 간다. 홈이 아직 안 만들어졌어도 처음 그릴 때 받는다.
 final homeTabRequestProvider =
@@ -123,8 +123,13 @@ class HomeTabRequestNotifier extends Notifier<HomeTabRequest?> {
   @override
   HomeTabRequest? build() => null;
 
-  void open({HomeTab? tab, bool firstCustom = false}) =>
-      state = (seq: (state?.seq ?? 0) + 1, tab: tab, firstCustom: firstCustom);
+  void open({HomeTab? tab, bool firstCustom = false, bool sale = false}) =>
+      state = (
+        seq: (state?.seq ?? 0) + 1,
+        tab: tab,
+        firstCustom: firstCustom,
+        sale: sale,
+      );
 
   /// 아직 받지 않은 요청을 한 번만 돌려준다.
   HomeTabRequest? take() {

@@ -222,7 +222,9 @@ void main() {
       await t.pumpAndSettle();
     }
     expect(key('wishlist-empty'), findsOneWidget);
-    expect(find.text('찜한 상품이 없어요'), findsOneWidget);
+    // 사용자 폰 캡처(2026-11-26): 굵은 두 줄 + 점선 사과 그림.
+    expect(find.textContaining('찜한 상품이 없어요.'), findsOneWidget);
+    expect(key('wishlist-empty-art'), findsOneWidget);
     await t.tap(key('wishlist-browse'));
     await t.pumpAndSettle();
     expect(key('wishlist'), findsNothing);
