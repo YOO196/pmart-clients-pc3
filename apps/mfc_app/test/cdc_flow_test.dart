@@ -212,6 +212,10 @@ void main() {
     expect(find.byKey(const ValueKey('cdc-load-done')), findsOneWidget);
     expect(find.text('상차는 출발이 아니에요. 출발은 따로 확정돼요'), findsOneWidget);
     expect((await repo.trip('TRIP-mock-1')).state, 'LOADED');
+    // 상차완료면 끝 — 다른 도크가 아니라 홈으로
+    expect(find.byKey(const ValueKey('cdc-other-trip')), findsNothing);
+    await tap(t, 'cdc-load-finish');
+    expect(find.byKey(const ValueKey('cdc-home')), findsOneWidget);
   });
 
   group('실서버 요청', () {

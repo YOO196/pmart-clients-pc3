@@ -1444,15 +1444,11 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
         ),
       );
       actions.add(
+        // 상차완료면 이 일은 끝 — 홈으로(사용자 2026-11-26 "상차 완료하면 끝이지 왜 다른 도크로 가기가 뜨니")
         FilledButton(
-          key: const ValueKey('cdc-other-trip'),
-          onPressed: () => setState(() {
-            _trip = null;
-            _vehicleOk = false;
-            _notice = null;
-            _lpns = const AsyncLoading();
-          }),
-          child: Text(l10n.cdcLoadOtherDock),
+          key: const ValueKey('cdc-load-finish'),
+          onPressed: () => context.go('/'),
+          child: Text(l10n.cdcLoadFinish),
         ),
       );
       return cdcStepBody(step: stepId, body: body, actions: actions);

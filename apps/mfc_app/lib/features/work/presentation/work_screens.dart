@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
+import '../../unload/presentation/unload_screen.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/field_widgets.dart' show NoticeBox, StepCaption;
@@ -360,6 +361,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               NoticeBox(
                                 text: l10n.countTimeBand,
                                 textKey: const ValueKey('count-time-band'),
+                              ),
+                            // DC 차량이 도착하면 맨 위에 하차 띠(사용자 2026-11-26 "PDA 에 하차 단계 없는 것 같은데")
+                            if (me.canUse(PdaMenu.unload) &&
+                                (ref.watch(arrivedTripsProvider).value ?? 0) >
+                                    0)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: FilledButton.icon(
+                                  key: const ValueKey('unload-band'),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(56),
+                                  ),
+                                  onPressed: () => context.push('/unload'),
+                                  icon: const Icon(
+                                    Icons.local_shipping_outlined,
+                                  ),
+                                  label: Text(
+                                    l10n.unloadBand(
+                                      ref.watch(arrivedTripsProvider).value ??
+                                          0,
+                                    ),
+                                  ),
+                                ),
                               ),
                             Padding(
                               padding: const EdgeInsets.fromLTRB(2, 12, 0, 8),

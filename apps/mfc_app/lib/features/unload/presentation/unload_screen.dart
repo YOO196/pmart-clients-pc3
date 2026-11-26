@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +22,16 @@ final unloadRepositoryProvider = Provider<UnloadRepository>(
     PmartEnv.local => ApiUnloadRepository(ref.watch(dioProvider)),
   },
 );
+
+/// 지금 이 센터에 도착해 하차를 기다리는 운행 수 — MFC 홈 띠(30초마다 다시 읽음). 못 읽으면 띠를 안 보인다.
+final arrivedTripsProvider = FutureProvider.autoDispose<int>((ref) async {
+  final timer = Timer(const Duration(seconds: 30), ref.invalidateSelf);
+  ref.onDispose(timer.cancel);
+  final mfcId = ref.watch(currentMfcIdProvider);
+  if (mfcId.isEmpty) return 0;
+  final trips = await ref.watch(unloadRepositoryProvider).trips(mfcId);
+  return trips.where((t) => t.arrived).length;
+});
 
 /// 하차 — 도착한 운행 고르기 → 박스 스캔(파손 표시) → 정차 인계 → 입고 수령으로.
 /// 스캔 ≠ 인계: 서버가 인계를 받은 뒤에만 "인계 기록"이라고 보인다(결과 불명이면 같은 키로 다시).
