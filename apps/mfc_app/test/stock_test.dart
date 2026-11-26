@@ -112,103 +112,144 @@ void main() {
     await tapKey(t, 'guide-ok');
   }
 
-  testWidgets('재고 이동(보충): 카트 → 출발 칸(위치 확인) → 다음 쪽에서 상품 스캔·싣기 → "이동하세요" → 도착 칸 → 내려놓기', (t) async {
-    await open(t, 'stockMove');
-    expect(find.byKey(const ValueKey('assigned-MV-mock-1')), findsOneWidget);
-    expect(find.text('선반 보충'), findsOneWidget);
-    await tapKey(t, 'run-task');
+  testWidgets(
+    '재고 이동(보충): 카트 → 출발 칸(위치 확인) → 다음 쪽에서 상품 스캔·싣기 → "이동하세요" → 도착 칸 → 내려놓기',
+    (t) async {
+      await open(t, 'stockMove');
+      expect(find.byKey(const ValueKey('assigned-MV-mock-1')), findsOneWidget);
+      expect(find.text('선반 보충'), findsOneWidget);
+      await tapKey(t, 'run-task');
 
-    // ① 위치 확인: 카트가 먼저다. 카트를 찍기 전에는 출발 칸도 받지 않는다.
-    expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
-    expect(find.text('카트 스캔'), findsOneWidget);
-    expect(find.byKey(const ValueKey('move-submit')), findsNothing); // 이 쪽에는 싣기 버튼·수량이 없다
-    expect(find.byKey(const ValueKey('move-qty-value')), findsNothing);
-    expect(t.widget<Opacity>(find.byKey(const ValueKey('target-from-lock'))).opacity, lessThan(1));
-    await scan(t, 'move-scan', 'C-R1-01-1-01');
-    expect(find.text('카트 바코드를 먼저 스캔해요'), findsWidgets);
-    await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
-    expect(find.text('카트 바코드를 먼저 스캔해요'), findsWidgets);
-    expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
+      // ① 위치 확인: 카트가 먼저다. 카트를 찍기 전에는 출발 칸도 받지 않는다.
+      expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
+      expect(find.text('카트 스캔'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('move-submit')),
+        findsNothing,
+      ); // 이 쪽에는 싣기 버튼·수량이 없다
+      expect(find.byKey(const ValueKey('move-qty-value')), findsNothing);
+      expect(
+        t
+            .widget<Opacity>(find.byKey(const ValueKey('target-from-lock')))
+            .opacity,
+        lessThan(1),
+      );
+      await scan(t, 'move-scan', 'C-R1-01-1-01');
+      expect(find.text('카트 바코드를 먼저 스캔해요'), findsWidgets);
+      await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
+      expect(find.text('카트 바코드를 먼저 스캔해요'), findsWidgets);
+      expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
 
-    await scan(t, 'move-scan', 'CRT-C-01');
-    expect(t.widget<Opacity>(find.byKey(const ValueKey('target-from-lock'))).opacity, 1);
-    expect(find.text('출발 칸 스캔'), findsOneWidget);
-    // 다른 칸·칸 아닌 값·상품은 거절 — 아직 위치 확인 쪽이다.
-    await scan(t, 'move-scan', 'C-S1-01-1-01');
-    expect(find.text('지시한 칸이 아니에요. 화면의 칸으로 가 주세요'), findsWidgets);
-    await scan(t, 'move-scan', 'hello');
-    expect(find.text('출발 칸 바코드를 먼저 스캔해요'), findsWidgets);
-    await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
-    expect(find.text('출발 칸 바코드를 먼저 스캔해요'), findsWidgets);
-    expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
+      await scan(t, 'move-scan', 'CRT-C-01');
+      expect(
+        t
+            .widget<Opacity>(find.byKey(const ValueKey('target-from-lock')))
+            .opacity,
+        1,
+      );
+      expect(find.text('출발 칸 스캔'), findsOneWidget);
+      // 다른 칸·칸 아닌 값·상품은 거절 — 아직 위치 확인 쪽이다.
+      await scan(t, 'move-scan', 'C-S1-01-1-01');
+      expect(find.text('지시한 칸이 아니에요. 화면의 칸으로 가 주세요'), findsWidgets);
+      await scan(t, 'move-scan', 'hello');
+      expect(find.text('출발 칸 바코드를 먼저 스캔해요'), findsWidgets);
+      await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
+      expect(find.text('출발 칸 바코드를 먼저 스캔해요'), findsWidgets);
+      expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
 
-    // 둘 다 찍으면 ② 상품 싣기 쪽으로 넘어간다.
-    await scan(t, 'move-scan', 'C-R1-01-1-01');
-    expect(find.byKey(const ValueKey('step-1')), findsOneWidget);
-    expect(find.text('상품을 하나씩 스캔'), findsOneWidget);
-    // 수량은 0부터 — 상품을 스캔해 센다. 다른 상품은 세지 않는다.
-    expect(find.text('스캔 수량 0'), findsOneWidget);
-    expect(enabled(t, 'move-submit'), isFalse); // 상품 아직
-    await scan(t, 'move-scan', MockTaskRepository.yogurtBarcode);
-    expect(find.text('지시한 상품이 아니에요 — 세지 않았어요'), findsWidgets);
-    // 첫 개를 스캔하면 수량 칸(피킹과 같게) — 스캔·+·수기, 1 ~ 옮길 양.
-    expect(find.byKey(const ValueKey('move-qty')), findsNothing);
-    await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
-    expect(find.text('스캔 수량 0'), findsNothing);
-    String qty() => t.widget<TextField>(find.byKey(const ValueKey('move-qty'))).controller!.text;
-    expect(qty(), '1');
-    await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
-    expect(qty(), '2');
-    await tapKey(t, 'move-qty-add');
-    expect(qty(), '3');
-    await t.enterText(find.byKey(const ValueKey('move-qty')), '0');
-    await t.testTextInput.receiveAction(TextInputAction.done);
-    await t.pumpAndSettle();
-    expect(qty(), '1'); // 1 아래로 내려가지 않는다
-    await t.enterText(find.byKey(const ValueKey('move-qty')), '99');
-    await t.testTextInput.receiveAction(TextInputAction.done);
-    await t.pumpAndSettle();
-    expect(qty(), '6'); // 옮길 양까지
-    expect(t.widget<ButtonStyleButton>(find.byKey(const ValueKey('move-qty-add'))).onPressed, isNull);
-    await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
-    expect(find.text('옮길 양을 넘었어요'), findsWidgets);
-    expect(enabled(t, 'move-submit'), isTrue);
-    expect(t.takeException(), isNull);
-    // 서버에는 아직 실은 것이 없다 — "카트에 실었어요"를 눌러야 기록된다.
-    expect((await t.runAsync(() => stockMove.move('MV-mock-1')))!.onCartQty, 0);
-    await tapKey(t, 'move-submit');
+      // 둘 다 찍으면 ② 상품 싣기 쪽으로 넘어간다.
+      await scan(t, 'move-scan', 'C-R1-01-1-01');
+      expect(find.byKey(const ValueKey('step-1')), findsOneWidget);
+      expect(find.text('상품을 하나씩 스캔'), findsOneWidget);
+      // 수량은 0부터 — 상품을 스캔해 센다. 다른 상품은 세지 않는다.
+      expect(find.text('스캔 수량 0'), findsOneWidget);
+      expect(enabled(t, 'move-submit'), isFalse); // 상품 아직
+      await scan(t, 'move-scan', MockTaskRepository.yogurtBarcode);
+      expect(find.text('지시한 상품이 아니에요 — 세지 않았어요'), findsWidgets);
+      // 첫 개를 스캔하면 수량 칸(피킹과 같게) — 스캔·+·수기, 1 ~ 옮길 양.
+      expect(find.byKey(const ValueKey('move-qty')), findsNothing);
+      await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
+      expect(find.text('스캔 수량 0'), findsNothing);
+      String qty() => t
+          .widget<TextField>(find.byKey(const ValueKey('move-qty')))
+          .controller!
+          .text;
+      expect(qty(), '1');
+      await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
+      expect(qty(), '2');
+      await tapKey(t, 'move-qty-add');
+      expect(qty(), '3');
+      await t.enterText(find.byKey(const ValueKey('move-qty')), '0');
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await t.pumpAndSettle();
+      expect(qty(), '1'); // 1 아래로 내려가지 않는다
+      await t.enterText(find.byKey(const ValueKey('move-qty')), '99');
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await t.pumpAndSettle();
+      expect(qty(), '6'); // 옮길 양까지
+      expect(
+        t
+            .widget<ButtonStyleButton>(
+              find.byKey(const ValueKey('move-qty-add')),
+            )
+            .onPressed,
+        isNull,
+      );
+      await scan(t, 'move-scan', MockTaskRepository.milkBarcode);
+      expect(find.text('옮길 양을 넘었어요'), findsWidgets);
+      expect(enabled(t, 'move-submit'), isTrue);
+      expect(t.takeException(), isNull);
+      // 서버에는 아직 실은 것이 없다 — "카트에 실었어요"를 눌러야 기록된다.
+      expect(
+        (await t.runAsync(() => stockMove.move('MV-mock-1')))!.onCartQty,
+        0,
+      );
+      await tapKey(t, 'move-submit');
 
-    // ③ 내려놓기: "이동하세요" 안내 → 도착 칸.
-    expect(find.byKey(const ValueKey('step-2')), findsOneWidget);
-    expect(find.byKey(const ValueKey('move-go')), findsOneWidget);
-    expect(find.text('도착 칸으로 이동해 칸을 찍어요'), findsOneWidget);
-    expect((await t.runAsync(() => stockMove.move('MV-mock-1')))!.onCartQty, 6);
-    expect(enabled(t, 'move-submit'), isFalse); // 도착 칸 아직
-    await scan(t, 'move-scan', 'C-S1-02-2-05');
-    expect(find.byKey(const ValueKey('move-go')), findsNothing);
-    await tapKey(t, 'move-submit');
-    // 이동 하나가 끝나면 완료 화면: 무엇을 몇 개, 어디서 어디로.
-    expect(find.byKey(const ValueKey('move-done')), findsOneWidget);
-    expect(find.text('보충 완료'), findsOneWidget);
-    expect(find.text('6개를 C-S1-02-2-05 에 옮겼어요'), findsOneWidget);
-    expect(find.text('6개 (지시 6개)'), findsOneWidget);
-    final summary = find.byKey(const ValueKey('done-summary'));
-    for (final v in ['C-R1-01-1-01', 'C-S1-02-2-05', 'CRT-C-01']) {
-      expect(find.descendant(of: summary, matching: find.text(v)), findsOneWidget, reason: v);
-    }
-    expect(find.byKey(const ValueKey('move-scan')), findsNothing);
-    expect(t.takeException(), isNull);
-    expect(
-      (await t.runAsync(() => stockMove.move('MV-mock-1')))!.state,
-      MoveState.completed,
-    );
+      // ③ 내려놓기: "이동하세요" 안내 → 도착 칸.
+      expect(find.byKey(const ValueKey('step-2')), findsOneWidget);
+      expect(find.byKey(const ValueKey('move-go')), findsOneWidget);
+      expect(find.text('도착 칸으로 이동해 칸을 찍어요'), findsOneWidget);
+      expect(
+        (await t.runAsync(() => stockMove.move('MV-mock-1')))!.onCartQty,
+        6,
+      );
+      expect(enabled(t, 'move-submit'), isFalse); // 도착 칸 아직
+      await scan(t, 'move-scan', 'C-S1-02-2-05');
+      expect(find.byKey(const ValueKey('move-go')), findsNothing);
+      await tapKey(t, 'move-submit');
+      // 이동 하나가 끝나면 완료 화면: 무엇을 몇 개, 어디서 어디로.
+      expect(find.byKey(const ValueKey('move-done')), findsOneWidget);
+      expect(find.text('보충 완료'), findsOneWidget);
+      expect(find.text('6개를 C-S1-02-2-05 에 옮겼어요'), findsOneWidget);
+      expect(find.text('6개 (지시 6개)'), findsOneWidget);
+      final summary = find.byKey(const ValueKey('done-summary'));
+      for (final v in ['C-R1-01-1-01', 'C-S1-02-2-05', 'CRT-C-01']) {
+        expect(
+          find.descendant(of: summary, matching: find.text(v)),
+          findsOneWidget,
+          reason: v,
+        );
+      }
+      expect(find.byKey(const ValueKey('move-scan')), findsNothing);
+      expect(t.takeException(), isNull);
+      expect(
+        (await t.runAsync(() => stockMove.move('MV-mock-1')))!.state,
+        MoveState.completed,
+      );
 
-    // 다음 작업 — 남은 이동·적치가 없어 취소품 복귀.
-    await tapKey(t, 'result-action');
-    expect(find.byKey(const ValueKey('assigned-shp-9-RETURN')), findsOneWidget);
-  });
+      // 다음 작업 — 남은 이동·적치가 없어 취소품 복귀.
+      await tapKey(t, 'result-action');
+      expect(
+        find.byKey(const ValueKey('assigned-shp-9-RETURN')),
+        findsOneWidget,
+      );
+    },
+  );
 
-  testWidgets('재고 이동 완료 화면: "다음 작업"을 10초 안에 누르지 않으면 자동으로 다음 작업을 받는다', (t) async {
+  testWidgets('재고 이동 완료 화면: "다음 작업"을 10초 안에 누르지 않으면 자동으로 다음 작업을 받는다', (
+    t,
+  ) async {
     await open(t, 'stockMove');
     await tapKey(t, 'run-task');
     await scan(t, 'move-scan', 'CRT-C-01');
@@ -229,7 +270,10 @@ void main() {
     await t.pump(const Duration(seconds: 7));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('move-done')), findsNothing);
-    expect(find.byKey(const ValueKey('assigned-shp-9-RETURN')), findsOneWidget); // 다음 작업을 받았다
+    expect(
+      find.byKey(const ValueKey('assigned-shp-9-RETURN')),
+      findsOneWidget,
+    ); // 다음 작업을 받았다
     expect(t.takeException(), isNull);
   });
 
@@ -503,7 +547,13 @@ void main() {
     expect(find.byKey(const ValueKey('step-1')), findsOneWidget);
     await scan(t, 'return-scan', MockTaskRepository.yogurtBarcode);
     await tapKey(t, 'return-qty-add');
-    expect(t.widget<TextField>(find.byKey(const ValueKey('return-qty'))).controller!.text, '2');
+    expect(
+      t
+          .widget<TextField>(find.byKey(const ValueKey('return-qty')))
+          .controller!
+          .text,
+      '2',
+    );
     await scan(t, 'return-scan', 'C-S1-01-1-01');
     expect(find.text("상품을 다 세었으면 '실었어요'를 먼저 눌러 주세요"), findsWidgets);
     await tapKey(t, 'return-load');
