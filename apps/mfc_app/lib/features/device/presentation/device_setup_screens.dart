@@ -136,7 +136,7 @@ class StartScreen extends ConsumerWidget {
                                     style: theme.textTheme.headlineMedium
                                         ?.copyWith(
                                           color: Colors.white,
-                                          fontWeight: FontWeight.w800,
+                                          fontWeight: FontWeight.w700,
                                         ),
                                   ),
                                 ],
@@ -242,7 +242,7 @@ class _StartTile extends StatelessWidget {
             Text(
               title,
               style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
             Text(
@@ -357,7 +357,7 @@ class _ScannerCheckScreenState extends State<ScannerCheckScreen> {
                                 _last!,
                                 key: const ValueKey('scanner-check-value'),
                                 style: theme.textTheme.headlineMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   letterSpacing: 1,
                                 ),
                               ),
@@ -455,7 +455,7 @@ class DeviceInfoScreen extends ConsumerWidget {
                                 : l10n.deviceInfoModeLocal,
                             key: const ValueKey('device-mode'),
                             style: theme.textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               color: mock
                                   ? PdaColors.onWarning
                                   : PdaColors.okInk,

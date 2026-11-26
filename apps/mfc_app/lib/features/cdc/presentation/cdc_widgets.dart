@@ -36,28 +36,28 @@ class CdcGuideScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final steps = switch (area) {
       CdcWorkArea.pick => [
-        (Icons.assignment_turned_in_outlined, l10n.cdcGuidePick1),
-        (Icons.place_outlined, l10n.cdcGuidePick2),
-        (Icons.qr_code_scanner, l10n.cdcGuidePick3),
-        (Icons.report_problem_outlined, l10n.cdcGuidePick4),
+        (Icons.assignment_turned_in_rounded, l10n.cdcGuidePick1),
+        (Icons.place_rounded, l10n.cdcGuidePick2),
+        (Icons.qr_code_scanner_rounded, l10n.cdcGuidePick3),
+        (Icons.report_problem_rounded, l10n.cdcGuidePick4),
       ],
       CdcWorkArea.inspect => [
-        (Icons.list_alt, l10n.cdcGuideInspect1),
-        (Icons.qr_code_scanner, l10n.cdcGuideInspect2),
-        (Icons.fact_check_outlined, l10n.cdcGuideInspect3),
-        (Icons.report_problem_outlined, l10n.cdcGuideInspect4),
+        (Icons.list_alt_rounded, l10n.cdcGuideInspect1),
+        (Icons.qr_code_scanner_rounded, l10n.cdcGuideInspect2),
+        (Icons.fact_check_rounded, l10n.cdcGuideInspect3),
+        (Icons.report_problem_rounded, l10n.cdcGuideInspect4),
       ],
       CdcWorkArea.load => [
-        (Icons.qr_code_scanner, l10n.cdcGuideLoad1),
-        (Icons.local_shipping_outlined, l10n.cdcGuideLoad2),
-        (Icons.qr_code_scanner, l10n.cdcGuideLoad3),
-        (Icons.info_outline, l10n.cdcGuideLoad4),
+        (Icons.qr_code_scanner_rounded, l10n.cdcGuideLoad1),
+        (Icons.local_shipping_rounded, l10n.cdcGuideLoad2),
+        (Icons.qr_code_scanner_rounded, l10n.cdcGuideLoad3),
+        (Icons.info_rounded, l10n.cdcGuideLoad4),
       ],
       CdcWorkArea.distribute => [
-        (Icons.list_alt, l10n.cdcGuideDistribute1),
-        (Icons.qr_code_scanner, l10n.cdcGuideDistribute2),
-        (Icons.grid_view, l10n.cdcGuideDistribute3),
-        (Icons.inventory_2_outlined, l10n.cdcGuideDistribute4),
+        (Icons.list_alt_rounded, l10n.cdcGuideDistribute1),
+        (Icons.qr_code_scanner_rounded, l10n.cdcGuideDistribute2),
+        (Icons.grid_view_rounded, l10n.cdcGuideDistribute3),
+        (Icons.inventory_2_rounded, l10n.cdcGuideDistribute4),
       ],
     };
     return Scaffold(
@@ -114,7 +114,7 @@ class CdcGuideScreen extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(64),
                   textStyle: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 onPressed: () =>
@@ -162,8 +162,8 @@ class CdcAreaHero extends StatelessWidget {
                     Text(
                       cdcAreaText(l10n, area),
                       style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -1.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.6,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -235,7 +235,7 @@ class _GuideStep extends StatelessWidget {
               style: const TextStyle(
                 color: PdaColors.primary,
                 fontSize: 12,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -357,8 +357,8 @@ class CdcItemCard extends StatelessWidget {
                 Text(
                   name,
                   style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.8,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.4,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -398,7 +398,7 @@ class CdcItemCard extends StatelessWidget {
                 child: Text(
                   '$qty',
                   style: theme.textTheme.displaySmall?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     color: PdaColors.ink,
                   ),
                 ),

@@ -37,11 +37,11 @@ String workAreaHint(AppLocalizations l10n, WorkArea a) => switch (a) {
 };
 
 IconData workAreaIcon(WorkArea a) => switch (a) {
-  WorkArea.inbound => Icons.local_shipping_outlined,
-  WorkArea.inspection => Icons.fact_check_outlined,
-  WorkArea.stockMove => Icons.swap_horiz,
-  WorkArea.stockCount => Icons.inventory_outlined,
-  WorkArea.pickPack => Icons.shopping_basket_outlined,
+  WorkArea.inbound => Icons.local_shipping_rounded,
+  WorkArea.inspection => Icons.fact_check_rounded,
+  WorkArea.stockMove => Icons.swap_horiz_rounded,
+  WorkArea.stockCount => Icons.inventory_rounded,
+  WorkArea.pickPack => Icons.shopping_basket_rounded,
 };
 
 String assignedTypeText(AppLocalizations l10n, String type) => switch (type) {
@@ -395,7 +395,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 l10n.chooseWork,
                                 style: theme.textTheme.labelLarge?.copyWith(
                                   color: PdaColors.muted,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -606,8 +606,8 @@ class AreaHeroCard extends StatelessWidget {
                       workAreaText(l10n, area),
                       key: const ValueKey('area-hero-title'),
                       style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -1.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.6,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -726,8 +726,8 @@ class _AreaFlight extends StatelessWidget {
                               overflow: TextOverflow.clip,
                               softWrap: false,
                               style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -1.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.6,
                               ),
                             ),
                             const SizedBox(height: 6),
@@ -890,7 +890,7 @@ class _AreaTileText extends StatelessWidget {
           style: TextStyle(
             color: allowed ? PdaColors.ink : PdaColors.muted,
             fontSize: 18,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             letterSpacing: -0.3,
           ),
         ),
@@ -951,7 +951,7 @@ class _Tile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       height: 1.25,
                     ),
                   ),
@@ -1043,34 +1043,34 @@ class WorkGuideScreen extends StatelessWidget {
     // 단계마다 픽토그램(아이콘)과 한 줄 안내.
     final steps = switch (area) {
       WorkArea.inbound => [
-        (Icons.local_shipping, l10n.guideInbound1),
-        (Icons.qr_code_scanner, l10n.guideInbound2),
-        (Icons.format_list_numbered, l10n.guideInbound3),
-        (Icons.report_problem_outlined, l10n.guideInbound4),
+        (Icons.local_shipping_rounded, l10n.guideInbound1),
+        (Icons.qr_code_scanner_rounded, l10n.guideInbound2),
+        (Icons.format_list_numbered_rounded, l10n.guideInbound3),
+        (Icons.report_problem_rounded, l10n.guideInbound4),
       ],
       WorkArea.inspection => [
-        (Icons.qr_code_scanner, l10n.guideInspection1),
-        (Icons.event_available, l10n.guideInspection2),
-        (Icons.health_and_safety_outlined, l10n.guideInspection3),
-        (Icons.recycling, l10n.guideInspection4),
+        (Icons.qr_code_scanner_rounded, l10n.guideInspection1),
+        (Icons.event_available_rounded, l10n.guideInspection2),
+        (Icons.health_and_safety_rounded, l10n.guideInspection3),
+        (Icons.recycling_rounded, l10n.guideInspection4),
       ],
       WorkArea.stockMove => [
         (Icons.shelves, l10n.guideStockMove1),
-        (Icons.move_down, l10n.guideStockMove2),
-        (Icons.sync_alt, l10n.guideStockMove3),
-        (Icons.report_problem_outlined, l10n.guideStockMove4),
+        (Icons.move_down_rounded, l10n.guideStockMove2),
+        (Icons.sync_alt_rounded, l10n.guideStockMove3),
+        (Icons.report_problem_rounded, l10n.guideStockMove4),
       ],
       WorkArea.stockCount => [
-        (Icons.place_outlined, l10n.guideStockCount1),
-        (Icons.numbers, l10n.guideStockCount2),
-        (Icons.visibility_outlined, l10n.guideStockCount3),
-        (Icons.verified_user_outlined, l10n.guideStockCount4),
+        (Icons.place_rounded, l10n.guideStockCount1),
+        (Icons.numbers_rounded, l10n.guideStockCount2),
+        (Icons.visibility_rounded, l10n.guideStockCount3),
+        (Icons.verified_user_rounded, l10n.guideStockCount4),
       ],
       WorkArea.pickPack => [
         (Icons.shelves, l10n.guidePickPack1),
-        (Icons.shopping_cart_checkout, l10n.guidePickPack2),
-        (Icons.report_problem_outlined, l10n.guidePickPack3),
-        (Icons.inventory_2_outlined, l10n.guidePickPack4),
+        (Icons.shopping_cart_checkout_rounded, l10n.guidePickPack2),
+        (Icons.report_problem_rounded, l10n.guidePickPack3),
+        (Icons.inventory_2_rounded, l10n.guidePickPack4),
       ],
     };
     return Scaffold(
@@ -1116,7 +1116,7 @@ class WorkGuideScreen extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(64),
                   textStyle: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 onPressed: () => context.pushReplacement('/work/${area.name}'),
@@ -1289,8 +1289,8 @@ class _AssignedView extends StatelessWidget {
               assignedTypeText(l10n, task.taskType),
               key: const ValueKey('assigned-type'),
               style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                letterSpacing: -1.2,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.6,
               ),
             ),
             if (task.urgent) ...[
@@ -1307,7 +1307,7 @@ class _AssignedView extends StatelessWidget {
                 : l10n.promisedReadyAt(formatSeoulTime(t)),
             style: theme.textTheme.bodyMedium?.copyWith(
               color: PdaColors.primary,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -1344,7 +1344,7 @@ class _AssignedView extends StatelessWidget {
                     ),
                     title: Text(
                       l.fromLocation!,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   );
                 }
@@ -1352,7 +1352,7 @@ class _AssignedView extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   title: Text(
                     l.productName ?? l.sku ?? '-',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   // 수량·칸은 이 작업의 핵심 — 회색 한 줄 대신 수량 보라 굵게, 칸 진하게(사용자 2026-11-20).
                   subtitle: Text.rich(
@@ -1365,7 +1365,7 @@ class _AssignedView extends StatelessWidget {
                           ].join(' · '),
                           style: const TextStyle(
                             color: PdaColors.primary,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         TextSpan(
@@ -1471,7 +1471,7 @@ class _GuideStep extends StatelessWidget {
                       style: const TextStyle(
                         color: PdaColors.primary,
                         fontSize: 12,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -1699,7 +1699,7 @@ class _StatusChip extends StatelessWidget {
         onBreak ? l10n.statusOnBreak : l10n.statusReady,
         key: const ValueKey('worker-status'),
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           color: onBreak ? PdaColors.onWarning : PdaColors.onNotice,
         ),
       ),

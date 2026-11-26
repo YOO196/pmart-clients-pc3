@@ -163,7 +163,7 @@ class _ReturnCard extends ConsumerWidget {
               returnPurposeText(l10n, item.purpose),
               style: theme.textTheme.titleMedium?.copyWith(
                 fontSize: 19,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
             Text(
@@ -200,7 +200,7 @@ class _ReturnCard extends ConsumerWidget {
                   textAlign: TextAlign.center,
                   style: theme.textTheme.displayLarge?.copyWith(
                     color: PdaColors.primary,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     letterSpacing: 12,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),

@@ -148,7 +148,7 @@ class InspectScreen extends ConsumerWidget {
               l10n.inspectAppliedTitle,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
+                  ?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 6),
             Text(
@@ -310,7 +310,7 @@ class _ProductHeader extends StatelessWidget {
               task.productName ?? task.sku,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontSize: 19,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
             Text(
@@ -322,7 +322,7 @@ class _ProductHeader extends StatelessWidget {
               l10n.inspectTarget(task.remainingQty),
               style: theme.textTheme.titleMedium?.copyWith(
                 color: PdaColors.primary,
-                fontWeight: FontWeight.w900,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
@@ -440,7 +440,7 @@ class _JudgeStep extends ConsumerWidget {
             l10n.inspectTotal(s.total, t.remainingQty),
             key: const ValueKey('inspect-total'),
             style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: s.total == t.remainingQty ? null : theme.colorScheme.error,
             ),
           ),
@@ -826,7 +826,7 @@ class _ReturnLineCard extends StatelessWidget {
             Text(
               title,
               style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
             Text(

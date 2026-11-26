@@ -486,7 +486,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                               p.line.productName ?? p.line.sku,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontSize: 19,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                             Text(
@@ -498,7 +498,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                               l10n.returnShelfLeft(p.left),
                               style: theme.textTheme.titleSmall?.copyWith(
                                 color: PdaColors.primary,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ],
@@ -555,7 +555,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                                 l10n.moveLoadedQty(qty),
                                 key: const ValueKey('return-loaded-qty'),
                                 style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
@@ -573,7 +573,7 @@ class ReturnShelfScreen extends ConsumerWidget {
                       Text(
                         l10n.returnColdQuestion,
                         style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 5),

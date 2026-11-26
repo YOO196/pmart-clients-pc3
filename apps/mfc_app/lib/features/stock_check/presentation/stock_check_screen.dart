@@ -159,8 +159,8 @@ class _StockResult extends ConsumerWidget {
         Text(
           name ?? view.sku,
           style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -1.2,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.6,
           ),
         ),
         if (name != null)
@@ -189,7 +189,7 @@ class _StockResult extends ConsumerWidget {
                   Text(
                     lot.lotId,
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   if (lot.expiryDate != null)
@@ -261,7 +261,7 @@ class _StockResult extends ConsumerWidget {
                         Text(
                           line.locationCode,
                           style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -283,7 +283,7 @@ class _StockResult extends ConsumerWidget {
                     l10n.qtyUnit(line.qty),
                     style: theme.textTheme.titleLarge?.copyWith(
                       color: PdaColors.primary,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ],

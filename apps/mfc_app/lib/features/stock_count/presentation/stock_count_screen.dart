@@ -251,7 +251,7 @@ class CountScreen extends ConsumerWidget {
                               Text(
                                 ctl.nameOf(l) ?? l.sku,
                                 style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                               // SKU·유통기한·로트를 한 줄로 이으면 두 줄로 꺾였다 — 이름표 + 진한 값으로 나눈다.

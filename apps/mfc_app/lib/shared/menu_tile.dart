@@ -77,7 +77,7 @@ class MenuTile extends StatelessWidget {
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: fg,
                                 fontSize: roomy ? 18 : 16,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                             if (roomy && hint != null)

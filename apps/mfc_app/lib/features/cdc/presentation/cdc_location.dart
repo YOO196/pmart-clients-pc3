@@ -116,8 +116,8 @@ class CdcLocationGuide extends StatelessWidget {
         Text(
           title ?? l10n.locGoTo,
           style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -1.2,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.6,
           ),
         ),
         if (detail case final d?)
@@ -193,7 +193,7 @@ class CdcLocationCard extends StatelessWidget {
                   style: const TextStyle(
                     color: PdaColors.muted,
                     fontSize: 12,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -229,7 +229,7 @@ class CdcLocationCard extends StatelessWidget {
                                   color: PdaColors.primary,
                                   fontSize: 30,
                                   height: 1.2,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   fontFeatures: [FontFeature.tabularFigures()],
                                 ),
                               ),
@@ -275,7 +275,7 @@ class _Chip extends StatelessWidget {
       style: const TextStyle(
         color: PdaColors.dark,
         fontSize: 13,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w700,
       ),
     ),
   );

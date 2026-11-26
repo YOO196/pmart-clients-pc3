@@ -301,7 +301,7 @@ class HandoverChecksScreen extends ConsumerWidget {
                                 : l10n.hoLocation(h.packingLocation!),
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontSize: 19,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                           DefaultTextStyle.merge(
@@ -399,8 +399,8 @@ class PackageHandoverScreen extends ConsumerWidget {
                   verdictText(l10n, h.verdict),
                   key: const ValueKey('verdict'),
                   style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -1.2,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.6,
                   ),
                 ),
                 if (!h.fresh)
@@ -427,7 +427,7 @@ class PackageHandoverScreen extends ConsumerWidget {
                           : l10n.hoLocation(h.packingLocation!),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontSize: 19,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     Text(
@@ -443,7 +443,7 @@ class PackageHandoverScreen extends ConsumerWidget {
                       packageStateText(l10n, h.packageState),
                       style: theme.textTheme.titleSmall?.copyWith(
                         color: PdaColors.primary,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     if (h.orderNumber != null)
@@ -501,7 +501,7 @@ class PackageHandoverScreen extends ConsumerWidget {
                       Text(
                         l10n.etaTitle,
                         style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       _PickupEta(shipmentId: h.shipmentId!),

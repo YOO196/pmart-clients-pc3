@@ -171,7 +171,7 @@ class _CenterCard extends StatelessWidget {
                         style: const TextStyle(
                           color: PdaColors.primary,
                           fontSize: 18,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -188,7 +188,7 @@ class _CenterCard extends StatelessWidget {
                             style: const TextStyle(
                               color: PdaColors.ink,
                               fontSize: 19,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               letterSpacing: -0.3,
                               fontFeatures: [FontFeature.tabularFigures()],
                             ),
@@ -401,8 +401,8 @@ class _PlaceCard extends StatelessWidget {
                                 style: const TextStyle(
                                   color: PdaColors.ink,
                                   fontSize: 25,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.8,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.4,
                                 ),
                               ),
                               Text(
@@ -511,8 +511,8 @@ class _Heading extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
           color: PdaColors.ink,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -1,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.6,
         ),
       ),
       const SizedBox(height: 4),
@@ -552,7 +552,7 @@ class _Crumb extends StatelessWidget {
           style: const TextStyle(
             color: PdaColors.dark,
             fontSize: 13,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],

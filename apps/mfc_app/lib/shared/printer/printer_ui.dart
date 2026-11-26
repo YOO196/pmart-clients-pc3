@@ -416,7 +416,7 @@ class PackageLabelCard extends StatelessWidget {
                       c,
                       key: const ValueKey('label-handover-code'),
                       style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         letterSpacing: 3,
                         color: PdaColors.ink,
                       ),
@@ -447,7 +447,7 @@ class PackageLabelCard extends StatelessWidget {
                           zoneText,
                           key: const ValueKey('label-zone'),
                           style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: PdaColors.ink,
                           ),
                         ),

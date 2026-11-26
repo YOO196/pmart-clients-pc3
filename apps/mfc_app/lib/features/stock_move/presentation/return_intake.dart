@@ -235,7 +235,7 @@ class ReturnArrivalsScreen extends ConsumerWidget {
                                 child: Text(
                                   arrivalPurposeText(l10n, a.purpose),
                                   style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
@@ -333,7 +333,7 @@ class ReturnIntakeScreen extends ConsumerWidget {
                     child: Text(
                       arrivalPurposeText(l10n, a.purpose),
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -387,7 +387,7 @@ class ReturnIntakeScreen extends ConsumerWidget {
                           child: Text(
                             l10n.riLocationNeeded,
                             style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               color: PdaColors.onWarning,
                             ),
                           ),
@@ -454,7 +454,7 @@ class ReturnIntakeScreen extends ConsumerWidget {
                                 key: ValueKey('ri-count-${l.sku}'),
                                 textAlign: TextAlign.center,
                                 style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   color: s.countOf(l.sku) == l.qty
                                       ? PdaColors.primary
                                       : PdaColors.ink,

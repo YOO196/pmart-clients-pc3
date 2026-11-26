@@ -29,10 +29,10 @@ String cdcAreaDesc(AppLocalizations l10n, CdcWorkArea a) => switch (a) {
 };
 
 IconData cdcAreaIcon(CdcWorkArea a) => switch (a) {
-  CdcWorkArea.pick => Icons.shopping_basket_outlined,
-  CdcWorkArea.distribute => Icons.call_split,
-  CdcWorkArea.inspect => Icons.fact_check_outlined,
-  CdcWorkArea.load => Icons.local_shipping_outlined,
+  CdcWorkArea.pick => Icons.shopping_basket_rounded,
+  CdcWorkArea.distribute => Icons.call_split_rounded,
+  CdcWorkArea.inspect => Icons.fact_check_rounded,
+  CdcWorkArea.load => Icons.local_shipping_rounded,
 };
 
 /// DC 직원(`CDC_WORKER`·`CDC_SUPERVISOR`) 홈(사용자 2026-11-26 "cdc 직원도 들어가면 … 다른 메뉴 뜨도록").
@@ -123,7 +123,7 @@ class CdcHomeScreen extends ConsumerWidget {
                   l10n.chooseWork,
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: PdaColors.muted,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
@@ -229,7 +229,7 @@ class _CdcAreaTile extends StatelessWidget {
                               style: const TextStyle(
                                 color: PdaColors.ink,
                                 fontSize: 18,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                             if (height >= 68)
@@ -330,7 +330,7 @@ class _CdcAreaFlight extends StatelessWidget {
                             style: const TextStyle(
                               color: PdaColors.ink,
                               fontSize: 18,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -354,8 +354,8 @@ class _CdcAreaFlight extends StatelessWidget {
                               softWrap: false,
                               overflow: TextOverflow.clip,
                               style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -1.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.6,
                               ),
                             ),
                             const SizedBox(height: 6),

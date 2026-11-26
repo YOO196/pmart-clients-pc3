@@ -374,7 +374,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                               Text(
                                 expectedCart,
                                 style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
@@ -427,8 +427,8 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                           l10n.packBagNo(sealedCount + 1),
                           key: const ValueKey('bag-no'),
                           style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -1.2,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.6,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -547,7 +547,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                                       ),
                                       style: theme.textTheme.titleMedium
                                           ?.copyWith(
-                                            fontWeight: FontWeight.w800,
+                                            fontWeight: FontWeight.w700,
                                           ),
                                     ),
                                   ],
@@ -765,7 +765,7 @@ class _PackingScreenState extends ConsumerState<PackingScreen> {
                                     key: ValueKey('pkg-code-${p.packageId}'),
                                     style: p.handoverCode != null
                                         ? theme.textTheme.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.w800,
+                                            fontWeight: FontWeight.w700,
                                             letterSpacing: 2,
                                           )
                                         : theme.textTheme.bodySmall?.copyWith(
@@ -988,7 +988,7 @@ class _OrderCard extends StatelessWidget {
                       orderNumber,
                       key: const ValueKey('pack-order-number'),
                       style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: PdaColors.ink,
                         letterSpacing: 0.5,
                       ),
@@ -1026,7 +1026,7 @@ class _OrderCard extends StatelessWidget {
                     l10n.packDispatchChip,
                     style: theme.textTheme.labelMedium?.copyWith(
                       color: Colors.white,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -1050,7 +1050,7 @@ class _OrderCard extends StatelessWidget {
                           t,
                           key: const ValueKey('pack-ready-at'),
                           style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: PdaColors.primary,
                           ),
                         ),

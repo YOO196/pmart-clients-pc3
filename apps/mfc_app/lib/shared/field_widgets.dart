@@ -78,7 +78,7 @@ class StepHeader extends StatelessWidget {
                                 ? PdaColors.body
                                 : PdaColors.muted,
                             fontWeight: i == current
-                                ? FontWeight.w800
+                                ? FontWeight.w700
                                 : FontWeight.w600,
                           ),
                           child: Text(n, maxLines: 1),
@@ -169,7 +169,7 @@ class ProgressLine extends StatelessWidget {
           text,
           key: textKey,
           style: Theme.of(context).textTheme.titleSmall
-              ?.copyWith(color: PdaColors.ink, fontWeight: FontWeight.w800),
+              ?.copyWith(color: PdaColors.ink, fontWeight: FontWeight.w700),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -294,7 +294,7 @@ class StepCaption extends StatelessWidget {
     child: Text(
       text,
       style: Theme.of(context).textTheme.labelLarge
-          ?.copyWith(color: PdaColors.muted, fontWeight: FontWeight.w800),
+          ?.copyWith(color: PdaColors.muted, fontWeight: FontWeight.w700),
     ),
   );
 }
@@ -336,8 +336,8 @@ class DoneMark extends StatelessWidget {
             title,
             textAlign: TextAlign.center,
             style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: -1.2,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.6,
             ),
           ),
           if (message case final m?)
@@ -564,7 +564,7 @@ class _TaskDoneViewState extends State<TaskDoneView> {
           key: const ValueKey('done-title'),
           textAlign: TextAlign.center,
           style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
           ),
         ),
         const SizedBox(height: 8),
@@ -685,7 +685,7 @@ class ResultView extends StatelessWidget {
         text,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.titleLarge
-            ?.copyWith(fontWeight: FontWeight.w800),
+            ?.copyWith(fontWeight: FontWeight.w700),
       ),
       if (detail case final d?)
         Padding(
@@ -696,7 +696,7 @@ class ResultView extends StatelessWidget {
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               color: PdaColors.primary,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ),
@@ -1051,7 +1051,7 @@ class ZoneChip extends StatelessWidget {
         text,
         style:
             (large ? theme.textTheme.titleMedium : theme.textTheme.labelLarge)
-                ?.copyWith(fontWeight: FontWeight.w800, color: PdaColors.ink),
+                ?.copyWith(fontWeight: FontWeight.w700, color: PdaColors.ink),
       ),
     );
   }
@@ -1098,7 +1098,7 @@ class StatBox extends StatelessWidget {
               value,
               key: valueKey,
               style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: strong ? PdaColors.primary : PdaColors.ink,
               ),
             ),
@@ -1130,7 +1130,7 @@ class DoneLine extends StatelessWidget {
             text,
             key: textKey,
             style: Theme.of(context).textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w800, color: PdaColors.okInk),
+                ?.copyWith(fontWeight: FontWeight.w700, color: PdaColors.okInk),
           ),
         ),
       ],
