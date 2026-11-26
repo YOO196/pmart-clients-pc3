@@ -510,7 +510,8 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
           q={tasks}
           value={tasksMore ? m.atLeast(openTasks.length) : m.count(openTasks.length)}
           trio={[waitingN, runningN, blocked]}
-          foot={m.kpi.taskTrio}
+          trioLabels={m.kpi.trioLabels}
+          foot={m.kpi.taskTotal(tasksMore ? m.atLeast(openTasks.length) : m.count(openTasks.length))}
           stack={[waitingN, runningN, blocked]}
         />
 
@@ -839,6 +840,7 @@ function Kpi({
   trend,
   track,
   trio,
+  trioLabels,
   stack,
 }: {
   readonly testId: string;
@@ -851,6 +853,8 @@ function Kpi({
   readonly track?: number | null;
   /** 세 숫자(레퍼런스 "36 / 24 / 284") — 있으면 큰 숫자 대신. value 는 화면 읽기용 이름에 */
   readonly trio?: readonly [number, number, number];
+  /** 숫자 옆 상태명(2026-11-26 표 검토 "1 / 16 / 1 은 범례를 읽어야 안다") */
+  readonly trioLabels?: readonly [string, string, string];
   /** 세 숫자 비율 막대(대기·진행·막힘) */
   readonly stack?: readonly [number, number, number];
 }) {
@@ -872,13 +876,14 @@ function Kpi({
       ) : (
         <>
           {trio ? (
-            <p className="mt-1 flex items-baseline gap-2 text-[30px] leading-tight font-extrabold tracking-[-0.04em] tabular-nums" aria-label={value}>
+            <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-[26px] leading-tight font-extrabold tracking-[-0.04em] tabular-nums" aria-label={value}>
               <span data-testid={`${testId}-value`} className="sr-only">
                 {value}
               </span>
               {trio.map((v, i) => (
                 <span key={i} className="flex items-baseline gap-2" aria-hidden="true">
-                  {i > 0 && <span className="text-lg font-medium text-base-content/30">/</span>}
+                  {i > 0 && <span className="text-lg font-medium text-base-content/30">{trioLabels ? '·' : '/'}</span>}
+                  {trioLabels && <span className="text-sm font-semibold tracking-normal text-base-content/60">{trioLabels[i]}</span>}
                   <span className={i === 2 && v > 0 ? 'text-error' : ''}>{v}</span>
                 </span>
               ))}

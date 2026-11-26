@@ -363,8 +363,9 @@ function StatusStrip({
       </span>
       <span className="font-bold">{title}</span>
       {issues.map((p) => (
+        // 건수는 위 숫자 칸에 있다 — 여기는 종류 이름만(2026-11-26 표 검토 "같은 숫자가 반복돼 시선이 멈춘다")
         <button key={p.key} type="button" className="link link-hover text-error" onClick={() => onFilter(p.key)}>
-          {p.text(p.n)}
+          {m.issueName[p.key]}
         </button>
       ))}
       {failed > 0 && <span className="text-xs text-base-content/60">{m.status.failed(failed)}</span>}

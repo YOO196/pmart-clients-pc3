@@ -160,7 +160,8 @@ export function StockProductList({ mfcId, onOpen }: { readonly mfcId: string; re
   };
   const nameOf = (p: ProductRow) => p.productName ?? infoOf(p.sku)?.name ?? p.sku;
   const qualityBadge = (p: ProductRow) =>
-    p.quarantined > 0 ? <span className="badge badge-sm badge-warning">{m.quarantined(p.quarantined)}</span> : <span className="badge badge-sm badge-success">{mv.quality.NORMAL}</span>;
+    // 격리 수량은 격리 칸에 있다 — 품질 칸은 판정 상태만(같은 숫자 반복 없이)
+    p.quarantined > 0 ? <span className="badge badge-sm badge-warning">{m.hasQuarantine}</span> : <span className="badge badge-sm badge-success">{mv.quality.NORMAL}</span>;
   return (
     <div className="space-y-4" data-testid="stock-products">
       <SearchPanel
@@ -226,8 +227,8 @@ export function StockProductList({ mfcId, onOpen }: { readonly mfcId: string; re
                     <thead>
                       <tr>
                         <th>{m.col.product}</th>
-                        <th className="text-right">{m.col.onHand}</th>
                         <th className="text-right" title={m.availableHint}>{m.col.available}</th>
+                        <th className="text-right">{m.col.onHand}</th>
                         <th className="text-right">{m.col.quarantinedQty}</th>
                         {filteredView && <th className="text-right">{m.col.filteredQty}</th>}
                         <th className="text-right">{m.col.lots}</th>
@@ -247,8 +248,9 @@ export function StockProductList({ mfcId, onOpen }: { readonly mfcId: string; re
                               </span>
                             </button>
                           </td>
+                          {/* 피킹 가능 수량을 먼저·크게(2026-11-26 표 검토) */}
+                          <td className="text-right text-base font-bold text-primary" data-testid="stock-product-available">{dash(num(p, 'available'))}</td>
                           <td className="text-right">{dash(num(p, 'onHand'))}</td>
-                          <td className="text-right font-semibold" data-testid="stock-product-available">{dash(num(p, 'available'))}</td>
                           <td className="text-right">{dash(num(p, 'quarantined'))}</td>
                           {filteredView && <td className="text-right">{p.qty}</td>}
                           <td className="text-right">{p.lots}</td>
