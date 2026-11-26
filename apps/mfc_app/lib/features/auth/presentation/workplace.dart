@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/pda_motion.dart';
 import '../../../shared/pda_theme.dart';
 import 'auth_controller.dart';
 
@@ -61,7 +62,7 @@ class WorkplaceSwitchButton extends ConsumerWidget {
   }
 }
 
-/// 근무 센터 고르기(홈 본문) — 센터가 여럿일 때
+/// 근무 센터 고르기(홈 본문) — 센터가 여럿일 때. 홈 업무 칸과 같은 모양(흰 카드·그림자·연보라 원·차례 등장·눌림).
 class CenterChoiceView extends ConsumerWidget {
   const CenterChoiceView({super.key, required this.centers});
 
@@ -70,89 +71,134 @@ class CenterChoiceView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
+    final both = ref.watch(employeeSessionProvider)?.hasBoth ?? false;
     return SafeArea(
-      child: ListView(
-        key: const ValueKey('center-choice'),
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text(
-            l10n.centerChoiceTitle,
-            style: Theme.of(context).textTheme.headlineSmall
-                ?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            l10n.centerChoiceHelp,
-            style: const TextStyle(color: PdaColors.muted),
-          ),
-          const SizedBox(height: 16),
-          for (final c in centers)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: OutlinedButton.icon(
-                key: ValueKey('center-$c'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(60),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Column(
+          key: const ValueKey('center-choice'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (both)
+              EnterFade(
+                child: Align(
                   alignment: Alignment.centerLeft,
-                  textStyle: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
+                  child: _Crumb(
+                    icon: Icons.storefront_outlined,
+                    text: l10n.workplaceMfc,
                   ),
                 ),
-                onPressed: () =>
-                    ref.read(centerChoiceProvider.notifier).choose(c),
-                icon: const Icon(Icons.storefront_outlined),
-                label: Text(c),
+              ),
+            EnterFade(
+              index: 1,
+              child: _Heading(
+                title: l10n.centerChoiceTitle,
+                help: l10n.centerChoiceHelp(centers.length),
               ),
             ),
-        ],
+            const SizedBox(height: 14),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.only(bottom: 8),
+                itemCount: centers.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (context, i) => EnterFade(
+                  index: i + 2,
+                  child: _CenterCard(
+                    n: i + 1,
+                    center: centers[i],
+                    onTap: () => ref
+                        .read(centerChoiceProvider.notifier)
+                        .choose(centers[i]),
+                  ),
+                ),
+              ),
+            ),
+            _Footnote(text: l10n.workplaceFootnote),
+          ],
+        ),
       ),
     );
   }
 }
 
-class WorkplaceChoiceScreen extends ConsumerWidget {
-  const WorkplaceChoiceScreen({super.key});
+class _CenterCard extends StatelessWidget {
+  const _CenterCard({
+    required this.n,
+    required this.center,
+    required this.onTap,
+  });
+
+  final int n;
+  final String center;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final s = ref.watch(employeeSessionProvider);
-    String join(List<String> c) => c.isEmpty ? '-' : c.join(' · ');
-    Widget card(Workplace w, IconData icon, String title, String desc) =>
-        Padding(
-          padding: const EdgeInsets.only(bottom: 14),
-          child: Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              key: ValueKey('workplace-${w.name}'),
-              borderRadius: BorderRadius.circular(16),
-              onTap: () => ref.read(workplaceProvider.notifier).choose(w),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: PdaColors.lilac, width: 1.5),
-                ),
+    return Pressable(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: PdaShadows.sm,
+        ),
+        child: Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: const BorderSide(color: PdaColors.line),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            key: ValueKey('center-$center'),
+            onTap: onTap,
+            child: SizedBox(
+              height: 78,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
                   children: [
-                    Icon(icon, size: 40, color: PdaColors.primary),
-                    const SizedBox(width: 16),
+                    Container(
+                      width: 44,
+                      height: 44,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                        color: PdaColors.softer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '$n',
+                        style: const TextStyle(
+                          color: PdaColors.primary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            title,
+                            center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 22,
+                              color: PdaColors.ink,
+                              fontSize: 19,
                               fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
+                              fontFeatures: [FontFeature.tabularFigures()],
                             ),
                           ),
                           Text(
-                            desc,
-                            style: const TextStyle(color: PdaColors.muted),
+                            l10n.centerChoiceCardSub,
+                            style: const TextStyle(
+                              color: PdaColors.muted,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -163,10 +209,36 @@ class WorkplaceChoiceScreen extends ConsumerWidget {
               ),
             ),
           ),
-        );
+        ),
+      ),
+    );
+  }
+}
+
+/// DC·MFC 작업장 고르기 — 두 큰 카드가 화면을 반씩. 카드마다 그곳의 업무·센터를 보여 고르기 전에 알 수 있게.
+class WorkplaceChoiceScreen extends ConsumerWidget {
+  const WorkplaceChoiceScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final s = ref.watch(employeeSessionProvider);
+    // 센터가 셋 이상이면 "첫 센터 외 N곳" — 카드 한 줄에 다 들어가게
+    String join(List<String> c) => c.isEmpty
+        ? '-'
+        : c.length > 2
+        ? l10n.workplaceCentersMore(c.first, c.length - 1)
+        : c.join(' · ');
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.homeTitle),
+        title: Text(
+          l10n.homeTitle,
+          style: const TextStyle(
+            color: PdaColors.onBarMuted,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         actions: [
           IconButton(
             key: const ValueKey('logout'),
@@ -177,36 +249,334 @@ class WorkplaceChoiceScreen extends ConsumerWidget {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          key: const ValueKey('workplace-choice'),
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text(
-              l10n.workplaceTitle,
-              style: Theme.of(context).textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              l10n.workplaceHelp,
-              style: const TextStyle(color: PdaColors.muted),
-            ),
-            const SizedBox(height: 20),
-            card(
-              Workplace.dc,
-              Icons.warehouse_outlined,
-              l10n.workplaceDc,
-              l10n.workplaceDcDesc(join(s?.cdcCenters ?? const [])),
-            ),
-            card(
-              Workplace.mfc,
-              Icons.storefront_outlined,
-              l10n.workplaceMfc,
-              l10n.workplaceMfcDesc(join(s?.mfcCenters ?? const [])),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          child: Column(
+            key: const ValueKey('workplace-choice'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              EnterFade(
+                child: _Heading(
+                  title: l10n.workplaceTitle,
+                  help: l10n.workplaceHelp,
+                ),
+              ),
+              // 카드는 내용 높이 — 두 카드를 가운데쯤(위 여백 1 : 아래 여백 2)
+              const Spacer(),
+              EnterFade(
+                index: 1,
+                child: _PlaceCard(
+                  keyName: 'workplace-dc',
+                  accent: PdaColors.dark,
+                  icon: Icons.warehouse_outlined,
+                  title: l10n.workplaceDc,
+                  tagline: l10n.workplaceDcTagline,
+                  duties: l10n.workplaceDcDuties.split('·'),
+                  dutyIcons: const [
+                    Icons.shopping_basket_outlined,
+                    Icons.call_split,
+                    Icons.inventory_2_outlined,
+                    Icons.fact_check_outlined,
+                    Icons.local_shipping_outlined,
+                  ],
+                  centers: join(s?.cdcCenters ?? const []),
+                  onTap: () =>
+                      ref.read(workplaceProvider.notifier).choose(Workplace.dc),
+                ),
+              ),
+              const SizedBox(height: 14),
+              EnterFade(
+                index: 2,
+                child: _PlaceCard(
+                  keyName: 'workplace-mfc',
+                  accent: PdaColors.primary,
+                  icon: Icons.storefront_outlined,
+                  title: l10n.workplaceMfc,
+                  tagline: l10n.workplaceMfcTagline,
+                  duties: l10n.workplaceMfcDuties.split('·'),
+                  dutyIcons: const [
+                    Icons.shopping_cart_outlined,
+                    Icons.local_shipping_outlined,
+                    Icons.move_to_inbox_outlined,
+                    Icons.verified_outlined,
+                    Icons.inventory_outlined,
+                  ],
+                  centers: join(s?.mfcCenters ?? const []),
+                  onTap: () => ref
+                      .read(workplaceProvider.notifier)
+                      .choose(Workplace.mfc),
+                ),
+              ),
+              const Spacer(flex: 2),
+              _Footnote(text: l10n.workplaceFootnote),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _PlaceCard extends StatelessWidget {
+  const _PlaceCard({
+    required this.keyName,
+    required this.accent,
+    required this.icon,
+    required this.title,
+    required this.tagline,
+    required this.duties,
+    required this.dutyIcons,
+    required this.centers,
+    required this.onTap,
+  });
+
+  final String keyName;
+  final Color accent;
+  final IconData icon;
+  final String title;
+  final String tagline;
+  final List<String> duties;
+  final List<IconData> dutyIcons;
+  final String centers;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Pressable(
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: PdaShadows.sm,
+      ),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: PdaColors.line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: ValueKey(keyName),
+          onTap: onTap,
+          child: Stack(
+            children: [
+              // 왼쪽 색 띠 + 오른쪽 아래 큰 그림(옅게) — 두 카드를 색·그림으로 바로 구별
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(width: 6, color: accent),
+              ),
+              Positioned(
+                right: -18,
+                bottom: -22,
+                child: Icon(
+                  icon,
+                  size: 120,
+                  color: accent.withValues(alpha: 0.05),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 18, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 54,
+                          height: 54,
+                          decoration: BoxDecoration(
+                            color: accent,
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Icon(icon, color: Colors.white, size: 30),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  color: PdaColors.ink,
+                                  fontSize: 25,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.8,
+                                ),
+                              ),
+                              Text(
+                                tagline,
+                                style: const TextStyle(
+                                  color: PdaColors.muted,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.arrow_forward_rounded,
+                            color: accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final (i, d) in duties.indexed)
+                          Container(
+                            padding: const EdgeInsets.fromLTRB(8, 5, 11, 5),
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (i < dutyIcons.length) ...[
+                                  Icon(dutyIcons[i], size: 16, color: accent),
+                                  const SizedBox(width: 4),
+                                ],
+                                Text(
+                                  d.trim(),
+                                  style: TextStyle(
+                                    color: accent,
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    const Divider(height: 1, color: PdaColors.line),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.place_outlined,
+                          size: 17,
+                          color: PdaColors.muted,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            centers,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: PdaColors.body,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _Heading extends StatelessWidget {
+  const _Heading({required this.title, required this.help});
+
+  final String title;
+  final String help;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        title,
+        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+          color: PdaColors.ink,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -1,
+        ),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        help,
+        style: const TextStyle(
+          color: PdaColors.muted,
+          fontSize: 14,
+          height: 1.4,
+        ),
+      ),
+    ],
+  );
+}
+
+class _Crumb extends StatelessWidget {
+  const _Crumb({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+    decoration: BoxDecoration(
+      color: PdaColors.lilac,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: PdaColors.dark),
+        const SizedBox(width: 5),
+        Text(
+          text,
+          style: const TextStyle(
+            color: PdaColors.dark,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _Footnote extends StatelessWidget {
+  const _Footnote({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      const Icon(Icons.swap_horiz, size: 16, color: PdaColors.muted),
+      const SizedBox(width: 4),
+      Flexible(
+        child: Text(
+          text,
+          style: const TextStyle(color: PdaColors.muted, fontSize: 12.5),
+        ),
+      ),
+    ],
+  );
 }
