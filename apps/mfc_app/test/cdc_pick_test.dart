@@ -16,6 +16,7 @@ import 'package:mfc_app/features/auth/presentation/auth_controller.dart';
 import 'package:mfc_app/features/cdc/data/cdc_task_repository.dart';
 import 'package:mfc_app/features/cdc/domain/cdc_task.dart';
 import 'package:mfc_app/features/cdc/presentation/cdc_pick_screen.dart';
+import 'package:mfc_app/shared/field_widgets.dart';
 import 'package:mfc_app/shared/providers.dart';
 
 const _worker = EmployeeSession(
@@ -130,6 +131,40 @@ void main() {
     expect(find.byKey(const ValueKey('done-title')), findsOneWidget);
     await tap(t, 'result-action');
     expect(find.textContaining('T261126002'), findsOneWidget);
+  });
+
+  testWidgets('틀린 스캔: 문구는 스캔 칸 바로 위(아래 고정 칸), 스캔 칸은 빨갛게 빛나고 흔들린다', (t) async {
+    await pump(t);
+    await tap(t, 'cdc-guide-ok');
+    await t.enterText(
+      find.byKey(const ValueKey('cdc-loc-scan')),
+      'CDC01-Z-9-99-99-9-9',
+    );
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pump(const Duration(milliseconds: 100));
+    final box = t.widget<DecoratedBox>(
+      find.byKey(const ValueKey('cdc-loc-scan-flash')),
+    );
+    final border = (box.decoration as BoxDecoration).border! as Border;
+    expect(border.top.color.a, greaterThan(0));
+    expect(border.top.color.r, greaterThan(border.top.color.g)); // 빨강 쪽
+    await t.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(ActionBar),
+        matching: find.byKey(const ValueKey('cdc-scan-error')),
+      ),
+      findsOneWidget,
+    );
+    // 맞는 스캔은 초록으로
+    await t.enterText(
+      find.byKey(const ValueKey('cdc-loc-scan')),
+      'CDC01-C-5-12-03-0-1',
+    );
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pump(const Duration(milliseconds: 50));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cdc-scan-error')), findsNothing);
   });
 
   testWidgets('부족 보고 — 큰 사유 칸을 고르면 그 줄은 끝, 완료 화면에 부족 수', (t) async {
