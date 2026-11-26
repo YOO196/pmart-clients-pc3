@@ -1,8 +1,9 @@
-// 재고 > 상품 취급 > 본사 상품 불러오기(2026-11-25 사용자 "백오피스에 등록된 상품일람 열람하고 일부 품목을 이 센터에서 판매하겠다고 올릴 수 있게").
+// 상품 관리 기본 목록 = 본사 상품 연동(2026-11-26 사용자 "본사상품 불러오기 말고 기본적으로 뜨는 상품들이 본사 취급품 연동이면 좋겠어").
+// 처음엔 본사 상품 불러오기 창(2026-11-25 "백오피스에 등록된 상품일람 열람하고 일부 품목을 이 센터에서 판매하겠다고 올릴 수 있게").
 // - 본사 상품 목록: product-service `GET /products?q=&saleState=`(0.5.0 — q = 관리용 명칭 부분 일치 또는 SKU·바코드 완전 일치, 커서).
 // - 이 센터 취급 여부: mfc-inventory `GET /mfcs/{mfcId}/sku-handlings?enabled=true`(켜진 SKU 전부 — 항목의 productId 로 상품에 잇는다).
 // - 고른 상품 → 각 상품의 SKU(`GET /products/{id}` skus, 단종 SKU 빼고) → `POST /mfcs/{mfcId}/sku-handling-batches`(최대 500행, 전부 또는 전무) 켜기.
-//   이미 켜진 SKU 는 서버가 그대로 둔다(changedCount). 그 센터 MFC_SUPERVISOR·MD 만(서버 판정 — 아니면 403).
+//   이미 켜진 SKU 는 서버가 그대로 둔다(changedCount). 줄마다 켜기·끄기도 같은 일괄 API(상품의 SKU 전부). 그 센터 MFC_SUPERVISOR·MD 만(서버 판정 — 아니면 403).
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -39,7 +40,7 @@ function useHandlingOn(mfcId: string) {
   });
 }
 
-export function CatalogImport({ mfcId, onClose }: { readonly mfcId: string; readonly onClose: () => void }) {
+export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState('');
@@ -85,13 +86,7 @@ export function CatalogImport({ mfcId, onClose }: { readonly mfcId: string; read
     return { changed: r.changedCount ?? 0, skus: skus.length };
   });
   return (
-    <section className="space-y-3 rounded-box border border-base-300 bg-base-100 p-4" data-testid="catalog-import">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="font-bold">{m.title}</h2>
-        <button type="button" className="btn btn-sm" onClick={onClose}>
-          {m.close}
-        </button>
-      </div>
+    <section className="space-y-3 text-sm" data-testid="catalog-products">
       <SearchPanel
         label={m.search}
         submitLabel={messages.inventory.lookup}
@@ -132,8 +127,8 @@ export function CatalogImport({ mfcId, onClose }: { readonly mfcId: string; read
                   const here = on.data?.get(id) ?? 0;
                   const info = cards.data?.get(id);
                   return (
-                    <li key={id} data-testid="catalog-card">
-                      <label className={`flex h-full cursor-pointer flex-col gap-2 rounded-box border p-3 ${picked.has(id) ? 'border-primary' : 'border-base-300'} ${discontinued ? 'cursor-not-allowed opacity-60' : ''}`}>
+                    <li key={id} className="flex flex-col gap-2" data-testid="catalog-card">
+                      <label className={`flex flex-1 cursor-pointer flex-col gap-2 rounded-box border p-3 ${picked.has(id) ? 'border-primary' : 'border-base-300'} ${discontinued ? 'cursor-not-allowed opacity-60' : ''}`}>
                         <span className="relative">
                           <ProductThumb info={info} fallback={p.internalName ?? id} size="card" />
                           <input type="checkbox" className="checkbox checkbox-sm absolute top-2 left-2 bg-base-100" aria-label={m.pickLabel(p.internalName ?? id)} disabled={discontinued} checked={picked.has(id)} onChange={() => toggle(id)} />
@@ -146,6 +141,7 @@ export function CatalogImport({ mfcId, onClose }: { readonly mfcId: string; read
                           {on.data && (here > 0 ? <span className="badge badge-sm badge-success">{m.here}</span> : <span className="badge badge-sm badge-ghost">{m.notHere}</span>)}
                         </span>
                       </label>
+                      {on.data && <HandlingToggle mfcId={mfcId} productId={id} name={p.internalName ?? id} on={here > 0} discontinued={discontinued} />}
                     </li>
                   );
                 })}
@@ -161,6 +157,7 @@ export function CatalogImport({ mfcId, onClose }: { readonly mfcId: string; read
                       <th>{m.col.name}</th>
                       <th>{m.col.sale}</th>
                       <th>{m.col.here}</th>
+                      <th>{m.col.action}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -183,6 +180,7 @@ export function CatalogImport({ mfcId, onClose }: { readonly mfcId: string; read
                             <span className={`badge badge-sm ${discontinued ? 'badge-error' : p.saleState === 'TEMPORARILY_SOLD_OUT' ? 'badge-warning' : 'badge-ghost'}`}>{m.saleName[p.saleState ?? ''] ?? p.saleState}</span>
                           </td>
                           <td>{on.isError ? m.hereFailed : !on.data ? '…' : here > 0 ? <span className="badge badge-sm badge-success">{m.here}</span> : <span className="badge badge-sm badge-ghost">{m.notHere}</span>}</td>
+                          <td>{on.data && <HandlingToggle mfcId={mfcId} productId={id} name={p.internalName ?? id} on={here > 0} discontinued={discontinued} />}</td>
                         </tr>
                       );
                     })}
@@ -220,5 +218,46 @@ export function CatalogImport({ mfcId, onClose }: { readonly mfcId: string; read
         </CommandFeedback>
       </div>
     </section>
+  );
+}
+
+/** 한 상품의 이 센터 취급 켜기·끄기 — 상품의 SKU 전부를 일괄 API 로(켤 때는 판매 중지 SKU 빼고). 결과는 서버 응답(changedCount)으로만. */
+function HandlingToggle({ mfcId, productId, name, on, discontinued }: { readonly mfcId: string; readonly productId: string; readonly name: string; readonly on: boolean; readonly discontinued: boolean }) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const cmd = useCommand(async (next: boolean, key) => {
+    const d = await request('GET', api.product.GET('/products/{productId}', { params: { path: { productId } } }));
+    const skus = [...new Set((d.skus ?? []).filter((s) => !next || s.saleState !== 'SALE_STOPPED').map((s) => s.sku))].slice(0, BATCH_MAX);
+    if (skus.length === 0) return { next, changed: 0, skus: 0 };
+    const r = await request(
+      'POST',
+      api.inventory.POST('/mfcs/{mfcId}/sku-handling-batches', { ...commandParams(key, { path: { mfcId } }), body: { reason: m.reason, items: skus.map((sku) => ({ sku, enabled: next })) } }),
+    );
+    await queryClient.invalidateQueries({ queryKey: ['handlings', mfcId] });
+    await queryClient.invalidateQueries({ queryKey: ['handlings-new-count', mfcId] });
+    return { next, changed: r.changedCount ?? 0, skus: skus.length };
+  });
+  return (
+    <span className="inline-flex flex-col items-start gap-1">
+      <button
+        type="button"
+        className="btn btn-xs"
+        aria-label={m.toggleLabel(name, !on)}
+        disabled={cmd.busy || (!on && discontinued)}
+        onClick={() => {
+          if (cmd.phase.kind === 'rejected' || cmd.phase.kind === 'done') cmd.reset();
+          void cmd.run(!on);
+        }}
+      >
+        {on ? messages.inventory.turnOff : messages.inventory.turnOn}
+      </button>
+      <CommandFeedback command={cmd}>
+        {(r) => (
+          <span role="status" className="text-xs text-success">
+            {r.skus === 0 ? m.noSkus : m.rowDone(r.next, r.changed)}
+          </span>
+        )}
+      </CommandFeedback>
+    </span>
   );
 }

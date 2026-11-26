@@ -199,7 +199,7 @@ describe('출하 부적격·보충 기준·상품 취급', () => {
   });
 
   it('상품 취급: 켜기는 지금 버전으로 보내고, 판매 중지 상품은 SKU_INACTIVE 문구', async () => {
-    const view = renderAt('/c/MFC-BJG-01/products');
+    const view = renderAt('/c/MFC-BJG-01/products?list=sku');
     await waitFor(() => expect(screen.getAllByTestId('handling-row')).toHaveLength(14));
     const ramen = screen.getAllByTestId('handling-row').find((r) => r.textContent?.includes('SKU-RAMEN-5'))!;
     await userEvent.click(within(ramen).getByRole('button', { name: '켜기' }));

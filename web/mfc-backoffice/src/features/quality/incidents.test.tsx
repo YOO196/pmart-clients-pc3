@@ -103,7 +103,7 @@ describe('상품 취급 — 단종·신상품(inventory 0.27.0)', () => {
   });
 
   it('본사 단종 상품은 "본사 단종"이고 켜기를 막는다, 정하면 배너에서 빠진다', async () => {
-    renderAt('/c/MFC-BJG-01/products');
+    renderAt('/c/MFC-BJG-01/products?list=sku');
     await waitFor(() => expect(screen.getAllByTestId('handling-row')).toHaveLength(14));
     const disc = screen.getAllByTestId('handling-row').find((r) => r.textContent?.includes('SKU-DISC-3'))!;
     expect(disc).toHaveTextContent('본사 단종');
