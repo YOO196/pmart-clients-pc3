@@ -435,15 +435,15 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
         taskId: 'PA-mock-1',
         state: 'DISPATCHED',
         version: 1,
-        rows: [row('SKU-1001', 'L261124011', 'CDC01-R-6-03-02-1-1', 120)],
+        rows: [row('SKU-1001', 'L261124011', 'CDC01-C-5-02-24-3-1', 120)],
       ),
       'PA-mock-2': CdcPutaway(
         taskId: 'PA-mock-2',
         state: 'DISPATCHED',
         version: 1,
         rows: [
-          row('SKU-2001', 'L261125021', 'CDC01-R-6-04-01-2-1', 40),
-          row('SKU-1002', 'L261125022', 'CDC01-R-6-04-02-1-1', 30),
+          row('SKU-2001', 'L261125021', 'CDC01-B-6-05-12-2-1', 40),
+          row('SKU-1002', 'L261125022', 'CDC01-F-5-01-07-1-2', 30),
         ],
       ),
     };

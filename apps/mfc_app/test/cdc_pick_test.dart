@@ -45,7 +45,7 @@ Map<String, Object?> _taskJson(String state, {int picked = 0, int short = 0}) =>
         {
           'sku': 'SKU-1001',
           'lot': 'L1',
-          'locationCode': 'CDC01-C-5-12-03-0-1',
+          'locationCode': 'CDC01-C-5-61-03-2-1',
           'plannedQty': 10,
           'pickedQty': picked,
           'shortQty': short,
@@ -115,7 +115,7 @@ void main() {
     expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
     await scan(t, 'cdc-loc-scan', 'CDC01-Z-9-99-99-9-9');
     expect(find.byKey(const ValueKey('cdc-scan-error')), findsOneWidget);
-    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-12-03-0-1');
+    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-61-03-2-1');
     expect(find.byKey(const ValueKey('step-1')), findsOneWidget);
     await scan(t, 'cdc-item-scan', 'SKU-9999');
     expect(find.text('이 상품이 아니에요. 화면의 상품을 스캔하세요'), findsOneWidget);
@@ -124,7 +124,7 @@ void main() {
     await setQty(t, '24');
     // 다음 줄은 다시 위치부터
     expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
-    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-12-04-0-2');
+    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-61-04-1-2');
     await scan(t, 'cdc-item-scan', 'SKU-1002');
     await setQty(t, '12');
     expect(find.byKey(const ValueKey('cdc-done')), findsOneWidget);
@@ -159,7 +159,7 @@ void main() {
     // 맞는 스캔은 초록으로
     await t.enterText(
       find.byKey(const ValueKey('cdc-loc-scan')),
-      'CDC01-C-5-12-03-0-1',
+      'CDC01-C-5-61-03-2-1',
     );
     await t.testTextInput.receiveAction(TextInputAction.done);
     await t.pump(const Duration(milliseconds: 50));
@@ -170,13 +170,13 @@ void main() {
   testWidgets('부족 보고 — 큰 사유 칸을 고르면 그 줄은 끝, 완료 화면에 부족 수', (t) async {
     await pump(t);
     await tap(t, 'cdc-guide-ok');
-    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-12-03-0-1');
+    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-61-03-2-1');
     await scan(t, 'cdc-item-scan', 'SKU-1001');
     await setQty(t, '20');
     await tap(t, 'cdc-short');
     expect(find.text('4개가 모자라요 — 사유를 고르세요'), findsOneWidget);
     await tap(t, 'cdc-short-NOT_FOUND');
-    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-12-04-0-2');
+    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-61-04-1-2');
     await tap(t, 'cdc-short');
     await tap(t, 'cdc-short-DAMAGED');
     expect(find.byKey(const ValueKey('cdc-done')), findsOneWidget);
@@ -299,7 +299,7 @@ void main() {
             {
               'sku': 'SKU-1001',
               'lot': 'L1',
-              'locationCode': 'CDC01-C-5-12-03-0-1',
+              'locationCode': 'CDC01-C-5-61-03-2-1',
               'pickedQty': 7,
               'shortQty': 3,
               'shortReason': 'DAMAGED',
