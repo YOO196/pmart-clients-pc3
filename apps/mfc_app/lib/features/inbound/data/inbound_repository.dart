@@ -241,6 +241,7 @@ InboundPromiseView promiseFromContract(ib.InboundPromise p) =>
         'RECEIVING' => PromiseState.receiving,
         'TIN_POSTED' => PromiseState.tinPosted,
         'CANCELLED' => PromiseState.cancelled,
+        'CLOSED' => PromiseState.closed,
         _ => PromiseState.unknown,
       },
       plannedArrivalAt: p.plannedArrivalAt,

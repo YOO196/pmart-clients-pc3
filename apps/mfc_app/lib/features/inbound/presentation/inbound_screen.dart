@@ -61,6 +61,12 @@ class InboundReceiveScreen extends ConsumerWidget {
                     action: l10n.retry,
                     onAction: ctl.load,
                   ),
+                  InboundPhase.closed => _Message(
+                    text: l10n.inboundClosed,
+                    action: l10n.nextTask,
+                    onAction: () async =>
+                        backToSession(context, WorkArea.inbound),
+                  ),
                   InboundPhase.cancelled => _Message(
                     text: l10n.inboundCancelled,
                     action: l10n.nextTask,

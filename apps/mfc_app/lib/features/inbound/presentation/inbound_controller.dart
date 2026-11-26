@@ -49,6 +49,9 @@ enum InboundPhase {
   /// 재고 반영이 거절됐다.
   applyRejected,
   cancelled,
+
+  /// 센터 관리자가 입고 종결(더 받지 않음)
+  closed,
   loadError,
 }
 
@@ -300,6 +303,7 @@ class InboundFlowController extends Notifier<InboundState> {
       PromiseState.receiving => InboundPhase.counting,
       PromiseState.tinPosted => InboundPhase.applied,
       PromiseState.cancelled => InboundPhase.cancelled,
+      PromiseState.closed => InboundPhase.closed,
       PromiseState.unknown => InboundPhase.loadError,
     };
     state = state.copyWith(

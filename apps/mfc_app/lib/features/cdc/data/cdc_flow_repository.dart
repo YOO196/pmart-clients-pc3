@@ -15,6 +15,10 @@ abstract interface class CdcFlowRepository {
   /// (cdc-outbound ResultService). 분배·패킹은 PICKED·SORTED, 검품은 SORTED·INSPECTED(사용자 2026-11-26 "분배 끝났는데 검품에 TRF 가 없다").
   Future<List<CdcTrf>> transfers(String cdcId, List<String> states);
 
+  /// 분배·패킹할 TRF — PICKED·SORTED, 그리고 INSPECTED 라도 덜 담은 것. 서버는 BOX 하나만 검품해도 TRF 를 INSPECTED 로
+  /// 올린다(cdc-outbound ResultService.inspect) — 다른 사람이 먼저 검품하면 남은 상품을 담을 길이 사라지지 않게.
+  Future<List<CdcTrf>> sortTransfers(String cdcId);
+
   /// TRF 몫으로 집은 SKU·LOT 와 이미 BOX 에 담은 수량
   Future<List<CdcSortItem>> sortItems(String cdcId, CdcTrf trf);
 
@@ -50,10 +54,13 @@ abstract interface class CdcFlowRepository {
 
   Future<CdcTrip> trip(String tripId);
 
-  /// 상차완료(transport-execution) — TRF 마다 실은 박스(CHECKED_IN → LOADED)
+  /// 상차완료(transport-execution) — TRF 마다 실은 박스(CHECKED_IN → LOADED). [transfers] 는 **BOX LPN 만**,
+  /// 롤테이너·팔레트는 [rtCounts] 개수로 — MFC 인계는 이 목록과 받은 박스(입고 예정 packages = BOX)를 비교해서,
+  /// 그릇 LPN 까지 넣으면 "부족"으로 운송 예외(QTY_MISMATCH)가 난다.
   Future<CdcTrip> completeLoading({
     required String tripId,
     required Map<String, List<String>> transfers,
+    Map<String, int> rtCounts = const {},
     required IdempotencyKey key,
   });
 }
@@ -92,6 +99,21 @@ final class ApiCdcFlowRepository implements CdcFlowRepository {
           pickedQty: t.pickedQty,
         ),
     ];
+  }
+
+  @override
+  Future<List<CdcTrf>> sortTransfers(String cdcId) async {
+    final open = await transfers(cdcId, const ['PICKED', 'SORTED']);
+    final inspected = await transfers(cdcId, const ['INSPECTED']);
+    final more = <CdcTrf>[];
+    for (final t in inspected) {
+      final boxed = (await lpns(cdcId, t.trfId))
+          .where((l) => l.unitType == 'BOX')
+          .expand((l) => l.contents)
+          .fold<int>(0, (a, c) => a + c.qty);
+      if (boxed < t.pickedQty) more.add(t);
+    }
+    return [...open, ...more]..sort((a, b) => a.dueAt.compareTo(b.dueAt));
   }
 
   @override
@@ -335,6 +357,7 @@ final class ApiCdcFlowRepository implements CdcFlowRepository {
   Future<CdcTrip> completeLoading({
     required String tripId,
     required Map<String, List<String>> transfers,
+    Map<String, int> rtCounts = const {},
     required IdempotencyKey key,
   }) async {
     final r = await pmartGuard(
@@ -345,7 +368,11 @@ final class ApiCdcFlowRepository implements CdcFlowRepository {
         loadingInput: te.LoadingInput(
           transfers: [
             for (final e in transfers.entries)
-              te.LoadingInputAllOfTransfers(trfId: e.key, lpns: e.value),
+              te.LoadingInputAllOfTransfers(
+                trfId: e.key,
+                lpns: e.value,
+                rtCount: rtCounts[e.key],
+              ),
           ],
         ),
         extra: commandOptions(key).extra,
@@ -495,6 +522,21 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
     ];
   }
 
+  @override
+  Future<List<CdcTrf>> sortTransfers(String cdcId) async {
+    final open = await transfers(cdcId, const ['PICKED', 'SORTED']);
+    final inspected = await transfers(cdcId, const ['INSPECTED']);
+    final more = <CdcTrf>[];
+    for (final t in inspected) {
+      final boxed = (await lpns(cdcId, t.trfId))
+          .where((l) => l.unitType == 'BOX')
+          .expand((l) => l.contents)
+          .fold<int>(0, (a, c) => a + c.qty);
+      if (boxed < t.pickedQty) more.add(t);
+    }
+    return [...open, ...more]..sort((a, b) => a.dueAt.compareTo(b.dueAt));
+  }
+
   void _advance(String trfId, String to) {
     const order = ['PICKED', 'SORTED', 'INSPECTED', 'LOADED'];
     if (order.indexOf(to) > order.indexOf(_state[trfId] ?? 'PICKED')) {
@@ -641,6 +683,7 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
   Future<CdcTrip> completeLoading({
     required String tripId,
     required Map<String, List<String>> transfers,
+    Map<String, int> rtCounts = const {},
     required IdempotencyKey key,
   }) async {
     await _wait();
@@ -668,7 +711,7 @@ final class _MockLpn {
 
   CdcLpn get view => CdcLpn(
     lpn: lpn,
-    unitType: 'BOX',
+    unitType: lpn.startsWith('RT-') ? 'RT' : 'BOX',
     inspection: inspection,
     failReason: failReason,
     loaded: loaded,

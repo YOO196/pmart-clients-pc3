@@ -774,10 +774,7 @@ void main() {
     }
 
     await splitOne('pkg-1');
-    expect(
-      find.text('나눈 결과를 몰라요 — 같은 수량으로 다시'),
-      findsOneWidget,
-    );
+    expect(find.text('나눈 결과를 몰라요 — 같은 수량으로 다시'), findsOneWidget);
     final c = ProviderScope.containerOf(t.element(find.byType(MfcApp)));
     final ctl = c.read(packingProvider('task-mock-2').notifier);
     final s0 = await t.runAsync(() => packing.shipment('shp-2'));
