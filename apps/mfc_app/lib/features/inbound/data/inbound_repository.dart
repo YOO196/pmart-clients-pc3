@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:pmart_api_mfc_inbound/pmart_api_mfc_inbound.dart' as ib;
+import 'package:pmart_api_transport_execution/pmart_api_transport_execution.dart'
+    as te;
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart' show sourceSystem;
@@ -30,13 +32,28 @@ abstract interface class InboundRepository {
 
   /// `GET /inbound-promises/{trfId}/receipts/{receiptId}` — 재고 반영 상태.
   Future<ReceiptView> receipt(String trfId, String receiptId);
+
+  /// 하차 인계(DC 시뮬레이터 요청 C-01) — 그 MFC 로 오는 운행(`GET /mfcs/{mfcId}/inbound-trips`)에서 이 TRF 의 정차를 찾아
+  /// `POST /trips/{tripId}/stops/{stopSeq}/handovers`(받은 박스·파손 박스). 차이가 있으면 서버가 예외로 남긴다(출발은 막지 않음).
+  Future<InboundCommandOutcome> recordHandover({
+    required String trfId,
+    required String mfcId,
+    required String tripId,
+    required List<String> received,
+    required List<String> damaged,
+    required IdempotencyKey key,
+  });
 }
 
 final class ApiInboundRepository implements InboundRepository {
   ApiInboundRepository(Dio dio)
-    : _api = ib.PmartApiMfcInbound(dio: dio).getInboundPromisesApi();
+    : _api = ib.PmartApiMfcInbound(dio: dio).getInboundPromisesApi(),
+      _trips = te.PmartApiTransportExecution(dio: dio).getTripsApi(),
+      _stops = te.PmartApiTransportExecution(dio: dio).getStopsApi();
 
   final ib.InboundPromisesApi _api;
+  final te.TripsApi _trips;
+  final te.StopsApi _stops;
 
   @override
   Future<InboundPromiseView> promise(String trfId) async {
@@ -131,6 +148,57 @@ final class ApiInboundRepository implements InboundRepository {
   }
 
   @override
+  Future<InboundCommandOutcome> recordHandover({
+    required String trfId,
+    required String mfcId,
+    required String tripId,
+    required List<String> received,
+    required List<String> damaged,
+    required IdempotencyKey key,
+  }) async {
+    try {
+      final trips = await pmartGuard(
+        () => _trips.listMfcInboundTrips(mfcId: mfcId, size: 200),
+      );
+      final trip = (trips.data?.items ?? const <te.Trip>[])
+          .where((t) => t.tripId == tripId)
+          .firstOrNull;
+      final seq = trip?.stops
+          .where(
+            (s) => s.mfcId == mfcId && (s.trfIds ?? const []).contains(trfId),
+          )
+          .firstOrNull
+          ?.seq;
+      if (seq == null) return const InboundRejected('STOP_NOT_FOUND');
+      await pmartGuard(
+        () => _stops.recordHandover(
+          tripId: tripId,
+          stopSeq: seq,
+          idempotencyKey: key.value,
+          xSourceSystem: sourceSystem,
+          handoverInput: te.HandoverInput(
+            transfers: [
+              te.HandoverInputAllOfTransfers(
+                trfId: trfId,
+                receivedLpns: received,
+                damagedLpns: damaged,
+              ),
+            ],
+          ),
+          extra: commandOptions(key).extra,
+        ),
+      );
+      return const InboundAccepted();
+    } on PmartFailure catch (f) {
+      return switch (f) {
+        UnknownResultFailure() || NetworkFailure() => const InboundUnknown(),
+        ProblemFailure(:final problem) => InboundRejected(problem.code),
+        _ => throw f,
+      };
+    }
+  }
+
+  @override
   Future<ReceiptView> receipt(String trfId, String receiptId) async {
     final res = await pmartGuard(
       () => _api.getReceipt(trfId: trfId, receiptId: receiptId),
@@ -171,6 +239,20 @@ InboundPromiseView promiseFromContract(ib.InboundPromise p) =>
       plannedArrivalAt: p.plannedArrivalAt,
       eta: p.eta,
       arrivedAt: p.arrivedAt,
+      mfcId: p.mfcId,
+      tripId: switch (p.tripId?.trim()) {
+        final t? when t.isNotEmpty => t,
+        _ => null,
+      },
+      boxList: [
+        for (final b in p.packages ?? const <ib.InboundPromisePackagesInner>[])
+          if (b.lpn case final lpn? when lpn.trim().isNotEmpty)
+            InboundBox(
+              boxId: lpn.trim(),
+              lineKey: _lineKeyOf(p, b.sku, b.lotId),
+              unitsPerBox: b.qty ?? 0,
+            ),
+      ],
       lines: [
         for (final l in p.lines ?? const <ib.InboundPromiseLinesInner>[])
           InboundLine(
@@ -197,3 +279,12 @@ InboundPromiseView promiseFromContract(ib.InboundPromise p) =>
           receiptFromContract(r),
       ],
     );
+
+/// 포장(LPN)이 어느 줄인지 — 같은 SKU 에 LOT 이 같거나 줄 LOT 이 비면 그 줄
+String _lineKeyOf(ib.InboundPromise p, String? sku, String? lotId) {
+  final lines = p.lines ?? const <ib.InboundPromiseLinesInner>[];
+  final hit =
+      lines.where((l) => l.sku == sku && l.lotId == lotId).firstOrNull ??
+      lines.where((l) => l.sku == sku).firstOrNull;
+  return '${hit?.sku ?? sku ?? ''}|${hit?.lotId ?? ''}';
+}

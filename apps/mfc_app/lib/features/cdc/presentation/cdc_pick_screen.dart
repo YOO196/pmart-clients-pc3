@@ -46,6 +46,9 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
   /// 줄 → 부족 사유(남은 수량 − 집은 수 = 부족)
   final _short = <String, String>{};
   bool _locOk = false;
+
+  /// 지역 묶음(REGION_BATCH) 작업이면 지역 카트 바코드를 먼저 확인한다(C-01)
+  bool _regionOk = false;
   String? _scanError;
 
   String get _cdcId => cdcCenterOf(ref);
@@ -62,6 +65,7 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
     _picked.clear();
     _short.clear();
     _locOk = false;
+    _regionOk = t.pickMode != 'REGION_BATCH' || t.regionCode == null;
     _scanError = null;
     _phase = t.finished ? _Phase.done : _Phase.working;
   }
@@ -115,6 +119,19 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
     }
     setState(() {
       _locOk = true;
+      _scanError = null;
+    });
+    return const ScanFeedback.ok();
+  }
+
+  ScanFeedback _scanRegion(String region, String code) {
+    final l10n = AppLocalizations.of(context);
+    if (code.trim().toUpperCase() != region.toUpperCase()) {
+      setState(() => _scanError = l10n.cdcPickWrongRegion);
+      return ScanFeedback.error(l10n.cdcPickWrongRegion);
+    }
+    setState(() {
+      _regionOk = true;
       _scanError = null;
     });
     return const ScanFeedback.ok();
@@ -338,6 +355,9 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
         total: total,
       ),
     );
+    if (cdcPickModeText(l10n, t) case final m?) {
+      body.add(NoticeBox(text: m, textKey: const ValueKey('cdc-pick-mode')));
+    }
     if (line == null) {
       // 다 찼다 — 보내는 중이거나, 보냈는데 서버가 아직 끝내지 않음
       body.add(
@@ -365,6 +385,28 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
           ),
         );
       }
+    } else if (!_regionOk) {
+      final region = t.regionCode!;
+      body.add(
+        ScanPrompt(
+          text: l10n.cdcPickRegionTitle,
+          detail: l10n.cdcPickRegionIs(region),
+        ),
+      );
+      actions.add(
+        ScanInput(
+          id: 'cdc-region-scan',
+          label: l10n.cdcPickRegion,
+          cameraTitle: l10n.cdcPickRegion,
+          continuous: false,
+          autofocus: false,
+          testValues: [
+            TestScan(region, region),
+            TestScan(l10n.tsWrong, 'SEOUL'),
+          ],
+          onScan: (code) => _scanRegion(region, code),
+        ),
+      );
     } else if (!_locOk) {
       body.add(
         CdcLocationGuide(
@@ -462,6 +504,8 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
     return cdcStepBody(
       step: line == null
           ? 'send'
+          : !_regionOk
+          ? 'region'
           : _locOk
           ? 'item-${line.key}'
           : 'loc-${line.key}',
@@ -509,3 +553,13 @@ class _TaskInfoSheet extends StatelessWidget {
     );
   }
 }
+
+/// 피킹 방식(pickMode)마다 담는 곳 안내(C-01) — DISCRETE 는 DPS 면 불 켜진 칸, 아니면 TRF 하나
+String? cdcPickModeText(AppLocalizations l10n, CdcTask t) =>
+    switch (t.pickMode) {
+      'REGION_BATCH' => l10n.cdcModeRegion,
+      'SKU_BATCH' => l10n.cdcModeSku,
+      'DISCRETE' when t.pickMethod == 'DPS' => l10n.cdcModeDps,
+      'DISCRETE' => l10n.cdcModeDiscrete,
+      _ => null,
+    };

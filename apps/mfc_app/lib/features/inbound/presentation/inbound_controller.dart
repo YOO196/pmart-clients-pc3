@@ -77,7 +77,11 @@ class InboundState {
     this.lastBox,
     this.lastBoxScan,
     this.expandedLine,
+    this.handover,
   });
+
+  /// 하차 인계 결과(운행이 있는 송장만) — 수령은 이와 상관없이 이어 한다
+  final InboundCommandOutcome? handover;
 
   /// 박스 검수에서 박스 번호를 펼친 상품(행 key).
   final String? expandedLine;
@@ -140,6 +144,7 @@ class InboundState {
     String? Function()? lastBox,
     BoxScan? Function()? lastBoxScan,
     String? Function()? expandedLine,
+    InboundCommandOutcome? Function()? handover,
   }) => InboundState(
     phase: phase ?? this.phase,
     promise: promise ?? this.promise,
@@ -157,6 +162,7 @@ class InboundState {
     lastBox: lastBox != null ? lastBox() : this.lastBox,
     lastBoxScan: lastBoxScan != null ? lastBoxScan() : this.lastBoxScan,
     expandedLine: expandedLine != null ? expandedLine() : this.expandedLine,
+    handover: handover != null ? handover() : this.handover,
   );
 
   bool get usesBoxes => promise?.boxList.isNotEmpty ?? false;
@@ -222,6 +228,7 @@ class InboundFlowController extends Notifier<InboundState> {
   final String trfId;
   IdempotencyKey? _arrivalKey;
   IdempotencyKey? _receiptKey;
+  IdempotencyKey? _handoverKey;
 
   InboundRepository get _repo => ref.read(inboundRepositoryProvider);
   String get _me => ref.read(currentWorkerIdProvider);
@@ -331,10 +338,33 @@ class InboundFlowController extends Notifier<InboundState> {
     state = state.copyWith(damaged: d);
   }
 
-  /// 박스 검수 끝 → 박스 열기. 안 온 박스는 미도착으로 남는다.
-  void finishBoxCheck() {
-    if (state.arrived.isEmpty) return;
+  /// 박스 검수 끝 → (운행으로 온 송장이면) 하차 인계 기록 → 박스 열기. 안 온 박스는 미도착으로 남는다.
+  Future<void> finishBoxCheck() async {
+    if (state.arrived.isEmpty || state.busy) return;
+    if (state.handover is! InboundAccepted) await sendHandover();
+    if (!ref.mounted) return;
     state = state.copyWith(phase: InboundPhase.boxInspect);
+  }
+
+  /// 하차 인계(C-01) — 결과 불명이면 같은 키로 다시
+  Future<void> sendHandover() async {
+    final p = state.promise;
+    final trip = p?.tripId;
+    final mfc = p?.mfcId;
+    if (p == null || trip == null || mfc == null) return;
+    state = state.copyWith(busy: true);
+    final key = _handoverKey ??= IdempotencyKey.generate();
+    final r = await _repo.recordHandover(
+      trfId: trfId,
+      mfcId: mfc,
+      tripId: trip,
+      received: [...state.arrived],
+      damaged: [...state.damaged],
+      key: key,
+    );
+    if (!ref.mounted) return;
+    if (r is! InboundUnknown) _handoverKey = null;
+    state = state.copyWith(busy: false, handover: () => r);
   }
 
   void backToBoxCheck() => state = state.copyWith(

@@ -18,6 +18,8 @@ final class CdcTask {
     required this.state,
     required this.version,
     required this.lines,
+    this.pickMode,
+    this.regionCode,
   });
 
   final String taskId;
@@ -32,6 +34,12 @@ final class CdcTask {
 
   /// DPS·BOX_PICK·FC·DISTRIBUTION·LINE(없을 수 있다)
   final String? pickMethod;
+
+  /// (0.9.0) DISCRETE·REGION_BATCH·SKU_BATCH — 문구가 다르다(C-01)
+  final String? pickMode;
+
+  /// REGION_BATCH 의 지역 = 지역 카트 바코드 값
+  final String? regionCode;
   final String? zone;
   final String? floor;
   final DateTime? dueAt;
@@ -134,6 +142,8 @@ CdcTask cdcTaskFromContract(co.Task t) {
     trfNumbers: t.trfNumbers ?? const [],
     kind: t.kind?.value ?? 'PICK',
     pickMethod: t.pickMethod?.value,
+    pickMode: t.pickMode?.value,
+    regionCode: str(t.regionCode),
     zone: str(t.zone),
     floor: str(t.floor),
     dueAt: t.dueAt,

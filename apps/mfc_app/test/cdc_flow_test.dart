@@ -15,6 +15,8 @@ import 'package:mfc_app/features/auth/presentation/auth_controller.dart';
 import 'package:mfc_app/features/cdc/data/cdc_flow_repository.dart';
 import 'package:mfc_app/features/cdc/domain/cdc_flow.dart';
 import 'package:mfc_app/features/cdc/presentation/cdc_flow_screens.dart';
+import 'package:mfc_app/features/inbound/data/inbound_repository.dart';
+import 'package:mfc_app/features/inbound/domain/inbound.dart';
 import 'package:mfc_app/shared/providers.dart';
 
 const _worker = EmployeeSession(
@@ -81,44 +83,70 @@ void main() {
   FilledButton button(WidgetTester t, String key) =>
       t.widget<FilledButton>(find.byKey(ValueKey(key)));
 
-  testWidgets('분배: TRF → 빈 BOX 스캔 → 상품 스캔·수량 → 봉인 등록, 쓴 BOX 는 거절, 다 담으면 끝', (
+  testWidgets(
+    '패킹(박스 닫기): TRF → 빈 BOX 스캔 → 상품 스캔·수량 → 봉인 등록, 쓴 BOX 는 거절, 다 담으면 끝',
+    (t) async {
+      await pump(t, 'sort');
+      await tap(t, 'cdc-trf-TRF-mock-1');
+      expect(find.byKey(const ValueKey('step-1')), findsOneWidget);
+      await scan(t, 'cdc-box-scan', 'BOX-A1');
+      expect(find.byKey(const ValueKey('step-2')), findsOneWidget);
+      expect(button(t, 'cdc-sort-go').onPressed, isNull);
+      await scan(t, 'cdc-sort-item-scan', 'SKU-1001');
+      await t.enterText(find.byKey(const ValueKey('cdc-sort-qty')), '24');
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await t.pumpAndSettle();
+      await tap(t, 'cdc-sort-go');
+      expect(find.text('BOX-A1 봉인을 보냈어요'), findsOneWidget);
+      expect(find.text('분배 24 / 집음 36'), findsOneWidget);
+      // 같은 BOX 번호는 다시 못 쓴다
+      await scan(t, 'cdc-box-scan', 'BOX-A1');
+      expect(find.text('이미 등록된 BOX 번호예요. 다른 BOX 를 쓰세요.'), findsOneWidget);
+      await scan(t, 'cdc-box-scan', 'BOX-A2');
+      await scan(t, 'cdc-sort-item-scan', 'SKU-1001');
+      expect(find.text('이 TRF 에 남은 상품이 아니에요'), findsOneWidget);
+      for (var i = 0; i < 12; i++) {
+        await scan(t, 'cdc-sort-item-scan', 'SKU-1002');
+      }
+      await tap(t, 'cdc-sort-go');
+      expect(find.byKey(const ValueKey('cdc-sort-done')), findsOneWidget);
+    },
+  );
+
+  testWidgets('분배(DAS): 묶음 → 상품 스캔 → 칸마다 넣을 수량 → 넣기 → 칸 BOX 닫기(분류 결과)', (
     t,
   ) async {
-    await pump(t, 'sort');
-    await tap(t, 'cdc-trf-TRF-mock-1');
-    expect(find.byKey(const ValueKey('step-1')), findsOneWidget);
-    await scan(t, 'cdc-box-scan', 'BOX-A1');
-    expect(find.byKey(const ValueKey('step-2')), findsOneWidget);
-    expect(button(t, 'cdc-sort-go').onPressed, isNull);
-    await scan(t, 'cdc-sort-item-scan', 'SKU-1001');
-    await t.enterText(find.byKey(const ValueKey('cdc-sort-qty')), '24');
-    await t.testTextInput.receiveAction(TextInputAction.done);
-    await t.pumpAndSettle();
-    await tap(t, 'cdc-sort-go');
-    expect(find.text('BOX-A1 봉인을 보냈어요'), findsOneWidget);
-    expect(find.text('분배 24 / 집음 36'), findsOneWidget);
-    // 같은 BOX 번호는 다시 못 쓴다
-    await scan(t, 'cdc-box-scan', 'BOX-A1');
-    expect(find.text('이미 등록된 BOX 번호예요. 다른 BOX 를 쓰세요.'), findsOneWidget);
-    await scan(t, 'cdc-box-scan', 'BOX-A2');
-    await scan(t, 'cdc-sort-item-scan', 'SKU-1001');
-    expect(find.text('이 TRF 에 남은 상품이 아니에요'), findsOneWidget);
-    for (var i = 0; i < 12; i++) {
-      await scan(t, 'cdc-sort-item-scan', 'SKU-1002');
-    }
-    await tap(t, 'cdc-sort-go');
-    expect(find.byKey(const ValueKey('cdc-sort-done')), findsOneWidget);
+    final repo = await pump(t, 'distribute');
+    await tap(t, 'cdc-wave-WAV-mock-1');
+    expect(find.text('나눔 10 / 집음 52'), findsOneWidget);
+    // 이미 BOX 에 다 담은 상품은 나눌 것이 없다
+    await scan(t, 'cdc-dist-item-scan', 'SKU-1003');
+    expect(find.text('이 묶음에 나눌 것이 남은 상품이 아니에요.'), findsOneWidget);
+    await scan(t, 'cdc-dist-item-scan', 'SKU-1001');
+    expect(find.text('칸 1 · MFC-BJG-01'), findsWidgets);
+    await tap(t, 'cdc-put-TRF-mock-1');
+    expect(find.text('나눔 34 / 집음 52'), findsOneWidget);
+    expect(find.text('넣음 24개 · 남음 12개'), findsOneWidget);
+    await tap(t, 'cdc-close-TRF-mock-1');
+    await scan(t, 'cdc-dist-box-scan', 'BOX-D1');
+    expect(find.text('칸 1 BOX 를 닫았어요.'), findsOneWidget);
+    final box = (await repo.lpns('', 'TRF-mock-1')).single;
+    expect([box.lpn, box.qty], ['BOX-D1', 24]);
   });
 
-  testWidgets('검품: BOX 스캔 → 불합격은 사유 → 서버 판정을 보인다', (t) async {
+  testWidgets('검품: 출고대기 자리 → BOX 스캔 → 온도·불합격 사유 → 서버 판정, 재포장 안내', (t) async {
     await pump(t, 'inspect');
     await tap(t, 'cdc-trf-TRF-mock-2');
+    await scan(t, 'cdc-staging-scan', 'CDC01-A-6-90-01-0-1');
+    expect(find.text('출고대기 자리 바코드가 아니에요(통로 91).'), findsOneWidget);
+    await scan(t, 'cdc-staging-scan', 'CDC01-A-6-91-01-0-1');
     await scan(t, 'cdc-insp-scan', 'BOX-0000');
     expect(find.text('이 TRF 의 BOX 가 아니에요'), findsOneWidget);
     await scan(t, 'cdc-insp-scan', 'BOX-26112600001');
-    expect(find.byKey(const ValueKey('step-2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('step-3')), findsOneWidget);
+    await t.enterText(find.byKey(const ValueKey('cdc-temp')), '9.5');
     await tap(t, 'cdc-fail');
-    await tap(t, 'cdc-fail-SEAL_BROKEN');
+    await tap(t, 'cdc-fail-TEMPERATURE');
     expect(find.text('BOX-26112600001 불합격을 보냈어요'), findsOneWidget);
     expect(
       t
@@ -126,40 +154,37 @@ void main() {
           .data,
       '불합격',
     );
+    expect(find.byKey(const ValueKey('cdc-repack')), findsOneWidget);
   });
 
-  testWidgets('상차: 운행 → 차량 → 합격 BOX 스캔 → 등록 → 다 실으면 끝(출발 아님)', (t) async {
-    await pump(t, 'load');
-    await tap(t, 'cdc-trf-TRF-mock-2');
-    await scan(t, 'cdc-trip-scan', 'TRIP-1');
+  testWidgets('상차: 도크 → 그 도크의 운행 → 차량 확인 → 합격 BOX 스캔·등록 → 상차완료(출발 아님)', (
+    t,
+  ) async {
+    final repo = await pump(t, 'load');
+    await scan(t, 'cdc-dock-scan', 'CDC01-A-6-91-01-0-1');
+    expect(find.text('도크 바코드가 아니에요(통로 90).'), findsOneWidget);
+    await scan(t, 'cdc-dock-scan', 'CDC01-A-6-90-04-0-1');
+    expect(
+      find.text('CDC01-A-6-90-04-0-1 에 상차할 운행이 없어요. 배차 계획완료를 확인해 주세요.'),
+      findsOneWidget,
+    );
+    await scan(t, 'cdc-dock-scan', 'CDC01-A-6-90-01-0-1');
+    expect(find.byKey(const ValueKey('cdc-trip-card')), findsOneWidget);
+    await scan(t, 'cdc-vehicle-scan', '대구99사9999');
+    expect(find.text('이 운행의 차량이 아니에요.'), findsOneWidget);
     await scan(t, 'cdc-vehicle-scan', '경북12가3456');
-    expect(button(t, 'cdc-load-go').onPressed, isNull);
+    await scan(t, 'cdc-load-scan', 'BOX-0000');
+    expect(find.text('이 운행에 실을 BOX 가 아니에요.'), findsOneWidget);
     await scan(t, 'cdc-load-scan', 'BOX-26112600001');
     await scan(t, 'cdc-load-scan', 'BOX-26112600001');
     expect(find.text('이미 스캔한 BOX 예요'), findsOneWidget);
     await tap(t, 'cdc-load-go');
+    final l = (await repo.lpns('', 'TRF-mock-2')).single;
+    expect([l.loaded, l.tripId], [true, 'TRIP-mock-1']);
+    await tap(t, 'cdc-load-complete');
     expect(find.byKey(const ValueKey('cdc-load-done')), findsOneWidget);
     expect(find.text('상차는 출발이 아니에요. 출발은 따로 확정돼요'), findsOneWidget);
-  });
-
-  testWidgets('검품 합격 BOX 가 없으면 상차할 것이 없다고 안내', (t) async {
-    await pump(t, 'load');
-    await tap(t, 'cdc-trf-TRF-mock-1');
-    expect(find.byKey(const ValueKey('cdc-empty')), findsOneWidget);
-  });
-
-  testWidgets('적치: 지시 스캔 → 다른 칸이면 이유 → 수량 → 적치 완료, 없는 지시는 안내', (t) async {
-    await pump(t, 'putaway');
-    await scan(t, 'cdc-pa-scan', 'PA-nope');
-    expect(find.byKey(const ValueKey('cdc-putaway-error')), findsOneWidget);
-    await scan(t, 'cdc-pa-scan', 'PA-mock-1');
-    expect(find.byKey(const ValueKey('cdc-pa-location')), findsOneWidget);
-    await scan(t, 'cdc-pa-loc-scan', 'CDC01-C-5-03-10-2-1');
-    await tap(t, 'cdc-pa-reason-LOCATION_FULL');
-    expect(find.text('다른 칸 · CDC01-C-5-03-10-2-1'), findsOneWidget);
-    await tap(t, 'cdc-putaway-go');
-    expect(find.byKey(const ValueKey('cdc-pa-done')), findsOneWidget);
-    expect(find.text('상태: 완료'), findsOneWidget);
+    expect((await repo.trip('TRIP-mock-1')).state, 'LOADED');
   });
 
   group('실서버 요청', () {
@@ -214,7 +239,12 @@ void main() {
         trfId: 'TRF-1',
         inspectorId: 'OP-1',
         items: const [
-          CdcInspection(lpn: 'BOX-1', passed: false, failReason: 'DAMAGE'),
+          CdcInspection(
+            lpn: 'BOX-1',
+            passed: false,
+            failReason: 'TEMPERATURE',
+            temperatureC: 9.5,
+          ),
         ],
         key: IdempotencyKey.generate(),
       );
@@ -222,7 +252,8 @@ void main() {
         trfId: 'TRF-1',
         tripId: 'TRIP-1',
         vehicleId: 'V-1',
-        dockCode: null,
+        dockCode: 'CDC01-A-6-90-01-0-1',
+        compartment: 'AMBIENT',
         workerId: 'OP-1',
         lpns: const ['BOX-1'],
         key: IdempotencyKey.generate(),
@@ -232,7 +263,12 @@ void main() {
         'trfId': 'TRF-1',
         'inspectorId': 'OP-1',
         'items': [
-          {'lpn': 'BOX-1', 'result': 'FAILED', 'failReason': 'DAMAGE'},
+          {
+            'lpn': 'BOX-1',
+            'result': 'FAILED',
+            'failReason': 'TEMPERATURE',
+            'temperatureC': 9.5,
+          },
         ],
       });
       expect(a.requests[1].path, endsWith('/loading-results'));
@@ -240,66 +276,132 @@ void main() {
         'trfId': 'TRF-1',
         'tripId': 'TRIP-1',
         'vehicleId': 'V-1',
+        'dockCode': 'CDC01-A-6-90-01-0-1',
         'workerId': 'OP-1',
         'action': 'LOADED',
         'lpns': [
-          {'lpn': 'BOX-1'},
+          {'lpn': 'BOX-1', 'compartment': 'AMBIENT'},
         ],
       });
     });
 
+    Map<String, dynamic> trip(String state) => {
+      'tripId': 'TRIP-1',
+      'cdcId': 'CDC01',
+      'shipDate': '2026-11-26',
+      'routeId': 'RT-04',
+      'tempClass': 'AMBIENT',
+      'vehicleId': 'VH-5T-04A',
+      'plateNo': '경북12가3456',
+      'dockCode': 'CDC01-A-6-90-01-0-1',
+      'state': state,
+      'version': 1,
+      'stops': [
+        {
+          'seq': 1,
+          'mfcId': 'MFC-BJG-01',
+          'trfIds': ['TRF-1'],
+        },
+      ],
+    };
+
     test(
-      '적치 실행: /putaway-tasks/{id}/executions — X-Expected-Version·위치·예외 사유',
+      '상차: 도크로 운행 찾기(입차·계획완료) → 상차완료 /trips/{id}/loading-completions',
       () async {
-        final a = FakeAdapter(
-          (_, _) async => const FakeReply(
-            202,
-            body: {'requestId': 'r', 'status': 'ACCEPTED'},
-          ),
-        );
-        const row = CdcPutawayRow(
-          sku: 'SKU-1',
-          lot: 'L1',
-          location: 'A',
-          q: 10,
-          c: 0,
-          u: 10,
-          k: 0,
-        );
-        await ApiCdcFlowRepository(_dio(a)).executePutaway(
-          task: const CdcPutaway(
-            taskId: 'PA-1',
-            state: 'DISPATCHED',
-            version: 4,
-            rows: [row],
-          ),
-          workerId: 'OP-1',
-          lines: const [
-            CdcPutawayLine(
-              row: row,
-              toLocation: 'B',
-              completedQty: 10,
-              exceptionReason: 'LOCATION_FULL',
-            ),
+        final a = FakeAdapter((o, _) async {
+          if (o.method == 'GET') {
+            final state = o.uri.queryParameters['state'];
+            return FakeReply(
+              200,
+              body: {
+                'items': [if (state == 'SCHEDULED') trip('SCHEDULED')],
+                'page': 0,
+                'size': 200,
+                'hasNext': false,
+              },
+            );
+          }
+          return FakeReply(200, body: trip('LOADED'));
+        });
+        final repo = ApiCdcFlowRepository(_dio(a));
+        final t = await repo.tripAtDock('CDC01', 'cdc01-a-6-90-01-0-1');
+        expect(
+          [t?.tripId, t?.state, t?.trfIds],
+          [
+            'TRIP-1',
+            'SCHEDULED',
+            ['TRF-1'],
           ],
-          key: IdempotencyKey.generate(),
         );
-        final o = a.requests.single;
-        expect(o.path, endsWith('/putaway-tasks/PA-1/executions'));
-        expect(o.headers['X-Expected-Version'], '4');
+        expect(a.requests.first.path, endsWith('/cdcs/CDC01/trips'));
+        final key = IdempotencyKey.generate();
+        final done = await repo.completeLoading(
+          tripId: 'TRIP-1',
+          transfers: {
+            'TRF-1': ['BOX-1'],
+          },
+          key: key,
+        );
+        expect(done.state, 'LOADED');
+        final o = a.requests.last;
+        expect(o.path, endsWith('/trips/TRIP-1/loading-completions'));
+        expect(o.headers['Idempotency-Key'], key.value);
         expect(_body(o), {
-          'workerId': 'OP-1',
-          'lines': [
+          'transfers': [
             {
-              'sku': 'SKU-1',
-              'lot': 'L1',
-              'toLocationCode': 'B',
-              'completedQty': 10,
-              'exceptionReason': 'LOCATION_FULL',
+              'trfId': 'TRF-1',
+              'lpns': ['BOX-1'],
             },
           ],
         });
       },
     );
+
+    test('MFC 하차 인계: 그 MFC 로 오는 운행에서 정차를 찾아 /stops/{seq}/handovers', () async {
+      final a = FakeAdapter((o, _) async {
+        if (o.method == 'GET') {
+          return FakeReply(
+            200,
+            body: {
+              'items': [trip('DEPARTED')],
+              'page': 0,
+              'size': 200,
+              'hasNext': false,
+            },
+          );
+        }
+        return FakeReply(200, body: trip('DEPARTED'));
+      });
+      final r = await ApiInboundRepository(_dio(a)).recordHandover(
+        trfId: 'TRF-1',
+        mfcId: 'MFC-BJG-01',
+        tripId: 'TRIP-1',
+        received: const ['BOX-1', 'BOX-2'],
+        damaged: const ['BOX-2'],
+        key: IdempotencyKey.generate(),
+      );
+      expect(r, isA<InboundAccepted>());
+      expect(a.requests.first.path, endsWith('/mfcs/MFC-BJG-01/inbound-trips'));
+      expect(a.requests.last.path, endsWith('/trips/TRIP-1/stops/1/handovers'));
+      expect(_body(a.requests.last), {
+        'transfers': [
+          {
+            'trfId': 'TRF-1',
+            'receivedLpns': ['BOX-1', 'BOX-2'],
+            'damagedLpns': ['BOX-2'],
+          },
+        ],
+      });
+      // 이 TRF 정차가 없으면 보내지 않고 알린다
+      final none = await ApiInboundRepository(_dio(a)).recordHandover(
+        trfId: 'TRF-9',
+        mfcId: 'MFC-BJG-01',
+        tripId: 'TRIP-1',
+        received: const ['BOX-1'],
+        damaged: const [],
+        key: IdempotencyKey.generate(),
+      );
+      expect(none, isA<InboundRejected>());
+    });
   });
 }

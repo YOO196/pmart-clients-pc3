@@ -55,7 +55,7 @@ void main() {
     );
     expect(find.byKey(const ValueKey('cdc-home')), findsOneWidget);
     expect(find.textContaining('DC CDC01', findRichText: true), findsOneWidget);
-    for (final k in ['pick', 'sort', 'inspect', 'load', 'putaway']) {
+    for (final k in ['pick', 'distribute', 'sort', 'inspect', 'load']) {
       expect(find.byKey(ValueKey('cdc-area-$k')), findsOneWidget);
     }
     expect(find.byKey(const ValueKey('area-pickPack')), findsNothing);
@@ -69,7 +69,8 @@ void main() {
     expect(find.byKey(const ValueKey('cdc-guide-step-4')), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('cdc-guide-ok')));
     await t.pumpAndSettle();
-    expect(find.byKey(const ValueKey('cdc-trf-TRF-mock-1')), findsOneWidget);
+    // 상차는 도크부터(C-01)
+    expect(find.byKey(const ValueKey('cdc-dock-scan')), findsOneWidget);
   });
 
   testWidgets('DC 관리자도 DC 메뉴', (t) async {

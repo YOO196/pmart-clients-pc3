@@ -9,30 +9,32 @@ import '../../auth/presentation/auth_controller.dart';
 
 /// DC(CDC) 직원 업무 — 계약 cdc-outbound `next-tasks` 의 kind(PICK·SORT·INSPECT·LOAD)와 cdc-inbound 적치(지게차).
 /// 백엔드 staff-roles.md: `CDC_WORKER` = 자기 CDC 센터의 FC 피킹·분배/라인·검품·상차·지게차 작업.
-enum CdcWorkArea { pick, sort, inspect, load, putaway }
+/// DC 업무(DC 시뮬레이터 요청 C-01, 사용자 2026-11-26) — 피킹·분배(DAS)·패킹(박스 닫기)·출고 검품·상차.
+/// 지게차 적치·보충은 가상 설비가 `/internal` 로 받는 일이라 PDA 에 두지 않는다(cdc-inbound 0.2.x).
+enum CdcWorkArea { pick, distribute, sort, inspect, load }
 
 String cdcAreaText(AppLocalizations l10n, CdcWorkArea a) => switch (a) {
   CdcWorkArea.pick => l10n.cdcAreaPick,
+  CdcWorkArea.distribute => l10n.cdcAreaDistribute,
   CdcWorkArea.sort => l10n.cdcAreaSort,
   CdcWorkArea.inspect => l10n.cdcAreaInspect,
   CdcWorkArea.load => l10n.cdcAreaLoad,
-  CdcWorkArea.putaway => l10n.cdcAreaPutaway,
 };
 
 String cdcAreaDesc(AppLocalizations l10n, CdcWorkArea a) => switch (a) {
   CdcWorkArea.pick => l10n.cdcAreaPickDesc,
+  CdcWorkArea.distribute => l10n.cdcAreaDistributeDesc,
   CdcWorkArea.sort => l10n.cdcAreaSortDesc,
   CdcWorkArea.inspect => l10n.cdcAreaInspectDesc,
   CdcWorkArea.load => l10n.cdcAreaLoadDesc,
-  CdcWorkArea.putaway => l10n.cdcAreaPutawayDesc,
 };
 
 IconData cdcAreaIcon(CdcWorkArea a) => switch (a) {
   CdcWorkArea.pick => Icons.shopping_basket_outlined,
-  CdcWorkArea.sort => Icons.call_split,
+  CdcWorkArea.distribute => Icons.call_split,
+  CdcWorkArea.sort => Icons.inventory_2_outlined,
   CdcWorkArea.inspect => Icons.fact_check_outlined,
   CdcWorkArea.load => Icons.local_shipping_outlined,
-  CdcWorkArea.putaway => Icons.forklift,
 };
 
 /// DC 직원(`CDC_WORKER`·`CDC_SUPERVISOR`) 홈(사용자 2026-11-26 "cdc 직원도 들어가면 … 다른 메뉴 뜨도록").

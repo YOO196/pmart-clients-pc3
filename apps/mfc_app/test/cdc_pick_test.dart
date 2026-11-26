@@ -113,6 +113,8 @@ void main() {
     // 받자마자 착수 — 첫 줄 위치
     expect(find.textContaining('T261126001'), findsOneWidget);
     expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
+    // 피킹 방식마다 담는 곳 안내(C-01) — DPS 는 불 켜진 칸
+    expect(find.text('DPS — 불 켜진 칸에서 숫자만큼 집어요'), findsOneWidget);
     await scan(t, 'cdc-loc-scan', 'CDC01-Z-9-99-99-9-9');
     expect(find.byKey(const ValueKey('cdc-scan-error')), findsOneWidget);
     await scan(t, 'cdc-loc-scan', 'CDC01-C-5-61-03-2-1');
@@ -131,6 +133,21 @@ void main() {
     expect(find.byKey(const ValueKey('done-title')), findsOneWidget);
     await tap(t, 'result-action');
     expect(find.textContaining('T261126002'), findsOneWidget);
+    expect(
+      find.text('라인용 — 상품 박스에 Wave 안 모든 MFC 몫을 담아요(라인에서 나눠요)'),
+      findsOneWidget,
+    );
+    await scan(t, 'cdc-loc-scan', 'CDC01-G-5-63-01-3-1');
+    await scan(t, 'cdc-item-scan', 'SKU-2001');
+    await setQty(t, '6');
+    await tap(t, 'result-action');
+    // 지역 묶음 — 지역 카트 바코드부터
+    expect(find.textContaining('T261126003'), findsOneWidget);
+    expect(find.text('지역 카트 바코드를 스캔하세요'), findsOneWidget);
+    await scan(t, 'cdc-region-scan', 'SEOUL');
+    expect(find.text('이 작업 지역의 카트가 아니에요.'), findsOneWidget);
+    await scan(t, 'cdc-region-scan', 'JEONNAM');
+    expect(find.byKey(const ValueKey('cdc-pick-location')), findsOneWidget);
   });
 
   testWidgets('틀린 스캔: 문구는 스캔 칸 바로 위(아래 고정 칸), 스캔 칸은 빨갛게 빛나고 흔들린다', (t) async {
