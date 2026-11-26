@@ -7,6 +7,7 @@ import 'dart:async';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
@@ -65,6 +66,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   static const _swipeMinDistance = 90.0;
 
   HomeTab _tab = HomeTab.home;
+
+  /// 홈 맨 아래 카테고리별 상품에서 고른 상위 카테고리. null 이면 첫 카테고리.
+  String? _feedCategory;
+
+  /// 아래 떠 있는 배달 중 카드·장바구니 막대 높이(목록 끝 여백을 그만큼만 둔다).
+  double _floatH = 0;
 
   /// 고른 MD 탭(storefront 0.9.0 customTabs). null 이면 고정 탭([_tab]).
   String? _customTab;
@@ -291,6 +298,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 // 할인 탭(앱이 둔다 — storefront 할인 탭은 1차 제외라 search onSale 목록, 사용자 2026-11-26).
                 final sale = _customTab == saleTabKey;
                 final isHome = !sale && custom == null && tab == HomeTab.home;
+                final homeShown = home.sections;
+                final feedRoots = isHome
+                    ? (ref.watch(categoriesProvider).value ?? const [])
+                          .where((n) => n.depth == 1)
+                          .toList()
+                    : const <CategoryNode>[];
+                final feedId =
+                    feedRoots
+                        .where((c) => c.categoryId == _feedCategory)
+                        .firstOrNull
+                        ?.categoryId ??
+                    feedRoots.firstOrNull?.categoryId;
+                final firstDeal = homeShown
+                    .where(
+                      (x) =>
+                          x.showTimer &&
+                          x.endsAt != null &&
+                          x.timerStyle == TimerStyle.band,
+                    )
+                    .firstOrNull;
+                final rankSlot = firstDeal == null
+                    ? 1
+                    : homeShown.indexOf(firstDeal) + 1;
                 // 탭 순서: 홈 → 할인 → 나머지 고정 탭 → MD 탭. 바뀌었으면 미끄럼 방향을 정한다(첫 그림은 미끄럼 없음).
                 final order = <Object>[
                   for (final t in home.tabs) ...[
@@ -368,184 +398,255 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: RefreshIndicator(
                         onRefresh: _refresh,
                         // 사용자 요청(2026-11-20): 아래로 내려도 검색창은 위에 붙어 남는다(배너·배송 안내는 올라간다).
-                        child: CustomScrollView(
-                          key: const ValueKey('home-scroll'),
-                          slivers: [
-                            SliverList.list(
-                              children: [
-                                // 상단바가 흰 바탕이 되어(D안) 그 아래 회색 번짐을 뺐다.
-                                const Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    SizedBox(height: 4),
-                                    _PendingPaymentBanner(),
-                                    _InProgressOrderCard(),
-                                  ],
-                                ),
-                                _HomeTabs(
-                                  key: const ValueKey('home-tabs'),
-                                  tabs: home.tabs,
-                                  selected: custom == null && !sale
-                                      ? tab
-                                      : null,
-                                  saleSelected: sale,
-                                  onSale: () =>
-                                      setState(() => _customTab = saleTabKey),
-                                  onSelected: (t) => setState(() {
-                                    _tab = t;
-                                    _customTab = null;
-                                  }),
-                                  customTabs: customs,
-                                  selectedCustom: custom?.tabKey,
-                                  onSelectedCustom: (k) =>
-                                      setState(() => _customTab = k),
-                                  onCustomGone: _dropCustomTab,
-                                ),
-                                if (isHome)
-                                  _SlideIn(
-                                    key: ValueKey('slide-top-$slideKey'),
-                                    from: _slideFrom,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        const _OutOfAreaStrip(),
-                                        // HOME_TOP 배너(가로 넘기기). 없으면 자리를 비운다.
-                                        if (home.banners
-                                                .where((b) => !b.middle)
-                                                .toList()
-                                            case final top when top.isNotEmpty)
-                                          BannerPager(
-                                            key: const ValueKey(
-                                              'home-banners-top',
-                                            ),
-                                            banners: top,
-                                            intervalSeconds:
-                                                home.bannerIntervalSeconds,
-                                            onOpen: (b) => openHomeBanner(
-                                              context,
-                                              b,
-                                              home,
-                                            ),
-                                          ),
-                                        // 사용자 캡처(2026-11-20 홈): 배너 아래 배송 안내 → 회색 띠 → 검색·카테고리
-                                        const _DeliverySummaryCard(),
-                                        const PmartSectionGap(height: 8),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            if (isHome)
-                              const SliverPersistentHeader(
-                                pinned: true,
-                                delegate: _PinnedSearchBar(),
-                              ),
-                            SliverList.list(
-                              children: [
-                                // 영역마다 따로 감싼다(한 Column 으로 묶으면 화면 밖 영역까지 한꺼번에 만든다).
-                                for (final (i, w) in <Widget>[
-                                  if (isHome) ...[
-                                    const _CategoryShortcuts(),
-                                    // 레퍼런스: 둘째 줄 이름 아래 → 회색 띠 98px/1080.
-                                    const SizedBox(height: 23.9),
-                                    const PmartSectionGap(height: 10),
-                                    // "내가 1번 구매한 상품 보기"(사용자 폰 캡처 2026-11-26) — 주문이 있는 회원만.
-                                    const _BoughtBeforeCard(),
-                                    // 레퍼런스: 섹션마다 회색 띠(약 8dp)로 나눈다.
-                                    for (final (i, s)
-                                        in home.sections.indexed) ...[
-                                      if (i > 0)
-                                        const PmartSectionGap(height: 8),
-                                      // HOME_MIDDLE 배너는 첫 영역 아래(storefront 0.7.0)
-                                      if (i == 1)
-                                        if (home.banners
-                                                .where((b) => b.middle)
-                                                .toList()
-                                            case final mid when mid.isNotEmpty)
-                                          BannerPager(
-                                            key: const ValueKey(
-                                              'home-banners-middle',
-                                            ),
-                                            banners: mid,
-                                            intervalSeconds:
-                                                home.bannerIntervalSeconds,
-                                            onOpen: (b) => openHomeBanner(
-                                              context,
-                                              b,
-                                              home,
-                                            ),
-                                          ),
-                                      // 배너 묶음(storefront 0.10.0 kind BANNER) — 받은 순서 그대로 이 자리에서 넘겨 보기
-                                      if (s.kind == SectionKind.banner)
-                                        BannerPager(
-                                          key: ValueKey(
-                                            'section-${s.sectionId}',
-                                          ),
-                                          banners: s.banners,
-                                          intervalSeconds:
-                                              s.intervalSeconds ??
-                                              home.bannerIntervalSeconds,
-                                          onOpen: (b) =>
-                                              openHomeBanner(context, b, home),
-                                        )
-                                      else
-                                        _SectionView(
-                                          key: ValueKey(
-                                            'section-${s.sectionId}',
-                                          ),
-                                          section: s,
-                                          layoutVersion: home.layoutVersion,
-                                        ),
+                        child: NotificationListener<ScrollNotification>(
+                          onNotification: (n) {
+                            if (feedId != null &&
+                                n.depth == 0 &&
+                                n.metrics.axis == Axis.vertical &&
+                                n.metrics.extentAfter < 900) {
+                              final feed = productListProvider(
+                                homeFeedQuery(feedId),
+                              );
+                              // 실패했으면 스크롤마다 다시 묻지 않는다(아래 [다시 확인]으로).
+                              if (ref.read(feed).value?.loadMoreFailure ==
+                                  null) {
+                                ref.read(feed.notifier).loadMore();
+                              }
+                            }
+                            return false;
+                          },
+                          child: CustomScrollView(
+                            key: const ValueKey('home-scroll'),
+                            slivers: [
+                              SliverList.list(
+                                children: [
+                                  // 상단바가 흰 바탕이 되어(D안) 그 아래 회색 번짐을 뺐다.
+                                  const Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      SizedBox(height: 4),
+                                      _PendingPaymentBanner(),
+                                      _InProgressOrderCard(),
                                     ],
-                                  ] else if (sale)
-                                    const _SaleTabBody(
-                                      key: ValueKey('home-tab-body-sale'),
-                                    )
-                                  else if (custom != null)
-                                    _CustomTabBody(
-                                      key: ValueKey(
-                                        'home-tab-body-${custom.tabKey}',
-                                      ),
-                                      tabKey: custom.tabKey,
-                                      onGone: _dropCustomTab,
-                                    )
-                                  else
-                                    _TabBody(
-                                      key: ValueKey(
-                                        'home-tab-body-${tab.name}',
-                                      ),
-                                      tab: tab,
-                                    ),
-                                ].indexed)
-                                  _SlideIn(
-                                    key: ValueKey('slide-$slideKey-$i'),
-                                    from: _slideFrom,
-                                    child: w,
                                   ),
-                                // 아래 떠 있는 카드·막대가 목록 끝을 가리지 않게
-                                const SizedBox(height: 170),
+                                  _HomeTabs(
+                                    key: const ValueKey('home-tabs'),
+                                    tabs: home.tabs,
+                                    selected: custom == null && !sale
+                                        ? tab
+                                        : null,
+                                    saleSelected: sale,
+                                    onSale: () =>
+                                        setState(() => _customTab = saleTabKey),
+                                    onSelected: (t) => setState(() {
+                                      _tab = t;
+                                      _customTab = null;
+                                    }),
+                                    customTabs: customs,
+                                    selectedCustom: custom?.tabKey,
+                                    onSelectedCustom: (k) =>
+                                        setState(() => _customTab = k),
+                                    onCustomGone: _dropCustomTab,
+                                  ),
+                                  if (isHome)
+                                    _SlideIn(
+                                      key: ValueKey('slide-top-$slideKey'),
+                                      from: _slideFrom,
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          const _OutOfAreaStrip(),
+                                          // HOME_TOP 배너(가로 넘기기). 없으면 자리를 비운다.
+                                          if (home.banners
+                                                  .where((b) => !b.middle)
+                                                  .toList()
+                                              case final top
+                                              when top.isNotEmpty)
+                                            BannerPager(
+                                              key: const ValueKey(
+                                                'home-banners-top',
+                                              ),
+                                              banners: top,
+                                              intervalSeconds:
+                                                  home.bannerIntervalSeconds,
+                                              onOpen: (b) => openHomeBanner(
+                                                context,
+                                                b,
+                                                home,
+                                              ),
+                                            ),
+                                          // 사용자 캡처(2026-11-20 홈): 배너 아래 배송 안내 → 회색 띠 → 검색·카테고리
+                                          const _DeliverySummaryCard(),
+                                          const PmartSectionGap(height: 8),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              if (isHome)
+                                const SliverPersistentHeader(
+                                  pinned: true,
+                                  delegate: _PinnedSearchBar(),
+                                ),
+                              SliverList.list(
+                                children: [
+                                  // 영역마다 따로 감싼다(한 Column 으로 묶으면 화면 밖 영역까지 한꺼번에 만든다).
+                                  for (final (i, w) in <Widget>[
+                                    if (isHome) ...[
+                                      const _CategoryShortcuts(),
+                                      // 레퍼런스: 둘째 줄 이름 아래 → 회색 띠 98px/1080.
+                                      const SizedBox(height: 23.9),
+                                      const PmartSectionGap(height: 10),
+                                      // "내가 1번 구매한 상품 보기"(사용자 폰 캡처 2026-11-26) — 주문이 있는 회원만.
+                                      const _BoughtBeforeCard(),
+                                      // 레퍼런스: 섹션마다 회색 띠(약 8dp)로 나눈다.
+                                      for (final (i, s)
+                                          in homeShown.indexed) ...[
+                                        if (i > 0)
+                                          const PmartSectionGap(height: 8),
+                                        // "지금 바로픽 TOP 30"(사용자 폰 캡처 2026-11-26): 맨 위 일일특가 바로 아래, 가운데 배너 위.
+                                        if (i == rankSlot) ...[
+                                          _HomeTopRanking(
+                                            key: const ValueKey('home-top30'),
+                                            onViewAll: () => setState(() {
+                                              _tab = HomeTab.ranking;
+                                              _customTab = null;
+                                            }),
+                                          ),
+                                          const PmartSectionGap(height: 8),
+                                        ],
+                                        // HOME_MIDDLE 배너는 첫 영역 아래(storefront 0.7.0)
+                                        if (i == 1)
+                                          if (home.banners
+                                                  .where((b) => b.middle)
+                                                  .toList()
+                                              case final mid
+                                              when mid.isNotEmpty)
+                                            BannerPager(
+                                              key: const ValueKey(
+                                                'home-banners-middle',
+                                              ),
+                                              banners: mid,
+                                              intervalSeconds:
+                                                  home.bannerIntervalSeconds,
+                                              onOpen: (b) => openHomeBanner(
+                                                context,
+                                                b,
+                                                home,
+                                              ),
+                                            ),
+                                        // 배너 묶음(storefront 0.10.0 kind BANNER) — 받은 순서 그대로 이 자리에서 넘겨 보기
+                                        if (s.kind == SectionKind.banner)
+                                          BannerPager(
+                                            key: ValueKey(
+                                              'section-${s.sectionId}',
+                                            ),
+                                            banners: s.banners,
+                                            intervalSeconds:
+                                                s.intervalSeconds ??
+                                                home.bannerIntervalSeconds,
+                                            onOpen: (b) => openHomeBanner(
+                                              context,
+                                              b,
+                                              home,
+                                            ),
+                                          )
+                                        else
+                                          _SectionView(
+                                            key: ValueKey(
+                                              'section-${s.sectionId}',
+                                            ),
+                                            section: s,
+                                            layoutVersion: home.layoutVersion,
+                                            // 일일특가 모양은 맨 위 하나만(사용자 2026-11-26 "왜 2번이나").
+                                            dealStyle: s == firstDeal,
+                                          ),
+                                      ],
+                                      if (rankSlot >= homeShown.length)
+                                        _HomeTopRanking(
+                                          key: const ValueKey('home-top30'),
+                                          onViewAll: () => setState(() {
+                                            _tab = HomeTab.ranking;
+                                            _customTab = null;
+                                          }),
+                                        ),
+                                    ] else if (sale)
+                                      const _SaleTabBody(
+                                        key: ValueKey('home-tab-body-sale'),
+                                      )
+                                    else if (custom != null)
+                                      _CustomTabBody(
+                                        key: ValueKey(
+                                          'home-tab-body-${custom.tabKey}',
+                                        ),
+                                        tabKey: custom.tabKey,
+                                        onGone: _dropCustomTab,
+                                      )
+                                    else
+                                      _TabBody(
+                                        key: ValueKey(
+                                          'home-tab-body-${tab.name}',
+                                        ),
+                                        tab: tab,
+                                      ),
+                                  ].indexed)
+                                    _SlideIn(
+                                      key: ValueKey('slide-$slideKey-$i'),
+                                      from: _slideFrom,
+                                      child: w,
+                                    ),
+                                ],
+                              ),
+                              if (feedId != null) ...[
+                                SliverPersistentHeader(
+                                  pinned: true,
+                                  delegate: _FeedHeader(
+                                    roots: feedRoots,
+                                    selected: feedId,
+                                    onSelect: (id) =>
+                                        setState(() => _feedCategory = id),
+                                  ),
+                                ),
+                                _HomeFeedGrid(
+                                  key: ValueKey('home-feed-$feedId'),
+                                  categoryId: feedId,
+                                ),
                               ],
-                            ),
-                          ],
+                              // 끝: 떠 있는 카드·막대가 가리지 않을 만큼만 비운다(사용자 2026-11-26 "여백 많이 보이지 말고").
+                              SliverToBoxAdapter(
+                                child: SizedBox(
+                                  key: const ValueKey('home-end-space'),
+                                  height: _floatH + 28,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ), // 배달 중 카드 위, 장바구니 막대 아래(사용자 캡처 2026-11-20 홈 — 둘 다 있으면 위아래로)
-                    const Positioned(
+                    Positioned(
                       left: 10,
                       right: 10,
                       bottom: 10,
                       // 알림(스낵바)이 배달 중 카드·장바구니 막대를 덮지 않게 위로 띄운다.
-                      child: NoticeClearance(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _InProgressOrderCard(floating: true),
-                            // 예약배달만 받는 때(심야)는 장바구니 막대 대신 안내(사용자 2026-11-26).
-                            _HomeCartBarOrNight(),
-                          ],
+                      child: _SizeReporter(
+                        onSize: (size) {
+                          if (mounted && size.height != _floatH) {
+                            setState(() => _floatH = size.height);
+                          }
+                        },
+                        child: const NoticeClearance(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _InProgressOrderCard(floating: true),
+                              // 예약배달만 받는 때(심야)는 장바구니 막대 대신 안내(사용자 2026-11-26).
+                              _HomeCartBarOrNight(),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -640,8 +741,10 @@ class _HomeTabsState extends State<_HomeTabs> {
       required bool on,
       required VoidCallback onTap,
       Widget? above,
-    }) => InkWell(
+    }) => GestureDetector(
+      // 누를 때 회색 물결 없이 검정 줄만(사용자 2026-11-26).
       key: key,
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         key: on ? _selectedKey : null,
@@ -695,6 +798,17 @@ class _HomeTabsState extends State<_HomeTabs> {
                   label: l10n.tabSale,
                   on: widget.saleSelected,
                   onTap: widget.onSale!,
+                  // 레퍼런스: 이름 위 분홍 작은 글 "오늘만특가".
+                  above: Text(
+                    l10n.tabSaleTag,
+                    key: const ValueKey('home-tab-sale-tag'),
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      height: 1.1,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFFE5197E),
+                    ),
+                  ),
                 ),
             ],
             for (final c in customTabs)
@@ -1435,11 +1549,15 @@ class _SectionView extends ConsumerWidget {
     required this.section,
     required this.layoutVersion,
     this.vertical = false,
+    this.dealStyle = true,
   });
 
   final HomeSection section;
   final int layoutVersion;
   final bool vertical;
+
+  /// 띠형 타이머를 일일특가 모양으로 그릴지. false 면 보통 영역 + 제목 위 남은 시간.
+  final bool dealStyle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1534,7 +1652,7 @@ class _SectionView extends ConsumerWidget {
     );
     // 띠형(timerStyle BAND) — 레퍼런스 "오늘 하루만 이 가격!"(사용자 2026-11-26): 연분홍 그라데이션 머리 + 한 쪽에
     // 2개씩 세로 줄(사진 위 빨간 할인 시간 띠) + [<] 1 / N [>].
-    if (endsAt != null && section.timerStyle == TimerStyle.band) {
+    if (endsAt != null && dealStyle && section.timerStyle == TimerStyle.band) {
       return SectionExpiry(
         endsAt: endsAt,
         child: _TimerDealList(
@@ -2026,7 +2144,7 @@ class _DeliverySummary extends ConsumerWidget {
               ),
               onTap: openGuide,
             ),
-          const _HomeCouponRow(),
+          const HomeCouponRow(),
         ],
       ),
     );
@@ -2083,8 +2201,11 @@ class _HomeInfoRow extends StatelessWidget {
 
 /// 쿠폰 줄(사용자 새 UI): 받을 수 있는 쿠폰 첫 장 이름 + "외 N개", 오른쪽 받기 동그라미 → "할인받고 주문해요" 시트.
 /// 회원: 받을 수 있는 쿠폰이 있을 때만(조회 실패·없음이면 줄 없음). 비회원: 고정 안내 → 로그인.
-class _HomeCouponRow extends ConsumerWidget {
-  const _HomeCouponRow();
+class HomeCouponRow extends ConsumerWidget {
+  const HomeCouponRow({super.key, this.fontSize = 13.5});
+
+  /// 글자 크기 — 홈 13.5, 상품 상세 15.2(배달팁 줄과 같게, 사용자 레퍼런스 2026-11-26).
+  final double fontSize;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -2116,7 +2237,7 @@ class _HomeCouponRow extends ConsumerWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleSmall?.copyWith(
-            fontSize: 13.5,
+            fontSize: fontSize,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -2141,7 +2262,7 @@ class _HomeCouponRow extends ConsumerWidget {
     if (open.isEmpty) return const SizedBox.shrink();
     final first = open.first;
     final style = theme.textTheme.titleSmall?.copyWith(
-      fontSize: 13.5,
+      fontSize: fontSize,
       fontWeight: FontWeight.w700,
     );
     final label = open.length > 1
@@ -3208,6 +3329,461 @@ class _SectionExpiryState extends ConsumerState<SectionExpiry> {
 }
 
 /// 홈 순위 진열에 보이는 칸 수(3칸 × 2줄, 레퍼런스 "16. 지금 TOP 30").
+/// "지금 바로픽 TOP 30" 상자 — 인기순 검색(search sort POPULAR, 랭킹 탭 전체 보기와 같은 출처)의 앞 30개를
+/// 서버 순서 그대로 1~30위로. 칩은 상위 카테고리(그 카테고리 인기순). null = 전체.
+const homeTopCount = 30;
+
+final _homeTopProvider = FutureProvider.autoDispose
+    .family<List<ProductTile>, String?>((ref, categoryId) async {
+      final repo = ref.watch(catalogRepositoryProvider);
+      final mfcId = ref.watch(currentMfcIdProvider);
+      final query = ProductQuery(sort: SortKey.popular, categoryId: categoryId);
+      final items = <ProductTile>[];
+      String? cursor;
+      // 빈 쪽이 오거나 몇 쪽을 넘기면 멈춘다(커서가 끝나지 않아도 끝없이 묻지 않게).
+      for (var tries = 0; tries < 4; tries++) {
+        final page = await repo.search(query, mfcId: mfcId, cursor: cursor);
+        items.addAll(page.items);
+        cursor = page.nextCursor;
+        if (cursor == null ||
+            page.items.isEmpty ||
+            items.length >= homeTopCount) {
+          break;
+        }
+      }
+      return [
+        for (final (i, t) in items.take(homeTopCount).indexed)
+          ProductTile(
+            productId: t.productId,
+            name: t.name,
+            saleState: t.saleState,
+            imageUrl: t.imageUrl,
+            representativeSku: t.representativeSku,
+            basePrice: t.basePrice,
+            carried: t.carried,
+            rating: t.rating,
+            reviewCount: t.reviewCount,
+            badge: DisplayBadge.rank,
+            rank: i + 1,
+            unitPrice: t.unitPrice,
+            discount: t.discount,
+            soldOut: t.soldOut,
+            lowStockQty: t.lowStockQty,
+          ),
+      ];
+    });
+
+/// 레퍼런스 홈 "지금 ○○ TOP 30"(사용자 폰 캡처 2026-11-26): 제목 + 전체 보기 › / 카테고리 칩(고른 칩 검정 바탕) /
+/// 순위 3칸 × 2줄 + ‹ 1 / 5 ›. 전체 보기는 랭킹 탭으로.
+class _HomeTopRanking extends ConsumerStatefulWidget {
+  const _HomeTopRanking({super.key, required this.onViewAll});
+
+  final VoidCallback onViewAll;
+
+  @override
+  ConsumerState<_HomeTopRanking> createState() => _HomeTopRankingState();
+}
+
+class _HomeTopRankingState extends ConsumerState<_HomeTopRanking> {
+  String? _categoryId;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final roots = (ref.watch(categoriesProvider).value ?? const [])
+        .where((n) => n.depth == 1)
+        .toList();
+    final provider = _homeTopProvider(_categoryId);
+    final result = ref.watch(provider);
+    // 전체에서 상품이 없으면 상자를 빼고, 칩을 고른 뒤 없으면 "없어요"를 보인다.
+    if (_categoryId == null &&
+        result is AsyncData<List<ProductTile>> &&
+        result.value.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    Widget chip(String? id, String label) {
+      final on = id == _categoryId;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8.7),
+        child: GestureDetector(
+          key: ValueKey('home-top30-chip-${id ?? 'all'}'),
+          behavior: HitTestBehavior.opaque,
+          onTap: () => setState(() => _categoryId = id),
+          child: Container(
+            height: 33.5,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: on ? const Color(0xFF1B1D1E) : Colors.white,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: on ? const Color(0xFF1B1D1E) : const Color(0xFFE1E2E4),
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: on ? FontWeight.w700 : FontWeight.w400,
+                color: on ? Colors.white : const Color(0xFF1B1D1E),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PmartSectionHeader(
+            title: l10n.homeTopTitle,
+            trailing: TextButton(
+              key: const ValueKey('home-top30-view-all'),
+              style: TextButton.styleFrom(
+                foregroundColor: scheme.onSurface,
+                textStyle: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+              ),
+              onPressed: widget.onViewAll,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(l10n.sectionViewAll),
+                  const PmartLineIcon(PmartLineIcons.chevronRight, size: 15),
+                ],
+              ),
+            ),
+          ),
+          if (roots.isNotEmpty)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 4, 7.3, 12),
+              child: Row(
+                children: [
+                  chip(null, l10n.homeTopAll),
+                  for (final c in roots) chip(c.categoryId, c.name),
+                ],
+              ),
+            ),
+          switch (result) {
+            AsyncData(:final value) when value.isEmpty => Padding(
+              key: const ValueKey('home-top30-empty'),
+              padding: const EdgeInsets.all(16),
+              child: Text(l10n.sectionEmpty),
+            ),
+            AsyncData(:final value) => _RankGrid(
+              key: ValueKey('home-top30-grid-${_categoryId ?? 'all'}'),
+              items: value,
+            ),
+            AsyncError() => _InlineFailure(
+              key: const ValueKey('home-top30-failed'),
+              text: l10n.sectionUnavailable,
+              onRetry: () => ref.invalidate(provider),
+            ),
+            _ => const _SkeletonRail(),
+          },
+        ],
+      ),
+    );
+  }
+}
+
+/// 홈 맨 아래 "카테고리별 상품"(사용자 폰 캡처 2026-11-26): 상위 카테고리 칩(위에 붙음) + "총 N개 상품 · 전체 보기 ›" +
+/// 그 카테고리 상품 2칸 목록을 끝까지(스크롤 끝 가까이에서 다음 묶음). 출처는 카테고리 상품 화면과 같은 검색.
+ProductQuery homeFeedQuery(String categoryId) =>
+    ProductQuery(categoryId: categoryId);
+
+/// 위에 붙는 칩 줄 + 개수 줄. 레퍼런스: 칩 위 12 · 칩 33.5 · 아래 10, 개수 줄 40, 아래 선.
+class _FeedHeader extends SliverPersistentHeaderDelegate {
+  const _FeedHeader({
+    required this.roots,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<CategoryNode> roots;
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  static const extent = 12 + 33.5 + 10 + 40 + 1.0;
+
+  @override
+  double get minExtent => extent;
+
+  @override
+  double get maxExtent => extent;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlaps) =>
+      _FeedHeaderBar(roots: roots, selected: selected, onSelect: onSelect);
+
+  @override
+  bool shouldRebuild(_FeedHeader old) =>
+      old.selected != selected || !identical(old.roots, roots);
+}
+
+class _FeedHeaderBar extends ConsumerWidget {
+  const _FeedHeaderBar({
+    required this.roots,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final List<CategoryNode> roots;
+  final String selected;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final total = ref
+        .watch(productListProvider(homeFeedQuery(selected)))
+        .value
+        ?.total;
+    final name = roots.where((c) => c.categoryId == selected).firstOrNull?.name;
+    return ColoredBox(
+      color: theme.colorScheme.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 12 + 33.5 + 10,
+            child: ListView(
+              key: const ValueKey('home-feed-chips'),
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 12, 7.3, 10),
+              children: [
+                for (final c in roots)
+                  _FeedChip(
+                    key: ValueKey('home-feed-chip-${c.categoryId}'),
+                    label: c.name,
+                    on: c.categoryId == selected,
+                    onTap: () => onSelect(c.categoryId),
+                  ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 40,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16, right: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      switch (total) {
+                        final int n => l10n.saleTotal(n),
+                        null => '',
+                      },
+                      key: const ValueKey('home-feed-total'),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 14,
+                        color: const Color(0xFF9A9CA0),
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    key: const ValueKey('home-feed-view-all'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: theme.colorScheme.onSurface,
+                      textStyle: theme.textTheme.bodyMedium?.copyWith(
+                        fontSize: 14,
+                      ),
+                    ),
+                    onPressed: () =>
+                        openCategoryBrowse(context, selected, title: name),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(l10n.sectionViewAll),
+                        const PmartLineIcon(
+                          PmartLineIcons.chevronRight,
+                          size: 15,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFF1F2F4)),
+        ],
+      ),
+    );
+  }
+}
+
+/// 칩 하나(고르면 검정 바탕 흰 굵은 글, 아니면 흰 바탕 옅은 테두리). 누를 때 물결 없음.
+class _FeedChip extends StatelessWidget {
+  const _FeedChip({
+    super.key,
+    required this.label,
+    required this.on,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(right: 8.7),
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        height: 33.5,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: on ? const Color(0xFF1B1D1E) : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: on ? const Color(0xFF1B1D1E) : const Color(0xFFE1E2E4),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14.5,
+            fontWeight: on ? FontWeight.w700 : FontWeight.w400,
+            color: on ? Colors.white : const Color(0xFF1B1D1E),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// 고른 카테고리 상품 2칸 목록(sliver). 다음 묶음은 홈 스크롤이 끝에 가까워지면 [HomeScreen] 이 부른다.
+class _HomeFeedGrid extends ConsumerWidget {
+  const _HomeFeedGrid({super.key, required this.categoryId});
+
+  final String categoryId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final provider = productListProvider(homeFeedQuery(categoryId));
+    final state = ref.watch(provider);
+    Widget box(Widget child) => SliverToBoxAdapter(child: child);
+    switch (state) {
+      case AsyncData(:final value) when value.items.isEmpty:
+        return box(
+          Padding(
+            key: const ValueKey('home-feed-empty'),
+            padding: const EdgeInsets.all(16),
+            child: Text(l10n.sectionEmpty),
+          ),
+        );
+      case AsyncData(:final value):
+        final width = ProductTileCard.gridWidthOf(context);
+        final height = ProductTileCard.heightFor(context, width);
+        return SliverMainAxisGroup(
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              sliver: SliverGrid(
+                key: ValueKey('home-feed-grid-$categoryId'),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: width / height,
+                ),
+                delegate: SliverChildBuilderDelegate((context, i) {
+                  final tile = value.items[i];
+                  return ProductTileCard(
+                    key: ValueKey('home-feed-${tile.productId}'),
+                    rail: true,
+                    tile: tile,
+                    onTap: () => context.push(
+                      '/products/${tile.productId}',
+                      extra: tile,
+                    ),
+                  );
+                }, childCount: value.items.length),
+              ),
+            ),
+            if (value.loadingMore)
+              box(
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(
+                    child: SizedBox.square(
+                      dimension: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ),
+              )
+            else if (value.loadMoreFailure != null)
+              box(
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: _InlineFailure(
+                    key: const ValueKey('home-feed-more-failed'),
+                    text: l10n.loadMoreFailed,
+                    onRetry: () => ref.read(provider.notifier).loadMore(),
+                  ),
+                ),
+              ),
+          ],
+        );
+      case AsyncError():
+        return box(
+          _InlineFailure(
+            key: const ValueKey('home-feed-failed'),
+            text: l10n.sectionUnavailable,
+            onRetry: () => ref.invalidate(provider),
+          ),
+        );
+      default:
+        return box(const _SkeletonRail());
+    }
+  }
+}
+
+/// 자식 크기가 바뀌면 알린다(떠 있는 장바구니 막대·배달 카드 높이 — 목록 끝 여백을 그만큼만).
+class _SizeReporter extends SingleChildRenderObjectWidget {
+  const _SizeReporter({required this.onSize, super.child});
+
+  final ValueChanged<Size> onSize;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderSizeReporter(onSize);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderSizeReporter renderObject,
+  ) => renderObject.onSize = onSize;
+}
+
+class _RenderSizeReporter extends RenderProxyBox {
+  _RenderSizeReporter(this.onSize);
+
+  ValueChanged<Size> onSize;
+  Size? _last;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    if (size == _last) return;
+    _last = size;
+    final s = size;
+    WidgetsBinding.instance.addPostFrameCallback((_) => onSize(s));
+  }
+}
+
 const rankGridCount = 6;
 
 /// 순위 숫자를 단 3칸 × 2줄 격자(좌우 16, 칸 사이 8.4) + 아래 넘김 "‹ 1 / 5 ›"(사용자 폰 캡처 2026-11-26:
@@ -3378,8 +3954,9 @@ class _SlideInState extends State<_SlideIn>
     duration: _HomeScreenState._slideDuration,
     value: widget.from == 0 ? 1 : 0,
   )..forward();
+  // 화면 폭 전체가 옆에서 밀려 들어온다(사용자 2026-11-26 "화면 자체가 자동으로 슬라이딩").
   late final _offset = Tween(
-    begin: Offset(0.35 * widget.from, 0),
+    begin: Offset(1.0 * widget.from, 0),
     end: Offset.zero,
   ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutCubic));
 
@@ -3391,10 +3968,7 @@ class _SlideInState extends State<_SlideIn>
 
   @override
   Widget build(BuildContext context) => ClipRect(
-    child: SlideTransition(
-      position: _offset,
-      child: FadeTransition(opacity: _c, child: widget.child),
-    ),
+    child: SlideTransition(position: _offset, child: widget.child),
   );
 }
 

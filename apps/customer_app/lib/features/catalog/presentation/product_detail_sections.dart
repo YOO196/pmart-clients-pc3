@@ -117,9 +117,9 @@ class DetailSectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // 실측: 제목 23 굵게(레퍼런스 "다른 사람들이 함께 본 상품" 폭 기준).
+    // 실측: 제목 21 굵게(레퍼런스 2026-11-26 "믿고 구매하는 평점 좋은 상품" 글 폭 420/455.7 × 23).
     final style = theme.textTheme.titleLarge?.copyWith(
-      fontSize: 23,
+      fontSize: 21,
       fontWeight: FontWeight.w800,
     );
     return Padding(
@@ -165,7 +165,7 @@ class DetailSeeAll extends StatelessWidget {
         children: [
           Text(
             l10n.sectionViewAll,
-            style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+            style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
           ),
           const PmartLineIcon(PmartLineIcons.chevronRight, size: 16),
         ],
@@ -282,9 +282,9 @@ class _RowCard extends StatelessWidget {
                     keepWordsTogether(t.name),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    // 실측: 이름 16 보통(레퍼런스 "평점 좋은 상품" 줄).
+                    // 실측: 이름 14.8 보통(레퍼런스 2026-11-26 한글 글자 높이 22/23.8 × 16).
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: 16,
+                      fontSize: 14.8,
                       height: 1.3,
                       fontWeight: FontWeight.w400,
                       color: theme.colorScheme.onSurface,
@@ -298,7 +298,7 @@ class _RowCard extends StatelessWidget {
                       showBase: false,
                       rateColor: const Color(0xFFFF3E3E),
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontSize: 13.4,
+                        fontSize: 14.5,
                         fontWeight: FontWeight.w800,
                       ),
                     )
@@ -309,7 +309,7 @@ class _RowCard extends StatelessWidget {
                         null => l10n.priceUnavailable,
                       },
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontSize: 13.4,
+                        fontSize: 14.5,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -365,7 +365,8 @@ class DetailTabs extends StatelessWidget {
           child: Text(
             text,
             style: theme.textTheme.titleMedium?.copyWith(
-              fontSize: 18.3,
+              // 레퍼런스 2026-11-26 "상품설명" 폭 100/107.5 × 18.3.
+              fontSize: 17,
               fontWeight: on ? FontWeight.w700 : FontWeight.w400,
               color: on ? scheme.onSurface : scheme.onSurfaceVariant,
             ),
@@ -709,7 +710,7 @@ class DetailReviewSection extends ConsumerWidget {
                 },
                 key: const ValueKey('product-reviews-count'),
                 style: theme.textTheme.titleMedium?.copyWith(
-                  fontSize: 18,
+                  fontSize: 17,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -796,7 +797,7 @@ class DetailReviewSection extends ConsumerWidget {
                       Text(
                         l10n.productReviewsAll,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 15,
+                          fontSize: 15.5,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -829,7 +830,8 @@ class ReviewPhotoGrid extends ConsumerWidget {
   final bool showMore;
 
   static const _cell = 106.0;
-  static const _gap = 3.0;
+  // 레퍼런스 2026-11-26: 사진 사이 거의 붙음(3px/1080).
+  static const _gap = 1.5;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -966,7 +968,7 @@ class DetailInfoRow extends StatelessWidget {
             Expanded(
               child: Text(
                 label,
-                style: theme.textTheme.bodyLarge?.copyWith(fontSize: 17.5),
+                style: theme.textTheme.bodyLarge?.copyWith(fontSize: 17),
               ),
             ),
             const PmartLineIcon(PmartLineIcons.chevronRight, size: 20),

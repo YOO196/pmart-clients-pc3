@@ -641,7 +641,8 @@ class _ReviewBody extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     text,
     style: Theme.of(context).textTheme.bodyLarge
-        ?.copyWith(fontSize: 18, height: 1.45),
+        // 레퍼런스 2026-11-26 "좋아요" 폭 75/79 × 18.
+        ?.copyWith(fontSize: 17, height: 1.45),
   );
 }
 
@@ -822,7 +823,10 @@ class _HelpfulButtonState extends ConsumerState<_HelpfulButton> {
               ),
               const SizedBox(width: 5),
               Text(
-                l10n.reviewHelpful(widget.count),
+                // 0 이면 숫자 없이 "도움돼요"(레퍼런스 2026-11-26).
+                widget.count > 0
+                    ? l10n.reviewHelpful(widget.count)
+                    : l10n.reviewHelpfulZero,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontSize: 14,
                   color: fg,

@@ -25,7 +25,7 @@ import 'widgets/discount_price.dart';
 import 'widgets/low_stock_toast.dart';
 import 'widgets/product_tile_card.dart';
 import 'home_providers.dart' show homeDeliveryOptionsProvider;
-import 'home_screen.dart' show BannerPager, DeliveryGuideSheet;
+import 'home_screen.dart' show BannerPager, DeliveryGuideSheet, HomeCouponRow;
 import 'product_detail_sections.dart';
 import 'widgets/delivery_badges.dart';
 import '../../checkout/domain/checkout.dart' show DeliveryMode;
@@ -72,6 +72,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   @override
   void dispose() {
     _lowToastTimer?.cancel();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -104,8 +105,21 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     };
     return Scaffold(
       appBar: AppBar(
-        // 레퍼런스 상단 막대 높이(약 47dp).
+        // 레퍼런스 상단 막대 높이(약 47dp). 뒤로 가기 바로 옆 브랜드 글자(사용자 레퍼런스 2026-11-26).
         toolbarHeight: 47,
+        leadingWidth: 51,
+        titleSpacing: 0,
+        centerTitle: false,
+        title: Text(
+          l10n.brandName,
+          key: const ValueKey('detail-brand'),
+          style: const TextStyle(
+            fontSize: 21,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -0.6,
+            color: Color(0xFF1B1D1E),
+          ),
+        ),
         actions: [
           IconButton(
             key: const ValueKey('detail-home'),
@@ -178,11 +192,12 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 9, 13, 9),
+              // 레퍼런스: 하트 가운데 30.9 · 버튼 왼쪽 63 · 오른쪽 13.4 · 위 11.7 · 아래 10.5.
+              padding: const EdgeInsets.fromLTRB(10, 11.7, 13.4, 10.5),
               child: Row(
                 children: [
                   SizedBox(
-                    width: 52,
+                    width: 42,
                     height: 54,
                     child: Center(
                       child: WishHeartWithCount(
@@ -191,7 +206,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 11),
                   Expanded(
                     child: SizedBox(
                       height: 54,
@@ -199,7 +214,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         key: const ValueKey('product-buy'),
                         style: FilledButton.styleFrom(
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(4),
                           ),
                           textStyle: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
@@ -230,15 +245,52 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
   final _reviewsKey = GlobalKey();
   bool _reviewsTab = false;
 
-  void _scrollTo(GlobalKey key, {required bool reviews}) {
+  final _scroll = ScrollController();
+  final _tabsKey = GlobalKey();
+
+  /// 붙은 탭 아래 끝(화면 좌표). 탭이 아직 없으면 null.
+  double? _tabsBottom() {
+    final box = _tabsKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return null;
+    return box.localToGlobal(Offset(0, box.size.height)).dy;
+  }
+
+  double? _topOf(GlobalKey key) {
+    final box = key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.attached) return null;
+    return box.localToGlobal(Offset.zero).dy;
+  }
+
+  /// 리뷰 구획 머리가 붙은 탭 아래까지 올라오면 [리뷰], 아니면 [상품설명](레퍼런스 — 스크롤 따라 바뀜).
+  bool _jumping = false;
+  void _syncTab() {
+    if (_jumping) return;
+    final bottom = _tabsBottom();
+    final reviewsTop = _topOf(_reviewsKey);
+    if (bottom == null || reviewsTop == null) return;
+    final reviews = reviewsTop <= bottom + 1;
+    if (reviews != _reviewsTab) setState(() => _reviewsTab = reviews);
+  }
+
+  Future<void> _scrollTo(GlobalKey key, {required bool reviews}) async {
     setState(() => _reviewsTab = reviews);
-    final ctx = key.currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(
-        ctx,
+    final bottom = _tabsBottom();
+    final top = _topOf(key);
+    if (bottom == null || top == null || !_scroll.hasClients) return;
+    // 구획 머리가 붙은 탭 바로 아래에 오도록.
+    final target = (_scroll.offset + top - bottom).clamp(
+      0.0,
+      _scroll.position.maxScrollExtent,
+    );
+    _jumping = true;
+    try {
+      await _scroll.animateTo(
+        target,
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOut,
       );
+    } finally {
+      _jumping = false;
     }
   }
 
@@ -362,7 +414,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
     final banners = ref.watch(productPageBannersProvider).value ?? const [];
 
     final soldOut = reason == CannotBuyReason.soldOut;
-    final children = <Widget>[
+    final before = <Widget>[
       // 사진(화면 폭 정사각형, 넓은 화면에서는 화면 높이 절반까지)
       LayoutBuilder(
         builder: (context, c) => Stack(
@@ -416,7 +468,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               style: theme.textTheme.titleLarge?.copyWith(
                 fontSize: 16.7,
                 height: 1.4,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w400,
               ),
             ),
             if (origin != null)
@@ -587,7 +639,12 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
             ),
           ),
         ),
-      const SizedBox(height: 14),
+      // 쿠폰 줄(레퍼런스 "첫주문 7,000원 할인쿠폰" — 홈과 같은 서버 쿠폰 행사, 없으면 줄 없음).
+      const Padding(
+        padding: EdgeInsets.fromLTRB(16.7, 9.9, 16.7, 0),
+        child: HomeCouponRow(key: ValueKey('product-coupon'), fontSize: 15.2),
+      ),
+      const SizedBox(height: 3.7),
       const DetailBand(),
       ?viewed,
       if (viewed != null) const DetailBand(),
@@ -598,13 +655,15 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           height: 91,
           child: BannerPager(banners: banners, onOpen: (_) {}),
         ),
-      // [상품설명 | 리뷰 N] 탭
-      DetailTabs(
-        reviewCount: rating?.count,
-        reviewsSelected: _reviewsTab,
-        onDescription: () => _scrollTo(_descriptionKey, reviews: false),
-        onReviews: () => _scrollTo(_reviewsKey, reviews: true),
-      ),
+    ];
+    // [상품설명 | 리뷰 N] 탭 — 내려가면 위 막대 아래에 붙는다(레퍼런스 2026-11-26), 아래는 그 뒤 구획.
+    final tabs = DetailTabs(
+      reviewCount: rating?.count,
+      reviewsSelected: _reviewsTab,
+      onDescription: () => _scrollTo(_descriptionKey, reviews: false),
+      onReviews: () => _scrollTo(_reviewsKey, reviews: true),
+    );
+    final after = <Widget>[
       KeyedSubtree(
         key: _descriptionKey,
         child: PurchaseNoteBox(product: p, onMore: () => _openInfo(p)),
@@ -666,13 +725,27 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         ),
       const DetailBand(),
     ];
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
-      // 구획을 화면 밖으로 내려도 버리지 않는다(사용자 2026-11-25 폰: 내렸다 올리면 "막힌다" — 버린 선반이
-      // 다시 읽는 동안 높이 0 이었다가 커지며 위치가 튀었다. [리뷰] 탭도 만들어지지 않은 리뷰 구획으로는
-      // 이동하지 못했다). 상세 한 장이라 모두 붙잡아도 된다.
-      scrollCacheExtent: const ScrollCacheExtent.pixels(100000),
-      children: children,
+    return NotificationListener<ScrollNotification>(
+      onNotification: (n) {
+        if (n.depth == 0 && n.metrics.axis == Axis.vertical) _syncTab();
+        return false;
+      },
+      child: CustomScrollView(
+        controller: _scroll,
+        // 구획을 화면 밖으로 내려도 버리지 않는다(사용자 2026-11-25 폰: 내렸다 올리면 "막힌다" — 버린 선반이
+        // 다시 읽는 동안 높이 0 이었다가 커지며 위치가 튀었다. [리뷰] 탭도 만들어지지 않은 리뷰 구획으로는
+        // 이동하지 못했다). 상세 한 장이라 모두 붙잡아도 된다.
+        scrollCacheExtent: const ScrollCacheExtent.pixels(100000),
+        slivers: [
+          SliverList.list(children: before),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _TabsHeader(tabs, key: _tabsKey),
+          ),
+          SliverList.list(children: after),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ),
     );
   }
 
@@ -1530,4 +1603,29 @@ class _NutritionTable extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 붙는 [상품설명 | 리뷰 N] 탭(높이 50 + 아래 선 1).
+class _TabsHeader extends SliverPersistentHeaderDelegate {
+  const _TabsHeader(this.tabs, {required this.key});
+
+  final DetailTabs tabs;
+  final GlobalKey key;
+
+  static const extent = 51.0;
+
+  @override
+  double get minExtent => extent;
+
+  @override
+  double get maxExtent => extent;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlaps) =>
+      SizedBox(key: key, height: extent, child: tabs);
+
+  @override
+  bool shouldRebuild(_TabsHeader old) =>
+      old.tabs.reviewsSelected != tabs.reviewsSelected ||
+      old.tabs.reviewCount != tabs.reviewCount;
 }

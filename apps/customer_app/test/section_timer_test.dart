@@ -64,7 +64,7 @@ void main() {
     DateTime Function() clock,
   ) async {
     t.view
-      ..physicalSize = const Size(800, 3000)
+      ..physicalSize = const Size(800, 4200)
       ..devicePixelRatio = 1;
     addTearDown(t.view.reset);
     await t.pumpWidget(
