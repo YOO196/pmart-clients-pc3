@@ -8,6 +8,9 @@ import { API_BASE } from '../api/client';
 import { listPage } from './listHandlers';
 import { db, nextSeq, timestamp, type MockInboundTask, type MockReturnReceipt, type MockSupplyRequest } from './db';
 import { expectedVersion, idempotent, operator, problem, unauthorized } from './support';
+import { simPromises } from './inboundPromiseSim';
+
+const seoulDay = (iso: string) => new Date(Date.parse(iso) + 9 * 3_600_000).toISOString().slice(0, 10);
 
 const canAccess = (request: Request, mfcId: string) => operator(request)?.centers.includes(mfcId) ?? false;
 const actor = (request: Request) => operator(request)?.subject ?? '';
@@ -29,6 +32,26 @@ function applyDone(t: MockInboundTask, qty: number): MockInboundTask {
 }
 
 export const inboundHandlers = [
+  // 입고 예정(TRF) — state 를 비우면 끝나지 않은 것(EXPECTED·RECEIVING), date = 예정 도착의 Asia/Seoul 날짜(서버와 같음)
+  http.get(`${API_BASE}/inbound-promises`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    const q = new URL(request.url).searchParams;
+    const mfcId = q.get('mfcId') ?? '';
+    if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
+    const state = q.get('state');
+    const date = q.get('date');
+    const items = simPromises(mfcId)
+      .filter((x) => (state ? x.state === state : x.state === 'EXPECTED' || x.state === 'RECEIVING'))
+      .filter((x) => !date || seoulDay(x.plannedArrivalAt ?? x.departedAt ?? '') === date);
+    return HttpResponse.json({ items, page: { nextCursor: null } });
+  }),
+
+  http.get(`${API_BASE}/inbound-promises/:trfId`, ({ request, params }) => {
+    if (!operator(request)) return unauthorized();
+    const x = (operator(request)?.centers ?? []).flatMap((c) => simPromises(c)).find((p) => p.trfId === String(params.trfId));
+    return x ? HttpResponse.json(x) : problem(404, 'INBOUND_PROMISE_NOT_FOUND');
+  }),
+
   http.get(`${API_BASE}/inbound-tasks`, ({ request }) => {
     if (!operator(request)) return unauthorized();
     const q = new URL(request.url).searchParams;

@@ -1,5 +1,5 @@
 // 입고 — mfc-inbound-service 0.9.0(요청서 mfc-backoffice/2026-11-15 §2·§2-1, 입고 화면 요청 all/2026-11-07 B2~B4).
-// 탭(URL 쿼리 `tab`): 입고 작업(기본) · 초기 보유 수령 · 회수품 반입 · 공급 요청 · 입고 예정(TRF — 계약만, 안내).
+// 탭(URL 쿼리 `tab`): 입고 작업(기본) · 초기 보유 수령 · 회수품 반입 · 공급 요청 · 입고 예정(TRF — 실시간 흐름, InboundPromisesTab).
 // 입고 작업:
 // - 목록 `GET /inbound-tasks?mfcId=&taskType=&state=&receiptId=` — 화면 기본은 대기(READY)를 보낸다.
 // - 품질검사 `POST /inbound-tasks/{id}/inspections` {results[]} · 적치 `POST …/putaways` {toLocationCode, qty} → InboundTaskExecution.
@@ -29,6 +29,7 @@ import { DetailTop, useGoBack } from '../../shared/DetailHead';
 import { StickyTitle, useScrolledPast } from '../../shared/StickyTitle';
 import { QueueNav, useRememberQueue } from '../../shared/workQueue';
 import { InitialStockTab, ReturnReceiptTab, SupplyRequestTab } from './InboundOtherTabs';
+import { InboundPromisesTab } from './InboundPromisesTab';
 
 const m = messages.inbound;
 
@@ -76,11 +77,7 @@ function InboundHome({ mfcId }: { readonly mfcId: string }) {
       {tab === 'initial' && <InitialStockTab mfcId={mfcId} />}
       {tab === 'returns' && <ReturnReceiptTab mfcId={mfcId} />}
       {tab === 'supply' && <SupplyRequestTab mfcId={mfcId} />}
-      {tab === 'promises' && (
-        <p role="note" className="alert text-sm">
-          {m.promisesMissing}
-        </p>
-      )}
+      {tab === 'promises' && <InboundPromisesTab mfcId={mfcId} />}
     </section>
   );
 }

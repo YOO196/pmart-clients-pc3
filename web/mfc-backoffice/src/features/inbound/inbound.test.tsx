@@ -32,9 +32,63 @@ describe('입고 작업 목록', () => {
     expect(screen.queryByText('조건에 맞는 입고 작업이 없어요.')).not.toBeInTheDocument();
   });
 
-  it('입고 예정(TRF) 탭은 계약만 있다는 안내', async () => {
+});
+
+describe('입고 예정(TRF) — 실시간 흐름', () => {
+  const at = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
+  const line = (sku: string, name: string, expectedQty: number, receivedQty = 0) => ({ sku, productName: name, lotId: 'CDC-L1', expiryDate: '2026-12-31', expectedQty, receivedQty, quarantinedQty: 0, pendingQty: 0 });
+  const promise = (trfId: string, state: string, extra: Record<string, unknown>) => ({ trfId, mfcId: 'MFC-BJG-01', fromCdc: 'CDC-CG-01', state, version: 1, packages: [], receipts: [], ...extra });
+
+  it('DC 출발 → 오는 중 → 도착·수령 중 → 오늘 받음을 서버 상태대로 나누고, 15초마다 다시 읽는 두 조회(끝나지 않은 것·오늘 받은 것)를 보낸다', async () => {
+    const asked: URL[] = [];
+    server.use(
+      http.get(`${API_BASE}/inbound-promises`, ({ request }) => {
+        const u = new URL(request.url);
+        asked.push(u);
+        if (u.searchParams.get('state') === 'TIN_POSTED') {
+          return HttpResponse.json({ items: [promise('TRF-DONE1', 'TIN_POSTED', { departureId: 'DEP-3', plannedArrivalAt: at(-60), lines: [line('SKU-MILK-1', '서울우유 1L', 10, 8)] })], page: { nextCursor: null } });
+        }
+        return HttpResponse.json({
+          items: [
+            promise('TRF-GO1', 'EXPECTED', { departureId: 'DEP-1', departedAt: at(-20), plannedArrivalAt: at(25), lines: [line('SKU-TOFU', '국산콩 두부 300g', 12), line('SKU-ICE', '바닐라 아이스크림', 6)], packages: [{ lpn: 'LPN-1', sku: 'SKU-TOFU', qty: 12 }] }),
+            promise('TRF-RCV1', 'RECEIVING', { departureId: 'DEP-2', arrivedAt: at(-5), plannedArrivalAt: at(-6), lines: [line('SKU-RAMEN-5', '신라면 5입', 20)] }),
+            promise('TRF-PREP1', 'EXPECTED', { departureId: null, plannedArrivalAt: at(180), lines: [line('SKU-WATER-2L', '생수 2L', 30)] }),
+          ],
+          page: { nextCursor: null },
+        });
+      }),
+    );
     renderAt('/c/MFC-BJG-01/inbound?tab=promises');
-    expect(await screen.findByRole('note')).toHaveTextContent('입고 예정은 아직 서버에 없어요.');
+    await waitFor(() => expect(screen.getAllByTestId('promise-row')).toHaveLength(4));
+    expect(screen.getByTestId('promise-step-PREP')).toHaveTextContent('1건');
+    expect(screen.getByTestId('promise-step-GOING')).toHaveTextContent('18개 싣고 오는 중');
+    expect(screen.getByTestId('promise-step-RECEIVING')).toHaveTextContent('20개 내리는 중');
+    await waitFor(() => expect(screen.getByTestId('promise-step-DONE')).toHaveTextContent('8개 재고 반영'));
+    // 줄 순서: 수령 중 → 오는 중 → 준비 중 → 받음
+    expect(screen.getAllByTestId('promise-row').map((r) => r.dataset.step)).toEqual(['RECEIVING', 'GOING', 'PREP', 'DONE']);
+    const rows = screen.getAllByTestId('promise-row');
+    expect(within(rows[1]!).getByTestId('promise-when')).toHaveTextContent(/2[45]분 뒤 도착 예정/);
+    expect(rows[1]!).toHaveTextContent('CDC-CG-01 에서 · 2종 18개 · LPN 1개');
+    expect(within(rows[3]!).getByTestId('promise-when')).toHaveTextContent('10개 중 8개 받음');
+    // 펼치면 줄(상품·CDC LOT·출발 수량)
+    await userEvent.click(within(rows[1]!).getByRole('button'));
+    expect(within(rows[1]!).getByTestId('promise-detail')).toHaveTextContent('국산콩 두부 300g');
+    expect(within(rows[1]!).getByTestId('promise-detail')).toHaveTextContent('CDC-L1');
+    expect(asked.some((u) => u.searchParams.get('mfcId') === 'MFC-BJG-01' && !u.searchParams.get('state'))).toBe(true);
+    expect(asked.some((u) => u.searchParams.get('state') === 'TIN_POSTED' && /^\d{4}-\d{2}-\d{2}$/.test(u.searchParams.get('date') ?? ''))).toBe(true);
+  });
+
+  it('목 흐름(시각으로 만든 TRF) — 출발 전 단계가 비면 아직 MFC 로 오지 않는다고 안내', async () => {
+    renderAt('/c/MFC-BJG-01/inbound?tab=promises');
+    await waitFor(() => expect(screen.getAllByTestId('promise-row').length).toBeGreaterThan(0));
+    expect(screen.getByTestId('promise-step-PREP')).toHaveTextContent('DC 출발 전 단계는 아직 MFC 로 오지 않아요');
+  });
+
+  it('조회 실패는 오류', async () => {
+    server.use(http.get(`${API_BASE}/inbound-promises`, () => new HttpResponse(null, { status: 500 })));
+    renderAt('/c/MFC-BJG-01/inbound?tab=promises');
+    await waitFor(() => expect(document.querySelector('[data-state="error"]')).not.toBeNull());
+    expect(screen.queryByText('오고 있는 TRF 가 없어요.')).not.toBeInTheDocument();
   });
 });
 
