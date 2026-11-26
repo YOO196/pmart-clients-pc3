@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -72,15 +73,45 @@ class ScanInput extends ConsumerStatefulWidget {
   ConsumerState<ScanInput> createState() => _ScanInputState();
 }
 
-class _ScanInputState extends ConsumerState<ScanInput> {
+class _ScanInputState extends ConsumerState<ScanInput>
+    with TickerProviderStateMixin {
   final _text = TextEditingController();
   final _focus = FocusNode();
+
+  /// 스캔 결과 표시 — 받아들이면 초록, 아니면 빨강 테두리가 잠깐 빛나고(빨강은 좌우로 흔들림) 사라진다
+  /// (사용자 2026-11-26 "다 개선해" — 성공·실패가 눈에 잘 안 보였다). 값 1 = 표시 없음.
+  late final _flash = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+    value: 1,
+  );
+  late final _shake = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 360),
+    value: 1,
+  );
+  bool _flashOk = true;
 
   @override
   void dispose() {
     _text.dispose();
     _focus.dispose();
+    _flash.dispose();
+    _shake.dispose();
     super.dispose();
+  }
+
+  /// 화면의 [ScanInput.onScan] 을 부르고 결과를 보인다(하드웨어 스캐너·카메라 같은 길).
+  ScanFeedback _handle(String code) {
+    final fb = widget.onScan(code);
+    if (!mounted) return fb;
+    setState(() => _flashOk = fb.ok);
+    if (!fb.ok) PdaHaptics.error();
+    if (!PdaMotion.reduced(context)) {
+      _flash.forward(from: 0);
+      if (!fb.ok) _shake.forward(from: 0);
+    }
+    return fb;
   }
 
   void _submit(String v) {
@@ -90,7 +121,7 @@ class _ScanInputState extends ConsumerState<ScanInput> {
     _focus.requestFocus();
     if (code.isEmpty) return;
     PdaHaptics.scanned();
-    widget.onScan(code);
+    _handle(code);
   }
 
   Future<void> _camera() async {
@@ -98,7 +129,7 @@ class _ScanInputState extends ConsumerState<ScanInput> {
         .read(cameraScannerProvider)
         .open(
           context,
-          onScan: widget.onScan,
+          onScan: _handle,
           title: widget.cameraTitle,
           continuous: widget.continuous,
         );
@@ -121,41 +152,81 @@ class _ScanInputState extends ConsumerState<ScanInput> {
           // 보이는 것은 진짜 단추(누르면 카메라, 눌림 물결·그림자), 그 밑에 스캐너 입력을 받는 칸을 숨겨 둔다.
           // 예전엔 입력칸을 단추처럼 칠해 글자가 안내 글씨(왼쪽·작게)였고 포커스 테두리가 안쪽에 그려져 허술해 보였다
           // (사용자 2026-11-20 "그 버튼이랑 폰트가 여전히 별로, 없어 보여").
-          child: SizedBox(
-            height: 58,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // 하드웨어 스캐너(키보드 웨지)는 글자 + Enter 를 보내므로 받을 자리는 있어야 한다 — 화면 키보드 없이, 보이지 않게.
-                Opacity(
-                  opacity: 0,
-                  child: TextField(
-                    key: ValueKey(widget.id),
-                    controller: _text,
-                    focusNode: _focus,
-                    autofocus: widget.autofocus,
-                    keyboardType: TextInputType.none,
-                    showCursor: false,
-                    enableInteractiveSelection: false,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    onSubmitted: _submit,
+          child: AnimatedBuilder(
+            animation: Listenable.merge([_flash, _shake]),
+            builder: (context, child) {
+              final glow = 1 - _flash.value;
+              final s = _shake.value;
+              final color = _flashOk ? PdaColors.ok : PdaColors.danger;
+              return Transform.translate(
+                offset: Offset(math.sin(s * math.pi * 4) * 9 * (1 - s), 0),
+                // 바깥 빛(버튼 뒤에 깔려 글자를 가리지 않는다) + 테두리(앞)
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: glow > 0
+                        ? [
+                            BoxShadow(
+                              color: color.withValues(alpha: 0.4 * glow),
+                              blurRadius: 16,
+                              spreadRadius: 3,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: DecoratedBox(
+                    key: ValueKey('${widget.id}-flash'),
+                    position: DecorationPosition.foreground,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: glow > 0
+                          ? Border.all(
+                              color: color.withValues(alpha: glow),
+                              width: 3,
+                            )
+                          : null,
+                    ),
+                    child: child,
                   ),
                 ),
-                ListenableBuilder(
-                  listenable: _focus,
-                  builder: (context, _) => _ScanButton(
-                    label: widget.label,
-                    secondary: ActionScope.secondaryScanOf(context),
-                    // 스캐너 입력을 받는 중이면 바깥에 옅은 보라 테두리(안쪽이 아니라 — 글자·아이콘을 가리지 않게).
-                    ready: _focus.hasFocus,
-                    onTap: () {
-                      _focus.requestFocus();
-                      unawaited(_camera());
-                    },
+              );
+            },
+            child: SizedBox(
+              height: 58,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // 하드웨어 스캐너(키보드 웨지)는 글자 + Enter 를 보내므로 받을 자리는 있어야 한다 — 화면 키보드 없이, 보이지 않게.
+                  Opacity(
+                    opacity: 0,
+                    child: TextField(
+                      key: ValueKey(widget.id),
+                      controller: _text,
+                      focusNode: _focus,
+                      autofocus: widget.autofocus,
+                      keyboardType: TextInputType.none,
+                      showCursor: false,
+                      enableInteractiveSelection: false,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      onSubmitted: _submit,
+                    ),
                   ),
-                ),
-              ],
+                  ListenableBuilder(
+                    listenable: _focus,
+                    builder: (context, _) => _ScanButton(
+                      label: widget.label,
+                      secondary: ActionScope.secondaryScanOf(context),
+                      // 스캐너 입력을 받는 중이면 바깥에 옅은 보라 테두리(안쪽이 아니라 — 글자·아이콘을 가리지 않게).
+                      ready: _focus.hasFocus,
+                      onTap: () {
+                        _focus.requestFocus();
+                        unawaited(_camera());
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

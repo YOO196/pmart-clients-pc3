@@ -13,6 +13,7 @@ import '../../../shared/scanner/scan_input.dart';
 import '../../../shared/scanner/scanner.dart';
 import '../data/cdc_flow_repository.dart';
 import '../domain/cdc_flow.dart';
+import 'cdc_home.dart';
 import 'cdc_widgets.dart';
 
 /// DC 분배·검품·상차·지게차 적치 — MFC 업무 화면과 같은 흐름(단계 알약·진행 막대·큰 지시·스캔 칸·완료 표시).
@@ -28,16 +29,6 @@ final cdcFlowRepositoryProvider = Provider<CdcFlowRepository>(
 
 String _contents(CdcLpn l) =>
     l.contents.map((c) => '${c.sku} ${c.qty}').join(' · ');
-
-/// 단계 화면 몸통 — 위 목록 + 아래 고정 칸(MFC 피킹과 같은 배치)
-Widget _stepBody(List<Widget> body, List<Widget> actions) => Column(
-  children: [
-    Expanded(
-      child: ListView(padding: const EdgeInsets.all(16), children: body),
-    ),
-    ActionBar(children: actions),
-  ],
-);
 
 /// 피킹 끝난 TRF 고르기(분배·검품·상차 첫 단계)
 class _TrfPick extends ConsumerStatefulWidget {
@@ -82,19 +73,25 @@ class _TrfPickState extends ConsumerState<_TrfPick> {
           child: Text(l10n.nextRetry),
         ),
       ),
-      AsyncData(:final value) => _stepBody([
-        StepHeader(names: widget.steps, current: 0),
-        ScanPrompt(text: l10n.cdcTrfTitle, detail: l10n.cdcTrfChoose),
-        for (final (i, t) in value.indexed)
-          EnterFade(
-            index: i,
-            child: _TrfCard(
-              key: ValueKey('cdc-trf-${t.trfId}'),
-              trf: t,
-              onTap: () => widget.onPick(t),
+      AsyncData(:final value) => cdcStepBody(
+        step: 'trf',
+        body: [
+          StepHeader(names: widget.steps, current: 0),
+          ScanPrompt(text: l10n.cdcTrfTitle, detail: l10n.cdcTrfChoose),
+          for (final (i, t) in value.indexed)
+            EnterFade(
+              key: ValueKey('fade-${t.trfId}'),
+              index: i,
+              child: _TrfCard(
+                key: ValueKey('cdc-trf-${t.trfId}'),
+                trf: t,
+                onTap: () => widget.onPick(t),
+              ),
             ),
-          ),
-      ], const []),
+        ],
+        actions: const [],
+      ),
+
       AsyncError() => CdcCenterNotice(
         icon: Icons.cloud_off,
         text: l10n.cdcLoadFailed,
@@ -183,13 +180,17 @@ class _TrfCard extends StatelessWidget {
 /// 화면 틀 — 위 제목(업무·TRF), 뒤로 가면 한 단계 앞으로
 class _Frame extends StatelessWidget {
   const _Frame({
+    required this.area,
     required this.title,
     required this.subtitle,
     required this.canPop,
     required this.onBack,
     required this.child,
+    this.busy = false,
   });
 
+  final CdcWorkArea area;
+  final bool busy;
   final String title;
   final String? subtitle;
   final bool canPop;
@@ -207,19 +208,35 @@ class _Frame extends StatelessWidget {
       child: Scaffold(
         resizeToAvoidBottomInset: false,
         appBar: AppBar(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          title: Row(
             children: [
-              if (subtitle != null)
-                Text(
-                  title,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: PdaColors.onBarMuted,
-                  ),
+              CdcBarIcon(area: area),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (subtitle != null)
+                      Text(
+                        title,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: PdaColors.onBarMuted,
+                        ),
+                      ),
+                    Text(
+                      subtitle ?? title,
+                      key: const ValueKey('cdc-flow-title'),
+                    ),
+                  ],
                 ),
-              Text(subtitle ?? title, key: const ValueKey('cdc-flow-title')),
+              ),
             ],
           ),
+          bottom: busy
+              ? const PreferredSize(
+                  preferredSize: Size.fromHeight(3),
+                  child: LinearProgressIndicator(minHeight: 3),
+                )
+              : null,
         ),
         body: SafeArea(child: child),
       ),
@@ -252,14 +269,27 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
 
   Future<void> _load() async {
     final trf = _trf!;
-    setState(() => _data = const AsyncLoading());
+    final had = _data.hasValue;
+    setState(() {
+      if (had) {
+        reloading = true;
+      } else {
+        _data = const AsyncLoading();
+      }
+    });
     final v = await AsyncValue.guard(
       () async => (
         await _repo.sortItems(cdcCenterOf(ref), trf),
         await _repo.lpns(cdcCenterOf(ref), trf.trfId),
       ),
     );
-    if (mounted) setState(() => _data = v);
+    if (mounted) {
+      setState(() {
+        reloading = false;
+        // 다시 읽기 실패면 보던 화면을 그대로 둔다
+        if (!(had && v.hasError)) _data = v;
+      });
+    }
   }
 
   void _resetBox() {
@@ -349,6 +379,8 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
     final steps = [l10n.cdcStepTrf, l10n.cdcStepBox, l10n.cdcStepItem];
     final trf = _trf;
     return _Frame(
+      area: CdcWorkArea.sort,
+      busy: busy || reloading,
       title: l10n.cdcAreaSort,
       subtitle: trf?.label,
       canPop: trf == null,
@@ -388,6 +420,11 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
     final body = <Widget>[];
     final actions = <Widget>[];
     final left = items.where((i) => i.remaining > 0).toList();
+    final step = left.isEmpty
+        ? 'done'
+        : _box == null
+        ? 'box-${lpns.length}'
+        : 'items-$_box';
     if (left.isNotEmpty) {
       body.add(StepHeader(names: steps, current: _box == null ? 1 : 2));
     }
@@ -420,7 +457,7 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
           child: Text(l10n.cdcOtherTrf),
         ),
       );
-      return _stepBody(body, actions);
+      return cdcStepBody(step: step, body: body, actions: actions);
     }
     if (_box == null) {
       body.add(
@@ -432,6 +469,7 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
       for (final (n, i) in left.indexed) {
         body.add(
           EnterFade(
+            key: ValueKey('fade-box-${i.key}'),
             index: n,
             child: CdcItemCard(
               key: ValueKey('cdc-sort-${i.sku}'),
@@ -486,15 +524,18 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
       for (final i in left) {
         final n = _inBox[i.key] ?? 0;
         body.add(
-          CdcItemCard(
-            key: ValueKey('cdc-sort-${i.sku}'),
-            name: i.productName ?? i.sku,
-            sku: i.sku,
-            lot: i.lot,
-            qty: i.remaining - n,
-            qtyLabel: l10n.cdcLeftUnit,
-            footer: n > 0 ? l10n.cdcSortInBox(n) : null,
-            emphasize: _last == i.key,
+          CdcReveal(
+            trigger: _last == i.key ? n : null,
+            child: CdcItemCard(
+              key: ValueKey('cdc-sort-${i.sku}'),
+              name: i.productName ?? i.sku,
+              sku: i.sku,
+              lot: i.lot,
+              qty: i.remaining - n,
+              qtyLabel: l10n.cdcLeftUnit,
+              footer: n > 0 ? l10n.cdcSortInBox(n) : null,
+              emphasize: _last == i.key,
+            ),
           ),
         );
       }
@@ -540,12 +581,12 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
       ]);
     }
     if (_scanError case final e?) {
-      body.add(CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
+      actions.insert(0, CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
     }
     if (failText case final f?) {
-      body.add(CdcErrorLine(f, key: const ValueKey('cdc-message')));
+      actions.insert(0, CdcErrorLine(f, key: const ValueKey('cdc-message')));
     }
-    return _stepBody(body, actions);
+    return cdcStepBody(step: step, body: body, actions: actions);
   }
 }
 
@@ -575,11 +616,23 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
   CdcFlowRepository get _repo => ref.read(cdcFlowRepositoryProvider);
 
   Future<void> _load() async {
-    setState(() => _lpns = const AsyncLoading());
+    final had = _lpns.hasValue;
+    setState(() {
+      if (had) {
+        reloading = true;
+      } else {
+        _lpns = const AsyncLoading();
+      }
+    });
     final v = await AsyncValue.guard(
       () => _repo.lpns(cdcCenterOf(ref), _trf!.trfId),
     );
-    if (mounted) setState(() => _lpns = v);
+    if (mounted) {
+      setState(() {
+        reloading = false;
+        if (!(had && v.hasError)) _lpns = v;
+      });
+    }
   }
 
   void _back() => setState(() {
@@ -658,6 +711,8 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
     final steps = [l10n.cdcStepTrf, l10n.cdcStepBox, l10n.cdcStepJudge];
     final trf = _trf;
     return _Frame(
+      area: CdcWorkArea.inspect,
+      busy: busy || reloading,
       title: l10n.cdcAreaInspect,
       subtitle: trf?.label,
       canPop: trf == null,
@@ -711,6 +766,7 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
       body.add(NoticeBox(text: n, textKey: const ValueKey('cdc-notice')));
     }
     final box = _box;
+    final step = box == null ? 'list' : 'box-${box.lpn}';
     if (box == null) {
       body.add(
         ScanPrompt(
@@ -723,6 +779,7 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
       for (final (i, l) in lpns.indexed) {
         body.add(
           EnterFade(
+            key: ValueKey('fade-${l.lpn}'),
             index: i,
             child: _BoxLine(lpn: l),
           ),
@@ -801,12 +858,12 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
       }
     }
     if (_scanError case final e?) {
-      body.add(CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
+      actions.insert(0, CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
     }
     if (failText case final f?) {
-      body.add(CdcErrorLine(f, key: const ValueKey('cdc-message')));
+      actions.insert(0, CdcErrorLine(f, key: const ValueKey('cdc-message')));
     }
-    return _stepBody(body, actions);
+    return cdcStepBody(step: step, body: body, actions: actions);
   }
 }
 
@@ -900,11 +957,23 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
   CdcFlowRepository get _repo => ref.read(cdcFlowRepositoryProvider);
 
   Future<void> _load() async {
-    setState(() => _lpns = const AsyncLoading());
+    final had = _lpns.hasValue;
+    setState(() {
+      if (had) {
+        reloading = true;
+      } else {
+        _lpns = const AsyncLoading();
+      }
+    });
     final v = await AsyncValue.guard(
       () => _repo.lpns(cdcCenterOf(ref), _trf!.trfId),
     );
-    if (mounted) setState(() => _lpns = v);
+    if (mounted) {
+      setState(() {
+        reloading = false;
+        if (!(had && v.hasError)) _lpns = v;
+      });
+    }
   }
 
   void _back() => setState(() {
@@ -980,6 +1049,8 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
     ];
     final trf = _trf;
     return _Frame(
+      area: CdcWorkArea.load,
+      busy: busy || reloading,
       title: l10n.cdcAreaLoad,
       subtitle: trf?.label,
       canPop: trf == null,
@@ -1020,6 +1091,13 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
     final loaded = passed.where((l) => l.loaded).length;
     final body = <Widget>[];
     final actions = <Widget>[];
+    final stepId = loaded == passed.length
+        ? 'done'
+        : _trip == null
+        ? 'trip'
+        : _vehicle == null
+        ? 'vehicle'
+        : 'boxes';
     final step = _trip == null
         ? 1
         : _vehicle == null
@@ -1062,7 +1140,7 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
           child: Text(l10n.cdcOtherTrf),
         ),
       );
-      return _stepBody(body, actions);
+      return cdcStepBody(step: stepId, body: body, actions: actions);
     }
     if (_trip == null) {
       body.add(
@@ -1113,8 +1191,15 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
       for (final (i, l) in passed.indexed) {
         body.add(
           EnterFade(
+            key: ValueKey('fade-${l.lpn}'),
             index: i,
-            child: _BoxLine(lpn: l, checked: _scanned.contains(l.lpn)),
+            // 방금 스캔한 BOX 가 화면 밖이면 그리로 스크롤
+            child: CdcReveal(
+              trigger: _scanned.isNotEmpty && _scanned.last == l.lpn
+                  ? _scanned.length
+                  : null,
+              child: _BoxLine(lpn: l, checked: _scanned.contains(l.lpn)),
+            ),
           ),
         );
       }
@@ -1142,12 +1227,12 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
       ]);
     }
     if (_scanError case final e?) {
-      body.add(CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
+      actions.insert(0, CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
     }
     if (failText case final f?) {
-      body.add(CdcErrorLine(f, key: const ValueKey('cdc-message')));
+      actions.insert(0, CdcErrorLine(f, key: const ValueKey('cdc-message')));
     }
-    return _stepBody(body, actions);
+    return cdcStepBody(step: stepId, body: body, actions: actions);
   }
 }
 
@@ -1287,6 +1372,13 @@ class _CdcPutawayScreenState extends ConsumerState<CdcPutawayScreen>
     final steps = [l10n.cdcStepOrder, l10n.cdcStepLocation, l10n.cdcStepQty];
     final t = _task;
     final row = _row;
+    final paStep = t == null
+        ? 'scan'
+        : row == null || t.finished
+        ? 'done'
+        : _loc == null
+        ? 'loc-${row.key}'
+        : 'qty-${row.key}';
     final body = <Widget>[];
     final actions = <Widget>[];
     if (t == null) {
@@ -1422,17 +1514,22 @@ class _CdcPutawayScreenState extends ConsumerState<CdcPutawayScreen>
       }
     }
     if (_scanError case final e?) {
-      body.add(CdcErrorLine(e, key: const ValueKey('cdc-putaway-error')));
+      actions.insert(
+        0,
+        CdcErrorLine(e, key: const ValueKey('cdc-putaway-error')),
+      );
     }
     if (failText case final f?) {
-      body.add(CdcErrorLine(f, key: const ValueKey('cdc-message')));
+      actions.insert(0, CdcErrorLine(f, key: const ValueKey('cdc-message')));
     }
     return _Frame(
+      area: CdcWorkArea.putaway,
+      busy: busy || reloading,
       title: l10n.cdcAreaPutaway,
       subtitle: t?.taskId,
       canPop: t == null,
       onBack: _back,
-      child: _stepBody(body, actions),
+      child: cdcStepBody(step: paStep, body: body, actions: actions),
     );
   }
 }

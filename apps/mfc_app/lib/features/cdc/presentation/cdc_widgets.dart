@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -76,23 +78,31 @@ class CdcGuideScreen extends StatelessWidget {
             children: [
               CdcAreaHero(area: area),
               const SizedBox(height: 12),
-              Text(
-                l10n.guideLead,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: PdaColors.muted,
+              EnterFade(
+                delay: const Duration(milliseconds: 260),
+                child: Text(
+                  l10n.guideLead,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: PdaColors.muted,
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
               Expanded(
                 child: Column(
                   children: [
+                    // 카드가 자리 잡은 뒤(Hero 380ms) 단계가 차례로 — 날아오는 카드와 겹쳐 보이지 않게
                     for (final (i, (icon, text)) in steps.indexed)
                       Expanded(
-                        child: _GuideStep(
-                          n: i + 1,
-                          icon: icon,
-                          text: text,
-                          last: i == steps.length - 1,
+                        child: EnterFade(
+                          delay: const Duration(milliseconds: 300),
+                          index: i,
+                          child: _GuideStep(
+                            n: i + 1,
+                            icon: icon,
+                            text: text,
+                            last: i == steps.length - 1,
+                          ),
                         ),
                       ),
                   ],
@@ -473,6 +483,9 @@ class CdcCenterNotice extends StatelessWidget {
 /// 보내기 공통 — 같은 행위 재전송은 같은 키, 결과 불명이면 "같은 내용으로 다시 보내기", 거절이면 다시 읽고 이유.
 mixin CdcCommand<T extends ConsumerStatefulWidget> on ConsumerState<T> {
   bool busy = false;
+
+  /// 보낸 뒤 다시 읽는 중 — 화면은 그대로 두고 위에 얇은 진행 줄만(깜빡이지 않게)
+  bool reloading = false;
   String? failText;
   IdempotencyKey? _key;
   Future<void> Function()? resend;
@@ -570,3 +583,178 @@ class _CdcCountState extends State<CdcCount> {
   Widget build(BuildContext context) =>
       SwapValue(value: widget.value, up: _up, child: widget.child);
 }
+
+/// 단계 화면 몸통 — 위의 단계 알약·진행 막대·안내 띠는 그대로 두고, 그 아래 단계 내용만 [step] 이 바뀔 때
+/// 교차 전환한다(나가는 것은 옅어지고 들어오는 것은 살짝 올라오며, 높이도 부드럽게). 아래 고정 칸은 [actions].
+Widget cdcStepBody({
+  required String step,
+  required List<Widget> body,
+  required List<Widget> actions,
+}) {
+  final fixed = body
+      .takeWhile((w) => w is StepHeader || w is ProgressLine || w is NoticeBox)
+      .length;
+  return Column(
+    children: [
+      Expanded(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            ...body.take(fixed),
+            CdcStepSwitch(
+              step: step,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: body.skip(fixed).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      ActionBar(children: actions),
+    ],
+  );
+}
+
+class CdcStepSwitch extends StatelessWidget {
+  const CdcStepSwitch({super.key, required this.step, required this.child});
+
+  final String step;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = PdaMotion.of(context, PdaMotion.base);
+    return AnimatedSize(
+      duration: d,
+      curve: PdaMotion.standard,
+      alignment: Alignment.topCenter,
+      child: AnimatedSwitcher(
+        duration: d,
+        switchInCurve: PdaMotion.enter,
+        switchOutCurve: PdaMotion.exit,
+        // 나가는 내용은 바로 뺀다 — 둘 다 흐려지면 그 사이 화면이 비어 보였다(중간 프레임 확인). 들어오는 것만 빠르게.
+        layoutBuilder: (current, previous) =>
+            current ?? const SizedBox.shrink(),
+        transitionBuilder: (child, a) => FadeTransition(
+          opacity: CurvedAnimation(
+            parent: a,
+            curve: const Interval(0, 0.6, curve: Curves.easeOut),
+          ),
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.03),
+              end: Offset.zero,
+            ).animate(a),
+            child: child,
+          ),
+        ),
+        child: KeyedSubtree(key: ValueKey(step), child: child),
+      ),
+    );
+  }
+}
+
+/// [trigger] 가 바뀌면(예: 방금 스캔한 상품) 화면 안으로 부드럽게 스크롤한다 — 아래에 있던 카드의 숫자가 바뀌어도 보이게.
+class CdcReveal extends StatefulWidget {
+  const CdcReveal({super.key, required this.trigger, required this.child});
+
+  final Object? trigger;
+  final Widget child;
+
+  @override
+  State<CdcReveal> createState() => _CdcRevealState();
+}
+
+class _CdcRevealState extends State<CdcReveal> {
+  @override
+  void didUpdateWidget(CdcReveal old) {
+    super.didUpdateWidget(old);
+    if (widget.trigger != null && widget.trigger != old.trigger) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Scrollable.ensureVisible(
+          context,
+          duration: PdaMotion.of(context, PdaMotion.base),
+          curve: PdaMotion.standard,
+          alignment: 0.4,
+        );
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
+/// 작업 화면 앱바의 업무 그림 — 안내 화면의 업무 카드가 여기로 줄어들며 이어진다(Hero).
+class CdcBarIcon extends StatelessWidget {
+  const CdcBarIcon({super.key, required this.area});
+
+  final CdcWorkArea area;
+
+  @override
+  Widget build(BuildContext context) => Hero(
+    tag: cdcHeroTag(area),
+    flightShuttleBuilder: cdcIconShuttle(area),
+    child: Container(
+      width: 34,
+      height: 34,
+      margin: const EdgeInsets.only(right: 10),
+      decoration: const BoxDecoration(
+        color: PdaColors.softer,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(cdcAreaIcon(area), size: 20, color: PdaColors.primary),
+    ),
+  );
+}
+
+/// 업무 카드 ↔ 앱바 그림 사이의 모습 — 카드 바탕은 흐려지고 그림 원만 남아 줄어든다.
+HeroFlightShuttleBuilder cdcIconShuttle(CdcWorkArea area) =>
+    (_, animation, direction, _, _) => AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        // 0 = 카드, 1 = 앱바 그림(들어갈 때). 나올 때(pop)는 거꾸로 흐른다.
+        final t = Curves.easeInOutCubic.transform(animation.value);
+        return LayoutBuilder(
+          builder: (context, c) {
+            final d = math.min(c.maxWidth, c.maxHeight);
+            return Stack(
+              alignment: Alignment.centerRight,
+              children: [
+                if (t < 1)
+                  Positioned.fill(
+                    child: Opacity(
+                      opacity: (1 - t * 1.6).clamp(0.0, 1.0),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(17),
+                          border: Border.all(
+                            color: PdaColors.lilac,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                Container(
+                  width: d,
+                  height: d,
+                  decoration: const BoxDecoration(
+                    color: PdaColors.softer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    cdcAreaIcon(area),
+                    size: d * 0.55,
+                    color: PdaColors.primary,
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
