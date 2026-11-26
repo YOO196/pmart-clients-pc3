@@ -775,7 +775,7 @@ void main() {
 
     await splitOne('pkg-1');
     expect(
-      find.text('나눴는지 확인하지 못했어요 — 같은 수량으로 다시 나누면 같은 요청으로 확인해요'),
+      find.text('나눈 결과를 몰라요 — 같은 수량으로 다시'),
       findsOneWidget,
     );
     final c = ProviderScope.containerOf(t.element(find.byType(MfcApp)));

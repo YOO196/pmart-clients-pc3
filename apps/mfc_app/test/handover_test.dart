@@ -342,7 +342,7 @@ void main() {
     expect(
       find.descendant(
         of: dialog,
-        matching: find.textContaining(RegExp(r'허가받은 라이더\(R\d{4,5}\)')),
+        matching: find.textContaining(RegExp(r'R\d{4,5}에게 인계')),
       ),
       findsOneWidget,
     );

@@ -88,7 +88,7 @@ class _TrfPickState extends ConsumerState<_TrfPick> {
         step: 'trf',
         body: [
           StepHeader(names: widget.steps, current: 0),
-          ScanPrompt(text: l10n.cdcTrfTitle, detail: l10n.cdcTrfChoose),
+          ScanPrompt(text: l10n.cdcTrfTitle),
           for (final (i, t) in value.indexed)
             EnterFade(
               key: ValueKey('fade-${t.trfId}'),

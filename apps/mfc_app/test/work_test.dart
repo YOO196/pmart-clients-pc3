@@ -414,7 +414,7 @@ void main() {
       await enterPin(t, '0000');
     }
     expect(
-      find.text('여러 번 틀려 오후 3:15까지 잠겼어요. 센터 관리자에게 휴게를 요청해 주세요'),
+      find.text('오후 3:15까지 잠겼어요 · 관리자에게 요청'),
       findsOneWidget,
     );
     expect(
