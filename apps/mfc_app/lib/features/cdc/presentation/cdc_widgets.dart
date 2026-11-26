@@ -341,7 +341,7 @@ class CdcItemCard extends StatelessWidget {
     final theme = Theme.of(context);
     // 강조(지금 스캔하는 상품)는 테두리가 부드럽게 바뀐다
     return AnimatedContainer(
-      duration: PdaMotion.of(context, PdaMotion.base),
+      duration: PdaMotion.of(context, PdaMotion.slow),
       curve: PdaMotion.standard,
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
@@ -428,7 +428,7 @@ class CdcErrorLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) => EnterFade(
     key: ValueKey(text),
-    offset: 6,
+    offset: 0,
     child: Padding(
       padding: const EdgeInsets.only(top: 10),
       child: Text(
@@ -624,7 +624,7 @@ class CdcStepSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final d = PdaMotion.of(context, PdaMotion.base);
+    final d = PdaMotion.of(context, cdcStepDuration);
     return AnimatedSize(
       duration: d,
       curve: PdaMotion.standard,
@@ -675,7 +675,7 @@ class _CdcRevealState extends State<CdcReveal> {
         if (!mounted) return;
         Scrollable.ensureVisible(
           context,
-          duration: PdaMotion.of(context, PdaMotion.base),
+          duration: PdaMotion.of(context, cdcStepDuration),
           curve: PdaMotion.standard,
           alignment: 0.4,
         );
@@ -758,3 +758,6 @@ HeroFlightShuttleBuilder cdcIconShuttle(CdcWorkArea area) =>
         );
       },
     );
+
+/// DC 작업 화면의 단계 전환·스크롤 시간 — 공통 기준(220ms)보다 느리게(사용자 2026-11-26 "애니메이션 너무 빨라서 정신없어").
+const cdcStepDuration = Duration(milliseconds: 380);
