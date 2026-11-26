@@ -371,6 +371,7 @@ void main() {
           transfers: {
             'TRF-1': ['BOX-1'],
           },
+          rtCounts: const {'TRF-1': 1},
           key: key,
         );
         expect(done.state, 'LOADED');
@@ -382,11 +383,36 @@ void main() {
             {
               'trfId': 'TRF-1',
               'lpns': ['BOX-1'],
+              'rtCount': 1,
             },
           ],
         });
       },
     );
+
+    test('분배 목록: 박스 하나 먼저 검품돼 INSPECTED 가 됐어도 덜 담았으면 남긴다', () async {
+      final repo = MockCdcFlowRepository(latency: Duration.zero);
+      final before = await repo.sortTransfers('CDC01');
+      expect(before.map((t) => t.trfId), contains('TRF-mock-2'));
+      // TRF-mock-2: 합격 BOX(생수 10) 외 양파 6 이 아직 안 담김 — 남은 BOX 도 검품해 INSPECTED 로
+      await repo.reportInspection(
+        trfId: 'TRF-mock-2',
+        inspectorId: 'OP-1',
+        items: const [CdcInspection(lpn: 'RT-26112600001', passed: true)],
+        key: IdempotencyKey.generate(),
+      );
+      expect(
+        (await repo.transfers('CDC01', const [
+          'PICKED',
+          'SORTED',
+        ])).map((t) => t.trfId),
+        isNot(contains('TRF-mock-2')),
+      );
+      expect(
+        (await repo.sortTransfers('CDC01')).map((t) => t.trfId),
+        contains('TRF-mock-2'),
+      );
+    });
 
     test('MFC 하차 인계: 그 MFC 로 오는 운행에서 정차를 찾아 /stops/{seq}/handovers', () async {
       final a = FakeAdapter((o, _) async {

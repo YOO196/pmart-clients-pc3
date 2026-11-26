@@ -413,10 +413,7 @@ void main() {
     for (var i = 0; i < 5; i++) {
       await enterPin(t, '0000');
     }
-    expect(
-      find.text('오후 3:15까지 잠겼어요 · 관리자에게 요청'),
-      findsOneWidget,
-    );
+    expect(find.text('오후 3:15까지 잠겼어요 · 관리자에게 요청'), findsOneWidget);
     expect(
       t.widget<TextField>(find.byKey(const ValueKey('break-pin'))).enabled,
       isFalse,

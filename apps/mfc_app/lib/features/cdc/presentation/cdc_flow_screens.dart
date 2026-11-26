@@ -32,6 +32,9 @@ String _contents(CdcLpn l) =>
     l.contents.map((c) => '${c.sku} ${c.qty}').join(' · ');
 
 /// 피킹 끝난 TRF 고르기(분배·검품·상차 첫 단계)
+/// 분배·패킹 TRF 목록 표시(저장소 [CdcFlowRepository.sortTransfers] — 덜 담은 INSPECTED 도 넣는다)
+const sortStates = ['PICKED', 'SORTED'];
+
 class _TrfPick extends ConsumerStatefulWidget {
   const _TrfPick({
     required this.steps,
@@ -63,9 +66,11 @@ class _TrfPickState extends ConsumerState<_TrfPick> {
   Future<void> _load() async {
     setState(() => _trfs = const AsyncLoading());
     final v = await AsyncValue.guard(
-      () => ref
-          .read(cdcFlowRepositoryProvider)
-          .transfers(cdcCenterOf(ref), widget.states),
+      () => widget.states == sortStates
+          ? ref.read(cdcFlowRepositoryProvider).sortTransfers(cdcCenterOf(ref))
+          : ref
+                .read(cdcFlowRepositoryProvider)
+                .transfers(cdcCenterOf(ref), widget.states),
     );
     if (mounted) setState(() => _trfs = v);
   }
@@ -428,7 +433,7 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
       onBack: _back,
       child: trf == null
           ? _TrfPick(
-              states: const ['PICKED', 'SORTED'],
+              states: sortStates,
               emptyText: l10n.cdcTrfEmptySort,
               steps: steps,
               onPick: (t) {
@@ -1304,17 +1309,25 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
       );
       if (ok != true || !mounted) return;
     }
+    bool mine(CdcLpn l) => l.loaded && l.tripId == trip.tripId;
+    // BOX 만 — 그릇(R/T·PLT)은 개수로(MFC 인계 비교는 BOX 끼리)
     final transfers = {
       for (final e in all.entries)
         e.key: [
           for (final l in e.value)
-            if (l.loaded && l.tripId == trip.tripId) l.lpn,
+            if (mine(l) && l.unitType == 'BOX') l.lpn,
         ],
+    };
+    final rtCounts = {
+      for (final e in all.entries)
+        if (e.value.any((l) => mine(l) && l.unitType != 'BOX'))
+          e.key: e.value.where((l) => mine(l) && l.unitType != 'BOX').length,
     };
     await send((key) async {
       final t = await _repo.completeLoading(
         tripId: trip.tripId,
         transfers: transfers,
+        rtCounts: rtCounts,
         key: key,
       );
       if (mounted) setState(() => _trip = t);
@@ -1610,7 +1623,7 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
   Future<void> _loadTrfs() async {
     setState(() => _trfs = const AsyncLoading());
     final v = await AsyncValue.guard(
-      () => _repo.transfers(cdcCenterOf(ref), const ['PICKED', 'SORTED']),
+      () => _repo.sortTransfers(cdcCenterOf(ref)),
     );
     if (mounted) setState(() => _trfs = v);
   }

@@ -13,6 +13,8 @@ import '../../../shared/scanner/scan_input.dart';
 import '../../../shared/scanner/scanner.dart';
 import '../../inbound/domain/inbound.dart';
 import '../../inbound/presentation/inbound_controller.dart';
+import '../../packing/presentation/packing_controller.dart'
+    show mfcClockProvider;
 import '../../tasks/presentation/task_controllers.dart';
 import '../data/unload_repository.dart';
 
@@ -83,7 +85,41 @@ class _UnloadScreenState extends ConsumerState<UnloadScreen> {
     final v = await AsyncValue.guard(
       () => Future.wait([for (final id in t.trfIds) repo.promise(id)]),
     );
-    if (mounted) setState(() => _promises = v);
+    if (!mounted) return;
+    setState(() => _promises = v);
+    // 이미 인계한 정차 — 완료 화면(입고 수령으로 가기)부터. 도착 등록이 빠진 예정은 여기서 마저 한다.
+    if (t.handedOver && v.hasValue) {
+      setState(() => _outcome = const InboundAccepted());
+      await _registerArrivals(t, v.value!);
+    }
+  }
+
+  /// 하차 인계 뒤 입고 예정 도착 등록(EXPECTED → RECEIVING). mfc-inbound 는 운행 도착·인계 사건을 받지 않아
+  /// 이것이 없으면 홈 "입고" 작업이 뜨지 않는다(mfc-capacity 는 RECEIVING 만 RECEIVE 로 준다 — 하차 → 입고 끊김).
+  /// 실패해도 막지 않는다 — 입고 화면 첫 단계(도착 등록)에서 다시 한다.
+  Future<void> _registerArrivals(
+    UnloadTrip t,
+    List<InboundPromiseView> ps,
+  ) async {
+    final repo = ref.read(inboundRepositoryProvider);
+    final at = t.arrivedAt ?? ref.read(mfcClockProvider)();
+    var changed = false;
+    for (final p in ps) {
+      if (p.state != PromiseState.expected) continue;
+      final r = await repo.recordArrival(
+        p.trfId,
+        version: p.version,
+        arrivedAt: at,
+        recordedBy: ref.read(currentWorkerIdProvider),
+        key: IdempotencyKey.generate(),
+      );
+      changed = changed || r is InboundAccepted;
+    }
+    if (!changed || !mounted) return;
+    final v = await AsyncValue.guard(
+      () => Future.wait([for (final p in ps) repo.promise(p.trfId)]),
+    );
+    if (mounted && v.hasValue) setState(() => _promises = v);
   }
 
   /// 박스 → 그 TRF
@@ -168,6 +204,7 @@ class _UnloadScreenState extends ConsumerState<UnloadScreen> {
       _busy = false;
       _outcome = r;
     });
+    if (r is InboundAccepted) await _registerArrivals(trip, ps);
   }
 
   void _back() {
@@ -266,8 +303,8 @@ class _UnloadScreenState extends ConsumerState<UnloadScreen> {
                 ),
               ),
               child: ListTile(
-                enabled: t.arrived,
-                onTap: t.arrived ? () => _open(t) : null,
+                enabled: t.arrived || t.handedOver,
+                onTap: t.arrived || t.handedOver ? () => _open(t) : null,
                 title: Text(
                   t.vehicleLabel,
                   style: const TextStyle(
@@ -288,8 +325,11 @@ class _UnloadScreenState extends ConsumerState<UnloadScreen> {
                     },
                   ].join(' · '),
                 ),
-                trailing: t.arrived
-                    ? const Icon(Icons.chevron_right, color: PdaColors.primary)
+                trailing: t.arrived || t.handedOver
+                    ? Icon(
+                        Icons.chevron_right,
+                        color: t.arrived ? PdaColors.primary : PdaColors.muted,
+                      )
                     : null,
               ),
             ),
@@ -312,11 +352,13 @@ class _UnloadScreenState extends ConsumerState<UnloadScreen> {
       return StepBody(
         actions: [
           for (final p in ps)
-            FilledButton(
-              key: ValueKey('unload-receive-${p.trfId}'),
-              onPressed: () => context.pushReplacement('/inbound/${p.trfId}'),
-              child: Text(l10n.unloadGoReceive(p.trfId)),
-            ),
+            if (p.state == PromiseState.expected ||
+                p.state == PromiseState.receiving)
+              FilledButton(
+                key: ValueKey('unload-receive-${p.trfId}'),
+                onPressed: () => context.pushReplacement('/inbound/${p.trfId}'),
+                child: Text(l10n.unloadGoReceive(p.trfId)),
+              ),
         ],
         child: ListView(
           children: [
@@ -425,7 +467,7 @@ class _UnloadScreenState extends ConsumerState<UnloadScreen> {
                 l10n.unloadTrfLine(
                   p.trfId,
                   _scanned.where((b) => owner[b] == p.trfId).length,
-                  p.boxList.length,
+                  {for (final b in p.boxList) b.boxId}.length,
                 ),
                 key: ValueKey('unload-trf-${p.trfId}'),
               ),

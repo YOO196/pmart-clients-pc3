@@ -144,10 +144,7 @@ void main() {
     await tap(t, 'cdc-area-pick');
     await tap(t, 'cdc-guide-ok');
     expect(find.textContaining('T261126002'), findsOneWidget);
-    expect(
-      find.text('라인용 — 상품 박스에 담아요'),
-      findsOneWidget,
-    );
+    expect(find.text('라인용 — 상품 박스에 담아요'), findsOneWidget);
     await scan(t, 'cdc-loc-scan', 'CDC01-G-5-63-01-3-1');
     await scan(t, 'cdc-item-scan', 'SKU-2001');
     await setQty(t, '6');

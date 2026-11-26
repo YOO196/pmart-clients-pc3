@@ -106,6 +106,16 @@ void main() {
       find.byKey(const ValueKey('unload-receive-TRF-MOCK-001')),
       findsOneWidget,
     );
+    // 인계 뒤 입고 예정 도착 등록까지(EXPECTED → RECEIVING) — 홈 "입고" 작업이 뜨게(하차 → 입고 끊김 없앰)
+    expect(inbound.peek('TRF-MOCK-001').state, PromiseState.receiving);
+    // 완료 화면을 떠나도 인계 끝난 운행을 다시 열어 입고 수령으로 갈 수 있다
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
+    await tap(t, 'unload-trip-TO-20261126-001');
+    expect(
+      find.byKey(const ValueKey('unload-receive-TRF-MOCK-001')),
+      findsOneWidget,
+    );
   });
 
   test('실서버: 그 MFC 정차만, 정차 인계는 TRF 전부를 한 번에(/stops/{seq}/handovers)', () async {
