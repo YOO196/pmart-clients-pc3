@@ -550,6 +550,23 @@ class _ManageMenu extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 10),
+        // 하차 — 관리자도 바로(사용자 2026-11-26 "pda mfc 에서 하차 작업 좀 하자"). 관리자 계정은 센터 작업자 등록이 없어
+        // 아래 업무 칸(작업자 정보)이 안 떠도 여기서 들어간다. 권한 판정은 서버(그 MFC 운영자).
+        Consumer(
+          builder: (context, ref, _) {
+            final n = ref.watch(arrivedTripsProvider).value ?? 0;
+            return FilledButton.icon(
+              key: const ValueKey('manage-unload'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              onPressed: () => context.push('/unload'),
+              icon: const Icon(Icons.local_shipping_outlined),
+              label: Text(n > 0 ? l10n.unloadBand(n) : l10n.unloadMenu),
+            );
+          },
+        ),
         const Divider(height: 24),
       ],
     );
