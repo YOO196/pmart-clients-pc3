@@ -32,9 +32,35 @@ describe('입고 작업 목록', () => {
     expect(screen.queryByText('조건에 맞는 입고 작업이 없어요.')).not.toBeInTheDocument();
   });
 
-  it('입고 예정(TRF) 탭은 계약만 있다는 안내', async () => {
-    renderAt('/c/MFC-BJG-01/inbound?tab=promises');
-    expect(await screen.findByRole('note')).toHaveTextContent('입고 예정은 아직 서버에 없어요.');
+  it('DC 이관 입고: TRF 목록(출발 센터·상태·수령/예정·박스), 상태 거르기는 서버 state', async () => {
+    const view = renderAt('/c/MFC-BJG-01/inbound?tab=promises');
+    await waitFor(() => expect(screen.getAllByTestId('dc-inbound-row')).toHaveLength(3));
+    const row = (id: string) => screen.getAllByTestId('dc-inbound-row').find((r) => r.textContent?.includes(id))!;
+    expect(row('TRF-SIM-DC-2')).toHaveTextContent('오는 중');
+    expect(row('TRF-SIM-DC-2')).toHaveTextContent('0 / 36');
+    expect(row('TRF-SIM-DC-1')).toHaveTextContent('받는 중');
+    expect(row('TRF-SIM-DC-1')).toHaveTextContent('15 / 16');
+    expect(screen.getByTestId('stock-live')).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'RECEIVING');
+    await waitFor(() => expect(screen.getAllByTestId('dc-inbound-row')).toHaveLength(1));
+    expect(view.gets('/inbound-promises').some((r) => new URL(r.url).searchParams.get('state') === 'RECEIVING')).toBe(true);
+  });
+
+  it('DC 이관 입고 상세: 단계·상품 줄(수령 격리)·지금 재고(실시간)·수령 반영·적치 작업으로', async () => {
+    const view = renderAt('/c/MFC-BJG-01/inbound?tab=promises&trf=TRF-SIM-DC-1');
+    expect(await screen.findByTestId('dc-inbound-steps')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByTestId('dc-inbound-line')).toHaveLength(2));
+    const ramen = screen.getAllByTestId('dc-inbound-line').find((r) => r.textContent?.includes('신라면'))!;
+    expect(ramen).toHaveTextContent('격리 1 · 보류 0');
+    await waitFor(() => expect(within(ramen).getByTestId('dc-inbound-stock')).toHaveTextContent(/가용 \d+/));
+    expect(view.gets('/stock').some((r) => new URL(r.url).searchParams.get('sku') === 'SKU-RAMEN-5')).toBe(true);
+    expect(screen.getByTestId('dc-inbound-receipt')).toHaveTextContent('재고 반영');
+    expect(screen.getByTestId('dc-inbound-receipt')).toHaveTextContent('예정과 차이 1줄');
+    await waitFor(() => expect(screen.getAllByTestId('dc-inbound-task').length).toBeGreaterThan(0));
+    expect(view.gets('/inbound-tasks').some((r) => new URL(r.url).searchParams.get('receiptId') === 'RCPT-1')).toBe(true);
+    const putaway = screen.getAllByTestId('dc-inbound-task').find((r) => r.textContent?.includes('적치'))!;
+    expect(within(putaway).getByRole('link', { name: '적치하기' })).toHaveAttribute('href', '/c/MFC-BJG-01/inbound/tasks/ITK-3');
+    expect(screen.getAllByTestId('dc-inbound-box')).toHaveLength(2);
   });
 });
 
