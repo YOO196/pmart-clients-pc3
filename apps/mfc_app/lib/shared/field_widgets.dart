@@ -9,7 +9,8 @@ import 'location_guide.dart';
 import 'pda_motion.dart';
 import 'pda_theme.dart';
 
-/// 단계 표시 — 시안의 알약 칸(지금 단계 진한 보라·흰 글씨, 끝난 단계 "✓ 이름").
+/// 단계 표시 — 얇은 진행 막대 + 단계 이름(지금 단계 보라 굵게, 끝난 단계 ✓).
+/// 회색 블록을 늘어놓던 모양이 "PPT 같다"(사용자 2026-11-26) — 막대 한 줄과 글자만 남겼다.
 class StepHeader extends StatelessWidget {
   const StepHeader({super.key, required this.names, required this.current});
 
@@ -21,58 +22,74 @@ class StepHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final d = PdaMotion.of(context, PdaMotion.base);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 17),
-      child: Row(
+      padding: const EdgeInsets.only(top: 2, bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 지금 단계 표시(시험·화면이 읽는 자리). 칸은 단계가 바뀌어도 그대로 두어 색이 부드럽게 바뀐다.
+          // 지금 단계 표시(시험·화면이 읽는 자리).
           SizedBox.shrink(key: ValueKey('step-$current')),
-          for (final (i, n) in names.indexed) ...[
-            if (i > 0) const SizedBox(width: 5),
-            Expanded(
-              child: AnimatedContainer(
-                duration: d,
-                curve: PdaMotion.standard,
-                height: 32,
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: BoxDecoration(
-                  color: i == current ? PdaColors.primary : PdaColors.soft,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                // 좁은 화면(360dp)에 다섯 칸이면 "✓ 장바구니"가 "장바…"로 잘렸다(에뮬레이터 확인 2026-11-20) —
-                // 자르지 않고 칸에 맞게 조금 줄인다.
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (i < current)
-                        const PopIn(
-                          child: Padding(
-                            padding: EdgeInsets.only(right: 2),
-                            child: Icon(
-                              Icons.check,
-                              size: 14,
-                              color: PdaColors.muted,
-                            ),
-                          ),
-                        ),
-                      AnimatedDefaultTextStyle(
-                        duration: d,
-                        style: theme.textTheme.labelMedium!.copyWith(
-                          color: i == current ? Colors.white : PdaColors.muted,
-                          fontWeight: i == current
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                        ),
-                        child: Text(n, maxLines: 1),
-                      ),
-                    ],
+          Row(
+            children: [
+              for (final i in names.indexed.map((x) => x.$1)) ...[
+                if (i > 0) const SizedBox(width: 4),
+                Expanded(
+                  child: AnimatedContainer(
+                    duration: d,
+                    curve: PdaMotion.standard,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: i <= current ? PdaColors.primary : PdaColors.line,
+                      borderRadius: BorderRadius.circular(3),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ],
+              ],
+            ],
+          ),
+          const SizedBox(height: 7),
+          Row(
+            children: [
+              for (final (i, n) in names.indexed) ...[
+                if (i > 0) const SizedBox(width: 4),
+                Expanded(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (i < current)
+                          const PopIn(
+                            child: Padding(
+                              padding: EdgeInsets.only(right: 2),
+                              child: Icon(
+                                Icons.check,
+                                size: 13,
+                                color: PdaColors.primary,
+                              ),
+                            ),
+                          ),
+                        AnimatedDefaultTextStyle(
+                          duration: d,
+                          style: theme.textTheme.labelMedium!.copyWith(
+                            color: i == current
+                                ? PdaColors.primary
+                                : i < current
+                                ? PdaColors.body
+                                : PdaColors.muted,
+                            fontWeight: i == current
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                          ),
+                          child: Text(n, maxLines: 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
       ),
     );
@@ -110,11 +127,14 @@ class ScanPrompt extends StatelessWidget {
             if (detail case final d?)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
+                // 설명은 짧게 — 최대 2줄(사용자 2026-11-26 "긴 글 줄줄 적어 놓은 부분 없게")
                 child: Text(
                   d,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: PdaColors.body,
-                    fontWeight: FontWeight.w500,
+                    color: PdaColors.muted,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -364,42 +384,49 @@ class NoticeBox extends StatelessWidget {
   final bool warning;
 
   @override
-  Widget build(BuildContext context) => EnterFade(
-    offset: 6,
-    child: Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(11),
-      decoration: BoxDecoration(
-        color: warning ? PdaColors.warning : PdaColors.notice,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (warning)
-            const Padding(
-              padding: EdgeInsets.only(right: 6),
+  Widget build(BuildContext context) {
+    final color = warning ? PdaColors.onWarning : PdaColors.onNotice;
+    // 보통 안내는 상자 없이 아이콘 + 한 줄(사용자 2026-11-26 "깔끔하게"), 주의만 노란 띠.
+    return EnterFade(
+      offset: 6,
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(top: 12),
+        padding: warning
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
+            : const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        decoration: warning
+            ? BoxDecoration(
+                color: PdaColors.warning,
+                borderRadius: BorderRadius.circular(10),
+              )
+            : null,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(right: 7, top: 1),
               child: Icon(
-                Icons.warning_amber_rounded,
+                warning
+                    ? Icons.warning_amber_rounded
+                    : Icons.info_outline_rounded,
                 size: 18,
-                color: PdaColors.onWarning,
+                color: color,
               ),
             ),
-          Expanded(
-            child: Text(
-              text,
-              key: textKey,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: warning ? PdaColors.onWarning : PdaColors.onNotice,
-                fontWeight: FontWeight.w600,
+            Expanded(
+              child: Text(
+                text,
+                key: textKey,
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: color, fontWeight: FontWeight.w600),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// "이동하세요" 안내 — 물건을 실은 뒤 도착 칸으로 가는 동안 보인다.

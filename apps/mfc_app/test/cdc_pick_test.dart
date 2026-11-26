@@ -115,7 +115,7 @@ void main() {
     expect(find.textContaining('T261126001'), findsOneWidget);
     expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
     // 피킹 방식마다 담는 곳 안내(C-01) — DPS 는 불 켜진 칸
-    expect(find.text('DPS — 불 켜진 칸에서 숫자만큼 집어요'), findsOneWidget);
+    expect(find.text('DPS — 불 켜진 칸에서 집어요'), findsOneWidget);
     await scan(t, 'cdc-loc-scan', 'CDC01-Z-9-99-99-9-9');
     expect(find.byKey(const ValueKey('cdc-scan-error')), findsOneWidget);
     await scan(t, 'cdc-loc-scan', 'CDC01-C-5-61-03-2-1');
@@ -145,7 +145,7 @@ void main() {
     await tap(t, 'cdc-guide-ok');
     expect(find.textContaining('T261126002'), findsOneWidget);
     expect(
-      find.text('라인용 — 상품 박스에 Wave 안 모든 MFC 몫을 담아요(라인에서 나눠요)'),
+      find.text('라인용 — 상품 박스에 담아요'),
       findsOneWidget,
     );
     await scan(t, 'cdc-loc-scan', 'CDC01-G-5-63-01-3-1');
