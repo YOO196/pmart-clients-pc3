@@ -6,11 +6,12 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
 import 'location_guide.dart';
+import 'pda_decor.dart';
 import 'pda_motion.dart';
 import 'pda_theme.dart';
 
-/// 단계 표시 — 얇은 진행 막대 + 단계 이름(지금 단계 보라 굵게, 끝난 단계 ✓).
-/// 회색 블록을 늘어놓던 모양이 "PPT 같다"(사용자 2026-11-26) — 막대 한 줄과 글자만 남겼다.
+/// 단계 표시 — 번호 원을 선으로 잇는다(끝난 단계 ✓ 보라, 지금 단계 그라데이션 원 + 빛, 다음 단계 흰 원).
+/// 사용자 2026-11-27 "PPT 처럼 각지다 — 디자인 요소·애니메이션" — 선이 차오르고 원이 커지며 바뀐다.
 class StepHeader extends StatelessWidget {
   const StepHeader({super.key, required this.names, required this.current});
 
@@ -20,74 +21,120 @@ class StepHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final d = PdaMotion.of(context, PdaMotion.base);
-    return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 16),
+    final d = PdaMotion.of(context, PdaMotion.slow);
+    const dot = 26.0;
+    return Container(
+      margin: const EdgeInsets.only(top: 2, bottom: 16),
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: PdaShadows.md,
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // 지금 단계 표시(시험·화면이 읽는 자리).
           SizedBox.shrink(key: ValueKey('step-$current')),
-          Row(
-            children: [
-              for (final i in names.indexed.map((x) => x.$1)) ...[
-                if (i > 0) const SizedBox(width: 4),
-                Expanded(
-                  child: AnimatedContainer(
-                    duration: d,
-                    curve: PdaMotion.standard,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: i <= current ? PdaColors.primary : PdaColors.line,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 7),
-          Row(
-            children: [
-              for (final (i, n) in names.indexed) ...[
-                if (i > 0) const SizedBox(width: 4),
-                Expanded(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (i < current)
-                          const PopIn(
-                            child: Padding(
-                              padding: EdgeInsets.only(right: 2),
-                              child: Icon(
-                                Icons.check,
-                                size: 13,
-                                color: PdaColors.primary,
+          SizedBox(
+            height: dot,
+            child: Row(
+              children: [
+                for (final (i, _) in names.indexed) ...[
+                  if (i > 0)
+                    Expanded(
+                      child: Stack(
+                        alignment: Alignment.centerLeft,
+                        children: [
+                          Container(height: 3, color: PdaColors.line),
+                          AnimatedFractionallySizedBox(
+                            duration: d,
+                            curve: PdaMotion.enter,
+                            widthFactor: i <= current ? 1 : 0,
+                            child: Container(
+                              height: 3,
+                              decoration: const BoxDecoration(
+                                gradient: PdaGradients.primary,
                               ),
                             ),
                           ),
-                        AnimatedDefaultTextStyle(
-                          duration: d,
-                          style: theme.textTheme.labelMedium!.copyWith(
-                            color: i == current
-                                ? PdaColors.primary
-                                : i < current
-                                ? PdaColors.body
-                                : PdaColors.muted,
-                            fontWeight: i == current
-                                ? FontWeight.w700
-                                : FontWeight.w600,
+                        ],
+                      ),
+                    ),
+                  AnimatedContainer(
+                    duration: d,
+                    curve: PdaMotion.enter,
+                    width: i == current ? dot : dot - 6,
+                    height: i == current ? dot : dot - 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: i <= current ? PdaGradients.primary : null,
+                      color: i <= current ? null : Colors.white,
+                      border: i <= current
+                          ? null
+                          : Border.all(color: PdaColors.line, width: 2),
+                      boxShadow: i == current
+                          ? [
+                              BoxShadow(
+                                color: PdaColors.primary.withValues(
+                                  alpha: 0.35,
+                                ),
+                                blurRadius: 10,
+                                spreadRadius: 1,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    alignment: Alignment.center,
+                    child: i < current
+                        ? const PopIn(
+                            child: Icon(
+                              Icons.check_rounded,
+                              size: 13,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            '${i + 1}',
+                            style: TextStyle(
+                              fontSize: i == current ? 12 : 10,
+                              fontWeight: FontWeight.w700,
+                              color: i == current
+                                  ? Colors.white
+                                  : PdaColors.onBarMuted,
+                            ),
                           ),
-                          child: Text(n, maxLines: 1),
-                        ),
-                      ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              for (final (i, n) in names.indexed)
+                Expanded(
+                  child: Align(
+                    alignment: i == 0
+                        ? Alignment.centerLeft
+                        : i == names.length - 1
+                        ? Alignment.centerRight
+                        : Alignment.center,
+                    child: AnimatedDefaultTextStyle(
+                      duration: d,
+                      style: theme.textTheme.labelSmall!.copyWith(
+                        color: i == current
+                            ? PdaColors.primary
+                            : i < current
+                            ? PdaColors.body
+                            : PdaColors.onBarMuted,
+                        fontWeight: i == current
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                      child: Text(n, maxLines: 1, overflow: TextOverflow.fade),
                     ),
                   ),
                 ),
-              ],
             ],
           ),
         ],
@@ -98,46 +145,74 @@ class StepHeader extends StatelessWidget {
 
 /// 지금 할 일 — 시안의 큰 제목(예 "장바구니를 스캔하세요") + 한 줄 설명(진한 글씨, 한 줄에 들어가게 짧게).
 class ScanPrompt extends StatelessWidget {
-  const ScanPrompt({super.key, required this.text, this.detail});
+  const ScanPrompt({super.key, required this.text, this.detail, this.icon});
 
   final String text;
   final String? detail;
+
+  /// 제목 옆 배지 그림 — 비우면 문구로 고른다(스캔·이동·담기·세기·확인).
+  final IconData? icon;
+
+  static IconData _guess(String t) {
+    if (t.contains('스캔') || t.contains('찍')) {
+      return Icons.qr_code_scanner_rounded;
+    }
+    if (t.contains('이동') || t.contains('위치') || t.contains('칸')) {
+      return Icons.place_rounded;
+    }
+    if (t.contains('담') || t.contains('넣')) {
+      return Icons.shopping_basket_rounded;
+    }
+    if (t.contains('세') || t.contains('수량')) return Icons.calculate_rounded;
+    if (t.contains('고르') || t.contains('선택')) return Icons.touch_app_rounded;
+    if (t.contains('확인') || t.contains('검')) return Icons.fact_check_rounded;
+    return Icons.auto_awesome_rounded;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      // 큰 제목 위아래 숨 쉴 틈(사용자 2026-11-20 "글자는 큰데 위아래 간격이 좁아 답답") — 위 6, 아래 16.
-      padding: const EdgeInsets.only(top: 8, bottom: 18),
+      padding: const EdgeInsets.only(top: 4, bottom: 16),
       // 할 일이 바뀌면 새 제목이 살짝 올라오며 나타난다(같은 제목이면 그대로).
       child: EnterFade(
         key: ValueKey(text),
         offset: 8,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              text,
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.6,
-                height: 1.3,
+            PopIn(child: GradientBadge(icon: icon ?? _guess(text), size: 44)),
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    text,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.5,
+                      height: 1.3,
+                    ),
+                  ),
+                  if (detail case final d?)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      // 설명은 짧게 — 최대 2줄(사용자 2026-11-26 "긴 글 줄줄 적어 놓은 부분 없게")
+                      child: Text(
+                        d,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: PdaColors.muted,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-            if (detail case final d?)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                // 설명은 짧게 — 최대 2줄(사용자 2026-11-26 "긴 글 줄줄 적어 놓은 부분 없게")
-                child: Text(
-                  d,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: PdaColors.muted,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -161,33 +236,76 @@ class ProgressLine extends StatelessWidget {
   final Key? textKey;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 18),
-    child: Row(
-      children: [
-        Text(
-          text,
-          key: textKey,
-          style: Theme.of(context).textTheme.titleSmall
-              ?.copyWith(color: PdaColors.ink, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          // 확정될 때마다 막대가 부드럽게 찬다.
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(end: total == 0 ? 0 : done / total),
-            duration: PdaMotion.of(context, PdaMotion.slow),
-            curve: PdaMotion.enter,
-            builder: (_, v, _) => LinearProgressIndicator(
-              value: v,
-              minHeight: 9,
-              borderRadius: BorderRadius.circular(5),
+  Widget build(BuildContext context) {
+    final ratio = total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.fromLTRB(14, 11, 14, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: PdaShadows.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  text,
+                  key: textKey,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: PdaColors.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: PdaColors.softer,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${(ratio * 100).round()}%',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: PdaColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          // 확정될 때마다 막대가 부드럽게 찬다(그라데이션).
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              height: 9,
+              color: PdaColors.lilac.withValues(alpha: 0.7),
+              alignment: Alignment.centerLeft,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(end: ratio),
+                duration: PdaMotion.of(context, PdaMotion.slow),
+                curve: PdaMotion.enter,
+                builder: (_, v, _) => FractionallySizedBox(
+                  widthFactor: v,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: PdaGradients.primary,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 /// 화면 아래 고정 버튼 칸(시안 actions) — 흰 바탕, 위 선, 버튼 사이 7.
@@ -319,18 +437,7 @@ class DoneMark extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 40),
       child: Column(
         children: [
-          PopIn(
-            haptic: true,
-            child: Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(
-                color: PdaColors.lilac,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.check, size: 36, color: PdaColors.dark),
-            ),
-          ),
+          const SuccessBurst(),
           const SizedBox(height: 18),
           Text(
             title,
@@ -383,25 +490,28 @@ class NoticeBox extends StatelessWidget {
       child: Container(
         width: double.infinity,
         margin: const EdgeInsets.only(top: 12),
-        padding: warning
-            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
-            : const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-        decoration: warning
-            ? BoxDecoration(
-                color: PdaColors.warning,
-                borderRadius: BorderRadius.circular(10),
-              )
-            : null,
+        padding: const EdgeInsets.fromLTRB(10, 9, 12, 9),
+        decoration: BoxDecoration(
+          color: warning ? PdaColors.warning : Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: warning ? null : PdaShadows.sm,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 7, top: 1),
+            Container(
+              width: 26,
+              height: 26,
+              margin: const EdgeInsets.only(right: 9),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: warning
+                    ? PdaColors.onWarning.withValues(alpha: 0.12)
+                    : PdaColors.softer,
+              ),
               child: Icon(
-                warning
-                    ? Icons.warning_amber_rounded
-                    : Icons.info_outline_rounded,
-                size: 18,
+                warning ? Icons.priority_high_rounded : Icons.lightbulb_rounded,
+                size: 16,
                 color: color,
               ),
             ),
@@ -1004,15 +1114,9 @@ class MarkCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-    child: Container(
-      width: 64,
-      height: 64,
-      decoration: const BoxDecoration(
-        color: PdaColors.lilac,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(icon, size: 36, color: PdaColors.dark),
-    ),
+    child: icon == Icons.check
+        ? const SuccessBurst(size: 64)
+        : PopIn(child: GradientBadge(icon: icon, size: 64, circle: true)),
   );
 }
 

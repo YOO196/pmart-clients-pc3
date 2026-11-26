@@ -148,7 +148,9 @@ abstract final class PdaTheme {
       cardTheme: CardThemeData(
         color: Colors.white,
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
+        // 보라빛 옅은 그림자 — 카드가 바탕 위에 떠 보이게
+        elevation: 2,
+        shadowColor: const Color(0x335E3BB2),
         margin: const EdgeInsets.only(top: 12),
         // 테두리 없이 둥근 흰 카드 — 연회색 바탕 위에 떠 보이게
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
