@@ -63,6 +63,7 @@ void main() {
     WidgetTester t, {
     bool unavailable = false,
     bool flakySubmit = false,
+    bool freshSeed = false,
   }) async {
     t.view
       ..physicalSize = const Size(800, 2600)
@@ -77,6 +78,7 @@ void main() {
             claims: ref.watch(claimsRepositoryProvider) as MockClaimsRepository,
             latency: Duration.zero,
           );
+          if (freshSeed) mock.freshProducts.add('P-0002');
           if (flakySubmit) return flaky = _FlakyRepo(mock);
           return mock;
         }),
@@ -144,6 +146,23 @@ void main() {
     expect(d.lines.single, (orderLineId: 'ol-3', qty: 2));
     expect(d.reason, ReturnReason.dislike);
     expect(d.redeliveryNote, isNotNull);
+  });
+
+  testWidgets('냉장·냉동 품목도 변심 교환 가능(교환비) — "상담원 확인" 표시, 접수 뒤 심사 중(ADR-0087)', (
+    t,
+  ) async {
+    await openEntry(t, freshSeed: true);
+    await t.tap(key('rr-go-exchange'));
+    await t.pumpAndSettle();
+    expect(find.text('상담원 확인'), findsOneWidget);
+    expect(find.text('신선보장'), findsOneWidget);
+    await tapVisible(t, 'rr-line-ol-3');
+    await tapVisible(t, 'rr-reason-dislike');
+    expect(find.text('배달팁 9,000원'), findsOneWidget);
+    expect(submitEnabled(t), isTrue);
+    await tapVisible(t, 'rr-submit');
+    expect(find.byType(ClaimScreen), findsOneWidget);
+    expect(mock.submitted, hasLength(1));
   });
 
   testWidgets('반품은 늘 흐리게 — 고객센터로(BR-95 회신 2026-11-25: 앱 접수는 교환만)', (t) async {

@@ -56,13 +56,14 @@ final class MockReturnRequestRepository implements ReturnRequestRepository {
   final MockClaimsRepository claims;
   final Duration latency;
 
-  /// 목 신선식품(변심 신청 불가·신선보장) — 감귤·방울토마토.
-  static const freshProducts = {'P-0003', 'P-0004'};
+  /// 목 신선식품(냉장 — 신선보장·상담원 승인 뒤 진행, ADR-0087 결정 3) — 감귤·방울토마토.
+  /// 변심 교환도 받는다(결정 4 — 교환비).
+  final freshProducts = <String>{'P-0003', 'P-0004'};
 
   /// 목 판매 중지 상품(신청 불가 칸).
   final discontinued = <String>{};
 
-  /// 목 배달팁(단순 변심) — 서버 정책 값 흉내.
+  /// 목 교환비(단순 변심) — 반품 회수비와 같은 금액(ADR-0087 결정 4, 서버 정책 값 흉내).
   int changeOfMindFee = 9000;
 
   /// 받은 신청(시험용).
@@ -106,8 +107,8 @@ final class MockReturnRequestRepository implements ReturnRequestRepository {
           lineAmount: l.lineAmount,
           orderedQty: delivered,
           requestableQty: left,
-          changeOfMindAllowed: !fresh,
           freshGuarantee: fresh,
+          needsAgentApproval: fresh,
         ),
       );
     }
@@ -134,6 +135,9 @@ final class MockReturnRequestRepository implements ReturnRequestRepository {
         _byKey[key.value] ??
         claims.fileCustomerReturn(
           orderId: draft.orderId,
+          needsApproval: draft.lines.any(
+            (p) => freshLineIds(draft.orderId).contains(p.orderLineId),
+          ),
           exchange: draft.type == ReturnRequestType.exchange,
           lines: draft.lines,
           reason: wireReason(draft.reason),
@@ -145,6 +149,14 @@ final class MockReturnRequestRepository implements ReturnRequestRepository {
     _byKey[key.value] = id;
     return claims.get(id);
   }
+
+  /// 목 주문에서 냉장(신선) 품목 줄 ID.
+  Set<String> freshLineIds(String orderId) => {
+    for (final l
+        in (claims.orders?.orderJson(orderId)?['lines'] as List? ?? const [])
+            .cast<Map<String, Object?>>())
+      if (freshProducts.contains(l['productId'])) l['orderLineId'] as String,
+  };
 
   /// 앱 이유 → 계약 ClaimReason(BR-95 요청서와 같은 대응).
   static String wireReason(ReturnReason r) => switch (r) {

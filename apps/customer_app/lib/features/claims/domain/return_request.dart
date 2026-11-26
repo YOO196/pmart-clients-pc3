@@ -52,6 +52,7 @@ class ReturnableLine {
     this.lineAmount,
     this.changeOfMindAllowed = true,
     this.freshGuarantee = false,
+    this.needsAgentApproval = false,
   });
 
   final String orderLineId;
@@ -72,6 +73,10 @@ class ReturnableLine {
 
   /// 신선보장 상품 — "신선하지 않으면 교환해드립니다".
   final bool freshGuarantee;
+
+  /// 냉장·냉동 상품 — 상담원이 사진·사유를 본 뒤 진행(ADR-0087 결정 3, 온도대는 서버 판정).
+  /// 상온만이면 접수 즉시 진행.
+  final bool needsAgentApproval;
 }
 
 /// 신청할 수 없는 품목(품절 취소·이미 신청·판매 중지 등) — "교환 불가 상품" 펼치기에 흐리게.

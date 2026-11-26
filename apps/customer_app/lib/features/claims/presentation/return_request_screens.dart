@@ -1139,6 +1139,13 @@ class _LineRow extends StatelessWidget {
                       Colors.white,
                       l10n.rrFreshText(type),
                     ),
+                  if (l.needsAgentApproval)
+                    tag(
+                      l10n.rrApprovalTag,
+                      theme.colorScheme.secondaryContainer,
+                      theme.colorScheme.onSecondaryContainer,
+                      l10n.rrApprovalText(type),
+                    ),
                   if (!l.changeOfMindAllowed)
                     tag(
                       l10n.rrRestrictTag(type),

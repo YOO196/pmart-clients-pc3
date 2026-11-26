@@ -249,6 +249,7 @@ base class MockClaimsRepository
     required List<({String orderLineId, int qty})> lines,
     required String reason,
     int? fee,
+    bool needsApproval = false,
   }) {
     final id = 'claim-${++_seq}';
     final orderLines = {
@@ -262,7 +263,14 @@ base class MockClaimsRepository
       'version': 1,
       'orderId': orderId,
       'type': exchange ? 'EXCHANGE' : 'RETURN',
-      'state': fee != null ? 'FEE_PENDING' : 'OPENED',
+      // 교환(ADR-0087): 교환비가 있으면 결제 대기, 냉장·냉동이 있으면 상담원 검토, 상온만이면 바로 진행.
+      'state': fee != null
+          ? 'FEE_PENDING'
+          : !exchange
+          ? 'OPENED'
+          : needsApproval
+          ? 'UNDER_REVIEW'
+          : 'IN_PROGRESS',
       'channel': 'CUSTOMER_APP',
       'reason': reason,
       'openedAt': _clock.toIso8601String(),
