@@ -590,18 +590,18 @@ class TileLook {
     unitWeight: FontWeight.w600,
   );
 
-  /// 빈 장바구니 아래 추천(레퍼런스 2026-11-26, 1080px = 384dp 실측): 하트 없음, 이름 11.6 보통·줄 1.43,
+  /// 빈 장바구니 아래 추천(레퍼런스 2026-11-26, 1080px = 411dp(S23) 실측): 하트 없음, 이름 11.6 보통·줄 1.43,
   /// 가격 11.4 아주 굵게, + 동그라미 30.3.
   static const emptyCart = TileLook(
     showWish: false,
     nameLineHeight: 1.43,
-    nameSize: 11.6,
-    priceSize: 11.4,
-    imageGap: 5.1,
+    nameSize: 12.4,
+    priceSize: 12.2,
+    imageGap: 5.5,
     priceGap: 0,
     ratingGap: 2,
-    addSize: 30.3,
-    addIconSize: 20.6,
+    addSize: 32.5,
+    addIconSize: 22.1,
     dark: true,
     keepWords: true,
     rateColor: Color(0xFFFF3E3E),

@@ -45,7 +45,7 @@ class CartScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       backgroundColor: scheme.surfaceContainer,
-      // 레퍼런스 장바구니(2026-11-26, 폰 1080px = 384dp — px ÷ 2.8125): 제목 굵게, 제목 가운데가 상태 표시줄
+      // 레퍼런스 장바구니(2026-11-26, S23 1080px = 411dp — px ÷ 2.625): 제목 굵게, 제목 가운데가 상태 표시줄
       // 아래 23.8dp. 비었을 때 회색 띠는 제목 아래 끝에서 제목→탭 글자 사이만큼(67px) 띄워 시작(상태 표시줄 아래 55.1dp, 사용자 2026-11-26).
       appBar: AppBar(
         title: Text(
@@ -53,12 +53,12 @@ class CartScreen extends ConsumerWidget {
           style: Theme.of(context).textTheme.titleLarge
               ?.copyWith(fontSize: 15.5, fontWeight: FontWeight.w700),
         ),
-        toolbarHeight: 46,
+        toolbarHeight: 42.6,
         centerTitle: true,
         backgroundColor: scheme.surface,
         bottom: value.value?.cart.lines.isEmpty == true
             ? const PreferredSize(
-                preferredSize: Size.fromHeight(9.1),
+                preferredSize: Size.fromHeight(12.3),
                 child: SizedBox.shrink(),
               )
             : null,
@@ -173,7 +173,7 @@ class _CartBody extends ConsumerWidget {
   }
 }
 
-/// 빈 장바구니(레퍼런스 2026-11-26, 1080px = 384dp 실측 — 위 탭 3개는 빼기로 함):
+/// 빈 장바구니(레퍼런스 2026-11-26, 1080px = 411dp(S23) 실측 — 위 탭 3개는 빼기로 함):
 /// 회색 띠(높이 172.8) 안에 굵은 안내 세 줄 + [바로픽 둘러보기], 그 아래 흰 바탕에 추천 상품 3칸 × 2줄.
 /// 추천은 장바구니 시트와 같은 출처(홈 편성 첫 상품 영역 — 개인 추천 API 없음, BR-98). 조회 중·실패면 추천만 비운다
 /// (빈 장바구니 안내는 장바구니 조회 결과라 그대로).
@@ -188,7 +188,7 @@ class _EmptyCart extends ConsumerWidget {
     final recs = ref.watch(cartRecommendationsProvider);
     final items = recs.value ?? const <ProductTile>[];
     final line = theme.textTheme.titleMedium?.copyWith(
-      fontSize: 13.6,
+      fontSize: 14.6,
       height: 1.52,
       fontWeight: FontWeight.w800,
       color: scheme.onSurface,
@@ -201,9 +201,9 @@ class _EmptyCart extends ConsumerWidget {
         slivers: [
           SliverToBoxAdapter(
             child: Container(
-              height: 172.8,
+              height: 185.1,
               color: scheme.surfaceContainer,
-              padding: const EdgeInsets.only(top: 26.9),
+              padding: const EdgeInsets.only(top: 28.8),
               child: Column(
                 children: [
                   Text.rich(
@@ -221,9 +221,9 @@ class _EmptyCart extends ConsumerWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 20.2),
+                  const SizedBox(height: 21.6),
                   SizedBox(
-                    height: 34.8,
+                    height: 37.3,
                     child: OutlinedButton(
                       key: const ValueKey('cart-empty-browse'),
                       style: OutlinedButton.styleFrom(
@@ -233,14 +233,14 @@ class _EmptyCart extends ConsumerWidget {
                           width: 1.2,
                         ),
                         shape: const StadiumBorder(),
-                        padding: const EdgeInsets.symmetric(horizontal: 12.8),
+                        padding: const EdgeInsets.symmetric(horizontal: 13.7),
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       onPressed: () => context.go('/'),
                       child: Text.rich(
                         TextSpan(
                           style: theme.textTheme.titleSmall?.copyWith(
-                            fontSize: 11.7,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w400,
                           ),
                           children: [
@@ -263,13 +263,13 @@ class _EmptyCart extends ConsumerWidget {
           if (items.isNotEmpty)
             SliverPadding(
               // 실측(÷2.8125): 띠 아래 → 사진 위 18.8, 좌우 14.9, 칸 사이 7.8, 줄 간격 = 사진(칸 폭) + 72.2.
-              padding: const EdgeInsets.fromLTRB(14.9, 18.8, 14.9, 24),
+              padding: const EdgeInsets.fromLTRB(16, 20.1, 16, 25.7),
               sliver: SliverLayoutBuilder(
                 builder: (context, c) => SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 3,
-                    crossAxisSpacing: 7.8,
-                    mainAxisExtent: (c.crossAxisExtent - 15.6) / 3 + 72.2,
+                    crossAxisSpacing: 8.4,
+                    mainAxisExtent: (c.crossAxisExtent - 16.7) / 3 + 77.4,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     childCount: items.length,

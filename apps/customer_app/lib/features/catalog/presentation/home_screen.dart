@@ -2877,18 +2877,18 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
       widget.endsAt.difference(ref.read(homeClockProvider)()),
     );
     final priceStyle = theme.textTheme.titleLarge?.copyWith(
-      fontSize: 15.8,
+      fontSize: 16.9,
       fontWeight: FontWeight.w800,
     );
     Widget pagerButton(String key, bool left, bool on, int to) => SizedBox(
-      width: 52,
-      height: 35,
+      width: 55.7,
+      height: 37.5,
       child: OutlinedButton(
         key: ValueKey('deal-${widget.section.sectionId}-$key'),
         style: OutlinedButton.styleFrom(
           padding: EdgeInsets.zero,
           foregroundColor: scheme.onSurface,
-          side: const BorderSide(color: Color(0xFFC9CACD)),
+          side: const BorderSide(color: Color(0xFFD5D7DB)),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(2)),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
@@ -2897,8 +2897,8 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
           quarterTurns: left ? 2 : 0,
           child: const PmartLineIcon(
             PmartLineIcons.chevronRight,
-            size: 19,
-            strokeWidth: 1.8,
+            size: 20.4,
+            strokeWidth: 1.4,
           ),
         ),
       ),
@@ -2906,9 +2906,9 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(height: 9.2, color: const Color(0xFFF4F5F7)),
+        Container(height: 9.9, color: const Color(0xFFF4F5F7)),
         Container(
-          padding: const EdgeInsets.fromLTRB(15.3, 4.7, 8, 14),
+          padding: const EdgeInsets.fromLTRB(16.4, 20.6, 14.7, 15),
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
@@ -2922,13 +2922,23 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      widget.section.title,
+                    // 머리 글은 레퍼런스 그대로 "오늘 하루만 이 가격! [일일특가]" · "오늘 한정 특별한 혜택!"(사용자 2026-11-26 "사진이랑 똑같이").
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(text: l10n.dealTitleLead),
+                          TextSpan(
+                            text: l10n.dealTitleAccent,
+                            style: const TextStyle(color: _red),
+                          ),
+                        ],
+                      ),
+                      key: ValueKey('deal-title-${widget.section.sectionId}'),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleLarge?.copyWith(
-                        fontSize: 17.3,
-                        height: 1.25,
+                        fontSize: 18.5,
+                        height: 1.0,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -2939,31 +2949,35 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
                         'section-view-all-${widget.section.sectionId}',
                       ),
                       style: TextButton.styleFrom(
+                        // 줄 높이를 늘리지 않게(누르는 자리 최소 48 을 쓰지 않는다).
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         foregroundColor: scheme.onSurface,
                         textStyle: theme.textTheme.bodyMedium?.copyWith(
-                          fontSize: 14,
+                          fontSize: 15,
                         ),
                       ),
                       onPressed: widget.onViewAll,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(l10n.sectionViewAll),
+                          Text(l10n.dealViewAll),
                           const PmartLineIcon(
                             PmartLineIcons.chevronRight,
-                            size: 15,
+                            size: 16.1,
                           ),
                         ],
                       ),
                     ),
                 ],
               ),
-              if (widget.section.subtitle case final sub?) ...[
-                const SizedBox(height: 4),
+              ...[
+                const SizedBox(height: 8.4),
                 Text(
-                  sub,
+                  l10n.dealSubtitle,
                   style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: 12.5,
+                    fontSize: 10.7,
                     color: scheme.onSurfaceVariant,
                   ),
                 ),
@@ -2973,7 +2987,7 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
         ),
         for (final tile in shown)
           Padding(
-            padding: const EdgeInsets.fromLTRB(15, 0, 15, 15.3),
+            padding: const EdgeInsets.fromLTRB(16.1, 0, 16.1, 16.4),
             child: InkWell(
               key: ValueKey('deal-item-${tile.productId}'),
               onTap: () =>
@@ -2982,7 +2996,7 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
-                    width: 154.7,
+                    width: 165.7,
                     child: DecoratedBox(
                       position: DecorationPosition.foreground,
                       decoration: BoxDecoration(
@@ -2997,7 +3011,7 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
                         child: Column(
                           children: [
                             Container(
-                              height: 20.3,
+                              height: 23.2,
                               color: _red,
                               alignment: Alignment.center,
                               child: Row(
@@ -3005,11 +3019,11 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
                                 children: [
                                   const PmartLineIcon(
                                     PmartLineIcons.clock,
-                                    size: 12,
+                                    size: 12.9,
                                     color: Colors.white,
                                     strokeWidth: 2.4,
                                   ),
-                                  const SizedBox(width: 4),
+                                  const SizedBox(width: 4.3),
                                   Text(
                                     l10n.dealTimeLeft(left),
                                     key: ValueKey(
@@ -3017,7 +3031,7 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
                                     ),
                                     style: theme.textTheme.labelMedium
                                         ?.copyWith(
-                                          fontSize: 12,
+                                          fontSize: 12.9,
                                           color: Colors.white,
                                           fontWeight: FontWeight.w800,
                                           fontFeatures: const [
@@ -3032,19 +3046,19 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
                               children: [
                                 ProductImage(
                                   url: tile.imageUrl,
-                                  size: 154.7,
-                                  height: 134.4,
+                                  size: 165.7,
+                                  height: 144,
                                   radius: 0,
                                 ),
                                 if (QuickAddButton.offeredFor(tile))
                                   Positioned(
-                                    right: 154.7 * 0.038,
-                                    bottom: 154.7 * 0.038,
+                                    right: 165.7 * 0.038,
+                                    bottom: 165.7 * 0.038,
                                     child: QuickAddButton(
                                       tile: tile,
-                                      size: 154.7 * 0.242,
-                                      iconSize: 154.7 * 0.242 * 0.47,
-                                      strokeWidth: 154.7 * 0.242 * 0.035,
+                                      size: 165.7 * 0.242,
+                                      iconSize: 165.7 * 0.242 * 0.47,
+                                      strokeWidth: 165.7 * 0.242 * 0.035,
                                     ),
                                   ),
                               ],
@@ -3054,7 +3068,7 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 9.6),
+                  const SizedBox(width: 10.3),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -3064,11 +3078,11 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyLarge?.copyWith(
-                            fontSize: 12.4,
+                            fontSize: 13.3,
                             height: 1.35,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 4.3),
                         if (tile.discount case final d?)
                           // 할인율과 가격 사이 4.3px 글자 간격(실측 — 공백 한 칸보다 좁다).
                           Text.rich(
@@ -3091,7 +3105,7 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
                             final int p => formatKrw(p),
                             null => l10n.priceUnavailable,
                           }, style: priceStyle),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 4.3),
                         RatingLine(
                           rating: tile.rating,
                           count: tile.reviewCount,
@@ -3105,24 +3119,26 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
           ),
         if (pages > 1)
           Padding(
-            padding: const EdgeInsets.only(top: 1.7, bottom: 20),
+            padding: const EdgeInsets.only(top: 1.7, bottom: 21.4),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // 레퍼런스: 첫 쪽에서도 [<] 가 켜져 있다 — 끝 쪽으로 돈다.
                 pagerButton('prev', true, true, (page - 1 + pages) % pages),
                 SizedBox(
-                  width: 113.6,
+                  width: 121.7,
                   child: Text.rich(
                     TextSpan(
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 15.5,
+                        fontSize: 16.6,
+                        fontWeight: FontWeight.w400,
                       ),
                       children: [
                         TextSpan(text: '${page + 1}'),
+                        // 레퍼런스: "/ 6" 은 옅은 회색.
                         TextSpan(
                           text: ' / $pages',
-                          style: TextStyle(color: scheme.outline),
+                          style: const TextStyle(color: Color(0xFFB4B7BC)),
                         ),
                       ],
                     ),
@@ -3135,8 +3151,8 @@ class _TimerDealListState extends ConsumerState<_TimerDealList> {
             ),
           )
         else
-          const SizedBox(height: 8),
-        Container(height: 9.2, color: const Color(0xFFF4F5F7)),
+          const SizedBox(height: 8.6),
+        Container(height: 9.9, color: const Color(0xFFF4F5F7)),
       ],
     );
   }

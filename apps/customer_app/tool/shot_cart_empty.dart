@@ -1,4 +1,4 @@
-// 빈 장바구니를 사용자 폰 폭(1080px = 384dp, 밀도 450)으로 찍는다.
+// 빈 장바구니를 사용자 폰 폭(1080px = 411dp, S23)으로 찍는다.
 //   flutter test tool/shot_cart_empty.dart --update-goldens --dart-define=SHOT_DIR=<절대 경로>
 import 'dart:io';
 
@@ -36,9 +36,9 @@ void main() {
     await t.runAsync(_fonts);
     t.view
       ..physicalSize = const Size(1080, 2340)
-      ..devicePixelRatio = 2.8125
-      ..padding = const FakeViewPadding(top: 88, bottom: 48)
-      ..viewPadding = const FakeViewPadding(top: 88, bottom: 48);
+      ..devicePixelRatio = 1080 / 411
+      ..padding = const FakeViewPadding(top: 99, bottom: 48)
+      ..viewPadding = const FakeViewPadding(top: 99, bottom: 48);
     addTearDown(t.view.reset);
     await t.pumpWidget(
       testApp(

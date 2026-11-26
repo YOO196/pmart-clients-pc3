@@ -12,8 +12,11 @@ import '../../auth/presentation/auth_controller.dart' show sessionProvider;
 import '../../cart/domain/cart.dart';
 import '../../cart/presentation/cart_controller.dart';
 import '../../cart/presentation/cart_messages.dart';
+import '../../../shared/shopping_context.dart' show currentMfcIdProvider;
 import '../../catalog/presentation/catalog_providers.dart'
     show productDetailProvider;
+import '../../checkout/presentation/checkout_controller.dart'
+    show checkoutRepositoryProvider, checkoutSetupProvider;
 import '../../catalog/presentation/widgets/product_tile_card.dart'
     show ProductImage;
 import '../domain/orders.dart' show FrequentItem;
@@ -35,6 +38,25 @@ final boughtItemsProvider = FutureProvider.autoDispose<List<FrequentItem>>((
     for (final f in all)
       if (f.productId != null && f.productName != null) f,
   ];
+});
+
+/// 고른 상품 합으로 서버에 묻는 배달팁(order `GET /delivery-options?itemAmount=` — 무료 사유 적용, 서버 값).
+/// 장바구니에서 고른 배송 방식이 있으면 그 방식, 없으면 가능한 첫 방식. 합을 아직 모르면 상품액 없이 물어 기본 배달팁.
+/// 서버가 값을 주지 않으면 null — 화면은 "배달팁 확인 중"(0원으로 바꾸지 않는다).
+final _boughtTipProvider = FutureProvider.autoDispose.family<int?, int?>((
+  ref,
+  itemAmount,
+) async {
+  final mfcId = ref.watch(currentMfcIdProvider);
+  if (mfcId == null) return null;
+  final options = await ref
+      .watch(checkoutRepositoryProvider)
+      .options(mfcId, itemAmount: itemAmount);
+  final mode = ref.watch(checkoutSetupProvider).mode;
+  final o =
+      options.where((o) => o.mode == mode && o.available).firstOrNull ??
+      options.where((o) => o.available).firstOrNull;
+  return o?.tip?.applied ?? o?.tip?.base;
 });
 
 class BoughtItemsScreen extends ConsumerStatefulWidget {
@@ -129,7 +151,7 @@ class _BoughtItemsScreenState extends ConsumerState<BoughtItemsScreen> {
         leading: IconButton(
           key: const ValueKey('bought-close'),
           onPressed: () => context.pop(),
-          icon: const PmartLineIcon(PmartLineIcons.close, size: 24),
+          icon: const PmartLineIcon(PmartLineIcons.close, size: 25.7),
         ),
       ),
       body: UiStateView<List<FrequentItem>>(
@@ -138,14 +160,14 @@ class _BoughtItemsScreenState extends ConsumerState<BoughtItemsScreen> {
         empty: (_) => Center(child: Text(l10n.boughtItemsEmpty)),
         ready: (context, items) => ListView(
           key: const ValueKey('bought-list'),
-          padding: const EdgeInsets.fromLTRB(0, 17.6, 0, 16),
+          padding: const EdgeInsets.fromLTRB(0, 18.9, 0, 17.1),
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(15.5, 0, 15.5, 10.6),
+              padding: const EdgeInsets.fromLTRB(16.6, 0, 16.6, 11.4),
               child: Text(
                 l10n.boughtItemsTitle,
                 style: theme.textTheme.headlineSmall?.copyWith(
-                  fontSize: 18.75,
+                  fontSize: 20.1,
                   height: 1.52,
                   fontWeight: FontWeight.w800,
                 ),
@@ -171,40 +193,74 @@ class _BoughtItemsScreenState extends ConsumerState<BoughtItemsScreen> {
                 children: [
                   const Divider(height: 1),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(15.5, 14, 15.5, 10),
+                    padding: const EdgeInsets.fromLTRB(16.6, 15, 16.6, 10.7),
                     child: Row(
                       children: [
                         Text(
                           l10n.boughtItemsCount(count),
                           key: const ValueKey('bought-count'),
                           style: theme.textTheme.titleMedium?.copyWith(
-                            fontSize: 14,
+                            fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                         if (sum != null && count > 0) ...[
                           Container(
                             width: 1,
-                            height: 12,
-                            margin: const EdgeInsets.symmetric(horizontal: 8),
+                            height: 12.9,
+                            margin: const EdgeInsets.symmetric(horizontal: 8.6),
                             color: scheme.outlineVariant,
                           ),
                           Text(
                             formatKrw(sum),
                             key: const ValueKey('bought-sum'),
                             style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 14,
+                              fontSize: 15,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
+                        const Spacer(),
+                        // 배달팁은 늘 보인다 — 서버 값, 받는 중·실패면 "배달팁 확인 중"(실패는 눌러 다시 묻기).
+                        if (count > 0)
+                          Builder(
+                            builder: (context) {
+                              final tipValue = ref.watch(
+                                _boughtTipProvider(sum),
+                              );
+                              final style = theme.textTheme.titleMedium
+                                  ?.copyWith(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: scheme.primary,
+                                  );
+                              return switch (tipValue) {
+                                AsyncData(value: final int tip) => Text(
+                                  l10n.optionTip(formatKrw(tip)),
+                                  key: const ValueKey('bought-tip'),
+                                  style: style,
+                                ),
+                                AsyncError() || AsyncData() => GestureDetector(
+                                  key: const ValueKey('bought-tip-retry'),
+                                  onTap: () =>
+                                      ref.invalidate(_boughtTipProvider(sum)),
+                                  child: Text(l10n.tipUnknown, style: style),
+                                ),
+                                _ => Text(
+                                  l10n.tipUnknown,
+                                  key: const ValueKey('bought-tip-loading'),
+                                  style: style,
+                                ),
+                              };
+                            },
+                          ),
                       ],
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(12.8, 0, 12.8, 12),
+                    padding: const EdgeInsets.fromLTRB(13.7, 0, 13.7, 12.9),
                     child: SizedBox(
-                      height: 46,
+                      height: 49.3,
                       child: FilledButton(
                         key: const ValueKey('bought-add'),
                         style: FilledButton.styleFrom(
@@ -212,7 +268,7 @@ class _BoughtItemsScreenState extends ConsumerState<BoughtItemsScreen> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           textStyle: theme.textTheme.titleMedium?.copyWith(
-                            fontSize: 17,
+                            fontSize: 18.2,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -238,7 +294,7 @@ class _BoughtItemsScreenState extends ConsumerState<BoughtItemsScreen> {
 }
 
 /// 한 줄(레퍼런스 실측 ÷2.8125): 체크 20 (왼쪽 21.7) · 사진 55.8(모서리 8, 왼쪽 54.5) · 글(왼쪽 120) — 이름 한 줄,
-/// 할인율 빨강 + 가격 굵게(지금 옵션 값), "N회 구매". 줄 간격 76.5. 글자: 이름 13.5 · 가격 13.6 굵게 · "N회 구매" 11 보라(브랜드색).
+/// 할인율 빨강 + 가격 굵게(지금 옵션 값), "N회 구매". 줄 간격 76.5. 글자: 이름 13.5 · 가격 13.6 굵게 · "N회 구매" 11 파랑(#2B7AE1, 레퍼런스 색).
 class _BoughtRow extends ConsumerWidget {
   const _BoughtRow({
     super.key,
@@ -259,19 +315,19 @@ class _BoughtRow extends ConsumerWidget {
     final detail = ref.watch(productDetailProvider(item.productId!)).value;
     final option = detail?.options.where((o) => o.sku == item.sku).firstOrNull;
     final priceStyle = theme.textTheme.titleMedium?.copyWith(
-      fontSize: 13.6,
+      fontSize: 14.6,
       height: 1.25,
       fontWeight: FontWeight.w800,
     );
     return InkWell(
       onTap: () => onChanged(!on),
       child: SizedBox(
-        height: 76.5,
+        height: 82,
         child: Row(
           children: [
-            const SizedBox(width: 7.5),
+            const SizedBox(width: 9.9),
             Transform.scale(
-              scale: 1.11,
+              scale: 1.19,
               child: Checkbox(
                 key: ValueKey('bought-check-${item.sku}'),
                 value: on,
@@ -288,7 +344,7 @@ class _BoughtRow extends ConsumerWidget {
             ),
             // 체크 칸(누르는 자리 40) 바로 옆 — 실측 사진 왼쪽 54.
             Transform.translate(
-              offset: const Offset(-1.7, 0),
+              offset: const Offset(2.1, 0),
               child: GestureDetector(
                 onTap: () => context.push('/products/${item.productId}'),
                 child: DecoratedBox(
@@ -302,13 +358,13 @@ class _BoughtRow extends ConsumerWidget {
                   ),
                   child: ProductImage(
                     url: item.imageUrl,
-                    size: 55.8,
+                    size: 59.8,
                     radius: 8,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 8.6),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,7 +377,7 @@ class _BoughtRow extends ConsumerWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      fontSize: 13.5,
+                      fontSize: 14.5,
                       height: 1.25,
                     ),
                   ),
@@ -353,18 +409,18 @@ class _BoughtRow extends ConsumerWidget {
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 3.2),
                   Text(
                     l10n.boughtItemsTimes(item.orderCount),
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: 11,
-                      color: scheme.primary,
+                      fontSize: 11.8,
+                      color: const Color(0xFF2B7AE1),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 17.1),
           ],
         ),
       ),
