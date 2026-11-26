@@ -104,11 +104,26 @@ void main() {
     expect(find.byKey(const ValueKey('center-notice')), findsNothing);
   });
 
-  testWidgets('센터가 여럿이면 앞의 것을 고르지 않고 안내', (t) async {
+  testWidgets('센터가 여럿이면 앞의 것을 고르지 않고 고르게 한다 — 고른 센터로만 부른다, 위 바꾸기로 다시', (
+    t,
+  ) async {
     final http = await pump(t, worker(['MFC-SEED-01', 'MFC-SEED-02']));
     expect(http.requests, isEmpty);
-    expect(find.byKey(const ValueKey('center-notice')), findsOneWidget);
+    expect(find.byKey(const ValueKey('center-choice')), findsOneWidget);
     expect(find.byKey(const ValueKey('area-pickPack')), findsNothing);
+    await t.tap(find.byKey(const ValueKey('center-MFC-SEED-02')));
+    await t.pumpAndSettle();
+    expect(
+      http.requests.map((r) => r.uri.path),
+      contains('/api/v1/mfcs/MFC-SEED-02/workers/OP-0000000011'),
+    );
+    expect(
+      http.requests.where((r) => r.uri.path.contains('MFC-SEED-01')),
+      isEmpty,
+    );
+    await t.tap(find.byKey(const ValueKey('switch-workplace')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('center-choice')), findsOneWidget);
   });
 
   test('목 모드는 목 데이터의 센터·작업자(로그인 세션과 무관)', () {
