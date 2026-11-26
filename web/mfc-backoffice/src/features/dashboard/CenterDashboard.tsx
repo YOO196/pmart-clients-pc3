@@ -403,9 +403,9 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
     .sort((a, b) => b[1] - a[1])
     .map(([s, n]) => ({ key: s, label: s === 'UNKNOWN' ? messages.centerDelivery.unknown : (messages.centerDelivery.executionState[s] ?? s), value: n, text: m.count(n) }));
 
-  // 알림 피드 — 서버 값으로 판정한 것만(약속 초과 = 작업 promisedReadyAt, 배차 지연 = 서버 지연 안내, 인계 확인·파손 = 서버 목록)
+  // 알림 피드 — 서버 값으로 판정한 것만(약속 초과 = 출고 배차 요청 예상 준비 시각(fulfillment 0.35.0), 배차 지연 = 서버 지연 안내, 인계 확인·파손 = 서버 목록)
   const taskNow = tasks.data?.asOf ? Date.parse(tasks.data.asOf) : nowMs;
-  const promise = tasks.data ? promiseRows(tasks.data.items, taskNow) : null;
+  const promise = tasks.data && ops.promises.data ? promiseRows(tasks.data.items, ops.promises.data.promises, taskNow) : null;
   const feed: FeedItem[] = [
     ...(promise?.rows ?? [])
       .filter((r) => r.kind === 'overdue')
@@ -446,7 +446,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
   const feedPartial = tasks.isError || delays.isError || handovers.isError || damages.isError;
 
   const asOf = picking.data?.asOf ?? tasks.data?.asOf ?? null;
-  const refetchAll = () => [picking, trend.picking, trend.bySku, onTime, workers, live, tasks, damages, handovers, delays].forEach((q) => void q.refetch());
+  const refetchAll = () => [picking, trend.picking, trend.bySku, onTime, workers, live, tasks, ops.summary, ops.promises, damages, handovers, delays].forEach((q) => void q.refetch());
 
   return (
     <section className="@container space-y-3">
@@ -463,7 +463,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
       {/* 우선 확인 — 급한 일 칩, 누르면 그 화면 */}
       <nav className="flex flex-wrap items-center gap-2" aria-label={m.priority.label} data-testid="priority-bar">
         <span className="mr-1 text-xs font-bold text-base-content/60">{m.priority.label}</span>
-        <PriorityChip to={`${centerPath(mfcId, 'ops')}?type=promise`} label={m.priority.overdue} n={promise?.overdue} failed={tasks.isError} tone="error" />
+        <PriorityChip to={`${centerPath(mfcId, 'ops')}?type=promise`} label={m.priority.overdue} n={ops.summary.data?.overdue} failed={ops.summary.isError} tone="error" />
         <PriorityChip to={centerPath(mfcId, 'dispatch-delays')} label={m.priority.delays} n={delays.data?.length} failed={delays.isError} tone="error" />
         <PriorityChip to={`${centerPath(mfcId, 'tasks')}#handover-checks`} label={m.priority.handover} n={handovers.data?.items?.length} failed={handovers.isError} tone="warning" />
         <PriorityChip to={`${centerPath(mfcId, 'tasks')}?state=BLOCKED`} label={m.priority.blocked} n={tasks.data ? blocked : undefined} failed={tasks.isError} tone="warning" />

@@ -54,38 +54,76 @@ function withTasks(pages: ReadonlyArray<ReadonlyArray<ReturnType<typeof task>>>)
   );
 }
 
-const standard = () =>
-  withTasks([
+/**
+ * 출하 약속(fulfillment 0.35.0 — 배차 요청 예상 준비 시각): 출고별 약속(shipmentId → 시각, 없으면 배차 요청 전)과 서버 요약.
+ * 요약은 부산진구만 이 값, 다른 센터는 0(목포는 늦게 온다).
+ */
+function withPromises(promises: Readonly<Record<string, string | null>>, summary = { overdue: 0, dueSoon: 0, onTime: 0, noPromise: 0 }) {
+  server.use(
+    http.get(`${API_BASE}/shipments/promise-summary`, async ({ request }) => {
+      const mfcId = new URL(request.url).searchParams.get('mfcId');
+      if (mfcId === 'MFC-MOKPO-01') await delay(200);
+      const n = mfcId === 'MFC-BJG-01' ? summary : { overdue: 0, dueSoon: 0, onTime: 0, noPromise: 0 };
+      return HttpResponse.json({ ...n, dueWithinMinutes: 15, asOf: NOW });
+    }),
+    http.get(`${API_BASE}/shipments`, ({ request }) => {
+      const mfcId = new URL(request.url).searchParams.get('mfcId');
+      const items =
+        mfcId === 'MFC-BJG-01'
+          ? Object.entries(promises).map(([shipmentId, p]) => ({ shipmentId, orderId: `ORD-${shipmentId}`, fulfillmentId: 'F', mfcId, workOrderKind: 'ORIGINAL', state: 'PREPARING', createdAt: NOW, dispatchRequestedAt: p ? NOW : null, packageCounts: { total: 0, sealed: 0, handedOver: 0 }, packages: [] }))
+          : [];
+      return HttpResponse.json({ items, nextCursor: null, asOf: NOW });
+    }),
+    http.get(`${API_BASE}/shipments/:shipmentId`, ({ params }) => {
+      const id = String(params.shipmentId);
+      const p = promises[id] ?? null;
+      return HttpResponse.json({ shipmentId: id, orderId: `ORD-${id}`, state: 'PREPARING', packages: [], dispatchRequest: p ? { shipmentId: id, trigger: 'MANUAL', estimatedReadyAt: p, requestedAt: NOW } : null });
+    }),
+  );
+}
+
+const standard = () => {
+  // 작업 promisedReadyAt(피킹 시작 가능 시각)은 판정에 쓰지 않는다 — 모두 지난 값이어도 출하 약속은 출고 쪽
+  withPromises({ 'SHP-1': at(-30), 'SHP-2': at(10), 'SHP-5': at(90), 'SHP-6': null }, { overdue: 1, dueSoon: 1, onTime: 1, noPromise: 1 });
+  return withTasks([
     [
       // 초과 30분 — 피킹·포장이 같은 출고(한 건으로)
       task({ taskId: 'TASK-PICK-1', shipmentId: 'SHP-1', promisedReadyAt: at(-30), orderNumber: '20000001', workerId: 'OP-wkr-1' }),
       task({ taskId: 'TASK-PACK-1', taskType: 'PACK', state: 'WAITING', shipmentId: 'SHP-1', promisedReadyAt: at(-30) }),
       // 임박 10분
-      task({ taskId: 'TASK-PICK-2', state: 'READY', shipmentId: 'SHP-2', promisedReadyAt: at(10) }),
+      task({ taskId: 'TASK-PICK-2', state: 'READY', shipmentId: 'SHP-2', promisedReadyAt: at(-60) }),
       // 여유(임박 아님)
-      task({ taskId: 'TASK-PICK-5', shipmentId: 'SHP-5', promisedReadyAt: at(90) }),
-      // 약속 시각 없음 — 세지 않는다
-      task({ taskId: 'TASK-PICK-6', shipmentId: 'SHP-6', promisedReadyAt: null }),
+      task({ taskId: 'TASK-PICK-5', shipmentId: 'SHP-5', promisedReadyAt: at(-60) }),
+      // 배차 요청 전(출하 약속 없음) — 세지 않는다
+      task({ taskId: 'TASK-PICK-6', shipmentId: 'SHP-6', promisedReadyAt: at(-60) }),
       // 복귀 작업은 출하 약속과 무관
       task({ taskId: 'TASK-RET-1', taskType: 'RETURN', shipmentId: null, promisedReadyAt: at(-100) }),
     ],
   ]);
+};
 
 const value = (id: string) => screen.findByTestId(`${id}-value`);
 const rows = () => screen.queryAllByTestId('exception-row');
 
 describe('출하 약속 규칙(opsRules)', () => {
-  it('출고별로 묶고, 약속 시각 없는 출고는 빼고, 임박은 기준 분 안', () => {
+  it('출고별로 묶고, 약속 = 출고 배차 요청 예상 준비 시각(작업 promisedReadyAt 은 안 씀), 요청 전 출고는 빼고, 임박은 기준 분 안', () => {
     const now = Date.parse(NOW);
     const r = promiseRows(
       [
-        task({ taskId: 'A', shipmentId: 'S1', promisedReadyAt: at(-5) }),
-        task({ taskId: 'B', taskType: 'PACK', state: 'WAITING', shipmentId: 'S1', promisedReadyAt: at(-5) }),
-        task({ taskId: 'C', shipmentId: 'S2', promisedReadyAt: at(14) }),
-        task({ taskId: 'D', shipmentId: 'S3', promisedReadyAt: at(15) }),
-        task({ taskId: 'E', shipmentId: 'S4', promisedReadyAt: null }),
-        task({ taskId: 'F', state: 'COMPLETED', shipmentId: 'S5', promisedReadyAt: at(-50) }),
+        // 작업 promisedReadyAt(피킹 시작 가능 시각)은 지났어도 출하 약속이 아니다
+        task({ taskId: 'A', shipmentId: 'S1', promisedReadyAt: at(-90) }),
+        task({ taskId: 'B', taskType: 'PACK', state: 'WAITING', shipmentId: 'S1', promisedReadyAt: at(-90) }),
+        task({ taskId: 'C', shipmentId: 'S2', promisedReadyAt: at(-90) }),
+        task({ taskId: 'D', shipmentId: 'S3', promisedReadyAt: at(-90) }),
+        task({ taskId: 'E', shipmentId: 'S4', promisedReadyAt: at(-90) }),
+        task({ taskId: 'F', state: 'COMPLETED', shipmentId: 'S5', promisedReadyAt: at(-90) }),
       ] as never,
+      new Map([
+        ['S1', at(-5)],
+        ['S2', at(14)],
+        ['S3', at(15)],
+        ['S5', at(-50)],
+      ]),
       now,
     );
     expect([r.overdue, r.dueSoon, r.noPromise]).toEqual([1, 1, 1]);
@@ -102,20 +140,21 @@ describe('센터 운영판', () => {
     expect(screen.getByRole('link', { name: '홈' })).toHaveAttribute('href', '/c/MFC-BJG-01/ops');
   });
 
-  it('내 할 일 숫자 칸: 출하 약속(서버 약속 시각) · 결품·파손(서버 지표) · 인계 확인 필요 — 작업 목록은 끝나지 않은 상태를 모두, 큰 쪽으로', async () => {
+  it('내 할 일 숫자 칸: 출하 약속(서버 요약 — 배차 요청 예상 준비 시각) · 결품·파손(서버 지표) · 인계 확인 필요 — 작업 목록은 끝나지 않은 상태를 모두, 큰 쪽으로', async () => {
     standard();
     const view = renderAt('/c/MFC-BJG-01/ops');
     expect(await value('tile-overdue')).toHaveTextContent('1건');
     expect(await value('tile-due')).toHaveTextContent('1건');
-    expect(screen.getByTestId('ops-rules')).toHaveTextContent('임박 = 약속 시각까지 15분 안');
-    expect(screen.getByTestId('ops-rules')).toHaveTextContent('약속 시각 없는 출고 1건은 세지 않아요');
+    expect(screen.getByTestId('ops-rules')).toHaveTextContent('출하 약속 = 배차 요청 때 정한 예상 준비 시각 · 임박 = 15분 안');
+    expect(screen.getByTestId('ops-rules')).toHaveTextContent('배차 요청 전이라 약속이 없는 출고 1건은 세지 않아요');
     expect(await value('tile-short')).toHaveTextContent('2줄');
     expect(await value('tile-damaged')).toHaveTextContent('1줄');
     // 변질(SPOILED — fulfillment 0.22.0) 줄도 따로
     expect(await value('tile-spoiled')).toHaveTextContent('1줄');
     expect(await value('tile-handover')).toHaveTextContent('1건');
-    // 이상 N 한 줄(서버 숫자) — 약속 초과·인계 확인·파손 사고
-    expect(await screen.findByTestId('ops-status')).toHaveTextContent('이상 3');
+    // 확인할 일 N가지 한 줄(서버 숫자) — 약속 초과·인계 확인·파손 사고 세 종류(건수가 아니다)
+    expect(await screen.findByTestId('ops-status')).toHaveTextContent('확인할 일 3가지');
+    expect(new URL(view.gets('/shipments/promise-summary')[0]!.url).searchParams.get('dueWithinMinutes')).toBe('15');
     const q = new URL(view.gets('/tasks')[0]!.url).searchParams;
     expect([q.get('mfcId'), q.getAll('state'), q.get('size')]).toEqual(['MFC-BJG-01', ['WAITING', 'READY', 'ASSIGNED', 'IN_PROGRESS', 'BLOCKED'], '200']);
     const m = new URL(view.gets('/metrics/picking-lines')[0]!.url).searchParams;
@@ -138,7 +177,8 @@ describe('센터 운영판', () => {
     expect(rows()[1]).toHaveTextContent('출하 약속 임박');
     expect(rows()[1]).toHaveTextContent('10분 남음');
     expect(rows()[1]).toHaveTextContent('정보 없음'); // 주문번호 없음
-    expect(within(rows()[0]!).getByRole('link', { name: '작업 상세 — 재배정·작업 풀기' })).toHaveAttribute('href', '/c/MFC-BJG-01/tasks/TASK-PICK-1');
+    expect(within(rows()[0]!).getByRole('link', { name: '작업 상세 — 재배정·작업 풀기' })).toHaveAttribute('href', '/c/MFC-BJG-01/tasks/TASK-PICK-1#task-actions');
+    expect(rows()[0]).toHaveTextContent(/출하 약속 \S/);
 
     // 결품·파손: 피킹 결품 보고로 열린 파손 사고만(직접 등록 사고 제외), 결품 건별 목록은 계약 없음 안내
     await userEvent.click(screen.getByTestId('tile-damaged'));
@@ -175,13 +215,22 @@ describe('센터 운영판', () => {
     expect(screen.getByRole('button', { name: '인계 확인' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('작업이 많으면 끝까지 읽되 상한을 넘으면 "N건 이상" — 첫 쪽만 세지 않는다', async () => {
-    const page = (n: number) => Array.from({ length: 3 }, (_, i) => task({ taskId: `T-${n}-${i}`, shipmentId: `S-${n}-${i}`, promisedReadyAt: at(-5) }));
+  it('숫자 칸은 서버 요약(전체) — 작업이 상한을 넘어 줄을 다 못 읽으면 그렇다고 알린다', async () => {
+    const page = (n: number) => Array.from({ length: 3 }, (_, i) => task({ taskId: `T-${n}-${i}`, shipmentId: `S-${n}-${i}` }));
     withTasks([page(0), page(1), page(2), page(3), page(4), page(5)]);
+    withPromises(Object.fromEntries(Array.from({ length: 18 }, (_, k) => [`S-${Math.floor(k / 3)}-${k % 3}`, at(-5)])), { overdue: 18, dueSoon: 0, onTime: 0, noPromise: 0 });
     const view = renderAt('/c/MFC-BJG-01/ops');
-    expect(await value('tile-overdue')).toHaveTextContent('15건 이상');
-    expect(view.gets('/tasks')).toHaveLength(5);
-    expect(screen.getByText(/앞의 15건까지만 읽었어요/)).toBeInTheDocument();
+    expect(await value('tile-overdue')).toHaveTextContent('18건');
+    await waitFor(() => expect(view.gets('/tasks')).toHaveLength(5));
+    expect(await screen.findByText(/일부만 읽었어요/)).toBeInTheDocument();
+  });
+
+  it('작업 promisedReadyAt 이 지났어도 배차 요청 전 출고는 "출하 약속 초과"가 아니다(즉시 주문 피킹 중)', async () => {
+    withTasks([[task({ taskId: 'TASK-NOW-1', shipmentId: 'SHP-NOW', promisedReadyAt: at(-40), orderNumber: '20009999' })]]);
+    withPromises({ 'SHP-NOW': null }, { overdue: 0, dueSoon: 0, onTime: 0, noPromise: 1 });
+    renderAt('/c/MFC-BJG-01/ops?type=promise');
+    expect(await value('tile-overdue')).toHaveTextContent('0건');
+    expect(await screen.findByText('처리할 예외가 없어요')).toBeInTheDocument();
   });
 
   it('조회 실패는 0건이 아니다 — 실패한 원천만 "조회 실패", 나머지는 보인다', async () => {
@@ -198,6 +247,7 @@ describe('센터 운영판', () => {
 
   it('실제 0건은 0건 — 예외가 없으면 빈 목록 안내', async () => {
     withTasks([[]]);
+    withPromises({});
     server.use(
       http.get(`${API_BASE}/packages`, () => HttpResponse.json({ items: [], asOf: { asOf: NOW, freshness: 'CURRENT' } })),
       http.get(`${API_BASE}/quality-incidents`, () => HttpResponse.json({ items: [], nextCursor: null })),
@@ -285,7 +335,8 @@ describe('홈 보탬 — 작업 흐름·작업자 지금·최근 본 것, 메뉴
     standard();
     renderAt('/c/MFC-BJG-01/ops');
     expect(await screen.findByTestId('recent-panel')).toHaveTextContent('최근 연 상세가 없어요');
-    await waitFor(() => expect(rows().length).toBeGreaterThan(0));
+    // 출하 약속 줄(맨 위)은 작업·출고별 약속을 다 읽은 뒤에 나온다
+    await waitFor(() => expect(rows()[0]?.dataset.group).toBe('promise'));
     await userEvent.click(within(rows()[0]!).getByRole('link'));
     await screen.findByRole('heading', { level: 1, name: /^20000001 피킹/ });
     await userEvent.click(screen.getByRole('link', { name: '홈' }));

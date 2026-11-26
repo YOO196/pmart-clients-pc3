@@ -388,9 +388,7 @@ function TaskDetailPage({ mfcId }: { readonly mfcId: string }) {
             )}
             <TaskFacts task={t} />
             {(t.pendingExecutions ?? []).length > 0 && <p className="alert alert-info text-sm">{m.pendingNote(t.pendingExecutions!.length)}</p>}
-            {(t.state === 'ASSIGNED' || t.state === 'IN_PROGRESS') && t.assignment?.workerId && (
-              <Release key={`${t.version ?? 0}`} mfcId={mfcId} task={t} onDone={setNotice} />
-            )}
+            <DetailActions key={`${t.version ?? 0}`} mfcId={mfcId} task={t} onDone={setNotice} />
             <TaskLines task={t} />
             {t.shipmentId ? <ShipmentView shipmentId={t.shipmentId} /> : <p className="text-sm opacity-70">{m.noShipment}</p>}
             <SystemNumbers
@@ -495,6 +493,45 @@ function TaskLines({ task: t }: { readonly task: TaskDetail }) {
   );
 }
 
+/**
+ * 상세의 조치 칸(2026-11-26 홈 평가 "작업 상세 — 재배정·작업 풀기 링크를 눌러도 상세에 조치가 없다") — 상태마다 할 수 있는 것,
+ * 못 하면 그 자리에 이유. 담당 정하기·바꾸기 = 목록 행 조치와 같은 폼(mfc-capacity), 내놓기 = fulfillment releases(ASSIGNED·IN_PROGRESS 만, 계약).
+ * 막힘(BLOCKED)은 재배정·내놓기가 안 된다 — 결품은 결품 처리가, 관리자 중지는 관리자 해제가 푼다(fulfillment 0.28~0.30 blockKind).
+ */
+function DetailActions({ mfcId, task: t, onDone }: { readonly mfcId: string; readonly task: TaskDetail; readonly onDone: (t: string | null) => void }) {
+  const a = m.ui.detailActions;
+  const [open, setOpen] = useState(false);
+  const canAssign = t.state === 'READY' || t.state === 'WAITING' || t.state === 'ASSIGNED' || t.state === 'IN_PROGRESS';
+  const canRelease = (t.state === 'ASSIGNED' || t.state === 'IN_PROGRESS') && !!t.assignment?.workerId;
+  const why = canAssign
+    ? null
+    : t.state === 'BLOCKED'
+      ? t.blockKind === 'SUPERVISOR'
+        ? a.whySupervisor
+        : t.blockKind === 'PARTIAL_CLOSE'
+          ? a.whyPartialClose
+          : a.whyShortage
+      : a.whyEnded;
+  return (
+    <section id="task-actions" className="space-y-3 rounded-box bg-base-100 p-4 text-sm" data-testid="task-actions">
+      <h2 className="font-semibold">{a.title}</h2>
+      {why ? (
+        <p className="text-base-content/70" data-testid="task-actions-why">
+          {why}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          <button type="button" className={`btn btn-sm ${open ? 'btn-primary' : ''}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+            {t.assignment?.workerId ? m.actions.reassign : m.actions.assign}
+          </button>
+          {open && <ReassignForm mfcId={mfcId} task={t} onClose={() => setOpen(false)} />}
+        </div>
+      )}
+      {canRelease && <Release mfcId={mfcId} task={t} onDone={onDone} />}
+    </section>
+  );
+}
+
 function Release({ mfcId, task, onDone }: { readonly mfcId: string; readonly task: TaskDetail; readonly onDone: (t: string | null) => void }) {
   const api = useApi();
   const queryClient = useQueryClient();
@@ -517,7 +554,7 @@ function Release({ mfcId, task, onDone }: { readonly mfcId: string; readonly tas
   });
   return (
     <form
-      className="space-y-2 rounded-box bg-base-100 p-4 text-sm"
+      className="space-y-2 border-t border-base-300 pt-3 text-sm"
       aria-label={m.release}
       onSubmit={(e) => {
         e.preventDefault();
@@ -563,6 +600,11 @@ function ShipmentView({ shipmentId }: { readonly shipmentId: string }) {
               )}
               {m.shipmentState[s.state ?? ''] ?? s.state}
               {s.holdReason && <span className="ml-1 opacity-70">{s.holdReason}</span>}
+            </p>
+            {/* 출하 약속 = 배차 요청 예상 준비 시각(fulfillment 0.35.0) — 홈 "출하 약속 초과·임박"과 같은 값 */}
+            <p data-testid="shipment-promise">
+              <span className="opacity-70">{m.shipmentPromise} </span>
+              {s.dispatchRequest?.estimatedReadyAt ? formatSeoul(s.dispatchRequest.estimatedReadyAt) : m.shipmentNoPromise}
             </p>
             {(s.packages ?? []).length === 0 ? (
               <p className="opacity-70">{m.noPackages}</p>

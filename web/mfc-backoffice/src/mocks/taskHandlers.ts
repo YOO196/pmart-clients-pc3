@@ -187,6 +187,61 @@ export const taskHandlers = [
     });
   }),
 
+  // 출하 약속 요약(0.35.0 — 약속 = 배차 요청 estimatedReadyAt, READY 전 출고만, 요청 전 = noPromise). `/shipments/:shipmentId` 보다 먼저
+  http.get(`${API_BASE}/shipments/promise-summary`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    const q = new URL(request.url).searchParams;
+    const mfcId = q.get('mfcId') ?? '';
+    if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
+    const due = Number(q.get('dueWithinMinutes') ?? 15);
+    const now = Date.now();
+    const n = { overdue: 0, dueSoon: 0, onTime: 0, noPromise: 0 };
+    for (const s of db.shipments.values()) {
+      if (s.mfcId !== mfcId || s.state !== 'PREPARING') continue;
+      const at = s.dispatchRequest?.estimatedReadyAt;
+      if (!at) n.noPromise += 1;
+      else if (Date.parse(at) < now) n.overdue += 1;
+      else if (Date.parse(at) < now + due * 60_000) n.dueSoon += 1;
+      else n.onTime += 1;
+    }
+    return HttpResponse.json({ ...n, dueWithinMinutes: due, asOf: new Date(now).toISOString() });
+  }),
+
+  // 센터 출고 목록(F-9) — state 비우면 끝나지 않은 출고. 작업 상태는 db.tasks 에서
+  http.get(`${API_BASE}/shipments`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    const q = new URL(request.url).searchParams;
+    const mfcId = q.get('mfcId') ?? '';
+    if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
+    const states = q.getAll('state');
+    const want = states.length > 0 ? states : ['PREPARING', 'READY', 'PARTIALLY_HANDED_OVER'];
+    const taskOf = (shipmentId: string, type: string) => [...db.tasks.values()].find((t) => t.shipmentId === shipmentId && t.taskType === type);
+    const items = [...db.shipments.values()]
+      .filter((s) => s.mfcId === mfcId && want.includes(s.state ?? ''))
+      .map((s) => {
+        const pick = taskOf(s.shipmentId, 'PICK');
+        const pack = taskOf(s.shipmentId, 'PACK');
+        const pkgs = s.packages ?? [];
+        return {
+          shipmentId: s.shipmentId,
+          orderId: s.orderId ?? '',
+          orderNumber: s.orderNumber ?? null,
+          fulfillmentId: s.fulfillmentId ?? '',
+          mfcId: s.mfcId,
+          workOrderKind: 'ORIGINAL',
+          state: s.state,
+          createdAt: pick?.createdAt ?? '2026-11-16T00:30:00.000Z',
+          readyAt: s.readyAt ?? null,
+          dispatchRequestedAt: s.dispatchRequest?.requestedAt ?? null,
+          pick: pick ? { state: pick.state, blockReason: pick.blockReason ?? null, startedAt: null } : null,
+          pack: pack ? { state: pack.state, blockReason: pack.blockReason ?? null, startedAt: null } : null,
+          packageCounts: { total: pkgs.length, sealed: pkgs.filter((p) => p.state === 'SEALED').length, handedOver: pkgs.filter((p) => p.state === 'HANDED_OVER').length },
+          packages: [],
+        };
+      });
+    return HttpResponse.json({ items, nextCursor: null, asOf: new Date().toISOString() });
+  }),
+
   http.get(`${API_BASE}/shipments/:shipmentId`, ({ request, params }) => {
     if (!operator(request)) return unauthorized();
     const s = db.shipments.get(String(params.shipmentId));

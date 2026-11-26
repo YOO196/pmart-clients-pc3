@@ -71,7 +71,8 @@ describe('센터 대시보드', () => {
   it('우선 확인 칩 — 서버 값으로 센 급한 일, 누르면 그 화면으로', async () => {
     renderAt('/c/MFC-BJG-01/dashboard');
     const bar = await screen.findByTestId('priority-bar');
-    await waitFor(() => expect(within(bar).getByRole('link', { name: /출하 약속 초과/ })).toHaveTextContent('3건'));
+    // 서버 요약(fulfillment 0.35.0 — 배차 요청 예상 준비 시각이 지난 READY 전 출고): 목 SHP-1·SHP-3
+    await waitFor(() => expect(within(bar).getByRole('link', { name: /출하 약속 초과/ })).toHaveTextContent('2건'));
     await waitFor(() => expect(within(bar).getByRole('link', { name: /배차 지연/ })).toHaveTextContent('2건'));
     expect(within(bar).getByRole('link', { name: /배차 지연/ })).toHaveAttribute('href', '/c/MFC-BJG-01/dispatch-delays');
     expect(within(bar).getByRole('link', { name: /막힌 작업/ })).toHaveAttribute('href', '/c/MFC-BJG-01/tasks?state=BLOCKED');

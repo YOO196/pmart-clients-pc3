@@ -1,5 +1,8 @@
 // 센터 운영판 규칙 — 한곳에 둔다(화면에도 기준을 보인다).
-// - 출하 약속: 서버 작업의 promisedReadyAt(출하 준비 약속 시각)과 작업 상태만 쓴다. 약속 시각이 없는 출고는 임박·초과에서 뺀다(빼낸 수를 보인다).
+// - 출하 약속 = 출고의 배차 요청 예상 준비 시각 `dispatchRequest.estimatedReadyAt`(mfc-fulfillment 0.35.0, 사용자 결정 2026-11-24 —
+//   `GET /shipments/promise-summary`·`/metrics/ship-promises` 와 같은 값). 배차 요청 전 출고는 약속이 없다(임박·초과에서 빼고 수를 보인다).
+//   예전(0.34.0 까지)처럼 작업 promisedReadyAt 을 쓰면 안 된다 — 실제로는 PICK 시작 가능 시각(즉시 주문은 접수 시각)이라 즉시 주문이 피킹 내내 "초과"로 나온다
+//   (2026-11-26 홈 평가로 찾음). 숫자 칸은 서버 요약, 예외 줄은 출고마다 같은 규칙으로 판정해 지금 단계 작업과 잇는다.
 //   출고 하나에 PICK·PACK 작업이 따로 있어 출고(shipmentId) 단위로 묶는다. 끝나지 않은 PICK·PACK 이 있으면 아직 출하 준비가 안 된 출고다
 //   (출고가 READY 가 되면 PICK·PACK 은 COMPLETED — mfc-fulfillment 상태표).
 // - 임박 기준: 업무 원문(MFC-business-logic)에 출하 임박 기준이 없다 → 화면 기준 DUE_SOON_MINUTES(백엔드 규칙이 생기면 바꾼다).
@@ -41,8 +44,8 @@ export interface PromiseResult {
 
 const STAGE_ORDER: Readonly<Record<string, number>> = { PICK: 0, PACK: 1 };
 
-/** 끝나지 않은 작업 → 출고별 약속 초과·임박 */
-export function promiseRows(tasks: readonly TaskSummary[], nowMs: number, dueSoonMinutes = DUE_SOON_MINUTES): PromiseResult {
+/** 끝나지 않은 작업 + 출고별 출하 약속(shipmentId → estimatedReadyAt) → 출고별 약속 초과·임박 */
+export function promiseRows(tasks: readonly TaskSummary[], promises: ReadonlyMap<string, string>, nowMs: number, dueSoonMinutes = DUE_SOON_MINUTES): PromiseResult {
   const groups = new Map<string, TaskSummary[]>();
   for (const t of tasks) {
     if (t.taskType !== 'PICK' && t.taskType !== 'PACK') continue;
@@ -53,12 +56,12 @@ export function promiseRows(tasks: readonly TaskSummary[], nowMs: number, dueSoo
   const rows: PromiseRow[] = [];
   let noPromise = 0;
   for (const list of groups.values()) {
-    const promised = list.map((t) => t.promisedReadyAt).filter((v): v is string => !!v);
-    if (promised.length === 0) {
+    const shipmentId = list[0]!.shipmentId;
+    const promisedAt = shipmentId ? promises.get(shipmentId) : undefined;
+    if (!promisedAt) {
       noPromise += 1;
       continue;
     }
-    const promisedAt = promised.reduce((a, b) => (Date.parse(a) <= Date.parse(b) ? a : b));
     const diff = Math.floor((Date.parse(promisedAt) - nowMs) / 60_000);
     const task = [...list].sort((a, b) => (STAGE_ORDER[a.taskType ?? ''] ?? 9) - (STAGE_ORDER[b.taskType ?? ''] ?? 9))[0]!;
     const base = { shipmentId: task.shipmentId ?? null, orderNumber: list.find((t) => t.orderNumber)?.orderNumber ?? null, task, promisedAt };
