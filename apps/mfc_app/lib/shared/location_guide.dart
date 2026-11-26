@@ -184,7 +184,7 @@ class LocationCard extends StatelessWidget {
                                 value,
                                 style: const TextStyle(
                                   color: PdaColors.primary,
-                                  fontSize: 30,
+                                  fontSize: 26,
                                   height: 1.2,
                                   fontWeight: FontWeight.w700,
                                   fontFeatures: [FontFeature.tabularFigures()],
@@ -279,7 +279,7 @@ class LocationBlocks extends StatelessWidget {
                         value,
                         style: const TextStyle(
                           color: PdaColors.primary,
-                          fontSize: 22,
+                          fontSize: 20,
                           fontWeight: FontWeight.w700,
                         ),
                       ),

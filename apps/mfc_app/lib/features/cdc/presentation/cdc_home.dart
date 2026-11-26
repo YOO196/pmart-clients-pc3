@@ -90,7 +90,7 @@ class CdcHomeScreen extends ConsumerWidget {
                 ),
                 style: const TextStyle(
                   color: PdaColors.ink,
-                  fontSize: 19,
+                  fontSize: 17,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.5,
                 ),
@@ -228,7 +228,7 @@ class _CdcAreaTile extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: PdaColors.ink,
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -329,7 +329,7 @@ class _CdcAreaFlight extends StatelessWidget {
                             overflow: TextOverflow.clip,
                             style: const TextStyle(
                               color: PdaColors.ink,
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

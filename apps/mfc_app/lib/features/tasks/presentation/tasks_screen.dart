@@ -736,7 +736,7 @@ class _PickCard extends StatelessWidget {
                   child: Text(
                     stop.line.productName ?? stop.line.sku,
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontSize: 19,
+                      fontSize: 17,
                       fontWeight: FontWeight.w700,
                       height: 1.35,
                     ),
@@ -746,7 +746,7 @@ class _PickCard extends StatelessWidget {
                 Text(
                   l10n.pickFooterQty(stop.qty),
                   style: const TextStyle(
-                    fontSize: 30,
+                    fontSize: 26,
                     fontWeight: FontWeight.w800,
                     color: PdaColors.primary,
                   ),

@@ -170,7 +170,7 @@ class _CenterCard extends StatelessWidget {
                         '$n',
                         style: const TextStyle(
                           color: PdaColors.primary,
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -187,7 +187,7 @@ class _CenterCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: PdaColors.ink,
-                              fontSize: 19,
+                              fontSize: 17,
                               fontWeight: FontWeight.w700,
                               letterSpacing: -0.3,
                               fontFeatures: [FontFeature.tabularFigures()],
@@ -400,7 +400,7 @@ class _PlaceCard extends StatelessWidget {
                                 title,
                                 style: const TextStyle(
                                   color: PdaColors.ink,
-                                  fontSize: 25,
+                                  fontSize: 22,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: -0.4,
                                 ),

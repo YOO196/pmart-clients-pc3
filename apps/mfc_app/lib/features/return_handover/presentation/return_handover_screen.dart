@@ -162,7 +162,7 @@ class _ReturnCard extends ConsumerWidget {
             Text(
               returnPurposeText(l10n, item.purpose),
               style: theme.textTheme.titleMedium?.copyWith(
-                fontSize: 19,
+                fontSize: 17,
                 fontWeight: FontWeight.w700,
               ),
             ),

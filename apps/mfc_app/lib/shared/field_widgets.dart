@@ -219,13 +219,13 @@ class ActionBar extends StatelessWidget {
         child: SafeArea(
           top: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(15, 12, 15, 14),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (final (i, c) in children.indexed) ...[
-                  if (i > 0) const SizedBox(height: 9),
+                  if (i > 0) const SizedBox(height: 7),
                   c,
                 ],
               ],

@@ -300,7 +300,7 @@ class HandoverChecksScreen extends ConsumerWidget {
                                 ? l10n.hoLocationUnknown
                                 : l10n.hoLocation(h.packingLocation!),
                             style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 19,
+                              fontSize: 17,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -426,7 +426,7 @@ class PackageHandoverScreen extends ConsumerWidget {
                           ? l10n.hoLocationUnknown
                           : l10n.hoLocation(h.packingLocation!),
                       style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 19,
+                        fontSize: 17,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

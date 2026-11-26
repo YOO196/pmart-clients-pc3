@@ -93,10 +93,10 @@ abstract final class PdaTheme {
       fontFamily: fontFamily,
     ).textTheme;
     const w4 = FontWeight.w400, w6 = FontWeight.w600, w7 = FontWeight.w700;
-    final base = m3.copyWith(
+    final base0 = m3.copyWith(
       headlineLarge: m3.headlineLarge!.copyWith(fontWeight: w7),
       headlineMedium: m3.headlineMedium!.copyWith(fontWeight: w7),
-      headlineSmall: m3.headlineSmall!.copyWith(fontSize: 22, fontWeight: w7),
+      headlineSmall: m3.headlineSmall!.copyWith(fontSize: 20, fontWeight: w7),
       titleLarge: m3.titleLarge!.copyWith(fontWeight: w6),
       titleMedium: m3.titleMedium!.copyWith(fontWeight: w6),
       titleSmall: m3.titleSmall!.copyWith(fontWeight: w6),
@@ -115,6 +115,10 @@ abstract final class PdaTheme {
       labelMedium: m3.labelMedium!.copyWith(fontSize: 13, fontWeight: w6),
       labelSmall: m3.labelSmall!.copyWith(fontSize: 12, fontWeight: w6),
     );
+    // 글자 전체를 조금 작게(사용자 2026-11-27 "글자 크기 부담스럽다")
+    final base = Typography.englishLike2021
+        .merge(base0)
+        .apply(fontSizeFactor: 0.92);
     final bold = base.labelLarge!.copyWith(fontWeight: FontWeight.w700);
     return ThemeData(
       colorScheme: scheme,
@@ -136,7 +140,7 @@ abstract final class PdaTheme {
         systemOverlayStyle: SystemUiOverlayStyle.dark,
         titleTextStyle: base.titleMedium!.copyWith(
           color: PdaColors.ink,
-          fontSize: 17,
+          fontSize: 16,
           fontWeight: FontWeight.w700,
           letterSpacing: -0.3,
         ),
@@ -152,22 +156,22 @@ abstract final class PdaTheme {
       dividerTheme: const DividerThemeData(color: PdaColors.line, space: 1),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(64, 56),
+          minimumSize: const Size(64, 50),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
           // 스캔 단추와 같은 글자 — 20·700(단추 높이 56~58 에 맞는 비율, 사용자 2026-11-20 "글자가 작다").
           textStyle: bold.copyWith(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
             letterSpacing: -0.2,
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(64, 50),
+          minimumSize: const Size(64, 46),
           shape: shape10,
           backgroundColor: Colors.white,
           foregroundColor: PdaColors.ink,
