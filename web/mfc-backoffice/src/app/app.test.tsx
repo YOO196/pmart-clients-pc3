@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { TokenStore } from '@pmart/web-core';
+import { mockOperatorToken, TokenStore } from '@pmart/web-core';
 import { API_BASE } from '../api/client';
 import { SOURCE_SYSTEM } from '../api/command';
 import { beginEmployeeLogin, browser, LOGIN_SILENT_KEY } from '../api/employeeAuth';
@@ -47,12 +47,51 @@ describe('로그인', () => {
 });
 
 describe('센터', () => {
-  it('센터가 하나면 고르지 않고 그 센터로 — 이름은 세션 응답 centerDetails(0.9.0)에서, GET /centers 는 부르지 않는다', async () => {
+  it('센터가 하나면 고르지 않고 그 센터로 — 이름은 세션 응답 centerDetails(0.9.0)에서, GET /centers 는 유형(type=MFC) 거르기에만', async () => {
     const view = renderAt('/');
     expect(await screen.findByRole('heading', { name: '오늘 센터 현황' })).toBeInTheDocument();
     expect(await screen.findByText('부산진구 MFC (MFC-BJG-01)')).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: '센터 고르기' })).not.toBeInTheDocument();
-    expect(view.gets('/centers')).toHaveLength(0);
+    expect(view.gets('/centers').map((r) => new URL(r.url).searchParams.get('type'))).toEqual(['MFC']);
+  });
+
+  it('DC 도 맡은 계정(CDC01·MFC) — DC 는 빼고 MFC 로 들어가고, 고르기에도 DC 가 없다(2026-11-26 "/c/CDC01/inbound 로 자동으로 쳐져")', async () => {
+    const mixed = mockOperatorToken({ sub: 'OP-mix-1', roles: ['MFC_SUPERVISOR', 'CDC_SUPERVISOR'], centers: ['CDC01', 'MFC-BJG-01', 'MFC-MOKPO-01'], exp: 4_000_000_000 });
+    server.use(
+      http.get(`${API_BASE}/employee-auth/sessions/current`, () =>
+        HttpResponse.json({
+          sessionId: 'SES-MIX',
+          operatorId: 'OP-mix-1',
+          app: 'mfc-backoffice',
+          issuedAt: '2026-11-26T00:00:00Z',
+          expiresAt: '2026-11-26T00:15:00Z',
+          roles: ['MFC_SUPERVISOR', 'CDC_SUPERVISOR'],
+          centers: ['CDC01', 'MFC-BJG-01', 'MFC-MOKPO-01'],
+          centerDetails: [
+            { centerId: 'CDC01', name: '칠곡 DC' },
+            { centerId: 'MFC-BJG-01', name: '부산진구 MFC' },
+            { centerId: 'MFC-MOKPO-01', name: '목포 MFC' },
+          ],
+        }),
+      ),
+    );
+    renderAt('/', mixed);
+    const select = await screen.findByRole('combobox', { name: '센터 고르기' });
+    expect(select).toHaveValue('MFC-BJG-01');
+    expect(within(select).getAllByRole('option').map((o) => o.textContent)).toEqual(['부산진구 MFC (MFC-BJG-01)', '목포 MFC (MFC-MOKPO-01)']);
+    cleanup();
+    // DC 주소로 들어오면 권한 없음 + MFC 로 가는 링크만
+    renderAt('/c/CDC01/inbound', mixed);
+    expect(await screen.findByRole('alert')).toHaveTextContent('이 센터 권한이 없습니다');
+    expect(screen.getByRole('link', { name: 'MFC-BJG-01' })).toHaveAttribute('href', '/c/MFC-BJG-01/inbound');
+    expect(screen.queryByRole('link', { name: 'CDC01' })).not.toBeInTheDocument();
+  });
+
+  it('센터 유형 목록을 못 받으면 거르지 않는다(고를 수 없게 만들지 않음)', async () => {
+    server.use(http.get(`${API_BASE}/centers`, () => new HttpResponse(null, { status: 503 })));
+    renderAt('/c/MFC-BJG-01/inventory', as.sup2);
+    const select = await screen.findByRole('combobox', { name: '센터 고르기' });
+    await waitFor(() => expect(within(select).getAllByRole('option')).toHaveLength(2));
   });
 
   it('센터가 둘 이상이면 위에서 고른다 — 세션 centers 만(전체 목록의 다른 센터는 없다), 바꾸면 같은 메뉴', async () => {

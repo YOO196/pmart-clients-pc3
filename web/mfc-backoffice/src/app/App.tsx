@@ -34,14 +34,15 @@ import { RequireSession, SessionProvider, useSession } from './SessionContext';
 import { LiveClock } from './LiveClock';
 import { groupIcon, useMenuCollapsed } from './sideMenu';
 import { ThemeToggle } from './ThemeToggle';
+import { useMfcCenters } from './mfcCenters';
 import { DETAIL_BAR_SLOT } from '../shared/StickyTitle';
 
-/** 주소의 센터(`/c/:mfcId/…`). 세션 centers(sessions/current)에 있을 때만 그 센터 */
+/** 주소의 센터(`/c/:mfcId/…`). 세션 centers 중 MFC(useMfcCenters — DC 는 빼고)에 있을 때만 그 센터 */
 function useCenter(): { readonly mfcId: string; readonly mine: boolean } | null {
   const { mfcId } = useParams();
-  const { session } = useSession();
+  const mfc = useMfcCenters();
   if (!mfcId) return null;
-  return { mfcId, mine: session?.centers.includes(mfcId) ?? false };
+  return { mfcId, mine: mfc.centers.includes(mfcId) };
 }
 
 /** 머리줄 내 정보 메뉴 — 이름·사번은 내 정보 화면과 같은 hr 본인 조회 */
@@ -71,9 +72,10 @@ function MfcAccountMenu() {
 function Layout() {
   const { session } = useSession();
   const center = useCenter();
+  const mfc = useMfcCenters();
   const { pathname } = useLocation();
   const [collapsed, toggleMenu] = useMenuCollapsed();
-  const target = center?.mine ? center.mfcId : session?.centers[0];
+  const target = center?.mine ? center.mfcId : mfc.centers[0];
   // 지금 메뉴(`/c/:mfcId/<segment>/…`) — 센터를 바꾸면 같은 메뉴로 간다
   const segment = pathname.split('/')[3] ?? allMenus[0]!.segment;
   const showMenus = !!target && !isWorkerOnly(session?.roles ?? []);
@@ -127,7 +129,7 @@ function Layout() {
       tools={
         <>
           <LiveClock />
-          {session && center?.mine && <CenterSwitcher centers={session.centers} current={center.mfcId} segment={segment} />}
+          {session && center?.mine && <CenterSwitcher centers={mfc.centers} current={center.mfcId} segment={segment} />}
           {/* 좁은 화면에서는 목 표시·단축키 도움·밝기 바꾸기·내 정보를 숨겨 머리줄이 넘치지 않게(2026-11-21) */}
           {env.isMock && <span className="badge badge-accent badge-sm hidden sm:inline-flex">{m.mockBadge}</span>}
           <span className="hidden sm:contents">
@@ -158,17 +160,19 @@ function Layout() {
 function CenterScope({ menu }: { readonly menu: MenuItem }) {
   const { session } = useSession();
   const center = useCenter();
+  const mfc = useMfcCenters();
   if (!session || !center) return null;
   if (isWorkerOnly(session.roles)) return <WorkerOnly />;
+  // MFC 목록을 받는 동안은 세션 centers 그대로(그리기를 막지 않는다) — 받은 뒤 DC 면 권한 없음으로 바뀐다. 첫 화면(Home)만 기다린다
   if (!center.mine) {
     return (
       <div className="space-y-3">
         <p role="alert" className="alert alert-warning text-sm">
-          {session.centers.length === 0 ? m.center.none : m.center.notMine}
+          {mfc.centers.length === 0 ? m.center.none : m.center.notMine}
         </p>
-        {session.centers.length > 0 && (
+        {mfc.centers.length > 0 && (
           <ul className="menu rounded-box bg-base-100 w-fit">
-            {session.centers.map((c) => (
+            {mfc.centers.map((c) => (
               <li key={c}>
                 <Link to={centerPath(c, menu.segment)}>{c}</Link>
               </li>
@@ -229,9 +233,11 @@ function WorkerOnly() {
 /** 첫 화면: 맡은 첫 센터의 센터 운영판(첫 메뉴)으로. 센터가 없거나 워커 전용이면 안내 */
 function Home() {
   const { session } = useSession();
+  const mfc = useMfcCenters();
   if (!session) return null;
   if (isWorkerOnly(session.roles)) return <WorkerOnly />;
-  const first = session.centers[0];
+  if (mfc.loading) return <Loading />;
+  const first = mfc.centers[0];
   if (!first) {
     return (
       <p role="alert" className="alert alert-warning text-sm">
@@ -240,6 +246,14 @@ function Home() {
     );
   }
   return <Navigate to={centerPath(first)} replace />;
+}
+
+function Loading() {
+  return (
+    <p role="status" className="p-6 text-sm opacity-70">
+      {m.loading}
+    </p>
+  );
 }
 
 const guarded = (element: ReactNode) => <RequireSession>{element}</RequireSession>;
