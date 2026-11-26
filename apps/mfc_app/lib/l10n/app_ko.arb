@@ -1810,8 +1810,8 @@
   "cdcLoadFinish": "끝 — 홈으로",
   "unloadBand": "도착한 DC 차량 {n}대 — 하차하기",
   "@unloadBand": {"placeholders": {"n": {"type": "int"}}},
-  "workplaceTitle": "어디서 일할까요?",
-  "workplaceHelp": "DC 와 MFC 권한이 모두 있어요. 할 곳을 고르세요 — 위의 바꾸기(⇄)로 언제든 바꿀 수 있어요.",
+  "workplaceTitle": "오늘 어디서 일할까요?",
+  "workplaceHelp": "DC 와 MFC 권한이 모두 있어요. 일할 곳을 고르면 그곳 업무가 열려요.",
   "workplaceDc": "DC 작업",
   "workplaceDcDesc": "피킹·분배·패킹·검품·상차 · {center}",
   "@workplaceDcDesc": {"placeholders": {"center": {"type": "String"}}},
@@ -1820,5 +1820,14 @@
   "@workplaceMfcDesc": {"placeholders": {"center": {"type": "String"}}},
   "workplaceSwitch": "작업장·센터 바꾸기",
   "centerChoiceTitle": "어느 센터에서 일할까요?",
-  "centerChoiceHelp": "근무 센터가 여러 곳이에요. 오늘 일할 센터를 고르세요 — 위의 바꾸기(⇄)로 언제든 바꿀 수 있어요."
+  "centerChoiceHelp": "근무 센터가 {n}곳이에요. 오늘 일할 센터를 고르면 그 센터 업무가 열려요.",
+  "@centerChoiceHelp": {"placeholders": {"n": {"type": "int"}}},
+  "workplaceDcTagline": "물류센터 출고 — 칠곡 DC",
+  "workplaceDcDuties": "피킹·분배·패킹·검품·상차",
+  "workplaceMfcTagline": "도심 센터 — 주문 출고·입고",
+  "workplaceMfcDuties": "피패킹·하차·입고·검품·재고",
+  "workplaceFootnote": "고른 뒤에도 상단 바꾸기 단추로 언제든 바꿀 수 있어요",
+  "centerChoiceCardSub": "근무 센터 · 누르면 이 센터로 시작",
+  "workplaceCentersMore": "{first} 외 {n}곳",
+  "@workplaceCentersMore": {"placeholders": {"first": {"type": "String"}, "n": {"type": "int"}}}
 }
