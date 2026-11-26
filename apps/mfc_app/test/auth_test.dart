@@ -773,7 +773,7 @@ void main() {
       await t.tap(find.byKey(const ValueKey('employee-login')));
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('login-error')), findsOneWidget);
-      expect(find.textContaining('이용할 수 없는 계정'), findsOneWidget);
+      expect(find.textContaining('쓸 수 없는 계정'), findsOneWidget);
       expect(find.byKey(const ValueKey('employee-login')), findsOneWidget);
 
       await t.tap(find.byKey(const ValueKey('employee-login')));
@@ -812,7 +812,7 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const ValueKey('employee-login')), findsOneWidget);
       expect(find.byKey(const ValueKey('session-ended')), findsOneWidget);
-      expect(find.textContaining('이용할 수 없는 계정'), findsOneWidget);
+      expect(find.textContaining('쓸 수 없는 계정'), findsOneWidget);
     });
 
     testWidgets('무활동 등으로 끝난 세션은 "다시 로그인" 안내', (t) async {

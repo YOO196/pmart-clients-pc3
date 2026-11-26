@@ -108,7 +108,7 @@ void main() {
   testWidgets('작업을 받을 수 없으면 사유와 서버 코드를 보인다', (t) async {
     await pump(t, nextRejectCode: 'WORKER_NOT_ACTIVE');
     await openRoute(t, '/work/pickPack');
-    expect(find.textContaining("작업자 상태가 '활동'이 아니에요"), findsOneWidget);
+    expect(find.textContaining('작업자 상태가 활동이 아니에요'), findsOneWidget);
     expect(find.text('사유 WORKER_NOT_ACTIVE'), findsOneWidget);
   });
 }

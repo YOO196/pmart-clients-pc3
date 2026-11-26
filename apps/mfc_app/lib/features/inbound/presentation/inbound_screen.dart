@@ -866,7 +866,7 @@ class _BoxCheckStep extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ScanPrompt(text: l10n.boxCheckTitle, detail: l10n.boxCheckHelp),
+          ScanPrompt(text: l10n.boxCheckTitle),
           // 한 줄에 함께 — 파손 표시로 줄이 늘어 아래 목록이 밀리지 않게.
           Text.rich(
             TextSpan(
