@@ -5,7 +5,6 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/field_widgets.dart';
-import '../../../shared/location_guide.dart';
 import '../../../shared/pda_theme.dart';
 import '../../../shared/providers.dart';
 import '../../../shared/scanner/scan_input.dart';
@@ -13,6 +12,7 @@ import '../../../shared/scanner/scanner.dart';
 import '../data/cdc_task_repository.dart';
 import '../domain/cdc_task.dart';
 import 'cdc_home.dart';
+import 'cdc_location.dart';
 import 'cdc_widgets.dart';
 
 final cdcTaskRepositoryProvider = Provider<CdcTaskRepository>(
@@ -367,7 +367,7 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
       }
     } else if (!_locOk) {
       body.add(
-        LocationGuide(
+        CdcLocationGuide(
           code: line.locationCode,
           codeKey: const ValueKey('cdc-pick-location'),
           detail: l10n.cdcPickLineOf(t.lines.indexOf(line) + 1, t.lines.length),

@@ -1635,5 +1635,17 @@
   "cdcPutawayOtherConfirmed": "다른 칸 · {code}",
   "@cdcPutawayOtherConfirmed": {"placeholders": {"code": {"type": "String"}}},
   "cdcPutawayQtyHelp": "넣은 수량(최대 {max}개). 일부만 넣으면 남은 양은 다음에",
-  "@cdcPutawayQtyHelp": {"placeholders": {"max": {"type": "int"}}}
+  "@cdcPutawayQtyHelp": {"placeholders": {"max": {"type": "int"}}},
+  "cdcLocFloor": "층",
+  "cdcLocAisle": "통로",
+  "cdcLocBay": "베이",
+  "cdcLocSpot": "자리",
+  "cdcLocBasement": "지하",
+  "cdcLocZone": "{zone}구역",
+  "@cdcLocZone": {"placeholders": {"zone": {"type": "String"}}},
+  "cdcLocRack": "팔레트 랙",
+  "cdcLocShelf": "피킹 선반",
+  "cdcLocDock": "지하 접안",
+  "cdcLocStaging": "출고대기",
+  "cdcLocLift": "승강기 문"
 }
