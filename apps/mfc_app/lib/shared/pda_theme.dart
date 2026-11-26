@@ -19,7 +19,7 @@ abstract final class PdaColors {
   static const paper = Colors.white;
 
   /// 화면 바탕(연회색) — 그 위에 테두리 없는 흰 둥근 카드(사용자 2026-11-27 "PPT 처럼 각지다, 부드럽게" — 참고 화면).
-  static const canvas = Color(0xFFF4F5F8);
+  static const canvas = Color(0xFFF7F7FA);
   static const dark = Color(0xFF3F2A66);
   static const primary = Color(0xFF6B45B0);
 
@@ -81,7 +81,7 @@ abstract final class PdaTheme {
           inverseSurface: PdaColors.dark,
         );
     final shape10 = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
     );
     // 글자 모양은 기본 글꼴 묶음에서 이어 받는다(글꼴 이름을 비워 두면 화면마다 글꼴이 달라진다).
     // PDA 는 팔 길이에서 본다 — 작은 글씨를 한 단계 키운다(본문 15, 작은 글씨 13).
@@ -92,7 +92,8 @@ abstract final class PdaTheme {
       useMaterial3: true,
       fontFamily: fontFamily,
     ).textTheme;
-    const w4 = FontWeight.w400, w6 = FontWeight.w600, w7 = FontWeight.w700;
+    // 본문 500(사용자 2026-11-27 "글자 굵기 얇은 건 굵게" — 400 은 현장에서 얇았다)
+    const w4 = FontWeight.w500, w6 = FontWeight.w600, w7 = FontWeight.w700;
     final base0 = m3.copyWith(
       headlineLarge: m3.headlineLarge!.copyWith(fontWeight: w7),
       headlineMedium: m3.headlineMedium!.copyWith(fontWeight: w7),
@@ -148,17 +149,17 @@ abstract final class PdaTheme {
       cardTheme: CardThemeData(
         color: Colors.white,
         surfaceTintColor: Colors.transparent,
-        // 보라빛 옅은 그림자 — 카드가 바탕 위에 떠 보이게
-        elevation: 2,
-        shadowColor: const Color(0x335E3BB2),
+        // 옅은 테두리 + 아주 옅은 그림자(참고 화면)
+        elevation: 3,
+        shadowColor: const Color(0x245E3BB2),
         margin: const EdgeInsets.only(top: 12),
         // 테두리 없이 둥근 흰 카드 — 연회색 바탕 위에 떠 보이게
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       dividerTheme: const DividerThemeData(color: PdaColors.line, space: 1),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(64, 50),
+          minimumSize: const Size(64, 46),
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -173,7 +174,7 @@ abstract final class PdaTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(64, 46),
+          minimumSize: const Size(64, 44),
           shape: shape10,
           backgroundColor: Colors.white,
           foregroundColor: PdaColors.ink,

@@ -206,9 +206,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // 상단바에 "픽PDA" + 직원 이름(사용자 2026-11-20 "직원 명은 픽PDA 문구가 있는 바로"). 이름을 읽기 전에는 픽PDA 만.
         title: _HomeTitle(me: barMe),
         // 오늘 업무 내역 칩 — 이름 바로 아래 줄(사용자 2026-11-17·2026-11-20). 근무 센터가 정해졌을 때만(내역 조회에 센터가 필요).
-        bottom: ref.watch(centerScopeProvider) is SingleCenter
-            ? const MyWorkBar()
-            : null,
+        // 업무 내역은 본문 "오늘 작업" 카드로(참고 화면 2026-11-27)
         actions: [
           // 목업 표시는 화면 맨 위 주황 띠가 한다 — 홈 상단바는 이름 자리를 남긴다.
           if (barMe case final me?) _StatusChip(onBreak: me.onBreak),
@@ -353,13 +351,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(
-                      // 업무 칸은 스크롤하지 않는다(사용자 2026-11-20) — 다섯 칸이 남은 높이에 맞게 줄어든다(최대 80).
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                      // 참고 화면(사용자 2026-11-27) — 인사·오늘 작업 → 띠 → 업무 2열, 넘치면 굴린다.
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const EnterFade(child: _HomeHero()),
+                            EnterFade(child: _HomeHero(me: me)),
                             // 지금 재고 실사 시간대(서버 activeNow)이고 실사 업무가 있으면 안내 띠(백엔드 지침 2026-11-20 §4).
                             // 조회가 안 되면 띠만 안 보인다(다음 작업 받기가 순서를 정하므로 업무에는 영향 없음).
                             if (ref.watch(countTimeProvider).value == true &&
@@ -377,7 +375,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 child: FilledButton.icon(
                                   key: const ValueKey('unload-band'),
                                   style: FilledButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(56),
+                                    minimumSize: const Size.fromHeight(46),
                                   ),
                                   onPressed: () => context.push('/unload'),
                                   icon: const Icon(
@@ -392,50 +390,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 ),
                               ),
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(2, 12, 0, 8),
+                              padding: const EdgeInsets.fromLTRB(2, 16, 0, 8),
                               child: Text(
                                 l10n.chooseWork,
-                                style: theme.textTheme.labelLarge?.copyWith(
-                                  color: PdaColors.muted,
+                                style: theme.textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
-                            // 업무는 한 줄에 하나, 가로로 긴 칸(사용자 2026-11-20 "1열로 가로로 긴 버튼") —
-                            // 그림·이름·한 줄 설명. 고르면 그 칸이 커지며 안내 화면 위 카드가 된다.
-                            Expanded(
-                              child: LayoutBuilder(
-                                builder: (context, c) {
-                                  const gap = 10.0;
-                                  final h =
-                                      ((c.maxHeight -
-                                                  gap * (areas.length - 1)) /
-                                              areas.length)
-                                          .clamp(44.0, _AreaFlight._tileHeight);
-                                  // 작은 화면(머리 카드·하차 띠가 있을 때)이면 넘치지 않게 굴린다
-                                  return SingleChildScrollView(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        for (final (i, a) in areas.indexed) ...[
-                                          if (i > 0)
-                                            const SizedBox(height: gap),
-                                          EnterFade(
-                                            index: i,
-                                            child: _AreaTile(
-                                              area: a,
-                                              allowed: me.can(a),
-                                              height: h,
-                                              onTap: () => openArea(a),
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
+                            _AreaGrid(
+                              areas: areas,
+                              allowed: me.can,
+                              onTap: openArea,
                             ),
                           ],
                         ),
@@ -653,7 +619,6 @@ class _AreaFlight extends StatelessWidget {
   final Animation<double> animation;
 
   // 칸([_AreaTile] — 가로로 긴 한 줄)과 카드([AreaHeroCard])의 치수 — 두 쪽을 바꾸면 여기도 맞춘다.
-  static const _tileHeight = 68.0;
   static const _tilePad = 16.0;
   static const _tileGap = 12.0;
   static const _tileCircle = 44.0;
@@ -779,94 +744,11 @@ String workAreaDesc(AppLocalizations l10n, WorkArea a) => switch (a) {
   WorkArea.stockCount => l10n.areaDescStockCount,
 };
 
-/// 업무 칸 — 모두 같은 크기, 위 그림 + 아래 이름. 권한이 없으면 자물쇠.
-/// 고르면 [Hero] 로 커지며 안내 화면 위 카드([AreaHeroCard])가 된다.
-class _AreaTile extends StatelessWidget {
-  const _AreaTile({
-    required this.area,
-    required this.allowed,
-    required this.onTap,
-    this.height = _AreaFlight._tileHeight,
-  });
-
-  final WorkArea area;
-  final bool allowed;
-  final VoidCallback onTap;
-
-  /// 칸 높이 — 홈은 남은 높이에 맞춰 줄인다(스크롤 없음). 낮으면(68 미만) 설명 줄을 숨긴다.
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    return Pressable(
-      child: Hero(
-        tag: 'area-card-${area.name}',
-        flightShuttleBuilder: _areaShuttle(area),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: PdaShadows.sm,
-          ),
-          child: Material(
-            color: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: BorderSide.none,
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              key: ValueKey('area-${area.name}'),
-              onTap: onTap,
-              child: SizedBox(
-                height: height,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: _AreaFlight._tilePad,
-                  ),
-                  child: Row(
-                    children: [
-                      GradientBadge(
-                        icon: allowed ? workAreaIcon(area) : Icons.lock_rounded,
-                        size: _AreaFlight._tileCircle,
-                        iconSize: _AreaFlight._tileIcon,
-                        gradient: workAreaGradient(area),
-                        enabled: allowed,
-                      ),
-                      const SizedBox(width: _AreaFlight._tileGap),
-                      Expanded(
-                        child: _AreaTileText(
-                          area: area,
-                          allowed: allowed,
-                          showDesc: height >= 68,
-                        ),
-                      ),
-                      Icon(
-                        allowed ? Icons.chevron_right : Icons.lock_outline,
-                        color: PdaColors.muted,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// 가로 칸의 글 — 이름(18·800) + 한 줄 설명. 날아가는 동안([_AreaFlight])에도 같은 모양으로 그린다.
 class _AreaTileText extends StatelessWidget {
-  const _AreaTileText({
-    required this.area,
-    this.allowed = true,
-    this.showDesc = true,
-  });
+  const _AreaTileText({required this.area});
 
   final WorkArea area;
-  final bool allowed;
-  final bool showDesc;
 
   @override
   Widget build(BuildContext context) {
@@ -882,13 +764,13 @@ class _AreaTileText extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           softWrap: false,
           style: TextStyle(
-            color: allowed ? PdaColors.ink : PdaColors.muted,
+            color: PdaColors.ink,
             fontSize: 16,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.3,
           ),
         ),
-        if (showDesc) ...[
+        ...[
           const SizedBox(height: 2),
           Text(
             workAreaDesc(l10n, area),
@@ -1227,7 +1109,6 @@ class WorkSessionScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(workAreaText(l10n, area)),
         automaticallyImplyLeading: false,
-        bottom: const MyWorkBar(),
       ),
       body: SafeArea(
         child: Padding(
@@ -1619,7 +1500,7 @@ class _HomeTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final who = me;
+    // 이름은 본문 인사로(참고 화면 2026-11-27) — 상단바는 앱 이름 + 센터
     return Text.rich(
       key: const ValueKey('home-title'),
       TextSpan(
@@ -1627,23 +1508,13 @@ class _HomeTitle extends StatelessWidget {
           TextSpan(
             text: l10n.homeTitle,
             style: const TextStyle(
-              color: PdaColors.onBarMuted,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
+              color: PdaColors.primary,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
             ),
           ),
-          if (who != null) ...[
-            const TextSpan(text: '   '),
-            TextSpan(
-              text: l10n.homeHello(who.displayName ?? who.workerId),
-              style: const TextStyle(
-                color: PdaColors.ink,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ],
+          if (me != null) const TextSpan(text: '  '),
         ],
       ),
       maxLines: 1,
@@ -1680,107 +1551,264 @@ class _StatusChip extends StatelessWidget {
   }
 }
 
-/// 홈 머리 카드 — 보라 그라데이션 + 장식 원, 오늘 날짜·처리한 업무 수(사용자 2026-11-27 "다양한 디자인 요소").
+/// 홈 머리(참고 화면 2026-11-27): 인사·센터 칩 → 보라 그라데이션 "오늘 작업 N건"(누르면 업무 내역) → 종류별 건수 칸.
+/// 수는 서버 오늘 업무 내역(mfc-capacity work-activities) 그대로 — 못 읽으면 "—".
 class _HomeHero extends ConsumerWidget {
-  const _HomeHero();
+  const _HomeHero({required this.me});
+
+  final WorkerProfile me;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final n = ref.watch(myTodayWorkProvider).value?.items.length;
-    final now = DateTime.now();
-    const days = ['월', '화', '수', '목', '금', '토', '일'];
-    return Container(
-      key: const ValueKey('home-hero'),
-      height: 112,
-      decoration: BoxDecoration(
-        gradient: PdaGradients.hero,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: PdaColors.primary.withValues(alpha: 0.30),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+    final theme = Theme.of(context);
+    final work = ref.watch(myTodayWorkProvider).value;
+    final n = work?.items.length;
+    final totals = [...?work?.totals]
+      ..sort((a, b) => b.count.compareTo(a.count));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          l10n.homeHello(me.displayName ?? me.workerId),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          l10n.homeHeroSafe,
+          style: theme.textTheme.bodyMedium?.copyWith(color: PdaColors.muted),
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(8, 4, 10, 4),
+            decoration: BoxDecoration(
+              color: PdaColors.softer,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.place_rounded,
+                  size: 14,
+                  color: PdaColors.primary,
+                ),
+                const SizedBox(width: 3),
+                Text(
+                  ref.watch(currentMfcIdProvider),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: PdaColors.dark,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Pressable(
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: Ink(
+              key: const ValueKey('home-hero'),
+              height: 92,
+              decoration: const BoxDecoration(gradient: PdaGradients.hero),
+              child: InkWell(
+                // 예전 "업무 내역" 칩 자리(시험·화면이 누르는 자리)
+                key: const ValueKey('my-work-chip'),
+                onTap: () => context.push('/my-work'),
+                child: CustomPaint(
+                  painter: const BubblesPainter(),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 12, 14, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                l10n.homeTodayWork,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                n == null ? '—' : l10n.homeTodayCount(n),
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.view_in_ar_rounded,
+                          size: 46,
+                          color: Colors.white.withValues(alpha: 0.55),
+                        ),
+                        const SizedBox(width: 10),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          color: Colors.white,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (totals.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              for (final (i, t) in totals.take(3).indexed) ...[
+                if (i > 0) const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    key: ValueKey('home-total-${t.type}'),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: PdaShadows.sm,
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          activityTypeText(l10n, t.type),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: PdaColors.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          l10n.homeTodayCount(t.count),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: PdaColors.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: CustomPaint(
-        painter: const BubblesPainter(),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      l10n.homeHeroDate(
-                        now.month,
-                        now.day,
-                        days[now.weekday - 1],
-                      ),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white.withValues(alpha: 0.78),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      n == null ? l10n.homeHeroLoading : l10n.homeHeroToday(n),
-                      style: const TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        l10n.homeHeroSafe,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+      ],
+    );
+  }
+}
+
+/// 업무 2열 칸(참고 화면) — 그림 + 이름, 주 업무(첫 칸)는 보라 그라데이션. 권한이 없으면 자물쇠·흐림.
+class _AreaGrid extends StatelessWidget {
+  const _AreaGrid({
+    required this.areas,
+    required this.allowed,
+    required this.onTap,
+  });
+
+  final List<WorkArea> areas;
+  final bool Function(WorkArea) allowed;
+  final void Function(WorkArea) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return LayoutBuilder(
+      builder: (context, c) {
+        const gap = 10.0;
+        final w = (c.maxWidth - gap) / 2;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [
+            for (final (i, a) in areas.indexed)
+              SizedBox(
+                width: w,
+                height: 86,
+                child: EnterFade(
+                  index: i,
+                  child: Pressable(
+                    child: Hero(
+                      tag: 'area-card-${a.name}',
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(14),
+                        clipBehavior: Clip.antiAlias,
+                        child: Ink(
+                          decoration: BoxDecoration(
+                            gradient: i == 0 && allowed(a)
+                                ? workAreaGradient(a)
+                                : null,
+                            color: i == 0 && allowed(a) ? null : Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: PdaShadows.sm,
+                          ),
+                          child: InkWell(
+                            key: ValueKey('area-${a.name}'),
+                            onTap: () => onTap(a),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  allowed(a)
+                                      ? workAreaIcon(a)
+                                      : Icons.lock_rounded,
+                                  size: 28,
+                                  color: i == 0 && allowed(a)
+                                      ? Colors.white
+                                      : allowed(a)
+                                      ? PdaColors.primary
+                                      : PdaColors.onBarMuted,
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  workAreaText(l10n, a),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: i == 0 && allowed(a)
+                                        ? Colors.white
+                                        : allowed(a)
+                                        ? PdaColors.ink
+                                        : PdaColors.onBarMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.16),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    width: 1.5,
                   ),
                 ),
-                child: const Icon(
-                  Icons.inventory_2_rounded,
-                  color: Colors.white,
-                  size: 32,
-                ),
               ),
-            ],
-          ),
-        ),
-      ),
+          ],
+        );
+      },
     );
   }
 }

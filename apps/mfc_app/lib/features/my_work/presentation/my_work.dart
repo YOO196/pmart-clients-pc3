@@ -104,13 +104,22 @@ class MyWorkScreen extends ConsumerWidget {
   }
 }
 
-class _MyWorkList extends ConsumerWidget {
+class _MyWorkList extends ConsumerStatefulWidget {
   const _MyWorkList({required this.a});
 
   final WorkActivities a;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_MyWorkList> createState() => _MyWorkListState();
+}
+
+class _MyWorkListState extends ConsumerState<_MyWorkList> {
+  /// 거르기(참고 화면 "전체·피킹·패킹·적치") — null 이면 전체
+  String? _type;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = widget.a;
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -182,6 +191,41 @@ class _MyWorkList extends ConsumerWidget {
                 ),
         ),
         const SizedBox(height: 12),
+        if (a.items.isNotEmpty)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final (t, label) in [
+                  (null, l10n.myWorkFilterAll(a.items.length)),
+                  for (final type in {for (final i in a.items) i.type})
+                    (
+                      type,
+                      l10n.myWorkFilterType(
+                        activityTypeText(l10n, type),
+                        a.items.where((i) => i.type == type).length,
+                      ),
+                    ),
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6, bottom: 10),
+                    child: ChoiceChip(
+                      key: ValueKey('my-work-filter-${t ?? 'ALL'}'),
+                      label: Text(label),
+                      selected: _type == t,
+                      showCheckmark: false,
+                      selectedColor: PdaColors.primary,
+                      labelStyle: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _type == t ? Colors.white : PdaColors.body,
+                      ),
+                      onSelected: (_) => setState(() => _type = t),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         if (a.items.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 32),
@@ -193,7 +237,7 @@ class _MyWorkList extends ConsumerWidget {
             ),
           ),
         // 한 건 = 한 상자. 결과는 색 칩(반영 초록·거절 빨강·그 밖 회색) — 오른쪽 작은 글씨로는 안 보였다.
-        for (final i in a.items)
+        for (final i in a.items.where((i) => _type == null || i.type == _type))
           Container(
             key: ValueKey('my-work-${i.refId}'),
             margin: const EdgeInsets.only(bottom: 10),
@@ -215,13 +259,42 @@ class _MyWorkList extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        [
-                          activityTypeText(l10n, i.type),
-                          if (i.sku case final s?) hints.bySku(s)?.name ?? s,
-                        ].join(' · '),
-                        style: theme.textTheme.titleSmall,
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: PdaColors.softer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              activityTypeText(l10n, i.type),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: PdaColors.primary,
+                              ),
+                            ),
+                          ),
+                          if (i.sku case final s?) ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                hints.bySku(s)?.name ?? s,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
+                      const SizedBox(height: 4),
                       const SizedBox(height: 2),
                       // 어떤 건을 작업했는지 — 작업 번호(입고는 TRF, 실사는 실사 번호 등)·기록 번호(사용자 2026-11-27)
                       Text(
@@ -243,6 +316,7 @@ class _MyWorkList extends ConsumerWidget {
                         ].join(' · '),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: PdaColors.body,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -282,6 +356,7 @@ class _MyWorkList extends ConsumerWidget {
           l10n.myWorkScopeNote,
           style: theme.textTheme.bodySmall?.copyWith(
             color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ],

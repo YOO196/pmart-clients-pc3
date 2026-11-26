@@ -37,10 +37,12 @@ abstract final class PdaMotion {
 /// 그림자 단계(Tailwind shadow-sm·shadow-md 정도) — 흰 바탕에서 칸이 떠 보이게, 진하지 않게.
 abstract final class PdaShadows {
   static const sm = [
-    BoxShadow(color: Color(0x0F1F1D24), blurRadius: 3, offset: Offset(0, 1)),
+    BoxShadow(color: Color(0x125E3BB2), blurRadius: 14, offset: Offset(0, 4)),
+    BoxShadow(color: Color(0x0A1F1D24), blurRadius: 2, offset: Offset(0, 1)),
   ];
   static const md = [
-    BoxShadow(color: Color(0x141F1D24), blurRadius: 12, offset: Offset(0, 4)),
+    BoxShadow(color: Color(0x175E3BB2), blurRadius: 22, offset: Offset(0, 8)),
+    BoxShadow(color: Color(0x0A1F1D24), blurRadius: 3, offset: Offset(0, 1)),
   ];
 }
 

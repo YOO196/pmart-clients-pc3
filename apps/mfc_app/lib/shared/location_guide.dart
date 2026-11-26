@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'field_widgets.dart' show ScanPrompt;
 import '../l10n/gen/app_localizations.dart';
+import 'pda_motion.dart' show PdaShadows;
 import 'pda_theme.dart';
 
 /// 위치 코드를 조각으로 나눈 것(채번 지침 — `docs/architecture/identifiers.md`).
@@ -114,7 +115,8 @@ class LocationCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: PdaColors.lilac, width: 1.5),
+        border: Border.all(color: PdaColors.lilac),
+        boxShadow: PdaShadows.sm,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

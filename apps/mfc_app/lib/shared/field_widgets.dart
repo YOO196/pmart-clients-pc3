@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
@@ -26,7 +27,7 @@ class StepHeader extends ConsumerWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     final d = PdaMotion.of(context, PdaMotion.slow);
-    const dot = 26.0;
+    const dot = 24.0;
     // 이전 작업 = 오늘 업무 내역의 마지막 건(서버 값, 못 읽으면 줄을 비운다) — 사용자 2026-11-27 "이전·다음 작업을 늘 작게"
     final acts = ref.watch(myTodayWorkProvider).value?.items;
     final last = acts == null || acts.isEmpty
@@ -40,16 +41,11 @@ class StepHeader extends ConsumerWidget {
       duration: PdaMotion.of(context, const Duration(milliseconds: 700)),
       curve: Curves.easeOut,
       builder: (context, flash, child) => Container(
-        margin: const EdgeInsets.only(top: 2, bottom: 16),
-        padding: const EdgeInsets.fromLTRB(10, 12, 10, 8),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.fromLTRB(2, 6, 2, 0),
         decoration: BoxDecoration(
-          color: Color.lerp(Colors.white, PdaColors.softer, flash),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: PdaColors.primary.withValues(alpha: 0.5 * flash),
-            width: 1.5,
-          ),
-          boxShadow: PdaShadows.md,
+          color: PdaColors.softer.withValues(alpha: flash),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: child,
       ),
@@ -67,13 +63,13 @@ class StepHeader extends ConsumerWidget {
                       child: Stack(
                         alignment: Alignment.centerLeft,
                         children: [
-                          Container(height: 3, color: PdaColors.line),
+                          Container(height: 2, color: PdaColors.line),
                           AnimatedFractionallySizedBox(
                             duration: d,
                             curve: PdaMotion.enter,
                             widthFactor: i <= current ? 1 : 0,
                             child: Container(
-                              height: 3,
+                              height: 2,
                               decoration: const BoxDecoration(
                                 gradient: PdaGradients.primary,
                               ),
@@ -163,56 +159,61 @@ class StepHeader extends ConsumerWidget {
             padding: EdgeInsets.only(top: 8),
             child: Divider(height: 1),
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: 7),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.history_rounded,
-                  size: 14,
-                  color: PdaColors.onBarMuted,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    last == null
-                        ? l10n.trailNoPrevious
-                        : l10n.trailPrevious(
-                            activityTypeText(l10n, last.type),
-                            last.taskId ?? last.refId,
-                            formatSeoulTime(last.at),
-                          ),
-                    key: const ValueKey('trail-previous'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: PdaColors.muted,
+          InkWell(
+            key: const ValueKey('trail'),
+            borderRadius: BorderRadius.circular(8),
+            onTap: () => GoRouter.of(context).push('/my-work'),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.history_rounded,
+                    size: 14,
+                    color: PdaColors.onBarMuted,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      last == null
+                          ? l10n.trailNoPrevious
+                          : l10n.trailPrevious(
+                              activityTypeText(l10n, last.type),
+                              last.taskId ?? last.refId,
+                              formatSeoulTime(last.at),
+                            ),
+                      key: const ValueKey('trail-previous'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: PdaColors.muted,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: PdaColors.softer,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    next == null ? l10n.trailNextLast : l10n.trailNext(next),
-                    key: const ValueKey('trail-next'),
-                    maxLines: 1,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: PdaColors.primary,
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: PdaColors.softer,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      next == null ? l10n.trailNextLast : l10n.trailNext(next),
+                      key: const ValueKey('trail-next'),
+                      maxLines: 1,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: PdaColors.primary,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -244,14 +245,14 @@ class ScanPrompt extends StatelessWidget {
     if (t.contains('세') || t.contains('수량')) return Icons.calculate_rounded;
     if (t.contains('고르') || t.contains('선택')) return Icons.touch_app_rounded;
     if (t.contains('확인') || t.contains('검')) return Icons.fact_check_rounded;
-    return Icons.auto_awesome_rounded;
+    return Icons.inventory_2_rounded;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 16),
+      padding: const EdgeInsets.only(top: 2, bottom: 12),
       // 할 일이 바뀌면 새 제목이 살짝 올라오며 나타난다(같은 제목이면 그대로).
       child: EnterFade(
         key: ValueKey(text),
@@ -259,8 +260,14 @@ class ScanPrompt extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            PopIn(child: GradientBadge(icon: icon ?? _guess(text), size: 44)),
-            const SizedBox(width: 13),
+            PopIn(
+              child: GradientBadge(
+                icon: icon ?? _guess(text),
+                size: 34,
+                radius: 10,
+              ),
+            ),
+            const SizedBox(width: 11),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,9 +275,9 @@ class ScanPrompt extends StatelessWidget {
                   Text(
                     text,
                     style: theme.textTheme.headlineSmall?.copyWith(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
+                      letterSpacing: -0.4,
                       height: 1.3,
                     ),
                   ),
@@ -317,11 +324,11 @@ class ProgressLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final ratio = total == 0 ? 0.0 : (done / total).clamp(0.0, 1.0);
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.fromLTRB(14, 11, 14, 12),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 11),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: PdaShadows.sm,
       ),
       child: Column(
@@ -361,7 +368,7 @@ class ProgressLine extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: Container(
-              height: 9,
+              height: 7,
               color: PdaColors.lilac.withValues(alpha: 0.7),
               alignment: Alignment.centerLeft,
               child: TweenAnimationBuilder<double>(
@@ -568,28 +575,27 @@ class NoticeBox extends StatelessWidget {
       child: Container(
         width: double.infinity,
         margin: const EdgeInsets.only(top: 12),
-        padding: const EdgeInsets.fromLTRB(10, 9, 12, 9),
+        padding: const EdgeInsets.fromLTRB(8, 7, 12, 7),
         decoration: BoxDecoration(
-          color: warning ? PdaColors.warning : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: warning ? null : PdaShadows.sm,
+          color: warning ? PdaColors.warning : PdaColors.softer,
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 26,
-              height: 26,
-              margin: const EdgeInsets.only(right: 9),
+              width: 22,
+              height: 22,
+              margin: const EdgeInsets.only(right: 8),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: warning
-                    ? PdaColors.onWarning.withValues(alpha: 0.12)
-                    : PdaColors.softer,
+                    ? PdaColors.onWarning.withValues(alpha: 0.14)
+                    : Colors.white,
               ),
               child: Icon(
                 warning ? Icons.priority_high_rounded : Icons.lightbulb_rounded,
-                size: 16,
+                size: 14,
                 color: color,
               ),
             ),
@@ -997,7 +1003,10 @@ class QtyStepper extends StatelessWidget {
         IconButton.outlined(
           key: ValueKey('$id-minus'),
           onPressed: enabled && value > 0 ? () => _set(value - 1) : null,
-          icon: const Icon(Icons.remove),
+          // 작게(참고 화면) — 누르는 자리는 36
+          style: IconButton.styleFrom(fixedSize: const Size(36, 36)),
+          iconSize: 18,
+          icon: const Icon(Icons.remove_rounded),
         ),
         InkWell(
           key: ValueKey('$id-value'),
@@ -1011,7 +1020,7 @@ class QtyStepper extends StatelessWidget {
                 }
               : null,
           child: SizedBox(
-            width: 64,
+            width: 56,
             child: ClipRect(
               child: _Counter(
                 value: value,
@@ -1029,7 +1038,9 @@ class QtyStepper extends StatelessWidget {
           onPressed: enabled && plusEnabled && (max == null || value < max!)
               ? () => _set(value + 1)
               : null,
-          icon: const Icon(Icons.add),
+          style: IconButton.styleFrom(fixedSize: const Size(36, 36)),
+          iconSize: 18,
+          icon: const Icon(Icons.add_rounded),
         ),
       ],
     );
