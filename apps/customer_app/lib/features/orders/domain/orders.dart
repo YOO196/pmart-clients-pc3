@@ -470,4 +470,16 @@ class FrequentItem {
   /// 서로 다른 주문 수(한 주문에 2개 = 1번).
   final int orderCount;
   final String? imageUrl;
+
+  /// 화면에 보일 이름: 상품 이름 + " · 옵션". 옵션이 이름에 이미 들어 있으면(예 "통삼겹살 1kg" · "1kg") 붙이지 않는다
+  /// (사용자 2026-11-26 "용량이 두 번 나온다"). 이름이 없으면 null.
+  String? get displayName {
+    final name = productName?.trim();
+    if (name == null || name.isEmpty) return null;
+    final option = optionLabel?.trim();
+    if (option == null || option.isEmpty) return name;
+    String squash(String v) => v.replaceAll(RegExp(r'\s+'), '').toLowerCase();
+    if (squash(name).contains(squash(option))) return name;
+    return '$name · $option';
+  }
 }

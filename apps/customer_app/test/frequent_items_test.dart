@@ -67,6 +67,7 @@ void main() {
   });
 
   boughtItemsTests();
+  displayNameTests();
 }
 
 // 홈 "내가 1번 구매한 상품 보기" → 산 상품 한 번에 담기(사용자 2026-11-26).
@@ -106,5 +107,26 @@ void boughtItemsTests() {
     final sent = cart.changes.sublist(before);
     expect(sent, hasLength(1));
     expect((sent.single as AddItem).sku, 'E-00000001');
+  });
+}
+
+void displayNameTests() {
+  test('옵션이 이름에 이미 있으면 붙이지 않는다', () {
+    const dup = FrequentItem(
+      sku: 'S1',
+      orderCount: 1,
+      productName: 'IBP 미국산 냉장 통삼겹살 1kg',
+      optionLabel: '1kg',
+    );
+    expect(dup.displayName, 'IBP 미국산 냉장 통삼겹살 1kg');
+    const other = FrequentItem(
+      sku: 'S2',
+      orderCount: 1,
+      productName: '서울우유',
+      optionLabel: '1L',
+    );
+    expect(other.displayName, '서울우유 · 1L');
+    const none = FrequentItem(sku: 'S3', orderCount: 1, productName: '감귤');
+    expect(none.displayName, '감귤');
   });
 }

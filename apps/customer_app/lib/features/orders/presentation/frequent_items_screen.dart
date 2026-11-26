@@ -371,9 +371,7 @@ class _BoughtRow extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    item.optionLabel == null
-                        ? item.productName!
-                        : '${item.productName!} · ${item.optionLabel}',
+                    item.displayName!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyLarge?.copyWith(

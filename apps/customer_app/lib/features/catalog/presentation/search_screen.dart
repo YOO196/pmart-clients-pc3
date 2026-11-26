@@ -382,11 +382,7 @@ class _FrequentItems extends ConsumerWidget {
                 avatar: f.imageUrl == null
                     ? null
                     : ProductImage(url: f.imageUrl, size: 22, radius: 11),
-                label: Text(
-                  f.optionLabel == null
-                      ? f.productName!
-                      : '${f.productName!} · ${f.optionLabel}',
-                ),
+                label: Text(f.displayName!),
                 onPressed: () => context.push('/products/${f.productId}'),
               ),
           ],
