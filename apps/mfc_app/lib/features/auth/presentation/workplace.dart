@@ -23,20 +23,90 @@ class WorkplaceController extends Notifier<Workplace?> {
   void choose(Workplace? w) => state = w;
 }
 
-/// 두 권한이 다 있으면 상단바에 "DC·MFC 바꾸기"
+/// 근무 센터가 여럿인 계정의 오늘 센터(사용자 2026-11-26 "근무센터가 여러 곳이라 지금은 이 앱을 쓸 수 없다고 떠") —
+/// 고르기 전에는 null, 로그인이 바뀌면 다시 고른다. 요청 경로의 mfcId 만 정한다(권한 판정은 서버).
+final centerChoiceProvider = NotifierProvider<CenterChoiceController, String?>(
+  CenterChoiceController.new,
+);
+
+class CenterChoiceController extends Notifier<String?> {
+  @override
+  String? build() {
+    ref.watch(employeeSessionProvider.select((s) => s?.operatorId));
+    return null;
+  }
+
+  void choose(String? c) => state = c;
+}
+
+/// 두 권한이 다 있거나 센터가 여럿이면 상단바에 "작업장·센터 바꾸기"
 class WorkplaceSwitchButton extends ConsumerWidget {
   const WorkplaceSwitchButton({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (!(ref.watch(employeeSessionProvider)?.hasBoth ?? false)) {
-      return const SizedBox.shrink();
-    }
+    final s = ref.watch(employeeSessionProvider);
+    final both = s?.hasBoth ?? false;
+    final many = (s?.mfcCenters.length ?? 0) > 1;
+    if (!both && !many) return const SizedBox.shrink();
     return IconButton(
       key: const ValueKey('switch-workplace'),
       tooltip: AppLocalizations.of(context).workplaceSwitch,
       icon: const Icon(Icons.swap_horiz),
-      onPressed: () => ref.read(workplaceProvider.notifier).choose(null),
+      onPressed: () {
+        ref.read(centerChoiceProvider.notifier).choose(null);
+        if (both) ref.read(workplaceProvider.notifier).choose(null);
+      },
+    );
+  }
+}
+
+/// 근무 센터 고르기(홈 본문) — 센터가 여럿일 때
+class CenterChoiceView extends ConsumerWidget {
+  const CenterChoiceView({super.key, required this.centers});
+
+  final List<String> centers;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    return SafeArea(
+      child: ListView(
+        key: const ValueKey('center-choice'),
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            l10n.centerChoiceTitle,
+            style: Theme.of(context).textTheme.headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            l10n.centerChoiceHelp,
+            style: const TextStyle(color: PdaColors.muted),
+          ),
+          const SizedBox(height: 16),
+          for (final c in centers)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: OutlinedButton.icon(
+                key: ValueKey('center-$c'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(60),
+                  alignment: Alignment.centerLeft,
+                  textStyle: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                onPressed: () =>
+                    ref.read(centerChoiceProvider.notifier).choose(c),
+                icon: const Icon(Icons.storefront_outlined),
+                label: Text(c),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

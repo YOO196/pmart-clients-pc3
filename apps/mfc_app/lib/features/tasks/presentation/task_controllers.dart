@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 
+import '../../auth/presentation/workplace.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../../shared/codes.dart';
 import '../../../shared/lot_code.dart';
@@ -39,8 +40,7 @@ final class NoCenter extends CenterScope {
   const NoCenter();
 }
 
-/// 센터가 여럿 — 어느 센터로 일할지 고르는 방법이 아직 정해지지 않았다.
-/// 앞의 것을 골라 쓰지 않고 홈에서 안내한다.
+/// 센터가 여럿이고 아직 고르지 않았다 — 앞의 것을 골라 쓰지 않고 홈에서 고르게 한다(centerChoiceProvider).
 final class MultipleCenters extends CenterScope {
   const MultipleCenters(this.centers);
   final List<String> centers;
@@ -60,7 +60,11 @@ final centerScopeProvider = Provider<CenterScope>((ref) {
   return switch (centers) {
     [] => const NoCenter(),
     [final only] => SingleCenter(only),
-    _ => MultipleCenters(centers),
+    // 여럿이면 홈에서 고른 센터(사용자 2026-11-26) — 고르기 전에는 고르기 화면
+    _ => switch (ref.watch(centerChoiceProvider)) {
+      final c? when centers.contains(c) => SingleCenter(c),
+      _ => MultipleCenters(centers),
+    },
   };
 });
 
