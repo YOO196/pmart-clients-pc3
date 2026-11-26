@@ -59,7 +59,8 @@ void main() {
     t,
   ) async {
     await pump(t);
-    expect(find.text('업무 내역 · 오늘 4건'), findsOneWidget);
+    // 홈 "오늘 작업" 카드 — 오늘 처리 건수(서버 내역)
+    expect(find.text('4건'), findsWidgets);
     await t.tap(find.byKey(const ValueKey('my-work-chip')));
     await t.pumpAndSettle();
 
@@ -86,10 +87,7 @@ void main() {
     );
     expect(find.byKey(const ValueKey('my-work-partial')), findsNothing);
     // 어떤 건을 작업했는지 번호(작업 번호·기록 번호)
-    expect(
-      find.text('작업 INB-T-1 · 기록 INB-M-1'),
-      findsOneWidget,
-    );
+    expect(find.text('작업 INB-T-1 · 기록 INB-M-1'), findsOneWidget);
   });
 
   testWidgets('못 읽은 원장이 있으면 빈 내역으로 두지 않고 "일부 내역을 못 불러왔어요"', (t) async {
@@ -101,11 +99,13 @@ void main() {
     expect(find.byKey(const ValueKey('my-work-empty')), findsOneWidget);
   });
 
-  testWidgets('업무 진행 화면 위에도 같은 칩', (t) async {
+  testWidgets('업무 진행 화면: 단계 카드의 "이전" 줄을 누르면 오늘 업무 내역', (t) async {
     await pump(t);
     await openRoute(t, '/work/pickPack');
-    expect(find.byKey(const ValueKey('my-work-chip')), findsOneWidget);
-    await t.tap(find.byKey(const ValueKey('my-work-chip')));
+    await t.tap(find.byKey(const ValueKey('run-task')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('trail-previous')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('trail')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('my-work-summary')), findsOneWidget);
   });

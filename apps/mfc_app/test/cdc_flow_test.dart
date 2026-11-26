@@ -209,6 +209,15 @@ void main() {
     await tap(t, 'cdc-load-go');
     await tap(t, 'cdc-load-complete');
     expect(find.byKey(const ValueKey('cdc-load-partial-dialog')), findsNothing);
+    // 다 실었어도 한 번 더 확인 — 취소면 그대로, 상차완료를 눌러야 끝
+    expect(
+      find.byKey(const ValueKey('cdc-load-confirm-dialog')),
+      findsOneWidget,
+    );
+    await tap(t, 'cdc-load-confirm-cancel');
+    expect((await repo.trip('TRIP-mock-1')).state, 'CHECKED_IN');
+    await tap(t, 'cdc-load-complete');
+    await tap(t, 'cdc-load-confirm-ok');
     expect(find.byKey(const ValueKey('cdc-load-done')), findsOneWidget);
     expect(find.text('상차는 출발이 아니에요. 출발은 따로 확정돼요'), findsOneWidget);
     expect((await repo.trip('TRIP-mock-1')).state, 'LOADED');

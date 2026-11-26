@@ -1867,5 +1867,16 @@
   "@boxCheckMissingTitle": {"placeholders": {"n": {"type": "int"}}},
   "boxCheckMissingBody": "안 찍은 박스는 미도착으로 처리돼요.",
   "boxCheckKeep": "계속 찍기",
-  "boxCheckGo": "미도착으로 넘어가기"
+  "boxCheckGo": "미도착으로 넘어가기",
+  "homeTodayWork": "오늘 작업",
+  "homeTodayCount": "{n}건",
+  "@homeTodayCount": {"placeholders": {"n": {"type": "int"}}},
+  "myWorkFilterAll": "전체({n})",
+  "@myWorkFilterAll": {"placeholders": {"n": {"type": "int"}}},
+  "myWorkFilterType": "{type}({n})",
+  "@myWorkFilterType": {"placeholders": {"type": {"type": "String"}, "n": {"type": "int"}}},
+  "cdcLoadConfirmTitle": "상차완료할까요?",
+  "cdcLoadConfirmBody": "BOX {boxes}개 · TRF {trfs}건 — 완료하면 되돌릴 수 없어요.",
+  "@cdcLoadConfirmBody": {"placeholders": {"boxes": {"type": "int"}, "trfs": {"type": "int"}}},
+  "cdcLoadConfirmGo": "상차완료"
 }

@@ -17,7 +17,6 @@ import '../../../shared/scanner/scan_input.dart';
 import '../../../shared/scanner/scanner.dart';
 import '../../../shared/ui_state_of.dart';
 import '../domain/task_list.dart';
-import '../../my_work/presentation/my_work.dart';
 import 'task_controllers.dart';
 
 String taskKindText(AppLocalizations l10n, TaskKind k) => switch (k) {
@@ -360,7 +359,6 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
             Text(stepTitle, key: const ValueKey('pick-step-title')),
           ],
         ),
-        bottom: const MyWorkBar(),
         actions: [
           if (picking.cart case final cart?)
             Padding(
