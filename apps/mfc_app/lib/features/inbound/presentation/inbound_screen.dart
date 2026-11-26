@@ -596,7 +596,10 @@ class _ReviewStep extends ConsumerWidget {
                 key: const ValueKey('inbound-submit'),
                 busy: s.busy,
                 label: s.unknown ? l10n.checkAgain : l10n.inboundSubmit,
-                onPressed: ctl.submit,
+                // 입고칸(수령 위치)을 다 고르기 전에는 못 보낸다 — 서버 필수(시뮬레이터 C-6)
+                onPressed: s.hasReceivingLocations || s.unknown
+                    ? ctl.submit
+                    : null,
               ),
             ),
           ],
@@ -606,6 +609,73 @@ class _ReviewStep extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ScanPrompt(text: l10n.inboundReviewTitle),
+          // 수령 입고칸 — 내려놓은 입고칸 위치 바코드를 온도대마다 한 번(시뮬레이터 C-6, 위치 라벨)
+          for (final z in s.receivingZones)
+            Card(
+              key: ValueKey('receiving-$z'),
+              margin: const EdgeInsets.only(bottom: 10),
+              color: (s.receivingAt[z] ?? '').isEmpty ? PdaColors.notice : null,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+                child: (s.receivingAt[z] ?? '').isEmpty
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            l10n.receivingScanTitle(zoneLabel(l10n, z)),
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 6),
+                          ScanInput(
+                            id: 'receiving-scan-$z',
+                            label: l10n.receivingScanHint,
+                            cameraTitle: l10n.receivingScanHint,
+                            continuous: false,
+                            autofocus: false,
+                            testValues: [
+                              TestScan(
+                                l10n.receivingTestValue(zoneLabel(l10n, z)),
+                                switch (z) {
+                                  'FROZEN' => 'RCV-F-01',
+                                  'CHILLED' => 'RCV-C-01',
+                                  _ => 'RCV-A-02',
+                                },
+                              ),
+                            ],
+                            onScan: (code) {
+                              ctl.setReceivingLocation(z, code);
+                              return const ScanFeedback.ok();
+                            },
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          const Icon(
+                            Icons.place_outlined,
+                            color: PdaColors.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              l10n.receivingAt(
+                                zoneLabel(l10n, z),
+                                s.receivingAt[z]!,
+                              ),
+                              key: ValueKey('receiving-at-$z'),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => ctl.clearReceivingLocation(z),
+                            child: Text(l10n.receivingChange),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
           Expanded(
             child: ListView(
               children: [
@@ -659,6 +729,13 @@ class _ReviewStep extends ConsumerWidget {
               },
               key: const ValueKey('inbound-receipt-rejected'),
               style: TextStyle(color: theme.colorScheme.error),
+            ),
+          // 거절 이유(서버 detail)를 한 줄로 — 코드만으로는 왜인지 모른다(시뮬레이터 C-6)
+          if (s.rejectDetail case final d? when d.isNotEmpty)
+            Text(
+              d,
+              key: const ValueKey('inbound-reject-detail'),
+              style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
             ),
           if (s.unknown)
             Text(
@@ -738,7 +815,8 @@ class _BoxCheckStep extends ConsumerWidget {
     final s = ref.watch(inboundFlowProvider(trfId));
     final ctl = ref.read(inboundFlowProvider(trfId).notifier);
     final p = s.promise!;
-    final total = p.boxList.length;
+    // 박스 = 고유 LPN(한 박스에 상품이 여럿일 수 있다 — 시뮬레이터 C-5)
+    final total = s.boxIds.length;
     final last = s.lastBox == null ? null : s.boxById(s.lastBox!);
     return StepBody(
       actions: [
@@ -756,18 +834,18 @@ class _BoxCheckStep extends ConsumerWidget {
             ),
             TestAction('all-but-one', l10n.testScanAllButOne, () {
               final left = [
-                for (final b in p.boxList)
-                  if (!ctl.current.arrived.contains(b.boxId)) b,
+                for (final id in ctl.current.boxIds)
+                  if (!ctl.current.arrived.contains(id)) id,
               ];
-              for (final b in left.take(left.length - 1)) {
-                ctl.scanBox(b.boxId);
+              for (final id in left.take(left.length - 1)) {
+                ctl.scanBox(id);
               }
             }),
           ],
           testValues: [
-            for (final b
-                in p.boxList.where((b) => !s.arrived.contains(b.boxId)).take(5))
-              TestScan(l10n.tsNext, b.boxId),
+            for (final id
+                in s.boxIds.where((id) => !s.arrived.contains(id)).take(5))
+              TestScan(l10n.tsNext, id),
             if (s.arrived.isNotEmpty) TestScan(l10n.tsAlready, s.arrived.first),
             TestScan(l10n.tsOtherTruck, 'BOX-99999999'),
           ],
@@ -830,14 +908,19 @@ class _BoxCheckStep extends ConsumerWidget {
               child: ListTile(
                 title: Text(last.boxId),
                 subtitle: Text(
-                  l10n.boxOf(
-                    p.lines
-                            .where((l) => l.key == last.lineKey)
-                            .firstOrNull
-                            ?.productName ??
-                        last.lineKey.split('|').first,
-                    last.unitsPerBox,
-                  ),
+                  s.entriesOf(last.boxId).length > 1
+                      ? l10n.boxMixed(
+                          s.entriesOf(last.boxId).length,
+                          s.unitsOf(last.boxId),
+                        )
+                      : l10n.boxOf(
+                          p.lines
+                                  .where((l) => l.key == last.lineKey)
+                                  .firstOrNull
+                                  ?.productName ??
+                              last.lineKey.split('|').first,
+                          last.unitsPerBox,
+                        ),
                 ),
                 trailing: FilterChip(
                   key: const ValueKey('box-damaged'),
@@ -958,43 +1041,47 @@ class _BoxInspectStep extends ConsumerWidget {
         lineOf(b)?.productName ?? b.lineKey.split('|').first;
 
     if (s.selectedBox case final id?) {
-      final b = s.boxById(id)!;
-      final c = ctl.boxCountOf(id);
+      final entries = s.entriesOf(id);
+      final mixed = entries.length > 1;
+      final counts = [for (final e in entries) ctl.boxCountOf(e.entryKey)];
+      final sum = counts.fold(0, (a, c) => a + c.total);
       return StepBody(
         key: ValueKey('box-open-$id'),
         actions: [
-          // 낱개는 0부터 — 상품 바코드 1번 = 정상 +1(입고는 수량·겉보기 파손만, 품질 판정은 품질검사).
+          // 낱개는 0부터 — 상품 바코드 1번 = 그 상품 정상 +1(섞인 박스면 바코드로 상품을 찾는다).
           ScanInput(
             id: 'box-item-scan',
             reprint: [
-              if (lineOf(b) case final l?)
-                ReprintTarget(sku: l.sku, name: nameOf(b), barcode: l.barcode),
+              for (final e in entries)
+                if (lineOf(e) case final l?)
+                  ReprintTarget(
+                    sku: l.sku,
+                    name: nameOf(e),
+                    barcode: l.barcode,
+                  ),
             ],
             testValues: [
-              if (lineOf(b)?.barcode case final bc?) TestScan(nameOf(b), bc),
+              for (final e in entries)
+                if (lineOf(e)?.barcode case final bc?) TestScan(nameOf(e), bc),
               TestScan(l10n.tsWrong, '0000000000000'),
             ],
             testActions: [
-              TestAction(
-                'fill',
-                l10n.testFillBox(b.unitsPerBox),
-                () => ctl.setBoxCount(
-                  id,
-                  c.copyWith(normal: b.unitsPerBox - c.pending),
-                ),
-              ),
+              TestAction('fill', l10n.testFillBox(s.unitsOf(id)), () {
+                for (final e in entries) {
+                  final c = ctl.boxCountOf(e.entryKey);
+                  ctl.setBoxCount(
+                    e.entryKey,
+                    c.copyWith(normal: e.unitsPerBox - c.pending),
+                  );
+                }
+              }),
             ],
             label: l10n.scanItemBtn,
             cameraTitle: l10n.boxItemScan,
             autofocus: false,
-            onScan: (code) {
-              if (!(lineOf(b)?.matchesBarcode(code) ?? false)) {
-                return ScanFeedback.error(l10n.inboundOtherLine);
-              }
-              final now = ctl.boxCountOf(id);
-              ctl.setBoxCount(id, now.copyWith(normal: now.normal + 1));
-              return const ScanFeedback.ok();
-            },
+            onScan: (code) => ctl.scanBoxItem(code)
+                ? const ScanFeedback.ok()
+                : ScanFeedback.error(l10n.inboundOtherLine),
           ),
           Row(
             children: [
@@ -1009,7 +1096,7 @@ class _BoxInspectStep extends ConsumerWidget {
               Expanded(
                 child: FilledButton(
                   key: const ValueKey('box-save'),
-                  onPressed: c.total > 0 ? ctl.saveBox : null,
+                  onPressed: sum > 0 ? ctl.saveBox : null,
                   child: Text(l10n.boxSave),
                 ),
               ),
@@ -1020,47 +1107,74 @@ class _BoxInspectStep extends ConsumerWidget {
           children: [
             StepCaption(id),
             ScanPrompt(
-              text: l10n.boxOf(nameOf(b), b.unitsPerBox),
-              detail: l10n.boxCountHelp,
+              text: mixed
+                  ? l10n.boxMixed(entries.length, s.unitsOf(id))
+                  : l10n.boxOf(
+                      nameOf(entries.first),
+                      entries.first.unitsPerBox,
+                    ),
+              detail: mixed ? l10n.boxMixedHelp : l10n.boxCountHelp,
             ),
-            Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(15, 6, 8, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    QtyStepper(
-                      id: 'box-normal',
-                      label: l10n.qtyNormal,
-                      value: c.normal,
-                      onChanged: (v) =>
-                          ctl.setBoxCount(id, c.copyWith(normal: v)),
-                    ),
-                    QtyStepper(
-                      id: 'box-damaged-units',
-                      label: l10n.boxLooksDamaged,
-                      value: c.pending,
-                      onChanged: (v) =>
-                          ctl.setBoxCount(id, c.copyWith(pending: v)),
-                    ),
-                    const Divider(),
-                    const SizedBox(height: 6),
-                    Text(
-                      l10n.inboundTotal(c.total, b.unitsPerBox),
-                      key: const ValueKey('box-total'),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: c.total == b.unitsPerBox
-                            ? null
-                            : theme.colorScheme.error,
+            for (final (i, e) in entries.indexed)
+              Card(
+                key: ValueKey('box-entry-${e.lineKey}'),
+                margin: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(15, 6, 8, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (mixed)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, bottom: 2),
+                          child: Text(
+                            l10n.boxEntryTitle(nameOf(e), e.unitsPerBox),
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      QtyStepper(
+                        // 한 상품 박스는 예전 키 그대로
+                        id: mixed ? 'box-normal-$i' : 'box-normal',
+                        label: l10n.qtyNormal,
+                        value: counts[i].normal,
+                        onChanged: (v) => ctl.setBoxCount(
+                          e.entryKey,
+                          counts[i].copyWith(normal: v),
+                        ),
                       ),
-                    ),
-                  ],
+                      QtyStepper(
+                        id: mixed
+                            ? 'box-damaged-units-$i'
+                            : 'box-damaged-units',
+                        label: l10n.boxLooksDamaged,
+                        value: counts[i].pending,
+                        onChanged: (v) => ctl.setBoxCount(
+                          e.entryKey,
+                          counts[i].copyWith(pending: v),
+                        ),
+                      ),
+                      const Divider(),
+                      const SizedBox(height: 6),
+                      Text(
+                        l10n.inboundTotal(counts[i].total, e.unitsPerBox),
+                        key: ValueKey(mixed ? 'box-total-$i' : 'box-total'),
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: counts[i].total == e.unitsPerBox
+                              ? null
+                              : theme.colorScheme.error,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (c.total != b.unitsPerBox && c.total > 0)
+            if (sum > 0 &&
+                entries.indexed.any(
+                  (x) => counts[x.$1].total != x.$2.unitsPerBox,
+                ))
               NoticeBox(text: l10n.boxCountDiff, warning: true),
           ],
         ),
@@ -1068,7 +1182,7 @@ class _BoxInspectStep extends ConsumerWidget {
     }
 
     final boxes = s.openable;
-    final done = boxes.where((b) => s.boxCounts.containsKey(b.boxId)).length;
+    final done = boxes.where((b) => s.boxDone(b.boxId)).length;
     return StepBody(
       actions: [
         ScanInput(
@@ -1076,19 +1190,21 @@ class _BoxInspectStep extends ConsumerWidget {
           testActions: [
             TestAction('all-normal', l10n.testOpenAllNormal, () {
               for (final b in ctl.current.openable) {
-                if (ctl.current.boxCounts.containsKey(b.boxId)) continue;
-                ctl
-                  ..openBox(b.boxId)
-                  ..setBoxCount(b.boxId, ReceiptCount(normal: b.unitsPerBox))
-                  ..saveBox();
+                if (ctl.current.boxDone(b.boxId)) continue;
+                ctl.openBox(b.boxId);
+                for (final e in ctl.current.entriesOf(b.boxId)) {
+                  ctl.setBoxCount(
+                    e.entryKey,
+                    ReceiptCount(normal: e.unitsPerBox),
+                  );
+                }
+                ctl.saveBox();
               }
             }),
           ],
           testValues: [
             for (final b
-                in s.openable
-                    .where((b) => !s.boxCounts.containsKey(b.boxId))
-                    .take(5))
+                in s.openable.where((b) => !s.boxDone(b.boxId)).take(5))
               TestScan(l10n.tsNext, b.boxId),
             TestScan(l10n.tsOtherTruck, 'BOX-99999999'),
           ],
@@ -1172,18 +1288,30 @@ class _BoxInspectStep extends ConsumerWidget {
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(
-                      s.boxCounts.containsKey(b.boxId)
+                      s.boxDone(b.boxId)
                           ? Icons.check_circle
                           : Icons.inventory_2_outlined,
                     ),
-                    title: Text('${b.boxId} · ${nameOf(b)}'),
-                    trailing: Text(switch (s.boxCounts[b.boxId]) {
-                      final c? => l10n.boxInspected(
-                        c.normal,
-                        c.quarantined + c.pending,
-                      ),
-                      null => l10n.boxNotInspected,
-                    }),
+                    title: Text(
+                      s.entriesOf(b.boxId).length > 1
+                          ? '${b.boxId} · ${l10n.boxMixedShort(s.entriesOf(b.boxId).length)}'
+                          : '${b.boxId} · ${nameOf(b)}',
+                    ),
+                    trailing: Text(
+                      s.boxDone(b.boxId)
+                          ? l10n.boxInspected(
+                              [
+                                for (final e in s.entriesOf(b.boxId))
+                                  s.boxCounts[e.entryKey]!.normal,
+                              ].fold(0, (a, n) => a + n),
+                              [
+                                for (final e in s.entriesOf(b.boxId))
+                                  s.boxCounts[e.entryKey]!.quarantined +
+                                      s.boxCounts[e.entryKey]!.pending,
+                              ].fold(0, (a, n) => a + n),
+                            )
+                          : l10n.boxNotInspected,
+                    ),
                     onTap: () => ctl.openBox(b.boxId),
                   ),
               ],
@@ -1194,3 +1322,11 @@ class _BoxInspectStep extends ConsumerWidget {
     );
   }
 }
+
+/// 입고칸 고를 온도대 이름(모르면 "입고칸")
+String zoneLabel(AppLocalizations l10n, String zone) => switch (zone) {
+  'FROZEN' => l10n.zoneFrozen,
+  'CHILLED' => l10n.zoneChilled,
+  'AMBIENT' => l10n.zoneAmbient,
+  _ => l10n.receivingAnyZone,
+};

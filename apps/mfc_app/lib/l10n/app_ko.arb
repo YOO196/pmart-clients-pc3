@@ -1829,5 +1829,21 @@
   "workplaceFootnote": "고른 뒤에도 상단 바꾸기 단추로 언제든 바꿀 수 있어요",
   "centerChoiceCardSub": "근무 센터 · 누르면 이 센터로 시작",
   "workplaceCentersMore": "{first} 외 {n}곳",
-  "@workplaceCentersMore": {"placeholders": {"first": {"type": "String"}, "n": {"type": "int"}}}
+  "@workplaceCentersMore": {"placeholders": {"first": {"type": "String"}, "n": {"type": "int"}}},
+  "boxMixed": "상품 {n}종이 섞인 박스 · 모두 {units}개",
+  "@boxMixed": {"placeholders": {"n": {"type": "int"}, "units": {"type": "int"}}},
+  "boxMixedShort": "상품 {n}종",
+  "@boxMixedShort": {"placeholders": {"n": {"type": "int"}}},
+  "boxMixedHelp": "박스 안 상품마다 세요 — 상품 바코드를 찍으면 그 상품이 +1",
+  "boxEntryTitle": "{name} · 예정 {qty}개",
+  "@boxEntryTitle": {"placeholders": {"name": {"type": "String"}, "qty": {"type": "int"}}},
+  "receivingScanTitle": "{zone} 상품을 내려놓은 입고칸을 스캔하세요",
+  "@receivingScanTitle": {"placeholders": {"zone": {"type": "String"}}},
+  "receivingScanHint": "입고칸 위치 바코드",
+  "receivingTestValue": "{zone} 입고칸",
+  "@receivingTestValue": {"placeholders": {"zone": {"type": "String"}}},
+  "receivingAt": "{zone} 입고칸 · {code}",
+  "@receivingAt": {"placeholders": {"zone": {"type": "String"}, "code": {"type": "String"}}},
+  "receivingChange": "바꾸기",
+  "receivingAnyZone": "입고칸"
 }

@@ -42,7 +42,11 @@ class InboundLine {
     this.receivedQty = 0,
     this.quarantinedQty = 0,
     this.pendingQty = 0,
+    this.temperatureZone,
   });
+
+  /// 보관 온도대(AMBIENT·CHILLED·FROZEN, mfc-inbound 0.16.0 lines[].temperatureZone) — 수령 입고칸을 온도대마다 고른다. 모르면 null.
+  final String? temperatureZone;
 
   final String sku;
   final String? lotId;
@@ -135,7 +139,8 @@ class InboundPromiseView {
   int get expectedTotal => lines.fold(0, (s, l) => s + l.expectedQty);
 }
 
-/// 송장의 박스 하나. 한 박스엔 한 상품(행)만 — 입수만큼 들어 있어야 한다.
+/// 송장 박스(LPN)의 한 상품 줄. DC 는 한 박스에 여러 상품을 섞어 싣는다(계약 packages = LPN×상품 줄 목록, 시뮬레이터 C-5) —
+/// 같은 [boxId] 가 여러 줄일 수 있다. 박스 수·도착·파손은 고유 boxId 로, 낱개 검수는 [entryKey](박스×상품)로 센다.
 @immutable
 class InboundBox {
   const InboundBox({
@@ -150,6 +155,9 @@ class InboundBox {
   /// 어느 행(SKU·LOT)의 박스인지([InboundLine.key]).
   final String lineKey;
   final int unitsPerBox;
+
+  /// 박스 안 이 상품 줄 — 낱개 검수 키
+  String get entryKey => '$boxId|$lineKey';
 }
 
 /// 한 행의 현장 계수. 인수 = 정상 + 격리 + 미판정(IV-02).
@@ -212,9 +220,12 @@ final class InboundAccepted extends InboundCommandOutcome {
 }
 
 final class InboundRejected extends InboundCommandOutcome {
-  const InboundRejected(this.code);
+  const InboundRejected(this.code, [this.detail]);
 
   final String code;
+
+  /// 서버 Problem detail(있으면 화면 한 줄로 — 시뮬레이터 C-6 "거절 이유를 보여 달라")
+  final String? detail;
 }
 
 /// 응답을 못 받았다. 같은 키로 다시 보내 확정한다.
