@@ -40,6 +40,14 @@ export const mockCenterNames: ReadonlyMap<string, string> = new Map([
 const available =(operatorId: string) => db.grants.has(operatorId) && !db.suspended.has(operatorId);
 
 export const authHandlers = [
+  // center-master 센터 유형 — MFC 백오피스는 type=MFC 만 고른다(DC CDC01 을 맡은 계정, 2026-11-26)
+  http.get(`${API_BASE}/centers`, ({ request }) => {
+    const type = new URL(request.url).searchParams.get('type');
+    // MFC = 이름 있는 다섯 곳 + 목 권한에 나오는 MFC-* 센터(시험이 만든 새 센터 포함), DC = CDC01
+    const mfcIds = new Set([...mockCenterNames.keys(), ...[...db.grants.values()].flatMap((g) => g.centers).filter((c) => c.startsWith('MFC-'))]);
+    const all = [...[...mfcIds].map((centerId) => ({ centerId, type: 'MFC' as const, name: mockCenterNames.get(centerId) ?? null })), { centerId: 'CDC01', type: 'CDC' as const, name: '칠곡 DC' }];
+    return HttpResponse.json({ items: all.filter((c) => !type || c.type === type), page: { nextCursor: null } });
+  }),
   http.post(`${API_BASE}/employee-auth/tokens`, async ({ request }) => {
     const body = (await request.json()) as { ticket?: string; codeVerifier?: string };
     const deviceId = request.headers.get('X-Device-Id');
