@@ -1846,5 +1846,11 @@
   "@receivingAt": {"placeholders": {"zone": {"type": "String"}, "code": {"type": "String"}}},
   "receivingChange": "바꾸기",
   "receivingAnyZone": "입고칸",
-  "inboundClosed": "센터 관리자가 종결한 입고예요 · 더 받지 않아요"
+  "inboundClosed": "센터 관리자가 종결한 입고예요 · 더 받지 않아요",
+  "homeHeroDate": "{m}월 {d}일 {w}요일",
+  "@homeHeroDate": {"placeholders": {"m": {"type": "int"}, "d": {"type": "int"}, "w": {"type": "String"}}},
+  "homeHeroToday": "오늘 {n}건 처리했어요",
+  "@homeHeroToday": {"placeholders": {"n": {"type": "int"}}},
+  "homeHeroLoading": "오늘 업무를 불러오는 중",
+  "homeHeroSafe": "오늘도 안전하게 작업해요"
 }

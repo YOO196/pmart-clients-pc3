@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/field_widgets.dart' show ScanPrompt;
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/location_guide.dart' show tempChipColor;
 import '../../../shared/pda_theme.dart';
@@ -109,23 +110,15 @@ class CdcLocationGuide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          title ?? l10n.locGoTo,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.6,
-          ),
+        // 제목은 다른 단계와 같은 모양(그림 배지 + 제목 + 한 줄)
+        ScanPrompt(
+          text: title ?? l10n.locGoTo,
+          detail: detail,
+          icon: Icons.place_rounded,
         ),
-        if (detail case final d?)
-          Text(
-            d,
-            style: theme.textTheme.bodyMedium?.copyWith(color: PdaColors.muted),
-          ),
-        const SizedBox(height: 12),
         CdcLocationCard(code: code, codeKey: codeKey),
       ],
     );

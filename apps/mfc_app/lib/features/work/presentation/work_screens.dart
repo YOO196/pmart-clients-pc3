@@ -18,6 +18,7 @@ import '../../my_work/presentation/my_work.dart';
 import '../../tasks/presentation/task_controllers.dart';
 import '../domain/work.dart';
 import 'work_controller.dart';
+import '../../../shared/pda_decor.dart';
 import '../../../shared/pda_motion.dart';
 
 String workAreaText(AppLocalizations l10n, WorkArea a) => switch (a) {
@@ -358,6 +359,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            const EnterFade(child: _HomeHero()),
                             // 지금 재고 실사 시간대(서버 activeNow)이고 실사 업무가 있으면 안내 띠(백엔드 지침 2026-11-20 §4).
                             // 조회가 안 되면 띠만 안 보인다(다음 작업 받기가 순서를 정하므로 업무에는 영향 없음).
                             if (ref.watch(countTimeProvider).value == true &&
@@ -410,23 +412,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                                   gap * (areas.length - 1)) /
                                               areas.length)
                                           .clamp(44.0, _AreaFlight._tileHeight);
-                                  return Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      for (final (i, a) in areas.indexed) ...[
-                                        if (i > 0) const SizedBox(height: gap),
-                                        EnterFade(
-                                          index: i,
-                                          child: _AreaTile(
-                                            area: a,
-                                            allowed: me.can(a),
-                                            height: h,
-                                            onTap: () => openArea(a),
+                                  // 작은 화면(머리 카드·하차 띠가 있을 때)이면 넘치지 않게 굴린다
+                                  return SingleChildScrollView(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        for (final (i, a) in areas.indexed) ...[
+                                          if (i > 0)
+                                            const SizedBox(height: gap),
+                                          EnterFade(
+                                            index: i,
+                                            child: _AreaTile(
+                                              area: a,
+                                              allowed: me.can(a),
+                                              height: h,
+                                              onTap: () => openArea(a),
+                                            ),
                                           ),
-                                        ),
+                                        ],
                                       ],
-                                    ],
+                                    ),
                                   );
                                 },
                               ),
@@ -590,7 +596,7 @@ class AreaHeroCard extends StatelessWidget {
         color: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(17),
-          side: const BorderSide(color: PdaColors.lilac, width: 1.5),
+          side: BorderSide.none,
         ),
         clipBehavior: Clip.antiAlias,
         child: Padding(
@@ -620,18 +626,11 @@ class AreaHeroCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                width: 84,
-                height: 84,
-                decoration: const BoxDecoration(
-                  color: PdaColors.softer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  workAreaIcon(area),
-                  size: 46,
-                  color: PdaColors.primary,
-                ),
+              GradientBadge(
+                icon: workAreaIcon(area),
+                size: 84,
+                iconSize: 46,
+                gradient: workAreaGradient(area),
               ),
             ],
           ),
@@ -678,10 +677,7 @@ class _AreaFlight extends StatelessWidget {
           color: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(lerp(14, 17)),
-            side: BorderSide(
-              color: Color.lerp(PdaColors.line, PdaColors.lilac, t)!,
-              width: lerp(1, 1.5),
-            ),
+            side: BorderSide.none,
           ),
           clipBehavior: Clip.antiAlias,
           child: LayoutBuilder(
@@ -748,16 +744,11 @@ class _AreaFlight extends StatelessWidget {
                     top: cy - d / 2,
                     width: d,
                     height: d,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: PdaColors.softer,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        workAreaIcon(area),
-                        size: lerp(_tileIcon, _cardIcon),
-                        color: PdaColors.primary,
-                      ),
+                    child: GradientBadge(
+                      icon: workAreaIcon(area),
+                      size: d,
+                      iconSize: lerp(_tileIcon, _cardIcon),
+                      gradient: workAreaGradient(area),
                     ),
                   ),
                 ],
@@ -769,6 +760,15 @@ class _AreaFlight extends StatelessWidget {
     );
   }
 }
+
+/// 업무마다 결이 다른 보라 그라데이션(사용자 2026-11-27 "디자인 요소").
+LinearGradient workAreaGradient(WorkArea a) => switch (a) {
+  WorkArea.pickPack => PdaGradients.violet,
+  WorkArea.inbound => PdaGradients.indigo,
+  WorkArea.inspection => PdaGradients.orchid,
+  WorkArea.stockMove => PdaGradients.lavenderBlue,
+  WorkArea.stockCount => PdaGradients.plum,
+};
 
 /// 업무 한 줄 설명(안내 화면 위 카드).
 String workAreaDesc(AppLocalizations l10n, WorkArea a) => switch (a) {
@@ -825,18 +825,12 @@ class _AreaTile extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: _AreaFlight._tileCircle,
-                        height: _AreaFlight._tileCircle,
-                        decoration: const BoxDecoration(
-                          color: PdaColors.softer,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          allowed ? workAreaIcon(area) : Icons.lock_outline,
-                          size: _AreaFlight._tileIcon,
-                          color: allowed ? PdaColors.primary : PdaColors.muted,
-                        ),
+                      GradientBadge(
+                        icon: allowed ? workAreaIcon(area) : Icons.lock_rounded,
+                        size: _AreaFlight._tileCircle,
+                        iconSize: _AreaFlight._tileIcon,
+                        gradient: workAreaGradient(area),
+                        enabled: allowed,
                       ),
                       const SizedBox(width: _AreaFlight._tileGap),
                       Expanded(
@@ -1432,71 +1426,50 @@ class _GuideStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return DecoratedBox(
+    // 단계마다 흰 둥근 카드 + 그라데이션 그림 배지 + 번호(사용자 2026-11-27 "디자인 요소")
+    return Container(
       key: ValueKey('guide-step-$n'),
+      margin: EdgeInsets.only(bottom: last ? 0 : 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
       decoration: BoxDecoration(
-        border: last
-            ? null
-            : const Border(bottom: BorderSide(color: PdaColors.line)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: PdaShadows.sm,
       ),
       child: Row(
         children: [
-          SizedBox(
-            width: 31,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                if (!last)
-                  const Positioned(
-                    top: 0,
-                    bottom: 0,
-                    left: 11,
-                    child: SizedBox(
-                      width: 1,
-                      child: ColoredBox(color: PdaColors.lilac),
-                    ),
-                  ),
-                Positioned(
-                  left: 0,
-                  child: Container(
-                    width: 23,
-                    height: 23,
-                    alignment: Alignment.center,
-                    decoration: const BoxDecoration(
-                      color: PdaColors.softer,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      '$n',
-                      style: const TextStyle(
-                        color: PdaColors.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          GradientBadge(
+            icon: icon,
+            size: 42,
+            iconSize: 22,
+            gradient: PdaGradients.all[(n - 1) % PdaGradients.all.length],
           ),
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: PdaColors.softer,
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Icon(icon, size: 30, color: PdaColors.primary),
-          ),
-          const SizedBox(width: 11),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
                 height: 1.35,
+              ),
+            ),
+          ),
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: PdaColors.softer,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$n',
+              style: const TextStyle(
+                color: PdaColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -1701,6 +1674,111 @@ class _StatusChip extends StatelessWidget {
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
           fontWeight: FontWeight.w700,
           color: onBreak ? PdaColors.onWarning : PdaColors.onNotice,
+        ),
+      ),
+    );
+  }
+}
+
+/// 홈 머리 카드 — 보라 그라데이션 + 장식 원, 오늘 날짜·처리한 업무 수(사용자 2026-11-27 "다양한 디자인 요소").
+class _HomeHero extends ConsumerWidget {
+  const _HomeHero();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final n = ref.watch(myTodayWorkProvider).value?.items.length;
+    final now = DateTime.now();
+    const days = ['월', '화', '수', '목', '금', '토', '일'];
+    return Container(
+      key: const ValueKey('home-hero'),
+      height: 112,
+      decoration: BoxDecoration(
+        gradient: PdaGradients.hero,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: PdaColors.primary.withValues(alpha: 0.30),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: CustomPaint(
+        painter: const BubblesPainter(),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      l10n.homeHeroDate(
+                        now.month,
+                        now.day,
+                        days[now.weekday - 1],
+                      ),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.78),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      n == null ? l10n.homeHeroLoading : l10n.homeHeroToday(n),
+                      style: const TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        l10n.homeHeroSafe,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    width: 1.5,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.inventory_2_rounded,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
