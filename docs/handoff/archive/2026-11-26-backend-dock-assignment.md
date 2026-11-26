@@ -31,3 +31,7 @@
 ## 앱이 지금 하는 것
 - 출하·운송 운행 상세에 "도크 배정은 아직 없어요(층 도크 확정 뒤)"를 적는다. 지어낸 도크 번호를 보이지 않는다.
 - 계약이 생기면 목(MSW)으로 먼저 붙이고 시험한다. 회신은 `../pmart-backend/docs/handoff/clients/cdc-backoffice/` 에서 읽는다.
+
+## 끝남 (2026-11-26)
+- 백엔드 #533(61a24d7d — cdc-location 0.8.0 `GET /cdcs/{cdcId}/dock-reservations`·planning·execution 0.3.0, 계획완료 때 자동 배정)이 main·LAN(pc3 cdc-location v5·execution v3·planning v3, pc4 게이트웨이 64c8d54c — pmart-config db6eda3)에 들어갔다. LAN claude-cdc-sup `dock-reservations?date=2026-11-26` 200·도크 12칸, 다른 센터 403(PR 백엔드 확인).
+- 화면은 clients #583(층별 도크 × 시간, 운행·지시서 도크 표시). 열린 목록에서 뺐다.
