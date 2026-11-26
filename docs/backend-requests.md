@@ -118,6 +118,7 @@
 | BR-108 | 보통 | 고객 | 주소에 라이더 요청사항(riderRequest) 저장·기본 문구 목록·주문 deliveryNote 기본값 — 레퍼런스 주소 편집 회색 줄·주소 상세 펼침 목록. 요청서 `docs/handoff/customer-app/2026-11-26-backend-address-rider-request.md` | 요청(앱 미표시) |
 | BR-109 | 보통 | 고객 | 본인이 산 상품 목록(중복 없이·최근 순·지금 살 수 있는지) — 홈 "내가 1번 구매한 상품 보기" 카드. 요청서 `docs/handoff/customer-app/2026-11-26-backend-bought-before-products.md` | 요청(앱: 카드 → 주문내역) |
 | BR-110 | 보통 | 고객 | 진열 칩·전체 수·정렬·비슷한 상품 영역, 상품 라벨·순위 변동·회원 가격·내 구매 횟수 — 홈·랭킹·신상품 레퍼런스. 요청서 `docs/handoff/customer-app/2026-11-26-backend-storefront-display-fields.md` | 요청(앱: 배치만 반영) |
+| BR-111 | 보통 | 고객 | 카카오 가입 때 실명 — `kakao_account.name`(동의항목 "이름")을 `Profile.name` 으로(지금은 늘 비움). 콘솔 "이름" 동의는 비즈 앱·검수 필요(사용자 작업). 네이버·구글 이름이 가입 화면에 안 들어가던 것은 앱 결함이라 고침(2026-11-26). 요청서 `docs/handoff/customer-app/2026-11-26-backend-kakao-real-name.md` | 요청(앱: 카카오는 이름 직접 입력) |
 
 ---
 

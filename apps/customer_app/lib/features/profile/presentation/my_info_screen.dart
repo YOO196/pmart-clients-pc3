@@ -62,6 +62,9 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
   /// 고객이 닉네임 칸을 직접 고쳤다 — 그 전까지는 닉네임이 이름을 따라간다(사용자 2026-11-26).
   bool _nickTouched = false;
 
+  /// 고객이 이름 칸을 직접 고쳤다 — 그 뒤로는 서버가 늦게 준 로그인 계정 이름으로 덮지 않는다.
+  bool _realTouched = false;
+
   void _followName() {
     if (!_nickTouched) _name.text = _realName.text;
   }
@@ -135,6 +138,18 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
     final l10n = AppLocalizations.of(context);
     final value = ref.watch(profileProvider);
     final profile = value.value;
+    // 로그인 계정 이름은 가입 완료 약 1초 뒤 서버에 들어온다(네이버 — BR-103 회신). 화면이 먼저 열려 비어 있던
+    // 이름 칸은, 고객이 아직 손대지 않았으면 나중에 온 이름으로 채운다(사용자 2026-11-26 "name 을 받긴 하는데
+    // 이름 입력창에 안 들어간다").
+    ref.listen(profileProvider, (_, next) {
+      final late = next.value?.name?.trim() ?? '';
+      if (_filled &&
+          !_realTouched &&
+          late.isNotEmpty &&
+          _realName.text.trim().isEmpty) {
+        _realName.text = late;
+      }
+    });
     // 서버 값으로 한 번만 채운다(입력 중에 덮어쓰지 않는다).
     if (!_filled && profile != null) {
       _filled = true;
@@ -178,6 +193,7 @@ class _MyInfoScreenState extends ConsumerState<MyInfoScreen> {
                 TextFormField(
                   key: const ValueKey('info-real-name'),
                   controller: _realName,
+                  onChanged: (_) => _realTouched = true,
                   // 이름이 비었으면(카카오 등) 이름 칸부터, 채워졌으면 닉네임 칸부터.
                   autofocus: widget.signup && _realName.text.trim().isEmpty,
                   maxLength: NameInput.maxLength,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_ui/pmart_ui.dart';
@@ -6,6 +8,9 @@ import 'package:customer_app/features/auth/data/mock_auth_repository.dart';
 import 'package:customer_app/features/auth/domain/auth.dart';
 import 'package:customer_app/features/auth/presentation/auth_controller.dart';
 import 'package:customer_app/features/profile/data/mock_profile_repository.dart';
+
+import 'package:customer_app/features/profile/presentation/profile_controller.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'support/app_harness.dart';
 
@@ -152,6 +157,56 @@ void main() {
     final sent = auth.completions.single.consents;
     expect(sent.firstWhere((d) => d.item == marketing).agreed, isTrue);
     expect(sent.where((d) => d.agreed), hasLength(4));
+  });
+
+  testWidgets('네이버 이름이 화면보다 늦게 와도 이름 칸에 들어가고, 닉네임이 따라온다 — 고친 칸은 덮지 않는다', (
+    t,
+  ) async {
+    final profile = MockProfileRepository(latency: Duration.zero);
+    await t.pumpWidget(testApp(const [], profile: profile));
+    await t.pumpAndSettle();
+    await t.tap(find.text('마이페이지').last);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-login')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-naver')));
+    await t.pumpAndSettle();
+    for (final c in MockAuthRepository.requiredConsents) {
+      await t.ensureVisible(find.byKey(ValueKey('consent-$c')));
+      await t.tap(find.byKey(ValueKey('consent-$c')));
+      await t.pump();
+    }
+    await t.tap(find.byKey(const ValueKey('consent-submit')));
+    await t.pumpAndSettle();
+    expect(find.text('내 정보 등록'), findsOneWidget);
+
+    String text(String k) =>
+        t.widget<TextFormField>(find.byKey(ValueKey(k))).controller!.text;
+    expect(text('info-real-name'), '');
+
+    // 서버가 가입 완료 뒤에 네이버 이름을 넣었다 → 다시 읽으면 칸에 들어온다.
+    profile.name = '홍길동';
+    unawaited(
+      ProviderScope.containerOf(
+        t.element(find.byKey(const ValueKey('info-real-name'))),
+      ).read(profileProvider.notifier).refreshQuietly(),
+    );
+    await t.pump(const Duration(milliseconds: 10));
+    await t.pumpAndSettle();
+    expect(text('info-real-name'), '홍길동');
+    expect(text('info-name'), '홍길동');
+
+    // 고객이 고친 이름은 다음에 온 값으로 덮지 않는다.
+    await t.enterText(find.byKey(const ValueKey('info-real-name')), '김피마');
+    profile.name = '다른이름';
+    unawaited(
+      ProviderScope.containerOf(
+        t.element(find.byKey(const ValueKey('info-real-name'))),
+      ).read(profileProvider.notifier).refreshQuietly(),
+    );
+    await t.pump(const Duration(milliseconds: 10));
+    await t.pumpAndSettle();
+    expect(text('info-real-name'), '김피마');
   });
 
   testWidgets('필수를 모두 체크해야 [동의하고 계속하기]가 켜지고, 약관 전체 동의는 모두 체크·해제한다', (t) async {
