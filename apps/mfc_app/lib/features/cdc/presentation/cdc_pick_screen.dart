@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
@@ -323,10 +324,11 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
             (l10n.cdcRowPicked, '$picked'),
             if (short > 0) (l10n.cdcRowShort, '$short'),
           ],
-          // DC 는 10초 뒤 자동으로 다음 피킹을 받지 않는다 — 출고대기로 옮긴다는 안내 뒤 피킹이 저절로 다시 시작돼
-          // 같은 작업이 되풀이되는 것처럼 보였다(사용자 2026-11-26). 다음 작업은 작업자가 눌러서 받는다. MFC 는 그대로 10초.
-          autoNext: false,
-          onNext: _pull,
+          // 피킹이 끝나면 10초 뒤(또는 누르면) 분배·패킹으로(사용자 2026-11-26 "피킹 끝나면 알아서 분배로 가게") —
+          // 다음 피킹을 저절로 받지 않는다("피킹작업이 다시 시작돼"). 다음 피킹은 홈의 피킹에서.
+          nextLabel: l10n.cdcGoDistribute,
+          autoNextText: l10n.cdcPickAutoDistribute,
+          onNext: () async => context.pushReplacement('/cdc/work/distribute'),
         );
       case _Phase.working:
         break;

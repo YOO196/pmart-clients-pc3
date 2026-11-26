@@ -196,4 +196,26 @@ void main() {
       ],
     });
   });
+
+  test('홈 하차 띠: 도착한 운행 수(인계 끝나면 빠짐)', () async {
+    final unload = MockUnloadRepository(mfcId: mockMfcId);
+    final c = ProviderContainer(
+      overrides: [
+        envProvider.overrideWithValue(PmartEnv.mock),
+        unloadRepositoryProvider.overrideWithValue(unload),
+      ],
+    );
+    addTearDown(c.dispose);
+    final sub = c.listen(arrivedTripsProvider, (_, _) {});
+    addTearDown(sub.close);
+    expect(await c.read(arrivedTripsProvider.future), 1);
+    await unload.handover(
+      tripId: 'TO-20261126-001',
+      stopSeq: 1,
+      transfers: const {},
+      key: IdempotencyKey.generate(),
+    );
+    c.invalidate(arrivedTripsProvider);
+    expect(await c.read(arrivedTripsProvider.future), 0);
+  });
 }

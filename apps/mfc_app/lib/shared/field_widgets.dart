@@ -456,9 +456,17 @@ class TaskDoneView extends StatefulWidget {
     required this.rows,
     required this.onNext,
     this.autoNext = true,
+    this.nextLabel,
+    this.autoNextText,
   });
 
   static const autoNextAfter = Duration(seconds: 10);
+
+  /// "다음 작업" 대신 단추 글(예: DC 피킹 끝 → "분배·패킹으로")
+  final String? nextLabel;
+
+  /// 자동으로 넘어가기까지 안내(남은 초) — 없으면 "N초 뒤 자동으로 다음 작업을 받아요"
+  final String Function(int seconds)? autoNextText;
 
   final String title;
   final String message;
@@ -597,7 +605,8 @@ class _TaskDoneViewState extends State<TaskDoneView> {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               widget.autoNext
-                  ? l10n.moveDoneAutoNext(_left)
+                  ? (widget.autoNextText?.call(_left) ??
+                        l10n.moveDoneAutoNext(_left))
                   : l10n.doneAutoNextOnBreak,
               key: ValueKey(
                 widget.autoNext ? 'done-auto-next' : 'done-auto-next-off',
@@ -610,7 +619,7 @@ class _TaskDoneViewState extends State<TaskDoneView> {
           ),
         CommandButton(
           key: const ValueKey('result-action'),
-          label: l10n.nextTask,
+          label: widget.nextLabel ?? l10n.nextTask,
           busy: _going,
           onPressed: _next,
         ),
