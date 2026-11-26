@@ -323,6 +323,9 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
             (l10n.cdcRowPicked, '$picked'),
             if (short > 0) (l10n.cdcRowShort, '$short'),
           ],
+          // DC 는 10초 뒤 자동으로 다음 피킹을 받지 않는다 — 출고대기로 옮긴다는 안내 뒤 피킹이 저절로 다시 시작돼
+          // 같은 작업이 되풀이되는 것처럼 보였다(사용자 2026-11-26). 다음 작업은 작업자가 눌러서 받는다. MFC 는 그대로 10초.
+          autoNext: false,
           onNext: _pull,
         );
       case _Phase.working:

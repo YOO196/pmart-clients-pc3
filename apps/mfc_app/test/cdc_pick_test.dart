@@ -131,6 +131,9 @@ void main() {
     await setQty(t, '12');
     expect(find.byKey(const ValueKey('cdc-done')), findsOneWidget);
     expect(find.byKey(const ValueKey('done-title')), findsOneWidget);
+    // 10초가 지나도 저절로 다음 피킹을 받지 않는다(DC — 작업자가 눌러서)
+    await t.pump(const Duration(seconds: 12));
+    expect(find.byKey(const ValueKey('cdc-done')), findsOneWidget);
     await tap(t, 'result-action');
     expect(find.textContaining('T261126002'), findsOneWidget);
     expect(
