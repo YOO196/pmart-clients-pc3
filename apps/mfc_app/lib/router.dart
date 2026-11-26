@@ -9,6 +9,7 @@ import 'features/auth/domain/employee_auth.dart';
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cdc/presentation/cdc_home.dart';
+import 'features/cdc/presentation/cdc_pick_screen.dart';
 import 'features/device/presentation/device_setup_screens.dart';
 import 'features/handover/presentation/handover_screens.dart';
 import 'features/inbound/presentation/inbound_screen.dart';
@@ -157,6 +158,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/manage/workers',
         pageBuilder: (_, s) => _page(s, const CenterWorkersScreen()),
+      ),
+      // DC 피킹(사용자 2026-11-26 "피킹부터 붙여줘")
+      GoRoute(
+        path: '/cdc/work/pick',
+        pageBuilder: (_, s) => _page(s, const CdcPickScreen()),
       ),
       // DC 직원 업무(사용자 2026-11-26) — 업무 화면 자리
       GoRoute(
