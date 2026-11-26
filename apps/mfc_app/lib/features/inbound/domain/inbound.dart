@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 /// 입고 예정(TRF) 상태. EXPECTED → RECEIVING(도착 등록) → TIN_POSTED(수령 반영).
-enum PromiseState { expected, receiving, tinPosted, cancelled, unknown }
+/// closed — 센터 관리자 입고 종결(오지 않은 이관, mfc-inbound 0.22.0 MI-5)
+enum PromiseState { expected, receiving, tinPosted, cancelled, closed, unknown }
 
 /// 재고 반영 상태. APPLIED 만 반영 완료다.
 enum ApplyStatus {
