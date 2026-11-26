@@ -193,14 +193,14 @@ class _BoughtItemsScreenState extends ConsumerState<BoughtItemsScreen> {
                 children: [
                   const Divider(height: 1),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16.6, 15, 16.6, 10.7),
+                    padding: const EdgeInsets.fromLTRB(15.5, 12.3, 16.6, 13.4),
                     child: Row(
                       children: [
                         Text(
                           l10n.boughtItemsCount(count),
                           key: const ValueKey('bought-count'),
                           style: theme.textTheme.titleMedium?.copyWith(
-                            fontSize: 15,
+                            fontSize: 13.3,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
@@ -215,7 +215,7 @@ class _BoughtItemsScreenState extends ConsumerState<BoughtItemsScreen> {
                             formatKrw(sum),
                             key: const ValueKey('bought-sum'),
                             style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 15,
+                              fontSize: 13.3,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -230,7 +230,7 @@ class _BoughtItemsScreenState extends ConsumerState<BoughtItemsScreen> {
                               );
                               final style = theme.textTheme.titleMedium
                                   ?.copyWith(
-                                    fontSize: 15,
+                                    fontSize: 13.3,
                                     fontWeight: FontWeight.w800,
                                     color: scheme.primary,
                                   );
@@ -268,7 +268,7 @@ class _BoughtItemsScreenState extends ConsumerState<BoughtItemsScreen> {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           textStyle: theme.textTheme.titleMedium?.copyWith(
-                            fontSize: 18.2,
+                            fontSize: 15.5,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
