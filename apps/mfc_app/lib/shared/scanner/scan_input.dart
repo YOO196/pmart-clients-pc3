@@ -82,12 +82,12 @@ class _ScanInputState extends ConsumerState<ScanInput>
   /// (사용자 2026-11-26 "다 개선해" — 성공·실패가 눈에 잘 안 보였다). 값 1 = 표시 없음.
   late final _flash = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 700),
+    duration: const Duration(milliseconds: 1100),
     value: 1,
   );
   late final _shake = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 360),
+    duration: const Duration(milliseconds: 480),
     value: 1,
   );
   bool _flashOk = true;
@@ -159,7 +159,7 @@ class _ScanInputState extends ConsumerState<ScanInput>
               final s = _shake.value;
               final color = _flashOk ? PdaColors.ok : PdaColors.danger;
               return Transform.translate(
-                offset: Offset(math.sin(s * math.pi * 4) * 9 * (1 - s), 0),
+                offset: Offset(math.sin(s * math.pi * 2) * 5 * (1 - s), 0),
                 // 바깥 빛(버튼 뒤에 깔려 글자를 가리지 않는다) + 테두리(앞)
                 child: DecoratedBox(
                   decoration: BoxDecoration(

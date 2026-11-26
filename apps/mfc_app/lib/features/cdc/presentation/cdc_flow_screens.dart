@@ -466,19 +466,15 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
           detail: l10n.cdcSortBoxNth(lpns.length + 1),
         ),
       );
-      for (final (n, i) in left.indexed) {
+      for (final i in left) {
         body.add(
-          EnterFade(
-            key: ValueKey('fade-box-${i.key}'),
-            index: n,
-            child: CdcItemCard(
-              key: ValueKey('cdc-sort-${i.sku}'),
-              name: i.productName ?? i.sku,
-              sku: i.sku,
-              lot: i.lot,
-              qty: i.remaining,
-              qtyLabel: l10n.cdcLeftUnit,
-            ),
+          CdcItemCard(
+            key: ValueKey('cdc-sort-${i.sku}'),
+            name: i.productName ?? i.sku,
+            sku: i.sku,
+            lot: i.lot,
+            qty: i.remaining,
+            qtyLabel: l10n.cdcLeftUnit,
           ),
         );
       }
@@ -776,14 +772,8 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
           detail: l10n.cdcInspectScanHelp,
         ),
       );
-      for (final (i, l) in lpns.indexed) {
-        body.add(
-          EnterFade(
-            key: ValueKey('fade-${l.lpn}'),
-            index: i,
-            child: _BoxLine(lpn: l),
-          ),
-        );
+      for (final l in lpns) {
+        body.add(_BoxLine(lpn: l));
       }
       actions.add(
         ScanInput(
@@ -806,18 +796,14 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
           detail: l10n.cdcInspectCheckHelp(box.lpn),
         ),
       );
-      for (final (i, c) in box.contents.indexed) {
+      for (final c in box.contents) {
         body.add(
-          EnterFade(
-            key: ValueKey('cdc-insp-${box.lpn}-$i'),
-            index: i,
-            child: CdcItemCard(
-              name: c.sku,
-              sku: c.sku,
-              lot: c.lot,
-              qty: c.qty,
-              qtyLabel: l10n.cdcQtyUnit,
-            ),
+          CdcItemCard(
+            name: c.sku,
+            sku: c.sku,
+            lot: c.lot,
+            qty: c.qty,
+            qtyLabel: l10n.cdcQtyUnit,
           ),
         );
       }
@@ -1188,18 +1174,13 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
           detail: l10n.cdcLoadVehicleIs(_vehicle!, _trip!),
         ),
       );
-      for (final (i, l) in passed.indexed) {
+      for (final l in passed) {
         body.add(
-          EnterFade(
-            key: ValueKey('fade-${l.lpn}'),
-            index: i,
-            // 방금 스캔한 BOX 가 화면 밖이면 그리로 스크롤
-            child: CdcReveal(
-              trigger: _scanned.isNotEmpty && _scanned.last == l.lpn
-                  ? _scanned.length
-                  : null,
-              child: _BoxLine(lpn: l, checked: _scanned.contains(l.lpn)),
-            ),
+          CdcReveal(
+            trigger: _scanned.isNotEmpty && _scanned.last == l.lpn
+                ? _scanned.length
+                : null,
+            child: _BoxLine(lpn: l, checked: _scanned.contains(l.lpn)),
           ),
         );
       }
@@ -1433,14 +1414,11 @@ class _CdcPutawayScreenState extends ConsumerState<CdcPutawayScreen>
         );
       } else if (_loc == null) {
         body.add(
-          EnterFade(
-            key: ValueKey('cdc-pa-stop-${row.key}'),
-            child: LocationGuide(
-              code: row.location,
-              codeKey: const ValueKey('cdc-pa-location'),
-              title: l10n.cdcPutawayGoTitle,
-              detail: t.taskId,
-            ),
+          LocationGuide(
+            code: row.location,
+            codeKey: const ValueKey('cdc-pa-location'),
+            title: l10n.cdcPutawayGoTitle,
+            detail: t.taskId,
           ),
         );
         body.add(const SizedBox(height: 12));
