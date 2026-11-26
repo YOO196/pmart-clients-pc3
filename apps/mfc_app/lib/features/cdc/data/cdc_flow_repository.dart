@@ -1,13 +1,15 @@
 import 'package:dio/dio.dart';
-import 'package:pmart_api_cdc_inbound/pmart_api_cdc_inbound.dart' as ci;
 import 'package:pmart_api_cdc_outbound/pmart_api_cdc_outbound.dart' as co;
+import 'package:pmart_api_transport_execution/pmart_api_transport_execution.dart'
+    as te;
 import 'package:pmart_core/pmart_core.dart';
 
 import '../../../shared/providers.dart' show sourceSystem;
 import '../domain/cdc_flow.dart';
 
-/// DC 분배·검품·상차(cdc-outbound 0.21.0 results·staff-views)와 지게차 적치(cdc-inbound 0.1.0 putaway-tasks).
-/// 결과 등록은 202 접수 — 화면은 다시 읽은 서버 값(LPN 검품·상차, 적치 진행)만 확정으로 보인다.
+/// DC 분배·패킹·검품·상차(cdc-outbound 0.29.0 results·staff-views)와 운행(transport-execution 0.3.0 — 도크의 운행·상차완료).
+/// DC 시뮬레이터 요청 C-01(사용자 2026-11-26). 결과 등록은 202 접수 — 화면은 다시 읽은 서버 값(LPN 검품·상차, 운행 상태)만 확정으로 보인다.
+/// 지게차 적치·보충은 가상 설비가 `/internal` 로 받는 일이라(cdc-inbound 0.2.x) PDA 에는 없다.
 abstract interface class CdcFlowRepository {
   /// 피킹이 끝난 TRF(state PICKED) — 기한 빠른 순(서버 정렬)
   Future<List<CdcTrf>> pickedTransfers(String cdcId);
@@ -36,17 +38,21 @@ abstract interface class CdcFlowRepository {
     required String tripId,
     required String vehicleId,
     required String? dockCode,
+    required String? compartment,
     required String workerId,
     required List<String> lpns,
     required IdempotencyKey key,
   });
 
-  Future<CdcPutaway> putaway(String taskId);
+  /// 그 도크에 계획완료(SCHEDULED)·입차(CHECKED_IN)된 운행 — 없으면 null
+  Future<CdcTrip?> tripAtDock(String cdcId, String dockCode);
 
-  Future<void> executePutaway({
-    required CdcPutaway task,
-    required String workerId,
-    required List<CdcPutawayLine> lines,
+  Future<CdcTrip> trip(String tripId);
+
+  /// 상차완료(transport-execution) — TRF 마다 실은 박스(CHECKED_IN → LOADED)
+  Future<CdcTrip> completeLoading({
+    required String tripId,
+    required Map<String, List<String>> transfers,
     required IdempotencyKey key,
   });
 }
@@ -56,12 +62,12 @@ final class ApiCdcFlowRepository implements CdcFlowRepository {
     : _views = co.PmartApiCdcOutbound(dio: dio).getStaffViewsApi(),
       _tasks = co.PmartApiCdcOutbound(dio: dio).getTasksApi(),
       _results = co.PmartApiCdcOutbound(dio: dio).getResultsApi(),
-      _putaway = ci.PmartApiCdcInbound(dio: dio).getPutawayTasksApi();
+      _trips = te.PmartApiTransportExecution(dio: dio).getTripsApi();
 
   final co.StaffViewsApi _views;
   final co.TasksApi _tasks;
   final co.ResultsApi _results;
-  final ci.PutawayTasksApi _putaway;
+  final te.TripsApi _trips;
 
   @override
   Future<List<CdcTrf>> pickedTransfers(String cdcId) async {
@@ -271,6 +277,7 @@ final class ApiCdcFlowRepository implements CdcFlowRepository {
     required String tripId,
     required String vehicleId,
     required String? dockCode,
+    required String? compartment,
     required String workerId,
     required List<String> lpns,
     required IdempotencyKey key,
@@ -288,7 +295,10 @@ final class ApiCdcFlowRepository implements CdcFlowRepository {
           action: co.ReportLoadingResultRequestActionEnum.LOADED,
           lpns: [
             for (final l in lpns)
-              co.ReportLoadingResultRequestLpnsInner(lpn: l),
+              co.ReportLoadingResultRequestLpnsInner(
+                lpn: l,
+                compartment: compartment,
+              ),
           ],
         ),
         extra: commandOptions(key).extra,
@@ -297,68 +307,69 @@ final class ApiCdcFlowRepository implements CdcFlowRepository {
   }
 
   @override
-  Future<CdcPutaway> putaway(String taskId) async {
-    final r = await pmartGuard(() => _putaway.getPutawayTask(taskId: taskId));
-    final t =
-        r.data ?? (throw const ContractViolationFailure('PutawayTask 없음'));
-    return CdcPutaway(
-      taskId: t.taskId ?? taskId,
-      state: t.state?.value ?? 'CREATED',
-      version: t.version ?? 0,
-      rows: [
-        for (final p in t.progress ?? const <ci.PutawayTaskAllOfProgress>[])
-          if (p.sku != null && p.lot != null)
-            CdcPutawayRow(
-              sku: p.sku!,
-              lot: p.lot!,
-              location: p.assignedLocationCode ?? '',
-              q: p.q ?? 0,
-              c: p.c ?? 0,
-              u: p.u ?? 0,
-              k: p.k ?? 0,
-            ),
-      ],
-    );
+  Future<CdcTrip?> tripAtDock(String cdcId, String dockCode) async {
+    final want = dockCode.trim().toUpperCase();
+    for (final state in [te.TripState.CHECKED_IN, te.TripState.SCHEDULED]) {
+      final r = await pmartGuard(
+        () => _trips.listCenterTrips(cdcId: cdcId, state: state, size: 200),
+      );
+      for (final t in r.data?.items ?? const <te.Trip>[]) {
+        if ((t.dockCode ?? '').toUpperCase() == want) return _trip(t);
+      }
+    }
+    return null;
   }
 
   @override
-  Future<void> executePutaway({
-    required CdcPutaway task,
-    required String workerId,
-    required List<CdcPutawayLine> lines,
+  Future<CdcTrip> trip(String tripId) async {
+    final r = await pmartGuard(() => _trips.getTrip(tripId: tripId));
+    return _trip(r.data ?? (throw const ContractViolationFailure('운행 없음')));
+  }
+
+  @override
+  Future<CdcTrip> completeLoading({
+    required String tripId,
+    required Map<String, List<String>> transfers,
     required IdempotencyKey key,
   }) async {
-    await pmartGuard(
-      () => _putaway.recordPutawayExecution(
-        taskId: task.taskId,
+    final r = await pmartGuard(
+      () => _trips.completeLoading(
+        tripId: tripId,
         idempotencyKey: key.value,
         xSourceSystem: sourceSystem,
-        xExpectedVersion: task.version,
-        recordPutawayExecutionRequest: ci.RecordPutawayExecutionRequest(
-          workerId: workerId,
-          lines: [
-            for (final l in lines)
-              ci.RecordPutawayExecutionRequestLinesInner(
-                sku: l.row.sku,
-                lot: l.row.lot,
-                toLocationCode: l.toLocation,
-                completedQty: l.completedQty,
-                exceptionReason: l.exceptionReason == null
-                    ? null
-                    : ci
-                          .RecordPutawayExecutionRequestLinesInnerExceptionReasonEnum
-                          .values
-                          .firstWhere((e) => e.value == l.exceptionReason),
-              ),
+        loadingInput: te.LoadingInput(
+          transfers: [
+            for (final e in transfers.entries)
+              te.LoadingInputAllOfTransfers(trfId: e.key, lpns: e.value),
           ],
         ),
-        extra: commandOptions(key, expectedVersion: task.version).extra,
+        extra: commandOptions(key).extra,
       ),
     );
+    return _trip(r.data ?? (throw const ContractViolationFailure('운행 없음')));
   }
+
+  static CdcTrip _trip(te.Trip t) => CdcTrip(
+    tripId: t.tripId,
+    state: t.state.value,
+    tempClass: t.tempClass.value,
+    vehicleId: t.vehicleId,
+    plateNo: t.plateNo,
+    driverName: t.driverName,
+    dockCode: t.dockCode,
+    stops: [
+      for (final s in t.stops)
+        if (s.mfcId != null)
+          CdcTripStop(
+            seq: s.seq ?? 0,
+            mfcId: s.mfcId!,
+            trfIds: s.trfIds ?? const [],
+          ),
+    ],
+  );
 }
 
-/// 목: 칠곡 DC — 피킹 끝난 TRF 둘, 분배·검품·상차가 서로 이어지고, 적치 지시 둘(`PA-mock-1`·`PA-mock-2`).
+/// 목: 칠곡 DC — 피킹 끝난 TRF 둘, 분배·패킹·검품·상차가 서로 이어지고, 6층 1번 도크(`CDC01-A-6-90-01-0-1`)에 입차한 운행 하나.
 final class MockCdcFlowRepository implements CdcFlowRepository {
   MockCdcFlowRepository({this.latency = const Duration(milliseconds: 300)}) {
     reset();
@@ -367,7 +378,9 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
   final Duration latency;
   late Map<String, List<CdcSortItem>> _picked;
   late Map<String, List<_MockLpn>> _lpns;
-  late Map<String, CdcPutaway> _putaways;
+  late CdcTrip _trip;
+
+  static const dock = 'CDC01-A-6-90-01-0-1';
   final _done = <String>{};
 
   static final trfs = [
@@ -420,33 +433,19 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
         ])..inspection = 'PASSED',
       ],
     };
-    CdcPutawayRow row(String sku, String lot, String loc, int q) =>
-        CdcPutawayRow(
-          sku: sku,
-          lot: lot,
-          location: loc,
-          q: q,
-          c: 0,
-          u: q,
-          k: 0,
-        );
-    _putaways = {
-      'PA-mock-1': CdcPutaway(
-        taskId: 'PA-mock-1',
-        state: 'DISPATCHED',
-        version: 1,
-        rows: [row('SKU-1001', 'L261124011', 'CDC01-C-5-02-24-3-1', 120)],
-      ),
-      'PA-mock-2': CdcPutaway(
-        taskId: 'PA-mock-2',
-        state: 'DISPATCHED',
-        version: 1,
-        rows: [
-          row('SKU-2001', 'L261125021', 'CDC01-B-6-05-12-2-1', 40),
-          row('SKU-1002', 'L261125022', 'CDC01-F-5-01-07-1-2', 30),
-        ],
-      ),
-    };
+    _trip = const CdcTrip(
+      tripId: 'TRIP-mock-1',
+      state: 'CHECKED_IN',
+      tempClass: 'AMBIENT',
+      vehicleId: 'VH-5T-04A',
+      plateNo: '경북12가3456',
+      driverName: '김기사',
+      dockCode: dock,
+      stops: [
+        CdcTripStop(seq: 1, mfcId: 'MFC-BJG-01', trfIds: ['TRF-mock-1']),
+        CdcTripStop(seq: 2, mfcId: 'MFC-MOKPO-01', trfIds: ['TRF-mock-2']),
+      ],
+    );
   }
 
   Future<void> _wait() =>
@@ -550,6 +549,7 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
     required String tripId,
     required String vehicleId,
     required String? dockCode,
+    required String? compartment,
     required String workerId,
     required List<String> lpns,
     required IdempotencyKey key,
@@ -578,49 +578,31 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
   }
 
   @override
-  Future<CdcPutaway> putaway(String taskId) async {
+  Future<CdcTrip?> tripAtDock(String cdcId, String dockCode) async {
     await _wait();
-    return _putaways[taskId] ?? _problem(404, 'NOT_FOUND');
+    return dockCode.trim().toUpperCase() == dock ? _trip : null;
   }
 
   @override
-  Future<void> executePutaway({
-    required CdcPutaway task,
-    required String workerId,
-    required List<CdcPutawayLine> lines,
+  Future<CdcTrip> trip(String tripId) async {
+    await _wait();
+    return tripId == _trip.tripId ? _trip : _problem(404, 'NOT_FOUND');
+  }
+
+  @override
+  Future<CdcTrip> completeLoading({
+    required String tripId,
+    required Map<String, List<String>> transfers,
     required IdempotencyKey key,
   }) async {
     await _wait();
-    if (_done.contains(key.value)) return;
-    final t = _putaways[task.taskId] ?? _problem(404, 'NOT_FOUND');
-    if (t.finished) _problem(409, 'INVALID_STATE');
-    if (t.version != task.version) _problem(409, 'VERSION_CONFLICT');
-    final rows = [
-      for (final r in t.rows)
-        switch (lines.where((l) => l.row.key == r.key).firstOrNull) {
-          null => r,
-          final l when l.completedQty > r.u => _problem(
-            409,
-            'EXECUTION_EXCEEDS_REMAINING',
-          ),
-          final l => CdcPutawayRow(
-            sku: r.sku,
-            lot: r.lot,
-            location: r.location,
-            q: r.q,
-            c: r.c + l.completedQty,
-            u: r.u - l.completedQty,
-            k: r.k,
-          ),
-        },
-    ];
+    if (_done.contains(key.value)) return _trip;
+    if (_trip.state != 'CHECKED_IN') _problem(409, 'INVALID_STATE');
+    if (transfers.values.every((l) => l.isEmpty)) {
+      _problem(409, 'NOTHING_LOADED');
+    }
     _done.add(key.value);
-    _putaways[t.taskId] = CdcPutaway(
-      taskId: t.taskId,
-      state: rows.every((r) => r.u == 0) ? 'COMPLETED' : 'PARTIALLY_COMPLETED',
-      version: t.version + 1,
-      rows: rows,
-    );
+    return _trip = _trip.withState('LOADED');
   }
 }
 

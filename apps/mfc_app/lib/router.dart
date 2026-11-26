@@ -204,8 +204,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (_, s) => _page(s, const CdcLoadScreen()),
       ),
       GoRoute(
-        path: '/cdc/work/putaway',
-        pageBuilder: (_, s) => _page(s, const CdcPutawayScreen()),
+        path: '/cdc/work/distribute',
+        pageBuilder: (_, s) => _page(s, const CdcDistributeScreen()),
       ),
       GoRoute(
         path: '/work/:area',

@@ -606,6 +606,17 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
   CdcTrf? _trf;
   AsyncValue<List<CdcLpn>> _lpns = const AsyncLoading();
   CdcLpn? _box;
+
+  /// 검품하는 출고대기 자리(통로 91) — C-01 "출고대기 박스 스캔"
+  String? _staging;
+  final _temp = TextEditingController();
+
+  @override
+  void dispose() {
+    _temp.dispose();
+    super.dispose();
+  }
+
   String? _scanError;
   String? _notice;
 
@@ -634,6 +645,8 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
   void _back() => setState(() {
     if (_box != null) {
       _box = null;
+    } else if (_staging != null) {
+      _staging = null;
       _scanError = null;
     } else {
       _trf = null;
@@ -642,6 +655,20 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
       resend = null;
     }
   });
+
+  ScanFeedback _scanStaging(String code) {
+    final l10n = AppLocalizations.of(context);
+    final c = code.trim().toUpperCase();
+    if (CdcLocationCode.parse(c)?.aisle != '91') {
+      setState(() => _scanError = l10n.cdcInspectNotStaging);
+      return ScanFeedback.error(l10n.cdcInspectNotStaging);
+    }
+    setState(() {
+      _staging = c;
+      _scanError = null;
+    });
+    return const ScanFeedback.ok();
+  }
 
   ScanFeedback _scanBox(List<CdcLpn> lpns, String code) {
     final l10n = AppLocalizations.of(context);
@@ -654,6 +681,7 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
     }
     setState(() {
       _box = hit;
+      _temp.clear();
       _scanError = null;
       _notice = null;
     });
@@ -685,7 +713,14 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
         trfId: _trf!.trfId,
         inspectorId: cdcWorkerOf(ref),
         items: [
-          CdcInspection(lpn: box.lpn, passed: passed, failReason: reason),
+          CdcInspection(
+            lpn: box.lpn,
+            passed: passed,
+            failReason: reason,
+            temperatureC: double.tryParse(
+              _temp.text.trim().replaceAll(',', '.'),
+            ),
+          ),
         ],
         key: key,
       ),
@@ -704,7 +739,12 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final steps = [l10n.cdcStepTrf, l10n.cdcStepBox, l10n.cdcStepJudge];
+    final steps = [
+      l10n.cdcStepTrf,
+      l10n.cdcStepStaging,
+      l10n.cdcStepBox,
+      l10n.cdcStepJudge,
+    ];
     final trf = _trf;
     return _Frame(
       area: CdcWorkArea.inspect,
@@ -749,7 +789,12 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
     final done = lpns.where((l) => l.inspection != null).length;
     final body = <Widget>[];
     final actions = <Widget>[];
-    body.add(StepHeader(names: steps, current: _box == null ? 1 : 2));
+    body.add(
+      StepHeader(
+        names: steps,
+        current: _staging == null ? 1 : (_box == null ? 2 : 3),
+      ),
+    );
     body.add(
       ProgressLine(
         textKey: const ValueKey('cdc-inspect-progress'),
@@ -762,8 +807,42 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
       body.add(NoticeBox(text: n, textKey: const ValueKey('cdc-notice')));
     }
     final box = _box;
-    final step = box == null ? 'list' : 'box-${box.lpn}';
-    if (box == null) {
+    final step = _staging == null
+        ? 'staging'
+        : box == null
+        ? 'list'
+        : 'box-${box.lpn}';
+    if (lpns.any((l) => l.inspection == 'FAILED')) {
+      body.add(
+        NoticeBox(
+          text: l10n.cdcInspectRepack,
+          textKey: const ValueKey('cdc-repack'),
+          warning: true,
+        ),
+      );
+    }
+    if (_staging == null) {
+      body.add(
+        ScanPrompt(
+          text: l10n.cdcInspectStagingTitle,
+          detail: l10n.cdcInspectStagingHelp,
+        ),
+      );
+      actions.add(
+        ScanInput(
+          id: 'cdc-staging-scan',
+          label: l10n.cdcStepStaging,
+          cameraTitle: l10n.cdcStepStaging,
+          continuous: false,
+          autofocus: false,
+          testValues: [
+            const TestScan('6층 출고대기 01', 'CDC01-A-6-91-01-0-1'),
+            TestScan(l10n.tsWrong, 'CDC01-A-6-90-01-0-1'),
+          ],
+          onScan: _scanStaging,
+        ),
+      );
+    } else if (box == null) {
       body.add(
         ScanPrompt(
           text: done == lpns.length
@@ -807,6 +886,24 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
           ),
         );
       }
+      body.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 8),
+          child: TextField(
+            key: const ValueKey('cdc-temp'),
+            controller: _temp,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+              signed: true,
+            ),
+            decoration: InputDecoration(
+              labelText: l10n.cdcInspectTemp,
+              helperText: l10n.cdcInspectTempHelp,
+              suffixText: '°C',
+            ),
+          ),
+        ),
+      );
       if (box.inspection != null) {
         body.add(
           NoticeBox(
@@ -924,6 +1021,9 @@ class _BoxLine extends StatelessWidget {
 
 // ---------------------------------------------------------------- 상차
 
+/// 상차(DC 시뮬레이터 요청 C-01) — 도크(통로 90) 스캔 → 그 도크의 운행(계획완료 때 자동 배정, transport-execution) →
+/// 차량 확인 → 검품 합격 BOX 스캔 → `POST /loading-results`(TRF 마다, 도크·구획 = 운행 온도대) → 다 실으면
+/// `POST /trips/{tripId}/loading-completions`(입차한 운행만 — CHECKED_IN → LOADED). 상차는 출발이 아니다.
 class CdcLoadScreen extends ConsumerStatefulWidget {
   const CdcLoadScreen({super.key});
 
@@ -932,17 +1032,23 @@ class CdcLoadScreen extends ConsumerStatefulWidget {
 }
 
 class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
-  CdcTrf? _trf;
-  AsyncValue<List<CdcLpn>> _lpns = const AsyncLoading();
-  String? _trip;
-  String? _vehicle;
-  final _scanned = <String>[];
+  CdcTrip? _trip;
+  bool _vehicleOk = false;
+  bool _looking = false;
+
+  /// 운행의 TRF 마다 LPN(서버 값)
+  AsyncValue<Map<String, List<CdcLpn>>> _lpns = const AsyncLoading();
+
+  /// 스캔한 BOX → 그 TRF
+  final _scanned = <String, String>{};
   String? _scanError;
   String? _notice;
 
   CdcFlowRepository get _repo => ref.read(cdcFlowRepositoryProvider);
 
   Future<void> _load() async {
+    final trip = _trip;
+    if (trip == null) return;
     final had = _lpns.hasValue;
     setState(() {
       if (had) {
@@ -951,9 +1057,10 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
         _lpns = const AsyncLoading();
       }
     });
-    final v = await AsyncValue.guard(
-      () => _repo.lpns(cdcCenterOf(ref), _trf!.trfId),
-    );
+    final v = await AsyncValue.guard(() async {
+      final cdc = cdcCenterOf(ref);
+      return {for (final t in trip.trfIds) t: await _repo.lpns(cdc, t)};
+    });
     if (mounted) {
       setState(() {
         reloading = false;
@@ -962,31 +1069,90 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
     }
   }
 
+  Future<void> _reloadTrip() async {
+    final t = await AsyncValue.guard(() => _repo.trip(_trip!.tripId));
+    if (mounted && t.hasValue) setState(() => _trip = t.value);
+  }
+
   void _back() => setState(() {
     _scanError = null;
     if (_scanned.isNotEmpty) {
       _scanned.clear();
-    } else if (_vehicle != null) {
-      _vehicle = null;
-    } else if (_trip != null) {
-      _trip = null;
+    } else if (_vehicleOk) {
+      _vehicleOk = false;
     } else {
-      _trf = null;
+      _trip = null;
       _notice = null;
       failText = null;
       resend = null;
     }
   });
 
-  ScanFeedback _scanBox(List<CdcLpn> lpns, String code) {
+  ScanFeedback _scanDock(String code) {
+    final l10n = AppLocalizations.of(context);
+    final c = code.trim().toUpperCase();
+    if (CdcLocationCode.parse(c)?.aisle != '90') {
+      setState(() => _scanError = l10n.cdcLoadNotDock);
+      return ScanFeedback.error(l10n.cdcLoadNotDock);
+    }
+    setState(() {
+      _looking = true;
+      _scanError = null;
+    });
+    () async {
+      final r = await AsyncValue.guard(
+        () => _repo.tripAtDock(cdcCenterOf(ref), c),
+      );
+      if (!mounted) return;
+      setState(() {
+        _looking = false;
+        switch (r) {
+          case AsyncData(:final value?):
+            _trip = value;
+            _vehicleOk = false;
+            _scanned.clear();
+            _notice = null;
+          case AsyncData():
+            _scanError = l10n.cdcLoadNoTrip(c);
+          default:
+            _scanError = l10n.cdcLoadFailed;
+        }
+      });
+      if (_trip != null) await _load();
+    }();
+    return const ScanFeedback.ok();
+  }
+
+  ScanFeedback _scanVehicle(String code) {
+    final l10n = AppLocalizations.of(context);
+    if (!_trip!.isVehicle(code)) {
+      setState(() => _scanError = l10n.cdcLoadWrongVehicle);
+      return ScanFeedback.error(l10n.cdcLoadWrongVehicle);
+    }
+    setState(() {
+      _vehicleOk = true;
+      _scanError = null;
+    });
+    return const ScanFeedback.ok();
+  }
+
+  ScanFeedback _scanBox(Map<String, List<CdcLpn>> all, String code) {
     final l10n = AppLocalizations.of(context);
     final c = code.trim();
-    final hit = lpns.where((l) => l.lpn == c).firstOrNull;
+    String? trf;
+    CdcLpn? hit;
+    for (final e in all.entries) {
+      final l = e.value.where((l) => l.lpn == c).firstOrNull;
+      if (l != null) {
+        trf = e.key;
+        hit = l;
+      }
+    }
     final error = switch (hit) {
-      null => l10n.cdcNotThisTrfBox,
+      null => l10n.cdcLoadNotThisTrip,
       final l when l.loaded => l10n.cdcLoadAlready,
       final l when !l.passed => l10n.cdcErrNotPassed,
-      _ when _scanned.contains(c) => l10n.cdcLoadScannedAlready,
+      _ when _scanned.containsKey(c) => l10n.cdcLoadScannedAlready,
       _ => null,
     };
     if (error != null) {
@@ -994,63 +1160,77 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
       return ScanFeedback.error(error);
     }
     setState(() {
-      _scanned.add(c);
+      _scanned[c] = trf!;
       _scanError = null;
       _notice = null;
     });
     return const ScanFeedback.ok();
   }
 
+  /// 스캔한 BOX 를 TRF 마다 상차 등록(TRF 하나 = 한 번, 결과 불명이면 같은 키로 다시)
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context);
-    final lpns = [..._scanned];
-    final ok = await send(
-      (key) => _repo.reportLoading(
-        trfId: _trf!.trfId,
-        tripId: _trip!,
-        vehicleId: _vehicle!,
-        dockCode: null,
-        workerId: cdcWorkerOf(ref),
-        lpns: lpns,
-        key: key,
-      ),
-      reload: _load,
-    );
-    if (ok && mounted) {
-      setState(() {
-        _scanned.clear();
-        _notice = l10n.cdcLoadDone(lpns.length);
-      });
+    final trip = _trip!;
+    final byTrf = <String, List<String>>{};
+    for (final e in _scanned.entries) {
+      (byTrf[e.value] ??= []).add(e.key);
     }
+    var sent = 0;
+    for (final e in byTrf.entries) {
+      final ok = await send(
+        (key) => _repo.reportLoading(
+          trfId: e.key,
+          tripId: trip.tripId,
+          vehicleId: trip.vehicleId ?? '',
+          dockCode: trip.dockCode,
+          compartment: trip.tempClass,
+          workerId: cdcWorkerOf(ref),
+          lpns: e.value,
+          key: key,
+        ),
+        reload: _load,
+      );
+      if (!ok || !mounted) return;
+      sent += e.value.length;
+      setState(() => e.value.forEach(_scanned.remove));
+    }
+    if (mounted) setState(() => _notice = l10n.cdcLoadDone(sent));
+  }
+
+  Future<void> _complete(Map<String, List<CdcLpn>> all) async {
+    final trip = _trip!;
+    final transfers = {
+      for (final e in all.entries)
+        e.key: [
+          for (final l in e.value)
+            if (l.loaded && l.tripId == trip.tripId) l.lpn,
+        ],
+    };
+    await send((key) async {
+      final t = await _repo.completeLoading(
+        tripId: trip.tripId,
+        transfers: transfers,
+        key: key,
+      );
+      if (mounted) setState(() => _trip = t);
+    }, reload: _load);
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final steps = [
-      l10n.cdcStepTrf,
-      l10n.cdcStepTrip,
-      l10n.cdcStepVehicle,
-      l10n.cdcStepBox,
-    ];
-    final trf = _trf;
+    final trip = _trip;
     return _Frame(
       area: CdcWorkArea.load,
-      busy: busy || reloading,
+      busy: busy || reloading || _looking,
       title: l10n.cdcAreaLoad,
-      subtitle: trf?.label,
-      canPop: trf == null,
+      subtitle: trip == null ? null : l10n.cdcLoadTripIs(trip.tripId),
+      canPop: trip == null,
       onBack: _back,
-      child: trf == null
-          ? _TrfPick(
-              steps: steps,
-              onPick: (t) {
-                setState(() => _trf = t);
-                _load();
-              },
-            )
+      child: trip == null
+          ? _dockStep(l10n)
           : switch (_lpns) {
-              AsyncData(:final value) => _work(l10n, steps, value),
+              AsyncData(:final value) => _work(l10n, trip, value),
               AsyncError() => CdcCenterNotice(
                 icon: Icons.cloud_off,
                 text: l10n.cdcLoadFailed,
@@ -1065,92 +1245,118 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
     );
   }
 
-  Widget _work(AppLocalizations l10n, List<String> steps, List<CdcLpn> all) {
-    final passed = all.where((l) => l.passed).toList();
-    if (passed.isEmpty) {
-      return CdcCenterNotice(
-        key: const ValueKey('cdc-empty'),
-        icon: Icons.inventory_2_outlined,
-        text: l10n.cdcLoadEmpty,
-      );
-    }
+  List<String> _steps(AppLocalizations l10n) => [
+    l10n.cdcStepDock,
+    l10n.cdcStepVehicle,
+    l10n.cdcStepBox,
+    l10n.cdcStepLoadDone,
+  ];
+
+  Widget _dockStep(AppLocalizations l10n) => cdcStepBody(
+    step: 'dock',
+    body: [
+      StepHeader(names: _steps(l10n), current: 0),
+      ScanPrompt(text: l10n.cdcLoadDockTitle, detail: l10n.cdcLoadDockHelp),
+    ],
+    actions: [
+      if (_scanError case final e?)
+        CdcErrorLine(e, key: const ValueKey('cdc-scan-error')),
+      ScanInput(
+        id: 'cdc-dock-scan',
+        label: l10n.cdcLoadDock,
+        cameraTitle: l10n.cdcLoadDock,
+        continuous: false,
+        autofocus: false,
+        testValues: [
+          const TestScan('6층 1번 도크', 'CDC01-A-6-90-01-0-1'),
+          TestScan(l10n.tsWrong, 'CDC01-A-6-90-04-0-1'),
+        ],
+        onScan: _scanDock,
+      ),
+    ],
+  );
+
+  Widget _tripCard(AppLocalizations l10n, CdcTrip t) => Container(
+    key: const ValueKey('cdc-trip-card'),
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: PdaColors.lilac, width: 1.5),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        MetaPair(label: l10n.cdcLoadVehicle, value: t.vehicleLabel),
+        if (t.driverName case final d?)
+          MetaPair(label: l10n.cdcLoadDriver, value: d),
+        MetaPair(label: l10n.cdcLoadTemp, value: _zoneText(l10n, t.tempClass)),
+        if (t.dockCode case final d?)
+          MetaPair(label: l10n.cdcLoadDock, value: d),
+        MetaPair(
+          label: l10n.cdcLoadStops,
+          value: [for (final s in t.stops) '${s.seq}. ${s.mfcId}'].join('  '),
+        ),
+      ],
+    ),
+  );
+
+  Widget _work(
+    AppLocalizations l10n,
+    CdcTrip trip,
+    Map<String, List<CdcLpn>> all,
+  ) {
+    final passed = [
+      for (final l in all.values.expand((l) => l))
+        if (l.passed) l,
+    ];
     final loaded = passed.where((l) => l.loaded).length;
     final body = <Widget>[];
     final actions = <Widget>[];
-    final stepId = loaded == passed.length
+    final allLoaded = passed.isNotEmpty && loaded == passed.length;
+    final stepId = trip.loadedDone
         ? 'done'
-        : _trip == null
-        ? 'trip'
-        : _vehicle == null
+        : !_vehicleOk
         ? 'vehicle'
+        : allLoaded
+        ? 'complete'
         : 'boxes';
-    final step = _trip == null
-        ? 1
-        : _vehicle == null
-        ? 2
-        : 3;
-    if (loaded < passed.length) {
-      body.add(StepHeader(names: steps, current: step));
+    final step = !_vehicleOk ? 1 : (allLoaded ? 3 : 2);
+    if (!trip.loadedDone) {
+      body.add(StepHeader(names: _steps(l10n), current: step));
     }
-    body.add(
-      ProgressLine(
-        textKey: const ValueKey('cdc-load-progress'),
-        text: l10n.cdcLoadProgress(loaded, passed.length),
-        done: loaded,
-        total: passed.length,
-      ),
-    );
+    body.add(_tripCard(l10n, trip));
     if (_notice case final n?) {
       body.add(NoticeBox(text: n, textKey: const ValueKey('cdc-notice')));
     }
-    if (loaded == passed.length) {
+    if (trip.loadedDone) {
       body.add(
         DoneMark(
           key: const ValueKey('cdc-load-done'),
-          title: l10n.cdcLoadAllDone,
+          title: l10n.cdcLoadCompleted,
           message: l10n.cdcLoadNotDeparture,
         ),
       );
-      for (final l in passed) {
-        body.add(_BoxLine(lpn: l));
-      }
       actions.add(
         FilledButton(
-          key: const ValueKey('cdc-other-trf'),
+          key: const ValueKey('cdc-other-trip'),
           onPressed: () => setState(() {
-            _trf = null;
             _trip = null;
-            _vehicle = null;
+            _vehicleOk = false;
             _notice = null;
+            _lpns = const AsyncLoading();
           }),
-          child: Text(l10n.cdcOtherTrf),
+          child: Text(l10n.cdcLoadOtherDock),
         ),
       );
       return cdcStepBody(step: stepId, body: body, actions: actions);
     }
-    if (_trip == null) {
-      body.add(
-        ScanPrompt(text: l10n.cdcLoadTripTitle, detail: l10n.cdcLoadTripHelp),
-      );
-      actions.add(
-        ScanInput(
-          id: 'cdc-trip-scan',
-          label: l10n.cdcLoadTrip,
-          cameraTitle: l10n.cdcLoadTrip,
-          continuous: false,
-          autofocus: false,
-          testValues: const [TestScan('TRIP-2611260007', 'TRIP-2611260007')],
-          onScan: (code) {
-            setState(() => _trip = code.trim());
-            return const ScanFeedback.ok();
-          },
-        ),
-      );
-    } else if (_vehicle == null) {
+    if (!_vehicleOk) {
       body.add(
         ScanPrompt(
           text: l10n.cdcLoadVehicleTitle,
-          detail: l10n.cdcLoadTripIs(_trip!),
+          detail: l10n.cdcLoadVehicleHelp(trip.vehicleLabel),
         ),
       );
       actions.add(
@@ -1160,52 +1366,90 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
           cameraTitle: l10n.cdcLoadVehicle,
           continuous: false,
           autofocus: false,
-          testValues: const [TestScan('경북12가3456', '경북12가3456')],
-          onScan: (code) {
-            setState(() => _vehicle = code.trim());
-            return const ScanFeedback.ok();
-          },
+          testValues: [
+            TestScan(trip.vehicleLabel, trip.vehicleLabel),
+            TestScan(l10n.tsWrong, '대구99사9999'),
+          ],
+          onScan: _scanVehicle,
         ),
       );
     } else {
       body.add(
-        ScanPrompt(
-          text: l10n.cdcLoadScanTitle,
-          detail: l10n.cdcLoadVehicleIs(_vehicle!, _trip!),
+        ProgressLine(
+          textKey: const ValueKey('cdc-load-progress'),
+          text: l10n.cdcLoadProgress(loaded, passed.length),
+          done: loaded,
+          total: passed.length,
         ),
       );
-      for (final l in passed) {
+      if (passed.isEmpty) {
         body.add(
-          CdcReveal(
-            trigger: _scanned.isNotEmpty && _scanned.last == l.lpn
-                ? _scanned.length
-                : null,
-            child: _BoxLine(lpn: l, checked: _scanned.contains(l.lpn)),
+          CdcCenterNotice(
+            key: const ValueKey('cdc-empty'),
+            icon: Icons.inventory_2_outlined,
+            text: l10n.cdcLoadEmpty,
           ),
         );
       }
-      actions.addAll([
-        ScanInput(
-          id: 'cdc-load-scan',
-          label: l10n.cdcScanBox,
-          cameraTitle: l10n.cdcScanBox,
-          continuous: false,
-          testValues: [
-            for (final l in passed.where((l) => !l.loaded))
-              TestScan(l.lpn, l.lpn),
-            TestScan(l10n.tsWrong, 'BOX-0000'),
-          ],
-          onScan: (code) => _scanBox(all, code),
-        ),
-        if (resendButton(context) case final b?)
-          b
-        else
+      for (final l in passed) {
+        body.add(
+          CdcReveal(
+            trigger: _scanned.isNotEmpty && _scanned.keys.last == l.lpn
+                ? _scanned.length
+                : null,
+            child: _BoxLine(lpn: l, checked: _scanned.containsKey(l.lpn)),
+          ),
+        );
+      }
+      if (allLoaded && !trip.checkedIn) {
+        body.add(
+          NoticeBox(
+            text: l10n.cdcLoadWaitCheckIn,
+            textKey: const ValueKey('cdc-wait-check-in'),
+          ),
+        );
+      }
+      if (!allLoaded) {
+        actions.add(
+          ScanInput(
+            id: 'cdc-load-scan',
+            label: l10n.cdcScanBox,
+            cameraTitle: l10n.cdcScanBox,
+            continuous: false,
+            testValues: [
+              for (final l in passed.where((l) => !l.loaded))
+                TestScan(l.lpn, l.lpn),
+              TestScan(l10n.tsWrong, 'BOX-0000'),
+            ],
+            onScan: (code) => _scanBox(all, code),
+          ),
+        );
+      }
+      if (resendButton(context) case final b?) {
+        actions.add(b);
+      } else if (_scanned.isNotEmpty) {
+        actions.add(
           FilledButton(
             key: const ValueKey('cdc-load-go'),
-            onPressed: _scanned.isEmpty || busy ? null : _submit,
+            onPressed: busy ? null : _submit,
             child: Text(l10n.cdcLoadSubmit(_scanned.length)),
           ),
-      ]);
+        );
+      } else if (loaded > 0) {
+        actions.add(
+          trip.checkedIn
+              ? FilledButton(
+                  key: const ValueKey('cdc-load-complete'),
+                  onPressed: busy ? null : () => _complete(all),
+                  child: Text(l10n.cdcLoadComplete(loaded)),
+                )
+              : OutlinedButton(
+                  key: const ValueKey('cdc-trip-reload'),
+                  onPressed: busy ? null : _reloadTrip,
+                  child: Text(l10n.cdcLoadReloadTrip),
+                ),
+        );
+      }
     }
     if (_scanError case final e?) {
       actions.insert(0, CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
@@ -1217,305 +1461,464 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
   }
 }
 
-// ---------------------------------------------------------------- 지게차 적치
+// ---------------------------------------------------------------- 분배·라인(DAS)
 
-class CdcPutawayScreen extends ConsumerStatefulWidget {
-  const CdcPutawayScreen({super.key});
+/// 분배·라인(DAS, DC 시뮬레이터 요청 C-01) — 피킹이 끝난 묶음(Wave)을 고르고, 상품을 스캔하면
+/// 칸(= TRF·MFC)마다 넣을 수량(작업 줄 shares 로 집은 몫 − 이미 BOX 에 담은 것)이 뜬다. 넣은 것은 이 화면에만 적고,
+/// MFC 몫을 다 넣으면 그 칸 BOX 를 닫는다 → `POST /sorting-results`(한 BOX = 한 TRF). 서버에 남는 것은 닫은 BOX 뿐이다.
+class CdcDistributeScreen extends ConsumerStatefulWidget {
+  const CdcDistributeScreen({super.key});
 
   @override
-  ConsumerState<CdcPutawayScreen> createState() => _CdcPutawayScreenState();
+  ConsumerState<CdcDistributeScreen> createState() =>
+      _CdcDistributeScreenState();
 }
 
-class _CdcPutawayScreenState extends ConsumerState<CdcPutawayScreen>
+class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
     with CdcCommand {
-  CdcPutaway? _task;
-  bool _opening = false;
+  AsyncValue<List<CdcTrf>> _trfs = const AsyncLoading();
+  String? _wave;
+  AsyncValue<Map<String, List<CdcSortItem>>> _items = const AsyncLoading();
 
-  /// 확인한 위치(지시와 다르면 이유와 함께)
-  String? _loc;
-  String? _reason;
-  int _qty = 0;
+  /// 칸(TRF)마다 넣은 수량(아직 BOX 를 닫지 않은 것) — 상품 키 → 수량
+  final _put = <String, Map<String, int>>{};
+  String? _item;
+  String? _closing;
   String? _scanError;
+  String? _notice;
 
   CdcFlowRepository get _repo => ref.read(cdcFlowRepositoryProvider);
 
-  CdcPutawayRow? get _row => _task?.rows.where((r) => r.u > 0).firstOrNull;
+  @override
+  void initState() {
+    super.initState();
+    _loadTrfs();
+  }
+
+  Future<void> _loadTrfs() async {
+    setState(() => _trfs = const AsyncLoading());
+    final v = await AsyncValue.guard(
+      () => _repo.pickedTransfers(cdcCenterOf(ref)),
+    );
+    if (mounted) setState(() => _trfs = v);
+  }
+
+  List<CdcTrf> get _slots => [
+    for (final t in _trfs.value ?? const <CdcTrf>[])
+      if (t.waveId == _wave) t,
+  ];
+
+  Future<void> _loadItems() async {
+    final had = _items.hasValue;
+    setState(() {
+      if (had) {
+        reloading = true;
+      } else {
+        _items = const AsyncLoading();
+      }
+    });
+    final v = await AsyncValue.guard(() async {
+      final cdc = cdcCenterOf(ref);
+      return {for (final t in _slots) t.trfId: await _repo.sortItems(cdc, t)};
+    });
+    if (mounted) {
+      setState(() {
+        reloading = false;
+        if (!(had && v.hasError)) _items = v;
+      });
+    }
+  }
+
+  int _left(String trfId, CdcSortItem i) =>
+      i.remaining - (_put[trfId]?[i.key] ?? 0);
+
+  int _putCount(String trfId) =>
+      (_put[trfId] ?? const <String, int>{}).values.fold(0, (a, b) => a + b);
 
   void _back() => setState(() {
     _scanError = null;
-    if (_loc != null) {
-      _loc = null;
-      _reason = null;
+    if (_closing != null) {
+      _closing = null;
+    } else if (_item != null) {
+      _item = null;
     } else {
-      _task = null;
+      _wave = null;
+      _put.clear();
+      _notice = null;
       failText = null;
       resend = null;
+      _items = const AsyncLoading();
     }
   });
 
-  ScanFeedback _scanTask(String code) {
-    final id = code.trim();
-    setState(() {
-      _opening = true;
-      _scanError = null;
-    });
-    _repo
-        .putaway(id)
-        .then(
-          (t) {
-            if (!mounted) return;
-            setState(() {
-              _opening = false;
-              _setTask(t);
-            });
-          },
-          onError: (Object e) {
-            if (!mounted) return;
-            final l10n = AppLocalizations.of(context);
-            setState(() {
-              _opening = false;
-              _scanError = e is ProblemFailure && e.problem.status == 404
-                  ? l10n.cdcErrNotFound
-                  : l10n.cdcLoadFailed;
-            });
-          },
-        );
-    return const ScanFeedback.ok();
-  }
-
-  void _setTask(CdcPutaway t) {
-    _task = t;
-    _loc = null;
-    _reason = null;
-    _qty = _row?.u ?? 0;
-  }
-
-  Future<ScanFeedback> _scanLoc(CdcPutawayRow row, String code) async {
+  ScanFeedback _scanItem(Map<String, List<CdcSortItem>> all, String code) {
     final l10n = AppLocalizations.of(context);
-    final c = code.trim();
-    if (c.toUpperCase() == row.location.toUpperCase()) {
-      setState(() {
-        _loc = row.location;
-        _reason = null;
-        _scanError = null;
-      });
-      return const ScanFeedback.ok();
+    for (final e in all.entries) {
+      for (final i in e.value) {
+        if (cdcCodeIsItem(code, i.sku, i.lot) && _left(e.key, i) > 0) {
+          setState(() {
+            _item = i.key;
+            _scanError = null;
+            _notice = null;
+          });
+          return const ScanFeedback.ok();
+        }
+      }
     }
-    // 지시와 다른 칸 — 이유가 있어야 여기에 둔다
-    final reason = await showCdcReasonDialog(
-      context,
-      title: l10n.cdcPutawayOtherLoc(c),
-      keyPrefix: 'cdc-pa-reason',
-      options: [
-        ('LOCATION_FULL', Icons.inventory, l10n.cdcPaFull),
-        ('LOCATION_BLOCKED', Icons.block, l10n.cdcShortBlocked),
-        ('DAMAGED', Icons.broken_image_outlined, l10n.cdcShortDamaged),
-        ('WRONG_LOT', Icons.swap_horiz, l10n.cdcPaWrongLot),
-        ('OTHER', Icons.more_horiz, l10n.cdcShortOther),
-      ],
-    );
-    if (reason == null || !mounted) {
-      return ScanFeedback.error(l10n.cdcPickWrongLocation);
-    }
-    setState(() {
-      _loc = c;
-      _reason = reason;
-      _scanError = null;
-    });
-    return const ScanFeedback.ok();
+    setState(() => _scanError = l10n.cdcDistNoItem);
+    return ScanFeedback.error(l10n.cdcDistNoItem);
   }
 
-  Future<void> _done(CdcPutaway t, CdcPutawayRow row) async {
-    await send(
-      (key) => _repo.executePutaway(
-        task: t,
-        workerId: cdcWorkerOf(ref),
-        lines: [
-          CdcPutawayLine(
-            row: row,
-            toLocation: _loc!,
-            completedQty: _qty,
-            exceptionReason: _reason,
+  void _putAll(String trfId, CdcSortItem i) {
+    PdaHaptics.scanned();
+    setState(() {
+      final m = _put[trfId] ??= {};
+      m[i.key] = (m[i.key] ?? 0) + _left(trfId, i);
+      final more = (_items.value ?? const {}).entries.any(
+        (e) => e.value.any((x) => x.key == _item && _left(e.key, x) > 0),
+      );
+      if (!more) _item = null;
+    });
+  }
+
+  ScanFeedback _scanBox(CdcTrf trf, String code) {
+    final l10n = AppLocalizations.of(context);
+    final lpn = code.trim();
+    if (lpn.isEmpty) return ScanFeedback.error(l10n.cdcErrLpnSealed);
+    final contents = [
+      for (final e in (_put[trf.trfId] ?? const <String, int>{}).entries)
+        if (e.value > 0)
+          CdcLpnContent(
+            sku: e.key.split('|').first,
+            lot: e.key.split('|').last,
+            qty: e.value,
           ),
-        ],
-        key: key,
-      ),
-      reload: () async {
-        final next = await _repo.putaway(t.taskId);
-        if (mounted) setState(() => _setTask(next));
-      },
-    );
+    ];
+    final slot = _slots.indexOf(trf) + 1;
+    () async {
+      final ok = await send(
+        (key) => _repo.reportSort(
+          trf: trf,
+          workerId: cdcWorkerOf(ref),
+          box: CdcBoxDraft(lpn: lpn, temperatureZone: null, contents: contents),
+          key: key,
+        ),
+        reload: _loadItems,
+      );
+      if (ok && mounted) {
+        setState(() {
+          _put.remove(trf.trfId);
+          _closing = null;
+          _notice = l10n.cdcDistClosed(slot);
+        });
+      }
+    }();
+    return const ScanFeedback.ok();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final steps = [l10n.cdcStepOrder, l10n.cdcStepLocation, l10n.cdcStepQty];
-    final t = _task;
-    final row = _row;
-    final paStep = t == null
-        ? 'scan'
-        : row == null || t.finished
-        ? 'done'
-        : _loc == null
-        ? 'loc-${row.key}'
-        : 'qty-${row.key}';
+    final wave = _wave;
+    final waveLabel = _slots.firstOrNull?.waveNumber ?? wave;
+    return _Frame(
+      area: CdcWorkArea.distribute,
+      busy: busy || reloading,
+      title: l10n.cdcAreaDistribute,
+      subtitle: wave == null ? null : waveLabel,
+      canPop: wave == null,
+      onBack: _back,
+      child: switch (_trfs) {
+        AsyncError() => CdcCenterNotice(
+          icon: Icons.cloud_off,
+          text: l10n.cdcLoadFailed,
+          action: FilledButton(
+            key: const ValueKey('cdc-reload'),
+            onPressed: _loadTrfs,
+            child: Text(l10n.retry),
+          ),
+        ),
+        AsyncData(:final value) when wave == null => _waves(l10n, value),
+        AsyncData() => switch (_items) {
+          AsyncData(:final value) => _work(l10n, value),
+          AsyncError() => CdcCenterNotice(
+            icon: Icons.cloud_off,
+            text: l10n.cdcLoadFailed,
+            action: FilledButton(
+              key: const ValueKey('cdc-reload'),
+              onPressed: _loadItems,
+              child: Text(l10n.retry),
+            ),
+          ),
+          _ => const Center(child: CircularProgressIndicator()),
+        },
+        _ => const Center(child: CircularProgressIndicator()),
+      },
+    );
+  }
+
+  List<String> _steps(AppLocalizations l10n) => [
+    l10n.cdcStepWave,
+    l10n.cdcStepItem,
+    l10n.cdcStepSlot,
+    l10n.cdcStepClose,
+  ];
+
+  Widget _waves(AppLocalizations l10n, List<CdcTrf> trfs) {
+    final waves = <String, List<CdcTrf>>{};
+    for (final t in trfs) {
+      if (t.waveId case final w?) (waves[w] ??= []).add(t);
+    }
+    if (waves.isEmpty) {
+      return CdcCenterNotice(
+        key: const ValueKey('cdc-empty'),
+        icon: Icons.inventory_2_outlined,
+        text: l10n.cdcDistEmpty,
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        StepHeader(names: _steps(l10n), current: 0),
+        ScanPrompt(text: l10n.cdcDistPickWave),
+        for (final e in waves.entries)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Pressable(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _wave = e.key);
+                  _loadItems();
+                },
+                child: Container(
+                  key: ValueKey('cdc-wave-${e.key}'),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: PdaColors.line),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        e.value.first.waveNumber ?? e.key,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        l10n.cdcDistWave(
+                          e.value.length,
+                          [for (final t in e.value) t.mfcId].join(' · '),
+                        ),
+                        style: const TextStyle(color: PdaColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _slotCard(
+    AppLocalizations l10n,
+    int n,
+    CdcTrf t, {
+    required Widget trailing,
+    String? detail,
+    bool strong = false,
+    String keyPrefix = 'cdc-slot',
+  }) => Container(
+    key: ValueKey('$keyPrefix-${t.trfId}'),
+    margin: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: strong ? PdaColors.primary : PdaColors.line,
+        width: strong ? 2 : 1,
+      ),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.cdcDistSlot(n, t.mfcId),
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              if (detail != null)
+                Text(detail, style: const TextStyle(color: PdaColors.muted)),
+            ],
+          ),
+        ),
+        trailing,
+      ],
+    ),
+  );
+
+  Widget _work(AppLocalizations l10n, Map<String, List<CdcSortItem>> all) {
+    final slots = _slots;
+    final picked = all.values
+        .expand((l) => l)
+        .fold<int>(0, (a, i) => a + i.pickedQty);
+    final done =
+        all.values.expand((l) => l).fold<int>(0, (a, i) => a + i.sortedQty) +
+        [for (final t in slots) _putCount(t.trfId)]
+            .fold<int>(0, (a, b) => a + b);
     final body = <Widget>[];
     final actions = <Widget>[];
-    if (t == null) {
-      body.addAll([
-        StepHeader(names: steps, current: 0),
-        ScanPrompt(text: l10n.cdcPutawayScanTitle, detail: l10n.cdcPutawayHint),
-        if (_opening) const Center(child: CircularProgressIndicator()),
-      ]);
+    final closing = _closing == null
+        ? null
+        : slots.where((t) => t.trfId == _closing).firstOrNull;
+    final item = _item;
+    final step = closing != null ? 3 : (item == null ? 1 : 2);
+    body.add(StepHeader(names: _steps(l10n), current: step));
+    body.add(
+      ProgressLine(
+        textKey: const ValueKey('cdc-dist-progress'),
+        text: l10n.cdcDistProgress(done, picked),
+        done: done,
+        total: picked,
+      ),
+    );
+    if (_notice case final n?) {
+      body.add(NoticeBox(text: n, textKey: const ValueKey('cdc-notice')));
+    }
+    if (closing != null) {
+      final n = slots.indexOf(closing) + 1;
+      body.add(
+        ScanPrompt(
+          text: l10n.cdcDistCloseTitle(n),
+          detail: l10n.cdcDistPutCount(_putCount(closing.trfId)),
+        ),
+      );
       actions.add(
         ScanInput(
-          id: 'cdc-pa-scan',
-          label: l10n.cdcPutawayIdLabel,
-          cameraTitle: l10n.cdcPutawayIdLabel,
+          id: 'cdc-dist-box-scan',
+          label: l10n.cdcScanBox,
+          cameraTitle: l10n.cdcScanBox,
+          continuous: false,
+          testValues: const [TestScan('BOX-26112600101', 'BOX-26112600101')],
+          onScan: (code) => _scanBox(closing, code),
+        ),
+      );
+    } else if (item == null) {
+      final left = [
+        for (final e in all.entries)
+          for (final i in e.value)
+            if (_left(e.key, i) > 0) i,
+      ];
+      body.add(ScanPrompt(text: l10n.cdcDistScanItem));
+      actions.add(
+        ScanInput(
+          id: 'cdc-dist-item-scan',
+          label: l10n.cdcDistItemLabel,
+          cameraTitle: l10n.cdcDistItemLabel,
           continuous: false,
           testValues: [
-            const TestScan('PA-mock-1', 'PA-mock-1'),
-            const TestScan('PA-mock-2', 'PA-mock-2'),
-            TestScan(l10n.tsWrong, 'PA-0000'),
+            for (final i in {for (final i in left) i.key: i}.values)
+              TestScan(i.productName ?? i.sku, i.sku),
+            TestScan(l10n.tsWrong, 'SKU-0000'),
           ],
-          onScan: _scanTask,
+          onScan: (code) => _scanItem(all, code),
         ),
       );
     } else {
-      final total = t.rows.fold<int>(0, (a, r) => a + r.q);
-      final done = t.rows.fold<int>(0, (a, r) => a + r.c + r.k);
-      if (row != null && !t.finished) {
-        body.add(StepHeader(names: steps, current: _loc == null ? 1 : 2));
-      }
+      final first = all.values
+          .expand((l) => l)
+          .firstWhere((i) => i.key == item);
       body.add(
-        ProgressLine(
-          textKey: const ValueKey('cdc-pa-progress'),
-          text: l10n.cdcProgress(done, total),
-          done: done,
-          total: total,
+        CdcItemCard(
+          key: const ValueKey('cdc-dist-item'),
+          name: first.productName ?? first.sku,
+          sku: first.sku,
+          lot: first.lot,
+          qty: [
+            for (final e in all.entries)
+              for (final i in e.value)
+                if (i.key == item) _left(e.key, i),
+          ].fold(0, (a, b) => a + b),
+          emphasize: true,
         ),
       );
-      if (row == null || t.finished) {
+      for (final (k, t) in slots.indexed) {
+        final i = (all[t.trfId] ?? const <CdcSortItem>[])
+            .where((i) => i.key == item)
+            .firstOrNull;
+        if (i == null) continue;
+        final left = _left(t.trfId, i);
         body.add(
-          DoneMark(
-            key: const ValueKey('cdc-pa-done'),
-            title: l10n.cdcPutawayAllDone,
-            message: l10n.cdcPutawayState(_putawayStateText(l10n, t.state)),
-            messageKey: const ValueKey('cdc-putaway-state'),
+          _slotCard(
+            l10n,
+            k + 1,
+            t,
+            strong: left > 0,
+            trailing: left > 0
+                ? FilledButton(
+                    key: ValueKey('cdc-put-${t.trfId}'),
+                    onPressed: () => _putAll(t.trfId, i),
+                    child: Text(l10n.cdcDistPut(left)),
+                  )
+                : Text(
+                    l10n.cdcDistPutDone,
+                    style: const TextStyle(color: PdaColors.primary),
+                  ),
           ),
         );
-        actions.add(
-          FilledButton(
-            key: const ValueKey('cdc-pa-next'),
-            onPressed: () => setState(() => _task = null),
-            child: Text(l10n.cdcPutawayNext),
-          ),
-        );
-      } else if (_loc == null) {
-        body.add(
-          CdcLocationGuide(
-            code: row.location,
-            codeKey: const ValueKey('cdc-pa-location'),
-            title: l10n.cdcPutawayGoTitle,
-            detail: t.taskId,
-          ),
-        );
-        body.add(const SizedBox(height: 12));
-        body.add(
-          CdcItemCard(
-            name: row.sku,
-            sku: row.sku,
-            lot: row.lot,
-            qty: row.u,
-            qtyLabel: l10n.cdcLeftUnit,
-          ),
-        );
-        actions.add(
-          ScanInput(
-            id: 'cdc-pa-loc-scan',
-            label: l10n.locScanHint,
-            cameraTitle: l10n.cdcCameraLocation,
-            continuous: false,
-            autofocus: false,
-            testValues: [
-              TestScan(l10n.tsLocation, row.location),
-              TestScan(l10n.cdcTsOtherLoc, 'CDC01-C-5-03-10-2-1'),
-            ],
-            onScan: (code) {
-              _scanLoc(row, code);
-              return const ScanFeedback.ok();
-            },
-          ),
-        );
-      } else {
-        body.add(
-          ScanPrompt(
-            text: l10n.cdcPutawayPlaceTitle(_qty),
-            detail: _reason == null
-                ? l10n.pickLocConfirmed(_loc!)
-                : l10n.cdcPutawayOtherConfirmed(_loc!),
-          ),
+      }
+      actions.add(
+        OutlinedButton(
+          key: const ValueKey('cdc-dist-other-item'),
+          onPressed: () => setState(() => _item = null),
+          child: Text(l10n.cdcDistOtherItem),
+        ),
+      );
+    }
+    if (closing == null) {
+      for (final (k, t) in slots.indexed) {
+        final n = _putCount(t.trfId);
+        final left = (all[t.trfId] ?? const <CdcSortItem>[]).fold<int>(
+          0,
+          (a, i) => a + _left(t.trfId, i),
         );
         body.add(
-          CdcItemCard(
-            name: row.sku,
-            sku: row.sku,
-            lot: row.lot,
-            qty: row.u,
-            qtyLabel: l10n.cdcLeftUnit,
-            emphasize: true,
+          _slotCard(
+            l10n,
+            k + 1,
+            t,
+            keyPrefix: 'cdc-slot-sum',
+            detail: l10n.cdcDistSlotState(n, left),
+            trailing: OutlinedButton(
+              key: ValueKey('cdc-close-${t.trfId}'),
+              onPressed: n == 0 || busy
+                  ? null
+                  : () => setState(() => _closing = t.trfId),
+              child: Text(l10n.cdcDistClose),
+            ),
           ),
-        );
-        body.add(
-          CountQtyField(
-            id: 'cdc-pa-qty',
-            label: l10n.cdcPutawayQty,
-            help: l10n.cdcPutawayQtyHelp(row.u),
-            addLabel: l10n.pickQtyAdd,
-            value: _qty,
-            max: row.u,
-            onAdd: () => setState(() => _qty += 1),
-            onSet: (v) => setState(() {
-              if (v >= 0 && v <= row.u) _qty = v;
-            }),
-          ),
-        );
-        actions.add(
-          resendButton(context) ??
-              FilledButton(
-                key: const ValueKey('cdc-putaway-go'),
-                onPressed: _qty == 0 || busy ? null : () => _done(t, row),
-                child: Text(l10n.cdcPutawaySubmit),
-              ),
         );
       }
     }
+    if (resendButton(context) case final b?) actions.add(b);
     if (_scanError case final e?) {
-      actions.insert(
-        0,
-        CdcErrorLine(e, key: const ValueKey('cdc-putaway-error')),
-      );
+      actions.insert(0, CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
     }
     if (failText case final f?) {
       actions.insert(0, CdcErrorLine(f, key: const ValueKey('cdc-message')));
     }
-    return _Frame(
-      area: CdcWorkArea.putaway,
-      busy: busy || reloading,
-      title: l10n.cdcAreaPutaway,
-      subtitle: t?.taskId,
-      canPop: t == null,
-      onBack: _back,
-      child: cdcStepBody(step: paStep, body: body, actions: actions),
+    return cdcStepBody(
+      step: closing != null ? 'close-$_closing' : (item ?? 'item'),
+      body: body,
+      actions: actions,
     );
   }
 }
-
-String _putawayStateText(AppLocalizations l10n, String s) => switch (s) {
-  'COMPLETED' => l10n.cdcPaCompleted,
-  'PARTIALLY_COMPLETED' => l10n.cdcPaPartial,
-  'CANCELLED' => l10n.cdcPaCancelled,
-  'FAILED' || 'RETRY_READY' || 'EXCEPTION_HOLD' => l10n.cdcPaFailed,
-  _ => l10n.cdcPaOpen,
-};

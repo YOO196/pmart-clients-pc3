@@ -63,8 +63,8 @@ const services = <String, List<String>>{
   'mfc-inventory-service': ['mfc'],
   // DC 작업자 PDA 피킹(다음 작업 받기·착수·피킹 결과, cdc-outbound 0.21.0) — 사용자 2026-11-26 "피킹부터 붙여줘"
   'cdc-outbound-service': ['mfc'],
-  // DC 지게차 적치(putaway-tasks 조회·실행, cdc-inbound 0.1.0) — 사용자 2026-11-26 "업무화면 다 만들어"
-  'cdc-inbound-service': ['mfc'],
+  // DC 상차완료·MFC 하차 인계(운행 — transport-execution 0.3.0) — DC 시뮬레이터 요청 C-01(사용자 2026-11-26)
+  'transport-execution-service': ['mfc'],
 };
 
 const excludedPathPrefixes = ['/internal', '/webhooks', '/actuator'];

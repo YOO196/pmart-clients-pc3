@@ -101,14 +101,20 @@ class InboundPromiseView {
     this.boxes,
     this.temperatureZone,
     this.boxList = const [],
+    this.mfcId,
+    this.tripId,
   });
+
+  /// 받는 MFC·싣고 온 운행(transport-execution) — 하차 인계에 쓴다(C-01)
+  final String? mfcId;
+  final String? tripId;
 
   /// 차량 적재 단위(롤테이너 R/T)·박스 수·온도대 — 계약 입고 예정에 없다(BR-53 R17). 목만.
   final int? rollContainers;
   final int? boxes;
   final String? temperatureZone;
 
-  /// 이 송장의 박스 하나하나(박스 바코드 = 번호 자체, 채번 지침 G-05). 계약에 없다(BR-53 R17) — 목만.
+  /// 이 송장의 박스 하나하나 — mfc-inbound 0.16.0 `packages`(CDC LPN 값 그대로, 박스 바코드 = LPN).
   /// 비어 있으면 박스 검수 없이 상품별 계수로 한다.
   final List<InboundBox> boxList;
 

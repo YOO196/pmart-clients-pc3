@@ -54,16 +54,16 @@ class CdcGuideScreen extends StatelessWidget {
         (Icons.report_problem_outlined, l10n.cdcGuideInspect4),
       ],
       CdcWorkArea.load => [
-        (Icons.list_alt, l10n.cdcGuideLoad1),
+        (Icons.qr_code_scanner, l10n.cdcGuideLoad1),
         (Icons.local_shipping_outlined, l10n.cdcGuideLoad2),
         (Icons.qr_code_scanner, l10n.cdcGuideLoad3),
         (Icons.info_outline, l10n.cdcGuideLoad4),
       ],
-      CdcWorkArea.putaway => [
-        (Icons.qr_code_scanner, l10n.cdcGuidePutaway1),
-        (Icons.place_outlined, l10n.cdcGuidePutaway2),
-        (Icons.forklift, l10n.cdcGuidePutaway3),
-        (Icons.report_problem_outlined, l10n.cdcGuidePutaway4),
+      CdcWorkArea.distribute => [
+        (Icons.list_alt, l10n.cdcGuideDistribute1),
+        (Icons.qr_code_scanner, l10n.cdcGuideDistribute2),
+        (Icons.grid_view, l10n.cdcGuideDistribute3),
+        (Icons.inventory_2_outlined, l10n.cdcGuideDistribute4),
       ],
     };
     return Scaffold(
@@ -541,6 +541,7 @@ mixin CdcCommand<T extends ConsumerStatefulWidget> on ConsumerState<T> {
 
 String cdcProblemText(AppLocalizations l10n, String code) => switch (code) {
   'LPN_ALREADY_SEALED' => l10n.cdcErrLpnSealed,
+  'NOTHING_LOADED' => l10n.cdcErrNothingLoaded,
   'SORT_EXCEEDS_PICKED' => l10n.cdcErrSortExceeds,
   'LPN_NOT_PASSED' || 'LOAD_EXCEEDS_INSPECTED' => l10n.cdcErrNotPassed,
   'TRIP_MISMATCH' => l10n.cdcErrTripMismatch,

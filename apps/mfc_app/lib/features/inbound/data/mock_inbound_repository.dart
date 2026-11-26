@@ -6,6 +6,22 @@ import 'inbound_repository.dart';
 /// 목 입고 예정 2건. 도착 등록 → RECEIVING, 수령 → 접수(202) 뒤 조회 [applyPolls] 번째에 반영(TIN_POSTED).
 /// 상품명·바코드는 계약에 없어 목만 준다(BR-53).
 final class MockInboundRepository implements InboundRepository {
+  /// 하차 인계로 보낸 것(시험용) — TRF → 받은 박스
+  final handovers = <String, List<String>>{};
+
+  @override
+  Future<InboundCommandOutcome> recordHandover({
+    required String trfId,
+    required String mfcId,
+    required String tripId,
+    required List<String> received,
+    required List<String> damaged,
+    required IdempotencyKey key,
+  }) async {
+    handovers[trfId] = received;
+    return const InboundAccepted();
+  }
+
   /// 목 입고 예정 = 오전 차량 2대(MFC 업무 문서 §6 "매일 오전 차량 2대 이상", TMS §22 예시).
   /// - TRF-MOCK-001: 냉장 차량, 롤테이너 6개·120박스(TMS §22 부산진구 하차분과 같은 규모).
   /// - TRF-MOCK-002: 상온 차량, 롤테이너 4개·80박스.
@@ -163,6 +179,9 @@ final class MockInboundRepository implements InboundRepository {
     rollContainers: rollContainers,
     boxes: lines.fold(0, (s, l) => s! + (l.boxCount ?? 0)),
     temperatureZone: zone,
+    // 칠곡 DC 에서 운행으로 왔다 — 박스 검수 끝에 하차 인계(C-01)
+    mfcId: 'MFC-BJG-01',
+    tripId: 'TRIP-mock-1',
     boxList: [
       if (withBoxes)
         for (final l in lines)
@@ -197,6 +216,8 @@ final class MockInboundRepository implements InboundRepository {
     boxes: p.boxes,
     temperatureZone: p.temperatureZone,
     boxList: p.boxList,
+    mfcId: p.mfcId,
+    tripId: p.tripId,
   );
 
   @override

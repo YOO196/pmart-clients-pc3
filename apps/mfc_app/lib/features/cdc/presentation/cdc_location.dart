@@ -6,7 +6,9 @@ import '../../../shared/pda_theme.dart';
 
 /// DC 위치 코드를 조각으로 나눈 것 — 백엔드 `docs/simulator/cdc/chilgok-dc.md`
 /// CDC-3 `{센터}-{구역}-{층}-{통로}-{베이}-{단}-{슬롯}`(예 `CDC01-C-5-02-24-3-1`),
-/// CDC-4 구역 글자(A 냉동·B 냉장·C~H 상온), CDC-5 통로 90 지하 접안·91 출고대기·92 승강기 문, CDC-7 통로 61~89 피킹 선반.
+/// CDC-4 구역 글자 — **R-22(2026-11-26)**: A~F 상온(E·F 생활용품)·G 냉장·H 냉동, R-25 층 5F G·H, 6F A~D, 7F E·F.
+/// CDC-5 통로 90 층 도크·91 출고대기·92 승강기 문, CDC-7 통로 61~89 피킹 선반(C-6·F-7 의 61~62 는 오토스토어 — 단 1~16), 93 바닥 레인.
+/// 온도대는 표시용 추정이다 — 백엔드 인수인계는 판정에 cdc-location 조회(온도대·유형)를 쓰라고 한다(이 카드는 판정하지 않는다).
 /// 조각은 표시용이고 판정은 서버가 한다. 형식이 아니면 null(코드 그대로 보인다).
 @immutable
 class CdcLocationCode {
@@ -25,7 +27,7 @@ class CdcLocationCode {
   /// 구역 글자(온도대를 함께 뜻함)
   final String zone;
 
-  /// 층(`5`·`6`·`7`, 지하 `B1`)
+  /// 층(`5`·`6`·`7`)
   final String floor;
   final String aisle;
   final String bay;
@@ -33,7 +35,7 @@ class CdcLocationCode {
   final String slot;
 
   static final _re = RegExp(
-    r'^([A-Z]+[0-9]+)-([A-H])-(B1|[0-9]{1,2})-([0-9]{2})-([0-9]{2})-([0-9])-([0-9])$',
+    r'^([A-Z]+[0-9]+)-([A-H])-([0-9]{1,2})-([0-9]{2})-([0-9]{2})-([0-9]{1,2})-([0-9])$',
   );
 
   static CdcLocationCode? parse(String code) {
@@ -53,20 +55,28 @@ class CdcLocationCode {
   int get _aisleNo => int.parse(aisle);
 
   /// 통로 90~92 — 랙이 아닌 자리(단 0·슬롯 1 로 채움)
-  bool get isSpot => _aisleNo >= 90;
-  bool get isShelf => _aisleNo >= 61 && _aisleNo <= 89;
+  bool get isSpot => _aisleNo >= 90 && _aisleNo <= 92;
+  bool get isShelf => _aisleNo >= 61 && _aisleNo <= 89 && !isAutoStore;
+
+  /// 오토스토어(R-25 — 6층 C·7층 F 통로 61~62)
+  bool get isAutoStore =>
+      ((zone == 'C' && floor == '6') || (zone == 'F' && floor == '7')) &&
+      (_aisleNo == 61 || _aisleNo == 62);
+
+  /// 바닥 레인(통로 93, 냉장 야채)
+  bool get isLane => _aisleNo == 93;
 
   /// MFC 온도대 칩 색 글자(A 상온·C 냉장·F 냉동)로 — 색만 같은 것을 쓴다.
   String get tempLetter => switch (zone) {
-    'A' => 'F',
-    'B' => 'C',
+    'H' => 'F',
+    'G' => 'C',
     _ => 'A',
   };
 }
 
 String _tempText(AppLocalizations l10n, String zone) => switch (zone) {
-  'A' => l10n.zoneFrozen,
-  'B' => l10n.zoneChilled,
+  'H' => l10n.zoneFrozen,
+  'G' => l10n.zoneChilled,
   _ => l10n.zoneAmbient,
 };
 
@@ -75,6 +85,8 @@ String _kindText(AppLocalizations l10n, CdcLocationCode c) =>
       90 => l10n.cdcLocDock,
       91 => l10n.cdcLocStaging,
       92 => l10n.cdcLocLift,
+      93 => l10n.cdcLocLane,
+      _ when c.isAutoStore => l10n.cdcLocAutoStore,
       >= 61 => l10n.cdcLocShelf,
       _ => l10n.cdcLocRack,
     };
@@ -132,11 +144,7 @@ class CdcLocationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final c = CdcLocationCode.parse(code);
-    final floor = c == null
-        ? null
-        : c.floor == 'B1'
-        ? l10n.cdcLocBasement
-        : c.floor;
+    final floor = c?.floor;
     final tiles = c == null
         ? [(code, null)]
         : c.isSpot

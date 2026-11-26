@@ -1127,6 +1127,28 @@ class _BoxInspectStep extends ConsumerWidget {
                 ? null
                 : l10n.boxDamagedQuarantined(s.damaged.length),
           ),
+          if (s.handover case final h?)
+            NoticeBox(
+              textKey: const ValueKey('handover-result'),
+              warning: h is! InboundAccepted,
+              text: switch (h) {
+                InboundAccepted() => l10n.handoverRecorded(s.arrived.length),
+                InboundUnknown() => l10n.handoverUnknown,
+                InboundRejected(code: 'STOP_NOT_FOUND') => l10n.handoverNoStop,
+                InboundRejected(code: 'INVALID_STATE') =>
+                  l10n.handoverNotArrived,
+                InboundRejected() => l10n.handoverRejected,
+              },
+            ),
+          if (s.handover case InboundUnknown() || InboundRejected())
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const ValueKey('handover-retry'),
+                onPressed: s.busy ? null : ctl.sendHandover,
+                child: Text(l10n.handoverRetry),
+              ),
+            ),
           Text(
             l10n.boxInspectProgress(done, boxes.length),
             key: const ValueKey('box-inspect-progress'),

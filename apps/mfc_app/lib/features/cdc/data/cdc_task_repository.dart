@@ -165,25 +165,32 @@ final class MockCdcTaskRepository implements CdcTaskRepository {
       pickedQty: 0,
       shortQty: 0,
     );
-    _MockTask task(String n, String method, List<CdcTaskLine> lines) =>
-        _MockTask(
-          CdcTask(
-            taskId: 'CTK-mock-$n',
-            taskNumber: 'T26112600$n',
-            waveNumber: 'W2611260001',
-            trfNumbers: ['TRF2611260$n'],
-            kind: 'PICK',
-            pickMethod: method,
-            zone: 'C',
-            floor: '5',
-            dueAt: DateTime.utc(2026, 11, 26, 9),
-            state: 'CREATED',
-            version: 1,
-            lines: lines,
-          ),
-        );
+    _MockTask task(
+      String n,
+      String method,
+      List<CdcTaskLine> lines, {
+      String mode = 'DISCRETE',
+      String? region,
+    }) => _MockTask(
+      CdcTask(
+        taskId: 'CTK-mock-$n',
+        taskNumber: 'T26112600$n',
+        waveNumber: 'W2611260001',
+        trfNumbers: ['TRF2611260$n'],
+        kind: 'PICK',
+        pickMethod: method,
+        pickMode: mode,
+        regionCode: region,
+        zone: 'C',
+        floor: '5',
+        dueAt: DateTime.utc(2026, 11, 26, 9),
+        state: 'CREATED',
+        version: 1,
+        lines: lines,
+      ),
+    );
     _tasks = [
-      task('1', 'FC', [
+      task('1', 'DPS', [
         line('SKU-1001', '서울우유 1L', 'L261120011', 'CDC01-C-5-61-03-2-1', 24),
         line(
           'SKU-1002',
@@ -193,11 +200,11 @@ final class MockCdcTaskRepository implements CdcTaskRepository {
           12,
         ),
       ]),
-      task('2', 'DPS', [
-        line('SKU-2001', '양파 3kg', 'L261122011', 'CDC01-B-6-63-01-3-1', 6),
+      task('2', 'LINE', mode: 'SKU_BATCH', [
+        line('SKU-2001', '양파 3kg', 'L261122011', 'CDC01-G-5-63-01-3-1', 6),
       ]),
-      task('3', 'BOX_PICK', [
-        line('SKU-1003', '생수 2L 6입', 'L261119031', 'CDC01-G-7-61-02-4-3', 10),
+      task('3', 'BOX_PICK', mode: 'REGION_BATCH', region: 'JEONNAM', [
+        line('SKU-1003', '생수 2L 6입', 'L261119031', 'CDC01-A-6-12-02-1-1', 10),
       ]),
     ];
   }
@@ -332,6 +339,8 @@ final class _MockTask {
       state: state ?? t.state,
       version: t.version + 1,
       lines: lines ?? t.lines,
+      pickMode: t.pickMode,
+      regionCode: t.regionCode,
     );
   }
 }

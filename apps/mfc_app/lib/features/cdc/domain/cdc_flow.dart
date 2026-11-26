@@ -138,70 +138,65 @@ const cdcTemperatureZones = ['AMBIENT', 'CHILLED', 'FROZEN'];
 
 /// 적치 지시(계약 cdc-inbound PutawayTask)
 @immutable
-final class CdcPutaway {
-  const CdcPutaway({
-    required this.taskId,
+/// 운행(transport-execution Trip) — 상차는 그 도크의 운행에 싣는다(C-01)
+final class CdcTrip {
+  const CdcTrip({
+    required this.tripId,
     required this.state,
-    required this.version,
-    required this.rows,
+    required this.tempClass,
+    required this.vehicleId,
+    required this.plateNo,
+    required this.driverName,
+    required this.dockCode,
+    required this.stops,
   });
 
-  final String taskId;
+  final String tripId;
 
-  /// CREATED·RESERVED·DISPATCHED·IN_PROGRESS·PARTIALLY_COMPLETED·COMPLETED·FAILED·RETRY_READY·CANCELLED …
+  /// SCHEDULED·CHECKED_IN·LOADED·DEPARTED·COMPLETED·CANCELLED
   final String state;
-  final int version;
-  final List<CdcPutawayRow> rows;
 
-  bool get finished => state == 'COMPLETED' || state == 'CANCELLED';
+  /// AMBIENT·CHILLED·FROZEN — 상차 구획 값으로 보낸다
+  final String tempClass;
+  final String? vehicleId;
+  final String? plateNo;
+  final String? driverName;
+  final String? dockCode;
+  final List<CdcTripStop> stops;
+
+  List<String> get trfIds => [for (final s in stops) ...s.trfIds];
+  String get vehicleLabel => plateNo ?? vehicleId ?? tripId;
+  bool get checkedIn => state == 'CHECKED_IN';
+  bool get loadedDone =>
+      state == 'LOADED' || state == 'DEPARTED' || state == 'COMPLETED';
+
+  /// 차량 스캔 값 — 차량 ID 나 번호판
+  bool isVehicle(String code) {
+    final c = code.trim().replaceAll(' ', '').toUpperCase();
+    return c == (vehicleId ?? '').toUpperCase() ||
+        c == (plateNo ?? '').replaceAll(' ', '').toUpperCase();
+  }
+
+  CdcTrip withState(String next) => CdcTrip(
+    tripId: tripId,
+    state: next,
+    tempClass: tempClass,
+    vehicleId: vehicleId,
+    plateNo: plateNo,
+    driverName: driverName,
+    dockCode: dockCode,
+    stops: stops,
+  );
 }
 
-/// 적치 줄 — 지시량 q = 완료 c + 미완료 u + 취소 k
-@immutable
-final class CdcPutawayRow {
-  const CdcPutawayRow({
-    required this.sku,
-    required this.lot,
-    required this.location,
-    required this.q,
-    required this.c,
-    required this.u,
-    required this.k,
+final class CdcTripStop {
+  const CdcTripStop({
+    required this.seq,
+    required this.mfcId,
+    required this.trfIds,
   });
 
-  final String sku;
-  final String lot;
-  final String location;
-  final int q;
-  final int c;
-  final int u;
-  final int k;
-
-  String get key => '$sku|$lot';
+  final int seq;
+  final String mfcId;
+  final List<String> trfIds;
 }
-
-/// 적치 실행 한 줄
-@immutable
-final class CdcPutawayLine {
-  const CdcPutawayLine({
-    required this.row,
-    required this.toLocation,
-    required this.completedQty,
-    this.exceptionReason,
-  });
-
-  final CdcPutawayRow row;
-  final String toLocation;
-  final int completedQty;
-
-  /// 지시 위치와 다르면 필수 — LOCATION_FULL·LOCATION_BLOCKED·DAMAGED·WRONG_LOT·OTHER
-  final String? exceptionReason;
-}
-
-const cdcPutawayExceptions = [
-  'LOCATION_FULL',
-  'LOCATION_BLOCKED',
-  'DAMAGED',
-  'WRONG_LOT',
-  'OTHER',
-];
