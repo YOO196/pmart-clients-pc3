@@ -1818,5 +1818,7 @@
   "workplaceMfc": "MFC 작업",
   "workplaceMfcDesc": "피패킹·입고·하차·검품·재고 · {center}",
   "@workplaceMfcDesc": {"placeholders": {"center": {"type": "String"}}},
-  "workplaceSwitch": "DC·MFC 바꾸기"
+  "workplaceSwitch": "작업장·센터 바꾸기",
+  "centerChoiceTitle": "어느 센터에서 일할까요?",
+  "centerChoiceHelp": "근무 센터가 여러 곳이에요. 오늘 일할 센터를 고르세요 — 위의 바꾸기(⇄)로 언제든 바꿀 수 있어요."
 }

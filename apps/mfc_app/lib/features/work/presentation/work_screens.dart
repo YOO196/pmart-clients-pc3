@@ -245,7 +245,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     false =>
               const SizedBox.shrink(),
             NoCenter() => _CenterNotice(l10n.noCenter),
-            MultipleCenters() => _CenterNotice(l10n.multipleCenters),
+            MultipleCenters(:final centers) => CenterChoiceView(
+              centers: centers,
+            ),
           } ??
           _withManage(
             ref.watch(employeeSessionProvider)?.isSupervisor ?? false,
