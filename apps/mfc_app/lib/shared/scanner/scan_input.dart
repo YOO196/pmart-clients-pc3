@@ -340,7 +340,7 @@ class _ScanButton extends StatelessWidget {
                       color: secondary ? PdaColors.dark : Colors.white,
                       fontSize: secondary ? 21 : 20,
                       // 옅은 바탕은 대비가 약해 같은 크기도 작아 보인다 — 조금 크고 굵게(사용자 2026-11-20).
-                      fontWeight: secondary ? FontWeight.w800 : FontWeight.w700,
+                      fontWeight: secondary ? FontWeight.w700 : FontWeight.w700,
                       letterSpacing: -0.2,
                     ),
                   ),

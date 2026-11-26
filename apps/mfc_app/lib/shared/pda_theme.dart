@@ -96,9 +96,9 @@ abstract final class PdaTheme {
     final base = m3.copyWith(
       headlineLarge: m3.headlineLarge!.copyWith(fontWeight: w7),
       headlineMedium: m3.headlineMedium!.copyWith(fontWeight: w7),
-      headlineSmall: m3.headlineSmall!.copyWith(fontWeight: w7),
-      titleLarge: m3.titleLarge!.copyWith(fontWeight: w7),
-      titleMedium: m3.titleMedium!.copyWith(fontWeight: w7),
+      headlineSmall: m3.headlineSmall!.copyWith(fontSize: 22, fontWeight: w7),
+      titleLarge: m3.titleLarge!.copyWith(fontWeight: w6),
+      titleMedium: m3.titleMedium!.copyWith(fontWeight: w6),
       titleSmall: m3.titleSmall!.copyWith(fontWeight: w6),
       bodyLarge: m3.bodyLarge!.copyWith(fontWeight: w4),
       bodyMedium: m3.bodyMedium!.copyWith(
@@ -115,7 +115,7 @@ abstract final class PdaTheme {
       labelMedium: m3.labelMedium!.copyWith(fontSize: 13, fontWeight: w6),
       labelSmall: m3.labelSmall!.copyWith(fontSize: 12, fontWeight: w6),
     );
-    final bold = base.labelLarge!.copyWith(fontWeight: FontWeight.w800);
+    final bold = base.labelLarge!.copyWith(fontWeight: FontWeight.w700);
     return ThemeData(
       colorScheme: scheme,
       useMaterial3: true,

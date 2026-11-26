@@ -726,7 +726,7 @@ class _PickCard extends StatelessWidget {
                 key: const ValueKey('pick-visit'),
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: PdaColors.primary,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             Row(
@@ -737,7 +737,7 @@ class _PickCard extends StatelessWidget {
                     stop.line.productName ?? stop.line.sku,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontSize: 19,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       height: 1.35,
                     ),
                   ),
@@ -747,7 +747,7 @@ class _PickCard extends StatelessWidget {
                   l10n.pickFooterQty(stop.qty),
                   style: const TextStyle(
                     fontSize: 30,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: FontWeight.w800,
                     color: PdaColors.primary,
                   ),
                 ),
@@ -777,7 +777,7 @@ class _PickCard extends StatelessWidget {
               l10n.pickStopQty(stop.qty, captured),
               key: const ValueKey('pick-counts'),
               style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: emphasize ? PdaColors.primary : PdaColors.ink,
               ),
             ),

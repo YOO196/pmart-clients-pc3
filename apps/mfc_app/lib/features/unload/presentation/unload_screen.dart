@@ -308,7 +308,7 @@ class _UnloadScreenState extends ConsumerState<UnloadScreen> {
                 title: Text(
                   t.vehicleLabel,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     fontSize: 18,
                   ),
                 ),

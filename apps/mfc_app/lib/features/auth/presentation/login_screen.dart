@@ -111,7 +111,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           l10n.homeTitle,
                           textAlign: TextAlign.center,
                           style: theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: scheme.onSurface,
                             letterSpacing: -0.5,
                           ),

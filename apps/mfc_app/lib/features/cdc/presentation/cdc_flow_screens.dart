@@ -155,7 +155,7 @@ class _TrfCard extends StatelessWidget {
                         Text(
                           trf.label,
                           style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -172,7 +172,7 @@ class _TrfCard extends StatelessWidget {
                       Text(
                         '${trf.pickedQty}',
                         style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
@@ -1076,7 +1076,7 @@ class _BoxLine extends StatelessWidget {
                 Text(
                   lpn.lpn,
                   style: const TextStyle(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     fontSize: 16,
                   ),
                 ),
@@ -1090,7 +1090,7 @@ class _BoxLine extends StatelessWidget {
           Text(
             text,
             key: ValueKey('cdc-insp-${lpn.lpn}'),
-            style: TextStyle(color: color, fontWeight: FontWeight.w800),
+            style: TextStyle(color: color, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -1844,7 +1844,7 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
                         e.value.first.waveNumber ?? e.key,
                         style: const TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
@@ -1894,7 +1894,7 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
             children: [
               Text(
                 l10n.cdcDistSlot(n, t.mfcId),
-                style: const TextStyle(fontWeight: FontWeight.w800),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               if (detail != null)
                 Text(detail, style: const TextStyle(color: PdaColors.muted)),

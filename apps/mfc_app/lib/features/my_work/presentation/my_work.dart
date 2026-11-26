@@ -162,7 +162,7 @@ class _MyWorkList extends ConsumerWidget {
                                   l10n.myWorkCount(t.count),
                                   style: theme.textTheme.headlineMedium
                                       ?.copyWith(
-                                        fontWeight: FontWeight.w800,
+                                        fontWeight: FontWeight.w700,
                                         color: PdaColors.primary,
                                       ),
                                 ),
@@ -246,7 +246,7 @@ class _MyWorkList extends ConsumerWidget {
                     child: Text(
                       r,
                       style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: switch (i.result) {
                           'APPLIED' => PdaColors.okInk,
                           'REJECTED' => scheme.error,

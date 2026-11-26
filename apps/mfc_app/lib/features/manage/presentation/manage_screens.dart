@@ -260,7 +260,7 @@ class CenterWorkersScreen extends ConsumerWidget {
                 child: ListTile(
                   title: Text(
                     w.displayName ?? w.workerId,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   subtitle: Text(switch (w.workAreas) {
                     final a? when a.isNotEmpty => [
@@ -296,7 +296,7 @@ class CenterWorkersScreen extends ConsumerWidget {
                             : w.onBreak
                             ? PdaColors.onWarning
                             : PdaColors.okInk,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),

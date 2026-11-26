@@ -80,8 +80,8 @@ class LocationGuide extends StatelessWidget {
         Text(
           title ?? l10n.locGoTo,
           style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -1.2,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.6,
           ),
         ),
         if (detail case final d?)
@@ -143,7 +143,7 @@ class LocationCard extends StatelessWidget {
                     style: const TextStyle(
                       color: PdaColors.dark,
                       fontSize: 13,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -154,7 +154,7 @@ class LocationCard extends StatelessWidget {
                 style: const TextStyle(
                   color: PdaColors.muted,
                   fontSize: 14,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -186,7 +186,7 @@ class LocationCard extends StatelessWidget {
                                   color: PdaColors.primary,
                                   fontSize: 30,
                                   height: 1.2,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w700,
                                   fontFeatures: [FontFeature.tabularFigures()],
                                 ),
                               ),
@@ -280,7 +280,7 @@ class LocationBlocks extends StatelessWidget {
                         style: const TextStyle(
                           color: PdaColors.primary,
                           fontSize: 22,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],

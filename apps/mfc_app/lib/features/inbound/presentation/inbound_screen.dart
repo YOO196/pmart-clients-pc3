@@ -176,7 +176,7 @@ class _Message extends StatelessWidget {
           text,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleMedium
-              ?.copyWith(fontWeight: FontWeight.w800),
+              ?.copyWith(fontWeight: FontWeight.w700),
         ),
       ],
     ),
@@ -240,7 +240,7 @@ class _ArrivalStep extends ConsumerWidget {
                   Text(
                     p.trfId,
                     style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   if (p.eta ?? p.plannedArrivalAt case final t?)
@@ -266,7 +266,7 @@ class _ArrivalStep extends ConsumerWidget {
                         key: const ValueKey('inbound-truck'),
                         style: theme.textTheme.titleMedium?.copyWith(
                           color: PdaColors.primary,
-                          fontWeight: FontWeight.w900,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
@@ -304,7 +304,7 @@ class _ArrivalStep extends ConsumerWidget {
                     contentPadding: EdgeInsets.zero,
                     title: Text(
                       l.productName ?? l.sku,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                     subtitle: Text(
                       [
@@ -319,7 +319,7 @@ class _ArrivalStep extends ConsumerWidget {
                         l10n.qtyUnit(l.expectedQty),
                       ].join(' · '),
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   );
@@ -477,7 +477,7 @@ class _CountStep extends ConsumerWidget {
                     },
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: PdaColors.primary,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 5),
@@ -505,7 +505,7 @@ class _CountStep extends ConsumerWidget {
                     l10n.inboundTotal(c.total, l.expectedQty),
                     key: const ValueKey('inbound-total'),
                     style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       color: diff ? theme.colorScheme.error : null,
                     ),
                   ),
@@ -541,7 +541,7 @@ class _CountStep extends ConsumerWidget {
             const SizedBox(height: 10),
             Text(
               l10n.inboundQuarantineReason,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             Wrap(
               spacing: 8,
@@ -629,7 +629,7 @@ class _ReviewStep extends ConsumerWidget {
                         children: [
                           Text(
                             l10n.receivingScanTitle(zoneLabel(l10n, z)),
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 6),
                           ScanInput(
@@ -670,7 +670,7 @@ class _ReviewStep extends ConsumerWidget {
                               ),
                               key: ValueKey('receiving-at-$z'),
                               style: const TextStyle(
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),
@@ -697,7 +697,7 @@ class _ReviewStep extends ConsumerWidget {
                           key: ValueKey('review-${l.key}'),
                           title: Text(
                             l.productName ?? l.sku,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                           subtitle: Text(
                             [
@@ -890,7 +890,7 @@ class _BoxCheckStep extends ConsumerWidget {
             key: const ValueKey('box-progress'),
             style: theme.textTheme.titleMedium?.copyWith(
               color: PdaColors.primary,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
             ),
           ),
           // 안내 줄 자리는 늘 잡아 둔다 — 오류가 나타나도 아래 목록이 밀리지 않게.
@@ -1147,7 +1147,7 @@ class _BoxInspectStep extends ConsumerWidget {
                           child: Text(
                             l10n.boxEntryTitle(nameOf(e), e.unitsPerBox),
                             style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
@@ -1178,7 +1178,7 @@ class _BoxInspectStep extends ConsumerWidget {
                         l10n.inboundTotal(counts[i].total, e.unitsPerBox),
                         key: ValueKey(mixed ? 'box-total-$i' : 'box-total'),
                         style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           color: counts[i].total == e.unitsPerBox
                               ? null
                               : theme.colorScheme.error,
@@ -1292,7 +1292,7 @@ class _BoxInspectStep extends ConsumerWidget {
             key: const ValueKey('box-inspect-progress'),
             style: theme.textTheme.titleMedium?.copyWith(
               color: PdaColors.primary,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 5),

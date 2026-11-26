@@ -86,7 +86,7 @@ class _MoveProductCard extends StatelessWidget {
                     name,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontSize: 19,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -106,7 +106,7 @@ class _MoveProductCard extends StatelessWidget {
               line,
               style: theme.textTheme.titleSmall?.copyWith(
                 color: PdaColors.primary,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
             if (warning case final w?)
@@ -689,7 +689,7 @@ class PutawayScreen extends ConsumerWidget {
                           l10n.moveLoadedQty(s.qty),
                           key: const ValueKey('putaway-loaded-qty'),
                           style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
