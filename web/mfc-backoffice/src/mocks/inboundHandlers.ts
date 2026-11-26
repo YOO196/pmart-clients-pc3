@@ -28,7 +28,83 @@ function applyDone(t: MockInboundTask, qty: number): MockInboundTask {
   return next;
 }
 
+/** DC 이관 입고 목(mfc-inbound 0.16.0 inbound-promises) — 오는 중·받는 중(수령 RCPT-1 = 시드 입고 작업)·재고 반영 */
+function mockPromises(mfcId: string) {
+  const at = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
+  const base = { mfcId, fromCdc: 'CDC01', version: 1, deadlineMeaning: 'ARRIVAL', sources: [] };
+  return [
+    {
+      ...base,
+      trfId: 'TRF-SIM-DC-2',
+      state: 'EXPECTED' as const,
+      departedAt: at(-20),
+      eta: at(35),
+      plannedArrivalAt: at(40),
+      tripId: 'TO-20261126-002',
+      arrivedAt: null,
+      lines: [
+        { sku: 'SKU-WATER-2L', productName: '생수 2L', lotId: 'L2611260021', expiryDate: '2027-11-01', temperatureZone: 'AMBIENT', expectedQty: 24, receivedQty: 0, quarantinedQty: 0, pendingQty: 0, barcodes: [] },
+        { sku: 'SKU-TOFU', productName: '국산콩 두부 300g', lotId: 'L2611260022', expiryDate: '2026-12-03', temperatureZone: 'CHILLED', expectedQty: 12, receivedQty: 0, quarantinedQty: 0, pendingQty: 0, barcodes: [] },
+      ],
+      packages: [
+        { lpn: 'LPN-SIM-DC2-1', sku: 'SKU-WATER-2L', lotId: 'L2611260021', qty: 12 },
+        { lpn: 'LPN-SIM-DC2-2', sku: 'SKU-WATER-2L', lotId: 'L2611260021', qty: 12 },
+        { lpn: 'LPN-SIM-DC2-3', sku: 'SKU-TOFU', lotId: 'L2611260022', qty: 12 },
+      ],
+      receipts: [],
+    },
+    {
+      ...base,
+      trfId: 'TRF-SIM-DC-1',
+      state: 'RECEIVING' as const,
+      departedAt: at(-90),
+      eta: at(-30),
+      plannedArrivalAt: at(-30),
+      tripId: 'TO-20261126-001',
+      arrivedAt: at(-28),
+      lines: [
+        { sku: 'SKU-MILK-1', productName: '서울우유 1L', lotId: 'L2611250011', expiryDate: '2026-12-05', temperatureZone: 'CHILLED', expectedQty: 6, receivedQty: 6, quarantinedQty: 0, pendingQty: 0, barcodes: [] },
+        { sku: 'SKU-RAMEN-5', productName: '신라면 5입', lotId: 'L2611250012', expiryDate: '2027-06-01', temperatureZone: 'AMBIENT', expectedQty: 10, receivedQty: 9, quarantinedQty: 1, pendingQty: 0, barcodes: [] },
+      ],
+      packages: [
+        { lpn: 'LPN-SIM-DC1-1', sku: 'SKU-MILK-1', lotId: 'L2611250011', qty: 6 },
+        { lpn: 'LPN-SIM-DC1-2', sku: 'SKU-RAMEN-5', lotId: 'L2611250012', qty: 10 },
+      ],
+      receipts: [{ receiptId: 'RCPT-1', trfId: 'TRF-SIM-DC-1', mfcId, receivedAt: at(-20), postedAt: at(-19), inventoryApplyStatus: 'APPLIED' as const, inventoryCommitId: 'CMT-1', discrepancies: [{ sku: 'SKU-RAMEN-5', expectedQty: 10, receivedQty: 9, reason: 'SHORT' }] }],
+    },
+    {
+      ...base,
+      trfId: 'TRF-SIM-DC-0',
+      state: 'TIN_POSTED' as const,
+      departedAt: at(-1500),
+      eta: at(-1440),
+      plannedArrivalAt: at(-1440),
+      tripId: 'TO-20261125-004',
+      arrivedAt: at(-1435),
+      lines: [{ sku: 'SKU-ICE', productName: '바닐라 아이스크림', lotId: 'L2611240031', expiryDate: '2027-05-01', temperatureZone: 'FROZEN', expectedQty: 8, receivedQty: 8, quarantinedQty: 0, pendingQty: 0, barcodes: [] }],
+      packages: [{ lpn: 'LPN-SIM-DC0-1', sku: 'SKU-ICE', lotId: 'L2611240031', qty: 8 }],
+      receipts: [{ receiptId: 'RCPT-0', trfId: 'TRF-SIM-DC-0', mfcId, receivedAt: at(-1420), postedAt: at(-1419), inventoryApplyStatus: 'APPLIED' as const, inventoryCommitId: 'CMT-0', discrepancies: [] }],
+    },
+  ];
+}
+
 export const inboundHandlers = [
+  http.get(`${API_BASE}/inbound-promises`, ({ request }) => {
+    if (!operator(request)) return unauthorized();
+    const q = new URL(request.url).searchParams;
+    const mfcId = q.get('mfcId') ?? '';
+    if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
+    const items = mockPromises(mfcId).filter((p) => !q.get('state') || p.state === q.get('state'));
+    return HttpResponse.json({ items, page: { nextCursor: null } });
+  }),
+
+  http.get(`${API_BASE}/inbound-promises/:trfId`, ({ request, params }) => {
+    const who = operator(request);
+    if (!who) return unauthorized();
+    const p = who.centers.flatMap((c) => mockPromises(c)).find((x) => x.trfId === String(params.trfId));
+    return p ? HttpResponse.json(p) : problem(404, 'NOT_FOUND');
+  }),
+
   http.get(`${API_BASE}/inbound-tasks`, ({ request }) => {
     if (!operator(request)) return unauthorized();
     const q = new URL(request.url).searchParams;
