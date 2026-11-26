@@ -286,6 +286,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         () => context.push('/handover-checks'),
                       ),
                     ),
+                    // 하차 — DC 운행이 도착하면(시뮬레이터·기사 도착 등록) 박스를 받아 정차 인계(사용자 2026-11-26)
+                    _ToolButton(
+                      key: const ValueKey('menu-unload'),
+                      icon: Icons.local_shipping_outlined,
+                      label: l10n.unloadMenu,
+                      allowed: me.canUse(PdaMenu.unload),
+                      onTap: () => _menu(
+                        me,
+                        PdaMenu.unload,
+                        l10n.unloadMenu,
+                        () => context.push('/unload'),
+                      ),
+                    ),
                     // 반납 인증번호 — 라이더가 회수품을 가져오면 알려 줄 번호(rider-app 요청 2026-11-18).
                     _ToolButton(
                       key: const ValueKey('menu-return-handover'),

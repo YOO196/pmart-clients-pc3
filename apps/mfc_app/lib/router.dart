@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'features/unload/presentation/unload_screen.dart';
 import 'features/manage/presentation/count_admin_screens.dart';
 import 'features/manage/presentation/manage_screens.dart';
 import 'features/manage/presentation/move_admin_screens.dart';
@@ -235,6 +236,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             area: WorkArea.fromName(s.pathParameters['area'])!,
           ),
         ),
+      ),
+      GoRoute(
+        path: '/unload',
+        pageBuilder: (_, s) => _page(s, const UnloadScreen()),
       ),
       GoRoute(
         path: '/inbound/:trfId',
