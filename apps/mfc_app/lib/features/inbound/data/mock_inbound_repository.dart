@@ -138,6 +138,52 @@ final class MockInboundRepository implements InboundRepository {
       zone: 'AMBIENT',
       arrival: DateTime.utc(2026, 11, 9, 22), // 07:00 KST
     );
+    // DC 가 한 박스(LPN)에 상품 셋을 섞어 실었다(시뮬레이터 C-5, 실서버 TRF-SIM-MWXELMKQ 와 같은 모양)
+    if (withBoxes) {
+      const mix = [
+        InboundLine(
+          sku: 'B-00000006',
+          lotId: 'B-00000006-A',
+          productName: '3겹 화장지 30롤',
+          barcodes: ['8801000000006'],
+          expectedQty: 2,
+          temperatureZone: 'AMBIENT',
+        ),
+        InboundLine(
+          sku: 'B-00000007',
+          lotId: 'B-00000007-A',
+          productName: '3겹 화장지 6롤',
+          barcodes: ['8801000000007'],
+          expectedQty: 2,
+          temperatureZone: 'AMBIENT',
+        ),
+        InboundLine(
+          sku: 'B-00000021',
+          lotId: 'B-00000021-A',
+          productName: '칠성사이다 제로 500ml 2개 묶음',
+          barcodes: ['8801000000021'],
+          expectedQty: 2,
+          temperatureZone: 'AMBIENT',
+        ),
+      ];
+      _promises['TRF-MOCK-MIX'] = InboundPromiseView(
+        trfId: 'TRF-MOCK-MIX',
+        version: 1,
+        state: PromiseState.expected,
+        plannedArrivalAt: DateTime.utc(2026, 11, 9, 23),
+        lines: mix,
+        mfcId: 'MFC-BJG-01',
+        tripId: 'TRIP-mock-1',
+        boxList: [
+          for (final l in mix)
+            InboundBox(
+              boxId: 'BOX-MIX-00000001',
+              lineKey: l.key,
+              unitsPerBox: 2,
+            ),
+        ],
+      );
+    }
   }
 
   final Duration latency;
@@ -159,6 +205,9 @@ final class MockInboundRepository implements InboundRepository {
   final _arrivalKeys = <String>{};
   int _seq = 0;
   int receiptCalls = 0;
+
+  /// 마지막 수령의 줄 → 입고칸(시험용)
+  Map<String, String> lastToLocations = const {};
 
   /// 목 입고 예정 ID(다음 작업 받기 목이 고른다).
   Iterable<String> get trfIds => _promises.keys;
@@ -260,12 +309,21 @@ final class MockInboundRepository implements InboundRepository {
     String trfId, {
     required int version,
     required List<(InboundLine, ReceiptCount)> counts,
+    required Map<String, String> toLocations,
     required DateTime receivedAt,
     required String receivedBy,
     required IdempotencyKey key,
   }) async {
     await _wait();
     receiptCalls++;
+    lastToLocations = toLocations;
+    // 서버처럼 줄마다 수령 위치 필수(0.16.0 — 없으면 400)
+    if (counts.any((c) => (toLocations[c.$1.key] ?? '').isEmpty)) {
+      return const InboundRejected(
+        'VALIDATION_FAILED',
+        '수령 위치(toLocationCode)가 없습니다',
+      );
+    }
     final existing = _receiptKeys[key.value];
     if (existing != null) return InboundAccepted(resultId: existing);
     final p = _promises[trfId]!;

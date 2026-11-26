@@ -90,6 +90,7 @@ void main() {
             ),
           ),
         ],
+        toLocations: {line.key: 'RCV-C-01'},
         receivedAt: DateTime.utc(2026, 11, 10, 6),
         receivedBy: 'w-1',
         key: IdempotencyKey('k-1'),
@@ -118,6 +119,8 @@ void main() {
       expect(l['pendingQty'], 0);
       // 합계 8 < 예정 10 → 수량 사유가 먼저.
       expect(l['discrepancyReason'], 'SHORT');
+      // 수령 위치(입고칸) — 서버 필수(0.16.0, 시뮬레이터 C-6)
+      expect(l['toLocationCode'], 'RCV-C-01');
     });
 
     test('입고 예정·수령 결과 변환', () async {
@@ -194,6 +197,15 @@ void main() {
     await t.enterText(find.byKey(const ValueKey('inbound-scan')), code);
     await t.testTextInput.receiveAction(TextInputAction.done);
     await t.pump();
+  }
+
+  /// 수령 입고칸 스캔(목 줄은 온도대 없음 — 하나). 이미 골랐으면 그대로.
+  Future<void> receiving(WidgetTester t, [String code = 'RCV-C-01']) async {
+    final f = find.byKey(const ValueKey('receiving-scan-ANY'));
+    if (f.evaluate().isEmpty) return;
+    await t.enterText(f, code);
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pumpAndSettle();
   }
 
   Future<void> setQty(WidgetTester t, String bucket, int v) async {
@@ -306,10 +318,13 @@ void main() {
         find.textContaining('예정 360 · 정상 358 · 격리 0 · 미판정 0'),
         findsOneWidget,
       );
+      await receiving(t);
       await tapKey(t, 'inbound-submit');
 
       // 4단계: 접수 → 조회로 반영 확인.
       expect(find.byKey(const ValueKey('inbound-applied')), findsOneWidget);
+      // 줄마다 수령 위치(입고칸)를 보냈다(시뮬레이터 C-6)
+      expect(inbound.lastToLocations.values.toSet(), {'RCV-C-01'});
       expect(inbound.peek('TRF-MOCK-001').state, PromiseState.tinPosted);
       final lines = inbound.peek('TRF-MOCK-001').lines;
       expect(lines[0].receivedQty, 358);
@@ -333,6 +348,7 @@ void main() {
       await setQty(t, 'normal', q);
       await tapKey(t, 'inbound-next');
     }
+    await receiving(t);
     await tapKey(t, 'inbound-submit');
     expect(find.byKey(const ValueKey('inbound-unknown')), findsOneWidget);
     expect(find.byKey(const ValueKey('inbound-applied')), findsNothing);
@@ -352,6 +368,7 @@ void main() {
       await setQty(t, 'normal', q);
       await tapKey(t, 'inbound-next');
     }
+    await receiving(t);
     await tapKey(t, 'inbound-submit');
     expect(find.byKey(const ValueKey('inbound-applying')), findsOneWidget);
     expect(find.byKey(const ValueKey('inbound-applied')), findsNothing);
@@ -462,10 +479,17 @@ void main() {
         find.textContaining('예정 360 · 정상 347 · 격리 12 · 미판정 1'),
         findsOneWidget,
       );
+      // 입고칸 칸이 위에 생겨 목록 아래 줄은 굴려서 본다
+      await t.scrollUntilVisible(
+        find.textContaining('예정 120 · 정상 112 · 격리 0 · 미판정 0'),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
       expect(
         find.textContaining('예정 120 · 정상 112 · 격리 0 · 미판정 0'),
         findsOneWidget,
       );
+      await receiving(t);
       await tapKey(t, 'inbound-submit');
       expect(find.byKey(const ValueKey('inbound-applied')), findsOneWidget);
       final lines = inbound.peek('TRF-MOCK-001').lines;
@@ -475,4 +499,87 @@ void main() {
       expect(lines[6].receivedQty, 112);
     },
   );
+
+  test(
+    '섞인 박스(한 LPN 에 상품 셋) — 박스 1개로 세고, 상품마다 센다, 수령은 입고칸과 함께(시뮬레이터 C-5·C-6)',
+    () async {
+      final repo = MockInboundRepository(latency: Duration.zero);
+      final c = ProviderContainer(
+        overrides: [
+          envProvider.overrideWithValue(PmartEnv.mock),
+          inboundRepositoryProvider.overrideWithValue(repo),
+          applyPollPolicyProvider.overrideWithValue((
+            interval: Duration.zero,
+            attempts: 3,
+          )),
+        ],
+      );
+      addTearDown(c.dispose);
+      final provider = inboundFlowProvider('TRF-MOCK-MIX');
+      final sub = c.listen(provider, (_, _) {});
+      addTearDown(sub.close);
+      final ctl = c.read(provider.notifier);
+      await ctl.load();
+      await ctl.arrive();
+      var s = c.read(provider);
+      expect(s.phase, InboundPhase.boxCheck);
+      expect(s.boxIds, ['BOX-MIX-00000001']);
+      expect(ctl.scanBox('BOX-MIX-00000001'), BoxScan.ok);
+      await ctl.finishBoxCheck();
+      s = c.read(provider);
+      // 박스 1개를 다 확인 — "2박스 미도착"이 아니다
+      expect([s.arrived.length, s.boxIds.length, s.openable.length], [1, 1, 1]);
+      expect(ctl.openBox('BOX-MIX-00000001'), isTrue);
+      expect(c.read(provider).entriesOf('BOX-MIX-00000001'), hasLength(3));
+      // 상품 바코드로 그 상품만 +1
+      expect(ctl.scanBoxItem('8801000000007'), isTrue);
+      expect(ctl.scanBoxItem('8801000000007'), isTrue);
+      expect(ctl.scanBoxItem('0000000000000'), isFalse);
+      final e = c.read(provider).entriesOf('BOX-MIX-00000001');
+      ctl
+        ..setBoxCount(e[0].entryKey, const ReceiptCount(normal: 2))
+        ..setBoxCount(e[2].entryKey, const ReceiptCount(normal: 1, pending: 1))
+        ..saveBox();
+      s = c.read(provider);
+      expect(s.boxDone('BOX-MIX-00000001'), isTrue);
+      expect(s.allBoxesInspected, isTrue);
+      ctl.boxesToReview();
+      s = c.read(provider);
+      final lines = s.promise!.lines;
+      expect([for (final l in lines) s.countOf(l).normal], [2, 2, 1]);
+      expect(s.countOf(lines[2]).pending, 1);
+      // 입고칸 전에는 보내지 않는다
+      await ctl.submit();
+      expect(repo.receiptCalls, 0);
+      expect(s.receivingZones, ['AMBIENT']);
+      ctl.setReceivingLocation('AMBIENT', 'rcv-a-02');
+      await ctl.submit();
+      expect(repo.lastToLocations.values.toSet(), {'RCV-A-02'});
+      expect(repo.lastToLocations.keys.toSet(), {for (final l in lines) l.key});
+      expect(c.read(provider).phase, InboundPhase.applied);
+    },
+  );
+
+  test('입고칸 없이 보내면 서버 거절 이유(detail)를 그대로 보인다', () async {
+    final repo = MockInboundRepository(latency: Duration.zero);
+    final r = await repo.recordReceipt(
+      'TRF-MOCK-001',
+      version: 1,
+      counts: [
+        (repo.peek('TRF-MOCK-001').lines.first, const ReceiptCount(normal: 1)),
+      ],
+      toLocations: const {},
+      receivedAt: DateTime.utc(2026, 11, 26),
+      receivedBy: 'w',
+      key: IdempotencyKey.generate(),
+    );
+    expect(
+      r,
+      isA<InboundRejected>().having(
+        (x) => x.detail,
+        'detail',
+        '수령 위치(toLocationCode)가 없습니다',
+      ),
+    );
+  });
 }

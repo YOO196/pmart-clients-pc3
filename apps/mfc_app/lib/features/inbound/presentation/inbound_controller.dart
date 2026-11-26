@@ -78,7 +78,15 @@ class InboundState {
     this.lastBoxScan,
     this.expandedLine,
     this.handover,
+    this.receivingAt = const {},
+    this.rejectDetail,
   });
+
+  /// 수령 입고칸 — 온도대(모르면 ANY) → 스캔한 위치 코드(시뮬레이터 C-6)
+  final Map<String, String> receivingAt;
+
+  /// 수령 거절의 서버 detail
+  final String? rejectDetail;
 
   /// 하차 인계 결과(운행이 있는 송장만) — 수령은 이와 상관없이 이어 한다
   final InboundCommandOutcome? handover;
@@ -145,6 +153,8 @@ class InboundState {
     BoxScan? Function()? lastBoxScan,
     String? Function()? expandedLine,
     InboundCommandOutcome? Function()? handover,
+    Map<String, String>? receivingAt,
+    String? Function()? rejectDetail,
   }) => InboundState(
     phase: phase ?? this.phase,
     promise: promise ?? this.promise,
@@ -163,6 +173,8 @@ class InboundState {
     lastBoxScan: lastBoxScan != null ? lastBoxScan() : this.lastBoxScan,
     expandedLine: expandedLine != null ? expandedLine() : this.expandedLine,
     handover: handover != null ? handover() : this.handover,
+    receivingAt: receivingAt ?? this.receivingAt,
+    rejectDetail: rejectDetail != null ? rejectDetail() : this.rejectDetail,
   );
 
   bool get usesBoxes => promise?.boxList.isNotEmpty ?? false;
@@ -170,14 +182,40 @@ class InboundState {
   InboundBox? boxById(String id) =>
       promise?.boxList.where((b) => b.boxId == id).firstOrNull;
 
-  /// 열어 볼 박스 = 확인했고 박스째 파손이 아닌 것.
-  List<InboundBox> get openable => [
-    for (final b in promise?.boxList ?? const <InboundBox>[])
-      if (arrived.contains(b.boxId) && !damaged.contains(b.boxId)) b,
+  /// 박스(고유 LPN) — 한 LPN 에 상품 줄이 여럿일 수 있다(시뮬레이터 C-5). 박스 수·미도착은 이것으로 센다.
+  List<String> get boxIds => [
+    ...{for (final b in promise?.boxList ?? const <InboundBox>[]) b.boxId},
   ];
 
-  bool get allBoxesInspected =>
-      openable.every((b) => boxCounts.containsKey(b.boxId));
+  /// 그 박스 안 상품 줄들
+  List<InboundBox> entriesOf(String boxId) => [
+    for (final b in promise?.boxList ?? const <InboundBox>[])
+      if (b.boxId == boxId) b,
+  ];
+
+  /// 그 박스 입수 합(상품 줄 합)
+  int unitsOf(String boxId) =>
+      entriesOf(boxId).fold(0, (a, b) => a + b.unitsPerBox);
+
+  /// 열어 볼 박스(고유 LPN 마다 첫 줄) = 확인했고 박스째 파손이 아닌 것.
+  List<InboundBox> get openable => [
+    for (final id in boxIds)
+      if (arrived.contains(id) && !damaged.contains(id)) entriesOf(id).first,
+  ];
+
+  /// 그 박스의 상품 줄을 모두 셌나
+  bool boxDone(String boxId) =>
+      entriesOf(boxId).every((e) => boxCounts.containsKey(e.entryKey));
+
+  bool get allBoxesInspected => openable.every((b) => boxDone(b.boxId));
+
+  /// 수령 입고칸을 고를 온도대 — 줄 온도대(모르면 ANY), 줄 순서대로
+  static String zoneOf(InboundLine l) => l.temperatureZone ?? 'ANY';
+  List<String> get receivingZones => [
+    ...{for (final l in promise?.lines ?? const <InboundLine>[]) zoneOf(l)},
+  ];
+  bool get hasReceivingLocations =>
+      receivingZones.every((z) => (receivingAt[z] ?? '').isNotEmpty);
 
   /// 박스 결과를 상품(행)별로 합친다. 미도착 박스는 0, 박스째 파손은 입수 전부 격리(파손).
   Map<String, ReceiptCount> get aggregated {
@@ -194,7 +232,7 @@ class InboundState {
           reason ??= DiscrepancyReason.damaged;
           continue;
         }
-        final c = boxCounts[b.boxId];
+        final c = boxCounts[b.entryKey];
         if (c == null) continue;
         n += c.normal;
         q += c.quarantined;
@@ -382,23 +420,68 @@ class InboundFlowController extends Notifier<InboundState> {
     return ok;
   }
 
-  void closeBox() => state = state.copyWith(selectedBox: () => null);
+  void closeBox() {
+    _draft.clear();
+    state = state.copyWith(selectedBox: () => null);
+  }
 
-  /// 지금 박스의 검수 결과(아직이면 0).
-  ReceiptCount boxCountOf(String id) =>
-      state.boxCounts[id] ?? const ReceiptCount();
+  /// 수령 입고칸 스캔(온도대마다) — 위치 확인은 서버(수령 때)
+  void setReceivingLocation(String zone, String code) {
+    final c = code.trim().toUpperCase();
+    if (c.isEmpty) return;
+    state = state.copyWith(
+      receivingAt: {...state.receivingAt, zone: c},
+      code: () => null,
+      rejectDetail: () => null,
+    );
+  }
 
-  void setBoxCount(String id, ReceiptCount c) =>
-      state = state.copyWith(boxCounts: {...state.boxCounts, id: c});
+  void clearReceivingLocation(String zone) =>
+      state = state.copyWith(receivingAt: {...state.receivingAt}..remove(zone));
 
-  /// 박스 검수 저장 — 격리가 있으면 사유를 골라야 한다.
+  /// 박스 안 상품 줄의 검수 결과(아직이면 0) — 키는 [InboundBox.entryKey].
+  ReceiptCount boxCountOf(String entryKey) =>
+      _draft[entryKey] ?? state.boxCounts[entryKey] ?? const ReceiptCount();
+
+  /// 연 박스에서 세는 중인 값(저장 전) — 저장하면 boxCounts 로
+  final _draft = <String, ReceiptCount>{};
+
+  void setBoxCount(String entryKey, ReceiptCount c) {
+    _draft[entryKey] = c;
+    state = state.copyWith(boxCounts: {...state.boxCounts});
+  }
+
+  /// 연 박스의 상품 바코드 — 그 박스 안 상품이면 그 줄 정상 +1. 맞는 줄이 없으면 false.
+  bool scanBoxItem(String code) {
+    final id = state.selectedBox;
+    if (id == null) return false;
+    final lines = state.promise?.lines ?? const <InboundLine>[];
+    for (final e in state.entriesOf(id)) {
+      final l = lines.where((x) => x.key == e.lineKey).firstOrNull;
+      if (l != null && l.matchesBarcode(code)) {
+        final now = boxCountOf(e.entryKey);
+        setBoxCount(e.entryKey, now.copyWith(normal: now.normal + 1));
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// 박스 검수 저장 — 박스 안 상품 줄 모두(격리가 있으면 사유를 골라야 한다).
   void saveBox() {
     final id = state.selectedBox;
     if (id == null) return;
-    final c = boxCountOf(id);
-    if (!c.complete) return;
+    final entries = state.entriesOf(id);
+    final counts = {
+      for (final e in entries) e.entryKey: boxCountOf(e.entryKey),
+    };
+    if (counts.values.any((c) => !c.complete)) return;
+    if (counts.values.fold(0, (a, c) => a + c.total) == 0) return;
+    for (final k in counts.keys) {
+      _draft.remove(k);
+    }
     state = state.copyWith(
-      boxCounts: {...state.boxCounts, id: c},
+      boxCounts: {...state.boxCounts, ...counts},
       selectedBox: () => null,
     );
   }
@@ -465,13 +548,21 @@ class InboundFlowController extends Notifier<InboundState> {
   /// 3단계: 수령 등록. 접수(202) ≠ 반영 — 반영은 수령 결과 조회로 확인한다.
   Future<void> submit() async {
     final p = state.promise;
-    if (p == null || state.busy) return;
-    state = state.copyWith(busy: true, code: () => null);
+    if (p == null || state.busy || !state.hasReceivingLocations) return;
+    state = state.copyWith(
+      busy: true,
+      code: () => null,
+      rejectDetail: () => null,
+    );
     final key = _receiptKey ??= IdempotencyKey.generate();
     final outcome = await _repo.recordReceipt(
       trfId,
       version: p.version,
       counts: [for (final l in p.lines) (l, state.countOf(l))],
+      toLocations: {
+        for (final l in p.lines)
+          l.key: state.receivingAt[InboundState.zoneOf(l)] ?? '',
+      },
       receivedAt: _now(),
       receivedBy: _me,
       key: key,
@@ -487,9 +578,14 @@ class InboundFlowController extends Notifier<InboundState> {
           receiptId: () => resultId,
         );
         await pollApply();
-      case InboundRejected(:final code):
+      case InboundRejected(:final code, :final detail):
         _receiptKey = null;
-        state = state.copyWith(busy: false, unknown: false, code: () => code);
+        state = state.copyWith(
+          busy: false,
+          unknown: false,
+          code: () => code,
+          rejectDetail: () => detail,
+        );
         if (code == InboundProblemCode.versionConflict ||
             code == InboundProblemCode.invalidState) {
           await load();
