@@ -55,7 +55,8 @@ final centerScopeProvider = Provider<CenterScope>((ref) {
   if (ref.watch(envProvider) == PmartEnv.mock) {
     return const SingleCenter(mockMfcId);
   }
-  final centers = ref.watch(employeeSessionProvider)?.centers ?? const [];
+  // DC 센터(CDC…)는 빼고 — DC·MFC 두 권한 계정의 토큰에 같이 온다
+  final centers = ref.watch(employeeSessionProvider)?.mfcCenters ?? const [];
   return switch (centers) {
     [] => const NoCenter(),
     [final only] => SingleCenter(only),
