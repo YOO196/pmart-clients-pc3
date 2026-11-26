@@ -200,8 +200,14 @@ class _MyWorkList extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: PdaColors.line, width: 1.5),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x145E3BB2),
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -215,6 +221,19 @@ class _MyWorkList extends ConsumerWidget {
                           if (i.sku case final s?) hints.bySku(s)?.name ?? s,
                         ].join(' · '),
                         style: theme.textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 2),
+                      // 어떤 건을 작업했는지 — 작업 번호(입고는 TRF, 실사는 실사 번호 등)·기록 번호(사용자 2026-11-27)
+                      Text(
+                        [
+                          if (i.taskId case final t?) l10n.myWorkTaskNo(t),
+                          l10n.myWorkRefNo(i.refId),
+                        ].join(' · '),
+                        key: ValueKey('my-work-no-${i.refId}'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: PdaColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(

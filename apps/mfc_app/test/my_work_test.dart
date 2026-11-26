@@ -85,6 +85,11 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('my-work-partial')), findsNothing);
+    // 어떤 건을 작업했는지 번호(작업 번호·기록 번호)
+    expect(
+      find.text('작업 INB-T-1 · 기록 INB-M-1'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('못 읽은 원장이 있으면 빈 내역으로 두지 않고 "일부 내역을 못 불러왔어요"', (t) async {
