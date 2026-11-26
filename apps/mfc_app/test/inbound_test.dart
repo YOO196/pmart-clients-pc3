@@ -423,6 +423,15 @@ void main() {
       expect(find.byKey(const ValueKey('box-missing')), findsOneWidget);
       expect(t.takeException(), isNull);
       await tapKey(t, 'box-check-done');
+      // 덜 찍었으면 확인 창 — 계속 찍기는 그대로, 넘어가기를 눌러야 넘어간다
+      expect(
+        find.byKey(const ValueKey('box-check-missing-dialog')),
+        findsOneWidget,
+      );
+      await tapKey(t, 'box-check-keep');
+      expect(find.byKey(const ValueKey('inbound-step-1')), findsOneWidget);
+      await tapKey(t, 'box-check-done');
+      await tapKey(t, 'box-check-go');
 
       // 3단계: 박스마다 열어 낱개 — 파손 박스는 열지 않는다(118 = 119 − 1).
       expect(find.byKey(const ValueKey('inbound-step-2')), findsOneWidget);

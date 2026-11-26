@@ -1852,5 +1852,20 @@
   "homeHeroToday": "오늘 {n}건 처리했어요",
   "@homeHeroToday": {"placeholders": {"n": {"type": "int"}}},
   "homeHeroLoading": "오늘 업무를 불러오는 중",
-  "homeHeroSafe": "오늘도 안전하게 작업해요"
+  "homeHeroSafe": "오늘도 안전하게 작업해요",
+  "trailPrevious": "이전 · {type} {no} · {time}",
+  "@trailPrevious": {"placeholders": {"type": {"type": "String"}, "no": {"type": "String"}, "time": {"type": "String"}}},
+  "trailNoPrevious": "이전 · 오늘 아직 없음",
+  "trailNext": "다음 · {step}",
+  "@trailNext": {"placeholders": {"step": {"type": "String"}}},
+  "trailNextLast": "다음 · 끝나면 다음 작업",
+  "myWorkTaskNo": "작업 {no}",
+  "@myWorkTaskNo": {"placeholders": {"no": {"type": "String"}}},
+  "myWorkRefNo": "기록 {no}",
+  "@myWorkRefNo": {"placeholders": {"no": {"type": "String"}}},
+  "boxCheckMissingTitle": "{n}박스를 아직 안 찍었어요",
+  "@boxCheckMissingTitle": {"placeholders": {"n": {"type": "int"}}},
+  "boxCheckMissingBody": "안 찍은 박스는 미도착으로 처리돼요.",
+  "boxCheckKeep": "계속 찍기",
+  "boxCheckGo": "미도착으로 넘어가기"
 }

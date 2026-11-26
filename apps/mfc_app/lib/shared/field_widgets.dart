@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../l10n/gen/app_localizations.dart';
+import '../features/my_work/presentation/my_work.dart'
+    show activityTypeText, myTodayWorkProvider;
 import 'location_guide.dart';
 import 'pda_decor.dart';
 import 'pda_motion.dart';
@@ -12,24 +15,43 @@ import 'pda_theme.dart';
 
 /// 단계 표시 — 번호 원을 선으로 잇는다(끝난 단계 ✓ 보라, 지금 단계 그라데이션 원 + 빛, 다음 단계 흰 원).
 /// 사용자 2026-11-27 "PPT 처럼 각지다 — 디자인 요소·애니메이션" — 선이 차오르고 원이 커지며 바뀐다.
-class StepHeader extends StatelessWidget {
+class StepHeader extends ConsumerWidget {
   const StepHeader({super.key, required this.names, required this.current});
 
   final List<String> names;
   final int current;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final d = PdaMotion.of(context, PdaMotion.slow);
     const dot = 26.0;
-    return Container(
-      margin: const EdgeInsets.only(top: 2, bottom: 16),
-      padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: PdaShadows.md,
+    // 이전 작업 = 오늘 업무 내역의 마지막 건(서버 값, 못 읽으면 줄을 비운다) — 사용자 2026-11-27 "이전·다음 작업을 늘 작게"
+    final acts = ref.watch(myTodayWorkProvider).value?.items;
+    final last = acts == null || acts.isEmpty
+        ? null
+        : acts.reduce((a, b) => a.at.isAfter(b.at) ? a : b);
+    final next = current + 1 < names.length ? names[current + 1] : null;
+    // 단계가 바뀌면 카드가 잠깐 보라빛으로 반짝인다(넘어간 것이 확실히 보이게, 0.7초).
+    return TweenAnimationBuilder<double>(
+      key: ValueKey('step-flash-$current'),
+      tween: Tween(begin: current == 0 ? 0 : 1, end: 0),
+      duration: PdaMotion.of(context, const Duration(milliseconds: 700)),
+      curve: Curves.easeOut,
+      builder: (context, flash, child) => Container(
+        margin: const EdgeInsets.only(top: 2, bottom: 16),
+        padding: const EdgeInsets.fromLTRB(10, 12, 10, 8),
+        decoration: BoxDecoration(
+          color: Color.lerp(Colors.white, PdaColors.softer, flash),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: PdaColors.primary.withValues(alpha: 0.5 * flash),
+            width: 1.5,
+          ),
+          boxShadow: PdaShadows.md,
+        ),
+        child: child,
       ),
       child: Column(
         children: [
@@ -136,6 +158,62 @@ class StepHeader extends StatelessWidget {
                   ),
                 ),
             ],
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Divider(height: 1),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 7),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.history_rounded,
+                  size: 14,
+                  color: PdaColors.onBarMuted,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    last == null
+                        ? l10n.trailNoPrevious
+                        : l10n.trailPrevious(
+                            activityTypeText(l10n, last.type),
+                            last.taskId ?? last.refId,
+                            formatSeoulTime(last.at),
+                          ),
+                    key: const ValueKey('trail-previous'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: PdaColors.muted,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: PdaColors.softer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    next == null ? l10n.trailNextLast : l10n.trailNext(next),
+                    key: const ValueKey('trail-next'),
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: PdaColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

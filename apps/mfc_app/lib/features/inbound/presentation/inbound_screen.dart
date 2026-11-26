@@ -865,7 +865,36 @@ class _BoxCheckStep extends ConsumerWidget {
         ),
         FilledButton(
           key: const ValueKey('box-check-done'),
-          onPressed: s.arrived.isEmpty ? null : ctl.finishBoxCheck,
+          // 덜 찍었으면 확인부터 — 모르고 넘어가지 않게(사용자 2026-11-27 "완료 안 했는데 넘어가지게 하지 말고")
+          onPressed: s.arrived.isEmpty
+              ? null
+              : () async {
+                  final missing = s.boxIds.length - s.arrived.length;
+                  if (missing > 0) {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        key: const ValueKey('box-check-missing-dialog'),
+                        title: Text(l10n.boxCheckMissingTitle(missing)),
+                        content: Text(l10n.boxCheckMissingBody),
+                        actions: [
+                          TextButton(
+                            key: const ValueKey('box-check-keep'),
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: Text(l10n.boxCheckKeep),
+                          ),
+                          FilledButton(
+                            key: const ValueKey('box-check-go'),
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: Text(l10n.boxCheckGo),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (ok != true) return;
+                  }
+                  await ctl.finishBoxCheck();
+                },
           child: Text(l10n.boxCheckDone),
         ),
       ],
