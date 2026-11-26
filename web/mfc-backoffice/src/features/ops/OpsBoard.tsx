@@ -1,7 +1,7 @@
 // 센터 운영판 + 예외 처리함(센터 첫 화면, 2026-11-19).
 // 원천(모두 기존 API — 새 계약 없음):
-// - 출하 약속 초과·임박: mfc-fulfillment `GET /tasks?mfcId=&state=WAITING…BLOCKED`(커서로 끝까지, 최대 TASK_MAX_PAGES 쪽 — 넘으면 "N건 이상"),
-//   promisedReadyAt + 작업 상태로만 판정(opsRules.ts). 상세 = 작업 상세(출고·포장·작업 풀기).
+// - 출하 약속 초과·임박(0.35.0 — 약속 = 배차 요청 예상 준비 시각): 숫자는 서버 요약 `GET /shipments/promise-summary`,
+//   예외 줄은 출고별 약속(opsQueries useShipPromises) + 끝나지 않은 작업 `GET /tasks?mfcId=&state=WAITING…BLOCKED`(지금 단계·담당). 상세 = 작업 상세(조치 칸).
 // - 피킹 결품·파손 건수: mfc-fulfillment `GET /metrics/picking-lines?from=오늘&to=오늘&mfcId=`(0.19.0, 서버가 센 줄 수 — 사유 SHORT·DAMAGED·SPOILED(0.22.0 변질, 선택 칸)).
 // - 피킹 파손·변질 사고: quality `kind=DAMAGE`·`kind=SPOILAGE` 중 결품 보고(LineShortageReported)로 자동으로 열린 것.
 //   건별: 파손은 mfc-quality `GET /quality-incidents?mfcId=&kind=DAMAGE`(열림·판정됨) 중 결품 보고(LineShortageReported)로 열린 것 → 품질 사고 상세.
@@ -34,7 +34,7 @@ import {
 } from './opsRules';
 import { useDispatchDelays } from '../delivery/DispatchDelayPage';
 import { FlowBoard, RecentPanel, WorkerLoad } from './FlowBoard';
-import { OPS_REFRESH_MS, useOpenTasks } from './opsQueries';
+import { OPS_REFRESH_MS, useOpenTasks, usePromiseSummary, useShipPromises } from './opsQueries';
 
 const m = messages.ops;
 
@@ -49,6 +49,8 @@ export function useOps(mfcId: string) {
   const api = useApi();
   const common = { refetchInterval: OPS_REFRESH_MS } as const;
   const tasks = useOpenTasks(mfcId);
+  const summary = usePromiseSummary(mfcId);
+  const promises = useShipPromises(mfcId);
   const metrics = useQuery({
     ...common,
     queryKey: ['ops', mfcId, 'picking-lines'],
@@ -77,7 +79,7 @@ export function useOps(mfcId: string) {
     queryKey: ['ops', mfcId, 'packages-to-check'],
     queryFn: () => request('GET', api.fulfillment.GET('/packages', { params: { query: { mfcId, checkRequired: true } } })),
   });
-  return { tasks, metrics, damages, handovers };
+  return { tasks, summary, promises, metrics, damages, handovers };
 }
 
 // ---------------------------------------------------------------- 화면
@@ -88,7 +90,7 @@ export function OpsMenu({ mfcId }: { readonly mfcId: string }) {
 }
 
 function OpsBoard({ mfcId }: { readonly mfcId: string }) {
-  const { tasks, metrics, damages, handovers } = useOps(mfcId);
+  const { tasks, summary, promises, metrics, damages, handovers } = useOps(mfcId);
   const [params, setParams] = useSearchParams();
   const raw = params.get('type');
   const filter = (FILTERS as readonly string[]).includes(raw ?? '') ? (raw as Filter) : null;
@@ -96,15 +98,26 @@ function OpsBoard({ mfcId }: { readonly mfcId: string }) {
 
   // 지금 = 서버 기준시각(asOf), 없으면 응답을 받은 시각(렌더 중 시계를 읽지 않는다)
   const nowMs = tasks.data?.asOf ? Date.parse(tasks.data.asOf) : tasks.dataUpdatedAt;
-  const promise = tasks.data ? promiseRows(tasks.data.items, nowMs) : null;
-  const countText = (n: number, complete: boolean) => (complete ? m.count(n) : m.atLeast(n));
+  const promise = tasks.data && promises.data ? promiseRows(tasks.data.items, promises.data.promises, nowMs) : null;
+  // 예외 줄의 출하 약속 원천 = 작업 + 출고별 약속(둘 다 읽어야 줄이 나온다)
+  const promiseSource = {
+    isPending: tasks.isPending || promises.isPending,
+    isError: tasks.isError || promises.isError,
+    refetch: () => {
+      void tasks.refetch();
+      void promises.refetch();
+    },
+    complete: !!tasks.data?.complete && !!promises.data?.complete,
+  };
   const refetchAll = () => {
     void tasks.refetch();
+    void summary.refetch();
+    void promises.refetch();
     void metrics.refetch();
     void damages.refetch();
     void handovers.refetch();
   };
-  const busy = tasks.isFetching || metrics.isFetching || damages.isFetching || handovers.isFetching;
+  const busy = tasks.isFetching || summary.isFetching || promises.isFetching || metrics.isFetching || damages.isFetching || handovers.isFetching;
 
   const asOf = tasks.data?.asOf ?? null;
   const shortN = metrics.data?.short ?? 0;
@@ -113,7 +126,7 @@ function OpsBoard({ mfcId }: { readonly mfcId: string }) {
   const handoverN = (handovers.data?.items ?? []).length;
   const notes = [
     m.card.promiseRule(DUE_SOON_MINUTES),
-    ...(promise && promise.noPromise > 0 ? [m.card.noPromise(promise.noPromise)] : []),
+    ...(summary.data && summary.data.noPromise > 0 ? [m.card.noPromise(summary.data.noPromise)] : []),
     m.card.pickingRule,
     m.card.handoverRule,
   ];
@@ -147,9 +160,9 @@ function OpsBoard({ mfcId }: { readonly mfcId: string }) {
             testId="tile-overdue"
             label={m.tile.overdue}
             tone="error"
-            state={tasks}
-            value={promise && tasks.data ? countText(promise.overdue, tasks.data.complete) : ''}
-            has={(promise?.overdue ?? 0) > 0}
+            state={summary}
+            value={summary.data ? m.count(summary.data.overdue) : ''}
+            has={(summary.data?.overdue ?? 0) > 0}
             active={filter === 'promise'}
             onClick={() => choose('promise')}
           />
@@ -157,9 +170,9 @@ function OpsBoard({ mfcId }: { readonly mfcId: string }) {
             testId="tile-due"
             label={m.tile.dueSoon}
             tone="warning"
-            state={tasks}
-            value={promise && tasks.data ? countText(promise.dueSoon, tasks.data.complete) : ''}
-            has={(promise?.dueSoon ?? 0) > 0}
+            state={summary}
+            value={summary.data ? m.count(summary.data.dueSoon) : ''}
+            has={(summary.data?.dueSoon ?? 0) > 0}
             active={filter === 'promise'}
             onClick={() => choose('promise')}
           />
@@ -215,7 +228,7 @@ function OpsBoard({ mfcId }: { readonly mfcId: string }) {
       <StatusStrip
         onFilter={choose}
         parts={[
-          { key: 'promise', state: tasks, n: promise?.overdue ?? 0, text: m.issue.overdue },
+          { key: 'promise', state: summary, n: summary.data?.overdue ?? 0, text: m.issue.overdue },
           { key: 'handover', state: handovers, n: handoverN, text: m.issue.handover },
           { key: 'picking', state: damages, n: damages.data?.items.length ?? 0, text: m.issue.damaged },
         ]}
@@ -226,7 +239,7 @@ function OpsBoard({ mfcId }: { readonly mfcId: string }) {
         filter={filter}
         onFilter={choose}
         promise={promise}
-        tasks={tasks}
+        promiseSource={promiseSource}
         damages={damages}
         handovers={handovers}
       />
@@ -378,7 +391,7 @@ function ExceptionList({
   filter,
   onFilter,
   promise,
-  tasks,
+  promiseSource,
   damages,
   handovers,
 }: {
@@ -386,13 +399,13 @@ function ExceptionList({
   readonly filter: Filter | null;
   readonly onFilter: (f: Filter | null) => void;
   readonly promise: ReturnType<typeof promiseRows> | null;
-  readonly tasks: ReturnType<typeof useOps>['tasks'];
+  readonly promiseSource: QueryLike & { readonly complete: boolean };
   readonly damages: ReturnType<typeof useOps>['damages'];
   readonly handovers: ReturnType<typeof useOps>['handovers'];
 }) {
   const show = (g: Filter) => filter === null || filter === g;
   const sources = [
-    { group: 'promise' as const, q: tasks, label: m.card.promise },
+    { group: 'promise' as const, q: promiseSource, label: m.card.promise },
     { group: 'picking' as const, q: damages, label: m.card.picking },
     { group: 'handover' as const, q: handovers, label: m.card.handover },
   ].filter((s) => show(s.group));
@@ -433,9 +446,7 @@ function ExceptionList({
           </button>
         </p>
       ))}
-      {show('promise') && tasks.data && !tasks.data.complete && (
-        <p className="text-warning text-xs">{m.truncated(tasks.data.items.length)}</p>
-      )}
+      {show('promise') && !promiseSource.isPending && !promiseSource.isError && !promiseSource.complete && <p className="text-warning text-xs">{m.truncated}</p>}
       {show('picking') && <p className="text-xs opacity-70">{m.shortListMissing}</p>}
       {pending && rows.length === 0 ? (
         <span className="loading loading-dots loading-sm" aria-label={messages.loading} />
@@ -499,8 +510,9 @@ function promiseRow(mfcId: string, r: PromiseRow): Row {
     elapsed: r.kind === 'overdue' ? m.overdueFor(minutesText(r.minutes)) : m.dueIn(minutesText(r.minutes)),
     assignee: <Who id={r.task.assignment?.workerId} empty={messages.tasks.unassigned} />,
     next: (
-      <Link className="link" to={centerPath(mfcId, `tasks/${encodeURIComponent(taskId)}`)}>
-        {m.next.task}
+      <Link className="link" to={`${centerPath(mfcId, `tasks/${encodeURIComponent(taskId)}`)}#task-actions`}>
+        {/* 막힌 작업은 재배정·내놓기가 안 된다(상세 조치 칸에 이유) — 링크 글이 할 수 없는 조치를 약속하지 않게 */}
+        {r.task.state === 'BLOCKED' ? m.next.taskBlocked : m.next.task}
       </Link>
     ),
   };

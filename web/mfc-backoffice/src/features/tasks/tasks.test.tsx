@@ -164,6 +164,25 @@ describe('작업 상세', () => {
     await waitFor(() => expect(document.querySelector('[data-state="error"]')).not.toBeNull());
     expect(screen.queryByText('아직 포장이 없어요.')).not.toBeInTheDocument();
   });
+
+  it('조치 칸(홈 "작업 상세 — 재배정·작업 풀기"가 여는 곳): 할 수 있으면 단추, 막혔으면 그 자리에 이유 · 출하 약속은 배차 요청 시각', async () => {
+    renderAt('/c/MFC-BJG-01/tasks/TASK-PICK-3');
+    await heading();
+    const box = screen.getByTestId('task-actions');
+    expect(within(box).getByTestId('task-actions-why')).toHaveTextContent('결품으로 막힌 작업이에요');
+    expect(within(box).queryByRole('button', { name: /담당/ })).not.toBeInTheDocument();
+    // 출고가 있어 "찾을 수 없어요"가 아니다 — 출하 약속(배차 요청 예상 준비 시각)
+    expect(await screen.findByTestId('shipment-promise')).toHaveTextContent(/출하 약속 \S/);
+    expect(screen.getByText('작업 목표 시각')).toBeInTheDocument();
+
+    renderAt('/c/MFC-BJG-01/tasks/TASK-PICK-2');
+    await screen.findByRole('heading', { level: 1, name: /피킹/ });
+    await waitFor(() => expect(screen.getAllByTestId('task-actions').at(-1)).toBeDefined());
+    const ready = screen.getAllByTestId('task-actions').at(-1)!;
+    await userEvent.click(within(ready).getByRole('button', { name: '담당 정하기' }));
+    expect(within(ready).getByRole('form', { name: '담당 바꾸기 — 다른 작업자에게 넘겨요' })).toBeInTheDocument();
+    expect(await screen.findByText('배차 요청 전 — 아직 약속 없음')).toBeInTheDocument();
+  });
 });
 
 // 담당 바꾸기·내려놓기(백엔드 알림 2026-11-19 notice-reassign-release — 서버 변경 없음)

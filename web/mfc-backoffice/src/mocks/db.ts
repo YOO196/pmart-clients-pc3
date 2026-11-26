@@ -277,7 +277,8 @@ function seedShipments(): Array<[string, MockShipment]> {
         containsAlcohol: false,
         weightG: 2400,
         readyAt: null,
-        dispatchRequest: null,
+        // 출하 약속 = 배차 요청 예상 준비 시각(fulfillment 0.35.0) — 홈 "출하 약속 초과"의 원천
+        dispatchRequest: { shipmentId: 'SHP-1', trigger: 'MANUAL', estimatedPackMinutes: 10, estimatedReadyAt: '2026-11-16T02:00:00.000Z', requestedAt: '2026-11-16T01:50:00.000Z', requestedBy: 'OP-wkr-1' },
         packages: [
           {
             packageId: 'PKG-1',
@@ -301,6 +302,30 @@ function seedShipments(): Array<[string, MockShipment]> {
         ],
       },
     ],
+    // 피킹 대기(SHP-2, 배차 요청 전 — 약속 없음)·결품으로 막힘(SHP-3, 배차 요청됨 — 약속 초과) 출고 — 작업 상세 "출하·포장"이 비지 않게(2026-11-26 홈 평가)
+    ...(['SHP-2', 'SHP-3'] as const).map((shipmentId, i): [string, MockShipment] => [
+      shipmentId,
+      {
+        shipmentId,
+        mfcId: 'MFC-BJG-01',
+        fulfillmentId: `FUL-${i + 2}`,
+        orderId: `ORD-${i + 2}`,
+        orderNumber: `2000000${i + 2}`,
+        deliveryId: null,
+        version: 1,
+        state: 'PREPARING',
+        holdReason: null,
+        bagCount: 0,
+        containsAlcohol: false,
+        weightG: 0,
+        readyAt: null,
+        dispatchRequest:
+          shipmentId === 'SHP-3'
+            ? { shipmentId, trigger: 'MANUAL', estimatedPackMinutes: 10, estimatedReadyAt: '2026-11-16T01:40:00.000Z', requestedAt: '2026-11-16T01:30:00.000Z', requestedBy: 'OP-wkr-1' }
+            : null,
+        packages: [],
+      },
+    ]),
   ];
 }
 
@@ -962,7 +987,9 @@ function seedDemoTasks() {
     const taskId = `TASK-DEMO-${i + 1}`;
     if (db.tasks.has(taskId)) return;
     const shipmentId = `SHP-DEMO-${i + 1}`;
-    if (base && !db.shipments.has(shipmentId)) db.shipments.set(shipmentId, { ...base, shipmentId, orderId: `ORD-DEMO-${i + 1}`, orderNumber: String(20001100 + i) });
+    // 포장 단계는 배차 요청됨(약속 = 지금 + 25~95분 — 초과·임박 알림은 안 만든다), 피킹 단계는 요청 전
+    const dispatchRequest = taskType === 'PACK' ? { shipmentId, trigger: 'MANUAL' as const, estimatedPackMinutes: 10, estimatedReadyAt: at(25 + i * 5), requestedAt: at(-5), requestedBy: workerId } : null;
+    if (base && !db.shipments.has(shipmentId)) db.shipments.set(shipmentId, { ...base, shipmentId, orderId: `ORD-DEMO-${i + 1}`, orderNumber: String(20001100 + i), dispatchRequest, packages: [] });
     const lineN = 2 + (i % 4);
     const lines = Array.from({ length: lineN }, (_, k) => {
       const [productName, sku, locationId] = goods[(g + k) % goods.length]!;
