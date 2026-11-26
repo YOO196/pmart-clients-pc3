@@ -143,3 +143,11 @@ docs/         아키텍처 · 앱별 화면과 규칙 · 백엔드 요청
 | 이종근 | 통합·인사 백오피스, 웹 공통 코드 |
 
 서버 담당까지 넣은 전체 팀 구성은 [code-and-pick](https://github.com/code-and-pick#팀) 에 있습니다.
+
+---
+
+<div align="center">
+
+<sub><a href="https://www.dshrd.or.kr/">동성인재개발교육원</a> · 지도: 서성원 훈련 교사</sub>
+
+</div>
