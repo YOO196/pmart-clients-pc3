@@ -137,52 +137,56 @@ class CdcAreaHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    return Material(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(17),
-        side: const BorderSide(color: PdaColors.lilac, width: 1.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(15),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    cdcAreaText(l10n, area),
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1.5,
+    return Hero(
+      tag: cdcHeroTag(area),
+      flightShuttleBuilder: cdcAreaShuttle(area),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(17),
+          side: const BorderSide(color: PdaColors.lilac, width: 1.5),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(15),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      cdcAreaText(l10n, area),
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1.5,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    cdcAreaDesc(l10n, area),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: PdaColors.muted,
+                    const SizedBox(height: 6),
+                    Text(
+                      cdcAreaDesc(l10n, area),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: PdaColors.muted,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Container(
-              width: 84,
-              height: 84,
-              decoration: const BoxDecoration(
-                color: PdaColors.softer,
-                shape: BoxShape.circle,
+              Container(
+                width: 84,
+                height: 84,
+                decoration: const BoxDecoration(
+                  color: PdaColors.softer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  cdcAreaIcon(area),
+                  size: 46,
+                  color: PdaColors.primary,
+                ),
               ),
-              child: Icon(
-                cdcAreaIcon(area),
-                size: 46,
-                color: PdaColors.primary,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -325,7 +329,10 @@ class CdcItemCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Container(
+    // 강조(지금 스캔하는 상품)는 테두리가 부드럽게 바뀐다
+    return AnimatedContainer(
+      duration: PdaMotion.of(context, PdaMotion.base),
+      curve: PdaMotion.standard,
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -363,11 +370,14 @@ class CdcItemCard extends StatelessWidget {
                 if (footer case final f?)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      f,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: PdaColors.primary,
-                        fontWeight: FontWeight.w700,
+                    child: SwapValue(
+                      value: f,
+                      child: Text(
+                        f,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: PdaColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
@@ -378,11 +388,15 @@ class CdcItemCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                '$qty',
-                style: theme.textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: PdaColors.ink,
+              // 수량이 바뀌면 새 숫자가 굴러 들어온다(MFC 수량 칸과 같은 효과)
+              CdcCount(
+                value: qty,
+                child: Text(
+                  '$qty',
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: PdaColors.ink,
+                  ),
                 ),
               ),
               if (qtyLabel case final q?)
@@ -402,13 +416,17 @@ class CdcErrorLine extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 10),
-    child: Text(
-      text,
-      style: TextStyle(
-        color: Theme.of(context).colorScheme.error,
-        fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) => EnterFade(
+    key: ValueKey(text),
+    offset: 6,
+    child: Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.error,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     ),
   );
@@ -526,4 +544,29 @@ String cdcProblemText(AppLocalizations l10n, String code) => switch (code) {
 bool cdcCodeIsItem(String code, String sku, String lot) {
   final c = code.trim().toUpperCase();
   return c == sku.toUpperCase() || c == lot.toUpperCase();
+}
+
+/// 수량 숫자 — 늘면 아래에서, 줄면 위에서 새 숫자가 들어온다(MFC `_Counter` 와 같다)
+class CdcCount extends StatefulWidget {
+  const CdcCount({super.key, required this.value, required this.child});
+
+  final int value;
+  final Widget child;
+
+  @override
+  State<CdcCount> createState() => _CdcCountState();
+}
+
+class _CdcCountState extends State<CdcCount> {
+  bool _up = true;
+
+  @override
+  void didUpdateWidget(CdcCount old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value) _up = widget.value > old.value;
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      SwapValue(value: widget.value, up: _up, child: widget.child);
 }
