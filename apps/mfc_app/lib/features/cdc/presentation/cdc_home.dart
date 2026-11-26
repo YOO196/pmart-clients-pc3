@@ -89,9 +89,9 @@ class CdcHomeScreen extends ConsumerWidget {
                   centers.length == 1 ? centers.single : '',
                 ),
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: PdaColors.ink,
                   fontSize: 19,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: -0.5,
                 ),
               ),
@@ -191,7 +191,7 @@ class _CdcAreaTile extends StatelessWidget {
             color: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: PdaColors.line),
+              side: BorderSide.none,
             ),
             clipBehavior: Clip.antiAlias,
             child: InkWell(

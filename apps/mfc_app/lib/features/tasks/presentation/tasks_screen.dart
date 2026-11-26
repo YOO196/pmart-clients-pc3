@@ -373,7 +373,7 @@ class _PickingScreenState extends ConsumerState<PickingScreen> {
                   Text(
                     cart,
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.white,
+                      color: PdaColors.ink,
                     ),
                   ),
                 ],

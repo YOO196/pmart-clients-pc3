@@ -146,7 +146,7 @@ class _CenterCard extends StatelessWidget {
           color: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: PdaColors.line),
+            side: BorderSide.none,
           ),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
@@ -351,7 +351,7 @@ class _PlaceCard extends StatelessWidget {
         color: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: PdaColors.line),
+          side: BorderSide.none,
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(

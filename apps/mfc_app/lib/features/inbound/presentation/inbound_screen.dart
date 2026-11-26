@@ -958,57 +958,68 @@ class _BoxCheckStep extends ConsumerWidget {
                           .length;
                       final done = got == boxes.length;
                       final open = s.expandedLine == l.key;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          ListTile(
-                            key: ValueKey('box-line-${l.key}'),
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                            onTap: () => ctl.toggleLine(l.key),
-                            leading: Icon(
-                              done
-                                  ? Icons.check_circle
-                                  : Icons.inventory_2_outlined,
-                              color: done ? theme.colorScheme.primary : null,
-                            ),
-                            title: Text(l.productName ?? l.sku),
-                            subtitle: Text(
-                              [
-                                if (l.unitsPerBox case final per?)
-                                  l10n.boxPer(per),
-                                if (bad > 0) l10n.boxDamagedCount(bad),
-                              ].join(' · '),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  l10n.boxLineProgress(got, boxes.length),
-                                  style: theme.textTheme.titleMedium,
+                      // 상품 줄마다 흰 둥근 카드(바탕 회색 위 — 사용자 2026-11-27 참고 화면)
+                      return Card(
+                        margin: const EdgeInsets.only(top: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 4, 10, 6),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ListTile(
+                                key: ValueKey('box-line-${l.key}'),
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                onTap: () => ctl.toggleLine(l.key),
+                                leading: Icon(
+                                  done
+                                      ? Icons.check_circle
+                                      : Icons.inventory_2_outlined,
+                                  color: done
+                                      ? theme.colorScheme.primary
+                                      : null,
                                 ),
-                                Icon(
-                                  open ? Icons.expand_less : Icons.expand_more,
+                                title: Text(l.productName ?? l.sku),
+                                subtitle: Text(
+                                  [
+                                    if (l.unitsPerBox case final per?)
+                                      l10n.boxPer(per),
+                                    if (bad > 0) l10n.boxDamagedCount(bad),
+                                  ].join(' · '),
                                 ),
-                              ],
-                            ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      l10n.boxLineProgress(got, boxes.length),
+                                      style: theme.textTheme.titleMedium,
+                                    ),
+                                    Icon(
+                                      open
+                                          ? Icons.expand_less
+                                          : Icons.expand_more,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (open)
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: [
+                                    for (final b in boxes)
+                                      FilterChip(
+                                        key: ValueKey('box-chip-${b.boxId}'),
+                                        label: Text(b.boxId.substring(4)),
+                                        selected: s.arrived.contains(b.boxId),
+                                        // 보기 전용 — 확인은 스캔으로만(안드로이드).
+                                        onSelected: null,
+                                      ),
+                                  ],
+                                ),
+                            ],
                           ),
-                          if (open)
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 4,
-                              children: [
-                                for (final b in boxes)
-                                  FilterChip(
-                                    key: ValueKey('box-chip-${b.boxId}'),
-                                    label: Text(b.boxId.substring(4)),
-                                    selected: s.arrived.contains(b.boxId),
-                                    // 보기 전용 — 확인은 스캔으로만(안드로이드).
-                                    onSelected: null,
-                                  ),
-                              ],
-                            ),
-                        ],
+                        ),
                       );
                     },
                   ),

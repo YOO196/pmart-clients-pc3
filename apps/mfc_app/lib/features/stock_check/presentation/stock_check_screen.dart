@@ -251,7 +251,6 @@ class _StockResult extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: PdaColors.line),
               ),
               child: Row(
                 children: [
