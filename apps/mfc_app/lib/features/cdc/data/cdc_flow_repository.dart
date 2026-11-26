@@ -11,8 +11,9 @@ import '../domain/cdc_flow.dart';
 /// DC 시뮬레이터 요청 C-01(사용자 2026-11-26). 결과 등록은 202 접수 — 화면은 다시 읽은 서버 값(LPN 검품·상차, 운행 상태)만 확정으로 보인다.
 /// 지게차 적치·보충은 가상 설비가 `/internal` 로 받는 일이라(cdc-inbound 0.2.x) PDA 에는 없다.
 abstract interface class CdcFlowRepository {
-  /// 피킹이 끝난 TRF(state PICKED) — 기한 빠른 순(서버 정렬)
-  Future<List<CdcTrf>> pickedTransfers(String cdcId);
+  /// 그 상태들의 TRF — 기한 빠른 순. TRF 는 PICKED → SORTED(첫 BOX 분류) → INSPECTED(모든 BOX 검품) → LOADED 로만 간다
+  /// (cdc-outbound ResultService). 분배·패킹은 PICKED·SORTED, 검품은 SORTED·INSPECTED(사용자 2026-11-26 "분배 끝났는데 검품에 TRF 가 없다").
+  Future<List<CdcTrf>> transfers(String cdcId, List<String> states);
 
   /// TRF 몫으로 집은 SKU·LOT 와 이미 BOX 에 담은 수량
   Future<List<CdcSortItem>> sortItems(String cdcId, CdcTrf trf);
@@ -70,13 +71,17 @@ final class ApiCdcFlowRepository implements CdcFlowRepository {
   final te.TripsApi _trips;
 
   @override
-  Future<List<CdcTrf>> pickedTransfers(String cdcId) async {
-    final r = await pmartGuard(
-      () =>
-          _views.listCenterTransfers(cdcId: cdcId, state: 'PICKED', size: 200),
-    );
+  Future<List<CdcTrf>> transfers(String cdcId, List<String> states) async {
+    final items = <co.TransferSummary>[];
+    for (final state in states) {
+      final r = await pmartGuard(
+        () => _views.listCenterTransfers(cdcId: cdcId, state: state, size: 200),
+      );
+      items.addAll(r.data?.items ?? const <co.TransferSummary>[]);
+    }
+    items.sort((a, b) => a.dueAt.compareTo(b.dueAt));
     return [
-      for (final t in r.data?.items ?? const <co.TransferSummary>[])
+      for (final t in items)
         CdcTrf(
           trfId: t.trfId,
           trfNumber: t.trfNumber,
@@ -383,6 +388,9 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
   static const dock = 'CDC01-A-6-90-01-0-1';
   final _done = <String>{};
 
+  /// TRF 상태(서버처럼 앞으로만) — TRF-mock-2 는 BOX 하나가 분류·검품 합격(아직 모든 BOX 검품 전 = SORTED)
+  final _state = <String, String>{};
+
   static final trfs = [
     CdcTrf(
       trfId: 'TRF-mock-1',
@@ -406,6 +414,9 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
 
   void reset() {
     _done.clear();
+    _state
+      ..clear()
+      ..addAll({'TRF-mock-1': 'PICKED', 'TRF-mock-2': 'SORTED'});
     CdcSortItem item(String sku, String name, String lot, int qty) =>
         CdcSortItem(
           sku: sku,
@@ -455,9 +466,19 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
       throw ProblemFailure(Problem(status: status, code: code));
 
   @override
-  Future<List<CdcTrf>> pickedTransfers(String cdcId) async {
+  Future<List<CdcTrf>> transfers(String cdcId, List<String> states) async {
     await _wait();
-    return trfs;
+    return [
+      for (final t in trfs)
+        if (states.contains(_state[t.trfId])) t,
+    ];
+  }
+
+  void _advance(String trfId, String to) {
+    const order = ['PICKED', 'SORTED', 'INSPECTED', 'LOADED'];
+    if (order.indexOf(to) > order.indexOf(_state[trfId] ?? 'PICKED')) {
+      _state[trfId] = to;
+    }
   }
 
   @override
@@ -514,6 +535,7 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
       }
     }
     _lpns[trf.trfId]!.add(_MockLpn(box.lpn, box.temperatureZone, box.contents));
+    _advance(trf.trfId, 'SORTED');
   }
 
   @override
@@ -540,6 +562,11 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
       l
         ..inspection = i.passed ? 'PASSED' : 'FAILED'
         ..failReason = i.passed ? null : i.failReason;
+    }
+    if ((_lpns[trfId] ?? const <_MockLpn>[]).every(
+      (l) => l.inspection != null,
+    )) {
+      _advance(trfId, 'INSPECTED');
     }
   }
 
