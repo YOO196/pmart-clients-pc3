@@ -106,7 +106,7 @@
 |---|---|
 | `093cc50f` | 반품·교환 목을 ADR-0087 에 맞춤: 냉장·냉동도 변심 교환(교환비 9,000원), "상담원 확인" 표시, 접수 뒤 상태(교환비 → 결제 대기, 냉장냉동 → 심사 중, 상온만 → 진행) |
 | `1227dddb` | 홈: 할인 탭 "오늘만특가", 탭 물결 없앰 + 화면 미끄럼, TOP 30 상자, 일일특가 한 번만, 맨 아래 카테고리별 상품, 끝 여백. 상품 상세: "바로픽" 글자·이름 굵기·쿠폰 줄·아래 막대·붙는 탭·글자 크기(레퍼런스 7장) |
-| (커밋 안 함) | 가입 "내 정보 등록" 이름 칸에 네이버·구글 이름이 안 들어가던 것 고침 + 시험, BR-111 카카오 실명 요청서 — §4 |
+| `6618c7d3` | 가입 "내 정보 등록" 이름 칸에 네이버·구글 이름이 안 들어가던 것 고침 + 시험, BR-111 카카오 실명 요청서, 이 인계서 |
 
 그 밖에 같은 날 다른 계정 세션이 한 일(빈 장바구니·일일특가·산 상품 화면·자주 산 상품·실명 수정·가입 두 번 누름 해결 등)은 `docs/worklog/customer-app/2026-11-26.md`.
 
@@ -119,17 +119,8 @@
 
 ## 4. 저장소 상태 (2026-11-26 인계 시점)
 
-- `main...origin/main [ahead 2, behind 4]` — 093cc50f·1227dddb **푸시 안 함**. 원본에 새 커밋 4개가 있어 푸시 전에 `git pull --rebase`(다른 앱 영역 커밋일 가능성 큼) 필요. 푸시는 사용자가 말할 때만.
-- 커밋 안 한 파일(사용자가 "커밋해" 하면 같이 넣을 것):
-  ```
-   M apps/customer_app/lib/features/profile/presentation/my_info_screen.dart   # 늦게 온 이름 채우기
-   M apps/customer_app/test/auth_address_screens_test.dart                     # 그 시험
-   M docs/backend-requests.md                                                  # BR-111 줄
-   M docs/handoff/README.md                                                    # BR-111 열린 목록
-   M docs/worklog/customer-app/2026-11-26.md
-  ?? docs/handoff/customer-app/2026-11-26-backend-kakao-real-name.md           # BR-111 요청서
-   M docs/operations/customer-app-handover.md                                  # 이 문서
-  ```
+- `main...origin/main [ahead 3, behind 4]` — 093cc50f·1227dddb·6618c7d3(가입 이름 칸·BR-111·이 인계서)와 이 문서 고침 커밋까지 **푸시 안 함**. 원본에 새 커밋 4개가 있어 푸시 전에 `git pull --rebase`(다른 앱 영역 커밋일 가능성 큼) 필요. 푸시는 사용자가 말할 때만.
+- 커밋 안 한 파일: 없음(`contracts.lock` 만 남음).
 - **`contracts.lock` 은 넣지 않는다** — 다른 세션이 cdc-outbound 를 다시 만들며 바꾼 것.
 
 ---
