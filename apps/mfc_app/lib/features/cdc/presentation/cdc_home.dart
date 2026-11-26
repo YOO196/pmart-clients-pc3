@@ -145,7 +145,7 @@ class CdcHomeScreen extends ConsumerWidget {
                             child: _CdcAreaTile(
                               area: a,
                               height: h,
-                              onTap: () => context.push('/cdc/work/${a.name}'),
+                              onTap: () => context.push('/cdc/guide/${a.name}'),
                             ),
                           ),
                         ],

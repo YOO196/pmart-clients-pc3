@@ -61,6 +61,8 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.byKey(ValueKey('cdc-area-$area')));
     await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('cdc-guide-ok')));
+    await t.pumpAndSettle();
     return repo;
   }
 
@@ -70,54 +72,54 @@ void main() {
     await t.pumpAndSettle();
   }
 
+  Future<void> scan(WidgetTester t, String id, String code) async {
+    await t.enterText(find.byKey(ValueKey(id)), code);
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pumpAndSettle();
+  }
+
   FilledButton button(WidgetTester t, String key) =>
       t.widget<FilledButton>(find.byKey(ValueKey(key)));
 
-  testWidgets('분배: TRF 고르기 → BOX 번호·담은 수량 → 봉인 등록 → 서버 BOX 목록, 다 담으면 끝', (
+  testWidgets('분배: TRF → 빈 BOX 스캔 → 상품 스캔·수량 → 봉인 등록, 쓴 BOX 는 거절, 다 담으면 끝', (
     t,
   ) async {
     await pump(t, 'sort');
-    expect(find.byKey(const ValueKey('cdc-trf-TRF-mock-2')), findsOneWidget);
     await tap(t, 'cdc-trf-TRF-mock-1');
-    expect(button(t, 'cdc-sort-go').onPressed, isNull); // BOX 번호 없음
-    await t.enterText(find.byKey(const ValueKey('cdc-box')), 'BOX-A1');
-    await t.enterText(find.byKey(const ValueKey('cdc-sort-qty-SKU-1002')), '0');
+    expect(find.byKey(const ValueKey('step-1')), findsOneWidget);
+    await scan(t, 'cdc-box-scan', 'BOX-A1');
+    expect(find.byKey(const ValueKey('step-2')), findsOneWidget);
+    expect(button(t, 'cdc-sort-go').onPressed, isNull);
+    await scan(t, 'cdc-sort-item-scan', 'SKU-1001');
+    await t.enterText(find.byKey(const ValueKey('cdc-sort-qty')), '24');
+    await t.testTextInput.receiveAction(TextInputAction.done);
     await t.pumpAndSettle();
     await tap(t, 'cdc-sort-go');
-    expect(find.byKey(const ValueKey('cdc-notice')), findsOneWidget);
-    expect(find.byKey(const ValueKey('cdc-lpn-BOX-A1')), findsOneWidget);
-    // 우유는 다 담았고 두부만 남는다
-    expect(find.byKey(const ValueKey('cdc-sort-SKU-1001')), findsNothing);
-    await t.enterText(find.byKey(const ValueKey('cdc-box')), 'BOX-A1');
-    await t.pumpAndSettle();
-    await tap(t, 'cdc-sort-go');
+    expect(find.text('BOX-A1 봉인을 보냈어요'), findsOneWidget);
+    expect(find.text('분배 24 / 집음 36'), findsOneWidget);
+    // 같은 BOX 번호는 다시 못 쓴다
+    await scan(t, 'cdc-box-scan', 'BOX-A1');
     expect(find.text('이미 등록된 BOX 번호예요. 다른 BOX 를 쓰세요.'), findsOneWidget);
-    await t.enterText(find.byKey(const ValueKey('cdc-box')), 'BOX-A2');
-    await t.pumpAndSettle();
+    await scan(t, 'cdc-box-scan', 'BOX-A2');
+    await scan(t, 'cdc-sort-item-scan', 'SKU-1001');
+    expect(find.text('이 TRF 에 남은 상품이 아니에요'), findsOneWidget);
+    for (var i = 0; i < 12; i++) {
+      await scan(t, 'cdc-sort-item-scan', 'SKU-1002');
+    }
     await tap(t, 'cdc-sort-go');
     expect(find.byKey(const ValueKey('cdc-sort-done')), findsOneWidget);
   });
 
-  testWidgets('검품: 불합격은 사유를 골라야 보낼 수 있고, 보낸 뒤 서버 판정을 보인다', (t) async {
+  testWidgets('검품: BOX 스캔 → 불합격은 사유 → 서버 판정을 보인다', (t) async {
     await pump(t, 'inspect');
     await tap(t, 'cdc-trf-TRF-mock-2');
-    expect(
-      find.byKey(const ValueKey('cdc-insp-BOX-26112600001')),
-      findsOneWidget,
-    );
-    expect(button(t, 'cdc-inspect-go').onPressed, isNull);
-    await t.tap(
-      find.descendant(
-        of: find.byKey(const ValueKey('cdc-judge-BOX-26112600001')),
-        matching: find.text('불합격'),
-      ),
-    );
-    await t.pumpAndSettle();
-    expect(button(t, 'cdc-inspect-go').onPressed, isNull);
-    await tap(t, 'cdc-fail-BOX-26112600001');
-    await t.tap(find.text('봉인 훼손').last);
-    await t.pumpAndSettle();
-    await tap(t, 'cdc-inspect-go');
+    await scan(t, 'cdc-insp-scan', 'BOX-0000');
+    expect(find.text('이 TRF 의 BOX 가 아니에요'), findsOneWidget);
+    await scan(t, 'cdc-insp-scan', 'BOX-26112600001');
+    expect(find.byKey(const ValueKey('step-2')), findsOneWidget);
+    await tap(t, 'cdc-fail');
+    await tap(t, 'cdc-fail-SEAL_BROKEN');
+    expect(find.text('BOX-26112600001 불합격을 보냈어요'), findsOneWidget);
     expect(
       t
           .widget<Text>(find.byKey(const ValueKey('cdc-insp-BOX-26112600001')))
@@ -126,18 +128,18 @@ void main() {
     );
   });
 
-  testWidgets('상차: 운행·차량 번호와 합격 BOX → 상차 등록 → 실음 표시', (t) async {
+  testWidgets('상차: 운행 → 차량 → 합격 BOX 스캔 → 등록 → 다 실으면 끝(출발 아님)', (t) async {
     await pump(t, 'load');
     await tap(t, 'cdc-trf-TRF-mock-2');
+    await scan(t, 'cdc-trip-scan', 'TRIP-1');
+    await scan(t, 'cdc-vehicle-scan', '경북12가3456');
     expect(button(t, 'cdc-load-go').onPressed, isNull);
-    await t.enterText(find.byKey(const ValueKey('cdc-trip')), 'TRIP-1');
-    await t.enterText(find.byKey(const ValueKey('cdc-vehicle')), '경북12가3456');
-    await t.pumpAndSettle();
+    await scan(t, 'cdc-load-scan', 'BOX-26112600001');
+    await scan(t, 'cdc-load-scan', 'BOX-26112600001');
+    expect(find.text('이미 스캔한 BOX 예요'), findsOneWidget);
     await tap(t, 'cdc-load-go');
-    expect(
-      find.byKey(const ValueKey('cdc-loaded-BOX-26112600001')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('cdc-load-done')), findsOneWidget);
+    expect(find.text('상차는 출발이 아니에요. 출발은 따로 확정돼요'), findsOneWidget);
   });
 
   testWidgets('검품 합격 BOX 가 없으면 상차할 것이 없다고 안내', (t) async {
@@ -146,33 +148,18 @@ void main() {
     expect(find.byKey(const ValueKey('cdc-empty')), findsOneWidget);
   });
 
-  testWidgets('적치: 지시 번호로 열기 → 위치를 바꾸면 이유가 필요 → 보내면 서버 진행(완료)', (t) async {
+  testWidgets('적치: 지시 스캔 → 다른 칸이면 이유 → 수량 → 적치 완료, 없는 지시는 안내', (t) async {
     await pump(t, 'putaway');
-    await t.enterText(find.byKey(const ValueKey('cdc-putaway-id')), 'PA-nope');
-    await t.pumpAndSettle();
-    await tap(t, 'cdc-putaway-open');
+    await scan(t, 'cdc-pa-scan', 'PA-nope');
     expect(find.byKey(const ValueKey('cdc-putaway-error')), findsOneWidget);
-
-    await t.enterText(
-      find.byKey(const ValueKey('cdc-putaway-id')),
-      'PA-mock-1',
-    );
-    await t.pumpAndSettle();
-    await tap(t, 'cdc-putaway-open');
-    expect(find.text('지시 120 · 완료 0 · 남음 120'), findsOneWidget);
-    await t.enterText(
-      find.byKey(const ValueKey('cdc-pa-loc-SKU-1001')),
-      'CDC01-R-6-03-03-1-1',
-    );
-    await t.pumpAndSettle();
-    expect(button(t, 'cdc-putaway-go').onPressed, isNull);
-    await tap(t, 'cdc-pa-reason-SKU-1001');
-    await t.tap(find.text('칸 가득 참').last);
-    await t.pumpAndSettle();
+    await scan(t, 'cdc-pa-scan', 'PA-mock-1');
+    expect(find.byKey(const ValueKey('cdc-pa-location')), findsOneWidget);
+    await scan(t, 'cdc-pa-loc-scan', 'CDC01-R-6-09-01-1-1');
+    await tap(t, 'cdc-pa-reason-LOCATION_FULL');
+    expect(find.text('다른 칸 · CDC01-R-6-09-01-1-1'), findsOneWidget);
     await tap(t, 'cdc-putaway-go');
+    expect(find.byKey(const ValueKey('cdc-pa-done')), findsOneWidget);
     expect(find.text('상태: 완료'), findsOneWidget);
-    expect(find.text('지시 120 · 완료 120 · 남음 0'), findsOneWidget);
-    expect(find.byKey(const ValueKey('cdc-putaway-go')), findsNothing);
   });
 
   group('실서버 요청', () {

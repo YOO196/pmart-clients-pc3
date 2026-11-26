@@ -11,6 +11,7 @@ import 'features/auth/presentation/login_screen.dart';
 import 'features/cdc/presentation/cdc_flow_screens.dart';
 import 'features/cdc/presentation/cdc_home.dart';
 import 'features/cdc/presentation/cdc_pick_screen.dart';
+import 'features/cdc/presentation/cdc_widgets.dart';
 import 'features/device/presentation/device_setup_screens.dart';
 import 'features/handover/presentation/handover_screens.dart';
 import 'features/inbound/presentation/inbound_screen.dart';
@@ -159,6 +160,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/manage/workers',
         pageBuilder: (_, s) => _page(s, const CenterWorkersScreen()),
+      ),
+      // DC 업무 순서 안내 → 작업(MFC 업무와 같은 흐름, 사용자 2026-11-26 "mfc 쪽 업무화면 참고해봐")
+      GoRoute(
+        path: '/cdc/guide/:area',
+        redirect: (_, s) =>
+            CdcWorkArea.values.any((a) => a.name == s.pathParameters['area'])
+            ? null
+            : '/',
+        pageBuilder: (_, s) => _page(
+          s,
+          CdcGuideScreen(
+            area: CdcWorkArea.values.byName(s.pathParameters['area']!),
+          ),
+        ),
       ),
       // DC 피킹(사용자 2026-11-26 "피킹부터 붙여줘")
       GoRoute(
