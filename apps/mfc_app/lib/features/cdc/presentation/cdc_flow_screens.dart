@@ -257,8 +257,16 @@ class _Frame extends StatelessWidget {
 
 // ---------------------------------------------------------------- 분배·라인
 
+/// 패킹(박스 닫기) — MFC 한 곳 몫(TRF 하나)을 빈 BOX 에 담아 닫는다. 분배·패킹 메뉴에서 묶음이 TRF 하나면 이 화면이 열린다
+/// (사용자 2026-11-26 "분배·패킹을 합쳐줘" — 묶음 피킹은 칸으로 나누고, 한 곳 몫은 바로 BOX 에).
 class CdcSortScreen extends ConsumerStatefulWidget {
-  const CdcSortScreen({super.key});
+  const CdcSortScreen({super.key, this.initialTrf, this.onExit});
+
+  /// 분배·패킹 메뉴에서 고른 TRF — 있으면 TRF 고르기 없이 바로
+  final CdcTrf? initialTrf;
+
+  /// 뒤로·다른 묶음 — 분배·패킹 묶음 목록으로
+  final VoidCallback? onExit;
 
   @override
   ConsumerState<CdcSortScreen> createState() => _CdcSortScreenState();
@@ -277,6 +285,26 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
   String? _notice;
 
   CdcFlowRepository get _repo => ref.read(cdcFlowRepositoryProvider);
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialTrf case final t?) {
+      _trf = t;
+      Future.microtask(_load);
+    }
+  }
+
+  void _exit() {
+    if (widget.onExit case final f?) {
+      f();
+    } else {
+      setState(() {
+        _trf = null;
+        _notice = null;
+      });
+    }
+  }
 
   Future<void> _load() async {
     final trf = _trf!;
@@ -314,6 +342,8 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
   void _back() => setState(() {
     if (_box != null) {
       _resetBox();
+    } else if (widget.onExit != null) {
+      widget.onExit!();
     } else {
       _trf = null;
       _notice = null;
@@ -390,11 +420,11 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
     final steps = [l10n.cdcStepTrf, l10n.cdcStepBox, l10n.cdcStepItem];
     final trf = _trf;
     return _Frame(
-      area: CdcWorkArea.sort,
+      area: CdcWorkArea.distribute,
       busy: busy || reloading,
-      title: l10n.cdcAreaSort,
-      subtitle: trf?.label,
-      canPop: trf == null,
+      title: l10n.cdcAreaDistribute,
+      subtitle: trf == null ? null : l10n.cdcPackSubtitle(trf.label, trf.mfcId),
+      canPop: trf == null && widget.onExit == null,
       onBack: _back,
       child: trf == null
           ? _TrfPick(
@@ -468,11 +498,8 @@ class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
         ),
         OutlinedButton(
           key: const ValueKey('cdc-other-trf'),
-          onPressed: () => setState(() {
-            _trf = null;
-            _notice = null;
-          }),
-          child: Text(l10n.cdcOtherTrf),
+          onPressed: _exit,
+          child: Text(l10n.cdcDistOtherWave),
         ),
       ]);
       return cdcStepBody(step: step, body: body, actions: actions);
@@ -1246,6 +1273,37 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
 
   Future<void> _complete(Map<String, List<CdcLpn>> all) async {
     final trip = _trip!;
+    // 덜 실었으면 확인부터(사용자 2026-11-26 "박스 스캔 다 안 했는데 상차완료가 그대로 됐다") — 서버는 받지만
+    // 안 실은 TRF 는 미상차(NOT_LOADED)로 이번 운행 출발 구성에서 빠진다(transport-execution loading-completions).
+    final missing = [
+      for (final l in all.values.expand((l) => l))
+        if (l.passed && !l.loaded) l,
+    ].length;
+    if (missing > 0) {
+      final l10n = AppLocalizations.of(context);
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          key: const ValueKey('cdc-load-partial-dialog'),
+          title: Text(l10n.cdcLoadPartialTitle(missing)),
+          content: Text(l10n.cdcLoadPartialBody),
+          actions: [
+            TextButton(
+              key: const ValueKey('cdc-load-partial-cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(l10n.cdcLoadPartialKeep),
+            ),
+            FilledButton(
+              key: const ValueKey('cdc-load-partial-ok'),
+              style: FilledButton.styleFrom(backgroundColor: PdaColors.danger),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(l10n.cdcLoadPartialGo),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
     final transfers = {
       for (final e in all.entries)
         e.key: [
@@ -1485,11 +1543,19 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
       } else if (loaded > 0) {
         actions.add(
           trip.checkedIn
-              ? FilledButton(
-                  key: const ValueKey('cdc-load-complete'),
-                  onPressed: busy ? null : () => _complete(all),
-                  child: Text(l10n.cdcLoadComplete(loaded)),
-                )
+              ? (allLoaded
+                    ? FilledButton(
+                        key: const ValueKey('cdc-load-complete'),
+                        onPressed: busy ? null : () => _complete(all),
+                        child: Text(l10n.cdcLoadComplete(loaded)),
+                      )
+                    : OutlinedButton(
+                        key: const ValueKey('cdc-load-complete'),
+                        onPressed: busy ? null : () => _complete(all),
+                        child: Text(
+                          l10n.cdcLoadCompletePartial(loaded, passed.length),
+                        ),
+                      ))
               : OutlinedButton(
                   key: const ValueKey('cdc-trip-reload'),
                   onPressed: busy ? null : _reloadTrip,
@@ -1525,6 +1591,9 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
     with CdcCommand {
   AsyncValue<List<CdcTrf>> _trfs = const AsyncLoading();
   String? _wave;
+
+  /// MFC 한 곳 몫 묶음 — 칸 나누기 없이 패킹 화면으로
+  CdcTrf? _pack;
   AsyncValue<Map<String, List<CdcSortItem>>> _items = const AsyncLoading();
 
   /// 칸(TRF)마다 넣은 수량(아직 BOX 를 닫지 않은 것) — 상품 키 → 수량
@@ -1666,6 +1735,16 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    if (_pack case final t?) {
+      return CdcSortScreen(
+        key: ValueKey('pack-${t.trfId}'),
+        initialTrf: t,
+        onExit: () {
+          setState(() => _pack = null);
+          _loadTrfs();
+        },
+      );
+    }
     final wave = _wave;
     final waveLabel = _slots.firstOrNull?.waveNumber ?? wave;
     return _Frame(
@@ -1714,7 +1793,8 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
   Widget _waves(AppLocalizations l10n, List<CdcTrf> trfs) {
     final waves = <String, List<CdcTrf>>{};
     for (final t in trfs) {
-      if (t.waveId case final w?) (waves[w] ??= []).add(t);
+      // 묶음(Wave)마다 — 묶음이 없는 TRF 는 그 TRF 하나로
+      (waves[t.waveId ?? t.trfId] ??= []).add(t);
     }
     if (waves.isEmpty) {
       return CdcCenterNotice(
@@ -1734,6 +1814,10 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
             child: Pressable(
               child: GestureDetector(
                 onTap: () {
+                  if (e.value.length == 1) {
+                    setState(() => _pack = e.value.single);
+                    return;
+                  }
                   setState(() => _wave = e.key);
                   _loadItems();
                 },
@@ -1756,10 +1840,12 @@ class _CdcDistributeScreenState extends ConsumerState<CdcDistributeScreen>
                         ),
                       ),
                       Text(
-                        l10n.cdcDistWave(
-                          e.value.length,
-                          [for (final t in e.value) t.mfcId].join(' · '),
-                        ),
+                        e.value.length == 1
+                            ? l10n.cdcDistModePack(e.value.single.mfcId)
+                            : l10n.cdcDistModeSplit(
+                                e.value.length,
+                                [for (final t in e.value) t.mfcId].join(' · '),
+                              ),
                         style: const TextStyle(color: PdaColors.muted),
                       ),
                     ],

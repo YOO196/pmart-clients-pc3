@@ -410,13 +410,27 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
       dueAt: DateTime.utc(2026, 11, 26, 11),
       pickedQty: 16,
     ),
+    // DPS 로 TRF 하나만 피킹한 묶음 — 칸 나누기 없이 바로 패킹
+    CdcTrf(
+      trfId: 'TRF-mock-3',
+      trfNumber: 'T482915',
+      mfcId: 'MFC-SEJ-01',
+      waveId: 'WAV-mock-2',
+      waveNumber: 'W2611260002',
+      dueAt: DateTime.utc(2026, 11, 26, 12),
+      pickedQty: 36,
+    ),
   ];
 
   void reset() {
     _done.clear();
     _state
       ..clear()
-      ..addAll({'TRF-mock-1': 'PICKED', 'TRF-mock-2': 'SORTED'});
+      ..addAll({
+        'TRF-mock-1': 'PICKED',
+        'TRF-mock-2': 'SORTED',
+        'TRF-mock-3': 'PICKED',
+      });
     CdcSortItem item(String sku, String name, String lot, int qty) =>
         CdcSortItem(
           sku: sku,
@@ -434,14 +448,21 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
         item('SKU-2001', '양파 3kg', 'L261122011', 6),
         item('SKU-1003', '생수 2L 6입', 'L261119031', 10),
       ],
+      'TRF-mock-3': [
+        item('SKU-1001', '서울우유 1L', 'L261120012', 24),
+        item('SKU-1002', '맛있는 두부 300g', 'L261121022', 12),
+      ],
     };
     // TRF-mock-2 는 BOX 하나가 이미 분배·검품 합격 — 상차 시험용
     _lpns = {
       'TRF-mock-1': [],
+      'TRF-mock-3': [],
       'TRF-mock-2': [
         _MockLpn('BOX-26112600001', 'AMBIENT', const [
           CdcLpnContent(sku: 'SKU-1003', lot: 'L261119031', qty: 10),
         ])..inspection = 'PASSED',
+        // 롤테이너(R/T) — 같이 실어야 하는 합격 단위(수량 없음)
+        _MockLpn('RT-26112600001', 'AMBIENT', const [])..inspection = 'PASSED',
       ],
     };
     _trip = const CdcTrip(

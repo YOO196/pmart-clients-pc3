@@ -55,7 +55,7 @@ void main() {
     );
     expect(find.byKey(const ValueKey('cdc-home')), findsOneWidget);
     expect(find.textContaining('DC CDC01', findRichText: true), findsOneWidget);
-    for (final k in ['pick', 'distribute', 'sort', 'inspect', 'load']) {
+    for (final k in ['pick', 'distribute', 'inspect', 'load']) {
       expect(find.byKey(ValueKey('cdc-area-$k')), findsOneWidget);
     }
     expect(find.byKey(const ValueKey('area-pickPack')), findsNothing);
