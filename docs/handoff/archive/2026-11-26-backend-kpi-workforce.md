@@ -39,3 +39,7 @@ cdc-outbound 0.23.0 `GET /cdcs/{cdcId}/workers` 로 **지금 위치·지금 작�
 - 리포트·KPI·작업자·인력은 "화면 준비 중"에 서버 API 없음을 적는다. 지어낸 숫자 없음.
 - 시스템관리 메뉴는 뺀다(권한 = 통합 백오피스 HR·권한 승인, 감사 기록 = audit).
 - 계약이 생기면 목(MSW)으로 먼저 붙이고 시험한다. 회신은 `../pmart-backend/docs/handoff/clients/cdc-backoffice/` 에서 읽는다.
+
+## 끝남 (2026-11-26)
+- 백엔드 #534(cdc-outbound 0.27.0 KP-2 일별 출고·WF-1 작업자 실적)·#535(0.28.0 KP-1 운영 확인 기준·cdc-inventory 0.21.0)·#536(0.29.0 WF-2 근무조·배치·출근)이 main 에 들어갔다. #534·#535 는 LAN(pc3 cdc-inventory v11·cdc-outbound v17, pc4 게이트웨이 ebdfdf4e) 200, #536 은 pc3 cdc-outbound 0.29.0(Flyway v18)·pc4 게이트웨이 638e361c(pmart-config 1a1a828) — shifts·shift-assignments·staffing 200, 다른 센터 403(PR 백엔드 확인).
+- 화면은 clients #585(리포트·KPI·작업자·인력). 열린 목록에서 뺐다.

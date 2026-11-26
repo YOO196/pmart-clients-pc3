@@ -22,7 +22,6 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 
 | 문서 | 기다리는 것 |
 |---|---|
-| `cdc-backoffice/2026-11-26-backend-kpi-workforce.md` | DC 리포트·KPI·작업자(PC 5, #584) — KP-1 운영 확인 지표(WMS CDC-F-034 6개), KP-2 일별 출고 추이, WF-1 작업자별 처리량, WF-2 근무조(설계·사용자 결정 필요). **기다리는 것: cdc-outbound(·인력) 계약** |
 | `cdc-backoffice/2026-11-26-backend-missing-screens.md` | DC 백오피스 API 없는 화면 — IB·RP·LG·TR: 적치·보충·재고 이동 이력·운송. **기다리는 것: cdc-inbound·cdc-inventory·transport 계약** |
 | `cdc-backoffice/2026-11-26-backend-purchase-orders.md` | DC 상품 발주·공급사(PC 3, #574) — PO-1~4: procurement·supplier·cdc-inbound ASN 계약, overview §4 "1차 제외: 공급사·구매발주" 범위 변경. 그 전까지 화면은 목 전용(실서버 "준비 중"). **기다리는 것: procurement·supplier·cdc-inbound 계약** |
 | `backoffice/2026-11-25-backend-customer-withdrawal-reasons.md` | 직원이 보는 고객 탈퇴 목록(탈퇴 사유) — 고객 앱이 보낸 reasonCode·reasonText 를 읽는 직원 API 없음(라이더는 rider 0.19.0 으로 됨). CW-1 목록, CW-2 고객 상세, 사유 글 보관·가리기 결정. **기다리는 것: customer 계약** |
