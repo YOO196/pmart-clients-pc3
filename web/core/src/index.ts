@@ -12,3 +12,4 @@ export * from './settle';
 export * from './sha256';
 export * from './tokens';
 export * from './uuid';
+export * from './theme';

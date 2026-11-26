@@ -1,34 +1,31 @@
-// 사본: web/hr-backoffice/src/shared/theme.ts (2026-11-20 사용자 — MFC 에도 어두운 화면) — 이 앱에서 따로 고친다. 고른 테마(보는 사람 한 명의 편의)만 이 브라우저에 — 토큰·개인정보는 두지 않는다.
-// 밝은/어두운 테마(2026-11-18). 고른 값은 이 브라우저에만(보는 사람 한 명의 편의) — 못 쓰는 환경이면 어두운(관제실) 테마(2026-11-21 기본 바꿈).
-// 시작할 때(main.tsx) 그리기 전에 한 번 붙여 깜빡임을 막는다.
-import { useState } from 'react';
+// 밝은/어두운 테마 — 다섯 백오피스(backoffice·hr·mfc·rider·cdc)가 같은 값을 쓴다(사용자 2026-11-26 "다크-라이트 동기화").
+// 고른 값은 @pmart/web-core 의 쿠키 하나(pmart_theme — 포트가 달라도 같은 호스트면 공유), 고른 적이 없으면 기기 설정.
+// 다른 앱에서 바꾸면 이 탭으로 돌아올 때 따라 바뀐다. 시작할 때(main.tsx) 그리기 전에 한 번 붙여 깜빡임을 막는다.
+// 테마는 보는 사람 한 명의 편의일 뿐 — 토큰·개인정보는 두지 않는다(BR-03).
+import { useEffect, useState } from 'react';
+import { applyTheme, readSharedTheme, watchSharedTheme, writeSharedTheme, type Theme } from '@pmart/web-core';
 
-export type Theme = 'pmart' | 'pmart-dark';
-const KEY = 'pmart.cdc-backoffice.theme';
+export type { Theme };
+export { applyTheme };
 
 export function readTheme(): Theme {
-  try {
-    // 2026-11-21 관제실 겉모습: 기본은 어두운(관제실) 화면 — 밝은 화면을 고른 사람만 밝게
-    return window.localStorage.getItem(KEY) === 'pmart' ? 'pmart' : 'pmart-dark';
-  } catch {
-    return 'pmart-dark';
-  }
-}
-
-export function applyTheme(t: Theme) {
-  document.documentElement.setAttribute('data-theme', t);
+  return readSharedTheme();
 }
 
 export function useTheme(): readonly [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(readTheme);
+  useEffect(
+    () =>
+      watchSharedTheme((t) => {
+        applyTheme(t);
+        setTheme(t);
+      }),
+    [],
+  );
   const toggle = () => {
     const next: Theme = theme === 'pmart' ? 'pmart-dark' : 'pmart';
     applyTheme(next);
-    try {
-      window.localStorage.setItem(KEY, next);
-    } catch {
-      /* 기억만 못 할 뿐 바꾸기는 된다 */
-    }
+    writeSharedTheme(next);
     setTheme(next);
   };
   return [theme, toggle];
