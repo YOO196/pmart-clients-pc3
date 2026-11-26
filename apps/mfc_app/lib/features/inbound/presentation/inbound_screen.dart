@@ -1135,12 +1135,17 @@ class _BoxInspectStep extends ConsumerWidget {
                 InboundAccepted() => l10n.handoverRecorded(s.arrived.length),
                 InboundUnknown() => l10n.handoverUnknown,
                 InboundRejected(code: 'STOP_NOT_FOUND') => l10n.handoverNoStop,
+                // 하차 화면에서 이미 정차 인계함(정차당 한 번)
+                InboundRejected(code: 'HANDOVER_RECORDED') =>
+                  l10n.handoverAlready,
                 InboundRejected(code: 'INVALID_STATE') =>
                   l10n.handoverNotArrived,
                 InboundRejected() => l10n.handoverRejected,
               },
             ),
-          if (s.handover case InboundUnknown() || InboundRejected())
+          if (s.handover
+              case InboundUnknown() ||
+                  InboundRejected(code: != 'HANDOVER_RECORDED'))
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(

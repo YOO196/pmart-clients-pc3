@@ -41,7 +41,10 @@ enum PdaMenu {
   rest(<String>{}),
 
   /// 반납 인증번호 — 센터 직원 누구나(delivery-execution 0.28.0 "그 센터 운영자, 작업자 포함").
-  returnHandover(<String>{});
+  returnHandover(<String>{}),
+
+  /// 하차 — DC 운행이 도착하면 박스를 받아 정차 인계(입고 자격, 사용자 2026-11-26).
+  unload({'RECEIVE'});
 
   const PdaMenu(this.requires);
 
