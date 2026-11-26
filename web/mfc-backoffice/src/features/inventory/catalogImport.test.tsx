@@ -70,9 +70,9 @@ describe('상품 관리 — 본사 상품 연동', () => {
     const view = open();
     await loaded();
     await switchOf('서울우유 1L');
-    await userEvent.click(within(bulk()).getByRole('checkbox', { name: /조건에 맞는 상품 .*모두 고르기/ }));
+    await userEvent.click(within(bulk()).getByRole('checkbox', { name: '조건에 맞는 상품 모두 고르기' }));
     expect(await within(bulk()).findByText('11개 고름')).toBeInTheDocument();
-    expect(within(bulk()).getByRole('checkbox', { name: '조건에 맞는 상품 11개 모두 고르기' })).toBeChecked();
+    expect(within(bulk()).getByRole('checkbox', { name: '조건에 맞는 상품 모두 고르기' })).toBeChecked();
     await userEvent.click(within(bulk()).getByRole('button', { name: '팔지 않기' }));
     expect(await within(bulk()).findByText('상품 11개 — SKU 6개를 껐어요.')).toBeInTheDocument();
     expect(db.handlings.filter((h) => h.handlingEnabled)).toHaveLength(0);

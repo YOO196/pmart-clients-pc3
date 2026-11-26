@@ -190,7 +190,7 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
               else void pickAll();
             }}
           />
-          <span>{allBusy ? m.pickAllBusy : m.pickAll(q !== '' || sale !== '', allCount)}</span>
+          <span>{allBusy ? m.pickAllBusy : m.pickAll(q !== '' || sale !== '')}</span>
         </label>
         {allFailed && <span className="text-error">{m.pickAllFailed}</span>}
         <span className="text-base-content/70" data-testid="result-count">
