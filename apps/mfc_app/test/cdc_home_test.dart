@@ -111,4 +111,38 @@ void main() {
     );
     expect(m.isCdc, isFalse);
   });
+
+  testWidgets('목 앱 로그인 화면에서 cdcw-fc-01 로 들어가면 DC 홈', (t) async {
+    t.view
+      ..physicalSize = const Size(800, 2000)
+      ..devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    await t.pumpWidget(
+      ProviderScope(
+        retry: (_, _) => null,
+        overrides: [
+          envProvider.overrideWithValue(PmartEnv.mock),
+          authRepositoryProvider.overrideWithValue(
+            MockPasswordAuthRepository(),
+          ),
+          secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),
+        ],
+        child: const MfcApp(),
+      ),
+    );
+    await t.pumpAndSettle();
+    final start = find.byKey(const ValueKey('start-login'));
+    if (start.evaluate().isNotEmpty) {
+      await t.tap(start);
+      await t.pumpAndSettle();
+    }
+    await t.tap(find.byKey(const ValueKey('employee-login')));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('login-id')), 'cdcw-fc-01');
+    await t.enterText(find.byKey(const ValueKey('login-password')), 'x');
+    await t.pump();
+    await t.tap(find.byKey(const ValueKey('mock-signin-submit')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cdc-home')), findsOneWidget);
+  });
 }
