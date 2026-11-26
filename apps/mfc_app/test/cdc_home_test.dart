@@ -62,10 +62,13 @@ void main() {
     expect(find.byKey(const ValueKey('menu-handover')), findsNothing);
     expect(find.byKey(const ValueKey('manage-menu')), findsNothing);
 
+    // 업무를 누르면 MFC 처럼 순서 안내 → 시작하기
     await t.tap(find.byKey(const ValueKey('cdc-area-load')));
     await t.pumpAndSettle();
-    // 상차는 피킹 끝난 TRF 고르기부터
-    expect(find.text('상차'), findsOneWidget);
+    expect(find.byKey(const ValueKey('cdc-guide')), findsOneWidget);
+    expect(find.byKey(const ValueKey('cdc-guide-step-4')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('cdc-guide-ok')));
+    await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('cdc-trf-TRF-mock-1')), findsOneWidget);
   });
 

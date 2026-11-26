@@ -1,0 +1,529 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:pmart_core/pmart_core.dart';
+
+import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/field_widgets.dart';
+import '../../../shared/pda_motion.dart';
+import '../../../shared/pda_theme.dart';
+import '../../auth/presentation/auth_controller.dart';
+import 'cdc_home.dart';
+
+/// DC 업무 공통 — MFC 업무 화면(순서 안내 → 단계별 스캔 → 완료 → 다음)과 같은 모양을 쓴다(사용자 2026-11-26
+/// "mfc 쪽 업무화면 참고해봐"). 공통 부품은 shared/field_widgets·scanner 를 그대로 쓴다.
+
+/// 로그인 세션의 DC — 하나일 때만(여럿·없음이면 빈 값)
+String cdcCenterOf(WidgetRef ref) {
+  final c = ref.read(employeeSessionProvider)?.centers ?? const [];
+  return c.length == 1 ? c.single : '';
+}
+
+String cdcWorkerOf(WidgetRef ref) =>
+    ref.read(employeeSessionProvider)?.operatorId ?? '';
+
+/// 업무 순서 안내 — MFC `WorkGuideScreen` 과 같은 배치(업무 카드 → 번호 단계 → 안내 띠 → "작업 받기").
+class CdcGuideScreen extends StatelessWidget {
+  const CdcGuideScreen({super.key, required this.area});
+
+  final CdcWorkArea area;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final steps = switch (area) {
+      CdcWorkArea.pick => [
+        (Icons.assignment_turned_in_outlined, l10n.cdcGuidePick1),
+        (Icons.place_outlined, l10n.cdcGuidePick2),
+        (Icons.qr_code_scanner, l10n.cdcGuidePick3),
+        (Icons.report_problem_outlined, l10n.cdcGuidePick4),
+      ],
+      CdcWorkArea.sort => [
+        (Icons.list_alt, l10n.cdcGuideSort1),
+        (Icons.inventory_2_outlined, l10n.cdcGuideSort2),
+        (Icons.qr_code_scanner, l10n.cdcGuideSort3),
+        (Icons.verified_outlined, l10n.cdcGuideSort4),
+      ],
+      CdcWorkArea.inspect => [
+        (Icons.list_alt, l10n.cdcGuideInspect1),
+        (Icons.qr_code_scanner, l10n.cdcGuideInspect2),
+        (Icons.fact_check_outlined, l10n.cdcGuideInspect3),
+        (Icons.report_problem_outlined, l10n.cdcGuideInspect4),
+      ],
+      CdcWorkArea.load => [
+        (Icons.list_alt, l10n.cdcGuideLoad1),
+        (Icons.local_shipping_outlined, l10n.cdcGuideLoad2),
+        (Icons.qr_code_scanner, l10n.cdcGuideLoad3),
+        (Icons.info_outline, l10n.cdcGuideLoad4),
+      ],
+      CdcWorkArea.putaway => [
+        (Icons.qr_code_scanner, l10n.cdcGuidePutaway1),
+        (Icons.place_outlined, l10n.cdcGuidePutaway2),
+        (Icons.forklift, l10n.cdcGuidePutaway3),
+        (Icons.report_problem_outlined, l10n.cdcGuidePutaway4),
+      ],
+    };
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      appBar: AppBar(title: Text(l10n.guideTitle(cdcAreaText(l10n, area)))),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            key: const ValueKey('cdc-guide'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              CdcAreaHero(area: area),
+              const SizedBox(height: 12),
+              Text(
+                l10n.guideLead,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: PdaColors.muted,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: Column(
+                  children: [
+                    for (final (i, (icon, text)) in steps.indexed)
+                      Expanded(
+                        child: _GuideStep(
+                          n: i + 1,
+                          icon: icon,
+                          text: text,
+                          last: i == steps.length - 1,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              NoticeBox(
+                text: area == CdcWorkArea.pick
+                    ? l10n.guideCommon
+                    : l10n.cdcGuideCommon,
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                key: const ValueKey('cdc-guide-ok'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(64),
+                  textStyle: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                onPressed: () =>
+                    context.pushReplacement('/cdc/work/${area.name}'),
+                child: Text(
+                  area == CdcWorkArea.pick ? l10n.guideOk : l10n.cdcGuideStart,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 업무 카드(이름·설명·큰 그림) — MFC `AreaHeroCard` 와 같은 모양
+class CdcAreaHero extends StatelessWidget {
+  const CdcAreaHero({super.key, required this.area});
+
+  final CdcWorkArea area;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(17),
+        side: const BorderSide(color: PdaColors.lilac, width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    cdcAreaText(l10n, area),
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    cdcAreaDesc(l10n, area),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: PdaColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: 84,
+              height: 84,
+              decoration: const BoxDecoration(
+                color: PdaColors.softer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                cdcAreaIcon(area),
+                size: 46,
+                color: PdaColors.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GuideStep extends StatelessWidget {
+  const _GuideStep({
+    required this.n,
+    required this.icon,
+    required this.text,
+    required this.last,
+  });
+
+  final int n;
+  final IconData icon;
+  final String text;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      key: ValueKey('cdc-guide-step-$n'),
+      decoration: BoxDecoration(
+        border: last
+            ? null
+            : const Border(bottom: BorderSide(color: PdaColors.line)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 23,
+            height: 23,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: PdaColors.softer,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$n',
+              style: const TextStyle(
+                color: PdaColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: PdaColors.softer,
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: Icon(icon, size: 30, color: PdaColors.primary),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 사유 고르기 — 장갑 낀 손으로도 누르게 큰 칸(MFC 결품 사유 창과 같은 모양)
+Future<String?> showCdcReasonDialog(
+  BuildContext context, {
+  required String title,
+  required List<(String, IconData, String)> options,
+  String keyPrefix = 'cdc-reason',
+}) => showDialog<String>(
+  context: context,
+  builder: (context) => SimpleDialog(
+    title: Text(title),
+    contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+    children: [
+      for (final (value, icon, label) in options)
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: OutlinedButton(
+            key: ValueKey('$keyPrefix-$value'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(60),
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () => Navigator.of(context).pop(value),
+            child: Row(
+              children: [
+                Icon(icon, size: 26),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+    ],
+  ),
+);
+
+/// 상품 카드 — 이름, 회색 SKU·LOT, 오른쪽 큰 수량(MFC 피킹 카드와 같은 무게)
+class CdcItemCard extends StatelessWidget {
+  const CdcItemCard({
+    super.key,
+    required this.name,
+    required this.sku,
+    required this.lot,
+    required this.qty,
+    this.qtyLabel,
+    this.footer,
+    this.emphasize = false,
+  });
+
+  final String name;
+  final String sku;
+  final String? lot;
+  final int qty;
+  final String? qtyLabel;
+  final String? footer;
+  final bool emphasize;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: emphasize ? PdaColors.primary : PdaColors.line,
+          width: emphasize ? 2 : 1,
+        ),
+        boxShadow: PdaShadows.sm,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  // 상품명이 없으면(BOX 내용) 이름 자리에 SKU — 아래 줄은 LOT 만
+                  name == sku
+                      ? (lot == null ? '' : 'LOT $lot')
+                      : (lot == null ? sku : '$sku · LOT $lot'),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: PdaColors.muted,
+                  ),
+                ),
+                if (footer case final f?)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      f,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: PdaColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '$qty',
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: PdaColors.ink,
+                ),
+              ),
+              if (qtyLabel case final q?)
+                Text(q, style: const TextStyle(color: PdaColors.muted)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 오류 한 줄(빨강, 굵게) — MFC 스캔 오류와 같은 모양
+class CdcErrorLine extends StatelessWidget {
+  const CdcErrorLine(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 10),
+    child: Text(
+      text,
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.error,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+}
+
+/// 가운데 안내(아이콘·문구·버튼) — 작업 없음·불러오기 실패
+class CdcCenterNotice extends StatelessWidget {
+  const CdcCenterNotice({
+    super.key,
+    required this.icon,
+    required this.text,
+    this.textKey,
+    this.action,
+  });
+
+  final IconData icon;
+  final String text;
+  final Key? textKey;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Icon(icon, size: 56, color: PdaColors.muted),
+          const SizedBox(height: 12),
+          Text(
+            text,
+            key: textKey,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          if (action != null) ...[const SizedBox(height: 16), action!],
+        ],
+      ),
+    ),
+  );
+}
+
+/// 보내기 공통 — 같은 행위 재전송은 같은 키, 결과 불명이면 "같은 내용으로 다시 보내기", 거절이면 다시 읽고 이유.
+mixin CdcCommand<T extends ConsumerStatefulWidget> on ConsumerState<T> {
+  bool busy = false;
+  String? failText;
+  IdempotencyKey? _key;
+  Future<void> Function()? resend;
+
+  Future<bool> send(
+    Future<void> Function(IdempotencyKey key) call, {
+    required Future<void> Function() reload,
+  }) async {
+    final key = _key ??= IdempotencyKey.generate();
+    setState(() {
+      busy = true;
+      failText = null;
+    });
+    try {
+      await call(key);
+      _key = null;
+      resend = null;
+      await reload();
+      return true;
+    } on PmartFailure catch (f) {
+      if (!mounted) return false;
+      final l10n = AppLocalizations.of(context);
+      final unknown = f is UnknownResultFailure || f is NetworkFailure;
+      resend = unknown ? () => send(call, reload: reload) : null;
+      if (!unknown) {
+        _key = null;
+        try {
+          await reload();
+        } on PmartFailure {
+          // 다시 읽지 못하면 지금 화면을 둔다
+        }
+      }
+      failText = switch (f) {
+        _ when unknown => l10n.cdcPickUnknown,
+        ProblemFailure(:final problem) => cdcProblemText(l10n, problem.code),
+        _ => l10n.cdcPickFailed,
+      };
+      return false;
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  /// 결과 불명이면 아래 칸에 넣을 "같은 내용으로 다시 보내기"
+  Widget? resendButton(BuildContext context) => resend == null
+      ? null
+      : FilledButton(
+          key: const ValueKey('cdc-retry'),
+          onPressed: busy ? null : resend,
+          child: Text(AppLocalizations.of(context).cdcPickResend),
+        );
+}
+
+String cdcProblemText(AppLocalizations l10n, String code) => switch (code) {
+  'LPN_ALREADY_SEALED' => l10n.cdcErrLpnSealed,
+  'SORT_EXCEEDS_PICKED' => l10n.cdcErrSortExceeds,
+  'LPN_NOT_PASSED' || 'LOAD_EXCEEDS_INSPECTED' => l10n.cdcErrNotPassed,
+  'TRIP_MISMATCH' => l10n.cdcErrTripMismatch,
+  'EXECUTION_EXCEEDS_REMAINING' ||
+  'PICK_EXCEEDS_ALLOCATION' => l10n.cdcPickExceeds,
+  'VERSION_CONFLICT' ||
+  'INVALID_STATE' ||
+  'NOT_ASSIGNEE' => l10n.cdcPickChanged,
+  'NOT_FOUND' => l10n.cdcErrNotFound,
+  _ => l10n.cdcPickFailed,
+};
+
+/// 스캔한 코드가 그 상품인지 — DC 작업 줄에는 바코드가 없어(계약) SKU 또는 LOT 코드로 맞춘다.
+bool cdcCodeIsItem(String code, String sku, String lot) {
+  final c = code.trim().toUpperCase();
+  return c == sku.toUpperCase() || c == lot.toUpperCase();
+}

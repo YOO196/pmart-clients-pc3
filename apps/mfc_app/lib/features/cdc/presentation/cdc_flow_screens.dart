@@ -1,18 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
+import '../../../shared/field_widgets.dart';
+import '../../../shared/location_guide.dart';
 import '../../../shared/pda_theme.dart';
 import '../../../shared/providers.dart';
-import '../../auth/presentation/auth_controller.dart';
+import '../../../shared/scanner/scan_input.dart';
+import '../../../shared/scanner/scanner.dart';
 import '../data/cdc_flow_repository.dart';
 import '../domain/cdc_flow.dart';
+import 'cdc_widgets.dart';
 
-/// DC 분배·검품·상차·지게차 적치(사용자 2026-11-26 "업무화면 다 만들어").
-/// 결과 등록은 202 접수 — 보낸 뒤 서버 값을 다시 읽어 그것만 보인다. 같은 행위의 재전송은 같은 멱등 키.
+/// DC 분배·검품·상차·지게차 적치 — MFC 업무 화면과 같은 흐름(단계 알약·진행 막대·큰 지시·스캔 칸·완료 표시).
+/// 사용자 2026-11-26 "업무화면 다 만들어", "mfc 쪽 업무화면 참고해봐".
+/// 분배·검품·상차는 계약이 TRF·LPN 단위(cdc-outbound results)라 피킹 끝난 TRF 를 고른 뒤 스캔으로 진행한다.
+/// 결과 등록은 202 접수 — 보낸 뒤 서버 값을 다시 읽어 그것만 보인다.
 final cdcFlowRepositoryProvider = Provider<CdcFlowRepository>(
   (ref) => switch (ref.watch(envProvider)) {
     PmartEnv.mock => MockCdcFlowRepository(),
@@ -20,262 +25,32 @@ final cdcFlowRepositoryProvider = Provider<CdcFlowRepository>(
   },
 );
 
-/// 보내기·다시 읽기 공통 — 실패 문구, 같은 키 재전송.
-mixin _Command<T extends ConsumerStatefulWidget> on ConsumerState<T> {
-  bool busy = false;
-  String? message;
-  String? notice;
-  IdempotencyKey? _key;
-  Future<void> Function()? retry;
-
-  String get cdcId {
-    final c = ref.read(employeeSessionProvider)?.centers ?? const [];
-    return c.length == 1 ? c.single : '';
-  }
-
-  String get workerId => ref.read(employeeSessionProvider)?.operatorId ?? '';
-
-  CdcFlowRepository get repo => ref.read(cdcFlowRepositoryProvider);
-
-  /// [send] 는 키를 받아 보낸다. 성공하면 [after](다시 읽기)와 [done] 문구.
-  Future<void> command(
-    Future<void> Function(IdempotencyKey key) send, {
-    required Future<void> Function() after,
-    required String done,
-  }) async {
-    final key = _key ??= IdempotencyKey.generate();
-    setState(() {
-      busy = true;
-      message = null;
-      notice = null;
-    });
-    try {
-      await send(key);
-      _key = null;
-      retry = null;
-      await after();
-      notice = done;
-    } on PmartFailure catch (f) {
-      if (!mounted) return;
-      final l10n = AppLocalizations.of(context);
-      final unknown = f is UnknownResultFailure || f is NetworkFailure;
-      // 결과를 모르면 같은 키로 다시 보내게 한다. 거절이면 키를 버리고 다시 읽는다.
-      retry = unknown ? () => command(send, after: after, done: done) : null;
-      if (!unknown) {
-        _key = null;
-        try {
-          await after();
-        } on PmartFailure {
-          // 다시 읽지 못하면 지금 화면을 둔다
-        }
-      }
-      message = switch (f) {
-        _ when unknown => l10n.cdcPickUnknown,
-        ProblemFailure(:final problem) => cdcProblemText(l10n, problem.code),
-        _ => l10n.cdcPickFailed,
-      };
-    } finally {
-      if (mounted) setState(() => busy = false);
-    }
-  }
-
-  Widget feedback(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (notice != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(
-              notice!,
-              key: const ValueKey('cdc-notice'),
-              style: const TextStyle(
-                color: PdaColors.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        if (message != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(
-              message!,
-              key: const ValueKey('cdc-message'),
-              style: TextStyle(color: theme.colorScheme.error),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget bottomButton(
-    BuildContext context, {
-    required Key key,
-    required String label,
-    required VoidCallback? onPressed,
-  }) {
-    final l10n = AppLocalizations.of(context);
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: SizedBox(
-          height: 52,
-          child: retry != null
-              ? FilledButton(
-                  key: const ValueKey('cdc-retry'),
-                  onPressed: busy ? null : retry,
-                  child: Text(l10n.cdcPickResend),
-                )
-              : FilledButton(
-                  key: key,
-                  onPressed: busy ? null : onPressed,
-                  child: Text(label),
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-String cdcProblemText(AppLocalizations l10n, String code) => switch (code) {
-  'LPN_ALREADY_SEALED' => l10n.cdcErrLpnSealed,
-  'SORT_EXCEEDS_PICKED' => l10n.cdcErrSortExceeds,
-  'LPN_NOT_PASSED' => l10n.cdcErrNotPassed,
-  'TRIP_MISMATCH' => l10n.cdcErrTripMismatch,
-  'LOAD_EXCEEDS_INSPECTED' => l10n.cdcErrNotPassed,
-  'EXECUTION_EXCEEDS_REMAINING' ||
-  'PICK_EXCEEDS_ALLOCATION' => l10n.cdcPickExceeds,
-  'VERSION_CONFLICT' ||
-  'INVALID_STATE' ||
-  'NOT_ASSIGNEE' => l10n.cdcPickChanged,
-  'NOT_FOUND' => l10n.cdcErrNotFound,
-  _ => l10n.cdcPickFailed,
-};
-
-// ---------------------------------------------------------------- 공통 조각
-
-/// 조회 상태(읽는 중·실패·빈 목록·내용)
-class _Load<T> extends StatelessWidget {
-  const _Load({
-    required this.value,
-    required this.onRetry,
-    required this.empty,
-    required this.isEmpty,
-    required this.builder,
-  });
-
-  final AsyncValue<T> value;
-  final VoidCallback onRetry;
-  final String empty;
-  final bool Function(T) isEmpty;
-  final Widget Function(T) builder;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return switch (value) {
-      AsyncData(:final value) when isEmpty(value) => _CenterText(
-        empty,
-        key: const ValueKey('cdc-empty'),
-      ),
-      AsyncData(:final value) => builder(value),
-      AsyncError() => _CenterText(
-        l10n.cdcLoadFailed,
-        action: FilledButton(
-          key: const ValueKey('cdc-reload'),
-          onPressed: onRetry,
-          child: Text(l10n.retry),
-        ),
-      ),
-      _ => const Center(child: CircularProgressIndicator()),
-    };
-  }
-}
-
-class _CenterText extends StatelessWidget {
-  const _CenterText(this.text, {super.key, this.action});
-
-  final String text;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            text,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          if (action != null) ...[const SizedBox(height: 16), action!],
-        ],
-      ),
-    ),
-  );
-}
-
-class _Card extends StatelessWidget {
-  const _Card({
-    super.key,
-    required this.child,
-    this.onTap,
-    this.selected = false,
-  });
-
-  final Widget child;
-  final VoidCallback? onTap;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Material(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: selected ? PdaColors.primary : PdaColors.line,
-          width: selected ? 2 : 1,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(padding: const EdgeInsets.all(14), child: child),
-      ),
-    ),
-  );
-}
-
-const _title = TextStyle(fontSize: 18, fontWeight: FontWeight.w800);
-const _muted = TextStyle(color: PdaColors.muted);
-const _strong = TextStyle(fontWeight: FontWeight.w700);
-
-String _contentsText(CdcLpn l) =>
+String _contents(CdcLpn l) =>
     l.contents.map((c) => '${c.sku} ${c.qty}').join(' · ');
 
-/// 피킹 끝난 TRF 고르기 — 분배·검품·상차 공통 첫 화면
-class _TrfList extends ConsumerStatefulWidget {
-  const _TrfList({required this.onPick});
+/// 단계 화면 몸통 — 위 목록 + 아래 고정 칸(MFC 피킹과 같은 배치)
+Widget _stepBody(List<Widget> body, List<Widget> actions) => Column(
+  children: [
+    Expanded(
+      child: ListView(padding: const EdgeInsets.all(16), children: body),
+    ),
+    ActionBar(children: actions),
+  ],
+);
 
+/// 피킹 끝난 TRF 고르기(분배·검품·상차 첫 단계)
+class _TrfPick extends ConsumerStatefulWidget {
+  const _TrfPick({required this.steps, required this.onPick});
+
+  final List<String> steps;
   final ValueChanged<CdcTrf> onPick;
 
   @override
-  ConsumerState<_TrfList> createState() => _TrfListState();
+  ConsumerState<_TrfPick> createState() => _TrfPickState();
 }
 
-class _TrfListState extends ConsumerState<_TrfList> {
+class _TrfPickState extends ConsumerState<_TrfPick> {
   AsyncValue<List<CdcTrf>> _trfs = const AsyncLoading();
-
-  String get _cdcId {
-    final c = ref.read(employeeSessionProvider)?.centers ?? const [];
-    return c.length == 1 ? c.single : '';
-  }
 
   @override
   void initState() {
@@ -286,7 +61,8 @@ class _TrfListState extends ConsumerState<_TrfList> {
   Future<void> _load() async {
     setState(() => _trfs = const AsyncLoading());
     final v = await AsyncValue.guard(
-      () => ref.read(cdcFlowRepositoryProvider).pickedTransfers(_cdcId),
+      () =>
+          ref.read(cdcFlowRepositoryProvider).pickedTransfers(cdcCenterOf(ref)),
     );
     if (mounted) setState(() => _trfs = v);
   }
@@ -294,71 +70,152 @@ class _TrfListState extends ConsumerState<_TrfList> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return _Load(
-      value: _trfs,
-      onRetry: _load,
-      empty: l10n.cdcTrfEmpty,
-      isEmpty: (v) => v.isEmpty,
-      builder: (trfs) => RefreshIndicator(
-        onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(l10n.cdcTrfChoose, style: _muted),
-            ),
-            for (final t in trfs)
-              _Card(
-                key: ValueKey('cdc-trf-${t.trfId}'),
-                onTap: () => widget.onPick(t),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return switch (_trfs) {
+      AsyncData(:final value) when value.isEmpty => CdcCenterNotice(
+        key: const ValueKey('cdc-empty'),
+        icon: Icons.hourglass_empty,
+        text: l10n.cdcTrfEmpty,
+        action: FilledButton(
+          key: const ValueKey('cdc-reload'),
+          onPressed: _load,
+          child: Text(l10n.nextRetry),
+        ),
+      ),
+      AsyncData(:final value) => _stepBody([
+        StepHeader(names: widget.steps, current: 0),
+        ScanPrompt(text: l10n.cdcTrfTitle, detail: l10n.cdcTrfChoose),
+        for (final t in value)
+          _TrfCard(
+            key: ValueKey('cdc-trf-${t.trfId}'),
+            trf: t,
+            onTap: () => widget.onPick(t),
+          ),
+      ], const []),
+      AsyncError() => CdcCenterNotice(
+        icon: Icons.cloud_off,
+        text: l10n.cdcLoadFailed,
+        action: FilledButton(
+          key: const ValueKey('cdc-reload'),
+          onPressed: _load,
+          child: Text(l10n.retry),
+        ),
+      ),
+      _ => const Center(child: CircularProgressIndicator()),
+    };
+  }
+}
+
+class _TrfCard extends StatelessWidget {
+  const _TrfCard({super.key, required this.trf, required this.onTap});
+
+  final CdcTrf trf;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: PdaColors.line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(15),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        trf.label,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${trf.mfcId} · ${l10n.cdcPickDue(formatSeoulDateTime(trf.dueAt))}',
+                        style: const TextStyle(color: PdaColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(t.label, style: _title),
                     Text(
-                      '${t.mfcId} · ${l10n.cdcPickDue(formatSeoulDateTime(t.dueAt))}',
-                      style: _muted,
+                      '${trf.pickedQty}',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                    Text(l10n.cdcTrfPicked(t.pickedQty), style: _strong),
+                    Text(
+                      l10n.cdcTrfPickedLabel,
+                      style: const TextStyle(color: PdaColors.muted),
+                    ),
                   ],
                 ),
-              ),
-          ],
+                const SizedBox(width: 6),
+                const Icon(Icons.chevron_right, color: PdaColors.muted),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-/// TRF 를 고른 뒤 화면 — 위에 TRF 머리, 뒤로 가면 TRF 목록
-class _TrfScaffold extends StatelessWidget {
-  const _TrfScaffold({
+/// 화면 틀 — 위 제목(업무·TRF), 뒤로 가면 한 단계 앞으로
+class _Frame extends StatelessWidget {
+  const _Frame({
     required this.title,
-    required this.trf,
+    required this.subtitle,
+    required this.canPop,
     required this.onBack,
-    required this.body,
-    this.bottom,
+    required this.child,
   });
 
   final String title;
-  final CdcTrf? trf;
+  final String? subtitle;
+  final bool canPop;
   final VoidCallback onBack;
-  final Widget body;
-  final Widget? bottom;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final t = trf;
+    final theme = Theme.of(context);
     return PopScope(
-      canPop: t == null,
+      canPop: canPop,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) onBack();
       },
       child: Scaffold(
-        appBar: AppBar(title: Text(t == null ? title : '$title · ${t.label}')),
-        body: SafeArea(child: body),
-        bottomNavigationBar: bottom,
+        resizeToAvoidBottomInset: false,
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (subtitle != null)
+                Text(
+                  title,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: PdaColors.onBarMuted,
+                  ),
+                ),
+              Text(subtitle ?? title, key: const ValueKey('cdc-flow-title')),
+            ],
+          ),
+        ),
+        body: SafeArea(child: child),
       ),
     );
   }
@@ -373,209 +230,313 @@ class CdcSortScreen extends ConsumerStatefulWidget {
   ConsumerState<CdcSortScreen> createState() => _CdcSortScreenState();
 }
 
-class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with _Command {
+class _CdcSortScreenState extends ConsumerState<CdcSortScreen> with CdcCommand {
   CdcTrf? _trf;
   AsyncValue<(List<CdcSortItem>, List<CdcLpn>)> _data = const AsyncLoading();
-  final _box = TextEditingController();
-  final _qty = <String, TextEditingController>{};
+  String? _box;
   String? _zone;
 
-  @override
-  void dispose() {
-    _box.dispose();
-    for (final c in _qty.values) {
-      c.dispose();
-    }
-    super.dispose();
-  }
+  /// 이 BOX 에 담은 수(줄 키 → 수)
+  final _inBox = <String, int>{};
+  String? _last;
+  String? _scanError;
+  String? _notice;
+
+  CdcFlowRepository get _repo => ref.read(cdcFlowRepositoryProvider);
 
   Future<void> _load() async {
     final trf = _trf!;
     setState(() => _data = const AsyncLoading());
     final v = await AsyncValue.guard(
-      () async =>
-          (await repo.sortItems(cdcId, trf), await repo.lpns(cdcId, trf.trfId)),
+      () async => (
+        await _repo.sortItems(cdcCenterOf(ref), trf),
+        await _repo.lpns(cdcCenterOf(ref), trf.trfId),
+      ),
     );
-    if (!mounted) return;
-    if (v case AsyncData(:final value)) {
-      for (final c in _qty.values) {
-        c.dispose();
-      }
-      _qty
-        ..clear()
-        ..addAll({
-          for (final i in value.$1)
-            if (i.remaining > 0)
-              i.key: TextEditingController(text: '${i.remaining}'),
-        });
-    }
-    setState(() => _data = v);
+    if (mounted) setState(() => _data = v);
   }
 
-  List<CdcLpnContent>? _contents(List<CdcSortItem> items) {
-    final out = <CdcLpnContent>[];
-    for (final i in items.where((i) => i.remaining > 0)) {
-      final n = int.tryParse(_qty[i.key]?.text.trim() ?? '');
-      if (n == null || n < 0 || n > i.remaining) return null;
-      if (n > 0) out.add(CdcLpnContent(sku: i.sku, lot: i.lot, qty: n));
+  void _resetBox() {
+    _box = null;
+    _zone = null;
+    _inBox.clear();
+    _last = null;
+    _scanError = null;
+  }
+
+  void _back() => setState(() {
+    if (_box != null) {
+      _resetBox();
+    } else {
+      _trf = null;
+      _notice = null;
+      failText = null;
+      resend = null;
     }
-    return out.isEmpty ? null : out;
+  });
+
+  ScanFeedback _scanBox(List<CdcLpn> lpns, String code) {
+    final l10n = AppLocalizations.of(context);
+    final c = code.trim();
+    if (lpns.any((l) => l.lpn == c)) {
+      setState(() => _scanError = l10n.cdcErrLpnSealed);
+      return ScanFeedback.error(l10n.cdcErrLpnSealed);
+    }
+    setState(() {
+      _box = c;
+      _scanError = null;
+      _notice = null;
+    });
+    return const ScanFeedback.ok();
+  }
+
+  ScanFeedback _scanItem(List<CdcSortItem> items, String code) {
+    final l10n = AppLocalizations.of(context);
+    final hit = items
+        .where((i) => i.remaining > 0 && cdcCodeIsItem(code, i.sku, i.lot))
+        .firstOrNull;
+    if (hit == null) {
+      setState(() => _scanError = l10n.cdcSortNotThisTrf);
+      return ScanFeedback.error(l10n.cdcSortNotThisTrf);
+    }
+    final n = (_inBox[hit.key] ?? 0) + 1;
+    if (n > hit.remaining) {
+      setState(() => _scanError = l10n.cdcErrSortExceeds);
+      return ScanFeedback.error(l10n.cdcErrSortExceeds);
+    }
+    setState(() {
+      _inBox[hit.key] = n;
+      _last = hit.key;
+      _scanError = null;
+    });
+    return const ScanFeedback.ok();
+  }
+
+  Future<void> _seal(List<CdcSortItem> items) async {
+    final l10n = AppLocalizations.of(context);
+    final box = _box!;
+    final contents = [
+      for (final i in items)
+        if ((_inBox[i.key] ?? 0) > 0)
+          CdcLpnContent(sku: i.sku, lot: i.lot, qty: _inBox[i.key]!),
+    ];
+    final ok = await send(
+      (key) => _repo.reportSort(
+        trf: _trf!,
+        workerId: cdcWorkerOf(ref),
+        box: CdcBoxDraft(lpn: box, temperatureZone: _zone, contents: contents),
+        key: key,
+      ),
+      reload: _load,
+    );
+    if (ok && mounted) {
+      setState(() {
+        _resetBox();
+        _notice = l10n.cdcSortDone(box);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final steps = [l10n.cdcStepTrf, l10n.cdcStepBox, l10n.cdcStepItem];
     final trf = _trf;
-    final data = _data.value;
-    final contents = data == null ? null : _contents(data.$1);
-    final box = _box.text.trim();
-    return _TrfScaffold(
+    return _Frame(
       title: l10n.cdcAreaSort,
-      trf: trf,
-      onBack: () => setState(() {
-        _trf = null;
-        message = notice = null;
-        retry = null;
-      }),
-      body: trf == null
-          ? _TrfList(
+      subtitle: trf?.label,
+      canPop: trf == null,
+      onBack: _back,
+      child: trf == null
+          ? _TrfPick(
+              steps: steps,
               onPick: (t) {
                 setState(() => _trf = t);
                 _load();
               },
             )
-          : _Load(
-              value: _data,
-              onRetry: _load,
-              empty: '',
-              isEmpty: (_) => false,
-              builder: (d) => ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  if (d.$1.every((i) => i.remaining == 0))
-                    _CenterText(
-                      l10n.cdcSortAllDone,
-                      key: const ValueKey('cdc-sort-done'),
-                    )
-                  else ...[
-                    TextField(
-                      key: const ValueKey('cdc-box'),
-                      controller: _box,
-                      keyboardType: TextInputType.visiblePassword,
-                      autocorrect: false,
-                      decoration: InputDecoration(
-                        labelText: l10n.cdcSortBoxLabel,
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      key: const ValueKey('cdc-zone'),
-                      initialValue: _zone,
-                      decoration: InputDecoration(
-                        labelText: l10n.cdcSortZoneLabel,
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      items: [
-                        for (final z in cdcTemperatureZones)
-                          DropdownMenuItem(
-                            value: z,
-                            child: Text(_zoneText(l10n, z)),
-                          ),
-                      ],
-                      onChanged: (z) => setState(() => _zone = z),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(l10n.cdcSortItemsHint, style: _muted),
-                    const SizedBox(height: 8),
-                    for (final i in d.$1.where((i) => i.remaining > 0))
-                      _Card(
-                        key: ValueKey('cdc-sort-${i.sku}'),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(i.productName ?? i.sku, style: _title),
-                            Text('${i.sku} · LOT ${i.lot}', style: _muted),
-                            Text(
-                              l10n.cdcSortLeft(i.pickedQty, i.remaining),
-                              style: _strong,
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              key: ValueKey('cdc-sort-qty-${i.sku}'),
-                              controller: _qty[i.key],
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              decoration: InputDecoration(
-                                labelText: l10n.cdcSortQtyLabel,
-                                border: const OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              onChanged: (_) => setState(() {}),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                  if (d.$2.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(l10n.cdcSortBoxes(d.$2.length), style: _strong),
-                    const SizedBox(height: 6),
-                    for (final l in d.$2)
-                      _Card(
-                        key: ValueKey('cdc-lpn-${l.lpn}'),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(l.lpn, style: _strong),
-                            Text(_contentsText(l), style: _muted),
-                          ],
-                        ),
-                      ),
-                  ],
-                ],
-              ),
-            ),
-      bottom:
-          trf == null || data == null || data.$1.every((i) => i.remaining == 0)
-          ? null
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                feedback(context),
-                bottomButton(
-                  context,
-                  key: const ValueKey('cdc-sort-go'),
-                  label: l10n.cdcSortSubmit,
-                  onPressed: box.isEmpty || contents == null
-                      ? null
-                      : () => command(
-                          (key) => repo.reportSort(
-                            trf: trf,
-                            workerId: workerId,
-                            box: CdcBoxDraft(
-                              lpn: box,
-                              temperatureZone: _zone,
-                              contents: contents,
-                            ),
-                            key: key,
-                          ),
-                          after: () async {
-                            _box.clear();
-                            await _load();
-                          },
-                          done: l10n.cdcSortDone(box),
-                        ),
+          : switch (_data) {
+              AsyncData(:final value) => _work(l10n, steps, value.$1, value.$2),
+              AsyncError() => CdcCenterNotice(
+                icon: Icons.cloud_off,
+                text: l10n.cdcLoadFailed,
+                action: FilledButton(
+                  key: const ValueKey('cdc-reload'),
+                  onPressed: _load,
+                  child: Text(l10n.retry),
                 ),
-              ],
-            ),
+              ),
+              _ => const Center(child: CircularProgressIndicator()),
+            },
     );
+  }
+
+  Widget _work(
+    AppLocalizations l10n,
+    List<String> steps,
+    List<CdcSortItem> items,
+    List<CdcLpn> lpns,
+  ) {
+    final picked = items.fold<int>(0, (a, i) => a + i.pickedQty);
+    final sorted = items.fold<int>(0, (a, i) => a + i.sortedQty);
+    final body = <Widget>[];
+    final actions = <Widget>[];
+    final left = items.where((i) => i.remaining > 0).toList();
+    if (left.isNotEmpty) {
+      body.add(StepHeader(names: steps, current: _box == null ? 1 : 2));
+    }
+    body.add(
+      ProgressLine(
+        textKey: const ValueKey('cdc-sort-progress'),
+        text: l10n.cdcSortProgress(sorted, picked),
+        done: sorted,
+        total: picked,
+      ),
+    );
+    if (_notice case final n?) {
+      body.add(NoticeBox(text: n, textKey: const ValueKey('cdc-notice')));
+    }
+    if (left.isEmpty) {
+      body.add(
+        DoneMark(
+          key: const ValueKey('cdc-sort-done'),
+          title: l10n.cdcSortAllDone,
+          message: l10n.cdcSortBoxes(lpns.length),
+        ),
+      );
+      actions.add(
+        FilledButton(
+          key: const ValueKey('cdc-other-trf'),
+          onPressed: () => setState(() {
+            _trf = null;
+            _notice = null;
+          }),
+          child: Text(l10n.cdcOtherTrf),
+        ),
+      );
+      return _stepBody(body, actions);
+    }
+    if (_box == null) {
+      body.add(
+        ScanPrompt(
+          text: l10n.cdcSortScanBoxTitle,
+          detail: l10n.cdcSortBoxNth(lpns.length + 1),
+        ),
+      );
+      for (final i in left) {
+        body.add(
+          CdcItemCard(
+            key: ValueKey('cdc-sort-${i.sku}'),
+            name: i.productName ?? i.sku,
+            sku: i.sku,
+            lot: i.lot,
+            qty: i.remaining,
+            qtyLabel: l10n.cdcLeftUnit,
+          ),
+        );
+      }
+      actions.add(
+        ScanInput(
+          id: 'cdc-box-scan',
+          label: l10n.cdcScanBox,
+          cameraTitle: l10n.cdcScanBox,
+          continuous: false,
+          autofocus: false,
+          testValues: [
+            TestScan(l10n.cdcTsNewBox, 'BOX-2611260${lpns.length + 11}'),
+            for (final l in lpns) TestScan(l10n.cdcTsUsedBox, l.lpn),
+          ],
+          onScan: (code) => _scanBox(lpns, code),
+        ),
+      );
+    } else {
+      final inBox = _inBox.values.fold<int>(0, (a, n) => a + n);
+      body.add(
+        ScanPrompt(
+          text: l10n.cdcSortScanItemTitle,
+          detail: l10n.cdcSortBoxIs(_box!),
+        ),
+      );
+      body.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Wrap(
+            spacing: 8,
+            children: [
+              for (final z in cdcTemperatureZones)
+                ChoiceChip(
+                  key: ValueKey('cdc-zone-$z'),
+                  label: Text(_zoneText(l10n, z)),
+                  selected: _zone == z,
+                  onSelected: (s) => setState(() => _zone = s ? z : null),
+                ),
+            ],
+          ),
+        ),
+      );
+      for (final i in left) {
+        final n = _inBox[i.key] ?? 0;
+        body.add(
+          CdcItemCard(
+            key: ValueKey('cdc-sort-${i.sku}'),
+            name: i.productName ?? i.sku,
+            sku: i.sku,
+            lot: i.lot,
+            qty: i.remaining - n,
+            qtyLabel: l10n.cdcLeftUnit,
+            footer: n > 0 ? l10n.cdcSortInBox(n) : null,
+            emphasize: _last == i.key,
+          ),
+        );
+      }
+      if (_last case final k?) {
+        final i = left.where((i) => i.key == k).firstOrNull;
+        if (i != null) {
+          body.add(
+            CountQtyField(
+              id: 'cdc-sort-qty',
+              label: l10n.cdcSortQtyLabel,
+              help: l10n.cdcSortQtyHelp(i.productName ?? i.sku, i.remaining),
+              addLabel: l10n.pickQtyAdd,
+              value: _inBox[k] ?? 0,
+              max: i.remaining,
+              onAdd: () => setState(() => _inBox[k] = (_inBox[k] ?? 0) + 1),
+              onSet: (v) => setState(() {
+                if (v >= 0 && v <= i.remaining) _inBox[k] = v;
+              }),
+            ),
+          );
+        }
+      }
+      actions.addAll([
+        ScanInput(
+          id: 'cdc-sort-item-scan',
+          label: l10n.cdcScanItem,
+          cameraTitle: l10n.cdcCameraItem,
+          continuous: false,
+          testValues: [
+            for (final i in left) TestScan(i.productName ?? i.sku, i.sku),
+            TestScan(l10n.tsWrong, 'SKU-0000'),
+          ],
+          onScan: (code) => _scanItem(items, code),
+        ),
+        if (resendButton(context) case final b?)
+          b
+        else
+          FilledButton(
+            key: const ValueKey('cdc-sort-go'),
+            onPressed: inBox == 0 || busy ? null : () => _seal(items),
+            child: Text(l10n.cdcSortSeal(inBox)),
+          ),
+      ]);
+    }
+    if (_scanError case final e?) {
+      body.add(CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
+    }
+    if (failText case final f?) {
+      body.add(CdcErrorLine(f, key: const ValueKey('cdc-message')));
+    }
+    return _stepBody(body, actions);
   }
 }
 
@@ -595,191 +556,306 @@ class CdcInspectScreen extends ConsumerStatefulWidget {
 }
 
 class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
-    with _Command {
+    with CdcCommand {
   CdcTrf? _trf;
   AsyncValue<List<CdcLpn>> _lpns = const AsyncLoading();
+  CdcLpn? _box;
+  String? _scanError;
+  String? _notice;
 
-  /// LPN → 합격(true)·불합격(false)
-  final _pick = <String, bool>{};
-  final _reason = <String, String>{};
+  CdcFlowRepository get _repo => ref.read(cdcFlowRepositoryProvider);
 
   Future<void> _load() async {
     setState(() => _lpns = const AsyncLoading());
-    final v = await AsyncValue.guard(() => repo.lpns(cdcId, _trf!.trfId));
-    if (!mounted) return;
-    _pick.clear();
-    _reason.clear();
-    setState(() => _lpns = v);
+    final v = await AsyncValue.guard(
+      () => _repo.lpns(cdcCenterOf(ref), _trf!.trfId),
+    );
+    if (mounted) setState(() => _lpns = v);
   }
 
-  List<CdcInspection>? _items() {
-    if (_pick.isEmpty) return null;
-    final out = <CdcInspection>[];
-    for (final e in _pick.entries) {
-      if (!e.value && _reason[e.key] == null) return null;
-      out.add(
-        CdcInspection(
-          lpn: e.key,
-          passed: e.value,
-          failReason: e.value ? null : _reason[e.key],
-        ),
-      );
+  void _back() => setState(() {
+    if (_box != null) {
+      _box = null;
+      _scanError = null;
+    } else {
+      _trf = null;
+      _notice = null;
+      failText = null;
+      resend = null;
     }
-    return out;
+  });
+
+  ScanFeedback _scanBox(List<CdcLpn> lpns, String code) {
+    final l10n = AppLocalizations.of(context);
+    final hit = lpns
+        .where((l) => l.lpn == code.trim() && !l.loaded)
+        .firstOrNull;
+    if (hit == null) {
+      setState(() => _scanError = l10n.cdcNotThisTrfBox);
+      return ScanFeedback.error(l10n.cdcNotThisTrfBox);
+    }
+    setState(() {
+      _box = hit;
+      _scanError = null;
+      _notice = null;
+    });
+    return const ScanFeedback.ok();
+  }
+
+  Future<void> _judge(bool passed) async {
+    final l10n = AppLocalizations.of(context);
+    final box = _box!;
+    String? reason;
+    if (!passed) {
+      reason = await showCdcReasonDialog(
+        context,
+        title: l10n.cdcInspectReason,
+        keyPrefix: 'cdc-fail',
+        options: [
+          ('QTY_MISMATCH', Icons.exposure, l10n.cdcFailQty),
+          ('SEAL_BROKEN', Icons.lock_open, l10n.cdcFailSeal),
+          ('TEMPERATURE', Icons.thermostat, l10n.cdcFailTemp),
+          ('DAMAGE', Icons.broken_image_outlined, l10n.cdcFailDamage),
+          ('WRONG_TRF', Icons.swap_horiz, l10n.cdcFailWrongTrf),
+          ('OTHER', Icons.more_horiz, l10n.cdcShortOther),
+        ],
+      );
+      if (reason == null || !mounted) return;
+    }
+    final ok = await send(
+      (key) => _repo.reportInspection(
+        trfId: _trf!.trfId,
+        inspectorId: cdcWorkerOf(ref),
+        items: [
+          CdcInspection(lpn: box.lpn, passed: passed, failReason: reason),
+        ],
+        key: key,
+      ),
+      reload: _load,
+    );
+    if (ok && mounted) {
+      setState(() {
+        _box = null;
+        _notice = passed
+            ? l10n.cdcInspectSentPass(box.lpn)
+            : l10n.cdcInspectSentFail(box.lpn);
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final steps = [l10n.cdcStepTrf, l10n.cdcStepBox, l10n.cdcStepJudge];
     final trf = _trf;
-    final items = _items();
-    return _TrfScaffold(
+    return _Frame(
       title: l10n.cdcAreaInspect,
-      trf: trf,
-      onBack: () => setState(() {
-        _trf = null;
-        message = notice = null;
-        retry = null;
-      }),
-      body: trf == null
-          ? _TrfList(
+      subtitle: trf?.label,
+      canPop: trf == null,
+      onBack: _back,
+      child: trf == null
+          ? _TrfPick(
+              steps: steps,
               onPick: (t) {
                 setState(() => _trf = t);
                 _load();
               },
             )
-          : _Load(
-              value: _lpns,
-              onRetry: _load,
-              empty: l10n.cdcInspectEmpty,
-              isEmpty: (v) => v.where((l) => !l.loaded).isEmpty,
-              builder: (lpns) => ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(l10n.cdcInspectHint, style: _muted),
-                  ),
-                  for (final l in lpns.where((l) => !l.loaded))
-                    _Card(
-                      key: ValueKey('cdc-lpn-${l.lpn}'),
-                      selected: _pick.containsKey(l.lpn),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(child: Text(l.lpn, style: _title)),
-                              Text(
-                                switch (l.inspection) {
-                                  'PASSED' => l10n.cdcInspectPassed,
-                                  'FAILED' => l10n.cdcInspectFailed,
-                                  _ => l10n.cdcInspectNone,
-                                },
-                                key: ValueKey('cdc-insp-${l.lpn}'),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: l.passed
-                                      ? PdaColors.primary
-                                      : (l.inspection == 'FAILED'
-                                            ? Theme.of(context)
-                                                  .colorScheme
-                                                  .error
-                                            : PdaColors.muted),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(_contentsText(l), style: _muted),
-                          const SizedBox(height: 8),
-                          SegmentedButton<bool>(
-                            key: ValueKey('cdc-judge-${l.lpn}'),
-                            emptySelectionAllowed: true,
-                            segments: [
-                              ButtonSegment(
-                                value: true,
-                                label: Text(l10n.cdcInspectPass),
-                              ),
-                              ButtonSegment(
-                                value: false,
-                                label: Text(l10n.cdcInspectFail),
-                              ),
-                            ],
-                            selected: {?_pick[l.lpn]},
-                            onSelectionChanged: (s) => setState(() {
-                              if (s.isEmpty) {
-                                _pick.remove(l.lpn);
-                              } else {
-                                _pick[l.lpn] = s.single;
-                              }
-                            }),
-                          ),
-                          if (_pick[l.lpn] == false) ...[
-                            const SizedBox(height: 8),
-                            DropdownButtonFormField<String>(
-                              key: ValueKey('cdc-fail-${l.lpn}'),
-                              initialValue: _reason[l.lpn],
-                              decoration: InputDecoration(
-                                labelText: l10n.cdcInspectReason,
-                                border: const OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              items: [
-                                for (final r in cdcFailReasons)
-                                  DropdownMenuItem(
-                                    value: r,
-                                    child: Text(_failText(l10n, r)),
-                                  ),
-                              ],
-                              onChanged: (r) => setState(() {
-                                if (r != null) _reason[l.lpn] = r;
-                              }),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-      bottom: trf == null
-          ? null
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                feedback(context),
-                bottomButton(
-                  context,
-                  key: const ValueKey('cdc-inspect-go'),
-                  label: l10n.cdcInspectSubmit(_pick.length),
-                  onPressed: items == null
-                      ? null
-                      : () => command(
-                          (key) => repo.reportInspection(
-                            trfId: trf.trfId,
-                            inspectorId: workerId,
-                            items: items,
-                            key: key,
-                          ),
-                          after: _load,
-                          done: l10n.cdcInspectDone(items.length),
-                        ),
+          : switch (_lpns) {
+              AsyncData(:final value) => _work(l10n, steps, value),
+              AsyncError() => CdcCenterNotice(
+                icon: Icons.cloud_off,
+                text: l10n.cdcLoadFailed,
+                action: FilledButton(
+                  key: const ValueKey('cdc-reload'),
+                  onPressed: _load,
+                  child: Text(l10n.retry),
                 ),
-              ],
-            ),
+              ),
+              _ => const Center(child: CircularProgressIndicator()),
+            },
     );
+  }
+
+  Widget _work(AppLocalizations l10n, List<String> steps, List<CdcLpn> all) {
+    final lpns = all.where((l) => !l.loaded).toList();
+    if (lpns.isEmpty) {
+      return CdcCenterNotice(
+        key: const ValueKey('cdc-empty'),
+        icon: Icons.inventory_2_outlined,
+        text: l10n.cdcInspectEmpty,
+      );
+    }
+    final done = lpns.where((l) => l.inspection != null).length;
+    final body = <Widget>[];
+    final actions = <Widget>[];
+    body.add(StepHeader(names: steps, current: _box == null ? 1 : 2));
+    body.add(
+      ProgressLine(
+        textKey: const ValueKey('cdc-inspect-progress'),
+        text: l10n.cdcInspectProgress(done, lpns.length),
+        done: done,
+        total: lpns.length,
+      ),
+    );
+    if (_notice case final n?) {
+      body.add(NoticeBox(text: n, textKey: const ValueKey('cdc-notice')));
+    }
+    final box = _box;
+    if (box == null) {
+      body.add(
+        ScanPrompt(
+          text: done == lpns.length
+              ? l10n.cdcInspectAllDone
+              : l10n.cdcInspectScanTitle,
+          detail: l10n.cdcInspectScanHelp,
+        ),
+      );
+      for (final l in lpns) {
+        body.add(_BoxLine(lpn: l));
+      }
+      actions.add(
+        ScanInput(
+          id: 'cdc-insp-scan',
+          label: l10n.cdcScanBox,
+          cameraTitle: l10n.cdcScanBox,
+          continuous: false,
+          autofocus: false,
+          testValues: [
+            for (final l in lpns) TestScan(l.lpn, l.lpn),
+            TestScan(l10n.tsWrong, 'BOX-0000'),
+          ],
+          onScan: (code) => _scanBox(lpns, code),
+        ),
+      );
+    } else {
+      body.add(
+        ScanPrompt(
+          text: l10n.cdcInspectCheckTitle,
+          detail: l10n.cdcInspectCheckHelp(box.lpn),
+        ),
+      );
+      for (final c in box.contents) {
+        body.add(
+          CdcItemCard(
+            name: c.sku,
+            sku: c.sku,
+            lot: c.lot,
+            qty: c.qty,
+            qtyLabel: l10n.cdcQtyUnit,
+          ),
+        );
+      }
+      if (box.inspection != null) {
+        body.add(
+          NoticeBox(
+            text: l10n.cdcInspectAgain(
+              box.passed ? l10n.cdcInspectPassed : l10n.cdcInspectFailed,
+            ),
+            warning: true,
+          ),
+        );
+      }
+      if (resendButton(context) case final b?) {
+        actions.add(b);
+      } else {
+        actions.addAll([
+          FilledButton.icon(
+            key: const ValueKey('cdc-pass'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(60),
+            ),
+            onPressed: busy ? null : () => _judge(true),
+            icon: const Icon(Icons.check_circle_outline),
+            label: Text(l10n.cdcInspectPass),
+          ),
+          OutlinedButton.icon(
+            key: const ValueKey('cdc-fail'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              foregroundColor: PdaColors.danger,
+            ),
+            onPressed: busy ? null : () => _judge(false),
+            icon: const Icon(Icons.report_gmailerrorred),
+            label: Text(l10n.cdcInspectFail),
+          ),
+        ]);
+      }
+    }
+    if (_scanError case final e?) {
+      body.add(CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
+    }
+    if (failText case final f?) {
+      body.add(CdcErrorLine(f, key: const ValueKey('cdc-message')));
+    }
+    return _stepBody(body, actions);
   }
 }
 
-String _failText(AppLocalizations l10n, String r) => switch (r) {
-  'QTY_MISMATCH' => l10n.cdcFailQty,
-  'SEAL_BROKEN' => l10n.cdcFailSeal,
-  'TEMPERATURE' => l10n.cdcFailTemp,
-  'DAMAGE' => l10n.cdcFailDamage,
-  'WRONG_TRF' => l10n.cdcFailWrongTrf,
-  _ => l10n.cdcShortOther,
-};
+/// BOX 한 줄(번호·내용·검품 상태)
+class _BoxLine extends StatelessWidget {
+  const _BoxLine({required this.lpn, this.checked = false});
+
+  final CdcLpn lpn;
+  final bool checked;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final (text, color) = lpn.loaded
+        ? (l10n.cdcBoxLoaded, PdaColors.primary)
+        : switch (lpn.inspection) {
+            'PASSED' => (l10n.cdcInspectPassed, PdaColors.primary),
+            'FAILED' => (l10n.cdcInspectFailed, PdaColors.danger),
+            _ => (l10n.cdcInspectNone, PdaColors.muted),
+          };
+    return Container(
+      key: ValueKey('cdc-lpn-${lpn.lpn}'),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: checked ? PdaColors.primary : PdaColors.line,
+          width: checked ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          if (checked)
+            const Padding(
+              padding: EdgeInsets.only(right: 10),
+              child: Icon(Icons.check_circle, color: PdaColors.primary),
+            ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  lpn.lpn,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  _contents(lpn),
+                  style: const TextStyle(color: PdaColors.muted),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            text,
+            key: ValueKey('cdc-insp-${lpn.lpn}'),
+            style: TextStyle(color: color, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 // ---------------------------------------------------------------- 상차
 
@@ -790,173 +866,261 @@ class CdcLoadScreen extends ConsumerStatefulWidget {
   ConsumerState<CdcLoadScreen> createState() => _CdcLoadScreenState();
 }
 
-class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with _Command {
+class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
   CdcTrf? _trf;
   AsyncValue<List<CdcLpn>> _lpns = const AsyncLoading();
-  final _chosen = <String>{};
-  final _trip = TextEditingController();
-  final _vehicle = TextEditingController();
-  final _dock = TextEditingController();
+  String? _trip;
+  String? _vehicle;
+  final _scanned = <String>[];
+  String? _scanError;
+  String? _notice;
 
-  @override
-  void dispose() {
-    _trip.dispose();
-    _vehicle.dispose();
-    _dock.dispose();
-    super.dispose();
-  }
+  CdcFlowRepository get _repo => ref.read(cdcFlowRepositoryProvider);
 
   Future<void> _load() async {
     setState(() => _lpns = const AsyncLoading());
-    final v = await AsyncValue.guard(() => repo.lpns(cdcId, _trf!.trfId));
-    if (!mounted) return;
-    _chosen
-      ..clear()
-      ..addAll([
-        for (final l in v.value ?? const <CdcLpn>[])
-          if (l.passed && !l.loaded) l.lpn,
-      ]);
-    setState(() => _lpns = v);
+    final v = await AsyncValue.guard(
+      () => _repo.lpns(cdcCenterOf(ref), _trf!.trfId),
+    );
+    if (mounted) setState(() => _lpns = v);
   }
 
-  Widget _field(String key, TextEditingController c, String label) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: TextField(
-      key: ValueKey(key),
-      controller: c,
-      keyboardType: TextInputType.visiblePassword,
-      autocorrect: false,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        isDense: true,
+  void _back() => setState(() {
+    _scanError = null;
+    if (_scanned.isNotEmpty) {
+      _scanned.clear();
+    } else if (_vehicle != null) {
+      _vehicle = null;
+    } else if (_trip != null) {
+      _trip = null;
+    } else {
+      _trf = null;
+      _notice = null;
+      failText = null;
+      resend = null;
+    }
+  });
+
+  ScanFeedback _scanBox(List<CdcLpn> lpns, String code) {
+    final l10n = AppLocalizations.of(context);
+    final c = code.trim();
+    final hit = lpns.where((l) => l.lpn == c).firstOrNull;
+    final error = switch (hit) {
+      null => l10n.cdcNotThisTrfBox,
+      final l when l.loaded => l10n.cdcLoadAlready,
+      final l when !l.passed => l10n.cdcErrNotPassed,
+      _ when _scanned.contains(c) => l10n.cdcLoadScannedAlready,
+      _ => null,
+    };
+    if (error != null) {
+      setState(() => _scanError = error);
+      return ScanFeedback.error(error);
+    }
+    setState(() {
+      _scanned.add(c);
+      _scanError = null;
+      _notice = null;
+    });
+    return const ScanFeedback.ok();
+  }
+
+  Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
+    final lpns = [..._scanned];
+    final ok = await send(
+      (key) => _repo.reportLoading(
+        trfId: _trf!.trfId,
+        tripId: _trip!,
+        vehicleId: _vehicle!,
+        dockCode: null,
+        workerId: cdcWorkerOf(ref),
+        lpns: lpns,
+        key: key,
       ),
-      onChanged: (_) => setState(() {}),
-    ),
-  );
+      reload: _load,
+    );
+    if (ok && mounted) {
+      setState(() {
+        _scanned.clear();
+        _notice = l10n.cdcLoadDone(lpns.length);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final steps = [
+      l10n.cdcStepTrf,
+      l10n.cdcStepTrip,
+      l10n.cdcStepVehicle,
+      l10n.cdcStepBox,
+    ];
     final trf = _trf;
-    final ready =
-        _trip.text.trim().isNotEmpty &&
-        _vehicle.text.trim().isNotEmpty &&
-        _chosen.isNotEmpty;
-    return _TrfScaffold(
+    return _Frame(
       title: l10n.cdcAreaLoad,
-      trf: trf,
-      onBack: () => setState(() {
-        _trf = null;
-        message = notice = null;
-        retry = null;
-      }),
-      body: trf == null
-          ? _TrfList(
+      subtitle: trf?.label,
+      canPop: trf == null,
+      onBack: _back,
+      child: trf == null
+          ? _TrfPick(
+              steps: steps,
               onPick: (t) {
                 setState(() => _trf = t);
                 _load();
               },
             )
-          : _Load(
-              value: _lpns,
-              onRetry: _load,
-              empty: l10n.cdcLoadEmpty,
-              isEmpty: (v) => v.where((l) => l.passed).isEmpty,
-              builder: (lpns) => ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(l10n.cdcLoadHint, style: _muted),
-                  ),
-                  _field('cdc-trip', _trip, l10n.cdcLoadTrip),
-                  _field('cdc-vehicle', _vehicle, l10n.cdcLoadVehicle),
-                  _field('cdc-dock', _dock, l10n.cdcLoadDock),
-                  const SizedBox(height: 4),
-                  for (final l in lpns.where((l) => l.passed))
-                    _Card(
-                      key: ValueKey('cdc-lpn-${l.lpn}'),
-                      selected: _chosen.contains(l.lpn),
-                      onTap: l.loaded
-                          ? null
-                          : () => setState(() {
-                              if (!_chosen.remove(l.lpn)) _chosen.add(l.lpn);
-                            }),
-                      child: Row(
-                        children: [
-                          Icon(
-                            l.loaded
-                                ? Icons.local_shipping
-                                : _chosen.contains(l.lpn)
-                                ? Icons.check_box
-                                : Icons.check_box_outline_blank,
-                            color: l.loaded || _chosen.contains(l.lpn)
-                                ? PdaColors.primary
-                                : PdaColors.muted,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(l.lpn, style: _strong),
-                                Text(_contentsText(l), style: _muted),
-                                if (l.loaded)
-                                  Text(
-                                    l10n.cdcLoadLoaded(
-                                      l.vehicleId ?? '-',
-                                      l.tripId ?? '-',
-                                    ),
-                                    key: ValueKey('cdc-loaded-${l.lpn}'),
-                                    style: const TextStyle(
-                                      color: PdaColors.primary,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-      bottom: trf == null
-          ? null
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                feedback(context),
-                bottomButton(
-                  context,
-                  key: const ValueKey('cdc-load-go'),
-                  label: l10n.cdcLoadSubmit(_chosen.length),
-                  onPressed: !ready
-                      ? null
-                      : () {
-                          final lpns = _chosen.toList();
-                          final dock = _dock.text.trim();
-                          command(
-                            (key) => repo.reportLoading(
-                              trfId: trf.trfId,
-                              tripId: _trip.text.trim(),
-                              vehicleId: _vehicle.text.trim(),
-                              dockCode: dock.isEmpty ? null : dock,
-                              workerId: workerId,
-                              lpns: lpns,
-                              key: key,
-                            ),
-                            after: _load,
-                            done: l10n.cdcLoadDone(lpns.length),
-                          );
-                        },
+          : switch (_lpns) {
+              AsyncData(:final value) => _work(l10n, steps, value),
+              AsyncError() => CdcCenterNotice(
+                icon: Icons.cloud_off,
+                text: l10n.cdcLoadFailed,
+                action: FilledButton(
+                  key: const ValueKey('cdc-reload'),
+                  onPressed: _load,
+                  child: Text(l10n.retry),
                 ),
-              ],
-            ),
+              ),
+              _ => const Center(child: CircularProgressIndicator()),
+            },
     );
+  }
+
+  Widget _work(AppLocalizations l10n, List<String> steps, List<CdcLpn> all) {
+    final passed = all.where((l) => l.passed).toList();
+    if (passed.isEmpty) {
+      return CdcCenterNotice(
+        key: const ValueKey('cdc-empty'),
+        icon: Icons.inventory_2_outlined,
+        text: l10n.cdcLoadEmpty,
+      );
+    }
+    final loaded = passed.where((l) => l.loaded).length;
+    final body = <Widget>[];
+    final actions = <Widget>[];
+    final step = _trip == null
+        ? 1
+        : _vehicle == null
+        ? 2
+        : 3;
+    if (loaded < passed.length) {
+      body.add(StepHeader(names: steps, current: step));
+    }
+    body.add(
+      ProgressLine(
+        textKey: const ValueKey('cdc-load-progress'),
+        text: l10n.cdcLoadProgress(loaded, passed.length),
+        done: loaded,
+        total: passed.length,
+      ),
+    );
+    if (_notice case final n?) {
+      body.add(NoticeBox(text: n, textKey: const ValueKey('cdc-notice')));
+    }
+    if (loaded == passed.length) {
+      body.add(
+        DoneMark(
+          key: const ValueKey('cdc-load-done'),
+          title: l10n.cdcLoadAllDone,
+          message: l10n.cdcLoadNotDeparture,
+        ),
+      );
+      for (final l in passed) {
+        body.add(_BoxLine(lpn: l));
+      }
+      actions.add(
+        FilledButton(
+          key: const ValueKey('cdc-other-trf'),
+          onPressed: () => setState(() {
+            _trf = null;
+            _trip = null;
+            _vehicle = null;
+            _notice = null;
+          }),
+          child: Text(l10n.cdcOtherTrf),
+        ),
+      );
+      return _stepBody(body, actions);
+    }
+    if (_trip == null) {
+      body.add(
+        ScanPrompt(text: l10n.cdcLoadTripTitle, detail: l10n.cdcLoadTripHelp),
+      );
+      actions.add(
+        ScanInput(
+          id: 'cdc-trip-scan',
+          label: l10n.cdcLoadTrip,
+          cameraTitle: l10n.cdcLoadTrip,
+          continuous: false,
+          autofocus: false,
+          testValues: const [TestScan('TRIP-2611260007', 'TRIP-2611260007')],
+          onScan: (code) {
+            setState(() => _trip = code.trim());
+            return const ScanFeedback.ok();
+          },
+        ),
+      );
+    } else if (_vehicle == null) {
+      body.add(
+        ScanPrompt(
+          text: l10n.cdcLoadVehicleTitle,
+          detail: l10n.cdcLoadTripIs(_trip!),
+        ),
+      );
+      actions.add(
+        ScanInput(
+          id: 'cdc-vehicle-scan',
+          label: l10n.cdcLoadVehicle,
+          cameraTitle: l10n.cdcLoadVehicle,
+          continuous: false,
+          autofocus: false,
+          testValues: const [TestScan('경북12가3456', '경북12가3456')],
+          onScan: (code) {
+            setState(() => _vehicle = code.trim());
+            return const ScanFeedback.ok();
+          },
+        ),
+      );
+    } else {
+      body.add(
+        ScanPrompt(
+          text: l10n.cdcLoadScanTitle,
+          detail: l10n.cdcLoadVehicleIs(_vehicle!, _trip!),
+        ),
+      );
+      for (final l in passed) {
+        body.add(_BoxLine(lpn: l, checked: _scanned.contains(l.lpn)));
+      }
+      actions.addAll([
+        ScanInput(
+          id: 'cdc-load-scan',
+          label: l10n.cdcScanBox,
+          cameraTitle: l10n.cdcScanBox,
+          continuous: false,
+          testValues: [
+            for (final l in passed.where((l) => !l.loaded))
+              TestScan(l.lpn, l.lpn),
+            TestScan(l10n.tsWrong, 'BOX-0000'),
+          ],
+          onScan: (code) => _scanBox(all, code),
+        ),
+        if (resendButton(context) case final b?)
+          b
+        else
+          FilledButton(
+            key: const ValueKey('cdc-load-go'),
+            onPressed: _scanned.isEmpty || busy ? null : _submit,
+            child: Text(l10n.cdcLoadSubmit(_scanned.length)),
+          ),
+      ]);
+    }
+    if (_scanError case final e?) {
+      body.add(CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
+    }
+    if (failText case final f?) {
+      body.add(CdcErrorLine(f, key: const ValueKey('cdc-message')));
+    }
+    return _stepBody(body, actions);
   }
 }
 
@@ -970,235 +1134,275 @@ class CdcPutawayScreen extends ConsumerStatefulWidget {
 }
 
 class _CdcPutawayScreenState extends ConsumerState<CdcPutawayScreen>
-    with _Command {
-  final _id = TextEditingController();
-  AsyncValue<CdcPutaway>? _task;
-  final _qty = <String, TextEditingController>{};
-  final _loc = <String, TextEditingController>{};
-  final _reason = <String, String>{};
+    with CdcCommand {
+  CdcPutaway? _task;
+  bool _opening = false;
 
-  @override
-  void dispose() {
-    _id.dispose();
-    for (final c in [..._qty.values, ..._loc.values]) {
-      c.dispose();
+  /// 확인한 위치(지시와 다르면 이유와 함께)
+  String? _loc;
+  String? _reason;
+  int _qty = 0;
+  String? _scanError;
+
+  CdcFlowRepository get _repo => ref.read(cdcFlowRepositoryProvider);
+
+  CdcPutawayRow? get _row => _task?.rows.where((r) => r.u > 0).firstOrNull;
+
+  void _back() => setState(() {
+    _scanError = null;
+    if (_loc != null) {
+      _loc = null;
+      _reason = null;
+    } else {
+      _task = null;
+      failText = null;
+      resend = null;
     }
-    super.dispose();
-  }
+  });
 
-  Future<void> _open(String id) async {
+  ScanFeedback _scanTask(String code) {
+    final id = code.trim();
     setState(() {
-      _task = const AsyncLoading();
-      message = notice = null;
+      _opening = true;
+      _scanError = null;
     });
-    final v = await AsyncValue.guard(() => repo.putaway(id));
-    if (!mounted) return;
-    if (v case AsyncData(:final value)) {
-      for (final c in [..._qty.values, ..._loc.values]) {
-        c.dispose();
-      }
-      _qty
-        ..clear()
-        ..addAll({
-          for (final r in value.rows)
-            if (r.u > 0) r.key: TextEditingController(text: '${r.u}'),
-        });
-      _loc
-        ..clear()
-        ..addAll({
-          for (final r in value.rows)
-            if (r.u > 0) r.key: TextEditingController(text: r.location),
-        });
-      _reason.clear();
-    }
-    setState(() => _task = v);
+    _repo
+        .putaway(id)
+        .then(
+          (t) {
+            if (!mounted) return;
+            setState(() {
+              _opening = false;
+              _setTask(t);
+            });
+          },
+          onError: (Object e) {
+            if (!mounted) return;
+            final l10n = AppLocalizations.of(context);
+            setState(() {
+              _opening = false;
+              _scanError = e is ProblemFailure && e.problem.status == 404
+                  ? l10n.cdcErrNotFound
+                  : l10n.cdcLoadFailed;
+            });
+          },
+        );
+    return const ScanFeedback.ok();
   }
 
-  List<CdcPutawayLine>? _lines(CdcPutaway t) {
-    final out = <CdcPutawayLine>[];
-    for (final r in t.rows.where((r) => r.u > 0)) {
-      final n = int.tryParse(_qty[r.key]?.text.trim() ?? '');
-      final loc = _loc[r.key]?.text.trim() ?? '';
-      if (n == null || n < 0 || n > r.u || loc.isEmpty) return null;
-      final moved = loc != r.location;
-      if (moved && _reason[r.key] == null) return null;
-      if (n == 0) continue;
-      out.add(
-        CdcPutawayLine(
-          row: r,
-          toLocation: loc,
-          completedQty: n,
-          exceptionReason: moved ? _reason[r.key] : null,
-        ),
-      );
+  void _setTask(CdcPutaway t) {
+    _task = t;
+    _loc = null;
+    _reason = null;
+    _qty = _row?.u ?? 0;
+  }
+
+  Future<ScanFeedback> _scanLoc(CdcPutawayRow row, String code) async {
+    final l10n = AppLocalizations.of(context);
+    final c = code.trim();
+    if (c.toUpperCase() == row.location.toUpperCase()) {
+      setState(() {
+        _loc = row.location;
+        _reason = null;
+        _scanError = null;
+      });
+      return const ScanFeedback.ok();
     }
-    return out.isEmpty ? null : out;
+    // 지시와 다른 칸 — 이유가 있어야 여기에 둔다
+    final reason = await showCdcReasonDialog(
+      context,
+      title: l10n.cdcPutawayOtherLoc(c),
+      keyPrefix: 'cdc-pa-reason',
+      options: [
+        ('LOCATION_FULL', Icons.inventory, l10n.cdcPaFull),
+        ('LOCATION_BLOCKED', Icons.block, l10n.cdcShortBlocked),
+        ('DAMAGED', Icons.broken_image_outlined, l10n.cdcShortDamaged),
+        ('WRONG_LOT', Icons.swap_horiz, l10n.cdcPaWrongLot),
+        ('OTHER', Icons.more_horiz, l10n.cdcShortOther),
+      ],
+    );
+    if (reason == null || !mounted) {
+      return ScanFeedback.error(l10n.cdcPickWrongLocation);
+    }
+    setState(() {
+      _loc = c;
+      _reason = reason;
+      _scanError = null;
+    });
+    return const ScanFeedback.ok();
+  }
+
+  Future<void> _done(CdcPutaway t, CdcPutawayRow row) async {
+    await send(
+      (key) => _repo.executePutaway(
+        task: t,
+        workerId: cdcWorkerOf(ref),
+        lines: [
+          CdcPutawayLine(
+            row: row,
+            toLocation: _loc!,
+            completedQty: _qty,
+            exceptionReason: _reason,
+          ),
+        ],
+        key: key,
+      ),
+      reload: () async {
+        final next = await _repo.putaway(t.taskId);
+        if (mounted) setState(() => _setTask(next));
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final task = _task;
-    final t = task?.value;
-    final lines = t == null ? null : _lines(t);
-    return Scaffold(
-      appBar: AppBar(title: Text(l10n.cdcAreaPutaway)),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    key: const ValueKey('cdc-putaway-id'),
-                    controller: _id,
-                    keyboardType: TextInputType.visiblePassword,
-                    autocorrect: false,
-                    decoration: InputDecoration(
-                      labelText: l10n.cdcPutawayIdLabel,
-                      border: const OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: (v) =>
-                        v.trim().isEmpty ? null : _open(v.trim()),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  key: const ValueKey('cdc-putaway-open'),
-                  onPressed: _id.text.trim().isEmpty || busy
-                      ? null
-                      : () => _open(_id.text.trim()),
-                  child: Text(l10n.cdcPutawayOpen),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            switch (task) {
-              null => Text(l10n.cdcPutawayHint, style: _muted),
-              AsyncData(value: final t) => Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(t.taskId, style: _title),
-                  Text(
-                    l10n.cdcPutawayState(_putawayStateText(l10n, t.state)),
-                    key: const ValueKey('cdc-putaway-state'),
-                    style: _strong,
-                  ),
-                  const SizedBox(height: 8),
-                  for (final r in t.rows)
-                    _Card(
-                      key: ValueKey('cdc-pa-${r.sku}'),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            r.location,
-                            style: _title.copyWith(color: PdaColors.primary),
-                          ),
-                          Text('${r.sku} · LOT ${r.lot}', style: _muted),
-                          Text(
-                            l10n.cdcPutawayProgress(r.q, r.c, r.u),
-                            style: _strong,
-                          ),
-                          if (r.u > 0 && !t.finished) ...[
-                            const SizedBox(height: 8),
-                            TextField(
-                              key: ValueKey('cdc-pa-qty-${r.sku}'),
-                              controller: _qty[r.key],
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              decoration: InputDecoration(
-                                labelText: l10n.cdcPutawayQty,
-                                border: const OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              key: ValueKey('cdc-pa-loc-${r.sku}'),
-                              controller: _loc[r.key],
-                              keyboardType: TextInputType.visiblePassword,
-                              autocorrect: false,
-                              decoration: InputDecoration(
-                                labelText: l10n.cdcPutawayLoc,
-                                border: const OutlineInputBorder(),
-                                isDense: true,
-                              ),
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            if ((_loc[r.key]?.text.trim() ?? r.location) !=
-                                r.location) ...[
-                              const SizedBox(height: 8),
-                              DropdownButtonFormField<String>(
-                                key: ValueKey('cdc-pa-reason-${r.sku}'),
-                                initialValue: _reason[r.key],
-                                decoration: InputDecoration(
-                                  labelText: l10n.cdcPutawayReason,
-                                  border: const OutlineInputBorder(),
-                                  isDense: true,
-                                ),
-                                items: [
-                                  for (final e in cdcPutawayExceptions)
-                                    DropdownMenuItem(
-                                      value: e,
-                                      child: Text(_paReasonText(l10n, e)),
-                                    ),
-                                ],
-                                onChanged: (e) => setState(() {
-                                  if (e != null) _reason[r.key] = e;
-                                }),
-                              ),
-                            ],
-                          ],
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-              AsyncError(:final error) => Text(
-                error is ProblemFailure && error.problem.status == 404
-                    ? l10n.cdcErrNotFound
-                    : l10n.cdcLoadFailed,
-                key: const ValueKey('cdc-putaway-error'),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-              _ => const Center(child: CircularProgressIndicator()),
-            },
+    final steps = [l10n.cdcStepOrder, l10n.cdcStepLocation, l10n.cdcStepQty];
+    final t = _task;
+    final row = _row;
+    final body = <Widget>[];
+    final actions = <Widget>[];
+    if (t == null) {
+      body.addAll([
+        StepHeader(names: steps, current: 0),
+        ScanPrompt(text: l10n.cdcPutawayScanTitle, detail: l10n.cdcPutawayHint),
+        if (_opening) const Center(child: CircularProgressIndicator()),
+      ]);
+      actions.add(
+        ScanInput(
+          id: 'cdc-pa-scan',
+          label: l10n.cdcPutawayIdLabel,
+          cameraTitle: l10n.cdcPutawayIdLabel,
+          continuous: false,
+          testValues: [
+            const TestScan('PA-mock-1', 'PA-mock-1'),
+            const TestScan('PA-mock-2', 'PA-mock-2'),
+            TestScan(l10n.tsWrong, 'PA-0000'),
           ],
+          onScan: _scanTask,
         ),
-      ),
-      bottomNavigationBar: t == null || t.finished
-          ? null
-          : Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                feedback(context),
-                bottomButton(
-                  context,
-                  key: const ValueKey('cdc-putaway-go'),
-                  label: l10n.cdcPutawaySubmit,
-                  onPressed: lines == null
-                      ? null
-                      : () => command(
-                          (key) => repo.executePutaway(
-                            task: t,
-                            workerId: workerId,
-                            lines: lines,
-                            key: key,
-                          ),
-                          after: () => _open(t.taskId),
-                          done: l10n.cdcPutawayDone,
-                        ),
-                ),
-              ],
-            ),
+      );
+    } else {
+      final total = t.rows.fold<int>(0, (a, r) => a + r.q);
+      final done = t.rows.fold<int>(0, (a, r) => a + r.c + r.k);
+      if (row != null && !t.finished) {
+        body.add(StepHeader(names: steps, current: _loc == null ? 1 : 2));
+      }
+      body.add(
+        ProgressLine(
+          textKey: const ValueKey('cdc-pa-progress'),
+          text: l10n.cdcProgress(done, total),
+          done: done,
+          total: total,
+        ),
+      );
+      if (row == null || t.finished) {
+        body.add(
+          DoneMark(
+            key: const ValueKey('cdc-pa-done'),
+            title: l10n.cdcPutawayAllDone,
+            message: l10n.cdcPutawayState(_putawayStateText(l10n, t.state)),
+            messageKey: const ValueKey('cdc-putaway-state'),
+          ),
+        );
+        actions.add(
+          FilledButton(
+            key: const ValueKey('cdc-pa-next'),
+            onPressed: () => setState(() => _task = null),
+            child: Text(l10n.cdcPutawayNext),
+          ),
+        );
+      } else if (_loc == null) {
+        body.add(
+          LocationGuide(
+            code: row.location,
+            codeKey: const ValueKey('cdc-pa-location'),
+            title: l10n.cdcPutawayGoTitle,
+            detail: t.taskId,
+          ),
+        );
+        body.add(const SizedBox(height: 12));
+        body.add(
+          CdcItemCard(
+            name: row.sku,
+            sku: row.sku,
+            lot: row.lot,
+            qty: row.u,
+            qtyLabel: l10n.cdcLeftUnit,
+          ),
+        );
+        actions.add(
+          ScanInput(
+            id: 'cdc-pa-loc-scan',
+            label: l10n.locScanHint,
+            cameraTitle: l10n.cdcCameraLocation,
+            continuous: false,
+            autofocus: false,
+            testValues: [
+              TestScan(l10n.tsLocation, row.location),
+              TestScan(l10n.cdcTsOtherLoc, 'CDC01-R-6-09-01-1-1'),
+            ],
+            onScan: (code) {
+              _scanLoc(row, code);
+              return const ScanFeedback.ok();
+            },
+          ),
+        );
+      } else {
+        body.add(
+          ScanPrompt(
+            text: l10n.cdcPutawayPlaceTitle(_qty),
+            detail: _reason == null
+                ? l10n.pickLocConfirmed(_loc!)
+                : l10n.cdcPutawayOtherConfirmed(_loc!),
+          ),
+        );
+        body.add(
+          CdcItemCard(
+            name: row.sku,
+            sku: row.sku,
+            lot: row.lot,
+            qty: row.u,
+            qtyLabel: l10n.cdcLeftUnit,
+            emphasize: true,
+          ),
+        );
+        body.add(
+          CountQtyField(
+            id: 'cdc-pa-qty',
+            label: l10n.cdcPutawayQty,
+            help: l10n.cdcPutawayQtyHelp(row.u),
+            addLabel: l10n.pickQtyAdd,
+            value: _qty,
+            max: row.u,
+            onAdd: () => setState(() => _qty += 1),
+            onSet: (v) => setState(() {
+              if (v >= 0 && v <= row.u) _qty = v;
+            }),
+          ),
+        );
+        actions.add(
+          resendButton(context) ??
+              FilledButton(
+                key: const ValueKey('cdc-putaway-go'),
+                onPressed: _qty == 0 || busy ? null : () => _done(t, row),
+                child: Text(l10n.cdcPutawaySubmit),
+              ),
+        );
+      }
+    }
+    if (_scanError case final e?) {
+      body.add(CdcErrorLine(e, key: const ValueKey('cdc-putaway-error')));
+    }
+    if (failText case final f?) {
+      body.add(CdcErrorLine(f, key: const ValueKey('cdc-message')));
+    }
+    return _Frame(
+      title: l10n.cdcAreaPutaway,
+      subtitle: t?.taskId,
+      canPop: t == null,
+      onBack: _back,
+      child: _stepBody(body, actions),
     );
   }
 }
@@ -1209,12 +1413,4 @@ String _putawayStateText(AppLocalizations l10n, String s) => switch (s) {
   'CANCELLED' => l10n.cdcPaCancelled,
   'FAILED' || 'RETRY_READY' || 'EXCEPTION_HOLD' => l10n.cdcPaFailed,
   _ => l10n.cdcPaOpen,
-};
-
-String _paReasonText(AppLocalizations l10n, String e) => switch (e) {
-  'LOCATION_FULL' => l10n.cdcPaFull,
-  'LOCATION_BLOCKED' => l10n.cdcShortBlocked,
-  'DAMAGED' => l10n.cdcShortDamaged,
-  'WRONG_LOT' => l10n.cdcPaWrongLot,
-  _ => l10n.cdcShortOther,
 };

@@ -91,40 +91,64 @@ void main() {
     await t.pumpAndSettle();
   }
 
-  testWidgets('작업 받기 → 시작 → 전량 피킹 → 서버가 끝냈다고 하면 끝', (t) async {
+  Future<void> scan(WidgetTester t, String id, String code) async {
+    await t.enterText(find.byKey(ValueKey(id)), code);
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pumpAndSettle();
+  }
+
+  Future<void> setQty(WidgetTester t, String n) async {
+    await t.enterText(find.byKey(const ValueKey('cdc-pick-qty')), n);
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pumpAndSettle();
+  }
+
+  testWidgets('안내 → 작업 받기 → 위치 스캔 → 상품 스캔·수량 → 다 차면 보내고 서버가 끝내면 완료 → 다음 작업', (
+    t,
+  ) async {
     await pump(t);
-    expect(find.text('T261126001'), findsOneWidget);
-    expect(find.byKey(const ValueKey('cdc-start')), findsOneWidget);
-    await tap(t, 'cdc-start');
-    // 기본값은 남은 수량 전부
-    expect(find.byKey(const ValueKey('cdc-picked-SKU-1001')), findsOneWidget);
-    await tap(t, 'cdc-report');
+    expect(find.byKey(const ValueKey('cdc-guide')), findsOneWidget);
+    await tap(t, 'cdc-guide-ok');
+    // 받자마자 착수 — 첫 줄 위치
+    expect(find.textContaining('T261126001'), findsOneWidget);
+    expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
+    await scan(t, 'cdc-loc-scan', 'CDC01-Z-9-99-99-9-9');
+    expect(find.byKey(const ValueKey('cdc-scan-error')), findsOneWidget);
+    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-12-03-0-1');
+    expect(find.byKey(const ValueKey('step-1')), findsOneWidget);
+    await scan(t, 'cdc-item-scan', 'SKU-9999');
+    expect(find.text('이 상품이 아니에요. 화면의 상품을 스캔하세요'), findsOneWidget);
+    await scan(t, 'cdc-item-scan', 'SKU-1001');
+    expect(find.text('집음 1'), findsOneWidget);
+    await setQty(t, '24');
+    // 다음 줄은 다시 위치부터
+    expect(find.byKey(const ValueKey('step-0')), findsOneWidget);
+    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-12-04-0-2');
+    await scan(t, 'cdc-item-scan', 'SKU-1002');
+    await setQty(t, '12');
     expect(find.byKey(const ValueKey('cdc-done')), findsOneWidget);
-    expect(find.text('작업이 끝났어요.'), findsOneWidget);
-    expect(find.text('계획 24 · 집음 24 · 부족 0'), findsOneWidget);
-    // 다음 작업
-    await tap(t, 'cdc-pull');
-    expect(find.text('T261126002'), findsOneWidget);
+    expect(find.byKey(const ValueKey('done-title')), findsOneWidget);
+    await tap(t, 'result-action');
+    expect(find.textContaining('T261126002'), findsOneWidget);
   });
 
-  testWidgets('부족이 있으면 사유를 골라야 보낼 수 있고, 끝나면 부족 수를 보인다', (t) async {
+  testWidgets('부족 보고 — 큰 사유 칸을 고르면 그 줄은 끝, 완료 화면에 부족 수', (t) async {
     await pump(t);
-    await tap(t, 'cdc-start');
-    await t.enterText(find.byKey(const ValueKey('cdc-picked-SKU-1001')), '20');
-    await t.pumpAndSettle();
-    final report = find.byKey(const ValueKey('cdc-report'));
-    expect(t.widget<FilledButton>(report).onPressed, isNull);
-    await t.ensureVisible(find.byKey(const ValueKey('cdc-reason-SKU-1001')));
-    await t.tap(find.byKey(const ValueKey('cdc-reason-SKU-1001')));
-    await t.pumpAndSettle();
-    await t.tap(find.text('못 찾음').last);
-    await t.pumpAndSettle();
-    expect(t.widget<FilledButton>(report).onPressed, isNotNull);
-    await tap(t, 'cdc-report');
-    expect(find.textContaining('부족 4개'), findsOneWidget);
+    await tap(t, 'cdc-guide-ok');
+    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-12-03-0-1');
+    await scan(t, 'cdc-item-scan', 'SKU-1001');
+    await setQty(t, '20');
+    await tap(t, 'cdc-short');
+    expect(find.text('4개가 모자라요 — 사유를 고르세요'), findsOneWidget);
+    await tap(t, 'cdc-short-NOT_FOUND');
+    await scan(t, 'cdc-loc-scan', 'CDC01-C-5-12-04-0-2');
+    await tap(t, 'cdc-short');
+    await tap(t, 'cdc-short-DAMAGED');
+    expect(find.byKey(const ValueKey('cdc-done')), findsOneWidget);
+    expect(find.textContaining('부족 16개'), findsOneWidget);
   });
 
-  testWidgets('받을 작업이 없으면 안내하고, 다시 받기를 누를 수 있다', (t) async {
+  testWidgets('받을 작업이 없으면 안내하고 다시 받기', (t) async {
     await pump(
       t,
       before: (repo) async {
@@ -137,11 +161,12 @@ void main() {
         }
       },
     );
+    await tap(t, 'cdc-guide-ok');
     expect(find.byKey(const ValueKey('cdc-no-task')), findsOneWidget);
     expect(find.byKey(const ValueKey('cdc-pull')), findsOneWidget);
   });
 
-  testWidgets('들고 있던 작업이 있으면 들어올 때 그 작업을 이어서 보인다', (t) async {
+  testWidgets('들고 있던 작업이 있으면 그 작업을 이어서 — 위치 단계부터', (t) async {
     await pump(
       t,
       before: (repo) async {
@@ -157,8 +182,9 @@ void main() {
         );
       },
     );
-    expect(find.text('T261126001'), findsOneWidget);
-    expect(find.byKey(const ValueKey('cdc-report')), findsOneWidget);
+    await tap(t, 'cdc-guide-ok');
+    expect(find.textContaining('T261126001'), findsOneWidget);
+    expect(find.byKey(const ValueKey('cdc-pick-location')), findsOneWidget);
   });
 
   group('실서버 요청(cdc-outbound)', () {
