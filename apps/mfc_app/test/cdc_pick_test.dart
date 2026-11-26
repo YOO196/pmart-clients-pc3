@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pmart_api_cdc_outbound/pmart_api_cdc_outbound.dart' as co;
 import 'package:pmart_core/pmart_core.dart';
@@ -131,10 +132,17 @@ void main() {
     await setQty(t, '12');
     expect(find.byKey(const ValueKey('cdc-done')), findsOneWidget);
     expect(find.byKey(const ValueKey('done-title')), findsOneWidget);
-    // 10초가 지나도 저절로 다음 피킹을 받지 않는다(DC — 작업자가 눌러서)
-    await t.pump(const Duration(seconds: 12));
-    expect(find.byKey(const ValueKey('cdc-done')), findsOneWidget);
-    await tap(t, 'result-action');
+    // 피킹이 끝나면 10초 뒤 분배·패킹으로 — 다음 피킹을 저절로 받지 않는다
+    expect(find.text('10초 뒤 분배·패킹으로 가요'), findsOneWidget);
+    await t.pump(const Duration(seconds: 11));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cdc-done')), findsNothing);
+    expect(find.text('분배·패킹'), findsWidgets);
+    // 다음 피킹은 홈의 피킹에서
+    GoRouter.of(t.element(find.byType(Scaffold).first)).go('/');
+    await t.pumpAndSettle();
+    await tap(t, 'cdc-area-pick');
+    await tap(t, 'cdc-guide-ok');
     expect(find.textContaining('T261126002'), findsOneWidget);
     expect(
       find.text('라인용 — 상품 박스에 Wave 안 모든 MFC 몫을 담아요(라인에서 나눠요)'),
@@ -144,6 +152,10 @@ void main() {
     await scan(t, 'cdc-item-scan', 'SKU-2001');
     await setQty(t, '6');
     await tap(t, 'result-action');
+    GoRouter.of(t.element(find.byType(Scaffold).first)).go('/');
+    await t.pumpAndSettle();
+    await tap(t, 'cdc-area-pick');
+    await tap(t, 'cdc-guide-ok');
     // 지역 묶음 — 지역 카트 바코드부터
     expect(find.textContaining('T261126003'), findsOneWidget);
     expect(find.text('지역 카트 바코드를 스캔하세요'), findsOneWidget);

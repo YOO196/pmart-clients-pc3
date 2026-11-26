@@ -1803,5 +1803,11 @@
   "@unloadRecordedHelp": {"placeholders": {"n": {"type": "int"}, "damaged": {"type": "int"}}},
   "unloadGoReceive": "입고 수령 · {trf}",
   "@unloadGoReceive": {"placeholders": {"trf": {"type": "String"}}},
-  "handoverAlready": "하차에서 이미 정차 인계를 기록했어요. 수령을 이어 해요."
+  "handoverAlready": "하차에서 이미 정차 인계를 기록했어요. 수령을 이어 해요.",
+  "cdcGoDistribute": "분배·패킹으로",
+  "cdcPickAutoDistribute": "{seconds}초 뒤 분배·패킹으로 가요",
+  "@cdcPickAutoDistribute": {"placeholders": {"seconds": {"type": "int"}}},
+  "cdcLoadFinish": "끝 — 홈으로",
+  "unloadBand": "도착한 DC 차량 {n}대 — 하차하기",
+  "@unloadBand": {"placeholders": {"n": {"type": "int"}}}
 }
