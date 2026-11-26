@@ -13,6 +13,7 @@ import '../../../shared/scanner/scan_input.dart';
 import '../../../shared/scanner/scanner.dart';
 import '../data/cdc_task_repository.dart';
 import '../domain/cdc_task.dart';
+import 'cdc_home.dart';
 import 'cdc_widgets.dart';
 
 final cdcTaskRepositoryProvider = Provider<CdcTaskRepository>(
@@ -207,20 +208,33 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Text(
-              _task == null
-                  ? l10n.cdcAreaPick
-                  : '${l10n.cdcAreaPick} · ${_task!.label}',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: PdaColors.onBarMuted,
+            const CdcBarIcon(area: CdcWorkArea.pick),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _task == null
+                        ? l10n.cdcAreaPick
+                        : '${l10n.cdcAreaPick} · ${_task!.label}',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: PdaColors.onBarMuted,
+                    ),
+                  ),
+                  Text(stepTitle, key: const ValueKey('cdc-pick-step-title')),
+                ],
               ),
             ),
-            Text(stepTitle, key: const ValueKey('cdc-pick-step-title')),
           ],
         ),
+        bottom: busy
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(3),
+                child: LinearProgressIndicator(minHeight: 3),
+              )
+            : null,
         actions: [
           if (_task case final t?)
             IconButton(
@@ -446,19 +460,20 @@ class _CdcPickScreenState extends ConsumerState<CdcPickScreen> with CdcCommand {
       ]);
     }
     if (_scanError case final e?) {
-      body.add(CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
+      actions.insert(0, CdcErrorLine(e, key: const ValueKey('cdc-scan-error')));
     }
     if (failText case final f?) {
-      body.add(CdcErrorLine(f, key: const ValueKey('cdc-message')));
+      actions.insert(0, CdcErrorLine(f, key: const ValueKey('cdc-message')));
     }
     if (resendButton(context) case final b?) actions.add(b);
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(padding: const EdgeInsets.all(16), children: body),
-        ),
-        ActionBar(children: actions),
-      ],
+    return cdcStepBody(
+      step: line == null
+          ? 'send'
+          : _locOk
+          ? 'item-${line.key}'
+          : 'loc-${line.key}',
+      body: body,
+      actions: actions,
     );
   }
 }

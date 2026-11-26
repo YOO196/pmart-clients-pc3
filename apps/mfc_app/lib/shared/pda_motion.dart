@@ -48,6 +48,9 @@ abstract final class PdaShadows {
 abstract final class PdaHaptics {
   static void scanned() => HapticFeedback.selectionClick();
   static void done() => HapticFeedback.mediumImpact();
+
+  /// 스캔을 받아들이지 않았을 때 — 세게(소음 속에서도 손에 느껴지게).
+  static void error() => HapticFeedback.heavyImpact();
 }
 
 /// 누르는 동안 살짝 작아진다(0.97) — 장갑을 끼고 눌러도 눌렸는지 보인다.
@@ -91,10 +94,14 @@ class EnterFade extends StatefulWidget {
     required this.child,
     this.index = 0,
     this.offset = 10,
+    this.delay = Duration.zero,
   });
 
   final Widget child;
   final int index;
+
+  /// 차례([index]) 앞에 더 기다릴 시간 — 다른 움직임(예: 칸이 커지는 Hero)이 끝난 뒤에 나타나게.
+  final Duration delay;
 
   /// 올라오는 거리(dp).
   final double offset;
@@ -113,7 +120,8 @@ class _EnterFadeState extends State<EnterFade>
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_c != null) return;
-    final delay = _step * widget.index.clamp(0, 6);
+    final delay =
+        widget.delay.inMilliseconds + _step * widget.index.clamp(0, 6);
     final run = PdaMotion.base.inMilliseconds;
     final total = delay + run;
     _c = AnimationController(
