@@ -216,7 +216,7 @@ class _MockSignInPageState extends ConsumerState<MockSignInPage> {
       await ref
           .read(authControllerProvider.notifier)
           .loginWithPassword(
-            loginId: _loginId.text.trim(),
+            loginId: _loginId.text.trim().toLowerCase(),
             password: _password.text,
           );
       // 키보드를 먼저 내리고 닫는다 — 열린 채 닫으면 다음 화면(메인)의 아래 줄이 키보드 높이만큼 떴다가 내려앉았다.
@@ -270,6 +270,9 @@ class _MockSignInPageState extends ConsumerState<MockSignInPage> {
               autofocus: true,
               autocorrect: false,
               enableSuggestions: false,
+              // 갤럭시 키보드가 첫 글자를 대문자로 바꾸지 않게 — 영문·숫자 키보드(사용자 2026-11-26 "시험 계정 안 돌아가는데")
+              keyboardType: TextInputType.visiblePassword,
+              textCapitalization: TextCapitalization.none,
               textInputAction: TextInputAction.next,
               autofillHints: const [AutofillHints.username],
               maxLength: 64,

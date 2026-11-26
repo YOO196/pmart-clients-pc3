@@ -138,7 +138,8 @@ void main() {
     }
     await t.tap(find.byKey(const ValueKey('employee-login')));
     await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('login-id')), 'cdcw-fc-01');
+    // 폰 키보드가 첫 글자를 대문자로 바꿔도 들어간다
+    await t.enterText(find.byKey(const ValueKey('login-id')), 'Cdcw-fc-01 ');
     await t.enterText(find.byKey(const ValueKey('login-password')), 'x');
     await t.pump();
     await t.tap(find.byKey(const ValueKey('mock-signin-submit')));
