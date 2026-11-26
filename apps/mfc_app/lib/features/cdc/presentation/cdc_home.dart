@@ -177,77 +177,222 @@ class _CdcAreaTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return Pressable(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: PdaShadows.sm,
-        ),
-        child: Material(
-          color: Colors.white,
-          shape: RoundedRectangleBorder(
+      // 고르면 칸이 커지며 안내 화면 위 카드([CdcAreaHero])가 된다 — MFC 업무 칸과 같은 효과
+      child: Hero(
+        tag: cdcHeroTag(area),
+        flightShuttleBuilder: cdcAreaShuttle(area),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: PdaColors.line),
+            boxShadow: PdaShadows.sm,
           ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            key: ValueKey('cdc-area-${area.name}'),
-            onTap: onTap,
-            child: SizedBox(
-              height: height,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: const BoxDecoration(
-                        color: PdaColors.softer,
-                        shape: BoxShape.circle,
+          child: Material(
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: PdaColors.line),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              key: ValueKey('cdc-area-${area.name}'),
+              onTap: onTap,
+              child: SizedBox(
+                height: height,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(
+                          color: PdaColors.softer,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          cdcAreaIcon(area),
+                          size: 24,
+                          color: PdaColors.primary,
+                        ),
                       ),
-                      child: Icon(
-                        cdcAreaIcon(area),
-                        size: 24,
-                        color: PdaColors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            cdcAreaText(l10n, area),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: PdaColors.ink,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          if (height >= 68)
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              cdcAreaDesc(l10n, area),
+                              cdcAreaText(l10n, area),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                color: PdaColors.muted,
-                                fontSize: 13,
+                                color: PdaColors.ink,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
-                        ],
+                            if (height >= 68)
+                              Text(
+                                cdcAreaDesc(l10n, area),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: PdaColors.muted,
+                                  fontSize: 13,
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const Icon(Icons.chevron_right, color: PdaColors.muted),
-                  ],
+                      const Icon(Icons.chevron_right, color: PdaColors.muted),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+String cdcHeroTag(CdcWorkArea a) => 'cdc-area-card-${a.name}';
+
+/// 칸 → 안내 카드로 커지는 동안의 모습(MFC `_AreaFlight` 와 같은 움직임): 그림은 칸 왼쪽(44)에서 카드 오른쪽(84)으로
+/// 크기와 함께 이어서 움직이고, 칸 이름은 흐려지며 카드 제목·설명이 나타난다. 돌아갈 때는 거꾸로.
+HeroFlightShuttleBuilder cdcAreaShuttle(CdcWorkArea area) =>
+    (_, animation, _, _, _) => _CdcAreaFlight(area: area, animation: animation);
+
+class _CdcAreaFlight extends StatelessWidget {
+  const _CdcAreaFlight({required this.area, required this.animation});
+
+  final CdcWorkArea area;
+  final Animation<double> animation;
+
+  static const _tilePad = 16.0;
+  static const _tileGap = 14.0;
+  static const _tileCircle = 44.0;
+  static const _tileIcon = 24.0;
+  static const _cardCircle = 84.0;
+  static const _cardIcon = 46.0;
+  static const _cardPad = 15.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        final t = Curves.easeInOutCubic.transform(animation.value);
+        double lerp(double a, double b) => a + (b - a) * t;
+        final tileText = (1 - t * 2).clamp(0.0, 1.0);
+        final cardText = (t * 2 - 1).clamp(0.0, 1.0);
+        return Material(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(lerp(14, 17)),
+            side: BorderSide(
+              color: Color.lerp(PdaColors.line, PdaColors.lilac, t)!,
+              width: lerp(1, 1.5),
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final w = c.maxWidth;
+              final h = c.maxHeight;
+              final d = lerp(_tileCircle, _cardCircle);
+              final cx = lerp(
+                _tilePad + _tileCircle / 2,
+                w - _cardPad - _cardCircle / 2,
+              );
+              final cy = h / 2;
+              return Stack(
+                children: [
+                  if (tileText > 0)
+                    Positioned(
+                      left: _tilePad + _tileCircle + _tileGap,
+                      right: _tilePad + 24,
+                      top: 0,
+                      bottom: 0,
+                      child: Opacity(
+                        opacity: tileText,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            cdcAreaText(l10n, area),
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.clip,
+                            style: const TextStyle(
+                              color: PdaColors.ink,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (cardText > 0)
+                    Positioned(
+                      left: _cardPad,
+                      right: d + _cardPad * 2,
+                      top: 0,
+                      bottom: 0,
+                      child: Opacity(
+                        opacity: cardText,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              cdcAreaText(l10n, area),
+                              maxLines: 1,
+                              softWrap: false,
+                              overflow: TextOverflow.clip,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              cdcAreaDesc(l10n, area),
+                              maxLines: 2,
+                              overflow: TextOverflow.clip,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: PdaColors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  Positioned(
+                    left: cx - d / 2,
+                    top: cy - d / 2,
+                    width: d,
+                    height: d,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: PdaColors.softer,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        cdcAreaIcon(area),
+                        size: lerp(_tileIcon, _cardIcon),
+                        color: PdaColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }
