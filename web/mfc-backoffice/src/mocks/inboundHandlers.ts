@@ -85,7 +85,7 @@ function mockPromises(mfcId: string) {
       arrivedAt: at(-1435),
       lines: [{ sku: 'SKU-ICE', productName: '바닐라 아이스크림', lotId: 'L2611240031', expiryDate: '2027-05-01', temperatureZone: 'FROZEN', expectedQty: 8, receivedQty: 8, quarantinedQty: 0, pendingQty: 0, barcodes: [] }],
       packages: [{ lpn: 'LPN-SIM-DC0-1', sku: 'SKU-ICE', lotId: 'L2611240031', qty: 8 }],
-      receipts: [{ receiptId: 'RCPT-0', trfId: 'TRF-SIM-DC-0', mfcId, receivedAt: at(-1420), postedAt: at(-1419), inventoryApplyStatus: 'APPLIED' as const, inventoryCommitId: 'CMT-0', discrepancies: [] }],
+      receipts: [{ receiptId: 'RCPT-0', trfId: 'TRF-SIM-DC-0', mfcId, receivedAt: at(-60), postedAt: at(-59), inventoryApplyStatus: 'APPLIED' as const, inventoryCommitId: 'CMT-0', discrepancies: [] }],
     },
   ];
 }
@@ -96,7 +96,9 @@ export const inboundHandlers = [
     const q = new URL(request.url).searchParams;
     const mfcId = q.get('mfcId') ?? '';
     if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
-    const items = mockPromises(mfcId).filter((p) => !q.get('state') || p.state === q.get('state'));
+    // 서버처럼 state 를 비우면 끝나지 않은 것(EXPECTED·RECEIVING)만(mfc-inbound 0.16.0)
+    const st = q.get('state');
+    const items = mockPromises(mfcId).filter((p) => (st ? p.state === st : p.state === 'EXPECTED' || p.state === 'RECEIVING'));
     return HttpResponse.json({ items, page: { nextCursor: null } });
   }),
 

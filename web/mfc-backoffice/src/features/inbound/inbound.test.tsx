@@ -34,8 +34,11 @@ describe('입고 작업 목록', () => {
 
   it('DC 이관 입고: TRF 목록(출발 센터·상태·수령/예정·박스), 상태 거르기는 서버 state', async () => {
     const view = renderAt('/c/MFC-BJG-01/inbound?tab=promises');
+    // "전체" = 끝나지 않은 것 + 재고 반영(TIN_POSTED)까지 — 서버는 state 를 비우면 끝나지 않은 것만 주므로 따로 읽는다
     await waitFor(() => expect(screen.getAllByTestId('dc-inbound-row')).toHaveLength(3));
+    expect(view.gets('/inbound-promises').some((r) => new URL(r.url).searchParams.get('state') === 'TIN_POSTED')).toBe(true);
     const row = (id: string) => screen.getAllByTestId('dc-inbound-row').find((r) => r.textContent?.includes(id))!;
+    expect(row('TRF-SIM-DC-0')).toHaveTextContent('재고 반영');
     expect(row('TRF-SIM-DC-2')).toHaveTextContent('오는 중');
     expect(row('TRF-SIM-DC-2')).toHaveTextContent('0 / 36');
     expect(row('TRF-SIM-DC-1')).toHaveTextContent('받는 중');

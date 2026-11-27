@@ -31,6 +31,7 @@ export function flowStepOf(x: Pick<InboundPromise, 'state' | 'departureId'>): Fl
 
 const qtyOf = (x: InboundPromise, k: 'expectedQty' | 'receivedQty') => (x.lines ?? []).reduce((a, l) => a + (l[k] ?? 0), 0);
 const todaySeoul = () => new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
+const seoulDay = (iso: string) => new Date(Date.parse(iso) + 9 * 3_600_000).toISOString().slice(0, 10);
 
 export function DcInboundFlow({ mfcId, onPick }: { readonly mfcId: string; readonly onPick: (state: string) => void }) {
   const api = useApi();
@@ -43,8 +44,11 @@ export function DcInboundFlow({ mfcId, onPick }: { readonly mfcId: string; reado
   const done = useQuery({
     queryKey: ['inbound-promises-flow', mfcId, 'TIN_POSTED', day],
     refetchInterval: FLOW_REFRESH,
+    // date 는 "예정 도착일"이라 쓰지 않는다 — 재고 반영 시각(수령 postedAt)이 오늘(서울)인 것만(사용자 2026-11-27 "적치까지 완료했는데 안 떠")
     queryFn: async () =>
-      (await request('GET', api.inbound.GET('/inbound-promises', { params: { query: { mfcId, state: 'TIN_POSTED', date: day, size: 200 } } }))).items ?? [],
+      ((await request('GET', api.inbound.GET('/inbound-promises', { params: { query: { mfcId, state: 'TIN_POSTED', size: 200 } } }))).items ?? []).filter((x) =>
+        (x.receipts ?? []).some((r) => r.postedAt != null && seoulDay(r.postedAt) === day),
+      ),
   });
   const count = (s: FlowStep) => {
     const src = s === 'DONE' ? done.data : open.data;
