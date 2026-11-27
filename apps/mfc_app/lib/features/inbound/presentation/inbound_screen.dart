@@ -588,27 +588,33 @@ class _ReviewStep extends ConsumerWidget {
     final p = s.promise!;
     return StepBody(
       actions: [
-        Row(
-          children: [
-            OutlinedButton(
-              key: const ValueKey('inbound-back'),
-              style: OutlinedButton.styleFrom(minimumSize: const Size(88, 50)),
-              onPressed: s.busy || s.unknown ? null : ctl.back,
-              child: Text(l10n.prev),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: CommandButton(
-                key: const ValueKey('inbound-submit'),
-                busy: s.busy,
-                label: s.unknown ? l10n.checkAgain : l10n.inboundSubmit,
-                // 입고칸(수령 위치)을 다 고르기 전에는 못 보낸다 — 서버 필수(시뮬레이터 C-6)
-                onPressed: s.hasReceivingLocations || s.unknown
-                    ? ctl.submit
-                    : null,
+        // 수령 등록은 한 줄 전체·크게(사용자 2026-11-27 "입고 수령 버튼도 너무 작아"), [이전]은 아래 작게
+        FilledButtonTheme(
+          data: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(60),
+              textStyle: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
               ),
             ),
-          ],
+          ),
+          child: CommandButton(
+            key: const ValueKey('inbound-submit'),
+            busy: s.busy,
+            label: s.unknown ? l10n.checkAgain : l10n.inboundSubmit,
+            // 입고칸(수령 위치)을 다 고르기 전에는 못 보낸다 — 서버 필수(시뮬레이터 C-6)
+            onPressed: s.hasReceivingLocations || s.unknown ? ctl.submit : null,
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton(
+            key: const ValueKey('inbound-back'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(88, 46)),
+            onPressed: s.busy || s.unknown ? null : ctl.back,
+            child: Text(l10n.prev),
+          ),
         ),
       ],
       child: Column(
