@@ -1901,5 +1901,13 @@
   "noNumber": "번호 없음",
   "myWorkTrfNo": "TRF {no}",
   "@myWorkTrfNo": {"placeholders": {"no": {"type": "String"}}},
-  "myWorkTrfLoading": "TRF …"
+  "myWorkTrfLoading": "TRF …",
+  "myWorkProductsTitle": "{type} 상품",
+  "@myWorkProductsTitle": {"placeholders": {"type": {"type": "String"}}},
+  "myWorkProductQty": "{n}개",
+  "@myWorkProductQty": {"placeholders": {"n": {"type": "int"}}},
+  "myWorkProductReceive": "예정 {e} · 격리 {q} · 미판정 {p}",
+  "@myWorkProductReceive": {"placeholders": {"e": {"type": "int"}, "q": {"type": "int"}, "p": {"type": "int"}}},
+  "myWorkProductsFailed": "상품 목록을 불러오지 못했어요",
+  "myWorkProductsNone": "이 기록에는 상품 정보가 없어요"
 }

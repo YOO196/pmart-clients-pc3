@@ -112,6 +112,40 @@ void main() {
     expect(find.text('TRF T100001'), findsOneWidget);
     expect(find.textContaining('RCV-TRF-'), findsNothing);
     expect(find.textContaining('TRF-MOCK-001'), findsNothing);
+
+    // 누르면 그 입고의 상품 목록(입고 예정 줄 — 서버 값)
+    await t.tap(
+      find.byKey(
+        const ValueKey(
+          'my-work-tap-RCV-TRF-0698a8c3-0268-4750-a216-4f3aae3362e7',
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('my-work-products')), findsOneWidget);
+    expect(find.text('입고 상품'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('my-work-products')),
+        matching: find.text('서울우유 1L'),
+      ),
+      findsWidgets,
+    );
+    expect(find.textContaining('예정 '), findsWidgets);
+  });
+
+  testWidgets('입고 아닌 기록도 누르면 그 작업의 상품·수량', (t) async {
+    await pump(t);
+    await t.tap(find.byKey(const ValueKey('my-work-chip')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('my-work-tap-INB-M-1')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('my-work-products')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('my-work-product-E-00000003')),
+      findsOneWidget,
+    );
+    expect(find.text('12개'), findsWidgets);
   });
 
   testWidgets('못 읽은 원장이 있으면 빈 내역으로 두지 않고 "일부 내역을 못 불러왔어요"', (t) async {
