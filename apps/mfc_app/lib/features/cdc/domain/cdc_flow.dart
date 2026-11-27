@@ -165,6 +165,17 @@ final class CdcTrip {
   final List<CdcTripStop> stops;
 
   List<String> get trfIds => [for (final s in stops) ...s.trfIds];
+
+  /// 이 운행에 실을 TRF 화면 번호(사용자 2026-11-27 "무슨 TRF 상차인지 모르겠다")
+  List<String> get trfNumbers => [for (final s in stops) ...s.knownNumbers];
+
+  String? trfNumberOf(String trfId) {
+    for (final s in stops) {
+      if (s.numberOf(trfId) case final n?) return n;
+    }
+    return null;
+  }
+
   String get vehicleLabel => plateNo ?? vehicleId ?? tripId;
   bool get checkedIn => state == 'CHECKED_IN';
   bool get loadedDone =>
@@ -194,9 +205,25 @@ final class CdcTripStop {
     required this.seq,
     required this.mfcId,
     required this.trfIds,
+    this.trfNumbers = const [],
   });
 
   final int seq;
   final String mfcId;
   final List<String> trfIds;
+
+  /// trfIds 순 TRF 화면 번호(T+6, transport-execution 0.6.0) — 모르면 빈 문자열
+  final List<String> trfNumbers;
+
+  /// 이 정차 TRF 의 화면 번호(아는 것만)
+  List<String> get knownNumbers => [
+    for (final n in trfNumbers)
+      if (n.isNotEmpty) n,
+  ];
+
+  String? numberOf(String trfId) {
+    final i = trfIds.indexOf(trfId);
+    if (i < 0 || i >= trfNumbers.length || trfNumbers[i].isEmpty) return null;
+    return trfNumbers[i];
+  }
 }

@@ -190,6 +190,9 @@ void main() {
     );
     await scan(t, 'cdc-dock-scan', 'CDC01-A-6-90-01-0-1');
     expect(find.byKey(const ValueKey('cdc-trip-card')), findsOneWidget);
+    // 긴 운행 id 대신 실을 TRF 번호, 정차마다 TRF 번호
+    expect(find.text('TRF T482913 · T482914'), findsOneWidget);
+    expect(find.textContaining('1. MFC-BJG-01 · T482913'), findsOneWidget);
     await scan(t, 'cdc-vehicle-scan', '대구99사9999');
     expect(find.text('이 운행의 차량이 아니에요.'), findsOneWidget);
     await scan(t, 'cdc-vehicle-scan', '경북12가3456');

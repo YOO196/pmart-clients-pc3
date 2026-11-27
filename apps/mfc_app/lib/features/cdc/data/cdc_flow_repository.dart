@@ -396,6 +396,7 @@ final class ApiCdcFlowRepository implements CdcFlowRepository {
             seq: s.seq ?? 0,
             mfcId: s.mfcId!,
             trfIds: s.trfIds ?? const [],
+            trfNumbers: s.trfNumbers ?? const [],
           ),
     ],
   );
@@ -501,8 +502,18 @@ final class MockCdcFlowRepository implements CdcFlowRepository {
       driverName: '김기사',
       dockCode: dock,
       stops: [
-        CdcTripStop(seq: 1, mfcId: 'MFC-BJG-01', trfIds: ['TRF-mock-1']),
-        CdcTripStop(seq: 2, mfcId: 'MFC-MOKPO-01', trfIds: ['TRF-mock-2']),
+        CdcTripStop(
+          seq: 1,
+          mfcId: 'MFC-BJG-01',
+          trfIds: ['TRF-mock-1'],
+          trfNumbers: ['T482913'],
+        ),
+        CdcTripStop(
+          seq: 2,
+          mfcId: 'MFC-MOKPO-01',
+          trfIds: ['TRF-mock-2'],
+          trfNumbers: ['T482914'],
+        ),
       ],
     );
   }

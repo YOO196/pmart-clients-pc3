@@ -1031,10 +1031,13 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
 
 /// BOX 한 줄(번호·내용·검품 상태)
 class _BoxLine extends StatelessWidget {
-  const _BoxLine({required this.lpn, this.checked = false});
+  const _BoxLine({required this.lpn, this.checked = false, this.trfNumber});
 
   final CdcLpn lpn;
   final bool checked;
+
+  /// 이 박스의 TRF 화면 번호(상차 — 어느 TRF 박스인지)
+  final String? trfNumber;
 
   @override
   Widget build(BuildContext context) {
@@ -1081,7 +1084,7 @@ class _BoxLine extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  _contents(lpn),
+                  [?trfNumber, _contents(lpn)].join(' · '),
                   style: const TextStyle(color: PdaColors.muted),
                 ),
               ],
@@ -1370,7 +1373,12 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
       area: CdcWorkArea.load,
       busy: busy || reloading || _looking,
       title: l10n.cdcAreaLoad,
-      subtitle: trip == null ? null : l10n.cdcLoadTripIs(trip.tripId),
+      // 긴 tripId 대신 실을 TRF 번호(T…)
+      subtitle: trip == null
+          ? null
+          : trip.trfNumbers.isEmpty
+          ? l10n.cdcLoadTripNoNumber
+          : l10n.cdcLoadTripIs(trip.trfNumbers.join(' · ')),
       canPop: trip == null,
       onBack: _back,
       child: trip == null
@@ -1442,7 +1450,10 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
           MetaPair(label: l10n.cdcLoadDock, value: d),
         MetaPair(
           label: l10n.cdcLoadStops,
-          value: [for (final s in t.stops) '${s.seq}. ${s.mfcId}'].join('  '),
+          value: [
+            for (final s in t.stops)
+              ['${s.seq}. ${s.mfcId}', ...s.knownNumbers].join(' · '),
+          ].join('\n'),
         ),
       ],
     ),
@@ -1539,7 +1550,15 @@ class _CdcLoadScreenState extends ConsumerState<CdcLoadScreen> with CdcCommand {
             trigger: _scanned.isNotEmpty && _scanned.keys.last == l.lpn
                 ? _scanned.length
                 : null,
-            child: _BoxLine(lpn: l, checked: _scanned.containsKey(l.lpn)),
+            child: _BoxLine(
+              lpn: l,
+              checked: _scanned.containsKey(l.lpn),
+              trfNumber: [
+                for (final e in all.entries)
+                  if (e.value.any((x) => x.lpn == l.lpn))
+                    trip.trfNumberOf(e.key),
+              ].nonNulls.firstOrNull,
+            ),
           ),
         );
       }
