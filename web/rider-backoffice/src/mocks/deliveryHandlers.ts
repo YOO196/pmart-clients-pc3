@@ -96,7 +96,7 @@ export const summary = (d: Execution): ExecC['schemas']['StaffDeliverySummary'] 
   version: d.version ?? 0,
 });
 
-const dispatchOf = (d: Execution): Dispatch => ({
+export const dispatchOf = (d: Execution): Dispatch => ({
   deliveryId: d.deliveryId ?? '',
   orderId: d.orderId ?? '',
   mfcId: d.mfcId ?? '',

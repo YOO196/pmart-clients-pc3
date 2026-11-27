@@ -374,7 +374,11 @@ function CancellationForm({ dispatch }: { readonly dispatch: DispatchView }) {
   // 운영 판단(OPERATOR)은 approvalRef 필수(dispatch 0.3.2, BOD-1) — 통합 백오피스 배차 취소와 같게 승인 번호 칸을 보이고, 없으면 못 누른다.
   const [reason, setReason] = useState<CancelReason | ''>('');
   const [approvalRef, setApprovalRef] = useState('');
-  const [reassign, setReassign] = useState(true);
+  const [reassignWanted, setReassign] = useState(true);
+  // 배차 중(아직 라이더 없음)은 서버가 "다시 배차 없이 취소"만 받는다 — reassign=true 면 409 INVALID_STATE
+  // (dispatch CancellationService "이미 배차 중입니다", 2026-11-27 사용자 캡처). 그때는 다시 배차하기를 끄고 잠근다.
+  const dispatching = dispatch.state !== 'ASSIGNED';
+  const reassign = dispatching ? false : reassignWanted;
   const needsApproval = reason === 'OPERATOR';
   const ready = reason !== '' && (!needsApproval || approvalRef.trim() !== '');
   const cancel = useCommand(async (body: { requestedBy: 'OPERATOR'; reason: CancelReason; reassign: boolean; approvalRef?: string }, key) => {
@@ -430,9 +434,10 @@ function CancellationForm({ dispatch }: { readonly dispatch: DispatchView }) {
         </Field>
       )}
       <label className="flex items-center gap-2 sm:pl-[8.75rem]">
-        <input type="checkbox" className="checkbox checkbox-sm" checked={reassign} onChange={(e) => setReassign(e.target.checked)} />
+        <input type="checkbox" className="checkbox checkbox-sm" checked={reassign} disabled={dispatching} onChange={(e) => setReassign(e.target.checked)} />
         {a.reassign}
       </label>
+      {dispatching && <p className="text-xs text-base-content/60 sm:pl-[8.75rem]">{a.reassignWhileDispatching}</p>}
     </ActionBox>
   );
 }

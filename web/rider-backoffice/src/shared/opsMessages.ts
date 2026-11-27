@@ -145,6 +145,7 @@ export const ops = {
     approvalRef: '승인 번호',
     approvalRefRequired: '운영 판단은 승인 번호가 필요해요.',
     reassign: '다시 배차하기',
+    reassignWhileDispatching: '아직 배차 중이라 다시 배차 없이 취소만 돼요.',
     cancel: '배차 취소',
     cancelled: '취소했어요.',
     reverseTitle: '확정 되돌리기',
