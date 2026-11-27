@@ -1303,6 +1303,31 @@ export const messages = {
     sys: { receipt: '수령', returnReceipt: '반입', supply: '공급 요청' },
     intro: '수령 → 품질검사 → 적치',
     tabs: { tasks: '입고 작업', initial: '초기 보유 수령', returns: '회수품 반입', supply: '공급 요청', promises: 'DC 이관 입고' },
+    // 공급 요청 — 추천으로 채우기(mfc-inbound GET /supply-recommendations, 사용자 2026-11-27 "추천해서 채우는 기능 여기도 있어야")
+    recommend: {
+      newTitle: '새 공급 요청',
+      fill: '추천으로 채우기',
+      busy: '추천 계산 중…',
+      hint: '이 센터 취급 상품 전부의 서버 발주 추천으로 줄을 채워요. 채운 뒤 수량을 고칠 수 있어요.',
+      storage: '온도대',
+      allStorage: '모든 온도대',
+      storageName: { AMBIENT: '상온', CHILLED: '냉장', FROZEN: '냉동' } as Readonly<Record<'AMBIENT' | 'CHILLED' | 'FROZEN', string>>,
+      filled: (n: number, asked: number) => `추천 ${n}줄을 채웠어요(취급 상품 ${asked}개 중)`,
+      none: (asked: number) => `지금 추천할 발주가 없어요(취급 상품 ${asked}개)`,
+      zero: (n: number) => `지금 필요 없음 ${n}`,
+      skipped: (why: string, n: number) => `${why} ${n}`,
+      salesThrough: (d: string) => `판매 실적 ${d}까지`,
+      failed: '추천을 불러오지 못했어요 — 잠시 뒤 다시 눌러 주세요.',
+      defaultReason: '발주 추천으로 채움',
+      basis: (r: number, a: number | null, e: number, p: number) => `추천 ${r} · 판매 가능 ${a ?? '모름'} · 입고 예정 ${e}${p > 0 ? ` · 승인 대기 ${p}` : ''}`,
+      reason: {
+        POLICY_MISSING: '공급 정책 없음',
+        STORAGE_TYPE_UNKNOWN: '온도대 모름',
+        INSUFFICIENT_HISTORY: '판매 기록 부족',
+        AVAILABILITY_UNKNOWN: '재고 모름',
+        SKU_NOT_HANDLED: '취급 안 함',
+      } as Readonly<Record<string, string>>,
+    },
     /** DC 이관 입고(TRF) — mfc-inbound inbound-promises 0.16.0 */
     dc: {
       // 탭 맨 위 흐름 한 줄(DcInboundFlow — #607 의 흐름 그림을 옮김)

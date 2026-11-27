@@ -5,6 +5,7 @@
 import { http, HttpResponse } from 'msw';
 
 import { API_BASE } from '../api/client';
+import { productOfSku } from './catalog';
 import { listPage } from './listHandlers';
 import { db, nextSeq, timestamp, type MockInboundTask, type MockReturnReceipt, type MockSupplyRequest } from './db';
 import { expectedVersion, idempotent, operator, problem, unauthorized } from './support';
@@ -273,6 +274,24 @@ export const inboundHandlers = [
     if (!rec) return problem(404, 'NOT_FOUND');
     if (!canAccess(request, rec.mfcId)) return problem(403, 'FORBIDDEN');
     return HttpResponse.json(rec);
+  }),
+
+  // 발주 수량 추천 목(mfc-inbound 0.21.0 MI-4) — SKU 마다 결정적으로: 추천 줄·지금 필요 없음·판매 기록 부족·정책 없음이 섞이게
+  http.get(`${API_BASE}/supply-recommendations`, ({ request }) => {
+    const q = new URL(request.url).searchParams;
+    const mfcId = q.get('mfcId') ?? '';
+    if (!operator(request)) return unauthorized();
+    if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
+    const skus = q.getAll('sku');
+    if (skus.length === 0 || skus.length > 100) return problem(400, 'VALIDATION_FAILED');
+    const items = skus.map((sku, i) => {
+      const kind = [...sku].reduce((a, c) => a + c.charCodeAt(0), 0) % 4;
+      const base = { sku, productName: productOfSku(sku)?.name ?? null, storageType: 'AMBIENT', expectedQty: kind === 0 ? 6 : 0, pendingRequestedQty: 0, historyDays: kind === 2 ? 3 : 28, missingPolicyFields: kind === 3 ? ['leadDays'] : [], availableQty: 4 + i };
+      if (kind === 2) return { ...base, recommendedQty: null, reason: 'INSUFFICIENT_HISTORY' };
+      if (kind === 3) return { ...base, recommendedQty: null, reason: 'POLICY_MISSING' };
+      return { ...base, recommendedQty: kind === 0 ? 0 : 12 + (i % 3) * 6, reason: null };
+    });
+    return HttpResponse.json({ mfcId, calculatedAt: timestamp(), availabilityAsOf: timestamp(), salesThrough: '2026-11-26', items });
   }),
 
   http.post(`${API_BASE}/supply-requests`, async ({ request }) => {

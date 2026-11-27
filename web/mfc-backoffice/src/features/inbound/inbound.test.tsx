@@ -274,6 +274,32 @@ describe('초기 보유·회수품·공급 요청', () => {
     expect(view).toHaveTextContent('검수 대기');
   });
 
+  it('공급 요청: 추천으로 채우기 — 취급 상품 전부를 서버 추천에 묻고, 추천 > 0 만 줄로(이름·근거), 0·사유는 개수만, 보내는 본문은 sku·qty', async () => {
+    const view = renderAt('/c/MFC-BJG-01/inbound?tab=supply');
+    const form = await screen.findByRole('form', { name: '공급 요청' });
+    await userEvent.click(within(form).getByRole('button', { name: '추천으로 채우기' }));
+    await waitFor(() => expect(screen.getByTestId('supply-recommend-result')).toHaveTextContent(/추천 \d+줄을 채웠어요/));
+    const asked = view.gets('/supply-recommendations');
+    expect(asked.length).toBeGreaterThan(0);
+    expect(new URL(asked[0]!.url).searchParams.getAll('sku').length).toBeGreaterThan(0);
+    const lines = within(form).getAllByTestId('supply-line');
+    expect(lines[0]).toHaveTextContent(/추천 \d+ · 판매 가능/);
+    // 추천을 채우면 사유가 비어 있을 때 기본 사유
+    expect(within(form).getByRole('textbox', { name: '사유' })).toHaveValue('발주 추천으로 채움');
+    // 0 으로 꾸미지 않는다 — 추천 안 한 사유는 개수로
+    expect(screen.getByTestId('supply-recommend-result')).toHaveTextContent(/판매 실적 2026-11-26까지/);
+  });
+
+  it('공급 요청: 추천 조회가 실패하면 줄을 바꾸지 않고 실패 안내', async () => {
+    server.use(http.get(`${API_BASE}/supply-recommendations`, () => new HttpResponse(null, { status: 503 })));
+    renderAt('/c/MFC-BJG-01/inbound?tab=supply');
+    const form = await screen.findByRole('form', { name: '공급 요청' });
+    await userEvent.click(within(form).getByRole('button', { name: '추천으로 채우기' }));
+    await waitFor(() => expect(screen.getByTestId('supply-recommend-result')).toHaveTextContent('추천을 불러오지 못했어요'));
+    expect(within(form).getAllByTestId('supply-line')).toHaveLength(1);
+    expect(within(form).getByRole('textbox', { name: '상품 코드' })).toHaveValue('');
+  });
+
   it('공급 요청 → 요청 화면(제출됨) → 철회', async () => {
     const view = renderAt('/c/MFC-BJG-01/inbound?tab=supply');
     const form = await screen.findByRole('form', { name: '공급 요청' });
