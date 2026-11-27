@@ -347,6 +347,11 @@ void main() {
     expect(find.text('추천 칸: C-S1-01-1-01, C-S1-01-1-02'), findsOneWidget);
     expect(find.text('실은 수량 6'), findsOneWidget);
     expect(enabled(t, 'putaway-submit'), isFalse); // 도착 선반 아직
+    // 꽉 찬 칸이면 서버가 거절 → 칸을 비우고 "다른 빈 칸" 안내, 다시 찍어야 적치할 수 있다
+    await scan(t, 'putaway-scan', MockQualityRepository.fullCell);
+    await tapKey(t, 'putaway-submit');
+    expect(find.text('이 칸은 꽉 찼어요 — 다른 빈 칸을 스캔하고 다시 적치해요'), findsOneWidget);
+    expect(enabled(t, 'putaway-submit'), isFalse);
     await scan(t, 'putaway-scan', 'C-S1-01-1-01');
     expect(find.byKey(const ValueKey('putaway-go')), findsNothing);
     await tapKey(t, 'putaway-submit');

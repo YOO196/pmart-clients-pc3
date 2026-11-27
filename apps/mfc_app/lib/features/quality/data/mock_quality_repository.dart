@@ -160,6 +160,9 @@ final class MockQualityRepository implements QualityRepository {
     return o;
   }
 
+  /// 이미 꽉 찬 칸 — 여기로 적치하면 LOCATION_CAPACITY_EXCEEDED
+  static const fullCell = 'C-S1-09-1-01';
+
   @override
   Future<FieldOutcome<InboundTaskExecutionView>> putaway(
     String taskId, {
@@ -173,6 +176,10 @@ final class MockQualityRepository implements QualityRepository {
     if (t == null) return const FieldRejected(ProblemCode.notFound);
     if (t.completed || qty > t.remainingQty) {
       return const FieldRejected(ProblemCode.invalidState);
+    }
+    // 꽉 찬 칸(서버 mfc-inventory 적재 한도) — 시험용
+    if (toLocationCode == fullCell) {
+      return const FieldRejected('LOCATION_CAPACITY_EXCEEDED');
     }
     final next = _advance(t, qty);
     _tasks[taskId] = next;

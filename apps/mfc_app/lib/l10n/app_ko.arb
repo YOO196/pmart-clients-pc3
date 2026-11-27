@@ -1881,5 +1881,6 @@
   "cdcLoadConfirmGo": "상차완료",
   "guideUnload": "먼저 도착 차량 하차",
   "guideUnloadArrived": "먼저 도착 차량 하차 · {n}대 도착",
-  "@guideUnloadArrived": {"placeholders": {"n": {"type": "int"}}}
+  "@guideUnloadArrived": {"placeholders": {"n": {"type": "int"}}},
+  "putawayCellFull": "이 칸은 꽉 찼어요 — 다른 빈 칸을 스캔하고 다시 적치해요"
 }
