@@ -39,7 +39,14 @@ class InboundReceiveScreen extends ConsumerWidget {
     };
     return Scaffold(
       resizeToAvoidBottomInset: false,
-      appBar: AppBar(title: Text(l10n.inboundTitle(trfId))),
+      // 긴 trfId 대신 화면 번호(T286575 · W6307 — 사용자 2026-11-27 "식별값이 길어 어떤 trf 인지 구분이 안 돼")
+      appBar: AppBar(
+        title: Text(switch (s.promise) {
+          InboundPromiseView(trfNumber: final n?, :final waveNumber) =>
+            l10n.inboundTitle(waveNumber == null ? n : '$n · $waveNumber'),
+          _ => l10n.inboundTitleNoNumber,
+        }, key: const ValueKey('inbound-title')),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.only(top: 14),
@@ -648,10 +655,10 @@ class _ReviewStep extends ConsumerWidget {
                                 },
                               ),
                             ],
-                            onScan: (code) {
-                              ctl.setReceivingLocation(z, code);
-                              return const ScanFeedback.ok();
-                            },
+                            // 위치 바코드만(송장 라벨 TRF:… 등은 거절)
+                            onScan: (code) => ctl.setReceivingLocation(z, code)
+                                ? const ScanFeedback.ok()
+                                : ScanFeedback.error(l10n.receivingNotLocation),
                           ),
                         ],
                       )

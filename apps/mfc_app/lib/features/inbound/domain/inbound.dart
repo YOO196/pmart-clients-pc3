@@ -108,7 +108,13 @@ class InboundPromiseView {
     this.boxList = const [],
     this.mfcId,
     this.tripId,
+    this.trfNumber,
+    this.waveNumber,
   });
+
+  /// TRF·Wave 화면 번호(예 T286575·W6307 — mfc-inbound 0.25.0 R-52). 모르면 null — 화면은 trfId 를 대신 내지 않는다.
+  final String? trfNumber;
+  final String? waveNumber;
 
   /// 받는 MFC·싣고 온 운행(transport-execution) — 하차 인계에 쓴다(C-01)
   final String? mfcId;

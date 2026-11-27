@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pmart_core/pmart_core.dart';
 import 'package:pmart_core/testing.dart';
 import 'package:pmart_ui/pmart_ui.dart';
@@ -244,6 +245,25 @@ void main() {
     expect(find.byType(UnloadScreen), findsOneWidget);
   });
 
+  testWidgets('하다 만 입고(RECEIVING)는 입고 안내에 "이어서 하기" — 누르면 그 송장으로', (t) async {
+    await pumpApp(t);
+    await tapKey(t, 'area-inbound');
+    expect(
+      find.byKey(const ValueKey('guide-resume-TRF-MOCK-001')),
+      findsNothing,
+    );
+    await tapKey(t, 'guide-ok');
+    await tapKey(t, 'run-task');
+    await tapKey(t, 'inbound-arrive'); // 도착 등록 → RECEIVING
+    // 뒤로 나가 홈으로 → 입고 안내에서 이어서 하기
+    GoRouter.of(t.element(find.byType(Scaffold).first)).go('/');
+    await t.pumpAndSettle();
+    await tapKey(t, 'area-inbound');
+    expect(find.textContaining('이어서 하기 · T100001'), findsOneWidget);
+    await tapKey(t, 'guide-resume-TRF-MOCK-001');
+    expect(find.text('입고 T100001 · W6307'), findsOneWidget);
+  });
+
   // 기본은 박스 목록 없이(계약 그대로 — 상품별 계수). 박스 검수는 아래 테스트에서 따로.
   setUp(
     () => inbound = MockInboundRepository(
@@ -328,11 +348,19 @@ void main() {
         find.textContaining('예정 360 · 정상 358 · 격리 0 · 미판정 0'),
         findsOneWidget,
       );
+      // 제목은 긴 trfId 대신 화면 번호(T… · W…)
+      expect(find.text('입고 T100001 · W6307'), findsOneWidget);
+      // 송장 라벨(TRF:…)을 입고칸으로 찍으면 받지 않는다
+      await receiving(t, 'TRF:TRF-MOCK-001:1');
+      expect(find.byKey(const ValueKey('receiving-at-ANY')), findsNothing);
       await receiving(t);
+      // 그 사이 서버 사건으로 버전이 올라 한 번 충돌 → 다시 읽고 줄이 같으면 같은 수량으로 다시 보내 접수
+      inbound.conflictOnce = true;
       await tapKey(t, 'inbound-submit');
 
       // 4단계: 접수 → 조회로 반영 확인.
       expect(find.byKey(const ValueKey('inbound-applied')), findsOneWidget);
+      expect(inbound.receiptCalls, 2);
       // 줄마다 수령 위치(입고칸)를 보냈다(시뮬레이터 C-6)
       expect(inbound.lastToLocations.values.toSet(), {'RCV-C-01'});
       expect(inbound.peek('TRF-MOCK-001').state, PromiseState.tinPosted);

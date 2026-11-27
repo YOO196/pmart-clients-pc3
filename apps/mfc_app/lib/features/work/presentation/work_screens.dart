@@ -16,6 +16,9 @@ import '../../../shared/pda_theme.dart';
 import '../../../shared/ui_state_of.dart';
 import '../../my_work/presentation/my_work.dart';
 import '../../tasks/presentation/task_controllers.dart';
+import '../../inbound/domain/inbound.dart';
+import '../../inbound/presentation/inbound_controller.dart'
+    show receivingPromisesProvider;
 import '../domain/work.dart';
 import 'work_controller.dart';
 import '../../../shared/pda_decor.dart';
@@ -975,6 +978,28 @@ class WorkGuideScreen extends ConsumerWidget {
               NoticeBox(text: l10n.guideCommon),
               const SizedBox(height: 12),
               // 하차는 입고의 첫 단계 — 아래 도구 줄이 아니라 입고 안에서(사용자 2026-11-27 "하차는 입고 업무 아니야?")
+              // 하다 만 입고(도착 등록한 RECEIVING) — 다시 들어가기(사용자 2026-11-27 "뒤로 가니 다시 들어갈 수가 없어")
+              if (area == WorkArea.inbound)
+                for (final p
+                    in ref.watch(receivingPromisesProvider).value ??
+                        const <InboundPromiseView>[])
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: FilledButton.tonalIcon(
+                      key: ValueKey('guide-resume-${p.trfId}'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      onPressed: () => context.push('/inbound/${p.trfId}'),
+                      icon: const Icon(Icons.play_arrow_rounded),
+                      label: Text(
+                        l10n.guideResumeReceipt(
+                          p.trfNumber ?? l10n.noNumber,
+                          p.lines.length,
+                        ),
+                      ),
+                    ),
+                  ),
               if (area == WorkArea.inbound &&
                   (ref.watch(meProvider).value?.canUse(PdaMenu.unload) ??
                       false)) ...[

@@ -11,6 +11,9 @@ abstract interface class InboundRepository {
   /// `GET /inbound-promises/{trfId}`.
   Future<InboundPromiseView> promise(String trfId);
 
+  /// 이 센터에서 하다 만 입고(도착 등록한 RECEIVING) — 입고 안내 화면에서 다시 들어가기(사용자 2026-11-27 "뒤로 가니 다시 들어갈 수가 없어")
+  Future<List<InboundPromiseView>> receiving(String mfcId);
+
   /// `POST /inbound-promises/{trfId}/arrivals` — 도착 등록·하차 시작(EXPECTED→RECEIVING).
   Future<InboundCommandOutcome> recordArrival(
     String trfId, {
@@ -55,6 +58,21 @@ final class ApiInboundRepository implements InboundRepository {
   final ib.InboundPromisesApi _api;
   final te.TripsApi _trips;
   final te.StopsApi _stops;
+
+  @override
+  Future<List<InboundPromiseView>> receiving(String mfcId) async {
+    final r = await pmartGuard(
+      () => _api.listInboundPromises(
+        mfcId: mfcId,
+        state: ib.InboundPromiseState.RECEIVING,
+        size: 50,
+      ),
+    );
+    return [
+      for (final p in r.data?.items ?? const <ib.InboundPromise>[])
+        promiseFromContract(p),
+    ];
+  }
 
   @override
   Future<InboundPromiseView> promise(String trfId) async {
@@ -235,6 +253,8 @@ ReceiptView receiptFromContract(ib.Receipt r) => ReceiptView(
 InboundPromiseView promiseFromContract(ib.InboundPromise p) =>
     InboundPromiseView(
       trfId: p.trfId ?? (throw const ContractViolationFailure('trfId 없음')),
+      trfNumber: p.trfNumber,
+      waveNumber: p.waveNumber,
       version: p.version ?? 0,
       state: switch (p.state?.value) {
         'EXPECTED' => PromiseState.expected,
