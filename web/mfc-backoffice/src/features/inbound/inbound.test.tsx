@@ -41,9 +41,19 @@ describe('입고 작업 목록', () => {
     expect(row('TRF-SIM-DC-1')).toHaveTextContent('받는 중');
     expect(row('TRF-SIM-DC-1')).toHaveTextContent('15 / 16');
     expect(screen.getByTestId('stock-live')).toBeInTheDocument();
+    // 맨 위 흐름 한 줄 — 준비 중 → 오는 중 → 도착·수령 중 → 오늘 받음(서버 상태·출발 여부 그대로)
+    await waitFor(() => expect(screen.getByTestId('dc-flow-GOING')).toHaveTextContent('1건'));
+    expect(screen.getByTestId('dc-flow-GOING')).toHaveTextContent('36개 싣고 오는 중');
+    expect(screen.getByTestId('dc-flow-RECEIVING')).toHaveTextContent('1건');
+    expect(screen.getByTestId('dc-flow-PREP')).toHaveTextContent('0건');
+    await waitFor(() => expect(screen.getByTestId('dc-flow-DONE')).toHaveTextContent('8개 재고 반영'));
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'RECEIVING');
     await waitFor(() => expect(screen.getAllByTestId('dc-inbound-row')).toHaveLength(1));
     expect(view.gets('/inbound-promises').some((r) => new URL(r.url).searchParams.get('state') === 'RECEIVING')).toBe(true);
+    // 흐름 칸을 누르면 목록이 그 상태로
+    await userEvent.click(screen.getByTestId('dc-flow-GOING'));
+    await waitFor(() => expect(screen.getAllByTestId('dc-inbound-row')).toHaveLength(1));
+    expect(screen.getByRole('combobox', { name: '상태' })).toHaveValue('EXPECTED');
   });
 
   it('DC 이관 입고 상세: 단계·상품 줄(수령 격리)·지금 재고(실시간)·수령 반영·적치 작업으로', async () => {

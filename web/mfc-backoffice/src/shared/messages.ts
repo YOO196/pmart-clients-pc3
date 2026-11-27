@@ -1288,6 +1288,20 @@ export const messages = {
     tabs: { tasks: '입고 작업', initial: '초기 보유 수령', returns: '회수품 반입', supply: '공급 요청', promises: 'DC 이관 입고' },
     /** DC 이관 입고(TRF) — mfc-inbound inbound-promises 0.16.0 */
     dc: {
+      // 탭 맨 위 흐름 한 줄(DcInboundFlow — #607 의 흐름 그림을 옮김)
+      flow: {
+        steps: { PREP: 'DC 에서 준비 중', GOING: '차 타고 오는 중', RECEIVING: '도착 · 수령 중', DONE: '오늘 받음' } as Readonly<Record<'PREP' | 'GOING' | 'RECEIVING' | 'DONE', string>>,
+        stepSub: {
+          PREP: (q: number) => `승인 ${q.toLocaleString('ko-KR')}개`,
+          GOING: (q: number) => `${q.toLocaleString('ko-KR')}개 싣고 오는 중`,
+          RECEIVING: (q: number) => `${q.toLocaleString('ko-KR')}개 내리는 중`,
+          DONE: (q: number) => `${q.toLocaleString('ko-KR')}개 재고 반영`,
+        } as Readonly<Record<'PREP' | 'GOING' | 'RECEIVING' | 'DONE', (q: number) => string>>,
+        prepHint: 'DC 출발 전 단계는 아직 MFC 로 오지 않아요 — 출발하면 바로 보여요.',
+        failed: '조회 실패',
+        failedSub: '불러오지 못했어요',
+        trfs: (n: number) => `${n}건`,
+      },
       state: '상태',
       date: '도착 예정일',
       all: '전체',
