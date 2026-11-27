@@ -193,7 +193,7 @@ class _ScanInputState extends ConsumerState<ScanInput>
               );
             },
             child: SizedBox(
-              height: 46,
+              height: 60,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -336,7 +336,7 @@ class _ScanButton extends StatelessWidget {
                   children: [
                     // 스캐너(총) 그림 대신 바코드 그림(사용자 2026-11-20).
                     BarcodeIcon(
-                      size: 22,
+                      size: 28,
                       color: secondary ? PdaColors.primary : Colors.white,
                     ),
                     const SizedBox(width: 12),
@@ -347,7 +347,7 @@ class _ScanButton extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: text?.copyWith(
                           color: secondary ? PdaColors.dark : Colors.white,
-                          fontSize: 16,
+                          fontSize: 19,
                           // 옅은 바탕은 대비가 약해 같은 크기도 작아 보인다 — 조금 크고 굵게(사용자 2026-11-20).
                           fontWeight: FontWeight.w600,
                           letterSpacing: -0.2,
