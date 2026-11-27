@@ -1893,5 +1893,10 @@
   "cdcWorkWave": "Wave {no}",
   "@cdcWorkWave": {"placeholders": {"no": {"type": "String"}}},
   "cdcWorkDone": "완료",
-  "cdcWorkHolding": "진행 중"
+  "cdcWorkHolding": "진행 중",
+  "inboundTitleNoNumber": "입고",
+  "receivingNotLocation": "입고칸 위치 바코드가 아니에요(송장 라벨은 안 돼요)",
+  "guideResumeReceipt": "이어서 하기 · {no} · 상품 {n}종",
+  "@guideResumeReceipt": {"placeholders": {"no": {"type": "String"}, "n": {"type": "int"}}},
+  "noNumber": "번호 없음"
 }

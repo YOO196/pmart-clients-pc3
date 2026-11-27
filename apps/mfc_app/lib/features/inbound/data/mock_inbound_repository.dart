@@ -221,6 +221,8 @@ final class MockInboundRepository implements InboundRepository {
     required DateTime arrival,
   }) => _promises[id] = InboundPromiseView(
     trfId: id,
+    trfNumber: 'T${100000 + _promises.length + 1}',
+    waveNumber: 'W6307',
     version: 1,
     state: PromiseState.expected,
     plannedArrivalAt: arrival,
@@ -254,6 +256,8 @@ final class MockInboundRepository implements InboundRepository {
     List<ReceiptView>? receipts,
   }) => InboundPromiseView(
     trfId: p.trfId,
+    trfNumber: p.trfNumber,
+    waveNumber: p.waveNumber,
     version: p.version + 1,
     state: state ?? p.state,
     plannedArrivalAt: p.plannedArrivalAt,
@@ -268,6 +272,18 @@ final class MockInboundRepository implements InboundRepository {
     mfcId: p.mfcId,
     tripId: p.tripId,
   );
+
+  @override
+  Future<List<InboundPromiseView>> receiving(String mfcId) async {
+    await _wait();
+    return [
+      for (final p in _promises.values)
+        if (p.state == PromiseState.receiving) p,
+    ];
+  }
+
+  /// 시험: 다음 수령 등록을 한 번 VERSION_CONFLICT 로(그 사이 서버 사건으로 버전이 올랐다)
+  bool conflictOnce = false;
 
   @override
   Future<InboundPromiseView> promise(String trfId) async {
@@ -316,6 +332,12 @@ final class MockInboundRepository implements InboundRepository {
   }) async {
     await _wait();
     receiptCalls++;
+    if (conflictOnce) {
+      conflictOnce = false;
+      final cur = _promises[trfId]!;
+      _promises[trfId] = _copy(cur);
+      return const InboundRejected(InboundProblemCode.versionConflict);
+    }
     lastToLocations = toLocations;
     // 서버처럼 줄마다 수령 위치 필수(0.16.0 — 없으면 400)
     if (counts.any((c) => (toLocations[c.$1.key] ?? '').isEmpty)) {

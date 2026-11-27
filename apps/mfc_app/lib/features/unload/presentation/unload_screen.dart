@@ -357,7 +357,7 @@ class _UnloadScreenState extends ConsumerState<UnloadScreen> {
               FilledButton(
                 key: ValueKey('unload-receive-${p.trfId}'),
                 onPressed: () => context.pushReplacement('/inbound/${p.trfId}'),
-                child: Text(l10n.unloadGoReceive(p.trfId)),
+                child: Text(l10n.unloadGoReceive(p.trfNumber ?? '')),
               ),
         ],
         child: ListView(
@@ -465,7 +465,7 @@ class _UnloadScreenState extends ConsumerState<UnloadScreen> {
               padding: const EdgeInsets.only(top: 6),
               child: Text(
                 l10n.unloadTrfLine(
-                  p.trfId,
+                  p.trfNumber ?? '',
                   _scanned.where((b) => owner[b] == p.trfId).length,
                   {for (final b in p.boxList) b.boxId}.length,
                 ),

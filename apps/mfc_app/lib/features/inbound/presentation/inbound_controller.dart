@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pmart_core/pmart_core.dart';
 
+import '../../../shared/codes.dart';
 import '../../../shared/providers.dart';
 import '../../packing/presentation/packing_controller.dart'
     show mfcClockProvider;
@@ -18,6 +19,14 @@ final inboundRepositoryProvider = Provider<InboundRepository>(
 );
 
 /// 재고 반영 조회 간격·횟수. 다 돌아도 안 끝나면 "반영 대기"로 두고 다시 확인한다.
+/// 이 센터에서 하다 만 입고(RECEIVING) — 입고 안내 화면 "이어서 하기"
+final receivingPromisesProvider =
+    FutureProvider.autoDispose<List<InboundPromiseView>>(
+      (ref) => ref
+          .watch(inboundRepositoryProvider)
+          .receiving(ref.watch(currentMfcIdProvider)),
+    );
+
 final applyPollPolicyProvider = Provider<({Duration interval, int attempts})>(
   (_) => (interval: const Duration(seconds: 1), attempts: 5),
 );
@@ -429,15 +438,17 @@ class InboundFlowController extends Notifier<InboundState> {
     state = state.copyWith(selectedBox: () => null);
   }
 
-  /// 수령 입고칸 스캔(온도대마다) — 위치 확인은 서버(수령 때)
-  void setReceivingLocation(String zone, String code) {
+  /// 수령 입고칸 스캔(온도대마다) — MFC 위치 코드만(송장 라벨 `TRF:…` 등은 받지 않는다, 사용자 2026-11-27 실기기).
+  /// 받으면 true.
+  bool setReceivingLocation(String zone, String code) {
     final c = code.trim().toUpperCase();
-    if (c.isEmpty) return;
+    if (c.isEmpty || !isMfcLocation(c) || isCartLocation(c)) return false;
     state = state.copyWith(
       receivingAt: {...state.receivingAt, zone: c},
       code: () => null,
       rejectDetail: () => null,
     );
+    return true;
   }
 
   void clearReceivingLocation(String zone) =>
@@ -550,6 +561,9 @@ class InboundFlowController extends Notifier<InboundState> {
   }
 
   /// 3단계: 수령 등록. 접수(202) ≠ 반영 — 반영은 수령 결과 조회로 확인한다.
+  /// 버전 충돌 뒤 한 번만 다시 보낸다(서버는 운송 ETA 등 사건마다 예정 버전을 올린다 — mfc-inbound touch).
+  bool _retried = false;
+
   Future<void> submit() async {
     final p = state.promise;
     if (p == null || state.busy || !state.hasReceivingLocations) return;
@@ -592,7 +606,24 @@ class InboundFlowController extends Notifier<InboundState> {
         );
         if (code == InboundProblemCode.versionConflict ||
             code == InboundProblemCode.invalidState) {
+          final before = [for (final l in p.lines) '${l.key}:${l.expectedQty}'];
           await load();
+          if (!ref.mounted) return;
+          final now = state.promise;
+          final same =
+              now != null &&
+              now.state == PromiseState.receiving &&
+              before.join('|') ==
+                  [for (final l in now.lines) '${l.key}:${l.expectedQty}']
+                      .join('|');
+          // 상품 줄이 그대로면 같은 수량으로 한 번 다시(새 버전) — 바뀌었으면 작업자가 확인
+          if (code == InboundProblemCode.versionConflict && same && !_retried) {
+            _retried = true;
+            state = state.copyWith(code: () => null);
+            await submit();
+            _retried = false;
+            return;
+          }
         }
       case InboundUnknown():
         state = state.copyWith(busy: false, unknown: true);
