@@ -71,20 +71,25 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
       else next.add(id);
       return next;
     });
-  const importCmd = useCommand(async (ids: readonly string[], key) => {
-    // 고른 상품의 SKU — 판매 중지(SALE_STOPPED — 취급 쪽에서는 단종) SKU 는 서버가 거절(전부 또는 전무)하므로 미리 뺀다
+  // 고른 상품 일괄 켜기·끄기(사용자 2026-11-27 "고르기 열은 있지만 켜기 끄기 일괄 변경이 안됨") — 같은 일괄 API, enabled 만 다르다
+  const bulkCmd = useCommand(async ({ ids, enabled }: { readonly ids: readonly string[]; readonly enabled: boolean }, key) => {
+    // 켤 때: 판매 중지(SALE_STOPPED — 취급 쪽에서는 단종) SKU 는 서버가 거절(전부 또는 전무)하므로 미리 뺀다. 끌 때는 전부.
     const details = await Promise.all(ids.map((productId) => request('GET', api.product.GET('/products/{productId}', { params: { path: { productId } } }))));
-    const skus = [...new Set(details.flatMap((d) => (d.skus ?? []).filter((s) => s.saleState !== 'SALE_STOPPED').map((s) => s.sku)))].slice(0, BATCH_MAX);
-    if (skus.length === 0) return { changed: 0, skus: 0 };
+    const skus = [...new Set(details.flatMap((d) => (d.skus ?? []).filter((s) => !enabled || s.saleState !== 'SALE_STOPPED').map((s) => s.sku)))].slice(0, BATCH_MAX);
+    if (skus.length === 0) return { enabled, changed: 0, skus: 0 };
     const r = await request(
       'POST',
-      api.inventory.POST('/mfcs/{mfcId}/sku-handling-batches', { ...commandParams(key, { path: { mfcId } }), body: { reason: m.reason, items: skus.map((sku) => ({ sku, enabled: true })) } }),
+      api.inventory.POST('/mfcs/{mfcId}/sku-handling-batches', { ...commandParams(key, { path: { mfcId } }), body: { reason: m.reason, items: skus.map((sku) => ({ sku, enabled })) } }),
     );
     setPicked(new Set());
     await queryClient.invalidateQueries({ queryKey: ['handlings', mfcId] });
     await queryClient.invalidateQueries({ queryKey: ['handlings-new-count', mfcId] });
-    return { changed: r.changedCount ?? 0, skus: skus.length };
+    return { enabled, changed: r.changedCount ?? 0, skus: skus.length };
   });
+  // 머리 칸 체크 = 지금 보이는(걸러진) 상품 전부 고르기·풀기
+  const pickable = rows.map((p) => p.productId ?? '').filter((id) => id !== '');
+  const allPicked = pickable.length > 0 && pickable.every((id) => picked.has(id));
+  const toggleAll = () => setPicked(allPicked ? new Set() : new Set(pickable));
   return (
     <section className="space-y-3 text-sm" data-testid="catalog-products">
       <SearchPanel
@@ -128,10 +133,10 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
                   const info = cards.data?.get(id);
                   return (
                     <li key={id} className="flex flex-col gap-2" data-testid="catalog-card">
-                      <label className={`flex flex-1 cursor-pointer flex-col gap-2 rounded-box border p-3 ${picked.has(id) ? 'border-primary' : 'border-base-300'} ${discontinued ? 'cursor-not-allowed opacity-60' : ''}`}>
+                      <label className={`flex flex-1 cursor-pointer flex-col gap-2 rounded-box border p-3 ${picked.has(id) ? 'border-primary' : 'border-base-300'} ${discontinued ? 'opacity-60' : ''}`}>
                         <span className="relative">
                           <ProductThumb info={info} fallback={p.internalName ?? id} size="card" />
-                          <input type="checkbox" className="checkbox checkbox-sm absolute top-2 left-2 bg-base-100" aria-label={m.pickLabel(p.internalName ?? id)} disabled={discontinued} checked={picked.has(id)} onChange={() => toggle(id)} />
+                          <input type="checkbox" className="checkbox checkbox-sm absolute top-2 left-2 bg-base-100" aria-label={m.pickLabel(p.internalName ?? id)} checked={picked.has(id)} onChange={() => toggle(id)} />
                         </span>
                         <span className="line-clamp-2 font-semibold" title={p.internalName ?? id}>
                           {p.internalName}
@@ -153,7 +158,9 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
                 <table className="table table-sm">
                   <thead>
                     <tr>
-                      <th className="w-12">{m.col.pick}</th>
+                      <th className="w-12">
+                        <input type="checkbox" className="checkbox checkbox-sm" aria-label={m.pickAll} checked={allPicked} onChange={toggleAll} />
+                      </th>
                       <th>{m.col.name}</th>
                       <th>{m.col.sale}</th>
                       <th>{m.col.here}</th>
@@ -168,7 +175,7 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
                       return (
                         <tr key={id} data-testid="catalog-row">
                           <td>
-                            <input type="checkbox" className="checkbox checkbox-sm" aria-label={m.pickLabel(p.internalName ?? id)} disabled={discontinued} checked={picked.has(id)} onChange={() => toggle(id)} />
+                            <input type="checkbox" className="checkbox checkbox-sm" aria-label={m.pickLabel(p.internalName ?? id)} checked={picked.has(id)} onChange={() => toggle(id)} />
                           </td>
                           <td>
                             <span className="flex items-center gap-2">
@@ -198,21 +205,24 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
         )}
       </QueryState>
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          className="btn btn-sm btn-primary"
-          disabled={picked.size === 0 || importCmd.busy}
-          onClick={() => {
-            if (importCmd.phase.kind === 'rejected' || importCmd.phase.kind === 'done') importCmd.reset();
-            void importCmd.run([...picked]);
-          }}
-        >
-          {m.submit(picked.size)}
-        </button>
-        <CommandFeedback command={importCmd}>
+        {[true, false].map((enabled) => (
+          <button
+            key={String(enabled)}
+            type="button"
+            className={`btn btn-sm ${enabled ? 'btn-primary' : ''}`}
+            disabled={picked.size === 0 || bulkCmd.busy}
+            onClick={() => {
+              if (bulkCmd.phase.kind === 'rejected' || bulkCmd.phase.kind === 'done') bulkCmd.reset();
+              void bulkCmd.run({ ids: [...picked], enabled });
+            }}
+          >
+            {enabled ? m.submit(picked.size) : m.submitOff(picked.size)}
+          </button>
+        ))}
+        <CommandFeedback command={bulkCmd}>
           {(r) => (
             <p role="status" className="text-sm text-success">
-              {r.skus === 0 ? m.noSkus : m.done(r.changed, r.skus)}
+              {r.skus === 0 ? m.noSkus : r.enabled ? m.done(r.changed, r.skus) : m.doneOff(r.changed, r.skus)}
             </p>
           )}
         </CommandFeedback>
