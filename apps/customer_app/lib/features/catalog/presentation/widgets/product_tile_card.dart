@@ -83,16 +83,19 @@ String ratingText(AppLocalizations l10n, double? rating, int? count) =>
 
 /// 평점 한 줄(별 + 글자). 집계가 없으면 글자만.
 class RatingLine extends StatelessWidget {
-  const RatingLine({super.key, this.rating, this.count});
+  const RatingLine({super.key, this.rating, this.count, this.size = 12});
 
   final double? rating;
   final int? count;
+
+  /// 글자 크기(별은 +1).
+  final double size;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final small = theme.textTheme.bodySmall?.copyWith(fontSize: 12);
+    final small = theme.textTheme.bodySmall?.copyWith(fontSize: size);
     if (rating == null || count == null) {
       return Text(
         ratingText(l10n, rating, count),
@@ -107,7 +110,7 @@ class RatingLine extends StatelessWidget {
       children: [
         Icon(
           Icons.star_rounded,
-          size: MediaQuery.textScalerOf(context).scale(13),
+          size: MediaQuery.textScalerOf(context).scale(size + 1),
           color: const Color(0xFFFFB300),
         ),
         const SizedBox(width: 1),
@@ -323,7 +326,8 @@ class ProductTileCard extends StatelessWidget {
           key: ValueKey('tile-discount-${tile.productId}'),
           price: d.salePrice,
           ratePercent: d.ratePercent,
-          showBase: false,
+          base: tile.basePrice,
+          showBase: look.showBase,
           rateColor: look.rateColor ?? discountRateColor,
           style: theme.textTheme.titleMedium?.copyWith(
             fontSize: look.priceSize,
@@ -360,7 +364,11 @@ class ProductTileCard extends StatelessWidget {
       if (!look.compact) SizedBox(height: look.ratingGap),
       // 장바구니 추천 시트는 평점이 없으면 줄을 비운다(레퍼런스).
       if (!look.compact && !(look.hideNoRating && tile.rating == null))
-        RatingLine(rating: tile.rating, count: tile.reviewCount),
+        RatingLine(
+          rating: tile.rating,
+          count: tile.reviewCount,
+          size: look.ratingSize,
+        ),
       // "N개 남음"(BR-100 R7 — 서버가 10개 이하일 때만). 레퍼런스 7-1: 평점 아래 빨간 한 줄
       // (Pretendard 보통 12, #FA4240). 안내일 뿐 확보가 아니다.
       if (tile.lowStockQty case final left? when status == null) ...[
@@ -410,8 +418,10 @@ class ProductTileCard extends StatelessWidget {
                         ),
                       ),
                     imageOf(c.maxWidth),
-                    SizedBox(height: look.imageGap),
-                    ...info,
+                    if (!look.imageOnly) ...[
+                      SizedBox(height: look.imageGap),
+                      ...info,
+                    ],
                   ],
                 ),
               )
@@ -559,7 +569,53 @@ class TileLook {
     this.nameSize = 14,
     this.compact = false,
     this.priceGap = 4,
+    this.showBase = false,
+    this.ratingSize = 12,
+    this.imageOnly = false,
   });
+
+  /// 사진(+ 담기)만 그린다 — 글자 줄 없음.
+  final bool imageOnly;
+
+  /// 할인 전 원래 가격(취소선)을 가격 옆에 둔다.
+  final bool showBase;
+
+  /// 평점 줄 글자 크기(별은 +1).
+  final double ratingSize;
+
+  /// 2칸 목록(할인·신상품·랭킹 베스트·홈 맨 아래 카테고리별 상품 — 사용자 태블릿 나란히 보기 2026-11-26,
+  /// 같은 밀도 px 비율): 사진 → 이름 3.5, 가격 15.5(레퍼런스 글 높이 29/25 × 14)·취소선 원래 가격,
+  /// 단위가격 13, 평점 13.2.
+  /// 3칸 순위 목록(홈 TOP 30) — [grid2] 와 같은 글자, 원래 가격 취소선은 없다(레퍼런스).
+  static const grid3 = TileLook(
+    imageGap: 3.5,
+    priceSize: 15,
+    priceWeight: FontWeight.w800,
+    unitSize: 12,
+    ratingGap: 3,
+    dark: true,
+    ratingSize: 12.8,
+    nameSize: 14,
+    nameLineHeight: 1.3,
+    nameWeight: FontWeight.w400,
+  );
+
+  /// 첫 주문 빈 장바구니 카드의 사진 칸만(이름·가격은 카드가 따로 그린다): 하트 없음, + 담기만.
+  static const firstOrderImage = TileLook(showWish: false, imageOnly: true);
+
+  static const grid2 = TileLook(
+    imageGap: 3.5,
+    priceSize: 15.5,
+    priceWeight: FontWeight.w800,
+    unitSize: 12.5,
+    ratingGap: 4,
+    dark: true,
+    showBase: true,
+    ratingSize: 13.2,
+    nameSize: 14.5,
+    nameLineHeight: 1.3,
+    nameWeight: FontWeight.w400,
+  );
 
   /// 이름 → 가격 사이.
   final double priceGap;
@@ -680,5 +736,56 @@ class LowStockText extends StatelessWidget {
       fontWeight: FontWeight.w400,
       color: color,
     ),
+  );
+}
+
+/// 2칸 상품 줄 — 칸 높이를 고정하지 않고 줄마다 두 카드 중 높은 쪽만큼(레퍼런스: 줄 사이 빈 칸 없이
+/// 아래 글 끝 → 다음 사진 약 26, 사용자 2026-11-26 "상품 사이 간격").
+class ProductPairRows extends StatelessWidget {
+  const ProductPairRows({
+    super.key,
+    required this.count,
+    required this.itemBuilder,
+    this.rowGap = 26,
+    this.colGap = 12,
+  });
+
+  final int count;
+  final Widget Function(BuildContext context, int index) itemBuilder;
+  final double rowGap;
+  final double colGap;
+
+  int get rows => (count / 2).ceil();
+
+  /// 줄 [r] 하나(아래 여백 포함).
+  Widget row(BuildContext context, int r) {
+    final a = r * 2;
+    return Padding(
+      padding: EdgeInsets.only(bottom: r == rows - 1 ? 0 : rowGap),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: itemBuilder(context, a)),
+          SizedBox(width: colGap),
+          Expanded(
+            child: a + 1 < count
+                ? itemBuilder(context, a + 1)
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 긴 목록(이어 받기)용 — 화면에 보이는 줄만 만든다.
+  Widget sliver() => SliverList.builder(
+    itemCount: rows,
+    itemBuilder: (context, r) => row(context, r),
+  );
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [for (var r = 0; r < rows; r++) row(context, r)],
   );
 }

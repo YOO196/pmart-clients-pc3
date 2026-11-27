@@ -76,12 +76,23 @@ final class _GatedHome extends MockCatalogRepository {
 final class _RankingDown extends MockCatalogRepository {
   _RankingDown() : super(latency: Duration.zero);
 
+  // 랭킹 탭 "꼼꼼하게 선정한 베스트"는 인기순 검색(사용자 2026-11-26) — 그 조회만 실패.
   @override
-  Future<HomeView> home({String? mfcId, HomeTab? tab}) async {
-    if (tab == HomeTab.ranking) {
+  Future<ProductPage> search(
+    ProductQuery query, {
+    String? mfcId,
+    String? cursor,
+    CancelToken? cancelToken,
+  }) async {
+    if (query.sort == SortKey.popular && query.keyword == null) {
       throw const NetworkFailure(DioExceptionType.connectionError);
     }
-    return super.home(mfcId: mfcId, tab: tab);
+    return super.search(
+      query,
+      mfcId: mfcId,
+      cursor: cursor,
+      cancelToken: cancelToken,
+    );
   }
 }
 
@@ -369,14 +380,17 @@ void main() {
 
       await t.tap(find.byKey(const ValueKey('home-tab-ranking')));
       await t.pumpAndSettle();
-      expect(find.text('지금 TOP'), findsOneWidget);
-      // 레퍼런스: 사진 위 굵은 순위 숫자("1")
+      // 사용자 2026-11-26: 위 배너 → "다른 사람들도 많이 눌러 봤어요"(목만) → "꼼꼼하게 선정한 베스트"(전체 보기 없이 이어 받기)
+      expect(find.text('꼼꼼하게 선정한 베스트'), findsOneWidget);
+      expect(find.byKey(const ValueKey('ranking-clicked')), findsOneWidget);
+      expect(find.byKey(const ValueKey('best-total')), findsOneWidget);
+      // 카드 위 굵은 순위 숫자("1")
       expect(
         find.byWidgetPredicate(
           (w) =>
               w is Text &&
               w.key is ValueKey<String> &&
-              (w.key! as ValueKey<String>).value.startsWith('tile-rank-') &&
+              (w.key! as ValueKey<String>).value.startsWith('best-rank-') &&
               w.data == '1',
         ),
         findsOneWidget,
@@ -388,25 +402,24 @@ void main() {
       expect(find.text('지금 많이 사는 상품'), findsOneWidget);
     });
 
-    testWidgets('신상품 탭: 제일 나중에 등록한 상품 10개(검색 NEWEST)', (t) async {
+    testWidgets('신상품 탭: 제목 없이 카테고리 줄·총 N개·정렬 → 최근 등록순 2칸 목록', (t) async {
       final catalog = MockCatalogRepository(latency: Duration.zero);
       await t.pumpWidget(testApp(const [], catalog: catalog));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const ValueKey('home-tab-isNew')));
       await t.pumpAndSettle();
-      expect(find.byKey(const ValueKey('section-NEWEST')), findsOneWidget);
-      expect(find.text('가장 최근에 등록한 상품'), findsOneWidget);
-      final tiles = find.descendant(
-        of: find.byKey(const ValueKey('section-NEWEST')),
-        matching: find.byWidgetPredicate(
+      expect(find.text('가장 최근에 등록한 상품'), findsNothing);
+      expect(find.byKey(const ValueKey('new-total')), findsOneWidget);
+      expect(find.byKey(const ValueKey('new-sort')), findsOneWidget);
+      expect(find.byKey(const ValueKey('new-category-all')), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
           (w) =>
-              w is InkWell &&
               w.key is ValueKey<String> &&
-              (w.key! as ValueKey<String>).value.startsWith('tile-'),
+              (w.key! as ValueKey<String>).value.startsWith('new-tile-'),
         ),
+        findsWidgets,
       );
-      expect(tiles, findsWidgets);
-      expect(t.widgetList(tiles).length, lessThanOrEqualTo(10));
     });
 
     testWidgets('탭 조회 실패는 빈 탭이 아니라 실패 한 줄이다', (t) async {
@@ -415,8 +428,8 @@ void main() {
       await t.tap(find.byKey(const ValueKey('home-tab-ranking')));
       await t.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('home-tab-failed')), findsOneWidget);
-      expect(find.byKey(const ValueKey('home-tab-empty')), findsNothing);
+      expect(find.byKey(const ValueKey('best-failed')), findsOneWidget);
+      expect(find.byKey(const ValueKey('best-empty')), findsNothing);
       expect(find.text('보여줄 상품이 없어요'), findsNothing);
     });
 

@@ -29,6 +29,9 @@ import '../../checkout/presentation/delivery_select_screen.dart'
         modeLabel,
         proceedToCheckout,
         showSlotSheet;
+import '../../catalog/presentation/home_screen.dart' show HomeCouponRow;
+import '../../orders/presentation/orders_providers.dart' show orderListProvider;
+import '../../orders/domain/orders.dart' show OrderListQuery;
 import 'cart_controller.dart';
 import 'guest_cart_carry.dart'
     show carryGuestCartOnLogin, checkoutLoginPendingProvider;
@@ -121,7 +124,7 @@ class _CartBody extends ConsumerWidget {
           ),
         Expanded(
           child: lines.isEmpty
-              ? const _EmptyCart()
+              ? const _EmptyCartSwitch()
               : RefreshIndicator(
                   onRefresh: controller.refresh,
                   child: ListView(
@@ -169,6 +172,212 @@ class _CartBody extends ConsumerWidget {
             child: _CartSummaryBar(cart: cart, state: state),
           ),
       ],
+    );
+  }
+}
+
+/// 빈 장바구니 고르기: 주문한 적이 없는 고객(비회원 포함)은 "첫 주문" 모양(사용자 레퍼런스 2026-11-26 —
+/// 쿠폰 줄 + "이런 상품은 어때요?" + 큰 카드 넘기기), 주문이 있으면 [_EmptyCart].
+/// 주문 여부는 주문 목록(최근 3개월 기본 조회)이 비었는지로 본다 — 조회 중·실패면 [_EmptyCart](지어내지 않는다).
+class _EmptyCartSwitch extends ConsumerWidget {
+  const _EmptyCartSwitch();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final member = ref.watch(sessionProvider) is MemberSession;
+    final first =
+        !member ||
+        switch (ref.watch(orderListProvider(const OrderListQuery()))) {
+          AsyncData(:final value) => value != null && value.items.isEmpty,
+          _ => false,
+        };
+    return first ? const _FirstOrderEmptyCart() : const _EmptyCart();
+  }
+}
+
+/// 첫 주문 빈 장바구니(사용자 레퍼런스 2026-11-26 "장바구니 첫 주문 UI"): 회색 바탕 → 쿠폰 받기 줄(서버 쿠폰 행사 —
+/// 홈과 같은 [HomeCouponRow]) → 굵은 "담은 상품이 없어요. 이런 상품은 어때요?" → 흰 큰 카드 가로 넘기기(옆 카드가 비침):
+/// 사진(+ 담기) · 바로픽 표 · 이름 · 가격 · [더 많은 상품 보러가기 >](홈). 추천 출처는 [_EmptyCart] 와 같다.
+/// 위 배달·픽업/장보기·쇼핑/전국특가 탭은 우리 서비스에 없어 뺐다.
+class _FirstOrderEmptyCart extends ConsumerStatefulWidget {
+  const _FirstOrderEmptyCart();
+
+  @override
+  ConsumerState<_FirstOrderEmptyCart> createState() =>
+      _FirstOrderEmptyCartState();
+}
+
+class _FirstOrderEmptyCartState extends ConsumerState<_FirstOrderEmptyCart> {
+  final _pages = PageController(viewportFraction: 0.64, initialPage: 1);
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final items =
+        ref.watch(cartRecommendationsProvider).value ?? const <ProductTile>[];
+    return ColoredBox(
+      color: scheme.surfaceContainer,
+      child: ListView(
+        key: const ValueKey('cart-empty-first'),
+        padding: const EdgeInsets.only(top: 16, bottom: 24),
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: HomeCouponRow(),
+          ),
+          const SizedBox(height: 40),
+          Text(
+            l10n.cartFirstOrderTitle,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontSize: 15.5,
+              height: 1.45,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 28),
+          if (items.isNotEmpty)
+            SizedBox(
+              // 카드 폭(화면 × 0.64 − 양옆 7) = 사진 + 안쪽 여백, 그 아래 글·단추 약 214.
+              height:
+                  MediaQuery.sizeOf(context).width * 0.64 -
+                  14 -
+                  32 +
+                  214 +
+                  MediaQuery.textScalerOf(context).scale(16) -
+                  16,
+              child: PageView.builder(
+                controller: _pages,
+                itemCount: items.length,
+                itemBuilder: (context, i) => Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 7),
+                  child: _FirstOrderCard(tile: items[i]),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FirstOrderCard extends StatelessWidget {
+  const _FirstOrderCard({required this.tile});
+
+  final ProductTile tile;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    void open() => context.push('/products/${tile.productId}', extra: tile);
+    final priceStyle = theme.textTheme.titleMedium?.copyWith(
+      fontSize: 18,
+      fontWeight: FontWeight.w800,
+    );
+    return Material(
+      key: ValueKey('cart-first-card-${tile.productId}'),
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: open,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 사진(+ 담기)만 카드 모양 그대로 — 이름·가격은 아래에 이 카드 글자로.
+              ProductTileCard(
+                rail: true,
+                look: TileLook.firstOrderImage,
+                tile: tile,
+                onTap: open,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(7),
+                    child: Image.asset(
+                      'assets/images/app_icon.png',
+                      width: 24,
+                      height: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    l10n.brandName,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 14.5,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                tile.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+              ),
+              const SizedBox(height: 4),
+              if (tile.discount case final d?)
+                DiscountPriceText(
+                  price: d.salePrice,
+                  ratePercent: d.ratePercent,
+                  base: tile.basePrice,
+                  style: priceStyle,
+                )
+              else
+                Text(switch (tile.basePrice) {
+                  final int p => formatKrw(p),
+                  null => l10n.priceUnavailable,
+                }, style: priceStyle),
+              const Spacer(),
+              SizedBox(
+                height: 48,
+                child: OutlinedButton(
+                  key: ValueKey('cart-first-more-${tile.productId}'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: scheme.onSurface,
+                    side: BorderSide(color: scheme.outlineVariant, width: 1.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    textStyle: theme.textTheme.titleSmall?.copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  onPressed: () => context.go('/'),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(l10n.cartFirstOrderMore),
+                      const SizedBox(width: 4),
+                      const PmartLineIcon(
+                        PmartLineIcons.chevronRight,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

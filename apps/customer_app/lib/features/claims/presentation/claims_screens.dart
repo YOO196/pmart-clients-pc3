@@ -136,8 +136,11 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
     final theme = Theme.of(context);
     final provider = orderDetailProvider(widget.orderId);
     // 레퍼런스 9-1 4: 가운데 작은 창 — 제목 "주문을 취소할까요?", 사유(계약 필수), 오른쪽 아래 [아니요][주문취소]
+    // 사용자 레퍼런스 2026-11-26(예약 주문 취소): 둥근 흰 창, 굵은 큰 제목, [아니요] 글자 + [주문취소] 검정 채움 단추.
+    // 사유는 계약 필수(CreateClaimRequest.reason)라 남긴다.
     return Dialog(
       key: const ValueKey('cancel-dialog'),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(context).height * 0.8,
@@ -160,8 +163,8 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
                   Text(
                     l10n.cancelConfirmTitle,
                     style: theme.textTheme.titleLarge?.copyWith(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -258,16 +261,35 @@ class _CancelScreenState extends ConsumerState<CancelScreen> {
                         child: Text(l10n.cancelConfirmNo),
                       ),
                       const SizedBox(width: 8),
-                      CommandButton(
-                        key: const ValueKey('cancel-submit'),
-                        // 결과를 모르면 같은 키로 다시 확인한다(새 취소 요청이 아니다).
-                        label: _unknown
-                            ? l10n.checkoutCheckAgain
-                            : l10n.cancelSubmit,
-                        onPressed: switch (lines) {
-                          final l? when l.isNotEmpty => () => _submit(order, l),
-                          _ => null,
-                        },
+                      FilledButtonTheme(
+                        data: FilledButtonThemeData(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: theme.colorScheme.onSurface,
+                            foregroundColor: theme.colorScheme.surface,
+                            minimumSize: const Size(104, 52),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            textStyle: theme.textTheme.titleMedium?.copyWith(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        child: CommandButton(
+                          key: const ValueKey('cancel-submit'),
+                          // 결과를 모르면 같은 키로 다시 확인한다(새 취소 요청이 아니다).
+                          label: _unknown
+                              ? l10n.checkoutCheckAgain
+                              : l10n.cancelSubmit,
+                          onPressed: switch (lines) {
+                            final l? when l.isNotEmpty => () => _submit(
+                              order,
+                              l,
+                            ),
+                            _ => null,
+                          },
+                        ),
                       ),
                     ],
                   ),

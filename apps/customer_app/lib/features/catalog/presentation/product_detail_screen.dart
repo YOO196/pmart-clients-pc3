@@ -113,11 +113,11 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
         title: Text(
           l10n.brandName,
           key: const ValueKey('detail-brand'),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 21,
             fontWeight: FontWeight.w900,
             letterSpacing: -0.6,
-            color: Color(0xFF1B1D1E),
+            color: Theme.of(context).colorScheme.onSurface,
           ),
         ),
         actions: [

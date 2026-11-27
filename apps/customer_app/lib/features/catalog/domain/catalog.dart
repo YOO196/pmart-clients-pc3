@@ -325,7 +325,12 @@ class ProductQuery {
     this.filters = const {},
     this.noCorrection = false,
     this.onSale = false,
+    this.minDiscountRate,
   });
+
+  /// 할인율 이상(%)만 — 할인 탭 [50% 초과·40%·30%·20%] 버튼(사용자 2026-11-26). **계약에 없다(BR-112)** —
+  /// 목 저장소만 거르고, 실서버 저장소는 보내지 않는다(버튼도 목 모드에서만 보인다).
+  final int? minDiscountRate;
 
   /// 지금 기간 할인이 있는 상품만(search 0.8.0 `onSale`, BR-82) — 카테고리 [할인] 타일.
   final bool onSale;
@@ -347,6 +352,7 @@ class ProductQuery {
     filters: filters ?? this.filters,
     noCorrection: noCorrection,
     onSale: onSale,
+    minDiscountRate: minDiscountRate,
   );
 
   @override
@@ -357,6 +363,7 @@ class ProductQuery {
       other.sort == sort &&
       other.noCorrection == noCorrection &&
       other.onSale == onSale &&
+      other.minDiscountRate == minDiscountRate &&
       setEquals(other.filters, filters);
 
   @override
@@ -366,6 +373,7 @@ class ProductQuery {
     sort,
     noCorrection,
     onSale,
+    minDiscountRate,
     Object.hashAllUnordered(filters),
   );
 }

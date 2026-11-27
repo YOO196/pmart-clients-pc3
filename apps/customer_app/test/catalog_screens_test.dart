@@ -709,9 +709,9 @@ void main() {
       // 초안 15 B: 동그라미·할인 줄 머리를 지나 격자까지 내린다.
       await t.drag(find.byType(CustomScrollView).last, const Offset(0, -500));
       await t.pumpAndSettle();
-      final grid = find.descendant(
-        of: find.byType(SliverGrid),
-        matching: find.byType(ProductTileCard),
+      // 2칸 목록 카드(가로 할인 줄 카드는 빼고).
+      final grid = find.byWidgetPredicate(
+        (w) => w is ProductTileCard && w.look == TileLook.grid2,
       );
 
       expect(grid, findsNWidgets(2));
@@ -748,9 +748,8 @@ void main() {
         await t.drag(find.byType(CustomScrollView).last, const Offset(0, -500));
         await t.pumpAndSettle();
         return find
-            .descendant(
-              of: find.byType(SliverGrid),
-              matching: find.byType(ProductTileCard),
+            .byWidgetPredicate(
+              (w) => w is ProductTileCard && w.look == TileLook.grid2,
             )
             .evaluate()
             .length;

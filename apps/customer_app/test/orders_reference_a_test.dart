@@ -332,7 +332,7 @@ void main() {
       // 앞 5줄만, 여섯째 줄은 아직 없다.
       expect(find.byKey(const ValueKey('order-line-ol-55')), findsOneWidget);
       expect(find.byKey(const ValueKey('order-line-ol-56')), findsNothing);
-      expect(find.text('더보기'), findsWidgets);
+      expect(find.text('모든 상품 보기'), findsWidgets);
 
       await t.tap(more);
       await t.pumpAndSettle();

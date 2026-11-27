@@ -38,7 +38,12 @@ import '../../catalog/presentation/widgets/discount_price.dart'
 import '../../catalog/presentation/widgets/product_tile_card.dart'
     show ProductImage;
 import '../../checkout/domain/checkout.dart'
-    show ArrivalWindow, OutOfStockPreference;
+    show ArrivalWindow, DeliveryMode, OutOfStockPreference, Quote;
+import '../../checkout/presentation/checkout_controller.dart'
+    show clockProvider;
+import '../../reviews/domain/reviews.dart' show ReviewEligibility;
+import '../../reviews/presentation/reviews_controller.dart'
+    show orderReviewEligibilitiesProvider;
 import '../data/orders_repository.dart'
     show OrdersRepository, orderNotFinishedCode;
 import '../domain/orders.dart';
@@ -670,6 +675,57 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
       _ => null,
     };
     final ongoing = !o.canHide;
+    // 레퍼런스 9-1 1: 오른쪽 회색 알약 "주문상세"(알약 58px ≈ 19dp, 글자 112px ≈ 11sp → 태블릿 레퍼런스 13).
+    Widget detailPill() => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        l10n.orderDetailTitle,
+        style: theme.textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          height: 1.2,
+          color: scheme.onSurface,
+        ),
+      ),
+    );
+    // 카드 안 작은 테두리 단추([⊗ 주문취소] [예약시간 변경 >]).
+    Widget smallButton(
+      String key,
+      String label,
+      VoidCallback onTap, {
+      PmartLineIcons? lead,
+      bool chevron = false,
+    }) => OutlinedButton(
+      key: ValueKey(key),
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 34),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        foregroundColor: scheme.onSurface,
+        side: BorderSide(color: scheme.outlineVariant),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        textStyle: theme.textTheme.bodySmall?.copyWith(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (lead != null) ...[
+            PmartLineIcon(lead, size: 15),
+            const SizedBox(width: 3),
+          ],
+          Text(label),
+          if (chevron)
+            const PmartLineIcon(PmartLineIcons.chevronRight, size: 15),
+        ],
+      ),
+    );
     Widget outlined(
       String key,
       String label,
@@ -696,97 +752,168 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         child: Text(label),
       ),
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // 예약 확정(준비 전) 주문은 큰 날짜·시간 머리(레퍼런스 "주문내역 예약 주문", 사용자 2026-11-26). 목록 응답에는
+    // 예약 시간이 없어 그 주문 상세를 읽는다(예약 진행 주문만 — 몇 건 안 된다). 못 읽으면 보통 모양.
+    final reserved = ongoing && mode == DeliveryMode.scheduled
+        ? ref.watch(orderDetailProvider(o.orderId)).value
+        : null;
+    final reservedWindow = reserved?.status == OrderStatus.confirmed
+        ? reserved?.window
+        : null;
+    final delivered = o.status == OrderStatus.completed;
+    // 앱 아이콘 표 + 센터 이름(굵게) + "날짜 · 상태"(레퍼런스 카드 머리 — 끝난 주문).
+    Widget storeHead() => Row(
       children: [
-        // 레퍼런스 9-1: 방식(굵게) ··· 오른쪽 회색 알약 "주문상세"
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                mode != null
-                    ? modeLabel(l10n, mode)
-                    : orderStatusText(l10n, o.status),
-                key: mode != null ? ValueKey('order-mode-${o.orderId}') : null,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            // 레퍼런스 9-1 1: 알약 58px ≈ 19dp, 글자 112px ≈ 11sp
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                l10n.orderDetailTitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  fontSize: 11,
-                  height: 1.2,
-                  color: scheme.onSurface,
-                ),
-              ),
-            ),
-          ],
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.asset(
+            'assets/images/app_icon.png',
+            width: 46,
+            height: 46,
+          ),
         ),
-        // 담당 센터 이름(order 0.17.0 — 레퍼런스 9-2 카드 머리). 모르면 줄 없이.
-        if (o.mfcName case final name?)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              name,
-              key: ValueKey('order-mfc-${o.orderId}'),
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontSize: 13,
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        const SizedBox(height: 10),
-        // 진행 중: 큰 굵은 글씨로 지금 상태, 아래 주문 시각. 끝난 주문: 날짜 · 상태 한 줄.
-        if (ongoing) ...[
-          Text(
-            orderStatusText(l10n, o.status),
-            key: ValueKey('order-status-${o.orderId}'),
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontSize: 21.5,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          if (o.orderedAt case final t?)
-            Text(
-              l10n.ordersOrderedAt(formatSeoulDateTime(t)),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-        ] else
-          Row(
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (o.orderedAt case final t?)
-                Text(
-                  '${formatSeoulDate(t)} · ',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontSize: 12,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
               Text(
-                orderStatusText(l10n, o.status),
-                key: ValueKey('order-status-${o.orderId}'),
+                o.mfcName ?? (mode != null ? modeLabel(l10n, mode) : ''),
+                key: ValueKey('order-mfc-${o.orderId}'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+              DefaultTextStyle.merge(
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: o.status == OrderStatus.cancelled
-                      ? scheme.error
-                      : scheme.onSurface,
+                  fontSize: 13.5,
+                  color: scheme.onSurfaceVariant,
+                ),
+                child: Row(
+                  children: [
+                    if (o.orderedAt case final t?)
+                      Text('${formatSeoulDate(t)} · '),
+                    Text(
+                      orderStatusText(l10n, o.status),
+                      key: ValueKey('order-status-${o.orderId}'),
+                      style: o.status == OrderStatus.cancelled
+                          ? TextStyle(color: scheme.error)
+                          : null,
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
+        ),
+        detailPill(),
+      ],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!ongoing)
+          storeHead()
+        else ...[
+          // 레퍼런스 9-1: 방식(굵게) ··· 오른쪽 회색 알약 "주문상세"
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  mode != null
+                      ? modeLabel(l10n, mode)
+                      : orderStatusText(l10n, o.status),
+                  key: mode != null
+                      ? ValueKey('order-mode-${o.orderId}')
+                      : null,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              detailPill(),
+            ],
+          ),
+          // 담당 센터 이름(order 0.17.0 — 레퍼런스 9-2 카드 머리). 모르면 줄 없이.
+          if (o.mfcName case final name?)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                name,
+                key: ValueKey('order-mfc-${o.orderId}'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 13,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          const SizedBox(height: 10),
+          // 진행 중: 큰 굵은 글씨로 지금 상태(예약 확정이면 날짜·시간 "예약"), 아래 주문 시각.
+          if (reservedWindow case final w?) ...[
+            Text(
+              reservedHeadline(l10n, w),
+              key: ValueKey('order-status-${o.orderId}'),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontSize: 23,
+                height: 1.35,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              l10n.ordersRescheduleNote,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: 14,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            if (reserved != null &&
+                (canRequestCancel(reserved) ||
+                    canRequestTimeChange(reserved))) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6,
+                children: [
+                  if (canRequestCancel(reserved))
+                    smallButton(
+                      'order-cancel-${o.orderId}',
+                      l10n.cancelTitle,
+                      () => context.push('/orders/${o.orderId}/cancel'),
+                      lead: PmartLineIcons.clearCircle,
+                    ),
+                  if (canRequestTimeChange(reserved))
+                    smallButton(
+                      'order-reschedule-${o.orderId}',
+                      l10n.rescheduleTitle,
+                      () => context.push('/orders/${o.orderId}/reschedule'),
+                      chevron: true,
+                    ),
+                ],
+              ),
+            ],
+          ] else ...[
+            Text(
+              orderStatusText(l10n, o.status),
+              key: ValueKey('order-status-${o.orderId}'),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontSize: 21.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (o.orderedAt case final t?)
+              Text(
+                l10n.ordersOrderedAt(formatSeoulDateTime(t)),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ],
         const SizedBox(height: 12),
         const Divider(height: 1),
         const SizedBox(height: 12),
@@ -866,17 +993,54 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen> {
         // 있으면(서버가 앞 5개만 줌) 전부 담을 수 있는 주문상세로 간다.
         if (!ongoing && o.lines.isNotEmpty) ...[
           const SizedBox(height: 14),
-          o.moreQty == null
-              ? ReorderAllButton(
-                  key: ValueKey('order-reorder-all-${o.orderId}'),
-                  lines: [
-                    for (final l in o.lines) (sku: l.sku, quantity: l.quantity),
-                  ],
-                )
-              : ReorderAllButton.goDetail(
-                  key: ValueKey('order-reorder-all-${o.orderId}'),
-                  onPressed: () => context.push('/orders/${o.orderId}'),
+          Row(
+            children: [
+              // 배송 완료 + 리뷰를 쓸 수 있는 품목이 있으면 왼쪽 [리뷰 쓰기 (D-N)](레퍼런스, 사용자 2026-11-26).
+              // 기한은 서버 eligibleUntil 그대로 날짜 수로만 바꿔 보인다. 포인트 꼬리표는 1차 제외라 없다.
+              if (delivered) _ReviewWriteButton(orderId: o.orderId),
+              Expanded(
+                child: o.moreQty == null
+                    ? ReorderAllButton(
+                        key: ValueKey('order-reorder-all-${o.orderId}'),
+                        lines: [
+                          for (final l in o.lines)
+                            (sku: l.sku, quantity: l.quantity),
+                        ],
+                      )
+                    : ReorderAllButton.goDetail(
+                        key: ValueKey('order-reorder-all-${o.orderId}'),
+                        onPressed: () => context.push('/orders/${o.orderId}'),
+                      ),
+              ),
+            ],
+          ),
+          // 카드 맨 아래 "반품 · 교환 >"(레퍼런스 배송 완료 카드).
+          if (delivered) ...[
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            Center(
+              child: TextButton(
+                key: ValueKey('order-return-${o.orderId}'),
+                onPressed: () =>
+                    context.push('/orders/${o.orderId}/return-exchange'),
+                style: TextButton.styleFrom(
+                  foregroundColor: scheme.onSurface,
+                  textStyle: theme.textTheme.titleSmall?.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(l10n.ordersReturnExchange),
+                    const SizedBox(width: 4),
+                    const PmartLineIcon(PmartLineIcons.chevronRight, size: 16),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
         // 목록 카드의 [삭제]는 뺐다(사용자 2026-11-23 "주문마다 붙어 있는 삭제 버튼 지워") — 삭제는 주문 상세 맨 아래에서만.
       ],
@@ -1243,6 +1407,17 @@ class _OrderBody extends ConsumerWidget {
                         ),
                       ],
                     ),
+                    // 주문일시(계약 confirmedAt — 사용자 레퍼런스 2026-11-26). 없으면 줄 없음.
+                    if (o.confirmedAt case final at?)
+                      Text(
+                        l10n.orderedAtLine(
+                          DateFormat(
+                            'y년 M월 d일 a h:mm',
+                            'ko',
+                          ).format(toSeoulWallClock(at)),
+                        ),
+                        key: const ValueKey('order-ordered-at'),
+                      ),
                     Text(
                       l10n.payOrderNumber(o.displayNumber),
                       key: const ValueKey('order-number'),
@@ -1492,15 +1667,9 @@ class _OrderBody extends ConsumerWidget {
                   _money(l10n, q.deliveryTip),
                 ),
               _Row(l10n.amountBag, _money(l10n, o.quote?.bagFee)),
-              // 할인(order 0.18.0 — 서버 값만, 0 이면 줄을 두지 않는다).
-              if (o.quote?.promotionDiscount case final d? when d > 0)
-                _Row(l10n.amountPromotion, formatKrw(d, negative: true)),
-              if (o.quote?.couponDiscount case final d? when d > 0)
-                _Row(
-                  // 주문 조회도 쿠폰 이름을 준다(order 0.19.0). 없으면 "쿠폰 할인".
-                  o.quote?.coupon?.name ?? l10n.amountCoupon,
-                  formatKrw(d, negative: true),
-                ),
+              // 할인(order 0.18.0 — 서버 값만, 0 이면 줄을 두지 않는다). 레퍼런스(사용자 2026-11-26): 점선 아래
+              // 보라 "총 할인받은 금액 ⌃" 묶음(누르면 접고 편다) — 상품할인·쿠폰 줄도 보라 값.
+              _DiscountGroup(quote: o.quote),
               Padding(
                 padding: const EdgeInsets.only(top: 10, bottom: 4),
                 child: Divider(
@@ -1509,24 +1678,66 @@ class _OrderBody extends ConsumerWidget {
                   color: scheme.onSurface,
                 ),
               ),
-              _Row(
-                (o.refundedAmount ?? 0) > 0
-                    ? l10n.amountTotalInitial
-                    : l10n.amountTotal,
-                _money(l10n, o.quote?.totalAmount),
-                strong: true,
-              ),
+              // 취소된 주문은 결제금액을 옅게 "N원 취소"(레퍼런스).
+              if (o.status == OrderStatus.cancelled &&
+                  o.quote?.totalAmount != null)
+                _Row(
+                  l10n.amountTotal,
+                  l10n.payCancelledAmount(formatKrw(o.quote!.totalAmount!)),
+                  strong: true,
+                  valueColor: scheme.outline,
+                )
+              else
+                _Row(
+                  (o.refundedAmount ?? 0) > 0
+                      ? l10n.amountTotalInitial
+                      : l10n.amountTotal,
+                  _money(l10n, o.quote?.totalAmount),
+                  strong: true,
+                ),
+              // 결제금액 아래 연보라 띠 "배달팁 0원! ⚡ N원 할인"(할인 합이 있을 때만 — 서버 값 합).
+              _DiscountBand(quote: o.quote),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 6),
                 child: Divider(height: 1),
               ),
               _PaymentMethodRow(paymentAttemptId: o.paymentAttemptId),
-              if ((o.refundedAmount ?? 0) > 0)
-                _Row(
-                  l10n.refundedAmount,
-                  formatKrw(o.refundedAmount!),
-                  key: const ValueKey('refunded'),
+              // 레퍼런스 회색 안내 상자(간편결제 영수증).
+              _GreyNote(l10n.payEasyPayReceiptNote),
+              // 총 환불금액(서버 환불액이 있을 때 — 레퍼런스 취소 주문).
+              if ((o.refundedAmount ?? 0) > 0) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Divider(height: 1),
                 ),
+                Row(
+                  key: const ValueKey('refunded'),
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.refundTotalTitle,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      formatKrw(o.refundedAmount!),
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
+                        color: scheme.error,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                _PaymentMethodRow(
+                  paymentAttemptId: o.paymentAttemptId,
+                  label: l10n.refundMethod,
+                ),
+              ],
             ],
           ),
           _ClaimsSection(order: o, onVisit: visit),
@@ -1767,9 +1978,12 @@ class _AutoCancelNotice extends ConsumerWidget {
 
 /// 결제 수단(`GET /payments/{paymentAttemptId}.method`). 조회 실패는 "정보 없음"이 아니라 실패 + 다시 조회.
 class _PaymentMethodRow extends ConsumerWidget {
-  const _PaymentMethodRow({required this.paymentAttemptId});
+  const _PaymentMethodRow({required this.paymentAttemptId, this.label});
 
   final String? paymentAttemptId;
+
+  /// 줄 이름(없으면 "결제방법" — 환불 칸은 "환불방법").
+  final String? label;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1778,9 +1992,11 @@ class _PaymentMethodRow extends ConsumerWidget {
     final id = paymentAttemptId;
     if (id == null) {
       return _Row(
-        l10n.orderPaymentMethod,
+        label ?? l10n.orderPaymentMethod,
         l10n.orderPaymentMethodNone,
-        key: const ValueKey('order-payment-method'),
+        key: ValueKey(
+          label == null ? 'order-payment-method' : 'order-refund-method',
+        ),
       );
     }
     final provider = orderPaymentProvider(id);
@@ -1802,10 +2018,202 @@ class _PaymentMethodRow extends ConsumerWidget {
         ],
       );
     }
-    return _Row(l10n.orderPaymentMethod, switch (value) {
-      AsyncData(:final value) => value.method ?? l10n.orderPaymentMethodNone,
-      _ => l10n.orderPaymentMethodChecking,
-    }, key: const ValueKey('order-payment-method'));
+    return _Row(
+      label ?? l10n.orderPaymentMethod,
+      switch (value) {
+        AsyncData(:final value) => value.method ?? l10n.orderPaymentMethodNone,
+        _ => l10n.orderPaymentMethodChecking,
+      },
+      key: ValueKey(
+        label == null ? 'order-payment-method' : 'order-refund-method',
+      ),
+    );
+  }
+}
+
+/// 레퍼런스 결제 정보 보라(할인) 색.
+const _discountPurple = Color(0xFF5B35E8);
+
+/// "총 할인받은 금액 ⌃" 묶음(사용자 레퍼런스 2026-11-26): 위 점선, 보라 굵은 이름·합계, 누르면 아래 상품할인·쿠폰
+/// 줄을 접고 편다(처음은 펼침). 서버 값만 — 할인이 하나도 없으면(0·없음) 묶음을 두지 않는다.
+class _DiscountGroup extends StatefulWidget {
+  const _DiscountGroup({required this.quote});
+
+  final Quote? quote;
+
+  @override
+  State<_DiscountGroup> createState() => _DiscountGroupState();
+}
+
+class _DiscountGroupState extends State<_DiscountGroup> {
+  bool _open = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final q = widget.quote;
+    final promo = q?.promotionDiscount ?? 0;
+    final coupon = q?.couponDiscount ?? 0;
+    final total = promo + coupon;
+    if (total <= 0) return const SizedBox.shrink();
+    return Column(
+      key: const ValueKey('order-discount-group'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: _DashedLine(),
+        ),
+        InkWell(
+          key: const ValueKey('order-discount-toggle'),
+          onTap: () => setState(() => _open = !_open),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Row(
+              children: [
+                Text(
+                  l10n.payDiscountTotal,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: _discountPurple,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Transform.flip(
+                  flipY: _open,
+                  child: const PmartLineIcon(
+                    PmartLineIcons.chevronDown,
+                    size: 15,
+                    color: _discountPurple,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  formatKrw(total, negative: true),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: _discountPurple,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_open) ...[
+          if (promo > 0)
+            _Row(
+              l10n.amountPromotion,
+              formatKrw(promo, negative: true),
+              valueColor: _discountPurple,
+            ),
+          if (coupon > 0)
+            _Row(
+              // 주문 조회도 쿠폰 이름을 준다(order 0.19.0). 없으면 "쿠폰 할인".
+              q?.coupon?.name ?? l10n.amountCoupon,
+              formatKrw(coupon, negative: true),
+              valueColor: _discountPurple,
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+/// 결제금액 아래 연보라 띠 "배달팁 0원! ⚡ N원 할인"(레퍼런스). 할인 합이 없으면 띠 없음, 배달팁이 0 일 때만 앞말.
+class _DiscountBand extends StatelessWidget {
+  const _DiscountBand({required this.quote});
+
+  final Quote? quote;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final q = quote;
+    final total = (q?.promotionDiscount ?? 0) + (q?.couponDiscount ?? 0);
+    if (total <= 0) return const SizedBox.shrink();
+    final style = theme.textTheme.bodyMedium?.copyWith(
+      fontSize: 15,
+      fontWeight: FontWeight.w800,
+      color: _discountPurple,
+    );
+    return Container(
+      key: const ValueKey('order-discount-band'),
+      margin: const EdgeInsets.only(top: 12, bottom: 4),
+      padding: const EdgeInsets.symmetric(vertical: 13),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFEEFD),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (q?.deliveryTip == 0) ...[
+            Text(l10n.payDiscountBandFreeTip, style: style),
+            const SizedBox(width: 2),
+          ],
+          const Icon(Icons.bolt, size: 18, color: _discountPurple),
+          Text(l10n.payDiscountBand(formatKrw(total)), style: style),
+        ],
+      ),
+    );
+  }
+}
+
+/// 회색 둥근 안내 상자(가운데 정렬 회색 글 — 레퍼런스 결제 정보·환불 안내).
+class _GreyNote extends StatelessWidget {
+  const _GreyNote(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: theme.textTheme.bodySmall?.copyWith(
+          fontSize: 13,
+          height: 1.5,
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+/// 옅은 점선 한 줄.
+class _DashedLine extends StatelessWidget {
+  const _DashedLine();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.outlineVariant;
+    return LayoutBuilder(
+      builder: (context, c) {
+        final n = (c.maxWidth / 6).floor();
+        return Row(
+          children: [
+            for (var i = 0; i < n; i++)
+              Expanded(
+                child: Container(
+                  height: 1,
+                  margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                  color: color,
+                ),
+              ),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -2293,13 +2701,22 @@ class _ReorderButtonState extends ConsumerState<ReorderButton> {
 }
 
 class _Row extends StatelessWidget {
-  const _Row(this.label, this.value, {super.key, this.strong = false});
+  const _Row(
+    this.label,
+    this.value, {
+    super.key,
+    this.strong = false,
+    this.valueColor,
+  });
 
   final String label;
   final String value;
 
   /// 합계 줄처럼 굵고 크게.
   final bool strong;
+
+  /// 값 색(할인 줄은 보라, 취소 금액은 옅게).
+  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -2313,7 +2730,12 @@ class _Row extends StatelessWidget {
         children: [
           Expanded(child: Text(label, style: style)),
           // 레퍼런스 9-1 3-1: 결제금액 값은 이름보다 크다(약 18.5sp).
-          Text(value, style: strong ? style?.copyWith(fontSize: 18.5) : style),
+          Text(
+            value,
+            style: (strong ? style?.copyWith(fontSize: 18.5) : style)?.copyWith(
+              color: valueColor,
+            ),
+          ),
         ],
       ),
     );
@@ -4099,6 +4521,80 @@ class _DeliveryInfoBox extends StatelessWidget {
             b,
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// 주문내역 배송 완료 카드 [리뷰 쓰기 (D-N)] — 이 주문에 리뷰를 쓸 수 있는 품목이 있을 때만(서버 자격).
+/// D-N 은 서버 기한(eligibleUntil, 품목 중 가장 이른 것)까지 남은 날 수(서울 달력). 누르면 리뷰관리.
+class _ReviewWriteButton extends ConsumerWidget {
+  const _ReviewWriteButton({required this.orderId});
+
+  final String orderId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final items = ref.watch(orderReviewEligibilitiesProvider(orderId)).value;
+    final writable = [
+      for (final e in items ?? const <ReviewEligibility>[])
+        if (e.writable) e,
+    ];
+    if (writable.isEmpty) return const SizedBox.shrink();
+    final until = writable
+        .map((e) => e.eligibleUntil)
+        .whereType<DateTime>()
+        .fold<DateTime?>(null, (a, b) => a == null || b.isBefore(a) ? b : a);
+    int? days;
+    if (until != null) {
+      final now = toSeoulWallClock(ref.watch(clockProvider)());
+      final end = toSeoulWallClock(until);
+      days = DateTime.utc(
+        end.year,
+        end.month,
+        end.day,
+      ).difference(DateTime.utc(now.year, now.month, now.day)).inDays;
+    }
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: OutlinedButton(
+          key: ValueKey('order-review-write-$orderId'),
+          onPressed: () => context.push('/reviews'),
+          // 레퍼런스 9-2 1: 옆 [같은 상품 담기]와 같은 높이 35dp·글자 14sp 굵게, (D-N)은 12sp 흐리게.
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(35),
+            padding: EdgeInsets.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            foregroundColor: scheme.onSurface,
+            side: BorderSide(color: scheme.outlineVariant, width: 1.2),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: l10n.ordersReviewWrite,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                if (days != null && days >= 0)
+                  TextSpan(
+                    text: ' ${l10n.ordersReviewDays(days)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+            style: theme.textTheme.titleSmall?.copyWith(fontSize: 14),
+          ),
+        ),
       ),
     );
   }

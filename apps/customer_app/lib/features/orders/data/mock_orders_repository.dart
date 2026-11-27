@@ -107,6 +107,7 @@ base class MockOrdersRepository implements OrdersRepository {
         },
       ],
       'outOfStockPreference': 'CANCEL_OOS_ONLY',
+      'confirmedAt': '2026-10-24T02:30:00Z',
       'deliveryNote': '문 앞에 두고 벨은 누르지 말아 주세요',
       'payment': {
         'paymentAttemptId': 'pa-4',
@@ -238,6 +239,7 @@ base class MockOrdersRepository implements OrdersRepository {
         },
       ],
       'outOfStockPreference': 'CANCEL_ALL',
+      'confirmedAt': '2026-10-24T02:30:00Z',
       'payment': {
         'paymentAttemptId': 'pa-2',
         'state': 'APPROVED',
@@ -345,6 +347,7 @@ base class MockOrdersRepository implements OrdersRepository {
           'state': 'PLANNED',
         },
       ],
+      'confirmedAt': DateTime.now().toUtc().toIso8601String(),
       'outOfStockPreference': switch (d.request.outOfStock) {
         OutOfStockPreference.cancelOutOfStockOnly => 'CANCEL_OOS_ONLY',
         OutOfStockPreference.cancelAll => 'CANCEL_ALL',

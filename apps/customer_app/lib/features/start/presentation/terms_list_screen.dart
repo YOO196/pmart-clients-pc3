@@ -4,9 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
-import '../../../shared/ui_state_of.dart';
 import '../../profile/data/consents_repository.dart' show ConsentWire;
-import '../data/device_consents_repository.dart';
 import 'start_controller.dart';
 
 /// 약관 이름(서버 항목 코드 → 화면 이름). 모르는 항목은 서버 코드 그대로(지어내지 않는다).
@@ -19,9 +17,9 @@ String consentTermTitle(AppLocalizations l10n, String type) => switch (type) {
   _ => type,
 };
 
-/// 마이 → 약관 및 정책(사용자 2026-11-20 "약관 볼 수 있게"). 로그인하지 않아도 본다.
-/// 목록은 서버 약관 목록(`GET /consent-terms` — 현행 버전), 누르면 본문(`/consent-terms/{항목}/{버전}`).
-/// 본문이 없는 항목은 누를 수 없다. 조회 실패는 빈 목록이 아니라 실패 + 다시 시도.
+/// 마이·고객센터 → 약관 및 정책(사용자 레퍼런스 2026-11-26 — 목록이 늘 보이게, 안 내용은 대충).
+/// 고정 목록: 이용약관·위치기반·개인정보는 서버 약관 본문(`/consent-terms` 현행 버전)이 있으면 그것을 열고,
+/// 못 읽었거나 없으면 아래 시연용 글을 연다. 나머지 항목은 시연용 글(법률 검토 전 — 화면에 그렇게 적는다).
 class TermsListScreen extends ConsumerWidget {
   const TermsListScreen({super.key});
 
@@ -29,38 +27,117 @@ class TermsListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final value = ref.watch(consentTermsProvider);
+    final server = ref.watch(consentTermsProvider).value;
+    String? serverVersion(String type) => server?.items
+        .where((t) => t.type == type && t.hasDocument)
+        .firstOrNull
+        ?.latestVersion;
+    final items = <(String key, String title, String? consentType)>[
+      ('business', l10n.policyBusiness, null),
+      ('terms', l10n.consentTerms, ConsentWire.terms),
+      ('location', l10n.consentLocation, ConsentWire.location),
+      ('finance', l10n.policyFinance, null),
+      ('privacy', l10n.consentPrivacy, ConsentWire.privacy),
+      ('review', l10n.policyReview, null),
+      ('data', l10n.policyData, null),
+      ('dispute', l10n.policyDispute, null),
+      ('copyright', l10n.policyCopyright, null),
+    ];
     return Scaffold(
       key: const ValueKey('terms-list'),
-      appBar: AppBar(title: Text(l10n.termsTitle)),
-      body: UiStateView<ConsentTerms>(
-        state: uiStateOf(value, isEmpty: (t) => t.items.isEmpty),
-        onRetry: () => ref.invalidate(consentTermsProvider),
-        empty: (_) => Center(child: Text(l10n.termsEmpty)),
-        ready: (context, terms) => ListView(
-          children: [
-            for (final t in terms.items)
-              ListTile(
-                key: ValueKey('terms-${t.type}'),
-                title: Text(consentTermTitle(l10n, t.type)),
-                subtitle: Text(
-                  l10n.termsVersion(t.latestVersion),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                trailing: t.hasDocument
-                    ? const PmartLineIcon(PmartLineIcons.chevronRight, size: 18)
-                    : null,
-                enabled: t.hasDocument,
-                onTap: t.hasDocument
-                    ? () => context.push(
-                        StartRoutes.terms(t.type, t.latestVersion),
-                      )
-                    : null,
-              ),
-          ],
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(
+          l10n.termsTitle,
+          style: theme.appBarTheme.titleTextStyle?.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
         ),
+      ),
+      body: ListView.separated(
+        itemCount: items.length,
+        separatorBuilder: (_, _) => Divider(
+          height: 1,
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
+        ),
+        itemBuilder: (context, i) {
+          final (key, title, type) = items[i];
+          final version = type == null ? null : serverVersion(type);
+          return InkWell(
+            key: ValueKey('terms-$key'),
+            onTap: () => version != null
+                ? context.push(StartRoutes.terms(type!, version))
+                : Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          _SamplePolicyScreen(title: title, policyKey: key),
+                    ),
+                  ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 16, 20),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: theme.textTheme.bodyLarge?.copyWith(fontSize: 17),
+                    ),
+                  ),
+                  PmartLineIcon(
+                    PmartLineIcons.chevronRight,
+                    size: 22,
+                    color: theme.colorScheme.outline,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// 시연용 약관 글(사용자 "안에 내용은 대충 적어") — 맨 위에 시연용 초안임을 적는다.
+class _SamplePolicyScreen extends StatelessWidget {
+  const _SamplePolicyScreen({required this.title, required this.policyKey});
+
+  final String title;
+  final String policyKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return Scaffold(
+      key: ValueKey('terms-sample-$policyKey'),
+      appBar: AppBar(title: Text(title)),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              l10n.policySampleNotice,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            l10n.policySampleBody(title),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 15,
+              height: 1.7,
+            ),
+          ),
+        ],
       ),
     );
   }

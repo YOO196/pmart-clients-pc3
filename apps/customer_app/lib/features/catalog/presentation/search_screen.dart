@@ -18,6 +18,7 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/cart_icon_button.dart';
 import '../domain/catalog.dart';
 import 'catalog_providers.dart';
+import 'widgets/product_tile_card.dart' show ProductTileCard, TileLook;
 import 'product_list_view.dart';
 import '../../../shared/notice.dart';
 
@@ -331,6 +332,8 @@ class _RecentSearchesState extends ConsumerState<_RecentSearches> {
         // 자주 산 상품(order 0.24.0, 백엔드 요청 2026-11-26 F1) — 회원·있을 때만, 실패도 숨김.
         _FrequentItems(spaceAbove: showRecent),
         _PopularKeywords(onPick: widget.onPick, spaceAbove: showRecent),
+        // 지금 잘 팔리는 상품(사용자 레퍼런스 2026-11-26).
+        const _SellingNow(),
       ],
     );
   }
@@ -392,78 +395,225 @@ class _FrequentItems extends ConsumerWidget {
   }
 }
 
-/// 인기 검색어(search 0.5.2 — 검색 첫 화면, 비회원도). 서버 순서 그대로 번호를 붙여 두 줄로 보인다.
+/// 인기 검색어(search 0.5.2 — 검색 첫 화면, 비회원도). 레퍼런스(사용자 2026-11-26): 굵은 제목 아래 회색 둥근 상자에
+/// 순위 하나씩 3초마다 위로 바뀌어 보이고 오른쪽 [펼쳐서 보기 ⌄] — 펼치면 서버 순서대로 두 줄 목록, [접기 ⌃].
 /// 집계가 없으면(빈 목록) 구역을 숨긴다. 못 읽어도 숨긴다 — 자동완성처럼 없어도 검색은 되는 보조 칸이라
-/// 실패 안내를 띄우지 않는다("인기 검색어가 없다"고 말하지도 않는다).
-class _PopularKeywords extends ConsumerWidget {
+/// 실패 안내를 띄우지 않는다("인기 검색어가 없다"고 말하지도 않는다). 순위 변동 화살표는 계약에 없다(BR-110).
+class _PopularKeywords extends ConsumerStatefulWidget {
   const _PopularKeywords({required this.onPick, required this.spaceAbove});
 
   final ValueChanged<String> onPick;
   final bool spaceAbove;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PopularKeywords> createState() => _PopularKeywordsState();
+}
+
+class _PopularKeywordsState extends ConsumerState<_PopularKeywords> {
+  bool _open = false;
+  int _index = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
+      final n = ref.read(popularKeywordsProvider).value?.length ?? 0;
+      if (!_open && n > 1 && mounted) setState(() => _index = (_index + 1) % n);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final items = ref.watch(popularKeywordsProvider).value;
     if (items == null || items.isEmpty) return const SizedBox.shrink();
+    final current = _index % items.length;
+    Widget entry(int i, {bool dense = false}) => InkWell(
+      key: ValueKey('popular-${i + 1}'),
+      onTap: () => widget.onPick(items[i]),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: dense ? 0 : 10),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 26,
+              child: Text(
+                '${i + 1}',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurface,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                items[i],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
     // 왼쪽 줄 1…n, 오른쪽 줄 n+1… (세로로 읽는 순위)
     final half = (items.length + 1) ~/ 2;
     Widget column(int from, int to) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = from; i < to; i++)
-          InkWell(
-            key: ValueKey('popular-${i + 1}'),
-            onTap: () => onPick(items[i]),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 26,
-                    child: Text(
-                      '${i + 1}',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      items[i],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyLarge?.copyWith(fontSize: 15),
-                    ),
-                  ),
-                ],
+      children: [for (var i = from; i < to; i++) entry(i)],
+    );
+    final toggle = InkWell(
+      key: ValueKey(_open ? 'popular-collapse' : 'popular-expand'),
+      onTap: () => setState(() => _open = !_open),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _open ? l10n.searchPopularCollapse : l10n.searchPopularExpand,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: 13.5,
+                color: scheme.onSurfaceVariant,
               ),
             ),
-          ),
-      ],
+            const SizedBox(width: 2),
+            Transform.flip(
+              flipY: _open,
+              child: PmartLineIcon(
+                PmartLineIcons.chevronDown,
+                size: 15,
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
     return Column(
       key: const ValueKey('popular-keywords'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (spaceAbove) const SizedBox(height: 28),
+        if (widget.spaceAbove) const SizedBox(height: 28),
         Text(
           l10n.searchPopularTitle,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 6),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: column(0, half)),
-            const SizedBox(width: 16),
-            Expanded(child: column(half, items.length)),
-          ],
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 10, 14, 10),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: _open
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: column(0, half)),
+                        const SizedBox(width: 16),
+                        Expanded(child: column(half, items.length)),
+                      ],
+                    ),
+                    Align(alignment: Alignment.centerRight, child: toggle),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: ClipRect(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 350),
+                          transitionBuilder: (child, a) => SlideTransition(
+                            position: Tween(
+                              begin: const Offset(0, 1),
+                              end: Offset.zero,
+                            ).animate(a),
+                            child: child,
+                          ),
+                          child: KeyedSubtree(
+                            key: ValueKey('popular-now-$current'),
+                            child: entry(current, dense: true),
+                          ),
+                        ),
+                      ),
+                    ),
+                    toggle,
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 검색 첫 화면 "지금 잘 팔리는 상품"(레퍼런스 "이 가게에서 지금 잘 팔리는 상품") — 지금 주소 센터 인기순 앞 10개
+/// 가로 줄(search `sort=POPULAR`). 비었거나 못 읽으면 구역을 숨긴다(검색은 그대로 된다).
+class _SellingNow extends ConsumerWidget {
+  const _SellingNow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final items = ref
+        .watch(productListProvider(const ProductQuery(sort: SortKey.popular)))
+        .value
+        ?.items
+        .take(10)
+        .toList();
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
+    final width = ProductTileCard.railWidthOf(context) * 1.25;
+    return Column(
+      key: const ValueKey('search-selling'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 36),
+        Text(
+          l10n.searchSellingTitle,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: width + 150,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, i) => SizedBox(
+              width: width,
+              child: ProductTileCard(
+                key: ValueKey('search-selling-${items[i].productId}'),
+                rail: true,
+                look: TileLook.grid3,
+                tile: items[i],
+                onTap: () => context.push(
+                  '/products/${items[i].productId}',
+                  extra: items[i],
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );

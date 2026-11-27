@@ -145,26 +145,57 @@ class SupportScreen extends ConsumerWidget {
             padding: EdgeInsets.symmetric(vertical: 8),
             child: _FullWidthGap(),
           ),
+          // 레퍼런스(사용자 2026-11-26): 줄 사이 화면 폭 옅은 선, 회색 띠 아래 "약관 및 정책".
           SupportRow(
             key: const ValueKey('support-chat'),
             label: l10n.supportChat,
             description: l10n.supportChatDesc,
             onTap: () => context.push('/support/chat'),
           ),
+          const _FullWidthLine(),
           SupportRow(
             key: const ValueKey('support-new-inquiry'),
             label: l10n.supportNewInquiry,
             onTap: () => context.push('/support/inquiries/new'),
           ),
+          const _FullWidthLine(),
           SupportRow(
             key: const ValueKey('support-my-inquiries'),
             label: l10n.supportMyInquiries,
             onTap: () => context.push('/support/inquiries'),
           ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: _FullWidthGap(),
+          ),
+          SupportRow(
+            key: const ValueKey('support-terms'),
+            label: l10n.termsTitle,
+            onTap: () => context.push('/me/terms'),
+          ),
         ],
       ),
     );
   }
+}
+
+/// 좌우 여백 16 인 목록 안에서 화면 폭 옅은 줄.
+class _FullWidthLine extends StatelessWidget {
+  const _FullWidthLine();
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 1,
+    child: OverflowBox(
+      maxWidth: MediaQuery.sizeOf(context).width,
+      child: Divider(
+        height: 1,
+        color: Theme.of(context).colorScheme.outlineVariant.withValues(
+          alpha: 0.6,
+        ),
+      ),
+    ),
+  );
 }
 
 /// 좌우 여백 16 인 목록 안에서 화면 폭 회색 띠.
@@ -205,20 +236,21 @@ class SupportRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 20),
         child: Row(
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 레퍼런스: 설명이 있는 줄(채팅 상담)은 17.5 아주 굵게, 나머지 17 보통.
                   Text(
                     label,
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      fontSize: 16,
+                      fontSize: description == null && !bold ? 17 : 17.5,
                       fontWeight: description == null && !bold
                           ? null
-                          : FontWeight.w700,
+                          : FontWeight.w800,
                     ),
                   ),
                   if (description case final d?)

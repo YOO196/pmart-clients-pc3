@@ -30,9 +30,9 @@ void main() {
     // 홈 다음은 할인 탭(사용자 2026-11-26).
     expect(key('home-tab-body-sale'), findsOneWidget);
 
-    // 탭 줄 바로 아래(할인 내용 위쪽)에서 오른쪽으로.
+    // 탭 줄 바로 아래(할인율 칩 위 빈 자리 — 칩 줄은 가로로 넘어간다)에서 오른쪽으로.
     await t.dragFrom(
-      t.getBottomLeft(key('home-tabs')) + const Offset(100, 40),
+      t.getBottomLeft(key('home-tabs')) + const Offset(100, 6),
       const Offset(160, 0),
     );
     await t.pumpAndSettle();
@@ -61,7 +61,8 @@ void main() {
     await t.tap(key('home-tab-ranking'));
     await t.pump();
     await t.pump(const Duration(milliseconds: 60));
-    final moving = find.ancestor(
+    // 랭킹 목록은 슬리버 묶음이라 안쪽 상자들(위 배너·붙는 줄·첫 줄들)이 미끄러진다.
+    final moving = find.descendant(
       of: key('home-tab-body-ranking'),
       matching: find.byType(SlideTransition),
     );

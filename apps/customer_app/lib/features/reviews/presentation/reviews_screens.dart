@@ -148,20 +148,26 @@ class ReviewManageScreen extends ConsumerWidget {
       initialIndex: initialMine ? 1 : 0,
       child: Scaffold(
         appBar: AppBar(
-          title: Text(l10n.reviewManageTitle),
+          // 레퍼런스 리뷰관리(사용자 2026-11-26): 가운데 굵은 제목, 아래 밑줄 탭 두 칸.
+          centerTitle: true,
+          title: Text(
+            l10n.reviewManageTitle,
+            style: Theme.of(context).appBarTheme.titleTextStyle
+                ?.copyWith(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
 
           // 레퍼런스 11 "리뷰관리": 회색 바탕 두 칸 — 고른 칸은 흰 바탕·테두리·검은 글씨(16), 안 고른 칸은 회색.
           // (위의 "배달·픽업 | 장보기·쇼핑" 밑줄 탭은 우리 앱에 없다.) 사용자 2026-11-21 "이 목록 너무 구려".
           bottom: member
               ? PreferredSize(
-                  preferredSize: const Size.fromHeight(47),
+                  preferredSize: const Size.fromHeight(52),
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: _SegmentTabs(
                       tabs: [
                         Tab(
                           key: const ValueKey('review-tab-write'),
-                          height: 35,
+                          height: 50,
                           child: tabLabel(
                             l10n.reviewTabWrite,
                             counts?.writable,
@@ -169,7 +175,7 @@ class ReviewManageScreen extends ConsumerWidget {
                         ),
                         Tab(
                           key: const ValueKey('review-tab-mine'),
-                          height: 35,
+                          height: 50,
                           child: tabLabel(l10n.reviewTabMine, counts?.written),
                         ),
                       ],
@@ -196,33 +202,24 @@ class _SegmentTabs extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Container(
-      height: 35,
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(10),
+    // 레퍼런스(사용자 2026-11-26): 밑줄 탭 — 고른 칸은 검정 굵은 글 + 검정 밑줄 2.5, 안 고른 칸은 회색, 아래 옅은 선.
+    return TabBar(
+      tabs: tabs,
+      indicatorSize: TabBarIndicatorSize.tab,
+      dividerHeight: 1,
+      dividerColor: scheme.outlineVariant.withValues(alpha: 0.6),
+      splashFactory: NoSplash.splashFactory,
+      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+      indicator: UnderlineTabIndicator(
+        borderSide: BorderSide(color: scheme.onSurface, width: 2.5),
       ),
-      child: TabBar(
-        tabs: tabs,
-        indicatorSize: TabBarIndicatorSize.tab,
-        dividerHeight: 0,
-        splashFactory: NoSplash.splashFactory,
-        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-        indicator: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: scheme.outlineVariant),
-        ),
-        labelColor: scheme.onSurface,
-        unselectedLabelColor: scheme.onSurfaceVariant,
-        labelStyle: theme.textTheme.bodyLarge?.copyWith(
-          fontSize: 14.5,
-          fontWeight: FontWeight.w500,
-        ),
-        unselectedLabelStyle: theme.textTheme.bodyLarge?.copyWith(
-          fontSize: 14.5,
-        ),
+      labelColor: scheme.onSurface,
+      unselectedLabelColor: scheme.onSurfaceVariant,
+      labelStyle: theme.textTheme.bodyLarge?.copyWith(
+        fontSize: 17,
+        fontWeight: FontWeight.w800,
       ),
+      unselectedLabelStyle: theme.textTheme.bodyLarge?.copyWith(fontSize: 17),
     );
   }
 }
@@ -463,6 +460,14 @@ class _MineTab extends ConsumerWidget {
           color: Theme.of(context).colorScheme.surfaceContainerLow,
           child: ListView(
             children: [
+              // 레퍼런스: "내가 쓴 총 리뷰 N개"(서버 counts.written) + "리뷰 수정 안내 ⓘ"(리뷰 정책 창).
+              _MineHeader(
+                count: ref
+                    .watch(writableReviewsProvider)
+                    .value
+                    ?.counts
+                    ?.written,
+              ),
               for (final (i, e) in list!.items.indexed) ...[
                 if (i > 0) const SizedBox(height: 8),
                 _MyReviewCard(eligibility: e),
@@ -2398,9 +2403,15 @@ class _ReviewPhotoViewerState extends State<ReviewPhotoViewer> {
           tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
           onPressed: () => Navigator.of(context).pop(),
         ),
+        // 레퍼런스 2026-11-26 "1 / 1": 흰 굵은 글, 숫자 높이 15.2dp.
         title: Text(
           '${_index + 1} / ${widget.urls.length}',
           key: const ValueKey('review-photo-viewer-count'),
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         centerTitle: true,
       ),
@@ -3055,4 +3066,60 @@ Future<void> showReviewPolicyDialog(BuildContext context) {
       ],
     ),
   );
+}
+
+/// "내가 쓴 리뷰" 머리 — 굵은 "내가 쓴 총 리뷰 N개"(서버 값이 없으면 줄 없이), 아래 회색 "리뷰 수정 안내 ⓘ".
+class _MineHeader extends StatelessWidget {
+  const _MineHeader({required this.count});
+
+  final int? count;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      key: const ValueKey('review-mine-header'),
+      color: scheme.surface,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (count case final n?)
+            Text(
+              l10n.reviewMineTotal(n),
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontSize: 21,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          const SizedBox(height: 4),
+          InkWell(
+            key: const ValueKey('review-edit-guide'),
+            onTap: () => showReviewPolicyDialog(context),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.reviewEditGuide,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontSize: 14,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                PmartLineIcon(
+                  PmartLineIcons.questionBubble,
+                  size: 15,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

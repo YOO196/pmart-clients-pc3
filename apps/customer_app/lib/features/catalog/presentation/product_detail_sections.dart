@@ -822,16 +822,21 @@ class ReviewPhotoGrid extends ConsumerWidget {
     super.key,
     required this.productId,
     this.showMore = false,
+    this.cell = 106,
+    this.gap = 1.5,
+    this.bottom = 22,
   });
 
   final String productId;
 
-  /// 사진 리뷰가 더 있으면 끝에 [+ 더보기] 칸(사진리뷰 모아보기로). 리뷰 전체 보기에서만.
+  /// 사진 리뷰가 더 있으면 끝에 [ › 모아보기] 동그라미(사진리뷰 모아보기로). 리뷰 전체 보기에서만.
   final bool showMore;
 
-  static const _cell = 106.0;
-  // 레퍼런스 2026-11-26: 사진 사이 거의 붙음(3px/1080).
-  static const _gap = 1.5;
+  /// 칸 크기·사이. 상품 상세 106·1.5(레퍼런스 2026-11-26: 사진 사이 거의 붙음 3px/1080),
+  /// 리뷰 전체 보기 104.5·3(같은 날 리뷰 레퍼런스 187/705 칸, 6px 사이).
+  final double cell;
+  final double gap;
+  final double bottom;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -850,92 +855,113 @@ class ReviewPhotoGrid extends ConsumerWidget {
           (review: r, index: i, url: resolveImageUrl(u, origin)),
     ];
     if (photos.isEmpty) return const SizedBox.shrink();
+    // 레퍼런스 2026-11-26: 사진을 다 넘긴 끝에 [ › ] 동그라미 + "모아보기"(사진 칸 두 줄 높이 가운데).
     final more = showMore && (photos.length > 8 || list.hasMore);
-    final cols = ((photos.length + (more ? 1 : 0)) / 2).ceil();
+    final cols = (photos.length / 2).ceil();
     return Padding(
       key: const ValueKey('review-photo-strip'),
-      padding: const EdgeInsets.only(bottom: 22),
+      padding: EdgeInsets.only(bottom: bottom),
       child: SizedBox(
-        height: _cell * 2 + _gap,
+        height: cell * 2 + gap,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16.7),
-          itemCount: cols,
-          separatorBuilder: (_, _) => const SizedBox(width: _gap),
-          itemBuilder: (context, c) => Column(
-            children: [
-              for (var r = 0; r < 2 && c * 2 + r <= photos.length; r++)
-                if (c * 2 + r == photos.length) ...[
-                  if (more) ...[
-                    if (r > 0) const SizedBox(height: _gap),
-                    _MoreCell(productId: productId, size: _cell),
-                  ],
-                ] else ...[
-                  if (r > 0) const SizedBox(height: _gap),
-                  GestureDetector(
-                    onTap: () => openReviewPhotoDetail(
-                      context,
-                      review: photos[c * 2 + r].review,
-                      initial: photos[c * 2 + r].index,
-                      query: query,
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: switch (photos[c * 2 + r].url) {
-                        final u? => pmartNetworkImage(
-                          u,
-                          width: _cell,
-                          height: _cell,
-                          fit: BoxFit.cover,
-                          cacheWidth:
-                              (_cell * MediaQuery.devicePixelRatioOf(context))
-                                  .round(),
-                          errorBuilder: (_, _, _) => _blank(context),
+          padding: EdgeInsets.fromLTRB(16.7, 0, more ? 0 : 16.7, 0),
+          itemCount: cols + (more ? 1 : 0),
+          separatorBuilder: (_, _) => SizedBox(width: gap),
+          itemBuilder: (context, c) => c == cols
+              ? _MoreCell(productId: productId)
+              : Column(
+                  children: [
+                    for (
+                      var r = 0;
+                      r < 2 && c * 2 + r < photos.length;
+                      r++
+                    ) ...[
+                      if (r > 0) SizedBox(height: gap),
+                      GestureDetector(
+                        onTap: () => openReviewPhotoDetail(
+                          context,
+                          review: photos[c * 2 + r].review,
+                          query: query,
                         ),
-                        null => _blank(context),
-                      },
-                    ),
-                  ),
-                ],
-            ],
-          ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: switch (photos[c * 2 + r].url) {
+                            final u? => pmartNetworkImage(
+                              u,
+                              width: cell,
+                              height: cell,
+                              fit: BoxFit.cover,
+                              cacheWidth:
+                                  (cell *
+                                          MediaQuery.devicePixelRatioOf(
+                                            context,
+                                          ))
+                                      .round(),
+                              errorBuilder: (_, _, _) => _blank(context),
+                            ),
+                            null => _blank(context),
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
         ),
       ),
     );
   }
 
   Widget _blank(BuildContext context) => Container(
-    width: _cell,
-    height: _cell,
+    width: cell,
+    height: cell,
     color: Theme.of(context).colorScheme.surfaceContainerHigh,
   );
 }
 
+/// 사진 줄 끝 [ › ] 동그라미 + "모아보기"(레퍼런스 2026-11-26 — 동그라미 72/705, 글 높이 11.1dp).
 class _MoreCell extends StatelessWidget {
-  const _MoreCell({required this.productId, required this.size});
+  const _MoreCell({required this.productId});
 
   final String productId;
-  final double size;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    return Material(
-      key: const ValueKey('review-photos-more'),
-      color: theme.colorScheme.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(4),
-      child: InkWell(
-        onTap: () => context.push('/products/$productId/review-photos'),
-        child: SizedBox.square(
-          dimension: size,
-          child: Center(
-            child: Text(
-              l10n.reviewPhotoMoreOverlay,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+    void open() => context.push('/products/$productId/review-photos');
+    return SizedBox(
+      width: 112,
+      child: Center(
+        child: GestureDetector(
+          key: const ValueKey('review-photos-more'),
+          behavior: HitTestBehavior.opaque,
+          onTap: open,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 37,
+                height: 37,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF5F5F5),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const PmartLineIcon(
+                  PmartLineIcons.chevronRight,
+                  size: 21,
+                ),
               ),
-            ),
+              const SizedBox(height: 12),
+              Text(
+                l10n.reviewPhotosMore,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  fontSize: 11.5,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+            ],
           ),
         ),
       ),

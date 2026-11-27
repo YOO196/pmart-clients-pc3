@@ -205,6 +205,25 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
   /// 펼친 질문(레퍼런스 고객센터 3 — 목록 안에서 답을 펼친다, 사용자 2026-11-23).
   final Set<String> _open = {};
 
+  /// 질문 줄 위치(펼치면 그 질문이 화면 위에 오게 — 사용자 2026-11-26).
+  final Map<String, GlobalKey> _rowKeys = {};
+
+  void _toggle(String id) {
+    final opening = !_open.contains(id);
+    setState(() => opening ? _open.add(id) : _open.remove(id));
+    if (!opening) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final c = _rowKeys[id]?.currentContext;
+      if (c != null && c.mounted) {
+        Scrollable.ensureVisible(
+          c,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -214,7 +233,17 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
     // 분류 칩은 조건 없는 목록의 categories 로 그린다(검색 결과에 따라 칩이 바뀌지 않게).
     final all = ref.watch(faqListProvider(const FaqQuery())).value;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.faqTitle)),
+      // 레퍼런스(사용자 2026-11-26): 가운데 굵은 제목.
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(
+          l10n.faqTitle,
+          style: theme.appBarTheme.titleTextStyle?.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
       body: switch (value) {
         AsyncData(value: null) => LoginRequired(message: l10n.faqLoginNeeded),
         // 검색칸·질문 유형·질문 목록이 한 화면으로 같이 내려간다(사용자 2026-11-20: 질문 유형을 누르면 아래 목록이
@@ -261,17 +290,14 @@ class _FaqListScreenState extends ConsumerState<FaqListScreen> {
                     final open = _open.contains(f.faqId);
                     // 레퍼런스 고객센터 3: 누르면 그 자리에서 답이 펼쳐진다 — 회색 바탕, 질문 굵게, ⌃.
                     return Container(
+                      key: _rowKeys.putIfAbsent(f.faqId, GlobalKey.new),
                       color: open ? theme.colorScheme.surfaceContainer : null,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           InkWell(
                             key: ValueKey('faq-${f.faqId}'),
-                            onTap: () => setState(
-                              () => open
-                                  ? _open.remove(f.faqId)
-                                  : _open.add(f.faqId),
-                            ),
+                            onTap: () => _toggle(f.faqId),
                             child: Padding(
                               padding: const EdgeInsets.fromLTRB(
                                 16,
@@ -445,11 +471,12 @@ class _FaqTypeChipsState extends State<FaqTypeChips> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 레퍼런스(사용자 2026-11-26): "질문 유형"은 회색 작은 글.
           Text(
             l10n.faqTypeLabel,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 14.5,
+              color: scheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 14),

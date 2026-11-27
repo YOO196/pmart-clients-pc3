@@ -319,7 +319,10 @@ class MyScreen extends ConsumerWidget {
             row(
               l10n.addressTitle,
               icon: PmartLineIcons.pin,
-              onTap: () => context.push('/addresses'),
+              // 마이 → 주소관리는 회원이면 바로 "주소 편집"(수정·삭제 목록 — 사용자 레퍼런스 2026-11-26).
+              // 비회원 주소는 이 기기에만 있어 편집 화면이 없다 — 주소 설정 그대로.
+              onTap: () =>
+                  context.push(member ? '/addresses/edit' : '/addresses'),
             ),
             row(
               l10n.noticeTitle,

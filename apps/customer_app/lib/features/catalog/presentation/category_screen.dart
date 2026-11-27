@@ -25,21 +25,34 @@ class CategoryScreen extends ConsumerWidget {
         centerTitle: false,
         // 아래 탭으로 열면 ← 가 없어 제목이 왼쪽 끝에 붙는다 — 아래 구획 제목·홈과 같은 16 을 띄운다(사용자 2026-11-24).
         titleSpacing: context.canPop() ? pmartLeftTitleSpacing : 16,
-        title: Text(l10n.categoryTitle),
+        // 레퍼런스 상단바(태블릿 나란히 보기 2026-11-26): 제목 굵게, 아이콘 크고 선 굵게(사용자 "너무 얇아").
+        title: Text(
+          l10n.categoryTitle,
+          style: Theme.of(context).appBarTheme.titleTextStyle
+              ?.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
         actions: [
           IconButton(
             visualDensity: VisualDensity.compact,
             tooltip: l10n.navHome,
-            icon: const PmartLineIcon(PmartLineIcons.home, size: 23),
+            icon: const PmartLineIcon(
+              PmartLineIcons.home,
+              size: 25,
+              strokeWidth: 2.3,
+            ),
             onPressed: () => context.go('/'),
           ),
           IconButton(
             visualDensity: VisualDensity.compact,
             tooltip: l10n.searchTitle,
-            icon: const PmartLineIcon(PmartLineIcons.search, size: 23),
+            icon: const PmartLineIcon(
+              PmartLineIcons.search,
+              size: 25,
+              strokeWidth: 2.3,
+            ),
             onPressed: () => context.push('/search'),
           ),
-          const CartIconButton(),
+          const CartIconButton(size: 25, strokeWidth: 2.3),
           const SizedBox(width: 6),
         ],
       ),
@@ -111,7 +124,7 @@ class CategoryScreen extends ConsumerWidget {
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color: const Color(0xFF17191A),
+                                color: theme.colorScheme.onSurface,
                               ),
                             ),
                           ),

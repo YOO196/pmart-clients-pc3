@@ -680,7 +680,8 @@ class _WishEmpty extends StatelessWidget {
                   key: const ValueKey('wishlist-empty-art'),
                   width: 69.6,
                   height: 62.8,
-                  color: const Color(0xFF111214),
+                  // 다크 모드에서도 보이게 글자색(사용자 2026-11-26 "다크모드 시 글자 안 보임").
+                  color: theme.colorScheme.onSurface,
                 ),
                 const SizedBox(height: 58),
                 Text(
@@ -690,7 +691,7 @@ class _WishEmpty extends StatelessWidget {
                     fontSize: 15,
                     height: 1.42,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF111214),
+                    color: theme.colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 16.5),

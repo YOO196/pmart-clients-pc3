@@ -55,9 +55,8 @@ void main() {
     final repo = (await t.runAsync(_withSecond))!;
     await t.pumpWidget(testApp(const [], address: repo));
     await t.pumpAndSettle();
+    // 회원은 마이 → 주소관리에서 바로 주소 편집(사용자 2026-11-26).
     await _openAddresses(t);
-    await t.tap(find.byKey(const ValueKey('address-edit')));
-    await t.pumpAndSettle();
 
     expect(find.text('주소 편집'), findsOneWidget);
     expect(find.byKey(const ValueKey('address-current-badge')), findsOneWidget);
@@ -82,9 +81,8 @@ void main() {
     final repo = (await t.runAsync(_withSecond))!..loseNextDelete = true;
     await t.pumpWidget(testApp(const [], address: repo));
     await t.pumpAndSettle();
+    // 회원은 마이 → 주소관리에서 바로 주소 편집(사용자 2026-11-26).
     await _openAddresses(t);
-    await t.tap(find.byKey(const ValueKey('address-edit')));
-    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('address-delete-addr-2')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('address-delete-confirm')));
@@ -101,9 +99,8 @@ void main() {
     final repo = (await t.runAsync(_withSecond))!;
     await t.pumpWidget(testApp(const [], address: repo));
     await t.pumpAndSettle();
+    // 회원은 마이 → 주소관리에서 바로 주소 편집(사용자 2026-11-26).
     await _openAddresses(t);
-    await t.tap(find.byKey(const ValueKey('address-edit')));
-    await t.pumpAndSettle();
 
     await t.tap(find.byKey(const ValueKey('address-modify-addr-2')));
     await t.pumpAndSettle();
@@ -127,9 +124,8 @@ void main() {
   Future<void> openEdit(WidgetTester t, MockAddressRepository repo) async {
     await t.pumpWidget(testApp(const [], address: repo));
     await t.pumpAndSettle();
+    // 회원은 마이 → 주소관리에서 바로 주소 편집(사용자 2026-11-26).
     await _openAddresses(t);
-    await t.tap(find.byKey(const ValueKey('address-edit')));
-    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('address-modify-addr-2')));
     await t.pumpAndSettle();
   }

@@ -508,6 +508,7 @@ OrderDetail orderFromContract(api.Order o) => OrderDetail(
   paymentState: o.payment?.state,
   paymentAttemptId: o.payment?.paymentAttemptId,
   refundedAmount: o.payment?.refundedAmount,
+  confirmedAt: o.confirmedAt,
   deliveryNote: switch (o.deliveryNote?.trim()) {
     final n? when n.isNotEmpty => n,
     _ => null,

@@ -334,7 +334,7 @@ class _BoughtRow extends ConsumerWidget {
                 onChanged: (v) => onChanged(v ?? false),
                 fillColor: WidgetStateProperty.resolveWith(
                   (s) => s.contains(WidgetState.selected)
-                      ? const Color(0xFF1B1B1D)
+                      ? Theme.of(context).colorScheme.onSurface
                       : null,
                 ),
                 shape: RoundedRectangleBorder(

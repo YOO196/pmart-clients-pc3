@@ -69,7 +69,7 @@ void main() {
     expect(find.text('이용약관'), findsOneWidget);
     expect(find.text('위치기반서비스 이용약관'), findsOneWidget);
 
-    await t.tap(key('terms-TERMS_OF_SERVICE'));
+    await t.tap(key('terms-terms'));
     await t.pumpAndSettle();
     expect(key('consent-term-body'), findsOneWidget);
 

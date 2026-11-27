@@ -517,7 +517,10 @@ class _ChildPills extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surface,
         border: Border(
-          bottom: BorderSide(width: 3, color: scheme.primaryContainer),
+          // 레퍼런스: 알약 줄 아래 옅은 회색 한 줄(연보라 굵은 선은 "별로" — 사용자 2026-11-26).
+          bottom: BorderSide(
+            color: scheme.outlineVariant.withValues(alpha: 0.6),
+          ),
         ),
       ),
       child: ListView(

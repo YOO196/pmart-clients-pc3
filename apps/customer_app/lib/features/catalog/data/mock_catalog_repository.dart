@@ -887,6 +887,10 @@ base class MockCatalogRepository implements CatalogRepository {
 
   Iterable<MockProduct> _match(ProductQuery q) => mockProducts.where((p) {
     if (q.onSale && p.salePrice == null) return false;
+    // 할인율 이상(목에만 — BR-112).
+    if (q.minDiscountRate case final m? when (p.discountRate ?? 0) < m) {
+      return false;
+    }
     final keyword = q.keyword?.trim();
     if (keyword != null && keyword.isNotEmpty && !p.name.contains(keyword)) {
       return false;

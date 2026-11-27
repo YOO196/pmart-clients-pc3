@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 /// 할인율 빨강(레퍼런스 3-2 TOP 30 카드·5-1 장바구니 "33%").
-// 할인율 숫자는 팔레트 강조색 분홍(사용자 2026-11-23 "분홍" — 타이머·쿠폰 만료 칩과 같은 tertiary. 전 빨강 #F2383B 은 팔레트 밖).
-const discountRateColor = Color(0xFFD9457A);
+// 할인율 숫자는 레퍼런스 빨강(사용자 2026-11-26 "할인% 글자 색" — 태블릿 나란히 보기에서 잰 색 약 #D94A52).
+// 전에는 팔레트 분홍 #D9457A(사용자 2026-11-23 "분홍")였다.
+const discountRateColor = Color(0xFFD94A52);
 
 /// 기간 할인 가격 줄(ADR-0082 4단계 — 서버 값만, 앱이 할인가·할인율을 계산하지 않는다):
 /// `[33%] 5,990원 [8,990원(취소선)]`. 레퍼런스 카드는 취소선 정가 없이([showBase] false), 장바구니·상세는 함께.

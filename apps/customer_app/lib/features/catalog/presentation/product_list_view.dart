@@ -675,20 +675,14 @@ class ProductGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = ProductTileCard.gridWidthOf(context);
     return CustomScrollView(
       slivers: [
         if (header case final h?) SliverToBoxAdapter(child: h),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          sliver: SliverGrid.builder(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 16,
-              mainAxisExtent: ProductTileCard.heightFor(context, width),
-            ),
-            itemCount: list.items.length,
+          // 칸 높이 고정 없이 줄마다 내용 높이(사용자 2026-11-26 "상품 사이 간격").
+          sliver: ProductPairRows(
+            count: list.items.length,
             itemBuilder: (context, i) {
               if (autoLoadMore &&
                   i >= list.items.length - autoLoadAhead &&
@@ -702,13 +696,14 @@ class ProductGrid extends StatelessWidget {
               final tile = list.items[i];
               return ProductTileCard(
                 rail: true,
+                look: TileLook.grid2,
                 tile: tile,
                 highlight: highlight,
                 onTap: () =>
                     context.push('/products/${tile.productId}', extra: tile),
               );
             },
-          ),
+          ).sliver(),
         ),
         if (list.hasMore)
           SliverToBoxAdapter(

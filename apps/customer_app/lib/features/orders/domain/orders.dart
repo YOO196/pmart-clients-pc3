@@ -276,6 +276,7 @@ class OrderDetail {
     this.paymentState,
     this.paymentAttemptId,
     this.refundedAmount,
+    this.confirmedAt,
     this.deliveryNote,
     this.outOfStock,
     this.claims = const [],
@@ -317,6 +318,9 @@ class OrderDetail {
 
   /// 서버가 준 환불 성공액. 앱이 계산하지 않는다.
   final int? refundedAmount;
+
+  /// 주문 확정 시각(계약 `Order.confirmedAt`) — 주문 상세 "주문일시" 줄(사용자 레퍼런스 2026-11-26). 없으면 줄 없음.
+  final DateTime? confirmedAt;
   final List<({String claimId, String type, String state})> claims;
   final List<SourceStamp> sources;
 

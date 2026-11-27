@@ -474,7 +474,7 @@ class _AddressEditScreenState extends ConsumerState<AddressEditScreen> {
                             style: theme.textTheme.bodyMedium?.copyWith(
                               fontSize: 14,
                               height: 1.4,
-                              color: const Color(0xFF1B1D1E),
+                              color: theme.colorScheme.onSurface,
                             ),
                           ),
                           const SizedBox(height: 18),
@@ -824,7 +824,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
             style: theme.textTheme.bodyLarge?.copyWith(
               fontSize: 16,
               height: 1.2,
-              color: const Color(0xFF0E0F11),
+              color: theme.colorScheme.onSurface,
             ),
             decoration: InputDecoration(
               // 칸 이름은 위에 따로 둔다 — 칸 안에는 예시만.
@@ -894,7 +894,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               fontSize: 19,
               height: 1.3,
               fontWeight: FontWeight.w700,
-              color: const Color(0xFF0E0F11),
+              color: theme.colorScheme.onSurface,
             ),
           ),
           if (_jibun case final j?) ...[
@@ -906,7 +906,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                 fontSize: 16,
                 height: 1.3,
                 fontWeight: FontWeight.w500,
-                color: const Color(0xFF0E0F11),
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ],
@@ -968,7 +968,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: on ? const Color(0xFF0E0F11) : const Color(0xFFD4D6D5),
+                  color: on ? theme.colorScheme.onSurface : const Color(0xFFD4D6D5),
                   width: on ? 2 : 1.2,
                 ),
               ),
@@ -979,7 +979,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                     icon,
                     size: 16,
                     strokeWidth: on ? 2 : 1.6,
-                    color: const Color(0xFF0E0F11),
+                    color: theme.colorScheme.onSurface,
                   ),
                   const SizedBox(width: 7.6),
                   Text(
@@ -987,7 +987,7 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
                     style: theme.textTheme.bodyLarge?.copyWith(
                       fontSize: 15,
                       fontWeight: on ? FontWeight.w700 : FontWeight.w400,
-                      color: const Color(0xFF0E0F11),
+                      color: theme.colorScheme.onSurface,
                     ),
                   ),
                 ],

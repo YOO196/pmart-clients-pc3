@@ -103,6 +103,9 @@ void main() {
     await _openSearch(t);
 
     expect(find.text('인기 검색어'), findsOneWidget);
+    // 접힌 상자에는 하나씩(1위부터) — [펼쳐서 보기]로 전체(사용자 레퍼런스 2026-11-26).
+    await t.tap(find.byKey(const ValueKey('popular-expand')));
+    await t.pumpAndSettle();
     final first = find.byKey(const ValueKey('popular-1'));
     expect(
       find.descendant(of: first, matching: find.text('우유')),

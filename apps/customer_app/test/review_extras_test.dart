@@ -11,7 +11,7 @@ import 'package:customer_app/features/reviews/data/mock_reviews_repository.dart'
 import 'package:customer_app/features/reviews/data/reviews_repository.dart';
 import 'package:customer_app/features/reviews/domain/reviews.dart';
 import 'package:customer_app/features/reviews/presentation/product_reviews_screen.dart'
-    show reviewDate;
+    show reviewDate, reviewPhotoBlocks;
 
 import 'package:customer_app/shared/providers.dart'
     show imageOriginProvider, sourceSystem;
@@ -273,7 +273,7 @@ void main() {
     expect(t.takeException(), isNull);
     expect(key('product-price'), findsOneWidget);
   });
-  testWidgets('리뷰 사진 → 사진 후기 → [구매하기]로 상품 상세, 도움돼요는 카드 왼쪽', (t) async {
+  testWidgets('카드 사진 → 사진만 크게(검은 화면 "1 / N"), 도움돼요는 카드 왼쪽', (t) async {
     final repo = MockReviewsRepository(latency: Duration.zero);
     await open(t, repo, 'P-0001');
     // 만든 리뷰 0번은 사진 리뷰
@@ -305,34 +305,38 @@ void main() {
     );
     await t.tap(photo);
     await t.pumpAndSettle();
-    // 사진 후기(그 리뷰 한 건) — 큰 사진을 누르면 확대 보기, [구매하기]는 상품 상세
-    expect(key('review-photo-detail'), findsOneWidget);
-    expect(key('review-photo-detail-wish'), findsOneWidget);
-    await t.tap(key('review-photo-detail-0'));
-    await t.pumpAndSettle();
+    // 사용자 레퍼런스 2026-11-26: 카드 사진은 사진만 크게(리뷰 상세가 아니다)
     expect(key('review-photo-viewer'), findsOneWidget);
+    expect(key('review-photo-detail'), findsNothing);
+    expect(
+      t.widget<Text>(key('review-photo-viewer-count')).data,
+      startsWith('1 / '),
+    );
     await t.tap(key('review-photo-viewer-close'));
     await t.pumpAndSettle();
-    await t.tap(key('review-photo-detail-buy'));
-    await t.pumpAndSettle();
-    expect(key('review-photo-detail'), findsNothing);
-    expect(key('product-price'), findsOneWidget);
+    expect(key('review-photo-viewer'), findsNothing);
   });
 
-  testWidgets('사진 후기: 작은 사진을 누르면 큰 사진이 바뀌고, 도움돼요는 서버 값으로 목록과 같이 바뀐다', (
+  testWidgets('사진리뷰 상세: 위 사진 줄에서 열면 "사진리뷰 k / N", 옆으로 넘기면 다음 리뷰, 도움돼요는 서버 값', (
     t,
   ) async {
     final repo = MockReviewsRepository(latency: Duration.zero);
     await open(t, repo, 'P-0001', login: true);
-    final photo = key('review-photo-rv-gen-P-0001-0-0');
+    final strip = key('review-photo-strip');
     await t.scrollUntilVisible(
-      photo,
+      strip,
       200,
       scrollable: find.byType(Scrollable).last,
     );
-    await t.tap(photo);
+    await t.tap(
+      find.descendant(of: strip, matching: find.byType(GestureDetector)).first,
+    );
     await t.pumpAndSettle();
     expect(key('review-photo-detail'), findsOneWidget);
+    String title() => t.widget<Text>(key('review-photo-detail-title')).data!;
+    expect(title(), startsWith('사진리뷰 1 / '));
+    // 구매 막대 없음(레퍼런스)
+    expect(key('review-photo-detail-buy'), findsNothing);
     final button = key('product-review-helpful-rv-gen-P-0001-0');
     String label() => t
         .widget<Text>(find.descendant(of: button, matching: find.byType(Text)))
@@ -342,10 +346,44 @@ void main() {
     await t.pumpAndSettle();
     expect(repo.helped, contains('rv-gen-P-0001-0'));
     expect(label(), '도움돼요 ${before + 1}');
-    // 목록으로 돌아가도 같은 값(서버가 준 값으로 바뀐 목록)
-    Navigator.of(t.element(key('review-photo-detail'))).pop();
+    // 옆으로 넘기면 다음 사진 리뷰
+    await t.drag(key('review-photo-detail-pages'), const Offset(-500, 0));
     await t.pumpAndSettle();
-    expect(label(), '도움돼요 ${before + 1}');
+    expect(title(), startsWith('사진리뷰 2 / '));
+    await t.tap(key('review-photo-detail-close'));
+    await t.pumpAndSettle();
+    expect(key('review-photo-detail'), findsNothing);
+  });
+
+  testWidgets('최신순 줄: 내리면 접히고 조금 올리면 다시 펼쳐진다, 카드에 바로픽 꼬리표', (t) async {
+    final repo = MockReviewsRepository(latency: Duration.zero);
+    await open(t, repo, 'P-0001');
+    final bar = key('review-filter-bar').hitTestable();
+    expect(bar, findsOneWidget);
+    expect(key('review-store-tag'), findsWidgets);
+    final list = key('product-reviews-list');
+    await t.drag(list, const Offset(0, -1500));
+    await t.pumpAndSettle();
+    expect(bar, findsNothing, reason: '내리면 접힘');
+    await t.drag(list, const Offset(0, 120));
+    await t.pumpAndSettle();
+    expect(bar, findsOneWidget, reason: '올리면 펼쳐짐');
+    expect(
+      t.getTopLeft(key('review-filter-bar')).dy,
+      closeTo(t.getBottomLeft(find.byType(AppBar)).dy, 1),
+      reason: '위 막대 바로 아래',
+    );
+  });
+
+  test('모아보기 격자: 작은 줄 2 → 큰 칸 왼쪽 → 작은 줄 2 → 큰 칸 오른쪽(레퍼런스 2026-11-26)', () {
+    final b = reviewPhotoBlocks(20);
+    expect([for (final x in b) x.big], [null, null, 6, null, null, 15, null]);
+    expect(b[2].bigLeft, isTrue);
+    expect(b[2].cells, [7, 8]);
+    expect(b[5].bigLeft, isFalse);
+    expect(b.last.cells, [18, 19]);
+    // 큰 칸을 채울 3장이 없으면 작은 줄
+    expect([for (final x in reviewPhotoBlocks(8)) x.big], [null, null, null]);
   });
 
   test('리뷰 날짜는 서울 달력 yyyy.MM.dd', () {

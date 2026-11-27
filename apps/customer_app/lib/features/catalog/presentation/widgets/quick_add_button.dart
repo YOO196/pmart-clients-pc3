@@ -74,18 +74,15 @@ class _QuickAddButtonState extends ConsumerState<QuickAddButton> {
           minimumSize: Size.square(widget.size),
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
-        onPressed: _busy ? null : _onPressed,
-        icon: _busy
-            ? const SizedBox.square(
-                dimension: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            // 레퍼런스: + 약 13dp, 굵은 선(약 1.7dp)
-            : PmartLineIcon(
-                PmartLineIcons.plus,
-                size: widget.iconSize,
-                strokeWidth: widget.strokeWidth,
-              ),
+        // 담는 중에도 모양은 그대로 + — 돌아가는 동그라미를 그리지 않는다(사용자 2026-11-26). 담는 중 다시 누른 것은
+        // [_onPressed] 가 무시하고, 결과는 서버가 확정한 뒤 알림으로만 보인다.
+        onPressed: _onPressed,
+        // 레퍼런스: + 약 13dp, 굵은 선(약 1.7dp)
+        icon: PmartLineIcon(
+          PmartLineIcons.plus,
+          size: widget.iconSize,
+          strokeWidth: widget.strokeWidth,
+        ),
       ),
     );
   }

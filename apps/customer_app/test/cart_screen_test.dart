@@ -444,18 +444,15 @@ void main() {
       final sentNow = cart.changes.sublist(sent);
       expect(sentNow, hasLength(2));
       expect(sentNow, everyElement(isA<RemoveItem>()));
-      expect(find.byKey(const ValueKey('cart-empty')), findsOneWidget);
-      // 빈 장바구니(레퍼런스 2026-11-26): 안내 + [둘러보기] + 추천 상품, 아래 주문 막대 없음.
-      expect(
-        find.textContaining('담은 상품이 없어요.', findRichText: true),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('cart-empty-browse')), findsOneWidget);
+      // 주문한 적 없는 고객(여기서는 비회원)은 첫 주문 빈 장바구니(사용자 레퍼런스 2026-11-26):
+      // 쿠폰 줄 + "이런 상품은 어때요?" + 큰 카드 넘기기, 아래 주문 막대 없음.
+      expect(find.byKey(const ValueKey('cart-empty-first')), findsOneWidget);
+      expect(find.textContaining('이런 상품은 어때요?'), findsOneWidget);
       expect(
         find.byWidgetPredicate(
           (w) =>
               w.key is ValueKey<String> &&
-              (w.key! as ValueKey<String>).value.startsWith('cart-empty-reco-'),
+              (w.key! as ValueKey<String>).value.startsWith('cart-first-card-'),
         ),
         findsWidgets,
       );

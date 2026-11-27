@@ -358,7 +358,12 @@ class NotificationSettingsScreen extends ConsumerWidget {
         centerTitle: false,
         titleSpacing: pmartLeftTitleSpacing,
         backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
-        title: Text(l10n.noticeSettingsTitle),
+        // 레퍼런스 환경설정(태블릿 나란히 보기 2026-11-26): 제목 굵게.
+        title: Text(
+          l10n.noticeSettingsTitle,
+          style: Theme.of(context).appBarTheme.titleTextStyle
+              ?.copyWith(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
       ),
       body: switch (value) {
         AsyncData(value: null) => LoginRequired(
@@ -393,12 +398,14 @@ class _SettingsBody extends ConsumerWidget {
       OsPermission.denied => l10n.noticeValueDenied,
       OsPermission.unknown || null => l10n.noticeValueUnknown,
     };
+    // 레퍼런스(태블릿 나란히 보기 2026-11-26, 1.875px/dp): 묶음 제목 회색 14, 흰 둥근 상자(모서리 18), 상자 안
+    // 줄 사이 옅은 선(양옆 16 안쪽), 줄 글 16.5·설명 14.
     Widget groupTitle(String text) => Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+      padding: const EdgeInsets.fromLTRB(17, 26, 17, 10),
       child: Text(
         text,
         style: theme.textTheme.bodySmall?.copyWith(
-          fontSize: 12,
+          fontSize: 14,
           color: theme.colorScheme.onSurfaceVariant,
         ),
       ),
@@ -407,11 +414,26 @@ class _SettingsBody extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Material(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
         clipBehavior: Clip.antiAlias,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(children: children),
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Column(
+            children: [
+              for (final (i, c) in children.indexed) ...[
+                if (i > 0)
+                  Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: theme.colorScheme.outlineVariant.withValues(
+                      alpha: 0.6,
+                    ),
+                  ),
+                c,
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -439,8 +461,16 @@ class _SettingsBody extends ConsumerWidget {
         card([
           ListTile(
             key: const ValueKey('settings-os-permission'),
+            minTileHeight: 56,
+            titleTextStyle: theme.textTheme.bodyLarge?.copyWith(fontSize: 16.5),
             title: Text(l10n.noticeOsPermission),
-            trailing: Text(os(settings.osPermission)),
+            trailing: Text(
+              os(settings.osPermission),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontSize: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
           // 마케팅 동의는 customer 의 내 동의(MARKETING)로 켜고 끈다 — notification 의 값은 아직 UNKNOWN(CU-1 §3).
           const MarketingConsentTile(),
@@ -450,7 +480,11 @@ class _SettingsBody extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           child: Text(
             l10n.noticeReferenceNote,
-            style: theme.textTheme.bodySmall,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontSize: 14,
+              height: 1.45,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
       ],
@@ -502,20 +536,29 @@ class _SettingRow extends ConsumerWidget {
         onPressed: () async => report(await controller.recheck(row)),
         child: Text(l10n.noticeSettingRecheck),
       ),
-      null => Switch(
-        key: ValueKey('setting-switch-$id'),
-        value: item.enabled,
-        onChanged: item.locked
-            ? null
-            : (v) async => report(await controller.change(item, v)),
+      // 레퍼런스: 켜짐은 검정 바탕·흰 동그라미(조금 작게).
+      null => Transform.scale(
+        scale: 0.9,
+        child: Switch(
+          key: ValueKey('setting-switch-$id'),
+          value: item.enabled,
+          activeTrackColor: Theme.of(context).colorScheme.onSurface,
+          activeThumbColor: Theme.of(context).colorScheme.surface,
+          onChanged: item.locked
+              ? null
+              : (v) async => report(await controller.change(item, v)),
+        ),
       ),
     };
     return ListTile(
       key: ValueKey('setting-$id'),
+      minTileHeight: 56,
       titleTextStyle: Theme.of(context).textTheme.bodyLarge
-          ?.copyWith(fontSize: 13.5),
-      subtitleTextStyle: Theme.of(context).textTheme.bodySmall
-          ?.copyWith(fontSize: 12),
+          ?.copyWith(fontSize: 16.5),
+      subtitleTextStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+        fontSize: 14,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
       title: Text(noticeChannelText(l10n, item.channel)),
       subtitle: switch ((status, item.locked)) {
         (SettingRowStatus.checking, _) => Text(

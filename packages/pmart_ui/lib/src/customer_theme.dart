@@ -215,7 +215,8 @@ abstract final class PmartCustomerTheme {
         overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
-            size: 22,
+            // 레퍼런스 하단 탭(태블릿 나란히 보기 2026-11-26): 아이콘 크게·선 굵게, 글자 굵게.
+            size: 24,
             color: states.contains(WidgetState.selected)
                 ? scheme.primary
                 : scheme.onSurface,
@@ -223,10 +224,10 @@ abstract final class PmartCustomerTheme {
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
           (states) => text.labelMedium!.copyWith(
-            fontSize: 10,
+            fontSize: 10.5,
             fontWeight: states.contains(WidgetState.selected)
-                ? FontWeight.w700
-                : FontWeight.w400,
+                ? FontWeight.w800
+                : FontWeight.w500,
             color: states.contains(WidgetState.selected)
                 ? scheme.primary
                 : scheme.onSurface,

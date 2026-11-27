@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pmart_ui/pmart_ui.dart';
 
 import 'features/address/presentation/address_screens.dart';
+import 'shared/tab_chrome.dart';
 import 'features/address/presentation/postcode_screen.dart' show PostcodeResult;
 import 'features/cart/presentation/cart_merge_screen.dart';
 import 'features/start/presentation/start_controller.dart';
@@ -622,13 +623,30 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class _TabShell extends StatelessWidget {
+class _TabShell extends ConsumerStatefulWidget {
   const _TabShell({required this.shell});
 
   final StatefulNavigationShell shell;
 
   @override
+  ConsumerState<_TabShell> createState() => _TabShellState();
+}
+
+class _TabShellState extends ConsumerState<_TabShell> {
+  @override
+  void didUpdateWidget(_TabShell old) {
+    super.didUpdateWidget(old);
+    // 다른 탭으로 옮기면(코드로 옮겨도) 접힌 막대를 다시 편다.
+    if (old.shell.currentIndex != widget.shell.currentIndex) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) ref.read(tabChromeHiddenProvider.notifier).set(false);
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final shell = widget.shell;
     final l10n = AppLocalizations.of(context);
     // 홈이 아닌 탭에서 뒤로 — 앱을 닫지 않고 홈 탭으로(애니메이션 없이, 사용자 2026-11-21). 탭 안에 올린 화면이 있으면 그것부터 닫힌다.
     return PopScope(
@@ -637,32 +655,58 @@ class _TabShell extends StatelessWidget {
         if (!didPop) shell.goBranch(0);
       },
       child: Scaffold(
-        body: shell,
+        body: NotificationListener<ScrollUpdateNotification>(
+          onNotification: (n) => handleTabChromeScroll(ref, n),
+          child: shell,
+        ),
+        // 하단 탭 막대는 늘 고정(사용자 2026-11-26 "스크롤할 때 내려가는 거 고정으로") — 주소 막대만 접힌다.
         bottomNavigationBar: NavigationBar(
           selectedIndex: shell.currentIndex,
-          onDestinationSelected: (i) =>
-              shell.goBranch(i, initialLocation: i == shell.currentIndex),
+          onDestinationSelected: (i) {
+            ref.read(tabChromeHiddenProvider.notifier).set(false);
+            shell.goBranch(i, initialLocation: i == shell.currentIndex);
+          },
           destinations: [
+            // 레퍼런스 하단 탭: 선 굵게(2.2), 고른 탭은 더 굵게(2.8) — 탭 구성은 그대로(사용자 2026-11-26).
             NavigationDestination(
-              icon: const PmartLineIcon(PmartLineIcons.home),
+              icon: const PmartLineIcon(PmartLineIcons.home, strokeWidth: 2.2),
+              selectedIcon: const PmartLineIcon(
+                PmartLineIcons.home,
+                strokeWidth: 2.8,
+              ),
               label: l10n.navHome,
             ),
             NavigationDestination(
-              icon: const PmartLineIcon(PmartLineIcons.grid),
+              icon: const PmartLineIcon(PmartLineIcons.grid, strokeWidth: 2.2),
+              selectedIcon: const PmartLineIcon(
+                PmartLineIcons.grid,
+                strokeWidth: 2.8,
+              ),
               label: l10n.navCategory,
             ),
             NavigationDestination(
               key: const ValueKey('nav-wish'),
-              icon: const PmartLineIcon(PmartLineIcons.heart),
+              icon: const PmartLineIcon(PmartLineIcons.heart, strokeWidth: 2.2),
               selectedIcon: const PmartLineIcon(PmartLineIcons.heartFilled),
               label: l10n.navWish,
             ),
             NavigationDestination(
-              icon: const PmartLineIcon(PmartLineIcons.receipt),
+              icon: const PmartLineIcon(
+                PmartLineIcons.receipt,
+                strokeWidth: 2.2,
+              ),
+              selectedIcon: const PmartLineIcon(
+                PmartLineIcons.receipt,
+                strokeWidth: 2.8,
+              ),
               label: l10n.navOrders,
             ),
             NavigationDestination(
-              icon: const PmartLineIcon(PmartLineIcons.user),
+              icon: const PmartLineIcon(PmartLineIcons.user, strokeWidth: 2.2),
+              selectedIcon: const PmartLineIcon(
+                PmartLineIcons.user,
+                strokeWidth: 2.8,
+              ),
               label: l10n.navMy,
             ),
           ],

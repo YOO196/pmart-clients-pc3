@@ -9,7 +9,15 @@ import '../l10n/gen/app_localizations.dart';
 /// 머리줄 장바구니 아이콘 + 담은 품목 수 뱃지(레퍼런스 상품 상세·주문상세·검색 머리줄).
 /// 수는 서버가 확정한 장바구니 품목 수만 — 읽지 못했거나 0이면 뱃지 없이 아이콘만.
 class CartIconButton extends ConsumerWidget {
-  const CartIconButton({super.key, this.size = 23, this.width});
+  const CartIconButton({
+    super.key,
+    this.size = 23,
+    this.width,
+    this.strokeWidth = 1.8,
+  });
+
+  /// 선 굵기(24 좌표 기준).
+  final double strokeWidth;
 
   /// 아이콘 크기(홈 머리줄은 레퍼런스대로 조금 크게).
   final double size;
@@ -35,7 +43,11 @@ class CartIconButton extends ConsumerWidget {
         isLabelVisible: count > 0,
         label: Text('$count'),
         offset: const Offset(6, -6),
-        child: PmartLineIcon(PmartLineIcons.cart, size: size),
+        child: PmartLineIcon(
+          PmartLineIcons.cart,
+          size: size,
+          strokeWidth: strokeWidth,
+        ),
       ),
     );
   }

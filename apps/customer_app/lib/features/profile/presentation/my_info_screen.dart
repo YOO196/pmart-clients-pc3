@@ -410,7 +410,15 @@ class _MyInfoView extends ConsumerWidget {
       null => null,
     };
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.infoTitle)),
+      // 레퍼런스 내 정보(사용자 2026-11-26): 가운데 굵은 제목.
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(
+          l10n.infoTitle,
+          style: Theme.of(context).appBarTheme.titleTextStyle
+              ?.copyWith(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+      ),
       body: switch (value) {
         AsyncError() when profile == null => Center(
           child: Text(l10n.infoLoadFailed),
