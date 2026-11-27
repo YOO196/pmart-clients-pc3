@@ -1097,7 +1097,12 @@ class _QtyDialogState extends State<QtyDialog> {
 
 /// 현장 명령 거절 문구. 담당 아님(409 `NOT_ASSIGNEE` — 이동 지시, 입고 작업 mfc-inbound 0.9.0)은 따로 알린다.
 String fieldRejectedText(AppLocalizations l10n, String code) =>
-    code == 'NOT_ASSIGNEE' ? l10n.startNotAssignee : l10n.inspectRejected(code);
+    code == 'NOT_ASSIGNEE'
+    ? l10n.startNotAssignee
+    // 칸이 꽉 참 — 관리자 일이 아니라 다른 칸을 찍으면 된다
+    : code.startsWith('LOCATION_CAPACITY_EXCEEDED')
+    ? l10n.putawayCellFull
+    : l10n.inspectRejected(code);
 
 /// 스캔해 센 수량 — 첫 개를 스캔한 뒤 보인다(사용자 2026-11-17, 피킹·이동·적치·복귀 같게).
 /// 스캔마다 +1(화면 밖), + 버튼, 숫자 수기(완료 키·바깥 누르면 반영). 범위 판단은 [onSet] 쪽.

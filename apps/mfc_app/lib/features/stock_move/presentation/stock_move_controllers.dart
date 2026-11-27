@@ -453,7 +453,14 @@ class PutawayController extends Notifier<PutawayState> {
               );
       case FieldRejected(:final code):
         _key = null;
-        state = state.copyWith(busy: false, unknown: false, code: () => code);
+        // 그 칸이 꽉 찼다(mfc-inventory LOCATION_CAPACITY_EXCEEDED) — 칸을 비워 다른 칸을 다시 찍게(사용자 2026-11-27 "이거 왜 이래")
+        final full = code.startsWith('LOCATION_CAPACITY_EXCEEDED');
+        state = state.copyWith(
+          busy: false,
+          unknown: false,
+          code: () => code,
+          to: full ? () => null : null,
+        );
       case FieldUnknown():
         state = state.copyWith(busy: false, unknown: true);
     }
