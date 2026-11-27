@@ -1878,5 +1878,8 @@
   "cdcLoadConfirmTitle": "상차완료할까요?",
   "cdcLoadConfirmBody": "BOX {boxes}개 · TRF {trfs}건 — 완료하면 되돌릴 수 없어요.",
   "@cdcLoadConfirmBody": {"placeholders": {"boxes": {"type": "int"}, "trfs": {"type": "int"}}},
-  "cdcLoadConfirmGo": "상차완료"
+  "cdcLoadConfirmGo": "상차완료",
+  "guideUnload": "먼저 도착 차량 하차",
+  "guideUnloadArrived": "먼저 도착 차량 하차 · {n}대 도착",
+  "@guideUnloadArrived": {"placeholders": {"n": {"type": "int"}}}
 }

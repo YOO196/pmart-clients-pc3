@@ -13,6 +13,7 @@ import 'package:mfc_app/features/inbound/data/inbound_repository.dart';
 import 'package:mfc_app/features/inbound/data/mock_inbound_repository.dart';
 import 'package:mfc_app/features/inbound/domain/inbound.dart';
 import 'package:mfc_app/features/inbound/presentation/inbound_controller.dart';
+import 'package:mfc_app/features/unload/presentation/unload_screen.dart';
 import 'package:mfc_app/features/packing/data/mock_packing_repository.dart';
 import 'package:mfc_app/features/packing/presentation/packing_controller.dart';
 import 'package:mfc_app/features/tasks/data/mock_task_repository.dart';
@@ -233,6 +234,15 @@ void main() {
     }
     await tapKey(t, 'run-task');
   }
+
+  testWidgets('하차는 입고 안 — 아래 도구 줄에 없고, 입고 안내 화면에 "먼저 도착 차량 하차"', (t) async {
+    await pumpApp(t);
+    expect(find.byKey(const ValueKey('menu-unload')), findsNothing);
+    await tapKey(t, 'area-inbound');
+    expect(find.byKey(const ValueKey('guide-unload')), findsOneWidget);
+    await tapKey(t, 'guide-unload');
+    expect(find.byType(UnloadScreen), findsOneWidget);
+  });
 
   // 기본은 박스 목록 없이(계약 그대로 — 상품별 계수). 박스 검수는 아래 테스트에서 따로.
   setUp(

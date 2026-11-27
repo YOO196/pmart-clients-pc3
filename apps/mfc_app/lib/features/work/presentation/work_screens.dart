@@ -290,19 +290,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         () => context.push('/handover-checks'),
                       ),
                     ),
-                    // 하차 — DC 운행이 도착하면(시뮬레이터·기사 도착 등록) 박스를 받아 정차 인계(사용자 2026-11-26)
-                    _ToolButton(
-                      key: const ValueKey('menu-unload'),
-                      icon: Icons.local_shipping_outlined,
-                      label: l10n.unloadMenu,
-                      allowed: me.canUse(PdaMenu.unload),
-                      onTap: () => _menu(
-                        me,
-                        PdaMenu.unload,
-                        l10n.unloadMenu,
-                        () => context.push('/unload'),
-                      ),
-                    ),
                     // 반납 인증번호 — 라이더가 회수품을 가져오면 알려 줄 번호(rider-app 요청 2026-11-18).
                     _ToolButton(
                       key: const ValueKey('menu-return-handover'),
@@ -907,13 +894,13 @@ class _ToolButton extends StatelessWidget {
 }
 
 /// 업무 설명 한 장(스크롤 없음). 확인을 누르면 작업을 받을 수 있다고 서버에 알린다(다음 작업 받기).
-class WorkGuideScreen extends StatelessWidget {
+class WorkGuideScreen extends ConsumerWidget {
   const WorkGuideScreen({super.key, required this.area});
 
   final WorkArea area;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     // 단계마다 픽토그램(아이콘)과 한 줄 안내.
@@ -987,6 +974,25 @@ class WorkGuideScreen extends StatelessWidget {
               const SizedBox(height: 10),
               NoticeBox(text: l10n.guideCommon),
               const SizedBox(height: 12),
+              // 하차는 입고의 첫 단계 — 아래 도구 줄이 아니라 입고 안에서(사용자 2026-11-27 "하차는 입고 업무 아니야?")
+              if (area == WorkArea.inbound &&
+                  (ref.watch(meProvider).value?.canUse(PdaMenu.unload) ??
+                      false)) ...[
+                OutlinedButton.icon(
+                  key: const ValueKey('guide-unload'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  onPressed: () => context.push('/unload'),
+                  icon: const Icon(Icons.local_shipping_rounded),
+                  label: Text(switch (ref.watch(arrivedTripsProvider).value ??
+                      0) {
+                    0 => l10n.guideUnload,
+                    final n => l10n.guideUnloadArrived(n),
+                  }),
+                ),
+                const SizedBox(height: 8),
+              ],
               FilledButton(
                 key: const ValueKey('guide-ok'),
                 style: FilledButton.styleFrom(
