@@ -4,6 +4,7 @@
 // - 상세(?trf=): `GET /inbound-promises/{trfId}` — 단계(출발 → 도착 → 수령 → 적치 → 재고 반영), 상품 줄(예정·수령 정상/격리/보류),
 //   박스(LPN), 수령 기록(재고 반영 상태·차이), 적치 작업(`GET /inbound-tasks?mfcId=&receiptId=` — 품질검사·적치, 누르면 작업 상세에서 적치),
 //   상품별 지금 재고(`GET /mfcs/{mfcId}/stock?sku=` — 재고 실시간 스트림이 바뀐 SKU 만 다시 읽는다).
+// - 맨 위 흐름 한 줄(DcInboundFlow, 2026-11-27 #607 흐름 그림을 옮김): 준비 중 → 오는 중 → 도착·수령 중 → 오늘 받음 건수, 누르면 목록 거르기.
 // 값은 서버 값만 — 수령 ≠ 반영(재고 반영 상태가 APPLIED 일 때만 "반영"), 조회 실패는 0 이 아니라 "조회 실패".
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router';
@@ -16,6 +17,7 @@ import { centerPath } from '../../app/nav';
 import { messages } from '../../shared/messages';
 import { ProgressSteps, type StepPlace } from '../../shared/ProgressSteps';
 import { StockLiveStatus } from '../stock-stream/useStockStream';
+import { DcInboundFlow } from './DcInboundFlow';
 
 const m = messages.inbound.dc;
 type Promise_ = components['schemas']['InboundPromise'];
@@ -53,6 +55,8 @@ export function DcInboundTab({ mfcId }: { readonly mfcId: string }) {
   if (trf) return <DcInboundDetail mfcId={mfcId} trfId={trf} onBack={() => set({ trf: '' })} />;
   return (
     <div className="space-y-3 text-sm" data-testid="dc-inbound">
+      {/* DC 에서 이 센터까지 단계별 건수 — 누르면 아래 목록을 그 상태로 거른다 */}
+      <DcInboundFlow mfcId={mfcId} onPick={(st) => set({ dstate: st, ddate: st === 'TIN_POSTED' ? new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10) : '' })} />
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
           {m.state}
