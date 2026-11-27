@@ -1236,62 +1236,70 @@ class _BoxInspectStep extends ConsumerWidget {
 
     final boxes = s.openable;
     final done = boxes.where((b) => s.boxDone(b.boxId)).length;
+    // 다 열어 셌으면 스캔 단추를 빼고 [확인 단계로]만 크게(사용자 2026-11-27 "다 했으면 확인 단계만 눌리게, 확인 버튼이 작다")
+    final allDone = s.allBoxesInspected;
     return StepBody(
       actions: [
-        ScanInput(
-          id: 'box-open-scan',
-          testActions: [
-            TestAction('all-normal', l10n.testOpenAllNormal, () {
-              for (final b in ctl.current.openable) {
-                if (ctl.current.boxDone(b.boxId)) continue;
-                ctl.openBox(b.boxId);
-                for (final e in ctl.current.entriesOf(b.boxId)) {
-                  ctl.setBoxCount(
-                    e.entryKey,
-                    ReceiptCount(normal: e.unitsPerBox),
-                  );
+        if (!allDone)
+          ScanInput(
+            id: 'box-open-scan',
+            testActions: [
+              TestAction('all-normal', l10n.testOpenAllNormal, () {
+                for (final b in ctl.current.openable) {
+                  if (ctl.current.boxDone(b.boxId)) continue;
+                  ctl.openBox(b.boxId);
+                  for (final e in ctl.current.entriesOf(b.boxId)) {
+                    ctl.setBoxCount(
+                      e.entryKey,
+                      ReceiptCount(normal: e.unitsPerBox),
+                    );
+                  }
+                  ctl.saveBox();
                 }
-                ctl.saveBox();
-              }
-            }),
-          ],
-          testValues: [
-            for (final b
-                in s.openable.where((b) => !s.boxDone(b.boxId)).take(5))
-              TestScan(l10n.tsNext, b.boxId),
-            TestScan(l10n.tsOtherTruck, 'BOX-99999999'),
-          ],
-          label: l10n.boxOpenScan,
-          cameraTitle: l10n.boxOpenScan,
-          continuous: false,
-          autofocus: false,
-          onScan: (code) => ctl.openBox(code)
-              ? const ScanFeedback.ok()
-              : ScanFeedback.error(l10n.boxNotThisTruck),
-        ),
-        Row(
-          children: [
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(minimumSize: const Size(88, 50)),
-              onPressed: ctl.backToBoxCheck,
-              child: Text(l10n.prev),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton(
-                key: const ValueKey('box-to-review'),
-                onPressed: s.allBoxesInspected ? ctl.boxesToReview : null,
-                child: Text(l10n.inboundToReview),
+              }),
+            ],
+            testValues: [
+              for (final b
+                  in s.openable.where((b) => !s.boxDone(b.boxId)).take(5))
+                TestScan(l10n.tsNext, b.boxId),
+              TestScan(l10n.tsOtherTruck, 'BOX-99999999'),
+            ],
+            label: l10n.boxOpenScan,
+            cameraTitle: l10n.boxOpenScan,
+            continuous: false,
+            autofocus: false,
+            onScan: (code) => ctl.openBox(code)
+                ? const ScanFeedback.ok()
+                : ScanFeedback.error(l10n.boxNotThisTruck),
+          ),
+        if (allDone)
+          FilledButton.icon(
+            key: const ValueKey('box-to-review'),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(60),
+              textStyle: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
               ),
             ),
-          ],
+            onPressed: ctl.boxesToReview,
+            icon: const Icon(Icons.arrow_forward_rounded),
+            label: Text(l10n.inboundToReview),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(minimumSize: const Size(88, 46)),
+            onPressed: ctl.backToBoxCheck,
+            child: Text(l10n.prev),
+          ),
         ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ScanPrompt(
-            text: l10n.boxInspectTitle,
+            text: allDone ? l10n.boxInspectAllDone : l10n.boxInspectTitle,
             detail: s.damaged.isEmpty
                 ? null
                 : l10n.boxDamagedQuarantined(s.damaged.length),

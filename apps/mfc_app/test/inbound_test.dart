@@ -507,17 +507,16 @@ void main() {
       await t.pumpAndSettle();
       await tapKey(t, 'box-save');
       expect(find.text('박스 열어 검수 2 / 118'), findsOneWidget);
-      expect(
-        t
-            .widget<FilledButton>(find.byKey(const ValueKey('box-to-review')))
-            .onPressed,
-        isNull,
-      ); // 전부 열어야
+      // 다 열기 전에는 [확인 단계로] 없음(스캔만)
+      expect(find.byKey(const ValueKey('box-to-review')), findsNothing);
       // 테스트 일괄 동작: 남은 박스 전부 입수대로 정상.
       await tapKey(t, 'box-open-scan-test');
       await tapKey(t, 'box-open-scan-action-all-normal');
       await t.pumpAndSettle();
       expect(t.takeException(), isNull);
+      // 다 셌으면 스캔 단추는 빠지고 [확인 단계로]만
+      expect(find.byKey(const ValueKey('box-open-scan')), findsNothing);
+      expect(find.text('박스를 다 셌어요 — 확인 단계로 넘어가세요'), findsOneWidget);
       await tapKey(t, 'box-to-review');
 
       // 4단계: 상품별 합계 — 우유 = 11 + (파손 12 격리) + 28×12, 샐러드 1박스 미도착.

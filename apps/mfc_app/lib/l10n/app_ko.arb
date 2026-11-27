@@ -1910,5 +1910,6 @@
   "myWorkProductReceive": "예정 {e} · 격리 {q} · 미판정 {p}",
   "@myWorkProductReceive": {"placeholders": {"e": {"type": "int"}, "q": {"type": "int"}, "p": {"type": "int"}}},
   "myWorkProductsFailed": "상품 목록을 불러오지 못했어요",
-  "myWorkProductsNone": "이 기록에는 상품 정보가 없어요"
+  "myWorkProductsNone": "이 기록에는 상품 정보가 없어요",
+  "boxInspectAllDone": "박스를 다 셌어요 — 확인 단계로 넘어가세요"
 }
