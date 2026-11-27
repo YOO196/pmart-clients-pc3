@@ -62,6 +62,53 @@ describe('입고 작업 목록', () => {
     expect(screen.getByRole('combobox', { name: '상태' })).toHaveValue('EXPECTED');
   });
 
+  it('DC 이관 입고 상세: 상품 줄이 비면 박스(LPN) 내용으로, 지금 단계 한 줄·담당 작업자, 도착했으면 "출발 전" 아님', async () => {
+    const at = new Date().toISOString();
+    server.use(
+      http.get(`${API_BASE}/inbound-promises/TRF-SIM-X`, () =>
+        HttpResponse.json({
+          trfId: 'TRF-SIM-X',
+          trfNumber: 'T697148',
+          mfcId: 'MFC-BJG-01',
+          fromCdc: 'CDC01',
+          version: 3,
+          state: 'RECEIVING',
+          tripId: 'TO-20261126-001',
+          arrivedAt: at,
+          departedAt: null,
+          lines: [],
+          packages: [
+            { lpn: 'LPN-1', sku: 'SKU-RAMEN-5', lotId: 'B-1', qty: 2 },
+            { lpn: 'LPN-2', sku: 'SKU-RAMEN-5', lotId: 'B-1', qty: 2 },
+            { lpn: 'LPN-3', sku: 'SKU-RAMEN-5', lotId: 'B-2', qty: 2 },
+          ],
+          receipts: [],
+          sources: [],
+        }),
+      ),
+      http.get(`${API_BASE}/assignments`, ({ request }) =>
+        HttpResponse.json({
+          items:
+            new URL(request.url).searchParams.get('taskId') === 'TRF-SIM-X'
+              ? [{ assignmentId: 'A-1', assignmentVersion: 1, taskId: 'TRF-SIM-X', taskType: 'RECEIVE', workerId: 'mfcw-0001', state: 'ACTIVE', assignedAt: at }]
+              : [],
+        }),
+      ),
+    );
+    renderAt('/c/MFC-BJG-01/inbound?tab=promises&trf=TRF-SIM-X');
+    expect(await screen.findByTestId('dc-inbound-now')).toHaveTextContent('도착했어요 — PDA 에서 박스 3개 검수·수령 중(수령 등록 전)');
+    await waitFor(() => expect(screen.getByTestId('dc-inbound-now')).toHaveTextContent('담당'));
+    expect(screen.getByTestId('dc-inbound-title')).toHaveTextContent('T697148');
+    expect(screen.getByTestId('dc-inbound-from-boxes')).toBeInTheDocument();
+    // 같은 SKU·LOT 박스는 한 줄로(B-1 4개, B-2 2개)
+    const ls = screen.getAllByTestId('dc-inbound-line');
+    expect(ls).toHaveLength(2);
+    expect(ls[0]).toHaveTextContent('B-1');
+    expect(ls[0]).toHaveTextContent('4');
+    expect(screen.queryByText('출발 전')).not.toBeInTheDocument();
+    expect(screen.getByText('시각 기록 없음')).toBeInTheDocument();
+  });
+
   it('DC 이관 입고 상세: 단계·상품 줄(수령 격리)·지금 재고(실시간)·수령 반영·적치 작업으로', async () => {
     const view = renderAt('/c/MFC-BJG-01/inbound?tab=promises&trf=TRF-SIM-DC-1');
     expect(await screen.findByTestId('dc-inbound-steps')).toBeInTheDocument();
