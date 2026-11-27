@@ -4179,7 +4179,7 @@ export const messages = {
     newChat: '새 채팅',
     chatUntitled: '제목 없는 채팅',
     questionCount: (n: number) => `질문 ${n.toLocaleString('ko-KR')}개`,
-    retention: '채팅은 14일 뒤 지워져요',
+    retention: '채팅은 마지막 질문 뒤 14일이 지나면 자동으로 지워져요.', // rag 회신 2026-11-27 assistant-question-delete
     deleteChat: '채팅 지우기',
     deleteChatNamed: (title: string) => `채팅 지우기: ${title}`,
     deleteConfirmTitle: '이 채팅을 지울까요?',
