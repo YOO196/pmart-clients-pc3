@@ -241,7 +241,7 @@ class _ReturnCard extends ConsumerWidget {
               OutlinedButton(
                 key: ValueKey('rh-reissue-$id'),
                 style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
+                  minimumSize: const Size.fromHeight(60),
                 ),
                 onPressed: busy
                     ? null

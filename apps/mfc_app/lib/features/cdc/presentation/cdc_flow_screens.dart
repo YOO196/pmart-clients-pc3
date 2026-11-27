@@ -1009,7 +1009,7 @@ class _CdcInspectScreenState extends ConsumerState<CdcInspectScreen>
           OutlinedButton.icon(
             key: const ValueKey('cdc-fail'),
             style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
+              minimumSize: const Size.fromHeight(60),
               foregroundColor: PdaColors.danger,
             ),
             onPressed: busy ? null : () => _judge(false),

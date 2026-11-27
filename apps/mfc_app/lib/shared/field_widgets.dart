@@ -431,21 +431,52 @@ class ActionBar extends StatelessWidget {
           top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final (i, c) in children.indexed) ...[
-                  if (i > 0) const SizedBox(height: 7),
-                  c,
+            // 아래 작업 단추는 두껍게(높이 60·글자 18 굵게) — 장갑 낀 손으로도 잘 눌리게(사용자 2026-11-27 "세로가 얇아 잘 안 눌린다")
+            child: Theme(
+              data: _thickButtons(Theme.of(context)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final (i, c) in children.indexed) ...[
+                    if (i > 0) const SizedBox(height: 8),
+                    c,
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+ThemeData _thickButtons(ThemeData t) {
+  const size = WidgetStatePropertyAll(Size(96, 60));
+  const text = WidgetStatePropertyAll(
+    TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+  );
+  return t.copyWith(
+    filledButtonTheme: FilledButtonThemeData(
+      style: (t.filledButtonTheme.style ?? const ButtonStyle()).copyWith(
+        minimumSize: size,
+        textStyle: text,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: (t.outlinedButtonTheme.style ?? const ButtonStyle()).copyWith(
+        minimumSize: size,
+        textStyle: text,
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: (t.elevatedButtonTheme.style ?? const ButtonStyle()).copyWith(
+        minimumSize: size,
+        textStyle: text,
+      ),
+    ),
+  );
 }
 
 /// 아래 버튼 칸 안의 정보 — 스캔 단추를 보조 모양으로 그릴지.

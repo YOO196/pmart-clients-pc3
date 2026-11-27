@@ -326,7 +326,7 @@ class CountScreen extends ConsumerWidget {
             children: [
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(88, 50),
+                  minimumSize: const Size(96, 60),
                 ),
                 onPressed: s.busy || s.unknown ? null : ctl.back,
                 child: Text(l10n.prev),

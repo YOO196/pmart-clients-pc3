@@ -436,7 +436,7 @@ class _CountStep extends ConsumerWidget {
               OutlinedButton(
                 key: const ValueKey('inbound-back'),
                 style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(88, 50),
+                  minimumSize: const Size(96, 60),
                 ),
                 onPressed: ctl.back,
                 child: Text(l10n.prev),
@@ -619,7 +619,7 @@ class _ReviewStep extends ConsumerWidget {
           alignment: Alignment.centerLeft,
           child: OutlinedButton(
             key: const ValueKey('inbound-back'),
-            style: OutlinedButton.styleFrom(minimumSize: const Size(88, 46)),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(96, 60)),
             onPressed: s.busy || s.unknown ? null : ctl.back,
             child: Text(l10n.prev),
           ),
@@ -1147,7 +1147,7 @@ class _BoxInspectStep extends ConsumerWidget {
             children: [
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(88, 50),
+                  minimumSize: const Size(96, 60),
                 ),
                 onPressed: ctl.closeBox,
                 child: Text(l10n.prev),
@@ -1296,7 +1296,7 @@ class _BoxInspectStep extends ConsumerWidget {
         Align(
           alignment: Alignment.centerLeft,
           child: OutlinedButton(
-            style: OutlinedButton.styleFrom(minimumSize: const Size(88, 46)),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(96, 60)),
             onPressed: ctl.backToBoxCheck,
             child: Text(l10n.prev),
           ),
