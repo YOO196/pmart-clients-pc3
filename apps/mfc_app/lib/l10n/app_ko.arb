@@ -1911,5 +1911,11 @@
   "@myWorkProductReceive": {"placeholders": {"e": {"type": "int"}, "q": {"type": "int"}, "p": {"type": "int"}}},
   "myWorkProductsFailed": "상품 목록을 불러오지 못했어요",
   "myWorkProductsNone": "이 기록에는 상품 정보가 없어요",
-  "boxInspectAllDone": "박스를 다 셌어요 — 확인 단계로 넘어가세요"
+  "boxInspectAllDone": "박스를 다 셌어요 — 확인 단계로 넘어가세요",
+  "boxNormalN": "정상 {n}",
+  "@boxNormalN": {"placeholders": {"n": {"type": "int"}}},
+  "boxIssueN": "이상 {n}",
+  "@boxIssueN": {"placeholders": {"n": {"type": "int"}}},
+  "trailPreviousShort": "이전 · {type} · {time}",
+  "@trailPreviousShort": {"placeholders": {"type": {"type": "String"}, "time": {"type": "String"}}}
 }
