@@ -30,12 +30,12 @@ describe('상품 관리 — 본사 상품 연동', () => {
     expect(rows().some((r) => r.textContent?.includes('단종 과자'))).toBe(false);
   });
 
-  it('고른 상품의 SKU 를 한꺼번에 켠다(일괄, 같은 키·출처 헤더) — 여러 SKU 상품은 모두', async () => {
+  it('고른 상품 중 한 줄의 켜기 → 고른 상품 전부 켜짐(일괄, 같은 키·출처 헤더) — 여러 SKU 상품은 모두', async () => {
     const view = renderAt('/c/MFC-BJG-01/products');
     await waitFor(() => expect(rows().length).toBeGreaterThan(0));
     await userEvent.click(within(rowOf('생수 2L')).getByRole('checkbox'));
     await userEvent.click(within(rowOf('그릭요거트 플레인')).getByRole('checkbox'));
-    await userEvent.click(screen.getByRole('button', { name: '선택한 2개 켜기' }));
+    await userEvent.click(within(rowOf('생수 2L')).getByRole('button', { name: '고른 2개 이 센터 취급 켜기' }));
     expect(await screen.findByText('3개 SKU 중 3개를 켰어요(이미 켜진 것은 그대로).')).toBeInTheDocument();
     const post = view.sent.find((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith('/sku-handling-batches'))!;
     const body = (await post.clone().json()) as { items: { sku: string; enabled: boolean }[] };
@@ -47,7 +47,7 @@ describe('상품 관리 — 본사 상품 연동', () => {
     await waitFor(() => expect(within(rowOf('생수 2L')).getByText('취급 중')).toBeInTheDocument());
   });
 
-  it('머리 칸 체크로 보이는 상품 모두 고르기 → 한꺼번에 끈다(enabled false), 다시 누르면 모두 풀기', async () => {
+  it('머리 칸 체크로 보이는 상품 모두 고르기·풀기, 고른 상품 중 켜진 줄의 끄기 → 전부 끔(enabled false)', async () => {
     const view = renderAt('/c/MFC-BJG-01/products');
     await waitFor(() => expect(within(rowOf('서울우유 1L')).getByText('취급 중')).toBeInTheDocument());
     expect(screen.queryByRole('columnheader', { name: '고르기' })).toBeNull();
@@ -56,8 +56,11 @@ describe('상품 관리 — 본사 상품 연동', () => {
     expect(rows().every((r) => within(r).getByRole<HTMLInputElement>('checkbox').checked)).toBe(true);
     await userEvent.click(all);
     expect(rows().some((r) => within(r).getByRole<HTMLInputElement>('checkbox').checked)).toBe(false);
+    // 켜진 줄(서울우유)과 꺼진 줄(생수)을 고르고, 켜진 줄의 끄기 → 둘 다 꺼짐(꺼진 것은 꺼짐 그대로)
     await userEvent.click(within(rowOf('서울우유 1L')).getByRole('checkbox'));
-    await userEvent.click(screen.getByRole('button', { name: '선택한 1개 끄기' }));
+    await userEvent.click(within(rowOf('생수 2L')).getByRole('checkbox'));
+    expect(within(rowOf('생수 2L')).getByRole('button', { name: '고른 2개 이 센터 취급 켜기' })).toBeInTheDocument();
+    await userEvent.click(within(rowOf('서울우유 1L')).getByRole('button', { name: '고른 2개 이 센터 취급 끄기' }));
     expect(await screen.findByText(/개를 껐어요/)).toBeInTheDocument();
     const post = view.sent.find((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith('/sku-handling-batches'))!;
     const body = (await post.clone().json()) as { items: { sku: string; enabled: boolean }[] };
@@ -69,7 +72,7 @@ describe('상품 관리 — 본사 상품 연동', () => {
     await open();
     await userEvent.click(within(rowOf('옛 묶음 상품')).getByRole('checkbox'));
     await userEvent.click(within(rowOf('생수 2L')).getByRole('checkbox'));
-    await userEvent.click(screen.getByRole('button', { name: '선택한 2개 켜기' }));
+    await userEvent.click(within(rowOf('생수 2L')).getByRole('button', { name: '고른 2개 이 센터 취급 켜기' }));
     expect(await screen.findByText(/아무것도 바꾸지 않았어요/)).toBeInTheDocument();
     expect(db.handlings.find((h) => h.sku === 'SKU-WATER-2L')!.handlingEnabled).toBe(false);
   });
@@ -94,8 +97,9 @@ describe('상품 관리 — 본사 상품 연동', () => {
     const water = cards.find((c) => c.textContent?.includes('생수 2L'))!;
     expect(water.querySelector('img')).not.toBeNull();
     await userEvent.click(within(water).getByRole('checkbox'));
-    await userEvent.click(screen.getByRole('button', { name: '선택한 1개 켜기' }));
-    expect(await screen.findByText('2개 SKU 중 2개를 켰어요(이미 켜진 것은 그대로).')).toBeInTheDocument();
+    // 하나만 골랐으면 그 카드 단추는 그 상품만
+    await userEvent.click(within(water).getByRole('button', { name: '생수 2L 이 센터 취급 켜기' }));
+    expect(await screen.findByText('이 센터에서 팔아요.')).toBeInTheDocument();
     // SKU별 취급 목록도 같은 보기(?view=card) — 카드형
     await userEvent.click(screen.getByRole('radio', { name: 'SKU별 취급' }));
     expect(screen.getAllByTestId('handling-card').length).toBeGreaterThan(0);
