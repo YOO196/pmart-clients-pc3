@@ -62,6 +62,18 @@ void main() {
     expect(find.byKey(const ValueKey('menu-handover')), findsNothing);
     expect(find.byKey(const ValueKey('manage-menu')), findsNothing);
 
+    // 업무마다 대기 수(서버 값 — 목: 피킹 2·분배 1·검품 1·상차 1), 오늘 작업 건수 → 누르면 내역(작업·TRF 번호)
+    expect(find.byKey(const ValueKey('cdc-waiting-pick')), findsOneWidget);
+    expect(find.text('대기 2'), findsOneWidget);
+    expect(find.text('2건'), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('cdc-today')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('cdc-my-work')), findsOneWidget);
+    expect(find.text('K20481'), findsOneWidget);
+    expect(find.textContaining('TRF T482913, T482914'), findsOneWidget);
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
+
     // 업무를 누르면 MFC 처럼 순서 안내 → 시작하기
     await t.tap(find.byKey(const ValueKey('cdc-area-load')));
     await t.pumpAndSettle();

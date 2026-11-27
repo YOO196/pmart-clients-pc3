@@ -1882,5 +1882,16 @@
   "guideUnload": "먼저 도착 차량 하차",
   "guideUnloadArrived": "먼저 도착 차량 하차 · {n}대 도착",
   "@guideUnloadArrived": {"placeholders": {"n": {"type": "int"}}},
-  "putawayCellFull": "이 칸은 꽉 찼어요 — 다른 빈 칸을 스캔하고 다시 적치해요"
+  "putawayCellFull": "이 칸은 꽉 찼어요 — 다른 빈 칸을 스캔하고 다시 적치해요",
+  "cdcWaiting": "대기 {n}",
+  "@cdcWaiting": {"placeholders": {"n": {"type": "int"}}},
+  "cdcHolding": "들고 있는 작업 · {kind} {no}",
+  "@cdcHolding": {"placeholders": {"kind": {"type": "String"}, "no": {"type": "String"}}},
+  "cdcMyWorkFailed": "끝낸 작업을 불러오지 못했어요",
+  "cdcWorkTrfs": "TRF {nos}",
+  "@cdcWorkTrfs": {"placeholders": {"nos": {"type": "String"}}},
+  "cdcWorkWave": "Wave {no}",
+  "@cdcWorkWave": {"placeholders": {"no": {"type": "String"}}},
+  "cdcWorkDone": "완료",
+  "cdcWorkHolding": "진행 중"
 }

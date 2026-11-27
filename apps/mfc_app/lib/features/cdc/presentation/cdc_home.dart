@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import 'cdc_board.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -101,6 +104,12 @@ class CdcHomeScreen extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          IconButton(
+            key: const ValueKey('cdc-board-refresh'),
+            tooltip: l10n.retry,
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: () => ref.invalidate(cdcBoardProvider),
+          ),
           const WorkplaceSwitchButton(),
           IconButton(
             key: const ValueKey('logout'),
@@ -117,6 +126,8 @@ class CdcHomeScreen extends ConsumerWidget {
             key: const ValueKey('cdc-home'),
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // 오늘 작업(누르면 내역) — 사용자 2026-11-27 "작업 대기랑 작업 내역이 안 뜨네"
+              const EnterFade(child: CdcTodayCard()),
               Padding(
                 padding: const EdgeInsets.fromLTRB(2, 12, 0, 8),
                 child: Text(
@@ -146,7 +157,14 @@ class CdcHomeScreen extends ConsumerWidget {
                             child: _CdcAreaTile(
                               area: a,
                               height: h,
-                              onTap: () => context.push('/cdc/guide/${a.name}'),
+                              waiting: cdcWaitingOf(
+                                ref.watch(cdcBoardProvider).value,
+                                a,
+                              ),
+                              onTap: () async {
+                                await context.push('/cdc/guide/${a.name}');
+                                ref.invalidate(cdcBoardProvider);
+                              },
                             ),
                           ),
                         ],
@@ -168,10 +186,14 @@ class _CdcAreaTile extends StatelessWidget {
     required this.area,
     required this.height,
     required this.onTap,
+    this.waiting,
   });
 
   final CdcWorkArea area;
   final double height;
+
+  /// 대기 수(서버 값, 못 읽으면 null)
+  final int? waiting;
   final VoidCallback onTap;
 
   @override
@@ -245,6 +267,8 @@ class _CdcAreaTile extends StatelessWidget {
                           ],
                         ),
                       ),
+                      CdcWaitingPill(area: area, n: waiting),
+                      const SizedBox(width: 4),
                       const Icon(Icons.chevron_right, color: PdaColors.muted),
                     ],
                   ),
