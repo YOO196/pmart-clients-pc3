@@ -47,12 +47,12 @@ class BarcodeReprintButton extends ConsumerWidget {
         message: l10n.reprintButton,
         child: SizedBox(
           width: 64,
-          height: 46,
+          height: 60,
           child: OutlinedButton(
             key: ValueKey('$id-reprint'),
             style: OutlinedButton.styleFrom(
               padding: EdgeInsets.zero,
-              minimumSize: const Size(64, 46),
+              minimumSize: const Size(64, 60),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
