@@ -72,6 +72,12 @@ describe('배송 통계', () => {
     // 완료 4 / (완료 4 + 실패 1) = 80%, 지연 1 / 판정 3, 픽업 대기 (300×3 + 900×1) ÷ 4 = 450초 = 8분
     expect(await screen.findByTestId('tile-completion')).toHaveTextContent('80%');
     expect(screen.getByTestId('tile-late')).toHaveTextContent('33.3%');
+    // 비율 막대 — 칸 안에 몫의 %(완료 80%·실패 20%), 범례에 이름·수
+    const bar = within(screen.getByTestId('tile-completion'));
+    expect(bar.getByRole('img')).toHaveAccessibleName(/완료 4, 실패 1/);
+    expect(bar.getByText('20%')).toBeInTheDocument();
+    // 전달 실패율 막대는 배정 5 = 완료 4 + 실패 1 (그 밖 0 칸은 안 그림)
+    expect(screen.getByTestId('tile-failure')).toHaveTextContent('20%');
     expect(screen.getByTestId('tile-pickup-wait')).toHaveTextContent('8분');
     expect(screen.getByTestId('tile-riders')).toHaveTextContent('2명');
     // 배차 줄이 없으면 배정 성공률 "—"(0% 아님)
