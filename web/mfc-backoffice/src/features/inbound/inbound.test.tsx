@@ -62,6 +62,24 @@ describe('입고 작업 목록', () => {
     expect(screen.getByRole('combobox', { name: '상태' })).toHaveValue('EXPECTED');
   });
 
+  it('DC 이관 입고 상세: 단계·상품 줄(수령 격리)·지금 재고(실시간)·수령 반영·적치 작업으로', async () => {
+    const view = renderAt('/c/MFC-BJG-01/inbound?tab=promises&trf=TRF-SIM-DC-1');
+    // 상세는 첫 화면에 조회가 여럿(입고 예정·배정·재고) — 부하 때 1초를 넘길 수 있어 5초까지 기다린다
+    expect(await screen.findByTestId('dc-inbound-steps', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByTestId('dc-inbound-title')).toHaveTextContent('T286576 · W6308');
+    await waitFor(() => expect(screen.getAllByTestId('dc-inbound-line')).toHaveLength(2));
+    const ramen = screen.getAllByTestId('dc-inbound-line').find((r) => r.textContent?.includes('신라면'))!;
+    expect(ramen).toHaveTextContent('격리 1 · 보류 0');
+    await waitFor(() => expect(within(ramen).getByTestId('dc-inbound-stock')).toHaveTextContent(/가용 \d+/));
+    expect(view.gets('/stock').some((r) => new URL(r.url).searchParams.get('sku') === 'SKU-RAMEN-5')).toBe(true);
+    expect(screen.getByTestId('dc-inbound-receipt')).toHaveTextContent('재고 반영');
+    expect(screen.getByTestId('dc-inbound-receipt')).toHaveTextContent('예정과 차이 1줄');
+    await waitFor(() => expect(screen.getAllByTestId('dc-inbound-task').length).toBeGreaterThan(0));
+    expect(view.gets('/inbound-tasks').some((r) => new URL(r.url).searchParams.get('receiptId') === 'RCPT-1')).toBe(true);
+    const putaway = screen.getAllByTestId('dc-inbound-task').find((r) => r.textContent?.includes('적치'))!;
+    expect(within(putaway).getByRole('link', { name: '적치하기' })).toHaveAttribute('href', '/c/MFC-BJG-01/inbound/tasks/ITK-3');
+    expect(screen.getAllByTestId('dc-inbound-box')).toHaveLength(2);
+  });
   it('DC 이관 입고 상세: 상품 줄이 비면 박스(LPN) 내용으로, 지금 단계 한 줄·담당 작업자, 도착했으면 "출발 전" 아님', async () => {
     const at = new Date().toISOString();
     server.use(
@@ -107,24 +125,6 @@ describe('입고 작업 목록', () => {
     expect(ls[0]).toHaveTextContent('4');
     expect(screen.queryByText('출발 전')).not.toBeInTheDocument();
     expect(screen.getByText('시각 기록 없음')).toBeInTheDocument();
-  });
-
-  it('DC 이관 입고 상세: 단계·상품 줄(수령 격리)·지금 재고(실시간)·수령 반영·적치 작업으로', async () => {
-    const view = renderAt('/c/MFC-BJG-01/inbound?tab=promises&trf=TRF-SIM-DC-1');
-    expect(await screen.findByTestId('dc-inbound-steps')).toBeInTheDocument();
-    expect(screen.getByTestId('dc-inbound-title')).toHaveTextContent('T286576 · W6308');
-    await waitFor(() => expect(screen.getAllByTestId('dc-inbound-line')).toHaveLength(2));
-    const ramen = screen.getAllByTestId('dc-inbound-line').find((r) => r.textContent?.includes('신라면'))!;
-    expect(ramen).toHaveTextContent('격리 1 · 보류 0');
-    await waitFor(() => expect(within(ramen).getByTestId('dc-inbound-stock')).toHaveTextContent(/가용 \d+/));
-    expect(view.gets('/stock').some((r) => new URL(r.url).searchParams.get('sku') === 'SKU-RAMEN-5')).toBe(true);
-    expect(screen.getByTestId('dc-inbound-receipt')).toHaveTextContent('재고 반영');
-    expect(screen.getByTestId('dc-inbound-receipt')).toHaveTextContent('예정과 차이 1줄');
-    await waitFor(() => expect(screen.getAllByTestId('dc-inbound-task').length).toBeGreaterThan(0));
-    expect(view.gets('/inbound-tasks').some((r) => new URL(r.url).searchParams.get('receiptId') === 'RCPT-1')).toBe(true);
-    const putaway = screen.getAllByTestId('dc-inbound-task').find((r) => r.textContent?.includes('적치'))!;
-    expect(within(putaway).getByRole('link', { name: '적치하기' })).toHaveAttribute('href', '/c/MFC-BJG-01/inbound/tasks/ITK-3');
-    expect(screen.getAllByTestId('dc-inbound-box')).toHaveLength(2);
   });
 });
 
