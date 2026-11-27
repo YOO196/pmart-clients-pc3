@@ -183,6 +183,8 @@ export const taskHandlers = [
         assignment: { workerId: null, assignmentVersion: (t.assignment?.assignmentVersion ?? 0) + 1 },
       };
       db.tasks.set(next.taskId, next);
+      // 서버처럼 capacity 배정도 풀린다(지금 배정 목록에서 빠짐)
+      for (const x of db.assignments) if (x.taskId === next.taskId && x.state === 'ACTIVE') x.state = 'RELEASED';
       return { status: 200, body: summary(next) };
     });
   }),

@@ -1434,6 +1434,19 @@ export const messages = {
 
   /** 배정 — mfc-capacity-service 0.14.0 assignments·assignment-plans */
   assignments: {
+    /** 배정 풀기(2026-11-27) — 피킹·포장만 서버 API 가 있다 */
+    release: {
+      open: '배정 풀기',
+      title: '배정 풀기 — 담당을 풀고 대기로',
+      hint: '작업자 PDA 에서 이 작업이 빠지고 다른 업무를 받을 수 있어요. 집은 수량은 그대로 남아 다음 사람이 이어서 해요. 진행 중 실적이나 열린 포장이 있으면 풀 수 없어요.',
+      reason: '사유',
+      reasonPlaceholder: '예: 교대·작업자 다른 업무로',
+      submit: '배정 풀기',
+      close: '닫기',
+      done: '배정을 풀었어요 — 작업이 대기로 돌아갔어요.',
+      unsupported: (type: string) => `${type} 작업은 아직 서버에 배정 풀기 기능이 없어요(백엔드에 요청함). 지금은 다른 작업자에게 재배정해 주세요.`,
+      reassignInstead: '다른 작업자에게 재배정',
+    },
     openTask: '작업 보기',
     planLabel: '배정 추천',
     intro: '작업마다 담당 한 명을 정해요.',

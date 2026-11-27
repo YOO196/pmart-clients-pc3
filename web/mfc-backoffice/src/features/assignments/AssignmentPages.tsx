@@ -99,6 +99,9 @@ function Eligibility({ code }: { readonly code: string | null | undefined }) {
 }
 
 function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonly onReassign: (a: Assignment) => void }) {
+  const [releasing, setReleasing] = useState<string | null>(null);
+  // 풀린 배정은 목록에서 빠지므로 안내는 목록 위에
+  const [released, setReleased] = useState(false);
   const api = useApi();
   const [params, setParams] = useSearchParams();
   const rawState = params.get('state');
@@ -175,6 +178,11 @@ function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonl
       </SearchBar>
       <SavedViews listKey={`assignments.${mfcId}`} />
       <p className="text-xs opacity-70">{m.eligibilityNote}</p>
+      {released && (
+        <p role="status" className="text-sm text-success" data-testid="assignment-released">
+          {m.release.done}
+        </p>
+      )}
       <QueryState state={toUiState(query, () => rows.length === 0)} onRetry={() => void query.refetch()} emptyText={m.empty}>
         {() => (
           <div className="overflow-x-auto rounded-box bg-base-100">
@@ -215,14 +223,41 @@ function AssignmentList({ mfcId, onReassign }: { readonly mfcId: string; readonl
                       <td>
                         <Eligibility code={a.workerEligibility} />
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         {a.state === 'ACTIVE' && (
-                          <button type="button" className="btn btn-xs" onClick={() => onReassign(a)}>
-                            {m.reassign}
-                          </button>
+                          <>
+                            <button type="button" className="btn btn-xs" onClick={() => onReassign(a)}>
+                              {m.reassign}
+                            </button>
+                            {/* 배정 풀기(사용자 2026-11-27 — PDA 에 받아 둔 작업이 남아 다른 업무를 못 받을 때) */}
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-xs ml-1 text-error"
+                              data-testid="assignment-release"
+                              onClick={() => setReleasing(releasing === k ? null : k)}
+                            >
+                              {m.release.open}
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>
+                    {releasing === k && (
+                      <tr>
+                        <td colSpan={9} className="bg-base-200/40">
+                          <ReleaseAssignment
+                            mfcId={mfcId}
+                            a={a}
+                            onClose={() => setReleasing(null)}
+                            onReassign={() => onReassign(a)}
+                            onReleased={() => {
+                              setReleased(true);
+                              setReleasing(null);
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    )}
                     {isOpen && (
                       <InlineDetail colSpan={9} testId="assignment-inline">
                         <InlineFields
@@ -609,5 +644,87 @@ function PlanView({ mfcId, plan }: { readonly mfcId: string; readonly plan: Plan
       )}
       {plan.state === 'STALE' && commit.phase.kind === 'rejected' && <CommandFeedback command={commit} />}
     </>
+  );
+}
+
+/**
+ * 배정 풀기 — 피킹·포장(PICK·PACK)은 mfc-fulfillment `POST /tasks/{taskId}/releases`(작업 내놓기 — 센터 관리자 가능, 담당을 풀고 READY,
+ * 진행 중 실적·열린 포장이 있으면 409 EXECUTION_IN_FLIGHT). 서버가 READY 를 돌려줄 때만 "풀었어요".
+ * 적치·입고·검사·이동 등(mfc-inbound 작업)은 공개된 배정 해제 API 가 없어(capacity `/internal/assignments/{taskId}/releases` 는 서비스 전용)
+ * 풀 수 없다고 알리고 재배정(다른 작업자에게)을 권한다 — 요청서 docs/handoff/mfc-backoffice/2026-11-27-backend-assignment-release.md.
+ */
+function ReleaseAssignment({
+  mfcId,
+  a,
+  onClose,
+  onReassign,
+  onReleased,
+}: {
+  readonly mfcId: string;
+  readonly a: Assignment;
+  readonly onClose: () => void;
+  readonly onReassign: () => void;
+  readonly onReleased: () => void;
+}) {
+  const api = useApi();
+  const queryClient = useQueryClient();
+  const [reason, setReason] = useState('');
+  const taskId = a.taskId ?? '';
+  const release = useCommand(async (_: null, key) => {
+    const r = await request(
+      'POST',
+      api.fulfillment.POST('/tasks/{taskId}/releases', {
+        ...commandParams(key, { path: { taskId } }),
+        body: { workerId: a.workerId ?? '', reason: reason.trim() },
+      }),
+    );
+    // 서버가 READY 를 돌려줄 때만 "풀었어요"
+    if (r.state === 'READY') onReleased();
+    await queryClient.invalidateQueries({ queryKey: ['assignments', mfcId] });
+    return r;
+  });
+  if (!isPickPack(a.taskType)) {
+    return (
+      <div className="space-y-2 p-2 text-sm" data-testid="assignment-release-unsupported">
+        <p>{m.release.unsupported(assignTaskName(a.taskType))}</p>
+        <div className="flex gap-2">
+          <button type="button" className="btn btn-sm btn-primary" onClick={onReassign}>
+            {m.release.reassignInstead}
+          </button>
+          <button type="button" className="btn btn-sm btn-ghost" onClick={onClose}>
+            {m.release.close}
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <form
+      className="space-y-2 p-2 text-sm"
+      aria-label={m.release.title}
+      data-testid="assignment-release-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!reason.trim()) return;
+        if (release.phase.kind === 'rejected' || release.phase.kind === 'done') release.reset();
+        void release.run(null);
+      }}
+    >
+      <p className="font-semibold">{m.release.title}</p>
+      <p className="text-xs opacity-70">{m.release.hint}</p>
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1">
+          {m.release.reason}
+          <input className="input input-sm w-72" maxLength={200} placeholder={m.release.reasonPlaceholder} value={reason} onChange={(e) => setReason(e.target.value)} />
+        </label>
+        <button type="submit" className="btn btn-sm btn-error" disabled={!reason.trim() || release.phase.kind === 'running'}>
+          {m.release.submit}
+        </button>
+        <button type="button" className="btn btn-sm btn-ghost" onClick={onClose}>
+          {m.release.close}
+        </button>
+      </div>
+      <CommandFeedback command={release} />
+    </form>
   );
 }
