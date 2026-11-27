@@ -40,6 +40,19 @@ describe('배송 현황(우리 센터)', () => {
   });
 });
 
+describe('배송 현황 > 배송 문제(배차 지연 + 배차 실패 한 화면, 2026-11-27)', () => {
+  it('배송 현황 탭에서 배송 문제를 누르면 배차 지연·배차 실패가 같이 — 옛 주소는 이 탭으로', async () => {
+    renderAt('/c/MFC-BJG-01/deliveries');
+    await userEvent.click(await screen.findByRole('tab', { name: '배송 문제' }));
+    expect(await screen.findByRole('heading', { level: 2, name: '배차 지연' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: '배차 실패' })).toBeInTheDocument();
+    expect(await screen.findAllByTestId('dispatch-failure-row')).toHaveLength(1);
+    // 처리 끝남 탭을 눌러도 배송 문제 탭에 머문다(?view=issues&fstate=CLOSED)
+    await userEvent.click(screen.getByRole('tab', { name: '처리 끝남' }));
+    expect(screen.getByRole('tab', { name: '배송 문제' })).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
 describe('배차 실패(우리 센터, 보기만)', () => {
   it('처리 중: 우리 센터 DISPATCH_FAILED 만, 기한 넘김 표시, 처리는 지원센터 안내 — 맡기·닫기 버튼 없음', async () => {
     const view = renderAt('/c/MFC-BJG-01/dispatch-failures');

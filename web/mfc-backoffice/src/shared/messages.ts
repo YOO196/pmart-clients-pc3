@@ -692,6 +692,7 @@ export const messages = {
   deliveryStats: {
     tabNow: '지금 배송',
     tabStats: '배송 통계',
+    tabIssues: '배송 문제',
     intro: '배송 품질·배차 효율을 봐요.',
     rangeLabel: '기간',
     range: { today: '오늘', d7: '최근 7일', d30: '최근 30일' } as Readonly<Record<'today' | 'd7' | 'd30', string>>,

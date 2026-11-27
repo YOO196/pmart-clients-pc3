@@ -89,7 +89,7 @@ function Layout() {
         id: g.key,
         label: m.groups[g.key],
         ...(groupIcon[g.key] ? { icon: groupIcon[g.key] } : {}),
-        items: g.items.map((item) => ({
+        items: g.items.filter((item) => !item.hidden).map((item) => ({
           to: centerPath(target, item.segment),
           label: m.menus[item.key],
           end: false,

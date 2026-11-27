@@ -15,6 +15,8 @@ export interface MenuItem {
   readonly apiReady: readonly string[];
   /** 서버 API 가 아직 없거나 계약만 있는 기능 */
   readonly apiMissing: readonly string[];
+  /** 왼쪽 메뉴에서 감춤(주소는 그대로 — 다른 화면 안 탭으로 옮긴 것) */
+  readonly hidden?: boolean;
 }
 
 export interface MenuGroup {
@@ -83,6 +85,8 @@ export const navGroups: readonly MenuGroup[] = [
         key: 'dispatchDelays',
         segment: 'dispatch-delays',
         ready: true,
+        // 2026-11-27 배송 현황 > 배송 문제 탭으로(사용자 "배차 지연·실패는 배송 현황 하위 탭, 배송 문제로 묶어 한 페이지")
+        hidden: true,
         apiReady: ['배차 지연 배송(픽업 전, 지연 안내 난 것)', '배송 번호 묶음 조회', '배차 불가로 취소(claim 0.11.0 DC-1)'],
         apiMissing: [],
       },
@@ -90,6 +94,7 @@ export const navGroups: readonly MenuGroup[] = [
         key: 'dispatchFailures',
         segment: 'dispatch-failures',
         ready: true,
+        hidden: true,
         apiReady: ['배차 실패 사건 목록·상세(보기만)'],
         apiMissing: [],
       },

@@ -8,7 +8,7 @@
 //   배정됨(ASSIGNED) = 픽업 지연. 줄마다 다음 할 일과 취소하면 생기는 일(백엔드 cancel-vs-handover §7 — 픽업 전 배송 거둠·포장분 취소 복귀),
 //   탐색 지연은 약속 + 30분 자동 취소(claim 0.9.1)까지 남은 시간. 같은 배송의 열린 배차 실패 접수(case DISPATCH_FAILED — 지원센터 처리)가 있으면 그 접수로.
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router';
+import { Link, Navigate } from 'react-router';
 
 import { request } from '@pmart/web-core';
 import { formatSeoul, QueryState, toUiState } from '@pmart/web-ui';
@@ -70,7 +70,13 @@ async function readNumbers(api: Api, mfcId: string, ids: readonly string[]) {
   return map;
 }
 
+/** 옛 주소 `/c/:mfcId/dispatch-delays` → 배송 현황 > 배송 문제(2026-11-27) */
 export function DispatchDelaysMenu({ mfcId }: { readonly mfcId: string }) {
+  return <Navigate to={`${centerPath(mfcId, 'deliveries')}?view=issues`} replace />;
+}
+
+/** 배차 지연 — 배송 현황 > 배송 문제 탭의 위쪽 */
+export function DispatchDelaysSection({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
   const query = useDispatchDelays(mfcId);
   const ids = (query.data ?? []).map((d) => d.deliveryId);
@@ -83,7 +89,7 @@ export function DispatchDelaysMenu({ mfcId }: { readonly mfcId: string }) {
   const failures = useOpenDispatchFailures(mfcId);
   return (
     <section className="space-y-4">
-      <h1>{messages.menus.dispatchDelays}</h1>
+      <h2 className="text-lg font-semibold">{messages.menus.dispatchDelays}</h2>
       {numbers.isError && (
         <p role="alert" className="alert alert-warning text-sm">
           {m.numbersFailed}
