@@ -453,6 +453,11 @@ main table tbody tr.pm-inline-row:hover > td {
     max-height: calc(100vh - 72px);
     overflow-y: auto;
   }
+  /* 처리 칸은 400px — 안의 양식을 두 칸(xl:grid-cols-2)으로 나누면 카드가 180px 남짓이라 사유 고르기·확인 칸이 잘렸다
+     (2026-11-27 사용자 캡처 "배차 취소"). 여기서는 한 칸으로 쌓는다. 처리 칸이 아래로 가는 1599px 이하는 두 칸 그대로 */
+  .pm-act-col [data-testid='delivery-actions'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 @media (max-width: 1599px) {
   .pm-detail-grid {
