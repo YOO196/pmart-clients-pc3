@@ -177,11 +177,19 @@ class StepHeader extends ConsumerWidget {
                     child: Text(
                       last == null
                           ? l10n.trailNoPrevious
-                          : l10n.trailPrevious(
-                              activityTypeText(l10n, last.type),
-                              last.taskId ?? last.refId,
-                              formatSeoulTime(last.at),
-                            ),
+                          // 긴 내부 id(TRF-SR-uuid 등)는 빼고 종류·시각만 — 작업자가 읽을 수 없는 값
+                          : switch (last.taskId ?? last.refId) {
+                              final id when id.length <= 16 =>
+                                l10n.trailPrevious(
+                                  activityTypeText(l10n, last.type),
+                                  id,
+                                  formatSeoulTime(last.at),
+                                ),
+                              _ => l10n.trailPreviousShort(
+                                activityTypeText(l10n, last.type),
+                                formatSeoulTime(last.at),
+                              ),
+                            },
                       key: const ValueKey('trail-previous'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

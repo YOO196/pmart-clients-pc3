@@ -5,6 +5,7 @@ import 'package:pmart_ui/pmart_ui.dart';
 
 import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/field_widgets.dart';
+import '../../../shared/pda_motion.dart';
 import '../../../shared/pda_theme.dart';
 import '../../../shared/printer/reprint.dart';
 import '../../../shared/scanner/scan_input.dart';
@@ -1333,48 +1334,128 @@ class _BoxInspectStep extends ConsumerWidget {
           Text(
             l10n.boxInspectProgress(done, boxes.length),
             key: const ValueKey('box-inspect-progress'),
-            style: theme.textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.titleLarge?.copyWith(
               color: PdaColors.primary,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 12),
+          // 박스 줄은 카드로 — 상품명 크게, 박스 번호 아래, 오른쪽에 정상·이상 크게(사용자 2026-11-27 "글자가 작고 다닥다닥 붙어 눈에 안 들어와")
           Expanded(
-            child: ListView(
-              children: [
-                for (final b in boxes)
-                  ListTile(
-                    key: ValueKey('box-${b.boxId}'),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      s.boxDone(b.boxId)
-                          ? Icons.check_circle
-                          : Icons.inventory_2_outlined,
-                    ),
-                    title: Text(
-                      s.entriesOf(b.boxId).length > 1
-                          ? '${b.boxId} · ${l10n.boxMixedShort(s.entriesOf(b.boxId).length)}'
-                          : '${b.boxId} · ${nameOf(b)}',
-                    ),
-                    trailing: Text(
-                      s.boxDone(b.boxId)
-                          ? l10n.boxInspected(
-                              [
-                                for (final e in s.entriesOf(b.boxId))
-                                  s.boxCounts[e.entryKey]!.normal,
-                              ].fold(0, (a, n) => a + n),
-                              [
-                                for (final e in s.entriesOf(b.boxId))
-                                  s.boxCounts[e.entryKey]!.quarantined +
-                                      s.boxCounts[e.entryKey]!.pending,
-                              ].fold(0, (a, n) => a + n),
-                            )
-                          : l10n.boxNotInspected,
-                    ),
+            child: ListView.separated(
+              itemCount: boxes.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
+              itemBuilder: (context, i) {
+                final b = boxes[i];
+                final done = s.boxDone(b.boxId);
+                final es = s.entriesOf(b.boxId);
+                final normal = [
+                  for (final e in es) s.boxCounts[e.entryKey]?.normal ?? 0,
+                ].fold(0, (a, n) => a + n);
+                final issue = [
+                  for (final e in es)
+                    (s.boxCounts[e.entryKey]?.quarantined ?? 0) +
+                        (s.boxCounts[e.entryKey]?.pending ?? 0),
+                ].fold(0, (a, n) => a + n);
+                return Material(
+                  key: ValueKey('box-${b.boxId}'),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  elevation: 0,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
                     onTap: () => ctl.openBox(b.boxId),
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 18, 16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: done ? PdaColors.lilac : PdaColors.line,
+                          width: done ? 1.5 : 1,
+                        ),
+                        boxShadow: PdaShadows.sm,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            done
+                                ? Icons.check_circle_rounded
+                                : Icons.inventory_2_outlined,
+                            size: 30,
+                            color: done ? PdaColors.primary : PdaColors.muted,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  es.length > 1
+                                      ? l10n.boxMixedShort(es.length)
+                                      : nameOf(b),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    height: 1.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  b.boxId,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    color: PdaColors.muted,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          if (done)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  l10n.boxNormalN(normal),
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                    color: PdaColors.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  l10n.boxIssueN(issue),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: issue > 0
+                                        ? PdaColors.danger
+                                        : PdaColors.muted,
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            Text(
+                              l10n.boxNotInspected,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: PdaColors.muted,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-              ],
+                );
+              },
             ),
           ),
         ],
