@@ -38,11 +38,14 @@ describe('입고 작업 목록', () => {
     await waitFor(() => expect(screen.getAllByTestId('dc-inbound-row')).toHaveLength(3));
     expect(view.gets('/inbound-promises').some((r) => new URL(r.url).searchParams.get('state') === 'TIN_POSTED')).toBe(true);
     const row = (id: string) => screen.getAllByTestId('dc-inbound-row').find((r) => r.textContent?.includes(id))!;
-    expect(row('TRF-SIM-DC-0')).toHaveTextContent('재고 반영');
-    expect(row('TRF-SIM-DC-2')).toHaveTextContent('오는 중');
-    expect(row('TRF-SIM-DC-2')).toHaveTextContent('0 / 36');
-    expect(row('TRF-SIM-DC-1')).toHaveTextContent('받는 중');
-    expect(row('TRF-SIM-DC-1')).toHaveTextContent('15 / 16');
+    expect(row('T286575')).toHaveTextContent('재고 반영');
+    // TRF 칸은 긴 trfId 대신 화면 번호 + Wave
+    expect(row('T286575')).toHaveTextContent('W6307');
+    expect(screen.queryByText('TRF-SIM-DC-0')).not.toBeInTheDocument();
+    expect(row('T286577')).toHaveTextContent('오는 중');
+    expect(row('T286577')).toHaveTextContent('0 / 36');
+    expect(row('T286576')).toHaveTextContent('받는 중');
+    expect(row('T286576')).toHaveTextContent('15 / 16');
     expect(screen.getByTestId('stock-live')).toBeInTheDocument();
     // 맨 위 흐름 한 줄 — 준비 중 → 오는 중 → 도착·수령 중 → 오늘 받음(서버 상태·출발 여부 그대로)
     await waitFor(() => expect(screen.getByTestId('dc-flow-GOING')).toHaveTextContent('1건'));
@@ -62,6 +65,7 @@ describe('입고 작업 목록', () => {
   it('DC 이관 입고 상세: 단계·상품 줄(수령 격리)·지금 재고(실시간)·수령 반영·적치 작업으로', async () => {
     const view = renderAt('/c/MFC-BJG-01/inbound?tab=promises&trf=TRF-SIM-DC-1');
     expect(await screen.findByTestId('dc-inbound-steps')).toBeInTheDocument();
+    expect(screen.getByTestId('dc-inbound-title')).toHaveTextContent('T286576 · W6308');
     await waitFor(() => expect(screen.getAllByTestId('dc-inbound-line')).toHaveLength(2));
     const ramen = screen.getAllByTestId('dc-inbound-line').find((r) => r.textContent?.includes('신라면'))!;
     expect(ramen).toHaveTextContent('격리 1 · 보류 0');

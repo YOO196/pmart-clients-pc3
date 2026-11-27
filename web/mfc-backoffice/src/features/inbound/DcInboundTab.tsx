@@ -6,36 +6,50 @@
 //   상품별 지금 재고(`GET /mfcs/{mfcId}/stock?sku=` — 재고 실시간 스트림이 바뀐 SKU 만 다시 읽는다).
 // - 맨 위 흐름 한 줄(DcInboundFlow, 2026-11-27 #607 흐름 그림을 옮김): 준비 중 → 오는 중 → 도착·수령 중 → 오늘 받음 건수, 누르면 목록 거르기.
 // 값은 서버 값만 — 수령 ≠ 반영(재고 반영 상태가 APPLIED 일 때만 "반영"), 조회 실패는 0 이 아니라 "조회 실패".
-import { useQueries, useQuery } from '@tanstack/react-query';
-import { Link, useSearchParams } from 'react-router';
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { Link, useSearchParams } from "react-router";
 
-import { request } from '@pmart/web-core';
-import { formatSeoul, QueryState, toUiState } from '@pmart/web-ui';
-import type { components } from '../../api/generated/mfc-inbound';
-import { useApi } from '../../app/ApiContext';
-import { centerPath } from '../../app/nav';
-import { messages } from '../../shared/messages';
-import { ProgressSteps, type StepPlace } from '../../shared/ProgressSteps';
-import { StockLiveStatus } from '../stock-stream/useStockStream';
-import { DcInboundFlow } from './DcInboundFlow';
+import { request } from "@pmart/web-core";
+import { formatSeoul, QueryState, toUiState } from "@pmart/web-ui";
+import type { components } from "../../api/generated/mfc-inbound";
+import { useApi } from "../../app/ApiContext";
+import { centerPath } from "../../app/nav";
+import { messages } from "../../shared/messages";
+import { ProgressSteps, type StepPlace } from "../../shared/ProgressSteps";
+import { StockLiveStatus } from "../stock-stream/useStockStream";
+import { DcInboundFlow } from "./DcInboundFlow";
 
 const m = messages.inbound.dc;
-type Promise_ = components['schemas']['InboundPromise'];
-type State = components['schemas']['InboundPromiseState'];
-const STATES: readonly State[] = ['EXPECTED', 'RECEIVING', 'TIN_POSTED', 'CANCELLED'];
+type Promise_ = components["schemas"]["InboundPromise"];
+type State = components["schemas"]["InboundPromiseState"];
+const STATES: readonly State[] = [
+  "EXPECTED",
+  "RECEIVING",
+  "TIN_POSTED",
+  "CANCELLED",
+];
 const REFRESH_MS = 30_000;
 
 const stateBadge = (s: State | undefined) =>
-  s === 'EXPECTED' ? 'badge-info' : s === 'RECEIVING' ? 'badge-warning' : s === 'TIN_POSTED' ? 'badge-success' : 'badge-ghost';
-const sum = (p: Promise_, k: 'expectedQty' | 'receivedQty') => (p.lines ?? []).reduce((a, l) => a + (l[k] ?? 0), 0);
+  s === "EXPECTED"
+    ? "badge-info"
+    : s === "RECEIVING"
+      ? "badge-warning"
+      : s === "TIN_POSTED"
+        ? "badge-success"
+        : "badge-ghost";
+const sum = (p: Promise_, k: "expectedQty" | "receivedQty") =>
+  (p.lines ?? []).reduce((a, l) => a + (l[k] ?? 0), 0);
 
 export function DcInboundTab({ mfcId }: { readonly mfcId: string }) {
   const api = useApi();
   const [params, setParams] = useSearchParams();
-  const rawState = params.get('dstate') ?? '';
-  const state = (STATES as readonly string[]).includes(rawState) ? (rawState as State) : undefined;
-  const date = params.get('ddate') ?? '';
-  const trf = params.get('trf');
+  const rawState = params.get("dstate") ?? "";
+  const state = (STATES as readonly string[]).includes(rawState)
+    ? (rawState as State)
+    : undefined;
+  const date = params.get("ddate") ?? "";
+  const trf = params.get("trf");
   const set = (next: Record<string, string>) => {
     const p = new URLSearchParams(params);
     for (const [k, v] of Object.entries(next)) {
@@ -45,28 +59,67 @@ export function DcInboundTab({ mfcId }: { readonly mfcId: string }) {
     setParams(p, { replace: true });
   };
   const list = useQuery({
-    queryKey: ['inbound-promises', mfcId, state ?? 'ALL', date],
+    queryKey: ["inbound-promises", mfcId, state ?? "ALL", date],
     refetchInterval: REFRESH_MS,
     queryFn: async () => {
       const get = async (st?: State) =>
-        (await request('GET', api.inbound.GET('/inbound-promises', { params: { query: { mfcId, size: 200, ...(st ? { state: st } : {}), ...(date ? { date } : {}) } } }))).items ?? [];
+        (
+          await request(
+            "GET",
+            api.inbound.GET("/inbound-promises", {
+              params: {
+                query: {
+                  mfcId,
+                  size: 200,
+                  ...(st ? { state: st } : {}),
+                  ...(date ? { date } : {}),
+                },
+              },
+            }),
+          )
+        ).items ?? [];
       if (state) return get(state);
       // "전체" — 서버는 state 를 비우면 끝나지 않은 것(EXPECTED·RECEIVING)만 준다(mfc-inbound 0.16.0).
       // 수령·적치까지 끝난(재고 반영 TIN_POSTED) TRF 가 빠지지 않게 함께 읽는다(사용자 2026-11-27 "적치까지 완료했는데 백오피스에 안 떠").
-      const [open, posted] = await Promise.all([get(), get('TIN_POSTED')]);
+      const [open, posted] = await Promise.all([get(), get("TIN_POSTED")]);
       const seen = new Set(open.map((p) => p.trfId));
       return [...open, ...posted.filter((p) => !seen.has(p.trfId))];
     },
   });
-  if (trf) return <DcInboundDetail mfcId={mfcId} trfId={trf} onBack={() => set({ trf: '' })} />;
+  if (trf)
+    return (
+      <DcInboundDetail
+        mfcId={mfcId}
+        trfId={trf}
+        onBack={() => set({ trf: "" })}
+      />
+    );
   return (
     <div className="space-y-3 text-sm" data-testid="dc-inbound">
       {/* DC 에서 이 센터까지 단계별 건수 — 누르면 아래 목록을 그 상태로 거른다 */}
-      <DcInboundFlow mfcId={mfcId} onPick={(st) => set({ dstate: st, ddate: st === 'TIN_POSTED' ? new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10) : '' })} />
+      <DcInboundFlow
+        mfcId={mfcId}
+        onPick={(st) =>
+          set({
+            dstate: st,
+            ddate:
+              st === "TIN_POSTED"
+                ? new Date(Date.now() + 9 * 3_600_000)
+                    .toISOString()
+                    .slice(0, 10)
+                : "",
+          })
+        }
+      />
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1">
           {m.state}
-          <select className="select select-sm w-36" aria-label={m.state} value={state ?? ''} onChange={(e) => set({ dstate: e.target.value })}>
+          <select
+            className="select select-sm w-36"
+            aria-label={m.state}
+            value={state ?? ""}
+            onChange={(e) => set({ dstate: e.target.value })}
+          >
             <option value="">{m.all}</option>
             {STATES.map((s) => (
               <option key={s} value={s}>
@@ -77,13 +130,23 @@ export function DcInboundTab({ mfcId }: { readonly mfcId: string }) {
         </label>
         <label className="flex flex-col gap-1">
           {m.date}
-          <input type="date" className="input input-sm w-40" aria-label={m.date} value={date} onChange={(e) => set({ ddate: e.target.value })} />
+          <input
+            type="date"
+            className="input input-sm w-40"
+            aria-label={m.date}
+            value={date}
+            onChange={(e) => set({ ddate: e.target.value })}
+          />
         </label>
         <span className="ml-auto flex items-center gap-2 text-xs text-base-content/60">
           <StockLiveStatus mfcId={mfcId} />· {m.refreshNote}
         </span>
       </div>
-      <QueryState state={toUiState(list, (d) => d.length === 0)} onRetry={() => void list.refetch()} emptyText={m.empty}>
+      <QueryState
+        state={toUiState(list, (d) => d.length === 0)}
+        onRetry={() => void list.refetch()}
+        emptyText={m.empty}
+      >
         {(items) => (
           <div className="overflow-x-auto rounded-box border border-base-300 bg-base-100">
             <table className="table table-sm">
@@ -101,27 +164,65 @@ export function DcInboundTab({ mfcId }: { readonly mfcId: string }) {
               </thead>
               <tbody>
                 {items.map((p) => {
-                  const expected = sum(p, 'expectedQty');
-                  const received = sum(p, 'receivedQty');
+                  const expected = sum(p, "expectedQty");
+                  const received = sum(p, "receivedQty");
                   return (
-                    <tr key={p.trfId} className="cursor-pointer hover:bg-base-200/50" onClick={() => set({ trf: p.trfId ?? '' })} data-testid="dc-inbound-row">
+                    <tr
+                      key={p.trfId}
+                      className="cursor-pointer hover:bg-base-200/50"
+                      onClick={() => set({ trf: p.trfId ?? "" })}
+                      data-testid="dc-inbound-row"
+                    >
                       <td>
-                        <button type="button" className="link font-mono font-semibold" onClick={() => set({ trf: p.trfId ?? '' })}>
-                          {p.trfId}
+                        {/* 긴 trfId 대신 화면 번호(T…·W…, mfc-inbound 0.25.0) — 없으면 "번호 없음"(trfId 를 대신 내지 않음) */}
+                        <button
+                          type="button"
+                          className="link font-mono font-semibold"
+                          onClick={() => set({ trf: p.trfId ?? "" })}
+                          data-testid="dc-inbound-no"
+                        >
+                          {p.trfNumber ?? m.noNumber}
                         </button>
+                        {p.waveNumber && (
+                          <span className="ml-1.5 font-mono text-xs text-base-content/55">
+                            {p.waveNumber}
+                          </span>
+                        )}
                       </td>
                       <td>{p.fromCdc ?? messages.none}</td>
                       <td>
-                        <span className={`badge badge-sm ${stateBadge(p.state)}`}>{m.stateName[p.state ?? ''] ?? p.state}</span>
+                        <span
+                          className={`badge badge-sm ${stateBadge(p.state)}`}
+                        >
+                          {m.stateName[p.state ?? ""] ?? p.state}
+                        </span>
                       </td>
-                      <td>{p.departedAt ? formatSeoul(p.departedAt) : m.notDeparted}</td>
-                      <td>{p.eta ? formatSeoul(p.eta) : p.plannedArrivalAt ? formatSeoul(p.plannedArrivalAt) : messages.none}</td>
-                      <td>{p.arrivedAt ? formatSeoul(p.arrivedAt) : messages.none}</td>
+                      <td>
+                        {p.departedAt
+                          ? formatSeoul(p.departedAt)
+                          : m.notDeparted}
+                      </td>
+                      <td>
+                        {p.eta
+                          ? formatSeoul(p.eta)
+                          : p.plannedArrivalAt
+                            ? formatSeoul(p.plannedArrivalAt)
+                            : messages.none}
+                      </td>
+                      <td>
+                        {p.arrivedAt ? formatSeoul(p.arrivedAt) : messages.none}
+                      </td>
                       <td className="text-right">
-                        <span className="font-semibold">{m.qty(received, expected)}</span>
-                        <span className="block text-xs text-base-content/60">{m.lines((p.lines ?? []).length)}</span>
+                        <span className="font-semibold">
+                          {m.qty(received, expected)}
+                        </span>
+                        <span className="block text-xs text-base-content/60">
+                          {m.lines((p.lines ?? []).length)}
+                        </span>
                       </td>
-                      <td className="text-right">{(p.packages ?? []).length}</td>
+                      <td className="text-right">
+                        {(p.packages ?? []).length}
+                      </td>
                     </tr>
                   );
                 })}
@@ -136,51 +237,111 @@ export function DcInboundTab({ mfcId }: { readonly mfcId: string }) {
 
 /** 단계 자리 — 출발 → 도착 → 수령 → 적치 → 재고 반영 */
 function placeOf(p: Promise_, putawayLeft: number | null): StepPlace | null {
-  const applied = (p.receipts ?? []).some((r) => r.inventoryApplyStatus === 'APPLIED');
-  if (p.state === 'TIN_POSTED' || applied) return putawayLeft === 0 ? { step: 4, done: true } : { step: 3, done: false };
-  if (p.state === 'RECEIVING') return (p.receipts ?? []).length > 0 ? { step: 2, done: false } : { step: 1, done: !!p.arrivedAt };
-  if (p.state === 'EXPECTED') return p.departedAt ? { step: 0, done: true } : { step: 0, done: false };
+  const applied = (p.receipts ?? []).some(
+    (r) => r.inventoryApplyStatus === "APPLIED",
+  );
+  if (p.state === "TIN_POSTED" || applied)
+    return putawayLeft === 0
+      ? { step: 4, done: true }
+      : { step: 3, done: false };
+  if (p.state === "RECEIVING")
+    return (p.receipts ?? []).length > 0
+      ? { step: 2, done: false }
+      : { step: 1, done: !!p.arrivedAt };
+  if (p.state === "EXPECTED")
+    return p.departedAt ? { step: 0, done: true } : { step: 0, done: false };
   return null;
 }
 
-function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; readonly trfId: string; readonly onBack: () => void }) {
+function DcInboundDetail({
+  mfcId,
+  trfId,
+  onBack,
+}: {
+  readonly mfcId: string;
+  readonly trfId: string;
+  readonly onBack: () => void;
+}) {
   const api = useApi();
   const q = useQuery({
-    queryKey: ['inbound-promise', trfId],
+    queryKey: ["inbound-promise", trfId],
     refetchInterval: 15_000,
-    queryFn: () => request('GET', api.inbound.GET('/inbound-promises/{trfId}', { params: { path: { trfId } } })),
+    queryFn: () =>
+      request(
+        "GET",
+        api.inbound.GET("/inbound-promises/{trfId}", {
+          params: { path: { trfId } },
+        }),
+      ),
   });
-  const receiptIds = (q.data?.receipts ?? []).map((r) => r.receiptId).filter((x): x is string => !!x);
+  const receiptIds = (q.data?.receipts ?? [])
+    .map((r) => r.receiptId)
+    .filter((x): x is string => !!x);
   const tasks = useQuery({
-    queryKey: ['inbound-tasks', mfcId, 'by-receipts', receiptIds.join(',')],
+    queryKey: ["inbound-tasks", mfcId, "by-receipts", receiptIds.join(",")],
     enabled: receiptIds.length > 0,
     refetchInterval: 15_000,
     queryFn: async () =>
-      (await Promise.all(receiptIds.map((receiptId) => request('GET', api.inbound.GET('/inbound-tasks', { params: { query: { mfcId, receiptId } } }))))).flatMap((r) => r.items ?? []),
+      (
+        await Promise.all(
+          receiptIds.map((receiptId) =>
+            request(
+              "GET",
+              api.inbound.GET("/inbound-tasks", {
+                params: { query: { mfcId, receiptId } },
+              }),
+            ),
+          ),
+        )
+      ).flatMap((r) => r.items ?? []),
   });
-  const skus = [...new Set((q.data?.lines ?? []).map((l) => l.sku).filter((x): x is string => !!x))];
+  const skus = [
+    ...new Set(
+      (q.data?.lines ?? []).map((l) => l.sku).filter((x): x is string => !!x),
+    ),
+  ];
   // 상품별 지금 재고 — 쿼리 키 ['stock', mfcId, sku] 는 재고 실시간 스트림이 바뀐 SKU 만 다시 읽는다
   const stocks = useQueries({
     queries: skus.map((sku) => ({
-      queryKey: ['stock', mfcId, sku],
-      queryFn: () => request('GET', api.inventory.GET('/mfcs/{mfcId}/stock', { params: { path: { mfcId }, query: { sku } } })),
+      queryKey: ["stock", mfcId, sku],
+      queryFn: () =>
+        request(
+          "GET",
+          api.inventory.GET("/mfcs/{mfcId}/stock", {
+            params: { path: { mfcId }, query: { sku } },
+          }),
+        ),
     })),
   });
   const stockOf = (sku: string) => {
     const s = stocks[skus.indexOf(sku)];
     if (!s || s.isPending) return null;
-    if (s.isError) return 'error' as const;
+    if (s.isError) return "error" as const;
     const lots = s.data?.lots ?? [];
-    return { onHand: lots.reduce((a, l) => a + (l.onHand ?? 0), 0), available: lots.reduce((a, l) => a + Math.max(0, l.available ?? 0), 0) };
+    return {
+      onHand: lots.reduce((a, l) => a + (l.onHand ?? 0), 0),
+      available: lots.reduce((a, l) => a + Math.max(0, l.available ?? 0), 0),
+    };
   };
-  const putawayLeft = tasks.data ? tasks.data.filter((t) => t.state !== 'COMPLETED').length : null;
+  const putawayLeft = tasks.data
+    ? tasks.data.filter((t) => t.state !== "COMPLETED").length
+    : null;
   return (
     <div className="space-y-4 text-sm" data-testid="dc-inbound-detail">
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className="btn btn-sm" onClick={onBack}>
           {m.back}
         </button>
-        <h2 className="font-mono text-lg font-bold">{trfId}</h2>
+        <h2
+          className="font-mono text-lg font-bold"
+          data-testid="dc-inbound-title"
+        >
+          {q.data
+            ? [q.data.trfNumber ?? m.noNumber, q.data.waveNumber]
+                .filter(Boolean)
+                .join(" · ")
+            : "…"}
+        </h2>
         <span className="ml-auto text-xs text-base-content/60">
           <StockLiveStatus mfcId={mfcId} />
         </span>
@@ -191,7 +352,9 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
             <ProgressSteps
               steps={m.steps}
               place={placeOf(p, putawayLeft)}
-              ended={p.state === 'CANCELLED' ? m.stateName.CANCELLED : undefined}
+              ended={
+                p.state === "CANCELLED" ? m.stateName.CANCELLED : undefined
+              }
               label={m.stepsLabel}
               testId="dc-inbound-steps"
               endedTestId="dc-inbound-ended"
@@ -199,12 +362,30 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
             <dl className="grid grid-cols-2 gap-x-6 gap-y-1 rounded-box bg-base-100 p-4 md:grid-cols-4">
               {(
                 [
-                  [m.col.state, <span className={`badge badge-sm ${stateBadge(p.state)}`}>{m.stateName[p.state ?? ''] ?? p.state}</span>],
+                  [
+                    m.col.state,
+                    <span className={`badge badge-sm ${stateBadge(p.state)}`}>
+                      {m.stateName[p.state ?? ""] ?? p.state}
+                    </span>,
+                  ],
                   [m.col.from, p.fromCdc ?? messages.none],
                   [m.trip, p.tripId ?? messages.none],
-                  [m.col.departed, p.departedAt ? formatSeoul(p.departedAt) : m.notDeparted],
-                  [m.col.eta, p.eta ? formatSeoul(p.eta) : p.plannedArrivalAt ? formatSeoul(p.plannedArrivalAt) : messages.none],
-                  [m.col.arrived, p.arrivedAt ? formatSeoul(p.arrivedAt) : messages.none],
+                  [
+                    m.col.departed,
+                    p.departedAt ? formatSeoul(p.departedAt) : m.notDeparted,
+                  ],
+                  [
+                    m.col.eta,
+                    p.eta
+                      ? formatSeoul(p.eta)
+                      : p.plannedArrivalAt
+                        ? formatSeoul(p.plannedArrivalAt)
+                        : messages.none,
+                  ],
+                  [
+                    m.col.arrived,
+                    p.arrivedAt ? formatSeoul(p.arrivedAt) : messages.none,
+                  ],
                 ] as const
               ).map(([k, v]) => (
                 <div key={k}>
@@ -217,7 +398,10 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
             <section className="space-y-2 rounded-box bg-base-100 p-4">
               <h3 className="font-semibold">{m.linesTitle}</h3>
               <div className="overflow-x-auto">
-                <table className="table table-sm" data-testid="dc-inbound-lines">
+                <table
+                  className="table table-sm"
+                  data-testid="dc-inbound-lines"
+                >
                   <thead>
                     <tr>
                       <th>{m.col.product}</th>
@@ -233,32 +417,66 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
                       const st = l.sku ? stockOf(l.sku) : null;
                       const left = (l.expectedQty ?? 0) - (l.receivedQty ?? 0);
                       return (
-                        <tr key={`${l.sku}-${l.lotId ?? ''}`} data-testid="dc-inbound-line">
+                        <tr
+                          key={`${l.sku}-${l.lotId ?? ""}`}
+                          data-testid="dc-inbound-line"
+                        >
                           <td>
-                            <span className="block font-medium">{l.productName ?? l.sku}</span>
-                            <span className="font-mono text-xs text-base-content/60">{l.sku}</span>
+                            <span className="block font-medium">
+                              {l.productName ?? l.sku}
+                            </span>
+                            <span className="font-mono text-xs text-base-content/60">
+                              {l.sku}
+                            </span>
                           </td>
                           <td>
-                            <span className="font-mono text-xs">{l.lotId ?? messages.none}</span>
-                            {l.expiryDate && <span className="block text-xs text-base-content/60">{m.expiry(l.expiryDate)}</span>}
+                            <span className="font-mono text-xs">
+                              {l.lotId ?? messages.none}
+                            </span>
+                            {l.expiryDate && (
+                              <span className="block text-xs text-base-content/60">
+                                {m.expiry(l.expiryDate)}
+                              </span>
+                            )}
                           </td>
                           <td className="text-right">{l.expectedQty ?? 0}</td>
                           <td className="text-right">
-                            <span className="font-semibold">{l.receivedQty ?? 0}</span>
-                            {((l.quarantinedQty ?? 0) > 0 || (l.pendingQty ?? 0) > 0) && (
-                              <span className="block text-xs text-warning">{m.receivedSplit(l.quarantinedQty ?? 0, l.pendingQty ?? 0)}</span>
+                            <span className="font-semibold">
+                              {l.receivedQty ?? 0}
+                            </span>
+                            {((l.quarantinedQty ?? 0) > 0 ||
+                              (l.pendingQty ?? 0) > 0) && (
+                              <span className="block text-xs text-warning">
+                                {m.receivedSplit(
+                                  l.quarantinedQty ?? 0,
+                                  l.pendingQty ?? 0,
+                                )}
+                              </span>
                             )}
                           </td>
-                          <td className={`text-right ${left > 0 ? 'font-semibold text-warning' : 'text-base-content/50'}`}>{left}</td>
-                          <td className="text-right" data-testid="dc-inbound-stock">
+                          <td
+                            className={`text-right ${left > 0 ? "font-semibold text-warning" : "text-base-content/50"}`}
+                          >
+                            {left}
+                          </td>
+                          <td
+                            className="text-right"
+                            data-testid="dc-inbound-stock"
+                          >
                             {st === null ? (
-                              '…'
-                            ) : st === 'error' ? (
-                              <span className="text-error">{m.stockFailed}</span>
+                              "…"
+                            ) : st === "error" ? (
+                              <span className="text-error">
+                                {m.stockFailed}
+                              </span>
                             ) : (
                               <>
-                                <span className="font-bold text-primary">{m.available(st.available)}</span>
-                                <span className="block text-xs text-base-content/60">{m.onHand(st.onHand)}</span>
+                                <span className="font-bold text-primary">
+                                  {m.available(st.available)}
+                                </span>
+                                <span className="block text-xs text-base-content/60">
+                                  {m.onHand(st.onHand)}
+                                </span>
                               </>
                             )}
                           </td>
@@ -274,17 +492,34 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
               <section className="space-y-2 rounded-box bg-base-100 p-4">
                 <h3 className="font-semibold">{m.receiptsTitle}</h3>
                 {(p.receipts ?? []).length === 0 ? (
-                  <p className="text-base-content/60">{p.state === 'EXPECTED' ? m.noReceiptYet : m.noReceipt}</p>
+                  <p className="text-base-content/60">
+                    {p.state === "EXPECTED" ? m.noReceiptYet : m.noReceipt}
+                  </p>
                 ) : (
                   <ul className="space-y-1.5">
                     {(p.receipts ?? []).map((r) => (
-                      <li key={r.receiptId} className="flex flex-wrap items-center gap-2" data-testid="dc-inbound-receipt">
+                      <li
+                        key={r.receiptId}
+                        className="flex flex-wrap items-center gap-2"
+                        data-testid="dc-inbound-receipt"
+                      >
                         <span className="font-mono text-xs">{r.receiptId}</span>
-                        <span className={`badge badge-sm ${r.inventoryApplyStatus === 'APPLIED' ? 'badge-success' : r.inventoryApplyStatus === 'REJECTED' ? 'badge-error' : 'badge-warning'}`}>
-                          {m.apply[r.inventoryApplyStatus ?? ''] ?? r.inventoryApplyStatus}
+                        <span
+                          className={`badge badge-sm ${r.inventoryApplyStatus === "APPLIED" ? "badge-success" : r.inventoryApplyStatus === "REJECTED" ? "badge-error" : "badge-warning"}`}
+                        >
+                          {m.apply[r.inventoryApplyStatus ?? ""] ??
+                            r.inventoryApplyStatus}
                         </span>
-                        {r.receivedAt && <span className="text-xs text-base-content/60">{formatSeoul(r.receivedAt)}</span>}
-                        {(r.discrepancies ?? []).length > 0 && <span className="text-xs text-warning">{m.discrepancies((r.discrepancies ?? []).length)}</span>}
+                        {r.receivedAt && (
+                          <span className="text-xs text-base-content/60">
+                            {formatSeoul(r.receivedAt)}
+                          </span>
+                        )}
+                        {(r.discrepancies ?? []).length > 0 && (
+                          <span className="text-xs text-warning">
+                            {m.discrepancies((r.discrepancies ?? []).length)}
+                          </span>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -295,18 +530,44 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
                 {receiptIds.length === 0 ? (
                   <p className="text-base-content/60">{m.tasksAfterReceipt}</p>
                 ) : (
-                  <QueryState state={toUiState(tasks, (d) => d.length === 0)} onRetry={() => void tasks.refetch()} emptyText={m.noTasks}>
+                  <QueryState
+                    state={toUiState(tasks, (d) => d.length === 0)}
+                    onRetry={() => void tasks.refetch()}
+                    emptyText={m.noTasks}
+                  >
                     {(list) => (
                       <ul className="space-y-1.5">
                         {list.map((t) => (
-                          <li key={t.taskId} className="flex flex-wrap items-center gap-2" data-testid="dc-inbound-task">
-                            <span className="badge badge-sm badge-outline">{messages.inbound.taskType[t.taskType ?? ''] ?? t.taskType}</span>
+                          <li
+                            key={t.taskId}
+                            className="flex flex-wrap items-center gap-2"
+                            data-testid="dc-inbound-task"
+                          >
+                            <span className="badge badge-sm badge-outline">
+                              {messages.inbound.taskType[t.taskType ?? ""] ??
+                                t.taskType}
+                            </span>
                             <span>{t.productName ?? t.sku}</span>
-                            <span className="text-xs text-base-content/60">{m.taskQty(t.doneQty, t.plannedQty ?? 0)}</span>
-                            <span className={`badge badge-sm ${t.state === 'COMPLETED' ? 'badge-success' : 'badge-warning'}`}>{messages.inbound.taskState[t.state ?? ''] ?? t.state}</span>
-                            {t.state !== 'COMPLETED' && (
-                              <Link className="link ml-auto text-xs" to={centerPath(mfcId, `inbound/tasks/${encodeURIComponent(t.taskId ?? '')}`)}>
-                                {t.taskType === 'PUTAWAY' ? m.doPutaway : m.doInspect}
+                            <span className="text-xs text-base-content/60">
+                              {m.taskQty(t.doneQty, t.plannedQty ?? 0)}
+                            </span>
+                            <span
+                              className={`badge badge-sm ${t.state === "COMPLETED" ? "badge-success" : "badge-warning"}`}
+                            >
+                              {messages.inbound.taskState[t.state ?? ""] ??
+                                t.state}
+                            </span>
+                            {t.state !== "COMPLETED" && (
+                              <Link
+                                className="link ml-auto text-xs"
+                                to={centerPath(
+                                  mfcId,
+                                  `inbound/tasks/${encodeURIComponent(t.taskId ?? "")}`,
+                                )}
+                              >
+                                {t.taskType === "PUTAWAY"
+                                  ? m.doPutaway
+                                  : m.doInspect}
                               </Link>
                             )}
                           </li>
@@ -319,13 +580,19 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
             </div>
 
             <section className="space-y-2 rounded-box bg-base-100 p-4">
-              <h3 className="font-semibold">{m.boxesTitle((p.packages ?? []).length)}</h3>
+              <h3 className="font-semibold">
+                {m.boxesTitle((p.packages ?? []).length)}
+              </h3>
               {(p.packages ?? []).length === 0 ? (
                 <p className="text-base-content/60">{m.noBoxes}</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {(p.packages ?? []).map((b, i) => (
-                    <span key={`${b.lpn ?? ''}-${i}`} className="rounded-field border border-base-300 px-2 py-1 font-mono text-xs" data-testid="dc-inbound-box">
+                    <span
+                      key={`${b.lpn ?? ""}-${i}`}
+                      className="rounded-field border border-base-300 px-2 py-1 font-mono text-xs"
+                      data-testid="dc-inbound-box"
+                    >
                       {b.lpn ?? messages.none} · {b.sku} × {b.qty ?? 0}
                     </span>
                   ))}

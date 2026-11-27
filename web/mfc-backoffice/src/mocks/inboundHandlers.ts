@@ -2,28 +2,51 @@
 // 서버 규칙 중 화면이 보여 줄 것만: 그 센터 권한, 담당이 있으면 담당만(409 NOT_ASSIGNEE), 합계 ≤ 잔량(400), 품질검사 APPLIED → 정상 LOT 마다 적치 작업,
 // 적치는 선반·피킹 칸만(아니면 REJECTED LOCATION_ZONE_MISMATCH), 초기 보유는 EXPECTED 만·승인 수량 이하·합계 0 이면 400,
 // 공급 요청은 ACKNOWLEDGED 뒤 변경 409, 철회는 WITHDRAWN.
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse } from "msw";
 
-import { API_BASE } from '../api/client';
-import { listPage } from './listHandlers';
-import { db, nextSeq, timestamp, type MockInboundTask, type MockReturnReceipt, type MockSupplyRequest } from './db';
-import { expectedVersion, idempotent, operator, problem, unauthorized } from './support';
+import { API_BASE } from "../api/client";
+import { listPage } from "./listHandlers";
+import {
+  db,
+  nextSeq,
+  timestamp,
+  type MockInboundTask,
+  type MockReturnReceipt,
+  type MockSupplyRequest,
+} from "./db";
+import {
+  expectedVersion,
+  idempotent,
+  operator,
+  problem,
+  unauthorized,
+} from "./support";
 
-const canAccess = (request: Request, mfcId: string) => operator(request)?.centers.includes(mfcId) ?? false;
-const actor = (request: Request) => operator(request)?.subject ?? '';
-const keyOf = (request: Request) => request.headers.get('Idempotency-Key') ?? '';
+const canAccess = (request: Request, mfcId: string) =>
+  operator(request)?.centers.includes(mfcId) ?? false;
+const actor = (request: Request) => operator(request)?.subject ?? "";
+const keyOf = (request: Request) =>
+  request.headers.get("Idempotency-Key") ?? "";
 
-function foundTask(request: Request, taskId: string): MockInboundTask | HttpResponse<Record<string, unknown>> {
+function foundTask(
+  request: Request,
+  taskId: string,
+): MockInboundTask | HttpResponse<Record<string, unknown>> {
   const t = db.inboundTasks.get(taskId);
-  if (!t) return problem(404, 'NOT_FOUND');
-  if (!canAccess(request, t.mfcId)) return problem(403, 'FORBIDDEN');
+  if (!t) return problem(404, "NOT_FOUND");
+  if (!canAccess(request, t.mfcId)) return problem(403, "FORBIDDEN");
   return t;
 }
 
 /** 실행 결과 + 작업 잔량 반영 */
 function applyDone(t: MockInboundTask, qty: number): MockInboundTask {
   const doneQty = t.doneQty + qty;
-  const next: MockInboundTask = { ...t, doneQty, version: t.version + 1, state: doneQty >= t.plannedQty ? 'COMPLETED' : 'READY' };
+  const next: MockInboundTask = {
+    ...t,
+    doneQty,
+    version: t.version + 1,
+    state: doneQty >= t.plannedQty ? "COMPLETED" : "READY",
+  };
   db.inboundTasks.set(next.taskId, next);
   return next;
 }
@@ -31,61 +54,186 @@ function applyDone(t: MockInboundTask, qty: number): MockInboundTask {
 /** DC 이관 입고 목(mfc-inbound 0.16.0 inbound-promises) — 오는 중·받는 중(수령 RCPT-1 = 시드 입고 작업)·재고 반영 */
 function mockPromises(mfcId: string) {
   const at = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
-  const base = { mfcId, fromCdc: 'CDC01', version: 1, deadlineMeaning: 'ARRIVAL', sources: [] };
+  const base = {
+    mfcId,
+    fromCdc: "CDC01",
+    version: 1,
+    deadlineMeaning: "ARRIVAL",
+    sources: [],
+  };
   return [
     {
       ...base,
-      trfId: 'TRF-SIM-DC-2',
-      state: 'EXPECTED' as const,
+      trfId: "TRF-SIM-DC-2",
+      trfNumber: "T286577",
+      waveNumber: "W6309",
+      state: "EXPECTED" as const,
       departedAt: at(-20),
-      departureId: 'DEP-SIM-2',
+      departureId: "DEP-SIM-2",
       eta: at(35),
       plannedArrivalAt: at(40),
-      tripId: 'TO-20261126-002',
+      tripId: "TO-20261126-002",
       arrivedAt: null,
       lines: [
-        { sku: 'SKU-WATER-2L', productName: '생수 2L', lotId: 'L2611260021', expiryDate: '2027-11-01', temperatureZone: 'AMBIENT', expectedQty: 24, receivedQty: 0, quarantinedQty: 0, pendingQty: 0, barcodes: [] },
-        { sku: 'SKU-TOFU', productName: '국산콩 두부 300g', lotId: 'L2611260022', expiryDate: '2026-12-03', temperatureZone: 'CHILLED', expectedQty: 12, receivedQty: 0, quarantinedQty: 0, pendingQty: 0, barcodes: [] },
+        {
+          sku: "SKU-WATER-2L",
+          productName: "생수 2L",
+          lotId: "L2611260021",
+          expiryDate: "2027-11-01",
+          temperatureZone: "AMBIENT",
+          expectedQty: 24,
+          receivedQty: 0,
+          quarantinedQty: 0,
+          pendingQty: 0,
+          barcodes: [],
+        },
+        {
+          sku: "SKU-TOFU",
+          productName: "국산콩 두부 300g",
+          lotId: "L2611260022",
+          expiryDate: "2026-12-03",
+          temperatureZone: "CHILLED",
+          expectedQty: 12,
+          receivedQty: 0,
+          quarantinedQty: 0,
+          pendingQty: 0,
+          barcodes: [],
+        },
       ],
       packages: [
-        { lpn: 'LPN-SIM-DC2-1', sku: 'SKU-WATER-2L', lotId: 'L2611260021', qty: 12 },
-        { lpn: 'LPN-SIM-DC2-2', sku: 'SKU-WATER-2L', lotId: 'L2611260021', qty: 12 },
-        { lpn: 'LPN-SIM-DC2-3', sku: 'SKU-TOFU', lotId: 'L2611260022', qty: 12 },
+        {
+          lpn: "LPN-SIM-DC2-1",
+          sku: "SKU-WATER-2L",
+          lotId: "L2611260021",
+          qty: 12,
+        },
+        {
+          lpn: "LPN-SIM-DC2-2",
+          sku: "SKU-WATER-2L",
+          lotId: "L2611260021",
+          qty: 12,
+        },
+        {
+          lpn: "LPN-SIM-DC2-3",
+          sku: "SKU-TOFU",
+          lotId: "L2611260022",
+          qty: 12,
+        },
       ],
       receipts: [],
     },
     {
       ...base,
-      trfId: 'TRF-SIM-DC-1',
-      state: 'RECEIVING' as const,
+      trfId: "TRF-SIM-DC-1",
+      trfNumber: "T286576",
+      waveNumber: "W6308",
+      state: "RECEIVING" as const,
       departedAt: at(-90),
-      departureId: 'DEP-SIM-1',
+      departureId: "DEP-SIM-1",
       eta: at(-30),
       plannedArrivalAt: at(-30),
-      tripId: 'TO-20261126-001',
+      tripId: "TO-20261126-001",
       arrivedAt: at(-28),
       lines: [
-        { sku: 'SKU-MILK-1', productName: '서울우유 1L', lotId: 'L2611250011', expiryDate: '2026-12-05', temperatureZone: 'CHILLED', expectedQty: 6, receivedQty: 6, quarantinedQty: 0, pendingQty: 0, barcodes: [] },
-        { sku: 'SKU-RAMEN-5', productName: '신라면 5입', lotId: 'L2611250012', expiryDate: '2027-06-01', temperatureZone: 'AMBIENT', expectedQty: 10, receivedQty: 9, quarantinedQty: 1, pendingQty: 0, barcodes: [] },
+        {
+          sku: "SKU-MILK-1",
+          productName: "서울우유 1L",
+          lotId: "L2611250011",
+          expiryDate: "2026-12-05",
+          temperatureZone: "CHILLED",
+          expectedQty: 6,
+          receivedQty: 6,
+          quarantinedQty: 0,
+          pendingQty: 0,
+          barcodes: [],
+        },
+        {
+          sku: "SKU-RAMEN-5",
+          productName: "신라면 5입",
+          lotId: "L2611250012",
+          expiryDate: "2027-06-01",
+          temperatureZone: "AMBIENT",
+          expectedQty: 10,
+          receivedQty: 9,
+          quarantinedQty: 1,
+          pendingQty: 0,
+          barcodes: [],
+        },
       ],
       packages: [
-        { lpn: 'LPN-SIM-DC1-1', sku: 'SKU-MILK-1', lotId: 'L2611250011', qty: 6 },
-        { lpn: 'LPN-SIM-DC1-2', sku: 'SKU-RAMEN-5', lotId: 'L2611250012', qty: 10 },
+        {
+          lpn: "LPN-SIM-DC1-1",
+          sku: "SKU-MILK-1",
+          lotId: "L2611250011",
+          qty: 6,
+        },
+        {
+          lpn: "LPN-SIM-DC1-2",
+          sku: "SKU-RAMEN-5",
+          lotId: "L2611250012",
+          qty: 10,
+        },
       ],
-      receipts: [{ receiptId: 'RCPT-1', trfId: 'TRF-SIM-DC-1', mfcId, receivedAt: at(-20), postedAt: at(-19), inventoryApplyStatus: 'APPLIED' as const, inventoryCommitId: 'CMT-1', discrepancies: [{ sku: 'SKU-RAMEN-5', expectedQty: 10, receivedQty: 9, reason: 'SHORT' }] }],
+      receipts: [
+        {
+          receiptId: "RCPT-1",
+          trfId: "TRF-SIM-DC-1",
+          mfcId,
+          receivedAt: at(-20),
+          postedAt: at(-19),
+          inventoryApplyStatus: "APPLIED" as const,
+          inventoryCommitId: "CMT-1",
+          discrepancies: [
+            {
+              sku: "SKU-RAMEN-5",
+              expectedQty: 10,
+              receivedQty: 9,
+              reason: "SHORT",
+            },
+          ],
+        },
+      ],
     },
     {
       ...base,
-      trfId: 'TRF-SIM-DC-0',
-      state: 'TIN_POSTED' as const,
+      trfId: "TRF-SIM-DC-0",
+      trfNumber: "T286575",
+      waveNumber: "W6307",
+      state: "TIN_POSTED" as const,
       departedAt: at(-1500),
       eta: at(-1440),
       plannedArrivalAt: at(-1440),
-      tripId: 'TO-20261125-004',
+      tripId: "TO-20261125-004",
       arrivedAt: at(-1435),
-      lines: [{ sku: 'SKU-ICE', productName: '바닐라 아이스크림', lotId: 'L2611240031', expiryDate: '2027-05-01', temperatureZone: 'FROZEN', expectedQty: 8, receivedQty: 8, quarantinedQty: 0, pendingQty: 0, barcodes: [] }],
-      packages: [{ lpn: 'LPN-SIM-DC0-1', sku: 'SKU-ICE', lotId: 'L2611240031', qty: 8 }],
-      receipts: [{ receiptId: 'RCPT-0', trfId: 'TRF-SIM-DC-0', mfcId, receivedAt: at(-60), postedAt: at(-59), inventoryApplyStatus: 'APPLIED' as const, inventoryCommitId: 'CMT-0', discrepancies: [] }],
+      lines: [
+        {
+          sku: "SKU-ICE",
+          productName: "바닐라 아이스크림",
+          lotId: "L2611240031",
+          expiryDate: "2027-05-01",
+          temperatureZone: "FROZEN",
+          expectedQty: 8,
+          receivedQty: 8,
+          quarantinedQty: 0,
+          pendingQty: 0,
+          barcodes: [],
+        },
+      ],
+      packages: [
+        { lpn: "LPN-SIM-DC0-1", sku: "SKU-ICE", lotId: "L2611240031", qty: 8 },
+      ],
+      receipts: [
+        {
+          receiptId: "RCPT-0",
+          trfId: "TRF-SIM-DC-0",
+          mfcId,
+          receivedAt: at(-60),
+          postedAt: at(-59),
+          inventoryApplyStatus: "APPLIED" as const,
+          inventoryCommitId: "CMT-0",
+          discrepancies: [],
+        },
+      ],
     },
   ];
 }
@@ -94,32 +242,36 @@ export const inboundHandlers = [
   http.get(`${API_BASE}/inbound-promises`, ({ request }) => {
     if (!operator(request)) return unauthorized();
     const q = new URL(request.url).searchParams;
-    const mfcId = q.get('mfcId') ?? '';
-    if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
+    const mfcId = q.get("mfcId") ?? "";
+    if (!canAccess(request, mfcId)) return problem(403, "FORBIDDEN");
     // 서버처럼 state 를 비우면 끝나지 않은 것(EXPECTED·RECEIVING)만(mfc-inbound 0.16.0)
-    const st = q.get('state');
-    const items = mockPromises(mfcId).filter((p) => (st ? p.state === st : p.state === 'EXPECTED' || p.state === 'RECEIVING'));
+    const st = q.get("state");
+    const items = mockPromises(mfcId).filter((p) =>
+      st ? p.state === st : p.state === "EXPECTED" || p.state === "RECEIVING",
+    );
     return HttpResponse.json({ items, page: { nextCursor: null } });
   }),
 
   http.get(`${API_BASE}/inbound-promises/:trfId`, ({ request, params }) => {
     const who = operator(request);
     if (!who) return unauthorized();
-    const p = who.centers.flatMap((c) => mockPromises(c)).find((x) => x.trfId === String(params.trfId));
-    return p ? HttpResponse.json(p) : problem(404, 'NOT_FOUND');
+    const p = who.centers
+      .flatMap((c) => mockPromises(c))
+      .find((x) => x.trfId === String(params.trfId));
+    return p ? HttpResponse.json(p) : problem(404, "NOT_FOUND");
   }),
 
   http.get(`${API_BASE}/inbound-tasks`, ({ request }) => {
     if (!operator(request)) return unauthorized();
     const q = new URL(request.url).searchParams;
-    const mfcId = q.get('mfcId') ?? '';
-    if (!canAccess(request, mfcId)) return problem(403, 'FORBIDDEN');
+    const mfcId = q.get("mfcId") ?? "";
+    if (!canAccess(request, mfcId)) return problem(403, "FORBIDDEN");
     const items = [...db.inboundTasks.values()]
       .filter((t) => t.mfcId === mfcId)
-      .filter((t) => !q.get('state') || t.state === q.get('state'))
-      .filter((t) => !q.get('taskType') || t.taskType === q.get('taskType'))
-      .filter((t) => !q.get('receiptId') || t.receiptId === q.get('receiptId'))
-      .sort((a, b) => (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
+      .filter((t) => !q.get("state") || t.state === q.get("state"))
+      .filter((t) => !q.get("taskType") || t.taskType === q.get("taskType"))
+      .filter((t) => !q.get("receiptId") || t.receiptId === q.get("receiptId"))
+      .sort((a, b) => (a.createdAt ?? "").localeCompare(b.createdAt ?? ""));
     return HttpResponse.json({ items });
   }),
 
@@ -129,103 +281,208 @@ export const inboundHandlers = [
     return t instanceof Response ? t : HttpResponse.json(t);
   }),
 
-  http.post(`${API_BASE}/inbound-tasks/:taskId/inspections`, async ({ request, params }) => {
-    if (!operator(request)) return unauthorized();
-    const t = foundTask(request, String(params.taskId));
-    if (t instanceof Response) return t;
-    const body = (await request.json()) as { results: Array<{ qty: number; resultQuality: 'NORMAL' | 'QUARANTINED'; sourceLotRef?: string; expiryDate?: string }> };
-    return idempotent(request, () => {
-      if (t.taskType !== 'INSPECT' || t.state !== 'READY') return problem(409, 'INVALID_STATE');
-      if (t.assigneeId && t.assigneeId !== actor(request)) return problem(409, 'NOT_ASSIGNEE');
-      const total = body.results.reduce((n, r) => n + r.qty, 0);
-      if (total > t.plannedQty - t.doneQty) return problem(400, 'VALIDATION_FAILED', [{ field: 'results', reason: 'QTY_EXCEEDS_REMAINING' }]);
-      // 정상 LOT(표기·기한이 같으면 하나)마다 적치 작업
-      const groups = new Map<string, number>();
-      for (const r of body.results.filter((x) => x.resultQuality === 'NORMAL')) {
-        const k = `${r.sourceLotRef ?? ''}|${r.expiryDate ?? ''}`;
-        groups.set(k, (groups.get(k) ?? 0) + r.qty);
-      }
-      const created = [...groups.entries()].map(([k, qty]) => {
-        const id = `ITK-${nextSeq()}`;
-        db.inboundTasks.set(id, {
-          ...t,
-          taskId: id,
-          taskType: 'PUTAWAY',
-          parentTaskId: t.taskId,
-          lotId: `LOT-${k.split('|')[0] || 'NEW'}`,
-          plannedQty: qty,
-          doneQty: 0,
-          state: 'READY',
-          version: 1,
-          assigneeId: null,
-          createdAt: timestamp(),
+  http.post(
+    `${API_BASE}/inbound-tasks/:taskId/inspections`,
+    async ({ request, params }) => {
+      if (!operator(request)) return unauthorized();
+      const t = foundTask(request, String(params.taskId));
+      if (t instanceof Response) return t;
+      const body = (await request.json()) as {
+        results: Array<{
+          qty: number;
+          resultQuality: "NORMAL" | "QUARANTINED";
+          sourceLotRef?: string;
+          expiryDate?: string;
+        }>;
+      };
+      return idempotent(request, () => {
+        if (t.taskType !== "INSPECT" || t.state !== "READY")
+          return problem(409, "INVALID_STATE");
+        if (t.assigneeId && t.assigneeId !== actor(request))
+          return problem(409, "NOT_ASSIGNEE");
+        const total = body.results.reduce((n, r) => n + r.qty, 0);
+        if (total > t.plannedQty - t.doneQty)
+          return problem(400, "VALIDATION_FAILED", [
+            { field: "results", reason: "QTY_EXCEEDS_REMAINING" },
+          ]);
+        // 정상 LOT(표기·기한이 같으면 하나)마다 적치 작업
+        const groups = new Map<string, number>();
+        for (const r of body.results.filter(
+          (x) => x.resultQuality === "NORMAL",
+        )) {
+          const k = `${r.sourceLotRef ?? ""}|${r.expiryDate ?? ""}`;
+          groups.set(k, (groups.get(k) ?? 0) + r.qty);
+        }
+        const created = [...groups.entries()].map(([k, qty]) => {
+          const id = `ITK-${nextSeq()}`;
+          db.inboundTasks.set(id, {
+            ...t,
+            taskId: id,
+            taskType: "PUTAWAY",
+            parentTaskId: t.taskId,
+            lotId: `LOT-${k.split("|")[0] || "NEW"}`,
+            plannedQty: qty,
+            doneQty: 0,
+            state: "READY",
+            version: 1,
+            assigneeId: null,
+            createdAt: timestamp(),
+          });
+          return id;
         });
-        return id;
+        const next = applyDone(t, total);
+        return {
+          status: 200,
+          body: {
+            executionId: `EXE-${keyOf(request).slice(0, 8)}`,
+            taskId: t.taskId,
+            applyStatus: "APPLIED",
+            inventoryCommitId: `CMT-${nextSeq()}`,
+            rejectReason: null,
+            createdTaskIds: created,
+            task: next,
+          },
+        };
       });
-      const next = applyDone(t, total);
-      return { status: 200, body: { executionId: `EXE-${keyOf(request).slice(0, 8)}`, taskId: t.taskId, applyStatus: 'APPLIED', inventoryCommitId: `CMT-${nextSeq()}`, rejectReason: null, createdTaskIds: created, task: next } };
-    });
-  }),
+    },
+  ),
 
-  http.post(`${API_BASE}/inbound-tasks/:taskId/putaways`, async ({ request, params }) => {
-    if (!operator(request)) return unauthorized();
-    const t = foundTask(request, String(params.taskId));
-    if (t instanceof Response) return t;
-    const body = (await request.json()) as { toLocationCode: string; qty: number };
-    return idempotent(request, () => {
-      if (t.taskType !== 'PUTAWAY' || t.state !== 'READY') return problem(409, 'INVALID_STATE');
-      if (t.assigneeId && t.assigneeId !== actor(request)) return problem(409, 'NOT_ASSIGNEE');
-      if (body.qty > t.plannedQty - t.doneQty) return problem(400, 'VALIDATION_FAILED', [{ field: 'qty', reason: 'QTY_EXCEEDS_REMAINING' }]);
-      const loc = [...db.locations.values()].find((l) => l.mfcId === t.mfcId && l.locationCode === body.toLocationCode);
-      const executionId = `EXE-${keyOf(request).slice(0, 8)}`;
-      if (!loc || (loc.zone !== 'STORAGE' && loc.zone !== 'PICKING')) {
-        // 재고가 거절 — 200 + REJECTED(작업 잔량 그대로)
-        return { status: 200, body: { executionId, taskId: t.taskId, applyStatus: 'REJECTED', inventoryCommitId: null, rejectReason: loc ? 'LOCATION_ZONE_MISMATCH' : 'LOCATION_NOT_REGISTERED', createdTaskIds: [], task: t } };
-      }
-      const next = applyDone(t, body.qty);
-      return { status: 200, body: { executionId, taskId: t.taskId, applyStatus: 'APPLIED', inventoryCommitId: `CMT-${nextSeq()}`, rejectReason: null, createdTaskIds: [], task: next } };
-    });
-  }),
+  http.post(
+    `${API_BASE}/inbound-tasks/:taskId/putaways`,
+    async ({ request, params }) => {
+      if (!operator(request)) return unauthorized();
+      const t = foundTask(request, String(params.taskId));
+      if (t instanceof Response) return t;
+      const body = (await request.json()) as {
+        toLocationCode: string;
+        qty: number;
+      };
+      return idempotent(request, () => {
+        if (t.taskType !== "PUTAWAY" || t.state !== "READY")
+          return problem(409, "INVALID_STATE");
+        if (t.assigneeId && t.assigneeId !== actor(request))
+          return problem(409, "NOT_ASSIGNEE");
+        if (body.qty > t.plannedQty - t.doneQty)
+          return problem(400, "VALIDATION_FAILED", [
+            { field: "qty", reason: "QTY_EXCEEDS_REMAINING" },
+          ]);
+        const loc = [...db.locations.values()].find(
+          (l) => l.mfcId === t.mfcId && l.locationCode === body.toLocationCode,
+        );
+        const executionId = `EXE-${keyOf(request).slice(0, 8)}`;
+        if (!loc || (loc.zone !== "STORAGE" && loc.zone !== "PICKING")) {
+          // 재고가 거절 — 200 + REJECTED(작업 잔량 그대로)
+          return {
+            status: 200,
+            body: {
+              executionId,
+              taskId: t.taskId,
+              applyStatus: "REJECTED",
+              inventoryCommitId: null,
+              rejectReason: loc
+                ? "LOCATION_ZONE_MISMATCH"
+                : "LOCATION_NOT_REGISTERED",
+              createdTaskIds: [],
+              task: t,
+            },
+          };
+        }
+        const next = applyDone(t, body.qty);
+        return {
+          status: 200,
+          body: {
+            executionId,
+            taskId: t.taskId,
+            applyStatus: "APPLIED",
+            inventoryCommitId: `CMT-${nextSeq()}`,
+            rejectReason: null,
+            createdTaskIds: [],
+            task: next,
+          },
+        };
+      });
+    },
+  ),
 
   http.get(`${API_BASE}/initial-stock-loads`, ({ request }) => {
     if (!operator(request)) return unauthorized();
     const q = new URL(request.url).searchParams;
-    const mfcId = q.get('mfcId');
+    const mfcId = q.get("mfcId");
     // (0.12.0, MB-1) 센터로 — 커서 목록. 승인 ID 로(예전 방식)는 그 승인 것 전부.
-    if (mfcId) return listPage(request, mfcId, db.initialLoads.filter((l) => l.mfcId === mfcId), (l) => l.state);
-    const approvalId = q.get('approvalId');
-    if (!approvalId) return problem(400, 'VALIDATION_FAILED', [{ field: 'mfcId', reason: 'REQUIRED' }]);
-    return HttpResponse.json({ items: db.initialLoads.filter((l) => l.approvalId === approvalId) });
-  }),
-
-  http.post(`${API_BASE}/initial-stock-loads/:receiptId/receipts`, async ({ request, params }) => {
-    if (!operator(request)) return unauthorized();
-    const load = db.initialLoads.find((l) => l.receiptId === String(params.receiptId));
-    if (!load) return problem(404, 'NOT_FOUND');
-    if (!load.mfcId || !canAccess(request, load.mfcId)) return problem(403, 'FORBIDDEN');
-    const body = (await request.json()) as { toLocationCode: string; lines: Array<{ sku: string; receivedQty: number }> };
-    return idempotent(request, () => {
-      if (load.state !== 'EXPECTED') return problem(409, 'INVALID_STATE');
-      for (const line of body.lines) {
-        const approved = load.lines.find((l) => l.sku === line.sku);
-        if (!approved) return problem(400, 'VALIDATION_FAILED', [{ field: 'lines.sku', reason: 'NOT_ALLOWED' }]);
-        if (line.receivedQty > approved.qty) return problem(400, 'VALIDATION_FAILED', [{ field: 'lines.receivedQty', reason: 'QTY_EXCEEDS_APPROVED' }]);
-      }
-      if (body.lines.reduce((n, l) => n + l.receivedQty, 0) === 0) return problem(400, 'VALIDATION_FAILED', [{ field: 'lines', reason: 'TOTAL_ZERO' }]);
-      // 접수(PENDING) — 목은 바로 전기까지 끝낸다(APPLIED + 품질검사 작업)
-      const next = {
-        ...load,
-        state: 'APPLIED' as const,
-        receivingLocation: body.toLocationCode,
-        receivedAt: timestamp(),
-        appliedAt: timestamp(),
-        inventoryCommitId: `CMT-${nextSeq()}`,
-        lines: load.lines.map((l) => ({ ...l, receivedQty: body.lines.find((x) => x.sku === l.sku)?.receivedQty ?? 0 })),
-      };
-      db.initialLoads = db.initialLoads.map((l) => (l === load ? next : l));
-      return { status: 202, body: { status: 'ACCEPTED', requestId: keyOf(request), resultId: load.receiptId } };
+    if (mfcId)
+      return listPage(
+        request,
+        mfcId,
+        db.initialLoads.filter((l) => l.mfcId === mfcId),
+        (l) => l.state,
+      );
+    const approvalId = q.get("approvalId");
+    if (!approvalId)
+      return problem(400, "VALIDATION_FAILED", [
+        { field: "mfcId", reason: "REQUIRED" },
+      ]);
+    return HttpResponse.json({
+      items: db.initialLoads.filter((l) => l.approvalId === approvalId),
     });
   }),
+
+  http.post(
+    `${API_BASE}/initial-stock-loads/:receiptId/receipts`,
+    async ({ request, params }) => {
+      if (!operator(request)) return unauthorized();
+      const load = db.initialLoads.find(
+        (l) => l.receiptId === String(params.receiptId),
+      );
+      if (!load) return problem(404, "NOT_FOUND");
+      if (!load.mfcId || !canAccess(request, load.mfcId))
+        return problem(403, "FORBIDDEN");
+      const body = (await request.json()) as {
+        toLocationCode: string;
+        lines: Array<{ sku: string; receivedQty: number }>;
+      };
+      return idempotent(request, () => {
+        if (load.state !== "EXPECTED") return problem(409, "INVALID_STATE");
+        for (const line of body.lines) {
+          const approved = load.lines.find((l) => l.sku === line.sku);
+          if (!approved)
+            return problem(400, "VALIDATION_FAILED", [
+              { field: "lines.sku", reason: "NOT_ALLOWED" },
+            ]);
+          if (line.receivedQty > approved.qty)
+            return problem(400, "VALIDATION_FAILED", [
+              { field: "lines.receivedQty", reason: "QTY_EXCEEDS_APPROVED" },
+            ]);
+        }
+        if (body.lines.reduce((n, l) => n + l.receivedQty, 0) === 0)
+          return problem(400, "VALIDATION_FAILED", [
+            { field: "lines", reason: "TOTAL_ZERO" },
+          ]);
+        // 접수(PENDING) — 목은 바로 전기까지 끝낸다(APPLIED + 품질검사 작업)
+        const next = {
+          ...load,
+          state: "APPLIED" as const,
+          receivingLocation: body.toLocationCode,
+          receivedAt: timestamp(),
+          appliedAt: timestamp(),
+          inventoryCommitId: `CMT-${nextSeq()}`,
+          lines: load.lines.map((l) => ({
+            ...l,
+            receivedQty:
+              body.lines.find((x) => x.sku === l.sku)?.receivedQty ?? 0,
+          })),
+        };
+        db.initialLoads = db.initialLoads.map((l) => (l === load ? next : l));
+        return {
+          status: 202,
+          body: {
+            status: "ACCEPTED",
+            requestId: keyOf(request),
+            resultId: load.receiptId,
+          },
+        };
+      });
+    },
+  ),
 
   http.post(`${API_BASE}/return-receipts`, async ({ request }) => {
     if (!operator(request)) return unauthorized();
@@ -235,9 +492,14 @@ export const inboundHandlers = [
       returnPickupId: string;
       toLocationCode: string;
       orderId?: string;
-      lines: Array<{ orderLineId?: string; sku: string; qty: number; conditionNote?: string }>;
+      lines: Array<{
+        orderLineId?: string;
+        sku: string;
+        qty: number;
+        conditionNote?: string;
+      }>;
     };
-    if (!canAccess(request, body.mfcId)) return problem(403, 'FORBIDDEN');
+    if (!canAccess(request, body.mfcId)) return problem(403, "FORBIDDEN");
     return idempotent(request, () => {
       const id = `RR-${nextSeq()}`;
       const rec: MockReturnReceipt = {
@@ -245,36 +507,61 @@ export const inboundHandlers = [
         claimId: body.claimId,
         returnPickupId: body.returnPickupId,
         mfcId: body.mfcId,
-        inventoryApplyStatus: 'APPLIED',
+        inventoryApplyStatus: "APPLIED",
         inventoryCommitId: `CMT-${nextSeq()}`,
-        inspectionState: 'PENDING',
+        inspectionState: "PENDING",
         receivedAt: timestamp(),
         orderId: body.orderId ?? null,
         toLocationCode: body.toLocationCode,
         receivedBy: actor(request),
         rejectReason: null,
-        lines: body.lines.map((l) => ({ orderLineId: l.orderLineId ?? null, sku: l.sku, qty: l.qty, lotId: `RET-${body.claimId}`, conditionNote: l.conditionNote ?? null })),
+        lines: body.lines.map((l) => ({
+          orderLineId: l.orderLineId ?? null,
+          sku: l.sku,
+          qty: l.qty,
+          lotId: `RET-${body.claimId}`,
+          conditionNote: l.conditionNote ?? null,
+        })),
         putawayTaskIds: [],
       };
       db.returnReceipts.set(id, rec);
-      return { status: 202, body: { status: 'APPLIED', requestId: keyOf(request), resultId: id } };
+      return {
+        status: 202,
+        body: { status: "APPLIED", requestId: keyOf(request), resultId: id },
+      };
     });
   }),
 
   http.get(`${API_BASE}/return-receipts/:id`, ({ request, params }) => {
     if (!operator(request)) return unauthorized();
     const rec = db.returnReceipts.get(String(params.id));
-    if (!rec) return problem(404, 'NOT_FOUND');
-    if (!canAccess(request, rec.mfcId)) return problem(403, 'FORBIDDEN');
+    if (!rec) return problem(404, "NOT_FOUND");
+    if (!canAccess(request, rec.mfcId)) return problem(403, "FORBIDDEN");
     return HttpResponse.json(rec);
   }),
 
   http.post(`${API_BASE}/supply-requests`, async ({ request }) => {
     if (!operator(request)) return unauthorized();
-    const body = (await request.json()) as Omit<MockSupplyRequest, 'supplyRequestId' | 'version' | 'state'>;
-    if (!canAccess(request, body.mfcId) || !operator(request)?.roles.includes('MFC_SUPERVISOR')) return problem(403, 'FORBIDDEN');
+    const body = (await request.json()) as Omit<
+      MockSupplyRequest,
+      "supplyRequestId" | "version" | "state"
+    >;
+    if (
+      !canAccess(request, body.mfcId) ||
+      !operator(request)?.roles.includes("MFC_SUPERVISOR")
+    )
+      return problem(403, "FORBIDDEN");
     return idempotent(request, () => {
-      const rec: MockSupplyRequest = { ...body, supplyRequestId: `SR-${nextSeq()}`, version: 1, state: 'SUBMITTED', submittedBy: actor(request), submittedAt: timestamp(), acknowledgedAt: null, linkedTrfId: null };
+      const rec: MockSupplyRequest = {
+        ...body,
+        supplyRequestId: `SR-${nextSeq()}`,
+        version: 1,
+        state: "SUBMITTED",
+        submittedBy: actor(request),
+        submittedAt: timestamp(),
+        acknowledgedAt: null,
+        linkedTrfId: null,
+      };
       db.supplyRequests.set(rec.supplyRequestId, rec);
       return { status: 201, body: rec };
     });
@@ -283,38 +570,74 @@ export const inboundHandlers = [
   http.get(`${API_BASE}/supply-requests/:id`, ({ request, params }) => {
     if (!operator(request)) return unauthorized();
     const rec = db.supplyRequests.get(String(params.id));
-    if (!rec) return problem(404, 'NOT_FOUND');
-    if (!canAccess(request, rec.mfcId)) return problem(403, 'FORBIDDEN');
+    if (!rec) return problem(404, "NOT_FOUND");
+    if (!canAccess(request, rec.mfcId)) return problem(403, "FORBIDDEN");
     return HttpResponse.json(rec);
   }),
 
   http.patch(`${API_BASE}/supply-requests/:id`, async ({ request, params }) => {
     if (!operator(request)) return unauthorized();
     const rec = db.supplyRequests.get(String(params.id));
-    if (!rec) return problem(404, 'NOT_FOUND');
-    if (!canAccess(request, rec.mfcId)) return problem(403, 'FORBIDDEN');
-    const body = (await request.json()) as Omit<MockSupplyRequest, 'supplyRequestId' | 'version' | 'state'>;
+    if (!rec) return problem(404, "NOT_FOUND");
+    if (!canAccess(request, rec.mfcId)) return problem(403, "FORBIDDEN");
+    const body = (await request.json()) as Omit<
+      MockSupplyRequest,
+      "supplyRequestId" | "version" | "state"
+    >;
     return idempotent(request, () => {
-      if (expectedVersion(request) !== rec.version) return problem(409, 'VERSION_CONFLICT');
-      if (rec.state !== 'DRAFT' && rec.state !== 'SUBMITTED') return problem(409, 'INVALID_STATE');
-      const next: MockSupplyRequest = { ...rec, ...body, supplyRequestId: rec.supplyRequestId, state: rec.state, version: rec.version + 1 };
+      if (expectedVersion(request) !== rec.version)
+        return problem(409, "VERSION_CONFLICT");
+      if (rec.state !== "DRAFT" && rec.state !== "SUBMITTED")
+        return problem(409, "INVALID_STATE");
+      const next: MockSupplyRequest = {
+        ...rec,
+        ...body,
+        supplyRequestId: rec.supplyRequestId,
+        state: rec.state,
+        version: rec.version + 1,
+      };
       db.supplyRequests.set(next.supplyRequestId, next);
       return { status: 200, body: next };
     });
   }),
 
-  http.post(`${API_BASE}/supply-requests/:id/withdrawals`, ({ request, params }) => {
-    if (!operator(request)) return unauthorized();
-    const rec = db.supplyRequests.get(String(params.id));
-    if (!rec) return problem(404, 'NOT_FOUND');
-    if (!canAccess(request, rec.mfcId)) return problem(403, 'FORBIDDEN');
-    return idempotent(request, () => {
-      if (expectedVersion(request) !== rec.version) return problem(409, 'VERSION_CONFLICT');
-      if (rec.state === 'WITHDRAWN') return { status: 202, body: { status: 'APPLIED', requestId: keyOf(request), resultId: rec.supplyRequestId, version: rec.version } };
-      if (rec.linkedTrfId) return problem(409, 'INVALID_STATE');
-      const next: MockSupplyRequest = { ...rec, state: 'WITHDRAWN', version: rec.version + 1 };
-      db.supplyRequests.set(next.supplyRequestId, next);
-      return { status: 202, body: { status: 'APPLIED', requestId: keyOf(request), resultId: next.supplyRequestId, version: next.version } };
-    });
-  }),
+  http.post(
+    `${API_BASE}/supply-requests/:id/withdrawals`,
+    ({ request, params }) => {
+      if (!operator(request)) return unauthorized();
+      const rec = db.supplyRequests.get(String(params.id));
+      if (!rec) return problem(404, "NOT_FOUND");
+      if (!canAccess(request, rec.mfcId)) return problem(403, "FORBIDDEN");
+      return idempotent(request, () => {
+        if (expectedVersion(request) !== rec.version)
+          return problem(409, "VERSION_CONFLICT");
+        if (rec.state === "WITHDRAWN")
+          return {
+            status: 202,
+            body: {
+              status: "APPLIED",
+              requestId: keyOf(request),
+              resultId: rec.supplyRequestId,
+              version: rec.version,
+            },
+          };
+        if (rec.linkedTrfId) return problem(409, "INVALID_STATE");
+        const next: MockSupplyRequest = {
+          ...rec,
+          state: "WITHDRAWN",
+          version: rec.version + 1,
+        };
+        db.supplyRequests.set(next.supplyRequestId, next);
+        return {
+          status: 202,
+          body: {
+            status: "APPLIED",
+            requestId: keyOf(request),
+            resultId: next.supplyRequestId,
+            version: next.version,
+          },
+        };
+      });
+    },
+  ),
 ];
