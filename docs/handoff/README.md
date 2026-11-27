@@ -22,6 +22,7 @@ pmart-clients 와 pmart-backend 는 서로의 저장소에 쓰지 않는다. 각
 
 | 문서 | 기다리는 것 |
 |---|---|
+| `cdc-backoffice/2026-11-27-backend-mfc-receipt-view.md` | DC 에서 MFC 재고 반영(수령 확정) 보기(PC 5, #614) — MF-1 DC 운영자가 TRF 의 MFC 수령·재고 반영 상태를 읽는 조회. **기다리는 것: cdc(또는 mfc-inbound) 계약** |
 | `cdc-backoffice/2026-11-26-backend-display-numbers.md` | DC 화면 번호(PC 5, #592·#599) — DN-1 shortages·DN-2 lpns·DN-3 trips·DN-4 transport-orders·DN-5 리콜 출발 물량에 화면 번호, DN-6 MFC 목록 운영자 권한 확인. **기다리는 것: cdc-outbound·transport 계약** |
 | `cdc-backoffice/2026-11-26-backend-missing-screens.md` | DC 백오피스 API 없는 화면 — IB·RP·LG·TR: 적치·보충·재고 이동 이력·운송. **기다리는 것: cdc-inbound·cdc-inventory·transport 계약** |
 | `backoffice/2026-11-25-backend-customer-withdrawal-reasons.md` | 직원이 보는 고객 탈퇴 목록(탈퇴 사유) — 고객 앱이 보낸 reasonCode·reasonText 를 읽는 직원 API 없음(라이더는 rider 0.19.0 으로 됨). CW-1 목록, CW-2 고객 상세, 사유 글 보관·가리기 결정. **기다리는 것: customer 계약** |
