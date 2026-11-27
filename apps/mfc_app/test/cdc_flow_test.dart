@@ -12,6 +12,7 @@ import 'package:mfc_app/app.dart';
 import 'package:mfc_app/features/auth/data/auth_repository.dart';
 import 'package:mfc_app/features/auth/domain/employee_auth.dart';
 import 'package:mfc_app/features/auth/presentation/auth_controller.dart';
+import 'package:mfc_app/features/cdc/data/cdc_board_repository.dart';
 import 'package:mfc_app/features/cdc/data/cdc_flow_repository.dart';
 import 'package:mfc_app/features/cdc/domain/cdc_flow.dart';
 import 'package:mfc_app/features/cdc/presentation/cdc_flow_screens.dart';
@@ -396,6 +397,126 @@ void main() {
             },
           ],
         });
+      },
+    );
+
+    test(
+      'DC 홈 현황: 피킹 대기 = 시작한 Wave 의 담당 없는 CREATED 피킹만, 오늘 끝낸 내 작업만 내역',
+      () async {
+        Map<String, dynamic> task(
+          String id,
+          String wave, {
+          String kind = 'PICK',
+          String? who,
+          String state = 'CREATED',
+          String? done,
+        }) => {
+          'taskId': id,
+          'taskNumber': 'K$id',
+          'waveId': wave,
+          'kind': kind,
+          'state': state,
+          'assigneeId': ?who,
+          'completedAt': ?done,
+          'trfNumbers': ['T1'],
+          'lines': <Object>[],
+        };
+        final a = FakeAdapter((o, _) async {
+          final q = o.uri.queryParameters;
+          final path = o.uri.path;
+          if (path.endsWith('/waves')) {
+            return FakeReply(
+              200,
+              body: {
+                'items': [
+                  if (q['state'] == 'RELEASED')
+                    {'waveId': 'W-ON', 'state': 'RELEASED'},
+                ],
+                'page': 0,
+                'size': 200,
+                'hasNext': false,
+              },
+            );
+          }
+          if (path.endsWith('/tasks')) {
+            final items = switch ((q['state'], q['assigneeId'])) {
+              ('CREATED', null) => [
+                task('1', 'W-ON'),
+                task('2', 'W-ON', who: 'OP-x'), // 담당 있음 — 빼기
+                task('3', 'W-OFF'), // 시작 안 한 Wave — 빼기
+                task('4', 'W-ON', kind: 'SORT'), // 피킹 아님 — 빼기
+              ],
+              ('DONE', 'OP-me') => [
+                task(
+                  '5',
+                  'W-ON',
+                  who: 'OP-me',
+                  state: 'DONE',
+                  done: '2026-11-27T01:00:00Z',
+                ),
+                task(
+                  '6',
+                  'W-ON',
+                  who: 'OP-me',
+                  state: 'DONE',
+                  done: '2026-11-25T01:00:00Z',
+                ), // 오늘 아님
+              ],
+              _ => <Object>[],
+            };
+            return FakeReply(
+              200,
+              body: {
+                'items': items,
+                'page': {'nextCursor': null},
+              },
+            );
+          }
+          if (path.endsWith('/transfers')) {
+            return FakeReply(
+              200,
+              body: {
+                'items': [
+                  if (q['state'] == 'PICKED')
+                    {
+                      'trfId': 'T-a',
+                      'trfVersion': 1,
+                      'mfcId': 'M',
+                      'state': 'PICKED',
+                      'dueAt': '2026-11-27T05:00:00Z',
+                      'lineCount': 1,
+                      'approvedQty': 1,
+                      'allocatedQty': 1,
+                      'pickedQty': 1,
+                      'shortQty': 0,
+                    },
+                ],
+                'page': 0,
+                'size': 200,
+                'hasNext': false,
+              },
+            );
+          }
+          if (path.endsWith('/trips')) {
+            return const FakeReply(
+              200,
+              body: {
+                'items': <Object>[],
+                'page': 0,
+                'size': 200,
+                'hasNext': false,
+              },
+            );
+          }
+          return const FakeReply(404, body: {});
+        });
+        final b = await ApiCdcBoardRepository(
+          _dio(a),
+          now: () => DateTime.utc(2026, 11, 27, 3),
+        ).board(cdcId: 'CDC01', workerId: 'OP-me');
+        expect([b.pick, b.distribute, b.inspect, b.load], [1, 1, 0, 0]);
+        expect(b.done?.map((i) => i.taskNumber), ['K5']);
+        expect(b.holding, isEmpty);
       },
     );
 

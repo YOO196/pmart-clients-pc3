@@ -11,6 +11,7 @@ import 'features/auth/domain/employee_auth.dart';
 import 'features/auth/presentation/auth_controller.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/cdc/presentation/cdc_flow_screens.dart';
+import 'features/cdc/presentation/cdc_board.dart';
 import 'features/cdc/presentation/cdc_home.dart';
 import 'features/cdc/presentation/cdc_pick_screen.dart';
 import 'features/cdc/presentation/cdc_widgets.dart';
@@ -188,6 +189,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       // DC 피킹(사용자 2026-11-26 "피킹부터 붙여줘")
+      GoRoute(path: '/cdc/my-work', builder: (_, _) => const CdcMyWorkScreen()),
       GoRoute(
         path: '/cdc/work/pick',
         pageBuilder: (_, s) => _page(s, const CdcPickScreen()),
