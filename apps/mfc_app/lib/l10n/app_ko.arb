@@ -1893,5 +1893,6 @@
   "cdcWorkWave": "Wave {no}",
   "@cdcWorkWave": {"placeholders": {"no": {"type": "String"}}},
   "cdcWorkDone": "완료",
-  "cdcWorkHolding": "진행 중"
+  "cdcWorkHolding": "진행 중",
+  "boxInspectAllDone": "박스를 다 셌어요 — 확인 단계로 넘어가세요"
 }
