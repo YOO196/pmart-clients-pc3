@@ -1325,6 +1325,7 @@ export const messages = {
       stateName: { EXPECTED: '오는 중', RECEIVING: '받는 중', TIN_POSTED: '재고 반영', CANCELLED: '취소' } as Readonly<Record<string, string>>,
       refreshNote: '30초마다 다시 읽어요',
       empty: '조건에 맞는 DC 이관 입고가 없어요.',
+      noNumber: '번호 없음',
       col: { trf: 'TRF', from: '출발 센터', state: '상태', departed: '출발', eta: '도착 예정', arrived: '도착', qty: '수령 / 예정', boxes: '박스', product: '상품', lot: 'LOT', expected: '예정', received: '수령', left: '남음', nowStock: '지금 재고(실시간)' },
       notDeparted: '출발 전',
       qty: (received: number, expected: number) => `${received} / ${expected}`,
