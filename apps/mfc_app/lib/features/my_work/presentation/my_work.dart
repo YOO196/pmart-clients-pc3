@@ -7,6 +7,8 @@ import '../../../l10n/gen/app_localizations.dart';
 import '../../../shared/pda_theme.dart';
 import '../../../shared/product_hints.dart';
 import '../../../shared/ui_state_of.dart';
+import '../../inbound/presentation/inbound_controller.dart'
+    show inboundRepositoryProvider;
 import '../../tasks/presentation/task_controllers.dart';
 import '../data/my_work_repository.dart';
 
@@ -48,6 +50,19 @@ String? activityResultText(AppLocalizations l10n, String? r) => switch (r) {
 
 /// 업무 고르기·업무 진행 화면 맨 위의 작은 바 — "업무 내역" 칩을 누르면 오늘 업무 내역.
 /// AppBar `bottom` 에 둔다. 조회 실패는 칩에 건수를 빼고 보일 뿐(내역 화면에서 오류를 보인다).
+/// 입고 기록(taskId = trfId)의 TRF 화면 번호 — 입고 예정 조회(mfc-inbound 0.25.0 `trfNumber`). 모르면 null.
+final trfNumberProvider = FutureProvider.autoDispose.family<String?, String>((
+  ref,
+  trfId,
+) async {
+  try {
+    return (await ref.watch(inboundRepositoryProvider).promise(trfId))
+        .trfNumber;
+  } on Object {
+    return null;
+  }
+});
+
 class MyWorkBar extends ConsumerWidget implements PreferredSizeWidget {
   const MyWorkBar({super.key});
 
@@ -297,10 +312,19 @@ class _MyWorkListState extends ConsumerState<_MyWorkList> {
                       const SizedBox(height: 4),
                       const SizedBox(height: 2),
                       // 어떤 건을 작업했는지 — 작업 번호(입고는 TRF, 실사는 실사 번호 등)·기록 번호(사용자 2026-11-27)
+                      // 긴 내부 id(TRF-SR-uuid·RCV-TRF-uuid)는 내지 않는다 — 입고는 TRF 화면 번호(T…)를 찾아서(사용자 2026-11-27 "뭘 바꾼 거야")
                       Text(
                         [
-                          if (i.taskId case final t?) l10n.myWorkTaskNo(t),
-                          l10n.myWorkRefNo(i.refId),
+                          if (i.type == 'RECEIVE' && i.taskId != null)
+                            switch (ref
+                                .watch(trfNumberProvider(i.taskId!))
+                                .value) {
+                              final n? => l10n.myWorkTrfNo(n),
+                              _ => l10n.myWorkTrfLoading,
+                            }
+                          else if (i.taskId case final t? when t.length <= 16)
+                            l10n.myWorkTaskNo(t),
+                          if (i.refId.length <= 16) l10n.myWorkRefNo(i.refId),
                         ].join(' · '),
                         key: ValueKey('my-work-no-${i.refId}'),
                         style: theme.textTheme.bodySmall?.copyWith(

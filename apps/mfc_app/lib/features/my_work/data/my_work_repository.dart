@@ -120,6 +120,9 @@ WorkActivities workActivitiesFromContract(cap.WorkerActivities a) =>
 
 /// 목 — 오늘 피킹 2(1 거절)·포장 1·적치 1. [unavailable] 을 넣으면 그 원장을 못 읽은 응답.
 final class MockMyWorkRepository implements MyWorkRepository {
+  /// 시험: 더 보일 내역 줄
+  List<WorkActivity> extra = const [];
+
   MockMyWorkRepository({this.latency = const Duration(milliseconds: 200)});
 
   final Duration latency;
@@ -162,6 +165,7 @@ final class MockMyWorkRepository implements MyWorkRepository {
               result: 'APPLIED',
               at: now.subtract(const Duration(minutes: 30)),
             ),
+            ...extra,
             WorkActivity(
               source: 'mfc-inbound',
               type: 'PUTAWAY',

@@ -25,6 +25,7 @@ void main() {
     String? nextRejectCode,
     List<String> unavailable = const [],
     bool empty = false,
+    List<WorkActivity> extra = const [],
   }) async {
     t.view
       ..physicalSize = const Size(412, 915)
@@ -45,7 +46,8 @@ void main() {
           myWorkRepositoryProvider.overrideWithValue(
             MockMyWorkRepository(latency: Duration.zero)
               ..unavailable = unavailable
-              ..empty = empty,
+              ..empty = empty
+              ..extra = extra,
           ),
           secureStoreProvider.overrideWithValue(MemoryKeyValueStore()),
         ],
@@ -88,6 +90,28 @@ void main() {
     expect(find.byKey(const ValueKey('my-work-partial')), findsNothing);
     // 어떤 건을 작업했는지 번호(작업 번호·기록 번호)
     expect(find.text('작업 INB-T-1 · 기록 INB-M-1'), findsOneWidget);
+  });
+
+  testWidgets('입고 기록은 긴 trfId·기록 id 대신 TRF 화면 번호(입고 예정 조회)', (t) async {
+    await pump(
+      t,
+      extra: [
+        WorkActivity(
+          source: 'mfc-inbound',
+          type: 'RECEIVE',
+          refId: 'RCV-TRF-0698a8c3-0268-4750-a216-4f3aae3362e7',
+          taskId: 'TRF-MOCK-001',
+          qty: 4,
+          result: 'APPLIED',
+          at: DateTime.now().toUtc(),
+        ),
+      ],
+    );
+    await t.tap(find.byKey(const ValueKey('my-work-chip')));
+    await t.pumpAndSettle();
+    expect(find.text('TRF T100001'), findsOneWidget);
+    expect(find.textContaining('RCV-TRF-'), findsNothing);
+    expect(find.textContaining('TRF-MOCK-001'), findsNothing);
   });
 
   testWidgets('못 읽은 원장이 있으면 빈 내역으로 두지 않고 "일부 내역을 못 불러왔어요"', (t) async {
