@@ -52,7 +52,7 @@ class LotLabelButtons extends ConsumerWidget {
                 child: OutlinedButton.icon(
                   key: ValueKey('lot-label-${t.lotId}'),
                   style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
+                    minimumSize: const Size.fromHeight(60),
                   ),
                   icon: const Icon(Icons.print_outlined),
                   label: Text(l10n.lotLabelPrint(t.lotId, t.plannedQty)),

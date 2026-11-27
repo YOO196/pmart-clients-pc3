@@ -365,7 +365,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 child: FilledButton.icon(
                                   key: const ValueKey('unload-band'),
                                   style: FilledButton.styleFrom(
-                                    minimumSize: const Size.fromHeight(46),
+                                    minimumSize: const Size.fromHeight(60),
                                   ),
                                   onPressed: () => context.push('/unload'),
                                   icon: const Icon(
@@ -521,7 +521,7 @@ class _ManageMenu extends StatelessWidget {
             return FilledButton.icon(
               key: const ValueKey('manage-unload'),
               style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
+                minimumSize: const Size.fromHeight(60),
               ),
               onPressed: () => context.push('/unload'),
               icon: const Icon(Icons.local_shipping_outlined),
@@ -988,7 +988,7 @@ class WorkGuideScreen extends ConsumerWidget {
                     child: FilledButton.tonalIcon(
                       key: ValueKey('guide-resume-${p.trfId}'),
                       style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
+                        minimumSize: const Size.fromHeight(60),
                       ),
                       onPressed: () => context.push('/inbound/${p.trfId}'),
                       icon: const Icon(Icons.play_arrow_rounded),
@@ -1006,7 +1006,7 @@ class WorkGuideScreen extends ConsumerWidget {
                 OutlinedButton.icon(
                   key: const ValueKey('guide-unload'),
                   style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
+                    minimumSize: const Size.fromHeight(60),
                   ),
                   onPressed: () => context.push('/unload'),
                   icon: const Icon(Icons.local_shipping_rounded),
@@ -1152,7 +1152,7 @@ class WorkSessionScreen extends ConsumerWidget {
               OutlinedButton(
                 key: const ValueKey('session-end'),
                 style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
+                  minimumSize: const Size.fromHeight(60),
                 ),
                 onPressed: () => context.go('/'),
                 child: Text(l10n.sessionEnd),

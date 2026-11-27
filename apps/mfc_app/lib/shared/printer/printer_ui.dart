@@ -147,7 +147,7 @@ class LabelPreviewDialog extends StatelessWidget {
             FilledButton(
               key: const ValueKey('label-ok'),
               style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
+                minimumSize: const Size.fromHeight(60),
               ),
               onPressed: () => Navigator.of(context).pop(),
               child: Text(l10n.confirmOk),
