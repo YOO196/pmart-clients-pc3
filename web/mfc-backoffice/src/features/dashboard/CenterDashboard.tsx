@@ -428,7 +428,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
       title: m.feed.delay,
       where: messages.dispatchDelays.state[d.state] ?? d.state,
       at: d.delayAlertedAt,
-      to: centerPath(mfcId, 'dispatch-delays'),
+      to: `${centerPath(mfcId, 'deliveries')}?view=issues`,
     })),
     ...(handovers.data?.items ?? []).map((p) => ({
       key: `h-${p.packageId ?? ''}`,
@@ -469,7 +469,7 @@ function Dashboard({ mfcId }: { readonly mfcId: string }) {
       <nav className="flex flex-wrap items-center gap-2" aria-label={m.priority.label} data-testid="priority-bar">
         <span className="mr-1 text-xs font-bold text-base-content/60">{m.priority.label}</span>
         <PriorityChip to={`${centerPath(mfcId, 'ops')}?type=promise`} label={m.priority.overdue} n={ops.summary.data?.overdue} failed={ops.summary.isError} tone="error" />
-        <PriorityChip to={centerPath(mfcId, 'dispatch-delays')} label={m.priority.delays} n={delays.data?.length} failed={delays.isError} tone="error" />
+        <PriorityChip to={`${centerPath(mfcId, 'deliveries')}?view=issues`} label={m.priority.delays} n={delays.data?.length} failed={delays.isError} tone="error" />
         <PriorityChip to={`${centerPath(mfcId, 'tasks')}#handover-checks`} label={m.priority.handover} n={handovers.data?.items?.length} failed={handovers.isError} tone="warning" />
         <PriorityChip to={`${centerPath(mfcId, 'tasks')}?state=BLOCKED`} label={m.priority.blocked} n={tasks.data ? blocked : undefined} failed={tasks.isError} tone="warning" />
       </nav>

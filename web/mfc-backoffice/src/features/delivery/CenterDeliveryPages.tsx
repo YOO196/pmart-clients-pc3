@@ -7,7 +7,7 @@
 //   집기·닫기는 없다(서버 403) — 처리는 지원센터(RIDER_OPS). 배차 실패의 센터 정보(DD-MFC)는 2026-11-16 배포 — 그 뒤 생긴 배차 실패부터 보인다고 안내한다.
 // - 배송·주문 상세 화면은 이 앱에 없어 번호만 보인다. 개인정보 없음.
 import { useQuery } from '@tanstack/react-query';
-import { Link, Route, Routes, useParams, useSearchParams } from 'react-router';
+import { Link, Navigate, Route, Routes, useParams, useSearchParams } from 'react-router';
 
 import { request } from '@pmart/web-core';
 import { formatSeoul, QueryState, toUiState } from '@pmart/web-ui';
@@ -21,6 +21,7 @@ import { SavedViews } from '../../shared/SavedViews';
 import { messages } from '../../shared/messages';
 import { Who } from '../../shared/OperatorLabel';
 import { DeliveryStats } from './DeliveryStats';
+import { DispatchDelaysSection } from './DispatchDelayPage';
 
 const m = messages.centerDelivery;
 const f = messages.dispatchFailures;
@@ -77,7 +78,8 @@ export function CenterDeliveriesMenu({ mfcId }: { readonly mfcId: string }) {
     setParams({ ...(s ? { state: s } : {}), ...(s && next.cursor ? { cursor: next.cursor } : {}) });
   };
   // 지금 배송 / 배송 통계(execution 0.38.0·dispatch 0.16.0, 2026-11-23) — 주소 ?view=stats
-  const view = params.get('view') === 'stats' ? 'stats' : 'now';
+  const rawView = params.get('view');
+  const view = rawView === 'stats' ? 'stats' : rawView === 'issues' ? 'issues' : 'now';
   const query = useQuery({
     queryKey: ['live-delivery', mfcId, state, cursor],
     enabled: view === 'now',
@@ -90,13 +92,23 @@ export function CenterDeliveriesMenu({ mfcId }: { readonly mfcId: string }) {
   });
   const tabs = (
     <div role="tablist" className="tabs tabs-box w-fit" data-testid="delivery-tabs">
-      {(['now', 'stats'] as const).map((v) => (
-        <button key={v} type="button" role="tab" aria-selected={view === v} className={`tab ${view === v ? 'tab-active' : ''}`} onClick={() => setParams(v === 'stats' ? { view: 'stats' } : {})}>
-          {v === 'stats' ? ds.tabStats : ds.tabNow}
+      {(['now', 'issues', 'stats'] as const).map((v) => (
+        <button key={v} type="button" role="tab" aria-selected={view === v} className={`tab ${view === v ? 'tab-active' : ''}`} onClick={() => setParams(v === 'now' ? {} : { view: v })}>
+          {v === 'stats' ? ds.tabStats : v === 'issues' ? ds.tabIssues : ds.tabNow}
         </button>
       ))}
     </div>
   );
+  // 배송 문제 = 배차 지연 + 배차 실패를 한 화면에(2026-11-27)
+  if (view === 'issues')
+    return (
+      <section className="space-y-4">
+        <h1>{m.title}</h1>
+        {tabs}
+        <DispatchDelaysSection mfcId={mfcId} />
+        <DispatchFailureListPage mfcId={mfcId} embedded />
+      </section>
+    );
   if (view === 'stats')
     return (
       <section className="space-y-4">
@@ -253,7 +265,7 @@ type Case = CaseC['schemas']['Case'];
 export function DispatchFailuresMenu({ mfcId }: { readonly mfcId: string }) {
   return (
     <Routes>
-      <Route index element={<DispatchFailureListPage mfcId={mfcId} />} />
+      <Route index element={<Navigate to={`${centerPath(mfcId, 'deliveries')}?view=issues`} replace />} />
       <Route path=":caseId" element={<DispatchFailureDetailPage mfcId={mfcId} />} />
     </Routes>
   );
@@ -273,10 +285,17 @@ function Sla({ slaDueAt, overdue }: { readonly slaDueAt: string | null | undefin
 const refIds = (refs: Case['refs']) =>
   (refs ?? []).filter((r) => r.refType === 'deliveryId' || r.refType === 'orderId').map((r) => ({ label: name(f.refName, r.refType), id: r.refId }));
 
-function DispatchFailureListPage({ mfcId }: { readonly mfcId: string }) {
+function DispatchFailureListPage({ mfcId, embedded = false }: { readonly mfcId: string; readonly embedded?: boolean }) {
   const api = useApi();
   const [params, setParams] = useSearchParams();
-  const closed = params.get('state') === 'CLOSED';
+  // 배송 현황 안에서는 ?view=issues 를 지키고 따로 fstate 로(배송 상태 ?state 와 겹치지 않게)
+  const closed = params.get('fstate') === 'CLOSED';
+  const setClosed = (c: boolean) => {
+    const p = new URLSearchParams(params);
+    if (c) p.set('fstate', 'CLOSED');
+    else p.delete('fstate');
+    setParams(p, { replace: true });
+  };
   const query = useQuery({
     queryKey: ['dispatch-failures', mfcId, closed],
     queryFn: () =>
@@ -284,14 +303,14 @@ function DispatchFailureListPage({ mfcId }: { readonly mfcId: string }) {
   });
   return (
     <section className="space-y-4">
-      <h1>{f.title}</h1>
+      {embedded ? <h2 className="text-lg font-semibold">{f.title}</h2> : <h1>{f.title}</h1>}
       <p className="text-sm opacity-70">{f.intro}</p>
       <p role="note" className="alert alert-info text-sm">
         {f.handledBySupport}
       </p>
       <div role="tablist" className="tabs tabs-box w-fit">
         {([false, true] as const).map((c) => (
-          <button key={String(c)} type="button" role="tab" aria-selected={c === closed} className={`tab ${c === closed ? 'tab-active' : ''}`} onClick={() => setParams(c ? { state: 'CLOSED' } : {})}>
+          <button key={String(c)} type="button" role="tab" aria-selected={c === closed} className={`tab ${c === closed ? 'tab-active' : ''}`} onClick={() => setClosed(c)}>
             {c ? f.tabClosed : f.tabOpen}
           </button>
         ))}
@@ -349,7 +368,7 @@ function DispatchFailureDetailPage({ mfcId }: { readonly mfcId: string }) {
   });
   return (
     <section className="max-w-3xl space-y-4">
-      <Link className="link text-sm" to={centerPath(mfcId, 'dispatch-failures')}>
+      <Link className="link text-sm" to={`${centerPath(mfcId, 'deliveries')}?view=issues`}>
         {f.back}
       </Link>
       <h1>{f.detailTitle(query.data?.caseNumber ?? (query.isSuccess ? messages.displayNumber.missing : ''))}</h1>
