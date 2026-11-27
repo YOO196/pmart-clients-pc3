@@ -48,8 +48,14 @@ export function DcInboundTab({ mfcId }: { readonly mfcId: string }) {
     queryKey: ['inbound-promises', mfcId, state ?? 'ALL', date],
     refetchInterval: REFRESH_MS,
     queryFn: async () => {
-      const r = await request('GET', api.inbound.GET('/inbound-promises', { params: { query: { mfcId, size: 200, ...(state ? { state } : {}), ...(date ? { date } : {}) } } }));
-      return r.items ?? [];
+      const get = async (st?: State) =>
+        (await request('GET', api.inbound.GET('/inbound-promises', { params: { query: { mfcId, size: 200, ...(st ? { state: st } : {}), ...(date ? { date } : {}) } } }))).items ?? [];
+      if (state) return get(state);
+      // "전체" — 서버는 state 를 비우면 끝나지 않은 것(EXPECTED·RECEIVING)만 준다(mfc-inbound 0.16.0).
+      // 수령·적치까지 끝난(재고 반영 TIN_POSTED) TRF 가 빠지지 않게 함께 읽는다(사용자 2026-11-27 "적치까지 완료했는데 백오피스에 안 떠").
+      const [open, posted] = await Promise.all([get(), get('TIN_POSTED')]);
+      const seen = new Set(open.map((p) => p.trfId));
+      return [...open, ...posted.filter((p) => !seen.has(p.trfId))];
     },
   });
   if (trf) return <DcInboundDetail mfcId={mfcId} trfId={trf} onBack={() => set({ trf: '' })} />;
