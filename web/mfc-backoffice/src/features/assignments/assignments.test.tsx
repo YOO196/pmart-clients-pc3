@@ -42,6 +42,34 @@ describe('배정 목록', () => {
     expect(new URL(view.gets('/assignments')[0]!.url).searchParams.get('state')).toBeNull();
   });
 
+  it('배정 풀기: 피킹은 사유를 넣고 풀면 작업 내놓기(fulfillment releases) → 지금 배정에서 빠진다', async () => {
+    const view = renderAt('/c/MFC-BJG-01/assignments');
+    await waitFor(() => expect(rows()).toHaveLength(3));
+    // 진행 중 피킹(TASK-PICK-1) — 막힌 작업(TASK-PICK-3)은 서버가 409 INVALID_STATE
+    const row = rows().find((r) => within(r).getByTestId('task-link').getAttribute('href')?.endsWith('/TASK-PICK-1'))!;
+    await userEvent.click(within(row).getByTestId('assignment-release'));
+    const form = await screen.findByTestId('assignment-release-form');
+    expect(within(form).getByRole('button', { name: '배정 풀기' })).toBeDisabled();
+    await userEvent.type(within(form).getByRole('textbox'), '작업자 다른 업무로');
+    await userEvent.click(within(form).getByRole('button', { name: '배정 풀기' }));
+    expect(await screen.findByTestId('assignment-released')).toHaveTextContent('배정을 풀었어요');
+    const posts = view.sent.filter((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith('/releases'));
+    expect(posts).toHaveLength(1);
+    expect(posts[0]!.headers.get('Idempotency-Key')).toBeTruthy();
+    await waitFor(() => expect(rows()).toHaveLength(2));
+  });
+
+  it('배정 풀기: 적치 등 입고 작업은 서버 기능이 없어 풀지 않고 재배정을 권한다(요청 중)', async () => {
+    db.assignments.push({ assignmentId: 'ASG-PUT', mfcId: 'MFC-BJG-01', taskId: 'INB-T-9', taskType: 'PUTAWAY', workerId: 'OP-wkr-1', assignmentVersion: 1, state: 'ACTIVE', assignedAt: '2026-11-16T00:40:00.000Z', source: 'MANUAL', assignedBy: 'OP-sup-1', warnings: [] });
+    const view = renderAt('/c/MFC-BJG-01/assignments');
+    await waitFor(() => expect(rows()).toHaveLength(4));
+    const row = rows().find((r) => r.textContent?.includes('적치'))!;
+    await userEvent.click(within(row).getByTestId('assignment-release'));
+    expect(await screen.findByTestId('assignment-release-unsupported')).toHaveTextContent('서버에 배정 풀기 기능이 없어요');
+    expect(screen.getByRole('button', { name: '다른 작업자에게 재배정' })).toBeInTheDocument();
+    expect(view.sent.some((r) => r.method === 'POST')).toBe(false);
+  });
+
   it('작업 유형은 피패킹의 단계로 보인다(피패킹 · 피킹 / 피패킹 · 포장)', async () => {
     renderAt('/c/MFC-BJG-01/assignments');
     await waitFor(() => expect(rows()).toHaveLength(3));
