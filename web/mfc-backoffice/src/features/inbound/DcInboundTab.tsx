@@ -136,6 +136,30 @@ export function DcInboundTab({ mfcId }: { readonly mfcId: string }) {
   );
 }
 
+type Line = NonNullable<Promise_['lines']>[number];
+
+/** 박스(LPN) 내용 → SKU·LOT 별 예정 수량(받은 수는 수령 등록 전이라 0) */
+function boxLines(packages: NonNullable<Promise_['packages']>): Line[] {
+  const m = new Map<string, Line>();
+  for (const b of packages) {
+    const key = `${b.sku}|${b.lotId ?? ''}`;
+    const cur = m.get(key);
+    m.set(key, { sku: b.sku, lotId: b.lotId ?? null, expectedQty: (cur?.expectedQty ?? 0) + (b.qty ?? 0), receivedQty: 0, quarantinedQty: 0, pendingQty: 0, barcodes: [] } as Line);
+  }
+  return [...m.values()];
+}
+
+/** 지금 단계를 한 문장으로 */
+function nowText(p: Promise_, putawayLeft: number | null): string {
+  const n = messages.inbound.dc.now;
+  const applied = (p.receipts ?? []).some((r) => r.inventoryApplyStatus === 'APPLIED');
+  if (p.state === 'CANCELLED') return n.cancelled;
+  if (p.state === 'TIN_POSTED' || applied) return putawayLeft === 0 ? n.done : putawayLeft === null ? n.applied : n.putaway(putawayLeft);
+  if ((p.receipts ?? []).length > 0) return n.applying;
+  if (p.state === 'RECEIVING' || p.arrivedAt) return n.receiving((p.packages ?? []).length);
+  return p.departedAt ? n.coming : n.prep;
+}
+
 /** 단계 자리 — 출발 → 도착 → 수령 → 적치 → 재고 반영 */
 function placeOf(p: Promise_, putawayLeft: number | null): StepPlace | null {
   const applied = (p.receipts ?? []).some((r) => r.inventoryApplyStatus === 'APPLIED');
@@ -160,7 +184,22 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
     queryFn: async () =>
       (await Promise.all(receiptIds.map((receiptId) => request('GET', api.inbound.GET('/inbound-tasks', { params: { query: { mfcId, receiptId } } }))))).flatMap((r) => r.items ?? []),
   });
-  const skus = [...new Set((q.data?.lines ?? []).map((l) => l.sku).filter((x): x is string => !!x))];
+  // 상품 줄이 비었으면(서버가 출발 줄 없이 박스 매니페스트만 가진 건) 박스(LPN) 내용을 SKU·LOT 별로 묶어 상품 줄 대신 — 사용자 2026-11-27 "상품 줄이 비어 진행을 모르겠다"
+  const fromBoxes = (q.data?.lines ?? []).length === 0;
+  const lines: readonly Line[] = fromBoxes ? boxLines(q.data?.packages ?? []) : (q.data?.lines ?? []);
+  const skus = [...new Set(lines.map((l) => l.sku).filter((x): x is string => !!x))];
+  // 지금 누가 이 입고를 하고 있나 — RECEIVE 작업 taskId = trfId(mfc-capacity 0.13.1)
+  const assignee = useQuery({
+    queryKey: ['assignments', mfcId, 'task', trfId],
+    refetchInterval: 15_000,
+    queryFn: async () => ((await request('GET', api.capacity.GET('/assignments', { params: { query: { mfcId, taskId: trfId } } }))).items ?? []).find((a) => a.state === 'ACTIVE') ?? null,
+  });
+  const workers = useQuery({
+    queryKey: ['workers', mfcId, 'DEFAULT'],
+    enabled: !!assignee.data,
+    queryFn: async () => (await request('GET', api.capacity.GET('/mfcs/{mfcId}/workers', { params: { path: { mfcId }, query: {} } }))).items ?? [],
+  });
+  const assigneeName = assignee.data ? (workers.data?.find((w) => w.workerId === assignee.data?.workerId)?.displayName ?? assignee.data.workerId) : null;
   // 상품별 지금 재고 — 쿼리 키 ['stock', mfcId, sku] 는 재고 실시간 스트림이 바뀐 SKU 만 다시 읽는다
   const stocks = useQueries({
     queries: skus.map((sku) => ({
@@ -176,6 +215,10 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
     return { onHand: lots.reduce((a, l) => a + (l.onHand ?? 0), 0), available: lots.reduce((a, l) => a + Math.max(0, l.available ?? 0), 0) };
   };
   const putawayLeft = tasks.data ? tasks.data.filter((t) => t.state !== 'COMPLETED').length : null;
+  const nameOf = (sku: string) => {
+    const st = stocks[skus.indexOf(sku)];
+    return st?.data?.productName ?? null;
+  };
   return (
     <div className="space-y-4 text-sm" data-testid="dc-inbound-detail">
       <div className="flex flex-wrap items-center gap-3">
@@ -200,13 +243,19 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
               testId="dc-inbound-steps"
               endedTestId="dc-inbound-ended"
             />
+            {/* 지금 어디까지 — 서버가 아는 것만(PDA 에서 센 수량은 수령 등록 전까지 서버에 없다) */}
+            <p className="rounded-box bg-primary/5 px-4 py-3 text-base font-semibold" data-testid="dc-inbound-now">
+              {nowText(p, putawayLeft)}
+              {assigneeName && <span className="ml-2 text-sm font-normal text-base-content/70">{m.assignee(assigneeName)}</span>}
+            </p>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-1 rounded-box bg-base-100 p-4 md:grid-cols-4">
               {(
                 [
                   [m.col.state, <span className={`badge badge-sm ${stateBadge(p.state)}`}>{m.stateName[p.state ?? ''] ?? p.state}</span>],
                   [m.col.from, p.fromCdc ?? messages.none],
                   [m.trip, p.tripId ?? messages.none],
-                  [m.col.departed, p.departedAt ? formatSeoul(p.departedAt) : m.notDeparted],
+                  // 출발 시각이 안 왔어도 도착했으면 "출발 전" 이 아니다
+                  [m.col.departed, p.departedAt ? formatSeoul(p.departedAt) : p.arrivedAt ? m.departedUnknown : m.notDeparted],
                   [m.col.eta, p.eta ? formatSeoul(p.eta) : p.plannedArrivalAt ? formatSeoul(p.plannedArrivalAt) : messages.none],
                   [m.col.arrived, p.arrivedAt ? formatSeoul(p.arrivedAt) : messages.none],
                 ] as const
@@ -220,6 +269,8 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
 
             <section className="space-y-2 rounded-box bg-base-100 p-4">
               <h3 className="font-semibold">{m.linesTitle}</h3>
+              {fromBoxes && lines.length > 0 && <p className="text-xs text-base-content/60" data-testid="dc-inbound-from-boxes">{m.fromBoxes}</p>}
+              {lines.length === 0 && <p className="text-base-content/60">{m.noLines}</p>}
               <div className="overflow-x-auto">
                 <table className="table table-sm" data-testid="dc-inbound-lines">
                   <thead>
@@ -233,13 +284,13 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
                     </tr>
                   </thead>
                   <tbody>
-                    {(p.lines ?? []).map((l) => {
+                    {lines.map((l) => {
                       const st = l.sku ? stockOf(l.sku) : null;
                       const left = (l.expectedQty ?? 0) - (l.receivedQty ?? 0);
                       return (
                         <tr key={`${l.sku}-${l.lotId ?? ''}`} data-testid="dc-inbound-line">
                           <td>
-                            <span className="block font-medium">{l.productName ?? l.sku}</span>
+                            <span className="block font-medium">{l.productName ?? (l.sku ? nameOf(l.sku) : null) ?? l.sku}</span>
                             <span className="font-mono text-xs text-base-content/60">{l.sku}</span>
                           </td>
                           <td>
