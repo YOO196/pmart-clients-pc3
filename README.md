@@ -148,6 +148,6 @@ docs/         아키텍처 · 앱별 화면과 규칙 · 백엔드 요청
 
 <div align="center">
 
-<sub><a href="https://www.dshrd.or.kr/">동성인재개발교육원</a> · 지도: 서성원 훈련 교사</sub>
+<sub><a href="https://www.dshrd.or.kr/">동성인재개발교육원</a></sub>
 
 </div>

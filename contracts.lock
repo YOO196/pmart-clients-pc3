@@ -1,12 +1,11 @@
 {
   "dart": {
-    "backendCommit": "a925a3908431c42078eff8d068b8f8eabd9ac541",
-    "backendContractsDirty": false,
-    "generatedAt": "2026-11-26T01:14:43.348125Z",
+    "backendCommit": "e5ca6328dd821f1a96d4a8ddebbed5bfc57be7da",
+    "backendContractsDirty": true,
+    "generatedAt": "2026-11-27T00:54:36.823119Z",
     "generator": "openapi-generator-cli 7.26.0 (dart-dio, json_serializable)",
     "regenerated": [
-      "order-service",
-      "review-service"
+      "transport-execution-service"
     ],
     "services": {
       "auth-service": [
@@ -110,13 +109,19 @@
       ],
       "mfc-inventory-service": [
         "mfc"
+      ],
+      "cdc-outbound-service": [
+        "mfc"
+      ],
+      "transport-execution-service": [
+        "mfc"
       ]
     }
   },
   "web": {
-    "backendCommit": "3ef008b3a71ee25835009bcee711420c3d84801b",
-    "backendContractsDirty": false,
-    "generatedAt": "2026-11-19T18:46:11.086Z",
+    "backendCommit": "be3a44fabf588c4ba4c8d09228def30deb8315a6",
+    "backendContractsDirty": true,
+    "generatedAt": "2026-11-26T09:36:18.222Z",
     "generator": "openapi-typescript 7.13.0 (TS 5.9)",
     "services": [
       "_internal-dead-letters",
