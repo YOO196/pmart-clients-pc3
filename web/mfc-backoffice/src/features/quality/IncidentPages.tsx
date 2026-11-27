@@ -232,7 +232,7 @@ function IncidentDetail({ incident: i }: { readonly incident: Incident }) {
         <span className="opacity-70">{m.origin[i.origin ?? ''] ?? i.origin}</span>
       </p>
       {i.description && <p>{i.description}</p>}
-      <dl className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-1">
+      <dl className="pm-kv grid grid-cols-[8rem_1fr] gap-x-4 gap-y-1">
         <dt className="opacity-70">{m.openedAt}</dt>
         <dd>{when(i.openedAt)}</dd>
         {i.origin === 'MANUAL' ? (

@@ -270,7 +270,7 @@ function WorkerPanel({ mfcId, workerId, onClose }: { readonly mfcId: string; rea
         <p className="text-sm text-base-content/60">{m.workerGone}</p>
       ) : (
         <>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+          <dl className="pm-kv grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
             <dt className="text-base-content/55">{m.employment}</dt>
             <dd>{messages.workers.employment[w.employmentType ?? ''] ?? w.employmentType ?? messages.none}</dd>
             <dt className="text-base-content/55">{m.now}</dt>

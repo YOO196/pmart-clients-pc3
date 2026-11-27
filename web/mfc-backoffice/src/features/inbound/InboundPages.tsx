@@ -252,7 +252,7 @@ function InboundTaskPage({ mfcId }: { readonly mfcId: string }) {
                 {notice.text}
               </p>
             )}
-            <dl className="grid grid-cols-[9rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm">
+            <dl className="pm-kv grid grid-cols-[9rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm">
               <dt className="opacity-70">{m.fields.product}</dt>
               <dd>{t.productName ? `${t.productName} (${t.sku})` : t.sku}</dd>
               <dt className="opacity-70">{m.fields.lot}</dt>

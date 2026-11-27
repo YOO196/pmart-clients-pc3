@@ -13,7 +13,7 @@ export function Caret({ open }: { readonly open: boolean }) {
 /** 펼친 줄 안 이름/값 칸(서버 값만) — 넓이에 맞춰 여러 칸, 이름은 작은 보조 글(list.css .pm-inline dt) */
 export function InlineFields({ rows }: { readonly rows: ReadonlyArray<readonly [string, ReactNode]> }) {
   return (
-    <dl className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-6 gap-y-3 text-sm">
+    <dl className="pm-kv-tiles grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-6 gap-y-3 text-sm">
       {rows.map(([k, v]) => (
         <div key={k} className="min-w-0">
           <dt>{k}</dt>

@@ -128,7 +128,7 @@ function Profile({ me }: { readonly me: EmployeeSelf }) {
   ];
   return (
     <div className="space-y-2">
-      <dl className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-2 text-sm" data-testid="me-profile">
+      <dl className="pm-kv grid grid-cols-[8rem_1fr] gap-x-4 gap-y-2 text-sm" data-testid="me-profile">
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
             <dt className="opacity-70">{k}</dt>

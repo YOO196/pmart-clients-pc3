@@ -97,7 +97,7 @@ function RestrictionCard({ mfcId, restriction: r, onDone }: { readonly mfcId: st
         <span className={`badge badge-sm ${r.state === 'ACTIVE' ? 'badge-warning' : 'badge-ghost'}`}>{m.state[r.state ?? ''] ?? r.state}</span>
         <span className="font-mono opacity-70">{r.restrictionId}</span>
       </p>
-      <dl className="grid grid-cols-[9rem_1fr] gap-x-4 gap-y-1">
+      <dl className="pm-kv grid grid-cols-[9rem_1fr] gap-x-4 gap-y-1">
         <dt className="opacity-70">{c.period}</dt>
         <dd>{m.period(r.effectiveFrom ? formatSeoul(r.effectiveFrom) : messages.none, r.effectiveTo ? formatSeoul(r.effectiveTo) : m.noEnd)}</dd>
         {r.restrictionType === 'CAPACITY_REDUCE' && (

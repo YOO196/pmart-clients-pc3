@@ -511,7 +511,7 @@ function CountSessionCard({ mfcId, session: s, onDecided }: { readonly mfcId: st
         <span className="opacity-70">{(s.locationCodes ?? []).join(', ')}</span>
       </p>
       <SystemNumbers ids={[{ label: m.sys.session, id: s.sessionId }]} />
-      <dl className="grid grid-cols-[9rem_1fr] gap-x-4 gap-y-1">
+      <dl className="pm-kv grid grid-cols-[9rem_1fr] gap-x-4 gap-y-1">
         <dt className="opacity-70">{f.created}</dt>
         <dd>
           <Who id={s.createdBy} />

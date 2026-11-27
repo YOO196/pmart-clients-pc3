@@ -359,7 +359,7 @@ function DispatchFailureDetailPage({ mfcId }: { readonly mfcId: string }) {
       <QueryState state={toUiState(query)} onRetry={() => void query.refetch()}>
         {(c) => (
           <div className="space-y-4">
-            <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm" data-testid="dispatch-failure-detail">
+            <dl className="pm-kv grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm" data-testid="dispatch-failure-detail">
               <dt className="opacity-70">{f.col.summary}</dt>
               <dd>{c.summary || f.kindName}</dd>
               <dt className="opacity-70">{f.col.priority}</dt>
