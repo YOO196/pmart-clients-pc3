@@ -362,6 +362,8 @@ function ReturnReceiptView({ id }: { readonly id: string }) {
 interface SupplyLine {
   readonly sku: string;
   readonly qty: string;
+  /** 추천으로 채운 줄 — 상품명·근거(보내지 않는다, 보기만) */
+  readonly hint?: { readonly name: string | null; readonly recommended: number; readonly available: number | null; readonly expected: number; readonly pending: number } | undefined;
 }
 interface SupplyForm {
   readonly requestedReadyAt: string;
@@ -413,15 +415,21 @@ function SupplyFields({ value, onChange }: { readonly value: SupplyForm; readonl
         </label>
       </div>
       {value.lines.map((l, i) => (
-        <fieldset key={i} className="flex flex-wrap items-end gap-2" aria-label={m.resultRow(i + 1)}>
+        <fieldset key={i} className="flex flex-wrap items-end gap-2" aria-label={m.resultRow(i + 1)} data-testid="supply-line">
           <label className="flex flex-col gap-1">
             {m.sku}
-            <input className="input input-sm w-36 font-mono" value={l.sku} onChange={(e) => setLine(i, { sku: e.target.value.toUpperCase() })} />
+            <input className="input input-sm w-36 font-mono" value={l.sku} onChange={(e) => setLine(i, { sku: e.target.value.toUpperCase(), hint: undefined })} />
           </label>
           <label className="flex flex-col gap-1">
             {m.fields.qty.split('(')[0]}
             <input className="input input-sm w-20" type="number" min={1} step={1} value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value })} />
           </label>
+          {l.hint && (
+            <span className="pb-1.5 text-xs">
+              <span className="font-semibold">{l.hint.name ?? l.sku}</span>
+              <span className="ml-2 text-base-content/60">{rec.basis(l.hint.recommended, l.hint.available, l.hint.expected, l.hint.pending)}</span>
+            </span>
+          )}
           {value.lines.length > 1 && (
             <button type="button" className="btn btn-xs" onClick={() => onChange({ ...value, lines: value.lines.filter((_, j) => j !== i) })}>
               {m.removeRow}
@@ -433,6 +441,101 @@ function SupplyFields({ value, onChange }: { readonly value: SupplyForm; readonl
         {m.addRow}
       </button>
     </>
+  );
+}
+
+const rec = messages.inbound.recommend;
+type StorageType = 'AMBIENT' | 'CHILLED' | 'FROZEN';
+
+/** 이 센터가 취급하는 SKU 전부(취급 ON) — 추천을 물을 후보 */
+async function handledSkus(api: ReturnType<typeof useApi>, mfcId: string): Promise<string[]> {
+  const out: string[] = [];
+  let cursor: string | undefined;
+  let pages = 0;
+  do {
+    const page = await request('GET', api.inventory.GET('/mfcs/{mfcId}/sku-handlings', { params: { path: { mfcId }, query: { enabled: true, size: 200, ...(cursor ? { cursor } : {}) } } }));
+    for (const h of page.items ?? []) if (h.handlingEnabled && h.sku) out.push(h.sku);
+    cursor = page.page?.nextCursor ?? undefined;
+    pages += 1;
+  } while (cursor && pages < 50);
+  return [...new Set(out)];
+}
+
+interface FillResult {
+  readonly lines: readonly SupplyLine[];
+  readonly zero: number;
+  readonly skipped: Readonly<Record<string, number>>;
+  readonly asked: number;
+  readonly salesThrough: string | null;
+}
+
+/**
+ * 추천으로 채우기 — mfc-inbound `GET /supply-recommendations`(0.21.0 MI-4)를 센터 취급 SKU 전부에 100개씩 묻는다.
+ * 추천 수량 > 0 만 줄로(서버 값 그대로), 0 은 "지금 필요 없음" 개수, null 은 사유별 개수만 — 0 으로 꾸미지 않는다.
+ */
+function RecommendFill({ mfcId, onFill }: { readonly mfcId: string; readonly onFill: (lines: SupplyLine[]) => void }) {
+  const api = useApi();
+  const [storage, setStorage] = useState<StorageType | ''>('');
+  const [state, setState] = useState<{ readonly kind: 'idle' } | { readonly kind: 'busy' } | { readonly kind: 'error' } | ({ readonly kind: 'done' } & FillResult)>({ kind: 'idle' });
+  const run = async () => {
+    setState({ kind: 'busy' });
+    try {
+      const skus = await handledSkus(api, mfcId);
+      const items = [];
+      let salesThrough: string | null = null;
+      for (let i = 0; i < skus.length; i += 100) {
+        const r = await request('GET', api.inbound.GET('/supply-recommendations', { params: { query: { mfcId, sku: skus.slice(i, i + 100), ...(storage ? { storageType: storage } : {}) } } }));
+        items.push(...r.items);
+        salesThrough = r.salesThrough;
+      }
+      const lines: SupplyLine[] = [];
+      let zero = 0;
+      const skipped: Record<string, number> = {};
+      for (const x of items) {
+        if (x.recommendedQty == null) skipped[x.reason ?? 'UNKNOWN'] = (skipped[x.reason ?? 'UNKNOWN'] ?? 0) + 1;
+        else if (x.recommendedQty <= 0) zero += 1;
+        else lines.push({ sku: x.sku, qty: String(x.recommendedQty), hint: { name: x.productName ?? null, recommended: x.recommendedQty, available: x.availableQty ?? null, expected: x.expectedQty, pending: x.pendingRequestedQty } });
+      }
+      lines.sort((a, b) => (b.hint?.recommended ?? 0) - (a.hint?.recommended ?? 0));
+      onFill(lines);
+      setState({ kind: 'done', lines, zero, skipped, asked: skus.length, salesThrough });
+    } catch {
+      setState({ kind: 'error' });
+    }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-box bg-primary/5 px-3 py-2" data-testid="supply-recommend">
+      <select className="select select-sm w-28" aria-label={rec.storage} value={storage} onChange={(e) => setStorage(e.target.value as StorageType | '')}>
+        <option value="">{rec.allStorage}</option>
+        <option value="AMBIENT">{rec.storageName.AMBIENT}</option>
+        <option value="CHILLED">{rec.storageName.CHILLED}</option>
+        <option value="FROZEN">{rec.storageName.FROZEN}</option>
+      </select>
+      <button type="button" className="btn btn-sm btn-primary btn-outline" disabled={state.kind === 'busy'} onClick={() => void run()}>
+        {state.kind === 'busy' ? rec.busy : rec.fill}
+      </button>
+      <span className="text-xs" data-testid="supply-recommend-result">
+        {state.kind === 'error' && <span className="text-error">{rec.failed}</span>}
+        {state.kind === 'done' &&
+          (state.lines.length > 0 ? (
+            <span>{rec.filled(state.lines.length, state.asked)}</span>
+          ) : (
+            <span className="text-base-content/70">{rec.none(state.asked)}</span>
+          ))}
+        {state.kind === 'done' && (
+          <span className="ml-2 text-base-content/60">
+            {[
+              state.zero > 0 ? rec.zero(state.zero) : null,
+              ...Object.entries(state.skipped).map(([k, n]) => rec.skipped(rec.reason[k] ?? k, n)),
+              state.salesThrough ? rec.salesThrough(state.salesThrough) : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+        )}
+        {state.kind === 'idle' && <span className="text-base-content/60">{rec.hint}</span>}
+      </span>
+    </div>
   );
 }
 
@@ -453,7 +556,6 @@ export function SupplyRequestTab({ mfcId }: { readonly mfcId: string }) {
   return (
     <div className="space-y-3 text-sm">
       <p className="text-xs opacity-70">{m.supplyHint}</p>
-      <SupplyRequestList mfcId={mfcId} />
       <form
         className="space-y-2 rounded-box bg-base-100 p-4"
         aria-label={m.submitSupply}
@@ -464,6 +566,8 @@ export function SupplyRequestTab({ mfcId }: { readonly mfcId: string }) {
           void create.run(null);
         }}
       >
+        <h3 className="font-semibold">{rec.newTitle}</h3>
+        <RecommendFill mfcId={mfcId} onFill={(lines) => setForm((f) => ({ ...f, lines: lines.length > 0 ? lines : f.lines, reason: f.reason || (lines.length > 0 ? rec.defaultReason : '') }))} />
         <SupplyFields value={form} onChange={setForm} />
         <div>
           <button type="submit" className="btn btn-sm btn-primary" disabled={!supplyValid(form) || create.busy}>
@@ -472,6 +576,7 @@ export function SupplyRequestTab({ mfcId }: { readonly mfcId: string }) {
         </div>
         <CommandFeedback command={create}>{() => <span className="text-success">{m.supplyCreated}</span>}</CommandFeedback>
       </form>
+      <SupplyRequestList mfcId={mfcId} />
       <LookupForm key={openId} label={m.supplyId} value={openId} onSubmit={setOpenId} />
       {openId && <SupplyRequestView mfcId={mfcId} id={openId} />}
     </div>
