@@ -115,6 +115,7 @@ export function DcInboundTab({ mfcId }: { readonly mfcId: string }) {
                       <td>{p.fromCdc ?? messages.none}</td>
                       <td>
                         <span className={`badge badge-sm ${stateBadge(p.state)}`}>{m.stateName[p.state ?? ''] ?? p.state}</span>
+                        {p.state === 'TIN_POSTED' && <AfterReceipt mfcId={mfcId} receiptIds={(p.receipts ?? []).map((r) => r.receiptId).filter((x): x is string => !!x)} />}
                       </td>
                       <td>{p.departedAt ? formatSeoul(p.departedAt) : m.notDeparted}</td>
                       <td>{p.eta ? formatSeoul(p.eta) : p.plannedArrivalAt ? formatSeoul(p.plannedArrivalAt) : messages.none}</td>
@@ -133,6 +134,58 @@ export function DcInboundTab({ mfcId }: { readonly mfcId: string }) {
         )}
       </QueryState>
     </div>
+  );
+}
+
+type InboundTask = components['schemas']['InboundTask'];
+
+/** 검사·적치 진행 — 수량 합(격리 이동은 빼고). 작업이 모두 끝나면 판매 가능 */
+export function afterProgress(tasks: readonly InboundTask[]) {
+  const sum = (ts: readonly InboundTask[], f: (t: InboundTask) => number) => ts.reduce((a, t) => a + f(t), 0);
+  const ins = tasks.filter((t) => t.taskType === 'INSPECT');
+  const put = tasks.filter((t) => t.taskType === 'PUTAWAY');
+  const open = tasks.filter((t) => t.taskType !== 'QUARANTINE_MOVE' && t.state !== 'COMPLETED');
+  return {
+    inspect: [sum(ins, (t) => t.doneQty), sum(ins, (t) => t.plannedQty)] as const,
+    putaway: [sum(put, (t) => t.doneQty), sum(put, (t) => t.plannedQty)] as const,
+    sellable: tasks.length > 0 && open.length === 0,
+  };
+}
+
+/** 목록의 "수령 끝" 옆 — 검사 a/b · 적치 c/d, 다 끝나면 판매 가능(mfc 시뮬 C-7) */
+function AfterReceipt({ mfcId, receiptIds }: { readonly mfcId: string; readonly receiptIds: readonly string[] }) {
+  const api = useApi();
+  const q = useQuery({
+    queryKey: ['inbound-tasks', mfcId, 'by-receipts', receiptIds.join(',')],
+    enabled: receiptIds.length > 0,
+    refetchInterval: 15_000,
+    queryFn: async () =>
+      (await Promise.all(receiptIds.map((receiptId) => request('GET', api.inbound.GET('/inbound-tasks', { params: { query: { mfcId, receiptId } } }))))).flatMap((r) => r.items ?? []),
+  });
+  if (receiptIds.length === 0) return null;
+  if (q.isError) return <span className="block text-xs text-error">{m.after.failed}</span>;
+  if (!q.data) return <span className="block text-xs text-base-content/40">…</span>;
+  return <AfterText tasks={q.data} />;
+}
+
+function AfterText({ tasks }: { readonly tasks: readonly InboundTask[] }) {
+  const x = afterProgress(tasks);
+  if (tasks.length === 0)
+    return (
+      <span className="block text-xs text-base-content/60" data-testid="dc-after">
+        {m.after.noTasks}
+      </span>
+    );
+  if (x.sellable)
+    return (
+      <span className="block text-xs font-semibold text-success" data-testid="dc-after">
+        {m.after.sellable}
+      </span>
+    );
+  return (
+    <span className="block text-xs text-warning" data-testid="dc-after">
+      {m.after.inspect(x.inspect[0], x.inspect[1])} · {x.putaway[1] > 0 ? m.after.putaway(x.putaway[0], x.putaway[1]) : m.after.putawayWait}
+    </span>
   );
 }
 
@@ -251,7 +304,13 @@ function DcInboundDetail({ mfcId, trfId, onBack }: { readonly mfcId: string; rea
             <dl className="grid grid-cols-2 gap-x-6 gap-y-1 rounded-box bg-base-100 p-4 md:grid-cols-4">
               {(
                 [
-                  [m.col.state, <span className={`badge badge-sm ${stateBadge(p.state)}`}>{m.stateName[p.state ?? ''] ?? p.state}</span>],
+                  [
+                    m.col.state,
+                    <>
+                      <span className={`badge badge-sm ${stateBadge(p.state)}`}>{m.stateName[p.state ?? ''] ?? p.state}</span>
+                      {p.state === 'TIN_POSTED' && tasks.data && <AfterText tasks={tasks.data} />}
+                    </>,
+                  ],
                   [m.col.from, p.fromCdc ?? messages.none],
                   [m.trip, p.tripId ?? messages.none],
                   // 출발 시각이 안 왔어도 도착했으면 "출발 전" 이 아니다

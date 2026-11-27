@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { API_BASE } from '../../api/client';
 import { db } from '../../mocks/db';
 import { openFilter, renderAt } from '../../test/render';
+import { afterProgress } from './DcInboundTab';
 import { server } from '../../test/server';
 
 const rows = () => screen.getAllByTestId('inbound-task-row');
@@ -38,7 +39,9 @@ describe('입고 작업 목록', () => {
     await waitFor(() => expect(screen.getAllByTestId('dc-inbound-row')).toHaveLength(3));
     expect(view.gets('/inbound-promises').some((r) => new URL(r.url).searchParams.get('state') === 'TIN_POSTED')).toBe(true);
     const row = (id: string) => screen.getAllByTestId('dc-inbound-row').find((r) => r.textContent?.includes(id))!;
-    expect(row('T286575')).toHaveTextContent('재고 반영');
+    // TIN_POSTED 는 "수령 끝"(적치 끝이 아니다) — 옆에 검사·적치 진행(mfc 시뮬 C-7)
+    expect(row('T286575')).toHaveTextContent('수령 끝');
+    await waitFor(() => expect(within(row('T286575')).getByTestId('dc-after')).toBeInTheDocument());
     // TRF 칸은 긴 trfId 대신 화면 번호 + Wave
     expect(row('T286575')).toHaveTextContent('W6307');
     expect(screen.queryByText('TRF-SIM-DC-0')).not.toBeInTheDocument();
@@ -52,7 +55,7 @@ describe('입고 작업 목록', () => {
     expect(screen.getByTestId('dc-flow-GOING')).toHaveTextContent('36개 싣고 오는 중');
     expect(screen.getByTestId('dc-flow-RECEIVING')).toHaveTextContent('1건');
     expect(screen.getByTestId('dc-flow-PREP')).toHaveTextContent('0건');
-    await waitFor(() => expect(screen.getByTestId('dc-flow-DONE')).toHaveTextContent('8개 재고 반영'));
+    await waitFor(() => expect(screen.getByTestId('dc-flow-DONE')).toHaveTextContent('8개 수령 끝'));
     await userEvent.selectOptions(screen.getByRole('combobox', { name: '상태' }), 'RECEIVING');
     await waitFor(() => expect(screen.getAllByTestId('dc-inbound-row')).toHaveLength(1));
     expect(view.gets('/inbound-promises').some((r) => new URL(r.url).searchParams.get('state') === 'RECEIVING')).toBe(true);
@@ -125,6 +128,21 @@ describe('입고 작업 목록', () => {
     expect(ls[0]).toHaveTextContent('4');
     expect(screen.queryByText('출발 전')).not.toBeInTheDocument();
     expect(screen.getByText('시각 기록 없음')).toBeInTheDocument();
+  });
+});
+
+describe('DC 이관 입고 — 수령 뒤 검사·적치 진행(C-7)', () => {
+  const t = (taskType: 'INSPECT' | 'PUTAWAY' | 'QUARANTINE_MOVE', plannedQty: number, doneQty: number) =>
+    ({ taskId: `${taskType}-${plannedQty}-${doneQty}`, taskType, plannedQty, doneQty, state: doneQty >= plannedQty ? 'COMPLETED' : 'READY', mfcId: 'M', receiptId: 'R', sku: 'S', lotId: 'L', locationCode: 'X', version: 1 }) as unknown as Parameters<typeof afterProgress>[0][number];
+  it('검사 0/10 — 적치 작업 전', () => {
+    const x = afterProgress([t('INSPECT', 10, 0)]);
+    expect(x.inspect).toEqual([0, 10]);
+    expect(x.putaway).toEqual([0, 0]);
+    expect(x.sellable).toBe(false);
+  });
+  it('검사 끝·적치 3/10, 다 끝나면 판매 가능(격리 이동은 빼고)', () => {
+    expect(afterProgress([t('INSPECT', 10, 10), t('PUTAWAY', 10, 3)]).putaway).toEqual([3, 10]);
+    expect(afterProgress([t('INSPECT', 10, 10), t('PUTAWAY', 9, 9), t('QUARANTINE_MOVE', 1, 0)]).sellable).toBe(true);
   });
 });
 
