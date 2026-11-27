@@ -370,9 +370,14 @@ function CancellationForm({ dispatch }: { readonly dispatch: DispatchView }) {
   const api = useApi();
   const deliveryId = dispatch.deliveryId ?? '';
   const refresh = useRefresh(deliveryId);
-  const [reason, setReason] = useState<CancelReason>('OPERATOR');
+  // 사유는 직접 고른다 — 기본이 "운영 판단"이면 승인 번호 없이 눌려 늘 422 APPROVAL_REQUIRED 였다(2026-11-27 사용자 캡처).
+  // 운영 판단(OPERATOR)은 approvalRef 필수(dispatch 0.3.2, BOD-1) — 통합 백오피스 배차 취소와 같게 승인 번호 칸을 보이고, 없으면 못 누른다.
+  const [reason, setReason] = useState<CancelReason | ''>('');
+  const [approvalRef, setApprovalRef] = useState('');
   const [reassign, setReassign] = useState(true);
-  const cancel = useCommand(async (body: { requestedBy: 'OPERATOR'; reason: CancelReason; reassign: boolean }, key) => {
+  const needsApproval = reason === 'OPERATOR';
+  const ready = reason !== '' && (!needsApproval || approvalRef.trim() !== '');
+  const cancel = useCommand(async (body: { requestedBy: 'OPERATOR'; reason: CancelReason; reassign: boolean; approvalRef?: string }, key) => {
     try {
       return settled(
         await request(
@@ -391,11 +396,14 @@ function CancellationForm({ dispatch }: { readonly dispatch: DispatchView }) {
     <ActionBox
       title={a.cancelTitle}
       intro={a.cancelIntro}
-      onSubmit={() => void cancel.run({ requestedBy: 'OPERATOR', reason, reassign })}
+      onSubmit={() => {
+        if (reason === '' || !ready) return;
+        void cancel.run({ requestedBy: 'OPERATOR', reason, reassign, ...(needsApproval ? { approvalRef: approvalRef.trim() } : {}) });
+      }}
       footer={
         <>
           <div className="flex justify-end">
-            <button type="submit" className="btn btn-sm btn-warning w-24" disabled={cancel.busy || cancel.phase.kind === 'done'}>
+            <button type="submit" className="btn btn-sm btn-warning w-24" disabled={!ready || cancel.busy || cancel.phase.kind === 'done'}>
               {a.cancel}
             </button>
           </div>
@@ -406,7 +414,8 @@ function CancellationForm({ dispatch }: { readonly dispatch: DispatchView }) {
       }
     >
       <Field name={a.cancelReason}>
-        <select className="select select-sm w-48" value={reason} onChange={(e) => setReason(e.target.value as CancelReason)}>
+        <select className="select select-sm w-48" value={reason} onChange={(e) => setReason(e.target.value as CancelReason | '')}>
+          <option value="">{a.cancelReasonPick}</option>
           {(Object.keys(a.cancelReasonName) as CancelReason[]).map((x) => (
             <option key={x} value={x}>
               {a.cancelReasonName[x]}
@@ -414,6 +423,12 @@ function CancellationForm({ dispatch }: { readonly dispatch: DispatchView }) {
           ))}
         </select>
       </Field>
+      {needsApproval && (
+        <Field name={a.approvalRef}>
+          <input className="input input-sm w-48" value={approvalRef} onChange={(e) => setApprovalRef(e.target.value)} aria-label={a.approvalRef} />
+          {!approvalRef.trim() && <p className="mt-1 text-xs text-warning">{a.approvalRefRequired}</p>}
+        </Field>
+      )}
       <label className="flex items-center gap-2 sm:pl-[8.75rem]">
         <input type="checkbox" className="checkbox checkbox-sm" checked={reassign} onChange={(e) => setReassign(e.target.checked)} />
         {a.reassign}

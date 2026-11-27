@@ -393,9 +393,12 @@ export const opsHandlers = [
     }
     return idempotent(request, () => applied(`REV-${nextSeq()}`));
   }),
-  http.post(`${API_BASE}/deliveries/:deliveryId/assignment-cancellations`, ({ request }) => {
+  http.post(`${API_BASE}/deliveries/:deliveryId/assignment-cancellations`, async ({ request }) => {
     const g = guard(request);
     if ('error' in g) return g.error;
+    // 계약(dispatch 0.3.2, BOD-1): 운영자 사유 OPERATOR 는 approvalRef 필수 — 없으면 422 APPROVAL_REQUIRED(실서버와 같게)
+    const body = (await request.clone().json()) as { reason?: string; approvalRef?: string };
+    if (body.reason === 'OPERATOR' && !body.approvalRef?.trim()) return problem(422, 'APPROVAL_REQUIRED');
     return idempotent(request, () => applied(`CAN-${nextSeq()}`));
   }),
 
