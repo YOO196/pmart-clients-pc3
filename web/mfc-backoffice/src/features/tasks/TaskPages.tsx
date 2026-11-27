@@ -439,7 +439,7 @@ function TaskFacts({ task: t }: { readonly task: TaskDetail }) {
     [m.fields.routeMethod, t.routeMethod ? (m.route[t.routeMethod] ?? t.routeMethod) : messages.none],
   ];
   return (
-    <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm">
+    <dl className="pm-kv grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm">
       {rows.map(([k, v]) => (
         <div key={k} className="contents">
           <dt className="opacity-70">{k}</dt>

@@ -552,7 +552,7 @@ function PlanView({ mfcId, plan }: { readonly mfcId: string; readonly plan: Plan
           {notice}
         </p>
       )}
-      <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm">
+      <dl className="pm-kv grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm">
         <dt className="opacity-70">{m.solver}</dt>
         <dd>{plan.solverStatus ?? messages.none}</dd>
         <dt className="opacity-70">{m.horizonShown}</dt>

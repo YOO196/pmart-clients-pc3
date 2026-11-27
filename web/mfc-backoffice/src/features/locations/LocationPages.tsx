@@ -524,7 +524,7 @@ function LocationInline({ location: l }: { readonly location: Location }) {
     [m.fields.positionZ, l.position ? l.position.zM : messages.none],
   ];
   return (
-    <dl className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-x-6 gap-y-3 text-sm">
+    <dl className="pm-kv-tiles grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-x-6 gap-y-3 text-sm">
       {rows.map(([k, v]) => (
         <div key={k} className="min-w-0">
           <dt>{k}</dt>
@@ -558,7 +558,7 @@ function Attributes({ location: l }: { readonly location: Location }) {
   return (
     <div className="rounded-box bg-base-100 p-4">
       <h2 className="mb-2 font-semibold">{m.attributes}</h2>
-      <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 text-sm">
+      <dl className="pm-kv grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 text-sm">
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
             <dt className="opacity-70">{k}</dt>

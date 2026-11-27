@@ -297,7 +297,7 @@ function WorkerInline({ worker: w }: { readonly worker: Worker }) {
     [m.fields.registered, w.registeredAt ? <WhoAt id={w.registeredBy} at={formatSeoul(w.registeredAt)} /> : messages.none],
   ];
   return (
-    <dl className="grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-6 gap-y-3 text-sm">
+    <dl className="pm-kv-tiles grid grid-cols-[repeat(auto-fill,minmax(12rem,1fr))] gap-x-6 gap-y-3 text-sm">
       {rows.map(([k, v]) => (
         <div key={k} className="min-w-0">
           <dt className="text-xs text-base-content/60">{k}</dt>
@@ -599,7 +599,7 @@ function WorkerFacts({ worker: w }: { readonly worker: WorkerDetail }) {
     [m.fields.registered, w.registeredAt ? <WhoAt id={w.registeredBy} at={formatSeoul(w.registeredAt)} /> : messages.none],
   ];
   return (
-    <dl className="grid grid-cols-[11rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm">
+    <dl className="pm-kv grid grid-cols-[11rem_1fr] gap-x-4 gap-y-1 rounded-box bg-base-100 p-4 text-sm">
       {rows.map(([k, v]) => (
         <div key={k} className="contents">
           <dt className="opacity-70">{k}</dt>
