@@ -146,7 +146,19 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
                           {on.data && (here > 0 ? <span className="badge badge-sm badge-success">{m.here}</span> : <span className="badge badge-sm badge-ghost">{m.notHere}</span>)}
                         </span>
                       </label>
-                      {on.data && <HandlingToggle mfcId={mfcId} productId={id} name={p.internalName ?? id} on={here > 0} discontinued={discontinued} />}
+                      {on.data && <HandlingToggle
+                          mfcId={mfcId}
+                          productId={id}
+                          name={p.internalName ?? id}
+                          on={here > 0}
+                          discontinued={discontinued}
+                          group={picked.has(id) && picked.size > 1 ? picked.size : 0}
+                          onGroup={(enabled) => {
+                            if (bulkCmd.phase.kind === 'rejected' || bulkCmd.phase.kind === 'done') bulkCmd.reset();
+                            void bulkCmd.run({ ids: [...picked], enabled });
+                          }}
+                          groupBusy={bulkCmd.busy}
+                        />}
                     </li>
                   );
                 })}
@@ -187,7 +199,19 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
                             <span className={`badge badge-sm ${discontinued ? 'badge-error' : p.saleState === 'TEMPORARILY_SOLD_OUT' ? 'badge-warning' : 'badge-ghost'}`}>{m.saleName[p.saleState ?? ''] ?? p.saleState}</span>
                           </td>
                           <td>{on.isError ? m.hereFailed : !on.data ? '…' : here > 0 ? <span className="badge badge-sm badge-success">{m.here}</span> : <span className="badge badge-sm badge-ghost">{m.notHere}</span>}</td>
-                          <td>{on.data && <HandlingToggle mfcId={mfcId} productId={id} name={p.internalName ?? id} on={here > 0} discontinued={discontinued} />}</td>
+                          <td>{on.data && <HandlingToggle
+                          mfcId={mfcId}
+                          productId={id}
+                          name={p.internalName ?? id}
+                          on={here > 0}
+                          discontinued={discontinued}
+                          group={picked.has(id) && picked.size > 1 ? picked.size : 0}
+                          onGroup={(enabled) => {
+                            if (bulkCmd.phase.kind === 'rejected' || bulkCmd.phase.kind === 'done') bulkCmd.reset();
+                            void bulkCmd.run({ ids: [...picked], enabled });
+                          }}
+                          groupBusy={bulkCmd.busy}
+                        />}</td>
                         </tr>
                       );
                     })}
@@ -205,20 +229,6 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
         )}
       </QueryState>
       <div className="flex flex-wrap items-center gap-3">
-        {[true, false].map((enabled) => (
-          <button
-            key={String(enabled)}
-            type="button"
-            className={`btn btn-sm ${enabled ? 'btn-primary' : ''}`}
-            disabled={picked.size === 0 || bulkCmd.busy}
-            onClick={() => {
-              if (bulkCmd.phase.kind === 'rejected' || bulkCmd.phase.kind === 'done') bulkCmd.reset();
-              void bulkCmd.run({ ids: [...picked], enabled });
-            }}
-          >
-            {enabled ? m.submit(picked.size) : m.submitOff(picked.size)}
-          </button>
-        ))}
         <CommandFeedback command={bulkCmd}>
           {(r) => (
             <p role="status" className="text-sm text-success">
@@ -232,7 +242,26 @@ export function CatalogProducts({ mfcId }: { readonly mfcId: string }) {
 }
 
 /** 한 상품의 이 센터 취급 켜기·끄기 — 상품의 SKU 전부를 일괄 API 로(켤 때는 판매 중지 SKU 빼고). 결과는 서버 응답(changedCount)으로만. */
-function HandlingToggle({ mfcId, productId, name, on, discontinued }: { readonly mfcId: string; readonly productId: string; readonly name: string; readonly on: boolean; readonly discontinued: boolean }) {
+function HandlingToggle({
+  mfcId,
+  productId,
+  name,
+  on,
+  discontinued,
+  group = 0,
+  onGroup,
+  groupBusy = false,
+}: {
+  readonly mfcId: string;
+  readonly productId: string;
+  readonly name: string;
+  readonly on: boolean;
+  readonly discontinued: boolean;
+  /** 이 줄이 고른 상품 중 하나면 고른 수(2 이상) — 누르면 고른 상품 전부를 같은 상태로 */
+  readonly group?: number;
+  readonly onGroup?: (enabled: boolean) => void;
+  readonly groupBusy?: boolean;
+}) {
   const api = useApi();
   const queryClient = useQueryClient();
   const cmd = useCommand(async (next: boolean, key) => {
@@ -252,14 +281,18 @@ function HandlingToggle({ mfcId, productId, name, on, discontinued }: { readonly
       <button
         type="button"
         className="btn btn-xs"
-        aria-label={m.toggleLabel(name, !on)}
-        disabled={cmd.busy || (!on && discontinued)}
+        aria-label={group > 1 ? m.groupLabel(group, !on) : m.toggleLabel(name, !on)}
+        disabled={cmd.busy || groupBusy || (!on && discontinued && group <= 1)}
         onClick={() => {
+          if (group > 1 && onGroup) {
+            onGroup(!on);
+            return;
+          }
           if (cmd.phase.kind === 'rejected' || cmd.phase.kind === 'done') cmd.reset();
           void cmd.run(!on);
         }}
       >
-        {on ? messages.inventory.turnOff : messages.inventory.turnOn}
+        {group > 1 ? m.groupButton(group, !on) : on ? messages.inventory.turnOff : messages.inventory.turnOn}
       </button>
       <CommandFeedback command={cmd}>
         {(r) => (
