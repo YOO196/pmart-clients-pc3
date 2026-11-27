@@ -35,7 +35,7 @@ describe('상품 관리 — 본사 상품 연동', () => {
     await waitFor(() => expect(rows().length).toBeGreaterThan(0));
     await userEvent.click(within(rowOf('생수 2L')).getByRole('checkbox'));
     await userEvent.click(within(rowOf('그릭요거트 플레인')).getByRole('checkbox'));
-    await userEvent.click(screen.getByRole('button', { name: '선택한 2개 이 센터에서 판매' }));
+    await userEvent.click(screen.getByRole('button', { name: '선택한 2개 켜기' }));
     expect(await screen.findByText('3개 SKU 중 3개를 켰어요(이미 켜진 것은 그대로).')).toBeInTheDocument();
     const post = view.sent.find((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith('/sku-handling-batches'))!;
     const body = (await post.clone().json()) as { items: { sku: string; enabled: boolean }[] };
@@ -47,11 +47,29 @@ describe('상품 관리 — 본사 상품 연동', () => {
     await waitFor(() => expect(within(rowOf('생수 2L')).getByText('취급 중')).toBeInTheDocument());
   });
 
+  it('머리 칸 체크로 보이는 상품 모두 고르기 → 한꺼번에 끈다(enabled false), 다시 누르면 모두 풀기', async () => {
+    const view = renderAt('/c/MFC-BJG-01/products');
+    await waitFor(() => expect(within(rowOf('서울우유 1L')).getByText('취급 중')).toBeInTheDocument());
+    expect(screen.queryByRole('columnheader', { name: '고르기' })).toBeNull();
+    const all = screen.getByRole('checkbox', { name: '보이는 상품 모두 고르기' });
+    await userEvent.click(all);
+    expect(rows().every((r) => within(r).getByRole<HTMLInputElement>('checkbox').checked)).toBe(true);
+    await userEvent.click(all);
+    expect(rows().some((r) => within(r).getByRole<HTMLInputElement>('checkbox').checked)).toBe(false);
+    await userEvent.click(within(rowOf('서울우유 1L')).getByRole('checkbox'));
+    await userEvent.click(screen.getByRole('button', { name: '선택한 1개 끄기' }));
+    expect(await screen.findByText(/개를 껐어요/)).toBeInTheDocument();
+    const post = view.sent.find((r) => r.method === 'POST' && new URL(r.url).pathname.endsWith('/sku-handling-batches'))!;
+    const body = (await post.clone().json()) as { items: { sku: string; enabled: boolean }[] };
+    expect(body.items.every((i) => !i.enabled)).toBe(true);
+    await waitFor(() => expect(within(rowOf('서울우유 1L')).getByText('안 함')).toBeInTheDocument());
+  });
+
   it('켤 수 없는 SKU 가 섞이면 서버가 전부 거절 — 아무것도 바뀌지 않음을 알린다', async () => {
     await open();
     await userEvent.click(within(rowOf('옛 묶음 상품')).getByRole('checkbox'));
     await userEvent.click(within(rowOf('생수 2L')).getByRole('checkbox'));
-    await userEvent.click(screen.getByRole('button', { name: '선택한 2개 이 센터에서 판매' }));
+    await userEvent.click(screen.getByRole('button', { name: '선택한 2개 켜기' }));
     expect(await screen.findByText(/아무것도 바꾸지 않았어요/)).toBeInTheDocument();
     expect(db.handlings.find((h) => h.sku === 'SKU-WATER-2L')!.handlingEnabled).toBe(false);
   });
@@ -76,7 +94,7 @@ describe('상품 관리 — 본사 상품 연동', () => {
     const water = cards.find((c) => c.textContent?.includes('생수 2L'))!;
     expect(water.querySelector('img')).not.toBeNull();
     await userEvent.click(within(water).getByRole('checkbox'));
-    await userEvent.click(screen.getByRole('button', { name: '선택한 1개 이 센터에서 판매' }));
+    await userEvent.click(screen.getByRole('button', { name: '선택한 1개 켜기' }));
     expect(await screen.findByText('2개 SKU 중 2개를 켰어요(이미 켜진 것은 그대로).')).toBeInTheDocument();
     // SKU별 취급 목록도 같은 보기(?view=card) — 카드형
     await userEvent.click(screen.getByRole('radio', { name: 'SKU별 취급' }));
