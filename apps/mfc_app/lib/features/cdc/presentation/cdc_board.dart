@@ -33,6 +33,10 @@ final cdcBoardProvider = FutureProvider.autoDispose<CdcBoard>((ref) {
 });
 
 /// 업무 칸의 대기 수(못 읽었거나 아직이면 null)
+/// 업무 칸에 보일 대기 건 번호(T…·W…) — 없으면 빈 목록
+List<String> cdcWaitingNumbersOf(CdcBoard? b, CdcWorkArea a) =>
+    b?.numbers[a.name] ?? const [];
+
 int? cdcWaitingOf(CdcBoard? b, CdcWorkArea a) => switch (a) {
   CdcWorkArea.pick => b?.pick,
   CdcWorkArea.distribute => b?.distribute,

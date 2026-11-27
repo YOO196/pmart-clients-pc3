@@ -21,7 +21,12 @@ class CdcBoard {
     required this.load,
     required this.done,
     required this.holding,
+    this.numbers = const {},
   });
+
+  /// 업무별 대기 건의 화면 번호 — 피킹은 Wave(W…), 분배·검품·상차는 TRF(T…). 키 'pick'·'distribute'·'inspect'·'load'.
+  /// (사용자 2026-11-27 "상차 대기 1 인데 무슨 TRF 인지 모르겠다")
+  final Map<String, List<String>> numbers;
 
   final int? pick;
   final int? distribute;
@@ -114,14 +119,21 @@ final class ApiCdcBoardRepository implements CdcBoardRepository {
     return out;
   }
 
-  Future<int> _transfers(String cdcId, String state) async {
+  Future<(int, List<String>)> _transfers(String cdcId, String state) async {
     final r = await pmartGuard(
       () => _views.listCenterTransfers(cdcId: cdcId, state: state, size: 200),
     );
-    return r.data?.items.length ?? 0;
+    final items = r.data?.items ?? const <co.TransferSummary>[];
+    return (
+      items.length,
+      [
+        for (final t in items)
+          if (t.trfNumber case final n? when n.isNotEmpty) n,
+      ],
+    );
   }
 
-  Future<int> _pickWaiting(String cdcId) async {
+  Future<(int, List<String>)> _pickWaiting(String cdcId) async {
     final waves = <String>{};
     for (final st in [co.WaveState.RELEASED, co.WaveState.IN_PROGRESS]) {
       final r = await pmartGuard(
@@ -131,19 +143,25 @@ final class ApiCdcBoardRepository implements CdcBoardRepository {
         if (w.waveId case final id?) waves.add(id);
       }
     }
-    if (waves.isEmpty) return 0;
+    if (waves.isEmpty) return (0, const <String>[]);
     final created = await _allTasks(cdcId, state: co.TaskState.CREATED);
-    return created
-        .where(
-          (t) =>
-              t.kind == co.TaskKindEnum.PICK &&
-              (t.assigneeId ?? '').isEmpty &&
-              waves.contains(t.waveId),
-        )
-        .length;
+    final open = [
+      for (final t in created)
+        if (t.kind == co.TaskKindEnum.PICK &&
+            (t.assigneeId ?? '').isEmpty &&
+            waves.contains(t.waveId))
+          t,
+    ];
+    return (
+      open.length,
+      {
+        for (final t in open)
+          if (t.waveNumber case final n? when n.isNotEmpty) n,
+      }.toList(),
+    );
   }
 
-  Future<int> _loadWaiting(String cdcId) async {
+  Future<(int, List<String>)> _loadWaiting(String cdcId) async {
     final r = await pmartGuard(
       () => _trips.listCenterTrips(
         cdcId: cdcId,
@@ -151,7 +169,16 @@ final class ApiCdcBoardRepository implements CdcBoardRepository {
         size: 200,
       ),
     );
-    return r.data?.items.length ?? 0;
+    final trips = r.data?.items ?? const <te.Trip>[];
+    return (
+      trips.length,
+      [
+        for (final t in trips)
+          for (final s in t.stops)
+            for (final n in s.trfNumbers ?? const <String>[])
+              if (n.isNotEmpty) n,
+      ],
+    );
   }
 
   static CdcWorkItem _item(co.Task t) => CdcWorkItem(
@@ -204,11 +231,21 @@ final class ApiCdcBoardRepository implements CdcBoardRepository {
     ]);
     final done = results[4] as List<co.Task>?;
     final holding = results[5] as List<co.Task>?;
+    final pick = results[0] as (int, List<String>)?;
+    final distribute = results[1] as (int, List<String>)?;
+    final inspect = results[2] as (int, List<String>)?;
+    final load = results[3] as (int, List<String>)?;
     return CdcBoard(
-      pick: results[0] as int?,
-      distribute: results[1] as int?,
-      inspect: results[2] as int?,
-      load: results[3] as int?,
+      pick: pick?.$1,
+      distribute: distribute?.$1,
+      inspect: inspect?.$1,
+      load: load?.$1,
+      numbers: {
+        'pick': ?pick?.$2,
+        'distribute': ?distribute?.$2,
+        'inspect': ?inspect?.$2,
+        'load': ?load?.$2,
+      },
       done: done == null
           ? null
           : ([
@@ -239,6 +276,12 @@ final class MockCdcBoardRepository implements CdcBoardRepository {
       distribute: 1,
       inspect: 1,
       load: 1,
+      numbers: const {
+        'pick': ['W6307'],
+        'distribute': ['T482915'],
+        'inspect': ['T482914'],
+        'load': ['T482913', 'T482914'],
+      },
       holding: const [],
       done: [
         CdcWorkItem(

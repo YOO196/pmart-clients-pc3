@@ -64,6 +64,9 @@ void main() {
 
     // 업무마다 대기 수(서버 값 — 목: 피킹 2·분배 1·검품 1·상차 1), 오늘 작업 건수 → 누르면 내역(작업·TRF 번호)
     expect(find.byKey(const ValueKey('cdc-waiting-pick')), findsOneWidget);
+    // 대기 건 번호 — 상차는 실을 TRF, 피킹은 Wave
+    expect(find.text('T482913 · T482914'), findsOneWidget);
+    expect(find.text('W6307'), findsOneWidget);
     expect(find.text('대기 2'), findsOneWidget);
     expect(find.text('2건'), findsOneWidget);
     await t.tap(find.byKey(const ValueKey('cdc-today')));

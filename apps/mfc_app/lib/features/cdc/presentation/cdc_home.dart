@@ -161,6 +161,10 @@ class CdcHomeScreen extends ConsumerWidget {
                                 ref.watch(cdcBoardProvider).value,
                                 a,
                               ),
+                              numbers: cdcWaitingNumbersOf(
+                                ref.watch(cdcBoardProvider).value,
+                                a,
+                              ),
                               onTap: () async {
                                 await context.push('/cdc/guide/${a.name}');
                                 ref.invalidate(cdcBoardProvider);
@@ -187,10 +191,14 @@ class _CdcAreaTile extends StatelessWidget {
     required this.height,
     required this.onTap,
     this.waiting,
+    this.numbers = const [],
   });
 
   final CdcWorkArea area;
   final double height;
+
+  /// 대기 건 화면 번호(T…·W…) — 있으면 설명 대신 보인다
+  final List<String> numbers;
 
   /// 대기 수(서버 값, 못 읽으면 null)
   final int? waiting;
@@ -254,7 +262,19 @@ class _CdcAreaTile extends StatelessWidget {
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            if (height >= 68)
+                            if (numbers.isNotEmpty)
+                              Text(
+                                numbers.join(' · '),
+                                key: ValueKey('cdc-waiting-no-${area.name}'),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: PdaColors.primary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              )
+                            else if (height >= 68)
                               Text(
                                 cdcAreaDesc(l10n, area),
                                 maxLines: 1,
